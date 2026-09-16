@@ -63,6 +63,7 @@ export async function updateDeal(dealId: string, formData: FormData) {
   const contactName = String(formData.get("contactName") || "") || null;
   const contactEmail = String(formData.get("contactEmail") || "") || null;
   const contactPhone = String(formData.get("contactPhone") || "") || null;
+  const invoiceEmail = String(formData.get("invoiceEmail") || "").trim() || null;
   const ownerId = String(formData.get("ownerId") || "");
   const stage = String(formData.get("stage") || "LEAD") as DealStage;
   const meetingDateRaw = String(formData.get("meetingDate") || "");
@@ -109,6 +110,7 @@ export async function updateDeal(dealId: string, formData: FormData) {
       contactName,
       contactEmail,
       contactPhone,
+      invoiceEmail,
       ownerId,
       stage,
       meetingDate,
@@ -197,6 +199,57 @@ export async function setMeetingDateAndStage(dealId: string, meetingDateIso: str
 
   revalidatePath("/deals");
   revalidatePath(`/deals/${dealId}`);
+}
+
+export async function markDealLost(dealId: string) {
+  await requireUser();
+  await prisma.deal.update({ where: { id: dealId }, data: { stage: "LOST" } });
+  revalidatePath("/deals");
+  revalidatePath(`/deals/${dealId}`);
+}
+
+/**
+ * Permanently deletes a deal and everything tied to it (notes, emails,
+ * invoices, commission, items, renewal history) via cascade. Admin-only -
+ * this can't be undone.
+ */
+export async function deleteDeal(dealId: string) {
+  const user = await requireUser();
+  if (user.role !== "ADMIN") throw new Error("Kun admin kan slette en deal.");
+  await prisma.deal.delete({ where: { id: dealId } });
+  revalidatePath("/deals");
+  redirect("/deals");
+}
+
+/**
+ * Groups a deal under another deal (customer) as a branch/department - e.g.
+ * several locations of the same chain shown together - without merging any
+ * actual data: each branch keeps its own CVR number, contract, invoicing
+ * and commission entirely independently.
+ */
+export async function linkDealToParent(dealId: string, formData: FormData) {
+  await requireUser();
+  const parentDealId = String(formData.get("parentDealId") || "");
+  if (!parentDealId) throw new Error("Vælg en kunde at kæde sammen med.");
+  if (parentDealId === dealId) throw new Error("En deal kan ikke kædes sammen med sig selv.");
+
+  const parent = await prisma.deal.findUniqueOrThrow({ where: { id: parentDealId } });
+  if (parent.parentDealId) {
+    throw new Error("Den valgte kunde er allerede en afdeling af en anden kunde.");
+  }
+
+  await prisma.deal.update({ where: { id: dealId }, data: { parentDealId } });
+  revalidatePath(`/deals/${dealId}`);
+  revalidatePath(`/deals/${parentDealId}`);
+  redirect(`/deals/${dealId}?saved=Kunde%20sammenkædet`);
+}
+
+export async function unlinkDealFromParent(dealId: string) {
+  await requireUser();
+  const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId } });
+  await prisma.deal.update({ where: { id: dealId }, data: { parentDealId: null } });
+  revalidatePath(`/deals/${dealId}`);
+  if (deal.parentDealId) revalidatePath(`/deals/${deal.parentDealId}`);
 }
 
 export async function addNote(dealId: string, formData: FormData) {

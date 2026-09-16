@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { disconnectEmailAccount } from "@/lib/actions/email";
 import { isGoogleConfigured, isMicrosoftConfigured } from "@/lib/email-oauth";
 import { formatDate } from "@/lib/labels";
+import { SyncNowButton } from "./sync-now-button";
 
 const errorMessages: Record<string, string> = {
   google_not_configured: "Google-integration er ikke konfigureret endnu (mangler GOOGLE_CLIENT_ID/SECRET).",
@@ -120,10 +121,23 @@ export default async function EmailSettingsPage({
         )}
       </section>
 
+      {google && (
+        <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 className="text-sm font-semibold text-slate-900">Indgående mails</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Mails der ankommer i Gmail-indbakken fra en deals kontaktperson (feltet &quot;E-mail&quot; på dealen)
+            matches automatisk og vises på dealen. Kører automatisk hver 4. time, eller kør det manuelt her:
+          </p>
+          <div className="mt-3">
+            <SyncNowButton />
+          </div>
+        </section>
+      )}
+
       <p className="text-xs text-slate-400">
-        Når I har oprettet OAuth-app'erne, tilføjer I nøglerne i serverens miljøvariabler (.env) og genstarter.
-        Selve synkroniseringen af indgående mails (matching på deal-mailadresse) færdiggøres og testes, når
-        adgangen er på plads.
+        Når I har oprettet OAuth-app&apos;erne, tilføjer I nøglerne i serverens miljøvariabler (.env) og genstarter.
+        Indgående mail-matching virker for Gmail. Outlook-forbindelsen (login + kalender) virker, men mail-matching
+        for Outlook er endnu ikke bygget.
       </p>
     </div>
   );

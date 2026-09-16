@@ -13,7 +13,7 @@ type DealItem = {
   isFree: boolean;
 };
 
-const PRODUCT_SUGGESTIONS = ["Hjemmeside", "Virtuel tour (Matterport)", "Drone", "Visitkort"];
+const PRODUCT_SUGGESTIONS = ["Visitkort", "Drone-optagelse", "Matterport", "Hjemmeside"];
 
 function RemoveItemButton({ dealId, itemId }: { dealId: string; itemId: string }) {
   const [pending, startTransition] = useTransition();

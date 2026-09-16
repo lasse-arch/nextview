@@ -131,7 +131,7 @@ export async function runQuarterlyInvoiceGeneration(): Promise<InvoiceRunSummary
           existingContactGuid: deal.dineroContactGuid,
           companyName: deal.companyName,
           cvrNumber: deal.cvrNumber,
-          contactEmail: deal.contactEmail,
+          contactEmail: deal.invoiceEmail || deal.contactEmail,
           address: deal.address,
           description: line.description,
           amount: line.amount,

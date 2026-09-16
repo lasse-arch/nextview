@@ -138,9 +138,18 @@ model Deal {
   contactName String?
   contactEmail String?
   contactPhone String?
+  /// Where invoices should be sent, if different from contactEmail (e.g. an accounting inbox).
+  invoiceEmail String?
 
   owner   User   @relation("DealOwner", fields: [ownerId], references: [id])
   ownerId String
+
+  /// Links this deal as a branch/department of another deal (customer) - e.g.
+  /// several locations of the same chain - while each keeps its own CVR
+  /// number, contract, and invoicing independently.
+  parent    Deal?  @relation("DealBranches", fields: [parentDealId], references: [id])
+  parentDealId String?
+  branches  Deal[] @relation("DealBranches")
 
   stage DealStage @default(LEAD)
 

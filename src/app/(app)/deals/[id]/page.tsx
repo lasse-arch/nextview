@@ -23,6 +23,8 @@ import { InactiveToggleButton } from "./inactive-toggle-button";
 import { RenewalSection } from "./renewal-section";
 import { TerminationSection } from "./termination-section";
 import { DealItemsSection } from "./deal-items-section";
+import { DealDangerActions } from "./danger-actions";
+import { CustomerLinkSection } from "./customer-link-section";
 
 function toDateInputValue(date: Date | null): string {
   if (!date) return "";
@@ -51,6 +53,8 @@ export default async function DealDetailPage({
         invoices: { orderBy: { quarterIndex: "asc" } },
         contractRenewals: { orderBy: { renewedAt: "desc" } },
         items: { orderBy: { createdAt: "asc" } },
+        parent: true,
+        branches: { orderBy: { companyName: "asc" } },
       },
     }),
     prisma.user.findMany({ orderBy: { name: "asc" } }),
@@ -58,6 +62,12 @@ export default async function DealDetailPage({
     dup ? prisma.deal.findUnique({ where: { id: dup } }) : Promise.resolve(null),
     isPandaDocConfigured(),
   ]);
+
+  const linkableDeals = await prisma.deal.findMany({
+    where: { id: { not: id }, parentDealId: null },
+    select: { id: true, companyName: true, displayName: true },
+    orderBy: { companyName: "asc" },
+  });
 
   if (!deal) notFound();
 
@@ -82,7 +92,10 @@ export default async function DealDetailPage({
             {deal.importBatch?.fileName ? ` (${deal.importBatch.fileName})` : ""}
           </p>
         </div>
-        <InactiveToggleButton dealId={deal.id} isChurned={Boolean(deal.churnedAt)} />
+        <div className="flex items-center gap-2">
+          <InactiveToggleButton dealId={deal.id} isChurned={Boolean(deal.churnedAt)} />
+          <DealDangerActions dealId={deal.id} stage={deal.stage} isAdmin={currentUser?.role === "ADMIN"} />
+        </div>
       </div>
 
       {duplicateDeal && (
@@ -163,6 +176,16 @@ export default async function DealDetailPage({
                   <input
                     name="contactPhone"
                     defaultValue={deal.contactPhone ?? ""}
+                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-500">Faktura-e-mail (valgfri)</label>
+                  <input
+                    name="invoiceEmail"
+                    type="email"
+                    placeholder="Hvis fakturaer skal et andet sted hen end kontaktpersonen"
+                    defaultValue={deal.invoiceEmail ?? ""}
                     className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
                   />
                 </div>
@@ -498,6 +521,13 @@ export default async function DealDetailPage({
           />
 
           <RenewalSection dealId={deal.id} currentTermNumber={deal.currentTermNumber} renewals={deal.contractRenewals} />
+
+          <CustomerLinkSection
+            dealId={deal.id}
+            parent={deal.parent}
+            branches={deal.branches}
+            linkableDeals={linkableDeals}
+          />
         </div>
       </div>
     </div>

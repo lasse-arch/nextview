@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { stageLabels, importTypeLabels, formatDKK, formatDate, dealName } from "@/lib/labels";
 import { DealsBoard, type BoardDeal } from "./board-view";
+import { DealsListTable } from "./deals-list-table";
 import type { Prisma, DealStage, ImportType } from "@prisma/client";
 
 type SearchParams = {
@@ -22,7 +23,7 @@ export default async function DealsPage({
   searchParams: Promise<SearchParams>;
 }) {
   const params = await searchParams;
-  const isBoard = params.view === "board";
+  const isBoard = params.view !== "list";
 
   const where: Prisma.DealWhereInput = {};
   if (params.owner) where.ownerId = params.owner;
@@ -51,11 +52,11 @@ export default async function DealsPage({
   function toggleViewUrl(view: "list" | "board") {
     const sp = new URLSearchParams();
     if (params.owner) sp.set("owner", params.owner);
-    if (!isBoard && params.stage) sp.set("stage", params.stage);
+    if (view === "list" && params.stage) sp.set("stage", params.stage);
     if (params.importType) sp.set("importType", params.importType);
     if (params.importBatchId) sp.set("importBatchId", params.importBatchId);
     if (params.sort) sp.set("sort", params.sort);
-    if (view === "board") sp.set("view", "board");
+    if (view === "list") sp.set("view", "list");
     const qs = sp.toString();
     return qs ? `/deals?${qs}` : "/deals";
   }
@@ -109,7 +110,7 @@ export default async function DealsPage({
       )}
 
       <form method="get" className="mt-4 flex flex-wrap gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-        {isBoard && <input type="hidden" name="view" value="board" />}
+        {!isBoard && <input type="hidden" name="view" value="list" />}
         <select name="owner" defaultValue={params.owner ?? ""} className="rounded-md border border-slate-300 px-2 py-1.5 text-sm">
           <option value="">Alle ejere</option>
           {users.map((u) => (
@@ -161,7 +162,7 @@ export default async function DealsPage({
         <button type="submit" className="rounded-md border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-50">
           Filtrér
         </button>
-        <Link href={isBoard ? "/deals?view=board" : "/deals"} className="rounded-md px-3 py-1.5 text-sm text-slate-500 hover:text-slate-900">
+        <Link href={isBoard ? "/deals" : "/deals?view=list"} className="rounded-md px-3 py-1.5 text-sm text-slate-500 hover:text-slate-900">
           Nulstil
         </Link>
       </form>
@@ -171,49 +172,7 @@ export default async function DealsPage({
           <DealsBoard initialDeals={boardDeals} isAdmin={currentUser?.role === "ADMIN"} />
         </div>
       ) : (
-        <div className="mt-4 overflow-hidden rounded-lg border border-slate-200 bg-white">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-left text-slate-500">
-              <tr>
-                <th className="px-4 py-2 font-medium">Firma</th>
-                <th className="px-4 py-2 font-medium">Ejer</th>
-                <th className="px-4 py-2 font-medium">Stadie</th>
-                <th className="px-4 py-2 font-medium">Solgt for</th>
-                <th className="px-4 py-2 font-medium">Import</th>
-                <th className="px-4 py-2 font-medium">Oprettet</th>
-              </tr>
-            </thead>
-            <tbody>
-              {deals.map((deal) => (
-                <tr key={deal.id} className="border-t border-slate-100 hover:bg-slate-50">
-                  <td className="px-4 py-1.5">
-                    <Link href={`/deals/${deal.id}`} className="font-medium text-slate-900 hover:underline">
-                      {dealName(deal)}
-                    </Link>
-                    {deal.contactName && <span className="ml-2 text-xs text-slate-400">{deal.contactName}</span>}
-                    {deal.churnedAt && (
-                      <span className="ml-2 rounded-full bg-slate-200 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">
-                        Inaktiv
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-1.5 text-slate-600">{deal.owner.name}</td>
-                  <td className="px-4 py-1.5 text-slate-600">{stageLabels[deal.stage]}</td>
-                  <td className="px-4 py-1.5 text-slate-600">{formatDKK(deal.saleAmount)}</td>
-                  <td className="px-4 py-1.5 text-slate-600">{importTypeLabels[deal.importType]}</td>
-                  <td className="px-4 py-1.5 text-slate-600">{formatDate(deal.createdAt)}</td>
-                </tr>
-              ))}
-              {deals.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-slate-400">
-                    Ingen deals fundet.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        <DealsListTable deals={deals} />
       )}
     </div>
   );
