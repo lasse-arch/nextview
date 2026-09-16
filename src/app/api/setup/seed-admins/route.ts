@@ -22,7 +22,9 @@ const ADMINS = [
 export async function GET(request: NextRequest) {
   const secret = process.env.CRON_SECRET;
   const authHeader = request.headers.get("authorization");
-  if (!secret || authHeader !== `Bearer ${secret}`) {
+  const querySecret = request.nextUrl.searchParams.get("secret");
+  const authorized = secret && (authHeader === `Bearer ${secret}` || querySecret === secret);
+  if (!authorized) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
