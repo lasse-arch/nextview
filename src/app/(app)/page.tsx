@@ -1,6 +1,7 @@
 import { getCurrentUser } from "@/lib/auth";
 import { getDashboardData } from "@/lib/dashboard-data";
 import { stageLabels, invoiceStatusLabels, formatDKK } from "@/lib/labels";
+import { getQuoteOfTheDay } from "@/lib/quotes";
 
 const FUNNEL_SHADES = [
   "bg-blue-200",
@@ -48,6 +49,7 @@ export default async function DashboardPage() {
   const funnelMax = Math.max(1, ...data.funnel.map((f) => f.count));
   const monthlyMax = Math.max(1, ...data.monthly.map((m) => m.value));
   const totalInvoices = data.invoiceStatuses.reduce((s, i) => s + i.count, 0);
+  const quote = getQuoteOfTheDay();
 
   return (
     <div className="space-y-6">
@@ -58,6 +60,11 @@ export default async function DashboardPage() {
             ? "Overblik over pipeline, salg, provision og fakturering"
             : "Overblik over din pipeline, salg og provision"}
         </p>
+      </div>
+
+      <div className="rounded-xl border border-slate-200 bg-gradient-to-r from-slate-900 to-slate-700 px-5 py-4 text-white shadow-sm">
+        <p className="text-sm italic leading-relaxed">&ldquo;{quote.text}&rdquo;</p>
+        <p className="mt-1 text-xs text-slate-300">— {quote.author}</p>
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
