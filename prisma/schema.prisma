@@ -1,0 +1,279 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  SALES
+}
+
+enum CommissionFrequency {
+  MONTHLY
+  QUARTERLY
+  ONE_TIME
+}
+
+enum ImportType {
+  MANUAL
+  CSV
+  GOOGLE_DOCS
+}
+
+enum DealStage {
+  LEAD
+  CONTACTED
+  MEETING_BOOKED
+  CONTRACT_SENT
+  CONTRACT_SIGNED
+  FILMED
+  LIVE
+  LOST
+}
+
+enum NoteKind {
+  MANUAL
+  AI_MEETING
+}
+
+enum CommissionStatus {
+  PENDING
+  DUE
+  PAID
+}
+
+enum EmailProvider {
+  GOOGLE
+  MICROSOFT
+}
+
+enum EmailDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum ContractStatus {
+  NONE
+  SENT
+  VIEWED
+  SIGNED
+  DECLINED
+  VOIDED
+}
+
+enum InvoiceStatus {
+  PENDING
+  DRAFT_CREATED
+  FAILED
+  /// Historical period from before the deal was imported into the CRM -
+  /// already handled by the previous system, intentionally not drafted in Dinero.
+  IMPORTED
+}
+
+model Invoice {
+  id     String @id @default(cuid())
+  deal   Deal   @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  dealId String
+
+  termNumber Int @default(1)
+  /// 0 = one-time establishment fee for this term, 1+ = recurring quarter number
+  quarterIndex  Int
+  amount        Int
+  scheduledDate DateTime
+  status        InvoiceStatus @default(PENDING)
+
+  dineroInvoiceGuid   String? @unique
+  dineroInvoiceNumber String?
+  failureReason       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([dealId, termNumber, quarterIndex])
+}
+
+model User {
+  id                String               @id @default(cuid())
+  name              String
+  email             String               @unique
+  passwordHash      String
+  role              Role                 @default(SALES)
+  isCommissionBased Boolean              @default(true)
+  commissionRate    Float                @default(10)
+  payoutFrequency   CommissionFrequency  @default(MONTHLY)
+  createdAt         DateTime             @default(now())
+
+  deals        Deal[]         @relation("DealOwner")
+  notes        Note[]
+  importBatches ImportBatch[]
+  commissions  Commission[]
+  emailAccounts EmailAccount[]
+}
+
+model ImportBatch {
+  id           String     @id @default(cuid())
+  importType   ImportType
+  fileName     String?
+  sourceUrl    String?
+  importedBy   User       @relation(fields: [importedById], references: [id])
+  importedById String
+  createdAt    DateTime   @default(now())
+
+  deals Deal[]
+}
+
+model Deal {
+  id          String   @id @default(cuid())
+  companyName String
+  cvrNumber   String?
+  address     String?
+  contactName String?
+  contactEmail String?
+  contactPhone String?
+
+  owner   User   @relation("DealOwner", fields: [ownerId], references: [id])
+  ownerId String
+
+  stage DealStage @default(LEAD)
+
+  meetingDate           DateTime?
+  googleCalendarEventId String?   @unique
+
+  soldProduct   String?
+  bindingMonths Int?
+  saleAmount    Int?
+  soldAt        DateTime?
+  filmedAt      DateTime?
+  liveAt        DateTime?
+  churnedAt     DateTime?
+
+  /// When the current contract term's billing clock starts (set when the
+  /// deal first goes Live; reset to the renewal date on each renewal).
+  billingStartDate DateTime?
+
+  contractLink      String?
+  establishmentFee  Int?
+  currentTermNumber Int     @default(1)
+
+  /// Notice period required to terminate (months). Editable per deal;
+  /// most contracts use 6 months.
+  noticePeriodMonths  Int       @default(6)
+  /// When the customer/we gave notice to terminate.
+  terminationNoticeAt DateTime?
+  /// Computed effective end date: max(binding period end, noticeAt + noticePeriodMonths).
+  /// Billing continues (rolling past the binding period if needed) until this date,
+  /// after which the deal is auto-marked inactive.
+  contractEndDate     DateTime?
+
+  importType    ImportType   @default(MANUAL)
+  importBatch   ImportBatch? @relation(fields: [importBatchId], references: [id])
+  importBatchId String?
+
+  dealEmailAddress String? @unique
+
+  contractStatus     ContractStatus @default(NONE)
+  pandaDocDocumentId String?        @unique
+  contractSentAt     DateTime?
+  contractViewedAt   DateTime?
+  contractSignedAt   DateTime?
+
+  dineroContactGuid String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  notes            Note[]
+  emails           EmailMessage[]
+  commission       Commission?
+  invoices         Invoice[]
+  contractRenewals ContractRenewal[]
+}
+
+model ContractRenewal {
+  id     String @id @default(cuid())
+  deal   Deal   @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  dealId String
+
+  termNumber Int
+
+  previousValue         Int
+  previousBindingMonths Int
+  newValue              Int
+  newBindingMonths      Int
+
+  contractLink     String?
+  establishmentFee Int?
+
+  renewedAt DateTime @default(now())
+}
+
+model Note {
+  id        String   @id @default(cuid())
+  deal      Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  dealId    String
+  author    User     @relation(fields: [authorId], references: [id])
+  authorId  String
+  kind      NoteKind @default(MANUAL)
+  body      String
+  createdAt DateTime @default(now())
+}
+
+model EmailAccount {
+  id           String        @id @default(cuid())
+  user         User          @relation(fields: [userId], references: [id])
+  userId       String
+  provider     EmailProvider
+  email        String
+  accessToken  String?
+  refreshToken String?
+  expiresAt    DateTime?
+  connectedAt  DateTime      @default(now())
+
+  @@unique([userId, provider])
+}
+
+model EmailMessage {
+  id          String         @id @default(cuid())
+  deal        Deal           @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  dealId      String
+  provider    EmailProvider
+  messageId   String
+  direction   EmailDirection
+  fromAddress String
+  toAddresses String
+  subject     String?
+  bodyText    String?
+  sentAt      DateTime
+  createdAt   DateTime       @default(now())
+
+  @@unique([provider, messageId])
+}
+
+model IntegrationSetting {
+  id      String  @id @default(cuid())
+  key     String  @unique
+  enabled Boolean @default(true)
+
+  updatedAt DateTime @updatedAt
+}
+
+model Commission {
+  id          String              @id @default(cuid())
+  deal        Deal                @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  dealId      String              @unique
+  seller      User                @relation(fields: [sellerId], references: [id])
+  sellerId    String
+  rate        Float
+  baseAmount  Int
+  amount      Int
+  frequency   CommissionFrequency
+  status      CommissionStatus    @default(PENDING)
+  dueDate     DateTime?
+  paidAt      DateTime?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+}
