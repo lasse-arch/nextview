@@ -32,7 +32,7 @@ function StatTile({
 }) {
   const valueColor = tone === "good" ? "text-emerald-700" : tone === "critical" ? "text-red-700" : "text-slate-900";
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4">
+    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="text-xs font-medium text-slate-500">{label}</div>
       <div className={`mt-1 text-2xl font-semibold ${valueColor}`}>{value}</div>
       {sub && <div className="mt-0.5 text-xs text-slate-400">{sub}</div>}
@@ -55,7 +55,7 @@ export default async function DashboardPage() {
         <p className="mt-1 text-sm text-slate-500">Overblik over pipeline, salg, provision og fakturering</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <StatTile
           label="Aktiv pipeline"
           value={formatDKK(data.pipelineValue)}
@@ -67,6 +67,7 @@ export default async function DashboardPage() {
           value={formatDKK(data.soldThisMonthValue)}
           sub={`${data.soldThisMonthCount} deals`}
         />
+        <StatTile label="Opstart i alt" value={formatDKK(data.establishmentFeeTotal)} sub="Etableringspriser" />
         <StatTile label="Provision skyldig" value={formatDKK(data.commissionOwed)} sub="Afventer + forfalden" />
         <StatTile
           label="Fejlede fakturaer"
@@ -77,7 +78,7 @@ export default async function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="rounded-lg border border-slate-200 bg-white p-5 lg:col-span-2">
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-2">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-slate-900">Pipeline pr. stadie</h2>
             {data.lostCount > 0 && (
@@ -104,7 +105,7 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        <div className="rounded-lg border border-slate-200 bg-white p-5">
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <h2 className="text-sm font-semibold text-slate-900">Fakturastatus</h2>
           <div className="mt-4 space-y-3">
             {data.invoiceStatuses.map((row) => {
@@ -131,7 +132,7 @@ export default async function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="rounded-lg border border-slate-200 bg-white p-5">
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <h2 className="text-sm font-semibold text-slate-900">Salg, seneste 6 måneder</h2>
           <div className="mt-4 flex h-32 items-end gap-3">
             {data.monthly.map((m) => (
@@ -148,7 +149,7 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        <div className="rounded-lg border border-slate-200 bg-white p-5 lg:col-span-2">
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-2">
           <h2 className="text-sm font-semibold text-slate-900">Sælgere</h2>
           <table className="mt-3 w-full text-sm">
             <thead className="text-left text-xs text-slate-500">

@@ -59,6 +59,10 @@ export const invoiceStatusLabels: Record<string, string> = {
   IMPORTED: "Importeret (historisk)",
 };
 
+export function dealName(deal: { companyName: string; displayName?: string | null }): string {
+  return deal.displayName || deal.companyName;
+}
+
 export function formatDKK(amount: number | null | undefined): string {
   if (amount === null || amount === undefined) return "–";
   return new Intl.NumberFormat("da-DK", { style: "currency", currency: "DKK", maximumFractionDigits: 0 }).format(

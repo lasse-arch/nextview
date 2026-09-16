@@ -22,7 +22,7 @@ export default async function UsersPage() {
             <form
               key={u.id}
               action={updateUserWithId}
-              className="rounded-lg border border-slate-200 bg-white p-4"
+              className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
             >
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <div className="col-span-2">
@@ -86,7 +86,7 @@ export default async function UsersPage() {
               </div>
               <button
                 type="submit"
-                className="mt-3 rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-700"
+                className="mt-3 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800"
               >
                 Gem
               </button>
@@ -128,7 +128,7 @@ export default async function UsersPage() {
           </select>
           <button
             type="submit"
-            className="col-span-2 rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-700 sm:col-span-4"
+            className="col-span-2 rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-800 sm:col-span-4"
           >
             Opret bruger
           </button>

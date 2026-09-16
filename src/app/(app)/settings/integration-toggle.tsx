@@ -3,6 +3,7 @@
 import { useTransition } from "react";
 import { toggleIntegration } from "@/lib/actions/integrations";
 import type { IntegrationKey } from "@/lib/integration-settings";
+import { useToast } from "@/components/toast";
 
 export function IntegrationToggle({
   integrationKey,
@@ -14,6 +15,7 @@ export function IntegrationToggle({
   disabled?: boolean;
 }) {
   const [pending, startTransition] = useTransition();
+  const showToast = useToast();
 
   return (
     <label className={`flex items-center gap-2 text-sm ${disabled ? "opacity-50" : ""}`}>
@@ -21,7 +23,12 @@ export function IntegrationToggle({
         type="checkbox"
         checked={enabled}
         disabled={pending || disabled}
-        onChange={(e) => startTransition(() => toggleIntegration(integrationKey, e.target.checked))}
+        onChange={(e) =>
+          startTransition(async () => {
+            await toggleIntegration(integrationKey, e.target.checked);
+            showToast(e.target.checked ? "Integration slået til" : "Integration slået fra");
+          })
+        }
       />
       <span className={enabled ? "text-emerald-700" : "text-slate-500"}>
         {pending ? "Gemmer…" : enabled ? "Slået til" : "Slået fra"}

@@ -11,7 +11,7 @@ export default function ImportPage() {
         </p>
       </div>
 
-      <section className="rounded-lg border border-slate-200 bg-white p-6">
+      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <h2 className="text-sm font-semibold text-slate-900">CSV-fil</h2>
         <form action={importFromCsvFile} className="mt-4 space-y-3">
           <input
@@ -19,18 +19,18 @@ export default function ImportPage() {
             name="file"
             accept=".csv,text/csv"
             required
-            className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-slate-900 file:px-3 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-slate-700"
+            className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-slate-900 file:px-3 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-slate-800"
           />
           <button
             type="submit"
-            className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
+            className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
           >
             Importér CSV
           </button>
         </form>
       </section>
 
-      <section className="rounded-lg border border-slate-200 bg-white p-6">
+      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <h2 className="text-sm font-semibold text-slate-900">Google Docs / Sheets</h2>
         <p className="mt-1 text-xs text-slate-500">
           Brug en offentligt publiceret link (Fil → Del → Publicér på nettet → CSV), eller indsæt tabellen som tekst
@@ -58,23 +58,26 @@ export default function ImportPage() {
           </div>
           <button
             type="submit"
-            className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
+            className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
           >
             Importér fra Google Docs
           </button>
         </form>
       </section>
 
-      <section className="rounded-lg border border-slate-200 bg-white p-6">
+      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <h2 className="text-sm font-semibold text-slate-900">Importér eksisterende kunder</h2>
         <p className="mt-1 text-xs text-slate-500">
-          Til jeres nuværende, allerede aktive kunder — oprettes direkte som "Live" med salgsdata udfyldt. Historiske
-          kvartaler (fra deres startdato og frem til i dag) markeres som allerede afregnet i jeres gamle system og
-          sendes <span className="font-medium">ikke</span> til Dinero — kun fremtidige kvartaler gør.
+          Til jeres nuværende kunder — både allerede aktive (oprettes som "Live") og kunder under kontrakt, der endnu
+          ikke er startet (oprettes som "Kontrakt underskrevet", uden startdato udfyldt). Historiske kvartaler for
+          aktive kunder markeres som allerede afregnet i jeres gamle system og sendes{" "}
+          <span className="font-medium">ikke</span> til Dinero — kun fremtidige kvartaler gør.
         </p>
         <p className="mt-2 text-xs text-slate-500">
-          Påkrævede kolonner: firmanavn, salgsbeløb (samlet kontraktværdi), bindingsperiode (måneder), startdato.
-          Valgfrie: cvr, kontaktperson, email, telefon, sælger (e-mail), produkt, etableringspris.
+          Påkrævede kolonner: firmanavn, salgsbeløb/kontraktværdi, binding/bindingsperiode (måneder). Startdato er
+          valgfri — mangler den, importeres kunden som pipeline i stedet for Live. Andre valgfrie kolonner: cvr,
+          kontaktperson, email, telefon, sælger (e-mail), produkt/service, etableringspris/opstartspris. Kolonnenavne
+          matches uafhængigt af mellemrum, bindestreger og parenteser (fx virker både "Binding" og "Binding (mdr)").
         </p>
         <form action={importExistingCustomers} className="mt-4 space-y-3">
           <input
@@ -82,11 +85,11 @@ export default function ImportPage() {
             name="file"
             accept=".csv,text/csv"
             required
-            className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-slate-900 file:px-3 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-slate-700"
+            className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-slate-900 file:px-3 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-slate-800"
           />
           <button
             type="submit"
-            className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
+            className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
           >
             Importér eksisterende kunder
           </button>

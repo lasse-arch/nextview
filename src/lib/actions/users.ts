@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { hashPassword } from "@/lib/password";
@@ -33,6 +34,7 @@ export async function createUser(formData: FormData) {
   });
 
   revalidatePath("/users");
+  redirect("/users?saved=Bruger%20oprettet");
 }
 
 export async function updateUser(userId: string, formData: FormData) {
@@ -68,4 +70,5 @@ export async function updateUser(userId: string, formData: FormData) {
   revalidatePath("/users");
   revalidatePath("/deals");
   revalidatePath("/commission");
+  redirect("/users?saved=1");
 }

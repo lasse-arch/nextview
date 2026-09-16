@@ -46,7 +46,7 @@ export default async function EmailSettingsPage({
       )}
       {error && <div className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">{errorMessages[error] ?? error}</div>}
 
-      <section className="rounded-lg border border-slate-200 bg-white p-6">
+      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-sm font-semibold text-slate-900">Gmail + Google Kalender</h2>
@@ -70,7 +70,7 @@ export default async function EmailSettingsPage({
           ) : (
             <a
               href="/api/integrations/google/authorize"
-              className="rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-700"
+              className="rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-800"
             >
               Forbind Gmail
             </a>
@@ -84,7 +84,7 @@ export default async function EmailSettingsPage({
         )}
       </section>
 
-      <section className="rounded-lg border border-slate-200 bg-white p-6">
+      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-sm font-semibold text-slate-900">Outlook (Microsoft)</h2>
@@ -106,7 +106,7 @@ export default async function EmailSettingsPage({
           ) : (
             <a
               href="/api/integrations/microsoft/authorize"
-              className="rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-700"
+              className="rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-800"
             >
               Forbind Outlook
             </a>

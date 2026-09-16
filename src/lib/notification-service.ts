@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { sendGmailMessage } from "@/lib/gmail";
 import { getAppBaseUrl } from "@/lib/email-oauth";
+import { dealName } from "@/lib/labels";
 
 export type NotificationResult = { sent: boolean; reason?: string };
 
@@ -28,8 +29,8 @@ export async function sendContractSignedNotification(dealId: string): Promise<No
   try {
     await sendGmailMessage(ownerAccount, {
       to: recipients,
-      subject: `Kontrakt underskrevet: ${deal.companyName}`,
-      bodyText: `${deal.companyName} har lige underskrevet kontrakt.\n\nSe dealen: ${dealUrl}`,
+      subject: `Kontrakt underskrevet: ${dealName(deal)}`,
+      bodyText: `${dealName(deal)} har lige underskrevet kontrakt.\n\nSe dealen: ${dealUrl}`,
     });
     return { sent: true };
   } catch (err) {

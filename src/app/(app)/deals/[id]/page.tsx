@@ -12,6 +12,7 @@ import {
   invoiceStatusLabels,
   formatDKK,
   formatDate,
+  dealName,
 } from "@/lib/labels";
 import { isCommissionOverdue } from "@/lib/commission";
 import { isPandaDocConfigured } from "@/lib/pandadoc";
@@ -21,6 +22,7 @@ import { StageFields } from "./stage-fields";
 import { InactiveToggleButton } from "./inactive-toggle-button";
 import { RenewalSection } from "./renewal-section";
 import { TerminationSection } from "./termination-section";
+import { DealItemsSection } from "./deal-items-section";
 
 function toDateInputValue(date: Date | null): string {
   if (!date) return "";
@@ -48,6 +50,7 @@ export default async function DealDetailPage({
         emails: { orderBy: { sentAt: "desc" } },
         invoices: { orderBy: { quarterIndex: "asc" } },
         contractRenewals: { orderBy: { renewedAt: "desc" } },
+        items: { orderBy: { createdAt: "asc" } },
       },
     }),
     prisma.user.findMany({ orderBy: { name: "asc" } }),
@@ -66,7 +69,7 @@ export default async function DealDetailPage({
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-semibold text-slate-900">{deal.companyName}</h1>
+            <h1 className="text-2xl font-semibold text-slate-900">{dealName(deal)}</h1>
             {deal.churnedAt && (
               <span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-600">
                 Inaktiv siden {formatDate(deal.churnedAt)}
@@ -74,6 +77,7 @@ export default async function DealDetailPage({
             )}
           </div>
           <p className="text-sm text-slate-500">
+            {deal.displayName && <span className="text-slate-400">CVR-navn: {deal.companyName} · </span>}
             Oprettet {formatDate(deal.createdAt)} · Import: {importTypeLabels[deal.importType]}
             {deal.importBatch?.fileName ? ` (${deal.importBatch.fileName})` : ""}
           </p>
@@ -99,16 +103,25 @@ export default async function DealDetailPage({
 
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-6">
-          <section className="rounded-lg border border-slate-200 bg-white p-6">
+          <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="text-sm font-semibold text-slate-900">Deal-information</h2>
             <form action={updateDealWithId} className="mt-4 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-slate-500">Firmanavn</label>
+                  <label className="block text-xs font-medium text-slate-500">Firmanavn (CVR)</label>
                   <input
                     name="companyName"
                     defaultValue={deal.companyName}
                     required
+                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-500">Kaldenavn (valgfri)</label>
+                  <input
+                    name="displayName"
+                    defaultValue={deal.displayName ?? ""}
+                    placeholder="Vises i stedet for CVR-navnet, hvis udfyldt"
                     className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
                   />
                 </div>
@@ -216,16 +229,6 @@ export default async function DealDetailPage({
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-500">Kontrakt-link</label>
-                  <input
-                    name="contractLink"
-                    type="url"
-                    defaultValue={deal.contractLink ?? ""}
-                    placeholder="https://…"
-                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-                  />
-                </div>
-                <div>
                   <label className="block text-xs font-medium text-slate-500">Etableringspris (DKK)</label>
                   <input
                     name="establishmentFee"
@@ -253,14 +256,16 @@ export default async function DealDetailPage({
 
               <button
                 type="submit"
-                className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
+                className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
               >
                 Gem ændringer
               </button>
             </form>
           </section>
 
-          <section className="rounded-lg border border-slate-200 bg-white p-6">
+          <DealItemsSection dealId={deal.id} items={deal.items} />
+
+          <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="text-sm font-semibold text-slate-900">Noter</h2>
 
             <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -276,7 +281,7 @@ export default async function DealDetailPage({
                 />
                 <button
                   type="submit"
-                  className="mt-2 rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-700"
+                  className="mt-2 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800"
                 >
                   Tilføj note
                 </button>
@@ -319,7 +324,7 @@ export default async function DealDetailPage({
             </ul>
           </section>
 
-          <section className="rounded-lg border border-slate-200 bg-white p-6">
+          <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="text-sm font-semibold text-slate-900">E-mail på dealen</h2>
             <p className="mt-1 text-xs text-slate-500">
               Sæt <span className="font-mono">{deal.dealEmailAddress}</span> i CC på mails vedrørende denne deal, så
@@ -349,7 +354,7 @@ export default async function DealDetailPage({
         </div>
 
         <div className="space-y-6">
-          <section className="rounded-lg border border-slate-200 bg-white p-6">
+          <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="text-sm font-semibold text-slate-900">Kontrakt (PandaDoc)</h2>
             <dl className="mt-3 space-y-2 text-sm">
               <div className="flex justify-between">
@@ -396,7 +401,7 @@ export default async function DealDetailPage({
             </div>
           </section>
 
-          <section className="rounded-lg border border-slate-200 bg-white p-6">
+          <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="text-sm font-semibold text-slate-900">Provision</h2>
             {deal.commission ? (
               <dl className="mt-3 space-y-2 text-sm">
@@ -448,7 +453,7 @@ export default async function DealDetailPage({
             )}
           </section>
 
-          <section className="rounded-lg border border-slate-200 bg-white p-6">
+          <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="text-sm font-semibold text-slate-900">Fakturaer (Dinero)</h2>
             {deal.invoices.length > 0 ? (
               <ul className="mt-3 space-y-2 text-sm">

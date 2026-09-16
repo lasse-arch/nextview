@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { upsertCalendarEvent } from "@/lib/google-calendar";
 import { getAppBaseUrl } from "@/lib/email-oauth";
+import { dealName } from "@/lib/labels";
 
 const DEFAULT_MEETING_DURATION_MINUTES = 30;
 
@@ -31,7 +32,7 @@ export async function syncDealMeetingToCalendar(dealId: string): Promise<Calenda
   try {
     const eventId = await upsertCalendarEvent(account, {
       eventId: deal.googleCalendarEventId,
-      summary: `Møde: ${deal.companyName}`,
+      summary: `Møde: ${dealName(deal)}`,
       description: `Deal i Nextview360: ${getAppBaseUrl()}/deals/${deal.id}`,
       startIso: start.toISOString(),
       endIso: end.toISOString(),

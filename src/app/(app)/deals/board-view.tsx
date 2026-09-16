@@ -2,13 +2,15 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { updateDealStage } from "@/lib/actions/deals";
-import { stageLabels, stageOrder, formatDKK } from "@/lib/labels";
+import { updateDealStage, setMeetingDateAndStage } from "@/lib/actions/deals";
+import { stageLabels, stageOrder, formatDKK, dealName } from "@/lib/labels";
+import { useToast } from "@/components/toast";
 import type { DealStage } from "@prisma/client";
 
 export type BoardDeal = {
   id: string;
   companyName: string;
+  displayName: string | null;
   contactName: string | null;
   ownerName: string;
   saleAmount: number | null;
@@ -18,11 +20,21 @@ export type BoardDeal = {
 
 const CONTRACT_MANAGED_STAGES: DealStage[] = ["CONTRACT_SENT", "CONTRACT_SIGNED"];
 
-export function DealsBoard({ initialDeals }: { initialDeals: BoardDeal[] }) {
+function toDateTimeLocalDefault(): string {
+  const d = new Date();
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  d.setSeconds(0, 0);
+  return d.toISOString().slice(0, 16);
+}
+
+export function DealsBoard({ initialDeals, isAdmin }: { initialDeals: BoardDeal[]; isAdmin: boolean }) {
   const [deals, setDeals] = useState(initialDeals);
   const [error, setError] = useState<string | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [meetingPromptDealId, setMeetingPromptDealId] = useState<string | null>(null);
+  const [meetingDateInput, setMeetingDateInput] = useState(toDateTimeLocalDefault());
   const [, startTransition] = useTransition();
+  const showToast = useToast();
 
   function moveDealLocally(dealId: string, newStage: DealStage) {
     setDeals((prev) => prev.map((d) => (d.id === dealId ? { ...d, stage: newStage } : d)));
@@ -34,8 +46,14 @@ export function DealsBoard({ initialDeals }: { initialDeals: BoardDeal[] }) {
     setDraggingId(null);
     if (!deal || deal.stage === newStage) return;
 
-    if (CONTRACT_MANAGED_STAGES.includes(newStage)) {
+    if (!isAdmin && CONTRACT_MANAGED_STAGES.includes(newStage)) {
       setError("Denne fase styres automatisk via PandaDoc-kontrakten på dealens side.");
+      return;
+    }
+
+    if (newStage === "MEETING_BOOKED") {
+      setMeetingDateInput(toDateTimeLocalDefault());
+      setMeetingPromptDealId(deal.id);
       return;
     }
 
@@ -46,9 +64,32 @@ export function DealsBoard({ initialDeals }: { initialDeals: BoardDeal[] }) {
     startTransition(async () => {
       try {
         await updateDealStage(deal.id, newStage);
+        showToast("Deal flyttet");
       } catch (err) {
         moveDealLocally(deal.id, previousStage);
         setError(err instanceof Error ? err.message : "Kunne ikke flytte dealen.");
+      }
+    });
+  }
+
+  function confirmMeetingDate() {
+    const dealId = meetingPromptDealId;
+    if (!dealId || !meetingDateInput) return;
+    const deal = deals.find((d) => d.id === dealId);
+    if (!deal) return;
+
+    const previousStage = deal.stage;
+    setMeetingPromptDealId(null);
+    setError(null);
+    moveDealLocally(dealId, "MEETING_BOOKED");
+
+    startTransition(async () => {
+      try {
+        await setMeetingDateAndStage(dealId, new Date(meetingDateInput).toISOString());
+        showToast("Møde booket");
+      } catch (err) {
+        moveDealLocally(dealId, previousStage);
+        setError(err instanceof Error ? err.message : "Kunne ikke booke mødet.");
       }
     });
   }
@@ -68,6 +109,39 @@ export function DealsBoard({ initialDeals }: { initialDeals: BoardDeal[] }) {
           </button>
         </div>
       )}
+
+      {meetingPromptDealId && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/40">
+          <div className="w-80 rounded-lg bg-white p-4 shadow-xl">
+            <h3 className="text-sm font-semibold text-slate-900">Hvornår er mødet booket?</h3>
+            <input
+              type="datetime-local"
+              value={meetingDateInput}
+              onChange={(e) => setMeetingDateInput(e.target.value)}
+              autoFocus
+              className="mt-3 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+            />
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setMeetingPromptDealId(null)}
+                className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50"
+              >
+                Annullér
+              </button>
+              <button
+                type="button"
+                onClick={confirmMeetingDate}
+                disabled={!meetingDateInput}
+                className="rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+              >
+                Book møde
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex gap-3 overflow-x-auto pb-4">
         {columns.map(({ stage, deals: colDeals }) => {
           const total = colDeals.reduce((sum, d) => sum + (d.saleAmount ?? 0), 0);
@@ -100,9 +174,9 @@ export function DealsBoard({ initialDeals }: { initialDeals: BoardDeal[] }) {
                     <Link
                       href={`/deals/${deal.id}`}
                       className="block truncate text-xs font-medium text-slate-900 hover:underline"
-                      title={deal.companyName}
+                      title={dealName(deal)}
                     >
-                      {deal.companyName}
+                      {dealName(deal)}
                       {deal.isChurned && <span className="ml-1 text-[10px] font-normal text-slate-400">(inaktiv)</span>}
                     </Link>
                     <div className="mt-0.5 flex items-center justify-between text-[11px] text-slate-500">

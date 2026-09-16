@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { stageLabels, importTypeLabels, formatDKK, formatDate } from "@/lib/labels";
+import { getCurrentUser } from "@/lib/auth";
+import { stageLabels, importTypeLabels, formatDKK, formatDate, dealName } from "@/lib/labels";
 import { DealsBoard, type BoardDeal } from "./board-view";
 import type { Prisma, DealStage, ImportType } from "@prisma/client";
 
@@ -36,7 +37,7 @@ export default async function DealsPage({
       ? { companyName: "asc" }
       : { createdAt: "desc" };
 
-  const [deals, users, importBatches] = await Promise.all([
+  const [deals, users, importBatches, currentUser] = await Promise.all([
     prisma.deal.findMany({
       where,
       orderBy,
@@ -44,6 +45,7 @@ export default async function DealsPage({
     }),
     prisma.user.findMany({ orderBy: { name: "asc" } }),
     prisma.importBatch.findMany({ orderBy: { createdAt: "desc" } }),
+    getCurrentUser(),
   ]);
 
   function toggleViewUrl(view: "list" | "board") {
@@ -61,6 +63,7 @@ export default async function DealsPage({
   const boardDeals: BoardDeal[] = deals.map((d) => ({
     id: d.id,
     companyName: d.companyName,
+    displayName: d.displayName,
     contactName: d.contactName,
     ownerName: d.owner.name,
     saleAmount: d.saleAmount,
@@ -89,7 +92,7 @@ export default async function DealsPage({
           </div>
           <Link
             href="/deals/new"
-            className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700"
+            className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700"
           >
             + Ny lead
           </Link>
@@ -111,7 +114,7 @@ export default async function DealsPage({
         </div>
       )}
 
-      <form method="get" className="mt-4 flex flex-wrap gap-3 rounded-lg border border-slate-200 bg-white p-4">
+      <form method="get" className="mt-4 flex flex-wrap gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         {isBoard && <input type="hidden" name="view" value="board" />}
         <select name="owner" defaultValue={params.owner ?? ""} className="rounded-md border border-slate-300 px-2 py-1.5 text-sm">
           <option value="">Alle ejere</option>
@@ -171,7 +174,7 @@ export default async function DealsPage({
 
       {isBoard ? (
         <div className="mt-4">
-          <DealsBoard initialDeals={boardDeals} />
+          <DealsBoard initialDeals={boardDeals} isAdmin={currentUser?.role === "ADMIN"} />
         </div>
       ) : (
         <div className="mt-4 overflow-hidden rounded-lg border border-slate-200 bg-white">
@@ -191,7 +194,7 @@ export default async function DealsPage({
                 <tr key={deal.id} className="border-t border-slate-100 hover:bg-slate-50">
                   <td className="px-4 py-1.5">
                     <Link href={`/deals/${deal.id}`} className="font-medium text-slate-900 hover:underline">
-                      {deal.companyName}
+                      {dealName(deal)}
                     </Link>
                     {deal.contactName && <span className="ml-2 text-xs text-slate-400">{deal.contactName}</span>}
                     {deal.churnedAt && (

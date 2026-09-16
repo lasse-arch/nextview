@@ -18,7 +18,7 @@ export default async function PandaDocSettingsPage() {
         </p>
       </div>
 
-      <section className="rounded-lg border border-slate-200 bg-white p-6">
+      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold text-slate-900">Status</h2>
           <IntegrationToggle integrationKey="PANDADOC" enabled={enabled} disabled={!hasCredentials} />
@@ -42,7 +42,7 @@ export default async function PandaDocSettingsPage() {
         </div>
       </section>
 
-      <section className="rounded-lg border border-slate-200 bg-white p-6">
+      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <h2 className="text-sm font-semibold text-slate-900">Webhook (automatisk statusopdatering)</h2>
         <p className="mt-2 text-sm text-slate-600">
           Opret et webhook i PandaDoc under Settings → API &amp; Integrations → Webhooks, der peger på:
@@ -57,7 +57,7 @@ export default async function PandaDocSettingsPage() {
         </p>
       </section>
 
-      <section className="rounded-lg border border-slate-200 bg-white p-6">
+      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <h2 className="text-sm font-semibold text-slate-900">Skabelon-tokens</h2>
         <p className="mt-2 text-sm text-slate-600">
           Jeres PandaDoc-skabelon skal bruge disse token-navne (Content Library → skabelon → Tokens), så

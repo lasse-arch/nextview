@@ -10,15 +10,18 @@ import { buildDealEmailAddress } from "@/lib/email-address";
 import { findDuplicateDeals } from "@/lib/duplicates";
 import { recalcCommission } from "@/lib/commission-service";
 import { computeBillingPeriods, computePeriodAmounts } from "@/lib/invoice-schedule";
-import { pick, type ParsedRow } from "@/lib/import-helpers";
+import { pick, parseAmount, type ParsedRow } from "@/lib/import-helpers";
 
 /**
- * Imports customers who are already active/paying (not new leads). Every
- * billing period that would already be due, based on the given start
- * date, is recorded as IMPORTED rather than drafted in Dinero - those
- * were already invoiced by whatever system was used before this CRM.
- * Only periods due from today onward will actually generate new Dinero
- * drafts going forward.
+ * Imports customers who are already active/paying, or already under
+ * contract but not started yet (not brand-new leads). A row with a start
+ * date becomes a Live customer; every billing period that would already
+ * be due is recorded as IMPORTED rather than drafted in Dinero, since
+ * those were already invoiced by whatever system was used before this
+ * CRM - only periods due from today onward will actually generate new
+ * Dinero drafts going forward. A row without a start date (but with a
+ * contract value + binding period) becomes a pipeline deal instead,
+ * awaiting its start date like any other signed-but-not-live deal.
  */
 export async function importExistingCustomers(formData: FormData) {
   const user = await requireUser();
@@ -46,18 +49,18 @@ export async function importExistingCustomers(formData: FormData) {
   for (const row of rows) {
     const companyName = pick(row, "companyName", "company", "firma", "firmanavn", "virksomhed");
     const saleAmountRaw = pick(row, "saleAmount", "salgsbeløb", "kontraktværdi", "beløb");
-    const bindingMonthsRaw = pick(row, "bindingMonths", "binding", "bindingsperiode");
-    const startDateRaw = pick(row, "startDate", "startdato", "livedato", "kontraktstart");
+    const bindingMonthsRaw = pick(row, "bindingMonths", "binding", "bindingsperiode", "binding (mdr)");
+    const startDateRaw = pick(row, "startDate", "startdato", "livedato", "kontraktstart", "kontrakt-start");
 
-    if (!companyName || !saleAmountRaw || !bindingMonthsRaw || !startDateRaw) {
+    if (!companyName || !saleAmountRaw || !bindingMonthsRaw) {
       if (companyName) skippedRows.push(companyName);
       continue;
     }
 
-    const saleAmount = Math.round(parseFloat(saleAmountRaw));
+    const saleAmount = parseAmount(saleAmountRaw);
     const bindingMonths = parseInt(bindingMonthsRaw, 10);
-    const startDate = new Date(startDateRaw);
-    if (!saleAmount || !bindingMonths || isNaN(startDate.getTime())) {
+    const startDate = startDateRaw ? new Date(startDateRaw) : null;
+    if (saleAmount === null || !bindingMonths || (startDateRaw && isNaN(startDate!.getTime()))) {
       skippedRows.push(companyName);
       continue;
     }
@@ -68,9 +71,9 @@ export async function importExistingCustomers(formData: FormData) {
     const contactEmail = pick(row, "contactEmail", "email", "e-mail");
     const contactPhone = pick(row, "contactPhone", "phone", "telefon", "tlf");
     const ownerEmail = pick(row, "ownerEmail", "owner", "ejer", "saelger", "sælger");
-    const soldProduct = pick(row, "soldProduct", "produkt", "ydelse");
-    const establishmentFeeRaw = pick(row, "establishmentFee", "etableringspris", "opstart");
-    const establishmentFee = establishmentFeeRaw ? Math.round(parseFloat(establishmentFeeRaw)) : null;
+    const soldProduct = pick(row, "soldProduct", "produkt", "ydelse", "service");
+    const establishmentFeeRaw = pick(row, "establishmentFee", "etableringspris", "opstart", "opstartspris");
+    const establishmentFee = establishmentFeeRaw ? parseAmount(establishmentFeeRaw) : null;
 
     const owner = (ownerEmail && usersByEmail.get(ownerEmail.toLowerCase())) || users.find((u) => u.id === user.id) || users[0];
 
@@ -88,7 +91,7 @@ export async function importExistingCustomers(formData: FormData) {
         ownerId: owner.id,
         importType: "CSV",
         importBatchId: batch.id,
-        stage: "LIVE",
+        stage: startDate ? "LIVE" : "CONTRACT_SIGNED",
         soldProduct,
         saleAmount,
         bindingMonths,
@@ -105,37 +108,42 @@ export async function importExistingCustomers(formData: FormData) {
       data: { dealEmailAddress: buildDealEmailAddress(deal.id) },
     });
 
-    // Mark historical periods (and the establishment fee, if the contract
-    // already started in the past) as already handled by the old system.
-    const now = new Date();
-    if (establishmentFee && establishmentFee > 0 && startDate <= now) {
-      await prisma.invoice.create({
-        data: {
-          dealId: deal.id,
-          termNumber: 1,
-          quarterIndex: 0,
-          amount: establishmentFee,
-          scheduledDate: startDate,
-          status: "IMPORTED",
-        },
-      });
-    }
+    // Rows without a start date are still pipeline (signed but not live
+    // yet) - nothing to bill until they get a start date, same as any
+    // other signed deal.
+    if (startDate) {
+      // Mark historical periods (and the establishment fee, if the contract
+      // already started in the past) as already handled by the old system.
+      const now = new Date();
+      if (establishmentFee && establishmentFee > 0 && startDate <= now) {
+        await prisma.invoice.create({
+          data: {
+            dealId: deal.id,
+            termNumber: 1,
+            quarterIndex: 0,
+            amount: establishmentFee,
+            scheduledDate: startDate,
+            status: "IMPORTED",
+          },
+        });
+      }
 
-    const until = maxDate([addMonths(startDate, bindingMonths), now]);
-    const periods = computeBillingPeriods(startDate, bindingMonths, until);
-    const amounts = computePeriodAmounts(saleAmount, periods, startDate, bindingMonths);
-    for (let i = 0; i < periods.length; i++) {
-      if (periods[i].draftTriggerDate > now) continue;
-      await prisma.invoice.create({
-        data: {
-          dealId: deal.id,
-          termNumber: 1,
-          quarterIndex: periods[i].index,
-          amount: amounts[i],
-          scheduledDate: periods[i].startDate,
-          status: "IMPORTED",
-        },
-      });
+      const until = maxDate([addMonths(startDate, bindingMonths), now]);
+      const periods = computeBillingPeriods(startDate, bindingMonths, until);
+      const amounts = computePeriodAmounts(saleAmount, periods, startDate, bindingMonths);
+      for (let i = 0; i < periods.length; i++) {
+        if (periods[i].draftTriggerDate > now) continue;
+        await prisma.invoice.create({
+          data: {
+            dealId: deal.id,
+            termNumber: 1,
+            quarterIndex: periods[i].index,
+            amount: amounts[i],
+            scheduledDate: periods[i].startDate,
+            status: "IMPORTED",
+          },
+        });
+      }
     }
 
     await recalcCommission(deal.id);

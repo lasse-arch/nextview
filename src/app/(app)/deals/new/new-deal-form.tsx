@@ -37,7 +37,7 @@ export function NewDealForm({ users, defaultOwnerId }: { users: User[]; defaultO
   }
 
   return (
-    <form action={createDealManual} className="mt-6 space-y-4 rounded-lg border border-slate-200 bg-white p-6">
+    <form action={createDealManual} className="mt-6 space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
       <input type="hidden" name="cvrNumber" value={cvrNumber} />
 
       <div className="rounded-md border border-dashed border-slate-300 bg-slate-50 p-3">
@@ -67,12 +67,20 @@ export function NewDealForm({ users, defaultOwnerId }: { users: User[]; defaultO
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-slate-700">Firmanavn *</label>
+        <label className="block text-sm font-medium text-slate-700">Firmanavn (CVR) *</label>
         <input
           name="companyName"
           required
           value={companyName}
           onChange={(e) => setCompanyName(e.target.value)}
+          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+        />
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-slate-700">Kaldenavn (valgfri)</label>
+        <input
+          name="displayName"
+          placeholder="Udfyld hvis kunden kaldes noget andet end CVR-navnet"
           className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
         />
       </div>
@@ -126,7 +134,7 @@ export function NewDealForm({ users, defaultOwnerId }: { users: User[]; defaultO
       </div>
       <button
         type="submit"
-        className="w-full rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700"
+        className="w-full rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800"
       >
         Opret deal
       </button>

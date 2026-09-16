@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/db";
 import { isDineroConfigured } from "@/lib/dinero";
 import { isIntegrationEnabled } from "@/lib/integration-settings";
-import { formatDKK, formatDate, invoiceStatusLabels } from "@/lib/labels";
+import { formatDKK, formatDate, invoiceStatusLabels, dealName } from "@/lib/labels";
 import { RunNowButton } from "./run-now-button";
 import { IntegrationToggle } from "../integration-toggle";
 import Link from "next/link";
@@ -34,7 +34,7 @@ export default async function DineroSettingsPage() {
         </p>
       </div>
 
-      <section className="rounded-lg border border-slate-200 bg-white p-6">
+      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold text-slate-900">Status</h2>
           <IntegrationToggle integrationKey="DINERO" enabled={enabled} disabled={!hasCredentials} />
@@ -66,7 +66,7 @@ export default async function DineroSettingsPage() {
         </div>
       </section>
 
-      <section className="rounded-lg border border-slate-200 bg-white p-6">
+      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <h2 className="text-sm font-semibold text-slate-900">Seneste kladder</h2>
         <div className="mt-3 overflow-hidden rounded-md border border-slate-100">
           <table className="w-full text-sm">
@@ -84,7 +84,7 @@ export default async function DineroSettingsPage() {
                 <tr key={inv.id} className="border-t border-slate-100">
                   <td className="px-3 py-2">
                     <Link href={`/deals/${inv.dealId}`} className="font-medium text-slate-900 hover:underline">
-                      {inv.deal.companyName}
+                      {dealName(inv.deal)}
                     </Link>
                   </td>
                   <td className="px-3 py-2 text-slate-600">{inv.quarterIndex}</td>

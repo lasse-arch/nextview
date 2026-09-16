@@ -54,6 +54,10 @@ export async function getDashboardData() {
 
   const failedInvoices = invoices.filter((i) => i.status === "FAILED").length;
 
+  const establishmentFeeTotal = deals
+    .filter((d) => d.stage !== "LOST")
+    .reduce((sum, d) => sum + (d.establishmentFee ?? 0), 0);
+
   const lostDeals = deals.filter((d) => d.stage === "LOST");
   const lostValue = lostDeals.reduce((sum, d) => sum + (d.saleAmount ?? 0), 0);
 
@@ -118,6 +122,7 @@ export async function getDashboardData() {
     soldThisMonthValue,
     soldThisMonthCount: soldThisMonth.length,
     commissionOwed,
+    establishmentFeeTotal,
     failedInvoices,
     lostValue,
     lostCount: lostDeals.length,

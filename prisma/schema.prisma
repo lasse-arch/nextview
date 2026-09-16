@@ -129,6 +129,10 @@ model ImportBatch {
 model Deal {
   id          String   @id @default(cuid())
   companyName String
+  /// Kaldenavn - shown instead of companyName wherever the deal appears, for
+  /// when the CVR-registered legal name differs from what the customer is
+  /// actually known as.
+  displayName String?
   cvrNumber   String?
   address     String?
   contactName String?
@@ -191,6 +195,26 @@ model Deal {
   commission       Commission?
   invoices         Invoice[]
   contractRenewals ContractRenewal[]
+  items            DealItem[]
+}
+
+/// A service/product line on a deal - optionally tied to one of the
+/// customer's several physical locations - so a deal covering multiple
+/// sites and/or multiple products (website, virtual tour, drone, business
+/// cards, ...) can be broken down and tracked, including ones given away
+/// for free.
+model DealItem {
+  id     String @id @default(cuid())
+  deal   Deal   @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  dealId String
+
+  /// Free-text label for the site this item belongs to, if relevant (e.g. "Hovedkontor", "Filial Aarhus").
+  location    String?
+  productType String
+  amount      Int?
+  isFree      Boolean @default(false)
+
+  createdAt DateTime @default(now())
 }
 
 model ContractRenewal {

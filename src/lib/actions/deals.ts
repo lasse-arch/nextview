@@ -20,6 +20,7 @@ export async function createDealManual(formData: FormData) {
   const companyName = String(formData.get("companyName") || "").trim();
   if (!companyName) throw new Error("Firmanavn er påkrævet");
 
+  const displayName = String(formData.get("displayName") || "").trim() || null;
   const ownerId = String(formData.get("ownerId") || user.id);
   const cvrNumber = String(formData.get("cvrNumber") || "").trim() || null;
   const address = String(formData.get("address") || "") || null;
@@ -32,6 +33,7 @@ export async function createDealManual(formData: FormData) {
   const deal = await prisma.deal.create({
     data: {
       companyName,
+      displayName,
       cvrNumber,
       address,
       contactName,
@@ -52,9 +54,10 @@ export async function createDealManual(formData: FormData) {
 }
 
 export async function updateDeal(dealId: string, formData: FormData) {
-  await requireUser();
+  const user = await requireUser();
 
   const companyName = String(formData.get("companyName") || "").trim();
+  const displayName = String(formData.get("displayName") || "").trim() || null;
   const cvrNumber = String(formData.get("cvrNumber") || "").trim() || null;
   const address = String(formData.get("address") || "") || null;
   const contactName = String(formData.get("contactName") || "") || null;
@@ -70,7 +73,6 @@ export async function updateDeal(dealId: string, formData: FormData) {
   const saleAmount = saleAmountRaw ? Math.round(parseFloat(saleAmountRaw)) : null;
   const soldAtRaw = String(formData.get("soldAt") || "");
   const soldAt = soldAtRaw ? new Date(soldAtRaw) : null;
-  const contractLink = String(formData.get("contractLink") || "").trim() || null;
   const establishmentFeeRaw = String(formData.get("establishmentFee") || "");
   const establishmentFee = establishmentFeeRaw ? Math.round(parseFloat(establishmentFeeRaw)) : null;
 
@@ -80,6 +82,10 @@ export async function updateDeal(dealId: string, formData: FormData) {
   const meetingDate = meetingDateRaw ? new Date(meetingDateRaw) : null;
 
   const existing = await prisma.deal.findUniqueOrThrow({ where: { id: dealId } });
+
+  if (user.role !== "ADMIN" && CONTRACT_MANAGED_STAGES.includes(stage) && stage !== existing.stage) {
+    throw new Error("Denne fase styres automatisk via PandaDoc-kontrakten på dealens side.");
+  }
 
   const stageDateUpdates: Record<string, Date> = {};
   if (stage === "FILMED" && !existing.filmedAt) stageDateUpdates.filmedAt = new Date();
@@ -97,6 +103,7 @@ export async function updateDeal(dealId: string, formData: FormData) {
     where: { id: dealId },
     data: {
       companyName,
+      displayName,
       cvrNumber,
       address,
       contactName,
@@ -109,7 +116,6 @@ export async function updateDeal(dealId: string, formData: FormData) {
       bindingMonths,
       saleAmount,
       soldAt,
-      contractLink,
       establishmentFee,
       ...stageDateUpdates,
     },
@@ -133,14 +139,14 @@ export async function updateDeal(dealId: string, formData: FormData) {
   const params = new URLSearchParams();
   if (duplicates.length > 0) params.set("dup", duplicates[0].id);
   if (calendarWarning) params.set("calendarWarning", calendarWarning);
-  const query = params.toString();
-  redirect(query ? `/deals/${dealId}?${query}` : `/deals/${dealId}`);
+  params.set("saved", "1");
+  redirect(`/deals/${dealId}?${params.toString()}`);
 }
 
 export async function updateDealStage(dealId: string, newStage: DealStage) {
-  await requireUser();
+  const user = await requireUser();
 
-  if (CONTRACT_MANAGED_STAGES.includes(newStage)) {
+  if (user.role !== "ADMIN" && CONTRACT_MANAGED_STAGES.includes(newStage)) {
     throw new Error("Denne fase styres automatisk via PandaDoc-kontrakten på dealens side.");
   }
 
@@ -171,6 +177,28 @@ export async function updateDealStage(dealId: string, newStage: DealStage) {
   revalidatePath("/commission");
 }
 
+/**
+ * Used by the board view's drag-and-drop: dropping a deal into "Møde
+ * booket" prompts for the meeting date right there, instead of requiring a
+ * trip to the full edit form first (which updateDealStage otherwise demands).
+ */
+export async function setMeetingDateAndStage(dealId: string, meetingDateIso: string) {
+  await requireUser();
+
+  const meetingDate = new Date(meetingDateIso);
+  if (isNaN(meetingDate.getTime())) throw new Error("Ugyldig mødedato.");
+
+  await prisma.deal.update({
+    where: { id: dealId },
+    data: { stage: "MEETING_BOOKED", meetingDate },
+  });
+
+  await syncDealMeetingToCalendar(dealId);
+
+  revalidatePath("/deals");
+  revalidatePath(`/deals/${dealId}`);
+}
+
 export async function addNote(dealId: string, formData: FormData) {
   const user = await requireUser();
   const body = String(formData.get("body") || "").trim();
@@ -182,6 +210,7 @@ export async function addNote(dealId: string, formData: FormData) {
   });
 
   revalidatePath(`/deals/${dealId}`);
+  redirect(`/deals/${dealId}?saved=Note%20tilf%C3%B8jet`);
 }
 
 export async function markDealInactive(dealId: string) {
@@ -235,6 +264,7 @@ export async function terminateContract(dealId: string, formData: FormData) {
 
   revalidatePath(`/deals/${dealId}`);
   revalidatePath("/deals");
+  redirect(`/deals/${dealId}?saved=Opsigelse%20registreret`);
 }
 
 export async function withdrawTermination(dealId: string) {
@@ -257,7 +287,7 @@ export async function renewContract(dealId: string, formData: FormData) {
 
   const newValue = Math.round(parseFloat(newValueRaw));
   const newBindingMonths = parseInt(newBindingMonthsRaw, 10);
-  if (!newValue || newValue <= 0) throw new Error("Angiv en gyldig ny kontraktværdi.");
+  if (isNaN(newValue) || newValue < 0) throw new Error("Angiv en gyldig ny kontraktværdi.");
   if (!newBindingMonths || newBindingMonths <= 0) throw new Error("Angiv en gyldig ny bindingsperiode.");
   const establishmentFee = establishmentFeeRaw ? Math.round(parseFloat(establishmentFeeRaw)) : null;
 
@@ -300,6 +330,7 @@ export async function renewContract(dealId: string, formData: FormData) {
   revalidatePath(`/deals/${dealId}`);
   revalidatePath("/deals");
   revalidatePath("/commission");
+  redirect(`/deals/${dealId}?saved=Kontrakt%20fornyet`);
 }
 
 export async function markCommissionPaid(commissionId: string) {

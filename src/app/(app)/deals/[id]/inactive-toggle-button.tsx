@@ -2,18 +2,25 @@
 
 import { useTransition } from "react";
 import { markDealInactive, reactivateDeal } from "@/lib/actions/deals";
+import { useToast } from "@/components/toast";
 
 export function InactiveToggleButton({ dealId, isChurned }: { dealId: string; isChurned: boolean }) {
   const [pending, startTransition] = useTransition();
+  const showToast = useToast();
 
   return (
     <button
       type="button"
       disabled={pending}
-      onClick={() => startTransition(() => (isChurned ? reactivateDeal(dealId) : markDealInactive(dealId)))}
+      onClick={() =>
+        startTransition(async () => {
+          await (isChurned ? reactivateDeal(dealId) : markDealInactive(dealId));
+          showToast(isChurned ? "Kunde genaktiveret" : "Kunde markeret som ikke aktiv");
+        })
+      }
       className={
         isChurned
-          ? "rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50"
+          ? "rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
           : "rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-50"
       }
     >

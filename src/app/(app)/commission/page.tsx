@@ -2,7 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { isCommissionOverdue } from "@/lib/commission";
-import { commissionFrequencyLabels, formatDKK, formatDate } from "@/lib/labels";
+import { commissionFrequencyLabels, formatDKK, formatDate, dealName } from "@/lib/labels";
 import { MarkPaidButton } from "@/app/(app)/deals/[id]/mark-paid-button";
 
 export default async function CommissionPage() {
@@ -59,7 +59,7 @@ export default async function CommissionPage() {
                 <tr key={c.id} className="border-t border-slate-100">
                   <td className="px-4 py-2">
                     <Link href={`/deals/${c.dealId}`} className="font-medium text-slate-900 hover:underline">
-                      {c.deal.companyName}
+                      {dealName(c.deal)}
                     </Link>
                   </td>
                   {isAdmin && <td className="px-4 py-2 text-slate-600">{c.seller.name}</td>}
@@ -107,7 +107,7 @@ export default async function CommissionPage() {
 
 function StatCard({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4">
+    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <p className="text-xs font-medium text-slate-500">{label}</p>
       <p className={`mt-1 text-xl font-semibold ${highlight ? "text-red-600" : "text-slate-900"}`}>{value}</p>
     </div>

@@ -25,7 +25,7 @@ export function RenewalSection({
   const renewContractWithId = renewContract.bind(null, dealId);
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-6">
+    <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
       <h2 className="text-sm font-semibold text-slate-900">Kontrakt-fornyelse</h2>
       <p className="mt-1 text-xs text-slate-500">
         Nuværende kontraktperiode: {currentTermNumber}. En fornyelse starter en ny periode med sit eget
@@ -79,7 +79,7 @@ export function RenewalSection({
         </div>
         <button
           type="submit"
-          className="rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-700"
+          className="rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-800"
         >
           Forny kontrakt
         </button>
