@@ -90,12 +90,6 @@ export default async function DealsPage({
               Tavle
             </Link>
           </div>
-          <Link
-            href="/deals/new"
-            className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700"
-          >
-            + Ny lead
-          </Link>
         </div>
       </div>
 
