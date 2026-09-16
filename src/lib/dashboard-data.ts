@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { startOfMonth, subMonths, isWithinInterval, endOfMonth, format } from "date-fns";
 import { da } from "date-fns/locale";
+import { totalContractValue } from "@/lib/labels";
 
 const PIPELINE_STAGES = [
   "LEAD",
@@ -38,15 +39,15 @@ export async function getDashboardData() {
   const monthEnd = endOfMonth(now);
 
   const activePipeline = deals.filter((d) => (PIPELINE_STAGES as readonly string[]).includes(d.stage));
-  const pipelineValue = activePipeline.reduce((sum, d) => sum + (d.saleAmount ?? 0), 0);
+  const pipelineValue = activePipeline.reduce((sum, d) => sum + totalContractValue(d), 0);
 
   const liveCustomers = deals.filter((d) => d.stage === "LIVE" && !d.churnedAt);
-  const liveValue = liveCustomers.reduce((sum, d) => sum + (d.saleAmount ?? 0), 0);
+  const liveValue = liveCustomers.reduce((sum, d) => sum + totalContractValue(d), 0);
 
   const soldThisMonth = deals.filter(
     (d) => d.soldAt && isWithinInterval(d.soldAt, { start: monthStart, end: monthEnd })
   );
-  const soldThisMonthValue = soldThisMonth.reduce((sum, d) => sum + (d.saleAmount ?? 0), 0);
+  const soldThisMonthValue = soldThisMonth.reduce((sum, d) => sum + totalContractValue(d), 0);
 
   const commissionOwed = commissions
     .filter((c) => c.status === "PENDING" || c.status === "DUE")
@@ -59,7 +60,7 @@ export async function getDashboardData() {
     .reduce((sum, d) => sum + (d.establishmentFee ?? 0), 0);
 
   const lostDeals = deals.filter((d) => d.stage === "LOST");
-  const lostValue = lostDeals.reduce((sum, d) => sum + (d.saleAmount ?? 0), 0);
+  const lostValue = lostDeals.reduce((sum, d) => sum + totalContractValue(d), 0);
 
   const funnel: FunnelBar[] = FUNNEL_STAGES.map((stage) => {
     const stageDeals = deals.filter((d) => d.stage === stage);
@@ -67,7 +68,7 @@ export async function getDashboardData() {
       stage,
       label: stage,
       count: stageDeals.length,
-      value: stageDeals.reduce((sum, d) => sum + (d.saleAmount ?? 0), 0),
+      value: stageDeals.reduce((sum, d) => sum + totalContractValue(d), 0),
     };
   });
 
@@ -77,7 +78,7 @@ export async function getDashboardData() {
     const mEnd = endOfMonth(m);
     const value = deals
       .filter((d) => d.soldAt && isWithinInterval(d.soldAt, { start: m, end: mEnd }))
-      .reduce((sum, d) => sum + (d.saleAmount ?? 0), 0);
+      .reduce((sum, d) => sum + totalContractValue(d), 0);
     monthly.push({ label: format(m, "MMM", { locale: da }), value });
   }
 
@@ -97,7 +98,7 @@ export async function getDashboardData() {
     if (d.stage === "LIVE" && !d.churnedAt) {
       const row = sellerMap.get(d.ownerId)!;
       row.wonCount++;
-      row.wonValue += d.saleAmount ?? 0;
+      row.wonValue += totalContractValue(d);
     }
   }
   for (const c of commissions) {

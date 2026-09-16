@@ -63,6 +63,11 @@ export function dealName(deal: { companyName: string; displayName?: string | nul
   return deal.displayName || deal.companyName;
 }
 
+/** saleAmount is the monthly recurring fee; the contract's total value over its binding period is that times bindingMonths. */
+export function totalContractValue(deal: { saleAmount: number | null; bindingMonths: number | null }): number {
+  return (deal.saleAmount ?? 0) * (deal.bindingMonths ?? 1);
+}
+
 export function formatDKK(amount: number | null | undefined): string {
   if (amount === null || amount === undefined) return "–";
   return new Intl.NumberFormat("da-DK", { style: "currency", currency: "DKK", maximumFractionDigits: 0 }).format(

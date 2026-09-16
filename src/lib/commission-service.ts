@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { calculateCommissionAmount, calculateCommissionDueDate } from "@/lib/commission";
+import { totalContractValue } from "@/lib/labels";
 
 export async function recalcCommission(dealId: string) {
   const deal = await prisma.deal.findUniqueOrThrow({
@@ -12,8 +13,8 @@ export async function recalcCommission(dealId: string) {
     return;
   }
 
-  // Commission base includes the establishment fee, not just the recurring value.
-  const baseAmount = deal.saleAmount + (deal.establishmentFee ?? 0);
+  // Commission base is the full contract value (monthly fee x binding period) plus the establishment fee.
+  const baseAmount = totalContractValue(deal) + (deal.establishmentFee ?? 0);
   const amount = calculateCommissionAmount(baseAmount, deal.owner.commissionRate);
   const dueDate = calculateCommissionDueDate(deal.soldAt, deal.owner.payoutFrequency);
 

@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { bulkUpdateSaleAmount, bulkAddProduct } from "@/lib/actions/bulk-deals";
-import { stageLabels, importTypeLabels, formatDKK, formatDate, dealName } from "@/lib/labels";
+import { stageLabels, importTypeLabels, formatDKK, formatDate, dealName, totalContractValue } from "@/lib/labels";
 import { useToast } from "@/components/toast";
 
 const PRODUCTS = ["Visitkort", "Drone-optagelse", "Matterport", "Hjemmeside"];
@@ -18,6 +18,8 @@ export type ListDeal = {
   owner: { name: string };
   stage: string;
   saleAmount: number | null;
+  bindingMonths: number | null;
+  establishmentFee: number | null;
   importType: string;
   createdAt: Date;
 };
@@ -79,7 +81,7 @@ export function DealsListTable({ deals }: { deals: ListDeal[] }) {
 
           <div className="flex items-end gap-2">
             <div>
-              <label className="block text-xs font-medium text-slate-500">Sæt salgsbeløb (DKK)</label>
+              <label className="block text-xs font-medium text-slate-500">Sæt salgsbeløb (DKK/måned)</label>
               <input
                 type="number"
                 min="0"
@@ -186,7 +188,9 @@ export function DealsListTable({ deals }: { deals: ListDeal[] }) {
                 </td>
                 <td className="px-4 py-1.5 text-slate-600">{deal.owner.name}</td>
                 <td className="px-4 py-1.5 text-slate-600">{stageLabels[deal.stage]}</td>
-                <td className="px-4 py-1.5 text-slate-600">{formatDKK(deal.saleAmount)}</td>
+                <td className="px-4 py-1.5 text-slate-600">
+                  {formatDKK(totalContractValue(deal) + (deal.establishmentFee ?? 0))}
+                </td>
                 <td className="px-4 py-1.5 text-slate-600">{importTypeLabels[deal.importType]}</td>
                 <td className="px-4 py-1.5 text-slate-600">{formatDate(deal.createdAt)}</td>
               </tr>

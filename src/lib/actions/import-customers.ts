@@ -10,6 +10,7 @@ import { buildDealEmailAddress } from "@/lib/email-address";
 import { findDuplicateDeals } from "@/lib/duplicates";
 import { recalcCommission } from "@/lib/commission-service";
 import { computeBillingPeriods, computePeriodAmounts } from "@/lib/invoice-schedule";
+import { totalContractValue } from "@/lib/labels";
 import { pick, parseAmount, type ParsedRow } from "@/lib/import-helpers";
 
 /**
@@ -48,7 +49,7 @@ export async function importExistingCustomers(formData: FormData) {
 
   for (const row of rows) {
     const companyName = pick(row, "companyName", "company", "firma", "firmanavn", "virksomhed");
-    const saleAmountRaw = pick(row, "saleAmount", "salgsbeløb", "kontraktværdi", "beløb");
+    const saleAmountRaw = pick(row, "saleAmount", "salgsbeløb", "månedligt beløb", "beløb");
     const bindingMonthsRaw = pick(row, "bindingMonths", "binding", "bindingsperiode", "binding (mdr)");
     const startDateRaw = pick(row, "startDate", "startdato", "livedato", "kontraktstart", "kontrakt-start");
 
@@ -130,7 +131,7 @@ export async function importExistingCustomers(formData: FormData) {
 
       const until = maxDate([addMonths(startDate, bindingMonths), now]);
       const periods = computeBillingPeriods(startDate, bindingMonths, until);
-      const amounts = computePeriodAmounts(saleAmount, periods, startDate, bindingMonths);
+      const amounts = computePeriodAmounts(totalContractValue({ saleAmount, bindingMonths }), periods, startDate, bindingMonths);
       for (let i = 0; i < periods.length; i++) {
         if (periods[i].draftTriggerDate > now) continue;
         await prisma.invoice.create({

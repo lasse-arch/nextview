@@ -9,6 +9,7 @@ import {
   format,
 } from "date-fns";
 import { da } from "date-fns/locale";
+import { totalContractValue } from "@/lib/labels";
 
 const PIPELINE_STAGES = ["CONTRACT_SIGNED", "FILMED"] as const;
 const RISK_WINDOWS = [30, 60, 90] as const;
@@ -24,9 +25,8 @@ type DealForGrowth = {
   contractEndDate: Date | null;
 };
 
-function monthlyRate(deal: { saleAmount: number | null; bindingMonths: number | null }): number {
-  if (!deal.saleAmount || !deal.bindingMonths) return 0;
-  return deal.saleAmount / deal.bindingMonths;
+function monthlyRate(deal: { saleAmount: number | null }): number {
+  return deal.saleAmount ?? 0;
 }
 
 function isBillable(deal: DealForGrowth): boolean {
@@ -67,15 +67,14 @@ export async function getGrowthDashboardData() {
     };
   });
 
-  const activeContractValue = activeDeals.reduce((sum, d) => sum + (d.saleAmount ?? 0), 0);
+  const activeContractValue = activeDeals.reduce((sum, d) => sum + totalContractValue(d), 0);
   const realizedToDate = activeDeals.reduce((sum, d) => {
     if (!d.billingStartDate || !d.bindingMonths || !d.saleAmount) return sum;
     const elapsedMonths = Math.max(0, differenceInCalendarMonths(now, d.billingStartDate));
-    const fraction = Math.min(1, elapsedMonths / d.bindingMonths);
-    return sum + d.saleAmount * fraction;
+    return sum + d.saleAmount * Math.min(elapsedMonths, d.bindingMonths);
   }, 0);
   const remainingContractValue = activeContractValue - realizedToDate;
-  const pipelineContractValue = pipelineDeals.reduce((sum, d) => sum + (d.saleAmount ?? 0), 0);
+  const pipelineContractValue = pipelineDeals.reduce((sum, d) => sum + totalContractValue(d), 0);
   const establishmentTotal = [...activeDeals, ...pipelineDeals].reduce(
     (sum, d) => sum + (d.establishmentFee ?? 0),
     0
@@ -89,7 +88,7 @@ export async function getGrowthDashboardData() {
       : 0;
   const avgContractValue =
     billableCustomers.length > 0
-      ? billableCustomers.reduce((sum, d) => sum + (d.saleAmount ?? 0), 0) / billableCustomers.length
+      ? billableCustomers.reduce((sum, d) => sum + totalContractValue(d), 0) / billableCustomers.length
       : 0;
   const avgEstablishmentFeeActive =
     activeDeals.length > 0

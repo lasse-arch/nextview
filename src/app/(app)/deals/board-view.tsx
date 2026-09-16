@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { updateDealStage, setMeetingDateAndStage } from "@/lib/actions/deals";
-import { stageLabels, stageOrder, formatDKK, dealName } from "@/lib/labels";
+import { stageLabels, stageOrder, formatDKK, dealName, totalContractValue } from "@/lib/labels";
 import { useToast } from "@/components/toast";
 import type { DealStage } from "@prisma/client";
 
@@ -14,6 +14,8 @@ export type BoardDeal = {
   contactName: string | null;
   ownerName: string;
   saleAmount: number | null;
+  bindingMonths: number | null;
+  establishmentFee: number | null;
   stage: DealStage;
   isChurned: boolean;
 };
@@ -144,7 +146,7 @@ export function DealsBoard({ initialDeals, isAdmin }: { initialDeals: BoardDeal[
 
       <div className="flex gap-3 overflow-x-auto pb-4">
         {columns.map(({ stage, deals: colDeals }) => {
-          const total = colDeals.reduce((sum, d) => sum + (d.saleAmount ?? 0), 0);
+          const total = colDeals.reduce((sum, d) => sum + totalContractValue(d) + (d.establishmentFee ?? 0), 0);
           const managed = CONTRACT_MANAGED_STAGES.includes(stage);
           return (
             <div
@@ -181,7 +183,9 @@ export function DealsBoard({ initialDeals, isAdmin }: { initialDeals: BoardDeal[
                     </Link>
                     <div className="mt-0.5 flex items-center justify-between text-[11px] text-slate-500">
                       <span className="truncate">{deal.ownerName}</span>
-                      <span className="flex-shrink-0 font-medium text-slate-700">{formatDKK(deal.saleAmount)}</span>
+                      <span className="flex-shrink-0 font-medium text-slate-700">
+                        {formatDKK(totalContractValue(deal) + (deal.establishmentFee ?? 0))}
+                      </span>
                     </div>
                   </div>
                 ))}

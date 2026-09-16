@@ -137,6 +137,7 @@ export default async function DashboardPage() {
           <div className="mt-4 flex h-32 items-end gap-3">
             {data.monthly.map((m) => (
               <div key={m.label} className="flex flex-1 flex-col items-center gap-1" title={formatDKK(m.value)}>
+                <span className="text-[11px] font-medium text-slate-600">{formatDKK(m.value)}</span>
                 <div className="flex h-24 w-full items-end">
                   <div
                     className="w-full rounded-t-md bg-blue-600"

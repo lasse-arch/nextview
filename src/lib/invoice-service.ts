@@ -2,6 +2,7 @@ import { addMonths, max as maxDate } from "date-fns";
 import { prisma } from "@/lib/db";
 import { isDineroConfigured, createQuarterlyInvoiceDraft } from "@/lib/dinero";
 import { computeBillingPeriods, computePeriodAmounts } from "@/lib/invoice-schedule";
+import { totalContractValue } from "@/lib/labels";
 import type { DealStage } from "@prisma/client";
 
 const ACTIVE_CUSTOMER_STAGES: DealStage[] = ["CONTRACT_SIGNED", "FILMED", "LIVE"];
@@ -59,7 +60,8 @@ function computeDueLines(deal: {
   const until = deal.contractEndDate ?? maxDate([contractEnd, addMonths(now, ROLLING_HORIZON_MONTHS)]);
 
   const periods = computeBillingPeriods(deal.billingStartDate, deal.bindingMonths, until);
-  const amounts = computePeriodAmounts(deal.saleAmount, periods, deal.billingStartDate, deal.bindingMonths);
+  // saleAmount is the monthly fee; computePeriodAmounts wants the contract's total value for the binding period.
+  const amounts = computePeriodAmounts(totalContractValue(deal), periods, deal.billingStartDate, deal.bindingMonths);
 
   periods.forEach((period, i) => {
     if (period.draftTriggerDate > now) return;

@@ -232,7 +232,7 @@ export default async function DealDetailPage({
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-500">Salgsbeløb (DKK)</label>
+                  <label className="block text-xs font-medium text-slate-500">Salgsbeløb (DKK/måned)</label>
                   <input
                     name="saleAmount"
                     type="number"

@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
@@ -41,7 +42,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <header className="border-b border-slate-200 bg-white shadow-sm">
           <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
             <div className="flex items-center gap-8">
-              <span className="text-lg font-semibold tracking-tight text-slate-900">Nextview360</span>
+              <Link href="/" className="flex items-center">
+                <Image src="/logo.png" alt="Nextview360" width={942} height={219} className="h-7 w-auto" priority />
+              </Link>
               <nav className="flex items-center gap-5 text-sm font-medium text-slate-500">
                 {navItems.map((item) => (
                   <Link key={item.href} href={item.href} className="transition-colors hover:text-slate-900">

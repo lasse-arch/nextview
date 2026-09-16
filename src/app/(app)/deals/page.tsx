@@ -68,6 +68,8 @@ export default async function DealsPage({
     contactName: d.contactName,
     ownerName: d.owner.name,
     saleAmount: d.saleAmount,
+    bindingMonths: d.bindingMonths,
+    establishmentFee: d.establishmentFee,
     stage: d.stage,
     isChurned: Boolean(d.churnedAt),
   }));
