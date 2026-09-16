@@ -67,7 +67,7 @@ export async function updateDeal(dealId: string, formData: FormData) {
   const ownerId = String(formData.get("ownerId") || "");
   const stage = String(formData.get("stage") || "LEAD") as DealStage;
   const meetingDateRaw = String(formData.get("meetingDate") || "");
-  const soldProduct = String(formData.get("soldProduct") || "") || null;
+  const soldProduct = formData.getAll("soldProduct").map(String).filter(Boolean).join(", ") || null;
   const bindingMonthsRaw = String(formData.get("bindingMonths") || "");
   const bindingMonths = bindingMonthsRaw ? parseInt(bindingMonthsRaw, 10) : null;
   const saleAmountRaw = String(formData.get("saleAmount") || "");

@@ -31,6 +31,8 @@ function toDateInputValue(date: Date | null): string {
   return date.toISOString().slice(0, 10);
 }
 
+const SOLD_PRODUCT_OPTIONS = ["Visitkort", "Drone-optagelse", "Matterport", "Hjemmeside"];
+
 export default async function DealDetailPage({
   params,
   searchParams,
@@ -214,12 +216,18 @@ export default async function DealDetailPage({
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-slate-500">Solgt til (produkt/ydelse)</label>
-                  <input
+                  <select
                     name="soldProduct"
-                    defaultValue={deal.soldProduct ?? ""}
-                    placeholder="F.eks. Video-pakke Guld"
+                    multiple
+                    defaultValue={deal.soldProduct ? deal.soldProduct.split(", ") : []}
                     className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-                  />
+                  >
+                    {SOLD_PRODUCT_OPTIONS.map((p) => (
+                      <option key={p} value={p}>
+                        {p}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-500">Binding (måneder)</label>
