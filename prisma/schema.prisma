@@ -40,6 +40,13 @@ enum NoteKind {
   AI_MEETING
 }
 
+enum GoalMetric {
+  MEETINGS_BOOKED
+  ESTABLISHMENT_FEE
+  MRR_SOLD
+  DEALS_SOLD
+}
+
 enum CommissionStatus {
   PENDING
   DUE
@@ -79,7 +86,7 @@ model Invoice {
   deal   Deal   @relation(fields: [dealId], references: [id], onDelete: Cascade)
   dealId String
 
-  termNumber Int @default(1)
+  termNumber    Int           @default(1)
   /// 0 = one-time establishment fee for this term, 1+ = recurring quarter number
   quarterIndex  Int
   amount        Int
@@ -97,21 +104,43 @@ model Invoice {
 }
 
 model User {
-  id                String               @id @default(cuid())
+  id                String              @id @default(cuid())
   name              String
-  email             String               @unique
+  email             String              @unique
   passwordHash      String
-  role              Role                 @default(SALES)
-  isCommissionBased Boolean              @default(true)
-  commissionRate    Float                @default(10)
-  payoutFrequency   CommissionFrequency  @default(MONTHLY)
-  createdAt         DateTime             @default(now())
+  role              Role                @default(SALES)
+  isCommissionBased Boolean             @default(true)
+  commissionRate    Float               @default(10)
+  payoutFrequency   CommissionFrequency @default(MONTHLY)
+  createdAt         DateTime            @default(now())
 
-  deals        Deal[]         @relation("DealOwner")
-  notes        Note[]
+  deals         Deal[]         @relation("DealOwner")
+  notes         Note[]
   importBatches ImportBatch[]
-  commissions  Commission[]
+  commissions   Commission[]
   emailAccounts EmailAccount[]
+  goals         Goal[]         @relation("GoalOwner")
+  createdGoals  Goal[]         @relation("GoalCreatedBy")
+}
+
+/// A monthly target, either for one seller (userId set) or for the whole
+/// company (userId null), tracked live against that month's deal data for
+/// the chosen metric. Anyone can set their own; only an admin can set a
+/// company-wide goal or one for someone else.
+model Goal {
+  id          String     @id @default(cuid())
+  user        User?      @relation("GoalOwner", fields: [userId], references: [id], onDelete: Cascade)
+  userId      String?
+  /// First day of the target month, e.g. 2026-09-01.
+  month       DateTime
+  metric      GoalMetric
+  targetValue Int
+
+  createdBy   User   @relation("GoalCreatedBy", fields: [createdById], references: [id])
+  createdById String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model ImportBatch {
@@ -127,15 +156,15 @@ model ImportBatch {
 }
 
 model Deal {
-  id          String   @id @default(cuid())
-  companyName String
+  id           String  @id @default(cuid())
+  companyName  String
   /// Kaldenavn - shown instead of companyName wherever the deal appears, for
   /// when the CVR-registered legal name differs from what the customer is
   /// actually known as.
-  displayName String?
-  cvrNumber   String?
-  address     String?
-  contactName String?
+  displayName  String?
+  cvrNumber    String?
+  address      String?
+  contactName  String?
   contactEmail String?
   contactPhone String?
   /// Where invoices should be sent, if different from contactEmail (e.g. an accounting inbox).
@@ -147,9 +176,9 @@ model Deal {
   /// Links this deal as a branch/department of another deal (customer) - e.g.
   /// several locations of the same chain - while each keeps its own CVR
   /// number, contract, and invoicing independently.
-  parent    Deal?  @relation("DealBranches", fields: [parentDealId], references: [id])
+  parent       Deal?   @relation("DealBranches", fields: [parentDealId], references: [id])
   parentDealId String?
-  branches  Deal[] @relation("DealBranches")
+  branches     Deal[]  @relation("DealBranches")
 
   stage DealStage @default(LEAD)
 
@@ -295,18 +324,18 @@ model IntegrationSetting {
 }
 
 model Commission {
-  id          String              @id @default(cuid())
-  deal        Deal                @relation(fields: [dealId], references: [id], onDelete: Cascade)
-  dealId      String              @unique
-  seller      User                @relation(fields: [sellerId], references: [id])
-  sellerId    String
-  rate        Float
-  baseAmount  Int
-  amount      Int
-  frequency   CommissionFrequency
-  status      CommissionStatus    @default(PENDING)
-  dueDate     DateTime?
-  paidAt      DateTime?
-  createdAt   DateTime            @default(now())
-  updatedAt   DateTime            @updatedAt
+  id         String              @id @default(cuid())
+  deal       Deal                @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  dealId     String              @unique
+  seller     User                @relation(fields: [sellerId], references: [id])
+  sellerId   String
+  rate       Float
+  baseAmount Int
+  amount     Int
+  frequency  CommissionFrequency
+  status     CommissionStatus    @default(PENDING)
+  dueDate    DateTime?
+  paidAt     DateTime?
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
 }

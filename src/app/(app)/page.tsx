@@ -1,7 +1,10 @@
 import { getCurrentUser } from "@/lib/auth";
+import { prisma } from "@/lib/db";
 import { getDashboardData } from "@/lib/dashboard-data";
 import { stageLabels, invoiceStatusLabels, formatDKK } from "@/lib/labels";
 import { getQuoteOfTheDay } from "@/lib/quotes";
+import { getGoalsForDashboard } from "@/lib/goals-data";
+import { GoalsCard } from "./goals-card";
 
 const FUNNEL_SHADES = [
   "bg-blue-200",
@@ -44,7 +47,11 @@ function StatTile({
 export default async function DashboardPage() {
   const user = await getCurrentUser();
   const isAdmin = user?.role === "ADMIN";
-  const data = await getDashboardData(isAdmin ? undefined : user?.id);
+  const [data, goals, users] = await Promise.all([
+    getDashboardData(isAdmin ? undefined : user?.id),
+    user ? getGoalsForDashboard(user) : Promise.resolve([]),
+    prisma.user.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
+  ]);
 
   const funnelMax = Math.max(1, ...data.funnel.map((f) => f.count));
   const monthlyMax = Math.max(1, ...data.monthly.map((m) => m.value));
@@ -140,6 +147,10 @@ export default async function DashboardPage() {
             })}
             {totalInvoices === 0 && <p className="text-xs text-slate-400">Ingen fakturaer endnu.</p>}
           </div>
+        </div>
+
+        <div className="lg:col-span-3">
+          <GoalsCard goals={goals} isAdmin={isAdmin} currentUserId={user?.id ?? ""} users={users} />
         </div>
       </div>
 
