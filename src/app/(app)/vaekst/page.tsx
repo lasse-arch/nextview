@@ -28,7 +28,7 @@ export default async function GrowthDashboardPage() {
   if (user.role !== "ADMIN") redirect("/");
 
   const d = await getGrowthDashboardData();
-  const monthlyMax = Math.max(1, ...d.monthlyNew.map((m) => m.newMRR));
+  const monthlyMax = Math.max(1, ...d.monthlyNew.map((m) => m.count));
   const riskLabelFor = (days: number) => (days === 30 ? "< 30 dage" : days === 60 ? "< 60 dage" : "< 90 dage");
 
   return (
@@ -108,10 +108,11 @@ export default async function GrowthDashboardPage() {
           <div className="mt-4 flex h-40 items-end gap-1.5">
             {d.monthlyNew.map((m) => (
               <div key={m.label} className="flex flex-1 flex-col items-center gap-1" title={`${m.count} nye · ${formatDKK(m.newMRR)} ny MRR`}>
+                <span className="text-[10px] font-medium text-slate-600">{m.count}</span>
                 <div className="flex h-28 w-full items-end">
                   <div
                     className="w-full rounded-t-md bg-blue-600"
-                    style={{ height: `${Math.max(m.newMRR > 0 ? 4 : 0, (m.newMRR / monthlyMax) * 100)}%` }}
+                    style={{ height: `${Math.max(m.count > 0 ? 4 : 0, (m.count / monthlyMax) * 100)}%` }}
                   />
                 </div>
                 <span className="text-[10px] text-slate-400 capitalize">{m.label.split(" ")[0]}</span>

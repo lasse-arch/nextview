@@ -27,11 +27,12 @@ export type SellerRow = {
 };
 export type InvoiceStatusRow = { status: string; count: number };
 
-export async function getDashboardData() {
+/** Pass an ownerId to scope the whole dashboard to one seller's own deals/commission (used for non-admins). */
+export async function getDashboardData(ownerId?: string) {
   const [deals, commissions, invoices] = await Promise.all([
-    prisma.deal.findMany({ include: { owner: true } }),
-    prisma.commission.findMany({ include: { seller: true } }),
-    prisma.invoice.findMany(),
+    prisma.deal.findMany({ where: ownerId ? { ownerId } : {}, include: { owner: true } }),
+    prisma.commission.findMany({ where: ownerId ? { sellerId: ownerId } : {}, include: { seller: true } }),
+    prisma.invoice.findMany({ where: ownerId ? { deal: { ownerId } } : {} }),
   ]);
 
   const now = new Date();

@@ -42,7 +42,8 @@ function StatTile({
 
 export default async function DashboardPage() {
   const user = await getCurrentUser();
-  const data = await getDashboardData();
+  const isAdmin = user?.role === "ADMIN";
+  const data = await getDashboardData(isAdmin ? undefined : user?.id);
 
   const funnelMax = Math.max(1, ...data.funnel.map((f) => f.count));
   const monthlyMax = Math.max(1, ...data.monthly.map((m) => m.value));
@@ -52,7 +53,11 @@ export default async function DashboardPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold text-slate-900">Velkommen, {user?.name}</h1>
-        <p className="mt-1 text-sm text-slate-500">Overblik over pipeline, salg, provision og fakturering</p>
+        <p className="mt-1 text-sm text-slate-500">
+          {isAdmin
+            ? "Overblik over pipeline, salg, provision og fakturering"
+            : "Overblik over din pipeline, salg og provision"}
+        </p>
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
@@ -132,7 +137,7 @@ export default async function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className={`rounded-xl border border-slate-200 bg-white p-5 shadow-sm ${isAdmin ? "" : "lg:col-span-3"}`}>
           <h2 className="text-sm font-semibold text-slate-900">Salg, seneste 6 måneder</h2>
           <div className="mt-4 flex h-32 items-end gap-3">
             {data.monthly.map((m) => (
@@ -150,45 +155,47 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-2">
-          <h2 className="text-sm font-semibold text-slate-900">Sælgere</h2>
-          <table className="mt-3 w-full text-sm">
-            <thead className="text-left text-xs text-slate-500">
-              <tr>
-                <th className="py-1.5 font-medium">Sælger</th>
-                <th className="py-1.5 text-right font-medium">Live-kunder</th>
-                <th className="py-1.5 text-right font-medium">Værdi</th>
-                <th className="py-1.5 text-right font-medium">Provision afventer</th>
-                <th className="py-1.5 text-right font-medium">Provision udbetalt</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.sellers.map((s) => (
-                <tr key={s.id} className="border-t border-slate-100">
-                  <td className="py-1.5 text-slate-800">
-                    {s.name}
-                    {!s.isCommissionBased && (
-                      <span className="ml-1.5 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500">
-                        Ikke provision
-                      </span>
-                    )}
-                  </td>
-                  <td className="py-1.5 text-right text-slate-600">{s.wonCount}</td>
-                  <td className="py-1.5 text-right text-slate-600">{formatDKK(s.wonValue)}</td>
-                  <td className="py-1.5 text-right text-amber-700">{formatDKK(s.commissionPending)}</td>
-                  <td className="py-1.5 text-right text-emerald-700">{formatDKK(s.commissionPaid)}</td>
-                </tr>
-              ))}
-              {data.sellers.length === 0 && (
+        {isAdmin && (
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-2">
+            <h2 className="text-sm font-semibold text-slate-900">Sælgere</h2>
+            <table className="mt-3 w-full text-sm">
+              <thead className="text-left text-xs text-slate-500">
                 <tr>
-                  <td colSpan={5} className="py-4 text-center text-slate-400">
-                    Ingen data endnu.
-                  </td>
+                  <th className="py-1.5 font-medium">Sælger</th>
+                  <th className="py-1.5 text-right font-medium">Live-kunder</th>
+                  <th className="py-1.5 text-right font-medium">Værdi</th>
+                  <th className="py-1.5 text-right font-medium">Provision afventer</th>
+                  <th className="py-1.5 text-right font-medium">Provision udbetalt</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {data.sellers.map((s) => (
+                  <tr key={s.id} className="border-t border-slate-100">
+                    <td className="py-1.5 text-slate-800">
+                      {s.name}
+                      {!s.isCommissionBased && (
+                        <span className="ml-1.5 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500">
+                          Ikke provision
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-1.5 text-right text-slate-600">{s.wonCount}</td>
+                    <td className="py-1.5 text-right text-slate-600">{formatDKK(s.wonValue)}</td>
+                    <td className="py-1.5 text-right text-amber-700">{formatDKK(s.commissionPending)}</td>
+                    <td className="py-1.5 text-right text-emerald-700">{formatDKK(s.commissionPaid)}</td>
+                  </tr>
+                ))}
+                {data.sellers.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="py-4 text-center text-slate-400">
+                      Ingen data endnu.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );
