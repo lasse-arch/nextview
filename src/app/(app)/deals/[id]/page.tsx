@@ -262,12 +262,20 @@ export default async function DealDetailPage({
                     className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
                   />
                 </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-500">Live dato (afleveret)</label>
+                  <input
+                    name="liveAt"
+                    type="date"
+                    defaultValue={toDateInputValue(deal.liveAt)}
+                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  />
+                </div>
                 <div className="col-span-2 flex flex-wrap gap-4 text-xs text-slate-500">
                   <span>Møde: {formatDate(deal.meetingDate)}</span>
                   <span>Kontrakt sendt: {formatDate(deal.contractSentAt)}</span>
                   <span>Underskrevet: {formatDate(deal.contractSignedAt)}</span>
                   <span>Filmet: {formatDate(deal.filmedAt)}</span>
-                  <span>Live: {formatDate(deal.liveAt)}</span>
                   <span>Fakturering starter: {formatDate(deal.billingStartDate)}</span>
                   {deal.contractEndDate && (
                     <span className="font-medium text-amber-700">

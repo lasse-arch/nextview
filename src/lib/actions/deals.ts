@@ -76,6 +76,7 @@ export async function updateDeal(dealId: string, formData: FormData) {
   const soldAt = soldAtRaw ? new Date(soldAtRaw) : null;
   const establishmentFeeRaw = String(formData.get("establishmentFee") || "");
   const establishmentFee = establishmentFeeRaw ? Math.round(parseFloat(establishmentFeeRaw)) : null;
+  const liveAtRaw = String(formData.get("liveAt") || "");
 
   if (stage === "MEETING_BOOKED" && !meetingDateRaw) {
     throw new Error("Angiv en mødedato når stadiet er 'Møde booket'.");
@@ -88,12 +89,13 @@ export async function updateDeal(dealId: string, formData: FormData) {
     throw new Error("Denne fase styres automatisk via PandaDoc-kontrakten på dealens side.");
   }
 
+  // The Live-dato field is explicit and editable; only fall back to "today"
+  // when a deal is newly moved to Live without one having been set yet.
+  const liveAt = liveAtRaw ? new Date(liveAtRaw) : stage === "LIVE" && !existing.liveAt ? new Date() : existing.liveAt;
+
   const stageDateUpdates: Record<string, Date> = {};
   if (stage === "FILMED" && !existing.filmedAt) stageDateUpdates.filmedAt = new Date();
-  if (stage === "LIVE" && !existing.liveAt) {
-    stageDateUpdates.liveAt = new Date();
-    if (!existing.billingStartDate) stageDateUpdates.billingStartDate = stageDateUpdates.liveAt;
-  }
+  if (stage === "LIVE" && !existing.billingStartDate && liveAt) stageDateUpdates.billingStartDate = liveAt;
 
   const duplicates =
     companyName && companyName.toLowerCase() !== existing.companyName.toLowerCase()
@@ -119,6 +121,7 @@ export async function updateDeal(dealId: string, formData: FormData) {
       saleAmount,
       soldAt,
       establishmentFee,
+      liveAt,
       ...stageDateUpdates,
     },
   });
