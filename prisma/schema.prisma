@@ -112,6 +112,8 @@ model User {
   isCommissionBased Boolean             @default(true)
   commissionRate    Float               @default(10)
   payoutFrequency   CommissionFrequency @default(MONTHLY)
+  /// Profile picture as a data URL (small, resized client-side before upload).
+  avatarUrl         String?
   createdAt         DateTime            @default(now())
 
   deals         Deal[]         @relation("DealOwner")
@@ -164,6 +166,10 @@ model Deal {
   displayName  String?
   cvrNumber    String?
   address      String?
+  /// Geocoded from address (Danish addresses only, via DAWA) - filled in lazily
+  /// the first time the customer map needs it, then cached here.
+  latitude     Float?
+  longitude    Float?
   contactName  String?
   contactEmail String?
   contactPhone String?

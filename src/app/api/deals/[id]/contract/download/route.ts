@@ -4,7 +4,11 @@ import { prisma } from "@/lib/db";
 import { downloadSignedDocument } from "@/lib/pandadoc";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  await requireUser();
+  try {
+    await requireUser();
+  } catch {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   const { id } = await params;
 
   const deal = await prisma.deal.findUnique({ where: { id } });

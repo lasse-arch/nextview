@@ -11,7 +11,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!user) redirect("/login");
 
   const navItems = [
-    { href: "/", label: "Dashboard" },
     { href: "/deals", label: "Deals" },
     { href: "/deals/import", label: "Importér" },
     { href: "/commission", label: "Provision" },
@@ -21,6 +20,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   }
 
   const settingsItems = [
+    { href: "/profile", label: "Min profil" },
     { href: "/settings/email", label: "E-mail" },
     { href: "/settings/pandadoc", label: "Kontrakter" },
     { href: "/settings/dinero", label: "Fakturaer" },
@@ -62,9 +62,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                 + Ny lead
               </Link>
               <div className="flex items-center gap-3 text-sm text-slate-600">
-                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-xs font-semibold text-white">
-                  {initials}
-                </span>
+                {user.avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={user.avatarUrl} alt={user.name} className="h-7 w-7 rounded-full object-cover" />
+                ) : (
+                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-xs font-semibold text-white">
+                    {initials}
+                  </span>
+                )}
                 <span>{user.name}</span>
                 <form action={logout}>
                   <button type="submit" className="text-slate-400 transition-colors hover:text-slate-900">

@@ -4,7 +4,13 @@ import { prisma } from "@/lib/db";
 import { getAppBaseUrl, MICROSOFT_SCOPES } from "@/lib/email-oauth";
 
 export async function GET(request: NextRequest) {
-  const user = await requireUser();
+  let user;
+  try {
+    user = await requireUser();
+  } catch {
+    return NextResponse.redirect(new URL("/login", getAppBaseUrl()));
+  }
+
   const code = request.nextUrl.searchParams.get("code");
   const errorParam = request.nextUrl.searchParams.get("error");
 

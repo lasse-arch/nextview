@@ -5,6 +5,8 @@ import { stageLabels, invoiceStatusLabels, formatDKK } from "@/lib/labels";
 import { getQuoteOfTheDay } from "@/lib/quotes";
 import { getGoalsForDashboard } from "@/lib/goals-data";
 import { GoalsCard } from "./goals-card";
+import { getCustomerMapPoints } from "@/lib/customer-map-data";
+import { DenmarkMap } from "./denmark-map";
 
 const FUNNEL_SHADES = [
   "bg-blue-200",
@@ -47,10 +49,11 @@ function StatTile({
 export default async function DashboardPage() {
   const user = await getCurrentUser();
   const isAdmin = user?.role === "ADMIN";
-  const [data, goals, users] = await Promise.all([
+  const [data, goals, users, customerMapPoints] = await Promise.all([
     getDashboardData(isAdmin ? undefined : user?.id),
     user ? getGoalsForDashboard(user) : Promise.resolve([]),
     prisma.user.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    getCustomerMapPoints(),
   ]);
 
   const funnelMax = Math.max(1, ...data.funnel.map((f) => f.count));
@@ -215,6 +218,16 @@ export default async function DashboardPage() {
           </div>
         )}
       </div>
+
+      {customerMapPoints.length > 0 && (
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <h2 className="text-sm font-semibold text-slate-900">Vores kunder i Danmark</h2>
+          <p className="mt-1 text-xs text-slate-500">Kunder med underskrevet aftale. Hold musen over en prik for at se hvem det er.</p>
+          <div className="mt-4">
+            <DenmarkMap points={customerMapPoints} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

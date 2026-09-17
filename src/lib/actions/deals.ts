@@ -269,6 +269,19 @@ export async function addNote(dealId: string, formData: FormData) {
   redirect(`/deals/${dealId}?saved=Note%20tilf%C3%B8jet`);
 }
 
+/** Used by the board view's Quick-note popup - adds a note without navigating away. */
+export async function addQuickNote(dealId: string, body: string) {
+  const user = await requireUser();
+  const trimmed = body.trim();
+  if (!trimmed) throw new Error("Skriv en note først.");
+
+  await prisma.note.create({
+    data: { dealId, authorId: user.id, body: trimmed, kind: "MANUAL" },
+  });
+
+  revalidatePath(`/deals/${dealId}`);
+}
+
 export async function markDealInactive(dealId: string) {
   await requireUser();
   await prisma.deal.update({ where: { id: dealId }, data: { churnedAt: new Date() } });

@@ -3,7 +3,11 @@ import { requireUser } from "@/lib/auth";
 import { getAppBaseUrl, GOOGLE_SCOPES, isGoogleConfigured } from "@/lib/email-oauth";
 
 export async function GET() {
-  await requireUser();
+  try {
+    await requireUser();
+  } catch {
+    return NextResponse.redirect(new URL("/login", getAppBaseUrl()));
+  }
 
   if (!isGoogleConfigured()) {
     return NextResponse.redirect(

@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { updateDealStage, setMeetingDateAndStage } from "@/lib/actions/deals";
+import { updateDealStage, setMeetingDateAndStage, addQuickNote } from "@/lib/actions/deals";
 import { stageLabels, stageOrder, formatDKK, dealName, totalContractValue } from "@/lib/labels";
 import { useToast } from "@/components/toast";
 import type { DealStage } from "@prisma/client";
@@ -13,12 +13,22 @@ export type BoardDeal = {
   displayName: string | null;
   contactName: string | null;
   ownerName: string;
+  ownerAvatarUrl: string | null;
   saleAmount: number | null;
   bindingMonths: number | null;
   establishmentFee: number | null;
   stage: DealStage;
   isChurned: boolean;
 };
+
+function ownerInitials(name: string): string {
+  return name
+    .split(" ")
+    .map((p) => p[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+}
 
 const CONTRACT_MANAGED_STAGES: DealStage[] = ["CONTRACT_SENT", "CONTRACT_SIGNED"];
 
@@ -35,6 +45,8 @@ export function DealsBoard({ initialDeals, isAdmin }: { initialDeals: BoardDeal[
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [meetingPromptDealId, setMeetingPromptDealId] = useState<string | null>(null);
   const [meetingDateInput, setMeetingDateInput] = useState(toDateTimeLocalDefault());
+  const [quickNoteDealId, setQuickNoteDealId] = useState<string | null>(null);
+  const [quickNoteText, setQuickNoteText] = useState("");
   const [, startTransition] = useTransition();
   const showToast = useToast();
 
@@ -96,6 +108,24 @@ export function DealsBoard({ initialDeals, isAdmin }: { initialDeals: BoardDeal[
     });
   }
 
+  function submitQuickNote() {
+    const dealId = quickNoteDealId;
+    const body = quickNoteText.trim();
+    if (!dealId || !body) return;
+
+    setQuickNoteDealId(null);
+    setQuickNoteText("");
+
+    startTransition(async () => {
+      try {
+        await addQuickNote(dealId, body);
+        showToast("Note tilføjet");
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Kunne ikke gemme noten.");
+      }
+    });
+  }
+
   const columns = stageOrder.map((stage) => ({
     stage,
     deals: deals.filter((d) => d.stage === stage),
@@ -144,6 +174,42 @@ export function DealsBoard({ initialDeals, isAdmin }: { initialDeals: BoardDeal[
         </div>
       )}
 
+      {quickNoteDealId && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/40">
+          <div className="w-80 rounded-lg bg-white p-4 shadow-xl">
+            <h3 className="text-sm font-semibold text-slate-900">Skriv en hurtig note</h3>
+            <textarea
+              value={quickNoteText}
+              onChange={(e) => setQuickNoteText(e.target.value)}
+              autoFocus
+              rows={4}
+              placeholder="Hvad skal huskes om denne deal?"
+              className="mt-3 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+            />
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setQuickNoteDealId(null);
+                  setQuickNoteText("");
+                }}
+                className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50"
+              >
+                Annullér
+              </button>
+              <button
+                type="button"
+                onClick={submitQuickNote}
+                disabled={!quickNoteText.trim()}
+                className="rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+              >
+                Gem note
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex gap-3 overflow-x-auto pb-4">
         {columns.map(({ stage, deals: colDeals }) => {
           const total = colDeals.reduce((sum, d) => sum + totalContractValue(d) + (d.establishmentFee ?? 0), 0);
@@ -182,11 +248,36 @@ export function DealsBoard({ initialDeals, isAdmin }: { initialDeals: BoardDeal[
                       {deal.isChurned && <span className="ml-1 text-[10px] font-normal text-slate-400">(inaktiv)</span>}
                     </Link>
                     <div className="mt-0.5 flex items-center justify-between text-[11px] text-slate-500">
-                      <span className="truncate">{deal.ownerName}</span>
+                      <span className="flex min-w-0 items-center gap-1">
+                        {deal.ownerAvatarUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={deal.ownerAvatarUrl}
+                            alt={deal.ownerName}
+                            className="h-4 w-4 flex-shrink-0 rounded-full object-cover"
+                          />
+                        ) : (
+                          <span className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full bg-slate-300 text-[8px] font-semibold text-white">
+                            {ownerInitials(deal.ownerName)}
+                          </span>
+                        )}
+                        <span className="truncate">{deal.ownerName}</span>
+                      </span>
                       <span className="flex-shrink-0 font-medium text-slate-700">
                         {formatDKK(totalContractValue(deal) + (deal.establishmentFee ?? 0))}
                       </span>
                     </div>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setQuickNoteText("");
+                        setQuickNoteDealId(deal.id);
+                      }}
+                      className="mt-1 text-[10px] text-blue-600 hover:underline"
+                    >
+                      + Quick-note
+                    </button>
                   </div>
                 ))}
                 {colDeals.length === 0 && (

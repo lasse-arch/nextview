@@ -3,7 +3,11 @@ import { requireUser } from "@/lib/auth";
 import { lookupCvrNumber } from "@/lib/cvr";
 
 export async function GET(request: NextRequest) {
-  await requireUser();
+  try {
+    await requireUser();
+  } catch {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   const nr = request.nextUrl.searchParams.get("nr") || "";
   const result = await lookupCvrNumber(nr);

@@ -3,7 +3,11 @@ import { requireUser } from "@/lib/auth";
 import { getAppBaseUrl, MICROSOFT_SCOPES, isMicrosoftConfigured } from "@/lib/email-oauth";
 
 export async function GET() {
-  await requireUser();
+  try {
+    await requireUser();
+  } catch {
+    return NextResponse.redirect(new URL("/login", getAppBaseUrl()));
+  }
 
   if (!isMicrosoftConfigured()) {
     return NextResponse.redirect(

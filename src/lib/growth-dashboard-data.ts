@@ -21,6 +21,7 @@ type DealForGrowth = {
   establishmentFee: number | null;
   billingStartDate: Date | null;
   liveAt: Date | null;
+  contractSignedAt: Date | null;
   churnedAt: Date | null;
   contractEndDate: Date | null;
 };
@@ -103,7 +104,7 @@ export async function getGrowthDashboardData() {
   for (let i = 11; i >= 0; i--) {
     const m = subMonths(thisMonthStart, i);
     const mEnd = endOfMonth(m);
-    const newDeals = deals.filter((d) => d.liveAt && isWithinInterval(d.liveAt, { start: m, end: mEnd }));
+    const newDeals = deals.filter((d) => d.contractSignedAt && isWithinInterval(d.contractSignedAt, { start: m, end: mEnd }));
     monthlyNew.push({
       label: format(m, "MMM yyyy", { locale: da }),
       count: newDeals.length,

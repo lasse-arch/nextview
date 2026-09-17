@@ -67,6 +67,7 @@ export default async function DealsPage({
     displayName: d.displayName,
     contactName: d.contactName,
     ownerName: d.owner.name,
+    ownerAvatarUrl: d.owner.avatarUrl,
     saleAmount: d.saleAmount,
     bindingMonths: d.bindingMonths,
     establishmentFee: d.establishmentFee,
