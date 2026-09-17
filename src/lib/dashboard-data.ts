@@ -42,17 +42,13 @@ export async function getDashboardData(ownerId?: string) {
   const monthStart = startOfMonth(now);
   const monthEnd = endOfMonth(now);
 
-  // "Solgt" is the one-time establishment fee plus the monthly fee for the sale -
-  // not the full contract value over the whole binding period.
-  const soldValue = (d: { establishmentFee: number | null; saleAmount: number | null }) =>
-    (d.establishmentFee ?? 0) + (d.saleAmount ?? 0);
-  // Full lifetime value of a signed contract: the monthly fee over its whole
-  // binding period, plus the one-time establishment fee.
+  // Full contract value: the monthly fee over its whole binding period, plus
+  // the one-time establishment fee.
   const soldTotalValue = (d: { establishmentFee: number | null; saleAmount: number | null; bindingMonths: number | null }) =>
     totalContractValue(d) + (d.establishmentFee ?? 0);
 
   const activePipeline = deals.filter((d) => (ACTIVE_PIPELINE_STAGES as readonly string[]).includes(d.stage));
-  const pipelineValue = activePipeline.reduce((sum, d) => sum + soldValue(d), 0);
+  const pipelineValue = activePipeline.reduce((sum, d) => sum + soldTotalValue(d), 0);
 
   const liveCustomers = deals.filter((d) => d.stage === "LIVE" && !d.churnedAt);
   const liveValue = liveCustomers.reduce((sum, d) => sum + soldTotalValue(d), 0);
@@ -60,9 +56,9 @@ export async function getDashboardData(ownerId?: string) {
   const soldThisMonth = deals.filter(
     (d) => d.soldAt && isWithinInterval(d.soldAt, { start: monthStart, end: monthEnd })
   );
-  const soldThisMonthValue = soldThisMonth.reduce((sum, d) => sum + soldValue(d), 0);
+  const soldThisMonthValue = soldThisMonth.reduce((sum, d) => sum + soldTotalValue(d), 0);
   const soldThisMonthDeals = soldThisMonth
-    .map((d) => ({ id: d.id, name: d.displayName || d.companyName, value: soldValue(d) }))
+    .map((d) => ({ id: d.id, name: d.displayName || d.companyName, value: soldTotalValue(d) }))
     .sort((a, b) => b.value - a.value);
 
   const commissionOwed = commissions
@@ -96,7 +92,7 @@ export async function getDashboardData(ownerId?: string) {
     const mEnd = endOfMonth(m);
     const value = deals
       .filter((d) => d.soldAt && isWithinInterval(d.soldAt, { start: m, end: mEnd }))
-      .reduce((sum, d) => sum + soldValue(d), 0);
+      .reduce((sum, d) => sum + soldTotalValue(d), 0);
     monthly.push({ label: format(m, "MMM", { locale: da }), value });
   }
 
