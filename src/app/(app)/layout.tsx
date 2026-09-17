@@ -12,7 +12,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   const navItems = [
     { href: "/deals", label: "Deals" },
-    { href: "/deals/import", label: "Importér" },
     { href: "/commission", label: "Provision" },
   ];
   if (user.role === "ADMIN") {
@@ -21,6 +20,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   const settingsItems = [
     { href: "/profile", label: "Min profil" },
+    { href: "/deals/import", label: "Importér" },
     { href: "/settings/email", label: "E-mail" },
     { href: "/settings/pandadoc", label: "Kontrakter" },
     { href: "/settings/dinero", label: "Fakturaer" },

@@ -9,7 +9,7 @@ const MAX_GEOCODES_PER_LOAD = 8;
 
 export async function getCustomerMapPoints(): Promise<CustomerMapPoint[]> {
   const signedDeals = await prisma.deal.findMany({
-    where: { contractSignedAt: { not: null }, address: { not: null } },
+    where: { stage: { in: ["CONTRACT_SIGNED", "FILMED", "LIVE"] }, address: { not: null } },
     select: {
       id: true,
       companyName: true,

@@ -94,6 +94,9 @@ export async function updateDeal(dealId: string, formData: FormData) {
   const liveAt = liveAtRaw ? new Date(liveAtRaw) : stage === "LIVE" && !existing.liveAt ? new Date() : existing.liveAt;
 
   const stageDateUpdates: Record<string, Date> = {};
+  if (["CONTRACT_SIGNED", "FILMED", "LIVE"].includes(stage) && !existing.contractSignedAt) {
+    stageDateUpdates.contractSignedAt = new Date();
+  }
   if (stage === "FILMED" && !existing.filmedAt) stageDateUpdates.filmedAt = new Date();
   if (stage === "LIVE" && !existing.billingStartDate && liveAt) stageDateUpdates.billingStartDate = liveAt;
 
@@ -162,6 +165,9 @@ export async function updateDealStage(dealId: string, newStage: DealStage) {
   }
 
   const stageDateUpdates: Record<string, Date> = {};
+  if (["CONTRACT_SIGNED", "FILMED", "LIVE"].includes(newStage) && !existing.contractSignedAt) {
+    stageDateUpdates.contractSignedAt = new Date();
+  }
   if (newStage === "FILMED" && !existing.filmedAt) stageDateUpdates.filmedAt = new Date();
   if (newStage === "LIVE" && !existing.liveAt) {
     stageDateUpdates.liveAt = new Date();
