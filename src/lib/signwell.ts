@@ -101,6 +101,8 @@ export async function ensureWebhookRegistered(callbackUrl: string): Promise<stri
     const hooks = (await listRes.json()) as { id: string; callback_url: string }[];
     const existing = hooks.find((h) => h.callback_url === callbackUrl);
     if (existing) return existing.id;
+  } else if (listRes.status === 401) {
+    throw new Error(`SignWell afviste API-nøglen (401): ${await listRes.text()}`);
   }
 
   const createRes = await fetch(`${SIGNWELL_API_BASE}/hooks`, {
@@ -108,7 +110,9 @@ export async function ensureWebhookRegistered(callbackUrl: string): Promise<stri
     headers: headers(),
     body: JSON.stringify({ callback_url: callbackUrl }),
   });
-  if (!createRes.ok) return null;
+  if (!createRes.ok) {
+    throw new Error(`SignWell: kunne ikke oprette webhook (${createRes.status}): ${await createRes.text()}`);
+  }
   const created = (await createRes.json()) as { id: string };
   return created.id;
 }
