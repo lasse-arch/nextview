@@ -196,3 +196,14 @@ export async function importFromGoogleDocs(formData: FormData) {
   revalidatePath("/deals");
   redirect(buildImportRedirectUrl(batchId, duplicateNames));
 }
+
+/** Removes an import batch that didn't actually create any deals (e.g. an empty/failed file). */
+export async function deleteEmptyImportBatch(batchId: string) {
+  await requireUser();
+  const dealCount = await prisma.deal.count({ where: { importBatchId: batchId } });
+  if (dealCount > 0) {
+    throw new Error("Denne import har importeret deals og kan ikke slettes herfra.");
+  }
+  await prisma.importBatch.delete({ where: { id: batchId } });
+  revalidatePath("/deals");
+}

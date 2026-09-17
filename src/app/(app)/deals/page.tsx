@@ -6,6 +6,7 @@ import { stageLabels, importTypeLabels, formatDKK, formatDate, dealName } from "
 import { DealsBoard, type BoardDeal } from "./board-view";
 import { DealsListTable } from "./deals-list-table";
 import { DuplicateReviewSection } from "./duplicate-review";
+import { DeleteEmptyImportBatchButton } from "./delete-empty-import-batch-button";
 import type { Prisma, DealStage, ImportType } from "@prisma/client";
 
 type SearchParams = {
@@ -116,6 +117,13 @@ export default async function DealsPage({
         <div className="mt-4 rounded-md bg-red-50 px-4 py-3 text-sm text-red-800">
           {params.skipped.split(",").length} række(r) blev sprunget over pga. manglende salgsbeløb, binding eller
           startdato: <span className="font-medium">{params.skipped.split(",").join(", ")}</span>
+        </div>
+      )}
+
+      {params.importBatchId && deals.length === 0 && (
+        <div className="mt-4 flex items-center justify-between gap-3 rounded-md bg-slate-100 px-4 py-3 text-sm text-slate-600">
+          <span>Denne import har ikke importeret nogen deals.</span>
+          <DeleteEmptyImportBatchButton batchId={params.importBatchId} />
         </div>
       )}
 
