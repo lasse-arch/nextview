@@ -63,9 +63,9 @@ export default async function CommissionPage() {
                     </Link>
                   </td>
                   {isAdmin && <td className="px-4 py-2 text-slate-600">{c.seller.name}</td>}
-                  <td className="px-4 py-2 text-slate-600">{formatDKK(c.baseAmount)}</td>
+                  <td className="money px-4 py-2 text-slate-600">{formatDKK(c.baseAmount)}</td>
                   <td className="px-4 py-2 text-slate-600">{c.rate}%</td>
-                  <td className="px-4 py-2 font-medium text-slate-900">{formatDKK(c.amount)}</td>
+                  <td className="money px-4 py-2 font-medium text-slate-900">{formatDKK(c.amount)}</td>
                   <td className="px-4 py-2 text-slate-600">{commissionFrequencyLabels[c.frequency]}</td>
                   <td className={`px-4 py-2 ${overdueRow ? "font-medium text-red-600" : "text-slate-600"}`}>
                     {formatDate(c.dueDate)}
@@ -109,7 +109,7 @@ function StatCard({ label, value, highlight }: { label: string; value: string; h
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <p className="text-xs font-medium text-slate-500">{label}</p>
-      <p className={`mt-1 text-xl font-semibold ${highlight ? "text-red-600" : "text-slate-900"}`}>{value}</p>
+      <p className={`money mt-1 text-xl font-semibold ${highlight ? "text-red-600" : "text-slate-900"}`}>{value}</p>
     </div>
   );
 }

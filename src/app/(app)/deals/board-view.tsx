@@ -224,7 +224,7 @@ export function DealsBoard({ initialDeals, isAdmin }: { initialDeals: BoardDeal[
               <div className="px-2 py-1.5">
                 <h3 className="truncate text-xs font-semibold text-slate-800">{stageLabels[stage]}</h3>
                 <p className="text-[11px] text-slate-500">
-                  {formatDKK(total)} · {colDeals.length}
+                  <span className="money">{formatDKK(total)}</span> · {colDeals.length}
                   {managed && " · PandaDoc"}
                 </p>
               </div>
@@ -263,7 +263,7 @@ export function DealsBoard({ initialDeals, isAdmin }: { initialDeals: BoardDeal[
                         )}
                         <span className="truncate">{deal.ownerName}</span>
                       </span>
-                      <span className="flex-shrink-0 font-medium text-slate-700">
+                      <span className="money flex-shrink-0 font-medium text-slate-700">
                         {formatDKK(totalContractValue(deal) + (deal.establishmentFee ?? 0))}
                       </span>
                     </div>

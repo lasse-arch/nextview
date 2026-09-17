@@ -13,11 +13,12 @@ export async function addDealItem(dealId: string, formData: FormData) {
   const isFree = formData.get("isFree") === "on";
   const amountRaw = String(formData.get("amount") || "");
   const amount = !isFree && amountRaw ? Math.round(parseFloat(amountRaw)) : null;
+  const url = String(formData.get("url") || "").trim() || null;
 
   if (!productType) throw new Error("Angiv en ydelse/produkt.");
 
   await prisma.dealItem.create({
-    data: { dealId, location, productType, amount, isFree },
+    data: { dealId, location, productType, amount, isFree, url },
   });
 
   revalidatePath(`/deals/${dealId}`);
@@ -27,5 +28,11 @@ export async function addDealItem(dealId: string, formData: FormData) {
 export async function removeDealItem(dealId: string, itemId: string) {
   await requireUser();
   await prisma.dealItem.delete({ where: { id: itemId } });
+  revalidatePath(`/deals/${dealId}`);
+}
+
+export async function updateDealItemUrl(dealId: string, itemId: string, url: string) {
+  await requireUser();
+  await prisma.dealItem.update({ where: { id: itemId }, data: { url: url.trim() || null } });
   revalidatePath(`/deals/${dealId}`);
 }

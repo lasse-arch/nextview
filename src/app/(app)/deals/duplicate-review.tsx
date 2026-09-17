@@ -30,7 +30,7 @@ function DealSummary({ deal }: { deal: DuplicateDealInfo }) {
         {stageLabels[deal.stage]} · {deal.owner.name} · Oprettet {formatDate(deal.createdAt)}
       </p>
       {deal.saleAmount != null && (
-        <p className="mt-0.5 text-xs text-slate-500">{formatDKK(deal.saleAmount)}/md.</p>
+        <p className="money mt-0.5 text-xs text-slate-500">{formatDKK(deal.saleAmount)}/md.</p>
       )}
     </div>
   );

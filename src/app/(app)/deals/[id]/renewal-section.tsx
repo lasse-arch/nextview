@@ -99,7 +99,7 @@ export function RenewalSection({
                     </a>
                   )}
                 </div>
-                <div className="mt-1">
+                <div className="money mt-1">
                   {formatDKK(r.previousValue)} / {r.previousBindingMonths} mdr → {formatDKK(r.newValue)} /{" "}
                   {r.newBindingMonths} mdr
                   {r.establishmentFee ? ` · Etablering: ${formatDKK(r.establishmentFee)}` : ""}

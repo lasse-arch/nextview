@@ -30,17 +30,19 @@ function StatTile({
   value,
   sub,
   tone = "default",
+  money,
 }: {
   label: string;
   value: string;
   sub?: string;
   tone?: "default" | "good" | "critical";
+  money?: boolean;
 }) {
   const valueColor = tone === "good" ? "text-emerald-700" : tone === "critical" ? "text-red-700" : "text-slate-900";
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="text-xs font-medium text-slate-500">{label}</div>
-      <div className={`mt-1 text-2xl font-semibold ${valueColor}`}>{value}</div>
+      <div className={`mt-1 text-2xl font-semibold ${valueColor} ${money ? "money" : ""}`}>{value}</div>
       {sub && <div className="mt-0.5 text-xs text-slate-400">{sub}</div>}
     </div>
   );
@@ -82,15 +84,17 @@ export default async function DashboardPage() {
           label="Aktiv pipeline"
           value={formatDKK(data.pipelineValue)}
           sub={`${data.pipelineCount} åbne deals`}
+          money
         />
-        <StatTile label="Aktive kunder (Live)" value={formatDKK(data.liveValue)} sub={`${data.liveCount} kunder`} />
+        <StatTile label="Aktive kunder (Live)" value={formatDKK(data.liveValue)} sub={`${data.liveCount} kunder`} money />
         <StatTile
           label="Solgt denne måned"
           value={formatDKK(data.soldThisMonthValue)}
           sub={`${data.soldThisMonthCount} deals`}
+          money
         />
-        <StatTile label="Opstart i alt" value={formatDKK(data.establishmentFeeTotal)} sub="Etableringspriser" />
-        <StatTile label="Provision skyldig" value={formatDKK(data.commissionOwed)} sub="Afventer + forfalden" />
+        <StatTile label="Opstart i alt" value={formatDKK(data.establishmentFeeTotal)} sub="Etableringspriser" money />
+        <StatTile label="Provision skyldig" value={formatDKK(data.commissionOwed)} sub="Afventer + forfalden" money />
         <StatTile
           label="Fejlede fakturaer"
           value={String(data.failedInvoices)}
@@ -106,7 +110,7 @@ export default async function DashboardPage() {
             {data.lostCount > 0 && (
               <span className="text-xs text-slate-500">
                 Tabt: <span className="font-medium text-red-600">{data.lostCount} stk</span> (
-                {formatDKK(data.lostValue)})
+                <span className="money">{formatDKK(data.lostValue)}</span>)
               </span>
             )}
           </div>
@@ -121,7 +125,7 @@ export default async function DashboardPage() {
                   />
                 </div>
                 <div className="w-14 shrink-0 text-right text-xs font-medium text-slate-700">{f.count}</div>
-                <div className="w-24 shrink-0 text-right text-xs text-slate-400">{formatDKK(f.value)}</div>
+                <div className="money w-24 shrink-0 text-right text-xs text-slate-400">{formatDKK(f.value)}</div>
               </div>
             ))}
           </div>
@@ -163,7 +167,7 @@ export default async function DashboardPage() {
           <div className="mt-4 flex h-32 items-end gap-3">
             {data.monthly.map((m) => (
               <div key={m.label} className="flex flex-1 flex-col items-center gap-1" title={formatDKK(m.value)}>
-                <span className="text-[11px] font-medium text-slate-600">{formatDKK(m.value)}</span>
+                <span className="money text-[11px] font-medium text-slate-600">{formatDKK(m.value)}</span>
                 <div className="flex h-24 w-full items-end">
                   <div
                     className="w-full rounded-t-md bg-blue-600"
@@ -201,9 +205,9 @@ export default async function DashboardPage() {
                       )}
                     </td>
                     <td className="py-1.5 text-right text-slate-600">{s.wonCount}</td>
-                    <td className="py-1.5 text-right text-slate-600">{formatDKK(s.wonValue)}</td>
-                    <td className="py-1.5 text-right text-amber-700">{formatDKK(s.commissionPending)}</td>
-                    <td className="py-1.5 text-right text-emerald-700">{formatDKK(s.commissionPaid)}</td>
+                    <td className="money py-1.5 text-right text-slate-600">{formatDKK(s.wonValue)}</td>
+                    <td className="money py-1.5 text-right text-amber-700">{formatDKK(s.commissionPending)}</td>
+                    <td className="money py-1.5 text-right text-emerald-700">{formatDKK(s.commissionPaid)}</td>
                   </tr>
                 ))}
                 {data.sellers.length === 0 && (

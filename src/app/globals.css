@@ -18,3 +18,11 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Blurs anything sold as sensitive sales data (amounts, provisions, contract
+   values) while presentation mode is on, so the CRM can be shown to
+   customers in meetings without revealing figures. */
+[data-presentation="true"] .money {
+  filter: blur(6px);
+  user-select: none;
+}

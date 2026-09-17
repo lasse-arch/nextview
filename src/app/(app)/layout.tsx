@@ -5,13 +5,16 @@ import { getCurrentUser } from "@/lib/auth";
 import { logout } from "@/lib/actions/auth";
 import { ToastProvider } from "@/components/toast";
 import { SettingsMenu } from "./settings-menu";
+import { PresentationModeToggle } from "./presentation-mode-toggle";
+import { isPresentationMode } from "@/lib/presentation-mode";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const user = await getCurrentUser();
+  const [user, presenting] = await Promise.all([getCurrentUser(), isPresentationMode()]);
   if (!user) redirect("/login");
 
   const navItems = [
     { href: "/deals", label: "Deals" },
+    { href: "/kunder-live", label: "Live kunder" },
     { href: "/commission", label: "Provision" },
   ];
   if (user.role === "ADMIN") {
@@ -38,7 +41,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <ToastProvider>
-      <div className="flex min-h-screen flex-col">
+      <div className="flex min-h-screen flex-col" data-presentation={presenting ? "true" : "false"}>
         <header className="border-b border-slate-200 bg-white shadow-sm">
           <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
             <div className="flex items-center gap-8">
@@ -61,6 +64,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               >
                 + Ny lead
               </Link>
+              <PresentationModeToggle enabled={presenting} />
               <div className="flex items-center gap-3 text-sm text-slate-600">
                 {user.avatarUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element

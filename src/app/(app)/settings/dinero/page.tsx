@@ -88,7 +88,7 @@ export default async function DineroSettingsPage() {
                     </Link>
                   </td>
                   <td className="px-3 py-2 text-slate-600">{inv.quarterIndex}</td>
-                  <td className="px-3 py-2 text-slate-600">{formatDKK(inv.amount)}</td>
+                  <td className="money px-3 py-2 text-slate-600">{formatDKK(inv.amount)}</td>
                   <td className="px-3 py-2 text-slate-600">{formatDate(inv.createdAt)}</td>
                   <td className="px-3 py-2">
                     <span

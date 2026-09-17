@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { addDealItem, removeDealItem } from "@/lib/actions/deal-items";
+import { addDealItem, removeDealItem, updateDealItemUrl } from "@/lib/actions/deal-items";
 import { formatDKK } from "@/lib/labels";
 import { useToast } from "@/components/toast";
 
@@ -11,9 +11,16 @@ type DealItem = {
   productType: string;
   amount: number | null;
   isFree: boolean;
+  url: string | null;
 };
 
 const PRODUCT_SUGGESTIONS = ["Visitkort", "Drone-optagelse", "Matterport", "Hjemmeside"];
+
+/** Products where we deliver a link the customer/team should be able to open directly. */
+function needsLink(productType: string): boolean {
+  const p = productType.trim().toLowerCase();
+  return p.includes("matterport") || p.includes("hjemmeside") || p.includes("tour");
+}
 
 function RemoveItemButton({ dealId, itemId }: { dealId: string; itemId: string }) {
   const [pending, startTransition] = useTransition();
@@ -36,9 +43,63 @@ function RemoveItemButton({ dealId, itemId }: { dealId: string; itemId: string }
   );
 }
 
+function ItemLink({ dealId, item }: { dealId: string; item: DealItem }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(item.url ?? "");
+  const [pending, startTransition] = useTransition();
+  const showToast = useToast();
+
+  if (!needsLink(item.productType) && !item.url) return null;
+
+  if (editing) {
+    return (
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          startTransition(async () => {
+            await updateDealItemUrl(dealId, item.id, value);
+            showToast("Link gemt");
+            setEditing(false);
+          });
+        }}
+        className="flex items-center gap-1.5"
+      >
+        <input
+          type="url"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder="https://…"
+          autoFocus
+          className="w-48 rounded-md border border-slate-300 px-2 py-1 text-xs"
+        />
+        <button type="submit" disabled={pending} className="text-xs font-medium text-slate-600 hover:text-slate-900">
+          Gem
+        </button>
+      </form>
+    );
+  }
+
+  return item.url ? (
+    <a
+      href={item.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={(e) => e.stopPropagation()}
+      className="text-xs font-medium text-blue-600 hover:underline"
+    >
+      Åbn link
+    </a>
+  ) : (
+    <button type="button" onClick={() => setEditing(true)} className="text-xs font-medium text-amber-600 hover:underline">
+      + Tilføj link
+    </button>
+  );
+}
+
 export function DealItemsSection({ dealId, items }: { dealId: string; items: DealItem[] }) {
   const [adding, setAdding] = useState(false);
   const [isFree, setIsFree] = useState(false);
+  const [productType, setProductType] = useState("");
   const addItemWithId = addDealItem.bind(null, dealId);
 
   const total = items.filter((i) => !i.isFree).reduce((sum, i) => sum + (i.amount ?? 0), 0);
@@ -77,6 +138,8 @@ export function DealItemsSection({ dealId, items }: { dealId: string; items: Dea
               name="productType"
               list="product-suggestions"
               required
+              value={productType}
+              onChange={(e) => setProductType(e.target.value)}
               placeholder="F.eks. Drone"
               className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
             />
@@ -109,6 +172,19 @@ export function DealItemsSection({ dealId, items }: { dealId: string; items: Dea
               Givet gratis
             </label>
           </div>
+          {needsLink(productType) && (
+            <div className="col-span-2 sm:col-span-4">
+              <label className="block text-xs font-medium text-slate-500">
+                Link til {productType.trim()} (så vi kan finde den igen og vise kunden)
+              </label>
+              <input
+                name="url"
+                type="url"
+                placeholder="https://…"
+                className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+              />
+            </div>
+          )}
           <button
             type="submit"
             className="col-span-2 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 sm:col-span-4"
@@ -129,12 +205,13 @@ export function DealItemsSection({ dealId, items }: { dealId: string; items: Dea
               {item.location && <span className="ml-2 text-xs text-slate-400">{item.location}</span>}
             </div>
             <div className="flex items-center gap-3">
+              <ItemLink dealId={dealId} item={item} />
               {item.isFree ? (
                 <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
                   Gratis
                 </span>
               ) : (
-                <span className="text-slate-600">{formatDKK(item.amount)}</span>
+                <span className="money text-slate-600">{formatDKK(item.amount)}</span>
               )}
               <RemoveItemButton dealId={dealId} itemId={item.id} />
             </div>
@@ -145,7 +222,7 @@ export function DealItemsSection({ dealId, items }: { dealId: string; items: Dea
 
       {items.length > 0 && (
         <p className="mt-3 text-xs text-slate-500">
-          I alt: {formatDKK(total)}
+          I alt: <span className="money">{formatDKK(total)}</span>
           {freeCount > 0 ? ` · ${freeCount} givet gratis` : ""}
         </p>
       )}

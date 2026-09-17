@@ -131,7 +131,7 @@ export function GoalsCard({
                   <span className="ml-1.5 text-slate-400">{goalMetricLabels[g.metric]}</span>
                 </span>
                 <span className="flex items-center gap-2">
-                  <span className="font-medium text-slate-600">
+                  <span className={`font-medium text-slate-600 ${goalMetricIsMoney[g.metric] ? "money" : ""}`}>
                     {formatValue(g.metric, g.currentValue)} / {formatValue(g.metric, g.targetValue)}
                   </span>
                   {g.canEdit && (

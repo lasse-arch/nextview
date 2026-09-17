@@ -257,6 +257,8 @@ model DealItem {
   productType String
   amount      Int?
   isFree      Boolean @default(false)
+  /// Link to the delivered product (e.g. the Matterport tour or the live website), so it can be opened directly.
+  url         String?
 
   createdAt DateTime @default(now())
 }

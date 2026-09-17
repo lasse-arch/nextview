@@ -470,11 +470,11 @@ export default async function DealDetailPage({
                 </div>
                 <div className="flex justify-between">
                   <dt className="text-slate-500">Grundlag</dt>
-                  <dd className="text-slate-800">{formatDKK(deal.commission.baseAmount)}</dd>
+                  <dd className="money text-slate-800">{formatDKK(deal.commission.baseAmount)}</dd>
                 </div>
                 <div className="flex justify-between font-medium">
                   <dt className="text-slate-500">Provision</dt>
-                  <dd className="text-slate-900">{formatDKK(deal.commission.amount)}</dd>
+                  <dd className="money text-slate-900">{formatDKK(deal.commission.amount)}</dd>
                 </div>
                 <div className="flex justify-between">
                   <dt className="text-slate-500">Udbetaling</dt>
@@ -518,7 +518,7 @@ export default async function DealDetailPage({
                       {inv.quarterIndex === 0 ? "Etablering" : `Periode ${inv.quarterIndex}`}
                       {inv.termNumber > 1 ? ` (kontraktperiode ${inv.termNumber})` : ""}
                     </span>
-                    <span className="font-medium text-slate-800">{formatDKK(inv.amount)}</span>
+                    <span className="money font-medium text-slate-800">{formatDKK(inv.amount)}</span>
                     <span
                       className={
                         inv.status === "DRAFT_CREATED"

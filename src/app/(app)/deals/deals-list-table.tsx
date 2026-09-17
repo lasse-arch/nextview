@@ -209,7 +209,7 @@ export function DealsListTable({ deals }: { deals: ListDeal[] }) {
                 </td>
                 <td className="px-4 py-1.5 text-slate-600">{deal.owner.name}</td>
                 <td className="px-4 py-1.5 text-slate-600">{stageLabels[deal.stage]}</td>
-                <td className="px-4 py-1.5 text-slate-600">
+                <td className="money px-4 py-1.5 text-slate-600">
                   {formatDKK(totalContractValue(deal) + (deal.establishmentFee ?? 0))}
                 </td>
                 <td className="px-4 py-1.5 text-slate-600">{importTypeLabels[deal.importType]}</td>

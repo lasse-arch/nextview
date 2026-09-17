@@ -3,21 +3,23 @@ import { getCurrentUser } from "@/lib/auth";
 import { getGrowthDashboardData } from "@/lib/growth-dashboard-data";
 import { formatDKK } from "@/lib/labels";
 
-function StatTile({ label, value, sub }: { label: string; value: string; sub?: string }) {
+function StatTile({ label, value, sub, money }: { label: string; value: string; sub?: string; money?: boolean }) {
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="text-xs font-medium text-slate-500">{label}</div>
-      <div className="mt-1 text-xl font-semibold text-slate-900">{value}</div>
+      <div className={`mt-1 text-xl font-semibold text-slate-900 ${money ? "money" : ""}`}>{value}</div>
       {sub && <div className="mt-0.5 text-xs text-slate-400">{sub}</div>}
     </div>
   );
 }
 
-function Row({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
+function Row({ label, value, strong, money }: { label: string; value: string; strong?: boolean; money?: boolean }) {
   return (
     <div className="flex justify-between py-1 text-sm">
       <span className="text-slate-500">{label}</span>
-      <span className={strong ? "font-semibold text-slate-900" : "text-slate-800"}>{value}</span>
+      <span className={`${strong ? "font-semibold text-slate-900" : "text-slate-800"} ${money ? "money" : ""}`}>
+        {value}
+      </span>
     </div>
   );
 }
@@ -51,12 +53,12 @@ export default async function GrowthDashboardPage() {
       <div>
         <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400">MRR</h2>
         <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          <StatTile label="Aktiv MRR" value={formatDKK(d.activeMRR)} />
-          <StatTile label="Inaktiv MRR (pipeline)" value={formatDKK(d.pipelineMRR)} />
-          <StatTile label="MRR i alt (potentiel)" value={formatDKK(d.totalMRR)} />
-          <StatTile label="ARR (aktiv × 12)" value={formatDKK(d.arr)} />
-          <StatTile label="Kvartalsvis fakturering" value={formatDKK(d.quarterlyBilling)} />
-          <StatTile label="Gns. MRR pr. aktiv kunde" value={formatDKK(d.avgMRRPerActive)} />
+          <StatTile label="Aktiv MRR" value={formatDKK(d.activeMRR)} money />
+          <StatTile label="Inaktiv MRR (pipeline)" value={formatDKK(d.pipelineMRR)} money />
+          <StatTile label="MRR i alt (potentiel)" value={formatDKK(d.totalMRR)} money />
+          <StatTile label="ARR (aktiv × 12)" value={formatDKK(d.arr)} money />
+          <StatTile label="Kvartalsvis fakturering" value={formatDKK(d.quarterlyBilling)} money />
+          <StatTile label="Gns. MRR pr. aktiv kunde" value={formatDKK(d.avgMRRPerActive)} money />
         </div>
       </div>
 
@@ -73,7 +75,7 @@ export default async function GrowthDashboardPage() {
               />
             ))}
             {d.risk.map((r) => (
-              <Row key={`mrr-${r.days}`} label={`MRR i risiko ${riskLabelFor(r.days)}`} value={formatDKK(r.mrr)} strong />
+              <Row key={`mrr-${r.days}`} label={`MRR i risiko ${riskLabelFor(r.days)}`} value={formatDKK(r.mrr)} strong money />
             ))}
           </div>
         </div>
@@ -81,12 +83,12 @@ export default async function GrowthDashboardPage() {
         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <h2 className="text-sm font-semibold text-slate-900">Kontraktværdi</h2>
           <div className="mt-3 divide-y divide-slate-100">
-            <Row label="Aktiv kontraktværdi (fuld binding)" value={formatDKK(d.activeContractValue)} />
-            <Row label="Realiseret til dato" value={formatDKK(d.realizedToDate)} />
-            <Row label="Resterende kontraktværdi (aktiv)" value={formatDKK(d.remainingContractValue)} />
-            <Row label="Pipeline kontraktværdi" value={formatDKK(d.pipelineContractValue)} />
-            <Row label="Opstart i alt" value={formatDKK(d.establishmentTotal)} />
-            <Row label="Samlet booket værdi" value={formatDKK(d.totalBookedValue)} strong />
+            <Row label="Aktiv kontraktværdi (fuld binding)" value={formatDKK(d.activeContractValue)} money />
+            <Row label="Realiseret til dato" value={formatDKK(d.realizedToDate)} money />
+            <Row label="Resterende kontraktværdi (aktiv)" value={formatDKK(d.remainingContractValue)} money />
+            <Row label="Pipeline kontraktværdi" value={formatDKK(d.pipelineContractValue)} money />
+            <Row label="Opstart i alt" value={formatDKK(d.establishmentTotal)} money />
+            <Row label="Samlet booket værdi" value={formatDKK(d.totalBookedValue)} strong money />
           </div>
         </div>
       </div>
@@ -95,9 +97,9 @@ export default async function GrowthDashboardPage() {
         <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Nøgletal</h2>
         <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           <StatTile label="Gns. bindingsperiode" value={`${d.avgBindingMonths.toFixed(1)} mdr`} />
-          <StatTile label="Gns. kontraktværdi" value={formatDKK(d.avgContractValue)} />
-          <StatTile label="Gns. kundelevetidsværdi (LTV)" value={formatDKK(d.ltv)} />
-          <StatTile label="Højeste månedspris" value={formatDKK(d.maxMonthlyPrice)} sub="Enkeltkunde" />
+          <StatTile label="Gns. kontraktværdi" value={formatDKK(d.avgContractValue)} money />
+          <StatTile label="Gns. kundelevetidsværdi (LTV)" value={formatDKK(d.ltv)} money />
+          <StatTile label="Højeste månedspris" value={formatDKK(d.maxMonthlyPrice)} sub="Enkeltkunde" money />
           <StatTile label="Kundekoncentration" value={`${d.concentration.toFixed(1)}%`} sub="Største ÷ aktiv MRR" />
         </div>
       </div>
@@ -132,7 +134,7 @@ export default async function GrowthDashboardPage() {
                 <tr key={m.label} className="border-t border-slate-100">
                   <td className="py-1 capitalize text-slate-700">{m.label}</td>
                   <td className="py-1 text-right text-slate-600">{m.count}</td>
-                  <td className="py-1 text-right text-slate-600">{formatDKK(m.newMRR)}</td>
+                  <td className="money py-1 text-right text-slate-600">{formatDKK(m.newMRR)}</td>
                 </tr>
               ))}
             </tbody>
@@ -155,7 +157,7 @@ export default async function GrowthDashboardPage() {
                 <tr key={s.productType} className="border-t border-slate-100">
                   <td className="py-1.5 text-slate-800">{s.productType}</td>
                   <td className="py-1.5 text-right text-slate-600">{s.count}</td>
-                  <td className="py-1.5 text-right text-slate-600">{formatDKK(s.total)}</td>
+                  <td className="money py-1.5 text-right text-slate-600">{formatDKK(s.total)}</td>
                 </tr>
               ))}
               {d.serviceMix.length === 0 && (
