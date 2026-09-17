@@ -18,18 +18,13 @@ import { CommissionExcludedToggle } from "./commission-excluded-toggle";
 import { SendContractButton } from "./send-contract-button";
 import { StageFields } from "./stage-fields";
 import { InactiveToggleButton } from "./inactive-toggle-button";
-import { RenewalSection } from "./renewal-section";
 import { TerminationSection } from "./termination-section";
 import { DealItemsSection } from "./deal-items-section";
 import { DealDangerActions } from "./danger-actions";
 import { CustomerLinkSection } from "./customer-link-section";
 import { AddressAutocomplete } from "../../address-autocomplete";
 import { DisplayNameInput } from "../../display-name-input";
-
-function toDateInputValue(date: Date | null): string {
-  if (!date) return "";
-  return date.toISOString().slice(0, 10);
-}
+import { LockedContractFields } from "./locked-contract-fields";
 
 function authorInitials(name: string): string {
   return name
@@ -39,8 +34,6 @@ function authorInitials(name: string): string {
     .join("")
     .toUpperCase();
 }
-
-const SOLD_PRODUCT_OPTIONS = ["Visitkort", "Drone-optagelse", "Matterport", "Hjemmeside"];
 
 export default async function DealDetailPage({
   params,
@@ -62,7 +55,6 @@ export default async function DealDetailPage({
         notes: { include: { author: true }, orderBy: { createdAt: "desc" } },
         emails: { orderBy: { sentAt: "desc" } },
         invoices: { orderBy: { quarterIndex: "asc" } },
-        contractRenewals: { orderBy: { renewedAt: "desc" } },
         items: { orderBy: { createdAt: "asc" } },
         parent: true,
         branches: { orderBy: { companyName: "asc" } },
@@ -213,84 +205,25 @@ export default async function DealDetailPage({
 
               <hr className="border-slate-100" />
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-slate-500">Solgt til (produkt/ydelse)</label>
-                  <select
-                    name="soldProduct"
-                    multiple
-                    defaultValue={deal.soldProduct ? deal.soldProduct.split(", ") : []}
-                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-                  >
-                    {SOLD_PRODUCT_OPTIONS.map((p) => (
-                      <option key={p} value={p}>
-                        {p}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-500">Binding (måneder)</label>
-                  <input
-                    name="bindingMonths"
-                    type="number"
-                    min="0"
-                    defaultValue={deal.bindingMonths ?? ""}
-                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-500">Salgsbeløb (DKK/måned)</label>
-                  <input
-                    name="saleAmount"
-                    type="number"
-                    min="0"
-                    step="1"
-                    defaultValue={deal.saleAmount ?? ""}
-                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-500">Solgt dato</label>
-                  <input
-                    name="soldAt"
-                    type="date"
-                    defaultValue={toDateInputValue(deal.soldAt)}
-                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-500">Etableringspris (DKK)</label>
-                  <input
-                    name="establishmentFee"
-                    type="number"
-                    min="0"
-                    step="1"
-                    defaultValue={deal.establishmentFee ?? ""}
-                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-500">Live dato (afleveret)</label>
-                  <input
-                    name="liveAt"
-                    type="date"
-                    defaultValue={toDateInputValue(deal.liveAt)}
-                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-                  />
-                </div>
-                <div className="col-span-2 flex flex-wrap gap-4 text-xs text-slate-500">
-                  <span>Møde: {formatDate(deal.meetingDate)}</span>
-                  <span>Kontrakt sendt: {formatDate(deal.contractSentAt)}</span>
-                  <span>Underskrevet: {formatDate(deal.contractSignedAt)}</span>
-                  <span>Filmet: {formatDate(deal.filmedAt)}</span>
-                  <span>Fakturering starter: {formatDate(deal.billingStartDate)}</span>
-                  {deal.contractEndDate && (
-                    <span className="font-medium text-amber-700">
-                      Ophører: {formatDate(deal.contractEndDate)}
-                    </span>
-                  )}
-                </div>
+              <LockedContractFields
+                isAdmin={currentUser?.role === "ADMIN"}
+                soldProduct={deal.soldProduct}
+                bindingMonths={deal.bindingMonths}
+                saleAmount={deal.saleAmount}
+                soldAt={deal.soldAt}
+                establishmentFee={deal.establishmentFee}
+                liveAt={deal.liveAt}
+              />
+
+              <div className="flex flex-wrap gap-4 text-xs text-slate-500">
+                <span>Møde: {formatDate(deal.meetingDate)}</span>
+                <span>Kontrakt sendt: {formatDate(deal.contractSentAt)}</span>
+                <span>Underskrevet: {formatDate(deal.contractSignedAt)}</span>
+                <span>Filmet: {formatDate(deal.filmedAt)}</span>
+                <span>Fakturering starter: {formatDate(deal.billingStartDate)}</span>
+                {deal.contractEndDate && (
+                  <span className="font-medium text-amber-700">Ophører: {formatDate(deal.contractEndDate)}</span>
+                )}
               </div>
 
               <button
@@ -443,9 +376,12 @@ export default async function DealDetailPage({
                   Download underskrevet kontrakt
                 </a>
               )}
-              {(deal.contractStatus === "NONE" ||
-                deal.contractStatus === "DECLINED" ||
-                deal.contractStatus === "VOIDED") && <SendContractButton dealId={deal.id} />}
+              {deal.contractStatus !== "SIGNED" && (
+                <SendContractButton
+                  dealId={deal.id}
+                  isEdit={deal.contractStatus === "SENT" || deal.contractStatus === "VIEWED"}
+                />
+              )}
               {!signWellEnabled && (
                 <p className="text-xs text-amber-600">
                   SignWell er ikke konfigureret eller er slået fra under Indstillinger → Kontrakter.
@@ -520,8 +456,6 @@ export default async function DealDetailPage({
             contractEndDate={deal.contractEndDate}
             isChurned={Boolean(deal.churnedAt)}
           />
-
-          <RenewalSection dealId={deal.id} currentTermNumber={deal.currentTermNumber} renewals={deal.contractRenewals} />
 
           <CustomerLinkSection
             dealId={deal.id}

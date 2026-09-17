@@ -3,17 +3,57 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
-import { isSignWellConfigured, createAndSendSignatureRequest, ensureWebhookRegistered } from "@/lib/signwell";
-import { buildContractTemplateData } from "@/lib/contract-template-data";
+import {
+  isSignWellConfigured,
+  createAndSendSignatureRequest,
+  cancelSignWellDocument,
+  ensureWebhookRegistered,
+} from "@/lib/signwell";
+import { lookupCvrNumber } from "@/lib/cvr";
+import { buildContractTemplateData, computeMonthlyTotal, computeSetupTotal, type ContractProducts } from "@/lib/contract-template-data";
 import { generateContractDocx } from "@/lib/contract-generator";
 
+const PRODUCT_LABELS: Record<keyof Pick<ContractProducts, "nextviewTour" | "hjemmeside" | "droneOptagelse" | "visitkort">, string> = {
+  nextviewTour: "Nextview360 Tour",
+  hjemmeside: "Hjemmeside",
+  droneOptagelse: "Drone-optagelse",
+  visitkort: "Visitkort",
+};
+
 /**
- * Returns a result object rather than throwing - Next.js redacts thrown
- * Server Action error messages in production builds (the client only ever
- * sees "Minified React error #441"), so expected/validation failures must
- * come back as data for the UI to display them.
+ * Pre-flight check before opening the contract-builder page: the master
+ * data has to be complete and the CVR number has to actually resolve to a
+ * real company, so the confirmation step can show its verified name.
  */
-export async function sendContractViaSignWell(dealId: string): Promise<{ ok: true } | { ok: false; error: string }> {
+export async function checkDealReadyForContract(
+  dealId: string
+): Promise<{ ok: true; cvrName: string } | { ok: false; error: string }> {
+  await requireUser();
+  const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId } });
+
+  if (!deal.cvrNumber) return { ok: false, error: "Udfyld CVR-nummer før kontrakten kan sendes." };
+  if (!deal.contactName) return { ok: false, error: "Udfyld kontaktperson før kontrakten kan sendes." };
+  if (!deal.contactEmail) return { ok: false, error: "Udfyld kontaktpersonens e-mail før kontrakten kan sendes." };
+  if (!deal.contactPhone) return { ok: false, error: "Udfyld kontaktpersonens telefonnummer før kontrakten kan sendes." };
+
+  const cvrResult = await lookupCvrNumber(deal.cvrNumber);
+  if (!cvrResult.ok) return { ok: false, error: `CVR-opslag fejlede: ${cvrResult.error}` };
+
+  return { ok: true, cvrName: cvrResult.data.name };
+}
+
+/**
+ * Builds the contract docx from exactly what was entered on the
+ * contract-builder page, sends it via SignWell, and freezes the resulting
+ * totals/binding/terms onto the deal (contract is the source of truth for
+ * those fields from here on - see LockedContractFields). If a previous,
+ * still-unsigned contract exists for this deal, it's canceled first so the
+ * customer can't accidentally sign the stale one.
+ */
+export async function buildAndSendContract(
+  dealId: string,
+  products: ContractProducts
+): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
     await requireUser();
 
@@ -23,38 +63,43 @@ export async function sendContractViaSignWell(dealId: string): Promise<{ ok: tru
 
     const deal = await prisma.deal.findUniqueOrThrow({
       where: { id: dealId },
-      include: { owner: true, items: true },
+      include: { owner: true },
     });
 
-    if (!deal.contactEmail) {
-      throw new Error("Dealen mangler en kontakt-e-mail. Udfyld den før kontrakten kan sendes.");
+    if (deal.contractStatus === "SIGNED") {
+      throw new Error("Kontrakten er allerede underskrevet og kan ikke ændres herfra.");
     }
-    if (!deal.contactName) {
-      throw new Error("Dealen mangler et kontaktpersonnavn. Udfyld det før kontrakten kan sendes.");
-    }
-    if (!deal.soldProduct && deal.items.length === 0) {
-      throw new Error("Vælg mindst ét produkt (Solgt til, eller Ydelser & steder) før kontrakten sendes.");
-    }
-    if (!deal.bindingMonths) {
-      throw new Error("Udfyld bindingsperiode (måneder) før kontrakten sendes.");
+    if (!deal.cvrNumber) throw new Error("Udfyld CVR-nummer før kontrakten kan sendes.");
+    if (!deal.contactName) throw new Error("Dealen mangler et kontaktpersonnavn.");
+    if (!deal.contactEmail) throw new Error("Dealen mangler en kontakt-e-mail.");
+    if (!deal.contactPhone) throw new Error("Dealen mangler et telefonnummer.");
+
+    const selectedKeys = (Object.keys(PRODUCT_LABELS) as (keyof typeof PRODUCT_LABELS)[]).filter(
+      (key) => products[key].selected
+    );
+    if (selectedKeys.length === 0) throw new Error("Vælg mindst ét produkt.");
+    if (!products.bindingMonths || products.bindingMonths <= 0) {
+      throw new Error("Angiv en gyldig bindingsperiode.");
     }
 
-    const templateData = buildContractTemplateData({
-      companyName: deal.companyName,
-      displayName: deal.displayName,
-      cvrNumber: deal.cvrNumber,
-      contactName: deal.contactName,
-      contactEmail: deal.contactEmail,
-      contactPhone: deal.contactPhone,
-      address: deal.address,
-      soldProduct: deal.soldProduct,
-      saleAmount: deal.saleAmount,
-      bindingMonths: deal.bindingMonths,
-      establishmentFee: deal.establishmentFee,
-      noticePeriodMonths: deal.noticePeriodMonths,
-      items: deal.items,
-      owner: { name: deal.owner.name, email: deal.owner.email, phone: deal.owner.phone },
-    });
+    if (deal.signWellDocumentId && deal.contractStatus !== "NONE") {
+      await cancelSignWellDocument(deal.signWellDocumentId);
+    }
+
+    const templateData = buildContractTemplateData(
+      {
+        companyName: deal.companyName,
+        displayName: deal.displayName,
+        cvrNumber: deal.cvrNumber,
+        contactName: deal.contactName,
+        contactEmail: deal.contactEmail,
+        contactPhone: deal.contactPhone,
+        address: deal.address,
+        noticePeriodMonths: deal.noticePeriodMonths,
+        owner: { name: deal.owner.name, email: deal.owner.email, phone: deal.owner.phone },
+      },
+      products
+    );
 
     const docxBuffer = generateContractDocx(templateData);
 
@@ -76,7 +121,15 @@ export async function sendContractViaSignWell(dealId: string): Promise<{ ok: tru
         signWellDocumentId: document.id,
         contractStatus: "SENT",
         contractSentAt: new Date(),
+        contractViewedAt: null,
+        contractSignedAt: null,
         stage: "CONTRACT_SENT",
+        saleAmount: computeMonthlyTotal(products),
+        establishmentFee: computeSetupTotal(products),
+        bindingMonths: products.bindingMonths,
+        additionalTerms: products.additionalTerms || null,
+        soldProduct: selectedKeys.map((key) => PRODUCT_LABELS[key]).join(", "),
+        contractProducts: products,
       },
     });
 

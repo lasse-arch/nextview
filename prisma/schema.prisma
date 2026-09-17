@@ -205,9 +205,15 @@ model Deal {
   /// deal first goes Live; reset to the renewal date on each renewal).
   billingStartDate DateTime?
 
-  contractLink      String?
   establishmentFee  Int?
   currentTermNumber Int     @default(1)
+  /// Free-text terms entered on the contract-builder page when the contract was sent.
+  additionalTerms   String?
+  /// Exact per-product selection/quantity/price entered on the contract-builder
+  /// page for the most recently sent contract - lets re-opening the builder to
+  /// edit an unsigned contract pre-fill with what was actually sent, rather
+  /// than guessing it back from the aggregate saleAmount/establishmentFee.
+  contractProducts  Json?
 
   /// Notice period required to terminate (months). Editable per deal;
   /// most contracts use 6 months.
@@ -242,12 +248,11 @@ model Deal {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  notes            Note[]
-  emails           EmailMessage[]
-  commission       Commission?
-  invoices         Invoice[]
-  contractRenewals ContractRenewal[]
-  items            DealItem[]
+  notes      Note[]
+  emails     EmailMessage[]
+  commission Commission?
+  invoices   Invoice[]
+  items      DealItem[]
 }
 
 /// A service/product line on a deal - optionally tied to one of the
@@ -269,24 +274,6 @@ model DealItem {
   url         String?
 
   createdAt DateTime @default(now())
-}
-
-model ContractRenewal {
-  id     String @id @default(cuid())
-  deal   Deal   @relation(fields: [dealId], references: [id], onDelete: Cascade)
-  dealId String
-
-  termNumber Int
-
-  previousValue         Int
-  previousBindingMonths Int
-  newValue              Int
-  newBindingMonths      Int
-
-  contractLink     String?
-  establishmentFee Int?
-
-  renewedAt DateTime @default(now())
 }
 
 model Note {

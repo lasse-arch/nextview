@@ -1,7 +1,5 @@
 import { formatDKK } from "@/lib/labels";
 
-type DealItemLike = { productType: string; amount: number | null };
-
 type DealForContract = {
   companyName: string;
   displayName: string | null;
@@ -10,31 +8,18 @@ type DealForContract = {
   contactEmail: string | null;
   contactPhone: string | null;
   address: string | null;
-  soldProduct: string | null;
-  saleAmount: number | null;
-  bindingMonths: number | null;
-  establishmentFee: number | null;
   noticePeriodMonths: number;
-  items: DealItemLike[];
   owner: { name: string; email: string; phone: string | null };
 };
 
-/** Maps our free-text product names/keywords onto the template's 4 fixed product blocks. */
-const PRODUCT_MATCHERS: Record<string, string> = {
-  matterport: "NextviewTour",
-  tour: "NextviewTour",
-  hjemmeside: "Hjemmeside",
-  drone: "DroneOptagelse",
-  visitkort: "Visitkort",
+export type ContractProducts = {
+  nextviewTour: { selected: boolean; quantity: number; unitPrice: number };
+  hjemmeside: { selected: boolean; setupFee: number; price: number };
+  droneOptagelse: { selected: boolean; quantity: number; price: number };
+  visitkort: { selected: boolean; quantity: number; price: number };
+  bindingMonths: number;
+  additionalTerms: string;
 };
-
-function matchProductKey(productType: string): string | null {
-  const normalized = productType.trim().toLowerCase();
-  for (const [needle, key] of Object.entries(PRODUCT_MATCHERS)) {
-    if (normalized.includes(needle)) return key;
-  }
-  return null;
-}
 
 function splitZipCity(address: string | null): { street: string; zipCity: string } {
   // We only store one free-text address field; the template wants street and
@@ -46,46 +31,39 @@ function splitZipCity(address: string | null): { street: string; zipCity: string
   return { street: address, zipCity: "" };
 }
 
+/** Sum of the one-off, engangsbeløb-style costs across the selected products. */
+export function computeSetupTotal(p: ContractProducts): number {
+  return (p.hjemmeside.selected ? p.hjemmeside.setupFee : 0) +
+    (p.droneOptagelse.selected ? p.droneOptagelse.price : 0) +
+    (p.visitkort.selected ? p.visitkort.price : 0);
+}
+
+/** Sum of the recurring monthly costs across the selected products. */
+export function computeMonthlyTotal(p: ContractProducts): number {
+  const tourTotal = p.nextviewTour.selected ? p.nextviewTour.quantity * p.nextviewTour.unitPrice : 0;
+  return tourTotal + (p.hjemmeside.selected ? p.hjemmeside.price : 0);
+}
+
 /**
  * Builds the flat, dot-keyed data object docxtemplater fills the contract
  * template with (see src/contract-templates/nextview360-contract.docx -
- * keys must match its {Tag} placeholders exactly; docxtemplater does not do
- * nested-object dot-path resolution by default, hence the flat shape here).
+ * keys must match its [[Tag]] placeholders exactly; docxtemplater does not
+ * do nested-object dot-path resolution by default, hence the flat shape).
  *
- * Per-product Quantity/Price figures are itemized from DealItem when
- * present (the precise source), and fall back to the deal's own
- * saleAmount/establishmentFee for the simple single-product case. The two
- * headline totals (Deal.Price / Deal.SetupPrice) always come straight from
- * the deal's own billing fields - the same numbers Dinero invoices from -
- * regardless of how the per-product breakdown above them is estimated.
+ * Product prices/quantities come directly from what was explicitly entered
+ * on the contract-builder page - not guessed from free-text fields - so
+ * what's on the document always matches what's shown there.
  */
-export function buildContractTemplateData(deal: DealForContract): Record<string, string | boolean> {
-  const itemsByProduct = new Map<string, DealItemLike[]>();
-  for (const item of deal.items) {
-    const key = matchProductKey(item.productType);
-    if (!key) continue;
-    itemsByProduct.set(key, [...(itemsByProduct.get(key) ?? []), item]);
-  }
-
-  const soldProductLower = (deal.soldProduct ?? "").toLowerCase();
-  const hasAnyItems = deal.items.length > 0;
-
-  function productBlock(key: string, matchWord: string) {
-    const items = itemsByProduct.get(key) ?? [];
-    const selected = items.length > 0 || (!hasAnyItems && soldProductLower.includes(matchWord));
-    const quantity = items.length > 0 ? items.length : selected ? 1 : 0;
-    const total = items.length > 0 ? items.reduce((sum, i) => sum + (i.amount ?? 0), 0) : selected ? deal.saleAmount ?? 0 : 0;
-    const unit = quantity > 0 ? Math.round(total / quantity) : 0;
-    return { selected, quantity, total, unit };
-  }
-
-  const tour = productBlock("NextviewTour", "matterport");
-  const site = productBlock("Hjemmeside", "hjemmeside");
-  const drone = productBlock("DroneOptagelse", "drone");
-  const cards = productBlock("Visitkort", "visitkort");
-
+export function buildContractTemplateData(
+  deal: DealForContract,
+  products: ContractProducts
+): Record<string, string | boolean> {
   const { street, zipCity } = splitZipCity(deal.address);
   const displayCompany = deal.displayName || deal.companyName;
+
+  const tourTotal = products.nextviewTour.selected
+    ? products.nextviewTour.quantity * products.nextviewTour.unitPrice
+    : 0;
 
   return {
     "Client.Company": displayCompany,
@@ -100,27 +78,27 @@ export function buildContractTemplateData(deal: DealForContract): Record<string,
     "Seller.Email": deal.owner.email,
     "Seller.Phone": deal.owner.phone ?? "",
 
-    "Deal.NextviewTour.Selected": tour.selected,
-    "Deal.NextviewTour.Quantity": String(tour.quantity),
-    "Deal.NextviewTour.UnitPrice": formatDKK(tour.unit),
-    "Deal.NextviewTour.Price": formatDKK(tour.total),
+    "Deal.NextviewTour.Selected": products.nextviewTour.selected,
+    "Deal.NextviewTour.Quantity": String(products.nextviewTour.quantity),
+    "Deal.NextviewTour.UnitPrice": formatDKK(products.nextviewTour.unitPrice),
+    "Deal.NextviewTour.Price": formatDKK(tourTotal),
 
-    "Deal.Hjemmeside.Selected": site.selected,
-    "Deal.Hjemmeside.SetupFee": formatDKK(site.selected ? deal.establishmentFee ?? 0 : 0),
-    "Deal.Hjemmeside.Price": formatDKK(site.total),
+    "Deal.Hjemmeside.Selected": products.hjemmeside.selected,
+    "Deal.Hjemmeside.SetupFee": formatDKK(products.hjemmeside.setupFee),
+    "Deal.Hjemmeside.Price": formatDKK(products.hjemmeside.price),
 
-    "Deal.DroneOptagelse.Selected": drone.selected,
-    "Deal.DroneOptagelse.Quantity": String(drone.quantity),
-    "Deal.DroneOptagelse.Price": formatDKK(drone.total),
+    "Deal.DroneOptagelse.Selected": products.droneOptagelse.selected,
+    "Deal.DroneOptagelse.Quantity": String(products.droneOptagelse.quantity),
+    "Deal.DroneOptagelse.Price": formatDKK(products.droneOptagelse.price),
 
-    "Deal.Visitkort.Selected": cards.selected,
-    "Deal.Visitkort.Quantity": String(cards.quantity),
-    "Deal.Visitkort.Price": formatDKK(cards.total),
+    "Deal.Visitkort.Selected": products.visitkort.selected,
+    "Deal.Visitkort.Quantity": String(products.visitkort.quantity),
+    "Deal.Visitkort.Price": formatDKK(products.visitkort.price),
 
-    "Deal.SetupPrice": formatDKK(deal.establishmentFee ?? 0),
-    "Deal.Price": formatDKK(deal.saleAmount ?? 0),
-    "Deal.AdditionalTerms": "",
-    "Deal.BindingMonths": String(deal.bindingMonths ?? ""),
+    "Deal.SetupPrice": formatDKK(computeSetupTotal(products)),
+    "Deal.Price": formatDKK(computeMonthlyTotal(products)),
+    "Deal.AdditionalTerms": products.additionalTerms,
+    "Deal.BindingMonths": String(products.bindingMonths),
     "Deal.NoticeMonths": String(deal.noticePeriodMonths),
   };
 }

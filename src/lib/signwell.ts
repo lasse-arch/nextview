@@ -89,6 +89,24 @@ export async function downloadCompletedPdf(documentId: string): Promise<ArrayBuf
 }
 
 /**
+ * Cancels an in-progress (not yet completed) document - used when resending
+ * an edited, still-unsigned contract, so the customer can't sign a stale
+ * copy if they still have the old email around. Best-effort: a 404 (already
+ * gone) is fine, anything else is swallowed too since this must never block
+ * sending the replacement contract.
+ */
+export async function cancelSignWellDocument(documentId: string): Promise<void> {
+  try {
+    await fetch(`${SIGNWELL_API_BASE}/documents/${documentId}`, {
+      method: "DELETE",
+      headers: headers(),
+    });
+  } catch {
+    // Non-fatal - see above.
+  }
+}
+
+/**
  * Registers our webhook callback URL with SignWell if it isn't already
  * registered (idempotent - safe to call on every send). Returns the
  * webhook's id, which SignWell uses as the HMAC key for event.hash

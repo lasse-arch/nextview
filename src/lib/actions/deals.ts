@@ -119,16 +119,6 @@ export async function updateDeal(dealId: string, formData: FormData) {
   const ownerId = String(formData.get("ownerId") || "");
   let stage = String(formData.get("stage") || "LEAD") as DealStage;
   const meetingDateRaw = String(formData.get("meetingDate") || "");
-  const soldProduct = formData.getAll("soldProduct").map(String).filter(Boolean).join(", ") || null;
-  const bindingMonthsRaw = String(formData.get("bindingMonths") || "");
-  const bindingMonths = bindingMonthsRaw ? parseInt(bindingMonthsRaw, 10) : null;
-  const saleAmountRaw = String(formData.get("saleAmount") || "");
-  const saleAmount = saleAmountRaw ? Math.round(parseFloat(saleAmountRaw)) : null;
-  const soldAtRaw = String(formData.get("soldAt") || "");
-  const soldAt = soldAtRaw ? new Date(soldAtRaw) : null;
-  const establishmentFeeRaw = String(formData.get("establishmentFee") || "");
-  const establishmentFee = establishmentFeeRaw ? Math.round(parseFloat(establishmentFeeRaw)) : null;
-  const liveAtRaw = String(formData.get("liveAt") || "");
 
   if (stage === "MEETING_BOOKED" && !meetingDateRaw) {
     throw new Error("Angiv en mødedato når stadiet er 'Møde booket'.");
@@ -147,9 +137,53 @@ export async function updateDeal(dealId: string, formData: FormData) {
     stage = existing.stage;
   }
 
-  // The Live-dato field is explicit and editable; only fall back to "today"
-  // when a deal is newly moved to Live without one having been set yet.
-  const liveAt = liveAtRaw ? new Date(liveAtRaw) : stage === "LIVE" && !existing.liveAt ? new Date() : existing.liveAt;
+  // Solgt til, binding, salgsbeløb, solgt dato and etableringspris are set by
+  // the contract-builder flow (or backfilled on import) and shown read-only
+  // here - only an admin who's clicked "Ret manuelt" gets real inputs for
+  // them, so their absence from the form means "leave unchanged", not "clear".
+  const canEditContractFields = user.role === "ADMIN";
+  const soldProduct =
+    canEditContractFields && formData.has("soldProduct")
+      ? formData.getAll("soldProduct").map(String).filter(Boolean).join(", ") || null
+      : existing.soldProduct;
+  const bindingMonths =
+    canEditContractFields && formData.has("bindingMonths")
+      ? (() => {
+          const raw = String(formData.get("bindingMonths") || "");
+          return raw ? parseInt(raw, 10) : null;
+        })()
+      : existing.bindingMonths;
+  const saleAmount =
+    canEditContractFields && formData.has("saleAmount")
+      ? (() => {
+          const raw = String(formData.get("saleAmount") || "");
+          return raw ? Math.round(parseFloat(raw)) : null;
+        })()
+      : existing.saleAmount;
+  const soldAt =
+    canEditContractFields && formData.has("soldAt")
+      ? (() => {
+          const raw = String(formData.get("soldAt") || "");
+          return raw ? new Date(raw) : null;
+        })()
+      : existing.soldAt;
+  const establishmentFee =
+    canEditContractFields && formData.has("establishmentFee")
+      ? (() => {
+          const raw = String(formData.get("establishmentFee") || "");
+          return raw ? Math.round(parseFloat(raw)) : null;
+        })()
+      : existing.establishmentFee;
+
+  // Live-dato is normally set automatically when a deal first moves to
+  // Live; an admin with "Ret manuelt" open can override it explicitly.
+  const liveAtOverrideRaw =
+    canEditContractFields && formData.has("liveAt") ? String(formData.get("liveAt") || "") : "";
+  const liveAt = liveAtOverrideRaw
+    ? new Date(liveAtOverrideRaw)
+    : stage === "LIVE" && !existing.liveAt
+      ? new Date()
+      : existing.liveAt;
 
   const stageDateUpdates: Record<string, Date> = {};
   if (["CONTRACT_SIGNED", "FILMED", "LIVE"].includes(stage) && !existing.contractSignedAt) {
@@ -469,62 +503,6 @@ export async function withdrawTermination(dealId: string) {
   });
   revalidatePath(`/deals/${dealId}`);
   revalidatePath("/deals");
-}
-
-export async function renewContract(dealId: string, formData: FormData) {
-  await requireUser();
-
-  const newValueRaw = String(formData.get("newValue") || "");
-  const newBindingMonthsRaw = String(formData.get("newBindingMonths") || "");
-  const contractLink = String(formData.get("contractLink") || "").trim() || null;
-  const establishmentFeeRaw = String(formData.get("establishmentFee") || "");
-
-  const newValue = Math.round(parseFloat(newValueRaw));
-  const newBindingMonths = parseInt(newBindingMonthsRaw, 10);
-  if (isNaN(newValue) || newValue < 0) throw new Error("Angiv en gyldig ny kontraktværdi.");
-  if (!newBindingMonths || newBindingMonths <= 0) throw new Error("Angiv en gyldig ny bindingsperiode.");
-  const establishmentFee = establishmentFeeRaw ? Math.round(parseFloat(establishmentFeeRaw)) : null;
-
-  const existing = await prisma.deal.findUniqueOrThrow({ where: { id: dealId } });
-  const newTermNumber = existing.currentTermNumber + 1;
-
-  await prisma.$transaction([
-    prisma.contractRenewal.create({
-      data: {
-        dealId,
-        termNumber: newTermNumber,
-        previousValue: existing.saleAmount ?? 0,
-        previousBindingMonths: existing.bindingMonths ?? 0,
-        newValue,
-        newBindingMonths,
-        contractLink,
-        establishmentFee,
-      },
-    }),
-    prisma.deal.update({
-      where: { id: dealId },
-      data: {
-        saleAmount: newValue,
-        bindingMonths: newBindingMonths,
-        contractSignedAt: new Date(),
-        billingStartDate: new Date(),
-        contractLink: contractLink ?? existing.contractLink,
-        establishmentFee,
-        currentTermNumber: newTermNumber,
-        churnedAt: null,
-        terminationNoticeAt: null,
-        contractEndDate: null,
-        stage: existing.stage === "LOST" ? "CONTRACT_SIGNED" : existing.stage,
-      },
-    }),
-  ]);
-
-  await recalcCommission(dealId);
-
-  revalidatePath(`/deals/${dealId}`);
-  revalidatePath("/deals");
-  revalidatePath("/commission");
-  redirect(`/deals/${dealId}?saved=Kontrakt%20fornyet`);
 }
 
 export async function markCommissionPaid(commissionId: string) {
