@@ -61,7 +61,7 @@ export function DealsBoard({ initialDeals, isAdmin }: { initialDeals: BoardDeal[
     if (!deal || deal.stage === newStage) return;
 
     if (!isAdmin && CONTRACT_MANAGED_STAGES.includes(newStage)) {
-      setError("Denne fase styres automatisk via PandaDoc-kontrakten på dealens side.");
+      setError("Denne fase styres automatisk via kontrakten på dealens side.");
       return;
     }
 
@@ -225,7 +225,7 @@ export function DealsBoard({ initialDeals, isAdmin }: { initialDeals: BoardDeal[
                 <h3 className="truncate text-xs font-semibold text-slate-800">{stageLabels[stage]}</h3>
                 <p className="text-[11px] text-slate-500">
                   <span className="money">{formatDKK(total)}</span> · {colDeals.length}
-                  {managed && " · PandaDoc"}
+                  {managed && " · Kontrakt"}
                 </p>
               </div>
               <div className="flex-1 space-y-1.5 overflow-y-auto px-1.5 pb-1.5">

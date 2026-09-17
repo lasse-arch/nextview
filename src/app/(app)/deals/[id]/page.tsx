@@ -12,7 +12,7 @@ import {
   formatDate,
   dealName,
 } from "@/lib/labels";
-import { isPandaDocConfigured } from "@/lib/pandadoc";
+import { isSignWellConfigured } from "@/lib/signwell";
 import { CommissionSection } from "./commission-section";
 import { CommissionExcludedToggle } from "./commission-excluded-toggle";
 import { SendContractButton } from "./send-contract-button";
@@ -52,7 +52,7 @@ export default async function DealDetailPage({
   const { id } = await params;
   const { dup, calendarWarning } = await searchParams;
 
-  const [deal, users, currentUser, duplicateDeal, pandaDocEnabled] = await Promise.all([
+  const [deal, users, currentUser, duplicateDeal, signWellEnabled] = await Promise.all([
     prisma.deal.findUnique({
       where: { id },
       include: {
@@ -71,7 +71,7 @@ export default async function DealDetailPage({
     prisma.user.findMany({ orderBy: { name: "asc" } }),
     getCurrentUser(),
     dup ? prisma.deal.findUnique({ where: { id: dup } }) : Promise.resolve(null),
-    isPandaDocConfigured(),
+    isSignWellConfigured(),
   ]);
 
   const linkableDeals = await prisma.deal.findMany({
@@ -408,7 +408,7 @@ export default async function DealDetailPage({
 
         <div className="space-y-6">
           <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-sm font-semibold text-slate-900">Kontrakt (PandaDoc)</h2>
+            <h2 className="text-sm font-semibold text-slate-900">Kontrakt</h2>
             <dl className="mt-3 space-y-2 text-sm">
               <div className="flex justify-between">
                 <dt className="text-slate-500">Status</dt>
@@ -446,9 +446,9 @@ export default async function DealDetailPage({
               {(deal.contractStatus === "NONE" ||
                 deal.contractStatus === "DECLINED" ||
                 deal.contractStatus === "VOIDED") && <SendContractButton dealId={deal.id} />}
-              {!pandaDocEnabled && (
+              {!signWellEnabled && (
                 <p className="text-xs text-amber-600">
-                  PandaDoc er ikke konfigureret eller er slået fra under Indstillinger → Kontrakter.
+                  SignWell er ikke konfigureret eller er slået fra under Indstillinger → Kontrakter.
                 </p>
               )}
             </div>

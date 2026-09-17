@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
+import { updateOwnPhone } from "@/lib/actions/profile";
 import { AvatarUploader } from "../avatar-uploader";
 
 export default async function ProfilePage() {
@@ -15,6 +16,27 @@ export default async function ProfilePage() {
         <div className="mt-4">
           <AvatarUploader currentAvatarUrl={user.avatarUrl} />
         </div>
+      </div>
+      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <h2 className="text-sm font-semibold text-slate-900">Kontaktoplysninger</h2>
+        <p className="mt-1 text-xs text-slate-500">Dit telefonnummer vises som sælgerens kontaktoplysning på genererede kontrakter.</p>
+        <form action={updateOwnPhone} className="mt-4 flex items-end gap-2">
+          <div className="flex-1">
+            <label className="block text-xs font-medium text-slate-500">Telefon</label>
+            <input
+              name="phone"
+              defaultValue={user.phone ?? ""}
+              placeholder="20 91 02 94"
+              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+            />
+          </div>
+          <button
+            type="submit"
+            className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800"
+          >
+            Gem
+          </button>
+        </form>
       </div>
     </div>
   );

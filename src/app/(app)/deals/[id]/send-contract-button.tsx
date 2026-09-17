@@ -1,7 +1,7 @@
 "use client";
 
 import { useTransition, useState } from "react";
-import { sendContract } from "@/lib/actions/pandadoc";
+import { sendContractViaSignWell } from "@/lib/actions/signwell";
 
 export function SendContractButton({ dealId }: { dealId: string }) {
   const [pending, startTransition] = useTransition();
@@ -16,7 +16,7 @@ export function SendContractButton({ dealId }: { dealId: string }) {
           setError(null);
           startTransition(async () => {
             try {
-              await sendContract(dealId);
+              await sendContractViaSignWell(dealId);
             } catch (err) {
               setError(err instanceof Error ? err.message : "Der opstod en fejl.");
             }
@@ -24,7 +24,7 @@ export function SendContractButton({ dealId }: { dealId: string }) {
         }}
         className="w-full rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
       >
-        {pending ? "Sender…" : "Send kontrakt via PandaDoc"}
+        {pending ? "Sender…" : "Send kontrakt til underskrift"}
       </button>
       {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
     </div>

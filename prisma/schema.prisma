@@ -114,6 +114,8 @@ model User {
   payoutFrequency   CommissionFrequency @default(MONTHLY)
   /// Profile picture as a data URL (small, resized client-side before upload).
   avatarUrl         String?
+  /// Shown as the seller's contact phone on generated contracts.
+  phone             String?
   createdAt         DateTime            @default(now())
 
   deals         Deal[]         @relation("DealOwner")
@@ -224,7 +226,9 @@ model Deal {
   dealEmailAddress String? @unique
 
   contractStatus     ContractStatus @default(NONE)
+  /// Historical - contracts sent before the switch to the self-built SignWell flow.
   pandaDocDocumentId String?        @unique
+  signWellDocumentId String?        @unique
   contractSentAt     DateTime?
   contractViewedAt   DateTime?
   contractSignedAt   DateTime?

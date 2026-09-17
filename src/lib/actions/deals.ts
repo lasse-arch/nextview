@@ -138,7 +138,7 @@ export async function updateDeal(dealId: string, formData: FormData) {
   const existing = await prisma.deal.findUniqueOrThrow({ where: { id: dealId } });
 
   if (user.role !== "ADMIN" && CONTRACT_MANAGED_STAGES.includes(stage) && stage !== existing.stage) {
-    throw new Error("Denne fase styres automatisk via PandaDoc-kontrakten på dealens side.");
+    throw new Error("Denne fase styres automatisk via kontrakten på dealens side.");
   }
 
   // The Live-dato field is explicit and editable; only fall back to "today"
@@ -215,7 +215,7 @@ export async function updateDealStage(dealId: string, newStage: DealStage) {
   const user = await requireUser();
 
   if (user.role !== "ADMIN" && CONTRACT_MANAGED_STAGES.includes(newStage)) {
-    throw new Error("Denne fase styres automatisk via PandaDoc-kontrakten på dealens side.");
+    throw new Error("Denne fase styres automatisk via kontrakten på dealens side.");
   }
 
   const existing = await prisma.deal.findUniqueOrThrow({ where: { id: dealId } });
