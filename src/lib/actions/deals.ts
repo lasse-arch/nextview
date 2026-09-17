@@ -117,7 +117,7 @@ export async function updateDeal(dealId: string, formData: FormData) {
   const contactPhone = String(formData.get("contactPhone") || "") || null;
   const invoiceEmail = String(formData.get("invoiceEmail") || "").trim() || null;
   const ownerId = String(formData.get("ownerId") || "");
-  const stage = String(formData.get("stage") || "LEAD") as DealStage;
+  let stage = String(formData.get("stage") || "LEAD") as DealStage;
   const meetingDateRaw = String(formData.get("meetingDate") || "");
   const soldProduct = formData.getAll("soldProduct").map(String).filter(Boolean).join(", ") || null;
   const bindingMonthsRaw = String(formData.get("bindingMonths") || "");
@@ -137,8 +137,14 @@ export async function updateDeal(dealId: string, formData: FormData) {
 
   const existing = await prisma.deal.findUniqueOrThrow({ where: { id: dealId } });
 
-  if (user.role !== "ADMIN" && CONTRACT_MANAGED_STAGES.includes(stage) && stage !== existing.stage) {
-    throw new Error("Denne fase styres automatisk via kontrakten på dealens side.");
+  // Non-admins can't manually jump into a contract-managed stage from this
+  // dropdown - that's driven by the actual contract-sending flow instead.
+  // Fall back to the existing stage rather than throwing, since this field
+  // has no client-side guard and a thrown error here would otherwise crash
+  // the whole page (Next.js redacts the real message in production anyway).
+  const blockedStageChange = user.role !== "ADMIN" && CONTRACT_MANAGED_STAGES.includes(stage) && stage !== existing.stage;
+  if (blockedStageChange) {
+    stage = existing.stage;
   }
 
   // The Live-dato field is explicit and editable; only fall back to "today"
@@ -207,7 +213,10 @@ export async function updateDeal(dealId: string, formData: FormData) {
   const params = new URLSearchParams();
   if (duplicates.length > 0) params.set("dup", duplicates[0].id);
   if (calendarWarning) params.set("calendarWarning", calendarWarning);
-  params.set("saved", "1");
+  params.set(
+    "saved",
+    blockedStageChange ? "Gemt (stadiet styres via kontrakten og blev ikke ændret)" : "1"
+  );
   redirect(`/deals/${dealId}?${params.toString()}`);
 }
 
