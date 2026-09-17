@@ -86,6 +86,8 @@ export async function buildAndSendContract(
       await cancelSignWellDocument(deal.signWellDocumentId);
     }
 
+    const sellerFullName = [deal.owner.name, deal.owner.lastName].filter(Boolean).join(" ");
+
     const templateData = buildContractTemplateData(
       {
         companyName: deal.companyName,
@@ -96,20 +98,20 @@ export async function buildAndSendContract(
         contactPhone: deal.contactPhone,
         address: deal.address,
         noticePeriodMonths: deal.noticePeriodMonths,
-        owner: { name: deal.owner.name, email: deal.owner.email, phone: deal.owner.phone },
+        owner: { name: sellerFullName, email: deal.owner.email, phone: deal.owner.phone },
       },
       products
     );
 
     const docxBuffer = generateContractDocx(templateData);
 
-    const documentName = `Kontrakt - ${deal.companyName}`;
+    const documentName = `Nextview360 x ${deal.displayName || deal.companyName}`;
     const document = await createAndSendSignatureRequest({
       fileName: `${documentName}.docx`,
       fileBuffer: docxBuffer,
       documentName,
       recipients: [
-        { id: "1", name: deal.owner.name, email: deal.owner.email },
+        { id: "1", name: sellerFullName, email: deal.owner.email },
         { id: "2", name: deal.contactName, email: deal.contactEmail },
       ],
       metadata: { dealId: deal.id },

@@ -116,6 +116,8 @@ model User {
   avatarUrl         String?
   /// Shown as the seller's contact phone on generated contracts.
   phone             String?
+  /// Shown together with `name` as the seller's full name on generated contracts.
+  lastName          String?
   createdAt         DateTime            @default(now())
 
   deals         Deal[]         @relation("DealOwner")

@@ -39,9 +39,10 @@ export async function removeOwnAvatar(targetUserId?: string) {
   revalidatePath("/users");
 }
 
-export async function updateOwnPhone(formData: FormData) {
+export async function updateOwnContactInfo(formData: FormData) {
   const user = await requireUser();
   const phone = String(formData.get("phone") || "").trim() || null;
-  await prisma.user.update({ where: { id: user.id }, data: { phone } });
+  const lastName = String(formData.get("lastName") || "").trim() || null;
+  await prisma.user.update({ where: { id: user.id }, data: { phone, lastName } });
   revalidatePath("/profile");
 }
