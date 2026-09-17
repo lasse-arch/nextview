@@ -59,6 +59,50 @@ export async function createDealManual(formData: FormData) {
   redirect(duplicates.length > 0 ? `/deals/${deal.id}?dup=${duplicates[0].id}` : `/deals/${deal.id}`);
 }
 
+/**
+ * Duplicates a deal as a fresh lead - copies the company/contact info so it
+ * doesn't need retyping, but resets stage, sale info, contract/integration
+ * fields and notes so the copy starts its own pipeline from scratch.
+ */
+export async function createDuplicateDealRecord(dealId: string) {
+  const source = await prisma.deal.findUniqueOrThrow({ where: { id: dealId } });
+
+  const companyName = `${source.companyName} (kopi)`;
+  const displayName = source.displayName ? `${source.displayName} (kopi)` : null;
+
+  const deal = await prisma.deal.create({
+    data: {
+      companyName,
+      displayName,
+      cvrNumber: source.cvrNumber,
+      address: source.address,
+      latitude: source.latitude,
+      longitude: source.longitude,
+      contactName: source.contactName,
+      contactEmail: source.contactEmail,
+      contactPhone: source.contactPhone,
+      invoiceEmail: source.invoiceEmail,
+      ownerId: source.ownerId,
+      importType: "MANUAL",
+    },
+  });
+
+  await prisma.deal.update({
+    where: { id: deal.id },
+    data: { dealEmailAddress: buildDealEmailAddress(deal.id) },
+  });
+
+  return deal;
+}
+
+export async function duplicateDeal(dealId: string) {
+  await requireUser();
+  const deal = await createDuplicateDealRecord(dealId);
+
+  revalidatePath("/deals");
+  redirect(`/deals/${deal.id}`);
+}
+
 export async function updateDeal(dealId: string, formData: FormData) {
   const user = await requireUser();
 

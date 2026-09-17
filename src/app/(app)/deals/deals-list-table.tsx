@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { bulkUpdateSaleAmount, bulkAddProduct } from "@/lib/actions/bulk-deals";
+import { bulkUpdateSaleAmount, bulkAddProduct, bulkDuplicateDeals } from "@/lib/actions/bulk-deals";
 import { stageLabels, importTypeLabels, formatDKK, formatDate, dealName, totalContractValue } from "@/lib/labels";
 import { useToast } from "@/components/toast";
 
@@ -56,6 +56,16 @@ export function DealsListTable({ deals }: { deals: ListDeal[] }) {
       const result = await bulkUpdateSaleAmount(ids, saleAmountInput);
       showToast(`Salgsbeløb sat på ${result.updated} deals`);
       setSaleAmountInput("");
+      setSelected(new Set());
+      router.refresh();
+    });
+  }
+
+  function duplicateSelected() {
+    startTransition(async () => {
+      const ids = Array.from(selected);
+      const result = await bulkDuplicateDeals(ids);
+      showToast(`${result.duplicated} deal(s) duplikeret`);
       setSelected(new Set());
       router.refresh();
     });
@@ -143,6 +153,17 @@ export function DealsListTable({ deals }: { deals: ListDeal[] }) {
               Anvend
             </button>
           </div>
+
+          <div className="h-8 w-px bg-slate-200" />
+
+          <button
+            type="button"
+            disabled={pending}
+            onClick={duplicateSelected}
+            className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+          >
+            Dupliker valgte
+          </button>
 
           <button
             type="button"

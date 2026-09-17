@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { recalcCommission } from "@/lib/commission-service";
+import { createDuplicateDealRecord } from "@/lib/actions/deals";
 
 export async function bulkUpdateSaleAmount(dealIds: string[], amountRaw: string) {
   await requireUser();
@@ -20,6 +21,18 @@ export async function bulkUpdateSaleAmount(dealIds: string[], amountRaw: string)
   revalidatePath("/deals");
   revalidatePath("/commission");
   return { updated: dealIds.length };
+}
+
+export async function bulkDuplicateDeals(dealIds: string[]) {
+  await requireUser();
+  if (dealIds.length === 0) throw new Error("Ingen deals valgt.");
+
+  for (const dealId of dealIds) {
+    await createDuplicateDealRecord(dealId);
+  }
+
+  revalidatePath("/deals");
+  return { duplicated: dealIds.length };
 }
 
 export async function bulkAddProduct(

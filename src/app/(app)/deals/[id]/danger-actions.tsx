@@ -1,7 +1,7 @@
 "use client";
 
 import { useTransition } from "react";
-import { markDealLost, deleteDeal } from "@/lib/actions/deals";
+import { markDealLost, deleteDeal, duplicateDeal } from "@/lib/actions/deals";
 import { useToast } from "@/components/toast";
 
 export function DealDangerActions({
@@ -18,6 +18,14 @@ export function DealDangerActions({
 
   return (
     <div className="flex items-center gap-2">
+      <button
+        type="button"
+        disabled={pending}
+        onClick={() => startTransition(() => duplicateDeal(dealId))}
+        className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+      >
+        Dupliker deal
+      </button>
       {stage !== "LOST" && (
         <button
           type="button"
