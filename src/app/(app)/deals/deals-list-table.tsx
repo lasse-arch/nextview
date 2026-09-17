@@ -22,7 +22,6 @@ const STRIPPABLE_FIELD_LABELS: Record<StrippableField, string> = {
   address: "Adresse",
   contactEmail: "E-mail",
   contactName: "Kontaktperson",
-  companyName: "Firmanavn",
   displayName: "Kaldenavn",
 };
 
@@ -70,83 +69,92 @@ export function DealsListTable({ deals, users }: { deals: ListDeal[]; users: { i
     });
   }
 
+  function runBulkAction<T>(action: () => Promise<T>, onSuccess: (result: T) => void) {
+    startTransition(async () => {
+      try {
+        const result = await action();
+        onSuccess(result);
+        setSelected(new Set());
+        router.refresh();
+      } catch (err) {
+        showToast(err instanceof Error ? err.message : "Handlingen fejlede.");
+      }
+    });
+  }
+
   function applySaleAmount() {
     if (!saleAmountInput) return;
-    startTransition(async () => {
-      const ids = Array.from(selected);
-      const result = await bulkUpdateSaleAmount(ids, saleAmountInput);
-      showToast(`Salgsbeløb sat på ${result.updated} deals`);
-      setSaleAmountInput("");
-      setSelected(new Set());
-      router.refresh();
-    });
+    const ids = Array.from(selected);
+    runBulkAction(
+      () => bulkUpdateSaleAmount(ids, saleAmountInput),
+      (result) => {
+        showToast(`Salgsbeløb sat på ${result.updated} deals`);
+        setSaleAmountInput("");
+      }
+    );
   }
 
   function applyBindingMonths() {
     if (!bindingMonthsInput) return;
-    startTransition(async () => {
-      const ids = Array.from(selected);
-      const result = await bulkUpdateBindingMonths(ids, bindingMonthsInput);
-      showToast(`Binding sat på ${result.updated} deals`);
-      setBindingMonthsInput("");
-      setSelected(new Set());
-      router.refresh();
-    });
+    const ids = Array.from(selected);
+    runBulkAction(
+      () => bulkUpdateBindingMonths(ids, bindingMonthsInput),
+      (result) => {
+        showToast(`Binding sat på ${result.updated} deals`);
+        setBindingMonthsInput("");
+      }
+    );
   }
 
   function duplicateSelected() {
-    startTransition(async () => {
-      const ids = Array.from(selected);
-      const result = await bulkDuplicateDeals(ids);
-      showToast(`${result.duplicated} deal(s) duplikeret`);
-      setSelected(new Set());
-      router.refresh();
-    });
+    const ids = Array.from(selected);
+    runBulkAction(
+      () => bulkDuplicateDeals(ids),
+      (result) => showToast(`${result.duplicated} deal(s) duplikeret`)
+    );
   }
 
   function applyProduct() {
-    startTransition(async () => {
-      const ids = Array.from(selected);
-      const result = await bulkAddProduct(ids, productType, productAmount, productFree);
-      showToast(`${productType} tilføjet til ${result.updated} deals`);
-      setProductAmount("");
-      setProductFree(false);
-      setSelected(new Set());
-      router.refresh();
-    });
+    const ids = Array.from(selected);
+    runBulkAction(
+      () => bulkAddProduct(ids, productType, productAmount, productFree),
+      (result) => {
+        showToast(`${productType} tilføjet til ${result.updated} deals`);
+        setProductAmount("");
+        setProductFree(false);
+      }
+    );
   }
 
   function applyOwner() {
     if (!ownerInput) return;
-    startTransition(async () => {
-      const ids = Array.from(selected);
-      const result = await bulkSetOwner(ids, ownerInput);
-      showToast(`Ejer sat på ${result.updated} deals`);
-      setOwnerInput("");
-      setSelected(new Set());
-      router.refresh();
-    });
+    const ids = Array.from(selected);
+    runBulkAction(
+      () => bulkSetOwner(ids, ownerInput),
+      (result) => {
+        showToast(`Ejer sat på ${result.updated} deals`);
+        setOwnerInput("");
+      }
+    );
   }
 
   function applySoldProducts() {
-    startTransition(async () => {
-      const ids = Array.from(selected);
-      const result = await bulkSetSoldProduct(ids, soldProducts);
-      showToast(`Produkt(er) sat på ${result.updated} deals`);
-      setSoldProducts([]);
-      setSelected(new Set());
-      router.refresh();
-    });
+    const ids = Array.from(selected);
+    runBulkAction(
+      () => bulkSetSoldProduct(ids, soldProducts),
+      (result) => {
+        showToast(`Produkt(er) sat på ${result.updated} deals`);
+        setSoldProducts([]);
+      }
+    );
   }
 
   function applyStripUrl() {
-    startTransition(async () => {
-      const ids = Array.from(selected);
-      const result = await bulkStripUrlFromField(ids, stripField);
-      showToast(`Link fjernet fra ${result.updated} deals`);
-      setSelected(new Set());
-      router.refresh();
-    });
+    const ids = Array.from(selected);
+    runBulkAction(
+      () => bulkStripUrlFromField(ids, stripField),
+      (result) => showToast(`Link fjernet fra ${result.updated} deals`)
+    );
   }
 
   return (

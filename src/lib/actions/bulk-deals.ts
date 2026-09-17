@@ -79,7 +79,8 @@ export async function bulkSetSoldProduct(dealIds: string[], products: string[]) 
   return { updated: dealIds.length };
 }
 
-const STRIPPABLE_FIELDS = ["address", "contactEmail", "contactName", "companyName", "displayName"] as const;
+// companyName is intentionally excluded - it's a required field on Deal and can't be cleared to null.
+const STRIPPABLE_FIELDS = ["address", "contactEmail", "contactName", "displayName"] as const;
 export type StrippableField = (typeof STRIPPABLE_FIELDS)[number];
 
 /**

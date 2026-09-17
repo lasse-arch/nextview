@@ -47,10 +47,14 @@ export function DuplicateReviewSection({ pairs }: { pairs: DuplicatePair[] }) {
 
   function resolve(keepId: string, deleteId: string, pairKey: string) {
     startTransition(async () => {
-      await resolveDuplicate(keepId, deleteId);
-      setResolved((prev) => new Set(prev).add(pairKey));
-      showToast("Dublet håndteret");
-      router.refresh();
+      try {
+        await resolveDuplicate(keepId, deleteId);
+        setResolved((prev) => new Set(prev).add(pairKey));
+        showToast("Dublet håndteret");
+        router.refresh();
+      } catch (err) {
+        showToast(err instanceof Error ? err.message : "Kunne ikke håndtere dubletten.");
+      }
     });
   }
 
