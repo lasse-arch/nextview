@@ -3,12 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
-import {
-  isSignWellConfigured,
-  createAndSendSignatureRequest,
-  cancelSignWellDocument,
-  ensureWebhookRegistered,
-} from "@/lib/signwell";
+import { isDocuSealConfigured, createAndSendSubmission, cancelDocuSealSubmission } from "@/lib/docuseal";
 import { lookupCvrNumber } from "@/lib/cvr";
 import { buildContractTemplateData, computeMonthlyTotal, computeSetupTotal, type ContractProducts } from "@/lib/contract-template-data";
 import { generateContractDocx } from "@/lib/contract-generator";
@@ -19,6 +14,13 @@ const PRODUCT_LABELS: Record<keyof Pick<ContractProducts, "nextviewTour" | "hjem
   droneOptagelse: "Drone-optagelse",
   visitkort: "Visitkort",
 };
+
+/**
+ * Only one person ever signs on our side, regardless of which seller owns
+ * the deal - the director, not the salesperson (see the contract template's
+ * "For leverandør" signature block, which prints this same fixed name).
+ */
+const CONTRACT_SIGNER = { name: "Lasse Larsen", email: "info@nextview360.dk" };
 
 /**
  * Pre-flight check before opening the contract-builder page: the master
@@ -44,7 +46,7 @@ export async function checkDealReadyForContract(
 
 /**
  * Builds the contract docx from exactly what was entered on the
- * contract-builder page, sends it via SignWell, and freezes the resulting
+ * contract-builder page, sends it via DocuSeal, and freezes the resulting
  * totals/binding/terms onto the deal (contract is the source of truth for
  * those fields from here on - see LockedContractFields). If a previous,
  * still-unsigned contract exists for this deal, it's canceled first so the
@@ -57,8 +59,8 @@ export async function buildAndSendContract(
   try {
     await requireUser();
 
-    if (!(await isSignWellConfigured())) {
-      throw new Error("SignWell er ikke konfigureret eller er slået fra under Indstillinger.");
+    if (!(await isDocuSealConfigured())) {
+      throw new Error("DocuSeal er ikke konfigureret eller er slået fra under Indstillinger.");
     }
 
     const deal = await prisma.deal.findUniqueOrThrow({
@@ -82,8 +84,8 @@ export async function buildAndSendContract(
       throw new Error("Angiv en gyldig bindingsperiode.");
     }
 
-    if (deal.signWellDocumentId && deal.contractStatus !== "NONE") {
-      await cancelSignWellDocument(deal.signWellDocumentId);
+    if (deal.docusealSubmissionId && deal.contractStatus !== "NONE") {
+      await cancelDocuSealSubmission(deal.docusealSubmissionId);
     }
 
     const sellerFullName = [deal.owner.name, deal.owner.lastName].filter(Boolean).join(" ");
@@ -106,13 +108,13 @@ export async function buildAndSendContract(
     const docxBuffer = generateContractDocx(templateData);
 
     const documentName = `Nextview360 x ${deal.displayName || deal.companyName}`;
-    const document = await createAndSendSignatureRequest({
+    const submission = await createAndSendSubmission({
       fileName: `${documentName}.docx`,
       fileBuffer: docxBuffer,
       documentName,
-      recipients: [
-        { id: "1", name: sellerFullName, email: deal.owner.email },
-        { id: "2", name: deal.contactName, email: deal.contactEmail },
+      submitters: [
+        { role: "Company", name: CONTRACT_SIGNER.name, email: CONTRACT_SIGNER.email, externalId: "director" },
+        { role: "Customer", name: deal.contactName, email: deal.contactEmail, externalId: "customer" },
       ],
       metadata: { dealId: deal.id },
     });
@@ -120,7 +122,7 @@ export async function buildAndSendContract(
     await prisma.deal.update({
       where: { id: dealId },
       data: {
-        signWellDocumentId: document.id,
+        docusealSubmissionId: String(submission.id),
         contractStatus: "SENT",
         contractSentAt: new Date(),
         contractViewedAt: null,
@@ -139,20 +141,5 @@ export async function buildAndSendContract(
     return { ok: true };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Der opstod en fejl ved afsendelse af kontrakten." };
-  }
-}
-
-export async function registerSignWellWebhook(): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
-  const user = await requireUser();
-  if (user.role !== "ADMIN") return { ok: false, error: "Kun admin kan registrere webhook." };
-
-  const appBaseUrl = process.env.APP_BASE_URL || "http://localhost:3000";
-  const callbackUrl = `${appBaseUrl}/api/integrations/signwell/webhook`;
-  try {
-    const id = await ensureWebhookRegistered(callbackUrl);
-    if (!id) return { ok: false, error: "Kunne ikke registrere webhook hos SignWell." };
-    return { ok: true, id };
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : "Kunne ikke registrere webhook hos SignWell." };
   }
 }

@@ -1,10 +1,10 @@
 import { prisma } from "@/lib/db";
 
-export type IntegrationKey = "DINERO" | "SIGNWELL";
+export type IntegrationKey = "DINERO" | "DOCUSEAL";
 
 export const integrationLabels: Record<IntegrationKey, string> = {
   DINERO: "Dinero",
-  SIGNWELL: "SignWell",
+  DOCUSEAL: "DocuSeal",
 };
 
 /** No row yet means the integration has never been explicitly turned off. */

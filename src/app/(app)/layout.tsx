@@ -25,7 +25,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: "/profile", label: "Min profil" },
     { href: "/deals/import", label: "Importér" },
     { href: "/settings/email", label: "E-mail" },
-    { href: "/settings/signwell", label: "Kontrakter" },
+    { href: "/settings/docuseal", label: "Kontrakter" },
     { href: "/settings/dinero", label: "Fakturaer" },
   ];
   if (user.role === "ADMIN") {

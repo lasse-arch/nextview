@@ -2,7 +2,7 @@
 
 import { useTransition, useState } from "react";
 import { useRouter } from "next/navigation";
-import { checkDealReadyForContract } from "@/lib/actions/signwell";
+import { checkDealReadyForContract } from "@/lib/actions/docuseal";
 
 export function SendContractButton({ dealId, isEdit }: { dealId: string; isEdit: boolean }) {
   const router = useRouter();

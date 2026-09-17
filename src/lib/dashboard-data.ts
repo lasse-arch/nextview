@@ -59,7 +59,7 @@ export async function getDashboardData(ownerId?: string) {
 
   const failedInvoices = invoices.filter((i) => i.status === "FAILED").length;
 
-  // Only counts contracts that are actually signed (via SignWell, or backfilled
+  // Only counts contracts that are actually signed (via DocuSeal, or backfilled
   // contractSignedAt for imported existing customers) - not deals still pending
   // signature further up the pipeline.
   const establishmentFeeTotal = deals

@@ -234,9 +234,10 @@ model Deal {
   dealEmailAddress String? @unique
 
   contractStatus     ContractStatus @default(NONE)
-  /// Historical - contracts sent before the switch to the self-built SignWell flow.
+  /// Historical - contracts sent before the switch to the self-built PandaDoc/SignWell flows.
   pandaDocDocumentId String?        @unique
   signWellDocumentId String?        @unique
+  docusealSubmissionId String?      @unique
   contractSentAt     DateTime?
   contractViewedAt   DateTime?
   contractSignedAt   DateTime?

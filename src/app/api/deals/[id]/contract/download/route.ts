@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { downloadCompletedPdf } from "@/lib/signwell";
+import { downloadCompletedPdf } from "@/lib/docuseal";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -12,11 +12,11 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const { id } = await params;
 
   const deal = await prisma.deal.findUnique({ where: { id } });
-  if (!deal?.signWellDocumentId) {
+  if (!deal?.docusealSubmissionId) {
     return NextResponse.json({ error: "Ingen kontrakt fundet for denne deal" }, { status: 404 });
   }
 
-  const pdf = await downloadCompletedPdf(deal.signWellDocumentId);
+  const pdf = await downloadCompletedPdf(deal.docusealSubmissionId);
 
   return new NextResponse(pdf, {
     headers: {

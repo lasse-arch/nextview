@@ -12,7 +12,7 @@ import {
   formatDate,
   dealName,
 } from "@/lib/labels";
-import { isSignWellConfigured } from "@/lib/signwell";
+import { isDocuSealConfigured } from "@/lib/docuseal";
 import { CommissionSection } from "./commission-section";
 import { CommissionExcludedToggle } from "./commission-excluded-toggle";
 import { SendContractButton } from "./send-contract-button";
@@ -45,7 +45,7 @@ export default async function DealDetailPage({
   const { id } = await params;
   const { dup, calendarWarning } = await searchParams;
 
-  const [deal, users, currentUser, duplicateDeal, signWellEnabled] = await Promise.all([
+  const [deal, users, currentUser, duplicateDeal, docuSealEnabled] = await Promise.all([
     prisma.deal.findUnique({
       where: { id },
       include: {
@@ -63,7 +63,7 @@ export default async function DealDetailPage({
     prisma.user.findMany({ orderBy: { name: "asc" } }),
     getCurrentUser(),
     dup ? prisma.deal.findUnique({ where: { id: dup } }) : Promise.resolve(null),
-    isSignWellConfigured(),
+    isDocuSealConfigured(),
   ]);
 
   const linkableDeals = await prisma.deal.findMany({
@@ -382,9 +382,9 @@ export default async function DealDetailPage({
                   isEdit={deal.contractStatus === "SENT" || deal.contractStatus === "VIEWED"}
                 />
               )}
-              {!signWellEnabled && (
+              {!docuSealEnabled && (
                 <p className="text-xs text-amber-600">
-                  SignWell er ikke konfigureret eller er slået fra under Indstillinger → Kontrakter.
+                  DocuSeal er ikke konfigureret eller er slået fra under Indstillinger → Kontrakter.
                 </p>
               )}
             </div>

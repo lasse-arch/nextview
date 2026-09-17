@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { buildAndSendContract } from "@/lib/actions/signwell";
+import { buildAndSendContract } from "@/lib/actions/docuseal";
 import { formatDKK } from "@/lib/labels";
 import type { ContractProducts } from "@/lib/contract-template-data";
 

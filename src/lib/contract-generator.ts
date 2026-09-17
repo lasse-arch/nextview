@@ -8,9 +8,9 @@ const TEMPLATE_PATH = path.join(process.cwd(), "src/contract-templates/nextview3
 /**
  * Fills the Nextview360 contract template with deal data, including only the
  * product sections that are actually selected on the deal. Uses [[ ]]
- * delimiters (configured below) since the template also carries SignWell's
- * own {{signature:N}}/{{date:N}} text tags, which must pass through
- * untouched for SignWell to place signature fields.
+ * delimiters (configured below) since the template also carries DocuSeal's
+ * own {{Sign;type=signature;role=X}}/{{Date;type=date;role=X}} text tags,
+ * which must pass through untouched for DocuSeal to place signature fields.
  */
 export function generateContractDocx(data: Record<string, string | boolean>): Buffer {
   const content = fs.readFileSync(TEMPLATE_PATH, "binary");

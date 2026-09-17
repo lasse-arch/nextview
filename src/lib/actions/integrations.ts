@@ -11,5 +11,5 @@ export async function toggleIntegration(key: IntegrationKey, enabled: boolean) {
   await setIntegrationEnabled(key, enabled);
 
   revalidatePath("/settings/dinero");
-  revalidatePath("/settings/signwell");
+  revalidatePath("/settings/docuseal");
 }
