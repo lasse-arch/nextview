@@ -278,6 +278,19 @@ export async function markDealLost(dealId: string) {
 }
 
 /**
+ * Excludes/re-includes a deal from provision entirely - e.g. so the owner
+ * (say Gustav) can stay on the deal for pipeline tracking without it ever
+ * generating commission for them.
+ */
+export async function setCommissionExcluded(dealId: string, excluded: boolean) {
+  await requireUser();
+  await prisma.deal.update({ where: { id: dealId }, data: { commissionExcluded: excluded } });
+  await recalcCommission(dealId);
+  revalidatePath(`/deals/${dealId}`);
+  revalidatePath("/commission");
+}
+
+/**
  * Permanently deletes a deal and everything tied to it (notes, emails,
  * invoices, commission, items, renewal history) via cascade. Admin-only -
  * this can't be undone.

@@ -17,6 +17,7 @@ import {
 import { isCommissionOverdue } from "@/lib/commission";
 import { isPandaDocConfigured } from "@/lib/pandadoc";
 import { MarkPaidButton } from "./mark-paid-button";
+import { CommissionExcludedToggle } from "./commission-excluded-toggle";
 import { SendContractButton } from "./send-contract-button";
 import { StageFields } from "./stage-fields";
 import { InactiveToggleButton } from "./inactive-toggle-button";
@@ -457,8 +458,15 @@ export default async function DealDetailPage({
           </section>
 
           <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-sm font-semibold text-slate-900">Provision</h2>
-            {deal.commission ? (
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-slate-900">Provision</h2>
+              <CommissionExcludedToggle dealId={deal.id} excluded={deal.commissionExcluded} />
+            </div>
+            {deal.commissionExcluded ? (
+              <p className="mt-3 text-sm text-slate-400">
+                Denne deal er undtaget fra provisionsordningen — ejeren får ikke provision af den.
+              </p>
+            ) : deal.commission ? (
               <dl className="mt-3 space-y-2 text-sm">
                 <div className="flex justify-between">
                   <dt className="text-slate-500">Sælger</dt>

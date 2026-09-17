@@ -231,6 +231,10 @@ model Deal {
 
   dineroContactGuid String?
 
+  /// Excludes this deal from provision entirely, e.g. so the owner can stay
+  /// on the deal for pipeline tracking without it generating commission.
+  commissionExcluded Boolean @default(false)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
