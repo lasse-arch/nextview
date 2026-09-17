@@ -6,8 +6,16 @@ import { revalidatePath } from "next/cache";
 
 const MAX_DATA_URL_LENGTH = 400_000;
 
-export async function updateOwnAvatar(dataUrl: string) {
+function assertCanEditAvatar(user: { id: string; role: string }, targetUserId: string) {
+  if (targetUserId !== user.id && user.role !== "ADMIN") {
+    throw new Error("Du kan kun ændre dit eget profilbillede.");
+  }
+}
+
+export async function updateOwnAvatar(dataUrl: string, targetUserId?: string) {
   const user = await requireUser();
+  const target = targetUserId ?? user.id;
+  assertCanEditAvatar(user, target);
 
   if (!dataUrl.startsWith("data:image/")) {
     throw new Error("Ugyldigt billede.");
@@ -16,12 +24,17 @@ export async function updateOwnAvatar(dataUrl: string) {
     throw new Error("Billedet er for stort.");
   }
 
-  await prisma.user.update({ where: { id: user.id }, data: { avatarUrl: dataUrl } });
+  await prisma.user.update({ where: { id: target }, data: { avatarUrl: dataUrl } });
   revalidatePath("/", "layout");
+  revalidatePath("/users");
 }
 
-export async function removeOwnAvatar() {
+export async function removeOwnAvatar(targetUserId?: string) {
   const user = await requireUser();
-  await prisma.user.update({ where: { id: user.id }, data: { avatarUrl: null } });
+  const target = targetUserId ?? user.id;
+  assertCanEditAvatar(user, target);
+
+  await prisma.user.update({ where: { id: target }, data: { avatarUrl: null } });
   revalidatePath("/", "layout");
+  revalidatePath("/users");
 }

@@ -34,7 +34,16 @@ function resizeToSquareDataUrl(file: File): Promise<string> {
   });
 }
 
-export function AvatarUploader({ currentAvatarUrl }: { currentAvatarUrl: string | null }) {
+export function AvatarUploader({
+  currentAvatarUrl,
+  targetUserId,
+  size = 80,
+}: {
+  currentAvatarUrl: string | null;
+  /** Whose avatar this edits - omit to edit your own. Only an admin may pass someone else's id. */
+  targetUserId?: string;
+  size?: number;
+}) {
   const [preview, setPreview] = useState<string | null>(currentAvatarUrl);
   const [pending, startTransition] = useTransition();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -49,7 +58,7 @@ export function AvatarUploader({ currentAvatarUrl }: { currentAvatarUrl: string 
       setPreview(dataUrl);
       startTransition(async () => {
         try {
-          await updateOwnAvatar(dataUrl);
+          await updateOwnAvatar(dataUrl, targetUserId);
           showToast("Profilbillede opdateret");
           router.refresh();
         } catch (err) {
@@ -64,7 +73,7 @@ export function AvatarUploader({ currentAvatarUrl }: { currentAvatarUrl: string 
   function handleRemove() {
     startTransition(async () => {
       try {
-        await removeOwnAvatar();
+        await removeOwnAvatar(targetUserId);
         setPreview(null);
         showToast("Profilbillede fjernet");
         router.refresh();
@@ -75,16 +84,24 @@ export function AvatarUploader({ currentAvatarUrl }: { currentAvatarUrl: string 
   }
 
   return (
-    <div className="flex items-center gap-4">
+    <div className="flex items-center gap-3">
       {preview ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={preview} alt="Profilbillede" className="h-20 w-20 rounded-full object-cover" />
+        <img
+          src={preview}
+          alt="Profilbillede"
+          className="rounded-full object-cover"
+          style={{ width: size, height: size }}
+        />
       ) : (
-        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-slate-200 text-2xl text-slate-400">
+        <div
+          className="flex items-center justify-center rounded-full bg-slate-200 text-slate-400"
+          style={{ width: size, height: size, fontSize: size / 3 }}
+        >
           ?
         </div>
       )}
-      <div className="space-y-2">
+      <div className="space-y-1">
         <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
         <div className="flex gap-2">
           <button
@@ -106,7 +123,6 @@ export function AvatarUploader({ currentAvatarUrl }: { currentAvatarUrl: string 
             </button>
           )}
         </div>
-        <p className="text-xs text-slate-400">JPG/PNG, beskæres automatisk til et kvadrat.</p>
       </div>
     </div>
   );

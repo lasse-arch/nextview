@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
-import { AvatarUploader } from "./avatar-uploader";
+import { AvatarUploader } from "../avatar-uploader";
 
 export default async function ProfilePage() {
   const user = await getCurrentUser();
