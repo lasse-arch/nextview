@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { findDuplicatePairsForBatch } from "@/lib/duplicates";
 import { stageLabels, importTypeLabels, formatDKK, formatDate, dealName } from "@/lib/labels";
 import { DealsBoard, type BoardDeal } from "./board-view";
 import { DealsListTable } from "./deals-list-table";
+import { DuplicateReviewSection } from "./duplicate-review";
 import type { Prisma, DealStage, ImportType } from "@prisma/client";
 
 type SearchParams = {
@@ -38,7 +40,7 @@ export default async function DealsPage({
       ? { companyName: "asc" }
       : { createdAt: "desc" };
 
-  const [deals, users, importBatches, currentUser] = await Promise.all([
+  const [deals, users, importBatches, currentUser, duplicatePairs] = await Promise.all([
     prisma.deal.findMany({
       where,
       orderBy,
@@ -47,6 +49,7 @@ export default async function DealsPage({
     prisma.user.findMany({ orderBy: { name: "asc" } }),
     prisma.importBatch.findMany({ orderBy: { createdAt: "desc" } }),
     getCurrentUser(),
+    params.importBatchId ? findDuplicatePairsForBatch(params.importBatchId) : Promise.resolve([]),
   ]);
 
   function toggleViewUrl(view: "list" | "board") {
@@ -97,12 +100,16 @@ export default async function DealsPage({
         </div>
       </div>
 
-      {params.duplicates && (
-        <div className="mt-4 rounded-md bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          Bemærk: {params.duplicates.split(",").length} af de importerede firmanavne fandtes allerede i systemet:{" "}
-          <span className="font-medium">{params.duplicates.split(",").join(", ")}</span>. De er importeret alligevel
-          — tjek for evt. dubletter.
-        </div>
+      {duplicatePairs.length > 0 ? (
+        <DuplicateReviewSection pairs={duplicatePairs} />
+      ) : (
+        params.duplicates && (
+          <div className="mt-4 rounded-md bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            Bemærk: {params.duplicates.split(",").length} af de importerede firmanavne fandtes allerede i systemet:{" "}
+            <span className="font-medium">{params.duplicates.split(",").join(", ")}</span>. De er importeret
+            alligevel — tjek for evt. dubletter.
+          </div>
+        )
       )}
 
       {params.skipped && (

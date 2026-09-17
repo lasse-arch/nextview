@@ -290,6 +290,14 @@ export async function deleteDeal(dealId: string) {
   redirect("/deals");
 }
 
+/** Resolves a detected import duplicate by keeping one deal and deleting the other. */
+export async function resolveDuplicate(keepId: string, deleteId: string) {
+  await requireUser();
+  await prisma.deal.delete({ where: { id: deleteId } });
+  revalidatePath("/deals");
+  return { keptId: keepId };
+}
+
 /**
  * Groups a deal under another deal (customer) as a branch/department - e.g.
  * several locations of the same chain shown together - without merging any

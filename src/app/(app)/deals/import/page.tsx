@@ -7,7 +7,10 @@ export default function ImportPage() {
       <div>
         <h1 className="text-2xl font-semibold text-slate-900">Importér leads</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Kolonner der genkendes: firmanavn, kontaktperson, e-mail, telefon og evt. ejer (sælgers e-mail).
+          Kolonner der genkendes: navn/firmanavn, kontaktperson, mail, nummer, adresse, salgtype/produkt,
+          oprettelse (etableringspris), potentiel MRR/salgsbeløb, status, provision, sidste touch (dato), noter og
+          sælger/owner. Alle er valgfrie ud over navn. Efter import bliver mulige dubletter vist, så du kan vælge
+          hvilken der skal beholdes.
         </p>
       </div>
 

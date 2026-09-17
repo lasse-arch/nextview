@@ -7,9 +7,34 @@ import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { buildDealEmailAddress } from "@/lib/email-address";
 import { findDuplicateDeals } from "@/lib/duplicates";
-import type { ImportType } from "@prisma/client";
+import type { ImportType, DealStage, User } from "@prisma/client";
 
-import { pick, type ParsedRow } from "@/lib/import-helpers";
+import { pick, parseAmount, type ParsedRow } from "@/lib/import-helpers";
+
+/** Maps a free-text status/stage cell (Danish or English) onto our pipeline stages. */
+function mapStatusToStage(raw: string): DealStage {
+  const s = raw.trim().toLowerCase();
+  if (["won", "vundet", "solgt", "signed", "kontrakt underskrevet"].includes(s)) return "CONTRACT_SIGNED";
+  if (["lost", "tabt"].includes(s)) return "LOST";
+  if (["contacted", "kontaktet"].includes(s)) return "CONTACTED";
+  if (["meeting booked", "møde booket", "mødebooket", "møde booked"].includes(s)) return "MEETING_BOOKED";
+  if (["contract sent", "kontrakt sendt", "tilbud sendt"].includes(s)) return "CONTRACT_SENT";
+  if (["filmed", "filmet"].includes(s)) return "FILMED";
+  if (["live"].includes(s)) return "LIVE";
+  return "LEAD";
+}
+
+/** Matches an owner column value against a user by email, full name, or first name. */
+function matchOwner(raw: string | null, users: User[]): User | null {
+  if (!raw) return null;
+  const needle = raw.trim().toLowerCase();
+  return (
+    users.find((u) => u.email.toLowerCase() === needle) ||
+    users.find((u) => u.name.toLowerCase() === needle) ||
+    users.find((u) => u.name.toLowerCase().split(" ")[0] === needle) ||
+    null
+  );
+}
 
 async function createDealsFromRows(
   rows: ParsedRow[],
@@ -18,7 +43,6 @@ async function createDealsFromRows(
   importerId: string
 ) {
   const users = await prisma.user.findMany();
-  const usersByEmail = new Map(users.map((u) => [u.email.toLowerCase(), u]));
 
   const batch = await prisma.importBatch.create({
     data: {
@@ -33,17 +57,28 @@ async function createDealsFromRows(
   const duplicateNames: string[] = [];
 
   for (const row of rows) {
-    const companyName = pick(row, "companyName", "company", "firma", "firmanavn", "virksomhed");
+    const companyName = pick(row, "companyName", "company", "firma", "firmanavn", "virksomhed", "navn");
     if (!companyName) continue;
 
     const cvrNumber = pick(row, "cvrNumber", "cvr", "cvrnr");
     const address = pick(row, "address", "adresse");
-    const contactName = pick(row, "contactName", "contact", "navn", "kontaktperson");
-    const contactEmail = pick(row, "contactEmail", "email", "e-mail");
-    const contactPhone = pick(row, "contactPhone", "phone", "telefon", "tlf");
-    const ownerEmail = pick(row, "ownerEmail", "owner", "ejer", "saelger", "sælger");
+    const contactName = pick(row, "contactName", "contact", "kontaktperson");
+    const contactEmail = pick(row, "contactEmail", "email", "e-mail", "mail");
+    const contactPhone = pick(row, "contactPhone", "phone", "telefon", "tlf", "nummer");
+    const ownerRaw = pick(row, "ownerEmail", "owner", "ejer", "saelger", "sælger", "sales rep", "salesrep");
+    const soldProduct = pick(row, "soldProduct", "produkt", "ydelse", "service", "salgtype");
+    const saleAmountRaw = pick(row, "saleAmount", "salgsbeløb", "månedligt beløb", "beløb", "potentiel mrr", "mrr");
+    const saleAmount = saleAmountRaw ? parseAmount(saleAmountRaw) : null;
+    const establishmentFeeRaw = pick(row, "establishmentFee", "etableringspris", "opstart", "opstartspris", "oprettelse");
+    const establishmentFee = establishmentFeeRaw ? parseAmount(establishmentFeeRaw) : null;
+    const statusRaw = pick(row, "status", "stadie", "stage");
+    const stage: DealStage = statusRaw ? mapStatusToStage(statusRaw) : "LEAD";
+    const provisionRaw = pick(row, "provision", "commission");
+    const provision = provisionRaw ? parseAmount(provisionRaw) : null;
+    const lastTouchRaw = pick(row, "sidste touch (dato)", "sidste touch", "sidste kontakt", "last touch");
+    const noteText = pick(row, "noter", "note", "notes", "kommentar");
 
-    const owner = (ownerEmail && usersByEmail.get(ownerEmail.toLowerCase())) || users.find((u) => u.id === importerId) || users[0];
+    const owner = matchOwner(ownerRaw, users) || users.find((u) => u.id === importerId) || users[0];
 
     const existingMatches = await findDuplicateDeals(companyName);
     if (existingMatches.length > 0) {
@@ -61,6 +96,10 @@ async function createDealsFromRows(
         ownerId: owner.id,
         importType,
         importBatchId: batch.id,
+        stage,
+        soldProduct,
+        saleAmount,
+        establishmentFee,
       },
     });
 
@@ -68,6 +107,30 @@ async function createDealsFromRows(
       where: { id: deal.id },
       data: { dealEmailAddress: buildDealEmailAddress(deal.id) },
     });
+
+    if (noteText || lastTouchRaw) {
+      const body = lastTouchRaw ? `Sidste touch (${lastTouchRaw}): ${noteText ?? ""}`.trim() : noteText!;
+      await prisma.note.create({
+        data: { dealId: deal.id, authorId: owner.id, kind: "MANUAL", body },
+      });
+    }
+
+    // The imported "provision" is a flat historical commission from the old
+    // system, unrelated to our rate-based engine - stored as-is rather than
+    // run through recalcCommission, which would replace it with a computed
+    // amount based on the seller's current commission rate.
+    if (provision !== null) {
+      await prisma.commission.create({
+        data: {
+          dealId: deal.id,
+          sellerId: owner.id,
+          rate: 0,
+          baseAmount: saleAmount ?? 0,
+          amount: provision,
+          frequency: owner.payoutFrequency,
+        },
+      });
+    }
 
     created++;
   }
