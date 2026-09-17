@@ -49,6 +49,9 @@ export async function getDashboardData(ownerId?: string) {
     (d) => d.soldAt && isWithinInterval(d.soldAt, { start: monthStart, end: monthEnd })
   );
   const soldThisMonthValue = soldThisMonth.reduce((sum, d) => sum + totalContractValue(d), 0);
+  const soldThisMonthDeals = soldThisMonth
+    .map((d) => ({ id: d.id, name: d.displayName || d.companyName, value: totalContractValue(d) }))
+    .sort((a, b) => b.value - a.value);
 
   const commissionOwed = commissions
     .filter((c) => c.status === "PENDING" || c.status === "DUE")
@@ -56,8 +59,11 @@ export async function getDashboardData(ownerId?: string) {
 
   const failedInvoices = invoices.filter((i) => i.status === "FAILED").length;
 
+  // Only counts contracts that are actually signed (via SignWell, or backfilled
+  // contractSignedAt for imported existing customers) - not deals still pending
+  // signature further up the pipeline.
   const establishmentFeeTotal = deals
-    .filter((d) => d.stage !== "LOST")
+    .filter((d) => d.contractSignedAt)
     .reduce((sum, d) => sum + (d.establishmentFee ?? 0), 0);
 
   const lostDeals = deals.filter((d) => d.stage === "LOST");
@@ -123,6 +129,7 @@ export async function getDashboardData(ownerId?: string) {
     liveCount: liveCustomers.length,
     soldThisMonthValue,
     soldThisMonthCount: soldThisMonth.length,
+    soldThisMonthDeals,
     commissionOwed,
     establishmentFeeTotal,
     failedInvoices,
