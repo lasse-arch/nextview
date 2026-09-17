@@ -4,7 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { buildAndSendContract } from "@/lib/actions/docuseal";
 import { formatDKK } from "@/lib/labels";
-import type { ContractProducts } from "@/lib/contract-template-data";
+import { computeSetupTotal, computeMonthlyTotal, type ContractProducts } from "@/lib/contract-template-data";
 
 function NumberField({
   label,
@@ -66,18 +66,8 @@ export function ContractBuilderForm({
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  const monthlyTotal = useMemo(() => {
-    const tour = products.nextviewTour.selected ? products.nextviewTour.quantity * products.nextviewTour.unitPrice : 0;
-    const site = products.hjemmeside.selected ? products.hjemmeside.price : 0;
-    return tour + site;
-  }, [products]);
-
-  const setupTotal = useMemo(() => {
-    const site = products.hjemmeside.selected ? products.hjemmeside.setupFee : 0;
-    const drone = products.droneOptagelse.selected ? products.droneOptagelse.price : 0;
-    const cards = products.visitkort.selected ? products.visitkort.price : 0;
-    return site + drone + cards;
-  }, [products]);
+  const monthlyTotal = useMemo(() => computeMonthlyTotal(products), [products]);
+  const setupTotal = useMemo(() => computeSetupTotal(products), [products]);
 
   function handleSubmit() {
     setError(null);
@@ -100,15 +90,14 @@ export function ContractBuilderForm({
           onToggle={(selected) => setProducts((p) => ({ ...p, nextviewTour: { ...p.nextviewTour, selected } }))}
         >
           <NumberField
-            label="Antal lokationer"
-            value={products.nextviewTour.quantity}
-            onChange={(quantity) => setProducts((p) => ({ ...p, nextviewTour: { ...p.nextviewTour, quantity } }))}
-            min={1}
+            label="Etableringspris (engangs, DKK)"
+            value={products.nextviewTour.setupFee}
+            onChange={(setupFee) => setProducts((p) => ({ ...p, nextviewTour: { ...p.nextviewTour, setupFee } }))}
           />
           <NumberField
-            label="Pris pr. lokation/md. (DKK)"
-            value={products.nextviewTour.unitPrice}
-            onChange={(unitPrice) => setProducts((p) => ({ ...p, nextviewTour: { ...p.nextviewTour, unitPrice } }))}
+            label="Pris pr. måned (DKK)"
+            value={products.nextviewTour.price}
+            onChange={(price) => setProducts((p) => ({ ...p, nextviewTour: { ...p.nextviewTour, price } }))}
           />
         </ProductCard>
 
@@ -118,7 +107,7 @@ export function ContractBuilderForm({
           onToggle={(selected) => setProducts((p) => ({ ...p, hjemmeside: { ...p.hjemmeside, selected } }))}
         >
           <NumberField
-            label="Opstartsgebyr (engangs, DKK)"
+            label="Etableringspris (engangs, DKK)"
             value={products.hjemmeside.setupFee}
             onChange={(setupFee) => setProducts((p) => ({ ...p, hjemmeside: { ...p.hjemmeside, setupFee } }))}
           />
@@ -135,15 +124,9 @@ export function ContractBuilderForm({
           onToggle={(selected) => setProducts((p) => ({ ...p, droneOptagelse: { ...p.droneOptagelse, selected } }))}
         >
           <NumberField
-            label="Antal optagelser"
-            value={products.droneOptagelse.quantity}
-            onChange={(quantity) => setProducts((p) => ({ ...p, droneOptagelse: { ...p.droneOptagelse, quantity } }))}
-            min={1}
-          />
-          <NumberField
-            label="Pris i alt (engangsbeløb, DKK)"
-            value={products.droneOptagelse.price}
-            onChange={(price) => setProducts((p) => ({ ...p, droneOptagelse: { ...p.droneOptagelse, price } }))}
+            label="Etableringspris (engangs, DKK)"
+            value={products.droneOptagelse.setupFee}
+            onChange={(setupFee) => setProducts((p) => ({ ...p, droneOptagelse: { ...p.droneOptagelse, setupFee } }))}
           />
         </ProductCard>
 
@@ -159,9 +142,9 @@ export function ContractBuilderForm({
             min={1}
           />
           <NumberField
-            label="Pris i alt (engangsbeløb, DKK)"
-            value={products.visitkort.price}
-            onChange={(price) => setProducts((p) => ({ ...p, visitkort: { ...p.visitkort, price } }))}
+            label="Etableringspris (engangs, DKK)"
+            value={products.visitkort.setupFee}
+            onChange={(setupFee) => setProducts((p) => ({ ...p, visitkort: { ...p.visitkort, setupFee } }))}
           />
         </ProductCard>
       </div>
@@ -173,7 +156,13 @@ export function ContractBuilderForm({
           onChange={(bindingMonths) => setProducts((p) => ({ ...p, bindingMonths }))}
           min={1}
         />
-        <div>
+        <NumberField
+          label="Opsigelsesvarsel (måneder)"
+          value={products.noticeMonths}
+          onChange={(noticeMonths) => setProducts((p) => ({ ...p, noticeMonths }))}
+          min={1}
+        />
+        <div className="col-span-2">
           <label className="block text-xs font-medium text-slate-500">Yderligere betingelser (fritekst, valgfri)</label>
           <textarea
             value={products.additionalTerms}

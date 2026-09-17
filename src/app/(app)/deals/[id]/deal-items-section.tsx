@@ -108,7 +108,7 @@ export function DealItemsSection({ dealId, items }: { dealId: string; items: Dea
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-slate-900">Ydelser & steder</h2>
+        <h2 className="text-sm font-semibold text-slate-900">Ydelser</h2>
         <button
           type="button"
           onClick={() => setAdding((v) => !v)}
@@ -118,8 +118,8 @@ export function DealItemsSection({ dealId, items }: { dealId: string; items: Dea
         </button>
       </div>
       <p className="mt-1 text-xs text-slate-500">
-        Brug til at holde styr på flere lokationer og/eller flere ydelser (hjemmeside, virtuel tour, drone,
-        visitkort m.m.) på samme kunde — inkl. hvad der er givet gratis.
+        Hvilke ydelser denne deal har — fyldes automatisk ud fra kontrakten, når den underskrives (inkl. hvad
+        der er givet gratis). Tilføj selv hvis noget mangler.
       </p>
 
       {adding && (

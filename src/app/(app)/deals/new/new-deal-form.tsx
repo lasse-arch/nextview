@@ -6,7 +6,6 @@ import { DisplayNameInput } from "../../display-name-input";
 
 type User = { id: string; name: string };
 type AddressSuggestion = { text: string; lat: number | null; lon: number | null };
-type CvrSearchHit = { cvr: string; name: string; status: string | null; city: string | null };
 
 export function NewDealForm({ users, defaultOwnerId }: { users: User[]; defaultOwnerId?: string }) {
   const [cvrInput, setCvrInput] = useState("");
@@ -17,34 +16,12 @@ export function NewDealForm({ users, defaultOwnerId }: { users: User[]; defaultO
   const [addressSuggestions, setAddressSuggestions] = useState<AddressSuggestion[]>([]);
   const [showAddressSuggestions, setShowAddressSuggestions] = useState(false);
   const addressDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [contactName, setContactName] = useState("");
   const [contactPhone, setContactPhone] = useState("");
   const [contactEmail, setContactEmail] = useState("");
   const [lookupState, setLookupState] = useState<{ status: "idle" | "loading" | "error" | "success"; message?: string }>({
     status: "idle",
   });
-  const [cvrNameResults, setCvrNameResults] = useState<CvrSearchHit[]>([]);
-  const cvrDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  function handleCvrInputChange(newValue: string) {
-    setCvrInput(newValue);
-
-    if (cvrDebounceRef.current) clearTimeout(cvrDebounceRef.current);
-    const isCvrNumber = /^[\d\s-]+$/.test(newValue.trim());
-    if (isCvrNumber || newValue.trim().length < 2) {
-      setCvrNameResults([]);
-      return;
-    }
-
-    cvrDebounceRef.current = setTimeout(async () => {
-      try {
-        const res = await fetch(`/api/cvr/search?q=${encodeURIComponent(newValue)}`);
-        const data = (await res.json()) as CvrSearchHit[];
-        setCvrNameResults(data);
-      } catch {
-        setCvrNameResults([]);
-      }
-    }, 300);
-  }
 
   function handleAddressChange(newValue: string) {
     setAddress(newValue);
@@ -75,12 +52,10 @@ export function NewDealForm({ users, defaultOwnerId }: { users: User[]; defaultO
     setShowAddressSuggestions(false);
   }
 
-  async function handleLookup(cvrOverride?: string) {
-    const nr = cvrOverride ?? cvrInput;
-    setCvrNameResults([]);
+  async function handleLookup() {
     setLookupState({ status: "loading" });
     try {
-      const res = await fetch(`/api/cvr/lookup?nr=${encodeURIComponent(nr)}`);
+      const res = await fetch(`/api/cvr/lookup?nr=${encodeURIComponent(cvrInput)}`);
       const data = await res.json();
       if (!res.ok) {
         setLookupState({ status: "error", message: data.error || "Kunne ikke slå CVR-nummeret op." });
@@ -90,6 +65,7 @@ export function NewDealForm({ users, defaultOwnerId }: { users: User[]; defaultO
       setCvrNumber(data.cvr);
       setCompanyName(data.name || "");
       setAddress(data.address || "");
+      if (data.contactName) setContactName(data.contactName);
       if (data.phone) setContactPhone(data.phone);
       if (data.email) setContactEmail(data.email);
       setLookupState({ status: "success", message: "Data hentet fra CVR — ret til hvis nødvendigt." });
@@ -107,9 +83,8 @@ export function NewDealForm({ users, defaultOwnerId }: { users: User[]; defaultO
         <div className="mt-1 flex gap-2">
           <input
             value={cvrInput}
-            onChange={(e) => handleCvrInputChange(e.target.value)}
-            onBlur={() => setTimeout(() => setCvrNameResults([]), 150)}
-            placeholder="CVR-nummer eller virksomhedsnavn"
+            onChange={(e) => setCvrInput(e.target.value)}
+            placeholder="CVR-nummer"
             autoComplete="off"
             className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm"
           />
@@ -122,25 +97,6 @@ export function NewDealForm({ users, defaultOwnerId }: { users: User[]; defaultO
             {lookupState.status === "loading" ? "Slår op…" : "Slå op"}
           </button>
         </div>
-        {cvrNameResults.length > 0 && (
-          <ul className="absolute z-10 mt-1 w-[calc(100%-1.5rem)] rounded-md border border-slate-200 bg-white text-sm shadow-lg">
-            {cvrNameResults.map((hit) => (
-              <li key={hit.cvr}>
-                <button
-                  type="button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => handleLookup(hit.cvr)}
-                  className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50"
-                >
-                  <span>
-                    {hit.name} <span className="text-xs text-slate-400">CVR {hit.cvr}</span>
-                  </span>
-                  <span className="text-xs text-slate-400">{[hit.city, hit.status].filter(Boolean).join(" · ")}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
         {lookupState.message && (
           <p className={`mt-2 text-xs ${lookupState.status === "error" ? "text-red-600" : "text-emerald-700"}`}>
             {lookupState.message}
@@ -194,7 +150,12 @@ export function NewDealForm({ users, defaultOwnerId }: { users: User[]; defaultO
       </div>
       <div>
         <label className="block text-sm font-medium text-slate-700">Kontaktperson</label>
-        <input name="contactName" className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm" />
+        <input
+          name="contactName"
+          value={contactName}
+          onChange={(e) => setContactName(e.target.value)}
+          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+        />
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div>

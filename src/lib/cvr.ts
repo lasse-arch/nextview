@@ -4,6 +4,8 @@ export type CvrCompanyData = {
   address: string | null;
   phone: string | null;
   email: string | null;
+  /** Owner's name, when the register exposes one (mainly sole proprietorships). */
+  contactName: string | null;
 };
 
 export type CvrLookupResult =
@@ -92,6 +94,7 @@ async function lookupViaOfficialApi(cvrNumber: string): Promise<CvrLookupResult>
       address: formatVirkAddress(meta.nyesteBeliggenhedsadresse),
       phone,
       email,
+      contactName: null,
     },
   };
 }
@@ -137,6 +140,9 @@ async function lookupViaCvrApiDk(cvrNumber: string): Promise<CvrLookupResult> {
   const name = typeof json.name === "string" ? json.name : null;
   if (!name) return { ok: false, error: "Intet firmanavn fundet for det CVR-nummer." };
 
+  const owners = Array.isArray(json.owners) ? (json.owners as { name?: string }[]) : [];
+  const contactName = owners.map((o) => o.name).filter(Boolean).join(", ") || null;
+
   return {
     ok: true,
     data: {
@@ -149,56 +155,9 @@ async function lookupViaCvrApiDk(cvrNumber: string): Promise<CvrLookupResult> {
       }),
       phone: typeof json.phone === "string" ? json.phone : json.phone != null ? String(json.phone) : null,
       email: typeof json.email === "string" ? json.email : null,
+      contactName,
     },
   };
-}
-
-export type CvrSearchHit = { cvr: string; name: string; status: string | null; city: string | null };
-
-/**
- * Company-name search, only available when the official register is
- * configured - cvrapi.dk's free tier has too tight a quota for search-as-you-go
- * and only ever returns a single best guess, not a pick list.
- */
-export async function searchCvrByName(name: string): Promise<CvrSearchHit[]> {
-  if (!isOfficialConfigured() || name.trim().length < 2) return [];
-
-  const username = process.env.CVR_API_USERNAME!;
-  const password = process.env.CVR_API_PASSWORD!;
-  const auth = Buffer.from(`${username}:${password}`).toString("base64");
-
-  let res: Response;
-  try {
-    res = await fetch("http://distribution.virk.dk/cvr-permanent/virksomhed/_search", {
-      method: "POST",
-      headers: { Authorization: `Basic ${auth}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        query: { match_phrase_prefix: { "Vrvirksomhed.virksomhedMetadata.nyesteNavn.navn": name.trim() } },
-        size: 8,
-      }),
-    });
-  } catch {
-    return [];
-  }
-  if (!res.ok) return [];
-
-  const json = await res.json();
-  const hits: unknown[] = json?.hits?.hits ?? [];
-
-  return hits
-    .map((h) => {
-      const v = (h as { _source: { Vrvirksomhed: Record<string, unknown> } })._source.Vrvirksomhed;
-      const meta = (v.virksomhedMetadata ?? {}) as Record<string, unknown>;
-      const nyesteNavn = (meta.nyesteNavn ?? {}) as { navn?: string };
-      const adresse = (meta.nyesteBeliggenhedsadresse ?? {}) as { postdistrikt?: string };
-      return {
-        cvr: String(v.cvrNummer ?? ""),
-        name: nyesteNavn.navn ?? "",
-        status: (meta.sammensatStatus as string) ?? null,
-        city: adresse.postdistrikt ?? null,
-      };
-    })
-    .filter((h) => h.cvr && h.name);
 }
 
 export async function lookupCvrNumber(cvrNumber: string): Promise<CvrLookupResult> {

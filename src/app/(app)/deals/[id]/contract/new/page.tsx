@@ -6,11 +6,12 @@ import { ContractBuilderForm } from "./contract-builder-form";
 import type { ContractProducts } from "@/lib/contract-template-data";
 
 const EMPTY_PRODUCTS: ContractProducts = {
-  nextviewTour: { selected: false, quantity: 1, unitPrice: 0 },
+  nextviewTour: { selected: false, setupFee: 0, price: 0 },
   hjemmeside: { selected: false, setupFee: 0, price: 0 },
-  droneOptagelse: { selected: false, quantity: 1, price: 0 },
-  visitkort: { selected: false, quantity: 1, price: 0 },
-  bindingMonths: 12,
+  droneOptagelse: { selected: false, setupFee: 0 },
+  visitkort: { selected: false, setupFee: 0, quantity: 1 },
+  bindingMonths: 36,
+  noticeMonths: 6,
   additionalTerms: "",
 };
 
@@ -21,7 +22,11 @@ export default async function NewContractPage({ params }: { params: Promise<{ id
 
   const initialProducts: ContractProducts = deal.contractProducts
     ? { ...EMPTY_PRODUCTS, ...(deal.contractProducts as unknown as ContractProducts) }
-    : { ...EMPTY_PRODUCTS, bindingMonths: deal.bindingMonths ?? 12 };
+    : {
+        ...EMPTY_PRODUCTS,
+        bindingMonths: deal.bindingMonths ?? EMPTY_PRODUCTS.bindingMonths,
+        noticeMonths: deal.noticePeriodMonths ?? EMPTY_PRODUCTS.noticeMonths,
+      };
 
   return (
     <div>

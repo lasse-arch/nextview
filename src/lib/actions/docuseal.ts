@@ -83,6 +83,9 @@ export async function buildAndSendContract(
     if (!products.bindingMonths || products.bindingMonths <= 0) {
       throw new Error("Angiv en gyldig bindingsperiode.");
     }
+    if (!products.noticeMonths || products.noticeMonths <= 0) {
+      throw new Error("Angiv et gyldigt opsigelsesvarsel.");
+    }
 
     if (deal.docusealSubmissionId && deal.contractStatus !== "NONE") {
       await cancelDocuSealSubmission(deal.docusealSubmissionId);
@@ -99,7 +102,6 @@ export async function buildAndSendContract(
         contactEmail: deal.contactEmail,
         contactPhone: deal.contactPhone,
         address: deal.address,
-        noticePeriodMonths: deal.noticePeriodMonths,
         owner: { name: sellerFullName, email: deal.owner.email, phone: deal.owner.phone },
       },
       products
@@ -131,6 +133,7 @@ export async function buildAndSendContract(
         saleAmount: computeMonthlyTotal(products),
         establishmentFee: computeSetupTotal(products),
         bindingMonths: products.bindingMonths,
+        noticePeriodMonths: products.noticeMonths,
         additionalTerms: products.additionalTerms || null,
         soldProduct: selectedKeys.map((key) => PRODUCT_LABELS[key]).join(", "),
         contractProducts: products,

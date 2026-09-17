@@ -8,16 +8,27 @@ type DealForContract = {
   contactEmail: string | null;
   contactPhone: string | null;
   address: string | null;
-  noticePeriodMonths: number;
   owner: { name: string; email: string; phone: string | null };
 };
 
+type SetupAndMonthly = { selected: boolean; setupFee: number; price: number };
+type SetupOnly = { selected: boolean; setupFee: number };
+type SetupAndQuantity = { selected: boolean; setupFee: number; quantity: number };
+
+/**
+ * Every product always has an etableringspris (one-off setup fee) - only
+ * hjemmeside and nextviewTour also recur monthly, and only visitkort also
+ * has a quantity. Whether a product counts at all is purely the `selected`
+ * checkbox - an unchecked product's numbers are ignored regardless of what's
+ * still sitting in its fields.
+ */
 export type ContractProducts = {
-  nextviewTour: { selected: boolean; quantity: number; unitPrice: number };
-  hjemmeside: { selected: boolean; setupFee: number; price: number };
-  droneOptagelse: { selected: boolean; quantity: number; price: number };
-  visitkort: { selected: boolean; quantity: number; price: number };
+  nextviewTour: SetupAndMonthly;
+  hjemmeside: SetupAndMonthly;
+  droneOptagelse: SetupOnly;
+  visitkort: SetupAndQuantity;
   bindingMonths: number;
+  noticeMonths: number;
   additionalTerms: string;
 };
 
@@ -31,17 +42,48 @@ function splitZipCity(address: string | null): { street: string; zipCity: string
   return { street: address, zipCity: "" };
 }
 
-/** Sum of the one-off, engangsbeløb-style costs across the selected products. */
+/** Sum of the one-off etableringspris across the selected products. */
 export function computeSetupTotal(p: ContractProducts): number {
-  return (p.hjemmeside.selected ? p.hjemmeside.setupFee : 0) +
-    (p.droneOptagelse.selected ? p.droneOptagelse.price : 0) +
-    (p.visitkort.selected ? p.visitkort.price : 0);
+  return (
+    (p.nextviewTour.selected ? p.nextviewTour.setupFee : 0) +
+    (p.hjemmeside.selected ? p.hjemmeside.setupFee : 0) +
+    (p.droneOptagelse.selected ? p.droneOptagelse.setupFee : 0) +
+    (p.visitkort.selected ? p.visitkort.setupFee : 0)
+  );
 }
 
 /** Sum of the recurring monthly costs across the selected products. */
 export function computeMonthlyTotal(p: ContractProducts): number {
-  const tourTotal = p.nextviewTour.selected ? p.nextviewTour.quantity * p.nextviewTour.unitPrice : 0;
-  return tourTotal + (p.hjemmeside.selected ? p.hjemmeside.price : 0);
+  return (p.nextviewTour.selected ? p.nextviewTour.price : 0) + (p.hjemmeside.selected ? p.hjemmeside.price : 0);
+}
+
+/**
+ * One "Ydelser" line per selected product, so as the customer base grows we
+ * can see at a glance which customers have which products - including ones
+ * given away for free, which still need to show up here (just flagged, not
+ * priced), not just the ones that generate revenue.
+ */
+export function contractProductsToDealItems(
+  p: ContractProducts
+): { productType: string; amount: number; isFree: boolean }[] {
+  const items: { productType: string; amount: number; isFree: boolean }[] = [];
+  if (p.nextviewTour.selected) {
+    items.push({ productType: "Nextview360 Tour", amount: p.nextviewTour.price, isFree: p.nextviewTour.price === 0 });
+  }
+  if (p.hjemmeside.selected) {
+    items.push({ productType: "Hjemmeside", amount: p.hjemmeside.price, isFree: p.hjemmeside.price === 0 });
+  }
+  if (p.droneOptagelse.selected) {
+    items.push({
+      productType: "Drone-optagelse",
+      amount: p.droneOptagelse.setupFee,
+      isFree: p.droneOptagelse.setupFee === 0,
+    });
+  }
+  if (p.visitkort.selected) {
+    items.push({ productType: "Visitkort", amount: p.visitkort.setupFee, isFree: p.visitkort.setupFee === 0 });
+  }
+  return items;
 }
 
 /**
@@ -61,10 +103,6 @@ export function buildContractTemplateData(
   const { street, zipCity } = splitZipCity(deal.address);
   const displayCompany = deal.displayName || deal.companyName;
 
-  const tourTotal = products.nextviewTour.selected
-    ? products.nextviewTour.quantity * products.nextviewTour.unitPrice
-    : 0;
-
   return {
     "Client.Company": displayCompany,
     "Client.CVR": deal.cvrNumber ?? "",
@@ -79,26 +117,24 @@ export function buildContractTemplateData(
     "Seller.Phone": deal.owner.phone ?? "",
 
     "Deal.NextviewTour.Selected": products.nextviewTour.selected,
-    "Deal.NextviewTour.Quantity": String(products.nextviewTour.quantity),
-    "Deal.NextviewTour.UnitPrice": formatDKK(products.nextviewTour.unitPrice),
-    "Deal.NextviewTour.Price": formatDKK(tourTotal),
+    "Deal.NextviewTour.SetupFee": formatDKK(products.nextviewTour.setupFee),
+    "Deal.NextviewTour.Price": formatDKK(products.nextviewTour.price),
 
     "Deal.Hjemmeside.Selected": products.hjemmeside.selected,
     "Deal.Hjemmeside.SetupFee": formatDKK(products.hjemmeside.setupFee),
     "Deal.Hjemmeside.Price": formatDKK(products.hjemmeside.price),
 
     "Deal.DroneOptagelse.Selected": products.droneOptagelse.selected,
-    "Deal.DroneOptagelse.Quantity": String(products.droneOptagelse.quantity),
-    "Deal.DroneOptagelse.Price": formatDKK(products.droneOptagelse.price),
+    "Deal.DroneOptagelse.SetupFee": formatDKK(products.droneOptagelse.setupFee),
 
     "Deal.Visitkort.Selected": products.visitkort.selected,
     "Deal.Visitkort.Quantity": String(products.visitkort.quantity),
-    "Deal.Visitkort.Price": formatDKK(products.visitkort.price),
+    "Deal.Visitkort.SetupFee": formatDKK(products.visitkort.setupFee),
 
     "Deal.SetupPrice": formatDKK(computeSetupTotal(products)),
     "Deal.Price": formatDKK(computeMonthlyTotal(products)),
     "Deal.AdditionalTerms": products.additionalTerms,
     "Deal.BindingMonths": String(products.bindingMonths),
-    "Deal.NoticeMonths": String(deal.noticePeriodMonths),
+    "Deal.NoticeMonths": String(products.noticeMonths),
   };
 }

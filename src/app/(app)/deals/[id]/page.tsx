@@ -343,7 +343,16 @@ export default async function DealDetailPage({
           <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="text-sm font-semibold text-slate-900">Kontrakt</h2>
             <dl className="mt-3 space-y-2 text-sm">
-              <div className="flex justify-between">
+              <div
+                className="flex justify-between"
+                title={[
+                  deal.contractSentAt ? `Sendt: ${formatDate(deal.contractSentAt)}` : null,
+                  deal.contractViewedAt ? `Kunden åbnede: ${formatDate(deal.contractViewedAt)}` : null,
+                  deal.contractSignedAt ? `Kunden underskrev: ${formatDate(deal.contractSignedAt)}` : null,
+                ]
+                  .filter(Boolean)
+                  .join("\n") || undefined}
+              >
                 <dt className="text-slate-500">Status</dt>
                 <dd className="font-medium text-slate-800">{contractStatusLabels[deal.contractStatus]}</dd>
               </div>

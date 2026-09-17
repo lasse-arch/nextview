@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { verifyWebhookSignature } from "@/lib/docuseal";
 import { recalcCommission } from "@/lib/commission-service";
 import { sendContractSignedNotification } from "@/lib/notification-service";
+import { contractProductsToDealItems, type ContractProducts } from "@/lib/contract-template-data";
 
 type DocuSealEvent = {
   event_type?: string;
@@ -57,6 +58,19 @@ export async function POST(request: NextRequest) {
         stage: "CONTRACT_SIGNED",
       },
     });
+
+    // Carry each product on the now-signed contract down into "Ydelser" as
+    // its own line - including ones given away for free - so once there are
+    // many customers, it's possible to see at a glance who has what.
+    if (deal!.contractProducts) {
+      const items = contractProductsToDealItems(deal!.contractProducts as unknown as ContractProducts);
+      if (items.length > 0) {
+        await prisma.dealItem.createMany({
+          data: items.map((item) => ({ ...item, dealId: deal!.id })),
+        });
+      }
+    }
+
     await recalcCommission(deal!.id);
     await sendContractSignedNotification(deal!.id);
   }

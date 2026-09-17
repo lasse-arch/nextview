@@ -41,7 +41,7 @@ export function LockedContractFields({
           <p className="mt-1 text-sm text-slate-700">{bindingMonths ?? "–"}</p>
         </div>
         <div>
-          <label className="block text-xs font-medium text-slate-500">Salgsbeløb (DKK/måned)</label>
+          <label className="block text-xs font-medium text-slate-500">Månedspris (DKK)</label>
           <p className="money mt-1 text-sm text-slate-700">{formatDKK(saleAmount)}</p>
         </div>
         <div>
@@ -100,7 +100,7 @@ export function LockedContractFields({
         />
       </div>
       <div>
-        <label className="block text-xs font-medium text-slate-500">Salgsbeløb (DKK/måned)</label>
+        <label className="block text-xs font-medium text-slate-500">Månedspris (DKK)</label>
         <input
           name="saleAmount"
           type="number"
