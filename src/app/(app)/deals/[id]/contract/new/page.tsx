@@ -13,6 +13,7 @@ const EMPTY_PRODUCTS: ContractProducts = {
   bindingMonths: 36,
   noticeMonths: 6,
   additionalTerms: "",
+  language: "da",
 };
 
 export default async function NewContractPage({ params }: { params: Promise<{ id: string }> }) {

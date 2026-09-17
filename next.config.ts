@@ -1,12 +1,12 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // The contract .docx template is only read via a dynamically-built fs
-  // path (see contract-generator.ts), which Next's file tracer can't
-  // discover statically - without this it gets left out of the deployed
-  // serverless function bundle and contract generation fails in production.
+  // The contract PDF renderer reads public/logo.png via fs at request time
+  // (see contract-html-template.ts) - without this it can be left out of
+  // the deployed serverless function bundle and contract generation fails
+  // in production, the same issue the old .docx template had.
   outputFileTracingIncludes: {
-    "/*": ["./src/contract-templates/**/*"],
+    "/*": ["./public/logo.png", "./node_modules/@sparticuz/chromium/bin/**/*"],
   },
 };
 

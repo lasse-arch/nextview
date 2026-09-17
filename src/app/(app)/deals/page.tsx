@@ -18,6 +18,7 @@ type SearchParams = {
   duplicates?: string;
   skipped?: string;
   view?: string;
+  soldWithSetupFee?: string;
 };
 
 export default async function DealsPage({
@@ -33,6 +34,10 @@ export default async function DealsPage({
   if (!isBoard && params.stage) where.stage = params.stage as DealStage;
   if (params.importType) where.importType = params.importType as ImportType;
   if (params.importBatchId) where.importBatchId = params.importBatchId;
+  if (params.soldWithSetupFee) {
+    where.establishmentFee = { gt: 0 };
+    where.soldAt = { not: null };
+  }
 
   const orderBy: Prisma.DealOrderByWithRelationInput =
     params.sort === "oldest"
@@ -60,6 +65,7 @@ export default async function DealsPage({
     if (params.importType) sp.set("importType", params.importType);
     if (params.importBatchId) sp.set("importBatchId", params.importBatchId);
     if (params.sort) sp.set("sort", params.sort);
+    if (params.soldWithSetupFee) sp.set("soldWithSetupFee", "1");
     if (view === "list") sp.set("view", "list");
     const qs = sp.toString();
     return qs ? `/deals?${qs}` : "/deals";
@@ -176,6 +182,11 @@ export default async function DealsPage({
             <option value="company">Firmanavn A-Å</option>
           </select>
         )}
+
+        <label className="flex items-center gap-1.5 rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-600">
+          <input type="checkbox" name="soldWithSetupFee" value="1" defaultChecked={params.soldWithSetupFee === "1"} />
+          Etableringspris &gt; 0 og solgt dato
+        </label>
 
         <button type="submit" className="rounded-md border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-50">
           Filtrér

@@ -15,6 +15,8 @@ type SetupAndMonthly = { selected: boolean; setupFee: number; price: number };
 type SetupOnly = { selected: boolean; setupFee: number };
 type SetupAndQuantity = { selected: boolean; setupFee: number; quantity: number };
 
+export type ContractLanguage = "da" | "en";
+
 /**
  * Every product always has an etableringspris (one-off setup fee) - only
  * hjemmeside and nextviewTour also recur monthly, and only visitkort also
@@ -30,6 +32,7 @@ export type ContractProducts = {
   bindingMonths: number;
   noticeMonths: number;
   additionalTerms: string;
+  language: ContractLanguage;
 };
 
 function splitZipCity(address: string | null): { street: string; zipCity: string } {
@@ -86,20 +89,32 @@ export function contractProductsToDealItems(
   return items;
 }
 
+export type ContractHtmlData = {
+  client: { company: string; cvr: string; name: string; email: string; phone: string; address: string; zipCity: string };
+  seller: { name: string; email: string; phone: string };
+  products: {
+    nextviewTour: { selected: boolean; setupFee: string; price: string };
+    hjemmeside: { selected: boolean; setupFee: string; price: string };
+    droneOptagelse: { selected: boolean; setupFee: string };
+    visitkort: { selected: boolean; quantity: number; setupFee: string };
+  };
+  setupPriceTotal: string;
+  priceTotal: string;
+  additionalTerms: string;
+  bindingMonths: number;
+  noticeMonths: number;
+  /** How many of the 4 products are selected - drives singular/plural wording ("the service" vs "the services"). */
+  selectedCount: number;
+};
+
 /**
- * Builds the flat, dot-keyed data object docxtemplater fills the contract
- * template with (see src/contract-templates/nextview360-contract.docx -
- * keys must match its [[Tag]] placeholders exactly; docxtemplater does not
- * do nested-object dot-path resolution by default, hence the flat shape).
- *
- * Product prices/quantities come directly from what was explicitly entered
- * on the contract-builder page - not guessed from free-text fields - so
- * what's on the document always matches what's shown there.
+ * Builds the nested data object the HTML contract template (see
+ * contract-html-template.ts) renders from. Product prices/quantities come
+ * directly from what was explicitly entered on the contract-builder page -
+ * not guessed from free-text fields - so what's on the document always
+ * matches what's shown there.
  */
-export function buildContractTemplateData(
-  deal: DealForContract,
-  products: ContractProducts
-): Record<string, string | boolean> {
+export function buildContractHtmlData(deal: DealForContract, products: ContractProducts): ContractHtmlData {
   const { street, zipCity } = splitZipCity(deal.address);
   const displayCompany = deal.displayName || deal.companyName;
 
@@ -109,45 +124,48 @@ export function buildContractTemplateData(
     products.droneOptagelse.selected,
     products.visitkort.selected,
   ].filter(Boolean).length;
-  const isSingle = selectedCount <= 1;
 
   return {
-    "Deal.DenDe": isSingle ? "den" : "de",
-    "Deal.Ydelse": isSingle ? "ydelse" : "ydelser",
-    "Deal.YdelseCap": isSingle ? "Ydelsen" : "Ydelserne",
-    "Deal.DensDeres": isSingle ? "dens" : "deres",
-
-    "Client.Company": displayCompany,
-    "Client.CVR": deal.cvrNumber ?? "",
-    "Client.Name": deal.contactName ?? "",
-    "Client.Email": deal.contactEmail ?? "",
-    "Client.Phone": deal.contactPhone ?? "",
-    "Client.Address": street,
-    "Client.ZipCity": zipCity,
-
-    "Seller.Name": deal.owner.name,
-    "Seller.Email": deal.owner.email,
-    "Seller.Phone": deal.owner.phone ?? "",
-
-    "Deal.NextviewTour.Selected": products.nextviewTour.selected,
-    "Deal.NextviewTour.SetupFee": formatDKK(products.nextviewTour.setupFee),
-    "Deal.NextviewTour.Price": formatDKK(products.nextviewTour.price),
-
-    "Deal.Hjemmeside.Selected": products.hjemmeside.selected,
-    "Deal.Hjemmeside.SetupFee": formatDKK(products.hjemmeside.setupFee),
-    "Deal.Hjemmeside.Price": formatDKK(products.hjemmeside.price),
-
-    "Deal.DroneOptagelse.Selected": products.droneOptagelse.selected,
-    "Deal.DroneOptagelse.SetupFee": formatDKK(products.droneOptagelse.setupFee),
-
-    "Deal.Visitkort.Selected": products.visitkort.selected,
-    "Deal.Visitkort.Quantity": String(products.visitkort.quantity),
-    "Deal.Visitkort.SetupFee": formatDKK(products.visitkort.setupFee),
-
-    "Deal.SetupPrice": formatDKK(computeSetupTotal(products)),
-    "Deal.Price": formatDKK(computeMonthlyTotal(products)),
-    "Deal.AdditionalTerms": products.additionalTerms,
-    "Deal.BindingMonths": String(products.bindingMonths),
-    "Deal.NoticeMonths": String(products.noticeMonths),
+    client: {
+      company: displayCompany,
+      cvr: deal.cvrNumber ?? "",
+      name: deal.contactName ?? "",
+      email: deal.contactEmail ?? "",
+      phone: deal.contactPhone ?? "",
+      address: street,
+      zipCity,
+    },
+    seller: {
+      name: deal.owner.name,
+      email: deal.owner.email,
+      phone: deal.owner.phone ?? "",
+    },
+    products: {
+      nextviewTour: {
+        selected: products.nextviewTour.selected,
+        setupFee: formatDKK(products.nextviewTour.setupFee),
+        price: formatDKK(products.nextviewTour.price),
+      },
+      hjemmeside: {
+        selected: products.hjemmeside.selected,
+        setupFee: formatDKK(products.hjemmeside.setupFee),
+        price: formatDKK(products.hjemmeside.price),
+      },
+      droneOptagelse: {
+        selected: products.droneOptagelse.selected,
+        setupFee: formatDKK(products.droneOptagelse.setupFee),
+      },
+      visitkort: {
+        selected: products.visitkort.selected,
+        quantity: products.visitkort.quantity,
+        setupFee: formatDKK(products.visitkort.setupFee),
+      },
+    },
+    setupPriceTotal: formatDKK(computeSetupTotal(products)),
+    priceTotal: formatDKK(computeMonthlyTotal(products)),
+    additionalTerms: products.additionalTerms,
+    bindingMonths: products.bindingMonths,
+    noticeMonths: products.noticeMonths,
+    selectedCount,
   };
 }

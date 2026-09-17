@@ -179,6 +179,29 @@ export function ContractBuilderForm({
             className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
           />
         </div>
+        <div className="col-span-2">
+          <label className="block text-xs font-medium text-slate-500">Kontraktsprog</label>
+          <div className="mt-1 flex rounded-md border border-slate-300 text-sm">
+            <button
+              type="button"
+              onClick={() => setProducts((p) => ({ ...p, language: "da" }))}
+              className={`flex-1 rounded-l-md px-3 py-2 ${
+                products.language === "da" ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-50"
+              }`}
+            >
+              Dansk
+            </button>
+            <button
+              type="button"
+              onClick={() => setProducts((p) => ({ ...p, language: "en" }))}
+              className={`flex-1 rounded-r-md px-3 py-2 ${
+                products.language === "en" ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-50"
+              }`}
+            >
+              English
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="rounded-lg border border-slate-300 bg-slate-50 p-4">

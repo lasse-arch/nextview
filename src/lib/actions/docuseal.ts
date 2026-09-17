@@ -5,8 +5,9 @@ import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { isDocuSealConfigured, createAndSendSubmission, cancelDocuSealSubmission } from "@/lib/docuseal";
 import { lookupCvrNumber } from "@/lib/cvr";
-import { buildContractTemplateData, computeMonthlyTotal, computeSetupTotal, type ContractProducts } from "@/lib/contract-template-data";
-import { generateContractDocx } from "@/lib/contract-generator";
+import { buildContractHtmlData, computeMonthlyTotal, computeSetupTotal, type ContractProducts } from "@/lib/contract-template-data";
+import { buildContractHtml } from "@/lib/contract-html-template";
+import { renderContractPdf } from "@/lib/contract-pdf-renderer";
 
 const PRODUCT_LABELS: Record<keyof Pick<ContractProducts, "nextviewTour" | "hjemmeside" | "droneOptagelse" | "visitkort">, string> = {
   nextviewTour: "Nextview360 Tour",
@@ -45,7 +46,7 @@ export async function checkDealReadyForContract(
 }
 
 /**
- * Builds the contract docx from exactly what was entered on the
+ * Renders the contract as HTML → PDF from exactly what was entered on the
  * contract-builder page, sends it via DocuSeal, and freezes the resulting
  * totals/binding/terms onto the deal (contract is the source of truth for
  * those fields from here on - see LockedContractFields). If a previous,
@@ -93,7 +94,7 @@ export async function buildAndSendContract(
 
     const sellerFullName = [deal.owner.name, deal.owner.lastName].filter(Boolean).join(" ");
 
-    const templateData = buildContractTemplateData(
+    const htmlData = buildContractHtmlData(
       {
         companyName: deal.companyName,
         displayName: deal.displayName,
@@ -107,12 +108,13 @@ export async function buildAndSendContract(
       products
     );
 
-    const docxBuffer = generateContractDocx(templateData);
+    const html = buildContractHtml(htmlData, products.language);
+    const pdfBuffer = await renderContractPdf(html);
 
     const documentName = `Nextview360 x ${deal.displayName || deal.companyName}`;
     const submission = await createAndSendSubmission({
-      fileName: `${documentName}.docx`,
-      fileBuffer: docxBuffer,
+      fileName: `${documentName}.pdf`,
+      fileBuffer: pdfBuffer,
       documentName,
       submitters: [
         { role: "Company", name: CONTRACT_SIGNER.name, email: CONTRACT_SIGNER.email, externalId: "director" },

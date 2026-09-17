@@ -32,11 +32,12 @@ export type DocuSealSubmission = {
 };
 
 /**
- * Creates and immediately sends a submission built from an already finished
- * .docx file (produced by our own contract-generator.ts) - DocuSeal accepts
- * .docx directly, no PDF conversion needed. Signature/date fields come from
- * {{Sign;type=signature;role=X}}/{{Date;type=date;role=X}} text tags baked
- * into the document content, matched to submitters by `role`.
+ * Creates and immediately sends a submission built from an already-rendered
+ * PDF (see contract-html-template.ts + contract-pdf-renderer.ts). Signature/
+ * date fields come from {{Sign;type=signature;role=X}}/{{Date;type=date;
+ * role=X}} text tags baked into the document content, matched to submitters
+ * by `role` - DocuSeal auto-detects these the same way for a PDF as for a
+ * docx (verified against the live API before switching to this pipeline).
  */
 export async function createAndSendSubmission(params: {
   fileName: string;
@@ -45,7 +46,7 @@ export async function createAndSendSubmission(params: {
   submitters: DocuSealSubmitter[];
   metadata?: Record<string, string>;
 }): Promise<DocuSealSubmission> {
-  const res = await fetch(`${DOCUSEAL_API_BASE}/submissions/docx`, {
+  const res = await fetch(`${DOCUSEAL_API_BASE}/submissions/pdf`, {
     method: "POST",
     headers: headers(),
     body: JSON.stringify({
