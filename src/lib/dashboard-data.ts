@@ -50,8 +50,14 @@ export async function getDashboardData(ownerId?: string) {
   const activePipeline = deals.filter((d) => (ACTIVE_PIPELINE_STAGES as readonly string[]).includes(d.stage));
   const pipelineValue = activePipeline.reduce((sum, d) => sum + soldTotalValue(d), 0);
 
-  const liveCustomers = deals.filter((d) => d.stage === "LIVE" && !d.churnedAt);
-  const liveValue = liveCustomers.reduce((sum, d) => sum + soldTotalValue(d), 0);
+  const liveDeals = deals.filter((d) => d.stage === "LIVE");
+  const liveCustomers = liveDeals.filter((d) => !d.churnedAt);
+  // A churned/inactive customer still paid their one-off establishment fee -
+  // that stays counted - but their monthly fee no longer counts going forward.
+  const liveValue = liveDeals.reduce(
+    (sum, d) => sum + (d.churnedAt ? d.establishmentFee ?? 0 : soldTotalValue(d)),
+    0
+  );
 
   const soldThisMonth = deals.filter(
     (d) => d.soldAt && isWithinInterval(d.soldAt, { start: monthStart, end: monthEnd })

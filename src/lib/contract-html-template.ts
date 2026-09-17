@@ -10,7 +10,7 @@ function logoDataUri(): string {
 }
 
 const COMPANY = {
-  name: "Nextview 360 ApS",
+  name: "Nextview360 ApS",
   cvr: "46452445",
   address: "Vesterbro 18, st., 9000 Aalborg",
 };
@@ -38,7 +38,6 @@ type Labels = {
   overviewPrice: string;
   overviewNote: string;
   additionalTermsTitle: string;
-  invoicingNote: string;
   section3Title: string;
   section3Body: string;
   bindingLabel: string;
@@ -51,8 +50,6 @@ type Labels = {
   section6Title: string;
   section6Body: string;
   signaturesTitle: string;
-  awaitingSignature: string;
-  signedAt: string;
 };
 
 const LABELS: Record<ContractLanguage, Labels> = {
@@ -88,7 +85,7 @@ const LABELS: Record<ContractLanguage, Labels> = {
         totalPriceLabel: "Pris pr. måned",
       },
       hjemmeside: {
-        name: "Hjemmeside",
+        name: "Nextview360 hjemmeside",
         bullets: [
           "Design og opsætning af hjemmeside tilpasset kundens branding",
           "Integration af 360°-rundvisning (hvis valgt) og kontaktformular",
@@ -125,7 +122,6 @@ const LABELS: Record<ContractLanguage, Labels> = {
     overviewPrice: "Samlet månedlig pris",
     overviewNote: "Etableringsprisen betales ved underskrift af kontrakten, med mindre andet er angivet i Yderligere betingelser.",
     additionalTermsTitle: "Yderligere betingelser",
-    invoicingNote: "Fakturering: Kvartalsvist forud (netto 8 dage), med mindre andet er angivet nedenfor.",
     section3Title: "3) Løbetid og opsigelse",
     section3Body:
       "Aftalen træder i kraft ved underskrift af begge parter. Bindingsperioden starter dog først, når det/de valgte produkt(er) er afleveret/leveret af leverandøren til kunden.",
@@ -134,7 +130,7 @@ const LABELS: Record<ContractLanguage, Labels> = {
     monthsSuffix: "måneder",
     section4Title: "4) Betaling",
     section4Body:
-      "Betaling sker via faktura eller efter særskilt aftale om automatisk betaling. Forsinket betaling påløber rente i henhold til renteloven og eventuelle inddrivelsesomkostninger.",
+      "Fakturering sker kvartalsvist forud (netto 8 dage), med mindre andet er angivet under Yderligere betingelser. Betaling sker via faktura eller efter særskilt aftale om automatisk betaling. Forsinket betaling påløber rente i henhold til renteloven og eventuelle inddrivelsesomkostninger.",
     section5Title: "5) Fortrolighed",
     section5Body:
       "Begge parter forpligter sig til at behandle fortrolige oplysninger om modparten som fortrolige. Oplysninger må ikke videregives til tredjepart uden forudgående skriftligt samtykke.",
@@ -142,8 +138,6 @@ const LABELS: Record<ContractLanguage, Labels> = {
     section6Body:
       "Leverandørens ansvar er begrænset til direkte tab forårsaget af grov uagtsomhed eller forsæt. Eventuel erstatning kan ikke overstige det samlede beløb, kunden har betalt inden for de seneste 12 måneder under denne aftale.",
     signaturesTitle: "Underskrifter",
-    awaitingSignature: "Afventer underskrift",
-    signedAt: "Underskrevet",
   },
   en: {
     docTitle: "Subscription Agreement",
@@ -177,7 +171,7 @@ const LABELS: Record<ContractLanguage, Labels> = {
         totalPriceLabel: "Price per month",
       },
       hjemmeside: {
-        name: "Website",
+        name: "Nextview360 Website",
         bullets: [
           "Website design and setup tailored to the customer's branding",
           "Integration of the 360° tour (if selected) and a contact form",
@@ -214,7 +208,6 @@ const LABELS: Record<ContractLanguage, Labels> = {
     overviewPrice: "Total monthly price",
     overviewNote: "The setup fee is due on signing of the contract, unless otherwise stated under Additional Terms.",
     additionalTermsTitle: "Additional Terms",
-    invoicingNote: "Invoicing: Quarterly in advance (net 8 days), unless otherwise stated below.",
     section3Title: "3) Term and Termination",
     section3Body:
       "This agreement takes effect once signed by both parties. The binding period, however, only begins once the selected product(s) have been delivered by the Supplier to the Customer.",
@@ -223,7 +216,7 @@ const LABELS: Record<ContractLanguage, Labels> = {
     monthsSuffix: "months",
     section4Title: "4) Payment",
     section4Body:
-      "Payment is made by invoice or by separate agreement on automatic payment. Late payment accrues interest under the Danish Interest Act and any recovery costs.",
+      "Invoicing is quarterly in advance (net 8 days), unless otherwise stated under Additional Terms. Payment is made by invoice or by separate agreement on automatic payment. Late payment accrues interest under the Danish Interest Act and any recovery costs.",
     section5Title: "5) Confidentiality",
     section5Body:
       "Both parties undertake to treat confidential information about the other party as confidential. Information may not be disclosed to third parties without prior written consent.",
@@ -231,8 +224,6 @@ const LABELS: Record<ContractLanguage, Labels> = {
     section6Body:
       "The Supplier's liability is limited to direct losses caused by gross negligence or intent. Any damages cannot exceed the total amount paid by the Customer within the preceding 12 months under this agreement.",
     signaturesTitle: "Signatures",
-    awaitingSignature: "Awaiting signature",
-    signedAt: "Signed",
   },
 };
 
@@ -319,11 +310,9 @@ export function buildContractHtml(data: ContractHtmlData, language: ContractLang
 <style>
   :root{
     --ink:#16233F;
-    --brand-deep:#16233F;
     --fill:#EAF2FF;
     --fill-border:#CFE0FB;
     --line:#E4E7EC;
-    --muted:#667085;
     --bg:#FFFFFF;
   }
   *{box-sizing:border-box;}
@@ -335,42 +324,42 @@ export function buildContractHtml(data: ContractHtmlData, language: ContractLang
     line-height:1.55;
     -webkit-font-smoothing:antialiased;
   }
-  .page{ max-width:760px; margin:0 auto; padding:56px 48px 64px; }
-  .masthead{ text-align:center; margin-bottom:8px; }
-  .masthead img{ height:44px; margin:0 auto 22px; display:block; }
-  .doc-title{ font-size:26px; font-weight:800; letter-spacing:-0.01em; margin:0 0 6px; color:var(--brand-deep); }
-  .doc-subtitle{ font-size:14px; color:var(--muted); margin:0 0 28px; }
-  .rule{ border:none; border-top:1px solid var(--line); margin:28px 0; }
-  .between-label{ font-size:13px; color:var(--muted); margin:0 0 14px; }
-  .party-grid{ display:flex; flex-wrap:wrap; border:1px solid var(--line); border-radius:12px; overflow:hidden; margin-bottom:14px; }
-  .party-col{ flex:1 1 0; min-width:220px; padding:18px 20px; }
+  .page{ max-width:760px; margin:0 auto; padding:48px 48px 56px; }
+  .masthead{ text-align:center; margin-bottom:6px; }
+  .masthead img{ height:40px; margin:0 auto 16px; display:block; }
+  .doc-title{ font-size:24px; font-weight:800; letter-spacing:-0.01em; margin:0 0 4px; color:var(--ink); }
+  .doc-subtitle{ font-size:14px; color:var(--ink); margin:0 0 18px; }
+  .rule{ border:none; border-top:1px solid var(--line); margin:20px 0; }
+  .between-label{ font-size:13px; color:var(--ink); margin:0 0 10px; }
+  .party-grid{ display:flex; flex-wrap:wrap; border:1px solid var(--line); border-radius:12px; overflow:hidden; margin-bottom:12px; }
+  .party-col{ flex:1 1 0; min-width:220px; padding:16px 18px; }
   .party-col + .party-col{ border-left:1px solid var(--line); }
   .party-name{ font-weight:700; font-size:15px; margin:0 0 2px; }
-  .party-role{ font-size:12px; color:var(--muted); margin:0 0 14px; }
-  .field-row{ display:flex; justify-content:space-between; gap:12px; padding:6px 0; font-size:13.5px; }
-  .field-label{ color:var(--muted); }
-  .field-value{ background:var(--fill); border:1px solid var(--fill-border); border-radius:6px; padding:2px 8px; font-weight:500; color:var(--brand-deep); }
-  .section{ margin:34px 0; page-break-inside:avoid; break-inside:avoid; }
-  .section-title{ font-size:17px; font-weight:700; margin:0 0 10px; color:var(--brand-deep); }
-  .section p{ margin:0 0 10px; }
-  .product-card{ border:1px solid var(--line); border-radius:12px; padding:20px 22px; margin-bottom:14px; page-break-inside:avoid; break-inside:avoid; }
-  .product-name{ font-size:15.5px; font-weight:700; margin:0 0 10px; }
-  .product-name .sub{ font-weight:400; color:var(--muted); font-size:13px; }
-  .product-list{ margin:0 0 16px; padding-left:20px; }
-  .product-list li{ margin-bottom:5px; font-size:13.5px; }
-  .price-rows{ border-top:1px solid var(--line); padding-top:12px; }
-  .overview{ background:#F8FAFC; border:1px solid var(--line); border-radius:12px; padding:18px 22px; margin:20px 0; page-break-inside:avoid; break-inside:avoid; }
-  .overview-row{ display:flex; justify-content:space-between; padding:6px 0; font-size:14px; }
+  .party-role{ font-size:12px; color:var(--ink); margin:0 0 10px; }
+  .field-row{ display:flex; justify-content:space-between; gap:12px; padding:3px 0; font-size:13.5px; }
+  .field-label{ color:var(--ink); }
+  .field-value{ background:var(--fill); border:1px solid var(--fill-border); border-radius:6px; padding:2px 8px; font-weight:500; color:var(--ink); }
+  .section{ margin:20px 0; }
+  .section-title{ font-size:17px; font-weight:700; margin:0 0 8px; color:var(--ink); }
+  .section p{ margin:0 0 8px; }
+  .product-card{ border:1px solid var(--line); border-radius:12px; padding:16px 20px; margin-bottom:12px; page-break-inside:avoid; break-inside:avoid; }
+  .product-name{ font-size:15.5px; font-weight:700; margin:0 0 8px; }
+  .product-name .sub{ font-weight:400; color:var(--ink); font-size:13px; }
+  .product-list{ margin:0 0 10px; padding-left:20px; }
+  .product-list li{ margin-bottom:4px; font-size:13.5px; }
+  .price-rows{ border-top:1px solid var(--line); padding-top:8px; }
+  .overview{ background:#F8FAFC; border:1px solid var(--line); border-radius:12px; padding:16px 20px; margin:14px 0; page-break-inside:avoid; break-inside:avoid; }
+  .overview-row{ display:flex; justify-content:space-between; padding:4px 0; font-size:14px; }
   .overview-row:not(:last-child){ border-bottom:1px solid #ECEFF3; }
   .overview-row .field-label{ font-weight:600; color:var(--ink); }
-  .overview-note{ font-size:13px; color:var(--muted); margin-top:10px; }
-  .terms-box{ border:1px solid var(--line); border-radius:12px; padding:18px 22px; min-height:100px; font-size:13.5px; margin-bottom:8px; white-space:pre-wrap; }
-  .sig-title{ font-size:19px; font-weight:800; margin:0 0 22px; color:var(--brand-deep); }
+  .overview-note{ font-size:13px; color:var(--ink); margin-top:8px; }
+  .terms-box{ border:1px solid var(--line); border-radius:12px; padding:14px 18px; font-size:13.5px; margin-bottom:8px; white-space:pre-wrap; }
+  .sig-title{ font-size:19px; font-weight:800; margin:0 0 16px; color:var(--ink); }
   .sig-grid{ display:flex; flex-wrap:wrap; gap:40px; page-break-inside:avoid; break-inside:avoid; }
   .sig-grid > div{ flex:1 1 0; min-width:220px; }
-  .sig-party{ font-size:13px; font-weight:700; color:var(--muted); margin-bottom:14px; }
-  .sig-box{ border-bottom:1px solid var(--ink); height:56px; margin-bottom:10px; display:flex; align-items:flex-end; justify-content:center; font-size:13px; color:var(--muted); }
-  .sig-meta{ font-size:12.5px; color:var(--muted); line-height:1.7; }
+  .sig-party{ font-size:13px; font-weight:700; color:var(--ink); margin-bottom:12px; }
+  .sig-box{ border-bottom:1px solid var(--ink); height:56px; margin-bottom:10px; display:flex; align-items:flex-end; justify-content:center; font-size:13px; color:var(--ink); }
+  .sig-meta{ font-size:12.5px; color:var(--ink); line-height:1.6; }
   .sig-meta b{ color:var(--ink); font-weight:600; }
   @page{ size:A4; margin:0; }
 </style>
@@ -421,8 +410,12 @@ export function buildContractHtml(data: ContractHtmlData, language: ContractLang
       <p class="overview-note">${esc(t.overviewNote)}</p>
     </div>
 
-    <p class="section-title" style="font-size:14.5px;margin-top:24px;">${esc(t.additionalTermsTitle)}</p>
-    <div class="terms-box">${esc(t.invoicingNote)}${data.additionalTerms ? `\n\n${esc(data.additionalTerms)}` : ""}</div>
+    ${
+      data.additionalTerms
+        ? `<p class="section-title" style="font-size:14.5px;margin-top:20px;">${esc(t.additionalTermsTitle)}</p>
+    <div class="terms-box">${esc(data.additionalTerms)}</div>`
+        : ""
+    }
   </div>
 
   <div class="section">
