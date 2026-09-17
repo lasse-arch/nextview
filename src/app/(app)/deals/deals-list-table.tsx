@@ -3,11 +3,28 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { bulkUpdateSaleAmount, bulkAddProduct, bulkDuplicateDeals } from "@/lib/actions/bulk-deals";
+import {
+  bulkUpdateSaleAmount,
+  bulkUpdateBindingMonths,
+  bulkAddProduct,
+  bulkDuplicateDeals,
+  bulkSetOwner,
+  bulkSetSoldProduct,
+  bulkStripUrlFromField,
+  type StrippableField,
+} from "@/lib/actions/bulk-deals";
 import { stageLabels, importTypeLabels, formatDKK, formatDate, dealName, totalContractValue } from "@/lib/labels";
 import { useToast } from "@/components/toast";
 
 const PRODUCTS = ["Visitkort", "Drone-optagelse", "Matterport", "Hjemmeside"];
+
+const STRIPPABLE_FIELD_LABELS: Record<StrippableField, string> = {
+  address: "Adresse",
+  contactEmail: "E-mail",
+  contactName: "Kontaktperson",
+  companyName: "Firmanavn",
+  displayName: "Kaldenavn",
+};
 
 export type ListDeal = {
   id: string;
@@ -24,12 +41,16 @@ export type ListDeal = {
   createdAt: Date;
 };
 
-export function DealsListTable({ deals }: { deals: ListDeal[] }) {
+export function DealsListTable({ deals, users }: { deals: ListDeal[]; users: { id: string; name: string }[] }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [saleAmountInput, setSaleAmountInput] = useState("");
+  const [bindingMonthsInput, setBindingMonthsInput] = useState("");
   const [productType, setProductType] = useState(PRODUCTS[0]);
   const [productAmount, setProductAmount] = useState("");
   const [productFree, setProductFree] = useState(false);
+  const [ownerInput, setOwnerInput] = useState("");
+  const [soldProducts, setSoldProducts] = useState<string[]>([]);
+  const [stripField, setStripField] = useState<StrippableField>("address");
   const [pending, startTransition] = useTransition();
   const router = useRouter();
   const showToast = useToast();
@@ -61,6 +82,18 @@ export function DealsListTable({ deals }: { deals: ListDeal[] }) {
     });
   }
 
+  function applyBindingMonths() {
+    if (!bindingMonthsInput) return;
+    startTransition(async () => {
+      const ids = Array.from(selected);
+      const result = await bulkUpdateBindingMonths(ids, bindingMonthsInput);
+      showToast(`Binding sat på ${result.updated} deals`);
+      setBindingMonthsInput("");
+      setSelected(new Set());
+      router.refresh();
+    });
+  }
+
   function duplicateSelected() {
     startTransition(async () => {
       const ids = Array.from(selected);
@@ -78,6 +111,39 @@ export function DealsListTable({ deals }: { deals: ListDeal[] }) {
       showToast(`${productType} tilføjet til ${result.updated} deals`);
       setProductAmount("");
       setProductFree(false);
+      setSelected(new Set());
+      router.refresh();
+    });
+  }
+
+  function applyOwner() {
+    if (!ownerInput) return;
+    startTransition(async () => {
+      const ids = Array.from(selected);
+      const result = await bulkSetOwner(ids, ownerInput);
+      showToast(`Ejer sat på ${result.updated} deals`);
+      setOwnerInput("");
+      setSelected(new Set());
+      router.refresh();
+    });
+  }
+
+  function applySoldProducts() {
+    startTransition(async () => {
+      const ids = Array.from(selected);
+      const result = await bulkSetSoldProduct(ids, soldProducts);
+      showToast(`Produkt(er) sat på ${result.updated} deals`);
+      setSoldProducts([]);
+      setSelected(new Set());
+      router.refresh();
+    });
+  }
+
+  function applyStripUrl() {
+    startTransition(async () => {
+      const ids = Array.from(selected);
+      const result = await bulkStripUrlFromField(ids, stripField);
+      showToast(`Link fjernet fra ${result.updated} deals`);
       setSelected(new Set());
       router.refresh();
     });
@@ -105,6 +171,30 @@ export function DealsListTable({ deals }: { deals: ListDeal[] }) {
               type="button"
               disabled={pending || !saleAmountInput}
               onClick={applySaleAmount}
+              className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+            >
+              Anvend
+            </button>
+          </div>
+
+          <div className="h-8 w-px bg-slate-200" />
+
+          <div className="flex items-end gap-2">
+            <div>
+              <label className="block text-xs font-medium text-slate-500">Sæt binding (mdr)</label>
+              <input
+                type="number"
+                min="1"
+                step="1"
+                value={bindingMonthsInput}
+                onChange={(e) => setBindingMonthsInput(e.target.value)}
+                className="mt-1 w-24 rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+              />
+            </div>
+            <button
+              type="button"
+              disabled={pending || !bindingMonthsInput}
+              onClick={applyBindingMonths}
               className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-50"
             >
               Anvend
@@ -151,6 +241,90 @@ export function DealsListTable({ deals }: { deals: ListDeal[] }) {
               className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-50"
             >
               Anvend
+            </button>
+          </div>
+
+          <div className="h-8 w-px bg-slate-200" />
+
+          <div className="flex items-end gap-2">
+            <div>
+              <label className="block text-xs font-medium text-slate-500">Sæt ejer</label>
+              <select
+                value={ownerInput}
+                onChange={(e) => setOwnerInput(e.target.value)}
+                className="mt-1 rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+              >
+                <option value="">Vælg ejer…</option>
+                {users.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button
+              type="button"
+              disabled={pending || !ownerInput}
+              onClick={applyOwner}
+              className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+            >
+              Anvend
+            </button>
+          </div>
+
+          <div className="h-8 w-px bg-slate-200" />
+
+          <div className="flex items-end gap-2">
+            <div>
+              <label className="block text-xs font-medium text-slate-500">Sæt produkt(er) (erstatter)</label>
+              <select
+                multiple
+                size={4}
+                value={soldProducts}
+                onChange={(e) => setSoldProducts(Array.from(e.target.selectedOptions, (o) => o.value))}
+                className="mt-1 w-40 rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+              >
+                {PRODUCTS.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button
+              type="button"
+              disabled={pending}
+              onClick={applySoldProducts}
+              className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+            >
+              Anvend
+            </button>
+          </div>
+
+          <div className="h-8 w-px bg-slate-200" />
+
+          <div className="flex items-end gap-2">
+            <div>
+              <label className="block text-xs font-medium text-slate-500">Fjern links (https) fra felt</label>
+              <select
+                value={stripField}
+                onChange={(e) => setStripField(e.target.value as StrippableField)}
+                className="mt-1 rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+              >
+                {Object.entries(STRIPPABLE_FIELD_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button
+              type="button"
+              disabled={pending}
+              onClick={applyStripUrl}
+              className="rounded-md border border-red-300 bg-white px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+            >
+              Fjern
             </button>
           </div>
 

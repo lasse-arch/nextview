@@ -71,6 +71,8 @@ async function createDealsFromRows(
     const saleAmount = saleAmountRaw ? parseAmount(saleAmountRaw) : null;
     const establishmentFeeRaw = pick(row, "establishmentFee", "etableringspris", "opstart", "opstartspris", "oprettelse");
     const establishmentFee = establishmentFeeRaw ? parseAmount(establishmentFeeRaw) : null;
+    const bindingMonthsRaw = pick(row, "bindingMonths", "binding", "bindingsperiode", "binding (mdr)");
+    const bindingMonths = bindingMonthsRaw ? parseInt(bindingMonthsRaw, 10) || null : null;
     const statusRaw = pick(row, "status", "stadie", "stage");
     const stage: DealStage = statusRaw ? mapStatusToStage(statusRaw) : "LEAD";
     const provisionRaw = pick(row, "provision", "commission");
@@ -100,6 +102,7 @@ async function createDealsFromRows(
         soldProduct,
         saleAmount,
         establishmentFee,
+        bindingMonths,
       },
     });
 

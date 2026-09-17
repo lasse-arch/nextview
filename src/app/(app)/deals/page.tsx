@@ -190,7 +190,7 @@ export default async function DealsPage({
           <DealsBoard initialDeals={boardDeals} isAdmin={currentUser?.role === "ADMIN"} />
         </div>
       ) : (
-        <DealsListTable deals={deals} />
+        <DealsListTable deals={deals} users={users} />
       )}
     </div>
   );

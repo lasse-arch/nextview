@@ -23,6 +23,23 @@ export async function bulkUpdateSaleAmount(dealIds: string[], amountRaw: string)
   return { updated: dealIds.length };
 }
 
+export async function bulkUpdateBindingMonths(dealIds: string[], monthsRaw: string) {
+  await requireUser();
+  if (dealIds.length === 0) throw new Error("Ingen deals valgt.");
+
+  const months = parseInt(monthsRaw, 10);
+  if (isNaN(months) || months <= 0) throw new Error("Angiv en gyldig bindingsperiode (måneder).");
+
+  await prisma.deal.updateMany({ where: { id: { in: dealIds } }, data: { bindingMonths: months } });
+  for (const dealId of dealIds) {
+    await recalcCommission(dealId);
+  }
+
+  revalidatePath("/deals");
+  revalidatePath("/commission");
+  return { updated: dealIds.length };
+}
+
 export async function bulkDuplicateDeals(dealIds: string[]) {
   await requireUser();
   if (dealIds.length === 0) throw new Error("Ingen deals valgt.");
@@ -33,6 +50,55 @@ export async function bulkDuplicateDeals(dealIds: string[]) {
 
   revalidatePath("/deals");
   return { duplicated: dealIds.length };
+}
+
+export async function bulkSetOwner(dealIds: string[], ownerId: string) {
+  await requireUser();
+  if (dealIds.length === 0) throw new Error("Ingen deals valgt.");
+  if (!ownerId) throw new Error("Vælg en ejer.");
+
+  await prisma.deal.updateMany({ where: { id: { in: dealIds } }, data: { ownerId } });
+
+  revalidatePath("/deals");
+  return { updated: dealIds.length };
+}
+
+export async function bulkSetSoldProduct(dealIds: string[], products: string[]) {
+  await requireUser();
+  if (dealIds.length === 0) throw new Error("Ingen deals valgt.");
+
+  await prisma.deal.updateMany({
+    where: { id: { in: dealIds } },
+    data: { soldProduct: products.length > 0 ? products.join(", ") : null },
+  });
+
+  revalidatePath("/deals");
+  for (const dealId of dealIds) {
+    revalidatePath(`/deals/${dealId}`);
+  }
+  return { updated: dealIds.length };
+}
+
+const STRIPPABLE_FIELDS = ["address", "contactEmail", "contactName", "companyName", "displayName"] as const;
+export type StrippableField = (typeof STRIPPABLE_FIELDS)[number];
+
+/**
+ * Clears a field on selected deals wherever it currently contains a URL -
+ * a cleanup for imports where a link ended up in the wrong column (e.g. an
+ * address or e-mail column that actually held a website link).
+ */
+export async function bulkStripUrlFromField(dealIds: string[], field: StrippableField) {
+  await requireUser();
+  if (dealIds.length === 0) throw new Error("Ingen deals valgt.");
+  if (!STRIPPABLE_FIELDS.includes(field)) throw new Error("Ugyldigt felt.");
+
+  const result = await prisma.deal.updateMany({
+    where: { id: { in: dealIds }, [field]: { contains: "http" } },
+    data: { [field]: null },
+  });
+
+  revalidatePath("/deals");
+  return { updated: result.count };
 }
 
 export async function bulkAddProduct(
