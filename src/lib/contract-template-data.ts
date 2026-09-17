@@ -94,7 +94,7 @@ export type ContractHtmlData = {
   seller: { name: string; email: string; phone: string };
   products: {
     nextviewTour: { selected: boolean; setupFee: string; price: string };
-    hjemmeside: { selected: boolean; setupFee: string; price: string };
+    hjemmeside: { selected: boolean; setupFee: string; price: string; hasMonthlyPrice: boolean };
     droneOptagelse: { selected: boolean; setupFee: string };
     visitkort: { selected: boolean; quantity: number; setupFee: string };
   };
@@ -150,6 +150,7 @@ export function buildContractHtmlData(deal: DealForContract, products: ContractP
         selected: products.hjemmeside.selected,
         setupFee: formatDKK(products.hjemmeside.setupFee),
         price: formatDKK(products.hjemmeside.price),
+        hasMonthlyPrice: products.hjemmeside.price > 0,
       },
       droneOptagelse: {
         selected: products.droneOptagelse.selected,

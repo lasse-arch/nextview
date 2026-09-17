@@ -30,8 +30,8 @@ type Labels = {
   section2Title: string;
   products: {
     nextviewTour: { name: string; sub: string; bullets: string[]; quantityLabel: string; unitPriceLabel: string; totalPriceLabel: string };
-    hjemmeside: { name: string; bullets: string[]; setupLabel: string; priceLabel: string };
-    droneOptagelse: { name: string; bullets: string[]; quantityLabel: string; priceLabel: string };
+    hjemmeside: { name: string; bulletsSubscription: string[]; bulletsOneTime: string[]; setupLabel: string; priceLabel: string };
+    droneOptagelse: { name: string; bullets: string[]; priceLabel: string };
     visitkort: { name: string; sub: string; bullets: string[]; quantityLabel: string; priceLabel: string };
   };
   overviewSetup: string;
@@ -86,11 +86,15 @@ const LABELS: Record<ContractLanguage, Labels> = {
       },
       hjemmeside: {
         name: "Nextview360 hjemmeside",
-        bullets: [
+        bulletsSubscription: [
           "Design og opsætning af hjemmeside tilpasset kundens branding",
-          "Integration af 360°-rundvisning (hvis valgt) og kontaktformular",
-          "Hosting og løbende drift inkluderet i abonnementet",
-          "Mindre tekst- og billedopdateringer efter aftale",
+          "Responsivt design, der fungerer på mobil, tablet og computer",
+          "<b>Hosting og løbende drift inkluderet i abonnementet</b>",
+          "Mindre tekst- og billedopdateringer",
+        ],
+        bulletsOneTime: [
+          "Design og opsætning af hjemmeside tilpasset kundens branding",
+          "Responsivt design, der fungerer på mobil, tablet og computer",
         ],
         setupLabel: "Etableringspris (engangs)",
         priceLabel: "Pris pr. måned",
@@ -98,21 +102,20 @@ const LABELS: Record<ContractLanguage, Labels> = {
       droneOptagelse: {
         name: "Drone-optagelse",
         bullets: [
-          "Luftfoto- og videooptagelse af lokation(er) med drone",
+          "Luftfoto- og videooptagelse tilpasset kundens behov",
+          "Erfarne dronepiloter",
           "Efterbehandling og redigering af optaget materiale",
           "Levering af billeder/video i høj kvalitet til fri afbenyttelse",
-          "Gennemføres efter forudgående aftale om dato og adgang",
         ],
-        quantityLabel: "Antal optagelser",
         priceLabel: "Pris (engangsbeløb)",
       },
       visitkort: {
         name: "Visitkort",
-        sub: "— med QR-kode til virtuel rundvisning",
+        sub: "",
         bullets: [
-          "Fysiske visitkort med tilhørende unik QR-kode",
-          "QR-koden linker direkte til kundens virtuelle rundvisning",
-          "Design tilpasses kundens eksisterende visuelle identitet",
+          "Professionelt design tilpasset kundens visuelle identitet",
+          "Tryk i høj kvalitet på valgfrit papir/finish",
+          "Hurtig levering",
         ],
         quantityLabel: "Antal",
         priceLabel: "Pris i alt (engangsbeløb)",
@@ -172,11 +175,15 @@ const LABELS: Record<ContractLanguage, Labels> = {
       },
       hjemmeside: {
         name: "Nextview360 Website",
-        bullets: [
+        bulletsSubscription: [
           "Website design and setup tailored to the customer's branding",
-          "Integration of the 360° tour (if selected) and a contact form",
-          "Hosting and ongoing operation included in the subscription",
-          "Minor text and image updates by agreement",
+          "Responsive design that works on mobile, tablet and desktop",
+          "<b>Hosting and ongoing operation included in the subscription</b>",
+          "Minor text and image updates",
+        ],
+        bulletsOneTime: [
+          "Website design and setup tailored to the customer's branding",
+          "Responsive design that works on mobile, tablet and desktop",
         ],
         setupLabel: "Setup fee (one-off)",
         priceLabel: "Price per month",
@@ -184,21 +191,20 @@ const LABELS: Record<ContractLanguage, Labels> = {
       droneOptagelse: {
         name: "Drone Footage",
         bullets: [
-          "Aerial photo and video footage of the location(s) by drone",
+          "Aerial photo and video footage tailored to the customer's needs",
+          "Experienced drone pilots",
           "Post-production and editing of the captured material",
           "Delivery of high-quality images/video for the customer's free use",
-          "Carried out by prior agreement on date and access",
         ],
-        quantityLabel: "Number of shoots",
         priceLabel: "Price (one-off)",
       },
       visitkort: {
         name: "Business Cards",
-        sub: "— with QR code to the virtual tour",
+        sub: "",
         bullets: [
-          "Physical business cards with a unique QR code",
-          "The QR code links directly to the customer's virtual tour",
-          "Design adapted to the customer's existing visual identity",
+          "Professional design tailored to the customer's visual identity",
+          "High-quality print on paper/finish of choice",
+          "Fast delivery",
         ],
         quantityLabel: "Quantity",
         priceLabel: "Total price (one-off)",
@@ -235,6 +241,17 @@ function fieldRow(label: string, value: string): string {
   return `<div class="field-row"><span class="field-label">${esc(label)}</span><span class="field-value">${esc(value)}</span></div>`;
 }
 
+function subSpan(sub: string): string {
+  return sub ? ` <span class="sub">${esc(sub)}</span>` : "";
+}
+
+/** Bullets are static, translator-authored copy (not user input) - a few
+ * intentionally include a literal <b> tag, so they're trusted as raw HTML
+ * rather than escaped like the rest of the document's dynamic values. */
+function bulletList(bullets: string[]): string {
+  return `<ul class="product-list">${bullets.map((b) => `<li>${b}</li>`).join("")}</ul>`;
+}
+
 /**
  * Renders the full contract as HTML (rendered to PDF via
  * contract-pdf-renderer.ts, then sent to DocuSeal as a PDF submission).
@@ -253,8 +270,8 @@ export function buildContractHtml(data: ContractHtmlData, language: ContractLang
     const pt = t.products.nextviewTour;
     productCards.push(`
     <div class="product-card">
-      <p class="product-name">${esc(pt.name)} <span class="sub">${esc(pt.sub)}</span></p>
-      <ul class="product-list">${pt.bullets.map((b) => `<li>${esc(b)}</li>`).join("")}</ul>
+      <p class="product-name">${esc(pt.name)}${subSpan(pt.sub)}</p>
+      ${bulletList(pt.bullets.map(esc))}
       <div class="price-rows">
         ${fieldRow(pt.unitPriceLabel, p.nextviewTour.setupFee)}
         ${fieldRow(pt.totalPriceLabel, p.nextviewTour.price)}
@@ -264,13 +281,14 @@ export function buildContractHtml(data: ContractHtmlData, language: ContractLang
 
   if (p.hjemmeside.selected) {
     const pt = t.products.hjemmeside;
+    const bullets = p.hjemmeside.hasMonthlyPrice ? pt.bulletsSubscription : pt.bulletsOneTime;
     productCards.push(`
     <div class="product-card">
       <p class="product-name">${esc(pt.name)}</p>
-      <ul class="product-list">${pt.bullets.map((b) => `<li>${esc(b)}</li>`).join("")}</ul>
+      ${bulletList(bullets)}
       <div class="price-rows">
         ${fieldRow(pt.setupLabel, p.hjemmeside.setupFee)}
-        ${fieldRow(pt.priceLabel, p.hjemmeside.price)}
+        ${p.hjemmeside.hasMonthlyPrice ? fieldRow(pt.priceLabel, p.hjemmeside.price) : ""}
       </div>
     </div>`);
   }
@@ -280,7 +298,7 @@ export function buildContractHtml(data: ContractHtmlData, language: ContractLang
     productCards.push(`
     <div class="product-card">
       <p class="product-name">${esc(pt.name)}</p>
-      <ul class="product-list">${pt.bullets.map((b) => `<li>${esc(b)}</li>`).join("")}</ul>
+      ${bulletList(pt.bullets.map(esc))}
       <div class="price-rows">
         ${fieldRow(pt.priceLabel, p.droneOptagelse.setupFee)}
       </div>
@@ -291,8 +309,8 @@ export function buildContractHtml(data: ContractHtmlData, language: ContractLang
     const pt = t.products.visitkort;
     productCards.push(`
     <div class="product-card">
-      <p class="product-name">${esc(pt.name)} <span class="sub">${esc(pt.sub)}</span></p>
-      <ul class="product-list">${pt.bullets.map((b) => `<li>${esc(b)}</li>`).join("")}</ul>
+      <p class="product-name">${esc(pt.name)}${subSpan(pt.sub)}</p>
+      ${bulletList(pt.bullets.map(esc))}
       <div class="price-rows">
         ${fieldRow(pt.quantityLabel, String(p.visitkort.quantity))}
         ${fieldRow(pt.priceLabel, p.visitkort.setupFee)}
