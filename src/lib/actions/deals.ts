@@ -269,6 +269,35 @@ export async function linkDealToParent(dealId: string, formData: FormData) {
   redirect(`/deals/${dealId}?saved=Kunde%20sammenkædet`);
 }
 
+/**
+ * Attaches several deals as branches under this deal in one go - lets a
+ * customer with many locations (e.g. 5 addresses under the same chain) be
+ * linked up from the parent's page instead of one-by-one from each branch.
+ */
+export async function linkBranchesToDeal(parentDealId: string, formData: FormData) {
+  await requireUser();
+  const branchDealIds = formData.getAll("branchDealIds").map(String).filter(Boolean);
+  if (branchDealIds.length === 0) throw new Error("Vælg mindst én afdeling at kæde sammen.");
+  if (branchDealIds.includes(parentDealId)) {
+    throw new Error("En deal kan ikke kædes sammen med sig selv.");
+  }
+
+  const parent = await prisma.deal.findUniqueOrThrow({ where: { id: parentDealId } });
+  if (parent.parentDealId) {
+    throw new Error("Denne kunde er allerede en afdeling af en anden kunde.");
+  }
+
+  const branches = await prisma.deal.findMany({ where: { id: { in: branchDealIds } } });
+  if (branches.some((b) => b.parentDealId)) {
+    throw new Error("En af de valgte afdelinger er allerede kædet sammen med en anden kunde.");
+  }
+
+  await prisma.deal.updateMany({ where: { id: { in: branchDealIds } }, data: { parentDealId } });
+  revalidatePath(`/deals/${parentDealId}`);
+  for (const id of branchDealIds) revalidatePath(`/deals/${id}`);
+  redirect(`/deals/${parentDealId}?saved=Afdelinger%20kædet%20sammen`);
+}
+
 export async function unlinkDealFromParent(dealId: string) {
   await requireUser();
   const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId } });

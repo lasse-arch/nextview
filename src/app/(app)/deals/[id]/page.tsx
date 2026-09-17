@@ -33,6 +33,15 @@ function toDateInputValue(date: Date | null): string {
   return date.toISOString().slice(0, 10);
 }
 
+function authorInitials(name: string): string {
+  return name
+    .split(" ")
+    .map((p) => p[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+}
+
 const SOLD_PRODUCT_OPTIONS = ["Visitkort", "Drone-optagelse", "Matterport", "Hjemmeside"];
 
 export default async function DealDetailPage({
@@ -344,7 +353,21 @@ export default async function DealDetailPage({
               {deal.notes.map((note) => (
                 <li key={note.id} className="rounded-md border border-slate-100 p-3">
                   <div className="flex items-center justify-between text-xs text-slate-500">
-                    <span className="font-medium text-slate-700">{note.author.name}</span>
+                    <span className="flex items-center gap-1.5 font-medium text-slate-700">
+                      {note.author.avatarUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={note.author.avatarUrl}
+                          alt={note.author.name}
+                          className="h-5 w-5 flex-shrink-0 rounded-full object-cover"
+                        />
+                      ) : (
+                        <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-slate-300 text-[9px] font-semibold text-white">
+                          {authorInitials(note.author.name)}
+                        </span>
+                      )}
+                      {note.author.name}
+                    </span>
                     <span>
                       {noteKindLabels[note.kind]} · {formatDate(note.createdAt)}
                     </span>

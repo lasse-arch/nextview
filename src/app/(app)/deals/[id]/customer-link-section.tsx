@@ -2,7 +2,7 @@
 
 import { useTransition } from "react";
 import Link from "next/link";
-import { linkDealToParent, unlinkDealFromParent } from "@/lib/actions/deals";
+import { linkDealToParent, linkBranchesToDeal, unlinkDealFromParent } from "@/lib/actions/deals";
 import { dealName } from "@/lib/labels";
 import { useToast } from "@/components/toast";
 
@@ -58,7 +58,9 @@ export function CustomerLinkSection({
       ) : (
         <form action={linkWithId} className="mt-4 flex flex-wrap items-end gap-2">
           <div className="flex-1">
-            <label className="block text-xs font-medium text-slate-500">Kæd sammen med kunde</label>
+            <label className="block text-xs font-medium text-slate-500">
+              Denne kunde er selv en afdeling under…
+            </label>
             <select
               name="parentDealId"
               defaultValue=""
@@ -83,6 +85,35 @@ export function CustomerLinkSection({
         </form>
       )}
 
+      {!parent && linkableDeals.length > 0 && (
+        <form
+          action={linkBranchesToDeal.bind(null, dealId)}
+          className="mt-4 border-t border-slate-100 pt-4"
+        >
+          <label className="block text-xs font-medium text-slate-500">
+            Tilføj flere afdelinger (vælg flere med Ctrl/Cmd)
+          </label>
+          <select
+            name="branchDealIds"
+            multiple
+            size={Math.min(6, linkableDeals.length)}
+            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+          >
+            {linkableDeals.map((d) => (
+              <option key={d.id} value={d.id}>
+                {dealName(d)}
+              </option>
+            ))}
+          </select>
+          <button
+            type="submit"
+            className="mt-2 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800"
+          >
+            Kæd sammen som afdelinger
+          </button>
+        </form>
+      )}
+
       {branches.length > 0 && (
         <div className="mt-4 border-t border-slate-100 pt-4">
           <h3 className="text-xs font-semibold text-slate-500">Afdelinger under denne kunde</h3>
@@ -92,7 +123,22 @@ export function CustomerLinkSection({
                 <Link href={`/deals/${b.id}`} className="text-slate-800 hover:underline">
                   {dealName(b)}
                 </Link>
-                {b.cvrNumber && <span className="text-xs text-slate-400">CVR: {b.cvrNumber}</span>}
+                <span className="flex items-center gap-2">
+                  {b.cvrNumber && <span className="text-xs text-slate-400">CVR: {b.cvrNumber}</span>}
+                  <button
+                    type="button"
+                    disabled={pending}
+                    onClick={() =>
+                      startTransition(async () => {
+                        await unlinkDealFromParent(b.id);
+                        showToast("Afdeling fjernet");
+                      })
+                    }
+                    className="rounded-md border border-slate-300 bg-white px-2 py-0.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    Fjern
+                  </button>
+                </span>
               </li>
             ))}
           </ul>
