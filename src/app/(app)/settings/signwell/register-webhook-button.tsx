@@ -16,17 +16,13 @@ export function RegisterWebhookButton() {
         disabled={pending}
         onClick={() =>
           startTransition(async () => {
-            try {
-              const id = await registerSignWellWebhook();
-              if (!id) {
-                showToast("Kunne ikke registrere webhook hos SignWell.");
-                return;
-              }
-              setWebhookId(id);
-              showToast("Webhook registreret");
-            } catch (err) {
-              showToast(err instanceof Error ? err.message : "Kunne ikke registrere webhook.");
+            const result = await registerSignWellWebhook();
+            if (!result.ok) {
+              showToast(result.error);
+              return;
             }
+            setWebhookId(result.id);
+            showToast("Webhook registreret");
           })
         }
         className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
