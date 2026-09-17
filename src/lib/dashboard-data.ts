@@ -14,6 +14,9 @@ const PIPELINE_STAGES = [
 
 const FUNNEL_STAGES = [...PIPELINE_STAGES, "LIVE"] as const;
 
+/** The "Aktiv pipeline" KPI only counts deals that have actually had a meeting booked or further - not raw leads/contacted. */
+const ACTIVE_PIPELINE_STAGES = ["MEETING_BOOKED", "CONTRACT_SENT", "CONTRACT_SIGNED", "FILMED"] as const;
+
 export type FunnelBar = { stage: string; label: string; count: number; value: number };
 export type MonthBar = { label: string; value: number };
 export type SellerRow = {
@@ -39,18 +42,27 @@ export async function getDashboardData(ownerId?: string) {
   const monthStart = startOfMonth(now);
   const monthEnd = endOfMonth(now);
 
-  const activePipeline = deals.filter((d) => (PIPELINE_STAGES as readonly string[]).includes(d.stage));
-  const pipelineValue = activePipeline.reduce((sum, d) => sum + totalContractValue(d), 0);
+  // "Solgt" is the one-time establishment fee plus the monthly fee for the sale -
+  // not the full contract value over the whole binding period.
+  const soldValue = (d: { establishmentFee: number | null; saleAmount: number | null }) =>
+    (d.establishmentFee ?? 0) + (d.saleAmount ?? 0);
+  // Full lifetime value of a signed contract: the monthly fee over its whole
+  // binding period, plus the one-time establishment fee.
+  const soldTotalValue = (d: { establishmentFee: number | null; saleAmount: number | null; bindingMonths: number | null }) =>
+    totalContractValue(d) + (d.establishmentFee ?? 0);
+
+  const activePipeline = deals.filter((d) => (ACTIVE_PIPELINE_STAGES as readonly string[]).includes(d.stage));
+  const pipelineValue = activePipeline.reduce((sum, d) => sum + soldValue(d), 0);
 
   const liveCustomers = deals.filter((d) => d.stage === "LIVE" && !d.churnedAt);
-  const liveValue = liveCustomers.reduce((sum, d) => sum + totalContractValue(d), 0);
+  const liveValue = liveCustomers.reduce((sum, d) => sum + soldTotalValue(d), 0);
 
   const soldThisMonth = deals.filter(
     (d) => d.soldAt && isWithinInterval(d.soldAt, { start: monthStart, end: monthEnd })
   );
-  const soldThisMonthValue = soldThisMonth.reduce((sum, d) => sum + totalContractValue(d), 0);
+  const soldThisMonthValue = soldThisMonth.reduce((sum, d) => sum + soldValue(d), 0);
   const soldThisMonthDeals = soldThisMonth
-    .map((d) => ({ id: d.id, name: d.displayName || d.companyName, value: totalContractValue(d) }))
+    .map((d) => ({ id: d.id, name: d.displayName || d.companyName, value: soldValue(d) }))
     .sort((a, b) => b.value - a.value);
 
   const commissionOwed = commissions
@@ -59,12 +71,11 @@ export async function getDashboardData(ownerId?: string) {
 
   const failedInvoices = invoices.filter((i) => i.status === "FAILED").length;
 
-  // Only counts contracts that are actually signed (via DocuSeal, or backfilled
-  // contractSignedAt for imported existing customers) - not deals still pending
-  // signature further up the pipeline.
-  const establishmentFeeTotal = deals
-    .filter((d) => d.contractSignedAt)
-    .reduce((sum, d) => sum + (d.establishmentFee ?? 0), 0);
+  // Establishment fees for deals sold this month (same deal set as "Solgt denne måned").
+  const establishmentFeeTotal = soldThisMonth.reduce((sum, d) => sum + (d.establishmentFee ?? 0), 0);
+  const establishmentFeeDeals = soldThisMonth
+    .map((d) => ({ id: d.id, name: d.displayName || d.companyName, value: d.establishmentFee ?? 0 }))
+    .sort((a, b) => b.value - a.value);
 
   const lostDeals = deals.filter((d) => d.stage === "LOST");
   const lostValue = lostDeals.reduce((sum, d) => sum + totalContractValue(d), 0);
@@ -85,7 +96,7 @@ export async function getDashboardData(ownerId?: string) {
     const mEnd = endOfMonth(m);
     const value = deals
       .filter((d) => d.soldAt && isWithinInterval(d.soldAt, { start: m, end: mEnd }))
-      .reduce((sum, d) => sum + totalContractValue(d), 0);
+      .reduce((sum, d) => sum + soldValue(d), 0);
     monthly.push({ label: format(m, "MMM", { locale: da }), value });
   }
 
@@ -132,6 +143,7 @@ export async function getDashboardData(ownerId?: string) {
     soldThisMonthDeals,
     commissionOwed,
     establishmentFeeTotal,
+    establishmentFeeDeals,
     failedInvoices,
     lostValue,
     lostCount: lostDeals.length,

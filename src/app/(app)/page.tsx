@@ -7,6 +7,7 @@ import { getGoalsForDashboard } from "@/lib/goals-data";
 import { GoalsCard } from "./goals-card";
 import { getCustomerMapPoints } from "@/lib/customer-map-data";
 import { DenmarkMap } from "./denmark-map";
+import { StatTile } from "./stat-tile";
 
 const FUNNEL_SHADES = [
   "bg-blue-200",
@@ -24,31 +25,6 @@ const INVOICE_STATUS_STYLE: Record<string, { dot: string; text: string }> = {
   FAILED: { dot: "bg-red-500", text: "text-red-700" },
   IMPORTED: { dot: "bg-slate-400", text: "text-slate-600" },
 };
-
-function StatTile({
-  label,
-  value,
-  sub,
-  tone = "default",
-  money,
-  tooltip,
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-  tone?: "default" | "good" | "critical";
-  money?: boolean;
-  tooltip?: string;
-}) {
-  const valueColor = tone === "good" ? "text-emerald-700" : tone === "critical" ? "text-red-700" : "text-slate-900";
-  return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm" title={tooltip}>
-      <div className="text-xs font-medium text-slate-500">{label}</div>
-      <div className={`mt-1 text-2xl font-semibold ${valueColor} ${money ? "money" : ""}`}>{value}</div>
-      {sub && <div className="mt-0.5 text-xs text-slate-400">{sub}</div>}
-    </div>
-  );
-}
 
 export default async function DashboardPage() {
   const user = await getCurrentUser();
@@ -88,19 +64,26 @@ export default async function DashboardPage() {
           sub={`${data.pipelineCount} åbne deals`}
           money
         />
-        <StatTile label="Aktive kunder (Live)" value={formatDKK(data.liveValue)} sub={`${data.liveCount} kunder`} money />
+        <StatTile
+          label="Solgt i alt (MRR + etableringspris)"
+          value={formatDKK(data.liveValue)}
+          sub={`${data.liveCount} kunder`}
+          money
+        />
         <StatTile
           label="Solgt denne måned"
           value={formatDKK(data.soldThisMonthValue)}
           sub={`${data.soldThisMonthCount} deals`}
           money
-          tooltip={
-            data.soldThisMonthDeals.length > 0
-              ? data.soldThisMonthDeals.map((d) => `${d.name}: ${formatDKK(d.value)}`).join("\n")
-              : undefined
-          }
+          tooltipRows={data.soldThisMonthDeals.map((d) => ({ label: d.name, value: formatDKK(d.value) }))}
         />
-        <StatTile label="Opstart i alt" value={formatDKK(data.establishmentFeeTotal)} sub="Etableringspriser" money />
+        <StatTile
+          label="Solgt etableringspris denne måned"
+          value={formatDKK(data.establishmentFeeTotal)}
+          sub={`${data.soldThisMonthCount} deals`}
+          money
+          tooltipRows={data.establishmentFeeDeals.map((d) => ({ label: d.name, value: formatDKK(d.value) }))}
+        />
         <StatTile label="Provision skyldig" value={formatDKK(data.commissionOwed)} sub="Afventer + forfalden" money />
         <StatTile
           label="Fejlede fakturaer"

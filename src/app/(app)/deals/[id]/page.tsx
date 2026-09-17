@@ -25,6 +25,7 @@ import { CustomerLinkSection } from "./customer-link-section";
 import { AddressAutocomplete } from "../../address-autocomplete";
 import { DisplayNameInput } from "../../display-name-input";
 import { LockedContractFields } from "./locked-contract-fields";
+import { ContractStatusRow } from "./contract-status-row";
 
 function authorInitials(name: string): string {
   return name
@@ -343,37 +344,12 @@ export default async function DealDetailPage({
           <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="text-sm font-semibold text-slate-900">Kontrakt</h2>
             <dl className="mt-3 space-y-2 text-sm">
-              <div
-                className="flex justify-between"
-                title={[
-                  deal.contractSentAt ? `Sendt: ${formatDate(deal.contractSentAt)}` : null,
-                  deal.contractViewedAt ? `Kunden åbnede: ${formatDate(deal.contractViewedAt)}` : null,
-                  deal.contractSignedAt ? `Kunden underskrev: ${formatDate(deal.contractSignedAt)}` : null,
-                ]
-                  .filter(Boolean)
-                  .join("\n") || undefined}
-              >
-                <dt className="text-slate-500">Status</dt>
-                <dd className="font-medium text-slate-800">{contractStatusLabels[deal.contractStatus]}</dd>
-              </div>
-              {deal.contractSentAt && (
-                <div className="flex justify-between">
-                  <dt className="text-slate-500">Sendt</dt>
-                  <dd className="text-slate-800">{formatDate(deal.contractSentAt)}</dd>
-                </div>
-              )}
-              {deal.contractViewedAt && (
-                <div className="flex justify-between">
-                  <dt className="text-slate-500">Åbnet</dt>
-                  <dd className="text-slate-800">{formatDate(deal.contractViewedAt)}</dd>
-                </div>
-              )}
-              {deal.contractSignedAt && (
-                <div className="flex justify-between">
-                  <dt className="text-slate-500">Underskrevet</dt>
-                  <dd className="font-medium text-emerald-700">{formatDate(deal.contractSignedAt)}</dd>
-                </div>
-              )}
+              <ContractStatusRow
+                label={contractStatusLabels[deal.contractStatus]}
+                sentAt={deal.contractSentAt}
+                viewedAt={deal.contractViewedAt}
+                signedAt={deal.contractSignedAt}
+              />
             </dl>
 
             <div className="mt-4 space-y-2">

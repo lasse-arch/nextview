@@ -25,7 +25,10 @@ function NumberField({
         min={min}
         step="1"
         value={Number.isFinite(value) ? value : 0}
-        onChange={(e) => onChange(e.target.value === "" ? 0 : Math.round(parseFloat(e.target.value)))}
+        onChange={(e) => {
+          const parsed = e.target.value === "" ? 0 : Math.round(parseFloat(e.target.value));
+          onChange(Number.isFinite(parsed) ? parsed : 0);
+        }}
         className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
       />
     </div>
@@ -45,10 +48,15 @@ function ProductCard({
 }) {
   return (
     <div className={`rounded-lg border p-4 ${selected ? "border-slate-300 bg-white" : "border-slate-200 bg-slate-50"}`}>
-      <label className="flex items-center gap-2 text-sm font-medium text-slate-800">
-        <input type="checkbox" checked={selected} onChange={(e) => onToggle(e.target.checked)} />
-        {title}
-      </label>
+      <div className="flex items-center gap-2 text-sm font-medium text-slate-800">
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={(e) => onToggle(e.target.checked)}
+          className="shrink-0"
+        />
+        <span>{title}</span>
+      </div>
       {selected && <div className="mt-3 grid grid-cols-2 gap-3">{children}</div>}
     </div>
   );

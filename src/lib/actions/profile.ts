@@ -41,8 +41,12 @@ export async function removeOwnAvatar(targetUserId?: string) {
 
 export async function updateOwnContactInfo(formData: FormData) {
   const user = await requireUser();
+  const name = String(formData.get("name") || "").trim();
   const phone = String(formData.get("phone") || "").trim() || null;
   const lastName = String(formData.get("lastName") || "").trim() || null;
-  await prisma.user.update({ where: { id: user.id }, data: { phone, lastName } });
+  if (!name) throw new Error("Fornavn kan ikke være tomt.");
+  await prisma.user.update({ where: { id: user.id }, data: { name, phone, lastName } });
   revalidatePath("/profile");
+  revalidatePath("/", "layout");
+  revalidatePath("/users");
 }
