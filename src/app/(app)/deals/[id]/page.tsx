@@ -25,6 +25,8 @@ import { TerminationSection } from "./termination-section";
 import { DealItemsSection } from "./deal-items-section";
 import { DealDangerActions } from "./danger-actions";
 import { CustomerLinkSection } from "./customer-link-section";
+import { AddressAutocomplete } from "../../address-autocomplete";
+import { DisplayNameInput } from "../../display-name-input";
 
 function toDateInputValue(date: Date | null): string {
   if (!date) return "";
@@ -133,12 +135,7 @@ export default async function DealDetailPage({
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-500">Kaldenavn (valgfri)</label>
-                  <input
-                    name="displayName"
-                    defaultValue={deal.displayName ?? ""}
-                    placeholder="Vises i stedet for CVR-navnet, hvis udfyldt"
-                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-                  />
+                  <DisplayNameInput defaultValue={deal.displayName ?? ""} />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-500">CVR-nummer</label>
@@ -150,11 +147,7 @@ export default async function DealDetailPage({
                 </div>
                 <div className="col-span-2">
                   <label className="block text-xs font-medium text-slate-500">Adresse</label>
-                  <input
-                    name="address"
-                    defaultValue={deal.address ?? ""}
-                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-                  />
+                  <AddressAutocomplete defaultValue={deal.address ?? ""} />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-500">Kontaktperson</label>

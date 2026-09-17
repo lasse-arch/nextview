@@ -24,6 +24,10 @@ export async function createDealManual(formData: FormData) {
   const ownerId = String(formData.get("ownerId") || user.id);
   const cvrNumber = String(formData.get("cvrNumber") || "").trim() || null;
   const address = String(formData.get("address") || "") || null;
+  const addressLatRaw = String(formData.get("addressLat") || "");
+  const addressLonRaw = String(formData.get("addressLon") || "");
+  const latitude = addressLatRaw ? parseFloat(addressLatRaw) : null;
+  const longitude = addressLonRaw ? parseFloat(addressLonRaw) : null;
   const contactName = String(formData.get("contactName") || "") || null;
   const contactEmail = String(formData.get("contactEmail") || "") || null;
   const contactPhone = String(formData.get("contactPhone") || "") || null;
@@ -36,6 +40,8 @@ export async function createDealManual(formData: FormData) {
       displayName,
       cvrNumber,
       address,
+      latitude,
+      longitude,
       contactName,
       contactEmail,
       contactPhone,
@@ -60,6 +66,8 @@ export async function updateDeal(dealId: string, formData: FormData) {
   const displayName = String(formData.get("displayName") || "").trim() || null;
   const cvrNumber = String(formData.get("cvrNumber") || "").trim() || null;
   const address = String(formData.get("address") || "") || null;
+  const addressLatRaw = String(formData.get("addressLat") || "");
+  const addressLonRaw = String(formData.get("addressLon") || "");
   const contactName = String(formData.get("contactName") || "") || null;
   const contactEmail = String(formData.get("contactEmail") || "") || null;
   const contactPhone = String(formData.get("contactPhone") || "") || null;
@@ -100,6 +108,12 @@ export async function updateDeal(dealId: string, formData: FormData) {
   if (stage === "FILMED" && !existing.filmedAt) stageDateUpdates.filmedAt = new Date();
   if (stage === "LIVE" && !existing.billingStartDate && liveAt) stageDateUpdates.billingStartDate = liveAt;
 
+  // A suggestion picked from the address autocomplete comes with fresh coordinates to store directly.
+  // Otherwise, if the address text changed, clear any stale coordinates so the map re-geocodes it.
+  const addressChanged = address !== existing.address;
+  const latitude = addressLatRaw ? parseFloat(addressLatRaw) : addressChanged ? null : existing.latitude;
+  const longitude = addressLonRaw ? parseFloat(addressLonRaw) : addressChanged ? null : existing.longitude;
+
   const duplicates =
     companyName && companyName.toLowerCase() !== existing.companyName.toLowerCase()
       ? await findDuplicateDeals(companyName, dealId)
@@ -112,6 +126,8 @@ export async function updateDeal(dealId: string, formData: FormData) {
       displayName,
       cvrNumber,
       address,
+      latitude,
+      longitude,
       contactName,
       contactEmail,
       contactPhone,
