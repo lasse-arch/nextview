@@ -251,11 +251,26 @@ model Deal {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  notes      Note[]
-  emails     EmailMessage[]
-  commission Commission?
-  invoices   Invoice[]
-  items      DealItem[]
+  notes          Note[]
+  emails         EmailMessage[]
+  commission     Commission?
+  invoices       Invoice[]
+  items          DealItem[]
+  contractEvents ContractEvent[]
+}
+
+/// One entry per DocuSeal webhook occurrence (sent/viewed/signed/declined/...) -
+/// kept as a full history (not just the latest per type) so the contract-status
+/// hover box can show e.g. every time the customer opened it, not just the first.
+model ContractEvent {
+  id         String   @id @default(cuid())
+  deal       Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  dealId     String
+  type       String
+  occurredAt DateTime
+  createdAt  DateTime @default(now())
+
+  @@index([dealId, occurredAt])
 }
 
 /// A service/product line on a deal - optionally tied to one of the

@@ -47,6 +47,10 @@ export async function POST(request: NextRequest) {
   const isCustomer = payload.data?.external_id === "customer";
   const changedAt = payload.timestamp ? new Date(payload.timestamp) : new Date();
 
+  function logEvent(eventType: string) {
+    return prisma.contractEvent.create({ data: { dealId: deal!.id, type: eventType, occurredAt: changedAt } });
+  }
+
   async function markSigned() {
     if (deal!.contractSignedAt) return;
     await prisma.deal.update({
@@ -58,6 +62,7 @@ export async function POST(request: NextRequest) {
         stage: "CONTRACT_SIGNED",
       },
     });
+    await logEvent("SIGNED");
 
     // Carry each product on the now-signed contract down into "Ydelser" as
     // its own line - including ones given away for free - so once there are
@@ -78,11 +83,16 @@ export async function POST(request: NextRequest) {
   if (type === "form.viewed") {
     // Only the customer opening it is meaningful here - the director (the
     // other submitter) may auto-preview it, which shouldn't count as "opened".
-    if (isCustomer && !deal.contractViewedAt) {
-      await prisma.deal.update({
-        where: { id: deal.id },
-        data: { contractStatus: "VIEWED", contractViewedAt: changedAt },
-      });
+    // Every open is logged (not just the first) so the hover box can show a
+    // history, e.g. the customer opening it several times before signing.
+    if (isCustomer) {
+      await logEvent("VIEWED");
+      if (!deal.contractViewedAt) {
+        await prisma.deal.update({
+          where: { id: deal.id },
+          data: { contractStatus: "VIEWED", contractViewedAt: changedAt },
+        });
+      }
     }
   } else if (type === "form.completed" && isCustomer) {
     // The customer's own signature is what "underskrevet" should reflect,
@@ -94,8 +104,10 @@ export async function POST(request: NextRequest) {
     await markSigned();
   } else if (type === "form.declined") {
     await prisma.deal.update({ where: { id: deal.id }, data: { contractStatus: "DECLINED" } });
+    await logEvent("DECLINED");
   } else if (type === "submission.expired" || type === "submission.archived") {
     await prisma.deal.update({ where: { id: deal.id }, data: { contractStatus: "VOIDED" } });
+    await logEvent(type === "submission.expired" ? "EXPIRED" : "ARCHIVED");
   }
 
   return NextResponse.json({ ok: true });

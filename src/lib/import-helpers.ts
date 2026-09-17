@@ -42,6 +42,43 @@ export function parseAmount(raw: string): number | null {
   return isNaN(value) ? null : Math.round(value);
 }
 
+/**
+ * Parses a date cell as Danish dd/mm/yyyy (also accepts "-" or "." as the
+ * separator) - never the native `new Date(string)` constructor, which
+ * silently guesses US mm/dd/yyyy for ambiguous slash-separated dates and
+ * has caused wrong billing/live dates on import. ISO "yyyy-mm-dd" is also
+ * accepted since it's unambiguous regardless of locale. Returns null
+ * (rather than a garbage date) for anything else, so callers can skip/flag
+ * the row instead of importing a silently wrong date.
+ */
+export function parseDanishDate(raw: string): Date | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+
+  const iso = trimmed.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (iso) {
+    const [, y, m, d] = iso;
+    return toValidDate(Number(y), Number(m), Number(d));
+  }
+
+  const dmy = trimmed.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})$/);
+  if (dmy) {
+    const [, d, m, yRaw] = dmy;
+    const y = yRaw.length === 2 ? 2000 + Number(yRaw) : Number(yRaw);
+    return toValidDate(y, Number(m), Number(d));
+  }
+
+  return null;
+}
+
+function toValidDate(year: number, month: number, day: number): Date | null {
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  const date = new Date(Date.UTC(year, month - 1, day));
+  // Guards against JS rolling e.g. 31/04 over into May.
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null;
+  return date;
+}
+
 export function pick(row: ParsedRow, ...candidates: string[]): string | null {
   const normalized: Record<string, string> = {};
   for (const [k, v] of Object.entries(row)) {

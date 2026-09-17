@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { updateDealStage, setMeetingDateAndStage, addQuickNote } from "@/lib/actions/deals";
 import { stageLabels, stageOrder, formatDKK, dealName, totalContractValue } from "@/lib/labels";
@@ -41,6 +41,7 @@ function toDateTimeLocalDefault(): string {
 
 export function DealsBoard({ initialDeals, isAdmin }: { initialDeals: BoardDeal[]; isAdmin: boolean }) {
   const [deals, setDeals] = useState(initialDeals);
+  const [search, setSearch] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [meetingPromptDealId, setMeetingPromptDealId] = useState<string | null>(null);
@@ -126,9 +127,18 @@ export function DealsBoard({ initialDeals, isAdmin }: { initialDeals: BoardDeal[
     });
   }
 
+  const filteredDeals = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return deals;
+    return deals.filter((d) => {
+      const haystack = `${dealName(d)} ${d.contactName ?? ""} ${d.ownerName}`.toLowerCase();
+      return haystack.includes(q);
+    });
+  }, [deals, search]);
+
   const columns = stageOrder.map((stage) => ({
     stage,
-    deals: deals.filter((d) => d.stage === stage),
+    deals: filteredDeals.filter((d) => d.stage === stage),
   }));
 
   return (
@@ -209,6 +219,16 @@ export function DealsBoard({ initialDeals, isAdmin }: { initialDeals: BoardDeal[
           </div>
         </div>
       )}
+
+      <div className="mb-3">
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Søg på firma, kaldenavn, kontaktperson eller sælger…"
+          className="w-full max-w-sm rounded-md border border-slate-300 px-3 py-1.5 text-sm"
+        />
+      </div>
 
       <div className="flex gap-3 overflow-x-auto pb-4">
         {columns.map(({ stage, deals: colDeals }) => {

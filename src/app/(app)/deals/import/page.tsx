@@ -82,6 +82,10 @@ export default function ImportPage() {
           kontaktperson, email, telefon, sælger (e-mail), produkt/service, etableringspris/opstartspris. Kolonnenavne
           matches uafhængigt af mellemrum, bindestreger og parenteser (fx virker både "Binding" og "Binding (mdr)").
         </p>
+        <p className="mt-2 text-xs text-slate-500">
+          <span className="font-medium">Startdato skal skrives som dd/mm/åååå</span> (fx 17/09/2026 eller 17-09-2026)
+          — ellers springes rækken over i stedet for at blive gættet forkert.
+        </p>
         <form action={importExistingCustomers} className="mt-4 space-y-3">
           <input
             type="file"

@@ -59,6 +59,7 @@ export default async function DealDetailPage({
         items: { orderBy: { createdAt: "asc" } },
         parent: true,
         branches: { orderBy: { companyName: "asc" } },
+        contractEvents: { orderBy: { occurredAt: "desc" }, take: 5 },
       },
     }),
     prisma.user.findMany({ orderBy: { name: "asc" } }),
@@ -344,12 +345,7 @@ export default async function DealDetailPage({
           <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="text-sm font-semibold text-slate-900">Kontrakt</h2>
             <dl className="mt-3 space-y-2 text-sm">
-              <ContractStatusRow
-                label={contractStatusLabels[deal.contractStatus]}
-                sentAt={deal.contractSentAt}
-                viewedAt={deal.contractViewedAt}
-                signedAt={deal.contractSignedAt}
-              />
+              <ContractStatusRow label={contractStatusLabels[deal.contractStatus]} events={deal.contractEvents} />
             </dl>
 
             <div className="mt-4 space-y-2">

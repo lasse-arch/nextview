@@ -103,7 +103,20 @@ export function buildContractTemplateData(
   const { street, zipCity } = splitZipCity(deal.address);
   const displayCompany = deal.displayName || deal.companyName;
 
+  const selectedCount = [
+    products.nextviewTour.selected,
+    products.hjemmeside.selected,
+    products.droneOptagelse.selected,
+    products.visitkort.selected,
+  ].filter(Boolean).length;
+  const isSingle = selectedCount <= 1;
+
   return {
+    "Deal.DenDe": isSingle ? "den" : "de",
+    "Deal.Ydelse": isSingle ? "ydelse" : "ydelser",
+    "Deal.YdelseCap": isSingle ? "Ydelsen" : "Ydelserne",
+    "Deal.DensDeres": isSingle ? "dens" : "deres",
+
     "Client.Company": displayCompany,
     "Client.CVR": deal.cvrNumber ?? "",
     "Client.Name": deal.contactName ?? "",

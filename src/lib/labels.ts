@@ -52,6 +52,15 @@ export const contractStatusLabels: Record<string, string> = {
   VOIDED: "Annulleret",
 };
 
+export const contractEventLabels: Record<string, string> = {
+  SENT: "Sendt",
+  VIEWED: "Kunden åbnede",
+  SIGNED: "Kunden underskrev",
+  DECLINED: "Afvist",
+  EXPIRED: "Udløbet",
+  ARCHIVED: "Annulleret",
+};
+
 export const invoiceStatusLabels: Record<string, string> = {
   PENDING: "Behandles",
   DRAFT_CREATED: "Kladde oprettet",
@@ -79,4 +88,10 @@ export function formatDate(date: Date | string | null | undefined): string {
   if (!date) return "–";
   const d = typeof date === "string" ? new Date(date) : date;
   return new Intl.DateTimeFormat("da-DK", { dateStyle: "medium" }).format(d);
+}
+
+export function formatDateTime(date: Date | string | null | undefined): string {
+  if (!date) return "–";
+  const d = typeof date === "string" ? new Date(date) : date;
+  return new Intl.DateTimeFormat("da-DK", { dateStyle: "medium", timeStyle: "short" }).format(d);
 }

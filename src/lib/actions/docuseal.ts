@@ -140,6 +140,8 @@ export async function buildAndSendContract(
       },
     });
 
+    await prisma.contractEvent.create({ data: { dealId, type: "SENT", occurredAt: new Date() } });
+
     revalidatePath(`/deals/${dealId}`);
     return { ok: true };
   } catch (err) {

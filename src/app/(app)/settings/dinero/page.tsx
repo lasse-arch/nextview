@@ -3,6 +3,7 @@ import { isDineroConfigured } from "@/lib/dinero";
 import { isIntegrationEnabled } from "@/lib/integration-settings";
 import { formatDKK, formatDate, invoiceStatusLabels, dealName } from "@/lib/labels";
 import { RunNowButton } from "./run-now-button";
+import { ClearInvoicesButton } from "./clear-invoices-button";
 import { IntegrationToggle } from "../integration-toggle";
 import Link from "next/link";
 
@@ -117,6 +118,17 @@ export default async function DineroSettingsPage() {
               )}
             </tbody>
           </table>
+        </div>
+      </section>
+
+      <section className="rounded-xl border border-red-200 bg-red-50/40 p-6 shadow-sm">
+        <h2 className="text-sm font-semibold text-red-900">Nulstil fakturering</h2>
+        <p className="mt-1 text-sm text-red-800/80">
+          Sletter alle fakturaer fra alle deals (inkl. importerede/historiske), så fakturering kun tæller fra nu og
+          fremad, mens funktionen stadig færdiggøres. Kan ikke fortrydes.
+        </p>
+        <div className="mt-3">
+          <ClearInvoicesButton />
         </div>
       </section>
     </div>

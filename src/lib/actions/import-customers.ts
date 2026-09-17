@@ -11,7 +11,7 @@ import { findDuplicateDeals } from "@/lib/duplicates";
 import { recalcCommission } from "@/lib/commission-service";
 import { computeBillingPeriods, computePeriodAmounts } from "@/lib/invoice-schedule";
 import { totalContractValue } from "@/lib/labels";
-import { pick, parseAmount, type ParsedRow } from "@/lib/import-helpers";
+import { pick, parseAmount, parseDanishDate, type ParsedRow } from "@/lib/import-helpers";
 
 /**
  * Imports customers who are already active/paying, or already under
@@ -60,8 +60,10 @@ export async function importExistingCustomers(formData: FormData) {
 
     const saleAmount = parseAmount(saleAmountRaw);
     const bindingMonths = parseInt(bindingMonthsRaw, 10);
-    const startDate = startDateRaw ? new Date(startDateRaw) : null;
-    if (saleAmount === null || !bindingMonths || (startDateRaw && isNaN(startDate!.getTime()))) {
+    // Always read as dd/mm/yyyy (Danish) - never the native Date constructor,
+    // which guesses US mm/dd/yyyy for ambiguous slash-separated dates.
+    const startDate = startDateRaw ? parseDanishDate(startDateRaw) : null;
+    if (saleAmount === null || !bindingMonths || (startDateRaw && !startDate)) {
       skippedRows.push(companyName);
       continue;
     }
