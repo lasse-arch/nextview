@@ -6,17 +6,14 @@ import Link from "next/link";
 import {
   importTypeLabels,
   noteKindLabels,
-  commissionFrequencyLabels,
-  commissionStatusLabels,
   contractStatusLabels,
   invoiceStatusLabels,
   formatDKK,
   formatDate,
   dealName,
 } from "@/lib/labels";
-import { isCommissionOverdue } from "@/lib/commission";
 import { isPandaDocConfigured } from "@/lib/pandadoc";
-import { MarkPaidButton } from "./mark-paid-button";
+import { CommissionSection } from "./commission-section";
 import { CommissionExcludedToggle } from "./commission-excluded-toggle";
 import { SendContractButton } from "./send-contract-button";
 import { StageFields } from "./stage-fields";
@@ -332,7 +329,7 @@ export default async function DealDetailPage({
               <form action={addNoteWithId} className="rounded-md border border-slate-200 bg-indigo-50/40 p-3">
                 <input type="hidden" name="kind" value="AI_MEETING" />
                 <label className="block text-xs font-medium text-slate-500">
-                  AI-mødenote (indsæt fra AI Rocket)
+                  AI-mødenote (indsæt fra AI Pocket)
                 </label>
                 <textarea
                   name="body"
@@ -467,47 +464,11 @@ export default async function DealDetailPage({
                 Denne deal er undtaget fra provisionsordningen — ejeren får ikke provision af den.
               </p>
             ) : deal.commission ? (
-              <dl className="mt-3 space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <dt className="text-slate-500">Sælger</dt>
-                  <dd className="text-slate-800">{deal.commission.seller.name}</dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt className="text-slate-500">Sats</dt>
-                  <dd className="text-slate-800">{deal.commission.rate}%</dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt className="text-slate-500">Grundlag</dt>
-                  <dd className="money text-slate-800">{formatDKK(deal.commission.baseAmount)}</dd>
-                </div>
-                <div className="flex justify-between font-medium">
-                  <dt className="text-slate-500">Provision</dt>
-                  <dd className="money text-slate-900">{formatDKK(deal.commission.amount)}</dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt className="text-slate-500">Udbetaling</dt>
-                  <dd className="text-slate-800">{commissionFrequencyLabels[deal.commission.frequency]}</dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt className="text-slate-500">Forfaldsdato</dt>
-                  <dd className={isCommissionOverdue(deal.commission.dueDate, deal.commission.paidAt) ? "font-medium text-red-600" : "text-slate-800"}>
-                    {formatDate(deal.commission.dueDate)}
-                  </dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt className="text-slate-500">Status</dt>
-                  <dd className="text-slate-800">
-                    {deal.commission.status === "PAID"
-                      ? commissionStatusLabels.PAID
-                      : isCommissionOverdue(deal.commission.dueDate, deal.commission.paidAt)
-                      ? commissionStatusLabels.DUE
-                      : commissionStatusLabels.PENDING}
-                  </dd>
-                </div>
-                {deal.commission.status !== "PAID" && currentUser?.role === "ADMIN" && (
-                  <MarkPaidButton commissionId={deal.commission.id} />
-                )}
-              </dl>
+              <CommissionSection
+                dealId={deal.id}
+                commission={deal.commission}
+                isAdmin={currentUser?.role === "ADMIN"}
+              />
             ) : (
               <p className="mt-3 text-sm text-slate-400">
                 Ingen provision beregnet endnu. Udfyld salgsbeløb og solgt dato, og sørg for at ejeren er

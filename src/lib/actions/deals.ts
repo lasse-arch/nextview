@@ -10,7 +10,7 @@ import { buildDealEmailAddress } from "@/lib/email-address";
 import { findDuplicateDeals } from "@/lib/duplicates";
 import { syncDealMeetingToCalendar } from "@/lib/calendar-service";
 import { sendContractSignedNotification } from "@/lib/notification-service";
-import type { DealStage } from "@prisma/client";
+import type { DealStage, CommissionFrequency, CommissionStatus } from "@prisma/client";
 
 const CONTRACT_MANAGED_STAGES: DealStage[] = ["CONTRACT_SENT", "CONTRACT_SIGNED"];
 
@@ -521,9 +521,44 @@ export async function renewContract(dealId: string, formData: FormData) {
 export async function markCommissionPaid(commissionId: string) {
   const user = await requireUser();
   if (user.role !== "ADMIN") throw new Error("Kun admin kan markere provision som udbetalt");
-  await prisma.commission.update({
+  const commission = await prisma.commission.update({
     where: { id: commissionId },
     data: { status: "PAID", paidAt: new Date() },
   });
   revalidatePath("/commission");
+  revalidatePath(`/deals/${commission.dealId}`);
+}
+
+/** Lets admin manually correct any field on a commission - rate, amounts, payout, due date and status/paid date. */
+export async function updateCommission(commissionId: string, formData: FormData) {
+  const user = await requireUser();
+  if (user.role !== "ADMIN") throw new Error("Kun admin kan redigere provision.");
+
+  const rate = parseFloat(String(formData.get("rate") || ""));
+  const baseAmount = Math.round(parseFloat(String(formData.get("baseAmount") || "")));
+  const amount = Math.round(parseFloat(String(formData.get("amount") || "")));
+  const frequency = String(formData.get("frequency") || "MONTHLY") as CommissionFrequency;
+  const status = String(formData.get("status") || "PENDING") as CommissionStatus;
+  const dueDateRaw = String(formData.get("dueDate") || "");
+  const paidAtRaw = String(formData.get("paidAt") || "");
+
+  if (isNaN(rate) || isNaN(baseAmount) || isNaN(amount)) {
+    throw new Error("Angiv gyldige tal for sats, grundlag og provision.");
+  }
+
+  const commission = await prisma.commission.update({
+    where: { id: commissionId },
+    data: {
+      rate,
+      baseAmount,
+      amount,
+      frequency,
+      status,
+      dueDate: dueDateRaw ? new Date(dueDateRaw) : null,
+      paidAt: status === "PAID" ? (paidAtRaw ? new Date(paidAtRaw) : new Date()) : null,
+    },
+  });
+
+  revalidatePath("/commission");
+  revalidatePath(`/deals/${commission.dealId}`);
 }
