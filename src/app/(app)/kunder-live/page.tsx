@@ -46,7 +46,7 @@ export default async function LiveCustomersPage({
       <div className="mt-6 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <ul className="divide-y divide-slate-100">
           {deals.map((deal) => (
-            <li key={deal.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
+            <li key={deal.id} className="flex flex-col gap-2 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
               <span className="font-medium text-slate-900">{dealName(deal)}</span>
               <div className="flex flex-wrap items-center gap-2">
                 {deal.items.length === 0 && <span className="text-xs text-slate-400">Ingen produkter tilføjet</span>}
