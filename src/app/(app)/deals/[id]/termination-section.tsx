@@ -1,7 +1,7 @@
 "use client";
 
-import { useTransition } from "react";
-import { terminateContract, withdrawTermination } from "@/lib/actions/deals";
+import { useState, useTransition } from "react";
+import { terminateContract, withdrawTermination, setManualContractEndDate } from "@/lib/actions/deals";
 import { formatDate } from "@/lib/labels";
 
 function toDateInputValue(date: Date | null): string {
@@ -14,16 +14,22 @@ export function TerminationSection({
   noticePeriodMonths,
   terminationNoticeAt,
   contractEndDate,
+  contractEndDateManual,
   isChurned,
+  isAdmin,
 }: {
   dealId: string;
   noticePeriodMonths: number;
   terminationNoticeAt: Date | null;
   contractEndDate: Date | null;
+  contractEndDateManual: boolean;
   isChurned: boolean;
+  isAdmin: boolean;
 }) {
   const [pending, startTransition] = useTransition();
+  const [editingEndDate, setEditingEndDate] = useState(false);
   const terminateWithId = terminateContract.bind(null, dealId);
+  const setManualEndDateWithId = setManualContractEndDate.bind(null, dealId);
 
   if (isChurned) return null;
 
@@ -41,7 +47,56 @@ export function TerminationSection({
           <p>
             Opsagt {formatDate(terminationNoticeAt)} med {noticePeriodMonths} måneders varsel.
           </p>
-          <p className="mt-1 font-medium">Ophører: {formatDate(contractEndDate)}</p>
+          <p className="mt-1 flex flex-wrap items-center gap-2">
+            <span className="font-medium">Ophører: {formatDate(contractEndDate)}</span>
+            {contractEndDateManual && (
+              <span className="rounded-full bg-amber-200 px-2 py-0.5 text-xs font-medium text-amber-900">
+                Rettet manuelt
+              </span>
+            )}
+            {isAdmin && !editingEndDate && (
+              <button
+                type="button"
+                onClick={() => setEditingEndDate(true)}
+                className="text-xs font-medium text-amber-800 underline hover:text-amber-950"
+              >
+                Ret manuelt
+              </button>
+            )}
+          </p>
+
+          {editingEndDate && (
+            <form
+              action={setManualEndDateWithId}
+              className="mt-2 flex flex-wrap items-end gap-2"
+              onSubmit={() => setEditingEndDate(false)}
+            >
+              <div>
+                <label className="block text-xs font-medium text-amber-800">Ny ophørsdato *</label>
+                <input
+                  name="contractEndDate"
+                  type="date"
+                  required
+                  defaultValue={toDateInputValue(contractEndDate)}
+                  className="mt-1 rounded-md border border-amber-300 bg-white px-3 py-1.5 text-sm"
+                />
+              </div>
+              <button
+                type="submit"
+                className="rounded-md bg-amber-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-900"
+              >
+                Gem dato
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditingEndDate(false)}
+                className="text-xs font-medium text-amber-800 underline hover:text-amber-950"
+              >
+                Annullér
+              </button>
+            </form>
+          )}
+
           <button
             type="button"
             disabled={pending}

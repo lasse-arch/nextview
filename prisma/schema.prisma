@@ -227,6 +227,11 @@ model Deal {
   /// Billing continues (rolling past the binding period if needed) until this date,
   /// after which the deal is auto-marked inactive.
   contractEndDate     DateTime?
+  /// True once an admin has manually overridden contractEndDate (e.g. a
+  /// negotiated exception to the usual tacit-renewal terms) - stops the
+  /// automatic recompute-on-save from clobbering it. Cleared whenever a
+  /// fresh opsigelse is registered or withdrawn.
+  contractEndDateManual Boolean @default(false)
 
   importType    ImportType   @default(MANUAL)
   importBatch   ImportBatch? @relation(fields: [importBatchId], references: [id])

@@ -229,8 +229,16 @@ async function updateDealInner(dealId: string, formData: FormData, user: Awaited
   // incomplete data and goes stale. Recompute it on every save of a deal
   // with an active, not-yet-churned opsigelse (cheap and idempotent) so it
   // self-heals instead of silently drifting from the actual binding terms.
+  // Skipped once an admin has manually overridden it (e.g. a negotiated
+  // exception to the usual tacit-renewal terms) - that's a deliberate,
+  // stated value, not a stale one to correct back.
   const effectiveBillingStartDate = stageDateUpdates.billingStartDate ?? existing.billingStartDate;
-  if (existing.terminationNoticeAt && existing.noticePeriodMonths && !existing.churnedAt) {
+  if (
+    existing.terminationNoticeAt &&
+    existing.noticePeriodMonths &&
+    !existing.churnedAt &&
+    !existing.contractEndDateManual
+  ) {
     const recomputedEndDate = computeContractEndDate(
       { billingStartDate: effectiveBillingStartDate, bindingMonths },
       existing.terminationNoticeAt,
@@ -348,7 +356,8 @@ export async function updateDealStage(dealId: string, newStage: DealStage) {
     stageDateUpdates.billingStartDate &&
     existing.terminationNoticeAt &&
     existing.noticePeriodMonths &&
-    !existing.churnedAt
+    !existing.churnedAt &&
+    !existing.contractEndDateManual
   ) {
     stageDateUpdates.contractEndDate = computeContractEndDate(
       { billingStartDate: stageDateUpdates.billingStartDate, bindingMonths: existing.bindingMonths },
@@ -593,7 +602,9 @@ export async function terminateContract(dealId: string, formData: FormData) {
 
   await prisma.deal.update({
     where: { id: dealId },
-    data: { terminationNoticeAt: noticeDate, noticePeriodMonths, contractEndDate },
+    // A fresh opsigelse always starts from the computed value - clear any
+    // earlier manual override rather than let it survive and go stale.
+    data: { terminationNoticeAt: noticeDate, noticePeriodMonths, contractEndDate, contractEndDateManual: false },
   });
 
   revalidatePath(`/deals/${dealId}`);
@@ -605,10 +616,36 @@ export async function withdrawTermination(dealId: string) {
   await requireUser();
   await prisma.deal.update({
     where: { id: dealId },
-    data: { terminationNoticeAt: null, contractEndDate: null },
+    data: { terminationNoticeAt: null, contractEndDate: null, contractEndDateManual: false },
   });
   revalidatePath(`/deals/${dealId}`);
   revalidatePath("/deals");
+}
+
+/**
+ * Lets an admin override the computed "Ophører"-dato directly - for a
+ * negotiated exception to the usual tacit-renewal terms (e.g. a customer
+ * granted a plain notice-period exit instead of being locked into the next
+ * full binding term). Marks it manual so the self-heal recompute in
+ * updateDealInner/updateDealStage leaves it alone afterwards.
+ */
+export async function setManualContractEndDate(dealId: string, formData: FormData) {
+  const user = await requireUser();
+  if (user.role !== "ADMIN") throw new Error("Kun admin kan rette ophørsdatoen manuelt.");
+
+  const raw = String(formData.get("contractEndDate") || "");
+  if (!raw) throw new Error("Angiv en ophørsdato.");
+  const contractEndDate = new Date(raw);
+  if (isNaN(contractEndDate.getTime())) throw new Error("Ugyldig ophørsdato.");
+
+  await prisma.deal.update({
+    where: { id: dealId },
+    data: { contractEndDate, contractEndDateManual: true },
+  });
+
+  revalidatePath(`/deals/${dealId}`);
+  revalidatePath("/deals");
+  redirect(`/deals/${dealId}?saved=Oph%C3%B8rsdato%20rettet%20manuelt`);
 }
 
 export async function markCommissionPaid(commissionId: string) {

@@ -450,7 +450,9 @@ export default async function DealDetailPage({
             noticePeriodMonths={deal.noticePeriodMonths}
             terminationNoticeAt={deal.terminationNoticeAt}
             contractEndDate={deal.contractEndDate}
+            contractEndDateManual={deal.contractEndDateManual}
             isChurned={Boolean(deal.churnedAt)}
+            isAdmin={currentUser?.role === "ADMIN"}
           />
 
           <CustomerLinkSection
