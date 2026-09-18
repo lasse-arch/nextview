@@ -1,4 +1,4 @@
-import { addMonths, max as maxDate } from "date-fns";
+import { addMonths, max as maxDate, startOfDay } from "date-fns";
 import { prisma } from "@/lib/db";
 import { isDineroConfigured, createQuarterlyInvoiceDraft } from "@/lib/dinero";
 import { computeBillingPeriods, computePeriodAmounts } from "@/lib/invoice-schedule";
@@ -172,11 +172,16 @@ export async function runQuarterlyInvoiceGeneration(): Promise<InvoiceRunSummary
  * Marks deals as inactive once their computed contract end date (from a
  * termination notice) has passed. Runs independently of whether Dinero is
  * configured, since churn is a CRM concern, not a billing-integration one.
+ *
+ * The customer counts as active through the whole of contractEndDate itself
+ * (e.g. a 36-month binding still counts them on day 36) and only drops off
+ * starting the day after - so this only churns once "today" is strictly
+ * past that calendar day, not merely on-or-after it.
  */
 export async function runAutoChurn(): Promise<{ churned: number }> {
-  const now = new Date();
+  const today = startOfDay(new Date());
   const dueDeals = await prisma.deal.findMany({
-    where: { churnedAt: null, contractEndDate: { lte: now } },
+    where: { churnedAt: null, contractEndDate: { lt: today } },
     select: { id: true, contractEndDate: true },
   });
 
