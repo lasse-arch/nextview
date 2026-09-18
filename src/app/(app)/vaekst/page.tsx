@@ -84,10 +84,15 @@ export default async function GrowthDashboardPage() {
           <h2 className="text-sm font-semibold text-slate-900">Kontraktværdi</h2>
           <div className="mt-3 divide-y divide-slate-100">
             <Row label="Aktiv kontraktværdi (fuld binding)" value={formatDKK(d.activeContractValue)} money />
-            <Row label="Realiseret til dato" value={formatDKK(d.realizedToDate)} money />
+            <Row label="Realiseret til dato (aktive, mod fuld binding)" value={formatDKK(d.realizedToDate)} money />
             <Row label="Resterende kontraktværdi (aktiv)" value={formatDKK(d.remainingContractValue)} money />
-            <Row label="Pipeline kontraktværdi" value={formatDKK(d.pipelineContractValue)} money />
+            <Row label="Pipeline kontraktværdi (fuld binding)" value={formatDKK(d.pipelineContractValue)} money />
             <Row label="Opstart i alt" value={formatDKK(d.establishmentTotal)} money />
+            <Row
+              label="Realiseret kontraktværdi i alt (alle solgte, ekskl. fremtidig binding)"
+              value={formatDKK(d.realizedContractTotal)}
+              money
+            />
             <Row label="Samlet booket værdi" value={formatDKK(d.totalBookedValue)} strong money />
           </div>
         </div>

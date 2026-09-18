@@ -101,7 +101,11 @@ export default async function DealDetailPage({
         </div>
         <div className="flex items-center gap-2">
           <InactiveToggleButton dealId={deal.id} isChurned={Boolean(deal.churnedAt)} />
-          <DealDangerActions dealId={deal.id} stage={deal.stage} isAdmin={currentUser?.role === "ADMIN"} />
+          <DealDangerActions
+            dealId={deal.id}
+            stage={deal.stage}
+            canDelete={currentUser?.role === "ADMIN" || currentUser?.id === deal.ownerId}
+          />
         </div>
       </div>
 

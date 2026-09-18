@@ -81,22 +81,27 @@ export function totalContractValue(deal: { saleAmount: number | null; bindingMon
 }
 
 /**
- * How much of a churned deal's monthly value was actually realized before it
- * churned - counted from when billing started to when the customer churned.
- * Deliberately uncapped by the binding period: billing rolls on past binding
- * until the contract is actually terminated, so a churn after the binding
- * period still represents real months of paid revenue that a binding-period
- * contract value alone wouldn't capture.
+ * How much of a deal's monthly value has actually been realized (billed) as
+ * of `asOf` - counted from when billing started to when the customer
+ * churned, or to `asOf` if it's still active. Deliberately uncapped by the
+ * binding period: billing rolls on past binding until the contract is
+ * actually terminated, so a customer active longer than their binding
+ * period (or churned after it) still represents real months of paid revenue
+ * that the binding-period contract value alone wouldn't capture.
  */
-export function churnedRealizedContractValue(deal: {
-  saleAmount: number | null;
-  billingStartDate: Date | null;
-  liveAt: Date | null;
-  churnedAt: Date | null;
-}): number {
+export function realizedContractValue(
+  deal: {
+    saleAmount: number | null;
+    billingStartDate: Date | null;
+    liveAt: Date | null;
+    churnedAt: Date | null;
+  },
+  asOf: Date
+): number {
   const start = deal.billingStartDate ?? deal.liveAt;
-  if (!start || !deal.churnedAt || !deal.saleAmount) return 0;
-  const months = Math.max(0, differenceInCalendarMonths(deal.churnedAt, start));
+  if (!start || !deal.saleAmount) return 0;
+  const end = deal.churnedAt ?? asOf;
+  const months = Math.max(0, differenceInCalendarMonths(end, start));
   return deal.saleAmount * months;
 }
 

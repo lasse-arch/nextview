@@ -386,7 +386,10 @@ export async function setCommissionExcluded(dealId: string, excluded: boolean) {
  */
 export async function deleteDeal(dealId: string) {
   const user = await requireUser();
-  if (user.role !== "ADMIN") throw new Error("Kun admin kan slette en deal.");
+  const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId } });
+  if (user.role !== "ADMIN" && deal.ownerId !== user.id) {
+    throw new Error("Du kan kun slette dine egne deals.");
+  }
   await prisma.deal.delete({ where: { id: dealId } });
   revalidatePath("/deals");
   redirect("/deals");
@@ -507,11 +510,37 @@ export async function reactivateDeal(dealId: string) {
 }
 
 /**
+ * A contract auto-renews for another full binding term (tacit renewal) if
+ * notice isn't given at least noticePeriodMonths before the current term's
+ * end - it isn't just tailed out by the notice period. This finds the
+ * earliest term boundary (billingStartDate + k * bindingMonths) that
+ * noticeDate + noticePeriodMonths actually reaches: giving notice with
+ * enough lead time before the very next boundary exits there as normal;
+ * giving it too late (or not at all until after a boundary has passed)
+ * locks the deal into however many additional full terms are needed before
+ * the notice period is satisfied.
+ */
+function computeContractEndDate(
+  deal: { billingStartDate: Date | null; bindingMonths: number | null },
+  noticeDate: Date,
+  noticePeriodMonths: number
+): Date {
+  const deadline = addMonths(noticeDate, noticePeriodMonths);
+  if (!deal.billingStartDate || !deal.bindingMonths) return deadline;
+  let k = 1;
+  let boundary = addMonths(deal.billingStartDate, deal.bindingMonths * k);
+  while (boundary < deadline) {
+    k++;
+    boundary = addMonths(deal.billingStartDate, deal.bindingMonths * k);
+  }
+  return boundary;
+}
+
+/**
  * Registers a contract termination with notice: billing keeps rolling on
- * (past the binding period if needed) until the later of the binding
- * period's end and noticeDate + noticePeriodMonths - the deal isn't marked
- * inactive immediately, since the customer is still being billed until
- * that computed end date. A daily job auto-churns the deal once it's passed.
+ * until the effective end date computed by computeContractEndDate above -
+ * the deal isn't marked inactive immediately, since the customer is still
+ * being billed until then. A daily job auto-churns the deal once it's passed.
  */
 export async function terminateContract(dealId: string, formData: FormData) {
   await requireUser();
@@ -526,10 +555,7 @@ export async function terminateContract(dealId: string, formData: FormData) {
   if (!noticePeriodMonths || noticePeriodMonths <= 0) throw new Error("Angiv et gyldigt opsigelsesvarsel.");
 
   const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId } });
-  const bindingEnd =
-    deal.billingStartDate && deal.bindingMonths ? addMonths(deal.billingStartDate, deal.bindingMonths) : null;
-  const noticeEnd = addMonths(noticeDate, noticePeriodMonths);
-  const contractEndDate = bindingEnd && bindingEnd > noticeEnd ? bindingEnd : noticeEnd;
+  const contractEndDate = computeContractEndDate(deal, noticeDate, noticePeriodMonths);
 
   await prisma.deal.update({
     where: { id: dealId },

@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/db";
 import { startOfMonth, subMonths, isWithinInterval, endOfMonth, format } from "date-fns";
 import { da } from "date-fns/locale";
-import { totalContractValue, churnedRealizedContractValue } from "@/lib/labels";
+import { totalContractValue, realizedContractValue } from "@/lib/labels";
 
 const PIPELINE_STAGES = [
   "LEAD",
@@ -63,17 +63,14 @@ export async function getDashboardData(ownerId?: string) {
   // MRR anymore, see below). This must match the growth dashboard's
   // "Samlet booket værdi" definition so the two numbers agree.
   const soldDeals = deals.filter((d) => (SOLD_STAGES as readonly string[]).includes(d.stage));
-  // A churned/inactive customer still paid their one-off establishment fee,
-  // plus whatever months of MRR they actually paid before churning (billing
-  // rolls on past the binding period until terminated, so this isn't capped
-  // at bindingMonths) - but no MRR beyond the churn date, since that never
-  // happened.
-  const churnedContribution = (d: Parameters<typeof churnedRealizedContractValue>[0] & { establishmentFee: number | null }) =>
-    (d.establishmentFee ?? 0) + churnedRealizedContractValue(d);
-  const soldValue = soldDeals.reduce(
-    (sum, d) => sum + (d.churnedAt ? churnedContribution(d) : soldTotalValue(d)),
-    0
-  );
+  // Counts actual realized revenue, not the theoretical full-binding value -
+  // months actually billed (from live/billing-start to churn, or to now if
+  // still active) times the monthly price, plus the one-off establishment
+  // fee. Uncapped by bindingMonths since billing rolls on past binding until
+  // the contract is actually terminated.
+  const soldContribution = (d: Parameters<typeof realizedContractValue>[0] & { establishmentFee: number | null }) =>
+    (d.establishmentFee ?? 0) + realizedContractValue(d, now);
+  const soldValue = soldDeals.reduce((sum, d) => sum + soldContribution(d), 0);
   const soldBreakdown = soldDeals
     .map((d) => ({
       id: d.id,
@@ -82,9 +79,9 @@ export async function getDashboardData(ownerId?: string) {
       churned: Boolean(d.churnedAt),
       mrr: d.saleAmount ?? 0,
       bindingMonths: d.bindingMonths ?? 0,
-      contractValue: d.churnedAt ? churnedRealizedContractValue(d) : totalContractValue(d),
+      contractValue: realizedContractValue(d, now),
       establishmentFee: d.establishmentFee ?? 0,
-      contribution: d.churnedAt ? churnedContribution(d) : soldTotalValue(d),
+      contribution: soldContribution(d),
     }))
     .sort((a, b) => b.contribution - a.contribution);
 

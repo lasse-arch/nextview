@@ -31,9 +31,9 @@ export function TerminationSection({
     <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
       <h2 className="text-sm font-semibold text-slate-900">Opsigelse</h2>
       <p className="mt-1 text-xs text-slate-500">
-        Kontrakten kører videre efter bindingsperioden, indtil den bliver opsagt med varsel — der skal ikke
-        nødvendigvis et nyt kontraktlink til. Ophørsdato regnes som det seneste af bindingsperiodens udløb og
-        opsigelsesdato + varsel.
+        Kontrakten fornyes automatisk med endnu en fuld bindingsperiode, hvis den ikke opsiges med varsel inden
+        udløb — der skal ikke nødvendigvis et nyt kontraktlink til. Opsiges den for sent til at nå varslet inden
+        den aktuelle periode udløber, låses den til den næste periode i stedet.
       </p>
 
       {terminationNoticeAt ? (

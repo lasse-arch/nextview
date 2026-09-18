@@ -7,11 +7,11 @@ import { useToast } from "@/components/toast";
 export function DealDangerActions({
   dealId,
   stage,
-  isAdmin,
+  canDelete,
 }: {
   dealId: string;
   stage: string;
-  isAdmin: boolean;
+  canDelete: boolean;
 }) {
   const [pending, startTransition] = useTransition();
   const showToast = useToast();
@@ -41,7 +41,7 @@ export function DealDangerActions({
           Markér som tabt
         </button>
       )}
-      {isAdmin && (
+      {canDelete && (
         <button
           type="button"
           disabled={pending}

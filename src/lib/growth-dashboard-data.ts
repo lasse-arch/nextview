@@ -9,7 +9,7 @@ import {
   format,
 } from "date-fns";
 import { da } from "date-fns/locale";
-import { totalContractValue, churnedRealizedContractValue } from "@/lib/labels";
+import { totalContractValue, realizedContractValue } from "@/lib/labels";
 
 const PIPELINE_STAGES = ["CONTRACT_SIGNED", "FILMED"] as const;
 const RISK_WINDOWS = [30, 60, 90] as const;
@@ -87,17 +87,15 @@ export async function getGrowthDashboardData() {
   }, 0);
   const remainingContractValue = activeContractValue - realizedToDate;
   const pipelineContractValue = pipelineDeals.reduce((sum, d) => sum + totalContractValue(d), 0);
-  // A churned deal contributes its establishment fee plus whatever MRR it
-  // actually paid before churning (uncapped by bindingMonths - billing rolls
-  // on until terminated) - its non-churned contract value is already
-  // excluded from activeContractValue/pipelineContractValue above, so this
-  // is the only place that revenue is counted. This must match the main
-  // dashboard's soldValue (src/lib/dashboard-data.ts) so the two totals agree.
-  const establishmentTotal = soldDeals.reduce(
-    (sum, d) => sum + (d.establishmentFee ?? 0) + (d.churnedAt ? churnedRealizedContractValue(d) : 0),
-    0
-  );
-  const totalBookedValue = activeContractValue + pipelineContractValue + establishmentTotal;
+  const establishmentTotal = soldDeals.reduce((sum, d) => sum + (d.establishmentFee ?? 0), 0);
+  // Actual realized revenue across every sold deal (active, pipeline, or
+  // churned) - months actually billed times the monthly price, uncapped by
+  // bindingMonths since billing rolls on past binding until terminated. This
+  // is what "Samlet booket værdi" is built from below, and must match the
+  // main dashboard's soldValue (src/lib/dashboard-data.ts) exactly so the two
+  // totals always agree.
+  const realizedContractTotal = soldDeals.reduce((sum, d) => sum + realizedContractValue(d, now), 0);
+  const totalBookedValue = establishmentTotal + realizedContractTotal;
 
   const billableCustomers = [...activeDeals, ...pipelineDeals];
   const avgBindingMonths =
@@ -173,6 +171,7 @@ export async function getGrowthDashboardData() {
     remainingContractValue,
     pipelineContractValue,
     establishmentTotal,
+    realizedContractTotal,
     totalBookedValue,
     avgBindingMonths,
     avgContractValue,
