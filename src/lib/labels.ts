@@ -1,3 +1,5 @@
+import { differenceInCalendarMonths } from "date-fns";
+
 export const stageOrder = [
   "LEAD",
   "CONTACTED",
@@ -76,6 +78,26 @@ export function dealName(deal: { companyName: string; displayName?: string | nul
 /** saleAmount is the monthly recurring fee; the contract's total value over its binding period is that times bindingMonths. */
 export function totalContractValue(deal: { saleAmount: number | null; bindingMonths: number | null }): number {
   return (deal.saleAmount ?? 0) * (deal.bindingMonths ?? 1);
+}
+
+/**
+ * How much of a churned deal's monthly value was actually realized before it
+ * churned - counted from when billing started to when the customer churned.
+ * Deliberately uncapped by the binding period: billing rolls on past binding
+ * until the contract is actually terminated, so a churn after the binding
+ * period still represents real months of paid revenue that a binding-period
+ * contract value alone wouldn't capture.
+ */
+export function churnedRealizedContractValue(deal: {
+  saleAmount: number | null;
+  billingStartDate: Date | null;
+  liveAt: Date | null;
+  churnedAt: Date | null;
+}): number {
+  const start = deal.billingStartDate ?? deal.liveAt;
+  if (!start || !deal.churnedAt || !deal.saleAmount) return 0;
+  const months = Math.max(0, differenceInCalendarMonths(deal.churnedAt, start));
+  return deal.saleAmount * months;
 }
 
 export function formatDKK(amount: number | null | undefined): string {

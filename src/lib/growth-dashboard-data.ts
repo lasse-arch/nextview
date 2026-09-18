@@ -9,7 +9,7 @@ import {
   format,
 } from "date-fns";
 import { da } from "date-fns/locale";
-import { totalContractValue } from "@/lib/labels";
+import { totalContractValue, churnedRealizedContractValue } from "@/lib/labels";
 
 const PIPELINE_STAGES = ["CONTRACT_SIGNED", "FILMED"] as const;
 const RISK_WINDOWS = [30, 60, 90] as const;
@@ -87,7 +87,16 @@ export async function getGrowthDashboardData() {
   }, 0);
   const remainingContractValue = activeContractValue - realizedToDate;
   const pipelineContractValue = pipelineDeals.reduce((sum, d) => sum + totalContractValue(d), 0);
-  const establishmentTotal = soldDeals.reduce((sum, d) => sum + (d.establishmentFee ?? 0), 0);
+  // A churned deal contributes its establishment fee plus whatever MRR it
+  // actually paid before churning (uncapped by bindingMonths - billing rolls
+  // on until terminated) - its non-churned contract value is already
+  // excluded from activeContractValue/pipelineContractValue above, so this
+  // is the only place that revenue is counted. This must match the main
+  // dashboard's soldValue (src/lib/dashboard-data.ts) so the two totals agree.
+  const establishmentTotal = soldDeals.reduce(
+    (sum, d) => sum + (d.establishmentFee ?? 0) + (d.churnedAt ? churnedRealizedContractValue(d) : 0),
+    0
+  );
   const totalBookedValue = activeContractValue + pipelineContractValue + establishmentTotal;
 
   const billableCustomers = [...activeDeals, ...pipelineDeals];

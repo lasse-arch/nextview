@@ -55,8 +55,9 @@ export function SoldTotalReportButton({ total, breakdown }: { total: number; bre
               <ul className="ml-4 list-disc space-y-1">
                 <li>Normal deal: (månedlig pris × bindingsperiode i måneder) + etableringspris.</li>
                 <li>
-                  Opsagt/churned deal: kun etableringsprisen tælles med (den er allerede betalt) - den fremtidige MRR
-                  regnes ikke med, da kunden ikke længere betaler.
+                  Opsagt/churned deal: etableringspris + de måneder kunden faktisk betalte, fra live-dato til
+                  opsigelsesdato (ikke begrænset af bindingsperioden, da fakturering fortsætter indtil kontrakten
+                  opsiges) - ingen fremtidig MRR efter opsigelsen, da den aldrig blev betalt.
                 </li>
               </ul>
               <p>

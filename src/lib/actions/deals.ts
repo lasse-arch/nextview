@@ -212,7 +212,16 @@ async function updateDealInner(dealId: string, formData: FormData, user: Awaited
     stageDateUpdates.contractSignedAt = new Date();
   }
   if (stage === "FILMED" && !existing.filmedAt) stageDateUpdates.filmedAt = new Date();
-  if (stage === "LIVE" && !existing.billingStartDate && liveAt) stageDateUpdates.billingStartDate = liveAt;
+  // Fakturering skal altid regnes fra live-/afleveringsdatoen, ikke en
+  // tidligere fastfrosset værdi - resync hver gang dealen gemmes mens den
+  // er Live, så en senere rettelse af Live-dato ikke efterlader den skæv.
+  if (stage === "LIVE" && liveAt) stageDateUpdates.billingStartDate = liveAt;
+  // "Underskrevet" er i praksis samme begivenhed som salget - når en admin
+  // retter salgsdatoen manuelt, skal den underskrevne dato følge med, så de
+  // to ikke kan drive fra hinanden (fx efter en forkert automatisk dato).
+  if (canEditContractFields && formData.has("soldAt") && soldAt) {
+    stageDateUpdates.contractSignedAt = soldAt;
+  }
 
   // A suggestion picked from the address autocomplete comes with fresh coordinates to store directly.
   // Otherwise, if the address text changed, clear any stale coordinates so the map re-geocodes it.
