@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { SidebarNav, type SidebarNavItem } from "./sidebar-nav";
@@ -34,11 +35,8 @@ export function MobileNav({
   return (
     <div className="md:hidden">
       <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-3">
-        <Link href="/" className="flex items-center gap-2.5">
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-sm font-bold text-white">
-            N
-          </span>
-          <span className="text-[15px] font-semibold tracking-tight text-slate-900">Nextview360</span>
+        <Link href="/" className="flex items-center">
+          <Image src="/logo.png" alt="Nextview360" width={942} height={219} className="h-6 w-auto" priority />
         </Link>
         <button
           type="button"
@@ -55,11 +53,8 @@ export function MobileNav({
           <div className="absolute inset-0 bg-black/30" onClick={() => setOpen(false)} />
           <div className="relative flex h-full w-72 max-w-[80vw] flex-col overflow-y-auto bg-slate-50 p-3 shadow-xl">
             <div className="flex items-center justify-between px-2.5 pb-5 pt-2">
-              <Link href="/" onClick={() => setOpen(false)} className="flex items-center gap-2.5">
-                <span className="flex h-7.5 w-7.5 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-sm font-bold text-white">
-                  N
-                </span>
-                <span className="text-[15px] font-semibold tracking-tight text-slate-900">Nextview360</span>
+              <Link href="/" onClick={() => setOpen(false)} className="flex items-center">
+                <Image src="/logo.png" alt="Nextview360" width={942} height={219} className="h-6 w-auto" priority />
               </Link>
               <button
                 type="button"

@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
@@ -46,11 +47,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <ToastProvider>
       <div className="flex min-h-screen" data-presentation={presenting ? "true" : "false"}>
         <aside className="hidden w-60 shrink-0 flex-col border-r border-slate-200 bg-slate-50 p-3 md:flex">
-          <Link href="/" className="flex items-center gap-2.5 px-2.5 pb-5 pt-2">
-            <span className="flex h-7.5 w-7.5 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-sm font-bold text-white">
-              N
-            </span>
-            <span className="text-[15px] font-semibold tracking-tight text-slate-900">Nextview360</span>
+          <Link href="/" className="flex items-center px-2.5 pb-6 pt-3">
+            <Image src="/logo.png" alt="Nextview360" width={942} height={219} className="h-6 w-auto" priority />
           </Link>
 
           <SidebarNav items={navItems} />
