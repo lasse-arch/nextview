@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { getGrowthDashboardData } from "@/lib/growth-dashboard-data";
 import { formatDKK } from "@/lib/labels";
+import { NewCustomersChart } from "./new-customers-chart";
 
 function StatTile({ label, value, sub, money }: { label: string; value: string; sub?: string; money?: boolean }) {
   return (
@@ -30,7 +31,6 @@ export default async function GrowthDashboardPage() {
   if (user.role !== "ADMIN") redirect("/");
 
   const d = await getGrowthDashboardData();
-  const monthlyMax = Math.max(1, ...d.monthlyNew.map((m) => m.count));
   const riskLabelFor = (days: number) => (days === 30 ? "< 30 dage" : days === 60 ? "< 60 dage" : "< 90 dage");
 
   return (
@@ -105,41 +105,7 @@ export default async function GrowthDashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-2">
-          <h2 className="text-sm font-semibold text-slate-900">Nye kunder pr. måned (12 mdr)</h2>
-          <div className="mt-4 flex h-40 items-end gap-1.5">
-            {d.monthlyNew.map((m) => (
-              <div key={m.label} className="flex flex-1 flex-col items-center gap-1" title={`${m.count} nye · ${formatDKK(m.newMRR)} ny MRR`}>
-                <span className="text-[10px] font-medium text-slate-600">{m.count}</span>
-                <div className="flex h-28 w-full items-end">
-                  <div
-                    className="w-full rounded-t-md bg-blue-600"
-                    style={{ height: `${Math.max(m.count > 0 ? 4 : 0, (m.count / monthlyMax) * 100)}%` }}
-                  />
-                </div>
-                <span className="text-[10px] text-slate-400 capitalize">{m.label.split(" ")[0]}</span>
-              </div>
-            ))}
-          </div>
-          <table className="mt-4 w-full text-xs">
-            <thead className="text-left text-slate-500">
-              <tr>
-                <th className="py-1 font-medium">Måned</th>
-                <th className="py-1 text-right font-medium">Nye</th>
-                <th className="py-1 text-right font-medium">Ny MRR</th>
-              </tr>
-            </thead>
-            <tbody>
-              {d.monthlyNew.map((m) => (
-                <tr key={m.label} className="border-t border-slate-100">
-                  <td className="py-1 capitalize text-slate-700">{m.label}</td>
-                  <td className="py-1 text-right text-slate-600">{m.count}</td>
-                  <td className="money py-1 text-right text-slate-600">{formatDKK(m.newMRR)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <NewCustomersChart bySignedDate={d.monthlyNewBySignedDate} byLiveDate={d.monthlyNewByLiveDate} />
 
         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <h2 className="text-sm font-semibold text-slate-900">Service mix</h2>

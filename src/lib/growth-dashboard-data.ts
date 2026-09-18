@@ -116,18 +116,33 @@ export async function getGrowthDashboardData() {
   const maxMonthlyPrice = activeDeals.reduce((max, d) => Math.max(max, monthlyRate(d)), 0);
   const concentration = activeMRR > 0 ? (maxMonthlyPrice / activeMRR) * 100 : 0;
 
-  const monthlyNew = [];
-  const thisMonthStart = startOfMonth(now);
-  for (let i = 11; i >= 0; i--) {
-    const m = subMonths(thisMonthStart, i);
-    const mEnd = endOfMonth(m);
-    const newDeals = deals.filter((d) => d.soldAt && isWithinInterval(d.soldAt, { start: m, end: mEnd }));
-    monthlyNew.push({
-      label: format(m, "MMM yyyy", { locale: da }),
-      count: newDeals.length,
-      newMRR: newDeals.reduce((sum, d) => sum + monthlyRate(d), 0),
-    });
+  /**
+   * "Ny kunde" can mean two different moments - when the contract was signed
+   * (soldAt, same date as "Underskrevet" now that the two are kept in sync -
+   * see src/lib/actions/deals.ts) or when the customer actually went live/was
+   * delivered (liveAt). Both are tracked in parallel so the page can offer a
+   * toggle rather than picking one.
+   */
+  function monthlySeries(pickDate: (d: (typeof deals)[number]) => Date | null) {
+    const thisMonthStart = startOfMonth(now);
+    const series = [];
+    for (let i = 11; i >= 0; i--) {
+      const m = subMonths(thisMonthStart, i);
+      const mEnd = endOfMonth(m);
+      const newDeals = deals.filter((d) => {
+        const date = pickDate(d);
+        return date && isWithinInterval(date, { start: m, end: mEnd });
+      });
+      series.push({
+        label: format(m, "MMM yyyy", { locale: da }),
+        count: newDeals.length,
+        newMRR: newDeals.reduce((sum, d) => sum + monthlyRate(d), 0),
+      });
+    }
+    return series;
   }
+  const monthlyNewBySignedDate = monthlySeries((d) => d.soldAt);
+  const monthlyNewByLiveDate = monthlySeries((d) => d.liveAt);
 
   const nonChurnedItems = items.filter((i) => !i.deal.churnedAt && !i.isFree && i.amount);
   const serviceMap = new Map<string, { count: number; total: number }>();
@@ -164,7 +179,8 @@ export async function getGrowthDashboardData() {
     ltv,
     maxMonthlyPrice,
     concentration,
-    monthlyNew,
+    monthlyNewBySignedDate,
+    monthlyNewByLiveDate,
     serviceMix,
   };
 }
