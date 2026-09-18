@@ -360,13 +360,13 @@ export function buildContractHtml(data: ContractHtmlData, language: ContractLang
   .section{ margin:20px 0; }
   .section-title{ font-size:17px; font-weight:700; margin:0 0 8px; color:var(--ink); }
   .section p{ margin:0 0 8px; }
-  .product-card{ border:1px solid var(--line); border-radius:12px; padding:16px 20px; margin-bottom:12px; page-break-inside:avoid; break-inside:avoid; }
+  .product-card{ border:1px solid var(--line); border-radius:12px; padding:16px 20px; margin-bottom:12px; }
   .product-name{ font-size:15.5px; font-weight:700; margin:0 0 8px; }
   .product-name .sub{ font-weight:400; color:var(--ink); font-size:13px; }
   .product-list{ margin:0 0 10px; padding-left:20px; }
   .product-list li{ margin-bottom:4px; font-size:13.5px; }
   .price-rows{ border-top:1px solid var(--line); padding-top:8px; }
-  .overview{ background:#F8FAFC; border:1px solid var(--line); border-radius:12px; padding:16px 20px; margin:14px 0; page-break-inside:avoid; break-inside:avoid; }
+  .overview{ background:#F8FAFC; border:1px solid var(--line); border-radius:12px; padding:16px 20px; margin:14px 0; }
   .overview-row{ display:flex; justify-content:space-between; padding:4px 0; font-size:14px; }
   .overview-row:not(:last-child){ border-bottom:1px solid #ECEFF3; }
   .overview-row .field-label{ font-weight:600; color:var(--ink); }
