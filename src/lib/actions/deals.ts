@@ -106,6 +106,23 @@ export async function duplicateDeal(dealId: string) {
 export async function updateDeal(dealId: string, formData: FormData) {
   const user = await requireUser();
 
+  try {
+    await updateDealInner(dealId, formData, user);
+  } catch (err) {
+    // redirect() throws internally to signal Next.js - let that pass through
+    // untouched. Any real validation/DB error instead redirects back to the
+    // deal with the message shown inline, rather than crashing the whole
+    // page to Next's generic error boundary (which redacts the message in
+    // production anyway, leaving no clue what went wrong or how to recover).
+    if (err && typeof err === "object" && "digest" in err && typeof err.digest === "string" && err.digest.startsWith("NEXT_REDIRECT")) {
+      throw err;
+    }
+    const message = err instanceof Error ? err.message : "Der opstod en uventet fejl ved gem.";
+    redirect(`/deals/${dealId}?saveError=${encodeURIComponent(message)}`);
+  }
+}
+
+async function updateDealInner(dealId: string, formData: FormData, user: Awaited<ReturnType<typeof requireUser>>) {
   const companyName = String(formData.get("companyName") || "").trim();
   const displayName = String(formData.get("displayName") || "").trim() || null;
   const cvrNumber = String(formData.get("cvrNumber") || "").trim() || null;

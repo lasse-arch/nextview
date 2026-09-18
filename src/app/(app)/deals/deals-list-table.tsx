@@ -16,7 +16,7 @@ import {
 import { stageLabels, importTypeLabels, formatDKK, formatDate, dealName, totalContractValue } from "@/lib/labels";
 import { useToast } from "@/components/toast";
 
-const PRODUCTS = ["Visitkort", "Drone-optagelse", "Matterport", "Hjemmeside"];
+const PRODUCTS = ["Visitkort", "Drone-optagelse", "Nextview360 Tour", "Hjemmeside"];
 
 const STRIPPABLE_FIELD_LABELS: Record<StrippableField, string> = {
   address: "Adresse",

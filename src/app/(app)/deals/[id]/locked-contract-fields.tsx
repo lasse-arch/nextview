@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { formatDKK, formatDate } from "@/lib/labels";
 
-const SOLD_PRODUCT_OPTIONS = ["Visitkort", "Drone-optagelse", "Matterport", "Hjemmeside"];
+const SOLD_PRODUCT_OPTIONS = ["Visitkort", "Drone-optagelse", "Nextview360 Tour", "Hjemmeside"];
 
 function toDateInputValue(date: Date | null): string {
   if (!date) return "";

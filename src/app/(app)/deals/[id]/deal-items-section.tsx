@@ -14,7 +14,7 @@ type DealItem = {
   url: string | null;
 };
 
-const PRODUCT_SUGGESTIONS = ["Visitkort", "Drone-optagelse", "Matterport", "Hjemmeside"];
+const PRODUCT_SUGGESTIONS = ["Visitkort", "Drone-optagelse", "Nextview360 Tour", "Hjemmeside"];
 
 /** Products where we deliver a link the customer/team should be able to open directly. */
 function needsLink(productType: string): boolean {

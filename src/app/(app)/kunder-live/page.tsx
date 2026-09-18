@@ -28,7 +28,7 @@ export default async function LiveCustomersPage({
       <div>
         <h1 className="text-2xl font-semibold text-slate-900">Live kunder</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Til fremvisning i møder — ingen salgstal her. Klik på et produkt for at åbne det (fx Matterport-tour eller
+          Til fremvisning i møder — ingen salgstal her. Klik på et produkt for at åbne det (fx Nextview360 Tour eller
           hjemmeside).
         </p>
       </div>

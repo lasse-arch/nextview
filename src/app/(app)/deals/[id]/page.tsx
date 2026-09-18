@@ -41,10 +41,10 @@ export default async function DealDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ dup?: string; calendarWarning?: string }>;
+  searchParams: Promise<{ dup?: string; calendarWarning?: string; saveError?: string }>;
 }) {
   const { id } = await params;
-  const { dup, calendarWarning } = await searchParams;
+  const { dup, calendarWarning, saveError } = await searchParams;
 
   const [deal, users, currentUser, duplicateDeal, docuSealEnabled] = await Promise.all([
     prisma.deal.findUnique({
@@ -102,6 +102,12 @@ export default async function DealDetailPage({
           <DealDangerActions dealId={deal.id} stage={deal.stage} isAdmin={currentUser?.role === "ADMIN"} />
         </div>
       </div>
+
+      {saveError && (
+        <div className="mt-4 rounded-md bg-red-50 px-4 py-3 text-sm text-red-800">
+          Kunne ikke gemme: {saveError}
+        </div>
+      )}
 
       {duplicateDeal && (
         <div className="mt-4 rounded-md bg-amber-50 px-4 py-3 text-sm text-amber-800">
