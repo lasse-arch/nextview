@@ -1,24 +1,26 @@
-import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { logout } from "@/lib/actions/auth";
 import { ToastProvider } from "@/components/toast";
 import { SettingsMenu } from "./settings-menu";
+import { SidebarNav, type SidebarNavItem } from "./sidebar-nav";
 import { PresentationModeToggle } from "./presentation-mode-toggle";
 import { isPresentationMode } from "@/lib/presentation-mode";
+import { IconHome, IconDeals, IconUsers, IconPercent, IconGrowth } from "./nav-icons";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const [user, presenting] = await Promise.all([getCurrentUser(), isPresentationMode()]);
   if (!user) redirect("/login");
 
-  const navItems = [
-    { href: "/deals", label: "Deals" },
-    { href: "/kunder-live", label: "Live kunder" },
-    { href: "/commission", label: "Provision" },
+  const navItems: SidebarNavItem[] = [
+    { href: "/", label: "Oversigt", icon: <IconHome /> },
+    { href: "/deals", label: "Deals", icon: <IconDeals /> },
+    { href: "/kunder-live", label: "Live kunder", icon: <IconUsers /> },
+    { href: "/commission", label: "Provision", icon: <IconPercent /> },
   ];
   if (user.role === "ADMIN") {
-    navItems.push({ href: "/vaekst", label: "Vækst" });
+    navItems.push({ href: "/vaekst", label: "Vækst", icon: <IconGrowth /> });
   }
 
   const settingsItems = [
@@ -41,50 +43,53 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <ToastProvider>
-      <div className="flex min-h-screen flex-col" data-presentation={presenting ? "true" : "false"}>
-        <header className="border-b border-slate-200 bg-white shadow-sm">
-          <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-            <div className="flex items-center gap-8">
-              <Link href="/" className="flex items-center">
-                <Image src="/logo.png" alt="Nextview360" width={942} height={219} className="h-7 w-auto" priority />
-              </Link>
-              <nav className="flex items-center gap-5 text-sm font-medium text-slate-500">
-                {navItems.map((item) => (
-                  <Link key={item.href} href={item.href} className="transition-colors hover:text-slate-900">
-                    {item.label}
-                  </Link>
-                ))}
-                <SettingsMenu items={settingsItems} />
-              </nav>
-            </div>
-            <div className="flex items-center gap-4">
-              <Link
-                href="/deals/new"
-                className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700"
-              >
-                + Ny lead
-              </Link>
-              <PresentationModeToggle enabled={presenting} />
-              <div className="flex items-center gap-3 text-sm text-slate-600">
-                {user.avatarUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={user.avatarUrl} alt={user.name} className="h-7 w-7 rounded-full object-cover" />
-                ) : (
-                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-xs font-semibold text-white">
-                    {initials}
-                  </span>
-                )}
-                <span>{user.name}</span>
-                <form action={logout}>
-                  <button type="submit" className="text-slate-400 transition-colors hover:text-slate-900">
-                    Log ud
-                  </button>
-                </form>
-              </div>
-            </div>
+      <div className="flex min-h-screen" data-presentation={presenting ? "true" : "false"}>
+        <aside className="flex w-60 shrink-0 flex-col border-r border-slate-200 bg-slate-50 p-3">
+          <Link href="/" className="flex items-center gap-2.5 px-2.5 pb-5 pt-2">
+            <span className="flex h-7.5 w-7.5 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-sm font-bold text-white">
+              N
+            </span>
+            <span className="text-[15px] font-semibold tracking-tight text-slate-900">Nextview360</span>
+          </Link>
+
+          <SidebarNav items={navItems} />
+
+          <div className="my-2.5 mx-1.5 h-px bg-slate-200" />
+
+          <SettingsMenu items={settingsItems} />
+
+          <div className="flex-1" />
+
+          <div className="flex items-center gap-2.5 border-t border-slate-200 px-2.5 pt-3">
+            {user.avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={user.avatarUrl} alt={user.name} className="h-7 w-7 shrink-0 rounded-full object-cover" />
+            ) : (
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-900 text-[11px] font-semibold text-white">
+                {initials}
+              </span>
+            )}
+            <span className="flex-1 truncate text-[13px] font-medium text-slate-900">{user.name}</span>
+            <form action={logout}>
+              <button type="submit" className="text-[12px] text-slate-400 transition-colors hover:text-slate-900">
+                Log ud
+              </button>
+            </form>
           </div>
-        </header>
-        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6">{children}</main>
+        </aside>
+
+        <div className="flex min-w-0 flex-1 flex-col">
+          <div className="flex items-center justify-end gap-2.5 px-10 pt-6">
+            <PresentationModeToggle enabled={presenting} />
+            <Link
+              href="/deals/new"
+              className="rounded-lg bg-slate-900 px-4 py-2 text-[13px] font-semibold text-white shadow-sm transition-colors hover:bg-slate-800"
+            >
+              + Ny lead
+            </Link>
+          </div>
+          <main className="flex-1 px-10 pb-10 pt-4">{children}</main>
+        </div>
       </div>
     </ToastProvider>
   );
