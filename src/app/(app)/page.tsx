@@ -153,7 +153,7 @@ export default async function DashboardPage() {
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className={`rounded-xl border border-slate-200 bg-white p-5 shadow-sm ${isAdmin ? "" : "lg:col-span-3"}`}>
-          <h2 className="text-sm font-semibold text-slate-900">Salg, seneste 6 måneder</h2>
+          <h2 className="text-sm font-semibold text-slate-900">Salg, seneste 3 måneder</h2>
           <div className="mt-4 flex h-32 items-end gap-3">
             {data.monthly.map((m) => (
               <div key={m.label} className="flex flex-1 flex-col items-center gap-1" title={formatDKK(m.value)}>
@@ -173,7 +173,8 @@ export default async function DashboardPage() {
         {isAdmin && (
           <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-2">
             <h2 className="text-sm font-semibold text-slate-900">Sælgere</h2>
-            <table className="mt-3 w-full text-sm">
+            <div className="overflow-x-auto">
+            <table className="mt-3 w-full min-w-[520px] text-sm">
               <thead className="text-left text-xs text-slate-500">
                 <tr>
                   <th className="py-1.5 font-medium">Sælger</th>
@@ -209,6 +210,7 @@ export default async function DashboardPage() {
                 )}
               </tbody>
             </table>
+            </div>
           </div>
         )}
       </div>

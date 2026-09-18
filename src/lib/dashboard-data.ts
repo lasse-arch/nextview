@@ -98,7 +98,7 @@ export async function getDashboardData(ownerId?: string) {
   });
 
   const monthly: MonthBar[] = [];
-  for (let i = 5; i >= 0; i--) {
+  for (let i = 2; i >= 0; i--) {
     const m = subMonths(monthStart, i);
     const mEnd = endOfMonth(m);
     const value = deals
