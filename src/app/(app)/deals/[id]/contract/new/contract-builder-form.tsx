@@ -176,7 +176,8 @@ export function ContractBuilderForm({
           <textarea
             value={products.additionalTerms}
             onChange={(e) => setProducts((p) => ({ ...p, additionalTerms: e.target.value }))}
-            rows={2}
+            rows={6}
+            placeholder="Fritekst - kan sagtens være 100-250 ord, boksen på selve kontrakten vokser automatisk med teksten."
             className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
           />
         </div>

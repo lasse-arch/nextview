@@ -379,7 +379,6 @@ export function buildContractHtml(data: ContractHtmlData, language: ContractLang
   .sig-box{ border-bottom:1px solid var(--ink); height:56px; margin-bottom:10px; display:flex; align-items:flex-end; justify-content:center; font-size:13px; color:var(--ink); }
   .sig-meta{ font-size:12.5px; color:var(--ink); line-height:1.6; }
   .sig-meta b{ color:var(--ink); font-weight:600; }
-  @page{ size:A4; margin:0; }
 </style>
 </head>
 <body>
