@@ -25,7 +25,7 @@ export default async function ProfilePage() {
         <form action={updateOwnContactInfo} className="mt-4 space-y-3">
           <div className="flex items-end gap-2">
             <div className="flex-1">
-              <label className="block text-xs font-medium text-slate-500">Fornavn</label>
+              <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Fornavn</label>
               <input
                 name="name"
                 required
@@ -35,7 +35,7 @@ export default async function ProfilePage() {
               />
             </div>
             <div className="flex-1">
-              <label className="block text-xs font-medium text-slate-500">Efternavn</label>
+              <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Efternavn</label>
               <input
                 name="lastName"
                 defaultValue={user.lastName ?? ""}
@@ -46,7 +46,7 @@ export default async function ProfilePage() {
           </div>
           <div className="flex items-end gap-2">
             <div className="flex-1">
-              <label className="block text-xs font-medium text-slate-500">Telefon</label>
+              <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Telefon</label>
               <input
                 name="phone"
                 defaultValue={user.phone ?? ""}

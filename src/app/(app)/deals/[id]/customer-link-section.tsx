@@ -58,7 +58,7 @@ export function CustomerLinkSection({
       ) : (
         <form action={linkWithId} className="mt-4 flex flex-wrap items-end gap-2">
           <div className="flex-1">
-            <label className="block text-xs font-medium text-slate-500">
+            <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">
               Denne kunde er selv en afdeling under…
             </label>
             <select
@@ -90,7 +90,7 @@ export function CustomerLinkSection({
           action={linkBranchesToDeal.bind(null, dealId)}
           className="mt-4 border-t border-slate-100 pt-4"
         >
-          <label className="block text-xs font-medium text-slate-500">
+          <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">
             Tilføj flere afdelinger (vælg flere med Ctrl/Cmd)
           </label>
           <select

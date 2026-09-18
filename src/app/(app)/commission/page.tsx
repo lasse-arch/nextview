@@ -40,7 +40,7 @@ export default async function CommissionPage() {
       <div className="mt-6 overflow-hidden rounded-lg border border-slate-200 bg-white">
         <div className="overflow-x-auto">
         <table className="w-full min-w-[640px] text-sm">
-          <thead className="bg-slate-50 text-left text-slate-500">
+          <thead className="bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
             <tr>
               <th className="px-4 py-2 font-medium">Deal</th>
               {isAdmin && <th className="px-4 py-2 font-medium">Sælger</th>}
@@ -110,7 +110,7 @@ export default async function CommissionPage() {
 function StatCard({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      <p className="text-xs font-medium text-slate-500">{label}</p>
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</p>
       <p className={`money mt-1 text-xl font-semibold ${highlight ? "text-red-600" : "text-slate-900"}`}>{value}</p>
     </div>
   );

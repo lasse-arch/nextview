@@ -7,7 +7,7 @@ import { NewCustomersChart } from "./new-customers-chart";
 function StatTile({ label, value, sub, money }: { label: string; value: string; sub?: string; money?: boolean }) {
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="text-xs font-medium text-slate-500">{label}</div>
+      <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</div>
       <div className={`mt-1 text-xl font-semibold text-slate-900 ${money ? "money" : ""}`}>{value}</div>
       {sub && <div className="mt-0.5 text-xs text-slate-400">{sub}</div>}
     </div>
@@ -116,7 +116,7 @@ export default async function GrowthDashboardPage() {
           <h2 className="text-sm font-semibold text-slate-900">Service mix</h2>
           <p className="mt-1 text-xs text-slate-500">Ydelser på tværs af aktive/ikke-opsagte kunder (ekskl. gratis).</p>
           <table className="mt-3 w-full text-sm">
-            <thead className="text-left text-xs text-slate-500">
+            <thead className="text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
               <tr>
                 <th className="py-1 font-medium">Service</th>
                 <th className="py-1 text-right font-medium">Antal</th>

@@ -27,7 +27,7 @@ export function StatTile({
       onMouseEnter={() => hasTooltip && setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      <div className="text-xs font-medium text-slate-500">{label}</div>
+      <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</div>
       <div className={`mt-1 text-2xl font-semibold ${valueColor} ${money ? "money" : ""}`}>{value}</div>
       {sub && <div className="mt-0.5 text-xs text-slate-400">{sub}</div>}
       {hasTooltip && hovered && (

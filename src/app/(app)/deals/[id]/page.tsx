@@ -139,7 +139,7 @@ export default async function DealDetailPage({
             <form action={updateDealWithId} className="mt-4 space-y-4">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="block text-xs font-medium text-slate-500">Firmanavn (CVR)</label>
+                  <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Firmanavn (CVR)</label>
                   <input
                     name="companyName"
                     defaultValue={deal.companyName}
@@ -148,11 +148,11 @@ export default async function DealDetailPage({
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-500">Kaldenavn (valgfri)</label>
+                  <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Kaldenavn (valgfri)</label>
                   <DisplayNameInput defaultValue={deal.displayName ?? ""} />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-500">CVR-nummer</label>
+                  <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">CVR-nummer</label>
                   <input
                     name="cvrNumber"
                     defaultValue={deal.cvrNumber ?? ""}
@@ -160,11 +160,11 @@ export default async function DealDetailPage({
                   />
                 </div>
                 <div className="col-span-2">
-                  <label className="block text-xs font-medium text-slate-500">Adresse</label>
+                  <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Adresse</label>
                   <AddressAutocomplete defaultValue={deal.address ?? ""} />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-500">Kontaktperson</label>
+                  <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Kontaktperson</label>
                   <input
                     name="contactName"
                     defaultValue={deal.contactName ?? ""}
@@ -172,7 +172,7 @@ export default async function DealDetailPage({
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-500">E-mail</label>
+                  <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">E-mail</label>
                   <input
                     name="contactEmail"
                     type="email"
@@ -181,7 +181,7 @@ export default async function DealDetailPage({
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-500">Telefon</label>
+                  <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Telefon</label>
                   <input
                     name="contactPhone"
                     defaultValue={deal.contactPhone ?? ""}
@@ -189,7 +189,7 @@ export default async function DealDetailPage({
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-500">Faktura-e-mail (valgfri)</label>
+                  <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Faktura-e-mail (valgfri)</label>
                   <input
                     name="invoiceEmail"
                     type="email"
@@ -199,7 +199,7 @@ export default async function DealDetailPage({
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-500">Ejer af deal</label>
+                  <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Ejer af deal</label>
                   <select
                     name="ownerId"
                     defaultValue={deal.ownerId}
@@ -258,7 +258,7 @@ export default async function DealDetailPage({
             <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
               <form action={addNoteWithId} className="rounded-md border border-slate-200 p-3">
                 <input type="hidden" name="kind" value="MANUAL" />
-                <label className="block text-xs font-medium text-slate-500">Ny note</label>
+                <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Ny note</label>
                 <textarea
                   name="body"
                   rows={3}
@@ -276,7 +276,7 @@ export default async function DealDetailPage({
 
               <form action={addNoteWithId} className="rounded-md border border-slate-200 bg-indigo-50/40 p-3">
                 <input type="hidden" name="kind" value="AI_MEETING" />
-                <label className="block text-xs font-medium text-slate-500">
+                <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                   AI-mødenote (indsæt fra AI Pocket)
                 </label>
                 <textarea

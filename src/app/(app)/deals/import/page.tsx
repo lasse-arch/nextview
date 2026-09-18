@@ -41,7 +41,7 @@ export default function ImportPage() {
         </p>
         <form action={importFromGoogleDocs} className="mt-4 space-y-3">
           <div>
-            <label className="block text-xs font-medium text-slate-500">Publiceret URL (valgfri)</label>
+            <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Publiceret URL (valgfri)</label>
             <input
               name="sourceUrl"
               type="url"
@@ -51,7 +51,7 @@ export default function ImportPage() {
           </div>
           <div className="text-center text-xs text-slate-400">— eller —</div>
           <div>
-            <label className="block text-xs font-medium text-slate-500">Indsæt tabel som tekst (CSV/tab-separeret)</label>
+            <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Indsæt tabel som tekst (CSV/tab-separeret)</label>
             <textarea
               name="pastedText"
               rows={6}

@@ -40,7 +40,7 @@ function TextField({
 }) {
   return (
     <div>
-      <label className="block text-xs font-medium text-slate-500">{label}</label>
+      <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</label>
       <input
         type={type}
         value={value}
@@ -64,7 +64,7 @@ function NumberField({
 }) {
   return (
     <div>
-      <label className="block text-xs font-medium text-slate-500">{label}</label>
+      <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</label>
       <input
         type="number"
         min={min}
@@ -217,7 +217,7 @@ export function StandaloneContractForm() {
           min={1}
         />
         <div className="col-span-2">
-          <label className="block text-xs font-medium text-slate-500">Yderligere betingelser (fritekst, valgfri)</label>
+          <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Yderligere betingelser (fritekst, valgfri)</label>
           <textarea
             value={products.additionalTerms}
             onChange={(e) => setProducts((p) => ({ ...p, additionalTerms: e.target.value }))}
@@ -227,7 +227,7 @@ export function StandaloneContractForm() {
           />
         </div>
         <div className="col-span-2">
-          <label className="block text-xs font-medium text-slate-500">Kontraktsprog</label>
+          <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Kontraktsprog</label>
           <div className="mt-1 flex rounded-md border border-slate-300 text-sm">
             <button
               type="button"

@@ -25,12 +25,12 @@ export default async function UsersPage() {
               <form action={updateUserWithId} className="mt-4">
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                   <div className="col-span-2">
-                    <label className="block text-xs font-medium text-slate-500">Navn</label>
+                    <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Navn</label>
                     <input name="name" defaultValue={u.name} className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm" />
                     <p className="mt-1 text-xs text-slate-400">{u.email}</p>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-slate-500">Rolle</label>
+                    <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Rolle</label>
                     <select name="role" defaultValue={u.role} className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm">
                       <option value="SALES">Sælger</option>
                       <option value="ADMIN">Admin</option>
@@ -43,7 +43,7 @@ export default async function UsersPage() {
                     </label>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-slate-500">Provisionssats (%)</label>
+                    <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Provisionssats (%)</label>
                     <input
                       type="number"
                       step="0.1"
@@ -53,7 +53,7 @@ export default async function UsersPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-slate-500">Udbetalingsfrekvens</label>
+                    <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Udbetalingsfrekvens</label>
                     <select
                       name="payoutFrequency"
                       defaultValue={u.payoutFrequency}
@@ -67,7 +67,7 @@ export default async function UsersPage() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-slate-500">Ny adgangskode</label>
+                    <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Ny adgangskode</label>
                     <input
                       type="password"
                       name="newPassword"

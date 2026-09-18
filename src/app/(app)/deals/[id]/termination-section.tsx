@@ -110,7 +110,7 @@ export function TerminationSection({
         <form action={terminateWithId} className="mt-4 space-y-3">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label className="block text-xs font-medium text-slate-500">Opsigelsesdato *</label>
+              <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Opsigelsesdato *</label>
               <input
                 name="noticeDate"
                 type="date"
@@ -120,7 +120,7 @@ export function TerminationSection({
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-500">Opsigelsesvarsel (måneder) *</label>
+              <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Opsigelsesvarsel (måneder) *</label>
               <input
                 name="noticePeriodMonths"
                 type="number"

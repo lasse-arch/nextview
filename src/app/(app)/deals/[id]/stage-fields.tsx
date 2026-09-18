@@ -24,7 +24,7 @@ export function StageFields({
   return (
     <>
       <div>
-        <label className="block text-xs font-medium text-slate-500">Stadie</label>
+        <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Stadie</label>
         <select
           name="stage"
           value={stage}
@@ -41,7 +41,7 @@ export function StageFields({
 
       {showMeetingDate && (
         <div>
-          <label className="block text-xs font-medium text-slate-500">
+          <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">
             Mødedato {stage === "MEETING_BOOKED" && "*"}
           </label>
           <input

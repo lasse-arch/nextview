@@ -125,7 +125,7 @@ export function DealItemsSection({ dealId, items }: { dealId: string; items: Dea
       {adding && (
         <form action={addItemWithId} className="mt-4 grid grid-cols-2 gap-3 rounded-md border border-slate-200 p-3 sm:grid-cols-4">
           <div>
-            <label className="block text-xs font-medium text-slate-500">Sted (valgfri)</label>
+            <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Sted (valgfri)</label>
             <input
               name="location"
               placeholder="F.eks. Hovedkontor"
@@ -133,7 +133,7 @@ export function DealItemsSection({ dealId, items }: { dealId: string; items: Dea
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-500">Ydelse/produkt *</label>
+            <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Ydelse/produkt *</label>
             <input
               name="productType"
               list="product-suggestions"
@@ -150,7 +150,7 @@ export function DealItemsSection({ dealId, items }: { dealId: string; items: Dea
             </datalist>
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-500">Beløb (DKK)</label>
+            <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Beløb (DKK)</label>
             <input
               name="amount"
               type="number"
@@ -174,7 +174,7 @@ export function DealItemsSection({ dealId, items }: { dealId: string; items: Dea
           </div>
           {needsLink(productType) && (
             <div className="col-span-2 sm:col-span-4">
-              <label className="block text-xs font-medium text-slate-500">
+              <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                 Link til {productType.trim()} (så vi kan finde den igen og vise kunden)
               </label>
               <input

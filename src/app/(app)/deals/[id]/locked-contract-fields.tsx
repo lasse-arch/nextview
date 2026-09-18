@@ -33,27 +33,27 @@ export function LockedContractFields({
     return (
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
-          <label className="block text-xs font-medium text-slate-500">Solgt til (produkt/ydelse)</label>
+          <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Solgt til (produkt/ydelse)</label>
           <p className="mt-1 text-sm text-slate-700">{soldProduct || "–"}</p>
         </div>
         <div>
-          <label className="block text-xs font-medium text-slate-500">Binding (måneder)</label>
+          <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Binding (måneder)</label>
           <p className="mt-1 text-sm text-slate-700">{bindingMonths ?? "–"}</p>
         </div>
         <div>
-          <label className="block text-xs font-medium text-slate-500">Månedspris (DKK)</label>
+          <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Månedspris (DKK)</label>
           <p className="money mt-1 text-sm text-slate-700">{formatDKK(saleAmount)}</p>
         </div>
         <div>
-          <label className="block text-xs font-medium text-slate-500">Solgt dato</label>
+          <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Solgt dato</label>
           <p className="mt-1 text-sm text-slate-700">{formatDate(soldAt)}</p>
         </div>
         <div>
-          <label className="block text-xs font-medium text-slate-500">Etableringspris (DKK)</label>
+          <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Etableringspris (DKK)</label>
           <p className="money mt-1 text-sm text-slate-700">{formatDKK(establishmentFee)}</p>
         </div>
         <div>
-          <label className="block text-xs font-medium text-slate-500">Live dato (afleveret)</label>
+          <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Live dato (afleveret)</label>
           <p className="mt-1 text-sm text-slate-700">{formatDate(liveAt)}</p>
         </div>
         <p className="col-span-2 text-xs text-slate-400">
@@ -75,7 +75,7 @@ export function LockedContractFields({
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
       <div>
-        <label className="block text-xs font-medium text-slate-500">Solgt til (produkt/ydelse)</label>
+        <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Solgt til (produkt/ydelse)</label>
         <select
           name="soldProduct"
           multiple
@@ -90,7 +90,7 @@ export function LockedContractFields({
         </select>
       </div>
       <div>
-        <label className="block text-xs font-medium text-slate-500">Binding (måneder)</label>
+        <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Binding (måneder)</label>
         <input
           name="bindingMonths"
           type="number"
@@ -100,7 +100,7 @@ export function LockedContractFields({
         />
       </div>
       <div>
-        <label className="block text-xs font-medium text-slate-500">Månedspris (DKK)</label>
+        <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Månedspris (DKK)</label>
         <input
           name="saleAmount"
           type="number"
@@ -111,7 +111,7 @@ export function LockedContractFields({
         />
       </div>
       <div>
-        <label className="block text-xs font-medium text-slate-500">Solgt dato</label>
+        <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Solgt dato</label>
         <input
           name="soldAt"
           type="date"
@@ -120,7 +120,7 @@ export function LockedContractFields({
         />
       </div>
       <div>
-        <label className="block text-xs font-medium text-slate-500">Etableringspris (DKK)</label>
+        <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Etableringspris (DKK)</label>
         <input
           name="establishmentFee"
           type="number"
@@ -131,7 +131,7 @@ export function LockedContractFields({
         />
       </div>
       <div>
-        <label className="block text-xs font-medium text-slate-500">Live dato (afleveret)</label>
+        <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Live dato (afleveret)</label>
         <input
           name="liveAt"
           type="date"

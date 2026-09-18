@@ -79,7 +79,7 @@ export function NewDealForm({ users, defaultOwnerId }: { users: User[]; defaultO
       <input type="hidden" name="cvrNumber" value={cvrNumber} />
 
       <div className="relative rounded-md border border-dashed border-slate-300 bg-slate-50 p-3">
-        <label className="block text-xs font-medium text-slate-500">Hent fra CVR (valgfrit)</label>
+        <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Hent fra CVR (valgfrit)</label>
         <div className="mt-1 flex gap-2">
           <input
             value={cvrInput}

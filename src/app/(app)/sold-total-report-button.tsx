@@ -74,7 +74,7 @@ export function SoldTotalReportButton({ total, breakdown }: { total: number; bre
 
             <div className="mt-4 overflow-x-auto">
               <table className="w-full min-w-[560px] text-xs">
-                <thead className="text-left text-slate-500">
+                <thead className="text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                   <tr className="border-b border-slate-200">
                     <th className="py-1.5 font-medium">Kunde</th>
                     <th className="py-1.5 font-medium">Stadie</th>

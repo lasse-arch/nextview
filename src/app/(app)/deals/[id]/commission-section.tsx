@@ -66,7 +66,7 @@ export function CommissionSection({
       <form action={save} className="mt-3 space-y-2.5 text-sm">
         <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
           <div>
-            <label className="block text-xs font-medium text-slate-500">Sats (%)</label>
+            <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Sats (%)</label>
             <input
               name="rate"
               type="number"
@@ -77,7 +77,7 @@ export function CommissionSection({
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-500">Grundlag (DKK)</label>
+            <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Grundlag (DKK)</label>
             <input
               name="baseAmount"
               type="number"
@@ -88,7 +88,7 @@ export function CommissionSection({
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-500">Provision (DKK)</label>
+            <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Provision (DKK)</label>
             <input
               name="amount"
               type="number"
@@ -99,7 +99,7 @@ export function CommissionSection({
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-500">Udbetaling</label>
+            <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Udbetaling</label>
             <select
               name="frequency"
               defaultValue={commission.frequency}
@@ -113,7 +113,7 @@ export function CommissionSection({
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-500">Forfaldsdato</label>
+            <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Forfaldsdato</label>
             <input
               name="dueDate"
               type="date"
@@ -122,7 +122,7 @@ export function CommissionSection({
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-500">Status</label>
+            <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Status</label>
             <select
               name="status"
               value={status}
@@ -138,7 +138,7 @@ export function CommissionSection({
           </div>
           {status === "PAID" && (
             <div>
-              <label className="block text-xs font-medium text-slate-500">Udbetalt dato</label>
+              <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Udbetalt dato</label>
               <input
                 name="paidAt"
                 type="date"

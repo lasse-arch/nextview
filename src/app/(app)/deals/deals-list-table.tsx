@@ -165,7 +165,7 @@ export function DealsListTable({ deals, users }: { deals: ListDeal[]; users: { i
 
           <div className="flex items-end gap-2">
             <div>
-              <label className="block text-xs font-medium text-slate-500">Sæt salgsbeløb (DKK/måned)</label>
+              <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Sæt salgsbeløb (DKK/måned)</label>
               <input
                 type="number"
                 min="0"
@@ -189,7 +189,7 @@ export function DealsListTable({ deals, users }: { deals: ListDeal[]; users: { i
 
           <div className="flex items-end gap-2">
             <div>
-              <label className="block text-xs font-medium text-slate-500">Sæt binding (mdr)</label>
+              <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Sæt binding (mdr)</label>
               <input
                 type="number"
                 min="1"
@@ -213,7 +213,7 @@ export function DealsListTable({ deals, users }: { deals: ListDeal[]; users: { i
 
           <div className="flex items-end gap-2">
             <div>
-              <label className="block text-xs font-medium text-slate-500">Tilføj produkt</label>
+              <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Tilføj produkt</label>
               <select
                 value={productType}
                 onChange={(e) => setProductType(e.target.value)}
@@ -227,7 +227,7 @@ export function DealsListTable({ deals, users }: { deals: ListDeal[]; users: { i
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-500">Beløb</label>
+              <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Beløb</label>
               <input
                 type="number"
                 min="0"
@@ -256,7 +256,7 @@ export function DealsListTable({ deals, users }: { deals: ListDeal[]; users: { i
 
           <div className="flex items-end gap-2">
             <div>
-              <label className="block text-xs font-medium text-slate-500">Sæt ejer</label>
+              <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Sæt ejer</label>
               <select
                 value={ownerInput}
                 onChange={(e) => setOwnerInput(e.target.value)}
@@ -284,7 +284,7 @@ export function DealsListTable({ deals, users }: { deals: ListDeal[]; users: { i
 
           <div className="flex items-end gap-2">
             <div>
-              <label className="block text-xs font-medium text-slate-500">Sæt produkt(er) (erstatter)</label>
+              <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Sæt produkt(er) (erstatter)</label>
               <select
                 multiple
                 size={4}
@@ -313,7 +313,7 @@ export function DealsListTable({ deals, users }: { deals: ListDeal[]; users: { i
 
           <div className="flex items-end gap-2">
             <div>
-              <label className="block text-xs font-medium text-slate-500">Fjern links (https) fra felt</label>
+              <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Fjern links (https) fra felt</label>
               <select
                 value={stripField}
                 onChange={(e) => setStripField(e.target.value as StrippableField)}
@@ -360,7 +360,7 @@ export function DealsListTable({ deals, users }: { deals: ListDeal[]; users: { i
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
         <table className="w-full min-w-[640px] text-sm">
-          <thead className="bg-slate-50 text-left text-slate-500">
+          <thead className="bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
             <tr>
               <th className="w-8 px-4 py-2">
                 <input type="checkbox" checked={allSelected} onChange={toggleAll} />

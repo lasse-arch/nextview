@@ -179,7 +179,7 @@ export default async function DashboardPage() {
             <h2 className="text-sm font-semibold text-slate-900">Sælgere</h2>
             <div className="overflow-x-auto">
             <table className="mt-3 w-full min-w-[520px] text-sm">
-              <thead className="text-left text-xs text-slate-500">
+              <thead className="text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                 <tr>
                   <th className="py-1.5 font-medium">Sælger</th>
                   <th className="py-1.5 text-right font-medium">Live-kunder</th>

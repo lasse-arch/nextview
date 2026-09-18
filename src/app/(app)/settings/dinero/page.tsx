@@ -72,7 +72,7 @@ export default async function DineroSettingsPage() {
         <div className="mt-3 overflow-hidden rounded-md border border-slate-100">
           <div className="overflow-x-auto">
           <table className="w-full min-w-[520px] text-sm">
-            <thead className="bg-slate-50 text-left text-slate-500">
+            <thead className="bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
               <tr>
                 <th className="px-3 py-2 font-medium">Deal</th>
                 <th className="px-3 py-2 font-medium">Kvartal</th>

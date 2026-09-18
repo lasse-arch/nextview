@@ -61,7 +61,7 @@ export function NewCustomersChart({
         ))}
       </div>
       <table className="mt-4 w-full text-xs">
-        <thead className="text-left text-slate-500">
+        <thead className="text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
           <tr>
             <th className="py-1 font-medium">Måned</th>
             <th className="py-1 text-right font-medium">Nye</th>
