@@ -152,7 +152,8 @@ export default async function EmailSettingsPage({
           <h2 className="text-sm font-semibold text-slate-900">Indgående mails</h2>
           <p className="mt-1 text-sm text-slate-500">
             Mails der ankommer i Gmail-indbakken fra en deals kontaktperson (feltet &quot;E-mail&quot; på dealen)
-            matches automatisk og vises på dealen. Kører automatisk hver 4. time, eller kør det manuelt her:
+            matches automatisk og vises på dealen for hele teamet - ingen CC eller andet nødvendigt. Kører
+            automatisk én gang dagligt, eller kør det manuelt her:
           </p>
           <div className="mt-3">
             <SyncNowButton />
