@@ -120,12 +120,17 @@ export async function updateDeal(dealId: string, formData: FormData) {
   let stage = String(formData.get("stage") || "LEAD") as DealStage;
   const meetingDateRaw = String(formData.get("meetingDate") || "");
 
-  if (stage === "MEETING_BOOKED" && !meetingDateRaw) {
+  const existing = await prisma.deal.findUniqueOrThrow({ where: { id: dealId } });
+
+  // An empty field means "leave unchanged", not "clear".
+  const meetingDate = meetingDateRaw ? new Date(meetingDateRaw) : existing.meetingDate;
+  // Only block the save when the stage is actually changing into Møde
+  // booket without a date - a deal that's already sitting in that stage
+  // (e.g. one imported without a meeting date ever set) must still be
+  // saveable for unrelated edits, not crash on every single save forever.
+  if (stage === "MEETING_BOOKED" && existing.stage !== "MEETING_BOOKED" && !meetingDate) {
     throw new Error("Angiv en mødedato når stadiet er 'Møde booket'.");
   }
-  const meetingDate = meetingDateRaw ? new Date(meetingDateRaw) : null;
-
-  const existing = await prisma.deal.findUniqueOrThrow({ where: { id: dealId } });
 
   // Non-admins can't manually jump into a contract-managed stage from this
   // dropdown - that's driven by the actual contract-sending flow instead.
@@ -228,6 +233,21 @@ export async function updateDeal(dealId: string, formData: FormData) {
       ...stageDateUpdates,
     },
   });
+
+  // A manually-corrected sold product/price (via "Ret manuelt") should also
+  // show up in "Ydelser" below, not just the auto-fill from the contract
+  // flow - otherwise a hand-fixed deal never gets tracked there. Only synced
+  // for a single product, since the manual fields don't carry a per-product
+  // price breakdown for us to split across several.
+  if (canEditContractFields && formData.has("soldProduct") && soldProduct && !soldProduct.includes(",")) {
+    const amount = saleAmount && saleAmount > 0 ? saleAmount : establishmentFee ?? 0;
+    const existingItem = await prisma.dealItem.findFirst({ where: { dealId, productType: soldProduct } });
+    if (existingItem) {
+      await prisma.dealItem.update({ where: { id: existingItem.id }, data: { amount, isFree: amount === 0 } });
+    } else {
+      await prisma.dealItem.create({ data: { dealId, productType: soldProduct, amount, isFree: amount === 0 } });
+    }
+  }
 
   await recalcCommission(dealId);
 

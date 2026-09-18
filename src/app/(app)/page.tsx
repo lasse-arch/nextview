@@ -80,7 +80,7 @@ export default async function DashboardPage() {
         <StatTile
           label="Solgt etableringspris denne måned"
           value={formatDKK(data.establishmentFeeTotal)}
-          sub={`${data.soldThisMonthCount} deals`}
+          sub={`${data.establishmentFeeCount} deals`}
           money
           tooltipRows={data.establishmentFeeDeals.map((d) => ({ label: d.name, value: formatDKK(d.value) }))}
         />

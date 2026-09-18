@@ -73,9 +73,12 @@ export async function getDashboardData(ownerId?: string) {
 
   const failedInvoices = invoices.filter((i) => i.status === "FAILED").length;
 
-  // Establishment fees for deals sold this month (same deal set as "Solgt denne måned").
-  const establishmentFeeTotal = soldThisMonth.reduce((sum, d) => sum + (d.establishmentFee ?? 0), 0);
-  const establishmentFeeDeals = soldThisMonth
+  // Establishment fees for deals sold this month (same deal set as "Solgt denne måned"),
+  // excluding ones with no establishment fee at all - a deal with a 0 kr. fee
+  // isn't part of "who was sold an etableringspris this month".
+  const soldWithEstablishmentFee = soldThisMonth.filter((d) => (d.establishmentFee ?? 0) > 0);
+  const establishmentFeeTotal = soldWithEstablishmentFee.reduce((sum, d) => sum + (d.establishmentFee ?? 0), 0);
+  const establishmentFeeDeals = soldWithEstablishmentFee
     .map((d) => ({ id: d.id, name: d.displayName || d.companyName, value: d.establishmentFee ?? 0 }))
     .sort((a, b) => b.value - a.value);
 
@@ -145,6 +148,7 @@ export async function getDashboardData(ownerId?: string) {
     soldThisMonthDeals,
     commissionOwed,
     establishmentFeeTotal,
+    establishmentFeeCount: soldWithEstablishmentFee.length,
     establishmentFeeDeals,
     failedInvoices,
     lostValue,

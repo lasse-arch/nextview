@@ -26,3 +26,16 @@ body {
   filter: blur(6px);
   user-select: none;
 }
+
+/* Hides the native up/down spinner on number inputs app-wide - scrolling the
+   page with the mouse wheel over one of these (a very easy accident) would
+   otherwise silently change the amount. Combined with the onWheel blur on
+   individual inputs where that's wired up. */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+}
