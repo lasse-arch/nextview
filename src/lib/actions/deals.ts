@@ -223,6 +223,24 @@ async function updateDealInner(dealId: string, formData: FormData, user: Awaited
     stageDateUpdates.contractSignedAt = soldAt;
   }
 
+  // A termination's "Ophører"-date is a term boundary computed from
+  // billingStartDate - if it was registered before Live-dato existed (or
+  // bindingMonths later got corrected), that boundary was based on
+  // incomplete data and goes stale. Recompute it on every save of a deal
+  // with an active, not-yet-churned opsigelse (cheap and idempotent) so it
+  // self-heals instead of silently drifting from the actual binding terms.
+  const effectiveBillingStartDate = stageDateUpdates.billingStartDate ?? existing.billingStartDate;
+  if (existing.terminationNoticeAt && existing.noticePeriodMonths && !existing.churnedAt) {
+    const recomputedEndDate = computeContractEndDate(
+      { billingStartDate: effectiveBillingStartDate, bindingMonths },
+      existing.terminationNoticeAt,
+      existing.noticePeriodMonths
+    );
+    if (recomputedEndDate.getTime() !== existing.contractEndDate?.getTime()) {
+      stageDateUpdates.contractEndDate = recomputedEndDate;
+    }
+  }
+
   // A suggestion picked from the address autocomplete comes with fresh coordinates to store directly.
   // Otherwise, if the address text changed, clear any stale coordinates so the map re-geocodes it.
   const addressChanged = address !== existing.address;
@@ -321,6 +339,22 @@ export async function updateDealStage(dealId: string, newStage: DealStage) {
   if (newStage === "LIVE" && !existing.liveAt) {
     stageDateUpdates.liveAt = new Date();
     if (!existing.billingStartDate) stageDateUpdates.billingStartDate = stageDateUpdates.liveAt;
+  }
+
+  // See the matching comment in updateDealInner: a termination's "Ophører"
+  // date is a boundary computed from billingStartDate, so it must be
+  // recomputed if that only just became known here.
+  if (
+    stageDateUpdates.billingStartDate &&
+    existing.terminationNoticeAt &&
+    existing.noticePeriodMonths &&
+    !existing.churnedAt
+  ) {
+    stageDateUpdates.contractEndDate = computeContractEndDate(
+      { billingStartDate: stageDateUpdates.billingStartDate, bindingMonths: existing.bindingMonths },
+      existing.terminationNoticeAt,
+      existing.noticePeriodMonths
+    );
   }
 
   await prisma.deal.update({
