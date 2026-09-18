@@ -81,6 +81,8 @@ type DocuSealSubmissionDetails = {
   id: number;
   status: string;
   combined_document_url: string | null;
+  documents?: { name: string; url: string }[];
+  submitters?: { documents?: { name: string; url: string }[] }[];
 };
 
 async function getSubmission(submissionId: string): Promise<DocuSealSubmissionDetails> {
@@ -91,10 +93,27 @@ async function getSubmission(submissionId: string): Promise<DocuSealSubmissionDe
   return res.json();
 }
 
+/**
+ * `combined_document_url` is only populated when DocuSeal actually combined
+ * multiple documents into one file - for a single-document submission (our
+ * case, one PDF per contract) it can be null even once fully signed. Fall
+ * back to the submission's own `documents`, then to the first submitter's
+ * signed copy, before giving up.
+ */
+function findSignedDocumentUrl(submission: DocuSealSubmissionDetails): string | null {
+  if (submission.combined_document_url) return submission.combined_document_url;
+  if (submission.documents?.[0]?.url) return submission.documents[0].url;
+  for (const submitter of submission.submitters ?? []) {
+    if (submitter.documents?.[0]?.url) return submitter.documents[0].url;
+  }
+  return null;
+}
+
 export async function downloadCompletedPdf(submissionId: string): Promise<ArrayBuffer> {
   const submission = await getSubmission(submissionId);
-  if (!submission.combined_document_url) throw new Error("DocuSeal: ingen underskrevet PDF fundet endnu.");
-  const res = await fetch(submission.combined_document_url);
+  const documentUrl = findSignedDocumentUrl(submission);
+  if (!documentUrl) throw new Error("DocuSeal: ingen underskrevet PDF fundet endnu.");
+  const res = await fetch(documentUrl);
   if (!res.ok) {
     throw new Error(`DocuSeal: kunne ikke downloade underskrevet PDF (${res.status})`);
   }

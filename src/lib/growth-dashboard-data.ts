@@ -48,12 +48,14 @@ export async function getGrowthDashboardData() {
   );
   const expiredCount = deals.filter((d) => d.churnedAt).length;
 
-  // "Solgt" (has a signed contract that reached at least Live) is a lower
+  // "Solgt" (has a signed contract - signed, filmed, or live) is a lower
   // bar than "billable" (also needs a recurring monthly fee + binding) - a
   // customer who only ever paid a one-off establishment fee, or who has
   // since churned, is still "solgt" and their establishment fee still
   // counts in "Opstart i alt", even though they're excluded from MRR/ARR
-  // and the other billable-only metrics above.
+  // and the other billable-only metrics above. This must match the main
+  // dashboard's SOLD_STAGES (src/lib/dashboard-data.ts) so "Solgt i alt"
+  // and "Samlet booket værdi" always agree.
   const soldStages = ["LIVE", ...PIPELINE_STAGES] as readonly string[];
   const soldDeals = deals.filter((d) => soldStages.includes(d.stage));
 
@@ -110,7 +112,7 @@ export async function getGrowthDashboardData() {
   for (let i = 11; i >= 0; i--) {
     const m = subMonths(thisMonthStart, i);
     const mEnd = endOfMonth(m);
-    const newDeals = deals.filter((d) => d.contractSignedAt && isWithinInterval(d.contractSignedAt, { start: m, end: mEnd }));
+    const newDeals = deals.filter((d) => d.soldAt && isWithinInterval(d.soldAt, { start: m, end: mEnd }));
     monthlyNew.push({
       label: format(m, "MMM yyyy", { locale: da }),
       count: newDeals.length,

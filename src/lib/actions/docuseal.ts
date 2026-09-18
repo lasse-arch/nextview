@@ -150,3 +150,52 @@ export async function buildAndSendContract(
     return { ok: false, error: err instanceof Error ? err.message : "Der opstod en fejl ved afsendelse af kontrakten." };
   }
 }
+
+/**
+ * Archives an already-signed contract so a new one can be built and sent for
+ * the same deal (the deal's sold terms - product, price, binding - stay
+ * untouched until a replacement contract is actually sent and overwrites
+ * them). Gated behind the admin typing "slet" as a lightweight confirmation,
+ * since this can't be undone from the UI once done.
+ */
+export async function archiveSignedContract(
+  dealId: string,
+  confirmationText: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const user = await requireUser();
+    if (user.role !== "ADMIN") {
+      throw new Error("Kun admins kan arkivere en underskrevet kontrakt.");
+    }
+    if (confirmationText.trim().toLowerCase() !== "slet") {
+      throw new Error('Skriv "slet" for at bekræfte arkivering.');
+    }
+
+    const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId } });
+    if (deal.contractStatus !== "SIGNED") {
+      throw new Error("Kontrakten er ikke underskrevet og kan ikke arkiveres herfra.");
+    }
+
+    if (deal.docusealSubmissionId) {
+      await cancelDocuSealSubmission(deal.docusealSubmissionId);
+    }
+
+    await prisma.deal.update({
+      where: { id: dealId },
+      data: {
+        contractStatus: "VOIDED",
+        docusealSubmissionId: null,
+        contractSentAt: null,
+        contractViewedAt: null,
+        contractSignedAt: null,
+      },
+    });
+
+    await prisma.contractEvent.create({ data: { dealId, type: "SIGNED_CONTRACT_ARCHIVED", occurredAt: new Date() } });
+
+    revalidatePath(`/deals/${dealId}`);
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Der opstod en fejl ved arkivering af kontrakten." };
+  }
+}

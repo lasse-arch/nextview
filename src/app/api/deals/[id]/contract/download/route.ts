@@ -16,12 +16,16 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "Ingen kontrakt fundet for denne deal" }, { status: 404 });
   }
 
-  const pdf = await downloadCompletedPdf(deal.docusealSubmissionId);
-
-  return new NextResponse(pdf, {
-    headers: {
-      "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="kontrakt-${deal.companyName.replace(/[^a-z0-9]+/gi, "-")}.pdf"`,
-    },
-  });
+  try {
+    const pdf = await downloadCompletedPdf(deal.docusealSubmissionId);
+    return new NextResponse(pdf, {
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `attachment; filename="kontrakt-${deal.companyName.replace(/[^a-z0-9]+/gi, "-")}.pdf"`,
+      },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Kunne ikke hente den underskrevne kontrakt";
+    return NextResponse.json({ error: message }, { status: 502 });
+  }
 }

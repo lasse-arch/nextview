@@ -44,7 +44,7 @@ type Labels = {
   noticeLabel: string;
   monthsSuffix: string;
   section4Title: string;
-  section4Body: string;
+  section4Body: string[];
   section5Title: string;
   section5Body: string;
   section6Title: string;
@@ -132,8 +132,10 @@ const LABELS: Record<ContractLanguage, Labels> = {
     noticeLabel: "Opsigelsesvarsel",
     monthsSuffix: "måneder",
     section4Title: "4) Betaling",
-    section4Body:
-      "Fakturering sker kvartalsvist forud (netto 8 dage), med mindre andet er angivet under Yderligere betingelser. Betaling sker via faktura eller efter særskilt aftale om automatisk betaling. Forsinket betaling påløber rente i henhold til renteloven og eventuelle inddrivelsesomkostninger.",
+    section4Body: [
+      "Fakturering sker kvartalsvist forud (netto 8 dage), medmindre andet er angivet under Yderligere betingelser.",
+      "Betaling sker via faktura eller efter aftale om automatisk betaling. Forsinket betaling påløber rente efter renteloven.",
+    ],
     section5Title: "5) Fortrolighed",
     section5Body:
       "Begge parter forpligter sig til at behandle fortrolige oplysninger om modparten som fortrolige. Oplysninger må ikke videregives til tredjepart uden forudgående skriftligt samtykke.",
@@ -221,8 +223,10 @@ const LABELS: Record<ContractLanguage, Labels> = {
     noticeLabel: "Notice period",
     monthsSuffix: "months",
     section4Title: "4) Payment",
-    section4Body:
-      "Invoicing is quarterly in advance (net 8 days), unless otherwise stated under Additional Terms. Payment is made by invoice or by separate agreement on automatic payment. Late payment accrues interest under the Danish Interest Act and any recovery costs.",
+    section4Body: [
+      "Invoicing is quarterly in advance (net 8 days), unless otherwise stated under Additional Terms.",
+      "Payment is made by invoice or by agreement on automatic payment. Late payment accrues interest under the Danish Interest Act.",
+    ],
     section5Title: "5) Confidentiality",
     section5Body:
       "Both parties undertake to treat confidential information about the other party as confidential. Information may not be disclosed to third parties without prior written consent.",
@@ -444,7 +448,7 @@ export function buildContractHtml(data: ContractHtmlData, language: ContractLang
 
   <div class="section">
     <p class="section-title">${esc(t.section4Title)}</p>
-    <p>${esc(t.section4Body)}</p>
+    ${t.section4Body.map((p) => `<p>${esc(p)}</p>`).join("\n    ")}
   </div>
 
   <div class="section">

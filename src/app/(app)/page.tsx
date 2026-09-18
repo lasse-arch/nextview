@@ -8,6 +8,7 @@ import { GoalsCard } from "./goals-card";
 import { getCustomerMapPoints } from "@/lib/customer-map-data";
 import { DenmarkMap } from "./denmark-map";
 import { StatTile } from "./stat-tile";
+import { SoldTotalReportButton } from "./sold-total-report-button";
 
 const FUNNEL_SHADES = [
   "bg-blue-200",
@@ -64,12 +65,15 @@ export default async function DashboardPage() {
           sub={`${data.pipelineCount} åbne deals`}
           money
         />
-        <StatTile
-          label="Solgt i alt (MRR + etableringspris)"
-          value={formatDKK(data.liveValue)}
-          sub={`${data.liveCount} kunder`}
-          money
-        />
+        <div className="relative">
+          <StatTile
+            label="Solgt i alt (MRR + etableringspris)"
+            value={formatDKK(data.soldValue)}
+            sub={`${data.soldCount} kunder`}
+            money
+          />
+          <SoldTotalReportButton total={data.soldValue} breakdown={data.soldBreakdown} />
+        </div>
         <StatTile
           label="Solgt denne måned"
           value={formatDKK(data.soldThisMonthValue)}

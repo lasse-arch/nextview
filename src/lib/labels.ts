@@ -59,6 +59,7 @@ export const contractEventLabels: Record<string, string> = {
   DECLINED: "Afvist",
   EXPIRED: "Udløbet",
   ARCHIVED: "Annulleret",
+  SIGNED_CONTRACT_ARCHIVED: "Underskrevet kontrakt arkiveret",
 };
 
 export const invoiceStatusLabels: Record<string, string> = {

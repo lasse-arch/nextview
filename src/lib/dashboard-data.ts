@@ -17,6 +17,14 @@ const FUNNEL_STAGES = [...PIPELINE_STAGES, "LIVE"] as const;
 /** The "Aktiv pipeline" KPI only counts deals that have actually had a meeting booked or further - not raw leads/contacted. */
 const ACTIVE_PIPELINE_STAGES = ["MEETING_BOOKED", "CONTRACT_SENT", "CONTRACT_SIGNED", "FILMED"] as const;
 
+/**
+ * "Solgt" = has a signed contract (Live, or signed and on its way to Live).
+ * This must stay identical to the growth dashboard's `soldStages`
+ * (src/lib/growth-dashboard-data.ts) - the two pages show the same "total
+ * sold" figure and must be computed the same way.
+ */
+const SOLD_STAGES = ["LIVE", "CONTRACT_SIGNED", "FILMED"] as const;
+
 export type FunnelBar = { stage: string; label: string; count: number; value: number };
 export type MonthBar = { label: string; value: number };
 export type SellerRow = {
@@ -50,16 +58,30 @@ export async function getDashboardData(ownerId?: string) {
   const activePipeline = deals.filter((d) => (ACTIVE_PIPELINE_STAGES as readonly string[]).includes(d.stage));
   const pipelineValue = activePipeline.reduce((sum, d) => sum + soldTotalValue(d), 0);
 
-  // "Solgt" means having a signed contract that reached Live - a churned
-  // customer still counts here (and in the funnel's Live bucket below),
-  // they just don't contribute ongoing MRR anymore.
-  const liveDeals = deals.filter((d) => d.stage === "LIVE");
+  // "Solgt" means having a signed contract (signed, filmed, or live) - a
+  // churned customer still counts here (they just don't contribute ongoing
+  // MRR anymore, see below). This must match the growth dashboard's
+  // "Samlet booket værdi" definition so the two numbers agree.
+  const soldDeals = deals.filter((d) => (SOLD_STAGES as readonly string[]).includes(d.stage));
   // A churned/inactive customer still paid their one-off establishment fee -
   // that stays counted - but their monthly fee no longer counts going forward.
-  const liveValue = liveDeals.reduce(
+  const soldValue = soldDeals.reduce(
     (sum, d) => sum + (d.churnedAt ? d.establishmentFee ?? 0 : soldTotalValue(d)),
     0
   );
+  const soldBreakdown = soldDeals
+    .map((d) => ({
+      id: d.id,
+      name: d.displayName || d.companyName,
+      stage: d.stage,
+      churned: Boolean(d.churnedAt),
+      mrr: d.saleAmount ?? 0,
+      bindingMonths: d.bindingMonths ?? 0,
+      contractValue: d.churnedAt ? 0 : totalContractValue(d),
+      establishmentFee: d.establishmentFee ?? 0,
+      contribution: d.churnedAt ? d.establishmentFee ?? 0 : soldTotalValue(d),
+    }))
+    .sort((a, b) => b.contribution - a.contribution);
 
   const soldThisMonth = deals.filter(
     (d) => d.soldAt && isWithinInterval(d.soldAt, { start: monthStart, end: monthEnd })
@@ -143,8 +165,9 @@ export async function getDashboardData(ownerId?: string) {
   return {
     pipelineValue,
     pipelineCount: activePipeline.length,
-    liveValue,
-    liveCount: liveDeals.length,
+    soldValue,
+    soldCount: soldDeals.length,
+    soldBreakdown,
     soldThisMonthValue,
     soldThisMonthCount: soldThisMonth.length,
     soldThisMonthDeals,

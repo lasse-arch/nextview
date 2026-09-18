@@ -16,6 +16,8 @@ import { isDocuSealConfigured } from "@/lib/docuseal";
 import { CommissionSection } from "./commission-section";
 import { CommissionExcludedToggle } from "./commission-excluded-toggle";
 import { SendContractButton } from "./send-contract-button";
+import { DownloadContractButton } from "./download-contract-button";
+import { ArchiveContractButton } from "./archive-contract-button";
 import { StageFields } from "./stage-fields";
 import { InactiveToggleButton } from "./inactive-toggle-button";
 import { TerminationSection } from "./termination-section";
@@ -356,12 +358,13 @@ export default async function DealDetailPage({
 
             <div className="mt-4 space-y-2">
               {deal.contractStatus === "SIGNED" && (
-                <a
-                  href={`/api/deals/${deal.id}/contract/download`}
-                  className="block w-full rounded-md border border-slate-300 px-3 py-2 text-center text-sm hover:bg-slate-50"
-                >
-                  Download underskrevet kontrakt
-                </a>
+                <DownloadContractButton
+                  dealId={deal.id}
+                  fileName={`kontrakt-${deal.companyName.replace(/[^a-z0-9]+/gi, "-")}.pdf`}
+                />
+              )}
+              {deal.contractStatus === "SIGNED" && currentUser?.role === "ADMIN" && (
+                <ArchiveContractButton dealId={deal.id} />
               )}
               {deal.contractStatus !== "SIGNED" && (
                 <SendContractButton
