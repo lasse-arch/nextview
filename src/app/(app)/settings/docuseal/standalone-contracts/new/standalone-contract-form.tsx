@@ -98,7 +98,7 @@ function ProductCard({
         <input type="checkbox" checked={selected} onChange={(e) => onToggle(e.target.checked)} className="shrink-0" />
         <span>{title}</span>
       </div>
-      {selected && <div className="mt-3 grid grid-cols-2 gap-3">{children}</div>}
+      {selected && <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">{children}</div>}
     </div>
   );
 }
@@ -127,7 +127,7 @@ export function StandaloneContractForm() {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-4 rounded-lg border border-slate-200 bg-white p-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 rounded-lg border border-slate-200 bg-white p-4">
         <TextField label="Firmanavn (CVR)" value={customer.companyName} onChange={(v) => setCustomer((c) => ({ ...c, companyName: v }))} />
         <TextField label="Kaldenavn (valgfri)" value={customer.displayName} onChange={(v) => setCustomer((c) => ({ ...c, displayName: v }))} />
         <TextField label="CVR-nummer" value={customer.cvrNumber} onChange={(v) => setCustomer((c) => ({ ...c, cvrNumber: v }))} />
@@ -203,7 +203,7 @@ export function StandaloneContractForm() {
         </ProductCard>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 rounded-lg border border-slate-200 bg-white p-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 rounded-lg border border-slate-200 bg-white p-4">
         <NumberField
           label="Binding (måneder)"
           value={products.bindingMonths}

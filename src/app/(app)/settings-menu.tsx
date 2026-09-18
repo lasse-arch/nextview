@@ -5,7 +5,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { IconGear, IconChevronDown } from "./nav-icons";
 
-export function SettingsMenu({ items }: { items: { href: string; label: string }[] }) {
+export function SettingsMenu({
+  items,
+  onNavigate,
+}: {
+  items: { href: string; label: string }[];
+  onNavigate?: () => void;
+}) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
@@ -38,7 +44,10 @@ export function SettingsMenu({ items }: { items: { href: string; label: string }
             <Link
               key={item.href}
               href={item.href}
-              onClick={() => setOpen(false)}
+              onClick={() => {
+                setOpen(false);
+                onNavigate?.();
+              }}
               className="block px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900"
             >
               {item.label}

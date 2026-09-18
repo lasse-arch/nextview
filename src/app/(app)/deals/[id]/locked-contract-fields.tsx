@@ -31,7 +31,7 @@ export function LockedContractFields({
 
   if (!unlocked) {
     return (
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
           <label className="block text-xs font-medium text-slate-500">Solgt til (produkt/ydelse)</label>
           <p className="mt-1 text-sm text-slate-700">{soldProduct || "–"}</p>
@@ -73,7 +73,7 @@ export function LockedContractFields({
   }
 
   return (
-    <div className="grid grid-cols-2 gap-4">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
       <div>
         <label className="block text-xs font-medium text-slate-500">Solgt til (produkt/ydelse)</label>
         <select

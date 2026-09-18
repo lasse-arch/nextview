@@ -28,7 +28,8 @@ export default async function StandaloneContractsPage() {
       </div>
 
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[720px] text-sm">
           <thead className="border-b border-slate-200 text-left text-xs text-slate-500">
             <tr>
               <th className="px-4 py-2 font-medium">Firma</th>
@@ -67,6 +68,7 @@ export default async function StandaloneContractsPage() {
             )}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

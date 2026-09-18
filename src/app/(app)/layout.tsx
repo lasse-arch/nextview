@@ -5,6 +5,7 @@ import { logout } from "@/lib/actions/auth";
 import { ToastProvider } from "@/components/toast";
 import { SettingsMenu } from "./settings-menu";
 import { SidebarNav, type SidebarNavItem } from "./sidebar-nav";
+import { MobileNav } from "./mobile-nav";
 import { PresentationModeToggle } from "./presentation-mode-toggle";
 import { isPresentationMode } from "@/lib/presentation-mode";
 import { IconHome, IconDeals, IconUsers, IconPercent, IconGrowth } from "./nav-icons";
@@ -44,7 +45,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <ToastProvider>
       <div className="flex min-h-screen" data-presentation={presenting ? "true" : "false"}>
-        <aside className="flex w-60 shrink-0 flex-col border-r border-slate-200 bg-slate-50 p-3">
+        <aside className="hidden w-60 shrink-0 flex-col border-r border-slate-200 bg-slate-50 p-3 md:flex">
           <Link href="/" className="flex items-center gap-2.5 px-2.5 pb-5 pt-2">
             <span className="flex h-7.5 w-7.5 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-sm font-bold text-white">
               N
@@ -79,7 +80,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </aside>
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <div className="flex items-center justify-end gap-2.5 px-10 pt-6">
+          <MobileNav
+            navItems={navItems}
+            settingsItems={settingsItems}
+            userName={user.name}
+            userInitials={initials}
+            userAvatarUrl={user.avatarUrl ?? null}
+            logoutAction={logout}
+          />
+
+          <div className="flex items-center justify-end gap-2.5 px-4 pt-4 sm:px-6 md:px-10 md:pt-6">
             <PresentationModeToggle enabled={presenting} />
             <Link
               href="/deals/new"
@@ -88,7 +98,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               + Ny lead
             </Link>
           </div>
-          <main className="flex-1 px-10 pb-10 pt-4">{children}</main>
+          <main className="flex-1 px-4 pb-10 pt-4 sm:px-6 md:px-10">{children}</main>
         </div>
       </div>
     </ToastProvider>

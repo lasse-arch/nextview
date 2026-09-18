@@ -64,7 +64,7 @@ export function CommissionSection({
   if (editing) {
     return (
       <form action={save} className="mt-3 space-y-2.5 text-sm">
-        <div className="grid grid-cols-2 gap-2.5">
+        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
           <div>
             <label className="block text-xs font-medium text-slate-500">Sats (%)</label>
             <input

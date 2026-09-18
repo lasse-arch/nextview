@@ -58,7 +58,7 @@ function ProductCard({
         />
         <span>{title}</span>
       </div>
-      {selected && <div className="mt-3 grid grid-cols-2 gap-3">{children}</div>}
+      {selected && <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">{children}</div>}
     </div>
   );
 }
@@ -158,7 +158,7 @@ export function ContractBuilderForm({
         </ProductCard>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 rounded-lg border border-slate-200 bg-white p-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 rounded-lg border border-slate-200 bg-white p-4">
         <NumberField
           label="Binding (måneder)"
           value={products.bindingMonths}

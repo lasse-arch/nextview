@@ -358,7 +358,8 @@ export function DealsListTable({ deals, users }: { deals: ListDeal[]; users: { i
       )}
 
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[640px] text-sm">
           <thead className="bg-slate-50 text-left text-slate-500">
             <tr>
               <th className="w-8 px-4 py-2">
@@ -407,6 +408,7 @@ export function DealsListTable({ deals, users }: { deals: ListDeal[]; users: { i
             )}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

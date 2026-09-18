@@ -38,7 +38,8 @@ export default async function CommissionPage() {
       </div>
 
       <div className="mt-6 overflow-hidden rounded-lg border border-slate-200 bg-white">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[640px] text-sm">
           <thead className="bg-slate-50 text-left text-slate-500">
             <tr>
               <th className="px-4 py-2 font-medium">Deal</th>
@@ -100,6 +101,7 @@ export default async function CommissionPage() {
             )}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

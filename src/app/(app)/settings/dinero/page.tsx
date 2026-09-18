@@ -70,7 +70,8 @@ export default async function DineroSettingsPage() {
       <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <h2 className="text-sm font-semibold text-slate-900">Seneste kladder</h2>
         <div className="mt-3 overflow-hidden rounded-md border border-slate-100">
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full min-w-[520px] text-sm">
             <thead className="bg-slate-50 text-left text-slate-500">
               <tr>
                 <th className="px-3 py-2 font-medium">Deal</th>
@@ -118,6 +119,7 @@ export default async function DineroSettingsPage() {
               )}
             </tbody>
           </table>
+          </div>
         </div>
       </section>
 
