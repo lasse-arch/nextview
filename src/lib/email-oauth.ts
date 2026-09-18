@@ -7,6 +7,9 @@ export const GOOGLE_SCOPES = [
   "https://www.googleapis.com/auth/gmail.send",
   "https://www.googleapis.com/auth/userinfo.email",
   "https://www.googleapis.com/auth/calendar.events",
+  // Only sees/manages files this app itself creates - not the user's whole
+  // Drive - used to file away signed contracts (see google-drive.ts).
+  "https://www.googleapis.com/auth/drive.file",
 ].join(" ");
 
 export const MICROSOFT_SCOPES = ["offline_access", "Mail.Read", "Mail.Send", "User.Read"].join(" ");

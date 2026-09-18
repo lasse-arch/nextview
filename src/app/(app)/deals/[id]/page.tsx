@@ -18,6 +18,7 @@ import { CommissionExcludedToggle } from "./commission-excluded-toggle";
 import { SendContractButton } from "./send-contract-button";
 import { DownloadContractButton } from "./download-contract-button";
 import { ArchiveContractButton } from "./archive-contract-button";
+import { ArchiveToDriveButton } from "./archive-to-drive-button";
 import { StageFields } from "./stage-fields";
 import { InactiveToggleButton } from "./inactive-toggle-button";
 import { TerminationSection } from "./termination-section";
@@ -367,6 +368,7 @@ export default async function DealDetailPage({
                   fileName={`kontrakt-${deal.companyName.replace(/[^a-z0-9]+/gi, "-")}.pdf`}
                 />
               )}
+              {deal.contractStatus === "SIGNED" && <ArchiveToDriveButton dealId={deal.id} />}
               {deal.contractStatus === "SIGNED" && currentUser?.role === "ADMIN" && (
                 <ArchiveContractButton dealId={deal.id} />
               )}

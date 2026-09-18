@@ -2,8 +2,10 @@ import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { disconnectEmailAccount } from "@/lib/actions/email";
 import { isGoogleConfigured, isMicrosoftConfigured } from "@/lib/email-oauth";
+import { isIntegrationEnabled } from "@/lib/integration-settings";
 import { formatDate } from "@/lib/labels";
 import { SyncNowButton } from "./sync-now-button";
+import { IntegrationToggle } from "../integration-toggle";
 
 const errorMessages: Record<string, string> = {
   google_not_configured: "Google-integration er ikke konfigureret endnu (mangler GOOGLE_CLIENT_ID/SECRET).",
@@ -26,6 +28,8 @@ export default async function EmailSettingsPage({
   const accounts = await prisma.emailAccount.findMany({ where: { userId: user.id } });
   const google = accounts.find((a) => a.provider === "GOOGLE");
   const microsoft = accounts.find((a) => a.provider === "MICROSOFT");
+  const anyGoogleConnected = await prisma.emailAccount.findFirst({ where: { provider: "GOOGLE" } });
+  const driveEnabled = await isIntegrationEnabled("GOOGLE_DRIVE");
 
   const disconnectGoogle = disconnectEmailAccount.bind(null, "GOOGLE");
   const disconnectMicrosoft = disconnectEmailAccount.bind(null, "MICROSOFT");
@@ -81,6 +85,28 @@ export default async function EmailSettingsPage({
           <p className="mt-3 text-xs text-amber-600">
             Kræver GOOGLE_CLIENT_ID og GOOGLE_CLIENT_SECRET i miljøvariabler (opret i Google Cloud Console →
             OAuth-klient, redirect-URI: <span className="font-mono">{"{APP_BASE_URL}"}/api/integrations/google/callback</span>).
+          </p>
+        )}
+      </section>
+
+      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-semibold text-slate-900">Underskrevne kontrakter → Google Drev</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Så snart en kontrakt er underskrevet af begge parter, lægges en kopi automatisk i mappen &ldquo;Nextview360
+              - Underskrevne kontrakter&rdquo; i Google Drev.
+            </p>
+          </div>
+          <IntegrationToggle integrationKey="GOOGLE_DRIVE" enabled={driveEnabled} disabled={!anyGoogleConnected} />
+        </div>
+        {!anyGoogleConnected && (
+          <p className="mt-3 text-xs text-amber-600">Kræver at mindst én bruger har forbundet Gmail ovenfor.</p>
+        )}
+        {anyGoogleConnected && (
+          <p className="mt-3 text-xs text-slate-400">
+            Bruger Drev-adgangen fra Gmail-forbindelsen ovenfor - forbandt du Gmail før denne funktion blev tilføjet,
+            skal du afbryde og forbinde igen, så Google også giver adgang til Drev.
           </p>
         )}
       </section>

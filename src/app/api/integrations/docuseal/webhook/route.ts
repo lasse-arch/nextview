@@ -4,6 +4,7 @@ import { verifyWebhookSignature } from "@/lib/docuseal";
 import { recalcCommission } from "@/lib/commission-service";
 import { sendContractSignedNotification } from "@/lib/notification-service";
 import { contractProductsToDealItems, type ContractProducts } from "@/lib/contract-template-data";
+import { archiveSignedContractToDrive } from "@/lib/actions/google-drive-archive";
 
 type DocuSealEvent = {
   event_type?: string;
@@ -102,6 +103,13 @@ export async function POST(request: NextRequest) {
   } else if (type === "submission.completed") {
     // Backstop in case form.completed's external_id was ever missing.
     await markSigned();
+    // Only now (both submitters done) is the fully-signed PDF actually
+    // available to download - best-effort, must never fail the webhook.
+    try {
+      await archiveSignedContractToDrive(deal.id);
+    } catch (err) {
+      console.error(`Google Drev-arkivering fejlede for deal ${deal.id}:`, err);
+    }
   } else if (type === "form.declined") {
     await prisma.deal.update({ where: { id: deal.id }, data: { contractStatus: "DECLINED" } });
     await logEvent("DECLINED");

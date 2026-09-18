@@ -12,4 +12,5 @@ export async function toggleIntegration(key: IntegrationKey, enabled: boolean) {
 
   revalidatePath("/settings/dinero");
   revalidatePath("/settings/docuseal");
+  revalidatePath("/settings/email");
 }
