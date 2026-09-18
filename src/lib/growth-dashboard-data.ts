@@ -9,7 +9,7 @@ import {
   format,
 } from "date-fns";
 import { da } from "date-fns/locale";
-import { totalContractValue, realizedContractValue } from "@/lib/labels";
+import { totalContractValue, contractedContractValue } from "@/lib/labels";
 
 const PIPELINE_STAGES = ["CONTRACT_SIGNED", "FILMED"] as const;
 const RISK_WINDOWS = [30, 60, 90] as const;
@@ -88,14 +88,13 @@ export async function getGrowthDashboardData() {
   const remainingContractValue = activeContractValue - realizedToDate;
   const pipelineContractValue = pipelineDeals.reduce((sum, d) => sum + totalContractValue(d), 0);
   const establishmentTotal = soldDeals.reduce((sum, d) => sum + (d.establishmentFee ?? 0), 0);
-  // Actual realized revenue across every sold deal (active, pipeline, or
-  // churned) - months actually billed times the monthly price, uncapped by
-  // bindingMonths since billing rolls on past binding until terminated. This
-  // is what "Samlet booket værdi" is built from below, and must match the
-  // main dashboard's soldValue (src/lib/dashboard-data.ts) exactly so the two
+  // Total contracted value across every sold deal (active, pipeline, or
+  // churned) - see contractedContractValue in labels.ts. This is what
+  // "Samlet booket værdi" is built from below, and must match the main
+  // dashboard's soldValue (src/lib/dashboard-data.ts) exactly so the two
   // totals always agree.
-  const realizedContractTotal = soldDeals.reduce((sum, d) => sum + realizedContractValue(d, now), 0);
-  const totalBookedValue = establishmentTotal + realizedContractTotal;
+  const contractedContractTotal = soldDeals.reduce((sum, d) => sum + contractedContractValue(d, now), 0);
+  const totalBookedValue = establishmentTotal + contractedContractTotal;
 
   const billableCustomers = [...activeDeals, ...pipelineDeals];
   const avgBindingMonths =
@@ -157,7 +156,10 @@ export async function getGrowthDashboardData() {
   return {
     activeCount: activeDeals.length,
     pipelineCount: pipelineDeals.length,
-    totalCount: activeDeals.length + pipelineDeals.length,
+    // Matches the main dashboard's soldCount exactly (src/lib/dashboard-data.ts) -
+    // all sold deals, including churned and ones without a recurring MRR, not
+    // just the billable active+pipeline subset above.
+    totalCount: soldDeals.length,
     expiredCount,
     activeMRR,
     pipelineMRR,
@@ -171,7 +173,7 @@ export async function getGrowthDashboardData() {
     remainingContractValue,
     pipelineContractValue,
     establishmentTotal,
-    realizedContractTotal,
+    contractedContractTotal,
     totalBookedValue,
     avgBindingMonths,
     avgContractValue,

@@ -81,28 +81,59 @@ export function totalContractValue(deal: { saleAmount: number | null; bindingMon
 }
 
 /**
- * How much of a deal's monthly value has actually been realized (billed) as
- * of `asOf` - counted from when billing started to when the customer
- * churned, or to `asOf` if it's still active. Deliberately uncapped by the
- * binding period: billing rolls on past binding until the contract is
- * actually terminated, so a customer active longer than their binding
- * period (or churned after it) still represents real months of paid revenue
- * that the binding-period contract value alone wouldn't capture.
+ * How many months of a deal's monthly value it's actually contracted for in
+ * total - the "sold" duration, not a snapshot of time elapsed:
+ *
+ * - Churned: the exact months from billing start to the churn date -
+ *   whatever they actually paid for, uncapped by the binding period (billing
+ *   rolls on past binding until terminated).
+ * - Notice given but not yet churned: the months up to the already-computed
+ *   contractEndDate (see computeContractEndDate in actions/deals.ts), which
+ *   already accounts for a renewal if notice came too late to exit at the
+ *   current term's end.
+ * - Still active, no notice ever given: the contract tacitly renews for
+ *   another full binding period every time a term boundary passes without
+ *   notice, so this counts every full term reached so far (at least one -
+ *   the current one) rather than just the original binding period.
  */
-export function realizedContractValue(
+export function contractedMonths(
   deal: {
-    saleAmount: number | null;
+    bindingMonths: number | null;
     billingStartDate: Date | null;
     liveAt: Date | null;
     churnedAt: Date | null;
+    contractEndDate: Date | null;
   },
-  asOf: Date
+  now: Date
 ): number {
   const start = deal.billingStartDate ?? deal.liveAt;
-  if (!start || !deal.saleAmount) return 0;
-  const end = deal.churnedAt ?? asOf;
-  const months = Math.max(0, differenceInCalendarMonths(end, start));
-  return deal.saleAmount * months;
+  if (!start) return 0;
+  if (deal.churnedAt) {
+    return Math.max(0, differenceInCalendarMonths(deal.churnedAt, start));
+  }
+  if (deal.contractEndDate) {
+    return Math.max(0, differenceInCalendarMonths(deal.contractEndDate, start));
+  }
+  const bindingMonths = deal.bindingMonths ?? 0;
+  if (bindingMonths <= 0) return 0;
+  const elapsed = Math.max(0, differenceInCalendarMonths(now, start));
+  const termsSoFar = Math.floor(elapsed / bindingMonths) + 1;
+  return termsSoFar * bindingMonths;
+}
+
+/** Total contracted value: contractedMonths (see above) times the monthly price. */
+export function contractedContractValue(
+  deal: {
+    saleAmount: number | null;
+    bindingMonths: number | null;
+    billingStartDate: Date | null;
+    liveAt: Date | null;
+    churnedAt: Date | null;
+    contractEndDate: Date | null;
+  },
+  now: Date
+): number {
+  return (deal.saleAmount ?? 0) * contractedMonths(deal, now);
 }
 
 export function formatDKK(amount: number | null | undefined): string {

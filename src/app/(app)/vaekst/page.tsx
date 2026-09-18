@@ -89,8 +89,8 @@ export default async function GrowthDashboardPage() {
             <Row label="Pipeline kontraktværdi (fuld binding)" value={formatDKK(d.pipelineContractValue)} money />
             <Row label="Opstart i alt" value={formatDKK(d.establishmentTotal)} money />
             <Row
-              label="Realiseret kontraktværdi i alt (alle solgte, ekskl. fremtidig binding)"
-              value={formatDKK(d.realizedContractTotal)}
+              label="Kontraktværdi i alt (alle solgte, inkl. genfornyede perioder)"
+              value={formatDKK(d.contractedContractTotal)}
               money
             />
             <Row label="Samlet booket værdi" value={formatDKK(d.totalBookedValue)} strong money />

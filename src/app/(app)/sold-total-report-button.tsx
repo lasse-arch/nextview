@@ -53,13 +53,16 @@ export function SoldTotalReportButton({ total, breakdown }: { total: number; bre
                 <span className="font-medium text-slate-800">Sådan beregnes hver deals bidrag:</span>
               </p>
               <ul className="ml-4 list-disc space-y-1">
+                <li>Etableringspris (altid), plus antal måneder kunden er/var kontraheret for × månedlig pris.</li>
+                <li>Opsagt: de måneder fra live-/faktureringsdato til opsigelsesdato - ikke mere, da det aldrig blev betalt.</li>
                 <li>
-                  Etableringspris (altid) + de måneder kunden faktisk har betalt månedlig pris for, talt fra
-                  live-/faktureringsdato til i dag (eller til opsigelsesdato, hvis opsagt).
+                  Opsagt med varsel, men endnu ikke ophørt: måneder til den beregnede ophørsdato - som kan ligge en
+                  hel bindingsperiode senere end forventet, hvis opsigelsen kom for sent til at nå varslet inden
+                  udløb (kontrakten fornyer sig selv med en ny periode).
                 </li>
                 <li>
-                  Ikke begrænset af bindingsperioden - fakturering fortsætter jo videre efter binding, indtil
-                  kontrakten opsiges - og ingen fremtidig MRR for en opsagt kunde, da den aldrig blev betalt.
+                  Stadig aktiv, aldrig opsagt: bindingsperioden, plus endnu en fuld periode for hver gang kunden er
+                  &ldquo;rullet videre&rdquo; forbi et udløbstidspunkt uden at opsige.
                 </li>
               </ul>
               <p>

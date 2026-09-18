@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/db";
 import { startOfMonth, subMonths, isWithinInterval, endOfMonth, format } from "date-fns";
 import { da } from "date-fns/locale";
-import { totalContractValue, realizedContractValue } from "@/lib/labels";
+import { totalContractValue, contractedContractValue } from "@/lib/labels";
 
 const PIPELINE_STAGES = [
   "LEAD",
@@ -63,13 +63,13 @@ export async function getDashboardData(ownerId?: string) {
   // MRR anymore, see below). This must match the growth dashboard's
   // "Samlet booket værdi" definition so the two numbers agree.
   const soldDeals = deals.filter((d) => (SOLD_STAGES as readonly string[]).includes(d.stage));
-  // Counts actual realized revenue, not the theoretical full-binding value -
-  // months actually billed (from live/billing-start to churn, or to now if
-  // still active) times the monthly price, plus the one-off establishment
-  // fee. Uncapped by bindingMonths since billing rolls on past binding until
-  // the contract is actually terminated.
-  const soldContribution = (d: Parameters<typeof realizedContractValue>[0] & { establishmentFee: number | null }) =>
-    (d.establishmentFee ?? 0) + realizedContractValue(d, now);
+  // Total contracted value (see contractedContractValue in labels.ts): the
+  // months actually contracted for - exact for a churned or already-notified
+  // deal, or every full binding term tacitly renewed through so far for a
+  // still-open one - times the monthly price, plus the one-off establishment
+  // fee.
+  const soldContribution = (d: Parameters<typeof contractedContractValue>[0] & { establishmentFee: number | null }) =>
+    (d.establishmentFee ?? 0) + contractedContractValue(d, now);
   const soldValue = soldDeals.reduce((sum, d) => sum + soldContribution(d), 0);
   const soldBreakdown = soldDeals
     .map((d) => ({
@@ -79,7 +79,7 @@ export async function getDashboardData(ownerId?: string) {
       churned: Boolean(d.churnedAt),
       mrr: d.saleAmount ?? 0,
       bindingMonths: d.bindingMonths ?? 0,
-      contractValue: realizedContractValue(d, now),
+      contractValue: contractedContractValue(d, now),
       establishmentFee: d.establishmentFee ?? 0,
       contribution: soldContribution(d),
     }))
