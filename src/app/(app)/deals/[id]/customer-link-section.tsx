@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import Link from "next/link";
 import { linkDealToParent, linkBranchesToDeal, unlinkDealFromParent } from "@/lib/actions/deals";
 import { dealName } from "@/lib/labels";
@@ -21,8 +21,37 @@ export function CustomerLinkSection({
   linkableDeals: LinkableDeal[];
 }) {
   const [pending, startTransition] = useTransition();
+  const [linkError, setLinkError] = useState<string | null>(null);
+  const [branchError, setBranchError] = useState<string | null>(null);
   const showToast = useToast();
-  const linkWithId = linkDealToParent.bind(null, dealId);
+
+  function handleLinkSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setLinkError(null);
+    const formData = new FormData(e.currentTarget);
+    startTransition(async () => {
+      const result = await linkDealToParent(dealId, formData);
+      if (!result.ok) {
+        setLinkError(result.error);
+        return;
+      }
+      showToast("Kunde sammenkædet");
+    });
+  }
+
+  function handleBranchesSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setBranchError(null);
+    const formData = new FormData(e.currentTarget);
+    startTransition(async () => {
+      const result = await linkBranchesToDeal(dealId, formData);
+      if (!result.ok) {
+        setBranchError(result.error);
+        return;
+      }
+      showToast("Afdelinger kædet sammen");
+    });
+  }
 
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -56,7 +85,7 @@ export function CustomerLinkSection({
           </button>
         </div>
       ) : (
-        <form action={linkWithId} className="mt-4 flex flex-wrap items-end gap-2">
+        <form onSubmit={handleLinkSubmit} className="mt-4 flex flex-wrap items-end gap-2">
           <div className="flex-1">
             <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">
               Denne kunde er selv en afdeling under…
@@ -78,18 +107,17 @@ export function CustomerLinkSection({
           </div>
           <button
             type="submit"
-            className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800"
+            disabled={pending}
+            className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
           >
-            Kæd sammen
+            {pending ? "Gemmer…" : "Kæd sammen"}
           </button>
+          {linkError && <p className="w-full text-xs text-red-600">{linkError}</p>}
         </form>
       )}
 
       {!parent && linkableDeals.length > 0 && (
-        <form
-          action={linkBranchesToDeal.bind(null, dealId)}
-          className="mt-4 border-t border-slate-100 pt-4"
-        >
+        <form onSubmit={handleBranchesSubmit} className="mt-4 border-t border-slate-100 pt-4">
           <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">
             Tilføj flere afdelinger (vælg flere med Ctrl/Cmd)
           </label>
@@ -105,11 +133,13 @@ export function CustomerLinkSection({
               </option>
             ))}
           </select>
+          {branchError && <p className="mt-1 text-xs text-red-600">{branchError}</p>}
           <button
             type="submit"
-            className="mt-2 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800"
+            disabled={pending}
+            className="mt-2 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-50"
           >
-            Kæd sammen som afdelinger
+            {pending ? "Gemmer…" : "Kæd sammen som afdelinger"}
           </button>
         </form>
       )}

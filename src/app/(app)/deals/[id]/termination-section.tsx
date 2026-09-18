@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { terminateContract, withdrawTermination, setManualContractEndDate } from "@/lib/actions/deals";
 import { formatDate } from "@/lib/labels";
+import { useToast } from "@/components/toast";
 
 function toDateInputValue(date: Date | null): string {
   if (!date) return "";
@@ -28,10 +29,47 @@ export function TerminationSection({
 }) {
   const [pending, startTransition] = useTransition();
   const [editingEndDate, setEditingEndDate] = useState(false);
-  const terminateWithId = terminateContract.bind(null, dealId);
-  const setManualEndDateWithId = setManualContractEndDate.bind(null, dealId);
+  const [terminateError, setTerminateError] = useState<string | null>(null);
+  const [manualEndDateError, setManualEndDateError] = useState<string | null>(null);
+  const showToast = useToast();
 
   if (isChurned) return null;
+
+  function handleTerminateSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setTerminateError(null);
+    const formData = new FormData(e.currentTarget);
+    startTransition(async () => {
+      const result = await terminateContract(dealId, formData);
+      if (!result.ok) {
+        setTerminateError(result.error);
+        return;
+      }
+      showToast("Opsigelse registreret");
+    });
+  }
+
+  function handleManualEndDateSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setManualEndDateError(null);
+    const formData = new FormData(e.currentTarget);
+    startTransition(async () => {
+      const result = await setManualContractEndDate(dealId, formData);
+      if (!result.ok) {
+        setManualEndDateError(result.error);
+        return;
+      }
+      setEditingEndDate(false);
+      showToast("Ophørsdato rettet manuelt");
+    });
+  }
+
+  function handleWithdraw() {
+    startTransition(async () => {
+      await withdrawTermination(dealId);
+      showToast("Opsigelse fortrudt");
+    });
+  }
 
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -66,11 +104,7 @@ export function TerminationSection({
           </p>
 
           {editingEndDate && (
-            <form
-              action={setManualEndDateWithId}
-              className="mt-2 flex flex-wrap items-end gap-2"
-              onSubmit={() => setEditingEndDate(false)}
-            >
+            <form onSubmit={handleManualEndDateSubmit} className="mt-2 flex flex-wrap items-end gap-2">
               <div>
                 <label className="block text-xs font-medium text-amber-800">Ny ophørsdato *</label>
                 <input
@@ -83,9 +117,10 @@ export function TerminationSection({
               </div>
               <button
                 type="submit"
-                className="rounded-md bg-amber-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-900"
+                disabled={pending}
+                className="rounded-md bg-amber-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-900 disabled:opacity-50"
               >
-                Gem dato
+                {pending ? "Gemmer…" : "Gem dato"}
               </button>
               <button
                 type="button"
@@ -94,23 +129,26 @@ export function TerminationSection({
               >
                 Annullér
               </button>
+              {manualEndDateError && <p className="w-full text-xs text-red-600">{manualEndDateError}</p>}
             </form>
           )}
 
           <button
             type="button"
             disabled={pending}
-            onClick={() => startTransition(() => withdrawTermination(dealId))}
+            onClick={handleWithdraw}
             className="mt-2 rounded-md border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-800 hover:bg-amber-100 disabled:opacity-50"
           >
             {pending ? "Gemmer…" : "Fortryd opsigelse"}
           </button>
         </div>
       ) : (
-        <form action={terminateWithId} className="mt-4 space-y-3">
+        <form onSubmit={handleTerminateSubmit} className="mt-4 space-y-3">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Opsigelsesdato *</label>
+              <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                Opsigelsesdato *
+              </label>
               <input
                 name="noticeDate"
                 type="date"
@@ -120,7 +158,9 @@ export function TerminationSection({
               />
             </div>
             <div>
-              <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Opsigelsesvarsel (måneder) *</label>
+              <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                Opsigelsesvarsel (måneder) *
+              </label>
               <input
                 name="noticePeriodMonths"
                 type="number"
@@ -132,11 +172,13 @@ export function TerminationSection({
               />
             </div>
           </div>
+          {terminateError && <p className="text-sm text-red-600">{terminateError}</p>}
           <button
             type="submit"
-            className="rounded-md border border-red-300 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50"
+            disabled={pending}
+            className="rounded-md border border-red-300 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
           >
-            Opsig kontrakt
+            {pending ? "Gemmer…" : "Opsig kontrakt"}
           </button>
         </form>
       )}

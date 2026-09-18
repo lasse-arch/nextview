@@ -1,11 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 
-export async function addDealItem(dealId: string, formData: FormData) {
+export async function addDealItem(
+  dealId: string,
+  formData: FormData
+): Promise<{ ok: true } | { ok: false; error: string }> {
   await requireUser();
 
   const location = String(formData.get("location") || "").trim() || null;
@@ -15,14 +17,14 @@ export async function addDealItem(dealId: string, formData: FormData) {
   const amount = !isFree && amountRaw ? Math.round(parseFloat(amountRaw)) : null;
   const url = String(formData.get("url") || "").trim() || null;
 
-  if (!productType) throw new Error("Angiv en ydelse/produkt.");
+  if (!productType) return { ok: false, error: "Angiv en ydelse/produkt." };
 
   await prisma.dealItem.create({
     data: { dealId, location, productType, amount, isFree, url },
   });
 
   revalidatePath(`/deals/${dealId}`);
-  redirect(`/deals/${dealId}?saved=Tilf%C3%B8jelse%20gemt`);
+  return { ok: true };
 }
 
 export async function removeDealItem(dealId: string, itemId: string) {

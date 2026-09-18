@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
-import { updateDeal, addNote } from "@/lib/actions/deals";
 import Link from "next/link";
 import {
   importTypeLabels,
@@ -29,6 +28,8 @@ import { AddressAutocomplete } from "../../address-autocomplete";
 import { DisplayNameInput } from "../../display-name-input";
 import { LockedContractFields } from "./locked-contract-fields";
 import { ContractStatusRow } from "./contract-status-row";
+import { DealInfoForm } from "./deal-info-form";
+import { NoteForm } from "./note-form";
 
 function authorInitials(name: string): string {
   return name
@@ -44,10 +45,10 @@ export default async function DealDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ dup?: string; calendarWarning?: string; saveError?: string }>;
+  searchParams: Promise<{ dup?: string }>;
 }) {
   const { id } = await params;
-  const { dup, calendarWarning, saveError } = await searchParams;
+  const { dup } = await searchParams;
 
   const [deal, users, currentUser, duplicateDeal, docuSealEnabled] = await Promise.all([
     prisma.deal.findUnique({
@@ -79,9 +80,6 @@ export default async function DealDetailPage({
 
   if (!deal) notFound();
 
-  const updateDealWithId = updateDeal.bind(null, deal.id);
-  const addNoteWithId = addNote.bind(null, deal.id);
-
   return (
     <div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -110,12 +108,6 @@ export default async function DealDetailPage({
         </div>
       </div>
 
-      {saveError && (
-        <div className="mt-4 rounded-md bg-red-50 px-4 py-3 text-sm text-red-800">
-          Kunne ikke gemme: {saveError}
-        </div>
-      )}
-
       {duplicateDeal && (
         <div className="mt-4 rounded-md bg-amber-50 px-4 py-3 text-sm text-amber-800">
           Bemærk: Der findes allerede en anden deal med navnet &quot;{duplicateDeal.companyName}&quot; —{" "}
@@ -126,17 +118,11 @@ export default async function DealDetailPage({
         </div>
       )}
 
-      {calendarWarning && (
-        <div className="mt-4 rounded-md bg-slate-100 px-4 py-3 text-sm text-slate-600">
-          Mødet blev gemt, men kunne ikke sættes i Google Kalender: {calendarWarning}
-        </div>
-      )}
-
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-6">
           <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="text-sm font-semibold text-slate-900">Deal-information</h2>
-            <form action={updateDealWithId} className="mt-4 space-y-4">
+            <DealInfoForm dealId={deal.id}>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Firmanavn (CVR)</label>
@@ -247,7 +233,7 @@ export default async function DealDetailPage({
               >
                 Gem ændringer
               </button>
-            </form>
+            </DealInfoForm>
           </section>
 
           <DealItemsSection dealId={deal.id} items={deal.items} />
@@ -256,43 +242,27 @@ export default async function DealDetailPage({
             <h2 className="text-sm font-semibold text-slate-900">Noter</h2>
 
             <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <form action={addNoteWithId} className="rounded-md border border-slate-200 p-3">
-                <input type="hidden" name="kind" value="MANUAL" />
-                <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Ny note</label>
-                <textarea
-                  name="body"
-                  rows={3}
-                  required
-                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-                  placeholder="Skriv en note om dealen…"
-                />
-                <button
-                  type="submit"
-                  className="mt-2 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800"
-                >
-                  Tilføj note
-                </button>
-              </form>
+              <NoteForm
+                dealId={deal.id}
+                kind="MANUAL"
+                label="Ny note"
+                placeholder="Skriv en note om dealen…"
+                className="rounded-md border border-slate-200 p-3"
+                buttonClassName="mt-2 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+                buttonLabel="Tilføj note"
+                savedMessage="Note tilføjet"
+              />
 
-              <form action={addNoteWithId} className="rounded-md border border-slate-200 bg-indigo-50/40 p-3">
-                <input type="hidden" name="kind" value="AI_MEETING" />
-                <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                  AI-mødenote (indsæt fra AI Pocket)
-                </label>
-                <textarea
-                  name="body"
-                  rows={3}
-                  required
-                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-                  placeholder="Indsæt mødenoten/transskriptionen her…"
-                />
-                <button
-                  type="submit"
-                  className="mt-2 rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-500"
-                >
-                  Gem mødenote
-                </button>
-              </form>
+              <NoteForm
+                dealId={deal.id}
+                kind="AI_MEETING"
+                label="AI-mødenote (indsæt fra AI Pocket)"
+                placeholder="Indsæt mødenoten/transskriptionen her…"
+                className="rounded-md border border-slate-200 bg-indigo-50/40 p-3"
+                buttonClassName="mt-2 rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
+                buttonLabel="Gem mødenote"
+                savedMessage="Mødenote gemt"
+              />
             </div>
 
             <ul className="mt-6 space-y-3">

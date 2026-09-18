@@ -103,26 +103,31 @@ export async function duplicateDeal(dealId: string) {
   redirect(`/deals/${deal.id}`);
 }
 
-export async function updateDeal(dealId: string, formData: FormData) {
+export type UpdateDealResult =
+  | {
+      ok: true;
+      message: string;
+      duplicate: { id: string; companyName: string } | null;
+      calendarWarning: string | null;
+    }
+  | { ok: false; error: string };
+
+export async function updateDeal(dealId: string, formData: FormData): Promise<UpdateDealResult> {
   const user = await requireUser();
 
   try {
-    await updateDealInner(dealId, formData, user);
+    return await updateDealInner(dealId, formData, user);
   } catch (err) {
-    // redirect() throws internally to signal Next.js - let that pass through
-    // untouched. Any real validation/DB error instead redirects back to the
-    // deal with the message shown inline, rather than crashing the whole
-    // page to Next's generic error boundary (which redacts the message in
-    // production anyway, leaving no clue what went wrong or how to recover).
-    if (err && typeof err === "object" && "digest" in err && typeof err.digest === "string" && err.digest.startsWith("NEXT_REDIRECT")) {
-      throw err;
-    }
     const message = err instanceof Error ? err.message : "Der opstod en uventet fejl ved gem.";
-    redirect(`/deals/${dealId}?saveError=${encodeURIComponent(message)}`);
+    return { ok: false, error: message };
   }
 }
 
-async function updateDealInner(dealId: string, formData: FormData, user: Awaited<ReturnType<typeof requireUser>>) {
+async function updateDealInner(
+  dealId: string,
+  formData: FormData,
+  user: Awaited<ReturnType<typeof requireUser>>
+): Promise<UpdateDealResult> {
   const companyName = String(formData.get("companyName") || "").trim();
   const displayName = String(formData.get("displayName") || "").trim() || null;
   const cvrNumber = String(formData.get("cvrNumber") || "").trim() || null;
@@ -315,15 +320,14 @@ async function updateDealInner(dealId: string, formData: FormData, user: Awaited
 
   revalidatePath("/deals");
   revalidatePath("/commission");
+  revalidatePath(`/deals/${dealId}`);
 
-  const params = new URLSearchParams();
-  if (duplicates.length > 0) params.set("dup", duplicates[0].id);
-  if (calendarWarning) params.set("calendarWarning", calendarWarning);
-  params.set(
-    "saved",
-    blockedStageChange ? "Gemt (stadiet styres via kontrakten og blev ikke ændret)" : "1"
-  );
-  redirect(`/deals/${dealId}?${params.toString()}`);
+  return {
+    ok: true,
+    message: blockedStageChange ? "Gemt (stadiet styres via kontrakten og blev ikke ændret)" : "Gemt",
+    duplicate: duplicates.length > 0 ? { id: duplicates[0].id, companyName: duplicates[0].companyName } : null,
+    calendarWarning,
+  };
 }
 
 export async function updateDealStage(dealId: string, newStage: DealStage) {
@@ -452,21 +456,24 @@ export async function resolveDuplicate(keepId: string, deleteId: string) {
  * actual data: each branch keeps its own CVR number, contract, invoicing
  * and commission entirely independently.
  */
-export async function linkDealToParent(dealId: string, formData: FormData) {
+export async function linkDealToParent(
+  dealId: string,
+  formData: FormData
+): Promise<{ ok: true } | { ok: false; error: string }> {
   await requireUser();
   const parentDealId = String(formData.get("parentDealId") || "");
-  if (!parentDealId) throw new Error("Vælg en kunde at kæde sammen med.");
-  if (parentDealId === dealId) throw new Error("En deal kan ikke kædes sammen med sig selv.");
+  if (!parentDealId) return { ok: false, error: "Vælg en kunde at kæde sammen med." };
+  if (parentDealId === dealId) return { ok: false, error: "En deal kan ikke kædes sammen med sig selv." };
 
   const parent = await prisma.deal.findUniqueOrThrow({ where: { id: parentDealId } });
   if (parent.parentDealId) {
-    throw new Error("Den valgte kunde er allerede en afdeling af en anden kunde.");
+    return { ok: false, error: "Den valgte kunde er allerede en afdeling af en anden kunde." };
   }
 
   await prisma.deal.update({ where: { id: dealId }, data: { parentDealId } });
   revalidatePath(`/deals/${dealId}`);
   revalidatePath(`/deals/${parentDealId}`);
-  redirect(`/deals/${dealId}?saved=Kunde%20sammenkædet`);
+  return { ok: true };
 }
 
 /**
@@ -474,28 +481,31 @@ export async function linkDealToParent(dealId: string, formData: FormData) {
  * customer with many locations (e.g. 5 addresses under the same chain) be
  * linked up from the parent's page instead of one-by-one from each branch.
  */
-export async function linkBranchesToDeal(parentDealId: string, formData: FormData) {
+export async function linkBranchesToDeal(
+  parentDealId: string,
+  formData: FormData
+): Promise<{ ok: true } | { ok: false; error: string }> {
   await requireUser();
   const branchDealIds = formData.getAll("branchDealIds").map(String).filter(Boolean);
-  if (branchDealIds.length === 0) throw new Error("Vælg mindst én afdeling at kæde sammen.");
+  if (branchDealIds.length === 0) return { ok: false, error: "Vælg mindst én afdeling at kæde sammen." };
   if (branchDealIds.includes(parentDealId)) {
-    throw new Error("En deal kan ikke kædes sammen med sig selv.");
+    return { ok: false, error: "En deal kan ikke kædes sammen med sig selv." };
   }
 
   const parent = await prisma.deal.findUniqueOrThrow({ where: { id: parentDealId } });
   if (parent.parentDealId) {
-    throw new Error("Denne kunde er allerede en afdeling af en anden kunde.");
+    return { ok: false, error: "Denne kunde er allerede en afdeling af en anden kunde." };
   }
 
   const branches = await prisma.deal.findMany({ where: { id: { in: branchDealIds } } });
   if (branches.some((b) => b.parentDealId)) {
-    throw new Error("En af de valgte afdelinger er allerede kædet sammen med en anden kunde.");
+    return { ok: false, error: "En af de valgte afdelinger er allerede kædet sammen med en anden kunde." };
   }
 
   await prisma.deal.updateMany({ where: { id: { in: branchDealIds } }, data: { parentDealId } });
   revalidatePath(`/deals/${parentDealId}`);
   for (const id of branchDealIds) revalidatePath(`/deals/${id}`);
-  redirect(`/deals/${parentDealId}?saved=Afdelinger%20kædet%20sammen`);
+  return { ok: true };
 }
 
 export async function unlinkDealFromParent(dealId: string) {
@@ -506,18 +516,21 @@ export async function unlinkDealFromParent(dealId: string) {
   if (deal.parentDealId) revalidatePath(`/deals/${deal.parentDealId}`);
 }
 
-export async function addNote(dealId: string, formData: FormData) {
+export async function addNote(
+  dealId: string,
+  formData: FormData
+): Promise<{ ok: true } | { ok: false; error: string }> {
   const user = await requireUser();
   const body = String(formData.get("body") || "").trim();
   const kind = String(formData.get("kind") || "MANUAL") === "AI_MEETING" ? "AI_MEETING" : "MANUAL";
-  if (!body) return;
+  if (!body) return { ok: false, error: "Skriv en note først." };
 
   await prisma.note.create({
     data: { dealId, authorId: user.id, body, kind },
   });
 
   revalidatePath(`/deals/${dealId}`);
-  redirect(`/deals/${dealId}?saved=Note%20tilf%C3%B8jet`);
+  return { ok: true };
 }
 
 /** Used by the board view's Quick-note popup - adds a note without navigating away. */
@@ -585,17 +598,20 @@ function computeContractEndDate(
  * the deal isn't marked inactive immediately, since the customer is still
  * being billed until then. A daily job auto-churns the deal once it's passed.
  */
-export async function terminateContract(dealId: string, formData: FormData) {
+export async function terminateContract(
+  dealId: string,
+  formData: FormData
+): Promise<{ ok: true } | { ok: false; error: string }> {
   await requireUser();
 
   const noticeDateRaw = String(formData.get("noticeDate") || "");
-  if (!noticeDateRaw) throw new Error("Angiv en opsigelsesdato.");
+  if (!noticeDateRaw) return { ok: false, error: "Angiv en opsigelsesdato." };
   const noticeDate = new Date(noticeDateRaw);
-  if (isNaN(noticeDate.getTime())) throw new Error("Ugyldig opsigelsesdato.");
+  if (isNaN(noticeDate.getTime())) return { ok: false, error: "Ugyldig opsigelsesdato." };
 
   const noticePeriodMonthsRaw = String(formData.get("noticePeriodMonths") || "");
   const noticePeriodMonths = parseInt(noticePeriodMonthsRaw, 10);
-  if (!noticePeriodMonths || noticePeriodMonths <= 0) throw new Error("Angiv et gyldigt opsigelsesvarsel.");
+  if (!noticePeriodMonths || noticePeriodMonths <= 0) return { ok: false, error: "Angiv et gyldigt opsigelsesvarsel." };
 
   const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId } });
   const contractEndDate = computeContractEndDate(deal, noticeDate, noticePeriodMonths);
@@ -609,7 +625,7 @@ export async function terminateContract(dealId: string, formData: FormData) {
 
   revalidatePath(`/deals/${dealId}`);
   revalidatePath("/deals");
-  redirect(`/deals/${dealId}?saved=Opsigelse%20registreret`);
+  return { ok: true };
 }
 
 export async function withdrawTermination(dealId: string) {
@@ -629,14 +645,17 @@ export async function withdrawTermination(dealId: string) {
  * full binding term). Marks it manual so the self-heal recompute in
  * updateDealInner/updateDealStage leaves it alone afterwards.
  */
-export async function setManualContractEndDate(dealId: string, formData: FormData) {
+export async function setManualContractEndDate(
+  dealId: string,
+  formData: FormData
+): Promise<{ ok: true } | { ok: false; error: string }> {
   const user = await requireUser();
-  if (user.role !== "ADMIN") throw new Error("Kun admin kan rette ophørsdatoen manuelt.");
+  if (user.role !== "ADMIN") return { ok: false, error: "Kun admin kan rette ophørsdatoen manuelt." };
 
   const raw = String(formData.get("contractEndDate") || "");
-  if (!raw) throw new Error("Angiv en ophørsdato.");
+  if (!raw) return { ok: false, error: "Angiv en ophørsdato." };
   const contractEndDate = new Date(raw);
-  if (isNaN(contractEndDate.getTime())) throw new Error("Ugyldig ophørsdato.");
+  if (isNaN(contractEndDate.getTime())) return { ok: false, error: "Ugyldig ophørsdato." };
 
   await prisma.deal.update({
     where: { id: dealId },
@@ -645,7 +664,7 @@ export async function setManualContractEndDate(dealId: string, formData: FormDat
 
   revalidatePath(`/deals/${dealId}`);
   revalidatePath("/deals");
-  redirect(`/deals/${dealId}?saved=Oph%C3%B8rsdato%20rettet%20manuelt`);
+  return { ok: true };
 }
 
 export async function markCommissionPaid(commissionId: string) {

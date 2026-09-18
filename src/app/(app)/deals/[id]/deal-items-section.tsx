@@ -100,10 +100,31 @@ export function DealItemsSection({ dealId, items }: { dealId: string; items: Dea
   const [adding, setAdding] = useState(false);
   const [isFree, setIsFree] = useState(false);
   const [productType, setProductType] = useState("");
-  const addItemWithId = addDealItem.bind(null, dealId);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+  const showToast = useToast();
 
   const total = items.filter((i) => !i.isFree).reduce((sum, i) => sum + (i.amount ?? 0), 0);
   const freeCount = items.filter((i) => i.isFree).length;
+
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setError(null);
+    const form = e.currentTarget;
+    const formData = new FormData(form);
+    startTransition(async () => {
+      const result = await addDealItem(dealId, formData);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      form.reset();
+      setIsFree(false);
+      setProductType("");
+      setAdding(false);
+      showToast("Tilføjelse gemt");
+    });
+  }
 
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -123,7 +144,7 @@ export function DealItemsSection({ dealId, items }: { dealId: string; items: Dea
       </p>
 
       {adding && (
-        <form action={addItemWithId} className="mt-4 grid grid-cols-2 gap-3 rounded-md border border-slate-200 p-3 sm:grid-cols-4">
+        <form onSubmit={handleSubmit} className="mt-4 grid grid-cols-2 gap-3 rounded-md border border-slate-200 p-3 sm:grid-cols-4">
           <div>
             <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Sted (valgfri)</label>
             <input
@@ -185,11 +206,13 @@ export function DealItemsSection({ dealId, items }: { dealId: string; items: Dea
               />
             </div>
           )}
+          {error && <p className="col-span-2 text-xs text-red-600 sm:col-span-4">{error}</p>}
           <button
             type="submit"
-            className="col-span-2 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 sm:col-span-4"
+            disabled={pending}
+            className="col-span-2 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-50 sm:col-span-4"
           >
-            Tilføj
+            {pending ? "Gemmer…" : "Tilføj"}
           </button>
         </form>
       )}
