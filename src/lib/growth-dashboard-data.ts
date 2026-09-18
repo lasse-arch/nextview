@@ -46,11 +46,16 @@ export async function getGrowthDashboardData() {
   const pipelineDeals = deals.filter(
     (d) => (PIPELINE_STAGES as readonly string[]).includes(d.stage) && !d.churnedAt && isBillable(d)
   );
-  // Churned/inactive customers still paid their one-off establishment fee -
-  // that stays counted in "Opstart i alt" - they just drop out of MRR/ARR
-  // and every other forward-looking metric above.
-  const churnedButWasLive = deals.filter((d) => d.stage === "LIVE" && d.churnedAt && isBillable(d));
   const expiredCount = deals.filter((d) => d.churnedAt).length;
+
+  // "Solgt" (has a signed contract that reached at least Live) is a lower
+  // bar than "billable" (also needs a recurring monthly fee + binding) - a
+  // customer who only ever paid a one-off establishment fee, or who has
+  // since churned, is still "solgt" and their establishment fee still
+  // counts in "Opstart i alt", even though they're excluded from MRR/ARR
+  // and the other billable-only metrics above.
+  const soldStages = ["LIVE", ...PIPELINE_STAGES] as readonly string[];
+  const soldDeals = deals.filter((d) => soldStages.includes(d.stage));
 
   const activeMRR = activeDeals.reduce((sum, d) => sum + monthlyRate(d), 0);
   const pipelineMRR = pipelineDeals.reduce((sum, d) => sum + monthlyRate(d), 0);
@@ -80,10 +85,7 @@ export async function getGrowthDashboardData() {
   }, 0);
   const remainingContractValue = activeContractValue - realizedToDate;
   const pipelineContractValue = pipelineDeals.reduce((sum, d) => sum + totalContractValue(d), 0);
-  const establishmentTotal = [...activeDeals, ...pipelineDeals, ...churnedButWasLive].reduce(
-    (sum, d) => sum + (d.establishmentFee ?? 0),
-    0
-  );
+  const establishmentTotal = soldDeals.reduce((sum, d) => sum + (d.establishmentFee ?? 0), 0);
   const totalBookedValue = activeContractValue + pipelineContractValue + establishmentTotal;
 
   const billableCustomers = [...activeDeals, ...pipelineDeals];

@@ -50,8 +50,10 @@ export async function getDashboardData(ownerId?: string) {
   const activePipeline = deals.filter((d) => (ACTIVE_PIPELINE_STAGES as readonly string[]).includes(d.stage));
   const pipelineValue = activePipeline.reduce((sum, d) => sum + soldTotalValue(d), 0);
 
+  // "Solgt" means having a signed contract that reached Live - a churned
+  // customer still counts here (and in the funnel's Live bucket below),
+  // they just don't contribute ongoing MRR anymore.
   const liveDeals = deals.filter((d) => d.stage === "LIVE");
-  const liveCustomers = liveDeals.filter((d) => !d.churnedAt);
   // A churned/inactive customer still paid their one-off establishment fee -
   // that stays counted - but their monthly fee no longer counts going forward.
   const liveValue = liveDeals.reduce(
@@ -142,7 +144,7 @@ export async function getDashboardData(ownerId?: string) {
     pipelineValue,
     pipelineCount: activePipeline.length,
     liveValue,
-    liveCount: liveCustomers.length,
+    liveCount: liveDeals.length,
     soldThisMonthValue,
     soldThisMonthCount: soldThisMonth.length,
     soldThisMonthDeals,

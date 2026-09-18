@@ -1,9 +1,24 @@
 import { prisma } from "@/lib/db";
 import { dealName } from "@/lib/labels";
+import type { Prisma } from "@prisma/client";
 
-export default async function LiveCustomersPage() {
+export default async function LiveCustomersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string }>;
+}) {
+  const { q } = await searchParams;
+
+  const where: Prisma.DealWhereInput = { stage: "LIVE", churnedAt: null };
+  if (q) {
+    where.OR = [
+      { companyName: { contains: q, mode: "insensitive" } },
+      { displayName: { contains: q, mode: "insensitive" } },
+    ];
+  }
+
   const deals = await prisma.deal.findMany({
-    where: { stage: "LIVE", churnedAt: null },
+    where,
     include: { items: { orderBy: { createdAt: "asc" } } },
     orderBy: { companyName: "asc" },
   });
@@ -17,6 +32,16 @@ export default async function LiveCustomersPage() {
           hjemmeside).
         </p>
       </div>
+
+      <form method="get" className="mt-4">
+        <input
+          type="text"
+          name="q"
+          defaultValue={q ?? ""}
+          placeholder="Søg på navn…"
+          className="w-full max-w-sm rounded-md border border-slate-300 px-3 py-2 text-sm"
+        />
+      </form>
 
       <div className="mt-6 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <ul className="divide-y divide-slate-100">
@@ -48,7 +73,11 @@ export default async function LiveCustomersPage() {
               </div>
             </li>
           ))}
-          {deals.length === 0 && <li className="px-5 py-8 text-center text-sm text-slate-400">Ingen live kunder endnu.</li>}
+          {deals.length === 0 && (
+            <li className="px-5 py-8 text-center text-sm text-slate-400">
+              {q ? "Ingen live kunder matcher søgningen." : "Ingen live kunder endnu."}
+            </li>
+          )}
         </ul>
       </div>
     </div>
