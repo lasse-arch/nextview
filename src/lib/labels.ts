@@ -84,6 +84,8 @@ export function totalContractValue(deal: { saleAmount: number | null; bindingMon
  * How many months of a deal's monthly value it's actually contracted for in
  * total - the "sold" duration, not a snapshot of time elapsed:
  *
+ * - Not live yet (signed/filmed, billing hasn't started): the plain binding
+ *   period - it's fully sold already, just not delivered/billing yet.
  * - Churned: the exact months from billing start to the churn date -
  *   whatever they actually paid for, uncapped by the binding period (billing
  *   rolls on past binding until terminated).
@@ -107,7 +109,7 @@ export function contractedMonths(
   now: Date
 ): number {
   const start = deal.billingStartDate ?? deal.liveAt;
-  if (!start) return 0;
+  if (!start) return deal.bindingMonths ?? 0;
   if (deal.churnedAt) {
     return Math.max(0, differenceInCalendarMonths(deal.churnedAt, start));
   }
