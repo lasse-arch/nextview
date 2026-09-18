@@ -1,10 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
-import { verifyWebhookSignature } from "@/lib/docuseal";
+import { verifyWebhookSignature, downloadCompletedPdf } from "@/lib/docuseal";
 import { recalcCommission } from "@/lib/commission-service";
 import { sendContractSignedNotification } from "@/lib/notification-service";
 import { contractProductsToDealItems, type ContractProducts } from "@/lib/contract-template-data";
-import { archiveSignedContractToDrive } from "@/lib/actions/google-drive-archive";
+import { archiveSignedContractToDrive, findArchivingGoogleAccount } from "@/lib/actions/google-drive-archive";
+import { findOrCreateContractsFolder, uploadPdfToDrive } from "@/lib/google-drive";
+import { isIntegrationEnabled } from "@/lib/integration-settings";
 
 type DocuSealEvent = {
   event_type?: string;
@@ -21,6 +23,55 @@ type DocuSealEvent = {
 // register one) - a GET here just lets us sanity-check the URL is reachable.
 export async function GET() {
   return NextResponse.json({ ok: true });
+}
+
+/**
+ * A standalone contract (see standalone-contracts.ts) has no Deal to attach
+ * ContractEvent history or run deal-only side effects (commission, "Ydelser"
+ * lines, the signed-notification email) to yet - those all happen once it's
+ * linked to one instead. This just keeps its own status/dates current and,
+ * once fully signed, files it into Drive under its company name.
+ */
+async function handleStandaloneEvent(
+  contract: { id: string; companyName: string; displayName: string | null; contractViewedAt: Date | null; contractSignedAt: Date | null; docusealSubmissionId: string | null },
+  type: string,
+  isCustomer: boolean,
+  changedAt: Date
+) {
+  if (type === "form.viewed") {
+    if (isCustomer && !contract.contractViewedAt) {
+      await prisma.standaloneContract.update({
+        where: { id: contract.id },
+        data: { contractStatus: "VIEWED", contractViewedAt: changedAt },
+      });
+    }
+  } else if ((type === "form.completed" && isCustomer) || type === "submission.completed") {
+    if (!contract.contractSignedAt) {
+      await prisma.standaloneContract.update({
+        where: { id: contract.id },
+        data: { contractStatus: "SIGNED", contractSignedAt: changedAt },
+      });
+    }
+    if (type === "submission.completed") {
+      try {
+        if ((await isIntegrationEnabled("GOOGLE_DRIVE")) && contract.docusealSubmissionId) {
+          const account = await findArchivingGoogleAccount();
+          if (account) {
+            const pdf = await downloadCompletedPdf(contract.docusealSubmissionId);
+            const folderId = await findOrCreateContractsFolder(account);
+            const fileName = `${contract.displayName || contract.companyName} - underskrevet kontrakt.pdf`;
+            await uploadPdfToDrive(account, folderId, fileName, Buffer.from(pdf));
+          }
+        }
+      } catch (err) {
+        console.error(`Google Drev-arkivering fejlede for standalone-kontrakt ${contract.id}:`, err);
+      }
+    }
+  } else if (type === "form.declined") {
+    await prisma.standaloneContract.update({ where: { id: contract.id }, data: { contractStatus: "DECLINED" } });
+  } else if (type === "submission.expired" || type === "submission.archived") {
+    await prisma.standaloneContract.update({ where: { id: contract.id }, data: { contractStatus: "VOIDED" } });
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -42,11 +93,15 @@ export async function POST(request: NextRequest) {
   const submissionId = payload.data?.submission?.id ?? payload.data?.submission_id;
   if (!type || !submissionId) return NextResponse.json({ ok: true });
 
-  const deal = await prisma.deal.findUnique({ where: { docusealSubmissionId: String(submissionId) } });
-  if (!deal) return NextResponse.json({ ok: true });
-
   const isCustomer = payload.data?.external_id === "customer";
   const changedAt = payload.timestamp ? new Date(payload.timestamp) : new Date();
+
+  const deal = await prisma.deal.findUnique({ where: { docusealSubmissionId: String(submissionId) } });
+  if (!deal) {
+    const standalone = await prisma.standaloneContract.findUnique({ where: { docusealSubmissionId: String(submissionId) } });
+    if (standalone) await handleStandaloneEvent(standalone, type, isCustomer, changedAt);
+    return NextResponse.json({ ok: true });
+  }
 
   function logEvent(eventType: string) {
     return prisma.contractEvent.create({ data: { dealId: deal!.id, type: eventType, occurredAt: changedAt } });

@@ -17,6 +17,23 @@ type SetupAndQuantity = { selected: boolean; setupFee: number; quantity: number 
 
 export type ContractLanguage = "da" | "en";
 
+export const PRODUCT_LABELS: Record<
+  keyof Pick<ContractProducts, "nextviewTour" | "hjemmeside" | "droneOptagelse" | "visitkort">,
+  string
+> = {
+  nextviewTour: "Nextview360 Tour",
+  hjemmeside: "Hjemmeside",
+  droneOptagelse: "Drone-optagelse",
+  visitkort: "Visitkort",
+};
+
+/**
+ * Only one person ever signs on our side, regardless of which seller owns
+ * the deal - the director, not the salesperson (see the contract template's
+ * "For leverandør" signature block, which prints this same fixed name).
+ */
+export const CONTRACT_SIGNER = { name: "Lasse Larsen", email: "info@nextview360.dk" };
+
 /**
  * Every product always has an etableringspris (one-off setup fee) - only
  * hjemmeside and nextviewTour also recur monthly, and only visitkort also

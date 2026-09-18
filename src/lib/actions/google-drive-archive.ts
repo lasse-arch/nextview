@@ -11,7 +11,7 @@ import { findOrCreateContractsFolder, uploadPdfToDrive } from "@/lib/google-driv
  * admin's, since this is a company-wide filing job, not tied to whichever
  * salesperson happened to own the deal.
  */
-async function findArchivingGoogleAccount() {
+export async function findArchivingGoogleAccount() {
   const accounts = await prisma.emailAccount.findMany({
     where: { provider: "GOOGLE" },
     include: { user: true },

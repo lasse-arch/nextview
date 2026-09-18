@@ -5,23 +5,16 @@ import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { isDocuSealConfigured, createAndSendSubmission, cancelDocuSealSubmission } from "@/lib/docuseal";
 import { lookupCvrNumber } from "@/lib/cvr";
-import { buildContractHtmlData, computeMonthlyTotal, computeSetupTotal, type ContractProducts } from "@/lib/contract-template-data";
+import {
+  buildContractHtmlData,
+  computeMonthlyTotal,
+  computeSetupTotal,
+  PRODUCT_LABELS,
+  CONTRACT_SIGNER,
+  type ContractProducts,
+} from "@/lib/contract-template-data";
 import { buildContractHtml } from "@/lib/contract-html-template";
 import { renderContractPdf } from "@/lib/contract-pdf-renderer";
-
-const PRODUCT_LABELS: Record<keyof Pick<ContractProducts, "nextviewTour" | "hjemmeside" | "droneOptagelse" | "visitkort">, string> = {
-  nextviewTour: "Nextview360 Tour",
-  hjemmeside: "Hjemmeside",
-  droneOptagelse: "Drone-optagelse",
-  visitkort: "Visitkort",
-};
-
-/**
- * Only one person ever signs on our side, regardless of which seller owns
- * the deal - the director, not the salesperson (see the contract template's
- * "For leverandør" signature block, which prints this same fixed name).
- */
-const CONTRACT_SIGNER = { name: "Lasse Larsen", email: "info@nextview360.dk" };
 
 /**
  * Pre-flight check before opening the contract-builder page: the master

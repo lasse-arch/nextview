@@ -127,6 +127,7 @@ model User {
   emailAccounts EmailAccount[]
   goals         Goal[]         @relation("GoalOwner")
   createdGoals  Goal[]         @relation("GoalCreatedBy")
+  standaloneContracts StandaloneContract[]
 }
 
 /// A monthly target, either for one seller (userId set) or for the whole
@@ -271,6 +272,43 @@ model ContractEvent {
   createdAt  DateTime @default(now())
 
   @@index([dealId, occurredAt])
+}
+
+/// A contract sent to a signer before any Deal exists for them yet (e.g. a
+/// walk-in customer signed on the spot at an event) - carries exactly the
+/// same fields a Deal would for contract purposes. Once a matching Deal is
+/// created or found, linkStandaloneContractToDeal copies these fields onto
+/// it and this row is deleted - it's a holding area, not permanent storage.
+model StandaloneContract {
+  id           String  @id @default(cuid())
+  companyName  String
+  displayName  String?
+  cvrNumber    String?
+  contactName  String?
+  contactEmail String?
+  contactPhone String?
+  address      String?
+
+  soldProduct        String?
+  bindingMonths      Int?
+  saleAmount         Int?
+  establishmentFee   Int?
+  noticePeriodMonths Int     @default(6)
+  additionalTerms    String?
+  contractProducts   Json?
+  language           String  @default("da")
+
+  docusealSubmissionId String?        @unique
+  contractStatus       ContractStatus @default(NONE)
+  contractSentAt       DateTime?
+  contractViewedAt     DateTime?
+  contractSignedAt     DateTime?
+
+  createdBy   User   @relation(fields: [createdById], references: [id])
+  createdById String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 /// A service/product line on a deal - optionally tied to one of the

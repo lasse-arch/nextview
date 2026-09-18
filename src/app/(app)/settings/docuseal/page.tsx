@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { isDocuSealConfigured } from "@/lib/docuseal";
 import { isIntegrationEnabled } from "@/lib/integration-settings";
 import { IntegrationToggle } from "../integration-toggle";
@@ -59,6 +60,24 @@ export default async function DocuSealSettingsPage() {
           Når kontrakten underskrives, sættes dealens &quot;solgt dato&quot; automatisk, provisionen beregnes med
           det samme, og sælgeren + alle admins får en e-mail.
         </p>
+      </section>
+
+      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-semibold text-slate-900">Kontrakter uden deal</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Send en kontrakt til nogen der endnu ikke har en deal (fx underskrift på stedet ved et event), og kæd
+              den sammen med en deal bagefter.
+            </p>
+          </div>
+          <Link
+            href="/settings/docuseal/standalone-contracts"
+            className="shrink-0 rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium hover:bg-slate-50"
+          >
+            Åbn
+          </Link>
+        </div>
       </section>
 
       <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
