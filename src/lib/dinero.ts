@@ -1,7 +1,7 @@
 import { isIntegrationEnabled } from "@/lib/integration-settings";
 
 const DINERO_API_BASE = "https://api.dinero.dk/v1";
-const DINERO_AUTH_URL = "https://authz.dinero.dk/dinero/oauth/token";
+const DINERO_AUTH_URL = "https://authz.dinero.dk/dineroapi/oauth/token";
 
 function hasDineroCredentials(): boolean {
   return Boolean(
@@ -20,10 +20,8 @@ export async function isDineroConfigured(): Promise<boolean> {
 /**
  * Dinero's OAuth2 "password" grant, scoped to a single organization by
  * passing that organization's personal API key as both username and
- * password. Not yet verified against a live Dinero account - built from
- * Dinero's public API documentation. Test and adjust once credentials are
- * available (Dinero -> Indstillinger -> API for the API key; a registered
- * developer app for client id/secret).
+ * password (per Dinero's personal-integration docs at
+ * developer.dinero.dk/documentation/personal-integration/).
  */
 async function getAccessToken(): Promise<string> {
   const clientId = process.env.DINERO_CLIENT_ID!;
@@ -37,7 +35,12 @@ async function getAccessToken(): Promise<string> {
       Authorization: `Basic ${basicAuth}`,
       "Content-Type": "application/x-www-form-urlencoded",
     },
-    body: new URLSearchParams({ grant_type: "password", username: apiKey, password: apiKey }),
+    body: new URLSearchParams({
+      grant_type: "password",
+      scope: "read write",
+      username: apiKey,
+      password: apiKey,
+    }),
   });
 
   if (!res.ok) throw new Error(`Dinero: kunne ikke godkende (${res.status}): ${await res.text()}`);
