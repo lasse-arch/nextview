@@ -404,6 +404,76 @@ export async function markEstablishmentSentManually(dealId: string): Promise<{ o
   return { ok: true };
 }
 
+export type InvoicePeriodOption = {
+  quarterIndex: number;
+  label: string;
+  amount: number;
+  status: string | null;
+};
+
+/**
+ * Every recurring period (quarterIndex 1+) in a deal's current term, past
+ * and future through the rolling horizon - not just the ones currently due
+ * like computeDueLines returns. Used by the "marker kvartal sendt manuelt"
+ * picker, for when a quarter was invoiced entirely outside the system (e.g.
+ * sent directly in Dinero) and just needs to be recorded here so the
+ * automated generator doesn't also try to draft it.
+ */
+export async function listRecurringPeriodsForDeal(dealId: string): Promise<InvoicePeriodOption[]> {
+  const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId }, include: { invoices: true } });
+  if (!deal.billingStartDate || !deal.saleAmount || !deal.bindingMonths) return [];
+
+  const now = new Date();
+  const contractEnd = addMonths(deal.billingStartDate, deal.bindingMonths);
+  const until = deal.contractEndDate ?? maxDate([contractEnd, addMonths(now, ROLLING_HORIZON_MONTHS)]);
+  const periods = computeBillingPeriods(deal.billingStartDate, deal.bindingMonths, until);
+  const amounts = computePeriodAmounts(totalContractValue(deal), periods, deal.billingStartDate, deal.bindingMonths);
+  const termInvoices = deal.invoices.filter((inv) => inv.termNumber === deal.currentTermNumber);
+
+  return periods.map((period, i) => ({
+    quarterIndex: period.index,
+    label: invoicePeriodLabel(period.startDate),
+    amount: amounts[i],
+    status: termInvoices.find((inv) => inv.quarterIndex === period.index)?.status ?? null,
+  }));
+}
+
+/**
+ * Marks one specific, chosen recurring period as handled by hand outside
+ * Dinero-kladden (e.g. a batch of quarters sent directly in Dinero without
+ * going through this system at all) - same idea as
+ * markEstablishmentSentManually, but for an admin-picked quarter instead of
+ * always quarterIndex 0. Creates the tracking row if none exists yet, or
+ * overwrites whatever state an existing one was in; either way the
+ * automated generator will never touch this line again.
+ */
+export async function markPeriodSentManually(
+  dealId: string,
+  quarterIndex: number
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (quarterIndex < 1) return { ok: false, error: "Ugyldigt kvartal." };
+
+  const periods = await listRecurringPeriodsForDeal(dealId);
+  const period = periods.find((p) => p.quarterIndex === quarterIndex);
+  if (!period) return { ok: false, error: "Dette kvartal findes ikke for denne deal." };
+
+  const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId } });
+  await prisma.invoice.upsert({
+    where: { dealId_termNumber_quarterIndex: { dealId, termNumber: deal.currentTermNumber, quarterIndex } },
+    create: {
+      dealId,
+      termNumber: deal.currentTermNumber,
+      quarterIndex,
+      amount: period.amount,
+      scheduledDate: new Date(),
+      status: "SENT_MANUALLY",
+    },
+    update: { status: "SENT_MANUALLY", failureReason: null },
+  });
+
+  return { ok: true };
+}
+
 /** Looks up whether a drafted invoice has since been paid in Dinero. Only
  * applies to invoices we actually have a real Dinero guid for. */
 export async function checkInvoicePayment(

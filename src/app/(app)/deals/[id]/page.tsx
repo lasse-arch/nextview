@@ -39,6 +39,7 @@ import { CreateInvoiceButton } from "./create-invoice-button";
 import { SendCalendarInviteButton } from "./send-calendar-invite-button";
 import { InvoiceLabelTooltip } from "./invoice-label-tooltip";
 import { MarkSentManuallyButton } from "./mark-sent-manually-button";
+import { MarkPeriodSentManuallyButton } from "./mark-period-sent-manually-button";
 import { CheckPaymentButton } from "./check-payment-button";
 import { DeleteInvoiceButton } from "@/components/delete-invoice-button";
 
@@ -427,6 +428,7 @@ export default async function DealDetailPage({
                     deal.invoices.find((i) => i.quarterIndex === 0)?.status !== "SENT_MANUALLY" && (
                       <MarkSentManuallyButton dealId={deal.id} />
                     )}
+                  <MarkPeriodSentManuallyButton dealId={deal.id} />
                   <CreateInvoiceButton dealId={deal.id} />
                 </div>
               )}

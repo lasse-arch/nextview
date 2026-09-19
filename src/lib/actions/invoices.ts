@@ -9,9 +9,12 @@ import {
   retrySingleInvoice,
   generateInvoiceForDeal,
   markEstablishmentSentManually,
+  listRecurringPeriodsForDeal,
+  markPeriodSentManually,
   checkInvoicePayment,
   checkAllPendingPayments,
   type InvoiceRunSummary,
+  type InvoicePeriodOption,
 } from "@/lib/invoice-service";
 
 export async function runInvoiceGenerationNow(): Promise<InvoiceRunSummary> {
@@ -42,6 +45,29 @@ export async function markEstablishmentSentManuallyAction(dealId: string): Promi
   if (user.role !== "ADMIN") throw new Error("Kun admin kan markere fakturaer som sendt manuelt");
 
   const result = await markEstablishmentSentManually(dealId);
+  revalidatePath(`/deals/${dealId}`);
+  revalidatePath("/settings/dinero");
+  return result;
+}
+
+/** Options for the "marker kvartal sendt manuelt" picker on the deal page -
+ * every recurring period for this deal's current term, past and future,
+ * with whatever status it already has. */
+export async function getRecurringPeriodOptions(dealId: string): Promise<InvoicePeriodOption[]> {
+  const user = await requireUser();
+  if (user.role !== "ADMIN") throw new Error("Kun admin kan se fakturaperioder");
+
+  return listRecurringPeriodsForDeal(dealId);
+}
+
+export async function markPeriodSentManuallyAction(
+  dealId: string,
+  quarterIndex: number
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const user = await requireUser();
+  if (user.role !== "ADMIN") throw new Error("Kun admin kan markere fakturaer som sendt manuelt");
+
+  const result = await markPeriodSentManually(dealId, quarterIndex);
   revalidatePath(`/deals/${dealId}`);
   revalidatePath("/settings/dinero");
   return result;
