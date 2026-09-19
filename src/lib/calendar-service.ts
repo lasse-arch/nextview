@@ -45,7 +45,7 @@ export async function syncDealMeetingToCalendar(dealId: string): Promise<Calenda
   try {
     const eventId = await upsertCalendarEvent(account, {
       eventId: deal.googleCalendarEventId,
-      summary: `Møde: ${dealName(deal)}`,
+      summary: `${dealName(deal)} x Nextview360`,
       description,
       startIso: start.toISOString(),
       endIso: end.toISOString(),
