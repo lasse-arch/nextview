@@ -30,12 +30,16 @@ export function CustomerLinkSection({
     setLinkError(null);
     const formData = new FormData(e.currentTarget);
     startTransition(async () => {
-      const result = await linkDealToParent(dealId, formData);
-      if (!result.ok) {
-        setLinkError(result.error);
-        return;
+      try {
+        const result = await linkDealToParent(dealId, formData);
+        if (!result.ok) {
+          setLinkError(result.error);
+          return;
+        }
+        showToast("Kunde sammenkædet");
+      } catch (err) {
+        setLinkError(err instanceof Error ? err.message : "Der opstod en fejl.");
       }
-      showToast("Kunde sammenkædet");
     });
   }
 
@@ -44,12 +48,16 @@ export function CustomerLinkSection({
     setBranchError(null);
     const formData = new FormData(e.currentTarget);
     startTransition(async () => {
-      const result = await linkBranchesToDeal(dealId, formData);
-      if (!result.ok) {
-        setBranchError(result.error);
-        return;
+      try {
+        const result = await linkBranchesToDeal(dealId, formData);
+        if (!result.ok) {
+          setBranchError(result.error);
+          return;
+        }
+        showToast("Afdelinger kædet sammen");
+      } catch (err) {
+        setBranchError(err instanceof Error ? err.message : "Der opstod en fejl.");
       }
-      showToast("Afdelinger kædet sammen");
     });
   }
 
@@ -75,8 +83,12 @@ export function CustomerLinkSection({
             disabled={pending}
             onClick={() =>
               startTransition(async () => {
-                await unlinkDealFromParent(dealId);
-                showToast("Sammenkædning fjernet");
+                try {
+                  await unlinkDealFromParent(dealId);
+                  showToast("Sammenkædning fjernet");
+                } catch (err) {
+                  showToast(err instanceof Error ? err.message : "Der opstod en fejl.");
+                }
               })
             }
             className="mt-2 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
@@ -160,8 +172,12 @@ export function CustomerLinkSection({
                     disabled={pending}
                     onClick={() =>
                       startTransition(async () => {
-                        await unlinkDealFromParent(b.id);
-                        showToast("Afdeling fjernet");
+                        try {
+                          await unlinkDealFromParent(b.id);
+                          showToast("Afdeling fjernet");
+                        } catch (err) {
+                          showToast(err instanceof Error ? err.message : "Der opstod en fejl.");
+                        }
                       })
                     }
                     className="rounded-md border border-slate-300 bg-white px-2 py-0.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"

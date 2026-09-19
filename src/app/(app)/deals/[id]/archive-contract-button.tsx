@@ -58,13 +58,17 @@ export function ArchiveContractButton({ dealId }: { dealId: string }) {
                 onClick={() => {
                   setError(null);
                   startTransition(async () => {
-                    const result = await archiveSignedContract(dealId, confirmText);
-                    if (!result.ok) {
-                      setError(result.error);
-                      return;
+                    try {
+                      const result = await archiveSignedContract(dealId, confirmText);
+                      if (!result.ok) {
+                        setError(result.error);
+                        return;
+                      }
+                      close();
+                      router.refresh();
+                    } catch (err) {
+                      setError(err instanceof Error ? err.message : "Der opstod en fejl.");
                     }
-                    close();
-                    router.refresh();
                   });
                 }}
                 className="rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"

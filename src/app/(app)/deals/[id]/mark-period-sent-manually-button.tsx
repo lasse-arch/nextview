@@ -30,13 +30,17 @@ export function MarkPeriodSentManuallyButton({ dealId }: { dealId: string }) {
   function confirm() {
     if (selected === null) return;
     startTransition(async () => {
-      const result = await markPeriodSentManuallyAction(dealId, selected);
-      if (result.ok) {
-        showToast("Kvartal markeret som sendt manuelt.");
-        setOpen(false);
-        setOptions(null);
-      } else {
-        showToast(result.error);
+      try {
+        const result = await markPeriodSentManuallyAction(dealId, selected);
+        if (result.ok) {
+          showToast("Kvartal markeret som sendt manuelt.");
+          setOpen(false);
+          setOptions(null);
+        } else {
+          showToast(result.error);
+        }
+      } catch (err) {
+        showToast(err instanceof Error ? err.message : "Der opstod en fejl.");
       }
     });
   }

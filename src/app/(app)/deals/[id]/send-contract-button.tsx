@@ -18,12 +18,16 @@ export function SendContractButton({ dealId, isEdit }: { dealId: string; isEdit:
         onClick={() => {
           setError(null);
           startTransition(async () => {
-            const result = await checkDealReadyForContract(dealId);
-            if (!result.ok) {
-              setError(result.error);
-              return;
+            try {
+              const result = await checkDealReadyForContract(dealId);
+              if (!result.ok) {
+                setError(result.error);
+                return;
+              }
+              setCvrName(result.cvrName);
+            } catch (err) {
+              setError(err instanceof Error ? err.message : "Der opstod en fejl.");
             }
-            setCvrName(result.cvrName);
           });
         }}
         className="w-full rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"

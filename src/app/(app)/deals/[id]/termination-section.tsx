@@ -40,12 +40,16 @@ export function TerminationSection({
     setTerminateError(null);
     const formData = new FormData(e.currentTarget);
     startTransition(async () => {
-      const result = await terminateContract(dealId, formData);
-      if (!result.ok) {
-        setTerminateError(result.error);
-        return;
+      try {
+        const result = await terminateContract(dealId, formData);
+        if (!result.ok) {
+          setTerminateError(result.error);
+          return;
+        }
+        showToast("Opsigelse registreret");
+      } catch (err) {
+        setTerminateError(err instanceof Error ? err.message : "Der opstod en fejl.");
       }
-      showToast("Opsigelse registreret");
     });
   }
 
@@ -54,20 +58,28 @@ export function TerminationSection({
     setManualEndDateError(null);
     const formData = new FormData(e.currentTarget);
     startTransition(async () => {
-      const result = await setManualContractEndDate(dealId, formData);
-      if (!result.ok) {
-        setManualEndDateError(result.error);
-        return;
+      try {
+        const result = await setManualContractEndDate(dealId, formData);
+        if (!result.ok) {
+          setManualEndDateError(result.error);
+          return;
+        }
+        setEditingEndDate(false);
+        showToast("Ophørsdato rettet manuelt");
+      } catch (err) {
+        setManualEndDateError(err instanceof Error ? err.message : "Der opstod en fejl.");
       }
-      setEditingEndDate(false);
-      showToast("Ophørsdato rettet manuelt");
     });
   }
 
   function handleWithdraw() {
     startTransition(async () => {
-      await withdrawTermination(dealId);
-      showToast("Opsigelse fortrudt");
+      try {
+        await withdrawTermination(dealId);
+        showToast("Opsigelse fortrudt");
+      } catch (err) {
+        showToast(err instanceof Error ? err.message : "Der opstod en fejl.");
+      }
     });
   }
 

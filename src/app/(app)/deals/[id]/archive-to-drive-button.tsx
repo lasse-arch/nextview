@@ -17,12 +17,16 @@ export function ArchiveToDriveButton({ dealId }: { dealId: string }) {
           setError(null);
           setDone(false);
           startTransition(async () => {
-            const result = await archiveSignedContractToDriveManual(dealId);
-            if (!result.ok) {
-              setError(result.error);
-              return;
+            try {
+              const result = await archiveSignedContractToDriveManual(dealId);
+              if (!result.ok) {
+                setError(result.error);
+                return;
+              }
+              setDone(true);
+            } catch (err) {
+              setError(err instanceof Error ? err.message : "Der opstod en fejl.");
             }
-            setDone(true);
           });
         }}
         className="block w-full rounded-md border border-slate-300 px-3 py-2 text-center text-sm hover:bg-slate-50 disabled:opacity-60"

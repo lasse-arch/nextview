@@ -14,8 +14,12 @@ export function MarkPaidButton({ commissionId }: { commissionId: string }) {
       disabled={pending}
       onClick={() =>
         startTransition(async () => {
-          await markCommissionPaid(commissionId);
-          showToast("Provision markeret som udbetalt");
+          try {
+            await markCommissionPaid(commissionId);
+            showToast("Provision markeret som udbetalt");
+          } catch (err) {
+            showToast(err instanceof Error ? err.message : "Der opstod en fejl.");
+          }
         })
       }
       className="mt-2 w-full rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"

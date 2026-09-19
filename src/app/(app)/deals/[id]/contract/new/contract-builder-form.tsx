@@ -81,12 +81,16 @@ export function ContractBuilderForm({
   function handleSubmit() {
     setError(null);
     startTransition(async () => {
-      const result = await buildAndSendContract(dealId, products);
-      if (!result.ok) {
-        setError(result.error);
-        return;
+      try {
+        const result = await buildAndSendContract(dealId, products);
+        if (!result.ok) {
+          setError(result.error);
+          return;
+        }
+        router.push(`/deals/${dealId}`);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Der opstod en fejl.");
       }
-      router.push(`/deals/${dealId}`);
     });
   }
 

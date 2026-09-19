@@ -14,9 +14,13 @@ export function CheckPaymentButton({ invoiceId }: { invoiceId: string }) {
       disabled={pending}
       onClick={() =>
         startTransition(async () => {
-          const result = await checkInvoicePaymentAction(invoiceId);
-          if (!result.ok) showToast(result.error);
-          else showToast(result.paid ? "Fakturaen er betalt" : "Ikke betalt endnu");
+          try {
+            const result = await checkInvoicePaymentAction(invoiceId);
+            if (!result.ok) showToast(result.error);
+            else showToast(result.paid ? "Fakturaen er betalt" : "Ikke betalt endnu");
+          } catch (err) {
+            showToast(err instanceof Error ? err.message : "Der opstod en fejl.");
+          }
         })
       }
       className="rounded-md border border-slate-300 px-2 py-0.5 text-[11px] font-medium text-slate-500 hover:bg-slate-50 disabled:opacity-50"

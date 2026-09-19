@@ -33,13 +33,17 @@ export function NoteForm({
     const form = e.currentTarget;
     const formData = new FormData(form);
     startTransition(async () => {
-      const result = await addNote(dealId, formData);
-      if (!result.ok) {
-        setError(result.error);
-        return;
+      try {
+        const result = await addNote(dealId, formData);
+        if (!result.ok) {
+          setError(result.error);
+          return;
+        }
+        form.reset();
+        showToast(savedMessage);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Der opstod en fejl.");
       }
-      form.reset();
-      showToast(savedMessage);
     });
   }
 

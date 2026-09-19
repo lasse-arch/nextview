@@ -109,9 +109,13 @@ export function SendCalendarInviteButton({
     // not yet saved still gets used for the invite.
     const dateInput = rootRef.current?.closest("form")?.querySelector<HTMLInputElement>('input[name="meetingDate"]');
     startTransition(async () => {
-      const result = await sendCalendarInvite(dealId, selected, dateInput?.value || undefined, customBody);
-      showToast(result.synced ? "Kalenderinvitation sendt." : result.reason ?? "Kunne ikke sende invitationen.");
-      if (result.synced) setOpen(false);
+      try {
+        const result = await sendCalendarInvite(dealId, selected, dateInput?.value || undefined, customBody);
+        showToast(result.synced ? "Kalenderinvitation sendt." : result.reason ?? "Kunne ikke sende invitationen.");
+        if (result.synced) setOpen(false);
+      } catch (err) {
+        showToast(err instanceof Error ? err.message : "Der opstod en fejl.");
+      }
     });
   }
 

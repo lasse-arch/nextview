@@ -50,7 +50,14 @@ export function DealTasksSection({
         : null;
 
     setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, done: turningDone } : t)));
-    startTransition(() => toggleTaskDone(taskId, deliveryUrl));
+    startTransition(async () => {
+      try {
+        await toggleTaskDone(taskId, deliveryUrl);
+      } catch (err) {
+        setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, done: !turningDone } : t)));
+        showToast(err instanceof Error ? err.message : "Der opstod en fejl.");
+      }
+    });
   }
 
   function toggleChecked(taskId: string) {
@@ -74,8 +81,12 @@ export function DealTasksSection({
     setCheckedIds(new Set());
     setBulkAssigneeId("");
     startTransition(async () => {
-      await bulkReassignTasks(ids, assigneeId);
-      showToast(`${ids.length} opgave${ids.length === 1 ? "" : "r"} tildelt`);
+      try {
+        await bulkReassignTasks(ids, assigneeId);
+        showToast(`${ids.length} opgave${ids.length === 1 ? "" : "r"} tildelt`);
+      } catch (err) {
+        showToast(err instanceof Error ? err.message : "Der opstod en fejl.");
+      }
     });
   }
 
@@ -90,12 +101,16 @@ export function DealTasksSection({
 
     setAdding(false);
     startTransition(async () => {
-      const result = await createTask(formData);
-      if (result.ok) {
-        setTasks((prev) => [...prev, { id: result.id, title, description: null, done: false, dueDate: null, assigneeId }]);
-        showToast("Opgave oprettet");
-      } else {
-        showToast(result.error);
+      try {
+        const result = await createTask(formData);
+        if (result.ok) {
+          setTasks((prev) => [...prev, { id: result.id, title, description: null, done: false, dueDate: null, assigneeId }]);
+          showToast("Opgave oprettet");
+        } else {
+          showToast(result.error);
+        }
+      } catch (err) {
+        showToast(err instanceof Error ? err.message : "Der opstod en fejl.");
       }
     });
   }

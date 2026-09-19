@@ -14,8 +14,12 @@ export function InactiveToggleButton({ dealId, isChurned }: { dealId: string; is
       disabled={pending}
       onClick={() =>
         startTransition(async () => {
-          await (isChurned ? reactivateDeal(dealId) : markDealInactive(dealId));
-          showToast(isChurned ? "Kunde genaktiveret" : "Kunde markeret som ikke aktiv");
+          try {
+            await (isChurned ? reactivateDeal(dealId) : markDealInactive(dealId));
+            showToast(isChurned ? "Kunde genaktiveret" : "Kunde markeret som ikke aktiv");
+          } catch (err) {
+            showToast(err instanceof Error ? err.message : "Der opstod en fejl.");
+          }
         })
       }
       className={

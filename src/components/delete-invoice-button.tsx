@@ -16,8 +16,12 @@ export function DeleteInvoiceButton({ invoiceId }: { invoiceId: string }) {
       onClick={() => {
         if (!window.confirm("Fjern denne faktura fra CRM'et? Sletter ikke en evt. rigtig kladde i Dinero.")) return;
         startTransition(async () => {
-          await deleteInvoiceDraft(invoiceId);
-          showToast("Faktura fjernet");
+          try {
+            await deleteInvoiceDraft(invoiceId);
+            showToast("Faktura fjernet");
+          } catch (err) {
+            showToast(err instanceof Error ? err.message : "Der opstod en fejl.");
+          }
         });
       }}
       className="rounded-md border border-slate-300 px-2 py-0.5 text-[11px] font-medium text-slate-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"

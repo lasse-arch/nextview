@@ -26,8 +26,12 @@ function RemoveItemButton({ dealId, itemId }: { dealId: string; itemId: string }
       disabled={pending}
       onClick={() =>
         startTransition(async () => {
-          await removeDealItem(dealId, itemId);
-          showToast("Fjernet");
+          try {
+            await removeDealItem(dealId, itemId);
+            showToast("Fjernet");
+          } catch (err) {
+            showToast(err instanceof Error ? err.message : "Der opstod en fejl.");
+          }
         })
       }
       className="text-xs text-slate-400 hover:text-red-600 disabled:opacity-50"
@@ -51,9 +55,13 @@ function ItemLink({ dealId, item }: { dealId: string; item: DealItem }) {
         onSubmit={(e) => {
           e.preventDefault();
           startTransition(async () => {
-            await updateDealItemUrl(dealId, item.id, value);
-            showToast("Link gemt");
-            setEditing(false);
+            try {
+              await updateDealItemUrl(dealId, item.id, value);
+              showToast("Link gemt");
+              setEditing(false);
+            } catch (err) {
+              showToast(err instanceof Error ? err.message : "Der opstod en fejl.");
+            }
           });
         }}
         className="flex items-center gap-1.5"
@@ -107,16 +115,20 @@ export function DealItemsSection({ dealId, items }: { dealId: string; items: Dea
     const form = e.currentTarget;
     const formData = new FormData(form);
     startTransition(async () => {
-      const result = await addDealItem(dealId, formData);
-      if (!result.ok) {
-        setError(result.error);
-        return;
+      try {
+        const result = await addDealItem(dealId, formData);
+        if (!result.ok) {
+          setError(result.error);
+          return;
+        }
+        form.reset();
+        setIsFree(false);
+        setProductType("");
+        setAdding(false);
+        showToast("Tilføjelse gemt");
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Der opstod en fejl.");
       }
-      form.reset();
-      setIsFree(false);
-      setProductType("");
-      setAdding(false);
-      showToast("Tilføjelse gemt");
     });
   }
 

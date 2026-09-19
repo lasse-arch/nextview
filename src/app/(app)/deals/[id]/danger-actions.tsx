@@ -32,8 +32,12 @@ export function DealDangerActions({
           disabled={pending}
           onClick={() =>
             startTransition(async () => {
-              await markDealLost(dealId);
-              showToast("Deal markeret som tabt");
+              try {
+                await markDealLost(dealId);
+                showToast("Deal markeret som tabt");
+              } catch (err) {
+                showToast(err instanceof Error ? err.message : "Der opstod en fejl.");
+              }
             })
           }
           className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-50"
