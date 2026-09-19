@@ -15,6 +15,16 @@ export function InvoiceLabelTooltip({
   rows: { label: string; value: string }[];
 }) {
   const [hovered, setHovered] = useState(false);
+  // A tooltip that would just repeat the label back (no product breakdown,
+  // and the heading is the same text as the label - e.g. an establishment
+  // line on a deal with no contractProducts snapshot to itemize) has nothing
+  // to add, so skip the hover behavior entirely rather than show an empty-
+  // looking popup.
+  const hasExtraInfo = rows.length > 0 || heading !== label;
+
+  if (!hasExtraInfo) {
+    return <span className="text-slate-600">{label}</span>;
+  }
 
   return (
     <span
