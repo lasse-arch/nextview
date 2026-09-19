@@ -96,6 +96,11 @@ function contactBody(input: DineroContactInput) {
     IsPerson: false,
     PaymentConditionType: "Netto",
     PaymentConditionNumberOfDays: 8,
+    // Dinero's own "Opret kontakt" form has an "Opdatér automatisk fra CVR"
+    // checkbox - guessing at CvrDataEnabled as the matching API field (no
+    // official field-name confirmation for this one), since it may also be
+    // what actually makes a contact's CVR-nummer field take effect at all.
+    CvrDataEnabled: true,
   };
 }
 
