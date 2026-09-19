@@ -1,4 +1,4 @@
-import { addMonths, max as maxDate, startOfDay } from "date-fns";
+import { addMonths, addDays, max as maxDate, startOfDay } from "date-fns";
 import { prisma } from "@/lib/db";
 import { isDineroConfigured, createQuarterlyInvoiceDraft } from "@/lib/dinero";
 import { computeBillingPeriods, computePeriodAmounts } from "@/lib/invoice-schedule";
@@ -23,10 +23,20 @@ type DueLine = { quarterIndex: number; amount: number; description: string; sche
 
 /**
  * Due lines for a deal's *current* contract term: a one-time establishment
- * fee (quarterIndex 0, drafted immediately once billing has started) plus
- * calendar-quarter-aligned recurring periods (quarterIndex 1+), each
- * drafted on the 22nd of the month before it starts. Only lines whose
- * trigger date has passed are returned.
+ * fee (quarterIndex 0) plus calendar-quarter-aligned recurring periods
+ * (quarterIndex 1+), each drafted on the 22nd of the month before it
+ * starts. Only lines whose trigger date has passed are returned.
+ *
+ * The establishment fee bills the day after the contract is signed -
+ * independent of billingStartDate, since that's the delivery/go-live date
+ * and signing typically happens well before delivery. Deals imported
+ * without a recorded signing date fall back to billingStartDate so they
+ * still get invoiced.
+ *
+ * The recurring periods still depend on billingStartDate. Billing only
+ * ever applies going forward from today - never retroactively backfill
+ * quarters that have already fully elapsed (e.g. a customer whose
+ * billingStartDate predates this automation existing).
  *
  * Billing isn't cut off just because the binding period has ended - most
  * contracts roll on until they're actually terminated (with notice). So
@@ -39,13 +49,24 @@ function computeDueLines(deal: {
   bindingMonths: number | null;
   establishmentFee: number | null;
   billingStartDate: Date | null;
+  contractSignedAt: Date | null;
   soldProduct: string | null;
   contractEndDate: Date | null;
 }): DueLine[] {
-  if (!deal.billingStartDate || !deal.saleAmount || !deal.bindingMonths) return [];
-
   const now = new Date();
   const lines: DueLine[] = [];
+
+  const establishmentDueDate = deal.contractSignedAt ? addDays(deal.contractSignedAt, 1) : deal.billingStartDate;
+  if (deal.establishmentFee && deal.establishmentFee > 0 && establishmentDueDate && establishmentDueDate <= now) {
+    lines.push({
+      quarterIndex: 0,
+      amount: deal.establishmentFee,
+      description: "Etableringsgebyr",
+      scheduledDate: establishmentDueDate,
+    });
+  }
+
+  if (!deal.billingStartDate || !deal.saleAmount || !deal.bindingMonths) return lines;
 
   const contractEnd = addMonths(deal.billingStartDate, deal.bindingMonths);
   const until = deal.contractEndDate ?? maxDate([contractEnd, addMonths(now, ROLLING_HORIZON_MONTHS)]);
@@ -54,22 +75,9 @@ function computeDueLines(deal: {
   // saleAmount is the monthly fee; computePeriodAmounts wants the contract's total value for the binding period.
   const amounts = computePeriodAmounts(totalContractValue(deal), periods, deal.billingStartDate, deal.bindingMonths);
 
-  // Billing only ever applies going forward from today - never retroactively
-  // backfill quarters that have already fully elapsed (e.g. a customer whose
-  // billingStartDate predates this automation existing). firstRelevantIndex
-  // is the first period that hasn't ended yet; anything before it is stale
-  // history and is skipped entirely, including the establishment fee if even
-  // that original stub period is already in the past.
+  // firstRelevantIndex is the first period that hasn't ended yet; anything
+  // before it is stale history and is skipped entirely.
   const firstRelevantIndex = periods.findIndex((p) => p.endDate >= now);
-
-  if (deal.establishmentFee && deal.establishmentFee > 0 && firstRelevantIndex <= 0) {
-    lines.push({
-      quarterIndex: 0,
-      amount: deal.establishmentFee,
-      description: "Etableringsgebyr",
-      scheduledDate: deal.billingStartDate,
-    });
-  }
 
   periods.forEach((period, i) => {
     if (i < firstRelevantIndex) return;
