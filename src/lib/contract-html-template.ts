@@ -380,7 +380,7 @@ export function buildContractHtml(data: ContractHtmlData, language: ContractLang
   .sig-grid{ display:flex; flex-wrap:wrap; gap:40px; page-break-inside:avoid; break-inside:avoid; }
   .sig-grid > div{ flex:1 1 0; min-width:220px; }
   .sig-party{ font-size:13px; font-weight:700; color:var(--ink); margin-bottom:12px; }
-  .sig-box{ border-bottom:1px solid var(--ink); height:56px; margin-bottom:10px; display:flex; align-items:flex-end; justify-content:center; font-size:13px; color:var(--ink); }
+  .sig-box{ border-bottom:1px solid var(--ink); height:56px; margin-bottom:10px; display:flex; align-items:center; justify-content:center; font-size:13px; color:var(--ink); }
   .sig-meta{ font-size:12.5px; color:var(--ink); line-height:1.6; }
   .sig-meta b{ color:var(--ink); font-weight:600; }
 </style>
