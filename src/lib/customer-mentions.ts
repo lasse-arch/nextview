@@ -1,7 +1,51 @@
+"use server";
+
 import { prisma } from "@/lib/db";
+import { requireUser } from "@/lib/auth";
 import { needsDeliveryLink } from "@/lib/labels";
 
 const MENTION_PATTERN = /@([a-zA-ZæøåÆØÅ0-9-]+)/g;
+
+export type MentionSuggestion = { token: string; label: string; hasLink: boolean };
+
+/** The @mention token suggested for a customer - the first alphanumeric
+ * word of their kaldenavn/firmanavn, lowercased (e.g. "Stidsholt
+ * efterskole" -> "stidsholt"). Matches resolveCustomerMentions's
+ * substring-based lookup either way, but this keeps the inserted text
+ * short and matching the seller's own convention. */
+function mentionToken(name: string): string {
+  return (name.match(/[a-zA-ZæøåÆØÅ0-9]+/)?.[0] ?? "").toLowerCase();
+}
+
+/**
+ * Live customers matching `query` (by kaldenavn/firmanavn), for the
+ * @mention autocomplete dropdown shown while typing "@" in the calendar
+ * invite's extra message field.
+ */
+export async function searchMentionableCustomers(query: string): Promise<MentionSuggestion[]> {
+  await requireUser();
+  const q = query.trim();
+  if (!q) return [];
+
+  const deals = await prisma.deal.findMany({
+    where: {
+      stage: "LIVE",
+      OR: [{ displayName: { contains: q, mode: "insensitive" } }, { companyName: { contains: q, mode: "insensitive" } }],
+    },
+    include: { items: true },
+    take: 8,
+    orderBy: { companyName: "asc" },
+  });
+
+  return deals.map((deal) => {
+    const name = deal.displayName || deal.companyName;
+    return {
+      token: mentionToken(name),
+      label: name,
+      hasLink: deal.items.some((i) => needsDeliveryLink(i.productType) && Boolean(i.url)),
+    };
+  });
+}
 
 /**
  * Replaces @mentions of a live customer's name (e.g. "@stidsholt") with a
