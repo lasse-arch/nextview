@@ -149,7 +149,7 @@ export async function runQuarterlyInvoiceGeneration(): Promise<InvoiceRunSummary
               dineroInvoiceNumber: result.invoiceNumber,
             },
           }),
-          ...(deal.dineroContactGuid
+          ...(deal.dineroContactGuid || result.isTest
             ? []
             : [prisma.deal.update({ where: { id: deal.id }, data: { dineroContactGuid: result.contactGuid } })]),
         ]);

@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db";
 import { isDineroConfigured } from "@/lib/dinero";
-import { isIntegrationEnabled } from "@/lib/integration-settings";
+import { isIntegrationEnabled, isDineroTestMode } from "@/lib/integration-settings";
 import { formatDKK, formatDate, invoiceStatusLabels, dealName } from "@/lib/labels";
 import { RunNowButton } from "./run-now-button";
 import { ClearInvoicesButton } from "./clear-invoices-button";
@@ -15,7 +15,11 @@ const hasCredentials = Boolean(
 );
 
 export default async function DineroSettingsPage() {
-  const [configured, enabled] = await Promise.all([isDineroConfigured(), isIntegrationEnabled("DINERO")]);
+  const [configured, enabled, testMode] = await Promise.all([
+    isDineroConfigured(),
+    isIntegrationEnabled("DINERO"),
+    isDineroTestMode(),
+  ]);
 
   const recentInvoices = await prisma.invoice.findMany({
     orderBy: { createdAt: "desc" },
@@ -67,6 +71,22 @@ export default async function DineroSettingsPage() {
         </div>
       </section>
 
+      <section className={`rounded-xl border p-6 shadow-sm ${testMode ? "border-amber-300 bg-amber-50/40" : "border-slate-200 bg-white"}`}>
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-slate-900">Testtilstand</h2>
+          <IntegrationToggle integrationKey="DINERO_TEST_MODE" enabled={testMode} />
+        </div>
+        <p className={`mt-2 text-sm ${testMode ? "text-amber-700" : "text-slate-500"}`}>
+          {testMode
+            ? "Slået til — der oprettes ALDRIG rigtige kladder i Dinero lige nu. Kladder herunder med et \"TEST\"-mærke er kun gemt i CRM'et."
+            : "Slået fra — kladder oprettes normalt i det rigtige Dinero-regnskab."}
+        </p>
+        <p className="mt-2 text-xs text-slate-400">
+          Brug denne mens I tester fakturaberegningen (fx med "Kør nu" ovenfor), så I kan se hvilke kladder der ville
+          blive oprettet, uden at røre det rigtige regnskab eller oprette rigtige kontakter/fakturaer i Dinero.
+        </p>
+      </section>
+
       <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <h2 className="text-sm font-semibold text-slate-900">Seneste kladder</h2>
         <div className="mt-3 overflow-hidden rounded-md border border-slate-100">
@@ -107,6 +127,11 @@ export default async function DineroSettingsPage() {
                     >
                       {invoiceStatusLabels[inv.status]}
                     </span>
+                    {inv.dineroInvoiceNumber?.startsWith("TEST-") && (
+                      <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">
+                        TEST
+                      </span>
+                    )}
                   </td>
                 </tr>
               ))}

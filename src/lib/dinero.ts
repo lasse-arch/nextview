@@ -1,4 +1,4 @@
-import { isIntegrationEnabled } from "@/lib/integration-settings";
+import { isIntegrationEnabled, isDineroTestMode } from "@/lib/integration-settings";
 
 const DINERO_API_BASE = "https://api.dinero.dk/v1";
 const DINERO_AUTH_URL = "https://authz.dinero.dk/dineroapi/oauth/token";
@@ -79,6 +79,20 @@ async function createContact(accessToken: string, input: DineroContactInput): Pr
   return data.ContactGuid;
 }
 
+/** Looks up an existing Dinero contact by CVR number. Returns null if none is found. */
+async function findContactByCvr(accessToken: string, cvr: string): Promise<string | null> {
+  const orgId = process.env.DINERO_ORGANIZATION_ID!;
+  const query = new URLSearchParams({ queryFilter: `Cvr eq '${cvr}'` });
+
+  const res = await fetch(`${DINERO_API_BASE}/${orgId}/contacts?${query}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+
+  if (!res.ok) throw new Error(`Dinero: kunne ikke slå kontakt op på CVR (${res.status}): ${await res.text()}`);
+  const data = (await res.json()) as { Collection: { ContactGuid: string }[] };
+  return data.Collection[0]?.ContactGuid ?? null;
+}
+
 type DineroInvoiceInput = {
   contactGuid: string;
   description: string;
@@ -116,7 +130,13 @@ async function createInvoiceDraft(
   return { guid: data.Guid, number: data.Number ?? null };
 }
 
-export type DineroDraftResult = { contactGuid: string; invoiceGuid: string; invoiceNumber: string | null };
+export type DineroDraftResult = {
+  contactGuid: string;
+  invoiceGuid: string;
+  invoiceNumber: string | null;
+  /** True if this was a test-mode simulation - no real Dinero API call was made. */
+  isTest?: boolean;
+};
 
 export async function createQuarterlyInvoiceDraft(params: {
   existingContactGuid: string | null;
@@ -128,10 +148,21 @@ export async function createQuarterlyInvoiceDraft(params: {
   amount: number;
   invoiceDate: Date;
 }): Promise<DineroDraftResult> {
+  if (await isDineroTestMode()) {
+    const fake = Math.random().toString(36).slice(2, 8);
+    return {
+      contactGuid: params.existingContactGuid ?? `TEST-CONTACT-${fake}`,
+      invoiceGuid: `TEST-INVOICE-${fake}`,
+      invoiceNumber: `TEST-${fake.toUpperCase()}`,
+      isTest: true,
+    };
+  }
+
   const accessToken = await getAccessToken();
 
   const contactGuid =
     params.existingContactGuid ??
+    (params.cvrNumber ? await findContactByCvr(accessToken, params.cvrNumber) : null) ??
     (await createContact(accessToken, {
       name: params.companyName,
       cvr: params.cvrNumber,
