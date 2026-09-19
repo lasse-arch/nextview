@@ -131,6 +131,7 @@ model User {
   standaloneContracts StandaloneContract[]
   tasksAssigned Task[] @relation("TaskAssignee")
   tasksCreated  Task[] @relation("TaskCreatedBy")
+  taskComments  TaskComment[]
 }
 
 /// A monthly target, either for one seller (userId set) or for the whole
@@ -428,4 +429,18 @@ model Task {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  comments TaskComment[]
+}
+
+model TaskComment {
+  id     String @id @default(cuid())
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  taskId String
+
+  author   User   @relation(fields: [authorId], references: [id])
+  authorId String
+
+  body      String
+  createdAt DateTime @default(now())
 }

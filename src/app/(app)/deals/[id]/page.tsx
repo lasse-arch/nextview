@@ -246,11 +246,13 @@ export default async function DealDetailPage({
             initialTasks={deal.tasks.map((t) => ({
               id: t.id,
               title: t.title,
+              description: t.description,
               done: t.done,
               dueDate: t.dueDate,
               assigneeId: t.assigneeId,
             }))}
             users={users.map((u) => ({ id: u.id, name: u.name }))}
+            deals={[{ id: deal.id, name: dealName(deal) }, ...linkableDeals.map((d) => ({ id: d.id, name: dealName(d) }))]}
           />
 
           <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">

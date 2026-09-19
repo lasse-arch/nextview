@@ -7,6 +7,7 @@ import { isDocuSealConfigured, createAndSendSubmission } from "@/lib/docuseal";
 import { lookupCvrNumber } from "@/lib/cvr";
 import { recalcCommission } from "@/lib/commission-service";
 import { sendContractSignedNotification } from "@/lib/notification-service";
+import { createDeliveryTasksForSignedContract } from "@/lib/task-automation";
 import {
   buildContractHtmlData,
   computeMonthlyTotal,
@@ -198,12 +199,14 @@ export async function linkStandaloneContractToDeal(
     });
 
     if (contract.contractStatus === "SIGNED" && contract.contractProducts) {
-      const items = contractProductsToDealItems(contract.contractProducts as unknown as ContractProducts);
+      const products = contract.contractProducts as unknown as ContractProducts;
+      const items = contractProductsToDealItems(products);
       if (items.length > 0) {
         await prisma.dealItem.createMany({ data: items.map((item) => ({ ...item, dealId })) });
       }
       await recalcCommission(dealId);
       await sendContractSignedNotification(dealId);
+      await createDeliveryTasksForSignedContract(dealId, deal.ownerId, products);
     }
 
     await prisma.standaloneContract.delete({ where: { id: contractId } });

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { createTask, toggleTaskDone, updateTaskAssignee, deleteTask } from "@/lib/actions/tasks";
 import { formatDate } from "@/lib/labels";
 import { useToast } from "@/components/toast";
+import { TaskDetailModal, type ModalTask } from "../task-detail-modal";
 
 export type BoardTask = {
   id: string;
@@ -154,6 +155,8 @@ export function TaskBoard({
   const [groupBy, setGroupBy] = useState<"person" | "deal">("person");
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [showNewTask, setShowNewTask] = useState(false);
+  const [showDone, setShowDone] = useState(false);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [quickAddColumn, setQuickAddColumn] = useState<string | null>(null);
   const [quickAddText, setQuickAddText] = useState("");
   const [, startTransition] = useTransition();
@@ -171,10 +174,14 @@ export function TaskBoard({
   }, [deals, tasks]);
 
   const columns = groupBy === "person" ? personColumns : dealColumns;
+  const selectedTask = tasks.find((t) => t.id === selectedTaskId) ?? null;
 
   function tasksForColumn(key: string) {
-    if (groupBy === "person") return tasks.filter((t) => (t.assigneeId ?? UNASSIGNED) === key);
-    return tasks.filter((t) => (t.dealId ?? NO_DEAL) === key);
+    const inColumn =
+      groupBy === "person"
+        ? tasks.filter((t) => (t.assigneeId ?? UNASSIGNED) === key)
+        : tasks.filter((t) => (t.dealId ?? NO_DEAL) === key);
+    return showDone ? inColumn : inColumn.filter((t) => !t.done);
   }
 
   function handleDrop(columnKey: string) {
@@ -262,6 +269,10 @@ export function TaskBoard({
             Pr. deal
           </button>
         </div>
+        <label className="flex items-center gap-1.5 text-xs font-medium text-slate-600">
+          <input type="checkbox" checked={showDone} onChange={(e) => setShowDone(e.target.checked)} />
+          Vis fuldførte
+        </label>
         <button
           type="button"
           onClick={() => setShowNewTask(true)}
@@ -295,14 +306,16 @@ export function TaskBoard({
                       draggable={groupBy === "person"}
                       onDragStart={() => setDraggingId(task.id)}
                       onDragEnd={() => setDraggingId(null)}
-                      className={`group rounded-md border px-2.5 py-2 shadow-sm ${
-                        groupBy === "person" ? "cursor-grab active:cursor-grabbing" : ""
+                      onClick={() => setSelectedTaskId(task.id)}
+                      className={`group cursor-pointer rounded-md border px-2.5 py-2 shadow-sm ${
+                        groupBy === "person" ? "active:cursor-grabbing" : ""
                       } ${task.done ? "border-slate-200 bg-slate-50" : "border-slate-200 bg-white"}`}
                     >
                       <div className="flex items-start gap-2">
                         <input
                           type="checkbox"
                           checked={task.done}
+                          onClick={(e) => e.stopPropagation()}
                           onChange={() => handleToggleDone(task.id)}
                           className="mt-0.5 shrink-0"
                         />
@@ -311,7 +324,10 @@ export function TaskBoard({
                         </p>
                         <button
                           type="button"
-                          onClick={() => handleDelete(task.id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(task.id);
+                          }}
                           className="shrink-0 text-slate-300 opacity-0 hover:text-red-600 group-hover:opacity-100"
                           aria-label="Slet opgave"
                         >
@@ -323,7 +339,11 @@ export function TaskBoard({
                           <span className="rounded-full bg-slate-200 px-1.5 py-0.5">{assignee}</span>
                         )}
                         {groupBy === "person" && deal && task.dealId && (
-                          <Link href={`/deals/${task.dealId}`} className="truncate text-blue-600 hover:underline">
+                          <Link
+                            href={`/deals/${task.dealId}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="truncate text-blue-600 hover:underline"
+                          >
                             {deal}
                           </Link>
                         )}
@@ -376,6 +396,23 @@ export function TaskBoard({
           deals={deals}
           onClose={() => setShowNewTask(false)}
           onCreated={(task) => setTasks((prev) => [...prev, task])}
+        />
+      )}
+
+      {selectedTask && (
+        <TaskDetailModal
+          task={selectedTask}
+          users={users}
+          deals={deals}
+          onClose={() => setSelectedTaskId(null)}
+          onUpdated={(updated) => {
+            setTasks((prev) => prev.map((t) => (t.id === updated.id ? { ...t, ...updated } : t)));
+            setSelectedTaskId(null);
+          }}
+          onDeleted={() => {
+            setTasks((prev) => prev.filter((t) => t.id !== selectedTaskId));
+            setSelectedTaskId(null);
+          }}
         />
       )}
     </div>

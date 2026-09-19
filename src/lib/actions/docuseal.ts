@@ -15,6 +15,7 @@ import {
 } from "@/lib/contract-template-data";
 import { buildContractHtml } from "@/lib/contract-html-template";
 import { renderContractPdf } from "@/lib/contract-pdf-renderer";
+import { createContractFollowUpTask } from "@/lib/task-automation";
 
 /**
  * Pre-flight check before opening the contract-builder page: the master
@@ -51,7 +52,7 @@ export async function buildAndSendContract(
   products: ContractProducts
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
-    await requireUser();
+    const sender = await requireUser();
 
     if (!(await isDocuSealConfigured())) {
       throw new Error("DocuSeal er ikke konfigureret eller er slået fra under Indstillinger.");
@@ -136,8 +137,10 @@ export async function buildAndSendContract(
     });
 
     await prisma.contractEvent.create({ data: { dealId, type: "SENT", occurredAt: new Date() } });
+    await createContractFollowUpTask(dealId, sender.id);
 
     revalidatePath(`/deals/${dealId}`);
+    revalidatePath("/opgaver");
     return { ok: true };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Der opstod en fejl ved afsendelse af kontrakten." };

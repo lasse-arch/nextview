@@ -1,13 +1,15 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { createTask, toggleTaskDone, deleteTask } from "@/lib/actions/tasks";
+import { createTask, toggleTaskDone } from "@/lib/actions/tasks";
 import { formatDate } from "@/lib/labels";
 import { useToast } from "@/components/toast";
+import { TaskDetailModal, type ModalTask } from "../../task-detail-modal";
 
 type DealTask = {
   id: string;
   title: string;
+  description: string | null;
   done: boolean;
   dueDate: Date | null;
   assigneeId: string | null;
@@ -17,24 +19,26 @@ export function DealTasksSection({
   dealId,
   initialTasks,
   users,
+  deals,
 }: {
   dealId: string;
   initialTasks: DealTask[];
   users: { id: string; name: string }[];
+  deals: { id: string; name: string }[];
 }) {
   const [tasks, setTasks] = useState(initialTasks);
   const [adding, setAdding] = useState(false);
+  const [showDone, setShowDone] = useState(false);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const showToast = useToast();
+
+  const selectedTask = tasks.find((t) => t.id === selectedTaskId) ?? null;
+  const visibleTasks = showDone ? tasks : tasks.filter((t) => !t.done);
 
   function handleToggle(taskId: string) {
     setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, done: !t.done } : t)));
     startTransition(() => toggleTaskDone(taskId));
-  }
-
-  function handleDelete(taskId: string) {
-    setTasks((prev) => prev.filter((t) => t.id !== taskId));
-    startTransition(() => deleteTask(taskId));
   }
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -50,7 +54,7 @@ export function DealTasksSection({
     startTransition(async () => {
       const result = await createTask(formData);
       if (result.ok) {
-        setTasks((prev) => [...prev, { id: result.id, title, done: false, dueDate: null, assigneeId }]);
+        setTasks((prev) => [...prev, { id: result.id, title, description: null, done: false, dueDate: null, assigneeId }]);
         showToast("Opgave oprettet");
       } else {
         showToast(result.error);
@@ -62,13 +66,19 @@ export function DealTasksSection({
     <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold text-slate-900">Opgaver</h2>
-        <button
-          type="button"
-          onClick={() => setAdding((v) => !v)}
-          className="rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
-        >
-          {adding ? "Annullér" : "+ Tilføj"}
-        </button>
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-1.5 text-xs font-medium text-slate-600">
+            <input type="checkbox" checked={showDone} onChange={(e) => setShowDone(e.target.checked)} />
+            Vis fuldførte
+          </label>
+          <button
+            type="button"
+            onClick={() => setAdding((v) => !v)}
+            className="rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+          >
+            {adding ? "Annullér" : "+ Tilføj"}
+          </button>
+        </div>
       </div>
 
       {adding && (
@@ -104,29 +114,47 @@ export function DealTasksSection({
       )}
 
       <ul className="mt-4 space-y-1.5">
-        {tasks.map((task) => {
+        {visibleTasks.map((task) => {
           const assignee = users.find((u) => u.id === task.assigneeId);
           return (
-            <li key={task.id} className="group flex items-center gap-2 rounded-md border border-slate-100 px-3 py-2 text-sm">
-              <input type="checkbox" checked={task.done} onChange={() => handleToggle(task.id)} />
+            <li
+              key={task.id}
+              onClick={() => setSelectedTaskId(task.id)}
+              className="group flex cursor-pointer items-center gap-2 rounded-md border border-slate-100 px-3 py-2 text-sm hover:bg-slate-50"
+            >
+              <input
+                type="checkbox"
+                checked={task.done}
+                onClick={(e) => e.stopPropagation()}
+                onChange={() => handleToggle(task.id)}
+              />
               <span className={`min-w-0 flex-1 truncate ${task.done ? "text-slate-400 line-through" : "text-slate-800"}`}>
                 {task.title}
               </span>
               {assignee && <span className="shrink-0 text-xs text-slate-400">{assignee.name}</span>}
               {task.dueDate && <span className="shrink-0 text-xs text-slate-400">{formatDate(task.dueDate)}</span>}
-              <button
-                type="button"
-                onClick={() => handleDelete(task.id)}
-                className="shrink-0 text-slate-300 opacity-0 hover:text-red-600 group-hover:opacity-100"
-                aria-label="Slet opgave"
-              >
-                ×
-              </button>
             </li>
           );
         })}
-        {tasks.length === 0 && <p className="text-sm text-slate-400">Ingen opgaver endnu.</p>}
+        {visibleTasks.length === 0 && <p className="text-sm text-slate-400">Ingen opgaver endnu.</p>}
       </ul>
+
+      {selectedTask && (
+        <TaskDetailModal
+          task={{ ...selectedTask, dealId }}
+          users={users}
+          deals={deals}
+          onClose={() => setSelectedTaskId(null)}
+          onUpdated={(updated) => {
+            setTasks((prev) => prev.map((t) => (t.id === updated.id ? { ...t, ...updated } : t)));
+            setSelectedTaskId(null);
+          }}
+          onDeleted={() => {
+            setTasks((prev) => prev.filter((t) => t.id !== selectedTaskId));
+            setSelectedTaskId(null);
+          }}
+        />
+      )}
     </section>
   );
 }

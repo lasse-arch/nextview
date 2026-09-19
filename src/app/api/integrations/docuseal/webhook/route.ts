@@ -7,6 +7,7 @@ import { contractProductsToDealItems, type ContractProducts } from "@/lib/contra
 import { archiveSignedContractToDrive, findArchivingGoogleAccount } from "@/lib/actions/google-drive-archive";
 import { findOrCreateContractsFolder, uploadPdfToDrive } from "@/lib/google-drive";
 import { isIntegrationEnabled } from "@/lib/integration-settings";
+import { createDeliveryTasksForSignedContract } from "@/lib/task-automation";
 
 type DocuSealEvent = {
   event_type?: string;
@@ -124,12 +125,14 @@ export async function POST(request: NextRequest) {
     // its own line - including ones given away for free - so once there are
     // many customers, it's possible to see at a glance who has what.
     if (deal!.contractProducts) {
-      const items = contractProductsToDealItems(deal!.contractProducts as unknown as ContractProducts);
+      const products = deal!.contractProducts as unknown as ContractProducts;
+      const items = contractProductsToDealItems(products);
       if (items.length > 0) {
         await prisma.dealItem.createMany({
           data: items.map((item) => ({ ...item, dealId: deal!.id })),
         });
       }
+      await createDeliveryTasksForSignedContract(deal!.id, deal!.ownerId, products);
     }
 
     await recalcCommission(deal!.id);
