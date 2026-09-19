@@ -9,6 +9,7 @@ export function StatTile({
   tone = "default",
   money,
   tooltipRows,
+  badge,
 }: {
   label: string;
   value: string;
@@ -16,6 +17,7 @@ export function StatTile({
   tone?: "default" | "good" | "critical";
   money?: boolean;
   tooltipRows?: { label: string; value: string }[];
+  badge?: React.ReactNode;
 }) {
   const [hovered, setHovered] = useState(false);
   const valueColor = tone === "good" ? "text-emerald-700" : tone === "critical" ? "text-red-700" : "text-slate-900";
@@ -27,7 +29,12 @@ export function StatTile({
       onMouseEnter={() => hasTooltip && setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</div>
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-h-[28px] flex-1 text-[11px] font-semibold uppercase leading-tight tracking-wide text-slate-500">
+          {label}
+        </div>
+        {badge}
+      </div>
       <div className={`mt-1 text-2xl font-semibold ${valueColor} ${money ? "money" : ""}`}>{value}</div>
       {sub && <div className="mt-0.5 text-xs text-slate-400">{sub}</div>}
       {hasTooltip && hovered && (

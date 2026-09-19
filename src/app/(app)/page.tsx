@@ -65,15 +65,13 @@ export default async function DashboardPage() {
           sub={`${data.pipelineCount} åbne deals`}
           money
         />
-        <div className="relative">
-          <StatTile
-            label="Solgt i alt (MRR + etableringspris)"
-            value={formatDKK(data.soldValue)}
-            sub={`${data.soldCount} kunder`}
-            money
-          />
-          <SoldTotalReportButton total={data.soldValue} breakdown={data.soldBreakdown} />
-        </div>
+        <StatTile
+          label="Solgt i alt (MRR + etableringspris)"
+          value={formatDKK(data.soldValue)}
+          sub={`${data.soldCount} kunder`}
+          money
+          badge={<SoldTotalReportButton total={data.soldValue} breakdown={data.soldBreakdown} />}
+        />
         <StatTile
           label="Solgt denne måned"
           value={formatDKK(data.soldThisMonthValue)}
