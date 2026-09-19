@@ -1,4 +1,4 @@
-import { addMonths, addDays, max as maxDate, startOfDay } from "date-fns";
+import { addMonths, addDays, max as maxDate, startOfDay, getQuarter, getYear } from "date-fns";
 import { prisma } from "@/lib/db";
 import { isDineroConfigured, createQuarterlyInvoiceDraft, type DineroInvoiceLine } from "@/lib/dinero";
 import { computeBillingPeriods, computePeriodAmounts } from "@/lib/invoice-schedule";
@@ -97,6 +97,32 @@ function computeDueLines(deal: {
   return lines;
 }
 
+const DANISH_MONTHS = [
+  "Januar",
+  "Februar",
+  "Marts",
+  "April",
+  "Maj",
+  "Juni",
+  "Juli",
+  "August",
+  "September",
+  "Oktober",
+  "November",
+  "December",
+];
+
+/** e.g. "Kvartal Q4, Oktober, November, December 2026" - based on the calendar
+ * quarter the period's start date falls in, not the internal sequential
+ * quarterIndex counter (which numbers a term's periods 1, 2, 3... regardless
+ * of which calendar quarter they land in). */
+function quarterLabel(date: Date): string {
+  const quarter = getQuarter(date);
+  const year = getYear(date);
+  const months = DANISH_MONTHS.slice((quarter - 1) * 3, quarter * 3);
+  return `Kvartal Q${quarter}, ${months.join(", ")} ${year}`;
+}
+
 type DraftableDeal = {
   id: string;
   companyName: string;
@@ -121,7 +147,8 @@ type DraftableDeal = {
 function buildInvoiceContent(
   deal: { soldProduct: string | null; contractProducts: unknown },
   quarterIndex: number,
-  totalAmount: number
+  totalAmount: number,
+  scheduledDate: Date
 ): { note: string; lines: DineroInvoiceLine[] } {
   const products = parseContractProducts(deal.contractProducts);
 
@@ -134,14 +161,15 @@ function buildInvoiceContent(
     };
   }
 
-  const fallback = { note: `${deal.soldProduct ?? "Ydelse"} - periode ${quarterIndex}` };
+  const quarter = quarterLabel(scheduledDate);
+  const fallback = { note: `${deal.soldProduct ?? "Ydelse"} - ${quarter}` };
   if (!products) return { ...fallback, lines: [{ description: deal.soldProduct ?? "Ydelse", amount: totalAmount }] };
 
   const recurringLabels = recurringProductLabels(products);
   const lines = recurringLineItems(products, totalAmount);
   if (lines.length === 0) return { ...fallback, lines: [{ description: deal.soldProduct ?? "Ydelse", amount: totalAmount }] };
 
-  return { note: `${recurringLabels.join(" + ")} - periode ${quarterIndex}`, lines };
+  return { note: `${recurringLabels.join(" + ")} - ${quarter}`, lines };
 }
 
 /**
@@ -152,10 +180,10 @@ function buildInvoiceContent(
  */
 async function draftInvoiceLine(
   deal: DraftableDeal,
-  invoiceRow: { id: string; amount: number; quarterIndex: number }
+  invoiceRow: { id: string; amount: number; quarterIndex: number; scheduledDate: Date }
 ): Promise<{ success: true } | { success: false; error: string }> {
   try {
-    const { note, lines } = buildInvoiceContent(deal, invoiceRow.quarterIndex, invoiceRow.amount);
+    const { note, lines } = buildInvoiceContent(deal, invoiceRow.quarterIndex, invoiceRow.amount, invoiceRow.scheduledDate);
     const result = await createQuarterlyInvoiceDraft({
       existingContactGuid: deal.dineroContactGuid,
       companyName: deal.companyName,

@@ -124,7 +124,7 @@ async function createInvoiceDraft(
       ProductLines: input.lines.map((line) => ({
         Description: line.description,
         Quantity: 1,
-        Unit: "stk.",
+        Unit: "parts",
         BaseAmountValue: line.amount,
         AccountNumber: Number(process.env.DINERO_SALES_ACCOUNT_NUMBER),
       })),
