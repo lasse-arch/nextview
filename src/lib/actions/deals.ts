@@ -9,6 +9,7 @@ import { recalcCommission } from "@/lib/commission-service";
 import { buildDealEmailAddress } from "@/lib/email-address";
 import { findDuplicateDeals } from "@/lib/duplicates";
 import { syncDealMeetingToCalendar, type CalendarSyncResult } from "@/lib/calendar-service";
+import { resolveCustomerMentions } from "@/lib/customer-mentions";
 import { sendContractSignedNotification } from "@/lib/notification-service";
 import type { DealStage, CommissionFrequency, CommissionStatus } from "@prisma/client";
 
@@ -423,10 +424,12 @@ export async function sendCalendarInvite(
     ? await prisma.user.findMany({ where: { id: { in: extraAttendeeUserIds } }, select: { email: true } })
     : [];
 
+  const resolvedCustomBody = customBody ? await resolveCustomerMentions(customBody) : customBody;
+
   const result = await syncDealMeetingToCalendar(
     dealId,
     extraUsers.map((u) => u.email),
-    customBody
+    resolvedCustomBody
   );
   revalidatePath(`/deals/${dealId}`);
   return result;

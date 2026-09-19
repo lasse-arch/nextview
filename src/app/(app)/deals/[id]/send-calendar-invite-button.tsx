@@ -76,6 +76,9 @@ export function SendCalendarInviteButton({
             rows={3}
             className="mt-1.5 w-full rounded-md border border-slate-300 px-2 py-1.5 text-xs"
           />
+          <p className="mt-1 text-[10px] text-slate-400">
+            Skriv @kundenavn for automatisk at indsætte et link til en live kundes tour/hjemmeside, fx @stidsholt
+          </p>
           <button
             type="button"
             disabled={pending}
