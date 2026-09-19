@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { createTask, toggleTaskDone } from "@/lib/actions/tasks";
+import { createTask, toggleTaskDone, bulkReassignTasks } from "@/lib/actions/tasks";
 import { formatDate } from "@/lib/labels";
 import { useToast } from "@/components/toast";
 import { TaskDetailModal, type ModalTask } from "../../task-detail-modal";
@@ -30,15 +30,44 @@ export function DealTasksSection({
   const [adding, setAdding] = useState(false);
   const [showDone, setShowDone] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
+  const [bulkAssigneeId, setBulkAssigneeId] = useState("");
   const [pending, startTransition] = useTransition();
   const showToast = useToast();
 
   const selectedTask = tasks.find((t) => t.id === selectedTaskId) ?? null;
   const visibleTasks = showDone ? tasks : tasks.filter((t) => !t.done);
+  const allVisibleChecked = visibleTasks.length > 0 && visibleTasks.every((t) => checkedIds.has(t.id));
 
   function handleToggle(taskId: string) {
     setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, done: !t.done } : t)));
     startTransition(() => toggleTaskDone(taskId));
+  }
+
+  function toggleChecked(taskId: string) {
+    setCheckedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(taskId)) next.delete(taskId);
+      else next.add(taskId);
+      return next;
+    });
+  }
+
+  function toggleAllChecked() {
+    setCheckedIds(allVisibleChecked ? new Set() : new Set(visibleTasks.map((t) => t.id)));
+  }
+
+  function handleBulkReassign() {
+    const ids = Array.from(checkedIds);
+    if (ids.length === 0) return;
+    const assigneeId = bulkAssigneeId || null;
+    setTasks((prev) => prev.map((t) => (ids.includes(t.id) ? { ...t, assigneeId } : t)));
+    setCheckedIds(new Set());
+    setBulkAssigneeId("");
+    startTransition(async () => {
+      await bulkReassignTasks(ids, assigneeId);
+      showToast(`${ids.length} opgave${ids.length === 1 ? "" : "r"} tildelt`);
+    });
   }
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -113,7 +142,47 @@ export function DealTasksSection({
         </form>
       )}
 
-      <ul className="mt-4 space-y-1.5">
+      {visibleTasks.length > 0 && (
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <label className="flex items-center gap-1.5 text-xs text-slate-500">
+            <input type="checkbox" checked={allVisibleChecked} onChange={toggleAllChecked} />
+            Vælg alle
+          </label>
+          {checkedIds.size > 0 && (
+            <>
+              <span className="text-xs text-slate-500">{checkedIds.size} valgt</span>
+              <select
+                value={bulkAssigneeId}
+                onChange={(e) => setBulkAssigneeId(e.target.value)}
+                className="rounded-md border border-slate-300 px-2 py-1 text-xs"
+              >
+                <option value="">Fælles (ingen)</option>
+                {users.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={handleBulkReassign}
+                className="rounded-md bg-slate-900 px-2.5 py-1 text-xs font-medium text-white hover:bg-slate-800"
+              >
+                Skift ejer
+              </button>
+              <button
+                type="button"
+                onClick={() => setCheckedIds(new Set())}
+                className="text-xs text-slate-500 underline hover:text-slate-700"
+              >
+                Fortryd valg
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
+      <ul className="mt-2 space-y-1.5">
         {visibleTasks.map((task) => {
           const assignee = users.find((u) => u.id === task.assigneeId);
           return (
@@ -124,6 +193,12 @@ export function DealTasksSection({
             >
               <input
                 type="checkbox"
+                checked={checkedIds.has(task.id)}
+                onClick={(e) => e.stopPropagation()}
+                onChange={() => toggleChecked(task.id)}
+              />
+              <input
+                type="checkbox"
                 checked={task.done}
                 onClick={(e) => e.stopPropagation()}
                 onChange={() => handleToggle(task.id)}
@@ -131,7 +206,11 @@ export function DealTasksSection({
               <span className={`min-w-0 flex-1 truncate ${task.done ? "text-slate-400 line-through" : "text-slate-800"}`}>
                 {task.title}
               </span>
-              {assignee && <span className="shrink-0 text-xs text-slate-400">{assignee.name}</span>}
+              {assignee ? (
+                <span className="shrink-0 rounded-full bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500">{assignee.name}</span>
+              ) : (
+                <span className="shrink-0 text-xs text-amber-600">Ingen ejer</span>
+              )}
               {task.dueDate && <span className="shrink-0 text-xs text-slate-400">{formatDate(task.dueDate)}</span>}
             </li>
           );

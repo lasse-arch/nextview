@@ -44,6 +44,17 @@ export async function updateTaskAssignee(taskId: string, assigneeId: string | nu
   revalidateTaskPaths(task.dealId);
 }
 
+/** Reassigns several tasks at once - e.g. all the "Aflever X" tasks that just landed on a deal after signing. */
+export async function bulkReassignTasks(taskIds: string[], assigneeId: string | null): Promise<void> {
+  await requireUser();
+  if (taskIds.length === 0) return;
+  const tasks = await prisma.task.findMany({ where: { id: { in: taskIds } }, select: { dealId: true } });
+  await prisma.task.updateMany({ where: { id: { in: taskIds } }, data: { assigneeId } });
+  const dealIds = new Set(tasks.map((t) => t.dealId).filter((id): id is string => Boolean(id)));
+  revalidatePath("/opgaver");
+  for (const dealId of dealIds) revalidatePath(`/deals/${dealId}`);
+}
+
 export async function deleteTask(taskId: string): Promise<void> {
   await requireUser();
   const task = await prisma.task.findUniqueOrThrow({ where: { id: taskId } });

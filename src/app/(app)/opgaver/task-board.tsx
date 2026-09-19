@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
-import { createTask, toggleTaskDone, updateTaskAssignee, deleteTask } from "@/lib/actions/tasks";
+import { createTask, toggleTaskDone, updateTaskAssignee, deleteTask, bulkReassignTasks } from "@/lib/actions/tasks";
 import { formatDate } from "@/lib/labels";
 import { useToast } from "@/components/toast";
 import { TaskDetailModal, type ModalTask } from "../task-detail-modal";
@@ -157,10 +157,34 @@ export function TaskBoard({
   const [showNewTask, setShowNewTask] = useState(false);
   const [showDone, setShowDone] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
+  const [bulkAssigneeId, setBulkAssigneeId] = useState("");
   const [quickAddColumn, setQuickAddColumn] = useState<string | null>(null);
   const [quickAddText, setQuickAddText] = useState("");
   const [, startTransition] = useTransition();
   const showToast = useToast();
+
+  function toggleChecked(taskId: string) {
+    setCheckedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(taskId)) next.delete(taskId);
+      else next.add(taskId);
+      return next;
+    });
+  }
+
+  function handleBulkReassign() {
+    const ids = Array.from(checkedIds);
+    if (ids.length === 0) return;
+    const assigneeId = bulkAssigneeId || null;
+    setTasks((prev) => prev.map((t) => (ids.includes(t.id) ? { ...t, assigneeId } : t)));
+    setCheckedIds(new Set());
+    setBulkAssigneeId("");
+    startTransition(async () => {
+      await bulkReassignTasks(ids, assigneeId);
+      showToast(`${ids.length} opgave${ids.length === 1 ? "" : "r"} tildelt`);
+    });
+  }
 
   const personColumns = useMemo(() => {
     return [...users.map((u) => ({ key: u.id, label: u.name })), { key: UNASSIGNED, label: "Fælles" }];
@@ -273,6 +297,37 @@ export function TaskBoard({
           <input type="checkbox" checked={showDone} onChange={(e) => setShowDone(e.target.checked)} />
           Vis fuldførte
         </label>
+        {checkedIds.size > 0 && (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-500">{checkedIds.size} valgt</span>
+            <select
+              value={bulkAssigneeId}
+              onChange={(e) => setBulkAssigneeId(e.target.value)}
+              className="rounded-md border border-slate-300 px-2 py-1 text-xs"
+            >
+              <option value="">Fælles (ingen)</option>
+              {users.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.name}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={handleBulkReassign}
+              className="rounded-md bg-slate-900 px-2.5 py-1 text-xs font-medium text-white hover:bg-slate-800"
+            >
+              Skift ejer
+            </button>
+            <button
+              type="button"
+              onClick={() => setCheckedIds(new Set())}
+              className="text-xs text-slate-500 underline hover:text-slate-700"
+            >
+              Fortryd valg
+            </button>
+          </div>
+        )}
         <button
           type="button"
           onClick={() => setShowNewTask(true)}
@@ -314,6 +369,13 @@ export function TaskBoard({
                       <div className="flex items-start gap-2">
                         <input
                           type="checkbox"
+                          checked={checkedIds.has(task.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={() => toggleChecked(task.id)}
+                          className="mt-0.5 shrink-0"
+                        />
+                        <input
+                          type="checkbox"
                           checked={task.done}
                           onClick={(e) => e.stopPropagation()}
                           onChange={() => handleToggleDone(task.id)}
@@ -334,10 +396,13 @@ export function TaskBoard({
                           ×
                         </button>
                       </div>
-                      <div className="mt-1 flex flex-wrap items-center gap-1.5 pl-5 text-[11px] text-slate-500">
-                        {groupBy === "deal" && assignee && (
-                          <span className="rounded-full bg-slate-200 px-1.5 py-0.5">{assignee}</span>
-                        )}
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5 pl-9 text-[11px] text-slate-500">
+                        {groupBy === "deal" &&
+                          (assignee ? (
+                            <span className="rounded-full bg-slate-200 px-1.5 py-0.5">{assignee}</span>
+                          ) : (
+                            <span className="text-amber-600">Ingen ejer</span>
+                          ))}
                         {groupBy === "person" && deal && task.dealId && (
                           <Link
                             href={`/deals/${task.dealId}`}

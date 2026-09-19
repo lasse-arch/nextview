@@ -4,13 +4,13 @@ import { contractProductsToDealItems, type ContractProducts } from "@/lib/contra
 
 /**
  * One "Aflever X" delivery task per product on a just-signed contract,
- * assigned to the deal's owner - so signing a contract automatically lines
- * up the team's delivery work instead of relying on someone remembering to
- * add it to the board by hand.
+ * landing unassigned ("Fælles") under the deal - the seller isn't usually
+ * who delivers the product, so it's left for whoever picks it up (or gets
+ * bulk-reassigned) rather than defaulting to the deal's owner.
  */
 export async function createDeliveryTasksForSignedContract(
   dealId: string,
-  ownerId: string,
+  createdById: string,
   products: ContractProducts
 ): Promise<void> {
   const items = contractProductsToDealItems(products);
@@ -19,8 +19,7 @@ export async function createDeliveryTasksForSignedContract(
   await prisma.task.createMany({
     data: items.map((item) => ({
       title: `Aflever ${item.productType}`,
-      assigneeId: ownerId,
-      createdById: ownerId,
+      createdById,
       dealId,
     })),
   });
