@@ -67,7 +67,7 @@ async function createContact(accessToken: string, input: DineroContactInput): Pr
       Cvr: input.cvr ?? undefined,
       Email: input.email ?? undefined,
       Street: input.address ?? undefined,
-      Country: "Danmark",
+      CountryKey: "DK",
       IsPerson: false,
       PaymentConditionType: "Netto",
       PaymentConditionNumberOfDays: 8,
