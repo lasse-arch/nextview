@@ -83,7 +83,9 @@ async function createContact(accessToken: string, input: DineroContactInput): Pr
 /** Looks up an existing Dinero contact by CVR number. Returns null if none is found. */
 async function findContactByCvr(accessToken: string, cvr: string): Promise<string | null> {
   const orgId = process.env.DINERO_ORGANIZATION_ID!;
-  const query = new URLSearchParams({ queryFilter: `Cvr eq '${cvr}'` });
+  // The filterable property is VatNumber, not Cvr (Cvr is only a valid field
+  // name for creating a contact, not for filtering an existing one).
+  const query = new URLSearchParams({ queryFilter: `VatNumber eq '${cvr}'` });
 
   const res = await fetch(`${DINERO_API_BASE}/${orgId}/contacts?${query}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
