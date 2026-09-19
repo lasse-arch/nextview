@@ -141,7 +141,23 @@ export function establishmentLineItems(products: ContractProducts, total: number
 
   if (entries.length === 0) return [{ description: "Etableringsgebyr", amount: total }];
 
-  const amounts = distributeByWeights(total, entries.map((e) => e.setupFee || 1));
+  // Weight only by an actual (positive) setup fee, so a free product's line
+  // stays exactly 0 kr instead of being given a phantom share of the
+  // rounding remainder. Splitting the remainder among just the paid entries
+  // (rather than distributeByWeights over all of them) also keeps it off a
+  // free entry purely because it happens to sit last in the list. Falls back
+  // to an even split across all of them only if none has a positive fee at
+  // all but the invoice total is still non-zero (e.g. a manually overridden
+  // establishment fee).
+  const paidIndexes = entries.flatMap((e, i) => (e.setupFee > 0 ? [i] : []));
+  const amounts = entries.map(() => 0);
+  if (paidIndexes.length > 0) {
+    const paidAmounts = distributeByWeights(total, paidIndexes.map((i) => entries[i].setupFee));
+    paidIndexes.forEach((idx, j) => (amounts[idx] = paidAmounts[j]));
+  } else {
+    distributeByWeights(total, entries.map(() => 1)).forEach((a, i) => (amounts[i] = a));
+  }
+
   return entries.map((e, i) => ({ description: e.label, amount: amounts[i] }));
 }
 
