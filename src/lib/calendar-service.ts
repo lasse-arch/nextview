@@ -25,9 +25,12 @@ function toWallClockDateTime(date: Date): string {
 
 /**
  * Creates or updates a Google Calendar event for a deal's booked meeting,
- * on the deal owner's connected Google account, inviting the deal's
- * contact person. Never throws - integration is best-effort and must not
- * block saving the deal itself if Google isn't connected or errors out.
+ * on the deal owner's connected Google account, inviting both the deal's
+ * contact person and the owner (seller) themselves - being the calendar
+ * it's created on doesn't automatically add them as a guest with an RSVP,
+ * so they'd otherwise be missing from the invite's guest list. Never
+ * throws - integration is best-effort and must not block saving the deal
+ * itself if Google isn't connected or errors out.
  */
 export async function syncDealMeetingToCalendar(dealId: string): Promise<CalendarSyncResult> {
   const deal = await prisma.deal.findUnique({ where: { id: dealId }, include: { owner: true } });
@@ -67,7 +70,7 @@ export async function syncDealMeetingToCalendar(dealId: string): Promise<Calenda
       startIso: toWallClockDateTime(start),
       endIso: toWallClockDateTime(end),
       timeZone: MEETING_TIME_ZONE,
-      attendeeEmail: deal.contactEmail,
+      attendeeEmails: [deal.owner.email, deal.contactEmail],
     });
 
     if (eventId !== deal.googleCalendarEventId) {

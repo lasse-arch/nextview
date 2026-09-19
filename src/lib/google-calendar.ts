@@ -44,18 +44,23 @@ export type CalendarEventInput = {
   startIso: string;
   endIso: string;
   timeZone: string;
-  attendeeEmail?: string | null;
+  /** Every attendee to invite - the calendar's own owner (the seller) isn't
+   * added automatically just by creating the event on their calendar, so
+   * they need to be listed explicitly to show up as a guest with an RSVP,
+   * same as the customer. */
+  attendeeEmails: (string | null | undefined)[];
 };
 
 export async function upsertCalendarEvent(account: EmailAccount, input: CalendarEventInput): Promise<string> {
   const accessToken = await getValidAccessToken(account);
+  const attendees = input.attendeeEmails.filter((email): email is string => Boolean(email)).map((email) => ({ email }));
 
   const body = {
     summary: input.summary,
     description: input.description,
     start: { dateTime: input.startIso, timeZone: input.timeZone },
     end: { dateTime: input.endIso, timeZone: input.timeZone },
-    attendees: input.attendeeEmail ? [{ email: input.attendeeEmail }] : undefined,
+    attendees: attendees.length > 0 ? attendees : undefined,
   };
 
   const url = input.eventId
