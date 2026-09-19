@@ -72,8 +72,8 @@ export default async function DineroSettingsPage() {
         <div className="mt-4">
           <RunNowButton />
           <p className="mt-1 text-xs text-slate-400">
-            Kører normalt automatisk hver dag og opretter kladder for kvartaler der er forfaldet. Brug knappen til at
-            teste med det samme.
+            Kører normalt automatisk hver dag - opretter kladder for kvartaler der er forfaldet, og tjekker samtidig
+            om afsendte kladder er blevet betalt i Dinero. Brug knappen til at teste med det samme.
           </p>
         </div>
       </section>

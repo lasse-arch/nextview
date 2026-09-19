@@ -18,11 +18,17 @@ export function RunNowButton() {
             try {
               const result = await runInvoiceGenerationNow();
               const churnedNote = result.churned ? ` ${result.churned} kunde(r) blev markeret inaktive (opsigelsesvarsel udløbet).` : "";
+              const paymentsNote =
+                result.paymentsChecked && result.paymentsChecked > 0
+                  ? ` Tjekkede betaling på ${result.paymentsChecked} kladde${result.paymentsChecked === 1 ? "" : "r"}${
+                      result.paymentsNewlyPaid ? ` — ${result.paymentsNewlyPaid} nu markeret betalt.` : "."
+                    }`
+                  : "";
               if (!result.configured) {
                 setMessage(`Dinero er ikke konfigureret endnu.${churnedNote}`);
               } else {
                 setMessage(
-                  `Tjekkede ${result.checked} forfaldne kvartaler — ${result.created} kladder oprettet, ${result.failed} fejlede.${churnedNote}`
+                  `Tjekkede ${result.checked} forfaldne kvartaler — ${result.created} kladder oprettet, ${result.failed} fejlede.${churnedNote}${paymentsNote}`
                 );
               }
             } catch (err) {

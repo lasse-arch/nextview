@@ -1,4 +1,4 @@
-import { addMonths, addDays, endOfQuarter, differenceInCalendarDays, subMonths } from "date-fns";
+import { addMonths, addDays, endOfQuarter, differenceInCalendarDays } from "date-fns";
 
 export type BillingPeriod = {
   /** 1-based sequential order within the term (never a literal calendar quarter number). */
@@ -19,10 +19,12 @@ export type BillingPeriod = {
  * notice was given but the effective end date falls later) continues in full
  * calendar quarters, capped at `until`.
  *
- * Full quarters are drafted in Dinero on the 22nd of the month before they
- * start (e.g. a quarter starting 1 April is drafted 22 March), so the
- * customer/accounting has it ready ahead of time. A stub period has no
- * such lead time available and is drafted immediately once due.
+ * Full quarters are due on the 1st of the quarter they cover, so with
+ * Dinero's Netto+8 payment terms the draft has to be sent exactly 8 days
+ * before that (e.g. a quarter starting 1 October is drafted 23 September) -
+ * assuming it's sent out the same day it's drafted, which is the point of
+ * drafting it ahead of time. A stub period has no such lead time available
+ * and is drafted immediately once due.
  */
 export function computeBillingPeriods(billingStartDate: Date, bindingMonths: number, until: Date): BillingPeriod[] {
   const contractEnd = addMonths(billingStartDate, bindingMonths);
@@ -43,14 +45,9 @@ export function computeBillingPeriods(billingStartDate: Date, bindingMonths: num
 
     // The first period bills as soon as it's due (no lead time exists before
     // something that already started). Every period after that is a full
-    // quarter, drafted on the 22nd of the month before it starts.
-    const draftTriggerDate =
-      index === 1
-        ? billingStartDate
-        : (() => {
-            const monthBefore = subMonths(cursor, 1);
-            return new Date(monthBefore.getFullYear(), monthBefore.getMonth(), 22);
-          })();
+    // quarter, drafted 8 days before it starts so Netto+8 lands the due date
+    // exactly on the quarter's first day.
+    const draftTriggerDate = index === 1 ? billingStartDate : addDays(cursor, -8);
 
     periods.push({ index, startDate: cursor, endDate: periodEnd, draftTriggerDate });
     cursor = addDays(periodEnd, 1);

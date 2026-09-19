@@ -18,7 +18,11 @@ export function CreateInvoiceButton({ dealId }: { dealId: string }) {
           if (!result.configured) {
             showToast("Dinero er ikke konfigureret endnu.");
           } else if (result.checked === 0) {
-            showToast("Ingen forfaldne kladder lige nu.");
+            showToast(
+              result.nextDueDateLabel
+                ? `Ingen forfaldne kladder lige nu — næste kladde oprettes tidligst d. ${result.nextDueDateLabel}.`
+                : "Ingen forfaldne kladder lige nu."
+            );
           } else {
             showToast(`${result.created} kladde${result.created === 1 ? "" : "r"} oprettet${result.failed > 0 ? `, ${result.failed} fejlede` : ""}.`);
           }

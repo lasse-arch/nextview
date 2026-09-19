@@ -40,8 +40,10 @@ export type CalendarEventInput = {
   eventId: string | null;
   summary: string;
   description?: string;
+  /** Wall-clock date-time with no UTC offset (e.g. "2026-09-26T20:00:00") - interpreted in `timeZone`, not converted from UTC. */
   startIso: string;
   endIso: string;
+  timeZone: string;
   attendeeEmail?: string | null;
 };
 
@@ -51,8 +53,8 @@ export async function upsertCalendarEvent(account: EmailAccount, input: Calendar
   const body = {
     summary: input.summary,
     description: input.description,
-    start: { dateTime: input.startIso },
-    end: { dateTime: input.endIso },
+    start: { dateTime: input.startIso, timeZone: input.timeZone },
+    end: { dateTime: input.endIso, timeZone: input.timeZone },
     attendees: input.attendeeEmail ? [{ email: input.attendeeEmail }] : undefined,
   };
 

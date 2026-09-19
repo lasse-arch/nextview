@@ -10,7 +10,9 @@ import {
   formatDKK,
   formatDate,
   dealName,
+  invoicePeriodLabel,
 } from "@/lib/labels";
+import { parseContractProducts, establishmentLineItems, recurringLineItems } from "@/lib/contract-template-data";
 import { isDocuSealConfigured } from "@/lib/docuseal";
 import { CommissionSection } from "./commission-section";
 import { CommissionExcludedToggle } from "./commission-excluded-toggle";
@@ -36,6 +38,21 @@ import { CreateInvoiceButton } from "./create-invoice-button";
 import { MarkSentManuallyButton } from "./mark-sent-manually-button";
 import { CheckPaymentButton } from "./check-payment-button";
 import { DeleteInvoiceButton } from "@/components/delete-invoice-button";
+
+/** A per-product breakdown of an invoice line, for a hover tooltip - reconstructed
+ * from the deal's current contractProducts snapshot, since it isn't persisted
+ * on the Invoice row itself. */
+function invoiceBreakdownTooltip(
+  deal: { contractProducts: unknown },
+  quarterIndex: number,
+  amount: number
+): string | undefined {
+  const products = parseContractProducts(deal.contractProducts);
+  if (!products) return undefined;
+  const lines = quarterIndex === 0 ? establishmentLineItems(products, amount) : recurringLineItems(products, amount);
+  if (lines.length <= 1) return undefined;
+  return lines.map((l) => `${l.description}: ${formatDKK(l.amount)}`).join("\n");
+}
 
 function authorInitials(name: string): string {
   return name
@@ -399,8 +416,11 @@ export default async function DealDetailPage({
               <ul className="mt-3 space-y-2 text-sm">
                 {deal.invoices.map((inv) => (
                   <li key={inv.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2 last:border-0">
-                    <span className="text-slate-600">
-                      {inv.quarterIndex === 0 ? "Etablering" : `Periode ${inv.quarterIndex}`}
+                    <span
+                      className="text-slate-600"
+                      title={invoiceBreakdownTooltip(deal, inv.quarterIndex, inv.amount)}
+                    >
+                      {inv.quarterIndex === 0 ? "Etablering" : invoicePeriodLabel(inv.scheduledDate)}
                       {inv.termNumber > 1 ? ` (kontraktperiode ${inv.termNumber})` : ""}
                     </span>
                     <span className="money font-medium text-slate-800">{formatDKK(inv.amount)}</span>

@@ -3,8 +3,25 @@ import { upsertCalendarEvent } from "@/lib/google-calendar";
 import { dealName } from "@/lib/labels";
 
 const DEFAULT_MEETING_DURATION_MINUTES = 30;
+const MEETING_TIME_ZONE = "Europe/Copenhagen";
 
 export type CalendarSyncResult = { synced: boolean; reason?: string };
+
+/**
+ * meetingDate is parsed from a plain "datetime-local" form field with no
+ * timezone info, so its stored instant's UTC digits are actually the
+ * intended Europe/Copenhagen wall-clock digits (e.g. a form value of
+ * "20:00" round-trips as 20:00 UTC, not 20:00 Copenhagen time). Google
+ * Calendar must therefore receive those literal digits with an explicit
+ * timeZone rather than a real UTC instant, or it double-converts and shows
+ * the wrong local time (e.g. 22:00 in summer, when DST adds two hours).
+ */
+function toWallClockDateTime(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}T${pad(
+    date.getUTCHours()
+  )}:${pad(date.getUTCMinutes())}:${pad(date.getUTCSeconds())}`;
+}
 
 /**
  * Creates or updates a Google Calendar event for a deal's booked meeting,
@@ -47,8 +64,9 @@ export async function syncDealMeetingToCalendar(dealId: string): Promise<Calenda
       eventId: deal.googleCalendarEventId,
       summary: `${dealName(deal)} x Nextview360`,
       description,
-      startIso: start.toISOString(),
-      endIso: end.toISOString(),
+      startIso: toWallClockDateTime(start),
+      endIso: toWallClockDateTime(end),
+      timeZone: MEETING_TIME_ZONE,
       attendeeEmail: deal.contactEmail,
     });
 

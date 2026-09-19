@@ -2,7 +2,7 @@ import { addMonths, addDays, max as maxDate, startOfDay, getQuarter, getYear } f
 import { prisma } from "@/lib/db";
 import { isDineroConfigured, createQuarterlyInvoiceDraft, getInvoicePaymentStatus, type DineroInvoiceLine } from "@/lib/dinero";
 import { computeBillingPeriods, computePeriodAmounts } from "@/lib/invoice-schedule";
-import { totalContractValue } from "@/lib/labels";
+import { totalContractValue, invoicePeriodLabel, formatDate } from "@/lib/labels";
 import {
   parseContractProducts,
   establishmentLineItems,
@@ -24,6 +24,10 @@ export type InvoiceRunSummary = {
   created: number;
   failed: number;
   churned?: number;
+  paymentsChecked?: number;
+  paymentsNewlyPaid?: number;
+  /** Set only when nothing was due right now - when the next quarterly (or establishment) draft will actually become due. */
+  nextDueDateLabel?: string;
 };
 
 type DueLine = { quarterIndex: number; amount: number; scheduledDate: Date };
@@ -61,9 +65,10 @@ function computeDueLines(
     contractEndDate: Date | null;
   },
   options: { sendEstablishmentNow?: boolean } = {}
-): DueLine[] {
+): { lines: DueLine[]; nextDueDate: Date | null } {
   const now = new Date();
   const lines: DueLine[] = [];
+  let nextDueDate: Date | null = null;
 
   const establishmentDueDate = deal.contractSignedAt ? addDays(deal.contractSignedAt, 1) : deal.billingStartDate;
   // Normally the establishment fee waits until the day after signing, so
@@ -73,15 +78,19 @@ function computeDueLines(
   const establishmentReady = options.sendEstablishmentNow
     ? Boolean(deal.contractSignedAt || deal.billingStartDate)
     : Boolean(establishmentDueDate && establishmentDueDate <= now);
-  if (deal.establishmentFee && deal.establishmentFee > 0 && establishmentReady) {
-    lines.push({
-      quarterIndex: 0,
-      amount: deal.establishmentFee,
-      scheduledDate: establishmentDueDate ?? now,
-    });
+  if (deal.establishmentFee && deal.establishmentFee > 0) {
+    if (establishmentReady) {
+      lines.push({
+        quarterIndex: 0,
+        amount: deal.establishmentFee,
+        scheduledDate: establishmentDueDate ?? now,
+      });
+    } else if (establishmentDueDate) {
+      nextDueDate = establishmentDueDate;
+    }
   }
 
-  if (!deal.billingStartDate || !deal.saleAmount || !deal.bindingMonths) return lines;
+  if (!deal.billingStartDate || !deal.saleAmount || !deal.bindingMonths) return { lines, nextDueDate };
 
   const contractEnd = addMonths(deal.billingStartDate, deal.bindingMonths);
   const until = deal.contractEndDate ?? maxDate([contractEnd, addMonths(now, ROLLING_HORIZON_MONTHS)]);
@@ -96,7 +105,10 @@ function computeDueLines(
 
   periods.forEach((period, i) => {
     if (i < firstRelevantIndex) return;
-    if (period.draftTriggerDate > now) return;
+    if (period.draftTriggerDate > now) {
+      if (!nextDueDate || period.draftTriggerDate < nextDueDate) nextDueDate = period.draftTriggerDate;
+      return;
+    }
     lines.push({
       quarterIndex: period.index,
       amount: amounts[i],
@@ -104,7 +116,7 @@ function computeDueLines(
     });
   });
 
-  return lines;
+  return { lines, nextDueDate };
 }
 
 const DANISH_MONTHS = [
@@ -253,8 +265,8 @@ type DealWithInvoices = DraftableDeal & {
 async function processDealDueInvoices(
   deal: DealWithInvoices,
   options: { sendEstablishmentNow?: boolean } = {}
-): Promise<{ checked: number; created: number; failed: number }> {
-  const dueLines = computeDueLines(deal, options);
+): Promise<{ checked: number; created: number; failed: number; nextDueDate: Date | null }> {
+  const { lines: dueLines, nextDueDate } = computeDueLines(deal, options);
   const termInvoices = deal.invoices.filter((inv) => inv.termNumber === deal.currentTermNumber);
 
   let checked = 0;
@@ -288,7 +300,7 @@ async function processDealDueInvoices(
     else failed++;
   }
 
-  return { checked, created, failed };
+  return { checked, created, failed, nextDueDate };
 }
 
 /**
@@ -336,8 +348,12 @@ export async function generateInvoiceForDeal(dealId: string): Promise<InvoiceRun
   }
 
   const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId }, include: { invoices: true } });
-  const result = await processDealDueInvoices(deal, { sendEstablishmentNow: true });
-  return { configured: true, ...result };
+  const { nextDueDate, ...result } = await processDealDueInvoices(deal, { sendEstablishmentNow: true });
+  return {
+    configured: true,
+    ...result,
+    nextDueDateLabel: result.checked === 0 && nextDueDate ? formatDate(nextDueDate) : undefined,
+  };
 }
 
 /**
@@ -412,4 +428,31 @@ export async function checkInvoicePayment(
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Ukendt fejl", dealId: invoice.dealId };
   }
+}
+
+/**
+ * Daily sweep (part of the same cron as invoice generation): checks every
+ * drafted-or-manually-sent invoice that isn't marked paid yet against
+ * Dinero, and records it as paid here the moment Dinero shows it as such.
+ * Best-effort per invoice - one failing lookup (e.g. a transient Dinero
+ * error) doesn't stop the rest of the sweep.
+ */
+export async function checkAllPendingPayments(): Promise<{ checked: number; paid: number }> {
+  if (!(await isDineroConfigured())) return { checked: 0, paid: 0 };
+
+  const invoices = await prisma.invoice.findMany({
+    where: { paidAt: null, dineroInvoiceGuid: { not: null }, status: { in: ["DRAFT_CREATED", "SENT_MANUALLY"] } },
+    select: { id: true },
+  });
+
+  let checked = 0;
+  let paid = 0;
+  for (const invoice of invoices) {
+    const result = await checkInvoicePayment(invoice.id);
+    if (!result.ok) continue;
+    checked++;
+    if (result.paid) paid++;
+  }
+
+  return { checked, paid };
 }

@@ -1,4 +1,51 @@
-import { differenceInCalendarMonths } from "date-fns";
+import { differenceInCalendarMonths, getQuarter, getYear, endOfMonth } from "date-fns";
+
+const DANISH_MONTHS = [
+  "januar",
+  "februar",
+  "marts",
+  "april",
+  "maj",
+  "juni",
+  "juli",
+  "august",
+  "september",
+  "oktober",
+  "november",
+  "december",
+];
+
+/** "a, b og c" - the Danish convention for joining a list in running text. */
+function joinDanish(items: string[]): string {
+  if (items.length <= 1) return items.join("");
+  if (items.length === 2) return `${items[0]} og ${items[1]}`;
+  return `${items.slice(0, -1).join(", ")} og ${items[items.length - 1]}`;
+}
+
+/**
+ * "Q4 Kvartal oktober, november og december 2026" for a period starting on
+ * the 1st of a quarter, or "Q3 Kvartal 4. juli til 31. juli, august og
+ * september 2026" for one starting mid-quarter (e.g. the first, stub period
+ * of a contract that begins partway through a quarter). Approximates the
+ * period's end as the end of its calendar quarter, since we don't persist
+ * the exact end date on the Invoice row - accurate for every period except
+ * one cut short by termination or the rolling-horizon cap.
+ */
+export function invoicePeriodLabel(scheduledDate: Date): string {
+  const quarter = getQuarter(scheduledDate);
+  const year = getYear(scheduledDate);
+  const quarterMonths = DANISH_MONTHS.slice((quarter - 1) * 3, quarter * 3);
+  const startMonth = DANISH_MONTHS[scheduledDate.getMonth()];
+
+  if (scheduledDate.getDate() === 1) {
+    return `Q${quarter} Kvartal ${joinDanish(quarterMonths)} ${year}`;
+  }
+
+  const lastDayOfStartMonth = endOfMonth(scheduledDate).getDate();
+  const remainingMonths = quarterMonths.slice(quarterMonths.indexOf(startMonth) + 1);
+  const monthsSuffix = remainingMonths.length > 0 ? `, ${joinDanish(remainingMonths)}` : "";
+  return `Q${quarter} Kvartal ${scheduledDate.getDate()}. ${startMonth} til ${lastDayOfStartMonth}. ${startMonth}${monthsSuffix} ${year}`;
+}
 
 export const stageOrder = [
   "LEAD",

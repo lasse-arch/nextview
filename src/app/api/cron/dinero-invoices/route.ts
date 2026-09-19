@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { runQuarterlyInvoiceGeneration, runAutoChurn } from "@/lib/invoice-service";
+import { runQuarterlyInvoiceGeneration, runAutoChurn, checkAllPendingPayments } from "@/lib/invoice-service";
 
 export async function GET(request: NextRequest) {
   const secret = process.env.CRON_SECRET;
@@ -13,5 +13,6 @@ export async function GET(request: NextRequest) {
   // churning it, so churn never pre-empts the last invoice.
   const summary = await runQuarterlyInvoiceGeneration();
   const churn = await runAutoChurn();
-  return NextResponse.json({ ...summary, ...churn });
+  const payments = await checkAllPendingPayments();
+  return NextResponse.json({ ...summary, ...churn, payments });
 }

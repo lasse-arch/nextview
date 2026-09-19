@@ -10,6 +10,7 @@ import {
   generateInvoiceForDeal,
   markEstablishmentSentManually,
   checkInvoicePayment,
+  checkAllPendingPayments,
   type InvoiceRunSummary,
 } from "@/lib/invoice-service";
 
@@ -19,9 +20,10 @@ export async function runInvoiceGenerationNow(): Promise<InvoiceRunSummary> {
 
   const summary = await runQuarterlyInvoiceGeneration();
   const { churned } = await runAutoChurn();
+  const payments = await checkAllPendingPayments();
   revalidatePath("/settings/dinero");
   revalidatePath("/deals");
-  return { ...summary, churned };
+  return { ...summary, churned, paymentsChecked: payments.checked, paymentsNewlyPaid: payments.paid };
 }
 
 /** "Opret faktura-kladde" on the deal page - drafts any currently-due lines for just this deal. */
