@@ -66,11 +66,21 @@ function splitDanishAddress(address: string | null): { street: string; zipCode: 
   return { street: address, zipCode: "", city: "" };
 }
 
+/** A contact created by an earlier version of this integration could have
+ * literally stored the text "undefined" as its CVR (from an unguarded
+ * template-literal interpolation, before `?? ""` was added) - `?? ""` alone
+ * doesn't catch that, since it's a real non-nullish string, not null or
+ * undefined. Treat that literal text the same as genuinely missing. */
+function sanitizeCvr(cvr: string | null): string {
+  const trimmed = (cvr ?? "").trim();
+  return trimmed.toLowerCase() === "undefined" || trimmed.toLowerCase() === "null" ? "" : trimmed;
+}
+
 function contactBody(input: DineroContactInput) {
   const { street, zipCode, city } = splitDanishAddress(input.address);
   return {
     Name: input.name,
-    Cvr: input.cvr ?? "",
+    Cvr: sanitizeCvr(input.cvr),
     Email: input.email ?? undefined,
     Street: street || undefined,
     ZipCode: zipCode || undefined,

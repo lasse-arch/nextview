@@ -110,8 +110,19 @@ export function contractProductsToDealItems(
 export function parseContractProducts(json: unknown): ContractProducts | null {
   if (!json || typeof json !== "object") return null;
   const p = json as Partial<ContractProducts>;
-  if (!p.nextviewTour || !p.hjemmeside || !p.droneOptagelse || !p.visitkort) return null;
-  return p as ContractProducts;
+  if (!p.nextviewTour && !p.hjemmeside && !p.droneOptagelse && !p.visitkort) return null;
+  // A contract built before a product type existed in the schema (e.g.
+  // visitkort was added later) is missing that key entirely, not just
+  // unselected - defaulting it to "not selected" here means the products
+  // that ARE present still get itemized, instead of discarding the whole
+  // snapshot and falling back to one flat, unitemized line.
+  return {
+    ...p,
+    nextviewTour: p.nextviewTour ?? { selected: false, setupFee: 0, price: 0 },
+    hjemmeside: p.hjemmeside ?? { selected: false, setupFee: 0, price: 0 },
+    droneOptagelse: p.droneOptagelse ?? { selected: false, setupFee: 0 },
+    visitkort: p.visitkort ?? { selected: false, setupFee: 0, quantity: 0 },
+  } as ContractProducts;
 }
 
 /** Splits `total` across `weights` proportionally, absorbing the rounding remainder into the last share. */
