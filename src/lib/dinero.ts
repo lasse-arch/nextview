@@ -66,31 +66,57 @@ function splitDanishAddress(address: string | null): { street: string; zipCode: 
   return { street: address, zipCode: "", city: "" };
 }
 
+function contactBody(input: DineroContactInput) {
+  const { street, zipCode, city } = splitDanishAddress(input.address);
+  return {
+    Name: input.name,
+    Cvr: input.cvr ?? "",
+    Email: input.email ?? undefined,
+    Street: street || undefined,
+    ZipCode: zipCode || undefined,
+    City: city || undefined,
+    CountryKey: "DK",
+    IsPerson: false,
+    PaymentConditionType: "Netto",
+    PaymentConditionNumberOfDays: 8,
+  };
+}
+
 /** Creates a Dinero contact and returns its ContactGuid. */
 async function createContact(accessToken: string, input: DineroContactInput): Promise<string> {
   const orgId = process.env.DINERO_ORGANIZATION_ID!;
-  const { street, zipCode, city } = splitDanishAddress(input.address);
 
   const res = await fetch(`${DINERO_API_BASE}/${orgId}/contacts`, {
     method: "POST",
     headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      Name: input.name,
-      Cvr: input.cvr ?? "",
-      Email: input.email ?? undefined,
-      Street: street || undefined,
-      ZipCode: zipCode || undefined,
-      City: city || undefined,
-      CountryKey: "DK",
-      IsPerson: false,
-      PaymentConditionType: "Netto",
-      PaymentConditionNumberOfDays: 8,
-    }),
+    body: JSON.stringify(contactBody(input)),
   });
 
   if (!res.ok) throw new Error(`Dinero: kunne ikke oprette kontakt (${res.status}): ${await res.text()}`);
   const data = (await res.json()) as { ContactGuid: string };
   return data.ContactGuid;
+}
+
+/**
+ * Refreshes an already-existing Dinero contact's fields (name, CVR, address).
+ * A contact's ContactGuid is cached on the deal (or found again by CVR) and
+ * reused for every later invoice, so a contact created before a data-quality
+ * fix landed - e.g. the CVR/address-split fix - would otherwise stay wrong in
+ * Dinero forever. Called every time an existing contact is reused, so it
+ * self-heals with the deal's current data instead of requiring a manual fix
+ * in Dinero. Best-effort: a failure here shouldn't block drafting the
+ * invoice itself, since the contact already exists and works either way.
+ */
+async function updateContact(accessToken: string, contactGuid: string, input: DineroContactInput): Promise<void> {
+  const orgId = process.env.DINERO_ORGANIZATION_ID!;
+
+  const res = await fetch(`${DINERO_API_BASE}/${orgId}/contacts/${contactGuid}`, {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify(contactBody(input)),
+  });
+
+  if (!res.ok) throw new Error(`Dinero: kunne ikke opdatere kontakt (${res.status}): ${await res.text()}`);
 }
 
 /** Looks up an existing Dinero contact by CVR number. Returns null if none is found. */
@@ -206,16 +232,27 @@ export async function createQuarterlyInvoiceDraft(params: {
   }
 
   const accessToken = await getAccessToken();
+  const contactInput: DineroContactInput = {
+    name: params.companyName,
+    cvr: params.cvrNumber,
+    email: params.contactEmail,
+    address: params.address,
+  };
 
-  const contactGuid =
-    params.existingContactGuid ??
-    (params.cvrNumber ? await findContactByCvr(accessToken, params.cvrNumber) : null) ??
-    (await createContact(accessToken, {
-      name: params.companyName,
-      cvr: params.cvrNumber,
-      email: params.contactEmail,
-      address: params.address,
-    }));
+  const reusedContactGuid =
+    params.existingContactGuid ?? (params.cvrNumber ? await findContactByCvr(accessToken, params.cvrNumber) : null);
+
+  const contactGuid = reusedContactGuid ?? (await createContact(accessToken, contactInput));
+  // A reused contact may have been created before a data-quality fix (e.g.
+  // the CVR/address-split fix) landed, so refresh it with the deal's current
+  // data on every use rather than leaving it wrong in Dinero indefinitely.
+  if (reusedContactGuid) {
+    try {
+      await updateContact(accessToken, reusedContactGuid, contactInput);
+    } catch (err) {
+      console.error("Dinero: kunne ikke opdatere eksisterende kontakt", err);
+    }
+  }
 
   const invoice = await createInvoiceDraft(accessToken, {
     contactGuid,
