@@ -67,6 +67,21 @@ export async function retryInvoiceDraft(invoiceId: string): Promise<{ success: b
 }
 
 /**
+ * Removes a single invoice row from our own tracking - like "Ryd alle
+ * fakturaer" but for one line. Does not touch Dinero itself: if a real
+ * kladde was already created there, it stays until deleted from within
+ * Dinero directly (see the "Nulstil fakturering" section for why).
+ */
+export async function deleteInvoiceDraft(invoiceId: string): Promise<void> {
+  const user = await requireUser();
+  if (user.role !== "ADMIN") throw new Error("Kun admin kan fjerne fakturaer");
+
+  const invoice = await prisma.invoice.delete({ where: { id: invoiceId } });
+  revalidatePath(`/deals/${invoice.dealId}`);
+  revalidatePath("/settings/dinero");
+}
+
+/**
  * Wipes every invoice row (including imported/historical ones) across all
  * deals, so fakturering only reflects what's generated from here on while
  * the feature is still being finished - a one-time reset, not something run

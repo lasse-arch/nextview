@@ -35,6 +35,7 @@ import { DealTasksSection } from "./deal-tasks-section";
 import { CreateInvoiceButton } from "./create-invoice-button";
 import { MarkSentManuallyButton } from "./mark-sent-manually-button";
 import { CheckPaymentButton } from "./check-payment-button";
+import { DeleteInvoiceButton } from "@/components/delete-invoice-button";
 
 function authorInitials(name: string): string {
   return name
@@ -429,6 +430,7 @@ export default async function DealDetailPage({
                         inv.dineroInvoiceGuid &&
                         !inv.dineroInvoiceGuid.startsWith("TEST-") && <CheckPaymentButton invoiceId={inv.id} />
                       )}
+                      {currentUser?.role === "ADMIN" && <DeleteInvoiceButton invoiceId={inv.id} />}
                     </span>
                   </li>
                 ))}

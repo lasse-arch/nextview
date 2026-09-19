@@ -5,6 +5,7 @@ import { formatDKK, formatDate, invoiceStatusLabels, dealName } from "@/lib/labe
 import { RunNowButton } from "./run-now-button";
 import { ClearInvoicesButton } from "./clear-invoices-button";
 import { RetryInvoiceButton } from "./retry-invoice-button";
+import { DeleteInvoiceButton } from "@/components/delete-invoice-button";
 import { IntegrationToggle } from "../integration-toggle";
 import Link from "next/link";
 
@@ -143,7 +144,10 @@ export default async function DineroSettingsPage() {
                     )}
                   </td>
                   <td className="px-3 py-2 text-right">
-                    {(inv.status === "FAILED" || inv.status === "PENDING") && <RetryInvoiceButton invoiceId={inv.id} />}
+                    <div className="flex items-center justify-end gap-1.5">
+                      {(inv.status === "FAILED" || inv.status === "PENDING") && <RetryInvoiceButton invoiceId={inv.id} />}
+                      <DeleteInvoiceButton invoiceId={inv.id} />
+                    </div>
                   </td>
                 </tr>
               ))}
