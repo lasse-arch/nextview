@@ -56,13 +56,15 @@ export async function syncDealMeetingToCalendar(
 
   const sellerFullName = [deal.owner.name, deal.owner.lastName].filter(Boolean).join(" ");
   const description = [
-    "Tusind tak fordi du har lyst til at bruge din tid på at høre mere om, hvordan vi kan hjælpe jer.",
+    "Hej,",
     "",
-    "Jeg ser frem til at mødes med dig.",
+    "Tak for at du har sat tid af til at mødes med os.",
     "",
-    "Du kan læse mere om os på www.nextview360.dk",
+    "Vi glæder os til at snakke med dig og fortælle mere om, hvad vi kan hjælpe med.",
     "",
-    "Mvh",
+    "Har du lyst til at kigge lidt nærmere på os inden mødet, er du velkommen til at besøge www.nextview360.dk",
+    "",
+    "Med venlig hilsen",
     sellerFullName,
     deal.owner.email,
     deal.owner.phone ?? "",

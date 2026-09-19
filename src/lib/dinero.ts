@@ -78,9 +78,16 @@ function sanitizeCvr(cvr: string | null): string {
 
 function contactBody(input: DineroContactInput) {
   const { street, zipCode, city } = splitDanishAddress(input.address);
+  const cvr = sanitizeCvr(input.cvr);
   return {
     Name: input.name,
-    Cvr: sanitizeCvr(input.cvr),
+    Cvr: cvr,
+    // Contacts are looked up by "VatNumber eq ..." (Cvr isn't a filterable
+    // property - see findContactByCvr), which suggests Dinero's CVR-nummer
+    // UI field (with its "DK" country-code selector) is actually bound to
+    // VatNumber, not Cvr - sending both since a fresh contact still came
+    // back with an empty CVR field even with Cvr set correctly.
+    VatNumber: cvr || undefined,
     Email: input.email ?? undefined,
     Street: street || undefined,
     ZipCode: zipCode || undefined,
