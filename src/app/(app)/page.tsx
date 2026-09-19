@@ -66,9 +66,9 @@ export default async function DashboardPage() {
           money
         />
         <StatTile
-          label="Solgt i alt (MRR + etableringspris)"
+          label="Solgt i alt"
           value={formatDKK(data.soldValue)}
-          sub={`${data.soldCount} kunder`}
+          sub={`MRR + etableringspris · ${data.soldCount} kunder`}
           money
           badge={<SoldTotalReportButton total={data.soldValue} breakdown={data.soldBreakdown} />}
         />

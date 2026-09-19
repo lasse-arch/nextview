@@ -372,13 +372,19 @@ export function TaskBoard({
                           checked={checkedIds.has(task.id)}
                           onClick={(e) => e.stopPropagation()}
                           onChange={() => toggleChecked(task.id)}
-                          className="mt-0.5 shrink-0"
+                          title="Vælg til bulk-handling"
+                          className={`mt-0.5 shrink-0 ${
+                            checkedIds.has(task.id) || checkedIds.size > 0
+                              ? "opacity-100"
+                              : "opacity-0 group-hover:opacity-100"
+                          }`}
                         />
                         <input
                           type="checkbox"
                           checked={task.done}
                           onClick={(e) => e.stopPropagation()}
                           onChange={() => handleToggleDone(task.id)}
+                          title="Marker som fuldført"
                           className="mt-0.5 shrink-0"
                         />
                         <p className={`min-w-0 flex-1 text-xs font-medium ${task.done ? "text-slate-400 line-through" : "text-slate-900"}`}>

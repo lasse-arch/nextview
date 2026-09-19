@@ -196,12 +196,15 @@ export function DealTasksSection({
                 checked={checkedIds.has(task.id)}
                 onClick={(e) => e.stopPropagation()}
                 onChange={() => toggleChecked(task.id)}
+                title="Vælg til bulk-handling"
+                className={checkedIds.has(task.id) || checkedIds.size > 0 ? "opacity-100" : "opacity-0 group-hover:opacity-100"}
               />
               <input
                 type="checkbox"
                 checked={task.done}
                 onClick={(e) => e.stopPropagation()}
                 onChange={() => handleToggle(task.id)}
+                title="Marker som fuldført"
               />
               <span className={`min-w-0 flex-1 truncate ${task.done ? "text-slate-400 line-through" : "text-slate-800"}`}>
                 {task.title}
