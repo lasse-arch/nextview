@@ -42,10 +42,18 @@ export async function getGrowthDashboardData() {
 
   const now = new Date();
 
-  const activeDeals = deals.filter((d) => d.stage === "LIVE" && !d.churnedAt && isBillable(d));
-  const pipelineDeals = deals.filter(
-    (d) => (PIPELINE_STAGES as readonly string[]).includes(d.stage) && !d.churnedAt && isBillable(d)
-  );
+  // Customer *counts* (activeCount/pipelineCount below) include every
+  // non-churned deal in that stage, whether or not price/binding has been
+  // filled in yet - a deal doesn't stop being "in the pipeline" just
+  // because nobody's typed in the monthly price yet. Only the *financial*
+  // metrics (MRR, contract value, LTV, risk, etc.) need a real price and
+  // binding period to mean anything, so those use the narrower
+  // isBillable() filter below. This keeps activeCount + pipelineCount +
+  // expiredCount always equal to totalCount, with no unexplained gap.
+  const allActiveDeals = deals.filter((d) => d.stage === "LIVE" && !d.churnedAt);
+  const allPipelineDeals = deals.filter((d) => (PIPELINE_STAGES as readonly string[]).includes(d.stage) && !d.churnedAt);
+  const activeDeals = allActiveDeals.filter(isBillable);
+  const pipelineDeals = allPipelineDeals.filter(isBillable);
   const expiredCount = deals.filter((d) => d.churnedAt).length;
 
   // "Solgt" (has a signed contract - signed, filmed, or live) is a lower
@@ -58,11 +66,6 @@ export async function getGrowthDashboardData() {
   // and "Samlet booket værdi" always agree.
   const soldStages = ["LIVE", ...PIPELINE_STAGES] as readonly string[];
   const soldDeals = deals.filter((d) => soldStages.includes(d.stage));
-  // Sold but excluded from both activeCount/pipelineCount (not billable: no
-  // saleAmount/bindingMonths yet) and expiredCount (not churned) - the gap
-  // that otherwise makes "Kunder i alt" look like it doesn't add up to
-  // Aktive + Pipeline + Udløbne.
-  const incompleteCount = soldDeals.filter((d) => !d.churnedAt && !isBillable(d)).length;
 
   const activeMRR = activeDeals.reduce((sum, d) => sum + monthlyRate(d), 0);
   const pipelineMRR = pipelineDeals.reduce((sum, d) => sum + monthlyRate(d), 0);
@@ -159,14 +162,17 @@ export async function getGrowthDashboardData() {
     .sort((a, b) => b.total - a.total);
 
   return {
-    activeCount: activeDeals.length,
-    pipelineCount: pipelineDeals.length,
+    // Counts every non-churned deal in the stage, billable or not - see the
+    // comment above allActiveDeals/allPipelineDeals for why this differs
+    // from activeDeals/pipelineDeals (used for MRR below).
+    activeCount: allActiveDeals.length,
+    pipelineCount: allPipelineDeals.length,
     // Matches the main dashboard's soldCount exactly (src/lib/dashboard-data.ts) -
     // all sold deals, including churned and ones without a recurring MRR, not
-    // just the billable active+pipeline subset above.
+    // just the billable active+pipeline subset above. Always equals
+    // activeCount + pipelineCount + expiredCount.
     totalCount: soldDeals.length,
     expiredCount,
-    incompleteCount,
     activeMRR,
     pipelineMRR,
     totalMRR,
