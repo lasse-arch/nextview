@@ -157,6 +157,7 @@ export function TaskBoard({
   const [showNewTask, setShowNewTask] = useState(false);
   const [showDone, setShowDone] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [selectMode, setSelectMode] = useState(false);
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
   const [bulkAssigneeId, setBulkAssigneeId] = useState("");
   const [quickAddColumn, setQuickAddColumn] = useState<string | null>(null);
@@ -313,7 +314,18 @@ export function TaskBoard({
           <input type="checkbox" checked={showDone} onChange={(e) => setShowDone(e.target.checked)} />
           Vis fuldførte
         </label>
-        {checkedIds.size > 0 && (
+        <label className="flex items-center gap-1.5 text-xs font-medium text-slate-600">
+          <input
+            type="checkbox"
+            checked={selectMode}
+            onChange={(e) => {
+              setSelectMode(e.target.checked);
+              if (!e.target.checked) setCheckedIds(new Set());
+            }}
+          />
+          Massemarkér
+        </label>
+        {selectMode && checkedIds.size > 0 && (
           <div className="flex items-center gap-2">
             <span className="text-xs text-slate-500">{checkedIds.size} valgt</span>
             <select
@@ -364,7 +376,7 @@ export function TaskBoard({
               className="flex h-[calc(100vh-260px)] w-64 flex-shrink-0 flex-col rounded-lg bg-slate-100"
             >
               <div className="flex items-start gap-1.5 px-2.5 py-2">
-                {colTasks.length > 0 && (
+                {selectMode && colTasks.length > 0 && (
                   <input
                     type="checkbox"
                     title="Vælg alle i denne kolonne"
@@ -394,26 +406,25 @@ export function TaskBoard({
                       } ${task.done ? "border-slate-200 bg-slate-50" : "border-slate-200 bg-white"}`}
                     >
                       <div className="flex items-start gap-2">
-                        <input
-                          type="checkbox"
-                          checked={checkedIds.has(task.id)}
-                          onClick={(e) => e.stopPropagation()}
-                          onChange={() => toggleChecked(task.id)}
-                          title="Vælg til bulk-handling"
-                          className={`mt-0.5 shrink-0 ${
-                            checkedIds.has(task.id) || checkedIds.size > 0
-                              ? "opacity-100"
-                              : "opacity-0 group-hover:opacity-100"
-                          }`}
-                        />
-                        <input
-                          type="checkbox"
-                          checked={task.done}
-                          onClick={(e) => e.stopPropagation()}
-                          onChange={() => handleToggleDone(task.id)}
-                          title="Marker som fuldført"
-                          className="mt-0.5 shrink-0"
-                        />
+                        {selectMode ? (
+                          <input
+                            type="checkbox"
+                            checked={checkedIds.has(task.id)}
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={() => toggleChecked(task.id)}
+                            title="Vælg til bulk-handling"
+                            className="mt-0.5 shrink-0"
+                          />
+                        ) : (
+                          <input
+                            type="checkbox"
+                            checked={task.done}
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={() => handleToggleDone(task.id)}
+                            title="Marker som fuldført"
+                            className="mt-0.5 shrink-0"
+                          />
+                        )}
                         <p className={`min-w-0 flex-1 text-xs font-medium ${task.done ? "text-slate-400 line-through" : "text-slate-900"}`}>
                           {task.title}
                         </p>

@@ -30,6 +30,7 @@ export function DealTasksSection({
   const [adding, setAdding] = useState(false);
   const [showDone, setShowDone] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [selectMode, setSelectMode] = useState(false);
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
   const [bulkAssigneeId, setBulkAssigneeId] = useState("");
   const [pending, startTransition] = useTransition();
@@ -100,6 +101,17 @@ export function DealTasksSection({
             <input type="checkbox" checked={showDone} onChange={(e) => setShowDone(e.target.checked)} />
             Vis fuldførte
           </label>
+          <label className="flex items-center gap-1.5 text-xs font-medium text-slate-600">
+            <input
+              type="checkbox"
+              checked={selectMode}
+              onChange={(e) => {
+                setSelectMode(e.target.checked);
+                if (!e.target.checked) setCheckedIds(new Set());
+              }}
+            />
+            Massemarkér
+          </label>
           <button
             type="button"
             onClick={() => setAdding((v) => !v)}
@@ -142,7 +154,7 @@ export function DealTasksSection({
         </form>
       )}
 
-      {visibleTasks.length > 0 && (
+      {selectMode && visibleTasks.length > 0 && (
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <label className="flex items-center gap-1.5 text-xs text-slate-500">
             <input type="checkbox" checked={allVisibleChecked} onChange={toggleAllChecked} />
@@ -191,21 +203,23 @@ export function DealTasksSection({
               onClick={() => setSelectedTaskId(task.id)}
               className="group flex cursor-pointer items-center gap-2 rounded-md border border-slate-100 px-3 py-2 text-sm hover:bg-slate-50"
             >
-              <input
-                type="checkbox"
-                checked={checkedIds.has(task.id)}
-                onClick={(e) => e.stopPropagation()}
-                onChange={() => toggleChecked(task.id)}
-                title="Vælg til bulk-handling"
-                className={checkedIds.has(task.id) || checkedIds.size > 0 ? "opacity-100" : "opacity-0 group-hover:opacity-100"}
-              />
-              <input
-                type="checkbox"
-                checked={task.done}
-                onClick={(e) => e.stopPropagation()}
-                onChange={() => handleToggle(task.id)}
-                title="Marker som fuldført"
-              />
+              {selectMode ? (
+                <input
+                  type="checkbox"
+                  checked={checkedIds.has(task.id)}
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={() => toggleChecked(task.id)}
+                  title="Vælg til bulk-handling"
+                />
+              ) : (
+                <input
+                  type="checkbox"
+                  checked={task.done}
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={() => handleToggle(task.id)}
+                  title="Marker som fuldført"
+                />
+              )}
               <span className={`min-w-0 flex-1 truncate ${task.done ? "text-slate-400 line-through" : "text-slate-800"}`}>
                 {task.title}
               </span>
