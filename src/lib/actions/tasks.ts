@@ -99,7 +99,13 @@ export async function updateTask(taskId: string, formData: FormData): Promise<Ta
   return { ok: true, id: taskId };
 }
 
-export type TaskCommentView = { id: string; body: string; authorName: string; createdAt: Date };
+export type TaskCommentView = {
+  id: string;
+  body: string;
+  authorName: string;
+  authorAvatarUrl: string | null;
+  createdAt: Date;
+};
 
 export async function getTaskComments(taskId: string): Promise<TaskCommentView[]> {
   await requireUser();
@@ -108,7 +114,13 @@ export async function getTaskComments(taskId: string): Promise<TaskCommentView[]
     include: { author: true },
     orderBy: { createdAt: "asc" },
   });
-  return comments.map((c) => ({ id: c.id, body: c.body, authorName: c.author.name, createdAt: c.createdAt }));
+  return comments.map((c) => ({
+    id: c.id,
+    body: c.body,
+    authorName: c.author.name,
+    authorAvatarUrl: c.author.avatarUrl,
+    createdAt: c.createdAt,
+  }));
 }
 
 export async function addTaskComment(
@@ -123,5 +135,14 @@ export async function addTaskComment(
   const task = await prisma.task.findUniqueOrThrow({ where: { id: taskId } });
   revalidateTaskPaths(task.dealId);
 
-  return { ok: true, comment: { id: comment.id, body: comment.body, authorName: user.name, createdAt: comment.createdAt } };
+  return {
+    ok: true,
+    comment: {
+      id: comment.id,
+      body: comment.body,
+      authorName: user.name,
+      authorAvatarUrl: user.avatarUrl,
+      createdAt: comment.createdAt,
+    },
+  };
 }

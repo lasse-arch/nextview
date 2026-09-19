@@ -5,6 +5,7 @@ import { useEffect, useState, useTransition } from "react";
 import { updateTask, deleteTask, addTaskComment, getTaskComments, type TaskCommentView } from "@/lib/actions/tasks";
 import { formatDateTime } from "@/lib/labels";
 import { useToast } from "@/components/toast";
+import { Avatar } from "@/components/avatar";
 
 export type ModalTask = {
   id: string;
@@ -19,15 +20,6 @@ export type ModalTask = {
 function toDateInputValue(date: Date | null): string {
   if (!date) return "";
   return new Date(date).toISOString().slice(0, 10);
-}
-
-function authorInitials(name: string): string {
-  return name
-    .split(" ")
-    .map((p) => p[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
 }
 
 export function TaskDetailModal({
@@ -227,9 +219,7 @@ export function TaskDetailModal({
             {comments === null && <p className="text-sm text-slate-400">Indlæser…</p>}
             {comments?.map((c) => (
               <li key={c.id} className="flex items-start gap-2">
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-300 text-[10px] font-semibold text-white">
-                  {authorInitials(c.authorName)}
-                </span>
+                <Avatar name={c.authorName} avatarUrl={c.authorAvatarUrl} size={24} />
                 <div className="min-w-0 flex-1 rounded-md bg-white p-2.5 text-sm shadow-sm">
                   <div className="flex items-center justify-between text-xs text-slate-500">
                     <span className="font-medium text-slate-700">{c.authorName}</span>
