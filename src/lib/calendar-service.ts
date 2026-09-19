@@ -34,10 +34,13 @@ function toWallClockDateTime(date: Date): string {
  *
  * `extraAttendeeEmails` lets whoever sends the invite pull in colleagues too
  * (e.g. Gustav inviting Victor along), on top of the owner and the contact.
+ * `customBody`, if given, is inserted as an extra paragraph into the
+ * standard invite text, for anything specific to this particular meeting.
  */
 export async function syncDealMeetingToCalendar(
   dealId: string,
-  extraAttendeeEmails: string[] = []
+  extraAttendeeEmails: string[] = [],
+  customBody?: string
 ): Promise<CalendarSyncResult> {
   const deal = await prisma.deal.findUnique({ where: { id: dealId }, include: { owner: true } });
   if (!deal || !deal.meetingDate) {
@@ -61,6 +64,7 @@ export async function syncDealMeetingToCalendar(
     "Tak for at du har sat tid af til at mødes med os.",
     "",
     "Vi glæder os til at snakke med dig og fortælle mere om, hvad vi kan hjælpe med.",
+    ...(customBody?.trim() ? ["", customBody.trim()] : []),
     "",
     "Har du lyst til at kigge lidt nærmere på os inden mødet, er du velkommen til at besøge www.nextview360.dk",
     "",

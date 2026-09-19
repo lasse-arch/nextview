@@ -396,14 +396,28 @@ export async function setMeetingDateAndStage(dealId: string, meetingDateIso: str
  * never sent automatically (e.g. just from booking a meeting or saving the
  * deal), only when explicitly requested here. `extraAttendeeUserIds` lets
  * whoever sends it pull in colleagues too (e.g. Gustav inviting Victor
- * along), on top of the deal owner and the customer contact. */
+ * along), on top of the deal owner and the customer contact.
+ *
+ * `meetingDateRaw` is the mødedato field's current on-screen value (read by
+ * the button directly, not from the deal's already-saved one) - the field
+ * sits right next to this button but belongs to the separate "Gem
+ * ændringer" form, so without this a date typed in but not yet saved would
+ * silently send an invite for the stale, already-saved date instead. */
 export async function sendCalendarInvite(
   dealId: string,
-  extraAttendeeUserIds: string[] = []
+  extraAttendeeUserIds: string[] = [],
+  meetingDateRaw?: string,
+  customBody?: string
 ): Promise<CalendarSyncResult> {
   await requireUser();
   const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId } });
-  if (!deal.meetingDate) return { synced: false, reason: "Angiv en mødedato først." };
+
+  const meetingDate = meetingDateRaw ? new Date(meetingDateRaw) : deal.meetingDate;
+  if (!meetingDate || isNaN(meetingDate.getTime())) return { synced: false, reason: "Angiv en mødedato først." };
+
+  if (meetingDate.getTime() !== deal.meetingDate?.getTime()) {
+    await prisma.deal.update({ where: { id: dealId }, data: { meetingDate } });
+  }
 
   const extraUsers = extraAttendeeUserIds.length
     ? await prisma.user.findMany({ where: { id: { in: extraAttendeeUserIds } }, select: { email: true } })
@@ -411,7 +425,8 @@ export async function sendCalendarInvite(
 
   const result = await syncDealMeetingToCalendar(
     dealId,
-    extraUsers.map((u) => u.email)
+    extraUsers.map((u) => u.email),
+    customBody
   );
   revalidatePath(`/deals/${dealId}`);
   return result;

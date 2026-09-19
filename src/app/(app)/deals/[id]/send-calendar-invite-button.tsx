@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { sendCalendarInvite } from "@/lib/actions/deals";
 import { useToast } from "@/components/toast";
 
@@ -19,23 +19,30 @@ export function SendCalendarInviteButton({
 }) {
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
+  const [customBody, setCustomBody] = useState("");
   const [pending, startTransition] = useTransition();
   const showToast = useToast();
+  const rootRef = useRef<HTMLDivElement>(null);
 
   function toggle(id: string) {
     setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }
 
   function send() {
+    // The mødedato field sits right next to this button but belongs to the
+    // separate "Gem ændringer" form - read its current on-screen value
+    // directly rather than whatever's already saved, so a date typed in but
+    // not yet saved still gets used for the invite.
+    const dateInput = rootRef.current?.closest("form")?.querySelector<HTMLInputElement>('input[name="meetingDate"]');
     startTransition(async () => {
-      const result = await sendCalendarInvite(dealId, selected);
+      const result = await sendCalendarInvite(dealId, selected, dateInput?.value || undefined, customBody);
       showToast(result.synced ? "Kalenderinvitation sendt." : result.reason ?? "Kunne ikke sende invitationen.");
       if (result.synced) setOpen(false);
     });
   }
 
   return (
-    <div className="relative inline-block">
+    <div ref={rootRef} className="relative inline-block">
       <button
         type="button"
         disabled={pending}
@@ -45,7 +52,7 @@ export function SendCalendarInviteButton({
         Send kalender invitation
       </button>
       {open && (
-        <div className="absolute left-0 top-full z-10 mt-1 w-56 rounded-md border border-slate-200 bg-white p-3 text-sm shadow-lg">
+        <div className="absolute left-0 top-full z-10 mt-1 w-64 rounded-md border border-slate-200 bg-white p-3 text-sm shadow-lg">
           {colleagues.length > 0 && (
             <>
               <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Inviter også</p>
@@ -59,6 +66,16 @@ export function SendCalendarInviteButton({
               </div>
             </>
           )}
+          <p className="mt-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+            Ekstra besked (valgfri)
+          </p>
+          <textarea
+            value={customBody}
+            onChange={(e) => setCustomBody(e.target.value)}
+            placeholder="Tilføjes lige under standardteksten"
+            rows={3}
+            className="mt-1.5 w-full rounded-md border border-slate-300 px-2 py-1.5 text-xs"
+          />
           <button
             type="button"
             disabled={pending}
