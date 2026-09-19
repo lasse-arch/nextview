@@ -25,15 +25,27 @@ export async function createDeliveryTasksForSignedContract(
   });
 }
 
+const CONTRACT_FOLLOW_UP_TITLE = "Opfølgning på kontrakt tilbud";
+
 /** A one-week-out reminder for whoever just sent a contract, to chase the customer for a reply. */
 export async function createContractFollowUpTask(dealId: string, senderId: string): Promise<void> {
   await prisma.task.create({
     data: {
-      title: "Opfølgning på kontrakt tilbud",
+      title: CONTRACT_FOLLOW_UP_TITLE,
       assigneeId: senderId,
       createdById: senderId,
       dealId,
       dueDate: addDays(new Date(), 7),
     },
+  });
+}
+
+/** Once the contract is actually signed, chasing the customer for a reply is
+ * moot - auto-complete any still-open follow-up reminder instead of leaving
+ * it sitting there as a stale task. */
+export async function completeContractFollowUpTasks(dealId: string): Promise<void> {
+  await prisma.task.updateMany({
+    where: { dealId, title: CONTRACT_FOLLOW_UP_TITLE, done: false },
+    data: { done: true },
   });
 }
