@@ -125,7 +125,7 @@ type DraftableDeal = {
   cvrNumber: string | null;
   invoiceEmail: string | null;
   contactEmail: string | null;
-  address: string | null;
+  contactPhone: string | null;
   dineroContactGuid: string | null;
   soldProduct: string | null;
   contractProducts: unknown;
@@ -193,7 +193,7 @@ async function draftInvoiceLine(
       companyName: deal.companyName,
       cvrNumber: deal.cvrNumber,
       contactEmail: deal.invoiceEmail || deal.contactEmail,
-      address: deal.address,
+      contactPhone: deal.contactPhone,
       note,
       lines,
       invoiceDate: new Date(),

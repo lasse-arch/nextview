@@ -53,18 +53,8 @@ type DineroContactInput = {
   name: string;
   cvr: string | null;
   email: string | null;
-  address: string | null;
+  phone: string | null;
 };
-
-/** Splits a one-line Danish address ("Vesterbro 18, st, 9000 Aalborg") into the
- * separate street/zip/city fields Dinero's contact form expects, rather than
- * dumping the whole thing into Street and leaving Postnr/By blank. */
-function splitDanishAddress(address: string | null): { street: string; zipCode: string; city: string } {
-  if (!address) return { street: "", zipCode: "", city: "" };
-  const match = address.match(/^([\s\S]*?),?\s*(\d{4})\s+([\s\S]+)$/);
-  if (match) return { street: match[1].trim(), zipCode: match[2], city: match[3].trim() };
-  return { street: address, zipCode: "", city: "" };
-}
 
 /** A contact created by an earlier version of this integration could have
  * literally stored the text "undefined" as its CVR (from an unguarded
@@ -76,8 +66,13 @@ function sanitizeCvr(cvr: string | null): string {
   return trimmed.toLowerCase() === "undefined" || trimmed.toLowerCase() === "null" ? "" : trimmed;
 }
 
+/**
+ * Dinero only needs CVR, email and phone from us - given a valid CVR, it
+ * looks up the company's name and address itself rather than us needing to
+ * supply/maintain them. Name is still sent since contact creation likely
+ * requires it as a non-empty field regardless.
+ */
 function contactBody(input: DineroContactInput) {
-  const { street, zipCode, city } = splitDanishAddress(input.address);
   const cvr = sanitizeCvr(input.cvr);
   return {
     Name: input.name,
@@ -89,18 +84,11 @@ function contactBody(input: DineroContactInput) {
     // back with an empty CVR field even with Cvr set correctly.
     VatNumber: cvr || undefined,
     Email: input.email ?? undefined,
-    Street: street || undefined,
-    ZipCode: zipCode || undefined,
-    City: city || undefined,
+    Phone: input.phone ?? undefined,
     CountryKey: "DK",
     IsPerson: false,
     PaymentConditionType: "Netto",
     PaymentConditionNumberOfDays: 8,
-    // Dinero's own "Opret kontakt" form has an "Opdatér automatisk fra CVR"
-    // checkbox - guessing at CvrDataEnabled as the matching API field (no
-    // official field-name confirmation for this one), since it may also be
-    // what actually makes a contact's CVR-nummer field take effect at all.
-    CvrDataEnabled: true,
   };
 }
 
@@ -250,7 +238,7 @@ export async function createQuarterlyInvoiceDraft(params: {
   companyName: string;
   cvrNumber: string | null;
   contactEmail: string | null;
-  address: string | null;
+  contactPhone: string | null;
   note: string;
   lines: DineroInvoiceLine[];
   invoiceDate: Date;
@@ -270,7 +258,7 @@ export async function createQuarterlyInvoiceDraft(params: {
     name: params.companyName,
     cvr: params.cvrNumber,
     email: params.contactEmail,
-    address: params.address,
+    phone: params.contactPhone,
   };
 
   const reusedContactGuid =
