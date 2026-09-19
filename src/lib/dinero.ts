@@ -56,18 +56,31 @@ type DineroContactInput = {
   address: string | null;
 };
 
+/** Splits a one-line Danish address ("Vesterbro 18, st, 9000 Aalborg") into the
+ * separate street/zip/city fields Dinero's contact form expects, rather than
+ * dumping the whole thing into Street and leaving Postnr/By blank. */
+function splitDanishAddress(address: string | null): { street: string; zipCode: string; city: string } {
+  if (!address) return { street: "", zipCode: "", city: "" };
+  const match = address.match(/^([\s\S]*?),?\s*(\d{4})\s+([\s\S]+)$/);
+  if (match) return { street: match[1].trim(), zipCode: match[2], city: match[3].trim() };
+  return { street: address, zipCode: "", city: "" };
+}
+
 /** Creates a Dinero contact and returns its ContactGuid. */
 async function createContact(accessToken: string, input: DineroContactInput): Promise<string> {
   const orgId = process.env.DINERO_ORGANIZATION_ID!;
+  const { street, zipCode, city } = splitDanishAddress(input.address);
 
   const res = await fetch(`${DINERO_API_BASE}/${orgId}/contacts`, {
     method: "POST",
     headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       Name: input.name,
-      Cvr: input.cvr ?? undefined,
+      Cvr: input.cvr ?? "",
       Email: input.email ?? undefined,
-      Street: input.address ?? undefined,
+      Street: street || undefined,
+      ZipCode: zipCode || undefined,
+      City: city || undefined,
       CountryKey: "DK",
       IsPerson: false,
       PaymentConditionType: "Netto",
