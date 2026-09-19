@@ -1,8 +1,15 @@
 import { addMonths, addDays, max as maxDate, startOfDay } from "date-fns";
 import { prisma } from "@/lib/db";
-import { isDineroConfigured, createQuarterlyInvoiceDraft } from "@/lib/dinero";
+import { isDineroConfigured, createQuarterlyInvoiceDraft, type DineroInvoiceLine } from "@/lib/dinero";
 import { computeBillingPeriods, computePeriodAmounts } from "@/lib/invoice-schedule";
 import { totalContractValue } from "@/lib/labels";
+import {
+  parseContractProducts,
+  establishmentLineItems,
+  recurringLineItems,
+  allSelectedProductLabels,
+  recurringProductLabels,
+} from "@/lib/contract-template-data";
 import type { DealStage } from "@prisma/client";
 
 const ACTIVE_CUSTOMER_STAGES: DealStage[] = ["CONTRACT_SIGNED", "FILMED", "LIVE"];
@@ -19,7 +26,7 @@ export type InvoiceRunSummary = {
   churned?: number;
 };
 
-type DueLine = { quarterIndex: number; amount: number; description: string; scheduledDate: Date };
+type DueLine = { quarterIndex: number; amount: number; scheduledDate: Date };
 
 /**
  * Due lines for a deal's *current* contract term: a one-time establishment
@@ -50,7 +57,6 @@ function computeDueLines(deal: {
   establishmentFee: number | null;
   billingStartDate: Date | null;
   contractSignedAt: Date | null;
-  soldProduct: string | null;
   contractEndDate: Date | null;
 }): DueLine[] {
   const now = new Date();
@@ -61,7 +67,6 @@ function computeDueLines(deal: {
     lines.push({
       quarterIndex: 0,
       amount: deal.establishmentFee,
-      description: "Etableringsgebyr",
       scheduledDate: establishmentDueDate,
     });
   }
@@ -85,7 +90,6 @@ function computeDueLines(deal: {
     lines.push({
       quarterIndex: period.index,
       amount: amounts[i],
-      description: `${deal.soldProduct ?? "Ydelse"} - periode ${period.index}`,
       scheduledDate: period.startDate,
     });
   });
@@ -101,7 +105,44 @@ type DraftableDeal = {
   contactEmail: string | null;
   address: string | null;
   dineroContactGuid: string | null;
+  soldProduct: string | null;
+  contractProducts: unknown;
 };
+
+/**
+ * Builds the invoice-level note and per-product line items for a due line.
+ * Itemizes by product using the deal's contractProducts snapshot (recorded
+ * when the contract was signed) - one line per product's setup fee for the
+ * establishment invoice (quarterIndex 0), or one line per recurring
+ * product proportional to its share of the period's total for later
+ * quarters. Deals without a usable contractProducts snapshot (e.g. older
+ * or imported deals) fall back to a single flat line, as before.
+ */
+function buildInvoiceContent(
+  deal: { soldProduct: string | null; contractProducts: unknown },
+  quarterIndex: number,
+  totalAmount: number
+): { note: string; lines: DineroInvoiceLine[] } {
+  const products = parseContractProducts(deal.contractProducts);
+
+  if (quarterIndex === 0) {
+    if (!products) return { note: "Etableringsgebyr", lines: [{ description: "Etableringsgebyr", amount: totalAmount }] };
+    const labels = allSelectedProductLabels(products);
+    return {
+      note: labels.length > 0 ? `Etablering af ${labels.join(" + ")}` : "Etableringsgebyr",
+      lines: establishmentLineItems(products, totalAmount),
+    };
+  }
+
+  const fallback = { note: `${deal.soldProduct ?? "Ydelse"} - periode ${quarterIndex}` };
+  if (!products) return { ...fallback, lines: [{ description: deal.soldProduct ?? "Ydelse", amount: totalAmount }] };
+
+  const recurringLabels = recurringProductLabels(products);
+  const lines = recurringLineItems(products, totalAmount);
+  if (lines.length === 0) return { ...fallback, lines: [{ description: deal.soldProduct ?? "Ydelse", amount: totalAmount }] };
+
+  return { note: `${recurringLabels.join(" + ")} - periode ${quarterIndex}`, lines };
+}
 
 /**
  * Attempts to draft one invoice line in Dinero and records the outcome on
@@ -111,18 +152,18 @@ type DraftableDeal = {
  */
 async function draftInvoiceLine(
   deal: DraftableDeal,
-  invoiceRow: { id: string; amount: number },
-  description: string
+  invoiceRow: { id: string; amount: number; quarterIndex: number }
 ): Promise<{ success: true } | { success: false; error: string }> {
   try {
+    const { note, lines } = buildInvoiceContent(deal, invoiceRow.quarterIndex, invoiceRow.amount);
     const result = await createQuarterlyInvoiceDraft({
       existingContactGuid: deal.dineroContactGuid,
       companyName: deal.companyName,
       cvrNumber: deal.cvrNumber,
       contactEmail: deal.invoiceEmail || deal.contactEmail,
       address: deal.address,
-      description,
-      amount: invoiceRow.amount,
+      note,
+      lines,
       invoiceDate: new Date(),
     });
 
@@ -149,15 +190,11 @@ async function draftInvoiceLine(
   }
 }
 
-function describeInvoiceLine(deal: { soldProduct: string | null }, quarterIndex: number): string {
-  return quarterIndex === 0 ? "Etableringsgebyr" : `${deal.soldProduct ?? "Ydelse"} - periode ${quarterIndex}`;
-}
-
 /** Re-attempts drafting a single already-existing invoice row - e.g. after fixing a config
  * issue that made it fail - without re-running the full bulk generation. */
 export async function retrySingleInvoice(invoiceId: string): Promise<{ success: boolean; error?: string }> {
   const invoice = await prisma.invoice.findUniqueOrThrow({ where: { id: invoiceId }, include: { deal: true } });
-  const result = await draftInvoiceLine(invoice.deal, invoice, describeInvoiceLine(invoice.deal, invoice.quarterIndex));
+  const result = await draftInvoiceLine(invoice.deal, invoice);
   return result.success ? { success: true } : { success: false, error: result.error };
 }
 
@@ -213,7 +250,7 @@ export async function runQuarterlyInvoiceGeneration(): Promise<InvoiceRunSummary
             },
           });
 
-      const result = await draftInvoiceLine(deal, invoiceRow, line.description);
+      const result = await draftInvoiceLine(deal, invoiceRow);
       if (result.success) created++;
       else failed++;
     }

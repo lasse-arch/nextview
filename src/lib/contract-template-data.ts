@@ -106,6 +106,77 @@ export function contractProductsToDealItems(
   return items;
 }
 
+/** Loosely validates and casts the deal's stored contractProducts JSON back to ContractProducts. */
+export function parseContractProducts(json: unknown): ContractProducts | null {
+  if (!json || typeof json !== "object") return null;
+  const p = json as Partial<ContractProducts>;
+  if (!p.nextviewTour || !p.hjemmeside || !p.droneOptagelse || !p.visitkort) return null;
+  return p as ContractProducts;
+}
+
+/** Splits `total` across `weights` proportionally, absorbing the rounding remainder into the last share. */
+function distributeByWeights(total: number, weights: number[]): number[] {
+  const sumWeights = weights.reduce((s, w) => s + w, 0);
+  if (sumWeights <= 0) return weights.map(() => 0);
+  const amounts = weights.map((w) => Math.floor((total * w) / sumWeights));
+  const allocated = amounts.reduce((s, a) => s + a, 0);
+  amounts[amounts.length - 1] += total - allocated;
+  return amounts;
+}
+
+export type InvoiceLineItem = { description: string; amount: number };
+
+/**
+ * One invoice line per selected product's one-off setup fee, itemizing the
+ * establishment invoice instead of one lump "Etableringsgebyr" line. Scaled
+ * to sum exactly to `total` (normally already equal to it) so the invoice
+ * total never drifts from the setup fees' rounding.
+ */
+export function establishmentLineItems(products: ContractProducts, total: number): InvoiceLineItem[] {
+  const entries: { label: string; setupFee: number }[] = [];
+  if (products.nextviewTour.selected) entries.push({ label: PRODUCT_LABELS.nextviewTour, setupFee: products.nextviewTour.setupFee });
+  if (products.hjemmeside.selected) entries.push({ label: PRODUCT_LABELS.hjemmeside, setupFee: products.hjemmeside.setupFee });
+  if (products.droneOptagelse.selected) entries.push({ label: PRODUCT_LABELS.droneOptagelse, setupFee: products.droneOptagelse.setupFee });
+  if (products.visitkort.selected) entries.push({ label: PRODUCT_LABELS.visitkort, setupFee: products.visitkort.setupFee });
+
+  if (entries.length === 0) return [{ description: "Etableringsgebyr", amount: total }];
+
+  const amounts = distributeByWeights(total, entries.map((e) => e.setupFee || 1));
+  return entries.map((e, i) => ({ description: e.label, amount: amounts[i] }));
+}
+
+export function allSelectedProductLabels(products: ContractProducts): string[] {
+  const labels: string[] = [];
+  if (products.nextviewTour.selected) labels.push(PRODUCT_LABELS.nextviewTour);
+  if (products.hjemmeside.selected) labels.push(PRODUCT_LABELS.hjemmeside);
+  if (products.droneOptagelse.selected) labels.push(PRODUCT_LABELS.droneOptagelse);
+  if (products.visitkort.selected) labels.push(PRODUCT_LABELS.visitkort);
+  return labels;
+}
+
+/** Only nextviewTour and hjemmeside recur monthly - see ContractProducts' own docs. */
+export function recurringProductLabels(products: ContractProducts): string[] {
+  const labels: string[] = [];
+  if (products.nextviewTour.selected && products.nextviewTour.price > 0) labels.push(PRODUCT_LABELS.nextviewTour);
+  if (products.hjemmeside.selected && products.hjemmeside.price > 0) labels.push(PRODUCT_LABELS.hjemmeside);
+  return labels;
+}
+
+/** One invoice line per recurring product, proportional to its share of the combined monthly price. */
+export function recurringLineItems(products: ContractProducts, total: number): InvoiceLineItem[] {
+  const entries: { label: string; price: number }[] = [];
+  if (products.nextviewTour.selected && products.nextviewTour.price > 0) {
+    entries.push({ label: PRODUCT_LABELS.nextviewTour, price: products.nextviewTour.price });
+  }
+  if (products.hjemmeside.selected && products.hjemmeside.price > 0) {
+    entries.push({ label: PRODUCT_LABELS.hjemmeside, price: products.hjemmeside.price });
+  }
+  if (entries.length === 0) return [];
+
+  const amounts = distributeByWeights(total, entries.map((e) => e.price));
+  return entries.map((e, i) => ({ description: e.label, amount: amounts[i] }));
+}
+
 export type ContractHtmlData = {
   client: { company: string; cvr: string; name: string; email: string; phone: string; address: string; zipCity: string };
   seller: { name: string; email: string; phone: string };

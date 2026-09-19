@@ -94,10 +94,14 @@ async function findContactByCvr(accessToken: string, cvr: string): Promise<strin
   return data.Collection[0]?.ContactGuid ?? null;
 }
 
+export type DineroInvoiceLine = { description: string; amount: number };
+
 type DineroInvoiceInput = {
   contactGuid: string;
-  description: string;
-  amount: number;
+  /** Invoice-level free-text note shown near the top of the document (Dinero's own "Description" field) -
+   * e.g. "Etablering af Hjemmeside + Nextview360 Tour" - distinct from each line's own description. */
+  note: string;
+  lines: DineroInvoiceLine[];
   invoiceDate: Date;
 };
 
@@ -114,16 +118,16 @@ async function createInvoiceDraft(
     body: JSON.stringify({
       ContactGuid: input.contactGuid,
       Date: input.invoiceDate.toISOString().slice(0, 10),
+      Description: input.note,
       PaymentConditionType: "Netto",
       PaymentConditionNumberOfDays: 8,
-      ProductLines: [
-        {
-          Description: input.description,
-          Quantity: 1,
-          BaseAmountValue: input.amount,
-          AccountNumber: Number(process.env.DINERO_SALES_ACCOUNT_NUMBER),
-        },
-      ],
+      ProductLines: input.lines.map((line) => ({
+        Description: line.description,
+        Quantity: 1,
+        Unit: "stk.",
+        BaseAmountValue: line.amount,
+        AccountNumber: Number(process.env.DINERO_SALES_ACCOUNT_NUMBER),
+      })),
     }),
   });
 
@@ -146,8 +150,8 @@ export async function createQuarterlyInvoiceDraft(params: {
   cvrNumber: string | null;
   contactEmail: string | null;
   address: string | null;
-  description: string;
-  amount: number;
+  note: string;
+  lines: DineroInvoiceLine[];
   invoiceDate: Date;
 }): Promise<DineroDraftResult> {
   if (await isDineroTestMode()) {
@@ -174,8 +178,8 @@ export async function createQuarterlyInvoiceDraft(params: {
 
   const invoice = await createInvoiceDraft(accessToken, {
     contactGuid,
-    description: params.description,
-    amount: params.amount,
+    note: params.note,
+    lines: params.lines,
     invoiceDate: params.invoiceDate,
   });
 
