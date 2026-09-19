@@ -8,7 +8,8 @@ function hasDineroCredentials(): boolean {
     process.env.DINERO_CLIENT_ID &&
       process.env.DINERO_CLIENT_SECRET &&
       process.env.DINERO_API_KEY &&
-      process.env.DINERO_ORGANIZATION_ID
+      process.env.DINERO_ORGANIZATION_ID &&
+      process.env.DINERO_SALES_ACCOUNT_NUMBER
   );
 }
 
@@ -120,6 +121,7 @@ async function createInvoiceDraft(
           Description: input.description,
           Quantity: 1,
           BaseAmountValue: input.amount,
+          AccountNumber: Number(process.env.DINERO_SALES_ACCOUNT_NUMBER),
         },
       ],
     }),

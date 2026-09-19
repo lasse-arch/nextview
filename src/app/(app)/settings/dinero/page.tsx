@@ -12,7 +12,8 @@ const hasCredentials = Boolean(
   process.env.DINERO_CLIENT_ID &&
     process.env.DINERO_CLIENT_SECRET &&
     process.env.DINERO_API_KEY &&
-    process.env.DINERO_ORGANIZATION_ID
+    process.env.DINERO_ORGANIZATION_ID &&
+    process.env.DINERO_SALES_ACCOUNT_NUMBER
 );
 
 export default async function DineroSettingsPage() {
@@ -59,6 +60,10 @@ export default async function DineroSettingsPage() {
             <li>DINERO_CLIENT_ID / DINERO_CLIENT_SECRET – fra en registreret udvikler-app hos Dinero</li>
             <li>DINERO_API_KEY – jeres organisations API-nøgle (Dinero → Indstillinger → API)</li>
             <li>DINERO_ORGANIZATION_ID – jeres organisations-ID i Dinero</li>
+            <li>
+              DINERO_SALES_ACCOUNT_NUMBER – salgskontoen fra jeres kontoplan (Dinero → Regnskab → Kontoplan) som
+              fakturalinjerne skal bogføres på, fx "1000"
+            </li>
             <li>CRON_SECRET – en tilfældig streng, bruges til at sikre den daglige automatiske kørsel</li>
           </ul>
         </div>
