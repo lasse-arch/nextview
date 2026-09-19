@@ -126,6 +126,7 @@ type DraftableDeal = {
   invoiceEmail: string | null;
   contactEmail: string | null;
   contactPhone: string | null;
+  address: string | null;
   dineroContactGuid: string | null;
   soldProduct: string | null;
   contractProducts: unknown;
@@ -194,6 +195,7 @@ async function draftInvoiceLine(
       cvrNumber: deal.cvrNumber,
       contactEmail: deal.invoiceEmail || deal.contactEmail,
       contactPhone: deal.contactPhone,
+      address: deal.address,
       note,
       lines,
       invoiceDate: new Date(),
@@ -408,6 +410,7 @@ export type InvoicePeriodOption = {
   quarterIndex: number;
   label: string;
   amount: number;
+  scheduledDate: Date;
   status: string | null;
 };
 
@@ -434,6 +437,7 @@ export async function listRecurringPeriodsForDeal(dealId: string): Promise<Invoi
     quarterIndex: period.index,
     label: invoicePeriodLabel(period.startDate),
     amount: amounts[i],
+    scheduledDate: period.startDate,
     status: termInvoices.find((inv) => inv.quarterIndex === period.index)?.status ?? null,
   }));
 }
@@ -465,7 +469,7 @@ export async function markPeriodSentManually(
       termNumber: deal.currentTermNumber,
       quarterIndex,
       amount: period.amount,
-      scheduledDate: new Date(),
+      scheduledDate: period.scheduledDate,
       status: "SENT_MANUALLY",
     },
     update: { status: "SENT_MANUALLY", failureReason: null },

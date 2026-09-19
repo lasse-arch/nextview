@@ -63,7 +63,7 @@ export function computeBillingPeriods(billingStartDate: Date, bindingMonths: num
  * of whether it has 28-31 days, and only a month it doesn't fully cover
  * (only possible for the period's first or last month, e.g. billing
  * starting mid-month, or a period cut short by termination) is pro-rated by
- * the days actually covered.
+ * the days actually covered within that specific month.
  */
 function accruedAmount(startDate: Date, endDate: Date, monthlyRate: number): number {
   let total = 0;
@@ -86,7 +86,7 @@ function accruedAmount(startDate: Date, endDate: Date, monthlyRate: number): num
  * genuine stub period (billing starting mid-month, or one cut short by
  * termination) is pro-rated for its partial month(s). The periods within
  * the original binding term can end up a few kroner off the exact contract
- * total from two independent day-fraction roundings (the very first period,
+ * total from independent day-fraction roundings (the very first period,
  * and one truncated right at the binding term's end) - absorbed into the
  * last such period so that sum still reconciles exactly.
  */

@@ -54,7 +54,18 @@ type DineroContactInput = {
   cvr: string | null;
   email: string | null;
   phone: string | null;
+  address: string | null;
 };
+
+/** Splits a one-line Danish address ("Vesterbro 18, st, 9000 Aalborg") into the
+ * separate street/zip/city fields Dinero's contact form expects, rather than
+ * dumping the whole thing into Street and leaving Postnr/By blank. */
+function splitDanishAddress(address: string | null): { street: string; zipCode: string; city: string } {
+  if (!address) return { street: "", zipCode: "", city: "" };
+  const match = address.match(/^([\s\S]*?),?\s*(\d{4})\s+([\s\S]+)$/);
+  if (match) return { street: match[1].trim(), zipCode: match[2], city: match[3].trim() };
+  return { street: address, zipCode: "", city: "" };
+}
 
 /** A contact created by an earlier version of this integration could have
  * literally stored the text "undefined" as its CVR (from an unguarded
@@ -67,12 +78,13 @@ function sanitizeCvr(cvr: string | null): string {
 }
 
 /**
- * Dinero only needs CVR, email and phone from us - given a valid CVR, it
- * looks up the company's name and address itself rather than us needing to
- * supply/maintain them. Name is still sent since contact creation likely
- * requires it as a non-empty field regardless.
+ * Dinero doesn't reliably auto-fill name/address from CVR on its own (the
+ * "Opdatér automatisk fra CVR" checkbox stayed unchecked regardless), so we
+ * send our own - already CVR-verified when the deal was first created -
+ * name and address, plus CVR, email and phone.
  */
 function contactBody(input: DineroContactInput) {
+  const { street, zipCode, city } = splitDanishAddress(input.address);
   const cvr = sanitizeCvr(input.cvr);
   return {
     Name: input.name,
@@ -85,6 +97,9 @@ function contactBody(input: DineroContactInput) {
     VatNumber: cvr || undefined,
     Email: input.email ?? undefined,
     Phone: input.phone ?? undefined,
+    Street: street || undefined,
+    ZipCode: zipCode || undefined,
+    City: city || undefined,
     CountryKey: "DK",
     IsPerson: false,
     PaymentConditionType: "Netto",
@@ -239,6 +254,7 @@ export async function createQuarterlyInvoiceDraft(params: {
   cvrNumber: string | null;
   contactEmail: string | null;
   contactPhone: string | null;
+  address: string | null;
   note: string;
   lines: DineroInvoiceLine[];
   invoiceDate: Date;
@@ -259,6 +275,7 @@ export async function createQuarterlyInvoiceDraft(params: {
     cvr: params.cvrNumber,
     email: params.contactEmail,
     phone: params.contactPhone,
+    address: params.address,
   };
 
   const reusedContactGuid =
