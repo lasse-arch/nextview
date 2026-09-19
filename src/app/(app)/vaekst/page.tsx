@@ -45,7 +45,15 @@ export default async function GrowthDashboardPage() {
         <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <StatTile label="Aktive kunder" value={String(d.activeCount)} />
           <StatTile label="Pipeline (afventer start)" value={String(d.pipelineCount)} />
-          <StatTile label="Kunder i alt" value={String(d.totalCount)} />
+          <StatTile
+            label="Kunder i alt"
+            value={String(d.totalCount)}
+            sub={
+              d.incompleteCount > 0
+                ? `Heraf ${d.incompleteCount} solgt uden pris/binding endnu`
+                : "Aktive + pipeline + udløbne"
+            }
+          />
           <StatTile label="Udløbne kontrakter" value={String(d.expiredCount)} />
         </div>
       </div>

@@ -13,8 +13,8 @@ export function DenmarkMap({ points }: { points: CustomerMapPoint[] }) {
   const hoveredPos = hovered ? projectLatLon(hovered.lat, hovered.lon) : null;
 
   return (
-    <div className="relative">
-      <svg viewBox={`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`} className="mx-auto w-full max-w-xs">
+    <div className="relative mx-auto w-full max-w-xs">
+      <svg viewBox={`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`} className="w-full">
         <path d={DENMARK_PATH} className="fill-blue-100 stroke-blue-300" strokeWidth={1} />
         {points.map((p) => {
           const { x, y } = projectLatLon(p.lat, p.lon);

@@ -83,7 +83,7 @@ export default async function DocuSealSettingsPage() {
       <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <h2 className="text-sm font-semibold text-slate-900">Kontrakt-skabelon</h2>
         <p className="mt-2 text-sm text-slate-600">
-          Skabelonen (Nextview360 abonnementsaftale) ligger i selve systemet og indeholder felter for kunde,
+          Skabelonen (Nextview360 samarbejdsaftale) ligger i selve systemet og indeholder felter for kunde,
           sælger og de 4 produkter (Nextview360 Tour, Hjemmeside, Drone-optagelse, Visitkort) — kun de produkter,
           der er valgt på dealen, tages med i den færdige kontrakt. Kontakt os hvis skabelonens indhold skal
           ændres.

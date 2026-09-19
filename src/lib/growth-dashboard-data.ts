@@ -58,6 +58,11 @@ export async function getGrowthDashboardData() {
   // and "Samlet booket værdi" always agree.
   const soldStages = ["LIVE", ...PIPELINE_STAGES] as readonly string[];
   const soldDeals = deals.filter((d) => soldStages.includes(d.stage));
+  // Sold but excluded from both activeCount/pipelineCount (not billable: no
+  // saleAmount/bindingMonths yet) and expiredCount (not churned) - the gap
+  // that otherwise makes "Kunder i alt" look like it doesn't add up to
+  // Aktive + Pipeline + Udløbne.
+  const incompleteCount = soldDeals.filter((d) => !d.churnedAt && !isBillable(d)).length;
 
   const activeMRR = activeDeals.reduce((sum, d) => sum + monthlyRate(d), 0);
   const pipelineMRR = pipelineDeals.reduce((sum, d) => sum + monthlyRate(d), 0);
@@ -161,6 +166,7 @@ export async function getGrowthDashboardData() {
     // just the billable active+pipeline subset above.
     totalCount: soldDeals.length,
     expiredCount,
+    incompleteCount,
     activeMRR,
     pipelineMRR,
     totalMRR,

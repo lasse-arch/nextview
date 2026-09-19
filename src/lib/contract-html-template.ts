@@ -54,7 +54,7 @@ type Labels = {
 
 const LABELS: Record<ContractLanguage, Labels> = {
   da: {
-    docTitle: "Abonnementsaftale",
+    docTitle: "Samarbejdsaftale",
     between: "Mellem",
     supplier: "Leverandør",
     customer: "Kunde",

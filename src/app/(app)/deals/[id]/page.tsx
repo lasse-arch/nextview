@@ -30,6 +30,7 @@ import { LockedContractFields } from "./locked-contract-fields";
 import { ContractStatusRow } from "./contract-status-row";
 import { DealInfoForm } from "./deal-info-form";
 import { NoteForm } from "./note-form";
+import { EmailList } from "./email-list";
 
 function authorInitials(name: string): string {
   return name
@@ -301,26 +302,7 @@ export default async function DealDetailPage({
               Mails der modtages fra <span className="font-medium">{deal.contactEmail || "kontaktpersonens e-mail"}</span>{" "}
               i en forbundet Gmail-indbakke vises automatisk her for hele teamet - ingen CC eller andet nødvendigt.
             </p>
-            <ul className="mt-4 space-y-3">
-              {deal.emails.map((email) => (
-                <li key={email.id} className="rounded-md border border-slate-100 p-3 text-sm">
-                  <div className="flex items-center justify-between text-xs text-slate-500">
-                    <span>
-                      {email.direction === "INBOUND" ? "Fra" : "Til"}: {email.direction === "INBOUND" ? email.fromAddress : email.toAddresses}
-                    </span>
-                    <span>{formatDate(email.sentAt)}</span>
-                  </div>
-                  <p className="mt-1 font-medium text-slate-800">{email.subject}</p>
-                  {email.bodyText && <p className="mt-1 text-slate-600 line-clamp-3">{email.bodyText}</p>}
-                </li>
-              ))}
-              {deal.emails.length === 0 && (
-                <p className="text-sm text-slate-400">
-                  Ingen mails endnu. Forbind Gmail/Outlook under Indstillinger → E-mail for at aktivere automatisk
-                  match.
-                </p>
-              )}
-            </ul>
+            <EmailList emails={deal.emails} />
           </section>
         </div>
 
