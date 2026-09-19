@@ -31,6 +31,7 @@ import { ContractStatusRow } from "./contract-status-row";
 import { DealInfoForm } from "./deal-info-form";
 import { NoteForm } from "./note-form";
 import { EmailList } from "./email-list";
+import { DealTasksSection } from "./deal-tasks-section";
 
 function authorInitials(name: string): string {
   return name
@@ -65,6 +66,7 @@ export default async function DealDetailPage({
         parent: true,
         branches: { orderBy: { companyName: "asc" } },
         contractEvents: { orderBy: { occurredAt: "desc" }, take: 5 },
+        tasks: { orderBy: { createdAt: "asc" } },
       },
     }),
     prisma.user.findMany({ orderBy: { name: "asc" } }),
@@ -238,6 +240,18 @@ export default async function DealDetailPage({
           </section>
 
           <DealItemsSection dealId={deal.id} items={deal.items} />
+
+          <DealTasksSection
+            dealId={deal.id}
+            initialTasks={deal.tasks.map((t) => ({
+              id: t.id,
+              title: t.title,
+              done: t.done,
+              dueDate: t.dueDate,
+              assigneeId: t.assigneeId,
+            }))}
+            users={users.map((u) => ({ id: u.id, name: u.name }))}
+          />
 
           <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="text-sm font-semibold text-slate-900">Noter</h2>

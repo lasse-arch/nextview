@@ -81,6 +81,7 @@ enum InvoiceStatus {
   IMPORTED
 }
 
+
 model Invoice {
   id     String @id @default(cuid())
   deal   Deal   @relation(fields: [dealId], references: [id], onDelete: Cascade)
@@ -128,6 +129,8 @@ model User {
   goals         Goal[]         @relation("GoalOwner")
   createdGoals  Goal[]         @relation("GoalCreatedBy")
   standaloneContracts StandaloneContract[]
+  tasksAssigned Task[] @relation("TaskAssignee")
+  tasksCreated  Task[] @relation("TaskCreatedBy")
 }
 
 /// A monthly target, either for one seller (userId set) or for the whole
@@ -263,6 +266,7 @@ model Deal {
   invoices       Invoice[]
   items          DealItem[]
   contractEvents ContractEvent[]
+  tasks          Task[]
 }
 
 /// One entry per DocuSeal webhook occurrence (sent/viewed/signed/declined/...) -
@@ -402,4 +406,26 @@ model Commission {
   paidAt     DateTime?
   createdAt  DateTime            @default(now())
   updatedAt  DateTime            @updatedAt
+}
+
+/// A Trello-style task, optionally tied to a deal - a standalone to-do list
+/// the team can also use for anything not deal-specific.
+model Task {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  done        Boolean   @default(false)
+  dueDate     DateTime?
+
+  assignee   User?   @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  assigneeId String?
+
+  createdBy   User   @relation("TaskCreatedBy", fields: [createdById], references: [id])
+  createdById String
+
+  deal   Deal?   @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  dealId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
