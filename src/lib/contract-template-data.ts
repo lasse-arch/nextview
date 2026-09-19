@@ -155,22 +155,25 @@ export function allSelectedProductLabels(products: ContractProducts): string[] {
 }
 
 /** Only nextviewTour and hjemmeside recur monthly - see ContractProducts' own docs. */
+/**
+ * Only nextviewTour and hjemmeside can recur monthly at all - but a selected
+ * one still counts here even priced at 0/month. Showing a free product as
+ * its own zero-kroner line (rather than silently dropping it) makes the
+ * value the customer's getting visible on the invoice, which is more
+ * "sælgende" than just not mentioning it.
+ */
 export function recurringProductLabels(products: ContractProducts): string[] {
   const labels: string[] = [];
-  if (products.nextviewTour.selected && products.nextviewTour.price > 0) labels.push(PRODUCT_LABELS.nextviewTour);
-  if (products.hjemmeside.selected && products.hjemmeside.price > 0) labels.push(PRODUCT_LABELS.hjemmeside);
+  if (products.nextviewTour.selected) labels.push(PRODUCT_LABELS.nextviewTour);
+  if (products.hjemmeside.selected) labels.push(PRODUCT_LABELS.hjemmeside);
   return labels;
 }
 
-/** One invoice line per recurring product, proportional to its share of the combined monthly price. */
+/** One invoice line per recurring product (even a free one, at 0 kr), proportional to its share of the combined monthly price. */
 export function recurringLineItems(products: ContractProducts, total: number): InvoiceLineItem[] {
   const entries: { label: string; price: number }[] = [];
-  if (products.nextviewTour.selected && products.nextviewTour.price > 0) {
-    entries.push({ label: PRODUCT_LABELS.nextviewTour, price: products.nextviewTour.price });
-  }
-  if (products.hjemmeside.selected && products.hjemmeside.price > 0) {
-    entries.push({ label: PRODUCT_LABELS.hjemmeside, price: products.hjemmeside.price });
-  }
+  if (products.nextviewTour.selected) entries.push({ label: PRODUCT_LABELS.nextviewTour, price: products.nextviewTour.price });
+  if (products.hjemmeside.selected) entries.push({ label: PRODUCT_LABELS.hjemmeside, price: products.hjemmeside.price });
   if (entries.length === 0) return [];
 
   const amounts = distributeByWeights(total, entries.map((e) => e.price));
