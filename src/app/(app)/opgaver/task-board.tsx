@@ -173,6 +173,22 @@ export function TaskBoard({
     });
   }
 
+  /** Selects/deselects every task currently visible in one column at once - e.g. all of a
+   * deal's tasks in "Pr. deal" view - feeding the same checkedIds/toolbar as picking tasks
+   * one by one, so there's a single bulk-reassign flow instead of a separate one per column. */
+  function toggleColumnChecked(colTasks: BoardTask[]) {
+    const ids = colTasks.map((t) => t.id);
+    const allChecked = ids.length > 0 && ids.every((id) => checkedIds.has(id));
+    setCheckedIds((prev) => {
+      const next = new Set(prev);
+      for (const id of ids) {
+        if (allChecked) next.delete(id);
+        else next.add(id);
+      }
+      return next;
+    });
+  }
+
   function handleBulkReassign() {
     const ids = Array.from(checkedIds);
     if (ids.length === 0) return;
@@ -347,9 +363,20 @@ export function TaskBoard({
               onDrop={() => handleDrop(col.key)}
               className="flex h-[calc(100vh-260px)] w-64 flex-shrink-0 flex-col rounded-lg bg-slate-100"
             >
-              <div className="px-2.5 py-2">
-                <h3 className="truncate text-xs font-semibold text-slate-800">{col.label}</h3>
-                <p className="text-[11px] text-slate-500">{colTasks.length} opgave{colTasks.length === 1 ? "" : "r"}</p>
+              <div className="flex items-start gap-1.5 px-2.5 py-2">
+                {colTasks.length > 0 && (
+                  <input
+                    type="checkbox"
+                    title="Vælg alle i denne kolonne"
+                    checked={colTasks.every((t) => checkedIds.has(t.id))}
+                    onChange={() => toggleColumnChecked(colTasks)}
+                    className="mt-0.5 shrink-0"
+                  />
+                )}
+                <div className="min-w-0">
+                  <h3 className="truncate text-xs font-semibold text-slate-800">{col.label}</h3>
+                  <p className="text-[11px] text-slate-500">{colTasks.length} opgave{colTasks.length === 1 ? "" : "r"}</p>
+                </div>
               </div>
               <div className="flex-1 space-y-1.5 overflow-y-auto px-1.5 pb-1.5">
                 {colTasks.map((task) => {
