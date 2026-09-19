@@ -33,8 +33,8 @@ export function MobileNav({
   }, [open]);
 
   return (
-    <div className="md:hidden">
-      <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-3">
+    <>
+      <div className="sticky top-0 z-40 flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-3 md:hidden">
         <Link href="/" className="flex items-center">
           <Image src="/logo.png" alt="Nextview360" width={942} height={219} className="h-6 w-auto" priority />
         </Link>
@@ -49,7 +49,7 @@ export function MobileNav({
       </div>
 
       {open && (
-        <div className="fixed inset-0 z-50 flex">
+        <div className="fixed inset-0 z-50 flex md:hidden">
           <div className="absolute inset-0 bg-black/30" onClick={() => setOpen(false)} />
           <div className="relative flex h-full w-72 max-w-[80vw] flex-col overflow-y-auto bg-slate-50 p-3 shadow-xl">
             <div className="flex items-center justify-between px-2.5 pb-5 pt-2">
@@ -93,6 +93,6 @@ export function MobileNav({
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
