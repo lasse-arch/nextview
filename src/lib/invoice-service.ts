@@ -51,23 +51,33 @@ type DueLine = { quarterIndex: number; amount: number; scheduledDate: Date };
  * termination notice has been given, or otherwise up to a rolling horizon
  * a few months ahead, so upcoming quarters are always ready in time.
  */
-function computeDueLines(deal: {
-  saleAmount: number | null;
-  bindingMonths: number | null;
-  establishmentFee: number | null;
-  billingStartDate: Date | null;
-  contractSignedAt: Date | null;
-  contractEndDate: Date | null;
-}): DueLine[] {
+function computeDueLines(
+  deal: {
+    saleAmount: number | null;
+    bindingMonths: number | null;
+    establishmentFee: number | null;
+    billingStartDate: Date | null;
+    contractSignedAt: Date | null;
+    contractEndDate: Date | null;
+  },
+  options: { sendEstablishmentNow?: boolean } = {}
+): DueLine[] {
   const now = new Date();
   const lines: DueLine[] = [];
 
   const establishmentDueDate = deal.contractSignedAt ? addDays(deal.contractSignedAt, 1) : deal.billingStartDate;
-  if (deal.establishmentFee && deal.establishmentFee > 0 && establishmentDueDate && establishmentDueDate <= now) {
+  // Normally the establishment fee waits until the day after signing, so
+  // it's not drafted the very same moment a contract gets signed. A seller
+  // choosing to send it same-day via the deal page's manual button can
+  // override that wait with sendEstablishmentNow.
+  const establishmentReady = options.sendEstablishmentNow
+    ? Boolean(deal.contractSignedAt || deal.billingStartDate)
+    : Boolean(establishmentDueDate && establishmentDueDate <= now);
+  if (deal.establishmentFee && deal.establishmentFee > 0 && establishmentReady) {
     lines.push({
       quarterIndex: 0,
       amount: deal.establishmentFee,
-      scheduledDate: establishmentDueDate,
+      scheduledDate: establishmentDueDate ?? now,
     });
   }
 
@@ -240,8 +250,11 @@ type DealWithInvoices = DraftableDeal & {
 
 /** Drafts every currently-due invoice line for one deal. Shared by the bulk
  * daily run and the "Opret faktura-kladde" button on the deal page. */
-async function processDealDueInvoices(deal: DealWithInvoices): Promise<{ checked: number; created: number; failed: number }> {
-  const dueLines = computeDueLines(deal);
+async function processDealDueInvoices(
+  deal: DealWithInvoices,
+  options: { sendEstablishmentNow?: boolean } = {}
+): Promise<{ checked: number; created: number; failed: number }> {
+  const dueLines = computeDueLines(deal, options);
   const termInvoices = deal.invoices.filter((inv) => inv.termNumber === deal.currentTermNumber);
 
   let checked = 0;
@@ -323,7 +336,7 @@ export async function generateInvoiceForDeal(dealId: string): Promise<InvoiceRun
   }
 
   const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId }, include: { invoices: true } });
-  const result = await processDealDueInvoices(deal);
+  const result = await processDealDueInvoices(deal, { sendEstablishmentNow: true });
   return { configured: true, ...result };
 }
 
