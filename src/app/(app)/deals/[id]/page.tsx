@@ -11,6 +11,7 @@ import {
   formatDate,
   dealName,
   invoicePeriodLabel,
+  invoiceQuarterShortLabel,
 } from "@/lib/labels";
 import { parseContractProducts, establishmentLineItems, recurringLineItems } from "@/lib/contract-template-data";
 import { isDocuSealConfigured } from "@/lib/docuseal";
@@ -35,23 +36,27 @@ import { NoteForm } from "./note-form";
 import { EmailList } from "./email-list";
 import { DealTasksSection } from "./deal-tasks-section";
 import { CreateInvoiceButton } from "./create-invoice-button";
+import { InvoiceLabelTooltip } from "./invoice-label-tooltip";
 import { MarkSentManuallyButton } from "./mark-sent-manually-button";
 import { CheckPaymentButton } from "./check-payment-button";
 import { DeleteInvoiceButton } from "@/components/delete-invoice-button";
 
-/** A per-product breakdown of an invoice line, for a hover tooltip - reconstructed
- * from the deal's current contractProducts snapshot, since it isn't persisted
- * on the Invoice row itself. */
-function invoiceBreakdownTooltip(
+/** Hover-tooltip content for an invoice's short label: the precise period
+ * (since the visible label is now just "Q3 Kvartal") plus, where the deal's
+ * contractProducts snapshot allows it, a per-product breakdown - reconstructed
+ * on the fly since it isn't persisted on the Invoice row itself. */
+function invoiceTooltip(
   deal: { contractProducts: unknown },
   quarterIndex: number,
-  amount: number
-): string | undefined {
+  amount: number,
+  scheduledDate: Date
+): { heading: string; rows: { label: string; value: string }[] } {
+  const heading = quarterIndex === 0 ? "Etableringspris" : invoicePeriodLabel(scheduledDate);
   const products = parseContractProducts(deal.contractProducts);
-  if (!products) return undefined;
+  if (!products) return { heading, rows: [] };
   const lines = quarterIndex === 0 ? establishmentLineItems(products, amount) : recurringLineItems(products, amount);
-  if (lines.length <= 1) return undefined;
-  return lines.map((l) => `${l.description}: ${formatDKK(l.amount)}`).join("\n");
+  if (lines.length <= 1) return { heading, rows: [] };
+  return { heading, rows: lines.map((l) => ({ label: l.description, value: formatDKK(l.amount) })) };
 }
 
 function authorInitials(name: string): string {
@@ -414,15 +419,14 @@ export default async function DealDetailPage({
             </div>
             {deal.invoices.length > 0 ? (
               <ul className="mt-3 space-y-2 text-sm">
-                {deal.invoices.map((inv) => (
+                {deal.invoices.map((inv) => {
+                  const { heading, rows } = invoiceTooltip(deal, inv.quarterIndex, inv.amount, inv.scheduledDate);
+                  const label =
+                    (inv.quarterIndex === 0 ? "Etableringspris" : invoiceQuarterShortLabel(inv.scheduledDate)) +
+                    (inv.termNumber > 1 ? ` (kontraktperiode ${inv.termNumber})` : "");
+                  return (
                   <li key={inv.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2 last:border-0">
-                    <span
-                      className="text-slate-600"
-                      title={invoiceBreakdownTooltip(deal, inv.quarterIndex, inv.amount)}
-                    >
-                      {inv.quarterIndex === 0 ? "Etablering" : invoicePeriodLabel(inv.scheduledDate)}
-                      {inv.termNumber > 1 ? ` (kontraktperiode ${inv.termNumber})` : ""}
-                    </span>
+                    <InvoiceLabelTooltip label={label} heading={heading} rows={rows} />
                     <span className="money font-medium text-slate-800">{formatDKK(inv.amount)}</span>
                     <span className="flex items-center gap-1.5">
                       <span
@@ -453,7 +457,8 @@ export default async function DealDetailPage({
                       {currentUser?.role === "ADMIN" && <DeleteInvoiceButton invoiceId={inv.id} />}
                     </span>
                   </li>
-                ))}
+                  );
+                })}
               </ul>
             ) : (
               <p className="mt-3 text-sm text-slate-400">

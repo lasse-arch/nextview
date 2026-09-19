@@ -47,6 +47,11 @@ export function invoicePeriodLabel(scheduledDate: Date): string {
   return `Q${quarter} Kvartal ${scheduledDate.getDate()}. ${startMonth} til ${lastDayOfStartMonth}. ${startMonth}${monthsSuffix} ${year}`;
 }
 
+/** "Q3 Kvartal" - the short form shown as the visible label; the precise date range from invoicePeriodLabel belongs in a hover tooltip instead. */
+export function invoiceQuarterShortLabel(scheduledDate: Date): string {
+  return `Q${getQuarter(scheduledDate)} Kvartal`;
+}
+
 export const stageOrder = [
   "LEAD",
   "CONTACTED",
