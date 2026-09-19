@@ -8,7 +8,7 @@ export async function addDealItem(
   dealId: string,
   formData: FormData
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  await requireUser();
+  const user = await requireUser();
 
   const location = String(formData.get("location") || "").trim() || null;
   const productType = String(formData.get("productType") || "").trim();
@@ -22,6 +22,14 @@ export async function addDealItem(
   await prisma.dealItem.create({
     data: { dealId, location, productType, amount, isFree, url },
   });
+
+  // Adding a visitkort item this way (rather than via a signed contract)
+  // skips the usual signing automation that creates its delivery task, so
+  // add one here too instead of leaving the delivery untracked.
+  if (productType.toLowerCase() === "visitkort") {
+    await prisma.task.create({ data: { title: "Aflever Visitkort", createdById: user.id, dealId } });
+    revalidatePath("/opgaver");
+  }
 
   revalidatePath(`/deals/${dealId}`);
   return { ok: true };
