@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { addDealItem, removeDealItem, updateDealItemUrl } from "@/lib/actions/deal-items";
-import { formatDKK } from "@/lib/labels";
+import { formatDKK, needsDeliveryLink as needsLink } from "@/lib/labels";
 import { useToast } from "@/components/toast";
 
 type DealItem = {
@@ -15,12 +15,6 @@ type DealItem = {
 };
 
 const PRODUCT_SUGGESTIONS = ["Visitkort", "Drone-optagelse", "Nextview360 Tour", "Hjemmeside"];
-
-/** Products where we deliver a link the customer/team should be able to open directly. */
-function needsLink(productType: string): boolean {
-  const p = productType.trim().toLowerCase();
-  return p.includes("matterport") || p.includes("hjemmeside") || p.includes("tour");
-}
 
 function RemoveItemButton({ dealId, itemId }: { dealId: string; itemId: string }) {
   const [pending, startTransition] = useTransition();

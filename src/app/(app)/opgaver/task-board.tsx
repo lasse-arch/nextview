@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { createTask, toggleTaskDone, updateTaskAssignee, deleteTask, bulkReassignTasks } from "@/lib/actions/tasks";
-import { formatDate } from "@/lib/labels";
+import { formatDate, needsDeliveryLink } from "@/lib/labels";
 import { useToast } from "@/components/toast";
 import { TaskDetailModal, type ModalTask } from "../task-detail-modal";
 import { Avatar } from "@/components/avatar";
@@ -258,8 +258,16 @@ export function TaskBoard({
   }
 
   function handleToggleDone(taskId: string) {
-    setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, done: !t.done } : t)));
-    startTransition(() => toggleTaskDone(taskId));
+    const task = tasks.find((t) => t.id === taskId);
+    const turningDone = task ? !task.done : false;
+    const productType = task?.title.startsWith("Aflever ") ? task.title.slice("Aflever ".length) : null;
+    const deliveryUrl =
+      turningDone && productType && needsDeliveryLink(productType)
+        ? window.prompt(`Link til ${productType} (valgfrit - vises under Live kunder):`)
+        : null;
+
+    setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, done: turningDone } : t)));
+    startTransition(() => toggleTaskDone(taskId, deliveryUrl));
   }
 
   function handleDelete(taskId: string) {

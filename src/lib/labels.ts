@@ -76,6 +76,12 @@ export function dealName(deal: { companyName: string; displayName?: string | nul
   return deal.displayName || deal.companyName;
 }
 
+/** Products where we deliver a link the customer/team should be able to open directly. */
+export function needsDeliveryLink(productType: string): boolean {
+  const p = productType.trim().toLowerCase();
+  return p.includes("matterport") || p.includes("hjemmeside") || p.includes("tour");
+}
+
 /** saleAmount is the monthly recurring fee; the contract's total value over its binding period is that times bindingMonths. */
 export function totalContractValue(deal: { saleAmount: number | null; bindingMonths: number | null }): number {
   return (deal.saleAmount ?? 0) * (deal.bindingMonths ?? 1);

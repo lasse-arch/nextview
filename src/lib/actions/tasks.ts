@@ -31,10 +31,24 @@ export async function createTask(formData: FormData): Promise<TaskResult> {
   return { ok: true, id: task.id };
 }
 
-export async function toggleTaskDone(taskId: string): Promise<void> {
+/**
+ * Toggles a task's done state. When completing an "Aflever X" delivery task
+ * with a deliveryUrl given (prompted client-side for Hjemmeside/tour
+ * products - see needsDeliveryLink), saves that link onto the matching
+ * DealItem so it shows up under Live kunder.
+ */
+export async function toggleTaskDone(taskId: string, deliveryUrl?: string | null): Promise<void> {
   await requireUser();
   const task = await prisma.task.findUniqueOrThrow({ where: { id: taskId } });
-  await prisma.task.update({ where: { id: taskId }, data: { done: !task.done } });
+  const done = !task.done;
+  await prisma.task.update({ where: { id: taskId }, data: { done } });
+
+  if (done && deliveryUrl && task.dealId && task.title.startsWith("Aflever ")) {
+    const productType = task.title.slice("Aflever ".length);
+    const item = await prisma.dealItem.findFirst({ where: { dealId: task.dealId, productType } });
+    if (item) await prisma.dealItem.update({ where: { id: item.id }, data: { url: deliveryUrl } });
+  }
+
   revalidateTaskPaths(task.dealId);
 }
 
