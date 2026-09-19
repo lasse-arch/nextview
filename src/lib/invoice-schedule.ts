@@ -1,4 +1,4 @@
-import { addMonths, addDays, endOfQuarter, differenceInCalendarDays } from "date-fns";
+import { addMonths, addDays, endOfQuarter, startOfMonth, endOfMonth, differenceInCalendarDays } from "date-fns";
 
 export type BillingPeriod = {
   /** 1-based sequential order within the term (never a literal calendar quarter number). */
@@ -58,13 +58,37 @@ export function computeBillingPeriods(billingStartDate: Date, bindingMonths: num
 }
 
 /**
- * Splits the original contract value proportionally across the periods that
- * fall within the binding period (by day length, so a short stub period is
- * charged less than a full quarter) - the rounding remainder is absorbed
- * into the last of those so the sum always equals the total exactly. Any
- * periods billed after the binding period ends ("rolling" continuation) are
- * charged at that same effective daily rate, since the contract simply
- * continues on its existing terms until it's actually terminated.
+ * Amount owed for one period, accrued calendar month by calendar month: a
+ * month the period fully covers is charged the flat monthly rate regardless
+ * of whether it has 28-31 days, and only a month it doesn't fully cover
+ * (only possible for the period's first or last month, e.g. billing
+ * starting mid-month, or a period cut short by termination) is pro-rated by
+ * the days actually covered.
+ */
+function accruedAmount(startDate: Date, endDate: Date, monthlyRate: number): number {
+  let total = 0;
+  let cursor = startDate;
+  while (cursor <= endDate) {
+    const monthEnd = endOfMonth(cursor);
+    const segmentEnd = monthEnd < endDate ? monthEnd : endDate;
+    const daysInMonth = differenceInCalendarDays(monthEnd, startOfMonth(cursor)) + 1;
+    const daysCovered = differenceInCalendarDays(segmentEnd, cursor) + 1;
+    total += daysCovered >= daysInMonth ? monthlyRate : Math.round((monthlyRate * daysCovered) / daysInMonth);
+    cursor = addDays(segmentEnd, 1);
+  }
+  return total;
+}
+
+/**
+ * One amount per period, at the deal's flat monthly rate (recovered from
+ * totalAmount/bindingMonths) accrued month by month - so every full quarter
+ * comes out the same regardless of which months it spans, and only a
+ * genuine stub period (billing starting mid-month, or one cut short by
+ * termination) is pro-rated for its partial month(s). The periods within
+ * the original binding term can end up a few kroner off the exact contract
+ * total from two independent day-fraction roundings (the very first period,
+ * and one truncated right at the binding term's end) - absorbed into the
+ * last such period so that sum still reconciles exactly.
  */
 export function computePeriodAmounts(
   totalAmount: number,
@@ -72,24 +96,15 @@ export function computePeriodAmounts(
   billingStartDate: Date,
   bindingMonths: number
 ): number[] {
+  const monthlyRate = totalAmount / bindingMonths;
+  const amounts = periods.map((p) => accruedAmount(p.startDate, p.endDate, monthlyRate));
+
   const contractEnd = addMonths(billingStartDate, bindingMonths);
-  const originalCount = periods.filter((p) => p.startDate < contractEnd).length;
-  const original = periods.slice(0, originalCount);
-  const rolling = periods.slice(originalCount);
-
-  const originalDays = original.map((p) => differenceInCalendarDays(p.endDate, p.startDate) + 1);
-  const totalOriginalDays = originalDays.reduce((sum, d) => sum + d, 0) || 1;
-
-  const originalAmounts = originalDays.map((days) => Math.floor((totalAmount * days) / totalOriginalDays));
-  if (originalAmounts.length > 0) {
-    const allocated = originalAmounts.reduce((sum, a) => sum + a, 0);
-    originalAmounts[originalAmounts.length - 1] += totalAmount - allocated;
+  const originalIndexes = periods.flatMap((p, i) => (p.startDate < contractEnd ? [i] : []));
+  if (originalIndexes.length > 0) {
+    const allocated = originalIndexes.reduce((sum, i) => sum + amounts[i], 0);
+    amounts[originalIndexes[originalIndexes.length - 1]] += totalAmount - allocated;
   }
 
-  const dailyRate = totalAmount / totalOriginalDays;
-  const rollingAmounts = rolling.map((p) =>
-    Math.round(dailyRate * (differenceInCalendarDays(p.endDate, p.startDate) + 1))
-  );
-
-  return [...originalAmounts, ...rollingAmounts];
+  return amounts;
 }
