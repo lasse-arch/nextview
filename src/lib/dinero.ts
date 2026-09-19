@@ -118,7 +118,11 @@ async function createInvoiceDraft(
     body: JSON.stringify({
       ContactGuid: input.contactGuid,
       Date: input.invoiceDate.toISOString().slice(0, 10),
-      Description: input.note,
+      // Comment is Dinero's free-text note shown near the top of the invoice
+      // (labelled "Kommentarer" in their UI) - distinct from Description,
+      // which Dinero treats as a short document title/type and defaults to
+      // "Faktura" when left unset, which is what we want there.
+      Comment: input.note,
       PaymentConditionType: "Netto",
       PaymentConditionNumberOfDays: 8,
       ProductLines: input.lines.map((line) => ({
@@ -134,6 +138,28 @@ async function createInvoiceDraft(
   if (!res.ok) throw new Error(`Dinero: kunne ikke oprette faktura-kladde (${res.status}): ${await res.text()}`);
   const data = (await res.json()) as { Guid: string; Number?: string };
   return { guid: data.Guid, number: data.Number ?? null };
+}
+
+/**
+ * Checks whether a Dinero invoice has been paid. Only meaningful once the
+ * invoice has actually been sent/booked from within Dinero (we only ever
+ * create drafts) - an unsent draft will simply come back as not paid.
+ * Uses PaymentDate being set as the paid signal rather than matching an
+ * exact PaymentStatus string, since that enum's values aren't confirmed.
+ */
+export async function getInvoicePaymentStatus(invoiceGuid: string): Promise<{ paid: boolean; paidDate: string | null }> {
+  if (await isDineroTestMode()) return { paid: false, paidDate: null };
+
+  const accessToken = await getAccessToken();
+  const orgId = process.env.DINERO_ORGANIZATION_ID!;
+
+  const res = await fetch(`${DINERO_API_BASE}/${orgId}/invoices/${invoiceGuid}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+
+  if (!res.ok) throw new Error(`Dinero: kunne ikke hente fakturastatus (${res.status}): ${await res.text()}`);
+  const data = (await res.json()) as { PaymentDate?: string | null };
+  return { paid: Boolean(data.PaymentDate), paidDate: data.PaymentDate ?? null };
 }
 
 export type DineroDraftResult = {
