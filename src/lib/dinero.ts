@@ -156,6 +156,12 @@ type DineroInvoiceInput = {
   invoiceDate: Date;
 };
 
+/** Thrown when Dinero rejects a contact GUID as nonexistent (e.g. it was
+ * cached on the deal but has since been deleted directly in Dinero) - lets
+ * the caller retry once with a freshly created contact instead of just
+ * failing outright. */
+class DineroInvalidContactError extends Error {}
+
 /** Creates a new invoice in Dinero. Invoices are created as drafts by default. */
 async function createInvoiceDraft(
   accessToken: string,
@@ -186,7 +192,13 @@ async function createInvoiceDraft(
     }),
   });
 
-  if (!res.ok) throw new Error(`Dinero: kunne ikke oprette faktura-kladde (${res.status}): ${await res.text()}`);
+  if (!res.ok) {
+    const body = await res.text();
+    if (res.status === 400 && body.includes("invalidContactId")) {
+      throw new DineroInvalidContactError(`Dinero: kunne ikke oprette faktura-kladde (${res.status}): ${body}`);
+    }
+    throw new Error(`Dinero: kunne ikke oprette faktura-kladde (${res.status}): ${body}`);
+  }
   const data = (await res.json()) as { Guid: string; Number?: string };
   return { guid: data.Guid, number: data.Number ?? null };
 }
@@ -264,12 +276,28 @@ export async function createQuarterlyInvoiceDraft(params: {
     }
   }
 
-  const invoice = await createInvoiceDraft(accessToken, {
-    contactGuid,
-    note: params.note,
-    lines: params.lines,
-    invoiceDate: params.invoiceDate,
-  });
+  try {
+    const invoice = await createInvoiceDraft(accessToken, {
+      contactGuid,
+      note: params.note,
+      lines: params.lines,
+      invoiceDate: params.invoiceDate,
+    });
+    return { contactGuid, invoiceGuid: invoice.guid, invoiceNumber: invoice.number };
+  } catch (err) {
+    // The cached/reused contact GUID no longer exists in Dinero (e.g. it was
+    // deleted there directly) - create a fresh contact and retry once,
+    // rather than leaving the deal permanently stuck drafting against a
+    // dead contact ID.
+    if (!(err instanceof DineroInvalidContactError)) throw err;
 
-  return { contactGuid, invoiceGuid: invoice.guid, invoiceNumber: invoice.number };
+    const freshContactGuid = await createContact(accessToken, contactInput);
+    const invoice = await createInvoiceDraft(accessToken, {
+      contactGuid: freshContactGuid,
+      note: params.note,
+      lines: params.lines,
+      invoiceDate: params.invoiceDate,
+    });
+    return { contactGuid: freshContactGuid, invoiceGuid: invoice.guid, invoiceNumber: invoice.number };
+  }
 }

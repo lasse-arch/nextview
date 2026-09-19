@@ -201,7 +201,12 @@ async function draftInvoiceLine(
           failureReason: null,
         },
       }),
-      ...(deal.dineroContactGuid || result.isTest
+      // Keep the cached contact GUID in sync with whatever Dinero actually
+      // used - not just the first time it's set. Dinero can end up creating
+      // a different (e.g. freshly recovered) contact than the one cached
+      // here, and leaving the stale GUID in place would make every future
+      // invoice for this deal keep failing against a dead contact ID.
+      ...(result.isTest || deal.dineroContactGuid === result.contactGuid
         ? []
         : [prisma.deal.update({ where: { id: deal.id }, data: { dineroContactGuid: result.contactGuid } })]),
     ]);
