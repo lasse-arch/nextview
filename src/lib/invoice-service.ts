@@ -47,7 +47,22 @@ function computeDueLines(deal: {
   const now = new Date();
   const lines: DueLine[] = [];
 
-  if (deal.establishmentFee && deal.establishmentFee > 0) {
+  const contractEnd = addMonths(deal.billingStartDate, deal.bindingMonths);
+  const until = deal.contractEndDate ?? maxDate([contractEnd, addMonths(now, ROLLING_HORIZON_MONTHS)]);
+
+  const periods = computeBillingPeriods(deal.billingStartDate, deal.bindingMonths, until);
+  // saleAmount is the monthly fee; computePeriodAmounts wants the contract's total value for the binding period.
+  const amounts = computePeriodAmounts(totalContractValue(deal), periods, deal.billingStartDate, deal.bindingMonths);
+
+  // Billing only ever applies going forward from today - never retroactively
+  // backfill quarters that have already fully elapsed (e.g. a customer whose
+  // billingStartDate predates this automation existing). firstRelevantIndex
+  // is the first period that hasn't ended yet; anything before it is stale
+  // history and is skipped entirely, including the establishment fee if even
+  // that original stub period is already in the past.
+  const firstRelevantIndex = periods.findIndex((p) => p.endDate >= now);
+
+  if (deal.establishmentFee && deal.establishmentFee > 0 && firstRelevantIndex <= 0) {
     lines.push({
       quarterIndex: 0,
       amount: deal.establishmentFee,
@@ -56,14 +71,8 @@ function computeDueLines(deal: {
     });
   }
 
-  const contractEnd = addMonths(deal.billingStartDate, deal.bindingMonths);
-  const until = deal.contractEndDate ?? maxDate([contractEnd, addMonths(now, ROLLING_HORIZON_MONTHS)]);
-
-  const periods = computeBillingPeriods(deal.billingStartDate, deal.bindingMonths, until);
-  // saleAmount is the monthly fee; computePeriodAmounts wants the contract's total value for the binding period.
-  const amounts = computePeriodAmounts(totalContractValue(deal), periods, deal.billingStartDate, deal.bindingMonths);
-
   periods.forEach((period, i) => {
+    if (i < firstRelevantIndex) return;
     if (period.draftTriggerDate > now) return;
     lines.push({
       quarterIndex: period.index,
@@ -74,6 +83,74 @@ function computeDueLines(deal: {
   });
 
   return lines;
+}
+
+type DraftableDeal = {
+  id: string;
+  companyName: string;
+  cvrNumber: string | null;
+  invoiceEmail: string | null;
+  contactEmail: string | null;
+  address: string | null;
+  dineroContactGuid: string | null;
+};
+
+/**
+ * Attempts to draft one invoice line in Dinero and records the outcome on
+ * its Invoice row. Shared by the bulk quarterly run and the single-invoice
+ * "Prøv igen" retry, so both go through the exact same success/failure
+ * bookkeeping (contact-guid caching, failureReason, etc).
+ */
+async function draftInvoiceLine(
+  deal: DraftableDeal,
+  invoiceRow: { id: string; amount: number },
+  description: string
+): Promise<{ success: true } | { success: false; error: string }> {
+  try {
+    const result = await createQuarterlyInvoiceDraft({
+      existingContactGuid: deal.dineroContactGuid,
+      companyName: deal.companyName,
+      cvrNumber: deal.cvrNumber,
+      contactEmail: deal.invoiceEmail || deal.contactEmail,
+      address: deal.address,
+      description,
+      amount: invoiceRow.amount,
+      invoiceDate: new Date(),
+    });
+
+    await prisma.$transaction([
+      prisma.invoice.update({
+        where: { id: invoiceRow.id },
+        data: {
+          status: "DRAFT_CREATED",
+          dineroInvoiceGuid: result.invoiceGuid,
+          dineroInvoiceNumber: result.invoiceNumber,
+          failureReason: null,
+        },
+      }),
+      ...(deal.dineroContactGuid || result.isTest
+        ? []
+        : [prisma.deal.update({ where: { id: deal.id }, data: { dineroContactGuid: result.contactGuid } })]),
+    ]);
+
+    return { success: true };
+  } catch (err) {
+    const error = err instanceof Error ? err.message : "Ukendt fejl";
+    await prisma.invoice.update({ where: { id: invoiceRow.id }, data: { status: "FAILED", failureReason: error } });
+    return { success: false, error };
+  }
+}
+
+function describeInvoiceLine(deal: { soldProduct: string | null }, quarterIndex: number): string {
+  return quarterIndex === 0 ? "Etableringsgebyr" : `${deal.soldProduct ?? "Ydelse"} - periode ${quarterIndex}`;
+}
+
+/** Re-attempts drafting a single already-existing invoice row - e.g. after fixing a config
+ * issue that made it fail - without re-running the full bulk generation. */
+export async function retrySingleInvoice(invoiceId: string): Promise<{ success: boolean; error?: string }> {
+  const invoice = await prisma.invoice.findUniqueOrThrow({ where: { id: invoiceId }, include: { deal: true } });
+  const result = await draftInvoiceLine(invoice.deal, invoice, describeInvoiceLine(invoice.deal, invoice.quarterIndex));
+  return result.success ? { success: true } : { success: false, error: result.error };
 }
 
 /**
@@ -128,40 +205,9 @@ export async function runQuarterlyInvoiceGeneration(): Promise<InvoiceRunSummary
             },
           });
 
-      try {
-        const result = await createQuarterlyInvoiceDraft({
-          existingContactGuid: deal.dineroContactGuid,
-          companyName: deal.companyName,
-          cvrNumber: deal.cvrNumber,
-          contactEmail: deal.invoiceEmail || deal.contactEmail,
-          address: deal.address,
-          description: line.description,
-          amount: line.amount,
-          invoiceDate: new Date(),
-        });
-
-        await prisma.$transaction([
-          prisma.invoice.update({
-            where: { id: invoiceRow.id },
-            data: {
-              status: "DRAFT_CREATED",
-              dineroInvoiceGuid: result.invoiceGuid,
-              dineroInvoiceNumber: result.invoiceNumber,
-            },
-          }),
-          ...(deal.dineroContactGuid || result.isTest
-            ? []
-            : [prisma.deal.update({ where: { id: deal.id }, data: { dineroContactGuid: result.contactGuid } })]),
-        ]);
-
-        created++;
-      } catch (err) {
-        await prisma.invoice.update({
-          where: { id: invoiceRow.id },
-          data: { status: "FAILED", failureReason: err instanceof Error ? err.message : "Ukendt fejl" },
-        });
-        failed++;
-      }
+      const result = await draftInvoiceLine(deal, invoiceRow, line.description);
+      if (result.success) created++;
+      else failed++;
     }
   }
 

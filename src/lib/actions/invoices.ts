@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { runQuarterlyInvoiceGeneration, runAutoChurn, type InvoiceRunSummary } from "@/lib/invoice-service";
+import { runQuarterlyInvoiceGeneration, runAutoChurn, retrySingleInvoice, type InvoiceRunSummary } from "@/lib/invoice-service";
 
 export async function runInvoiceGenerationNow(): Promise<InvoiceRunSummary> {
   const user = await requireUser();
@@ -14,6 +14,15 @@ export async function runInvoiceGenerationNow(): Promise<InvoiceRunSummary> {
   revalidatePath("/settings/dinero");
   revalidatePath("/deals");
   return { ...summary, churned };
+}
+
+export async function retryInvoiceDraft(invoiceId: string): Promise<{ success: boolean; error?: string }> {
+  const user = await requireUser();
+  if (user.role !== "ADMIN") throw new Error("Kun admin kan genforsøge fakturaer");
+
+  const result = await retrySingleInvoice(invoiceId);
+  revalidatePath("/settings/dinero");
+  return result;
 }
 
 /**

@@ -4,6 +4,7 @@ import { isIntegrationEnabled, isDineroTestMode } from "@/lib/integration-settin
 import { formatDKK, formatDate, invoiceStatusLabels, dealName } from "@/lib/labels";
 import { RunNowButton } from "./run-now-button";
 import { ClearInvoicesButton } from "./clear-invoices-button";
+import { RetryInvoiceButton } from "./retry-invoice-button";
 import { IntegrationToggle } from "../integration-toggle";
 import Link from "next/link";
 
@@ -99,6 +100,7 @@ export default async function DineroSettingsPage() {
                 <th className="px-3 py-2 font-medium">Beløb</th>
                 <th className="px-3 py-2 font-medium">Dato</th>
                 <th className="px-3 py-2 font-medium">Status</th>
+                <th className="px-3 py-2 font-medium"></th>
               </tr>
             </thead>
             <tbody>
@@ -133,11 +135,14 @@ export default async function DineroSettingsPage() {
                       </span>
                     )}
                   </td>
+                  <td className="px-3 py-2 text-right">
+                    {(inv.status === "FAILED" || inv.status === "PENDING") && <RetryInvoiceButton invoiceId={inv.id} />}
+                  </td>
                 </tr>
               ))}
               {recentInvoices.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-3 py-6 text-center text-slate-400">
+                  <td colSpan={6} className="px-3 py-6 text-center text-slate-400">
                     Ingen kladder oprettet endnu.
                   </td>
                 </tr>
