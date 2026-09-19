@@ -178,20 +178,20 @@ export default async function DashboardPage() {
           <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-2">
             <h2 className="text-sm font-semibold text-slate-900">Sælgere</h2>
             <div className="overflow-x-auto">
-            <table className="mt-3 w-full min-w-[520px] text-sm">
+            <table className="mt-3 w-full min-w-[640px] text-sm">
               <thead className="text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                 <tr>
-                  <th className="py-1.5 font-medium">Sælger</th>
-                  <th className="py-1.5 text-right font-medium">Live-kunder</th>
-                  <th className="py-1.5 text-right font-medium">Værdi</th>
-                  <th className="py-1.5 text-right font-medium">Provision afventer</th>
-                  <th className="py-1.5 text-right font-medium">Provision udbetalt</th>
+                  <th className="py-1.5 pr-3 font-medium">Sælger</th>
+                  <th className="px-3 py-1.5 text-right font-medium">Live-kunder</th>
+                  <th className="px-3 py-1.5 text-right font-medium">Værdi</th>
+                  <th className="px-3 py-1.5 text-right font-medium">Provision afventer</th>
+                  <th className="py-1.5 pl-3 text-right font-medium">Provision udbetalt</th>
                 </tr>
               </thead>
               <tbody>
                 {data.sellers.map((s) => (
                   <tr key={s.id} className="border-t border-slate-100">
-                    <td className="py-1.5 text-slate-800">
+                    <td className="whitespace-nowrap py-1.5 pr-3 text-slate-800">
                       {s.name}
                       {!s.isCommissionBased && (
                         <span className="ml-1.5 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500">
@@ -199,10 +199,10 @@ export default async function DashboardPage() {
                         </span>
                       )}
                     </td>
-                    <td className="py-1.5 text-right text-slate-600">{s.wonCount}</td>
-                    <td className="money py-1.5 text-right text-slate-600">{formatDKK(s.wonValue)}</td>
-                    <td className="money py-1.5 text-right text-amber-700">{formatDKK(s.commissionPending)}</td>
-                    <td className="money py-1.5 text-right text-emerald-700">{formatDKK(s.commissionPaid)}</td>
+                    <td className="px-3 py-1.5 text-right text-slate-600">{s.wonCount}</td>
+                    <td className="money px-3 py-1.5 text-right text-slate-600">{formatDKK(s.wonValue)}</td>
+                    <td className="money px-3 py-1.5 text-right text-amber-700">{formatDKK(s.commissionPending)}</td>
+                    <td className="money py-1.5 pl-3 text-right text-emerald-700">{formatDKK(s.commissionPaid)}</td>
                   </tr>
                 ))}
                 {data.sellers.length === 0 && (
