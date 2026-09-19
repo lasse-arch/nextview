@@ -6,6 +6,7 @@ import { createTask, toggleTaskDone, updateTaskAssignee, deleteTask, bulkReassig
 import { formatDate } from "@/lib/labels";
 import { useToast } from "@/components/toast";
 import { TaskDetailModal, type ModalTask } from "../task-detail-modal";
+import { Avatar } from "@/components/avatar";
 
 export type BoardTask = {
   id: string;
@@ -17,7 +18,7 @@ export type BoardTask = {
   dealId: string | null;
 };
 
-export type BoardUser = { id: string; name: string };
+export type BoardUser = { id: string; name: string; avatarUrl?: string | null };
 export type BoardDealOption = { id: string; name: string };
 
 const UNASSIGNED = "__unassigned__";
@@ -25,6 +26,10 @@ const NO_DEAL = "__no_deal__";
 
 function userName(users: BoardUser[], id: string | null): string | null {
   return users.find((u) => u.id === id)?.name ?? null;
+}
+
+function findUser(users: BoardUser[], id: string | null): BoardUser | null {
+  return users.find((u) => u.id === id) ?? null;
 }
 
 function dealLabel(deals: BoardDealOption[], id: string | null): string | null {
@@ -204,13 +209,18 @@ export function TaskBoard({
   }
 
   const personColumns = useMemo(() => {
-    return [...users.map((u) => ({ key: u.id, label: u.name })), { key: UNASSIGNED, label: "Fælles" }];
+    return [
+      ...users.map((u) => ({ key: u.id, label: u.name, avatarUrl: u.avatarUrl })),
+      { key: UNASSIGNED, label: "Fælles", avatarUrl: null },
+    ];
   }, [users]);
 
   const dealColumns = useMemo(() => {
     const idsInUse = new Set(tasks.map((t) => t.dealId).filter((id): id is string => Boolean(id)));
-    const cols = deals.filter((d) => idsInUse.has(d.id)).map((d) => ({ key: d.id, label: d.name }));
-    cols.push({ key: NO_DEAL, label: "Uden deal" });
+    const cols = deals
+      .filter((d) => idsInUse.has(d.id))
+      .map((d) => ({ key: d.id, label: d.name, avatarUrl: null as string | null }));
+    cols.push({ key: NO_DEAL, label: "Uden deal", avatarUrl: null });
     return cols;
   }, [deals, tasks]);
 
@@ -385,6 +395,7 @@ export function TaskBoard({
                     className="mt-0.5 shrink-0"
                   />
                 )}
+                {groupBy === "person" && col.key !== UNASSIGNED && <Avatar name={col.label} avatarUrl={col.avatarUrl} size={22} />}
                 <div className="min-w-0">
                   <h3 className="truncate text-xs font-semibold text-slate-800">{col.label}</h3>
                   <p className="text-[11px] text-slate-500">{colTasks.length} opgave{colTasks.length === 1 ? "" : "r"}</p>
@@ -393,6 +404,7 @@ export function TaskBoard({
               <div className="flex-1 space-y-1.5 overflow-y-auto px-1.5 pb-1.5">
                 {colTasks.map((task) => {
                   const assignee = userName(users, task.assigneeId);
+                  const assigneeUser = findUser(users, task.assigneeId);
                   const deal = dealLabel(deals, task.dealId);
                   return (
                     <div
@@ -443,7 +455,10 @@ export function TaskBoard({
                       <div className="mt-1 flex flex-wrap items-center gap-1.5 pl-9 text-[11px] text-slate-500">
                         {groupBy === "deal" &&
                           (assignee ? (
-                            <span className="rounded-full bg-slate-200 px-1.5 py-0.5">{assignee}</span>
+                            <span className="flex items-center gap-1 rounded-full bg-slate-200 py-0.5 pl-0.5 pr-1.5">
+                              <Avatar name={assignee} avatarUrl={assigneeUser?.avatarUrl} size={14} />
+                              {assignee}
+                            </span>
                           ) : (
                             <span className="text-amber-600">Ingen ejer</span>
                           ))}

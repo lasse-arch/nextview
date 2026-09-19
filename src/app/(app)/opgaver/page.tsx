@@ -19,7 +19,7 @@ export default async function TasksPage() {
     dealId: t.dealId,
   }));
 
-  const boardUsers = users.map((u) => ({ id: u.id, name: u.name }));
+  const boardUsers = users.map((u) => ({ id: u.id, name: u.name, avatarUrl: u.avatarUrl }));
   const boardDeals = deals.map((d) => ({ id: d.id, name: dealName(d) }));
 
   return (
