@@ -53,7 +53,8 @@ export type CalendarEventInput = {
 
 export async function upsertCalendarEvent(account: EmailAccount, input: CalendarEventInput): Promise<string> {
   const accessToken = await getValidAccessToken(account);
-  const attendees = input.attendeeEmails.filter((email): email is string => Boolean(email)).map((email) => ({ email }));
+  const uniqueEmails = [...new Set(input.attendeeEmails.filter((email): email is string => Boolean(email)).map((e) => e.trim()))];
+  const attendees = uniqueEmails.map((email) => ({ email }));
 
   const body = {
     summary: input.summary,

@@ -8,7 +8,7 @@ import { requireUser } from "@/lib/auth";
 import { recalcCommission } from "@/lib/commission-service";
 import { buildDealEmailAddress } from "@/lib/email-address";
 import { findDuplicateDeals } from "@/lib/duplicates";
-import { syncDealMeetingToCalendar } from "@/lib/calendar-service";
+import { syncDealMeetingToCalendar, type CalendarSyncResult } from "@/lib/calendar-service";
 import { sendContractSignedNotification } from "@/lib/notification-service";
 import type { DealStage, CommissionFrequency, CommissionStatus } from "@prisma/client";
 
@@ -108,7 +108,6 @@ export type UpdateDealResult =
       ok: true;
       message: string;
       duplicate: { id: string; companyName: string } | null;
-      calendarWarning: string | null;
     }
   | { ok: false; error: string };
 
@@ -312,12 +311,6 @@ async function updateDealInner(
     await sendContractSignedNotification(dealId);
   }
 
-  let calendarWarning: string | null = null;
-  if (stage === "MEETING_BOOKED" && meetingDate) {
-    const result = await syncDealMeetingToCalendar(dealId);
-    if (!result.synced) calendarWarning = result.reason ?? "Kunne ikke synkronisere med Google Kalender.";
-  }
-
   revalidatePath("/deals");
   revalidatePath("/commission");
   revalidatePath(`/deals/${dealId}`);
@@ -326,7 +319,6 @@ async function updateDealInner(
     ok: true,
     message: blockedStageChange ? "Gemt (stadiet styres via kontrakten og blev ikke ændret)" : "Gemt",
     duplicate: duplicates.length > 0 ? { id: duplicates[0].id, companyName: duplicates[0].companyName } : null,
-    calendarWarning,
   };
 }
 
@@ -375,10 +367,6 @@ export async function updateDealStage(dealId: string, newStage: DealStage) {
     data: { stage: newStage, ...stageDateUpdates },
   });
 
-  if (newStage === "MEETING_BOOKED") {
-    await syncDealMeetingToCalendar(dealId);
-  }
-
   revalidatePath("/deals");
   revalidatePath(`/deals/${dealId}`);
   revalidatePath("/commission");
@@ -400,10 +388,33 @@ export async function setMeetingDateAndStage(dealId: string, meetingDateIso: str
     data: { stage: "MEETING_BOOKED", meetingDate },
   });
 
-  await syncDealMeetingToCalendar(dealId);
-
   revalidatePath("/deals");
   revalidatePath(`/deals/${dealId}`);
+}
+
+/** "Send kalender invitation" button on the deal page - calendar invites are
+ * never sent automatically (e.g. just from booking a meeting or saving the
+ * deal), only when explicitly requested here. `extraAttendeeUserIds` lets
+ * whoever sends it pull in colleagues too (e.g. Gustav inviting Victor
+ * along), on top of the deal owner and the customer contact. */
+export async function sendCalendarInvite(
+  dealId: string,
+  extraAttendeeUserIds: string[] = []
+): Promise<CalendarSyncResult> {
+  await requireUser();
+  const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId } });
+  if (!deal.meetingDate) return { synced: false, reason: "Angiv en mødedato først." };
+
+  const extraUsers = extraAttendeeUserIds.length
+    ? await prisma.user.findMany({ where: { id: { in: extraAttendeeUserIds } }, select: { email: true } })
+    : [];
+
+  const result = await syncDealMeetingToCalendar(
+    dealId,
+    extraUsers.map((u) => u.email)
+  );
+  revalidatePath(`/deals/${dealId}`);
+  return result;
 }
 
 export async function markDealLost(dealId: string) {

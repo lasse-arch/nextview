@@ -36,6 +36,7 @@ import { NoteForm } from "./note-form";
 import { EmailList } from "./email-list";
 import { DealTasksSection } from "./deal-tasks-section";
 import { CreateInvoiceButton } from "./create-invoice-button";
+import { SendCalendarInviteButton } from "./send-calendar-invite-button";
 import { InvoiceLabelTooltip } from "./invoice-label-tooltip";
 import { MarkSentManuallyButton } from "./mark-sent-manually-button";
 import { CheckPaymentButton } from "./check-payment-button";
@@ -231,6 +232,19 @@ export default async function DealDetailPage({
                   initialStage={deal.stage}
                   meetingDateIso={deal.meetingDate ? deal.meetingDate.toISOString() : null}
                 />
+                {deal.meetingDate && (
+                  <div>
+                    <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                      Kalenderinvitation
+                    </label>
+                    <div className="mt-1">
+                      <SendCalendarInviteButton
+                        dealId={deal.id}
+                        colleagues={users.filter((u) => u.id !== deal.ownerId).map((u) => ({ id: u.id, name: u.name }))}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
               <hr className="border-slate-100" />

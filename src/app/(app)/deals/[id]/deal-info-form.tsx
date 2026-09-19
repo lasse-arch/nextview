@@ -9,7 +9,6 @@ export function DealInfoForm({ dealId, children }: { dealId: string; children: R
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [duplicate, setDuplicate] = useState<{ id: string; companyName: string } | null>(null);
-  const [calendarWarning, setCalendarWarning] = useState<string | null>(null);
   const showToast = useToast();
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -23,7 +22,6 @@ export function DealInfoForm({ dealId, children }: { dealId: string; children: R
         return;
       }
       setDuplicate(result.duplicate);
-      setCalendarWarning(result.calendarWarning);
       showToast(result.message);
     });
   }
@@ -40,11 +38,6 @@ export function DealInfoForm({ dealId, children }: { dealId: string; children: R
             se dealen her
           </Link>
           .
-        </div>
-      )}
-      {calendarWarning && (
-        <div className="mb-4 rounded-md bg-slate-100 px-4 py-3 text-sm text-slate-600">
-          Mødet blev gemt, men kunne ikke sættes i Google Kalender: {calendarWarning}
         </div>
       )}
       <form onSubmit={handleSubmit} className="mt-4 space-y-4">

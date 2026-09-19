@@ -31,8 +31,14 @@ function toWallClockDateTime(date: Date): string {
  * so they'd otherwise be missing from the invite's guest list. Never
  * throws - integration is best-effort and must not block saving the deal
  * itself if Google isn't connected or errors out.
+ *
+ * `extraAttendeeEmails` lets whoever sends the invite pull in colleagues too
+ * (e.g. Gustav inviting Victor along), on top of the owner and the contact.
  */
-export async function syncDealMeetingToCalendar(dealId: string): Promise<CalendarSyncResult> {
+export async function syncDealMeetingToCalendar(
+  dealId: string,
+  extraAttendeeEmails: string[] = []
+): Promise<CalendarSyncResult> {
   const deal = await prisma.deal.findUnique({ where: { id: dealId }, include: { owner: true } });
   if (!deal || !deal.meetingDate) {
     return { synced: false, reason: "Ingen mødedato sat." };
@@ -70,7 +76,7 @@ export async function syncDealMeetingToCalendar(dealId: string): Promise<Calenda
       startIso: toWallClockDateTime(start),
       endIso: toWallClockDateTime(end),
       timeZone: MEETING_TIME_ZONE,
-      attendeeEmails: [deal.owner.email, deal.contactEmail],
+      attendeeEmails: [deal.owner.email, deal.contactEmail, ...extraAttendeeEmails],
     });
 
     if (eventId !== deal.googleCalendarEventId) {
