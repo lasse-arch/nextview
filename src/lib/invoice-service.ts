@@ -1,6 +1,6 @@
 import { addMonths, addDays, max as maxDate, startOfDay, getQuarter, getYear } from "date-fns";
 import { prisma } from "@/lib/db";
-import { isDineroConfigured, createQuarterlyInvoiceDraft, type DineroInvoiceLine } from "@/lib/dinero";
+import { isDineroConfigured, createQuarterlyInvoiceDraft, getInvoicePaymentStatus, type DineroInvoiceLine } from "@/lib/dinero";
 import { computeBillingPeriods, computePeriodAmounts } from "@/lib/invoice-schedule";
 import { totalContractValue } from "@/lib/labels";
 import {
@@ -13,7 +13,7 @@ import {
 import type { DealStage } from "@prisma/client";
 
 const ACTIVE_CUSTOMER_STAGES: DealStage[] = ["CONTRACT_SIGNED", "FILMED", "LIVE"];
-const HANDLED_STATUSES = ["DRAFT_CREATED", "IMPORTED"];
+const HANDLED_STATUSES = ["DRAFT_CREATED", "IMPORTED", "SENT_MANUALLY"];
 /** How far past "now" to keep generating rolling periods for, so upcoming
  * quarters are always ready to draft ahead of their trigger date. */
 const ROLLING_HORIZON_MONTHS = 4;
@@ -226,6 +226,58 @@ export async function retrySingleInvoice(invoiceId: string): Promise<{ success: 
   return result.success ? { success: true } : { success: false, error: result.error };
 }
 
+type DealWithInvoices = DraftableDeal & {
+  id: string;
+  currentTermNumber: number;
+  saleAmount: number | null;
+  bindingMonths: number | null;
+  establishmentFee: number | null;
+  billingStartDate: Date | null;
+  contractSignedAt: Date | null;
+  contractEndDate: Date | null;
+  invoices: { id: string; termNumber: number; quarterIndex: number; status: string }[];
+};
+
+/** Drafts every currently-due invoice line for one deal. Shared by the bulk
+ * daily run and the "Opret faktura-kladde" button on the deal page. */
+async function processDealDueInvoices(deal: DealWithInvoices): Promise<{ checked: number; created: number; failed: number }> {
+  const dueLines = computeDueLines(deal);
+  const termInvoices = deal.invoices.filter((inv) => inv.termNumber === deal.currentTermNumber);
+
+  let checked = 0;
+  let created = 0;
+  let failed = 0;
+
+  for (const line of dueLines) {
+    const existingInvoice = termInvoices.find((inv) => inv.quarterIndex === line.quarterIndex);
+    if (existingInvoice && HANDLED_STATUSES.includes(existingInvoice.status)) continue;
+
+    checked++;
+
+    const invoiceRow = existingInvoice
+      ? await prisma.invoice.update({
+          where: { id: existingInvoice.id },
+          data: { amount: line.amount, status: "PENDING", failureReason: null },
+        })
+      : await prisma.invoice.create({
+          data: {
+            dealId: deal.id,
+            termNumber: deal.currentTermNumber,
+            quarterIndex: line.quarterIndex,
+            amount: line.amount,
+            scheduledDate: line.scheduledDate,
+            status: "PENDING",
+          },
+        });
+
+    const result = await draftInvoiceLine(deal, invoiceRow);
+    if (result.success) created++;
+    else failed++;
+  }
+
+  return { checked, created, failed };
+}
+
 /**
  * Creates Dinero invoice drafts for every due line (establishment fee +
  * calendar-aligned recurring periods) across all active, non-churned
@@ -253,38 +305,26 @@ export async function runQuarterlyInvoiceGeneration(): Promise<InvoiceRunSummary
   let failed = 0;
 
   for (const deal of deals) {
-    const dueLines = computeDueLines(deal);
-    const termInvoices = deal.invoices.filter((inv) => inv.termNumber === deal.currentTermNumber);
-
-    for (const line of dueLines) {
-      const existingInvoice = termInvoices.find((inv) => inv.quarterIndex === line.quarterIndex);
-      if (existingInvoice && HANDLED_STATUSES.includes(existingInvoice.status)) continue;
-
-      checked++;
-
-      const invoiceRow = existingInvoice
-        ? await prisma.invoice.update({
-            where: { id: existingInvoice.id },
-            data: { amount: line.amount, status: "PENDING", failureReason: null },
-          })
-        : await prisma.invoice.create({
-            data: {
-              dealId: deal.id,
-              termNumber: deal.currentTermNumber,
-              quarterIndex: line.quarterIndex,
-              amount: line.amount,
-              scheduledDate: line.scheduledDate,
-              status: "PENDING",
-            },
-          });
-
-      const result = await draftInvoiceLine(deal, invoiceRow);
-      if (result.success) created++;
-      else failed++;
-    }
+    const result = await processDealDueInvoices(deal);
+    checked += result.checked;
+    created += result.created;
+    failed += result.failed;
   }
 
   return { configured: true, checked, created, failed };
+}
+
+/** Manually drafts any currently-due invoice lines for a single deal - the "Opret
+ * faktura-kladde" button on the deal page, for when an admin doesn't want to wait
+ * for the daily cron. */
+export async function generateInvoiceForDeal(dealId: string): Promise<InvoiceRunSummary> {
+  if (!(await isDineroConfigured())) {
+    return { configured: false, checked: 0, created: 0, failed: 0 };
+  }
+
+  const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId }, include: { invoices: true } });
+  const result = await processDealDueInvoices(deal);
+  return { configured: true, ...result };
 }
 
 /**
@@ -309,4 +349,54 @@ export async function runAutoChurn(): Promise<{ churned: number }> {
   }
 
   return { churned: dueDeals.length };
+}
+
+/**
+ * Marks a deal's establishment invoice as handled by hand outside Dinero-kladden
+ * (e.g. the seller sent it directly themselves) - creates the tracking row if none
+ * exists yet, or overwrites whatever state an existing one was in. Either way, the
+ * automated generator will never touch this line again (see HANDLED_STATUSES).
+ */
+export async function markEstablishmentSentManually(dealId: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId } });
+  if (!deal.establishmentFee || deal.establishmentFee <= 0) {
+    return { ok: false, error: "Denne deal har intet etableringsgebyr." };
+  }
+
+  await prisma.invoice.upsert({
+    where: { dealId_termNumber_quarterIndex: { dealId, termNumber: deal.currentTermNumber, quarterIndex: 0 } },
+    create: {
+      dealId,
+      termNumber: deal.currentTermNumber,
+      quarterIndex: 0,
+      amount: deal.establishmentFee,
+      scheduledDate: new Date(),
+      status: "SENT_MANUALLY",
+    },
+    update: { status: "SENT_MANUALLY", failureReason: null },
+  });
+
+  return { ok: true };
+}
+
+/** Looks up whether a drafted invoice has since been paid in Dinero. Only
+ * applies to invoices we actually have a real Dinero guid for. */
+export async function checkInvoicePayment(
+  invoiceId: string
+): Promise<{ ok: true; paid: boolean; dealId: string } | { ok: false; error: string; dealId: string }> {
+  const invoice = await prisma.invoice.findUniqueOrThrow({ where: { id: invoiceId } });
+  if (!invoice.dineroInvoiceGuid || invoice.dineroInvoiceGuid.startsWith("TEST-")) {
+    return { ok: false, error: "Ingen rigtig Dinero-faktura at tjekke for denne linje.", dealId: invoice.dealId };
+  }
+
+  try {
+    const { paid, paidDate } = await getInvoicePaymentStatus(invoice.dineroInvoiceGuid);
+    await prisma.invoice.update({
+      where: { id: invoice.id },
+      data: { paidAt: paid ? (paidDate ? new Date(paidDate) : new Date()) : null },
+    });
+    return { ok: true, paid, dealId: invoice.dealId };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Ukendt fejl", dealId: invoice.dealId };
+  }
 }

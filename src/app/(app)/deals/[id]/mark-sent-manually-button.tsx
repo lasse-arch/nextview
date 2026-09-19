@@ -1,0 +1,27 @@
+"use client";
+
+import { useTransition } from "react";
+import { markEstablishmentSentManuallyAction } from "@/lib/actions/invoices";
+import { useToast } from "@/components/toast";
+
+export function MarkSentManuallyButton({ dealId }: { dealId: string }) {
+  const [pending, startTransition] = useTransition();
+  const showToast = useToast();
+
+  return (
+    <button
+      type="button"
+      disabled={pending}
+      onClick={() => {
+        if (!window.confirm("Marker etablering som sendt manuelt? Systemet opretter herefter aldrig selv en kladde for den.")) return;
+        startTransition(async () => {
+          const result = await markEstablishmentSentManuallyAction(dealId);
+          showToast(result.ok ? "Etablering markeret som sendt manuelt" : result.error);
+        });
+      }}
+      className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+    >
+      {pending ? "Markerer…" : "Etablering sendt manuelt"}
+    </button>
+  );
+}

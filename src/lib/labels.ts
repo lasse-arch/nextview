@@ -69,6 +69,7 @@ export const invoiceStatusLabels: Record<string, string> = {
   DRAFT_CREATED: "Kladde oprettet",
   FAILED: "Fejlede",
   IMPORTED: "Importeret (historisk)",
+  SENT_MANUALLY: "Sendt manuelt",
 };
 
 export function dealName(deal: { companyName: string; displayName?: string | null }): string {

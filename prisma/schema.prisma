@@ -79,6 +79,9 @@ enum InvoiceStatus {
   /// Historical period from before the deal was imported into the CRM -
   /// already handled by the previous system, intentionally not drafted in Dinero.
   IMPORTED
+  /// A seller sent this one by hand (outside Dinero-kladden), so the
+  /// automated generator must never touch it either.
+  SENT_MANUALLY
 }
 
 
@@ -97,6 +100,11 @@ model Invoice {
   dineroInvoiceGuid   String? @unique
   dineroInvoiceNumber String?
   failureReason       String?
+
+  /// Set once Dinero reports the sent invoice as paid - checked on demand,
+  /// not automatically, since most invoices sit as unsent drafts and have
+  /// nothing to check yet.
+  paidAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

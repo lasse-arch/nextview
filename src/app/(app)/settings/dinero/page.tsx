@@ -128,6 +128,8 @@ export default async function DineroSettingsPage() {
                           ? "rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700"
                           : inv.status === "IMPORTED"
                           ? "rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700"
+                          : inv.status === "SENT_MANUALLY"
+                          ? "rounded-full bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-700"
                           : "rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600"
                       }
                       title={inv.failureReason ?? undefined}

@@ -32,6 +32,9 @@ import { DealInfoForm } from "./deal-info-form";
 import { NoteForm } from "./note-form";
 import { EmailList } from "./email-list";
 import { DealTasksSection } from "./deal-tasks-section";
+import { CreateInvoiceButton } from "./create-invoice-button";
+import { MarkSentManuallyButton } from "./mark-sent-manually-button";
+import { CheckPaymentButton } from "./check-payment-button";
 
 function authorInitials(name: string): string {
   return name
@@ -378,29 +381,54 @@ export default async function DealDetailPage({
           </section>
 
           <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-sm font-semibold text-slate-900">Fakturaer (Dinero)</h2>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-sm font-semibold text-slate-900">Fakturaer (Dinero)</h2>
+              {currentUser?.role === "ADMIN" && (
+                <div className="flex items-center gap-2">
+                  {deal.establishmentFee &&
+                    deal.establishmentFee > 0 &&
+                    deal.invoices.find((i) => i.quarterIndex === 0)?.status !== "SENT_MANUALLY" && (
+                      <MarkSentManuallyButton dealId={deal.id} />
+                    )}
+                  <CreateInvoiceButton dealId={deal.id} />
+                </div>
+              )}
+            </div>
             {deal.invoices.length > 0 ? (
               <ul className="mt-3 space-y-2 text-sm">
                 {deal.invoices.map((inv) => (
-                  <li key={inv.id} className="flex items-center justify-between border-b border-slate-100 pb-2 last:border-0">
+                  <li key={inv.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2 last:border-0">
                     <span className="text-slate-600">
                       {inv.quarterIndex === 0 ? "Etablering" : `Periode ${inv.quarterIndex}`}
                       {inv.termNumber > 1 ? ` (kontraktperiode ${inv.termNumber})` : ""}
                     </span>
                     <span className="money font-medium text-slate-800">{formatDKK(inv.amount)}</span>
-                    <span
-                      className={
-                        inv.status === "DRAFT_CREATED"
-                          ? "rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700"
-                          : inv.status === "FAILED"
-                          ? "rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700"
-                          : inv.status === "IMPORTED"
-                          ? "rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700"
-                          : "rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600"
-                      }
-                      title={inv.failureReason ?? undefined}
-                    >
-                      {invoiceStatusLabels[inv.status]}
+                    <span className="flex items-center gap-1.5">
+                      <span
+                        className={
+                          inv.status === "DRAFT_CREATED"
+                            ? "rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700"
+                            : inv.status === "FAILED"
+                            ? "rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700"
+                            : inv.status === "IMPORTED"
+                            ? "rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700"
+                            : inv.status === "SENT_MANUALLY"
+                            ? "rounded-full bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-700"
+                            : "rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600"
+                        }
+                        title={inv.failureReason ?? undefined}
+                      >
+                        {invoiceStatusLabels[inv.status]}
+                      </span>
+                      {inv.paidAt ? (
+                        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800">
+                          Betalt {formatDate(inv.paidAt)}
+                        </span>
+                      ) : (
+                        currentUser?.role === "ADMIN" &&
+                        inv.dineroInvoiceGuid &&
+                        !inv.dineroInvoiceGuid.startsWith("TEST-") && <CheckPaymentButton invoiceId={inv.id} />
+                      )}
                     </span>
                   </li>
                 ))}

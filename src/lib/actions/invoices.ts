@@ -3,7 +3,15 @@
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { runQuarterlyInvoiceGeneration, runAutoChurn, retrySingleInvoice, type InvoiceRunSummary } from "@/lib/invoice-service";
+import {
+  runQuarterlyInvoiceGeneration,
+  runAutoChurn,
+  retrySingleInvoice,
+  generateInvoiceForDeal,
+  markEstablishmentSentManually,
+  checkInvoicePayment,
+  type InvoiceRunSummary,
+} from "@/lib/invoice-service";
 
 export async function runInvoiceGenerationNow(): Promise<InvoiceRunSummary> {
   const user = await requireUser();
@@ -14,6 +22,39 @@ export async function runInvoiceGenerationNow(): Promise<InvoiceRunSummary> {
   revalidatePath("/settings/dinero");
   revalidatePath("/deals");
   return { ...summary, churned };
+}
+
+/** "Opret faktura-kladde" on the deal page - drafts any currently-due lines for just this deal. */
+export async function createInvoiceForDeal(dealId: string): Promise<InvoiceRunSummary> {
+  const user = await requireUser();
+  if (user.role !== "ADMIN") throw new Error("Kun admin kan oprette faktura-kladder");
+
+  const summary = await generateInvoiceForDeal(dealId);
+  revalidatePath(`/deals/${dealId}`);
+  revalidatePath("/settings/dinero");
+  return summary;
+}
+
+export async function markEstablishmentSentManuallyAction(dealId: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const user = await requireUser();
+  if (user.role !== "ADMIN") throw new Error("Kun admin kan markere fakturaer som sendt manuelt");
+
+  const result = await markEstablishmentSentManually(dealId);
+  revalidatePath(`/deals/${dealId}`);
+  revalidatePath("/settings/dinero");
+  return result;
+}
+
+export async function checkInvoicePaymentAction(
+  invoiceId: string
+): Promise<{ ok: true; paid: boolean } | { ok: false; error: string }> {
+  const user = await requireUser();
+  if (user.role !== "ADMIN") throw new Error("Kun admin kan tjekke betalingsstatus");
+
+  const result = await checkInvoicePayment(invoiceId);
+  revalidatePath(`/deals/${result.dealId}`);
+  revalidatePath("/settings/dinero");
+  return result;
 }
 
 export async function retryInvoiceDraft(invoiceId: string): Promise<{ success: boolean; error?: string }> {
