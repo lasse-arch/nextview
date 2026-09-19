@@ -54,6 +54,12 @@ type DueLine = { quarterIndex: number; amount: number; scheduledDate: Date };
  * periods are generated up to the deal's computed `contractEndDate` if a
  * termination notice has been given, or otherwise up to a rolling horizon
  * a few months ahead, so upcoming quarters are always ready in time.
+ *
+ * `handledQuarterIndexes` (e.g. one marked "sendt manuelt") is skipped
+ * entirely - not just excluded from the due lines, but also from
+ * `nextDueDate`, so an already-handled quarter's trigger date doesn't get
+ * reported as the next thing coming up when a later, still-unhandled
+ * quarter is actually next.
  */
 function computeDueLines(
   deal: {
@@ -64,7 +70,8 @@ function computeDueLines(
     contractSignedAt: Date | null;
     contractEndDate: Date | null;
   },
-  options: { sendEstablishmentNow?: boolean } = {}
+  options: { sendEstablishmentNow?: boolean } = {},
+  handledQuarterIndexes: Set<number> = new Set()
 ): { lines: DueLine[]; nextDueDate: Date | null } {
   const now = new Date();
   const lines: DueLine[] = [];
@@ -78,7 +85,7 @@ function computeDueLines(
   const establishmentReady = options.sendEstablishmentNow
     ? Boolean(deal.contractSignedAt || deal.billingStartDate)
     : Boolean(establishmentDueDate && establishmentDueDate <= now);
-  if (deal.establishmentFee && deal.establishmentFee > 0) {
+  if (deal.establishmentFee && deal.establishmentFee > 0 && !handledQuarterIndexes.has(0)) {
     if (establishmentReady) {
       lines.push({
         quarterIndex: 0,
@@ -105,6 +112,7 @@ function computeDueLines(
 
   periods.forEach((period, i) => {
     if (i < firstRelevantIndex) return;
+    if (handledQuarterIndexes.has(period.index)) return;
     if (period.draftTriggerDate > now) {
       if (!nextDueDate || period.draftTriggerDate < nextDueDate) nextDueDate = period.draftTriggerDate;
       return;
@@ -255,8 +263,11 @@ async function processDealDueInvoices(
   deal: DealWithInvoices,
   options: { sendEstablishmentNow?: boolean } = {}
 ): Promise<{ checked: number; created: number; failed: number; nextDueDate: Date | null }> {
-  const { lines: dueLines, nextDueDate } = computeDueLines(deal, options);
   const termInvoices = deal.invoices.filter((inv) => inv.termNumber === deal.currentTermNumber);
+  const handledQuarterIndexes = new Set(
+    termInvoices.filter((inv) => HANDLED_STATUSES.includes(inv.status)).map((inv) => inv.quarterIndex)
+  );
+  const { lines: dueLines, nextDueDate } = computeDueLines(deal, options, handledQuarterIndexes);
 
   let checked = 0;
   let created = 0;
