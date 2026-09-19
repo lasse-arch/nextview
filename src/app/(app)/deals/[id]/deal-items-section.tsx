@@ -222,14 +222,18 @@ export function DealItemsSection({ dealId, items }: { dealId: string; items: Dea
               {item.location && <span className="ml-2 text-xs text-slate-400">{item.location}</span>}
             </div>
             <div className="flex items-center gap-3">
-              <ItemLink dealId={dealId} item={item} />
-              {item.isFree ? (
-                <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
-                  Gratis
-                </span>
-              ) : (
-                <span className="money text-slate-600">{formatDKK(item.amount)}</span>
-              )}
+              <div className="w-16 shrink-0 text-right">
+                <ItemLink dealId={dealId} item={item} />
+              </div>
+              <div className="w-16 shrink-0 text-right">
+                {item.isFree ? (
+                  <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                    Gratis
+                  </span>
+                ) : (
+                  <span className="money text-slate-600">{formatDKK(item.amount)}</span>
+                )}
+              </div>
               <RemoveItemButton dealId={dealId} itemId={item.id} />
             </div>
           </li>
