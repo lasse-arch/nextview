@@ -173,15 +173,23 @@ function buildInvoiceContent(
  * its Invoice row. Shared by the bulk quarterly run and the single-invoice
  * "Prøv igen" retry, so both go through the exact same success/failure
  * bookkeeping (contact-guid caching, failureReason, etc).
+ *
+ * `contactGuidHint` is passed in explicitly (rather than always reading
+ * `deal.dineroContactGuid`) so a caller drafting several lines for the same
+ * deal back-to-back (e.g. establishment + a quarter, both due at once) can
+ * carry forward the contact just created by an earlier line in the same
+ * batch - otherwise a fresh contact might not show up yet in Dinero's own
+ * CVR lookup by the time the very next line runs, creating a duplicate.
  */
 async function draftInvoiceLine(
   deal: DraftableDeal,
-  invoiceRow: { id: string; amount: number; quarterIndex: number; scheduledDate: Date }
-): Promise<{ success: true } | { success: false; error: string }> {
+  invoiceRow: { id: string; amount: number; quarterIndex: number; scheduledDate: Date },
+  contactGuidHint: string | null
+): Promise<{ success: true; contactGuid: string } | { success: false; error: string }> {
   try {
     const { note, lines } = buildInvoiceContent(deal, invoiceRow.quarterIndex, invoiceRow.amount, invoiceRow.scheduledDate);
     const result = await createQuarterlyInvoiceDraft({
-      existingContactGuid: deal.dineroContactGuid,
+      existingContactGuid: contactGuidHint,
       companyName: deal.companyName,
       cvrNumber: deal.cvrNumber,
       contactEmail: deal.invoiceEmail || deal.contactEmail,
@@ -211,7 +219,7 @@ async function draftInvoiceLine(
         : [prisma.deal.update({ where: { id: deal.id }, data: { dineroContactGuid: result.contactGuid } })]),
     ]);
 
-    return { success: true };
+    return { success: true, contactGuid: result.contactGuid };
   } catch (err) {
     const error = err instanceof Error ? err.message : "Ukendt fejl";
     await prisma.invoice.update({ where: { id: invoiceRow.id }, data: { status: "FAILED", failureReason: error } });
@@ -223,7 +231,7 @@ async function draftInvoiceLine(
  * issue that made it fail - without re-running the full bulk generation. */
 export async function retrySingleInvoice(invoiceId: string): Promise<{ success: boolean; error?: string }> {
   const invoice = await prisma.invoice.findUniqueOrThrow({ where: { id: invoiceId }, include: { deal: true } });
-  const result = await draftInvoiceLine(invoice.deal, invoice);
+  const result = await draftInvoiceLine(invoice.deal, invoice, invoice.deal.dineroContactGuid);
   return result.success ? { success: true } : { success: false, error: result.error };
 }
 
@@ -251,6 +259,11 @@ async function processDealDueInvoices(
   let checked = 0;
   let created = 0;
   let failed = 0;
+  // Carried forward across lines so a contact just created for e.g. the
+  // establishment fee is reused directly for the next due line (a quarter)
+  // in the same run, instead of re-querying Dinero's CVR lookup - which may
+  // not see a contact created moments earlier yet, creating a duplicate.
+  let contactGuidHint = deal.dineroContactGuid;
 
   for (const line of dueLines) {
     const existingInvoice = termInvoices.find((inv) => inv.quarterIndex === line.quarterIndex);
@@ -274,9 +287,13 @@ async function processDealDueInvoices(
           },
         });
 
-    const result = await draftInvoiceLine(deal, invoiceRow);
-    if (result.success) created++;
-    else failed++;
+    const result = await draftInvoiceLine(deal, invoiceRow, contactGuidHint);
+    if (result.success) {
+      created++;
+      contactGuidHint = result.contactGuid;
+    } else {
+      failed++;
+    }
   }
 
   return { checked, created, failed, nextDueDate };
