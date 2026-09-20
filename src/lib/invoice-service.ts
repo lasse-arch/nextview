@@ -149,6 +149,14 @@ type DraftableDeal = {
  * quarters. Deals without a usable contractProducts snapshot (e.g. older
  * or imported deals) fall back to a single flat line, as before.
  */
+/**
+ * The invoice's wording (note + line item descriptions) follows the
+ * language the customer's contract was actually sent in - stored as
+ * `language` inside the deal's own snapshotted contractProducts (see
+ * ContractProducts) - so a customer who signed an English contract also
+ * gets an English invoice, not a Danish one just because we operate in
+ * Danish internally.
+ */
 function buildInvoiceContent(
   deal: { soldProduct: string | null; contractProducts: unknown },
   quarterIndex: number,
@@ -156,23 +164,26 @@ function buildInvoiceContent(
   scheduledDate: Date
 ): { note: string; lines: DineroInvoiceLine[] } {
   const products = parseContractProducts(deal.contractProducts);
+  const language = products?.language ?? "da";
+  const setupFeeFallback = language === "en" ? "Setup fee" : "Etableringsgebyr";
+  const serviceFallback = language === "en" ? "Service" : "Ydelse";
 
   if (quarterIndex === 0) {
-    if (!products) return { note: "Etableringsgebyr", lines: [{ description: "Etableringsgebyr", amount: totalAmount }] };
-    const labels = allSelectedProductLabels(products);
+    if (!products) return { note: setupFeeFallback, lines: [{ description: setupFeeFallback, amount: totalAmount }] };
+    const labels = allSelectedProductLabels(products, language);
     return {
-      note: labels.length > 0 ? `Etablering af ${labels.join(" + ")}` : "Etableringsgebyr",
-      lines: establishmentLineItems(products, totalAmount),
+      note: labels.length > 0 ? `${language === "en" ? "Setup of" : "Etablering af"} ${labels.join(" + ")}` : setupFeeFallback,
+      lines: establishmentLineItems(products, totalAmount, language),
     };
   }
 
-  const quarter = invoicePeriodLabel(scheduledDate);
-  const fallback = { note: `${deal.soldProduct ?? "Ydelse"} - ${quarter}` };
-  if (!products) return { ...fallback, lines: [{ description: deal.soldProduct ?? "Ydelse", amount: totalAmount }] };
+  const quarter = invoicePeriodLabel(scheduledDate, language);
+  const fallback = { note: `${deal.soldProduct ?? serviceFallback} - ${quarter}` };
+  if (!products) return { ...fallback, lines: [{ description: deal.soldProduct ?? serviceFallback, amount: totalAmount }] };
 
-  const recurringLabels = recurringProductLabels(products);
-  const lines = recurringLineItems(products, totalAmount);
-  if (lines.length === 0) return { ...fallback, lines: [{ description: deal.soldProduct ?? "Ydelse", amount: totalAmount }] };
+  const recurringLabels = recurringProductLabels(products, language);
+  const lines = recurringLineItems(products, totalAmount, language);
+  if (lines.length === 0) return { ...fallback, lines: [{ description: deal.soldProduct ?? serviceFallback, amount: totalAmount }] };
 
   return { note: `${recurringLabels.join(" + ")} - ${quarter}`, lines };
 }

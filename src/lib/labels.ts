@@ -15,11 +15,33 @@ const DANISH_MONTHS = [
   "december",
 ];
 
+const ENGLISH_MONTHS = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
 /** "a, b og c" - the Danish convention for joining a list in running text. */
 function joinDanish(items: string[]): string {
   if (items.length <= 1) return items.join("");
   if (items.length === 2) return `${items[0]} og ${items[1]}`;
   return `${items.slice(0, -1).join(", ")} og ${items[items.length - 1]}`;
+}
+
+/** "a, b and c" - the English equivalent of joinDanish. */
+function joinEnglish(items: string[]): string {
+  if (items.length <= 1) return items.join("");
+  if (items.length === 2) return `${items[0]} and ${items[1]}`;
+  return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
 }
 
 /**
@@ -30,10 +52,30 @@ function joinDanish(items: string[]): string {
  * period's end as the end of its calendar quarter, since we don't persist
  * the exact end date on the Invoice row - accurate for every period except
  * one cut short by termination or the rolling-horizon cap.
+ *
+ * `language` only affects the wording (used when this text ends up on an
+ * invoice sent to a customer whose contract was in English) - the CRM's own
+ * internal displays always call this without a language, defaulting to
+ * Danish.
  */
-export function invoicePeriodLabel(scheduledDate: Date): string {
+export function invoicePeriodLabel(scheduledDate: Date, language: "da" | "en" = "da"): string {
   const quarter = getQuarter(scheduledDate);
   const year = getYear(scheduledDate);
+
+  if (language === "en") {
+    const quarterMonths = ENGLISH_MONTHS.slice((quarter - 1) * 3, quarter * 3);
+    const startMonth = ENGLISH_MONTHS[scheduledDate.getMonth()];
+
+    if (scheduledDate.getDate() === 1) {
+      return `Q${quarter} Quarter ${joinEnglish(quarterMonths)} ${year}`;
+    }
+
+    const lastDayOfStartMonth = endOfMonth(scheduledDate).getDate();
+    const remainingMonths = quarterMonths.slice(quarterMonths.indexOf(startMonth) + 1);
+    const monthsSuffix = remainingMonths.length > 0 ? `, ${joinEnglish(remainingMonths)}` : "";
+    return `Q${quarter} Quarter ${scheduledDate.getDate()} ${startMonth} to ${lastDayOfStartMonth} ${startMonth}${monthsSuffix} ${year}`;
+  }
+
   const quarterMonths = DANISH_MONTHS.slice((quarter - 1) * 3, quarter * 3);
   const startMonth = DANISH_MONTHS[scheduledDate.getMonth()];
 

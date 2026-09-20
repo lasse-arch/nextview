@@ -27,6 +27,16 @@ export const PRODUCT_LABELS: Record<
   visitkort: "Visitkort",
 };
 
+/** English product names, matching the wording used in the English contract
+ * template (contract-html-template.ts) - used for invoice line items when
+ * the deal's contract was sent in English (see buildInvoiceContent). */
+export const PRODUCT_LABELS_EN: Record<keyof typeof PRODUCT_LABELS, string> = {
+  nextviewTour: "Nextview360 Tour",
+  hjemmeside: "Nextview360 Website",
+  droneOptagelse: "Drone Footage",
+  visitkort: "Business Cards",
+};
+
 /**
  * Only one person ever signs on our side, regardless of which seller owns
  * the deal - the director, not the salesperson (see the contract template's
@@ -143,14 +153,19 @@ export type InvoiceLineItem = { description: string; amount: number };
  * to sum exactly to `total` (normally already equal to it) so the invoice
  * total never drifts from the setup fees' rounding.
  */
-export function establishmentLineItems(products: ContractProducts, total: number): InvoiceLineItem[] {
+export function establishmentLineItems(
+  products: ContractProducts,
+  total: number,
+  language: ContractLanguage = "da"
+): InvoiceLineItem[] {
+  const labels = language === "en" ? PRODUCT_LABELS_EN : PRODUCT_LABELS;
   const entries: { label: string; setupFee: number }[] = [];
-  if (products.nextviewTour.selected) entries.push({ label: PRODUCT_LABELS.nextviewTour, setupFee: products.nextviewTour.setupFee });
-  if (products.hjemmeside.selected) entries.push({ label: PRODUCT_LABELS.hjemmeside, setupFee: products.hjemmeside.setupFee });
-  if (products.droneOptagelse.selected) entries.push({ label: PRODUCT_LABELS.droneOptagelse, setupFee: products.droneOptagelse.setupFee });
-  if (products.visitkort.selected) entries.push({ label: PRODUCT_LABELS.visitkort, setupFee: products.visitkort.setupFee });
+  if (products.nextviewTour.selected) entries.push({ label: labels.nextviewTour, setupFee: products.nextviewTour.setupFee });
+  if (products.hjemmeside.selected) entries.push({ label: labels.hjemmeside, setupFee: products.hjemmeside.setupFee });
+  if (products.droneOptagelse.selected) entries.push({ label: labels.droneOptagelse, setupFee: products.droneOptagelse.setupFee });
+  if (products.visitkort.selected) entries.push({ label: labels.visitkort, setupFee: products.visitkort.setupFee });
 
-  if (entries.length === 0) return [{ description: "Etableringsgebyr", amount: total }];
+  if (entries.length === 0) return [{ description: language === "en" ? "Setup fee" : "Etableringsgebyr", amount: total }];
 
   // Weight only by an actual (positive) setup fee, so a free product's line
   // stays exactly 0 kr instead of being given a phantom share of the
@@ -172,12 +187,13 @@ export function establishmentLineItems(products: ContractProducts, total: number
   return entries.map((e, i) => ({ description: e.label, amount: amounts[i] }));
 }
 
-export function allSelectedProductLabels(products: ContractProducts): string[] {
+export function allSelectedProductLabels(products: ContractProducts, language: ContractLanguage = "da"): string[] {
+  const productLabels = language === "en" ? PRODUCT_LABELS_EN : PRODUCT_LABELS;
   const labels: string[] = [];
-  if (products.nextviewTour.selected) labels.push(PRODUCT_LABELS.nextviewTour);
-  if (products.hjemmeside.selected) labels.push(PRODUCT_LABELS.hjemmeside);
-  if (products.droneOptagelse.selected) labels.push(PRODUCT_LABELS.droneOptagelse);
-  if (products.visitkort.selected) labels.push(PRODUCT_LABELS.visitkort);
+  if (products.nextviewTour.selected) labels.push(productLabels.nextviewTour);
+  if (products.hjemmeside.selected) labels.push(productLabels.hjemmeside);
+  if (products.droneOptagelse.selected) labels.push(productLabels.droneOptagelse);
+  if (products.visitkort.selected) labels.push(productLabels.visitkort);
   return labels;
 }
 
@@ -189,18 +205,24 @@ export function allSelectedProductLabels(products: ContractProducts): string[] {
  * value the customer's getting visible on the invoice, which is more
  * "sælgende" than just not mentioning it.
  */
-export function recurringProductLabels(products: ContractProducts): string[] {
+export function recurringProductLabels(products: ContractProducts, language: ContractLanguage = "da"): string[] {
+  const productLabels = language === "en" ? PRODUCT_LABELS_EN : PRODUCT_LABELS;
   const labels: string[] = [];
-  if (products.nextviewTour.selected) labels.push(PRODUCT_LABELS.nextviewTour);
-  if (products.hjemmeside.selected) labels.push(PRODUCT_LABELS.hjemmeside);
+  if (products.nextviewTour.selected) labels.push(productLabels.nextviewTour);
+  if (products.hjemmeside.selected) labels.push(productLabels.hjemmeside);
   return labels;
 }
 
 /** One invoice line per recurring product (even a free one, at 0 kr), proportional to its share of the combined monthly price. */
-export function recurringLineItems(products: ContractProducts, total: number): InvoiceLineItem[] {
+export function recurringLineItems(
+  products: ContractProducts,
+  total: number,
+  language: ContractLanguage = "da"
+): InvoiceLineItem[] {
+  const productLabels = language === "en" ? PRODUCT_LABELS_EN : PRODUCT_LABELS;
   const entries: { label: string; price: number }[] = [];
-  if (products.nextviewTour.selected) entries.push({ label: PRODUCT_LABELS.nextviewTour, price: products.nextviewTour.price });
-  if (products.hjemmeside.selected) entries.push({ label: PRODUCT_LABELS.hjemmeside, price: products.hjemmeside.price });
+  if (products.nextviewTour.selected) entries.push({ label: productLabels.nextviewTour, price: products.nextviewTour.price });
+  if (products.hjemmeside.selected) entries.push({ label: productLabels.hjemmeside, price: products.hjemmeside.price });
   if (entries.length === 0) return [];
 
   const amounts = distributeByWeights(total, entries.map((e) => e.price));
