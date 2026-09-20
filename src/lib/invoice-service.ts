@@ -18,6 +18,14 @@ const HANDLED_STATUSES = ["DRAFT_CREATED", "IMPORTED", "SENT_MANUALLY"];
  * quarters are always ready to draft ahead of their trigger date. */
 const ROLLING_HORIZON_MONTHS = 4;
 
+/** The CRM only started being used for invoicing from Q4 2026 - some deals'
+ * billingStartDate predates that (backfilled from before the system was in
+ * use), so without this floor the "marker kvartal sendt manuelt" picker
+ * would offer Q1-Q3 2026 quarters that were never actually run through here
+ * and have no real meaning to hand-mark. Only affects that picker, not the
+ * automated draft generator. */
+const MANUAL_QUARTER_PICKER_FLOOR = new Date(2026, 9, 1);
+
 export type InvoiceRunSummary = {
   configured: boolean;
   checked: number;
@@ -476,7 +484,9 @@ export async function listRecurringPeriodsForDeal(dealId: string): Promise<Invoi
     }))
     // Quarters that have already fully elapsed are long past being useful to
     // pick here - only the current one onward is worth choosing manually.
-    .filter((option) => option.endDate >= now)
+    // Also never offer anything before Q4 2026, regardless of a deal's real
+    // billingStartDate - see MANUAL_QUARTER_PICKER_FLOOR.
+    .filter((option) => option.endDate >= now && option.scheduledDate >= MANUAL_QUARTER_PICKER_FLOOR)
     .map(({ endDate: _endDate, ...option }) => option);
 }
 
