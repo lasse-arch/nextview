@@ -446,12 +446,13 @@ export type InvoicePeriodOption = {
 };
 
 /**
- * Every recurring period (quarterIndex 1+) in a deal's current term, past
- * and future through the rolling horizon - not just the ones currently due
- * like computeDueLines returns. Used by the "marker kvartal sendt manuelt"
- * picker, for when a quarter was invoiced entirely outside the system (e.g.
- * sent directly in Dinero) and just needs to be recorded here so the
- * automated generator doesn't also try to draft it.
+ * Every recurring period (quarterIndex 1+) in a deal's current term from the
+ * current one through the rolling horizon - not just the ones currently due
+ * like computeDueLines returns, but excluding anything that's already fully
+ * elapsed (not useful to hand-pick once it's long past). Used by the "marker
+ * kvartal sendt manuelt" picker, for when a quarter was invoiced entirely
+ * outside the system (e.g. sent directly in Dinero) and just needs to be
+ * recorded here so the automated generator doesn't also try to draft it.
  */
 export async function listRecurringPeriodsForDeal(dealId: string): Promise<InvoicePeriodOption[]> {
   const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId }, include: { invoices: true } });
@@ -464,13 +465,19 @@ export async function listRecurringPeriodsForDeal(dealId: string): Promise<Invoi
   const amounts = computePeriodAmounts(totalContractValue(deal), periods, deal.billingStartDate, deal.bindingMonths);
   const termInvoices = deal.invoices.filter((inv) => inv.termNumber === deal.currentTermNumber);
 
-  return periods.map((period, i) => ({
-    quarterIndex: period.index,
-    label: invoicePeriodLabel(period.startDate),
-    amount: amounts[i],
-    scheduledDate: period.startDate,
-    status: termInvoices.find((inv) => inv.quarterIndex === period.index)?.status ?? null,
-  }));
+  return periods
+    .map((period, i) => ({
+      quarterIndex: period.index,
+      label: invoicePeriodLabel(period.startDate),
+      amount: amounts[i],
+      scheduledDate: period.startDate,
+      status: termInvoices.find((inv) => inv.quarterIndex === period.index)?.status ?? null,
+      endDate: period.endDate,
+    }))
+    // Quarters that have already fully elapsed are long past being useful to
+    // pick here - only the current one onward is worth choosing manually.
+    .filter((option) => option.endDate >= now)
+    .map(({ endDate: _endDate, ...option }) => option);
 }
 
 /**
