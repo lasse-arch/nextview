@@ -241,74 +241,141 @@ async function fetchImageAsBuffer(page: Page, url: string): Promise<Buffer> {
   return Buffer.from(base64, "base64");
 }
 
+/** "01min 47 sec" (or similar, with an optional leading "Xh") -> total seconds. */
+function parseAvgTimeToSeconds(avgTime: string): number {
+  const hours = /(\d+)\s*h/i.exec(avgTime);
+  const minutes = /(\d+)\s*min/i.exec(avgTime);
+  const seconds = /(\d+)\s*sec/i.exec(avgTime);
+  return (hours ? Number(hours[1]) * 3600 : 0) + (minutes ? Number(minutes[1]) * 60 : 0) + (seconds ? Number(seconds[1]) : 0);
+}
+
+function formatSecondsAsAvgTime(totalSeconds: number): string {
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = Math.round(totalSeconds % 60);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return hours > 0 ? `${hours}h ${pad(minutes)}min ${pad(seconds)} sec` : `${pad(minutes)}min ${pad(seconds)} sec`;
+}
+
+/** "08.11.2025" -> a comparable Date, for picking the earliest of several tours' go-live dates. */
+function parseDanishDate(label: string): Date | null {
+  const match = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec(label.trim());
+  if (!match) return null;
+  return new Date(Number(match[3]), Number(match[2]) - 1, Number(match[1]));
+}
+
+/** Sums visits/sessions/users across tours, and averages avgTime weighted by each tour's session count. */
+function sumPeriodStats(all: ExplorePeriodStats[]): ExplorePeriodStats {
+  const visits = all.reduce((sum, s) => sum + s.visits, 0);
+  const sessions = all.reduce((sum, s) => sum + s.sessions, 0);
+  const users = all.reduce((sum, s) => sum + s.users, 0);
+  const weightedSeconds = all.reduce((sum, s) => sum + s.sessions * parseAvgTimeToSeconds(s.avgTime), 0);
+  const avgTime = sessions > 0 ? formatSecondsAsAvgTime(weightedSeconds / sessions) : all[0]?.avgTime ?? "–";
+  return { visits, sessions, users, avgTime };
+}
+
 /**
- * Logs into explore.nextview360.dk, finds the given tour by MP-Space ID, and
- * pulls its visitor stats and cover photo.
+ * Combines several tours' stats into one, for the rare customer with more
+ * than one MP-Skin (e.g. multiple locations under one deal) - every number
+ * is summed, except "since" which keeps the earliest go-live date of the
+ * bunch (the customer's overall presence started then, not later).
  */
-export async function fetchExploreTourData(mpSkinId: string): Promise<ExploreTourData> {
+function aggregateTourStats(all: ExploreTourStats[]): ExploreTourStats {
+  if (all.length === 1) return all[0];
+
+  const earliest = all.reduce((best, s) => {
+    const bestDate = parseDanishDate(best.sinceLabel);
+    const date = parseDanishDate(s.sinceLabel);
+    if (!date) return best;
+    if (!bestDate || date < bestDate) return s;
+    return best;
+  });
+
+  return {
+    last7Days: sumPeriodStats(all.map((s) => s.last7Days)),
+    last30Days: sumPeriodStats(all.map((s) => s.last30Days)),
+    last90Days: sumPeriodStats(all.map((s) => s.last90Days)),
+    sinceLabel: earliest.sinceLabel,
+    sinceStats: sumPeriodStats(all.map((s) => s.sinceStats)),
+  };
+}
+
+/** Finds the tour, opens its Stats tab and reads back the 4 period cards, retrying the whole flow on failure. */
+async function fetchOneTourStats(page: Page, mpSkinId: string, editorHref: string): Promise<ExploreTourStats> {
+  let statsText = "";
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      // Every link on this site - including the one we already grabbed - is
+      // wrapped in a single-use `/en/login?x=<token>` redirect, so reusing
+      // the same href on a retry just lands back on a dead/expired link.
+      // Re-searching gets a fresh, still-valid one each time.
+      const href = attempt === 0 ? editorHref : await findEditorHref(page, mpSkinId);
+      await gotoRetry(page, href);
+      await sleep(3000);
+      const clicked = await clickButtonWithText(page, "Stats");
+      if (!clicked) throw new Error('Fanen "Stats" blev ikke fundet.');
+
+      // The "Enable cookies for stats" Yes/No toggle and its explanation
+      // text render immediately either way (on or off) - it's not a signal
+      // of anything. The actual period cards (LAST 7 DAYS etc.) load a
+      // little after that, apparently slow enough in practice to still be
+      // missing after a single fixed pause, so poll for them instead of
+      // trusting one fixed sleep.
+      statsText = "";
+      for (let poll = 0; poll < 12; poll++) {
+        try {
+          statsText = await page.evaluate(() => document.body.innerText);
+        } catch (err) {
+          // A destroyed context mid-poll just means "not ready yet, and the
+          // page moved" - keep polling rather than aborting the attempt.
+          if (!(err instanceof Error) || !/execution context was destroyed/i.test(err.message)) throw err;
+        }
+        if (/LAST 7 DAYS/i.test(statsText)) break;
+        await sleep(1000);
+      }
+      if (!/LAST 7 DAYS/i.test(statsText)) {
+        const snippet = statsText.replace(/\s+/g, " ").trim().slice(0, 300);
+        throw new Error(`Statistik-siden indeholdt ikke de forventede tal (uddrag: "${snippet}").`);
+      }
+
+      return parseStatsText(statsText);
+    } catch (err) {
+      lastError = err;
+      await sleep(1500);
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error("Ukendt fejl.");
+}
+
+/**
+ * Logs into explore.nextview360.dk, finds the given tour(s) by MP-Space ID,
+ * and pulls their visitor stats and cover photo. Almost always a single ID -
+ * a handful of customers have more than one tour under the same deal, in
+ * which case the numbers are summed and the first tour's cover photo is used
+ * as the report's hero image.
+ */
+export async function fetchExploreTourData(mpSkinIds: string | string[]): Promise<ExploreTourData> {
+  const ids = Array.isArray(mpSkinIds) ? mpSkinIds : [mpSkinIds];
   const browser = await launchBrowser();
   try {
     const page = await browser.newPage();
     await page.setViewport({ width: 1600, height: 1000 });
 
-    const editorHref = await findEditorHref(page, mpSkinId);
-
-    // Cover image lives at a predictable authenticated URL per MP-Space ID -
-    // far more reliable than the JS-rendered "Cover/Title" tab, which never
-    // exposes the URL in the server-rendered HTML.
-    const coverImage = await fetchImageAsBuffer(
-      page,
-      `${BASE_URL}/cache/tour-cache-mpApi-${mpSkinId}-cover-.png`
-    );
-
-    let statsText = "";
-    let lastError: unknown;
-    for (let attempt = 0; attempt < 3; attempt++) {
-      try {
-        // Every link on this site - including the one we already grabbed -
-        // is wrapped in a single-use `/en/login?x=<token>` redirect, so
-        // reusing the same href on a retry just lands back on a dead/expired
-        // link. Re-searching gets a fresh, still-valid one each time.
-        const href = attempt === 0 ? editorHref : await findEditorHref(page, mpSkinId);
-        await gotoRetry(page, href);
-        await sleep(3000);
-        const clicked = await clickButtonWithText(page, "Stats");
-        if (!clicked) throw new Error('Fanen "Stats" blev ikke fundet.');
-
-        // The "Enable cookies for stats" Yes/No toggle and its explanation
-        // text render immediately either way (on or off) - it's not a signal
-        // of anything. The actual period cards (LAST 7 DAYS etc.) load a
-        // little after that, apparently slow enough in practice to still be
-        // missing after a single fixed pause, so poll for them instead of
-        // trusting one fixed sleep.
-        statsText = "";
-        for (let poll = 0; poll < 12; poll++) {
-          try {
-            statsText = await page.evaluate(() => document.body.innerText);
-          } catch (err) {
-            // A destroyed context mid-poll just means "not ready yet, and the
-            // page moved" - keep polling rather than aborting the attempt.
-            if (!(err instanceof Error) || !/execution context was destroyed/i.test(err.message)) throw err;
-          }
-          if (/LAST 7 DAYS/i.test(statsText)) break;
-          await sleep(1000);
-        }
-        if (!/LAST 7 DAYS/i.test(statsText)) {
-          const snippet = statsText.replace(/\s+/g, " ").trim().slice(0, 300);
-          throw new Error(`Statistik-siden indeholdt ikke de forventede tal (uddrag: "${snippet}").`);
-        }
-
-        lastError = undefined;
-        break;
-      } catch (err) {
-        lastError = err;
-        await sleep(1500);
+    let coverImage: Buffer | null = null;
+    const allStats: ExploreTourStats[] = [];
+    for (const mpSkinId of ids) {
+      const editorHref = await findEditorHref(page, mpSkinId);
+      if (!coverImage) {
+        // Cover image lives at a predictable authenticated URL per MP-Space
+        // ID - far more reliable than the JS-rendered "Cover/Title" tab,
+        // which never exposes the URL in the server-rendered HTML.
+        coverImage = await fetchImageAsBuffer(page, `${BASE_URL}/cache/tour-cache-mpApi-${mpSkinId}-cover-.png`);
       }
+      allStats.push(await fetchOneTourStats(page, mpSkinId, editorHref));
     }
-    if (lastError) throw lastError;
 
-    const stats = parseStatsText(statsText);
-    return { stats, coverImage };
+    return { stats: aggregateTourStats(allStats), coverImage: coverImage! };
   } finally {
     await browser.close();
   }

@@ -15,7 +15,14 @@ export async function updateMpSkinIdAction(
   const user = await requireUser();
   if (user.role !== "ADMIN") throw new Error("Kun admin kan ændre MP-Skin nummer");
 
-  await prisma.deal.update({ where: { id: dealId }, data: { mpSkinId: mpSkinId.trim() || null } });
+  // Almost always just one, but a few customers have more than one tour
+  // under the same deal - comma-separated, same as CC-modtagere.
+  const ids = mpSkinId
+    .split(/[,;]/)
+    .map((id) => id.trim())
+    .filter(Boolean);
+
+  await prisma.deal.update({ where: { id: dealId }, data: { mpSkinId: ids.join(", ") || null } });
   revalidatePath("/stats");
   revalidatePath(`/deals/${dealId}`);
   return { ok: true };

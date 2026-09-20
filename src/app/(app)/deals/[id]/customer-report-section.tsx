@@ -102,7 +102,7 @@ export function CustomerReportSection({
           onChange={(e) => setMpSkinIdValue(e.target.value)}
           onBlur={saveMpSkinId}
           disabled={savingId}
-          placeholder="fx SuPVjGiRx8q"
+          placeholder="fx SuPVjGiRx8q (eller flere adskilt af komma)"
           className="mt-1 w-56 rounded-md border border-slate-300 px-2 py-1.5 text-sm disabled:opacity-50"
         />
       </div>

@@ -118,7 +118,8 @@ export function StatsCustomerRow({
           onBlur={saveMpSkinId}
           disabled={savingId}
           placeholder="fx SuPVjGiRx8q"
-          className="w-36 rounded-md border border-slate-300 px-2 py-1 text-xs disabled:opacity-50"
+          title="Flere MP-Skin numre kan adskilles med komma, hvis kunden har mere end én tour"
+          className="w-40 rounded-md border border-slate-300 px-2 py-1 text-xs disabled:opacity-50"
         />
       </td>
       <td className="px-3 py-2">

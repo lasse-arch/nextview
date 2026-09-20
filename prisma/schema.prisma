@@ -289,9 +289,11 @@ model Deal {
   /// on the deal for pipeline tracking without it generating commission.
   commissionExcluded Boolean @default(false)
 
-  /// The customer's tour on explore.nextview360.dk (MP-Space ID, e.g.
+  /// The customer's tour(s) on explore.nextview360.dk (MP-Space ID, e.g.
   /// "SuPVjGiRx8q") - lets the visitor-stats report be pulled for this deal
-  /// without relying on fuzzy name matching.
+  /// without relying on fuzzy name matching. Almost always one ID, but a few
+  /// customers have more than one tour under the same deal - comma-separated
+  /// in that case, with the report's numbers summed across all of them.
   mpSkinId String?
 
   /// Defaults to quarterly - explicitly set to null to turn automatic

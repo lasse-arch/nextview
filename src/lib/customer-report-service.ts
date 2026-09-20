@@ -40,6 +40,14 @@ function parseCcEmails(raw: string | null): string[] {
     .filter(Boolean);
 }
 
+/** Almost always a single MP-Skin nummer, but a few customers have more than one tour under the same deal. */
+function parseMpSkinIds(raw: string | null): string[] {
+  return (raw ?? "")
+    .split(/[,;]/)
+    .map((e) => e.trim())
+    .filter(Boolean);
+}
+
 /** The report email's body, matching the signature/wording Lasse uses when sending manually. */
 function buildReportEmailHtml(customerName: string): string {
   const name = escapeHtml(customerName);
@@ -113,14 +121,15 @@ export async function generateAndSendCustomerReport(
   existingReportId?: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
-    if (!deal.mpSkinId) throw new Error("Dealen har intet MP-Skin nummer udfyldt.");
+    const mpSkinIds = parseMpSkinIds(deal.mpSkinId);
+    if (mpSkinIds.length === 0) throw new Error("Dealen har intet MP-Skin nummer udfyldt.");
     const recipient = deal.invoiceEmail || deal.contactEmail;
     if (!recipient) throw new Error("Dealen har ingen e-mail at sende rapporten til.");
 
     const customerName = deal.displayName || deal.companyName;
     const monthLabel = currentMonthLabel();
 
-    const tourData = await fetchExploreTourData(deal.mpSkinId);
+    const tourData = await fetchExploreTourData(mpSkinIds);
     const html = buildCustomerReportHtml({
       customerName,
       monthLabel,
