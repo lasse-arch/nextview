@@ -139,10 +139,24 @@ async function findEditorHref(page: Page, mpSkinId: string): Promise<string> {
   await ensureOnSearchPage(page);
   const searchBoxes = await page.$$('input[name="p[search]"]');
   if (searchBoxes.length === 0) throw new Error("Søgefeltet blev ikke fundet (ikke logget ind?).");
-  await searchBoxes[0].evaluate((el: Element, value: string) => {
-    (el as HTMLInputElement).value = value;
-    el.dispatchEvent(new Event("input", { bubbles: true }));
-  }, mpSkinId);
+
+  // There are several same-named search inputs on this page (only one visible);
+  // the site's search only actually runs off real keystroke events, so setting
+  // `.value` and dispatching a synthetic "input" event does nothing - the
+  // request that fires on Enter goes out with an empty/stale search term and
+  // the "results" are just whatever was already on screen. Confirmed via
+  // network inspection: only real simulated typing produces the filtered
+  // request (`...&p[search]=<id>...`) that actually narrows the list.
+  let searchBox = searchBoxes[0];
+  for (const box of searchBoxes) {
+    const visible = await box.evaluate((el) => !!(el as HTMLElement).offsetWidth || !!(el as HTMLElement).offsetHeight);
+    if (visible) {
+      searchBox = box;
+      break;
+    }
+  }
+  await searchBox.click({ count: 3 });
+  await searchBox.type(mpSkinId, { delay: 50 });
   await page.keyboard.press("Enter");
 
   // Before the results list actually re-renders to the filtered match, the
