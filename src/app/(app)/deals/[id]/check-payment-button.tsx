@@ -26,7 +26,7 @@ export function CheckPaymentButton({ invoiceId }: { invoiceId: string }) {
           }
         })
       }
-      className="rounded-md border border-slate-300 px-2 py-0.5 text-[11px] font-medium text-slate-500 hover:bg-slate-50 disabled:opacity-50"
+      className="shrink-0 whitespace-nowrap rounded-md border border-slate-300 px-2 py-0.5 text-[11px] font-medium text-slate-500 hover:bg-slate-50 disabled:opacity-50"
     >
       {pending ? "Tjekker…" : "Tjek betaling"}
     </button>

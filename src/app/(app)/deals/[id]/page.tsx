@@ -440,28 +440,30 @@ export default async function DealDetailPage({
                     (inv.quarterIndex === 0 ? "Etableringspris" : invoiceQuarterShortLabel(inv.scheduledDate)) +
                     (inv.termNumber > 1 ? ` (kontraktperiode ${inv.termNumber})` : "");
                   return (
-                  <li key={inv.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2 last:border-0">
-                    <InvoiceLabelTooltip label={label} heading={heading} rows={rows} />
-                    <span className="money font-medium text-slate-800">{formatDKK(inv.amount)}</span>
-                    <span className="flex items-center gap-1.5">
+                  <li key={inv.id} className="flex flex-col gap-1.5 border-b border-slate-100 pb-2 last:border-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <InvoiceLabelTooltip label={label} heading={heading} rows={rows} />
+                      <span className="money font-medium text-slate-800">{formatDKK(inv.amount)}</span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1.5">
                       <span
                         className={
                           inv.status === "DRAFT_CREATED"
-                            ? "rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700"
+                            ? "shrink-0 whitespace-nowrap rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700"
                             : inv.status === "FAILED"
-                            ? "rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700"
+                            ? "shrink-0 whitespace-nowrap rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700"
                             : inv.status === "IMPORTED"
-                            ? "rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700"
+                            ? "shrink-0 whitespace-nowrap rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700"
                             : inv.status === "SENT_MANUALLY"
-                            ? "rounded-full bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-700"
-                            : "rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600"
+                            ? "shrink-0 whitespace-nowrap rounded-full bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-700"
+                            : "shrink-0 whitespace-nowrap rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600"
                         }
                         title={inv.failureReason ?? undefined}
                       >
                         {invoiceStatusLabels[inv.status]}
                       </span>
                       {inv.paidAt && (
-                        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800">
+                        <span className="shrink-0 whitespace-nowrap rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800">
                           Betalt {formatDate(inv.paidAt)}
                         </span>
                       )}
@@ -470,7 +472,7 @@ export default async function DealDetailPage({
                       )}
                       {currentUser?.role === "ADMIN" && <MarkInvoicePaidButton invoiceId={inv.id} paid={Boolean(inv.paidAt)} />}
                       {currentUser?.role === "ADMIN" && <DeleteInvoiceButton invoiceId={inv.id} />}
-                    </span>
+                    </div>
                   </li>
                   );
                 })}
