@@ -68,7 +68,7 @@ export function StatsCustomerRow({
     startSendTransition(async () => {
       try {
         const result = await sendCustomerReportNowAction(dealId);
-        showToast(result.ok ? `Rapport sendt til ${name}.` : result.error);
+        showToast(result.ok ? `Sender til ${name} i baggrunden - opdater siden om et minuts tid.` : result.error);
       } catch (err) {
         showToast(err instanceof Error ? err.message : "Der opstod en fejl.");
       }

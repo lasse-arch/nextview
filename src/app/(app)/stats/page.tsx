@@ -3,6 +3,11 @@ import { isIntegrationEnabled } from "@/lib/integration-settings";
 import { IntegrationToggle } from "../settings/integration-toggle";
 import { StatsCustomerRow } from "./stats-customer-row";
 
+// "Send nu" schedules its actual scraping/PDF/email work via next/server's
+// `after()`, which keeps running past this page's own response but is still
+// bounded by its maxDuration.
+export const maxDuration = 300;
+
 /**
  * Central home for the visitor-stats report feature - deliberately holds
  * almost everything (every live customer's MP-Skin nummer, interval, next/

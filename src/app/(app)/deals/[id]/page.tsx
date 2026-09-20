@@ -1,5 +1,10 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
+
+// "Send stats" (see CustomerReportSection) schedules its actual scraping/PDF/
+// email work via next/server's `after()`, which keeps running past this
+// page's own response but is still bounded by its maxDuration.
+export const maxDuration = 300;
 import { getCurrentUser } from "@/lib/auth";
 import Link from "next/link";
 import {

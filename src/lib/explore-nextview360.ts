@@ -193,26 +193,37 @@ export async function fetchExploreTourData(mpSkinId: string): Promise<ExploreTou
 
     let statsText = "";
     let heatmapImage: Buffer | null = null;
-    for (let attempt = 0; attempt < 5; attempt++) {
+    let lastError: unknown;
+    for (let attempt = 0; attempt < 3; attempt++) {
       try {
-        await gotoRetry(page, editorHref);
+        // Every link on this site - including the one we already grabbed -
+        // is wrapped in a single-use `/en/login?x=<token>` redirect, so
+        // reusing the same href on a retry just lands back on a dead/expired
+        // link. Re-searching gets a fresh, still-valid one each time.
+        const href = attempt === 0 ? editorHref : await findEditorHref(page, mpSkinId);
+        await gotoRetry(page, href);
         await sleep(3000);
         const clicked = await clickButtonWithText(page, "Stats");
         if (!clicked) throw new Error('Fanen "Stats" blev ikke fundet.');
         await sleep(3000);
         statsText = await page.evaluate(() => document.body.innerText);
-        if (!/LAST 7 DAYS/i.test(statsText)) throw new Error("Statistik-siden indeholdt ikke de forventede tal.");
+        if (!/LAST 7 DAYS/i.test(statsText)) {
+          const snippet = statsText.replace(/\s+/g, " ").trim().slice(0, 300);
+          throw new Error(`Statistik-siden indeholdt ikke de forventede tal (uddrag: "${snippet}").`);
+        }
 
         const heatmapEl = await page.$(".heatmap, [class*='heatmap']");
         if (heatmapEl) {
           heatmapImage = (await heatmapEl.screenshot({ type: "png" })) as Buffer;
         }
+        lastError = undefined;
         break;
       } catch (err) {
-        if (attempt === 4) throw err;
+        lastError = err;
         await sleep(1500);
       }
     }
+    if (lastError) throw lastError;
 
     const stats = parseStatsText(statsText);
     return { stats, coverImage, heatmapImage };

@@ -70,7 +70,7 @@ export function CustomerReportSection({
     startSendTransition(async () => {
       try {
         const result = await sendCustomerReportNowAction(dealId);
-        showToast(result.ok ? "Besøgsrapport sendt." : result.error);
+        showToast(result.ok ? "Sender i baggrunden - opdater siden om et minuts tid for at se status." : result.error);
       } catch (err) {
         showToast(err instanceof Error ? err.message : "Der opstod en fejl.");
       }
