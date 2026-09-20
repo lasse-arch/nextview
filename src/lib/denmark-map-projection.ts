@@ -21,3 +21,46 @@ export function projectLatLon(lat: number, lon: number): { x: number; y: number 
     y: TRANSLATE_Y - SCALE * rawY,
   };
 }
+
+/**
+ * Nudges apart points whose projected positions are close enough to visibly
+ * overlap (e.g. several customers geocoded to the same building or town
+ * centre) - each such cluster is arranged in a small circle around its
+ * shared spot instead of drawing one dot directly on top of another, which
+ * hid all but the topmost from both view and hover. Points far enough apart
+ * to already read as distinct dots are left untouched.
+ */
+export function spreadOverlappingPoints<T extends { id: string; x: number; y: number }>(
+  points: T[],
+  clusterRadius = 7
+): Map<string, { x: number; y: number }> {
+  const result = new Map<string, { x: number; y: number }>();
+  const visited = new Set<string>();
+
+  for (const point of points) {
+    if (visited.has(point.id)) continue;
+
+    const cluster = points.filter(
+      (other) => !visited.has(other.id) && Math.hypot(other.x - point.x, other.y - point.y) <= clusterRadius
+    );
+    cluster.forEach((p) => visited.add(p.id));
+
+    if (cluster.length === 1) {
+      result.set(point.id, { x: point.x, y: point.y });
+      continue;
+    }
+
+    const centerX = cluster.reduce((sum, p) => sum + p.x, 0) / cluster.length;
+    const centerY = cluster.reduce((sum, p) => sum + p.y, 0) / cluster.length;
+    const spreadRadius = 5 + cluster.length;
+    cluster.forEach((p, i) => {
+      const angle = (2 * Math.PI * i) / cluster.length - Math.PI / 2;
+      result.set(p.id, {
+        x: centerX + spreadRadius * Math.cos(angle),
+        y: centerY + spreadRadius * Math.sin(angle),
+      });
+    });
+  }
+
+  return result;
+}
