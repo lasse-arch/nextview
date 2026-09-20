@@ -132,8 +132,14 @@ async function ensureOnSearchPage(page: Page): Promise<void> {
   throw new Error("Kunne ikke logge ind på explore.nextview360.dk efter flere forsøg.");
 }
 
-/** Searches by MP-Space ID and returns the href of that tour's editor link. */
-async function findEditorHref(page: Page, mpSkinId: string): Promise<string> {
+/**
+ * Searches by MP-Space ID and returns the editor hrefs of every matching
+ * result row - normally just one, but the same MP-Space ID can legitimately
+ * have 2-4 separate "Skin" entries under it (e.g. one for the whole tour and
+ * others scoped to specific rooms), each with its own independently tracked
+ * visitor stats that all belong to the same customer/deal.
+ */
+async function findEditorHrefs(page: Page, mpSkinId: string): Promise<string[]> {
   await ensureOnSearchPage(page);
   const searchBoxes = await page.$$('input[name="p[search]"]');
   if (searchBoxes.length === 0) throw new Error("Søgefeltet blev ikke fundet (ikke logget ind?).");
@@ -174,18 +180,19 @@ async function findEditorHref(page: Page, mpSkinId: string): Promise<string> {
   }
   if (!sawMpSkinId) throw new Error(`Søgeresultatet viste aldrig MP-Skin nummer "${mpSkinId}" - prøver igen.`);
 
-  const href = await retryOnDestroyedContext(() =>
+  const hrefs = await retryOnDestroyedContext(() =>
     page.evaluate((expectedId: string) => {
       const links = Array.from(document.querySelectorAll("a.cnt.force-top")) as HTMLAnchorElement[];
-      // Prefer a result row whose own text actually names this MP-Space ID,
-      // rather than blindly trusting the first result in the list.
+      // Every result row whose own text actually names this MP-Space ID -
+      // there's normally exactly one, but a handful of tours have several
+      // "Skin" entries sharing the same MP-Space ID (see the function doc).
       const container = (el: HTMLElement) => el.closest("tr, .list-item, li") ?? el;
-      const match = links.find((l) => container(l).textContent?.includes(expectedId));
-      return (match ?? links[0])?.href ?? null;
+      const matches = links.filter((l) => container(l).textContent?.includes(expectedId));
+      return (matches.length > 0 ? matches : links.slice(0, 1)).map((l) => l.href);
     }, mpSkinId)
   );
-  if (!href) throw new Error(`Ingen tour fundet for MP-Skin nummer "${mpSkinId}".`);
-  return href;
+  if (hrefs.length === 0) throw new Error(`Ingen tour fundet for MP-Skin nummer "${mpSkinId}".`);
+  return hrefs;
 }
 
 function parseDanishNumber(raw: string): number {
@@ -275,10 +282,12 @@ function sumPeriodStats(all: ExplorePeriodStats[]): ExplorePeriodStats {
 }
 
 /**
- * Combines several tours' stats into one, for the rare customer with more
- * than one MP-Skin (e.g. multiple locations under one deal) - every number
- * is summed, except "since" which keeps the earliest go-live date of the
- * bunch (the customer's overall presence started then, not later).
+ * Combines several tours' stats into one - either because a customer has
+ * more than one MP-Skin nummer entered (multiple locations under one deal),
+ * or because a single searched MP-Space ID turned up several separate
+ * result rows (see findEditorHrefs). Every number is summed, except "since"
+ * which keeps the earliest go-live date of the bunch (the customer's
+ * overall presence started then, not later).
  */
 function aggregateTourStats(all: ExploreTourStats[]): ExploreTourStats {
   if (all.length === 1) return all[0];
@@ -300,8 +309,12 @@ function aggregateTourStats(all: ExploreTourStats[]): ExploreTourStats {
   };
 }
 
-/** Finds the tour, opens its Stats tab and reads back the 4 period cards, retrying the whole flow on failure. */
-async function fetchOneTourStats(page: Page, mpSkinId: string, editorHref: string): Promise<ExploreTourStats> {
+/**
+ * Opens one specific result row's editor (by its position among the search's
+ * matches for mpSkinId) and reads back its Stats tab's 4 period cards,
+ * retrying the whole flow on failure.
+ */
+async function fetchOneTourStats(page: Page, mpSkinId: string, resultIndex: number, editorHref: string): Promise<ExploreTourStats> {
   let statsText = "";
   let lastError: unknown;
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -309,8 +322,10 @@ async function fetchOneTourStats(page: Page, mpSkinId: string, editorHref: strin
       // Every link on this site - including the one we already grabbed - is
       // wrapped in a single-use `/en/login?x=<token>` redirect, so reusing
       // the same href on a retry just lands back on a dead/expired link.
-      // Re-searching gets a fresh, still-valid one each time.
-      const href = attempt === 0 ? editorHref : await findEditorHref(page, mpSkinId);
+      // Re-searching gets a fresh, still-valid one each time - same result
+      // position as before, since the site returns matches in a stable order
+      // for the same search term.
+      const href = attempt === 0 ? editorHref : (await findEditorHrefs(page, mpSkinId))[resultIndex] ?? editorHref;
       await gotoRetry(page, href);
       await sleep(3000);
       const clicked = await clickButtonWithText(page, "Stats");
@@ -350,10 +365,13 @@ async function fetchOneTourStats(page: Page, mpSkinId: string, editorHref: strin
 
 /**
  * Logs into explore.nextview360.dk, finds the given tour(s) by MP-Space ID,
- * and pulls their visitor stats and cover photo. Almost always a single ID -
- * a handful of customers have more than one tour under the same deal, in
- * which case the numbers are summed and the first tour's cover photo is used
- * as the report's hero image.
+ * and pulls their visitor stats and cover photo. Almost always a single ID
+ * resolving to a single result - but a handful of customers have more than
+ * one tour under the same deal, and/or a single searched ID can itself
+ * resolve to 2-4 separate result rows (distinct "Skin" entries sharing one
+ * MP-Space ID, e.g. one for the whole tour plus others scoped to specific
+ * rooms). Every case sums into one set of numbers; the first tour's cover
+ * photo is used as the report's hero image.
  */
 export async function fetchExploreTourData(mpSkinIds: string | string[]): Promise<ExploreTourData> {
   const ids = Array.isArray(mpSkinIds) ? mpSkinIds : [mpSkinIds];
@@ -365,14 +383,20 @@ export async function fetchExploreTourData(mpSkinIds: string | string[]): Promis
     let coverImage: Buffer | null = null;
     const allStats: ExploreTourStats[] = [];
     for (const mpSkinId of ids) {
-      const editorHref = await findEditorHref(page, mpSkinId);
+      // A single searched MP-Space ID can turn up more than one result row
+      // (2-4 seen in practice - e.g. one Skin for the whole tour and others
+      // scoped to specific rooms), each tracked independently - so every
+      // matching row's stats are fetched and summed in, not just the first.
+      const editorHrefs = await findEditorHrefs(page, mpSkinId);
       if (!coverImage) {
         // Cover image lives at a predictable authenticated URL per MP-Space
         // ID - far more reliable than the JS-rendered "Cover/Title" tab,
         // which never exposes the URL in the server-rendered HTML.
         coverImage = await fetchImageAsBuffer(page, `${BASE_URL}/cache/tour-cache-mpApi-${mpSkinId}-cover-.png`);
       }
-      allStats.push(await fetchOneTourStats(page, mpSkinId, editorHref));
+      for (let i = 0; i < editorHrefs.length; i++) {
+        allStats.push(await fetchOneTourStats(page, mpSkinId, i, editorHrefs[i]));
+      }
     }
 
     return { stats: aggregateTourStats(allStats), coverImage: coverImage! };
