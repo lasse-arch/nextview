@@ -422,7 +422,7 @@ export default async function DealDetailPage({
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-sm font-semibold text-slate-900">Fakturaer (Dinero)</h2>
               {currentUser?.role === "ADMIN" && (
-                <div className="flex items-center gap-2">
+                <div className="flex items-stretch gap-2">
                   {deal.establishmentFee &&
                     deal.establishmentFee > 0 &&
                     deal.invoices.find((i) => i.quarterIndex === 0)?.status !== "SENT_MANUALLY" && (
