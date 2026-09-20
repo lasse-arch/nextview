@@ -68,15 +68,39 @@ async function gotoRetry(page: Page, url: string, tries = 8): Promise<void> {
   throw lastError instanceof Error ? lastError : new Error("Kunne ikke indlæse siden.");
 }
 
+/**
+ * Retries an evaluate-style call if the page navigated away mid-call - a
+ * frequent failure on this site ("Execution context was destroyed, most
+ * likely because of a navigation"), seemingly from client-side redirects
+ * that can fire with no action on our part. A destroyed context is a
+ * transient race, not a real failure, so it's worth a few quick retries
+ * before giving up.
+ */
+async function retryOnDestroyedContext<T>(fn: () => Promise<T>, tries = 5): Promise<T> {
+  let lastError: unknown;
+  for (let i = 0; i < tries; i++) {
+    try {
+      return await fn();
+    } catch (err) {
+      if (!(err instanceof Error) || !/execution context was destroyed/i.test(err.message)) throw err;
+      lastError = err;
+      await sleep(1000);
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error("Ukendt fejl.");
+}
+
 async function clickButtonWithText(page: Page, text: string): Promise<boolean> {
-  return page.evaluate((label: string) => {
-    const btn = Array.from(document.querySelectorAll("button, a")).find(
-      (el) => el.textContent?.trim() === label
-    ) as HTMLElement | undefined;
-    if (!btn) return false;
-    btn.click();
-    return true;
-  }, text);
+  return retryOnDestroyedContext(() =>
+    page.evaluate((label: string) => {
+      const btn = Array.from(document.querySelectorAll("button, a")).find(
+        (el) => el.textContent?.trim() === label
+      ) as HTMLElement | undefined;
+      if (!btn) return false;
+      btn.click();
+      return true;
+    }, text)
+  );
 }
 
 /**
@@ -122,10 +146,12 @@ async function findEditorHref(page: Page, mpSkinId: string): Promise<string> {
   await page.keyboard.press("Enter");
   await sleep(2500);
 
-  const href = await page.evaluate(() => {
-    const link = document.querySelector("a.cnt.force-top") as HTMLAnchorElement | null;
-    return link?.href ?? null;
-  });
+  const href = await retryOnDestroyedContext(() =>
+    page.evaluate(() => {
+      const link = document.querySelector("a.cnt.force-top") as HTMLAnchorElement | null;
+      return link?.href ?? null;
+    })
+  );
   if (!href) throw new Error(`Ingen tour fundet for MP-Skin nummer "${mpSkinId}".`);
   return href;
 }
@@ -170,14 +196,16 @@ function parseStatsText(text: string): ExploreTourStats {
 }
 
 async function fetchImageAsBuffer(page: Page, url: string): Promise<Buffer> {
-  const base64 = await page.evaluate(async (imgUrl: string) => {
-    const res = await fetch(imgUrl);
-    const buf = await res.arrayBuffer();
-    const bytes = new Uint8Array(buf);
-    let binary = "";
-    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-    return btoa(binary);
-  }, url);
+  const base64 = await retryOnDestroyedContext(() =>
+    page.evaluate(async (imgUrl: string) => {
+      const res = await fetch(imgUrl);
+      const buf = await res.arrayBuffer();
+      const bytes = new Uint8Array(buf);
+      let binary = "";
+      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+      return btoa(binary);
+    }, url)
+  );
   return Buffer.from(base64, "base64");
 }
 
@@ -224,7 +252,13 @@ export async function fetchExploreTourData(mpSkinId: string): Promise<ExploreTou
         // trusting one fixed sleep.
         statsText = "";
         for (let poll = 0; poll < 12; poll++) {
-          statsText = await page.evaluate(() => document.body.innerText);
+          try {
+            statsText = await page.evaluate(() => document.body.innerText);
+          } catch (err) {
+            // A destroyed context mid-poll just means "not ready yet, and the
+            // page moved" - keep polling rather than aborting the attempt.
+            if (!(err instanceof Error) || !/execution context was destroyed/i.test(err.message)) throw err;
+          }
           if (/LAST 7 DAYS/i.test(statsText)) break;
           await sleep(1000);
         }
