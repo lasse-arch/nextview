@@ -21,6 +21,28 @@ export async function updateMpSkinIdAction(
   return { ok: true };
 }
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export async function updateReportCcEmailsAction(
+  dealId: string,
+  ccEmails: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const user = await requireUser();
+  if (user.role !== "ADMIN") throw new Error("Kun admin kan ændre CC-modtagere");
+
+  const addresses = ccEmails
+    .split(/[,;]/)
+    .map((e) => e.trim())
+    .filter(Boolean);
+  const invalid = addresses.find((e) => !EMAIL_RE.test(e));
+  if (invalid) return { ok: false, error: `"${invalid}" ser ikke ud som en gyldig e-mail.` };
+
+  await prisma.deal.update({ where: { id: dealId }, data: { reportCcEmails: addresses.join(", ") || null } });
+  revalidatePath("/stats");
+  revalidatePath(`/deals/${dealId}`);
+  return { ok: true };
+}
+
 export async function updateReportIntervalAction(
   dealId: string,
   interval: ReportInterval | null

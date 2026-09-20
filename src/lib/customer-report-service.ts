@@ -3,7 +3,7 @@ import type { ReportInterval, ReportSendMethod } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { isIntegrationEnabled } from "@/lib/integration-settings";
 import { fetchExploreTourData } from "@/lib/explore-nextview360";
-import { buildCustomerReportHtml, currentMonthLabel } from "@/lib/customer-report-template";
+import { buildCustomerReportHtml, currentMonthLabel, escapeHtml } from "@/lib/customer-report-template";
 import { renderCustomerReportPdf } from "@/lib/customer-report-pdf";
 import { sendGmailMessage } from "@/lib/gmail";
 import { findOrCreateCustomerReportsFolder, uploadPdfToDrive } from "@/lib/google-drive";
@@ -29,7 +29,31 @@ export type ReportableDeal = {
   invoiceEmail: string | null;
   reportInterval: ReportInterval | null;
   nextReportDueAt: Date | null;
+  reportCcEmails: string | null;
 };
+
+/** Splits the deal's comma-separated CC field into trimmed, non-empty addresses. */
+function parseCcEmails(raw: string | null): string[] {
+  return (raw ?? "")
+    .split(/[,;]/)
+    .map((e) => e.trim())
+    .filter(Boolean);
+}
+
+/** The report email's body, matching the signature/wording Lasse uses when sending manually. */
+function buildReportEmailHtml(customerName: string): string {
+  const name = escapeHtml(customerName);
+  return `<div style="font-family: Arial, sans-serif; font-size: 14px; color: #1d1d1f; line-height: 1.5;">
+<p>Kære ${name}</p>
+<p>Vi er nu klar med en besøgsrapport for jeres virtuelle tour, for den seneste måned.</p>
+<p>Se vedhæftede PDF</p>
+<p>Hvis I har nogle spørgsmål, eller overvejer at få opdateret jeres materiale, eller har andre lokaler, som giver mening at vise frem med en virtuel tour, så er I meget velkommen til at kontakte os.</p>
+<p>Med venlig hilsen<br>
+<b>Lasse Larsen</b><br>
+Nextview360<br>
+Tlf: 23 27 07 86</p>
+</div>`;
+}
 
 async function findReportSenderAccount() {
   const account = await prisma.emailAccount.findFirst({
@@ -120,8 +144,10 @@ export async function generateAndSendCustomerReport(
 
     await sendGmailMessage(account, {
       to: [recipient],
+      cc: parseCcEmails(deal.reportCcEmails),
       subject: `Besøgsrapport for jeres virtuelle tour – ${monthLabel}`,
-      bodyText: `Hej,\n\nHer er jeres besøgsstatistik for ${customerName}.\n\nMed venlig hilsen\nNextview360`,
+      bodyText: `Kære ${customerName}\n\nVi er nu klar med en besøgsrapport for jeres virtuelle tour, for den seneste måned.\n\nSe vedhæftede PDF\n\nHvis I har nogle spørgsmål, eller overvejer at få opdateret jeres materiale, eller har andre lokaler, som giver mening at vise frem med en virtuel tour, så er I meget velkommen til at kontakte os.\n\nMed venlig hilsen\nLasse Larsen\nNextview360\nTlf: 23 27 07 86`,
+      bodyHtml: buildReportEmailHtml(customerName),
       attachment: { filename: fileName, contentType: "application/pdf", data: pdf },
     });
 
@@ -180,6 +206,7 @@ export async function runScheduledCustomerReports(): Promise<{ checked: number; 
       invoiceEmail: true,
       reportInterval: true,
       nextReportDueAt: true,
+      reportCcEmails: true,
     },
   });
 

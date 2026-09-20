@@ -48,11 +48,12 @@ export default async function StatsPage() {
         <h2 className="text-sm font-semibold text-slate-900">Live kunder</h2>
         <div className="mt-3 overflow-hidden rounded-md border border-slate-100">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] text-sm">
+            <table className="w-full min-w-[900px] text-sm">
               <thead className="bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                 <tr>
                   <th className="px-3 py-2 font-medium">Kunde</th>
                   <th className="px-3 py-2 font-medium">MP-Skin nummer</th>
+                  <th className="px-3 py-2 font-medium">CC</th>
                   <th className="px-3 py-2 font-medium">Interval</th>
                   <th className="px-3 py-2 font-medium">Næste afsendelse</th>
                   <th className="px-3 py-2 font-medium">Sidst sendt</th>
@@ -66,6 +67,7 @@ export default async function StatsPage() {
                     dealId={deal.id}
                     name={deal.displayName || deal.companyName}
                     mpSkinId={deal.mpSkinId}
+                    reportCcEmails={deal.reportCcEmails}
                     reportInterval={deal.reportInterval}
                     nextReportDueAt={deal.nextReportDueAt ? deal.nextReportDueAt.toISOString() : null}
                     lastSentAt={deal.reports[0] ? deal.reports[0].sentAt.toISOString() : null}
@@ -81,7 +83,7 @@ export default async function StatsPage() {
                 ))}
                 {deals.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-3 py-6 text-center text-slate-400">
+                    <td colSpan={7} className="px-3 py-6 text-center text-slate-400">
                       Ingen live kunder endnu.
                     </td>
                   </tr>

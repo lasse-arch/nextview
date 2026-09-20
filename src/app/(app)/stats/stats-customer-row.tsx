@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import {
   updateMpSkinIdAction,
+  updateReportCcEmailsAction,
   updateReportIntervalAction,
   sendCustomerReportNowAction,
 } from "@/lib/actions/customer-reports";
@@ -23,6 +24,7 @@ export function StatsCustomerRow({
   dealId,
   name,
   mpSkinId,
+  reportCcEmails,
   reportInterval,
   nextReportDueAt,
   lastSentAt,
@@ -34,6 +36,7 @@ export function StatsCustomerRow({
   dealId: string;
   name: string;
   mpSkinId: string | null;
+  reportCcEmails: string | null;
   reportInterval: ReportInterval | null;
   nextReportDueAt: string | null;
   lastSentAt: string | null;
@@ -43,7 +46,9 @@ export function StatsCustomerRow({
   history: ReportHistoryEntry[];
 }) {
   const [mpSkinIdValue, setMpSkinIdValue] = useState(mpSkinId ?? "");
+  const [ccValue, setCcValue] = useState(reportCcEmails ?? "");
   const [savingId, startSavingId] = useTransition();
+  const [savingCc, startSavingCc] = useTransition();
   const [pending, startTransition] = useTransition();
   const [sending, startSendTransition] = useTransition();
   const showToast = useToast();
@@ -55,6 +60,18 @@ export function StatsCustomerRow({
     startSavingId(async () => {
       try {
         const result = await updateMpSkinIdAction(dealId, mpSkinIdValue);
+        if (!result.ok) showToast(result.error);
+      } catch (err) {
+        showToast(err instanceof Error ? err.message : "Der opstod en fejl.");
+      }
+    });
+  }
+
+  function saveCc() {
+    if (ccValue === (reportCcEmails ?? "")) return;
+    startSavingCc(async () => {
+      try {
+        const result = await updateReportCcEmailsAction(dealId, ccValue);
         if (!result.ok) showToast(result.error);
       } catch (err) {
         showToast(err instanceof Error ? err.message : "Der opstod en fejl.");
@@ -102,6 +119,16 @@ export function StatsCustomerRow({
           disabled={savingId}
           placeholder="fx SuPVjGiRx8q"
           className="w-36 rounded-md border border-slate-300 px-2 py-1 text-xs disabled:opacity-50"
+        />
+      </td>
+      <td className="px-3 py-2">
+        <input
+          value={ccValue}
+          onChange={(e) => setCcValue(e.target.value)}
+          onBlur={saveCc}
+          disabled={savingCc}
+          placeholder="cc@firma.dk, ..."
+          className="w-40 rounded-md border border-slate-300 px-2 py-1 text-xs disabled:opacity-50"
         />
       </td>
       <td className="px-3 py-2">

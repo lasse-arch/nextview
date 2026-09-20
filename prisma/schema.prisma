@@ -301,6 +301,11 @@ model Deal {
   reportInterval  ReportInterval? @default(QUARTERLY)
   nextReportDueAt DateTime?
 
+  /// Extra recipients CC'd on the visitor-stats report, comma-separated.
+  /// Optional - the report always goes to the deal's own contact/invoice
+  /// email regardless.
+  reportCcEmails String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
