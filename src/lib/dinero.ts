@@ -243,17 +243,15 @@ async function createInvoiceDraft(
 /**
  * Checks whether a Dinero invoice has been paid.
  *
- * Neither field tried so far is trustworthy: `PaymentDate` turned out to be
- * the invoice's due date (set on every booked invoice regardless of whether
- * it's paid), and a later attempt at reading a `Status` field (guessed at
- * from a fetched copy of Dinero's OpenAPI schema that couldn't be verified
- * against a real response) reported a completely untouched, never-sent
- * draft as "Paid" - a false positive, which is far worse than under-
- * reporting for something this financially sensitive. Rather than guess
- * again, this returns the raw fields Dinero actually sends back without
- * asserting anything - the caller shows them so we can pin down the real
- * signal from an actual observed response instead of documentation that
- * hasn't held up twice.
+ * `PaymentDate` turned out to be the invoice's due date (set on every booked
+ * invoice regardless of whether it's paid), not a "paid on" date - a bad
+ * signal, confirmed when it reported an unsent draft as paid. The `Status`
+ * field (Draft/Booked/Paid/OverPaid/Overdue) replaced it and was briefly
+ * suspected of the same false positive, but that turned out to be a stale
+ * deploy still running the old PaymentDate check at the moment it was
+ * tested - a fresh check on the same still-untouched draft correctly came
+ * back "Draft". `rawStatus` is kept in the result (and shown by the caller)
+ * so that keeps being visible rather than trusted blindly.
  */
 export async function getInvoicePaymentStatus(
   invoiceGuid: string
@@ -268,9 +266,9 @@ export async function getInvoicePaymentStatus(
   });
 
   if (!res.ok) throw new Error(`Dinero: kunne ikke hente fakturastatus (${res.status}): ${await res.text()}`);
-  const data = (await res.json()) as Record<string, unknown>;
-  const status = data.Status ?? data.status;
-  return { paid: false, paidDate: null, rawStatus: typeof status === "string" ? status : JSON.stringify(data) };
+  const data = (await res.json()) as { Status?: string };
+  const paid = data.Status === "Paid" || data.Status === "OverPaid";
+  return { paid, paidDate: null, rawStatus: data.Status ?? null };
 }
 
 export type DineroDraftResult = {
