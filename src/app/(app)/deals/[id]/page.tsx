@@ -419,20 +419,18 @@ export default async function DealDetailPage({
           </section>
 
           <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-sm font-semibold text-slate-900">Fakturaer (Dinero)</h2>
-              {currentUser?.role === "ADMIN" && (
-                <div className="flex items-stretch gap-2">
-                  {deal.establishmentFee &&
-                    deal.establishmentFee > 0 &&
-                    deal.invoices.find((i) => i.quarterIndex === 0)?.status !== "SENT_MANUALLY" && (
-                      <MarkSentManuallyButton dealId={deal.id} />
-                    )}
-                  <MarkPeriodSentManuallyButton dealId={deal.id} />
-                  <CreateInvoiceButton dealId={deal.id} />
-                </div>
-              )}
-            </div>
+            <h2 className="text-sm font-semibold text-slate-900">Fakturaer (Dinero)</h2>
+            {currentUser?.role === "ADMIN" && (
+              <div className="mt-3 flex flex-wrap items-stretch gap-2">
+                {deal.establishmentFee &&
+                  deal.establishmentFee > 0 &&
+                  deal.invoices.find((i) => i.quarterIndex === 0)?.status !== "SENT_MANUALLY" && (
+                    <MarkSentManuallyButton dealId={deal.id} />
+                  )}
+                <MarkPeriodSentManuallyButton dealId={deal.id} />
+                <CreateInvoiceButton dealId={deal.id} />
+              </div>
+            )}
             {deal.invoices.length > 0 ? (
               <ul className="mt-3 space-y-2 text-sm">
                 {deal.invoices.map((inv) => {
