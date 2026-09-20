@@ -343,6 +343,15 @@ export async function runQuarterlyInvoiceGeneration(): Promise<InvoiceRunSummary
     checked += result.checked;
     created += result.created;
     failed += result.failed;
+
+    // Space out bulk runs a little - each due line is already several
+    // sequential Dinero calls (contact lookup/create/update, invoice
+    // create), and firing that for many deals back-to-back with no gap can
+    // still burst past Dinero's rate limit even though dineroFetch retries
+    // individual 429s.
+    if (result.checked > 0) {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    }
   }
 
   return { configured: true, checked, created, failed };

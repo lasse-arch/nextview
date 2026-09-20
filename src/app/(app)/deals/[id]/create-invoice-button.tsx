@@ -32,7 +32,7 @@ export function CreateInvoiceButton({ dealId }: { dealId: string }) {
           }
         })
       }
-      className="flex w-28 items-center justify-center rounded-md border border-slate-300 px-2.5 py-1.5 text-center text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+      className="flex w-[190px] items-center justify-center whitespace-nowrap rounded-md border border-slate-300 px-3 py-1.5 text-center text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
     >
       {pending ? "Opretter…" : "Opret faktura-kladde"}
     </button>

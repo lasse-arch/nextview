@@ -18,9 +18,10 @@ const hasCredentials = Boolean(
 );
 
 export default async function DineroSettingsPage() {
-  const [configured, enabled, testMode] = await Promise.all([
+  const [configured, enabled, autoRunEnabled, testMode] = await Promise.all([
     isDineroConfigured(),
     isIntegrationEnabled("DINERO"),
+    isIntegrationEnabled("DINERO_AUTO_RUN"),
     isDineroTestMode(),
   ]);
 
@@ -69,11 +70,23 @@ export default async function DineroSettingsPage() {
           </ul>
         </div>
 
+        <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-4">
+          <div>
+            <p className="text-sm text-slate-700">Automatisk daglig kørsel</p>
+            <p className="mt-0.5 text-xs text-slate-400">
+              {autoRunEnabled
+                ? "Slået til — kører automatisk hver dag og opretter kladder for forfaldne kvartaler."
+                : "Slået fra — der oprettes intet automatisk. Brug \"Kør nu\" eller \"Opret faktura-kladde\" på den enkelte deal."}
+            </p>
+          </div>
+          <IntegrationToggle integrationKey="DINERO_AUTO_RUN" enabled={autoRunEnabled} disabled={!hasCredentials} />
+        </div>
+
         <div className="mt-4">
           <RunNowButton />
           <p className="mt-1 text-xs text-slate-400">
-            Kører normalt automatisk hver dag - opretter kladder for kvartaler der er forfaldet, og tjekker samtidig
-            om afsendte kladder er blevet betalt i Dinero. Brug knappen til at teste med det samme.
+            Opretter kladder for kvartaler der er forfaldet lige nu, og tjekker samtidig om afsendte kladder er
+            blevet betalt i Dinero — uafhængigt af om automatisk kørsel er slået til eller fra.
           </p>
         </div>
       </section>

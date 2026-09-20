@@ -3,6 +3,28 @@ import { isIntegrationEnabled, isDineroTestMode } from "@/lib/integration-settin
 const DINERO_API_BASE = "https://api.dinero.dk/v1";
 const DINERO_AUTH_URL = "https://authz.dinero.dk/dineroapi/oauth/token";
 
+/**
+ * Wraps fetch with a small retry-with-backoff for Dinero's rate limiting
+ * (429 Too Many Requests) and transient 5xx responses. A bulk run drafts
+ * many invoices back-to-back (each involving several Dinero calls: token,
+ * contact lookup/create/update, invoice create), which can burst past
+ * Dinero's rate limit even though the calls are sequential - retrying
+ * instead of failing the line outright avoids marking invoices as FAILED
+ * when the real problem is "try again in a second", not a real error.
+ */
+async function dineroFetch(url: string, init: RequestInit, attempt = 1): Promise<Response> {
+  const res = await fetch(url, init);
+  if (res.status !== 429 && !(res.status >= 500 && res.status < 600)) return res;
+  if (attempt >= 4) return res;
+
+  const retryAfterHeader = res.headers.get("Retry-After");
+  const retryAfterMs = retryAfterHeader ? Number(retryAfterHeader) * 1000 : NaN;
+  const backoffMs = Number.isFinite(retryAfterMs) && retryAfterMs > 0 ? retryAfterMs : 1000 * 2 ** (attempt - 1);
+
+  await new Promise((resolve) => setTimeout(resolve, backoffMs));
+  return dineroFetch(url, init, attempt + 1);
+}
+
 function hasDineroCredentials(): boolean {
   return Boolean(
     process.env.DINERO_CLIENT_ID &&
@@ -111,7 +133,7 @@ function contactBody(input: DineroContactInput) {
 async function createContact(accessToken: string, input: DineroContactInput): Promise<string> {
   const orgId = process.env.DINERO_ORGANIZATION_ID!;
 
-  const res = await fetch(`${DINERO_API_BASE}/${orgId}/contacts`, {
+  const res = await dineroFetch(`${DINERO_API_BASE}/${orgId}/contacts`, {
     method: "POST",
     headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
     body: JSON.stringify(contactBody(input)),
@@ -135,7 +157,7 @@ async function createContact(accessToken: string, input: DineroContactInput): Pr
 async function updateContact(accessToken: string, contactGuid: string, input: DineroContactInput): Promise<void> {
   const orgId = process.env.DINERO_ORGANIZATION_ID!;
 
-  const res = await fetch(`${DINERO_API_BASE}/${orgId}/contacts/${contactGuid}`, {
+  const res = await dineroFetch(`${DINERO_API_BASE}/${orgId}/contacts/${contactGuid}`, {
     method: "PUT",
     headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
     body: JSON.stringify(contactBody(input)),
@@ -151,7 +173,7 @@ async function findContactByCvr(accessToken: string, cvr: string): Promise<strin
   // name for creating a contact, not for filtering an existing one).
   const query = new URLSearchParams({ queryFilter: `VatNumber eq '${cvr}'` });
 
-  const res = await fetch(`${DINERO_API_BASE}/${orgId}/contacts?${query}`, {
+  const res = await dineroFetch(`${DINERO_API_BASE}/${orgId}/contacts?${query}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
 
@@ -184,7 +206,7 @@ async function createInvoiceDraft(
 ): Promise<{ guid: string; number: string | null }> {
   const orgId = process.env.DINERO_ORGANIZATION_ID!;
 
-  const res = await fetch(`${DINERO_API_BASE}/${orgId}/invoices`, {
+  const res = await dineroFetch(`${DINERO_API_BASE}/${orgId}/invoices`, {
     method: "POST",
     headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -231,7 +253,7 @@ export async function getInvoicePaymentStatus(invoiceGuid: string): Promise<{ pa
   const accessToken = await getAccessToken();
   const orgId = process.env.DINERO_ORGANIZATION_ID!;
 
-  const res = await fetch(`${DINERO_API_BASE}/${orgId}/invoices/${invoiceGuid}`, {
+  const res = await dineroFetch(`${DINERO_API_BASE}/${orgId}/invoices/${invoiceGuid}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
 

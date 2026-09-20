@@ -1,12 +1,13 @@
 import { prisma } from "@/lib/db";
 
-export type IntegrationKey = "DINERO" | "DOCUSEAL" | "GOOGLE_DRIVE" | "DINERO_TEST_MODE";
+export type IntegrationKey = "DINERO" | "DOCUSEAL" | "GOOGLE_DRIVE" | "DINERO_TEST_MODE" | "DINERO_AUTO_RUN";
 
 export const integrationLabels: Record<IntegrationKey, string> = {
   DINERO: "Dinero",
   DOCUSEAL: "DocuSeal",
   GOOGLE_DRIVE: "Google Drev",
   DINERO_TEST_MODE: "Dinero – testtilstand",
+  DINERO_AUTO_RUN: "Dinero – automatisk daglig kørsel",
 };
 
 /** No row yet means the integration has never been explicitly turned off. */
