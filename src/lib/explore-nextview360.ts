@@ -144,13 +144,33 @@ async function findEditorHref(page: Page, mpSkinId: string): Promise<string> {
     el.dispatchEvent(new Event("input", { bubbles: true }));
   }, mpSkinId);
   await page.keyboard.press("Enter");
-  await sleep(2500);
+
+  // Before the results list actually re-renders to the filtered match, the
+  // page still shows whatever was there before (the Home page's own default
+  // "last updated skins" list) - grabbing the first "a.cnt.force-top" too
+  // early silently returns a link to a completely different, unrelated
+  // tour instead of failing loudly. Wait until the page's own text actually
+  // mentions this MP-Space ID before trusting that link.
+  let sawMpSkinId = false;
+  for (let poll = 0; poll < 10; poll++) {
+    const text = await retryOnDestroyedContext(() => page.evaluate(() => document.body.innerText)).catch(() => "");
+    if (text.includes(mpSkinId)) {
+      sawMpSkinId = true;
+      break;
+    }
+    await sleep(500);
+  }
+  if (!sawMpSkinId) throw new Error(`Søgeresultatet viste aldrig MP-Skin nummer "${mpSkinId}" - prøver igen.`);
 
   const href = await retryOnDestroyedContext(() =>
-    page.evaluate(() => {
-      const link = document.querySelector("a.cnt.force-top") as HTMLAnchorElement | null;
-      return link?.href ?? null;
-    })
+    page.evaluate((expectedId: string) => {
+      const links = Array.from(document.querySelectorAll("a.cnt.force-top")) as HTMLAnchorElement[];
+      // Prefer a result row whose own text actually names this MP-Space ID,
+      // rather than blindly trusting the first result in the list.
+      const container = (el: HTMLElement) => el.closest("tr, .list-item, li") ?? el;
+      const match = links.find((l) => container(l).textContent?.includes(expectedId));
+      return (match ?? links[0])?.href ?? null;
+    }, mpSkinId)
   );
   if (!href) throw new Error(`Ingen tour fundet for MP-Skin nummer "${mpSkinId}".`);
   return href;
