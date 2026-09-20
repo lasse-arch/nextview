@@ -3,6 +3,11 @@ import chromium from "@sparticuz/chromium";
 
 const BASE_URL = "https://explore.nextview360.dk";
 
+/** Thrown for a deterministic precondition (e.g. stats not enabled for this
+ * tour yet) that a retry can never fix - callers should stop immediately
+ * instead of burning time re-attempting the same doomed request. */
+class ExploreConfigError extends Error {}
+
 export type ExplorePeriodStats = {
   visits: number;
   sessions: number;
@@ -218,6 +223,17 @@ export async function fetchExploreTourData(mpSkinId: string): Promise<ExploreTou
         await sleep(3000);
         statsText = await page.evaluate(() => document.body.innerText);
         if (!/LAST 7 DAYS/i.test(statsText)) {
+          // The Stats tab shows a "cookies for stats" Yes/No toggle above the
+          // period cards - if it's set to No (the default for a tour where
+          // nobody's turned it on yet), the cards never render at all, only
+          // the toggle and its explanation text. Not a scraper bug - a
+          // per-tour setting that has to be turned on once in explore.nextview360.dk
+          // itself before there's anything to report.
+          if (/cookies for stats/i.test(statsText)) {
+            throw new ExploreConfigError(
+              'Statistik er ikke slået til for denne tour i explore.nextview360.dk. Åbn kunden der, gå til fanen "Stats", sæt "Enable cookies for stats" til Yes, og gem - så kan rapporten hentes.'
+            );
+          }
           const snippet = statsText.replace(/\s+/g, " ").trim().slice(0, 300);
           throw new Error(`Statistik-siden indeholdt ikke de forventede tal (uddrag: "${snippet}").`);
         }
@@ -229,6 +245,7 @@ export async function fetchExploreTourData(mpSkinId: string): Promise<ExploreTou
         lastError = undefined;
         break;
       } catch (err) {
+        if (err instanceof ExploreConfigError) throw err;
         lastError = err;
         await sleep(1500);
       }
