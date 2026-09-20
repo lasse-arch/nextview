@@ -20,11 +20,13 @@ const ROLLING_HORIZON_MONTHS = 4;
 
 /** The CRM only started being used for invoicing from Q4 2026 - some deals'
  * billingStartDate predates that (backfilled from before the system was in
- * use), so without this floor the "marker kvartal sendt manuelt" picker
- * would offer Q1-Q3 2026 quarters that were never actually run through here
- * and have no real meaning to hand-mark. Only affects that picker, not the
- * automated draft generator. */
-const MANUAL_QUARTER_PICKER_FLOOR = new Date(2026, 9, 1);
+ * use), so without this floor both the automated due-line generator and the
+ * "marker kvartal sendt manuelt" picker would treat Q1-Q3 2026 as real,
+ * unhandled quarters - e.g. marking Q4 done by hand and then hitting "Opret
+ * faktura-kladde" would draft Q3 right after, since nothing had marked it
+ * handled and it hadn't technically finished yet. Periods before this floor
+ * are skipped entirely, the same as already-elapsed ones. */
+const INVOICING_FLOOR = new Date(2026, 9, 1);
 
 export type InvoiceRunSummary = {
   configured: boolean;
@@ -114,9 +116,10 @@ function computeDueLines(
   // saleAmount is the monthly fee; computePeriodAmounts wants the contract's total value for the binding period.
   const amounts = computePeriodAmounts(totalContractValue(deal), periods, deal.billingStartDate, deal.bindingMonths);
 
-  // firstRelevantIndex is the first period that hasn't ended yet; anything
-  // before it is stale history and is skipped entirely.
-  const firstRelevantIndex = periods.findIndex((p) => p.endDate >= now);
+  // firstRelevantIndex is the first period that hasn't ended yet and starts
+  // at or after the system's real invoicing floor; anything before it is
+  // stale history and is skipped entirely.
+  const firstRelevantIndex = periods.findIndex((p) => p.endDate >= now && p.startDate >= INVOICING_FLOOR);
 
   periods.forEach((period, i) => {
     if (i < firstRelevantIndex) return;
@@ -485,8 +488,8 @@ export async function listRecurringPeriodsForDeal(dealId: string): Promise<Invoi
     // Quarters that have already fully elapsed are long past being useful to
     // pick here - only the current one onward is worth choosing manually.
     // Also never offer anything before Q4 2026, regardless of a deal's real
-    // billingStartDate - see MANUAL_QUARTER_PICKER_FLOOR.
-    .filter((option) => option.endDate >= now && option.scheduledDate >= MANUAL_QUARTER_PICKER_FLOOR)
+    // billingStartDate - see INVOICING_FLOOR.
+    .filter((option) => option.endDate >= now && option.scheduledDate >= INVOICING_FLOOR)
     .map(({ endDate: _endDate, ...option }) => option);
 }
 
