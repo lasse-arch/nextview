@@ -52,10 +52,10 @@ export function MarkPeriodSentManuallyButton({ dealId }: { dealId: string }) {
         onClick={() => setOpen((o) => !o)}
         className="flex w-[140px] items-center justify-center rounded-md border border-slate-300 px-2 py-1.5 text-center text-xs font-medium leading-tight text-slate-600 hover:bg-slate-50"
       >
-        Marker kvartal sendt manuelt
+        Kvartal manuelt
       </button>
       {open && (
-        <div className="absolute left-0 top-full z-10 mt-1 w-64 rounded-md border border-slate-200 bg-white p-3 text-sm shadow-lg">
+        <div className="absolute right-0 top-full z-10 mt-1 w-64 max-w-[calc(100vw-2.5rem)] rounded-md border border-slate-200 bg-white p-3 text-sm shadow-lg">
           {options === null ? (
             <p className="text-xs text-slate-400">Indlæser…</p>
           ) : options.length === 0 ? (

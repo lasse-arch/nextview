@@ -13,6 +13,7 @@ import {
   markPeriodSentManually,
   checkInvoicePayment,
   checkAllPendingPayments,
+  markInvoicePaidManually,
   type InvoiceRunSummary,
   type InvoicePeriodOption,
 } from "@/lib/invoice-service";
@@ -81,6 +82,19 @@ export async function checkInvoicePaymentAction(
 
   const result = await checkInvoicePayment(invoiceId);
   revalidatePath(`/deals/${result.dealId}`);
+  revalidatePath("/settings/dinero");
+  return result;
+}
+
+export async function markInvoicePaidManuallyAction(
+  invoiceId: string,
+  paid: boolean
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const user = await requireUser();
+  if (user.role !== "ADMIN") throw new Error("Kun admin kan markere fakturaer som betalt");
+
+  const result = await markInvoicePaidManually(invoiceId, paid);
+  if (result.ok) revalidatePath(`/deals/${result.dealId}`);
   revalidatePath("/settings/dinero");
   return result;
 }

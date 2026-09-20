@@ -499,14 +499,11 @@ export async function markPeriodSentManually(
 }
 
 /** Looks up whether a drafted invoice has since been paid in Dinero. Only
- * applies to invoices we actually have a real Dinero guid for.
- *
- * Doesn't currently assert `paid` from anything Dinero returns (see
- * getInvoicePaymentStatus) - two different guesses at the right field both
- * turned out wrong, the second one badly (a never-sent draft came back as
- * "paid"). Clearing paidAt back to unset here at least self-heals any
- * invoice a previous bad guess had wrongly marked, and `rawStatus` is
- * surfaced so a real observed response can be used to fix this properly. */
+ * applies to invoices we actually have a real Dinero guid for - see
+ * markInvoicePaidManually for invoices without one (e.g. sent outside the
+ * system entirely). `rawStatus` is threaded through so it stays visible
+ * rather than trusted blindly, since a previous guess at the right Dinero
+ * field turned out wrong. */
 export async function checkInvoicePayment(
   invoiceId: string
 ): Promise<
@@ -527,6 +524,26 @@ export async function checkInvoicePayment(
     return { ok: true, paid, rawStatus, dealId: invoice.dealId };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Ukendt fejl", dealId: invoice.dealId };
+  }
+}
+
+/**
+ * Directly marks (or unmarks) an invoice as paid, bypassing Dinero entirely -
+ * for lines sent manually outside the system (e.g. "Etablering sendt
+ * manuelt"), which have no real Dinero guid for "Tjek betaling" to check.
+ */
+export async function markInvoicePaidManually(
+  invoiceId: string,
+  paid: boolean
+): Promise<{ ok: true; dealId: string } | { ok: false; error: string }> {
+  try {
+    const invoice = await prisma.invoice.update({
+      where: { id: invoiceId },
+      data: { paidAt: paid ? new Date() : null },
+    });
+    return { ok: true, dealId: invoice.dealId };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Ukendt fejl" };
   }
 }
 

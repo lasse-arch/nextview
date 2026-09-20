@@ -41,6 +41,7 @@ import { InvoiceLabelTooltip } from "./invoice-label-tooltip";
 import { MarkSentManuallyButton } from "./mark-sent-manually-button";
 import { MarkPeriodSentManuallyButton } from "./mark-period-sent-manually-button";
 import { CheckPaymentButton } from "./check-payment-button";
+import { MarkInvoicePaidButton } from "./mark-invoice-paid-button";
 import { DeleteInvoiceButton } from "@/components/delete-invoice-button";
 
 /** Hover-tooltip content for an invoice's short label: the precise period
@@ -459,15 +460,15 @@ export default async function DealDetailPage({
                       >
                         {invoiceStatusLabels[inv.status]}
                       </span>
-                      {inv.paidAt ? (
+                      {inv.paidAt && (
                         <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800">
                           Betalt {formatDate(inv.paidAt)}
                         </span>
-                      ) : (
-                        currentUser?.role === "ADMIN" &&
-                        inv.dineroInvoiceGuid &&
-                        !inv.dineroInvoiceGuid.startsWith("TEST-") && <CheckPaymentButton invoiceId={inv.id} />
                       )}
+                      {currentUser?.role === "ADMIN" && !inv.paidAt && inv.dineroInvoiceGuid && !inv.dineroInvoiceGuid.startsWith("TEST-") && (
+                        <CheckPaymentButton invoiceId={inv.id} />
+                      )}
+                      {currentUser?.role === "ADMIN" && <MarkInvoicePaidButton invoiceId={inv.id} paid={Boolean(inv.paidAt)} />}
                       {currentUser?.role === "ADMIN" && <DeleteInvoiceButton invoiceId={inv.id} />}
                     </span>
                   </li>
