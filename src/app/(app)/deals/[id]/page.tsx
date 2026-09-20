@@ -217,6 +217,15 @@ export default async function DealDetailPage({
                   />
                 </div>
                 <div>
+                  <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">MP-Skin nummer (explore.nextview360.dk)</label>
+                  <input
+                    name="mpSkinId"
+                    placeholder="fx SuPVjGiRx8q"
+                    defaultValue={deal.mpSkinId ?? ""}
+                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
                   <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Ejer af deal</label>
                   <select
                     name="ownerId"

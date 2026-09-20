@@ -84,6 +84,19 @@ enum InvoiceStatus {
   SENT_MANUALLY
 }
 
+/// How often a customer's visitor-stats report (see CustomerReport) goes out
+/// automatically. Null on the deal itself means reporting is off for that deal.
+enum ReportInterval {
+  MONTHLY
+  BIMONTHLY
+  QUARTERLY
+}
+
+enum ReportSendMethod {
+  MANUAL
+  AUTOMATIC
+}
+
 
 model Invoice {
   id     String @id @default(cuid())
@@ -266,6 +279,17 @@ model Deal {
   /// on the deal for pipeline tracking without it generating commission.
   commissionExcluded Boolean @default(false)
 
+  /// The customer's tour on explore.nextview360.dk (MP-Space ID, e.g.
+  /// "SuPVjGiRx8q") - lets the visitor-stats report be pulled for this deal
+  /// without relying on fuzzy name matching.
+  mpSkinId String?
+
+  /// Null means automatic visitor-stats reports are off for this deal - only
+  /// the manual "Send nu" action can send one. See CustomerReport for the
+  /// send history and reportScheduler.ts for how nextReportDueAt advances.
+  reportInterval  ReportInterval?
+  nextReportDueAt DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -276,6 +300,24 @@ model Deal {
   items          DealItem[]
   contractEvents ContractEvent[]
   tasks          Task[]
+  reports        CustomerReport[]
+}
+
+/// One row per visitor-stats report actually sent to a customer (manually or
+/// by the scheduler) - the "last sent" history shown on the deal and in the
+/// settings overview, and what nextReportDueAt's push-back logic reads.
+model CustomerReport {
+  id         String           @id @default(cuid())
+  deal       Deal             @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  dealId     String
+  sentAt     DateTime         @default(now())
+  method     ReportSendMethod
+  /// Google Drive link to the generated PDF, if archiving succeeded - best-effort,
+  /// same pattern as signed-contract archiving.
+  pdfDriveUrl String?
+  createdAt  DateTime         @default(now())
+
+  @@index([dealId, sentAt])
 }
 
 /// One entry per DocuSeal webhook occurrence (sent/viewed/signed/declined/...) -
