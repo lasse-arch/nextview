@@ -284,10 +284,11 @@ model Deal {
   /// without relying on fuzzy name matching.
   mpSkinId String?
 
-  /// Null means automatic visitor-stats reports are off for this deal - only
-  /// the manual "Send nu" action can send one. See CustomerReport for the
-  /// send history and reportScheduler.ts for how nextReportDueAt advances.
-  reportInterval  ReportInterval?
+  /// Defaults to quarterly - explicitly set to null to turn automatic
+  /// visitor-stats reports off for a deal (the manual "Send nu" action still
+  /// works regardless). See CustomerReport for the send history and
+  /// customer-report-service.ts for how nextReportDueAt advances.
+  reportInterval  ReportInterval? @default(QUARTERLY)
   nextReportDueAt DateTime?
 
   createdAt DateTime @default(now())

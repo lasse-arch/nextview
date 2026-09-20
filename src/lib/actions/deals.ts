@@ -138,7 +138,6 @@ async function updateDealInner(
   const contactEmail = String(formData.get("contactEmail") || "") || null;
   const contactPhone = String(formData.get("contactPhone") || "") || null;
   const invoiceEmail = String(formData.get("invoiceEmail") || "").trim() || null;
-  const mpSkinId = String(formData.get("mpSkinId") || "").trim() || null;
   const ownerId = String(formData.get("ownerId") || "");
   let stage = String(formData.get("stage") || "LEAD") as DealStage;
   const meetingDateRaw = String(formData.get("meetingDate") || "");
@@ -279,7 +278,6 @@ async function updateDealInner(
       contactEmail,
       contactPhone,
       invoiceEmail,
-      mpSkinId,
       ownerId,
       stage,
       meetingDate,

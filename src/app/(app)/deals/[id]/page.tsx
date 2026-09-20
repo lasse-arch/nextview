@@ -42,6 +42,7 @@ import { MarkSentManuallyButton } from "./mark-sent-manually-button";
 import { MarkPeriodSentManuallyButton } from "./mark-period-sent-manually-button";
 import { CheckPaymentButton } from "./check-payment-button";
 import { MarkInvoicePaidButton } from "./mark-invoice-paid-button";
+import { CustomerReportSection } from "./customer-report-section";
 import { DeleteInvoiceButton } from "@/components/delete-invoice-button";
 
 /** Hover-tooltip content for an invoice's short label: the precise period
@@ -96,6 +97,7 @@ export default async function DealDetailPage({
         branches: { orderBy: { companyName: "asc" } },
         contractEvents: { orderBy: { occurredAt: "desc" }, take: 5 },
         tasks: { orderBy: { createdAt: "asc" } },
+        reports: { orderBy: { sentAt: "desc" }, take: 1 },
       },
     }),
     prisma.user.findMany({ orderBy: { name: "asc" } }),
@@ -213,15 +215,6 @@ export default async function DealDetailPage({
                     type="email"
                     placeholder="Hvis fakturaer skal et andet sted hen end kontaktpersonen"
                     defaultValue={deal.invoiceEmail ?? ""}
-                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">MP-Skin nummer (explore.nextview360.dk)</label>
-                  <input
-                    name="mpSkinId"
-                    placeholder="fx SuPVjGiRx8q"
-                    defaultValue={deal.mpSkinId ?? ""}
                     className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
                   />
                 </div>
@@ -492,6 +485,17 @@ export default async function DealDetailPage({
               </p>
             )}
           </section>
+
+          {currentUser?.role === "ADMIN" && (
+            <CustomerReportSection
+              dealId={deal.id}
+              mpSkinId={deal.mpSkinId}
+              reportInterval={deal.reportInterval}
+              nextReportDueAt={deal.nextReportDueAt ? deal.nextReportDueAt.toISOString() : null}
+              lastSentAt={deal.reports[0] ? deal.reports[0].sentAt.toISOString() : null}
+              lastSentMethod={deal.reports[0]?.method ?? null}
+            />
+          )}
 
           <TerminationSection
             dealId={deal.id}

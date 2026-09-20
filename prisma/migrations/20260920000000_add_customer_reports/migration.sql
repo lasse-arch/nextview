@@ -6,7 +6,7 @@ CREATE TYPE "ReportSendMethod" AS ENUM ('MANUAL', 'AUTOMATIC');
 
 -- AlterTable
 ALTER TABLE "Deal" ADD COLUMN "mpSkinId" TEXT,
-    ADD COLUMN "reportInterval" "ReportInterval",
+    ADD COLUMN "reportInterval" "ReportInterval" DEFAULT 'QUARTERLY',
     ADD COLUMN "nextReportDueAt" TIMESTAMP(3);
 
 -- CreateTable
