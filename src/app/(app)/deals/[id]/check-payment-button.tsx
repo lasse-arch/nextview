@@ -17,7 +17,7 @@ export function CheckPaymentButton({ invoiceId }: { invoiceId: string }) {
           try {
             const result = await checkInvoicePaymentAction(invoiceId);
             if (!result.ok) showToast(result.error);
-            else showToast(result.paid ? "Fakturaen er betalt" : "Ikke betalt endnu");
+            else showToast(`Dinero status: ${result.rawStatus ?? "ukendt"}`);
           } catch (err) {
             showToast(err instanceof Error ? err.message : "Der opstod en fejl.");
           }

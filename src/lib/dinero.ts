@@ -241,19 +241,24 @@ async function createInvoiceDraft(
 }
 
 /**
- * Checks whether a Dinero invoice has been paid. Only meaningful once the
- * invoice has actually been sent/booked from within Dinero (we only ever
- * create drafts) - an unsent draft will simply come back as not paid.
+ * Checks whether a Dinero invoice has been paid.
  *
- * Per Dinero's OpenAPI schema (api.dinero.dk/openapi), an invoice's `Status`
- * is an enum of Draft/Booked/Paid/OverPaid/Overdue - that's the real payment
- * signal. `PaymentDate` is NOT a "paid on" date, it's the invoice's due date
- * (derived from its payment terms), so it's set on every booked invoice
- * whether or not it's actually been paid - using it as the paid check (as an
- * earlier, unconfirmed guess did) meant this never worked correctly.
+ * Neither field tried so far is trustworthy: `PaymentDate` turned out to be
+ * the invoice's due date (set on every booked invoice regardless of whether
+ * it's paid), and a later attempt at reading a `Status` field (guessed at
+ * from a fetched copy of Dinero's OpenAPI schema that couldn't be verified
+ * against a real response) reported a completely untouched, never-sent
+ * draft as "Paid" - a false positive, which is far worse than under-
+ * reporting for something this financially sensitive. Rather than guess
+ * again, this returns the raw fields Dinero actually sends back without
+ * asserting anything - the caller shows them so we can pin down the real
+ * signal from an actual observed response instead of documentation that
+ * hasn't held up twice.
  */
-export async function getInvoicePaymentStatus(invoiceGuid: string): Promise<{ paid: boolean; paidDate: string | null }> {
-  if (await isDineroTestMode()) return { paid: false, paidDate: null };
+export async function getInvoicePaymentStatus(
+  invoiceGuid: string
+): Promise<{ paid: boolean; paidDate: string | null; rawStatus: string | null }> {
+  if (await isDineroTestMode()) return { paid: false, paidDate: null, rawStatus: null };
 
   const accessToken = await getAccessToken();
   const orgId = process.env.DINERO_ORGANIZATION_ID!;
@@ -263,11 +268,9 @@ export async function getInvoicePaymentStatus(invoiceGuid: string): Promise<{ pa
   });
 
   if (!res.ok) throw new Error(`Dinero: kunne ikke hente fakturastatus (${res.status}): ${await res.text()}`);
-  const data = (await res.json()) as { Status?: string };
-  const paid = data.Status === "Paid" || data.Status === "OverPaid";
-  // Dinero's invoice model has no separate "paid on" date - the moment we
-  // detect it here is the closest we get, same as a manual "Tjek betaling".
-  return { paid, paidDate: null };
+  const data = (await res.json()) as Record<string, unknown>;
+  const status = data.Status ?? data.status;
+  return { paid: false, paidDate: null, rawStatus: typeof status === "string" ? status : JSON.stringify(data) };
 }
 
 export type DineroDraftResult = {

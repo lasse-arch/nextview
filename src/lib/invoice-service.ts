@@ -499,22 +499,32 @@ export async function markPeriodSentManually(
 }
 
 /** Looks up whether a drafted invoice has since been paid in Dinero. Only
- * applies to invoices we actually have a real Dinero guid for. */
+ * applies to invoices we actually have a real Dinero guid for.
+ *
+ * Doesn't currently assert `paid` from anything Dinero returns (see
+ * getInvoicePaymentStatus) - two different guesses at the right field both
+ * turned out wrong, the second one badly (a never-sent draft came back as
+ * "paid"). Clearing paidAt back to unset here at least self-heals any
+ * invoice a previous bad guess had wrongly marked, and `rawStatus` is
+ * surfaced so a real observed response can be used to fix this properly. */
 export async function checkInvoicePayment(
   invoiceId: string
-): Promise<{ ok: true; paid: boolean; dealId: string } | { ok: false; error: string; dealId: string }> {
+): Promise<
+  | { ok: true; paid: boolean; rawStatus: string | null; dealId: string }
+  | { ok: false; error: string; dealId: string }
+> {
   const invoice = await prisma.invoice.findUniqueOrThrow({ where: { id: invoiceId } });
   if (!invoice.dineroInvoiceGuid || invoice.dineroInvoiceGuid.startsWith("TEST-")) {
     return { ok: false, error: "Ingen rigtig Dinero-faktura at tjekke for denne linje.", dealId: invoice.dealId };
   }
 
   try {
-    const { paid, paidDate } = await getInvoicePaymentStatus(invoice.dineroInvoiceGuid);
+    const { paid, paidDate, rawStatus } = await getInvoicePaymentStatus(invoice.dineroInvoiceGuid);
     await prisma.invoice.update({
       where: { id: invoice.id },
       data: { paidAt: paid ? (paidDate ? new Date(paidDate) : new Date()) : null },
     });
-    return { ok: true, paid, dealId: invoice.dealId };
+    return { ok: true, paid, rawStatus, dealId: invoice.dealId };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Ukendt fejl", dealId: invoice.dealId };
   }

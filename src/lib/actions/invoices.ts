@@ -75,7 +75,7 @@ export async function markPeriodSentManuallyAction(
 
 export async function checkInvoicePaymentAction(
   invoiceId: string
-): Promise<{ ok: true; paid: boolean } | { ok: false; error: string }> {
+): Promise<{ ok: true; paid: boolean; rawStatus: string | null } | { ok: false; error: string }> {
   const user = await requireUser();
   if (user.role !== "ADMIN") throw new Error("Kun admin kan tjekke betalingsstatus");
 
