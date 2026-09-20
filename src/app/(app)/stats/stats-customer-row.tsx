@@ -9,7 +9,8 @@ import {
 } from "@/lib/actions/customer-reports";
 import { formatDate } from "@/lib/labels";
 import { useToast } from "@/components/toast";
-import type { ReportInterval } from "@prisma/client";
+import { usePollWhilePending } from "../use-poll-while-pending";
+import type { ReportInterval, ReportSendStatus } from "@prisma/client";
 
 const INTERVAL_LABELS: Record<ReportInterval, string> = {
   MONTHLY: "Hver måned",
@@ -25,6 +26,8 @@ export function StatsCustomerRow({
   nextReportDueAt,
   lastSentAt,
   lastSentMethod,
+  lastStatus,
+  lastErrorMessage,
 }: {
   dealId: string;
   name: string;
@@ -33,12 +36,16 @@ export function StatsCustomerRow({
   nextReportDueAt: string | null;
   lastSentAt: string | null;
   lastSentMethod: "MANUAL" | "AUTOMATIC" | null;
+  lastStatus: ReportSendStatus | null;
+  lastErrorMessage: string | null;
 }) {
   const [mpSkinIdValue, setMpSkinIdValue] = useState(mpSkinId ?? "");
   const [savingId, startSavingId] = useTransition();
   const [pending, startTransition] = useTransition();
   const [sending, startSendTransition] = useTransition();
   const showToast = useToast();
+
+  usePollWhilePending(lastStatus === "PENDING");
 
   function saveMpSkinId() {
     if (mpSkinIdValue === (mpSkinId ?? "")) return;
@@ -68,12 +75,14 @@ export function StatsCustomerRow({
     startSendTransition(async () => {
       try {
         const result = await sendCustomerReportNowAction(dealId);
-        showToast(result.ok ? `Sender til ${name} i baggrunden - opdater siden om et minuts tid.` : result.error);
+        if (!result.ok) showToast(result.error);
       } catch (err) {
         showToast(err instanceof Error ? err.message : "Der opstod en fejl.");
       }
     });
   }
+
+  const isSending = sending || lastStatus === "PENDING";
 
   return (
     <tr className="border-t border-slate-100">
@@ -109,7 +118,16 @@ export function StatsCustomerRow({
         {reportInterval && nextReportDueAt ? formatDate(nextReportDueAt) : "–"}
       </td>
       <td className="px-3 py-2 text-slate-600">
-        {lastSentAt ? (
+        {isSending ? (
+          <span className="flex items-center gap-1.5 text-slate-500">
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-slate-400" />
+            Sender…
+          </span>
+        ) : lastStatus === "FAILED" ? (
+          <span className="text-red-600" title={lastErrorMessage ?? "ukendt fejl"}>
+            Fejlede {lastSentAt ? formatDate(lastSentAt) : ""}
+          </span>
+        ) : lastSentAt ? (
           <>
             {formatDate(lastSentAt)}{" "}
             <span
@@ -129,11 +147,11 @@ export function StatsCustomerRow({
       <td className="px-3 py-2 text-right">
         <button
           type="button"
-          disabled={sending}
+          disabled={isSending}
           onClick={sendNow}
           className="shrink-0 whitespace-nowrap rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
         >
-          {sending ? "Sender…" : "Send nu"}
+          {isSending ? "Sender…" : "Send nu"}
         </button>
       </td>
     </tr>

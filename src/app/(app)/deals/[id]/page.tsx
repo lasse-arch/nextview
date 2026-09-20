@@ -499,6 +499,8 @@ export default async function DealDetailPage({
               nextReportDueAt={deal.nextReportDueAt ? deal.nextReportDueAt.toISOString() : null}
               lastSentAt={deal.reports[0] ? deal.reports[0].sentAt.toISOString() : null}
               lastSentMethod={deal.reports[0]?.method ?? null}
+              lastStatus={deal.reports[0]?.status ?? null}
+              lastErrorMessage={deal.reports[0]?.errorMessage ?? null}
             />
           )}
 

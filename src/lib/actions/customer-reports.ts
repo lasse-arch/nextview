@@ -47,8 +47,14 @@ export async function updateReportIntervalAction(
  * third-party site), far past what a button click should block on and
  * uncomfortably close to a serverless function's request timeout. `after()`
  * lets the actual work keep running past this action's own response, so the
- * click returns immediately and the send happens in the background - the
- * page just needs a refresh a little later to see the updated "sidst sendt".
+ * click returns immediately and the send happens in the background.
+ *
+ * A PENDING CustomerReport row is created synchronously, before after() even
+ * starts, so the UI has a real, persisted "sending..." state to show (and
+ * poll for) rather than just a client-side spinner that would otherwise
+ * vanish the instant this fast-returning action resolves - and if the
+ * background job fails, that same row flips to FAILED with the real reason,
+ * instead of the failure disappearing into server logs nobody sees.
  */
 export async function sendCustomerReportNowAction(
   dealId: string
@@ -59,12 +65,18 @@ export async function sendCustomerReportNowAction(
   const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId } });
   if (!deal.mpSkinId) return { ok: false, error: "Dealen har intet MP-Skin nummer udfyldt." };
 
+  const pendingReport = await prisma.customerReport.create({
+    data: { dealId, method: "MANUAL", status: "PENDING" },
+  });
+
   after(async () => {
-    const result = await generateAndSendCustomerReport(deal, "MANUAL");
+    const result = await generateAndSendCustomerReport(deal, "MANUAL", pendingReport.id);
     if (!result.ok) console.error(`Besøgsrapport til deal ${dealId} fejlede:`, result.error);
     revalidatePath(`/deals/${dealId}`);
     revalidatePath("/stats");
   });
 
+  revalidatePath(`/deals/${dealId}`);
+  revalidatePath("/stats");
   return { ok: true, queued: true };
 }

@@ -97,6 +97,16 @@ enum ReportSendMethod {
   AUTOMATIC
 }
 
+enum ReportSendStatus {
+  /// A manual send's row is created with this status immediately (before the
+  /// background job even starts), so the UI has something real in the
+  /// database to show a loading state from - not just client-side component
+  /// state that vanishes the moment the (now near-instant) action returns.
+  PENDING
+  SENT
+  FAILED
+}
+
 
 model Invoice {
   id     String @id @default(cuid())
@@ -304,19 +314,25 @@ model Deal {
   reports        CustomerReport[]
 }
 
-/// One row per visitor-stats report actually sent to a customer (manually or
-/// by the scheduler) - the "last sent" history shown on the deal and in the
-/// settings overview, and what nextReportDueAt's push-back logic reads.
+/// One row per visitor-stats report attempt for a customer (manually or by
+/// the scheduler) - the "last sent" history shown on the deal and in the
+/// /stats overview, and what nextReportDueAt's push-back logic reads. Failed
+/// attempts are recorded too (status FAILED + errorMessage), not just
+/// successes - since the actual send happens in a background job the user
+/// can't otherwise see, a silent failure there would look exactly like
+/// nothing happened at all.
 model CustomerReport {
-  id         String           @id @default(cuid())
-  deal       Deal             @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  id         String            @id @default(cuid())
+  deal       Deal              @relation(fields: [dealId], references: [id], onDelete: Cascade)
   dealId     String
-  sentAt     DateTime         @default(now())
+  sentAt     DateTime          @default(now())
   method     ReportSendMethod
+  status     ReportSendStatus  @default(SENT)
+  errorMessage String?
   /// Google Drive link to the generated PDF, if archiving succeeded - best-effort,
   /// same pattern as signed-contract archiving.
   pdfDriveUrl String?
-  createdAt  DateTime         @default(now())
+  createdAt  DateTime          @default(now())
 
   @@index([dealId, sentAt])
 }

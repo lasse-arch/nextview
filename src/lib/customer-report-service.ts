@@ -74,12 +74,19 @@ export function computeNextReportDueAt(
 /**
  * Generates a visitor-stats report for one deal (scraping explore.nextview360.dk,
  * rendering the PDF, archiving it to Drive, and emailing it) and records the
- * send + advances the schedule. Used by both the manual "Send nu" button and
- * the daily scheduler.
+ * outcome + advances the schedule. Used by both the manual "Send nu" button
+ * and the daily scheduler.
+ *
+ * `existingReportId` - the manual-send path creates a PENDING CustomerReport
+ * row up front (so the UI has a real, persisted "sending..." state to poll
+ * for) and passes its id here to be updated in place with the outcome,
+ * rather than a second row being created. The scheduler has no such row yet,
+ * so it's created fresh with the final status.
  */
 export async function generateAndSendCustomerReport(
   deal: ReportableDeal,
-  method: ReportSendMethod
+  method: ReportSendMethod,
+  existingReportId?: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
     if (!deal.mpSkinId) throw new Error("Dealen har intet MP-Skin nummer udfyldt.");
@@ -121,13 +128,31 @@ export async function generateAndSendCustomerReport(
 
     const nextReportDueAt = computeNextReportDueAt(deal, method);
     await prisma.$transaction([
-      prisma.customerReport.create({ data: { dealId: deal.id, method, pdfDriveUrl } }),
+      existingReportId
+        ? prisma.customerReport.update({
+            where: { id: existingReportId },
+            data: { status: "SENT", pdfDriveUrl, errorMessage: null, sentAt: new Date() },
+          })
+        : prisma.customerReport.create({ data: { dealId: deal.id, method, status: "SENT", pdfDriveUrl } }),
       prisma.deal.update({ where: { id: deal.id }, data: { nextReportDueAt } }),
     ]);
 
     return { ok: true };
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : "Ukendt fejl" };
+    const errorMessage = err instanceof Error ? err.message : "Ukendt fejl";
+    try {
+      if (existingReportId) {
+        await prisma.customerReport.update({
+          where: { id: existingReportId },
+          data: { status: "FAILED", errorMessage, sentAt: new Date() },
+        });
+      } else {
+        await prisma.customerReport.create({ data: { dealId: deal.id, method, status: "FAILED", errorMessage } });
+      }
+    } catch (recordErr) {
+      console.error("Kunne ikke gemme fejlet besøgsrapport-forsøg", recordErr);
+    }
+    return { ok: false, error: errorMessage };
   }
 }
 

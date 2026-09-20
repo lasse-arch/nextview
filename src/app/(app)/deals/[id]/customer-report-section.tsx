@@ -8,7 +8,8 @@ import {
 } from "@/lib/actions/customer-reports";
 import { formatDate } from "@/lib/labels";
 import { useToast } from "@/components/toast";
-import type { ReportInterval } from "@prisma/client";
+import { usePollWhilePending } from "../../use-poll-while-pending";
+import type { ReportInterval, ReportSendStatus } from "@prisma/client";
 
 const INTERVAL_LABELS: Record<ReportInterval, string> = {
   MONTHLY: "Hver måned",
@@ -28,6 +29,8 @@ export function CustomerReportSection({
   nextReportDueAt,
   lastSentAt,
   lastSentMethod,
+  lastStatus,
+  lastErrorMessage,
 }: {
   dealId: string;
   mpSkinId: string | null;
@@ -35,12 +38,16 @@ export function CustomerReportSection({
   nextReportDueAt: string | null;
   lastSentAt: string | null;
   lastSentMethod: "MANUAL" | "AUTOMATIC" | null;
+  lastStatus: ReportSendStatus | null;
+  lastErrorMessage: string | null;
 }) {
   const [mpSkinIdValue, setMpSkinIdValue] = useState(mpSkinId ?? "");
   const [savingId, startSavingId] = useTransition();
   const [pending, startTransition] = useTransition();
   const [sending, startSendTransition] = useTransition();
   const showToast = useToast();
+
+  usePollWhilePending(lastStatus === "PENDING");
 
   function saveMpSkinId() {
     if (mpSkinIdValue === (mpSkinId ?? "")) return;
@@ -70,12 +77,14 @@ export function CustomerReportSection({
     startSendTransition(async () => {
       try {
         const result = await sendCustomerReportNowAction(dealId);
-        showToast(result.ok ? "Sender i baggrunden - opdater siden om et minuts tid for at se status." : result.error);
+        if (!result.ok) showToast(result.error);
       } catch (err) {
         showToast(err instanceof Error ? err.message : "Der opstod en fejl.");
       }
     });
   }
+
+  const isSending = sending || lastStatus === "PENDING";
 
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -112,19 +121,22 @@ export function CustomerReportSection({
         </select>
         <button
           type="button"
-          disabled={sending}
+          disabled={isSending}
           onClick={sendNow}
           className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
         >
-          {sending ? "Sender…" : "Send stats"}
+          {isSending ? "Sender…" : "Send stats"}
         </button>
+        {isSending && <span className="text-xs text-slate-400">Kan tage op til et minuts tid…</span>}
       </div>
 
       <div className="mt-2 space-y-0.5 text-xs text-slate-400">
         {reportInterval && nextReportDueAt && <p>Næste automatiske afsendelse: {formatDate(nextReportDueAt)}</p>}
         <p>
           Sidst sendt:{" "}
-          {lastSentAt ? (
+          {lastStatus === "PENDING" ? (
+            "sender lige nu…"
+          ) : lastSentAt ? (
             <>
               {formatDate(lastSentAt)} ({lastSentMethod === "AUTOMATIC" ? "automatisk" : "manuelt"})
             </>
@@ -132,6 +144,9 @@ export function CustomerReportSection({
             "aldrig"
           )}
         </p>
+        {lastStatus === "FAILED" && (
+          <p className="text-red-600">Sidste forsøg fejlede: {lastErrorMessage ?? "ukendt fejl"}</p>
+        )}
       </div>
     </section>
   );
