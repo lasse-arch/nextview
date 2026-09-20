@@ -33,6 +33,7 @@ import { DealItemsSection } from "./deal-items-section";
 import { DealDangerActions } from "./danger-actions";
 import { CustomerLinkSection } from "./customer-link-section";
 import { AddressAutocomplete } from "../../address-autocomplete";
+import { CvrLookupField } from "./cvr-lookup-field";
 import { DisplayNameInput } from "../../display-name-input";
 import { LockedContractFields } from "./locked-contract-fields";
 import { ContractStatusRow } from "./contract-status-row";
@@ -176,14 +177,7 @@ export default async function DealDetailPage({
                   <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Kaldenavn (valgfri)</label>
                   <DisplayNameInput defaultValue={deal.displayName ?? ""} />
                 </div>
-                <div>
-                  <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">CVR-nummer</label>
-                  <input
-                    name="cvrNumber"
-                    defaultValue={deal.cvrNumber ?? ""}
-                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-                  />
-                </div>
+                <CvrLookupField defaultValue={deal.cvrNumber ?? ""} />
                 <div className="col-span-2">
                   <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Adresse</label>
                   <AddressAutocomplete defaultValue={deal.address ?? ""} />
