@@ -423,8 +423,7 @@ export default async function DealDetailPage({
             <h2 className="text-sm font-semibold text-slate-900">Fakturaer (Dinero)</h2>
             {currentUser?.role === "ADMIN" && (
               <div className="mt-3 flex flex-wrap items-stretch gap-2">
-                {deal.establishmentFee &&
-                  deal.establishmentFee > 0 &&
+                {(deal.establishmentFee ?? 0) > 0 &&
                   deal.invoices.find((i) => i.quarterIndex === 0)?.status !== "SENT_MANUALLY" && (
                     <MarkSentManuallyButton dealId={deal.id} />
                   )}
