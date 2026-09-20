@@ -18,7 +18,7 @@ export default async function StatsPage() {
 
   const deals = await prisma.deal.findMany({
     where: { stage: { in: ["FILMED", "LIVE"] }, churnedAt: null },
-    include: { reports: { orderBy: { sentAt: "desc" }, take: 1 } },
+    include: { reports: { orderBy: { sentAt: "desc" }, take: 10 } },
     orderBy: { companyName: "asc" },
   });
 
@@ -72,6 +72,11 @@ export default async function StatsPage() {
                     lastSentMethod={deal.reports[0]?.method ?? null}
                     lastStatus={deal.reports[0]?.status ?? null}
                     lastErrorMessage={deal.reports[0]?.errorMessage ?? null}
+                    history={deal.reports.map((r) => ({
+                      sentAt: r.sentAt.toISOString(),
+                      method: r.method,
+                      status: r.status,
+                    }))}
                   />
                 ))}
                 {deals.length === 0 && (

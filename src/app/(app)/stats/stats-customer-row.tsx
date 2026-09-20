@@ -10,6 +10,7 @@ import {
 import { formatDate } from "@/lib/labels";
 import { useToast } from "@/components/toast";
 import { usePollWhilePending } from "../use-poll-while-pending";
+import { ReportHistoryTooltip, type ReportHistoryEntry } from "./report-history-tooltip";
 import type { ReportInterval, ReportSendStatus } from "@prisma/client";
 
 const INTERVAL_LABELS: Record<ReportInterval, string> = {
@@ -28,6 +29,7 @@ export function StatsCustomerRow({
   lastSentMethod,
   lastStatus,
   lastErrorMessage,
+  history,
 }: {
   dealId: string;
   name: string;
@@ -38,6 +40,7 @@ export function StatsCustomerRow({
   lastSentMethod: "MANUAL" | "AUTOMATIC" | null;
   lastStatus: ReportSendStatus | null;
   lastErrorMessage: string | null;
+  history: ReportHistoryEntry[];
 }) {
   const [mpSkinIdValue, setMpSkinIdValue] = useState(mpSkinId ?? "");
   const [savingId, startSavingId] = useTransition();
@@ -124,22 +127,32 @@ export function StatsCustomerRow({
             Sender…
           </span>
         ) : lastStatus === "FAILED" ? (
-          <span className="text-red-600" title={lastErrorMessage ?? "ukendt fejl"}>
-            Fejlede {lastSentAt ? formatDate(lastSentAt) : ""}
-          </span>
+          <ReportHistoryTooltip
+            history={history}
+            label={
+              <span className="text-red-600" title={lastErrorMessage ?? "ukendt fejl"}>
+                Fejlede {lastSentAt ? formatDate(lastSentAt) : ""}
+              </span>
+            }
+          />
         ) : lastSentAt ? (
-          <>
-            {formatDate(lastSentAt)}{" "}
-            <span
-              className={
-                lastSentMethod === "AUTOMATIC"
-                  ? "ml-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600"
-                  : "ml-1 rounded-full bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-700"
-              }
-            >
-              {lastSentMethod === "AUTOMATIC" ? "Automatisk" : "Manuelt"}
-            </span>
-          </>
+          <ReportHistoryTooltip
+            history={history}
+            label={
+              <>
+                {formatDate(lastSentAt)}{" "}
+                <span
+                  className={
+                    lastSentMethod === "AUTOMATIC"
+                      ? "ml-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600"
+                      : "ml-1 rounded-full bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-700"
+                  }
+                >
+                  {lastSentMethod === "AUTOMATIC" ? "Automatisk" : "Manuelt"}
+                </span>
+              </>
+            }
+          />
         ) : (
           "Aldrig sendt"
         )}

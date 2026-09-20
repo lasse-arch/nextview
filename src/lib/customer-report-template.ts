@@ -37,7 +37,6 @@ export type CustomerReportData = {
   customerName: string;
   monthLabel: string;
   coverImage: Buffer;
-  heatmapImage: Buffer | null;
   stats: ExploreTourStats;
 };
 
@@ -70,16 +69,14 @@ const TIPS = [
 ];
 
 /**
- * Builds the visitor-stats report as a 3-4 page HTML deck (rendered to PDF by
+ * Builds the visitor-stats report as a 3-page HTML deck (rendered to PDF by
  * customer-report-pdf.ts): cover with the tour's real cover photo, a stats
- * page with the 4 period cards, an optional heatmap page, and a fixed "5 gode
- * råd" tips page. Landscape 1280x720 - a screen-sized report, not a printed
- * document.
+ * page with the 4 period cards, and a fixed "5 gode råd" tips page. Landscape
+ * 1280x720 - a screen-sized report, not a printed document.
  */
 export function buildCustomerReportHtml(data: CustomerReportData): string {
   const logo = logoDataUri();
   const cover = toDataUri(data.coverImage, "image/png");
-  const heatmap = data.heatmapImage ? toDataUri(data.heatmapImage, "image/png") : null;
 
   return `<!DOCTYPE html>
 <html lang="da">
@@ -122,9 +119,6 @@ export function buildCustomerReportHtml(data: CustomerReportData): string {
   .page-footer { position: absolute; left: 72px; bottom: 40px; }
   .page-footer img { height: 26px; }
 
-  .heatmap-wrap { display: flex; align-items: center; justify-content: center; height: 500px; background: #f5f5f7; border-radius: 20px; overflow: hidden; }
-  .heatmap-wrap img { max-width: 100%; max-height: 100%; object-fit: contain; }
-
   .tips { display: flex; flex-direction: column; gap: 16px; }
   .tip { display: flex; align-items: flex-start; gap: 20px; background: #f5f5f7; border-radius: 18px; padding: 20px 26px; }
   .tip .num { flex-shrink: 0; width: 36px; height: 36px; border-radius: 50%; background: #1d3f9e; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 700; }
@@ -156,17 +150,6 @@ export function buildCustomerReportHtml(data: CustomerReportData): string {
     <p class="footnote">Tallene er udelukkende baseret på visninger via explore.nextview360.dk og bør derfor afspejle reelle visninger fra interesserede kunder.</p>
     <div class="page-footer"><img src="${logo}"></div>
   </div>
-
-  ${
-    heatmap
-      ? `<div class="page content-page">
-    <div class="top-row"><div></div><div class="brand">${escapeHtml(data.customerName)}</div></div>
-    <h2>Hvor besøgende bruger mest tid</h2>
-    <div class="heatmap-wrap"><img src="${heatmap}"></div>
-    <div class="page-footer"><img src="${logo}"></div>
-  </div>`
-      : ""
-  }
 
   <div class="page content-page">
     <h2>5 gode råd til flere besøgende</h2>

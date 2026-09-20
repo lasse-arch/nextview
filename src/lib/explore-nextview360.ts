@@ -23,8 +23,6 @@ export type ExploreTourData = {
   stats: ExploreTourStats;
   /** Full-resolution cover photo (PNG), used as the report's front-page hero image. */
   coverImage: Buffer;
-  /** Screenshot of the visitor heatmap floor plan - best-effort, null if the tour has no floor plan or it couldn't be captured. */
-  heatmapImage: Buffer | null;
 };
 
 function sleep(ms: number): Promise<void> {
@@ -245,7 +243,7 @@ async function fetchImageAsBuffer(page: Page, url: string): Promise<Buffer> {
 
 /**
  * Logs into explore.nextview360.dk, finds the given tour by MP-Space ID, and
- * pulls its visitor stats, cover photo and (best-effort) heatmap.
+ * pulls its visitor stats and cover photo.
  */
 export async function fetchExploreTourData(mpSkinId: string): Promise<ExploreTourData> {
   const browser = await launchBrowser();
@@ -264,7 +262,6 @@ export async function fetchExploreTourData(mpSkinId: string): Promise<ExploreTou
     );
 
     let statsText = "";
-    let heatmapImage: Buffer | null = null;
     let lastError: unknown;
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
@@ -301,10 +298,6 @@ export async function fetchExploreTourData(mpSkinId: string): Promise<ExploreTou
           throw new Error(`Statistik-siden indeholdt ikke de forventede tal (uddrag: "${snippet}").`);
         }
 
-        const heatmapEl = await page.$(".heatmap, [class*='heatmap']");
-        if (heatmapEl) {
-          heatmapImage = (await heatmapEl.screenshot({ type: "png" })) as Buffer;
-        }
         lastError = undefined;
         break;
       } catch (err) {
@@ -315,7 +308,7 @@ export async function fetchExploreTourData(mpSkinId: string): Promise<ExploreTou
     if (lastError) throw lastError;
 
     const stats = parseStatsText(statsText);
-    return { stats, coverImage, heatmapImage };
+    return { stats, coverImage };
   } finally {
     await browser.close();
   }

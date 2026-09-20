@@ -101,7 +101,6 @@ export async function generateAndSendCustomerReport(
       customerName,
       monthLabel,
       coverImage: tourData.coverImage,
-      heatmapImage: tourData.heatmapImage,
       stats: tourData.stats,
     });
     const pdf = await renderCustomerReportPdf(html);
