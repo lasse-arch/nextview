@@ -79,10 +79,20 @@ async function clickButtonWithText(page: Page, text: string): Promise<boolean> {
   }, text);
 }
 
-async function login(page: Page): Promise<void> {
+/**
+ * Ensures the page is on a screen with the search box - logging in (or
+ * re-logging in) as needed. Session state on this site is unpredictable:
+ * a search box found a moment ago can be gone by the very next check with no
+ * navigation in between (client-side redirect, dropped session, or similar),
+ * so this is called again at the start of every search rather than trusting
+ * a login done once at the top to still hold.
+ */
+async function ensureOnSearchPage(page: Page): Promise<void> {
   const { username, password } = credentials();
 
   for (let attempt = 0; attempt < 5; attempt++) {
+    if ((await page.$$('input[name="p[search]"]')).length > 0) return;
+
     await gotoRetry(page, `${BASE_URL}/en/login`);
     await sleep(1500);
 
@@ -94,14 +104,15 @@ async function login(page: Page): Promise<void> {
       await sleep(4000);
     }
 
-    const searchBoxes = await page.$$('input[name="p[search]"]');
-    if (searchBoxes.length > 0) return;
+    if ((await page.$$('input[name="p[search]"]')).length > 0) return;
+    await sleep(1500);
   }
   throw new Error("Kunne ikke logge ind på explore.nextview360.dk efter flere forsøg.");
 }
 
 /** Searches by MP-Space ID and returns the href of that tour's editor link. */
 async function findEditorHref(page: Page, mpSkinId: string): Promise<string> {
+  await ensureOnSearchPage(page);
   const searchBoxes = await page.$$('input[name="p[search]"]');
   if (searchBoxes.length === 0) throw new Error("Søgefeltet blev ikke fundet (ikke logget ind?).");
   await searchBoxes[0].evaluate((el: Element, value: string) => {
@@ -180,7 +191,6 @@ export async function fetchExploreTourData(mpSkinId: string): Promise<ExploreTou
     const page = await browser.newPage();
     await page.setViewport({ width: 1600, height: 1000 });
 
-    await login(page);
     const editorHref = await findEditorHref(page, mpSkinId);
 
     // Cover image lives at a predictable authenticated URL per MP-Space ID -
