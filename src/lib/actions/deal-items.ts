@@ -47,7 +47,7 @@ export async function updateDealItemUrl(dealId: string, itemId: string, url: str
   revalidatePath(`/deals/${dealId}`);
 }
 
-const MAX_IMAGE_DATA_URL_LENGTH = 2_000_000; // ~1.5MB of actual image data once base64-decoded
+const MAX_IMAGE_DATA_URL_LENGTH = 3_500_000; // ~2.6MB of actual image data once base64-decoded
 
 export async function updateDealItemImageAction(
   dealId: string,

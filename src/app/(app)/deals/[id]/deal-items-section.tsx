@@ -15,8 +15,10 @@ type DealItem = {
   imageUrl: string | null;
 };
 
-const MAX_IMAGE_DIMENSION = 1000;
-const IMAGE_QUALITY = 0.8;
+// Shown full-screen on /kunder-live when presenting to customers, so this
+// needs to hold up a lot better than a small thumbnail would.
+const MAX_IMAGE_DIMENSION = 1800;
+const IMAGE_QUALITY = 0.85;
 
 /** Downscales/recompresses a photo client-side before it's stored as a data URI - a
  * phone camera shot can be 5-10MB, far more than needed for a hover preview. */
