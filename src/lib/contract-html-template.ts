@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { ContractHtmlData, ContractLanguage } from "@/lib/contract-template-data";
+import { CONTRACT_SIGNER } from "@/lib/contract-template-data";
 
 const LOGO_PATH = path.join(process.cwd(), "public/logo.png");
 
@@ -469,8 +470,8 @@ export function buildContractHtml(data: ContractHtmlData, language: ContractLang
       <p class="sig-party">${esc(COMPANY.name)}</p>
       <div class="sig-box">{{Sign;type=signature;role=Company}}</div>
       <p class="sig-meta">
-        <b>${esc(data.seller.name)}</b><br>
-        ${esc(data.seller.email)}<br>
+        <b>${esc(CONTRACT_SIGNER.name)}</b><br>
+        ${esc(CONTRACT_SIGNER.email)}<br>
         {{Date;type=date;role=Company;format=DD/MM/YYYY}}
       </p>
     </div>

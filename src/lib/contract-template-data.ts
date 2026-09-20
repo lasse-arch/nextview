@@ -32,7 +32,7 @@ export const PRODUCT_LABELS: Record<
  * the deal - the director, not the salesperson (see the contract template's
  * "For leverandør" signature block, which prints this same fixed name).
  */
-export const CONTRACT_SIGNER = { name: "Lasse Larsen", email: "info@nextview360.dk" };
+export const CONTRACT_SIGNER = { name: "Victor Emil Rasmussen", email: "info@nextview360.dk" };
 
 /**
  * Every product always has an etableringspris (one-off setup fee) - only
