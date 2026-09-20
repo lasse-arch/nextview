@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { dealName } from "@/lib/labels";
+import { DealItemPill } from "./deal-item-pill";
 import type { Prisma } from "@prisma/client";
 
 export default async function LiveCustomersPage({
@@ -50,26 +51,9 @@ export default async function LiveCustomersPage({
               <span className="font-medium text-slate-900">{dealName(deal)}</span>
               <div className="flex flex-wrap items-center gap-2">
                 {deal.items.length === 0 && <span className="text-xs text-slate-400">Ingen produkter tilføjet</span>}
-                {deal.items.map((item) =>
-                  item.url ? (
-                    <a
-                      key={item.id}
-                      href={item.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100"
-                    >
-                      {item.productType} ↗
-                    </a>
-                  ) : (
-                    <span
-                      key={item.id}
-                      className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-500"
-                    >
-                      {item.productType}
-                    </span>
-                  )
-                )}
+                {deal.items.map((item) => (
+                  <DealItemPill key={item.id} item={item} />
+                ))}
               </div>
             </li>
           ))}

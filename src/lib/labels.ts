@@ -179,6 +179,11 @@ export function needsDeliveryLink(productType: string): boolean {
   return p.includes("matterport") || p.includes("hjemmeside") || p.includes("tour");
 }
 
+/** Products where we upload a photo of the physical delivered item, previewable on hover. */
+export function needsImage(productType: string): boolean {
+  return productType.trim().toLowerCase().includes("visitkort");
+}
+
 /** saleAmount is the monthly recurring fee; the contract's total value over its binding period is that times bindingMonths. */
 export function totalContractValue(deal: { saleAmount: number | null; bindingMonths: number | null }): number {
   return (deal.saleAmount ?? 0) * (deal.bindingMonths ?? 1);

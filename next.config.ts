@@ -8,6 +8,13 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     "/*": ["./public/logo.png", "./node_modules/@sparticuz/chromium/bin/**/*"],
   },
+  experimental: {
+    // Visitkort photo uploads are compressed client-side but base64 still
+    // inflates size ~33% - the default 1MB limit was too tight for that.
+    serverActions: {
+      bodySizeLimit: "4mb",
+    },
+  },
 };
 
 export default nextConfig;

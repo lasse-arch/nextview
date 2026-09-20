@@ -412,6 +412,9 @@ model DealItem {
   isFree      Boolean @default(false)
   /// Link to the delivered product (e.g. the Matterport tour or the live website), so it can be opened directly.
   url         String?
+  /// Uploaded photo of the item, as a data URI (base64) - currently only used for
+  /// Visitkort, shown as a hover preview on the Live kunder page.
+  imageUrl    String?
 
   createdAt DateTime @default(now())
 }

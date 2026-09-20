@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { addDealItem, removeDealItem, updateDealItemUrl } from "@/lib/actions/deal-items";
-import { formatDKK, needsDeliveryLink as needsLink } from "@/lib/labels";
+import { useRef, useState, useTransition } from "react";
+import { addDealItem, removeDealItem, updateDealItemUrl, updateDealItemImageAction } from "@/lib/actions/deal-items";
+import { formatDKK, needsDeliveryLink as needsLink, needsImage } from "@/lib/labels";
 import { useToast } from "@/components/toast";
 
 type DealItem = {
@@ -12,7 +12,39 @@ type DealItem = {
   amount: number | null;
   isFree: boolean;
   url: string | null;
+  imageUrl: string | null;
 };
+
+const MAX_IMAGE_DIMENSION = 1000;
+const IMAGE_QUALITY = 0.8;
+
+/** Downscales/recompresses a photo client-side before it's stored as a data URI - a
+ * phone camera shot can be 5-10MB, far more than needed for a hover preview. */
+function readImageFileAsCompressedDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      const scale = Math.min(1, MAX_IMAGE_DIMENSION / Math.max(img.width, img.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        reject(new Error("Kunne ikke behandle billedet."));
+        return;
+      }
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL("image/jpeg", IMAGE_QUALITY));
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("Kunne ikke læse billedet."));
+    };
+    img.src = objectUrl;
+  });
+}
 
 const PRODUCT_SUGGESTIONS = ["Visitkort", "Drone-optagelse", "Nextview360 Tour", "Hjemmeside"];
 
@@ -95,6 +127,51 @@ function ItemLink({ dealId, item }: { dealId: string; item: DealItem }) {
     <button type="button" onClick={() => setEditing(true)} className="text-xs font-medium text-amber-600 hover:underline">
       + Tilføj link
     </button>
+  );
+}
+
+function ItemImage({ dealId, item }: { dealId: string; item: DealItem }) {
+  const [pending, startTransition] = useTransition();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const showToast = useToast();
+
+  if (!needsImage(item.productType)) return null;
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    startTransition(async () => {
+      try {
+        const dataUrl = await readImageFileAsCompressedDataUrl(file);
+        const result = await updateDealItemImageAction(dealId, item.id, dataUrl);
+        if (!result.ok) {
+          showToast(result.error);
+          return;
+        }
+        showToast("Billede gemt");
+      } catch (err) {
+        showToast(err instanceof Error ? err.message : "Der opstod en fejl.");
+      }
+    });
+  }
+
+  return (
+    <div className="flex items-center gap-1.5">
+      {item.imageUrl && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={item.imageUrl} alt="" className="h-8 w-12 rounded border border-slate-200 object-cover" />
+      )}
+      <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
+      <button
+        type="button"
+        disabled={pending}
+        onClick={() => fileInputRef.current?.click()}
+        className="text-xs font-medium text-blue-600 hover:underline disabled:opacity-50"
+      >
+        {pending ? "Uploader…" : item.imageUrl ? "Skift billede" : "+ Upload billede"}
+      </button>
+    </div>
   );
 }
 
@@ -237,6 +314,7 @@ export function DealItemsSection({ dealId, items }: { dealId: string; items: Dea
               <div className="w-16 shrink-0 text-right">
                 <ItemLink dealId={dealId} item={item} />
               </div>
+              <ItemImage dealId={dealId} item={item} />
               <div className="w-16 shrink-0 text-right">
                 {item.isFree ? (
                   <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
