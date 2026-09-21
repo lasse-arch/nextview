@@ -274,9 +274,13 @@ async function listAllDineroContacts(accessToken: string): Promise<(DineroContac
     return data.Collection;
   }
 
+  // Dinero's own 400 error spelled out the exact required format, including
+  // that every value - even a boolean - must be quoted (its own example:
+  // IsPerson+eq+'true', not IsPerson+eq+true, which is what this used
+  // before and got rejected outright).
   const [debitors, creditors] = await Promise.all([
-    fetchPage("IsDebitor eq true"),
-    fetchPage("IsCreditor eq true"),
+    fetchPage("IsDebitor eq 'true'"),
+    fetchPage("IsCreditor eq 'true'"),
   ]);
   const guids = Array.from(
     new Set([...debitors, ...creditors].map((c) => c.ContactGuid).filter((g): g is string => Boolean(g)))
