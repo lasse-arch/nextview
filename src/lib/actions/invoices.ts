@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { isDineroConfigured, searchDineroContactsByCvr, type DineroContactMatch } from "@/lib/dinero";
+import { isDineroConfigured, searchDineroContactsByCvr } from "@/lib/dinero";
+import { dealName } from "@/lib/labels";
 import {
   runQuarterlyInvoiceGeneration,
   runAutoChurn,
@@ -142,10 +143,18 @@ export async function linkDealToDineroContact(dealId: string, contactGuid: strin
   revalidatePath(`/deals/${dealId}`);
 }
 
-/** Looks up every Dinero contact sharing the deal's CVR number, so an admin
+export type DineroContactCandidate = { contactGuid: string; linkedDealName: string | null };
+
+/**
+ * Looks up every Dinero contact sharing the deal's CVR number, so an admin
  * can pick the right one to link to instead of copy-pasting a GUID out of
- * Dinero's own UI. */
-export async function findDineroContactsForDeal(dealId: string): Promise<DineroContactMatch[]> {
+ * Dinero's own UI. Dinero's contact list only returns bare GUIDs (a
+ * separate per-contact detail fetch 404s against this organization), so
+ * instead of Dinero-side name/email, each match is cross-referenced
+ * against our own deals - showing which deal (if any) already uses that
+ * contact is exactly what's needed to tell duplicates apart anyway.
+ */
+export async function findDineroContactsForDeal(dealId: string): Promise<DineroContactCandidate[]> {
   const user = await requireUser();
   if (user.role !== "ADMIN") throw new Error("Kun admin kan søge i Dinero");
 
@@ -153,7 +162,16 @@ export async function findDineroContactsForDeal(dealId: string): Promise<DineroC
   if (!deal.cvrNumber) throw new Error("Dealen har intet CVR-nummer at søge på");
   if (!(await isDineroConfigured())) throw new Error("Dinero er ikke konfigureret");
 
-  return searchDineroContactsByCvr(deal.cvrNumber);
+  const guids = await searchDineroContactsByCvr(deal.cvrNumber);
+  if (guids.length === 0) return [];
+
+  const linkedDeals = await prisma.deal.findMany({
+    where: { dineroContactGuid: { in: guids } },
+    select: { companyName: true, displayName: true, dineroContactGuid: true },
+  });
+  const dealNameByGuid = new Map(linkedDeals.map((d) => [d.dineroContactGuid as string, dealName(d)]));
+
+  return guids.map((contactGuid) => ({ contactGuid, linkedDealName: dealNameByGuid.get(contactGuid) ?? null }));
 }
 
 /**

@@ -182,41 +182,22 @@ async function findContactByCvr(accessToken: string, cvr: string): Promise<strin
   return data.Collection[0]?.ContactGuid ?? null;
 }
 
-export type DineroContactMatch = { contactGuid: string; name: string | null; email: string | null; debugError?: string };
-
-/** Fetches one contact's full record - the CVR search list only returns bare
- * ContactGuids, not Name/Email, so distinguishing between several matches
- * (exactly the case this exists for - duplicate contacts sharing a CVR)
- * needs a follow-up detail fetch per match. `debugError` surfaces a failed
- * fetch back to the admin's screen (rather than only a server log neither
- * of us can otherwise see) so the real cause is visible immediately. */
-async function getContact(
-  accessToken: string,
-  contactGuid: string
-): Promise<{ name: string | null; email: string | null; debugError?: string }> {
-  const orgId = process.env.DINERO_ORGANIZATION_ID!;
-  const res = await dineroFetch(`${DINERO_API_BASE}/${orgId}/contacts/${contactGuid}`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-  if (!res.ok) {
-    const body = await res.text();
-    console.error(`Dinero: kunne ikke hente kontaktdetaljer for ${contactGuid} (${res.status}): ${body}`);
-    return { name: null, email: null, debugError: `${res.status}: ${body.slice(0, 200)}` };
-  }
-  const data = (await res.json()) as Record<string, unknown>;
-  const name = typeof data.Name === "string" ? data.Name : null;
-  const email = typeof data.Email === "string" ? data.Email : null;
-  return { name, email, debugError: name || email ? undefined : `Uventet svar: ${JSON.stringify(data).slice(0, 200)}` };
-}
-
 /**
  * Same lookup as findContactByCvr, but returns every match instead of just
  * the first - a company can end up with more than one contact in Dinero
  * (e.g. one created per duplicate deal in the CRM before that was noticed),
  * and an admin needs to see and pick the right one rather than us silently
  * grabbing whichever one the API happens to list first.
+ *
+ * The list endpoint only returns bare ContactGuids, not Name/Email - and a
+ * separate per-contact detail fetch (GET .../contacts/{guid}) turned out to
+ * 404 against this organization, so this deliberately doesn't try to
+ * enrich the matches with Dinero-side details at all. The caller instead
+ * cross-references each GUID against our own deals (see
+ * findDineroContactsForDeal in actions/invoices.ts) to show something
+ * actually useful: which deal, if any, already uses it.
  */
-export async function searchDineroContactsByCvr(cvr: string): Promise<DineroContactMatch[]> {
+export async function searchDineroContactsByCvr(cvr: string): Promise<string[]> {
   if (await isDineroTestMode()) return [];
 
   const accessToken = await getAccessToken();
@@ -229,9 +210,7 @@ export async function searchDineroContactsByCvr(cvr: string): Promise<DineroCont
 
   if (!res.ok) throw new Error(`Dinero: kunne ikke slå kontakt op på CVR (${res.status}): ${await res.text()}`);
   const data = (await res.json()) as { Collection: { ContactGuid: string }[] };
-  return Promise.all(
-    data.Collection.map(async (c) => ({ contactGuid: c.ContactGuid, ...(await getContact(accessToken, c.ContactGuid)) }))
-  );
+  return data.Collection.map((c) => c.ContactGuid);
 }
 
 export type DineroInvoiceLine = { description: string; amount: number };

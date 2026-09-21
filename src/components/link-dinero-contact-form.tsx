@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { linkDealToDineroContact, findDineroContactsForDeal } from "@/lib/actions/invoices";
 import { useToast } from "@/components/toast";
 
-type Match = { contactGuid: string; name: string | null; email: string | null; debugError?: string };
+type Match = { contactGuid: string; linkedDealName: string | null };
 
 export function LinkDineroContactForm({ dealId, currentGuid }: { dealId: string; currentGuid: string | null }) {
   const [open, setOpen] = useState(false);
@@ -84,8 +84,15 @@ export function LinkDineroContactForm({ dealId, currentGuid }: { dealId: string;
           {matches.map((m) => (
             <li key={m.contactGuid} className="flex flex-wrap items-center justify-between gap-2 text-xs">
               <span className="text-slate-600">
-                {m.name || "(intet navn)"} {m.email && <span className="text-slate-400">— {m.email}</span>}
-                {m.debugError && <span className="block text-red-500">{m.debugError}</span>}
+                <span className="font-mono text-[11px] text-slate-400">{m.contactGuid}</span>
+                <br />
+                {m.linkedDealName ? (
+                  <span>
+                    Bruges allerede af deal: <span className="font-medium">{m.linkedDealName}</span>
+                  </span>
+                ) : (
+                  <span className="text-slate-400">Ikke koblet til nogen deal i CRM&apos;et endnu</span>
+                )}
               </span>
               <button
                 type="button"
