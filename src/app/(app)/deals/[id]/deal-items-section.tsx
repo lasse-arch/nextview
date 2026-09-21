@@ -313,7 +313,7 @@ export function DealItemsSection({ dealId, items }: { dealId: string; items: Dea
               {item.location && <span className="ml-2 text-xs text-slate-400">{item.location}</span>}
             </div>
             <div className="flex items-center gap-3">
-              <div className="w-16 shrink-0 text-right">
+              <div className="min-w-16 shrink-0 text-right">
                 <ItemLink dealId={dealId} item={item} />
               </div>
               <ItemImage dealId={dealId} item={item} />
