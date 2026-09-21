@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { sendStandaloneContract, type StandaloneContractCustomer } from "@/lib/actions/standalone-contracts";
 import { formatDKK } from "@/lib/labels";
@@ -62,6 +62,18 @@ function NumberField({
   onChange: (value: number) => void;
   min?: number;
 }) {
+  // A plain controlled `value={value}` re-fills the field with "0" on every
+  // keystroke that empties it (onChange(0) fires immediately), making it
+  // impossible to actually clear the number to type a new one. Tracking the
+  // raw text separately lets the field sit empty while typing; it only
+  // resyncs from the numeric value when that value changed for some other
+  // reason (e.g. a reset elsewhere), not from this field's own edits.
+  const [text, setText] = useState(String(value));
+  useEffect(() => {
+    if (parseFloat(text) !== value) setText(String(value));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+
   return (
     <div>
       <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</label>
@@ -69,10 +81,19 @@ function NumberField({
         type="number"
         min={min}
         step="1"
-        value={Number.isFinite(value) ? value : 0}
+        value={text}
         onChange={(e) => {
-          const parsed = e.target.value === "" ? 0 : Math.round(parseFloat(e.target.value));
-          onChange(Number.isFinite(parsed) ? parsed : 0);
+          const raw = e.target.value;
+          setText(raw);
+          if (raw === "") return;
+          const parsed = Math.round(parseFloat(raw));
+          if (Number.isFinite(parsed)) onChange(parsed);
+        }}
+        onBlur={() => {
+          const parsed = Math.round(parseFloat(text));
+          const clamped = Number.isFinite(parsed) ? Math.max(min, parsed) : min;
+          setText(String(clamped));
+          onChange(clamped);
         }}
         onWheel={(e) => e.currentTarget.blur()}
         className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"

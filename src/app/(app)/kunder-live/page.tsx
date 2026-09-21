@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { dealName } from "@/lib/labels";
 import { DealItemPill } from "./deal-item-pill";
@@ -49,7 +50,9 @@ export default async function LiveCustomersPage({
         <ul className="divide-y divide-slate-100">
           {deals.map((deal) => (
             <li key={deal.id} className="flex flex-col gap-2 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-              <span className="font-medium text-slate-900">{dealName(deal)}</span>
+              <Link href={`/deals/${deal.id}`} className="font-medium text-slate-900 hover:underline">
+                {dealName(deal)}
+              </Link>
               <div className="flex flex-wrap items-center gap-2">
                 {deal.items.length === 0 && <span className="text-xs text-slate-400">Ingen produkter tilføjet</span>}
                 {deal.items.map((item) => (
