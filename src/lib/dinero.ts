@@ -213,30 +213,6 @@ export async function searchDineroContactsByCvr(cvr: string): Promise<string[]> 
   return data.Collection.map((c) => c.ContactGuid);
 }
 
-/**
- * Looks up a contact's GUID by its Dinero-facing "kontaktnummer" (a short
- * numeric id, visible in that contact's own URL in the Dinero UI, e.g.
- * app.dinero.dk/{orgId}/contacts/1037433153 -> 1037433153) - much easier
- * for an admin to grab than the internal ContactGuid, and this goes through
- * the same list/filter endpoint as the CVR search (not the per-contact GET
- * that 404s), so it's known to work.
- */
-export async function findContactGuidByContactNumber(contactNumber: string): Promise<string | null> {
-  if (await isDineroTestMode()) return null;
-
-  const accessToken = await getAccessToken();
-  const orgId = process.env.DINERO_ORGANIZATION_ID!;
-  const query = new URLSearchParams({ queryFilter: `ContactNumber eq '${contactNumber}'` });
-
-  const res = await dineroFetch(`${DINERO_API_BASE}/${orgId}/contacts?${query}`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-
-  if (!res.ok) throw new Error(`Dinero: kunne ikke slå kontakt op på nummer (${res.status}): ${await res.text()}`);
-  const data = (await res.json()) as { Collection: { ContactGuid: string }[] };
-  return data.Collection[0]?.ContactGuid ?? null;
-}
-
 export type DineroInvoiceLine = { description: string; amount: number };
 
 type DineroInvoiceInput = {

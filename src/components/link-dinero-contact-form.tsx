@@ -1,11 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import {
-  linkDealToDineroContact,
-  findDineroContactsForDeal,
-  resolveDineroContactNumber,
-} from "@/lib/actions/invoices";
+import { linkDealToDineroContact, findDineroContactsForDeal } from "@/lib/actions/invoices";
 import { useToast } from "@/components/toast";
 
 type Match = { contactGuid: string; linkedDealName: string | null };
@@ -13,11 +9,9 @@ type Match = { contactGuid: string; linkedDealName: string | null };
 export function LinkDineroContactForm({ dealId, currentGuid }: { dealId: string; currentGuid: string | null }) {
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState(currentGuid ?? "");
-  const [urlInput, setUrlInput] = useState("");
   const [matches, setMatches] = useState<Match[] | null>(null);
   const [pending, startTransition] = useTransition();
   const [searching, startSearch] = useTransition();
-  const [resolving, startResolve] = useTransition();
   const showToast = useToast();
 
   if (!open) {
@@ -36,41 +30,9 @@ export function LinkDineroContactForm({ dealId, currentGuid }: { dealId: string;
 
   return (
     <div className="mt-3 space-y-2 border-t border-slate-100 pt-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <label className="text-xs font-medium text-slate-500">Link/nummer fra Dinero</label>
-        <input
-          type="text"
-          value={urlInput}
-          onChange={(e) => setUrlInput(e.target.value)}
-          placeholder="Indsæt kontaktens URL fra Dinero, fx app.dinero.dk/.../contacts/1037433153"
-          className="min-w-0 flex-1 rounded-md border border-slate-300 px-2 py-1 text-xs"
-        />
-        <button
-          type="button"
-          disabled={resolving}
-          onClick={() => {
-            startResolve(async () => {
-              const result = await resolveDineroContactNumber(urlInput);
-              if (!result.ok) {
-                showToast(result.error);
-                return;
-              }
-              if (!result.value) {
-                showToast("Ingen kontakt fundet med det nummer");
-                return;
-              }
-              setValue(result.value);
-              showToast("Fundet - tryk Gem for at koble");
-            });
-          }}
-          className="shrink-0 rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
-        >
-          {resolving ? "Slår op…" : "Slå op"}
-        </button>
-      </div>
       <p className="text-xs text-slate-400">
-        Eller tryk &quot;Find i Dinero&quot; for at søge på dealens eget CVR-nummer - feltet nedenfor skal ikke
-        udfyldes først, det er kun der GUID&apos;en ender når du vælger en match (eller indsætter en selv).
+        Tryk &quot;Find i Dinero&quot; for at søge på dealens eget CVR-nummer - feltet nedenfor skal ikke udfyldes
+        først, det er kun der GUID&apos;en ender når du vælger en match (eller indsætter en selv).
       </p>
       <div className="flex flex-wrap items-center gap-2">
         <label className="text-xs font-medium text-slate-500">Dinero kontakt-GUID</label>
