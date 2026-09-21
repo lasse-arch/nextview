@@ -118,8 +118,13 @@ function computeDueLines(
 
   // firstRelevantIndex is the first period that hasn't ended yet and starts
   // at or after the system's real invoicing floor; anything before it is
-  // stale history and is skipped entirely.
-  const firstRelevantIndex = periods.findIndex((p) => p.endDate >= now && p.startDate >= INVOICING_FLOOR);
+  // stale history and is skipped entirely. findIndex returns -1 when NO
+  // period qualifies (e.g. a short contract that fully ended before the
+  // floor) - that must mean "skip all of them", not "skip none": `i < -1`
+  // is never true, so treating -1 literally would have flooded every
+  // historical period back in as newly due all at once.
+  const firstRelevantIndexRaw = periods.findIndex((p) => p.endDate >= now && p.startDate >= INVOICING_FLOOR);
+  const firstRelevantIndex = firstRelevantIndexRaw === -1 ? periods.length : firstRelevantIndexRaw;
 
   periods.forEach((period, i) => {
     if (i < firstRelevantIndex) return;
