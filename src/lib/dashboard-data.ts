@@ -7,6 +7,7 @@ const PIPELINE_STAGES = [
   "LEAD",
   "CONTACTED",
   "MEETING_BOOKED",
+  "FOLLOW_UP",
   "CONTRACT_SENT",
   "CONTRACT_SIGNED",
   "FILMED",
@@ -15,7 +16,7 @@ const PIPELINE_STAGES = [
 const FUNNEL_STAGES = [...PIPELINE_STAGES, "LIVE"] as const;
 
 /** The "Aktiv pipeline" KPI only counts deals that have actually had a meeting booked or further - not raw leads/contacted. */
-const ACTIVE_PIPELINE_STAGES = ["MEETING_BOOKED", "CONTRACT_SENT", "CONTRACT_SIGNED", "FILMED"] as const;
+const ACTIVE_PIPELINE_STAGES = ["MEETING_BOOKED", "FOLLOW_UP", "CONTRACT_SENT", "CONTRACT_SIGNED", "FILMED"] as const;
 
 /**
  * "Solgt" = has a signed contract (Live, or signed and on its way to Live).
