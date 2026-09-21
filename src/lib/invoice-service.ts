@@ -80,7 +80,7 @@ function computeDueLines(
     contractSignedAt: Date | null;
     contractEndDate: Date | null;
   },
-  options: { sendEstablishmentNow?: boolean } = {},
+  options: { sendEstablishmentNow?: boolean; sendPeriodsNow?: boolean } = {},
   handledQuarterIndexes: Set<number> = new Set()
 ): { lines: DueLine[]; nextDueDate: Date | null } {
   const now = new Date();
@@ -126,13 +126,21 @@ function computeDueLines(
   const firstRelevantIndexRaw = periods.findIndex((p) => p.endDate >= now && p.startDate >= INVOICING_FLOOR);
   const firstRelevantIndex = firstRelevantIndexRaw === -1 ? periods.length : firstRelevantIndexRaw;
 
+  // A seller manually clicking "Opret faktura-kladde" (sendPeriodsNow) can
+  // jump the gun on the very next period's own lead time the same way
+  // sendEstablishmentNow already does for the establishment fee - but only
+  // the single next one, not every period in the rolling horizon at once.
+  let forcedOnePeriod = false;
   periods.forEach((period, i) => {
     if (i < firstRelevantIndex) return;
     if (handledQuarterIndexes.has(period.index)) return;
-    if (period.draftTriggerDate > now) {
+    const isDue = period.draftTriggerDate <= now;
+    const forceThisOne = options.sendPeriodsNow && !forcedOnePeriod;
+    if (!isDue && !forceThisOne) {
       if (!nextDueDate || period.draftTriggerDate < nextDueDate) nextDueDate = period.draftTriggerDate;
       return;
     }
+    forcedOnePeriod = true;
     lines.push({
       quarterIndex: period.index,
       amount: amounts[i],
@@ -288,7 +296,7 @@ type DealWithInvoices = DraftableDeal & {
  * daily run and the "Opret faktura-kladde" button on the deal page. */
 async function processDealDueInvoices(
   deal: DealWithInvoices,
-  options: { sendEstablishmentNow?: boolean } = {}
+  options: { sendEstablishmentNow?: boolean; sendPeriodsNow?: boolean } = {}
 ): Promise<{ checked: number; created: number; failed: number; nextDueDate: Date | null }> {
   const termInvoices = deal.invoices.filter((inv) => inv.termNumber === deal.currentTermNumber);
   const handledQuarterIndexes = new Set(
@@ -384,16 +392,25 @@ export async function runQuarterlyInvoiceGeneration(): Promise<InvoiceRunSummary
   return { configured: true, checked, created, failed };
 }
 
-/** Manually drafts any currently-due invoice lines for a single deal - the "Opret
- * faktura-kladde" button on the deal page, for when an admin doesn't want to wait
- * for the daily cron. */
+/**
+ * Manually drafts invoice lines for a single deal - the "Opret faktura-
+ * kladde" button on the deal page, for when an admin doesn't want to wait
+ * for the daily cron. Both the establishment fee and the very next
+ * recurring period are drafted right away even if their own lead time
+ * hasn't started yet (sendEstablishmentNow/sendPeriodsNow) - a seller
+ * clicking this button has already decided it's time, regardless of what
+ * the automatic schedule would otherwise wait for.
+ */
 export async function generateInvoiceForDeal(dealId: string): Promise<InvoiceRunSummary> {
   if (!(await isDineroConfigured())) {
     return { configured: false, checked: 0, created: 0, failed: 0 };
   }
 
   const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId }, include: { invoices: true } });
-  const { nextDueDate, ...result } = await processDealDueInvoices(deal, { sendEstablishmentNow: true });
+  const { nextDueDate, ...result } = await processDealDueInvoices(deal, {
+    sendEstablishmentNow: true,
+    sendPeriodsNow: true,
+  });
   return {
     configured: true,
     ...result,

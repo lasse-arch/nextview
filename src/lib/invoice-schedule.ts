@@ -19,12 +19,16 @@ export type BillingPeriod = {
  * notice was given but the effective end date falls later) continues in full
  * calendar quarters, capped at `until`.
  *
- * Full quarters are due on the 1st of the quarter they cover, so with
- * Dinero's Netto+8 payment terms the draft has to be sent exactly 8 days
- * before that (e.g. a quarter starting 1 October is drafted 23 September) -
- * assuming it's sent out the same day it's drafted, which is the point of
- * drafting it ahead of time. A stub period has no such lead time available
- * and is drafted immediately once due.
+ * Every period - including the first - is due on the 1st of the quarter it
+ * covers, so with Dinero's Netto+8 payment terms the draft has to be sent
+ * exactly 8 days before that (e.g. a quarter starting 1 October is drafted
+ * 23 September), assuming it's sent out the same day it's drafted, which is
+ * the point of drafting it ahead of time. For a billingStartDate already in
+ * the past (the overwhelmingly common case - it's normally set to "today"
+ * when a deal goes Live), that 8-day lookback is also already in the past,
+ * so the draft is simply due immediately either way - the lead time only
+ * actually matters, and only ever helps, when billingStartDate is set
+ * ahead of time for a future start.
  */
 export function computeBillingPeriods(billingStartDate: Date, bindingMonths: number, until: Date): BillingPeriod[] {
   const contractEnd = addMonths(billingStartDate, bindingMonths);
@@ -43,11 +47,7 @@ export function computeBillingPeriods(billingStartDate: Date, bindingMonths: num
       periodEnd = contractEnd;
     }
 
-    // The first period bills as soon as it's due (no lead time exists before
-    // something that already started). Every period after that is a full
-    // quarter, drafted 8 days before it starts so Netto+8 lands the due date
-    // exactly on the quarter's first day.
-    const draftTriggerDate = index === 1 ? billingStartDate : addDays(cursor, -8);
+    const draftTriggerDate = addDays(cursor, -8);
 
     periods.push({ index, startDate: cursor, endDate: periodEnd, draftTriggerDate });
     cursor = addDays(periodEnd, 1);
