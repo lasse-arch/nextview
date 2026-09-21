@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { isDineroConfigured, searchDineroContactsByCvr } from "@/lib/dinero";
+import { isDineroConfigured, searchDineroContactsByCvr, searchDineroContactsByName } from "@/lib/dinero";
 import { dealName } from "@/lib/labels";
 import {
   runQuarterlyInvoiceGeneration,
@@ -185,11 +185,18 @@ export async function findDineroContactsForDeal(dealId: string): Promise<ActionR
     const user = await requireUser();
     if (user.role !== "ADMIN") throw new Error("Kun admin kan søge i Dinero");
 
-    const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId }, select: { cvrNumber: true } });
+    const deal = await prisma.deal.findUniqueOrThrow({
+      where: { id: dealId },
+      select: { cvrNumber: true, companyName: true, displayName: true },
+    });
     if (!deal.cvrNumber) throw new Error("Dealen har intet CVR-nummer at søge på");
     if (!(await isDineroConfigured())) throw new Error("Dinero er ikke konfigureret");
 
-    const guids = await searchDineroContactsByCvr(deal.cvrNumber);
+    let guids = await searchDineroContactsByCvr(deal.cvrNumber);
+    // A contact entered by hand directly in Dinero can have its CVR sitting
+    // in a field our CVR search doesn't filter on - fall back to matching
+    // by company name rather than reporting "nothing found" outright.
+    if (guids.length === 0) guids = await searchDineroContactsByName(dealName(deal));
     if (guids.length === 0) return [];
 
     const linkedDeals = await prisma.deal.findMany({

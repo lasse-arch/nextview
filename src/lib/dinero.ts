@@ -197,23 +197,42 @@ async function findContactByCvr(accessToken: string, cvr: string): Promise<strin
  * findDineroContactsForDeal in actions/invoices.ts) to show something
  * actually useful: which deal, if any, already uses it.
  */
-export async function searchDineroContactsByCvr(cvr: string): Promise<string[]> {
-  if (await isDineroTestMode()) return [];
-
-  const accessToken = await getAccessToken();
+async function queryContactGuids(accessToken: string, queryFilter: string): Promise<string[]> {
   const orgId = process.env.DINERO_ORGANIZATION_ID!;
-  const query = new URLSearchParams({ queryFilter: `VatNumber eq '${cvr}'` });
+  const query = new URLSearchParams({ queryFilter });
 
   const res = await dineroFetch(`${DINERO_API_BASE}/${orgId}/contacts?${query}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
 
-  if (!res.ok) throw new Error(`Dinero: kunne ikke slå kontakt op på CVR (${res.status}): ${await res.text()}`);
+  if (!res.ok) throw new Error(`Dinero: kunne ikke slå kontakt op (${res.status}): ${await res.text()}`);
   const data = (await res.json()) as { Collection: { ContactGuid?: string }[] };
   // At least one real-world match came back without a ContactGuid at all -
   // filtered out rather than passed through, since an `undefined` in the
   // list blows up the caller's Prisma `in: [...]` query outright.
   return data.Collection.map((c) => c.ContactGuid).filter((guid): guid is string => Boolean(guid));
+}
+
+export async function searchDineroContactsByCvr(cvr: string): Promise<string[]> {
+  if (await isDineroTestMode()) return [];
+  const accessToken = await getAccessToken();
+  return queryContactGuids(accessToken, `VatNumber eq '${cvr}'`);
+}
+
+/**
+ * Falls back to a name search when the CVR search comes up empty - a
+ * contact entered by hand directly in Dinero (rather than created through
+ * this integration) can have its CVR sitting only in the `Cvr` field,
+ * which isn't filterable, while `VatNumber` (the field the CVR search
+ * actually filters on) stays blank. A real case: a customer visibly
+ * findable by CVR in Dinero's own UI search, but invisible to our
+ * VatNumber-only queryFilter.
+ */
+export async function searchDineroContactsByName(name: string): Promise<string[]> {
+  if (await isDineroTestMode()) return [];
+  const accessToken = await getAccessToken();
+  const escaped = name.replace(/'/g, "''");
+  return queryContactGuids(accessToken, `Name contains '${escaped}'`);
 }
 
 export type DineroInvoiceLine = { description: string; amount: number };
