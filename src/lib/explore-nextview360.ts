@@ -169,10 +169,15 @@ async function findEditorHrefs(page: Page, mpSkinId: string): Promise<string[]> 
   // early silently returns a link to a completely different, unrelated
   // tour instead of failing loudly. Wait until the page's own text actually
   // mentions this MP-Space ID before trusting that link.
+  // Matched case-insensitively - a stored MP-Skin ID that's correct except
+  // for its letter casing (an easy mistake, since these are mixed-case
+  // tokens that get copy-pasted/typed by hand) would otherwise never be
+  // found even though it's right there on the page.
+  const mpSkinIdLower = mpSkinId.toLowerCase();
   let sawMpSkinId = false;
   for (let poll = 0; poll < 10; poll++) {
     const text = await retryOnDestroyedContext(() => page.evaluate(() => document.body.innerText)).catch(() => "");
-    if (text.includes(mpSkinId)) {
+    if (text.toLowerCase().includes(mpSkinIdLower)) {
       sawMpSkinId = true;
       break;
     }
@@ -181,15 +186,15 @@ async function findEditorHrefs(page: Page, mpSkinId: string): Promise<string[]> 
   if (!sawMpSkinId) throw new Error(`Søgeresultatet viste aldrig MP-Skin nummer "${mpSkinId}" - prøver igen.`);
 
   const hrefs = await retryOnDestroyedContext(() =>
-    page.evaluate((expectedId: string) => {
+    page.evaluate((expectedIdLower: string) => {
       const links = Array.from(document.querySelectorAll("a.cnt.force-top")) as HTMLAnchorElement[];
       // Every result row whose own text actually names this MP-Space ID -
       // there's normally exactly one, but a handful of tours have several
       // "Skin" entries sharing the same MP-Space ID (see the function doc).
       const container = (el: HTMLElement) => el.closest("tr, .list-item, li") ?? el;
-      const matches = links.filter((l) => container(l).textContent?.includes(expectedId));
+      const matches = links.filter((l) => container(l).textContent?.toLowerCase().includes(expectedIdLower));
       return (matches.length > 0 ? matches : links.slice(0, 1)).map((l) => l.href);
-    }, mpSkinId)
+    }, mpSkinIdLower)
   );
   if (hrefs.length === 0) throw new Error(`Ingen tour fundet for MP-Skin nummer "${mpSkinId}".`);
   return hrefs;
