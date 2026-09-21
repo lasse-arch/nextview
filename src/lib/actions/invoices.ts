@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { isDineroConfigured, searchDineroContactsByCvr, type DineroContactMatch } from "@/lib/dinero";
 import {
   runQuarterlyInvoiceGeneration,
   runAutoChurn,
@@ -139,6 +140,20 @@ export async function linkDealToDineroContact(dealId: string, contactGuid: strin
   const trimmed = contactGuid.trim();
   await prisma.deal.update({ where: { id: dealId }, data: { dineroContactGuid: trimmed || null } });
   revalidatePath(`/deals/${dealId}`);
+}
+
+/** Looks up every Dinero contact sharing the deal's CVR number, so an admin
+ * can pick the right one to link to instead of copy-pasting a GUID out of
+ * Dinero's own UI. */
+export async function findDineroContactsForDeal(dealId: string): Promise<DineroContactMatch[]> {
+  const user = await requireUser();
+  if (user.role !== "ADMIN") throw new Error("Kun admin kan søge i Dinero");
+
+  const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId }, select: { cvrNumber: true } });
+  if (!deal.cvrNumber) throw new Error("Dealen har intet CVR-nummer at søge på");
+  if (!(await isDineroConfigured())) throw new Error("Dinero er ikke konfigureret");
+
+  return searchDineroContactsByCvr(deal.cvrNumber);
 }
 
 /**

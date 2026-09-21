@@ -182,6 +182,31 @@ async function findContactByCvr(accessToken: string, cvr: string): Promise<strin
   return data.Collection[0]?.ContactGuid ?? null;
 }
 
+export type DineroContactMatch = { contactGuid: string; name: string | null; email: string | null };
+
+/**
+ * Same lookup as findContactByCvr, but returns every match instead of just
+ * the first - a company can end up with more than one contact in Dinero
+ * (e.g. one created per duplicate deal in the CRM before that was noticed),
+ * and an admin needs to see and pick the right one rather than us silently
+ * grabbing whichever one the API happens to list first.
+ */
+export async function searchDineroContactsByCvr(cvr: string): Promise<DineroContactMatch[]> {
+  if (await isDineroTestMode()) return [];
+
+  const accessToken = await getAccessToken();
+  const orgId = process.env.DINERO_ORGANIZATION_ID!;
+  const query = new URLSearchParams({ queryFilter: `VatNumber eq '${cvr}'` });
+
+  const res = await dineroFetch(`${DINERO_API_BASE}/${orgId}/contacts?${query}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+
+  if (!res.ok) throw new Error(`Dinero: kunne ikke slå kontakt op på CVR (${res.status}): ${await res.text()}`);
+  const data = (await res.json()) as { Collection: { ContactGuid: string; Name?: string; Email?: string }[] };
+  return data.Collection.map((c) => ({ contactGuid: c.ContactGuid, name: c.Name ?? null, email: c.Email ?? null }));
+}
+
 export type DineroInvoiceLine = { description: string; amount: number };
 
 type DineroInvoiceInput = {
