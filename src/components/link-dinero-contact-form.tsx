@@ -4,7 +4,13 @@ import { useState, useTransition } from "react";
 import { linkDealToDineroContact, findDineroContactsForDeal } from "@/lib/actions/invoices";
 import { useToast } from "@/components/toast";
 
-type Match = { contactGuid: string; linkedDealName: string | null };
+type Match = {
+  contactGuid: string;
+  name: string | null;
+  email: string | null;
+  linkedDealName: string | null;
+  isCurrentLink: boolean;
+};
 
 export function LinkDineroContactForm({ dealId, currentGuid }: { dealId: string; currentGuid: string | null }) {
   const [open, setOpen] = useState(false);
@@ -80,6 +86,10 @@ export function LinkDineroContactForm({ dealId, currentGuid }: { dealId: string;
           {matches.map((m) => (
             <li key={m.contactGuid} className="flex flex-wrap items-center justify-between gap-2 text-xs">
               <span className="text-slate-600">
+                <span className="font-medium">{m.name || "(intet navn)"}</span>
+                {m.email && <span className="text-slate-400"> — {m.email}</span>}
+                {m.isCurrentLink && <span className="ml-1 font-medium text-blue-600">(dealens nuværende kobling)</span>}
+                <br />
                 <span className="font-mono text-[11px] text-slate-400">{m.contactGuid}</span>
                 <br />
                 {m.linkedDealName ? (

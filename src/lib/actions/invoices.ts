@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { isDineroConfigured, searchDineroContactsByCvr, searchDineroContactsByName } from "@/lib/dinero";
+import { isDineroConfigured, searchDineroContacts, getDineroContact } from "@/lib/dinero";
 import { dealName } from "@/lib/labels";
 import {
   runQuarterlyInvoiceGeneration,
@@ -169,16 +169,25 @@ export async function linkDealToDineroContact(dealId: string, contactGuid: strin
   });
 }
 
-export type DineroContactCandidate = { contactGuid: string; linkedDealName: string | null };
+export type DineroContactCandidate = {
+  contactGuid: string;
+  name: string | null;
+  email: string | null;
+  linkedDealName: string | null;
+  isCurrentLink: boolean;
+};
 
 /**
- * Looks up every Dinero contact sharing the deal's CVR number, so an admin
- * can pick the right one to link to instead of copy-pasting a GUID out of
- * Dinero's own UI. Dinero's contact list only returns bare GUIDs (a
- * separate per-contact detail fetch 404s against this organization), so
- * instead of Dinero-side name/email, each match is cross-referenced
- * against our own deals - showing which deal (if any) already uses that
- * contact is exactly what's needed to tell duplicates apart anyway.
+ * Looks up Dinero contacts an admin might want to link this deal to - the
+ * deal's own already-cached contact (if any) is always included first,
+ * fetched directly by GUID rather than re-derived through search, since a
+ * deal that already knows its contact shouldn't ever come back "not
+ * found" just because a CVR/name filter search happens to miss it.
+ * Additional candidates come from a CVR search, falling back to a name
+ * search (a contact entered by hand directly in Dinero can have its CVR
+ * sitting in a field the CVR search doesn't filter on). Every candidate
+ * is enriched with its real Name/Email via a per-GUID detail fetch, and
+ * cross-referenced against our own deals to flag existing duplicates.
  */
 export async function findDineroContactsForDeal(dealId: string): Promise<ActionResult<DineroContactCandidate[]>> {
   return asActionResult(async () => {
@@ -187,25 +196,31 @@ export async function findDineroContactsForDeal(dealId: string): Promise<ActionR
 
     const deal = await prisma.deal.findUniqueOrThrow({
       where: { id: dealId },
-      select: { cvrNumber: true, companyName: true, displayName: true },
+      select: { cvrNumber: true, companyName: true, displayName: true, dineroContactGuid: true },
     });
-    if (!deal.cvrNumber) throw new Error("Dealen har intet CVR-nummer at søge på");
     if (!(await isDineroConfigured())) throw new Error("Dinero er ikke konfigureret");
 
-    let guids = await searchDineroContactsByCvr(deal.cvrNumber);
-    // A contact entered by hand directly in Dinero can have its CVR sitting
-    // in a field our CVR search doesn't filter on - fall back to matching
-    // by company name rather than reporting "nothing found" outright.
-    if (guids.length === 0) guids = await searchDineroContactsByName(dealName(deal).trim());
+    const searchGuids = await searchDineroContacts(deal.cvrNumber, dealName(deal));
+
+    const guids = Array.from(new Set([...(deal.dineroContactGuid ? [deal.dineroContactGuid] : []), ...searchGuids]));
     if (guids.length === 0) return [];
 
-    const linkedDeals = await prisma.deal.findMany({
-      where: { dineroContactGuid: { in: guids } },
-      select: { companyName: true, displayName: true, dineroContactGuid: true },
-    });
+    const [linkedDeals, details] = await Promise.all([
+      prisma.deal.findMany({
+        where: { dineroContactGuid: { in: guids } },
+        select: { companyName: true, displayName: true, dineroContactGuid: true },
+      }),
+      Promise.all(guids.map((guid) => getDineroContact(guid))),
+    ]);
     const dealNameByGuid = new Map(linkedDeals.map((d) => [d.dineroContactGuid as string, dealName(d)]));
 
-    return guids.map((contactGuid) => ({ contactGuid, linkedDealName: dealNameByGuid.get(contactGuid) ?? null }));
+    return guids.map((contactGuid, i) => ({
+      contactGuid,
+      name: details[i]?.name ?? null,
+      email: details[i]?.email ?? null,
+      linkedDealName: dealNameByGuid.get(contactGuid) ?? null,
+      isCurrentLink: contactGuid === deal.dineroContactGuid,
+    }));
   });
 }
 

@@ -183,73 +183,103 @@ async function updateContact(accessToken: string, contactGuid: string, input: Di
   if (!res.ok) throw new Error(`Dinero: kunne ikke opdatere kontakt (${res.status}): ${await res.text()}`);
 }
 
-/** Looks up an existing Dinero contact by CVR number. Returns null if none is found. */
-async function findContactByCvr(accessToken: string, cvr: string): Promise<string | null> {
+/**
+ * Fetches one contact's Name/CVR/VatNumber by its GUID. An earlier attempt
+ * at this looked like it 404'd against this organization - but that call
+ * happened while a separate bug meant `undefined` was sometimes passed in
+ * as the GUID (naturally 404ing, since no contact has that id), not
+ * because the endpoint itself is broken. Returns null on any failure
+ * rather than throwing, since this is used to enrich an already-known
+ * link, not to gate anything.
+ */
+export async function getDineroContact(
+  contactGuid: string
+): Promise<{ name: string | null; cvr: string | null; vatNumber: string | null; email: string | null } | null> {
+  if (await isDineroTestMode()) return null;
+  const accessToken = await getAccessToken();
   const orgId = process.env.DINERO_ORGANIZATION_ID!;
-  // The filterable property is VatNumber, not Cvr (Cvr is only a valid field
-  // name for creating a contact, not for filtering an existing one).
-  const query = new URLSearchParams({ queryFilter: `VatNumber eq '${sanitizeCvr(cvr)}'` });
+
+  const res = await dineroFetch(`${DINERO_API_BASE}/${orgId}/contacts/${contactGuid}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) return null;
+  const data = (await res.json()) as { Name?: string; Cvr?: string; VatNumber?: string; Email?: string };
+  return {
+    name: data.Name ?? null,
+    cvr: data.Cvr ?? null,
+    vatNumber: data.VatNumber ?? null,
+    email: data.Email ?? null,
+  };
+}
+
+/**
+ * Looks up an existing Dinero contact by CVR, falling back to a name
+ * match. Used before drafting an invoice, to decide whether to reuse an
+ * existing contact instead of creating a new one - this used to filter
+ * server-side via `VatNumber eq '...'`, but that queryFilter proved
+ * unreliable (came back empty even for a CVR that demonstrably exists on
+ * a real, freshly self-created contact), which is very likely the actual
+ * reason duplicate contacts kept getting created for the same company in
+ * the first place. See listAllDineroContacts/searchDineroContacts.
+ */
+async function findContactByCvr(accessToken: string, cvr: string, companyName?: string): Promise<string | null> {
+  const all = await listAllDineroContacts(accessToken);
+  const cleanCvr = sanitizeCvr(cvr);
+  const byCvr = cleanCvr ? all.find((c) => c.vatNumber && sanitizeCvr(c.vatNumber) === cleanCvr) : undefined;
+  if (byCvr) return byCvr.contactGuid;
+
+  const nameLower = companyName?.trim().toLowerCase();
+  if (!nameLower) return null;
+  return all.find((c) => c.name?.toLowerCase().includes(nameLower))?.contactGuid ?? null;
+}
+
+/**
+ * Fetches every contact in the organization - deliberately not filtered
+ * server-side via queryFilter at all. That query DSL has proven
+ * unreliable here in practice (rejected an undocumented-but-real property
+ * outright with a 400, and separately came back with zero matches for a
+ * CVR that demonstrably exists on a real, even freshly self-created
+ * contact), so instead of trying to reverse-engineer its exact semantics,
+ * this fetches the plain unfiltered list - reliable, since it's the same
+ * basic endpoint every other lookup already depends on - and callers
+ * match client-side instead. Fine at this organization's scale
+ * (dozens of contacts, not thousands).
+ */
+async function listAllDineroContacts(
+  accessToken: string
+): Promise<{ contactGuid: string; name: string | null; vatNumber: string | null }[]> {
+  const orgId = process.env.DINERO_ORGANIZATION_ID!;
+  const query = new URLSearchParams({ pageSize: "1000" });
 
   const res = await dineroFetch(`${DINERO_API_BASE}/${orgId}/contacts?${query}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
 
-  if (!res.ok) throw new Error(`Dinero: kunne ikke slå kontakt op på CVR (${res.status}): ${await res.text()}`);
-  const data = (await res.json()) as { Collection: { ContactGuid: string }[] };
-  return data.Collection[0]?.ContactGuid ?? null;
+  if (!res.ok) throw new Error(`Dinero: kunne ikke hente kontaktliste (${res.status}): ${await res.text()}`);
+  const data = (await res.json()) as { Collection: { ContactGuid?: string; Name?: string; VatNumber?: string }[] };
+  return data.Collection.filter((c): c is typeof c & { ContactGuid: string } => Boolean(c.ContactGuid)).map((c) => ({
+    contactGuid: c.ContactGuid,
+    name: c.Name ?? null,
+    vatNumber: c.VatNumber ?? null,
+  }));
 }
 
-/**
- * Same lookup as findContactByCvr, but returns every match instead of just
- * the first - a company can end up with more than one contact in Dinero
- * (e.g. one created per duplicate deal in the CRM before that was noticed),
- * and an admin needs to see and pick the right one rather than us silently
- * grabbing whichever one the API happens to list first.
- *
- * The list endpoint only returns bare ContactGuids, not Name/Email - and a
- * separate per-contact detail fetch (GET .../contacts/{guid}) turned out to
- * 404 against this organization, so this deliberately doesn't try to
- * enrich the matches with Dinero-side details at all. The caller instead
- * cross-references each GUID against our own deals (see
- * findDineroContactsForDeal in actions/invoices.ts) to show something
- * actually useful: which deal, if any, already uses it.
- */
-async function queryContactGuids(accessToken: string, queryFilter: string): Promise<string[]> {
-  const orgId = process.env.DINERO_ORGANIZATION_ID!;
-  const query = new URLSearchParams({ queryFilter });
-
-  const res = await dineroFetch(`${DINERO_API_BASE}/${orgId}/contacts?${query}`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-
-  if (!res.ok) throw new Error(`Dinero: kunne ikke slå kontakt op (${res.status}): ${await res.text()}`);
-  const data = (await res.json()) as { Collection: { ContactGuid?: string }[] };
-  // At least one real-world match came back without a ContactGuid at all -
-  // filtered out rather than passed through, since an `undefined` in the
-  // list blows up the caller's Prisma `in: [...]` query outright.
-  return data.Collection.map((c) => c.ContactGuid).filter((guid): guid is string => Boolean(guid));
-}
-
-export async function searchDineroContactsByCvr(cvr: string): Promise<string[]> {
+/** Every contact whose CVR matches, or - if none do - whose name contains the
+ * given company name (case-insensitive) - a contact entered by hand
+ * directly in Dinero can have its CVR sitting in a field that isn't
+ * VatNumber, so the name fallback catches those too. */
+export async function searchDineroContacts(cvr: string | null, companyName: string): Promise<string[]> {
   if (await isDineroTestMode()) return [];
   const accessToken = await getAccessToken();
-  return queryContactGuids(accessToken, `VatNumber eq '${sanitizeCvr(cvr)}'`);
-}
+  const all = await listAllDineroContacts(accessToken);
 
-/**
- * Falls back to a name search when the CVR search comes up empty - a
- * contact entered by hand directly in Dinero (rather than created through
- * this integration) can have its CVR sitting only in the `Cvr` field,
- * which isn't filterable, while `VatNumber` (the field the CVR search
- * actually filters on) stays blank. A real case: a customer visibly
- * findable by CVR in Dinero's own UI search, but invisible to our
- * VatNumber-only queryFilter.
- */
-export async function searchDineroContactsByName(name: string): Promise<string[]> {
-  if (await isDineroTestMode()) return [];
-  const accessToken = await getAccessToken();
-  const escaped = name.replace(/'/g, "''");
-  return queryContactGuids(accessToken, `Name contains '${escaped}'`);
+  const cleanCvr = cvr ? sanitizeCvr(cvr) : "";
+  const byCvr = cleanCvr ? all.filter((c) => c.vatNumber && sanitizeCvr(c.vatNumber) === cleanCvr) : [];
+  if (byCvr.length > 0) return byCvr.map((c) => c.contactGuid);
+
+  const nameLower = companyName.trim().toLowerCase();
+  if (!nameLower) return [];
+  return all.filter((c) => c.name?.toLowerCase().includes(nameLower)).map((c) => c.contactGuid);
 }
 
 export type DineroInvoiceLine = { description: string; amount: number };
@@ -380,7 +410,7 @@ export async function createQuarterlyInvoiceDraft(params: {
   };
 
   const reusedContactGuid =
-    params.existingContactGuid ?? (params.cvrNumber ? await findContactByCvr(accessToken, params.cvrNumber) : null);
+    params.existingContactGuid ?? (await findContactByCvr(accessToken, params.cvrNumber ?? "", params.companyName));
 
   const contactGuid = reusedContactGuid ?? (await createContact(accessToken, contactInput));
   // A reused contact may have been created before a data-quality fix (e.g.
