@@ -30,13 +30,17 @@ export function LinkDineroContactForm({ dealId, currentGuid }: { dealId: string;
 
   return (
     <div className="mt-3 space-y-2 border-t border-slate-100 pt-3">
+      <p className="text-xs text-slate-400">
+        Tryk &quot;Find i Dinero&quot; for at søge på dealens eget CVR-nummer - feltet nedenfor skal ikke udfyldes
+        først, det er kun der GUID&apos;en ender når du vælger en match (eller indsætter en selv).
+      </p>
       <div className="flex flex-wrap items-center gap-2">
         <label className="text-xs font-medium text-slate-500">Dinero kontakt-GUID</label>
         <input
           type="text"
           value={value}
           onChange={(e) => setValue(e.target.value)}
-          placeholder="Sæt for at genbruge en eksisterende Dinero-kontakt"
+          placeholder="Udfyldes automatisk når du vælger en match herunder"
           className="min-w-0 flex-1 rounded-md border border-slate-300 px-2 py-1 text-xs"
         />
         <button

@@ -193,10 +193,12 @@ async function getContact(accessToken: string, contactGuid: string): Promise<{ n
   const res = await dineroFetch(`${DINERO_API_BASE}/${orgId}/contacts/${contactGuid}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
-  if (!res.ok) return { name: null, email: null };
-  const data = (await res.json()) as { Name?: string; Email?: string | { Address?: string }[] };
-  const email = Array.isArray(data.Email) ? data.Email[0]?.Address ?? null : (data.Email as string | undefined) ?? null;
-  return { name: data.Name ?? null, email };
+  if (!res.ok) {
+    console.error(`Dinero: kunne ikke hente kontaktdetaljer for ${contactGuid} (${res.status}): ${await res.text()}`);
+    return { name: null, email: null };
+  }
+  const data = (await res.json()) as { Name?: string; Email?: string };
+  return { name: data.Name ?? null, email: data.Email ?? null };
 }
 
 /**
