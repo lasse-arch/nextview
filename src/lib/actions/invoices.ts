@@ -116,13 +116,36 @@ export async function retryInvoiceDraft(invoiceId: string): Promise<{ success: b
  * kladde was already created there, it stays until deleted from within
  * Dinero directly (see the "Nulstil fakturering" section for why).
  */
-export async function deleteInvoiceDraft(invoiceId: string): Promise<void> {
-  const user = await requireUser();
-  if (user.role !== "ADMIN") throw new Error("Kun admin kan fjerne fakturaer");
+type ActionResult<T = undefined> = { ok: true; value: T } | { ok: false; error: string };
 
-  const invoice = await prisma.invoice.delete({ where: { id: invoiceId } });
-  revalidatePath(`/deals/${invoice.dealId}`);
-  revalidatePath("/settings/dinero");
+/**
+ * Next.js replaces a Server Action's thrown error with a generic masked
+ * message in production ("An error occurred in the Server Components
+ * render...") - real for security, but it means every specific error we
+ * throw (a permission check, a validation message, a downstream API
+ * error) never actually reaches the user, only a useless digest. Wrapping
+ * the action's body and returning the message as normal data sidesteps
+ * that masking entirely - this is the actual explanation for the
+ * recurring "Minified React error #441" toasts, not a database issue.
+ */
+async function asActionResult<T>(fn: () => Promise<T>): Promise<ActionResult<T>> {
+  try {
+    return { ok: true, value: await fn() };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Der opstod en fejl." };
+  }
+}
+
+export async function deleteInvoiceDraft(invoiceId: string): Promise<ActionResult> {
+  return asActionResult(async () => {
+    const user = await requireUser();
+    if (user.role !== "ADMIN") throw new Error("Kun admin kan fjerne fakturaer");
+
+    const invoice = await prisma.invoice.delete({ where: { id: invoiceId } });
+    revalidatePath(`/deals/${invoice.dealId}`);
+    revalidatePath("/settings/dinero");
+    return undefined;
+  });
 }
 
 /**
@@ -134,13 +157,16 @@ export async function deleteInvoiceDraft(invoiceId: string): Promise<void> {
  * instead of creating yet another duplicate. An empty guid clears the link,
  * falling back to the normal CVR-lookup-or-create behavior again.
  */
-export async function linkDealToDineroContact(dealId: string, contactGuid: string): Promise<void> {
-  const user = await requireUser();
-  if (user.role !== "ADMIN") throw new Error("Kun admin kan ændre Dinero-kobling");
+export async function linkDealToDineroContact(dealId: string, contactGuid: string): Promise<ActionResult> {
+  return asActionResult(async () => {
+    const user = await requireUser();
+    if (user.role !== "ADMIN") throw new Error("Kun admin kan ændre Dinero-kobling");
 
-  const trimmed = contactGuid.trim();
-  await prisma.deal.update({ where: { id: dealId }, data: { dineroContactGuid: trimmed || null } });
-  revalidatePath(`/deals/${dealId}`);
+    const trimmed = contactGuid.trim();
+    await prisma.deal.update({ where: { id: dealId }, data: { dineroContactGuid: trimmed || null } });
+    revalidatePath(`/deals/${dealId}`);
+    return undefined;
+  });
 }
 
 export type DineroContactCandidate = { contactGuid: string; linkedDealName: string | null };
@@ -154,24 +180,26 @@ export type DineroContactCandidate = { contactGuid: string; linkedDealName: stri
  * against our own deals - showing which deal (if any) already uses that
  * contact is exactly what's needed to tell duplicates apart anyway.
  */
-export async function findDineroContactsForDeal(dealId: string): Promise<DineroContactCandidate[]> {
-  const user = await requireUser();
-  if (user.role !== "ADMIN") throw new Error("Kun admin kan søge i Dinero");
+export async function findDineroContactsForDeal(dealId: string): Promise<ActionResult<DineroContactCandidate[]>> {
+  return asActionResult(async () => {
+    const user = await requireUser();
+    if (user.role !== "ADMIN") throw new Error("Kun admin kan søge i Dinero");
 
-  const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId }, select: { cvrNumber: true } });
-  if (!deal.cvrNumber) throw new Error("Dealen har intet CVR-nummer at søge på");
-  if (!(await isDineroConfigured())) throw new Error("Dinero er ikke konfigureret");
+    const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId }, select: { cvrNumber: true } });
+    if (!deal.cvrNumber) throw new Error("Dealen har intet CVR-nummer at søge på");
+    if (!(await isDineroConfigured())) throw new Error("Dinero er ikke konfigureret");
 
-  const guids = await searchDineroContactsByCvr(deal.cvrNumber);
-  if (guids.length === 0) return [];
+    const guids = await searchDineroContactsByCvr(deal.cvrNumber);
+    if (guids.length === 0) return [];
 
-  const linkedDeals = await prisma.deal.findMany({
-    where: { dineroContactGuid: { in: guids } },
-    select: { companyName: true, displayName: true, dineroContactGuid: true },
+    const linkedDeals = await prisma.deal.findMany({
+      where: { dineroContactGuid: { in: guids } },
+      select: { companyName: true, displayName: true, dineroContactGuid: true },
+    });
+    const dealNameByGuid = new Map(linkedDeals.map((d) => [d.dineroContactGuid as string, dealName(d)]));
+
+    return guids.map((contactGuid) => ({ contactGuid, linkedDealName: dealNameByGuid.get(contactGuid) ?? null }));
   });
-  const dealNameByGuid = new Map(linkedDeals.map((d) => [d.dineroContactGuid as string, dealName(d)]));
-
-  return guids.map((contactGuid) => ({ contactGuid, linkedDealName: dealNameByGuid.get(contactGuid) ?? null }));
 }
 
 /**
@@ -181,15 +209,17 @@ export async function findDineroContactsForDeal(dealId: string): Promise<DineroC
  * has the exact right contact open in Dinero, which sidesteps the CVR
  * search entirely (and its ambiguity when a CVR has several matches).
  */
-export async function resolveDineroContactNumber(input: string): Promise<string | null> {
-  const user = await requireUser();
-  if (user.role !== "ADMIN") throw new Error("Kun admin kan søge i Dinero");
-  if (!(await isDineroConfigured())) throw new Error("Dinero er ikke konfigureret");
+export async function resolveDineroContactNumber(input: string): Promise<ActionResult<string | null>> {
+  return asActionResult(async () => {
+    const user = await requireUser();
+    if (user.role !== "ADMIN") throw new Error("Kun admin kan søge i Dinero");
+    if (!(await isDineroConfigured())) throw new Error("Dinero er ikke konfigureret");
 
-  const match = input.trim().match(/(\d+)\s*$/);
-  if (!match) throw new Error("Kunne ikke finde et kontaktnummer i det du indsatte");
+    const match = input.trim().match(/(\d+)\s*$/);
+    if (!match) throw new Error("Kunne ikke finde et kontaktnummer i det du indsatte");
 
-  return findContactGuidByContactNumber(match[1]);
+    return findContactGuidByContactNumber(match[1]);
+  });
 }
 
 /**

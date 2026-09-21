@@ -226,7 +226,7 @@ export async function findContactGuidByContactNumber(contactNumber: string): Pro
 
   const accessToken = await getAccessToken();
   const orgId = process.env.DINERO_ORGANIZATION_ID!;
-  const query = new URLSearchParams({ queryFilter: `ContactNumber eq ${contactNumber}` });
+  const query = new URLSearchParams({ queryFilter: `ContactNumber eq '${contactNumber}'` });
 
   const res = await dineroFetch(`${DINERO_API_BASE}/${orgId}/contacts?${query}`, {
     headers: { Authorization: `Bearer ${accessToken}` },

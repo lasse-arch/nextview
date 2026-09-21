@@ -50,17 +50,17 @@ export function LinkDineroContactForm({ dealId, currentGuid }: { dealId: string;
           disabled={resolving}
           onClick={() => {
             startResolve(async () => {
-              try {
-                const guid = await resolveDineroContactNumber(urlInput);
-                if (!guid) {
-                  showToast("Ingen kontakt fundet med det nummer");
-                  return;
-                }
-                setValue(guid);
-                showToast("Fundet - tryk Gem for at koble");
-              } catch (err) {
-                showToast(err instanceof Error ? err.message : "Der opstod en fejl.");
+              const result = await resolveDineroContactNumber(urlInput);
+              if (!result.ok) {
+                showToast(result.error);
+                return;
               }
+              if (!result.value) {
+                showToast("Ingen kontakt fundet med det nummer");
+                return;
+              }
+              setValue(result.value);
+              showToast("Fundet - tryk Gem for at koble");
             });
           }}
           className="shrink-0 rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
@@ -86,13 +86,13 @@ export function LinkDineroContactForm({ dealId, currentGuid }: { dealId: string;
           disabled={searching}
           onClick={() => {
             startSearch(async () => {
-              try {
-                const found = await findDineroContactsForDeal(dealId);
-                setMatches(found);
-                if (found.length === 0) showToast("Ingen Dinero-kontakter fundet på dealens CVR-nummer");
-              } catch (err) {
-                showToast(err instanceof Error ? err.message : "Der opstod en fejl.");
+              const result = await findDineroContactsForDeal(dealId);
+              if (!result.ok) {
+                showToast(result.error);
+                return;
               }
+              setMatches(result.value);
+              if (result.value.length === 0) showToast("Ingen Dinero-kontakter fundet på dealens CVR-nummer");
             });
           }}
           className="shrink-0 rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
@@ -104,12 +104,8 @@ export function LinkDineroContactForm({ dealId, currentGuid }: { dealId: string;
           disabled={pending}
           onClick={() => {
             startTransition(async () => {
-              try {
-                await linkDealToDineroContact(dealId, value);
-                showToast(value.trim() ? "Kontakt koblet" : "Kobling fjernet");
-              } catch (err) {
-                showToast(err instanceof Error ? err.message : "Der opstod en fejl.");
-              }
+              const result = await linkDealToDineroContact(dealId, value);
+              showToast(result.ok ? (value.trim() ? "Kontakt koblet" : "Kobling fjernet") : result.error);
             });
           }}
           className="shrink-0 rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
