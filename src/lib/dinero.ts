@@ -183,22 +183,19 @@ async function updateContact(accessToken: string, contactGuid: string, input: Di
   if (!res.ok) throw new Error(`Dinero: kunne ikke opdatere kontakt (${res.status}): ${await res.text()}`);
 }
 
+type DineroContactDetail = { name: string | null; cvr: string | null; vatNumber: string | null; email: string | null };
+
 /**
  * Fetches one contact's Name/CVR/VatNumber by its GUID. An earlier attempt
  * at this looked like it 404'd against this organization - but that call
  * happened while a separate bug meant `undefined` was sometimes passed in
  * as the GUID (naturally 404ing, since no contact has that id), not
  * because the endpoint itself is broken. Returns null on any failure
- * rather than throwing, since this is used to enrich an already-known
- * link, not to gate anything.
+ * rather than throwing, since it's used to enrich an already-known link
+ * or a plain listing, not to gate anything.
  */
-export async function getDineroContact(
-  contactGuid: string
-): Promise<{ name: string | null; cvr: string | null; vatNumber: string | null; email: string | null } | null> {
-  if (await isDineroTestMode()) return null;
-  const accessToken = await getAccessToken();
+async function fetchContactDetail(accessToken: string, contactGuid: string): Promise<DineroContactDetail | null> {
   const orgId = process.env.DINERO_ORGANIZATION_ID!;
-
   const res = await dineroFetch(`${DINERO_API_BASE}/${orgId}/contacts/${contactGuid}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
@@ -210,6 +207,12 @@ export async function getDineroContact(
     vatNumber: data.VatNumber ?? null,
     email: data.Email ?? null,
   };
+}
+
+export async function getDineroContact(contactGuid: string): Promise<DineroContactDetail | null> {
+  if (await isDineroTestMode()) return null;
+  const accessToken = await getAccessToken();
+  return fetchContactDetail(accessToken, contactGuid);
 }
 
 /**
@@ -225,7 +228,9 @@ export async function getDineroContact(
 async function findContactByCvr(accessToken: string, cvr: string, companyName?: string): Promise<string | null> {
   const all = await listAllDineroContacts(accessToken);
   const cleanCvr = sanitizeCvr(cvr);
-  const byCvr = cleanCvr ? all.find((c) => c.vatNumber && sanitizeCvr(c.vatNumber) === cleanCvr) : undefined;
+  const byCvr = cleanCvr
+    ? all.find((c) => sanitizeCvr(c.vatNumber) === cleanCvr || sanitizeCvr(c.cvr) === cleanCvr)
+    : undefined;
   if (byCvr) return byCvr.contactGuid;
 
   const nameLower = companyName?.trim().toLowerCase();
@@ -245,9 +250,7 @@ async function findContactByCvr(accessToken: string, cvr: string, companyName?: 
  * match client-side instead. Fine at this organization's scale
  * (dozens of contacts, not thousands).
  */
-async function listAllDineroContacts(
-  accessToken: string
-): Promise<{ contactGuid: string; name: string | null; vatNumber: string | null }[]> {
+async function listAllDineroContacts(accessToken: string): Promise<(DineroContactDetail & { contactGuid: string })[]> {
   const orgId = process.env.DINERO_ORGANIZATION_ID!;
   const query = new URLSearchParams({ pageSize: "1000" });
 
@@ -256,25 +259,38 @@ async function listAllDineroContacts(
   });
 
   if (!res.ok) throw new Error(`Dinero: kunne ikke hente kontaktliste (${res.status}): ${await res.text()}`);
-  const data = (await res.json()) as { Collection: { ContactGuid?: string; Name?: string; VatNumber?: string }[] };
-  return data.Collection.filter((c): c is typeof c & { ContactGuid: string } => Boolean(c.ContactGuid)).map((c) => ({
-    contactGuid: c.ContactGuid,
-    name: c.Name ?? null,
-    vatNumber: c.VatNumber ?? null,
+  const data = (await res.json()) as { Collection: { ContactGuid?: string }[] };
+  const guids = data.Collection.map((c) => c.ContactGuid).filter((g): g is string => Boolean(g));
+
+  // The plain list only ever returns bare GUIDs (same limitation observed on
+  // the filtered search before it) - Name/VatNumber/Cvr all come back
+  // undefined - so every contact needs its own detail fetch to actually be
+  // matchable. Costs `guids.length` extra requests, fine at this org's
+  // small scale.
+  const details = await Promise.all(guids.map((guid) => fetchContactDetail(accessToken, guid)));
+  return guids.map((contactGuid, i) => ({
+    contactGuid,
+    name: details[i]?.name ?? null,
+    cvr: details[i]?.cvr ?? null,
+    vatNumber: details[i]?.vatNumber ?? null,
+    email: details[i]?.email ?? null,
   }));
 }
 
-/** Every contact whose CVR matches, or - if none do - whose name contains the
- * given company name (case-insensitive) - a contact entered by hand
- * directly in Dinero can have its CVR sitting in a field that isn't
- * VatNumber, so the name fallback catches those too. */
+/** Every contact whose CVR matches (checking both VatNumber and Cvr - a
+ * contact entered by hand directly in Dinero, or one with "Opdatér
+ * automatisk fra CVR" enabled, can have its CVR living in either field),
+ * or - if none do - whose name contains the given company name
+ * (case-insensitive). */
 export async function searchDineroContacts(cvr: string | null, companyName: string): Promise<string[]> {
   if (await isDineroTestMode()) return [];
   const accessToken = await getAccessToken();
   const all = await listAllDineroContacts(accessToken);
 
   const cleanCvr = cvr ? sanitizeCvr(cvr) : "";
-  const byCvr = cleanCvr ? all.filter((c) => c.vatNumber && sanitizeCvr(c.vatNumber) === cleanCvr) : [];
+  const byCvr = cleanCvr
+    ? all.filter((c) => sanitizeCvr(c.vatNumber) === cleanCvr || sanitizeCvr(c.cvr) === cleanCvr)
+    : [];
   if (byCvr.length > 0) return byCvr.map((c) => c.contactGuid);
 
   const nameLower = companyName.trim().toLowerCase();
