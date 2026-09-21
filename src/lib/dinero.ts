@@ -199,7 +199,10 @@ async function fetchContactDetail(accessToken: string, contactGuid: string): Pro
   const res = await dineroFetch(`${DINERO_API_BASE}/${orgId}/contacts/${contactGuid}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
-  if (!res.ok) return null;
+  if (!res.ok) {
+    console.error(`Dinero: kunne ikke hente kontaktdetaljer for ${contactGuid} (${res.status}): ${await res.text()}`);
+    return null;
+  }
   const data = (await res.json()) as { Name?: string; Cvr?: string; VatNumber?: string; Email?: string };
   return {
     name: data.Name ?? null,
@@ -265,9 +268,16 @@ async function listAllDineroContacts(accessToken: string): Promise<(DineroContac
   // The plain list only ever returns bare GUIDs (same limitation observed on
   // the filtered search before it) - Name/VatNumber/Cvr all come back
   // undefined - so every contact needs its own detail fetch to actually be
-  // matchable. Costs `guids.length` extra requests, fine at this org's
-  // small scale.
-  const details = await Promise.all(guids.map((guid) => fetchContactDetail(accessToken, guid)));
+  // matchable. Fetched one at a time rather than via Promise.all: firing
+  // dozens of these at once tends to hit Dinero's rate limiting, and
+  // fetchContactDetail swallows a failed fetch as a silent null rather
+  // than throwing - so a burst of 429s here wouldn't error, it would just
+  // make every contact look like it has no name/CVR, and nothing would
+  // ever match. Slower, but reliable - fine at this org's small scale.
+  const details: (DineroContactDetail | null)[] = [];
+  for (const guid of guids) {
+    details.push(await fetchContactDetail(accessToken, guid));
+  }
   return guids.map((contactGuid, i) => ({
     contactGuid,
     name: details[i]?.name ?? null,
