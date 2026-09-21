@@ -474,6 +474,14 @@ export default async function DealDetailPage({
                           Betalt {formatDate(inv.paidAt)}
                         </span>
                       )}
+                      {!inv.paidAt && inv.status === "DRAFT_CREATED" && inv.quarterIndex >= 1 && (
+                        // Netto+8 is set so it lands exactly on the period's start date
+                        // (see draftInvoiceLine in invoice-service.ts) - scheduledDate
+                        // *is* the due date here, no separate field needed.
+                        <span className="shrink-0 whitespace-nowrap rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
+                          Forfalder {formatDate(inv.scheduledDate)}
+                        </span>
+                      )}
                       {currentUser?.role === "ADMIN" && !inv.paidAt && inv.dineroInvoiceGuid && !inv.dineroInvoiceGuid.startsWith("TEST-") && (
                         <CheckPaymentButton invoiceId={inv.id} />
                       )}
