@@ -17,7 +17,7 @@ function ToastViewport({ toasts }: { toasts: Toast[] }) {
       {toasts.map((t) => (
         <div
           key={t.id}
-          className="pointer-events-auto rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white shadow-lg"
+          className="pointer-events-auto max-w-lg whitespace-pre-wrap rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white shadow-lg"
         >
           {t.message}
         </div>

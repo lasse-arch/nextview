@@ -287,25 +287,35 @@ async function listAllDineroContacts(accessToken: string): Promise<(DineroContac
   }));
 }
 
+export type DineroSearchResult = {
+  guids: string[];
+  /** Every contact actually fetched, for debugging when nothing matches -
+   * lets the admin (and us, without Vercel log access) see directly
+   * whether the target company shows up at all, and under what
+   * name/CVR, rather than just being told "not found". */
+  debugAllContacts: { name: string | null; cvr: string | null; vatNumber: string | null }[];
+};
+
 /** Every contact whose CVR matches (checking both VatNumber and Cvr - a
  * contact entered by hand directly in Dinero, or one with "Opdatér
  * automatisk fra CVR" enabled, can have its CVR living in either field),
  * or - if none do - whose name contains the given company name
  * (case-insensitive). */
-export async function searchDineroContacts(cvr: string | null, companyName: string): Promise<string[]> {
-  if (await isDineroTestMode()) return [];
+export async function searchDineroContacts(cvr: string | null, companyName: string): Promise<DineroSearchResult> {
+  if (await isDineroTestMode()) return { guids: [], debugAllContacts: [] };
   const accessToken = await getAccessToken();
   const all = await listAllDineroContacts(accessToken);
+  const debugAllContacts = all.map((c) => ({ name: c.name, cvr: c.cvr, vatNumber: c.vatNumber }));
 
   const cleanCvr = cvr ? sanitizeCvr(cvr) : "";
   const byCvr = cleanCvr
     ? all.filter((c) => sanitizeCvr(c.vatNumber) === cleanCvr || sanitizeCvr(c.cvr) === cleanCvr)
     : [];
-  if (byCvr.length > 0) return byCvr.map((c) => c.contactGuid);
+  if (byCvr.length > 0) return { guids: byCvr.map((c) => c.contactGuid), debugAllContacts };
 
   const nameLower = companyName.trim().toLowerCase();
-  if (!nameLower) return [];
-  return all.filter((c) => c.name?.toLowerCase().includes(nameLower)).map((c) => c.contactGuid);
+  const byName = nameLower ? all.filter((c) => c.name?.toLowerCase().includes(nameLower)) : [];
+  return { guids: byName.map((c) => c.contactGuid), debugAllContacts };
 }
 
 export type DineroInvoiceLine = { description: string; amount: number };

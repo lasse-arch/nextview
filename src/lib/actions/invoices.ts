@@ -200,10 +200,22 @@ export async function findDineroContactsForDeal(dealId: string): Promise<ActionR
     });
     if (!(await isDineroConfigured())) throw new Error("Dinero er ikke konfigureret");
 
-    const searchGuids = await searchDineroContacts(deal.cvrNumber, dealName(deal));
+    const { guids: searchGuids, debugAllContacts } = await searchDineroContacts(deal.cvrNumber, dealName(deal));
 
     const guids = Array.from(new Set([...(deal.dineroContactGuid ? [deal.dineroContactGuid] : []), ...searchGuids]));
-    if (guids.length === 0) return [];
+    if (guids.length === 0) {
+      // Nothing matched at all - rather than a bare "not found" (which has
+      // repeatedly turned out to hide a real bug), list every contact this
+      // search actually fetched from Dinero, so it's visible right away
+      // whether the target company even showed up, and under what
+      // name/CVR, instead of guessing again.
+      const summary = debugAllContacts
+        .map((c) => `${c.name ?? "(intet navn)"} [CVR:${c.cvr ?? "-"} VAT:${c.vatNumber ?? "-"}]`)
+        .join(", ");
+      throw new Error(
+        `Ingen match for CVR "${deal.cvrNumber ?? "-"}" / navn "${dealName(deal)}". Dinero har ${debugAllContacts.length} kontakter: ${summary}`
+      );
+    }
 
     const [linkedDeals, details] = await Promise.all([
       prisma.deal.findMany({
