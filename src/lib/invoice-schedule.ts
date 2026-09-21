@@ -1,4 +1,4 @@
-import { addMonths, addDays, endOfQuarter, startOfMonth, endOfMonth, differenceInCalendarDays } from "date-fns";
+import { addMonths, subMonths, addDays, endOfQuarter, startOfMonth, endOfMonth, differenceInCalendarDays } from "date-fns";
 
 export type BillingPeriod = {
   /** 1-based sequential order within the term (never a literal calendar quarter number). */
@@ -20,15 +20,19 @@ export type BillingPeriod = {
  * calendar quarters, capped at `until`.
  *
  * Every period - including the first - is due on the 1st of the quarter it
- * covers, so with Dinero's Netto+8 payment terms the draft has to be sent
- * exactly 8 days before that (e.g. a quarter starting 1 October is drafted
- * 23 September), assuming it's sent out the same day it's drafted, which is
- * the point of drafting it ahead of time. For a billingStartDate already in
- * the past (the overwhelmingly common case - it's normally set to "today"
- * when a deal goes Live), that 8-day lookback is also already in the past,
- * so the draft is simply due immediately either way - the lead time only
- * actually matters, and only ever helps, when billingStartDate is set
- * ahead of time for a future start.
+ * covers. `draftTriggerDate` is when a draft is *allowed* to be created for
+ * it - from the 1st of the preceding calendar month onwards (e.g. a quarter
+ * starting 1 October can be drafted anytime from 1 September) - giving
+ * sellers room to prepare invoices ahead of time without having to wait
+ * until the last minute. The invoice's actual Dinero date is a separate
+ * concern (see `draftInvoiceLine` in invoice-service.ts): it's always set
+ * so Netto+8 lands exactly on the period's start date, regardless of which
+ * day within that eligible window the draft actually gets created. For a
+ * billingStartDate already in the past (the overwhelmingly common case -
+ * it's normally set to "today" when a deal goes Live), that lookback is
+ * also already in the past, so the draft is simply due immediately either
+ * way - the lead time only actually matters, and only ever helps, when
+ * billingStartDate is set ahead of time for a future start.
  */
 export function computeBillingPeriods(billingStartDate: Date, bindingMonths: number, until: Date): BillingPeriod[] {
   const contractEnd = addMonths(billingStartDate, bindingMonths);
@@ -47,7 +51,7 @@ export function computeBillingPeriods(billingStartDate: Date, bindingMonths: num
       periodEnd = contractEnd;
     }
 
-    const draftTriggerDate = addDays(cursor, -8);
+    const draftTriggerDate = startOfMonth(subMonths(cursor, 1));
 
     periods.push({ index, startDate: cursor, endDate: periodEnd, draftTriggerDate });
     cursor = addDays(periodEnd, 1);

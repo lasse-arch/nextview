@@ -45,8 +45,9 @@ type DueLine = { quarterIndex: number; amount: number; scheduledDate: Date };
 /**
  * Due lines for a deal's *current* contract term: a one-time establishment
  * fee (quarterIndex 0) plus calendar-quarter-aligned recurring periods
- * (quarterIndex 1+), each drafted on the 22nd of the month before it
- * starts. Only lines whose trigger date has passed are returned.
+ * (quarterIndex 1+), each draftable from the 1st of the month before it
+ * starts (see computeBillingPeriods). Only lines whose trigger date has
+ * passed are returned.
  *
  * The establishment fee bills the day after the contract is signed -
  * independent of billingStartDate, since that's the delivery/go-live date
@@ -232,6 +233,13 @@ async function draftInvoiceLine(
 ): Promise<{ success: true; contactGuid: string } | { success: false; error: string }> {
   try {
     const { note, lines } = buildInvoiceContent(deal, invoiceRow.quarterIndex, invoiceRow.amount, invoiceRow.scheduledDate);
+    // For a recurring period, the Dinero invoice date must land the customer's
+    // Netto+8 due date exactly on the period's start date, regardless of which
+    // day the draft actually gets created on (drafts can now be made up to a
+    // month ahead - see computeBillingPeriods' draftTriggerDate). The
+    // one-off establishment fee has no such period to align to, so it's
+    // simply dated whenever it's actually drafted.
+    const invoiceDate = invoiceRow.quarterIndex === 0 ? new Date() : addDays(invoiceRow.scheduledDate, -8);
     const result = await createQuarterlyInvoiceDraft({
       existingContactGuid: contactGuidHint,
       companyName: deal.companyName,
@@ -241,7 +249,7 @@ async function draftInvoiceLine(
       address: deal.address,
       note,
       lines,
-      invoiceDate: new Date(),
+      invoiceDate,
     });
 
     await prisma.$transaction([
