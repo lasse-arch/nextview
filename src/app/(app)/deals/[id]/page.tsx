@@ -39,6 +39,7 @@ import { LockedContractFields } from "./locked-contract-fields";
 import { ContractStatusRow } from "./contract-status-row";
 import { DealInfoForm } from "./deal-info-form";
 import { NoteForm } from "./note-form";
+import { CreateTaskFromNoteButton } from "./create-task-from-note-button";
 import { EmailList } from "./email-list";
 import { DealTasksSection } from "./deal-tasks-section";
 import { CreateInvoiceButton } from "./create-invoice-button";
@@ -344,8 +345,9 @@ export default async function DealDetailPage({
                       )}
                       {note.author.name}
                     </span>
-                    <span>
+                    <span className="flex items-center gap-2">
                       {noteKindLabels[note.kind]} · {formatDate(note.createdAt)}
+                      <CreateTaskFromNoteButton noteId={note.id} />
                     </span>
                   </div>
                   <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">{note.body}</p>

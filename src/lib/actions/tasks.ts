@@ -11,6 +11,24 @@ function revalidateTaskPaths(dealId: string | null) {
   if (dealId) revalidatePath(`/deals/${dealId}`);
 }
 
+/** "Opret opgave"-knap på en note - lidt hurtigere end at åbne opgave-formularen
+ * og selv skrive titlen ud igen, når det man vil huske allerede står i noten. */
+export async function createTaskFromNote(noteId: string): Promise<TaskResult> {
+  const user = await requireUser();
+
+  const note = await prisma.note.findUniqueOrThrow({ where: { id: noteId } });
+
+  const oneLine = note.body.replace(/\s+/g, " ").trim();
+  const title = oneLine.length > 60 ? `${oneLine.slice(0, 60)}…` : oneLine || "Opgave fra note";
+
+  const task = await prisma.task.create({
+    data: { title, description: note.body, dealId: note.dealId, createdById: user.id },
+  });
+
+  revalidateTaskPaths(note.dealId);
+  return { ok: true, id: task.id };
+}
+
 export async function createTask(formData: FormData): Promise<TaskResult> {
   const user = await requireUser();
 

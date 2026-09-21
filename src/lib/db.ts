@@ -9,9 +9,13 @@ import { PrismaClient } from "@prisma/client";
  * edited directly in the dashboard, so the limit is appended here instead,
  * in code, rather than in the env var itself.
  */
-function withConnectionLimit(url: string, limit = 5): string {
+function withConnectionLimit(url: string, limit = 1): string {
   if (/[?&]connection_limit=/.test(url)) return url;
-  return `${url}${url.includes("?") ? "&" : "?"}connection_limit=${limit}`;
+  const withLimit = `${url}${url.includes("?") ? "&" : "?"}connection_limit=${limit}`;
+  // Queue for a connection instead of failing immediately when this
+  // instance's one connection is already busy (e.g. two Prisma calls
+  // in the same request's Promise.all) - a few seconds' wait beats a crash.
+  return /[?&]pool_timeout=/.test(withLimit) ? withLimit : `${withLimit}&pool_timeout=20`;
 }
 
 function createPrismaClient(): PrismaClient {
