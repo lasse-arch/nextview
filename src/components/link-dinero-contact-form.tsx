@@ -7,11 +7,26 @@ import { useToast } from "@/components/toast";
 type Match = { contactGuid: string; name: string | null; email: string | null };
 
 export function LinkDineroContactForm({ dealId, currentGuid }: { dealId: string; currentGuid: string | null }) {
+  const [open, setOpen] = useState(Boolean(currentGuid));
   const [value, setValue] = useState(currentGuid ?? "");
   const [matches, setMatches] = useState<Match[] | null>(null);
   const [pending, startTransition] = useTransition();
   const [searching, startSearch] = useTransition();
   const showToast = useToast();
+
+  if (!open) {
+    return (
+      <div className="mt-3 border-t border-slate-100 pt-3">
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="text-xs font-medium text-slate-400 hover:text-slate-600"
+        >
+          Kobl til eksisterende Dinero-kontakt…
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="mt-3 space-y-2 border-t border-slate-100 pt-3">
