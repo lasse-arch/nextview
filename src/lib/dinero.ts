@@ -13,7 +13,12 @@ const DINERO_AUTH_URL = "https://authz.dinero.dk/dineroapi/oauth/token";
  * when the real problem is "try again in a second", not a real error.
  */
 async function dineroFetch(url: string, init: RequestInit, attempt = 1): Promise<Response> {
-  const res = await fetch(url, init);
+  // Every one of these calls is a live, mutable lookup (token, contact
+  // search/create/update, invoice create, payment status) - Next.js's
+  // fetch() patches in its own Data Cache by default, and none of these
+  // should ever be served stale, so caching is explicitly turned off
+  // rather than relying on it happening to not kick in.
+  const res = await fetch(url, { ...init, cache: "no-store" });
   if (res.status !== 429 && !(res.status >= 500 && res.status < 600)) return res;
   if (attempt >= 4) return res;
 
