@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { isDineroConfigured, searchDineroContactsByCvr } from "@/lib/dinero";
+import { isDineroConfigured, searchDineroContactsByCvr, findContactGuidByContactNumber } from "@/lib/dinero";
 import { dealName } from "@/lib/labels";
 import {
   runQuarterlyInvoiceGeneration,
@@ -172,6 +172,24 @@ export async function findDineroContactsForDeal(dealId: string): Promise<DineroC
   const dealNameByGuid = new Map(linkedDeals.map((d) => [d.dineroContactGuid as string, dealName(d)]));
 
   return guids.map((contactGuid) => ({ contactGuid, linkedDealName: dealNameByGuid.get(contactGuid) ?? null }));
+}
+
+/**
+ * Resolves a pasted Dinero contact URL (or bare kontaktnummer) to its
+ * ContactGuid - e.g. https://app.dinero.dk/637871/contacts/1037433153
+ * pastes straight out of the browser's address bar when an admin already
+ * has the exact right contact open in Dinero, which sidesteps the CVR
+ * search entirely (and its ambiguity when a CVR has several matches).
+ */
+export async function resolveDineroContactNumber(input: string): Promise<string | null> {
+  const user = await requireUser();
+  if (user.role !== "ADMIN") throw new Error("Kun admin kan søge i Dinero");
+  if (!(await isDineroConfigured())) throw new Error("Dinero er ikke konfigureret");
+
+  const match = input.trim().match(/(\d+)\s*$/);
+  if (!match) throw new Error("Kunne ikke finde et kontaktnummer i det du indsatte");
+
+  return findContactGuidByContactNumber(match[1]);
 }
 
 /**
