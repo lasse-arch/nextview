@@ -49,11 +49,26 @@ function parseMpSkinIds(raw: string | null): string[] {
 }
 
 /** The report email's body, matching the signature/wording Lasse uses when sending manually. */
-function buildReportEmailHtml(customerName: string): string {
+/** Describes the period the report covers to match how often it's actually sent -
+ * a quarterly customer shouldn't be told their report is "for the latest month". */
+function periodPhrase(interval: ReportInterval | null): string {
+  switch (interval) {
+    case "MONTHLY":
+      return "for den seneste måned";
+    case "BIMONTHLY":
+      return "for de seneste 2 måneder";
+    case "QUARTERLY":
+      return "for det seneste kvartal";
+    default:
+      return "for den seneste periode";
+  }
+}
+
+function buildReportEmailHtml(customerName: string, interval: ReportInterval | null): string {
   const name = escapeHtml(customerName);
   return `<div style="font-family: Arial, sans-serif; font-size: 14px; color: #1d1d1f; line-height: 1.5;">
 <p>Kære ${name}</p>
-<p>Vi er nu klar med en besøgsrapport for jeres virtuelle tour, for den seneste måned.</p>
+<p>Vi er nu klar med en besøgsrapport for jeres virtuelle tour, ${periodPhrase(interval)}.</p>
 <p>Se vedhæftede PDF</p>
 <p>Hvis I har nogle spørgsmål, eller overvejer at få opdateret jeres materiale, eller har andre lokaler, som giver mening at vise frem med en virtuel tour, så er I meget velkommen til at kontakte os.</p>
 <p>Med venlig hilsen<br>
@@ -155,8 +170,8 @@ export async function generateAndSendCustomerReport(
       to: [recipient],
       cc: parseCcEmails(deal.reportCcEmails),
       subject: `Besøgsrapport for jeres virtuelle tour – ${monthLabel}`,
-      bodyText: `Kære ${customerName}\n\nVi er nu klar med en besøgsrapport for jeres virtuelle tour, for den seneste måned.\n\nSe vedhæftede PDF\n\nHvis I har nogle spørgsmål, eller overvejer at få opdateret jeres materiale, eller har andre lokaler, som giver mening at vise frem med en virtuel tour, så er I meget velkommen til at kontakte os.\n\nMed venlig hilsen\nLasse Larsen\nNextview360\nTlf: 23 27 07 86`,
-      bodyHtml: buildReportEmailHtml(customerName),
+      bodyText: `Kære ${customerName}\n\nVi er nu klar med en besøgsrapport for jeres virtuelle tour, ${periodPhrase(deal.reportInterval)}.\n\nSe vedhæftede PDF\n\nHvis I har nogle spørgsmål, eller overvejer at få opdateret jeres materiale, eller har andre lokaler, som giver mening at vise frem med en virtuel tour, så er I meget velkommen til at kontakte os.\n\nMed venlig hilsen\nLasse Larsen\nNextview360\nTlf: 23 27 07 86`,
+      bodyHtml: buildReportEmailHtml(customerName, deal.reportInterval),
       attachment: { filename: fileName, contentType: "application/pdf", data: pdf },
       fromName: "Nextview360 ApS",
     });
