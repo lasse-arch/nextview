@@ -89,14 +89,26 @@ function splitDanishAddress(address: string | null): { street: string; zipCode: 
   return { street: address, zipCode: "", city: "" };
 }
 
-/** A contact created by an earlier version of this integration could have
+/**
+ * A contact created by an earlier version of this integration could have
  * literally stored the text "undefined" as its CVR (from an unguarded
  * template-literal interpolation, before `?? ""` was added) - `?? ""` alone
  * doesn't catch that, since it's a real non-nullish string, not null or
- * undefined. Treat that literal text the same as genuinely missing. */
+ * undefined. Treat that literal text the same as genuinely missing.
+ *
+ * Also strips everything but digits - a Danish CVR is always 8 plain
+ * digits, so any whitespace/dash/hidden character (e.g. from a CSV import)
+ * is definitely not meant to be part of it. This matters a lot here:
+ * Dinero's queryFilter is an exact string match, so a CVR with so much as
+ * a stray trailing space would silently fail to find a contact that was
+ * itself created with the (correctly sanitized) clean value - which is
+ * exactly how a duplicate contact could keep getting created for the same
+ * company every time its deal's CVR lookup ran.
+ */
 function sanitizeCvr(cvr: string | null): string {
   const trimmed = (cvr ?? "").trim();
-  return trimmed.toLowerCase() === "undefined" || trimmed.toLowerCase() === "null" ? "" : trimmed;
+  if (trimmed.toLowerCase() === "undefined" || trimmed.toLowerCase() === "null") return "";
+  return trimmed.replace(/\D/g, "");
 }
 
 /**
@@ -171,7 +183,7 @@ async function findContactByCvr(accessToken: string, cvr: string): Promise<strin
   const orgId = process.env.DINERO_ORGANIZATION_ID!;
   // The filterable property is VatNumber, not Cvr (Cvr is only a valid field
   // name for creating a contact, not for filtering an existing one).
-  const query = new URLSearchParams({ queryFilter: `VatNumber eq '${cvr}'` });
+  const query = new URLSearchParams({ queryFilter: `VatNumber eq '${sanitizeCvr(cvr)}'` });
 
   const res = await dineroFetch(`${DINERO_API_BASE}/${orgId}/contacts?${query}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
@@ -216,7 +228,7 @@ async function queryContactGuids(accessToken: string, queryFilter: string): Prom
 export async function searchDineroContactsByCvr(cvr: string): Promise<string[]> {
   if (await isDineroTestMode()) return [];
   const accessToken = await getAccessToken();
-  return queryContactGuids(accessToken, `VatNumber eq '${cvr}'`);
+  return queryContactGuids(accessToken, `VatNumber eq '${sanitizeCvr(cvr)}'`);
 }
 
 /**

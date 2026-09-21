@@ -196,7 +196,7 @@ export async function findDineroContactsForDeal(dealId: string): Promise<ActionR
     // A contact entered by hand directly in Dinero can have its CVR sitting
     // in a field our CVR search doesn't filter on - fall back to matching
     // by company name rather than reporting "nothing found" outright.
-    if (guids.length === 0) guids = await searchDineroContactsByName(dealName(deal));
+    if (guids.length === 0) guids = await searchDineroContactsByName(dealName(deal).trim());
     if (guids.length === 0) return [];
 
     const linkedDeals = await prisma.deal.findMany({
