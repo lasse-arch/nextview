@@ -450,12 +450,23 @@ export async function createQuarterlyInvoiceDraft(params: {
     return { contactGuid, invoiceGuid: invoice.guid, invoiceNumber: invoice.number };
   } catch (err) {
     // The cached/reused contact GUID no longer exists in Dinero (e.g. it was
-    // deleted there directly) - create a fresh contact and retry once,
-    // rather than leaving the deal permanently stuck drafting against a
-    // dead contact ID.
+    // deleted there directly) - re-run the CVR/name search once more before
+    // giving up and creating a fresh contact. Without this, a deleted
+    // cached contact would always spawn a brand new one even when a
+    // perfectly good existing contact for the same company is sitting
+    // right there in Dinero - the cache being stale is exactly the
+    // situation this search exists to recover from.
     if (!(err instanceof DineroInvalidContactError)) throw err;
 
-    const freshContactGuid = await createContact(accessToken, contactInput);
+    const recoveredGuid = await findContactByCvr(accessToken, params.cvrNumber ?? "", params.companyName);
+    const freshContactGuid = recoveredGuid ?? (await createContact(accessToken, contactInput));
+    if (recoveredGuid) {
+      try {
+        await updateContact(accessToken, recoveredGuid, contactInput);
+      } catch (updateErr) {
+        console.error("Dinero: kunne ikke opdatere genfundet kontakt", updateErr);
+      }
+    }
     const invoice = await createInvoiceDraft(accessToken, {
       contactGuid: freshContactGuid,
       note: params.note,
