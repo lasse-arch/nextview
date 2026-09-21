@@ -158,6 +158,7 @@ export async function generateAndSendCustomerReport(
       bodyText: `Kære ${customerName}\n\nVi er nu klar med en besøgsrapport for jeres virtuelle tour, for den seneste måned.\n\nSe vedhæftede PDF\n\nHvis I har nogle spørgsmål, eller overvejer at få opdateret jeres materiale, eller har andre lokaler, som giver mening at vise frem med en virtuel tour, så er I meget velkommen til at kontakte os.\n\nMed venlig hilsen\nLasse Larsen\nNextview360\nTlf: 23 27 07 86`,
       bodyHtml: buildReportEmailHtml(customerName),
       attachment: { filename: fileName, contentType: "application/pdf", data: pdf },
+      fromName: "Nextview360 ApS",
     });
 
     const nextReportDueAt = computeNextReportDueAt(deal, method);

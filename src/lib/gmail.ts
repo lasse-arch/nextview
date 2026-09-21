@@ -19,14 +19,17 @@ export async function sendGmailMessage(
     /** Renders as the body instead of bodyText when set, for simple formatting (e.g. a bold signature name). */
     bodyHtml?: string;
     attachment?: { filename: string; contentType: string; data: Buffer };
+    /** Shown as the sender's display name (e.g. "Nextview360 ApS") instead of the raw account email. */
+    fromName?: string;
   }
 ): Promise<void> {
   const accessToken = await getValidAccessToken(account);
 
   const bodyContentType = params.bodyHtml ? "text/html" : "text/plain";
   const body = params.bodyHtml ?? params.bodyText;
+  const from = params.fromName ? `${encodeHeaderUtf8(params.fromName)} <${account.email}>` : account.email;
   const headerLines = [
-    `From: ${account.email}`,
+    `From: ${from}`,
     `To: ${params.to.join(", ")}`,
     ...(params.cc && params.cc.length > 0 ? [`Cc: ${params.cc.join(", ")}`] : []),
     `Subject: ${encodeHeaderUtf8(params.subject)}`,
