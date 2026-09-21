@@ -255,15 +255,32 @@ async function findContactByCvr(accessToken: string, cvr: string, companyName?: 
  */
 async function listAllDineroContacts(accessToken: string): Promise<(DineroContactDetail & { contactGuid: string })[]> {
   const orgId = process.env.DINERO_ORGANIZATION_ID!;
-  const query = new URLSearchParams({ pageSize: "1000" });
 
-  const res = await dineroFetch(`${DINERO_API_BASE}/${orgId}/contacts?${query}`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
+  // A request with no queryFilter at all came back with a genuinely empty
+  // Collection (confirmed live - 0 contacts - despite the org visibly
+  // having ~37 in Dinero's own UI, and despite single-contact GETs by GUID
+  // working fine). So the list endpoint appears to require some filter to
+  // return anything at all, rather than defaulting to "everything". Two
+  // separate queries (debitors, then creditors) rather than one combined
+  // "or" filter, since we don't know for certain that operator works
+  // either at this point.
+  async function fetchPage(queryFilter: string): Promise<{ ContactGuid?: string }[]> {
+    const query = new URLSearchParams({ pageSize: "1000", queryFilter });
+    const res = await dineroFetch(`${DINERO_API_BASE}/${orgId}/contacts?${query}`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!res.ok) throw new Error(`Dinero: kunne ikke hente kontaktliste (${res.status}): ${await res.text()}`);
+    const data = (await res.json()) as { Collection: { ContactGuid?: string }[] };
+    return data.Collection;
+  }
 
-  if (!res.ok) throw new Error(`Dinero: kunne ikke hente kontaktliste (${res.status}): ${await res.text()}`);
-  const data = (await res.json()) as { Collection: { ContactGuid?: string }[] };
-  const guids = data.Collection.map((c) => c.ContactGuid).filter((g): g is string => Boolean(g));
+  const [debitors, creditors] = await Promise.all([
+    fetchPage("IsDebitor eq true"),
+    fetchPage("IsCreditor eq true"),
+  ]);
+  const guids = Array.from(
+    new Set([...debitors, ...creditors].map((c) => c.ContactGuid).filter((g): g is string => Boolean(g)))
+  );
 
   // The plain list only ever returns bare GUIDs (same limitation observed on
   // the filtered search before it) - Name/VatNumber/Cvr all come back
