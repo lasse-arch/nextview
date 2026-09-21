@@ -184,6 +184,21 @@ async function findContactByCvr(accessToken: string, cvr: string): Promise<strin
 
 export type DineroContactMatch = { contactGuid: string; name: string | null; email: string | null };
 
+/** Fetches one contact's full record - the CVR search list only returns bare
+ * ContactGuids, not Name/Email, so distinguishing between several matches
+ * (exactly the case this exists for - duplicate contacts sharing a CVR)
+ * needs a follow-up detail fetch per match. */
+async function getContact(accessToken: string, contactGuid: string): Promise<{ name: string | null; email: string | null }> {
+  const orgId = process.env.DINERO_ORGANIZATION_ID!;
+  const res = await dineroFetch(`${DINERO_API_BASE}/${orgId}/contacts/${contactGuid}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) return { name: null, email: null };
+  const data = (await res.json()) as { Name?: string; Email?: string | { Address?: string }[] };
+  const email = Array.isArray(data.Email) ? data.Email[0]?.Address ?? null : (data.Email as string | undefined) ?? null;
+  return { name: data.Name ?? null, email };
+}
+
 /**
  * Same lookup as findContactByCvr, but returns every match instead of just
  * the first - a company can end up with more than one contact in Dinero
@@ -203,8 +218,10 @@ export async function searchDineroContactsByCvr(cvr: string): Promise<DineroCont
   });
 
   if (!res.ok) throw new Error(`Dinero: kunne ikke slå kontakt op på CVR (${res.status}): ${await res.text()}`);
-  const data = (await res.json()) as { Collection: { ContactGuid: string; Name?: string; Email?: string }[] };
-  return data.Collection.map((c) => ({ contactGuid: c.ContactGuid, name: c.Name ?? null, email: c.Email ?? null }));
+  const data = (await res.json()) as { Collection: { ContactGuid: string }[] };
+  return Promise.all(
+    data.Collection.map(async (c) => ({ contactGuid: c.ContactGuid, ...(await getContact(accessToken, c.ContactGuid)) }))
+  );
 }
 
 export type DineroInvoiceLine = { description: string; amount: number };
