@@ -209,8 +209,11 @@ export async function searchDineroContactsByCvr(cvr: string): Promise<string[]> 
   });
 
   if (!res.ok) throw new Error(`Dinero: kunne ikke slå kontakt op på CVR (${res.status}): ${await res.text()}`);
-  const data = (await res.json()) as { Collection: { ContactGuid: string }[] };
-  return data.Collection.map((c) => c.ContactGuid);
+  const data = (await res.json()) as { Collection: { ContactGuid?: string }[] };
+  // At least one real-world match came back without a ContactGuid at all -
+  // filtered out rather than passed through, since an `undefined` in the
+  // list blows up the caller's Prisma `in: [...]` query outright.
+  return data.Collection.map((c) => c.ContactGuid).filter((guid): guid is string => Boolean(guid));
 }
 
 export type DineroInvoiceLine = { description: string; amount: number };
