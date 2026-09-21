@@ -182,23 +182,31 @@ async function findContactByCvr(accessToken: string, cvr: string): Promise<strin
   return data.Collection[0]?.ContactGuid ?? null;
 }
 
-export type DineroContactMatch = { contactGuid: string; name: string | null; email: string | null };
+export type DineroContactMatch = { contactGuid: string; name: string | null; email: string | null; debugError?: string };
 
 /** Fetches one contact's full record - the CVR search list only returns bare
  * ContactGuids, not Name/Email, so distinguishing between several matches
  * (exactly the case this exists for - duplicate contacts sharing a CVR)
- * needs a follow-up detail fetch per match. */
-async function getContact(accessToken: string, contactGuid: string): Promise<{ name: string | null; email: string | null }> {
+ * needs a follow-up detail fetch per match. `debugError` surfaces a failed
+ * fetch back to the admin's screen (rather than only a server log neither
+ * of us can otherwise see) so the real cause is visible immediately. */
+async function getContact(
+  accessToken: string,
+  contactGuid: string
+): Promise<{ name: string | null; email: string | null; debugError?: string }> {
   const orgId = process.env.DINERO_ORGANIZATION_ID!;
   const res = await dineroFetch(`${DINERO_API_BASE}/${orgId}/contacts/${contactGuid}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   if (!res.ok) {
-    console.error(`Dinero: kunne ikke hente kontaktdetaljer for ${contactGuid} (${res.status}): ${await res.text()}`);
-    return { name: null, email: null };
+    const body = await res.text();
+    console.error(`Dinero: kunne ikke hente kontaktdetaljer for ${contactGuid} (${res.status}): ${body}`);
+    return { name: null, email: null, debugError: `${res.status}: ${body.slice(0, 200)}` };
   }
-  const data = (await res.json()) as { Name?: string; Email?: string };
-  return { name: data.Name ?? null, email: data.Email ?? null };
+  const data = (await res.json()) as Record<string, unknown>;
+  const name = typeof data.Name === "string" ? data.Name : null;
+  const email = typeof data.Email === "string" ? data.Email : null;
+  return { name, email, debugError: name || email ? undefined : `Uventet svar: ${JSON.stringify(data).slice(0, 200)}` };
 }
 
 /**

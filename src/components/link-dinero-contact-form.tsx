@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { linkDealToDineroContact, findDineroContactsForDeal } from "@/lib/actions/invoices";
 import { useToast } from "@/components/toast";
 
-type Match = { contactGuid: string; name: string | null; email: string | null };
+type Match = { contactGuid: string; name: string | null; email: string | null; debugError?: string };
 
 export function LinkDineroContactForm({ dealId, currentGuid }: { dealId: string; currentGuid: string | null }) {
   const [open, setOpen] = useState(false);
@@ -85,6 +85,7 @@ export function LinkDineroContactForm({ dealId, currentGuid }: { dealId: string;
             <li key={m.contactGuid} className="flex flex-wrap items-center justify-between gap-2 text-xs">
               <span className="text-slate-600">
                 {m.name || "(intet navn)"} {m.email && <span className="text-slate-400">— {m.email}</span>}
+                {m.debugError && <span className="block text-red-500">{m.debugError}</span>}
               </span>
               <button
                 type="button"
