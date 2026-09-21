@@ -3,11 +3,12 @@ import { dealName } from "@/lib/labels";
 import { TaskBoard } from "./task-board";
 
 export default async function TasksPage() {
-  const [tasks, users, deals] = await Promise.all([
+  const [tasks, users, unsortedDeals] = await Promise.all([
     prisma.task.findMany({ orderBy: { createdAt: "asc" } }),
     prisma.user.findMany({ orderBy: { name: "asc" } }),
-    prisma.deal.findMany({ orderBy: { companyName: "asc" }, select: { id: true, companyName: true, displayName: true } }),
+    prisma.deal.findMany({ select: { id: true, companyName: true, displayName: true } }),
   ]);
+  const deals = unsortedDeals.sort((a, b) => dealName(a).localeCompare(dealName(b), "da"));
 
   const boardTasks = tasks.map((t) => ({
     id: t.id,

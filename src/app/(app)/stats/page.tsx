@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { isIntegrationEnabled } from "@/lib/integration-settings";
+import { dealName } from "@/lib/labels";
 import { IntegrationToggle } from "../settings/integration-toggle";
 import { StatsCustomerRow } from "./stats-customer-row";
 
@@ -16,11 +17,12 @@ export const maxDuration = 300;
 export default async function StatsPage() {
   const autoRunEnabled = await isIntegrationEnabled("CUSTOMER_REPORTS_AUTO_RUN");
 
-  const deals = await prisma.deal.findMany({
-    where: { stage: { in: ["FILMED", "LIVE"] }, churnedAt: null },
-    include: { reports: { orderBy: { sentAt: "desc" }, take: 10 } },
-    orderBy: { companyName: "asc" },
-  });
+  const deals = (
+    await prisma.deal.findMany({
+      where: { stage: { in: ["FILMED", "LIVE"] }, churnedAt: null },
+      include: { reports: { orderBy: { sentAt: "desc" }, take: 10 } },
+    })
+  ).sort((a, b) => dealName(a).localeCompare(dealName(b), "da"));
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">

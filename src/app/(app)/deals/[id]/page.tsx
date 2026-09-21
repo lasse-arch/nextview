@@ -101,7 +101,7 @@ export default async function DealDetailPage({
         invoices: { orderBy: { quarterIndex: "asc" } },
         items: { orderBy: { createdAt: "asc" } },
         parent: true,
-        branches: { orderBy: { companyName: "asc" } },
+        branches: true,
         contractEvents: { orderBy: { occurredAt: "desc" }, take: 5 },
         tasks: { orderBy: { createdAt: "asc" } },
         reports: { orderBy: { sentAt: "desc" }, take: 1 },
@@ -113,13 +113,18 @@ export default async function DealDetailPage({
     isDocuSealConfigured(),
   ]);
 
-  const linkableDeals = await prisma.deal.findMany({
-    where: { id: { not: id }, parentDealId: null },
-    select: { id: true, companyName: true, displayName: true },
-    orderBy: { companyName: "asc" },
-  });
+  const linkableDeals = (
+    await prisma.deal.findMany({
+      where: { id: { not: id }, parentDealId: null },
+      select: { id: true, companyName: true, displayName: true },
+    })
+  ).sort((a, b) => dealName(a).localeCompare(dealName(b), "da"));
 
   if (!deal) notFound();
+  // Sorted by whatever's actually shown (kaldenavn when set, else the CVR
+  // name) - sorting by companyName alone left the list looking scrambled
+  // whenever a branch's displayed name differs from its legal name.
+  deal.branches.sort((a, b) => dealName(a).localeCompare(dealName(b), "da"));
 
   return (
     <div>

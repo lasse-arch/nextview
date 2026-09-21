@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { formatDate, formatDKK, contractStatusLabels } from "@/lib/labels";
+import { formatDate, formatDKK, contractStatusLabels, dealName } from "@/lib/labels";
 import { LinkContractRow } from "./link-contract-row";
 
 export default async function StandaloneContractsPage() {
-  const [contracts, deals] = await Promise.all([
+  const [contracts, unsortedDeals] = await Promise.all([
     prisma.standaloneContract.findMany({ orderBy: { createdAt: "desc" }, include: { createdBy: true } }),
-    prisma.deal.findMany({ orderBy: { companyName: "asc" }, select: { id: true, companyName: true, displayName: true } }),
+    prisma.deal.findMany({ select: { id: true, companyName: true, displayName: true } }),
   ]);
+  const deals = unsortedDeals.sort((a, b) => dealName(a).localeCompare(dealName(b), "da"));
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">

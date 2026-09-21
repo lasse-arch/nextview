@@ -18,11 +18,12 @@ export default async function LiveCustomersPage({
     ];
   }
 
-  const deals = await prisma.deal.findMany({
-    where,
-    include: { items: { orderBy: { createdAt: "asc" } } },
-    orderBy: { companyName: "asc" },
-  });
+  const deals = (
+    await prisma.deal.findMany({
+      where,
+      include: { items: { orderBy: { createdAt: "asc" } } },
+    })
+  ).sort((a, b) => dealName(a).localeCompare(dealName(b), "da"));
 
   return (
     <div>
