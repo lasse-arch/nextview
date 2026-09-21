@@ -124,6 +124,24 @@ export async function deleteInvoiceDraft(invoiceId: string): Promise<void> {
 }
 
 /**
+ * Points a deal at an already-existing Dinero contact by GUID (copied from
+ * that contact's URL in Dinero) instead of letting the next invoice draft
+ * either create a new one or find one by CVR - useful when a customer was
+ * already invoiced under a contact created outside this integration (or
+ * under a duplicate deal), and we want every future draft to reuse it
+ * instead of creating yet another duplicate. An empty guid clears the link,
+ * falling back to the normal CVR-lookup-or-create behavior again.
+ */
+export async function linkDealToDineroContact(dealId: string, contactGuid: string): Promise<void> {
+  const user = await requireUser();
+  if (user.role !== "ADMIN") throw new Error("Kun admin kan ændre Dinero-kobling");
+
+  const trimmed = contactGuid.trim();
+  await prisma.deal.update({ where: { id: dealId }, data: { dineroContactGuid: trimmed || null } });
+  revalidatePath(`/deals/${dealId}`);
+}
+
+/**
  * Wipes every invoice row (including imported/historical ones) across all
  * deals, so fakturering only reflects what's generated from here on while
  * the feature is still being finished - a one-time reset, not something run
