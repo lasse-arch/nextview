@@ -123,13 +123,14 @@ export async function getDashboardData(ownerId?: string) {
   });
 
   const monthly: MonthBar[] = [];
+  const monthlyEstablishment: MonthBar[] = [];
   for (let i = 2; i >= 0; i--) {
     const m = subMonths(monthStart, i);
     const mEnd = endOfMonth(m);
-    const value = deals
-      .filter((d) => d.soldAt && isWithinInterval(d.soldAt, { start: m, end: mEnd }))
-      .reduce((sum, d) => sum + soldTotalValue(d), 0);
-    monthly.push({ label: format(m, "MMM", { locale: da }), value });
+    const soldInMonth = deals.filter((d) => d.soldAt && isWithinInterval(d.soldAt, { start: m, end: mEnd }));
+    const label = format(m, "MMM", { locale: da });
+    monthly.push({ label, value: soldInMonth.reduce((sum, d) => sum + soldTotalValue(d), 0) });
+    monthlyEstablishment.push({ label, value: soldInMonth.reduce((sum, d) => sum + (d.establishmentFee ?? 0), 0) });
   }
 
   const sellerMap = new Map<string, SellerRow>();
@@ -183,6 +184,7 @@ export async function getDashboardData(ownerId?: string) {
     lostCount: lostDeals.length,
     funnel,
     monthly,
+    monthlyEstablishment,
     sellers,
     invoiceStatuses,
   };

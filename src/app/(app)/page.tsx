@@ -9,6 +9,7 @@ import { getCustomerMapPoints } from "@/lib/customer-map-data";
 import { DenmarkMap } from "./denmark-map";
 import { StatTile } from "./stat-tile";
 import { SoldTotalReportButton } from "./sold-total-report-button";
+import { MonthlySalesChart } from "./monthly-sales-chart";
 
 const FUNNEL_SHADES = [
   "bg-blue-200",
@@ -38,7 +39,6 @@ export default async function DashboardPage() {
   ]);
 
   const funnelMax = Math.max(1, ...data.funnel.map((f) => f.count));
-  const monthlyMax = Math.max(1, ...data.monthly.map((m) => m.value));
   const totalInvoices = data.invoiceStatuses.reduce((s, i) => s + i.count, 0);
   const quote = getQuoteOfTheDay();
 
@@ -155,21 +155,7 @@ export default async function DashboardPage() {
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className={`rounded-xl border border-slate-200 bg-white p-5 shadow-sm ${isAdmin ? "" : "lg:col-span-3"}`}>
-          <h2 className="text-sm font-semibold text-slate-900">Salg, seneste 3 måneder</h2>
-          <div className="mt-4 flex h-32 items-end gap-3">
-            {data.monthly.map((m) => (
-              <div key={m.label} className="flex flex-1 flex-col items-center gap-1" title={formatDKK(m.value)}>
-                <span className="money text-[11px] font-medium text-slate-600">{formatDKK(m.value)}</span>
-                <div className="flex h-24 w-full items-end">
-                  <div
-                    className="w-full rounded-t-md bg-blue-600"
-                    style={{ height: `${Math.max(m.value > 0 ? 4 : 0, (m.value / monthlyMax) * 100)}%` }}
-                  />
-                </div>
-                <span className="text-[11px] text-slate-400 capitalize">{m.label}</span>
-              </div>
-            ))}
-          </div>
+          <MonthlySalesChart salesData={data.monthly} establishmentData={data.monthlyEstablishment} />
         </div>
 
         {isAdmin && (
