@@ -3,8 +3,6 @@
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { isDineroConfigured, searchDineroContacts, getDineroContact } from "@/lib/dinero";
-import { dealName } from "@/lib/labels";
 import {
   runQuarterlyInvoiceGeneration,
   runAutoChurn,
@@ -145,82 +143,6 @@ export async function deleteInvoiceDraft(invoiceId: string): Promise<ActionResul
     revalidatePath(`/deals/${invoice.dealId}`);
     revalidatePath("/settings/dinero");
     return undefined;
-  });
-}
-
-/**
- * Points a deal at an already-existing Dinero contact by GUID (copied from
- * that contact's URL in Dinero) instead of letting the next invoice draft
- * either create a new one or find one by CVR - useful when a customer was
- * already invoiced under a contact created outside this integration (or
- * under a duplicate deal), and we want every future draft to reuse it
- * instead of creating yet another duplicate. An empty guid clears the link,
- * falling back to the normal CVR-lookup-or-create behavior again.
- */
-export async function linkDealToDineroContact(dealId: string, contactGuid: string): Promise<ActionResult> {
-  return asActionResult(async () => {
-    const user = await requireUser();
-    if (user.role !== "ADMIN") throw new Error("Kun admin kan ændre Dinero-kobling");
-
-    const trimmed = contactGuid.trim();
-    await prisma.deal.update({ where: { id: dealId }, data: { dineroContactGuid: trimmed || null } });
-    revalidatePath(`/deals/${dealId}`);
-    return undefined;
-  });
-}
-
-export type DineroContactCandidate = {
-  contactGuid: string;
-  name: string | null;
-  email: string | null;
-  linkedDealName: string | null;
-  isCurrentLink: boolean;
-};
-
-/**
- * Looks up Dinero contacts an admin might want to link this deal to - the
- * deal's own already-cached contact (if any) is always included first,
- * fetched directly by GUID rather than re-derived through search, since a
- * deal that already knows its contact shouldn't ever come back "not
- * found" just because a CVR/name filter search happens to miss it.
- * Additional candidates come from a CVR search, falling back to a name
- * search (a contact entered by hand directly in Dinero can have its CVR
- * sitting in a field the CVR search doesn't filter on). Every candidate
- * is enriched with its real Name/Email via a per-GUID detail fetch, and
- * cross-referenced against our own deals to flag existing duplicates.
- */
-export async function findDineroContactsForDeal(dealId: string): Promise<ActionResult<DineroContactCandidate[]>> {
-  return asActionResult(async () => {
-    const user = await requireUser();
-    if (user.role !== "ADMIN") throw new Error("Kun admin kan søge i Dinero");
-
-    const deal = await prisma.deal.findUniqueOrThrow({
-      where: { id: dealId },
-      select: { cvrNumber: true, companyName: true, displayName: true, dineroContactGuid: true },
-    });
-    if (!(await isDineroConfigured())) throw new Error("Dinero er ikke konfigureret");
-
-    const { guids: searchGuids } = await searchDineroContacts(deal.cvrNumber, dealName(deal));
-
-    const guids = Array.from(new Set([...(deal.dineroContactGuid ? [deal.dineroContactGuid] : []), ...searchGuids]));
-    if (guids.length === 0) return [];
-
-    const [linkedDeals, details] = await Promise.all([
-      prisma.deal.findMany({
-        where: { dineroContactGuid: { in: guids } },
-        select: { companyName: true, displayName: true, dineroContactGuid: true },
-      }),
-      Promise.all(guids.map((guid) => getDineroContact(guid))),
-    ]);
-    const dealNameByGuid = new Map(linkedDeals.map((d) => [d.dineroContactGuid as string, dealName(d)]));
-
-    return guids.map((contactGuid, i) => ({
-      contactGuid,
-      name: details[i]?.name ?? null,
-      email: details[i]?.email ?? null,
-      linkedDealName: dealNameByGuid.get(contactGuid) ?? null,
-      isCurrentLink: contactGuid === deal.dineroContactGuid,
-    }));
   });
 }
 

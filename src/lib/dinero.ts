@@ -212,12 +212,6 @@ async function fetchContactDetail(accessToken: string, contactGuid: string): Pro
   };
 }
 
-export async function getDineroContact(contactGuid: string): Promise<DineroContactDetail | null> {
-  if (await isDineroTestMode()) return null;
-  const accessToken = await getAccessToken();
-  return fetchContactDetail(accessToken, contactGuid);
-}
-
 /**
  * Finds contacts by a direct, targeted server-side "Name contains" search -
  * "Name" with the "contains" operator is the one property/operator pair
@@ -314,19 +308,6 @@ async function findContactByCvr(accessToken: string, cvr: string, companyName?: 
     console.error("Dinero: kunne ikke slå kontakt op på navn", err);
     return null;
   }
-}
-
-export type DineroSearchResult = {
-  guids: string[];
-};
-
-/** Every contact whose name contains the given company name
- * (server-side, case-insensitive per Dinero's own "contains" operator). */
-export async function searchDineroContacts(cvr: string | null, companyName: string): Promise<DineroSearchResult> {
-  if (await isDineroTestMode()) return { guids: [] };
-  const accessToken = await getAccessToken();
-  const guids = await findContactGuidsByName(accessToken, companyName);
-  return { guids };
 }
 
 export type DineroInvoiceLine = { description: string; amount: number };

@@ -51,7 +51,6 @@ import { CheckPaymentButton } from "./check-payment-button";
 import { MarkInvoicePaidButton } from "./mark-invoice-paid-button";
 import { CustomerReportSection } from "./customer-report-section";
 import { DeleteInvoiceButton } from "@/components/delete-invoice-button";
-import { LinkDineroContactForm } from "@/components/link-dinero-contact-form";
 
 /** Hover-tooltip content for an invoice's short label: the precise period
  * (since the visible label is now just "Q3 Kvartal") plus, where the deal's
@@ -498,9 +497,6 @@ export default async function DealDetailPage({
                 Ingen faktura-kladder endnu. Oprettes automatisk hvert kvartal, når kontrakten er underskrevet og
                 salgsbeløb + binding er udfyldt.
               </p>
-            )}
-            {currentUser?.role === "ADMIN" && (
-              <LinkDineroContactForm dealId={deal.id} currentGuid={deal.dineroContactGuid} />
             )}
           </section>
 
