@@ -389,8 +389,14 @@ async function createInvoiceDraft(
     }
     throw new Error(`Dinero: kunne ikke oprette faktura-kladde (${res.status}): ${body}`);
   }
-  const data = (await res.json()) as { Guid: string; Number?: string; Timestamp?: string };
-  return { guid: data.Guid, number: data.Number ?? null, timestamp: data.Timestamp ?? null };
+  // Dinero's own inconsistency, confirmed via its OpenAPI spec: request
+  // bodies use "Timestamp" (one word), but every response (this one,
+  // GET .../invoices/{guid}, and the /book response) returns it as
+  // "TimeStamp" (capital S) instead - reading it as "Timestamp" here always
+  // came back undefined, which is what made bookAndSendInvoice send a null
+  // Timestamp to /book and get "The Timestamp field is required." back.
+  const data = (await res.json()) as { Guid: string; Number?: string; TimeStamp?: string };
+  return { guid: data.Guid, number: data.Number ?? null, timestamp: data.TimeStamp ?? null };
 }
 
 /**
@@ -420,9 +426,10 @@ async function bookAndSendInvoice(
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       if (!res.ok) throw new Error(`Dinero: kunne ikke hente faktura før bogføring (${res.status}): ${await res.text()}`);
-      const data = (await res.json()) as { Timestamp?: string };
-      return data.Timestamp ?? null;
+      const data = (await res.json()) as { TimeStamp?: string };
+      return data.TimeStamp ?? null;
     })());
+  if (!ts) throw new Error(`Dinero: fandt ingen Timestamp for faktura ${invoiceGuid} - kan ikke bogføre`);
 
   const bookRes = await dineroFetch(`${DINERO_API_BASE}/${orgId}/invoices/${invoiceGuid}/book`, {
     method: "POST",
@@ -430,8 +437,8 @@ async function bookAndSendInvoice(
     body: JSON.stringify({ Timestamp: ts }),
   });
   if (!bookRes.ok) throw new Error(`Dinero: kunne ikke bogføre faktura (${bookRes.status}): ${await bookRes.text()}`);
-  const bookData = (await bookRes.json()) as { Timestamp?: string };
-  const bookedTimestamp = bookData.Timestamp ?? ts;
+  const bookData = (await bookRes.json()) as { TimeStamp?: string };
+  const bookedTimestamp = bookData.TimeStamp ?? ts;
 
   if (!receiverEmail) {
     console.error(`Dinero: faktura ${invoiceGuid} bogført, men ikke sendt - ingen kontakt-mail`);
@@ -444,7 +451,14 @@ async function bookAndSendInvoice(
     body: JSON.stringify({
       Timestamp: bookedTimestamp,
       Receiver: receiverEmail,
-      AddVoucherAsAttachment: true,
+      // The checkbox shown in Dinero's UI ("Vedhæft faktura som PDF (kun
+      // mail)") maps to this field - confirmed via Dinero's OpenAPI spec.
+      // "AddVoucherAsAttachment" (no "Pdf") isn't a real field on this
+      // model and would have silently been ignored.
+      AddVoucherAsPdfAttachment: true,
+      // Marked required in Dinero's own spec despite being a plain boolean -
+      // sent explicitly rather than relying on an implicit default.
+      ShouldAddTrustPilotEmailAsBcc: false,
     }),
   });
   if (!emailRes.ok) throw new Error(`Dinero: kunne ikke afsende faktura (${emailRes.status}): ${await emailRes.text()}`);
