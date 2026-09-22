@@ -11,11 +11,11 @@ export function MonthlySalesChart({ salesData, establishmentData }: { salesData:
 
   return (
     <div>
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="min-w-0 truncate text-sm font-semibold text-slate-900">
+      <div>
+        <h2 className="text-sm font-semibold text-slate-900">
           {showEstablishment ? "Etablering" : "Salg"}, seneste 3 måneder
         </h2>
-        <div className="flex items-center gap-2 text-xs text-slate-500">
+        <div className="mt-1.5 flex items-center gap-2 text-xs text-slate-500">
           <span className={showEstablishment ? "text-slate-400" : "font-medium text-slate-700"}>Salg</span>
           <button
             type="button"
@@ -27,8 +27,8 @@ export function MonthlySalesChart({ salesData, establishmentData }: { salesData:
             }`}
           >
             <span
-              className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${
-                showEstablishment ? "translate-x-4" : "translate-x-0.5"
+              className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${
+                showEstablishment ? "translate-x-4" : "translate-x-0"
               }`}
             />
           </button>
