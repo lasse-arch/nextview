@@ -8,6 +8,7 @@ import {
   runAutoChurn,
   retrySingleInvoice,
   generateInvoiceForDeal,
+  previewInvoiceForDeal,
   markEstablishmentSentManually,
   listRecurringPeriodsForDeal,
   markPeriodSentManually,
@@ -16,6 +17,7 @@ import {
   markInvoicePaidManually,
   type InvoiceRunSummary,
   type InvoicePeriodOption,
+  type InvoicePreviewLine,
 } from "@/lib/invoice-service";
 
 export async function runInvoiceGenerationNow(): Promise<InvoiceRunSummary> {
@@ -30,7 +32,17 @@ export async function runInvoiceGenerationNow(): Promise<InvoiceRunSummary> {
   return { ...summary, churned, paymentsChecked: payments.checked, paymentsNewlyPaid: payments.paid };
 }
 
-/** "Opret faktura-kladde" on the deal page - drafts any currently-due lines for just this deal. */
+/** What "Opret faktura-kladde" would draft and send right now, shown in a
+ * confirmation dialog before the button actually commits to anything. */
+export async function previewInvoiceForCurrentDeal(dealId: string): Promise<ActionResult<InvoicePreviewLine[]>> {
+  return asActionResult(async () => {
+    const user = await requireUser();
+    if (user.role !== "ADMIN") throw new Error("Kun admin kan oprette faktura-kladder");
+    return previewInvoiceForDeal(dealId);
+  });
+}
+
+/** "Opret faktura-kladde" on the deal page - drafts and sends any currently-due lines for just this deal. */
 export async function createInvoiceForDeal(dealId: string): Promise<InvoiceRunSummary> {
   const user = await requireUser();
   if (user.role !== "ADMIN") throw new Error("Kun admin kan oprette faktura-kladder");

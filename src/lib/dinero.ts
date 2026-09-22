@@ -331,7 +331,7 @@ class DineroInvalidContactError extends Error {}
 async function createInvoiceDraft(
   accessToken: string,
   input: DineroInvoiceInput
-): Promise<{ guid: string; number: string | null }> {
+): Promise<{ guid: string; number: string | null; timestamp: string | null }> {
   const orgId = process.env.DINERO_ORGANIZATION_ID!;
 
   const res = await dineroFetch(`${DINERO_API_BASE}/${orgId}/invoices`, {
@@ -364,8 +364,65 @@ async function createInvoiceDraft(
     }
     throw new Error(`Dinero: kunne ikke oprette faktura-kladde (${res.status}): ${body}`);
   }
-  const data = (await res.json()) as { Guid: string; Number?: string };
-  return { guid: data.Guid, number: data.Number ?? null };
+  const data = (await res.json()) as { Guid: string; Number?: string; Timestamp?: string };
+  return { guid: data.Guid, number: data.Number ?? null, timestamp: data.Timestamp ?? null };
+}
+
+/**
+ * Books (finalizes) a draft invoice and sends it to the customer by email -
+ * so "Opret faktura-kladde" results in the customer actually receiving the
+ * invoice, rather than a draft that still has to be reviewed and sent by
+ * hand inside Dinero. These are two separate Dinero API calls (confirmed
+ * against Dinero's own swagger.json and the eikc/dinero-go client library):
+ * POST .../book takes only a Timestamp (the optimistic-concurrency token)
+ * and returns a NEW Timestamp, which the follow-up POST .../email call must
+ * use - reusing the pre-book Timestamp on the email call fails. Skips the
+ * email step entirely (leaving a booked-but-unsent invoice) when there's no
+ * receiver address to send to, since Dinero requires one.
+ */
+async function bookAndSendInvoice(
+  accessToken: string,
+  invoiceGuid: string,
+  timestamp: string | null,
+  receiverEmail: string | null
+): Promise<void> {
+  const orgId = process.env.DINERO_ORGANIZATION_ID!;
+
+  const ts =
+    timestamp ??
+    (await (async () => {
+      const res = await dineroFetch(`${DINERO_API_BASE}/${orgId}/invoices/${invoiceGuid}`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (!res.ok) throw new Error(`Dinero: kunne ikke hente faktura før bogføring (${res.status}): ${await res.text()}`);
+      const data = (await res.json()) as { Timestamp?: string };
+      return data.Timestamp ?? null;
+    })());
+
+  const bookRes = await dineroFetch(`${DINERO_API_BASE}/${orgId}/invoices/${invoiceGuid}/book`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ Timestamp: ts }),
+  });
+  if (!bookRes.ok) throw new Error(`Dinero: kunne ikke bogføre faktura (${bookRes.status}): ${await bookRes.text()}`);
+  const bookData = (await bookRes.json()) as { Timestamp?: string };
+  const bookedTimestamp = bookData.Timestamp ?? ts;
+
+  if (!receiverEmail) {
+    console.error(`Dinero: faktura ${invoiceGuid} bogført, men ikke sendt - ingen kontakt-mail`);
+    return;
+  }
+
+  const emailRes = await dineroFetch(`${DINERO_API_BASE}/${orgId}/invoices/${invoiceGuid}/email`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      Timestamp: bookedTimestamp,
+      Receiver: receiverEmail,
+      AddVoucherAsAttachment: true,
+    }),
+  });
+  if (!emailRes.ok) throw new Error(`Dinero: kunne ikke afsende faktura (${emailRes.status}): ${await emailRes.text()}`);
 }
 
 /**
@@ -459,6 +516,7 @@ export async function createQuarterlyInvoiceDraft(params: {
       lines: params.lines,
       invoiceDate: params.invoiceDate,
     });
+    await bookAndSendInvoice(accessToken, invoice.guid, invoice.timestamp, params.contactEmail);
     return { contactGuid, invoiceGuid: invoice.guid, invoiceNumber: invoice.number };
   } catch (err) {
     // The cached/reused contact GUID no longer exists in Dinero (e.g. it was
@@ -485,6 +543,7 @@ export async function createQuarterlyInvoiceDraft(params: {
       lines: params.lines,
       invoiceDate: params.invoiceDate,
     });
+    await bookAndSendInvoice(accessToken, invoice.guid, invoice.timestamp, params.contactEmail);
     return { contactGuid: freshContactGuid, invoiceGuid: invoice.guid, invoiceNumber: invoice.number };
   }
 }

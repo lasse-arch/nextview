@@ -426,6 +426,30 @@ export async function generateInvoiceForDeal(dealId: string): Promise<InvoiceRun
   };
 }
 
+export type InvoicePreviewLine = { label: string; amount: number };
+
+/**
+ * What "Opret faktura-kladde" would actually draft and send right now, for
+ * the confirmation dialog shown before it commits to anything - computed
+ * the same way generateInvoiceForDeal decides what's due, but without
+ * creating any Invoice rows or calling Dinero.
+ */
+export async function previewInvoiceForDeal(dealId: string): Promise<InvoicePreviewLine[]> {
+  if (!(await isDineroConfigured())) return [];
+
+  const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId }, include: { invoices: true } });
+  const termInvoices = deal.invoices.filter((inv) => inv.termNumber === deal.currentTermNumber);
+  const handledQuarterIndexes = new Set(
+    termInvoices.filter((inv) => HANDLED_STATUSES.includes(inv.status)).map((inv) => inv.quarterIndex)
+  );
+  const { lines } = computeDueLines(deal, { sendEstablishmentNow: true, sendPeriodsNow: true }, handledQuarterIndexes);
+
+  return lines.map((line) => ({
+    label: line.quarterIndex === 0 ? "Etableringspris" : invoicePeriodLabel(line.scheduledDate),
+    amount: line.amount,
+  }));
+}
+
 /**
  * Marks deals as inactive once their computed contract end date (from a
  * termination notice) has passed. Runs independently of whether Dinero is
