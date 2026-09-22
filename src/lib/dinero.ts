@@ -236,7 +236,12 @@ async function findContactGuidsByName(accessToken: string, companyName: string):
   if (!trimmed) return [];
   const orgId = process.env.DINERO_ORGANIZATION_ID!;
   const escaped = trimmed.replace(/'/g, "''");
-  const query = new URLSearchParams({ queryFilter: `Name contains '${escaped}'` });
+  // Without an explicit pageSize, this almost certainly defaults to a small
+  // page (looked exactly like this in practice: multiple contacts sharing
+  // the identical name, but the search only ever surfaced one) - Dinero's
+  // documented max is 1000, so ask for that outright instead of guessing
+  // at what the unstated default is.
+  const query = new URLSearchParams({ queryFilter: `Name contains '${escaped}'`, pageSize: "1000" });
 
   const res = await dineroFetch(`${DINERO_API_BASE}/${orgId}/contacts?${query}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
