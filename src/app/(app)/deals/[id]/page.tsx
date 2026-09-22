@@ -488,6 +488,11 @@ export default async function DealDetailPage({
                       {currentUser?.role === "ADMIN" && <MarkInvoicePaidButton invoiceId={inv.id} paid={Boolean(inv.paidAt)} />}
                       {currentUser?.role === "ADMIN" && <DeleteInvoiceButton invoiceId={inv.id} />}
                     </div>
+                    {inv.failureReason && (
+                      <p className={inv.status === "FAILED" ? "text-xs text-red-600" : "text-xs text-amber-600"}>
+                        {inv.failureReason}
+                      </p>
+                    )}
                   </li>
                   );
                 })}

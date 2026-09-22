@@ -487,7 +487,34 @@ export type DineroDraftResult = {
   invoiceNumber: string | null;
   /** True if this was a test-mode simulation - no real Dinero API call was made. */
   isTest?: boolean;
+  /**
+   * Set if the draft was created successfully in Dinero but the follow-up
+   * booking/emailing step then failed - the draft still exists under
+   * invoiceGuid, so this must never be treated as an overall failure (doing
+   * so would make a retry create a second, duplicate draft for the same
+   * period). The caller should keep the draft as-is and surface this for
+   * manual follow-up (book/send by hand in Dinero, or fix and retry just the
+   * send step) instead.
+   */
+  sendError?: string;
 };
+
+/** Runs bookAndSendInvoice but never throws - a failure here must not undo
+ * or hide the fact that the draft itself was created successfully. */
+async function bookAndSendOrCapture(
+  accessToken: string,
+  invoiceGuid: string,
+  timestamp: string | null,
+  receiverEmail: string | null
+): Promise<string | undefined> {
+  try {
+    await bookAndSendInvoice(accessToken, invoiceGuid, timestamp, receiverEmail);
+    return undefined;
+  } catch (err) {
+    console.error(`Dinero: faktura ${invoiceGuid} oprettet, men bogføring/afsendelse fejlede`, err);
+    return err instanceof Error ? err.message : "Ukendt fejl ved bogføring/afsendelse";
+  }
+}
 
 export async function createQuarterlyInvoiceDraft(params: {
   existingContactGuid: string | null;
@@ -541,8 +568,8 @@ export async function createQuarterlyInvoiceDraft(params: {
       lines: params.lines,
       invoiceDate: params.invoiceDate,
     });
-    await bookAndSendInvoice(accessToken, invoice.guid, invoice.timestamp, params.contactEmail);
-    return { contactGuid, invoiceGuid: invoice.guid, invoiceNumber: invoice.number };
+    const sendError = await bookAndSendOrCapture(accessToken, invoice.guid, invoice.timestamp, params.contactEmail);
+    return { contactGuid, invoiceGuid: invoice.guid, invoiceNumber: invoice.number, sendError };
   } catch (err) {
     // The cached/reused contact GUID no longer exists in Dinero (e.g. it was
     // deleted there directly) - re-run the CVR/name search once more before
@@ -568,7 +595,7 @@ export async function createQuarterlyInvoiceDraft(params: {
       lines: params.lines,
       invoiceDate: params.invoiceDate,
     });
-    await bookAndSendInvoice(accessToken, invoice.guid, invoice.timestamp, params.contactEmail);
-    return { contactGuid: freshContactGuid, invoiceGuid: invoice.guid, invoiceNumber: invoice.number };
+    const sendError = await bookAndSendOrCapture(accessToken, invoice.guid, invoice.timestamp, params.contactEmail);
+    return { contactGuid: freshContactGuid, invoiceGuid: invoice.guid, invoiceNumber: invoice.number, sendError };
   }
 }

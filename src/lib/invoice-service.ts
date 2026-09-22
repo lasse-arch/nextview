@@ -259,7 +259,12 @@ async function draftInvoiceLine(
           status: "DRAFT_CREATED",
           dineroInvoiceGuid: result.invoiceGuid,
           dineroInvoiceNumber: result.invoiceNumber,
-          failureReason: null,
+          // The draft itself was created successfully - keep that status even
+          // if the automatic booking/emailing step afterwards failed, so a
+          // retry never creates a second, duplicate draft for the same
+          // period. The send error is kept here just to stay visible; it
+          // needs a human to book/send the existing draft by hand in Dinero.
+          failureReason: result.sendError ? `Oprettet, men ikke sendt automatisk: ${result.sendError}` : null,
         },
       }),
       // Keep the cached contact GUID in sync with whatever Dinero actually
