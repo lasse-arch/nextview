@@ -231,11 +231,9 @@ export async function getDineroContact(contactGuid: string): Promise<DineroConta
  * everything" filter at all, which this API doesn't seem to have a
  * reliable one for.
  */
-async function findContactGuidsByName(accessToken: string, companyName: string): Promise<string[]> {
-  const trimmed = companyName.trim();
-  if (!trimmed) return [];
+async function nameContainsSearch(accessToken: string, term: string): Promise<string[]> {
   const orgId = process.env.DINERO_ORGANIZATION_ID!;
-  const escaped = trimmed.replace(/'/g, "''");
+  const escaped = term.replace(/'/g, "''");
   // Without an explicit pageSize, this almost certainly defaults to a small
   // page (looked exactly like this in practice: multiple contacts sharing
   // the identical name, but the search only ever surfaced one) - Dinero's
@@ -249,6 +247,40 @@ async function findContactGuidsByName(accessToken: string, companyName: string):
   if (!res.ok) throw new Error(`Dinero: kunne ikke søge på navn (${res.status}): ${await res.text()}`);
   const data = (await res.json()) as { Collection: { ContactGuid?: string }[] };
   return data.Collection.map((c) => c.ContactGuid).filter((g): g is string => Boolean(g));
+}
+
+const DANISH_TRANSLITERATIONS: [RegExp, string][] = [
+  [/æ/g, "ae"],
+  [/ø/g, "oe"],
+  [/å/g, "aa"],
+  [/Æ/g, "Ae"],
+  [/Ø/g, "Oe"],
+  [/Å/g, "Aa"],
+];
+
+async function findContactGuidsByName(accessToken: string, companyName: string): Promise<string[]> {
+  const trimmed = companyName.trim();
+  if (!trimmed) return [];
+
+  const exact = await nameContainsSearch(accessToken, trimmed);
+  if (exact.length > 0) return exact;
+
+  // Fall back to progressively "safer" substrings, in case Dinero's
+  // contains-matching mishandles Danish æ/ø/å somewhere along the way -
+  // first a plain transliteration of the full name, then just its first
+  // word (shorter, more likely to be plain ASCII, and still a real match
+  // for company names that lead with an unaccented word).
+  const transliterated = DANISH_TRANSLITERATIONS.reduce((s, [pattern, repl]) => s.replace(pattern, repl), trimmed);
+  if (transliterated !== trimmed) {
+    const byTransliterated = await nameContainsSearch(accessToken, transliterated);
+    if (byTransliterated.length > 0) return byTransliterated;
+  }
+
+  const firstWord = trimmed.split(/\s+/)[0];
+  if (firstWord && firstWord !== trimmed && firstWord.length >= 3) {
+    return nameContainsSearch(accessToken, firstWord);
+  }
+  return [];
 }
 
 /**
