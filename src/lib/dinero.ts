@@ -229,7 +229,17 @@ export async function getDineroContact(contactGuid: string): Promise<DineroConta
  * the first place. See listAllDineroContacts/searchDineroContacts.
  */
 async function findContactByCvr(accessToken: string, cvr: string, companyName?: string): Promise<string | null> {
-  const all = await listAllDineroContacts(accessToken);
+  let all: (DineroContactDetail & { contactGuid: string })[];
+  try {
+    all = await listAllDineroContacts(accessToken);
+  } catch (err) {
+    // This search is a best-effort optimization to avoid creating a
+    // duplicate contact - it must never be the reason an invoice draft
+    // fails outright. Worse case on failure: a fresh contact gets created
+    // as it always would have before this search existed.
+    console.error("Dinero: kunne ikke hente kontaktliste til CVR-opslag", err);
+    return null;
+  }
   const cleanCvr = sanitizeCvr(cvr);
   const byCvr = cleanCvr
     ? all.find((c) => sanitizeCvr(c.vatNumber) === cleanCvr || sanitizeCvr(c.cvr) === cleanCvr)
@@ -257,15 +267,19 @@ async function listAllDineroContacts(accessToken: string): Promise<(DineroContac
   const orgId = process.env.DINERO_ORGANIZATION_ID!;
 
   // A request with no queryFilter at all came back with a genuinely empty
-  // Collection (confirmed live - 0 contacts - despite the org visibly
-  // having ~37 in Dinero's own UI, and despite single-contact GETs by GUID
-  // working fine). So the list endpoint appears to require some filter to
-  // return anything at all, rather than defaulting to "everything".
-  // "IsDebitor eq 'true'" works (values must be quoted, even booleans -
-  // confirmed by Dinero's own 400 error spelling out the exact format);
-  // "IsCreditor" isn't a recognized property at all, but that's fine -
-  // invoicing only ever cares about customers (debitors), not suppliers.
-  const query = new URLSearchParams({ pageSize: "1000", queryFilter: "IsDebitor eq 'true'" });
+  // Collection (confirmed live - despite the org visibly having ~37
+  // contacts in Dinero's own UI, and despite single-contact GETs by GUID
+  // working fine) - the list endpoint appears to require some filter to
+  // return anything, rather than defaulting to "everything". IsDebitor and
+  // IsCreditor both turned out to be unrecognized properties too (an
+  // earlier test seemed to show IsDebitor working, but that was two
+  // parallel requests racing - Promise.all only surfaced whichever one
+  // rejected first, hiding that IsDebitor was invalid all along). "Name"
+  // is the one property Dinero's own 400 error explicitly names as valid
+  // (its own example: "Name+contains+'test'"), so "contains ''" - every
+  // contact's name contains the empty string - is used as a known-good
+  // stand-in for "everything".
+  const query = new URLSearchParams({ pageSize: "1000", queryFilter: "Name contains ''" });
   const res = await dineroFetch(`${DINERO_API_BASE}/${orgId}/contacts?${query}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
