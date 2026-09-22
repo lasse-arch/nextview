@@ -11,18 +11,18 @@ export function MonthlySalesChart({ salesData, establishmentData }: { salesData:
 
   return (
     <div>
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="min-w-0 truncate text-sm font-semibold text-slate-900">
           {showEstablishment ? "Solgt etablering, seneste 3 måneder" : "Salg, seneste 3 måneder"}
         </h2>
-        <div className="flex shrink-0 items-center gap-2 text-xs text-slate-500">
+        <div className="flex items-center gap-2 text-xs text-slate-500">
           <span className={showEstablishment ? "text-slate-400" : "font-medium text-slate-700"}>Salg</span>
           <button
             type="button"
             role="switch"
             aria-checked={showEstablishment}
             onClick={() => setShowEstablishment((v) => !v)}
-            className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${
+            className={`relative inline-block h-5 w-9 shrink-0 grow-0 rounded-full transition-colors ${
               showEstablishment ? "bg-blue-600" : "bg-slate-200"
             }`}
           >
@@ -32,7 +32,9 @@ export function MonthlySalesChart({ salesData, establishmentData }: { salesData:
               }`}
             />
           </button>
-          <span className={showEstablishment ? "font-medium text-slate-700" : "text-slate-400"}>Etablering</span>
+          <span className={`shrink-0 ${showEstablishment ? "font-medium text-slate-700" : "text-slate-400"}`}>
+            Etablering
+          </span>
         </div>
       </div>
       <div className="mt-4 flex h-32 items-end gap-3">
