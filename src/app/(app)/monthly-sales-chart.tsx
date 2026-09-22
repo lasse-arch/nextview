@@ -13,7 +13,7 @@ export function MonthlySalesChart({ salesData, establishmentData }: { salesData:
     <div>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="min-w-0 truncate text-sm font-semibold text-slate-900">
-          {showEstablishment ? "Solgt etablering, seneste 3 måneder" : "Salg, seneste 3 måneder"}
+          {showEstablishment ? "Etablering" : "Salg"}, seneste 3 måneder
         </h2>
         <div className="flex items-center gap-2 text-xs text-slate-500">
           <span className={showEstablishment ? "text-slate-400" : "font-medium text-slate-700"}>Salg</span>
