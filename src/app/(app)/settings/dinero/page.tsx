@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/db";
 import { isDineroConfigured } from "@/lib/dinero";
 import { isIntegrationEnabled, isDineroTestMode } from "@/lib/integration-settings";
-import { formatDKK, formatDate, invoiceStatusLabels, dealName } from "@/lib/labels";
+import { formatDKK, formatDate, invoiceStatusLabel, dealName } from "@/lib/labels";
 import { RunNowButton } from "./run-now-button";
 import { ClearInvoicesButton } from "./clear-invoices-button";
 import { RetryInvoiceButton } from "./retry-invoice-button";
@@ -148,7 +148,7 @@ export default async function DineroSettingsPage() {
                       }
                       title={inv.failureReason ?? undefined}
                     >
-                      {invoiceStatusLabels[inv.status]}
+                      {invoiceStatusLabel(inv)}
                     </span>
                     {inv.dineroInvoiceNumber?.startsWith("TEST-") && (
                       <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">

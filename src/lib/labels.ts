@@ -171,6 +171,19 @@ export const invoiceStatusLabels: Record<string, string> = {
   SENT_MANUALLY: "Sendt manuelt",
 };
 
+/**
+ * Per-invoice status label. DRAFT_CREATED now means "oprettet, bogført og
+ * sendt til kunden" in the normal case (createQuarterlyInvoiceDraft books
+ * and emails it automatically) - "Kladde oprettet" is misleading there, so
+ * it's shown as "Sendt" instead. The one case where it really is still just
+ * an unsent draft is when the automatic send failed (failureReason set,
+ * shown separately as a warning) - that keeps the original wording.
+ */
+export function invoiceStatusLabel(inv: { status: string; failureReason?: string | null }): string {
+  if (inv.status === "DRAFT_CREATED" && !inv.failureReason) return "Sendt";
+  return invoiceStatusLabels[inv.status] ?? inv.status;
+}
+
 export function dealName(deal: { companyName: string; displayName?: string | null }): string {
   return deal.displayName || deal.companyName;
 }

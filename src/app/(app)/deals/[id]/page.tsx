@@ -11,7 +11,7 @@ import {
   importTypeLabels,
   noteKindLabels,
   contractStatusLabels,
-  invoiceStatusLabels,
+  invoiceStatusLabel,
   formatDKK,
   formatDate,
   dealName,
@@ -467,7 +467,7 @@ export default async function DealDetailPage({
                         }
                         title={inv.failureReason ?? undefined}
                       >
-                        {invoiceStatusLabels[inv.status]}
+                        {invoiceStatusLabel(inv)}
                       </span>
                       {inv.paidAt && (
                         <span className="shrink-0 whitespace-nowrap rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800">
