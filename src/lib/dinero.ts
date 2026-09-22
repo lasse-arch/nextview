@@ -260,31 +260,18 @@ async function listAllDineroContacts(accessToken: string): Promise<(DineroContac
   // Collection (confirmed live - 0 contacts - despite the org visibly
   // having ~37 in Dinero's own UI, and despite single-contact GETs by GUID
   // working fine). So the list endpoint appears to require some filter to
-  // return anything at all, rather than defaulting to "everything". Two
-  // separate queries (debitors, then creditors) rather than one combined
-  // "or" filter, since we don't know for certain that operator works
-  // either at this point.
-  async function fetchPage(queryFilter: string): Promise<{ ContactGuid?: string }[]> {
-    const query = new URLSearchParams({ pageSize: "1000", queryFilter });
-    const res = await dineroFetch(`${DINERO_API_BASE}/${orgId}/contacts?${query}`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-    if (!res.ok) throw new Error(`Dinero: kunne ikke hente kontaktliste (${res.status}): ${await res.text()}`);
-    const data = (await res.json()) as { Collection: { ContactGuid?: string }[] };
-    return data.Collection;
-  }
-
-  // Dinero's own 400 error spelled out the exact required format, including
-  // that every value - even a boolean - must be quoted (its own example:
-  // IsPerson+eq+'true', not IsPerson+eq+true, which is what this used
-  // before and got rejected outright).
-  const [debitors, creditors] = await Promise.all([
-    fetchPage("IsDebitor eq 'true'"),
-    fetchPage("IsCreditor eq 'true'"),
-  ]);
-  const guids = Array.from(
-    new Set([...debitors, ...creditors].map((c) => c.ContactGuid).filter((g): g is string => Boolean(g)))
-  );
+  // return anything at all, rather than defaulting to "everything".
+  // "IsDebitor eq 'true'" works (values must be quoted, even booleans -
+  // confirmed by Dinero's own 400 error spelling out the exact format);
+  // "IsCreditor" isn't a recognized property at all, but that's fine -
+  // invoicing only ever cares about customers (debitors), not suppliers.
+  const query = new URLSearchParams({ pageSize: "1000", queryFilter: "IsDebitor eq 'true'" });
+  const res = await dineroFetch(`${DINERO_API_BASE}/${orgId}/contacts?${query}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) throw new Error(`Dinero: kunne ikke hente kontaktliste (${res.status}): ${await res.text()}`);
+  const data = (await res.json()) as { Collection: { ContactGuid?: string }[] };
+  const guids = data.Collection.map((c) => c.ContactGuid).filter((g): g is string => Boolean(g));
 
   // The plain list only ever returns bare GUIDs (same limitation observed on
   // the filtered search before it) - Name/VatNumber/Cvr all come back
