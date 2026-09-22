@@ -213,12 +213,42 @@ async function fetchContactDetail(accessToken: string, contactGuid: string): Pro
 }
 
 /**
+ * List Contacts v2 (`/v2/{organizationId}/contacts`) - confirmed via
+ * Dinero's own OpenAPI spec to take the same queryFilter DSL as v1
+ * (identical filterable-fields list, identical response shape), but this is
+ * the endpoint Dinero's own docs point at for exactly this use case
+ * ("When you want to create a new contact, it's a good idea to query to see
+ * if something similar already exists and use that instead").
+ */
+async function dineroContactsSearch(accessToken: string, queryFilter: string): Promise<string[]> {
+  const orgId = process.env.DINERO_ORGANIZATION_ID!;
+  const query = new URLSearchParams({ queryFilter, pageSize: "1000" });
+
+  const res = await dineroFetch(`https://api.dinero.dk/v2/${orgId}/contacts?${query}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) throw new Error(`Dinero: kunne ikke søge kontakter (${res.status}): ${await res.text()}`);
+  const data = (await res.json()) as { Collection: { ContactGuid?: string }[] };
+  return data.Collection.map((c) => c.ContactGuid).filter((g): g is string => Boolean(g));
+}
+
+/**
+ * Finds a contact by an exact VatNumber match - authoritative when it hits,
+ * since a CVR uniquely identifies a company, unlike name matching which
+ * breaks on renames, punctuation and Danish characters. Tried before name
+ * search for exactly that reason.
+ */
+async function findContactGuidsByVatNumber(accessToken: string, cvr: string): Promise<string[]> {
+  const clean = sanitizeCvr(cvr);
+  if (!clean) return [];
+  return dineroContactsSearch(accessToken, `VatNumber eq '${clean}'`);
+}
+
+/**
  * Finds contacts by a direct, targeted server-side "Name contains" search -
  * "Name" with the "contains" operator is the one property/operator pair
  * Dinero's own 400 error explicitly confirms as valid (its own example:
- * "Name+contains+'test'"), unlike VatNumber-based filtering (came back
- * empty even for a CVR that demonstrably exists on a real, freshly
- * self-created contact) or IsDebitor/IsCreditor (both rejected outright as
+ * "Name+contains+'test'"), unlike IsDebitor/IsCreditor (rejected outright as
  * unrecognized properties). Targeted rather than listing everything and
  * matching client-side: far fewer requests (no per-contact enrichment
  * needed just to find candidates), and avoids needing any "give me
@@ -226,21 +256,8 @@ async function fetchContactDetail(accessToken: string, contactGuid: string): Pro
  * reliable one for.
  */
 async function nameContainsSearch(accessToken: string, term: string): Promise<string[]> {
-  const orgId = process.env.DINERO_ORGANIZATION_ID!;
   const escaped = term.replace(/'/g, "''");
-  // Without an explicit pageSize, this almost certainly defaults to a small
-  // page (looked exactly like this in practice: multiple contacts sharing
-  // the identical name, but the search only ever surfaced one) - Dinero's
-  // documented max is 1000, so ask for that outright instead of guessing
-  // at what the unstated default is.
-  const query = new URLSearchParams({ queryFilter: `Name contains '${escaped}'`, pageSize: "1000" });
-
-  const res = await dineroFetch(`${DINERO_API_BASE}/${orgId}/contacts?${query}`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-  if (!res.ok) throw new Error(`Dinero: kunne ikke søge på navn (${res.status}): ${await res.text()}`);
-  const data = (await res.json()) as { Collection: { ContactGuid?: string }[] };
-  return data.Collection.map((c) => c.ContactGuid).filter((g): g is string => Boolean(g));
+  return dineroContactsSearch(accessToken, `Name contains '${escaped}'`);
 }
 
 const DANISH_TRANSLITERATIONS: [RegExp, string][] = [
@@ -278,13 +295,21 @@ async function findContactGuidsByName(accessToken: string, companyName: string):
 }
 
 /**
- * Looks up an existing Dinero contact by company name (falling back to
- * nothing if no match - the caller then creates a fresh one, exactly as
- * it always did before this search existed). Used before drafting an
- * invoice, to decide whether to reuse an existing contact instead of
- * creating a new one.
+ * Looks up an existing Dinero contact, preferring an exact CVR/VatNumber
+ * match (unambiguous) and falling back to a name search only when that
+ * finds nothing - e.g. the existing contact predates us always setting
+ * VatNumber, or has no CVR at all. Returns null if nothing matches, and the
+ * caller then creates a fresh contact exactly as it always did before this
+ * search existed.
  */
 async function findContactByCvr(accessToken: string, cvr: string, companyName?: string): Promise<string | null> {
+  try {
+    const byVat = await findContactGuidsByVatNumber(accessToken, cvr);
+    if (byVat.length > 0) return byVat[0];
+  } catch (err) {
+    console.error("Dinero: kunne ikke slå kontakt op på CVR", err);
+  }
+
   if (!companyName) return null;
   try {
     const guids = await findContactGuidsByName(accessToken, companyName);
