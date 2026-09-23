@@ -256,7 +256,6 @@ export type ContractHtmlData = {
  */
 export function buildContractHtmlData(deal: DealForContract, products: ContractProducts): ContractHtmlData {
   const { street, zipCity } = splitZipCity(deal.address);
-  const displayCompany = deal.displayName || deal.companyName;
 
   const selectedCount = [
     products.nextviewTour.selected,
@@ -267,7 +266,11 @@ export function buildContractHtmlData(deal: DealForContract, products: ContractP
 
   return {
     client: {
-      company: displayCompany,
+      // Always the real, CVR-registered company name - never the internal
+      // "kaldenavn" (displayName), which is a shorthand for the CRM's own
+      // UI and not a legally valid party name for a contract, just like the
+      // supplier side always reads "Nextview360 ApS", not some nickname.
+      company: deal.companyName,
       cvr: deal.cvrNumber ?? "",
       name: deal.contactName ?? "",
       email: deal.contactEmail ?? "",
