@@ -128,12 +128,12 @@ export default async function DealDetailPage({
 
   return (
     <div>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-semibold text-slate-900">{dealName(deal)}</h1>
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="break-words text-2xl font-semibold text-slate-900">{dealName(deal)}</h1>
             {deal.churnedAt && (
-              <span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-600">
+              <span className="shrink-0 rounded-full bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-600">
                 Inaktiv siden {formatDate(deal.churnedAt)}
               </span>
             )}
@@ -144,7 +144,7 @@ export default async function DealDetailPage({
             {deal.importBatch?.fileName ? ` (${deal.importBatch.fileName})` : ""}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 lg:shrink-0">
           <InactiveToggleButton dealId={deal.id} isChurned={Boolean(deal.churnedAt)} />
           <DealDangerActions
             dealId={deal.id}
