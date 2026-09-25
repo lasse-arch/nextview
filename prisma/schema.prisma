@@ -230,6 +230,9 @@ model Deal {
   stage DealStage @default(LEAD)
 
   meetingDate           DateTime?
+  /// Length of the booked meeting in minutes (30/45/60, chosen when the
+  /// calendar invite is sent) - also used to compute "timer i møder" stats.
+  meetingDurationMinutes Int      @default(30)
   googleCalendarEventId String?   @unique
 
   soldProduct   String?

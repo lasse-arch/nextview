@@ -27,13 +27,16 @@ function activeMentionAt(value: string, cursor: number): { start: number; query:
 export function SendCalendarInviteButton({
   dealId,
   colleagues,
+  defaultDurationMinutes = 30,
 }: {
   dealId: string;
   colleagues: { id: string; name: string }[];
+  defaultDurationMinutes?: number;
 }) {
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
   const [customBody, setCustomBody] = useState("");
+  const [duration, setDuration] = useState(defaultDurationMinutes);
   const [pending, startTransition] = useTransition();
   const showToast = useToast();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -110,7 +113,7 @@ export function SendCalendarInviteButton({
     const dateInput = rootRef.current?.closest("form")?.querySelector<HTMLInputElement>('input[name="meetingDate"]');
     startTransition(async () => {
       try {
-        const result = await sendCalendarInvite(dealId, selected, dateInput?.value || undefined, customBody);
+        const result = await sendCalendarInvite(dealId, selected, dateInput?.value || undefined, customBody, duration);
         showToast(result.synced ? "Kalenderinvitation sendt." : result.reason ?? "Kunne ikke sende invitationen.");
         if (result.synced) setOpen(false);
       } catch (err) {
@@ -144,6 +147,17 @@ export function SendCalendarInviteButton({
               </div>
             </>
           )}
+          <p className="mt-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Varighed</p>
+          <select
+            value={duration}
+            onChange={(e) => setDuration(Number(e.target.value))}
+            className="mt-1.5 w-full rounded-md border border-slate-300 px-2 py-1.5 text-xs"
+          >
+            <option value={30}>30 minutter</option>
+            <option value={45}>45 minutter</option>
+            <option value={60}>60 minutter</option>
+          </select>
+
           <p className="mt-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
             Ekstra besked (valgfri)
           </p>

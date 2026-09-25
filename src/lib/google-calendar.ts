@@ -97,6 +97,9 @@ export type GoogleCalendarEvent = {
    * once per invited seller. */
   organizerEmail: string | null;
   attendeeEmails: string[];
+  /** "outOfOffice" for a Calendar-native Out of Office block - these aren't
+   * meetings and shouldn't count as one. */
+  eventType: string | null;
 };
 
 /** Lists events on the account's primary calendar within [timeMinIso, timeMaxIso) - used
@@ -128,6 +131,7 @@ export async function listCalendarEvents(
       end?: { date?: string; dateTime?: string };
       organizer?: { email?: string };
       attendees?: { email?: string }[];
+      eventType?: string;
     }[];
   };
 
@@ -141,5 +145,6 @@ export async function listCalendarEvents(
       isAllDay: !e.start!.dateTime,
       organizerEmail: e.organizer?.email ?? null,
       attendeeEmails: (e.attendees ?? []).map((a) => a.email).filter((email): email is string => Boolean(email)),
+      eventType: e.eventType ?? null,
     }));
 }

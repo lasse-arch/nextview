@@ -1,8 +1,16 @@
 import { prisma } from "@/lib/db";
-import { listCalendarEvents } from "@/lib/google-calendar";
+import { listCalendarEvents, type GoogleCalendarEvent } from "@/lib/google-calendar";
 import { dealName } from "@/lib/labels";
 
 const CPH_TZ = "Europe/Copenhagen";
+
+/** "Out of Office" (Calendar's own block type, or someone manually titling a
+ * block "OOO"/"Out of office") isn't a meeting and must not count as one -
+ * neither shown on the grid nor counted in the meeting-hours stats. */
+function isOutOfOffice(event: Pick<GoogleCalendarEvent, "eventType" | "summary">): boolean {
+  if (event.eventType === "outOfOffice") return true;
+  return /\bout[\s-]?of[\s-]?office\b|\bo\.?o\.?o\.?\b/i.test(event.summary);
+}
 
 /** Adds `days` via pure UTC date math - avoids any ambiguity from the
  * server's local timezone setting, unlike date-fns' local-getter-based helpers. */
@@ -37,7 +45,13 @@ export type CalendarMeeting = {
   /** Deal link, or null for a meeting only found in Google Calendar. */
   href: string | null;
   ownerName: string;
+  /** Matched User id for whoever booked/organized it - null when the
+   * organizer isn't one of our own sellers (e.g. an external organizer), in
+   * which case it can't be attributed to anyone for the per-seller stats. */
+  ownerUserId: string | null;
   source: "crm" | "google";
+  /** 0 for an all-day event - not meaningful in minutes. */
+  durationMinutes: number;
   /** Other sellers invited to this meeting (excluding the organizer shown as
    * ownerName) - shown as a hover tooltip rather than a separate card, since
    * Google gives every attendee's calendar its own copy of the same event. */
@@ -74,7 +88,9 @@ export async function getCalendarWeek(weekOffset: number): Promise<CalendarWeek>
       companyName: true,
       displayName: true,
       meetingDate: true,
+      meetingDurationMinutes: true,
       googleCalendarEventId: true,
+      ownerId: true,
       owner: { select: { name: true, lastName: true } },
     },
     orderBy: { meetingDate: "asc" },
@@ -88,6 +104,8 @@ export async function getCalendarWeek(weekOffset: number): Promise<CalendarWeek>
     label: dealName(d),
     href: `/deals/${d.id}`,
     ownerName: [d.owner.name, d.owner.lastName].filter(Boolean).join(" "),
+    ownerUserId: d.ownerId,
+    durationMinutes: d.meetingDurationMinutes,
     source: "crm",
   }));
 
@@ -102,9 +120,9 @@ export async function getCalendarWeek(weekOffset: number): Promise<CalendarWeek>
   // needed because Google gives every attendee's own calendar an identical
   // copy of the same event (same id, same organizer/attendees), which is
   // exactly what lets it be collapsed to one card instead of one per invitee.
-  const allUsers = await prisma.user.findMany({ select: { email: true, name: true, lastName: true } });
-  const nameByEmail = new Map(
-    allUsers.map((u) => [u.email.toLowerCase(), [u.name, u.lastName].filter(Boolean).join(" ")])
+  const allUsers = await prisma.user.findMany({ select: { id: true, email: true, name: true, lastName: true } });
+  const userByEmail = new Map(
+    allUsers.map((u) => [u.email.toLowerCase(), { id: u.id, name: [u.name, u.lastName].filter(Boolean).join(" ") }])
   );
 
   // Padded by a day on each side so no real event can be clipped by a DST
@@ -123,21 +141,28 @@ export async function getCalendarWeek(weekOffset: number): Promise<CalendarWeek>
 
       for (const event of events) {
         if (knownGoogleEventIds.has(event.id) || seenGoogleEventIds.has(event.id)) continue;
+        if (isOutOfOffice(event)) continue;
         seenGoogleEventIds.add(event.id);
 
         const start = new Date(event.startIso);
         if (Number.isNaN(start.getTime())) continue;
 
-        const organizerName = event.organizerEmail ? nameByEmail.get(event.organizerEmail.toLowerCase()) : undefined;
+        const organizer = event.organizerEmail ? userByEmail.get(event.organizerEmail.toLowerCase()) : undefined;
         const invitedNames = event.attendeeEmails
-          .map((email) => nameByEmail.get(email.toLowerCase()))
-          .filter((name): name is string => Boolean(name) && name !== (organizerName ?? fallbackOwnerName));
+          .map((email) => userByEmail.get(email.toLowerCase())?.name)
+          .filter((name): name is string => Boolean(name) && name !== (organizer?.name ?? fallbackOwnerName));
+
+        const durationMinutes = event.isAllDay
+          ? 0
+          : Math.max(0, Math.round((new Date(event.endIso).getTime() - start.getTime()) / 60_000));
 
         const base = {
           id: `google-${event.id}`,
           label: event.summary,
           href: null,
-          ownerName: organizerName ?? fallbackOwnerName,
+          ownerName: organizer?.name ?? fallbackOwnerName,
+          ownerUserId: organizer?.id ?? null,
+          durationMinutes,
           source: "google" as const,
           ...(invitedNames.length > 0 ? { invitedNames: [...new Set(invitedNames)] } : {}),
         };
@@ -189,46 +214,70 @@ function formatShortDate(date: Date): string {
   return new Intl.DateTimeFormat("da-DK", { day: "numeric", month: "short", timeZone: "UTC" }).format(date);
 }
 
-export type SellerMeetingStats = { userId: string; name: string; thisWeek: number; thisMonth: number };
+export type SellerMeetingStats = {
+  userId: string;
+  name: string;
+  thisWeek: number;
+  thisMonth: number;
+  hoursThisWeek: number;
+};
 
-/** Meeting counts for the current real week/month (independent of which
- * week the calendar grid above is currently showing). */
-export async function getMeetingStats(): Promise<{
+/** Standard full-time work week - the reference "timer på arbejde" is measured against. */
+const STANDARD_WORK_HOURS_PER_WEEK = 37;
+
+function round1(n: number): number {
+  return Math.round(n * 10) / 10;
+}
+
+/**
+ * Meeting counts/hours for the current real week/month (independent of
+ * which week the calendar grid above is currently showing). The weekly
+ * figures - both the count and the hours - are read from the same merged
+ * CRM+Google, Out-of-Office-filtered calendar the grid renders, so they line
+ * up with what's actually shown there; the monthly count stays CRM-only
+ * (a month of Google Calendar fetches across every seller isn't worth the
+ * cost just for one extra number).
+ */
+export async function getMeetingStats(currentWeek?: CalendarWeek): Promise<{
   thisWeekTotal: number;
   thisMonthTotal: number;
+  hoursThisWeek: number;
+  workHoursThisWeek: number;
   bySeller: SellerMeetingStats[];
 }> {
   const now = new Date();
-  const weekStart = utcWeekStart(now);
-  const weekEnd = addUtcDays(weekStart, 7);
   const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
   const monthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
 
-  const rangeStart = new Date(Math.min(weekStart.getTime(), monthStart.getTime()));
-  const rangeEnd = new Date(Math.max(weekEnd.getTime(), monthEnd.getTime()));
-
-  const [deals, users] = await Promise.all([
+  const [thisWeek, monthDeals, users] = await Promise.all([
+    currentWeek ?? getCalendarWeek(0),
     prisma.deal.findMany({
-      where: { meetingDate: { gte: rangeStart, lt: rangeEnd } },
-      select: { ownerId: true, meetingDate: true },
+      where: { meetingDate: { gte: monthStart, lt: monthEnd } },
+      select: { ownerId: true },
     }),
     prisma.user.findMany({ select: { id: true, name: true, lastName: true }, orderBy: { name: "asc" } }),
   ]);
 
-  const inRange = (d: Date, start: Date, end: Date) => d >= start && d < end;
-
-  const thisWeekTotal = deals.filter((d) => inRange(d.meetingDate!, weekStart, weekEnd)).length;
-  const thisMonthTotal = deals.filter((d) => inRange(d.meetingDate!, monthStart, monthEnd)).length;
+  const timedMeetings = thisWeek.meetings.filter((m) => m.hour !== -1);
+  const thisWeekTotal = thisWeek.meetings.length;
+  const thisMonthTotal = monthDeals.length;
+  const hoursThisWeek = round1(timedMeetings.reduce((sum, m) => sum + m.durationMinutes, 0) / 60);
+  const workHoursThisWeek = users.length * STANDARD_WORK_HOURS_PER_WEEK;
 
   const bySeller = users
-    .map((u) => ({
-      userId: u.id,
-      name: [u.name, u.lastName].filter(Boolean).join(" "),
-      thisWeek: deals.filter((d) => d.ownerId === u.id && inRange(d.meetingDate!, weekStart, weekEnd)).length,
-      thisMonth: deals.filter((d) => d.ownerId === u.id && inRange(d.meetingDate!, monthStart, monthEnd)).length,
-    }))
+    .map((u) => {
+      const weekMeetings = thisWeek.meetings.filter((m) => m.ownerUserId === u.id);
+      const weekTimedMeetings = weekMeetings.filter((m) => m.hour !== -1);
+      return {
+        userId: u.id,
+        name: [u.name, u.lastName].filter(Boolean).join(" "),
+        thisWeek: weekMeetings.length,
+        thisMonth: monthDeals.filter((d) => d.ownerId === u.id).length,
+        hoursThisWeek: round1(weekTimedMeetings.reduce((sum, m) => sum + m.durationMinutes, 0) / 60),
+      };
+    })
     .filter((s) => s.thisMonth > 0 || s.thisWeek > 0)
     .sort((a, b) => b.thisMonth - a.thisMonth);
 
-  return { thisWeekTotal, thisMonthTotal, bySeller };
+  return { thisWeekTotal, thisMonthTotal, hoursThisWeek, workHoursThisWeek, bySeller };
 }

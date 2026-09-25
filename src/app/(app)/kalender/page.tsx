@@ -19,7 +19,8 @@ export default async function KalenderPage({ searchParams }: { searchParams: Pro
   const params = await searchParams;
   const weekOffset = Number.isFinite(Number(params.week)) ? Math.trunc(Number(params.week)) : 0;
 
-  const [week, stats] = await Promise.all([getCalendarWeek(weekOffset), getMeetingStats()]);
+  const week = await getCalendarWeek(weekOffset);
+  const stats = await getMeetingStats(weekOffset === 0 ? week : undefined);
 
   const todayKey = new Intl.DateTimeFormat("en-CA", { timeZone: "UTC" }).format(new Date());
 
@@ -35,6 +36,12 @@ export default async function KalenderPage({ searchParams }: { searchParams: Pro
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <StatTile label="Møder denne uge" value={String(stats.thisWeekTotal)} />
         <StatTile label="Møder denne måned" value={String(stats.thisMonthTotal)} />
+        <StatTile label="Timer i møder denne uge" value={stats.hoursThisWeek.toLocaleString("da-DK")} />
+        <StatTile
+          label="Arbejdstimer denne uge"
+          value={String(stats.workHoursThisWeek)}
+          sub={`${stats.workHoursThisWeek / 37} sælger${stats.workHoursThisWeek / 37 === 1 ? "" : "e"} × 37 t`}
+        />
       </div>
 
       {stats.bySeller.length > 0 && (
@@ -46,6 +53,7 @@ export default async function KalenderPage({ searchParams }: { searchParams: Pro
               <span className="flex gap-6">
                 <span className="w-16 text-right">Denne uge</span>
                 <span className="w-16 text-right">Denne måned</span>
+                <span className="w-20 text-right">Timer / 37</span>
               </span>
             </div>
             {stats.bySeller.map((s) => (
@@ -54,6 +62,9 @@ export default async function KalenderPage({ searchParams }: { searchParams: Pro
                 <span className="flex gap-6">
                   <span className="w-16 text-right font-medium text-slate-900">{s.thisWeek}</span>
                   <span className="w-16 text-right font-medium text-slate-900">{s.thisMonth}</span>
+                  <span className="w-20 text-right font-medium text-slate-900">
+                    {s.hoursThisWeek.toLocaleString("da-DK")} / 37
+                  </span>
                 </span>
               </div>
             ))}

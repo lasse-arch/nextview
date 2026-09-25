@@ -2,7 +2,6 @@ import { prisma } from "@/lib/db";
 import { upsertCalendarEvent } from "@/lib/google-calendar";
 import { dealName } from "@/lib/labels";
 
-const DEFAULT_MEETING_DURATION_MINUTES = 30;
 const MEETING_TIME_ZONE = "Europe/Copenhagen";
 
 export type CalendarSyncResult = { synced: boolean; reason?: string };
@@ -40,7 +39,8 @@ function toWallClockDateTime(date: Date): string {
 export async function syncDealMeetingToCalendar(
   dealId: string,
   extraAttendeeEmails: string[] = [],
-  customBody?: string
+  customBody?: string,
+  durationMinutes?: number
 ): Promise<CalendarSyncResult> {
   const deal = await prisma.deal.findUnique({ where: { id: dealId }, include: { owner: true } });
   if (!deal || !deal.meetingDate) {
@@ -54,8 +54,12 @@ export async function syncDealMeetingToCalendar(
     return { synced: false, reason: "Ejeren har ikke forbundet Google under Indstillinger → E-mail." };
   }
 
+  if (durationMinutes && durationMinutes !== deal.meetingDurationMinutes) {
+    await prisma.deal.update({ where: { id: deal.id }, data: { meetingDurationMinutes: durationMinutes } });
+  }
+
   const start = deal.meetingDate;
-  const end = new Date(start.getTime() + DEFAULT_MEETING_DURATION_MINUTES * 60_000);
+  const end = new Date(start.getTime() + (durationMinutes ?? deal.meetingDurationMinutes) * 60_000);
 
   const sellerFullName = [deal.owner.name, deal.owner.lastName].filter(Boolean).join(" ");
   const description = [

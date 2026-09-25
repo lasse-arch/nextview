@@ -251,6 +251,7 @@ export default async function DealDetailPage({
                       <SendCalendarInviteButton
                         dealId={deal.id}
                         colleagues={users.filter((u) => u.id !== deal.ownerId).map((u) => ({ id: u.id, name: u.name }))}
+                        defaultDurationMinutes={deal.meetingDurationMinutes}
                       />
                     </div>
                   </div>

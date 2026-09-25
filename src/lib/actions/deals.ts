@@ -408,7 +408,8 @@ export async function sendCalendarInvite(
   dealId: string,
   extraAttendeeUserIds: string[] = [],
   meetingDateRaw?: string,
-  customBody?: string
+  customBody?: string,
+  durationMinutes?: number
 ): Promise<CalendarSyncResult> {
   await requireUser();
   const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId } });
@@ -429,7 +430,8 @@ export async function sendCalendarInvite(
   const result = await syncDealMeetingToCalendar(
     dealId,
     extraUsers.map((u) => u.email),
-    resolvedCustomBody
+    resolvedCustomBody,
+    durationMinutes
   );
   revalidatePath(`/deals/${dealId}`);
   return result;
