@@ -82,7 +82,7 @@ type DocuSealSubmissionDetails = {
   status: string;
   combined_document_url: string | null;
   documents?: { name: string; url: string }[];
-  submitters?: { slug: string; external_id?: string | null; documents?: { name: string; url: string }[] }[];
+  submitters?: { documents?: { name: string; url: string }[] }[];
 };
 
 async function getSubmission(submissionId: string): Promise<DocuSealSubmissionDetails> {
@@ -107,25 +107,6 @@ function findSignedDocumentUrl(submission: DocuSealSubmissionDetails): string | 
     if (submitter.documents?.[0]?.url) return submitter.documents[0].url;
   }
   return null;
-}
-
-/**
- * The customer submitter's own signing-form link (`slug`, "unique key to be
- * used in the form signing link" per DocuSeal's API docs) - the exact same
- * live page DocuSeal emailed to them, and what DocuSeal's own admin
- * "Submissions" list opens under "View". Preferred over re-rendering our own
- * copy of the PDF for a preview: this is the real, authoritative document
- * (with live per-submitter status), not a reconstruction.
- */
-export async function getCustomerContractViewUrl(submissionId: string): Promise<string | null> {
-  const submission = await getSubmission(submissionId);
-  const customer = submission.submitters?.find((s) => s.external_id === "customer");
-  if (!customer?.slug) return null;
-  // The app's customer-facing domain mirrors the API's (api.docuseal.eu ->
-  // docuseal.eu), confirmed against DocuSeal's own admin UI, which links to
-  // exactly this un-prefixed domain for a submission.
-  const appBase = DOCUSEAL_API_BASE.replace("https://api.", "https://");
-  return `${appBase}/s/${customer.slug}`;
 }
 
 export async function downloadCompletedPdf(submissionId: string): Promise<ArrayBuffer> {
