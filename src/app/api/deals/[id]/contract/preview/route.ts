@@ -1,17 +1,13 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { buildContractHtmlData, parseContractProducts } from "@/lib/contract-template-data";
-import { buildContractHtml } from "@/lib/contract-html-template";
-import { renderContractPdf } from "@/lib/contract-pdf-renderer";
+import { getCustomerContractViewUrl } from "@/lib/docuseal";
 
 /**
- * Re-renders the contract exactly as it was sent - same template, same
- * products/terms snapshot frozen onto the deal at send-time (contractProducts)
- * - so a seller can check what the customer actually received without
- * waiting for DocuSeal's signed copy to exist. Not literally the file
- * DocuSeal holds, but byte-for-byte the same document, since nothing about
- * an already-sent contract's content can change afterwards.
+ * Returns the customer's own DocuSeal signing-form link for a sent (not yet
+ * signed) contract - the real, live document with real-time status, exactly
+ * what DocuSeal's own admin "Submissions" list opens under "View" - so a
+ * seller can check precisely what the customer received/sees.
  */
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -21,38 +17,17 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   }
   const { id } = await params;
 
-  const deal = await prisma.deal.findUnique({ where: { id }, include: { owner: true } });
-  if (!deal) return NextResponse.json({ error: "Deal ikke fundet" }, { status: 404 });
-
-  const products = parseContractProducts(deal.contractProducts);
-  if (!products) return NextResponse.json({ error: "Ingen sendt kontrakt fundet for denne deal" }, { status: 404 });
-
-  const sellerFullName = [deal.owner.name, deal.owner.lastName].filter(Boolean).join(" ");
-  const htmlData = buildContractHtmlData(
-    {
-      companyName: deal.companyName,
-      displayName: deal.displayName,
-      cvrNumber: deal.cvrNumber,
-      contactName: deal.contactName,
-      contactEmail: deal.contactEmail,
-      contactPhone: deal.contactPhone,
-      address: deal.address,
-      owner: { name: sellerFullName, email: deal.owner.email, phone: deal.owner.phone },
-    },
-    products
-  );
+  const deal = await prisma.deal.findUnique({ where: { id } });
+  if (!deal?.docusealSubmissionId) {
+    return NextResponse.json({ error: "Ingen sendt kontrakt fundet for denne deal" }, { status: 404 });
+  }
 
   try {
-    const html = buildContractHtml(htmlData, products.language);
-    const pdf = await renderContractPdf(html);
-    return new NextResponse(new Uint8Array(pdf), {
-      headers: {
-        "Content-Type": "application/pdf",
-        "Content-Disposition": `inline; filename="kontrakt-${deal.companyName.replace(/[^a-z0-9]+/gi, "-")}.pdf"`,
-      },
-    });
+    const url = await getCustomerContractViewUrl(deal.docusealSubmissionId);
+    if (!url) return NextResponse.json({ error: "Kunne ikke finde et preview-link for kontrakten" }, { status: 404 });
+    return NextResponse.json({ url });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Kunne ikke generere preview af kontrakten";
-    return NextResponse.json({ error: message }, { status: 500 });
+    const message = error instanceof Error ? error.message : "Kunne ikke hente preview af kontrakten";
+    return NextResponse.json({ error: message }, { status: 502 });
   }
 }
