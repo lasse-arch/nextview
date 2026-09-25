@@ -91,6 +91,12 @@ export type GoogleCalendarEvent = {
   startIso: string;
   endIso: string;
   isAllDay: boolean;
+  /** Who booked the meeting - Google keeps this (and the event `id`) the
+   * same across every attendee's own calendar, which is what lets a shared
+   * internal meeting be de-duplicated down to one card instead of showing
+   * once per invited seller. */
+  organizerEmail: string | null;
+  attendeeEmails: string[];
 };
 
 /** Lists events on the account's primary calendar within [timeMinIso, timeMaxIso) - used
@@ -120,6 +126,8 @@ export async function listCalendarEvents(
       status?: string;
       start?: { date?: string; dateTime?: string };
       end?: { date?: string; dateTime?: string };
+      organizer?: { email?: string };
+      attendees?: { email?: string }[];
     }[];
   };
 
@@ -131,5 +139,7 @@ export async function listCalendarEvents(
       startIso: (e.start!.dateTime ?? e.start!.date)!,
       endIso: e.end?.dateTime ?? e.end?.date ?? (e.start!.dateTime ?? e.start!.date)!,
       isAllDay: !e.start!.dateTime,
+      organizerEmail: e.organizer?.email ?? null,
+      attendeeEmails: (e.attendees ?? []).map((a) => a.email).filter((email): email is string => Boolean(email)),
     }));
 }

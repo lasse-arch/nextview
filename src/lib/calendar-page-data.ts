@@ -38,6 +38,10 @@ export type CalendarMeeting = {
   href: string | null;
   ownerName: string;
   source: "crm" | "google";
+  /** Other sellers invited to this meeting (excluding the organizer shown as
+   * ownerName) - shown as a hover tooltip rather than a separate card, since
+   * Google gives every attendee's calendar its own copy of the same event. */
+  invitedNames?: string[];
 };
 
 export type CalendarWeek = {
@@ -94,6 +98,15 @@ export async function getCalendarWeek(weekOffset: number): Promise<CalendarWeek>
     include: { user: { select: { name: true, lastName: true } } },
   });
 
+  // Resolve organizer/attendee emails back to a seller's display name -
+  // needed because Google gives every attendee's own calendar an identical
+  // copy of the same event (same id, same organizer/attendees), which is
+  // exactly what lets it be collapsed to one card instead of one per invitee.
+  const allUsers = await prisma.user.findMany({ select: { email: true, name: true, lastName: true } });
+  const nameByEmail = new Map(
+    allUsers.map((u) => [u.email.toLowerCase(), [u.name, u.lastName].filter(Boolean).join(" ")])
+  );
+
   // Padded by a day on each side so no real event can be clipped by a DST
   // offset near the week boundary - events outside the 7 real days are
   // filtered back out below via dayKeys.
@@ -101,31 +114,39 @@ export async function getCalendarWeek(weekOffset: number): Promise<CalendarWeek>
   const timeMaxIso = addUtcDays(weekEnd, 1).toISOString();
   const dayKeys = new Set(days.map((d) => d.dayKey));
 
+  const seenGoogleEventIds = new Set<string>();
   const googleMeetings: CalendarMeeting[] = [];
   for (const account of accounts) {
     try {
       const events = await listCalendarEvents(account, { timeMinIso, timeMaxIso });
-      const ownerName = [account.user.name, account.user.lastName].filter(Boolean).join(" ");
+      const fallbackOwnerName = [account.user.name, account.user.lastName].filter(Boolean).join(" ");
 
       for (const event of events) {
-        if (knownGoogleEventIds.has(event.id)) continue;
+        if (knownGoogleEventIds.has(event.id) || seenGoogleEventIds.has(event.id)) continue;
+        seenGoogleEventIds.add(event.id);
+
         const start = new Date(event.startIso);
         if (Number.isNaN(start.getTime())) continue;
+
+        const organizerName = event.organizerEmail ? nameByEmail.get(event.organizerEmail.toLowerCase()) : undefined;
+        const invitedNames = event.attendeeEmails
+          .map((email) => nameByEmail.get(email.toLowerCase()))
+          .filter((name): name is string => Boolean(name) && name !== (organizerName ?? fallbackOwnerName));
+
+        const base = {
+          id: `google-${event.id}`,
+          label: event.summary,
+          href: null,
+          ownerName: organizerName ?? fallbackOwnerName,
+          source: "google" as const,
+          ...(invitedNames.length > 0 ? { invitedNames: [...new Set(invitedNames)] } : {}),
+        };
 
         if (event.isAllDay) {
           // All-day events come back as a bare "YYYY-MM-DD" (no timezone to convert).
           const dKey = event.startIso.slice(0, 10);
           if (!dayKeys.has(dKey)) continue;
-          googleMeetings.push({
-            id: `google-${account.userId}-${event.id}`,
-            dayKey: dKey,
-            hour: -1,
-            minute: 0,
-            label: event.summary,
-            href: null,
-            ownerName,
-            source: "google",
-          });
+          googleMeetings.push({ ...base, dayKey: dKey, hour: -1, minute: 0 });
           continue;
         }
 
@@ -142,16 +163,7 @@ export async function getCalendarWeek(weekOffset: number): Promise<CalendarWeek>
         const dKey = `${get("year")}-${get("month")}-${get("day")}`;
         if (!dayKeys.has(dKey)) continue;
 
-        googleMeetings.push({
-          id: `google-${account.userId}-${event.id}`,
-          dayKey: dKey,
-          hour: Number(get("hour")),
-          minute: Number(get("minute")),
-          label: event.summary,
-          href: null,
-          ownerName,
-          source: "google",
-        });
+        googleMeetings.push({ ...base, dayKey: dKey, hour: Number(get("hour")), minute: Number(get("minute")) });
       }
     } catch (err) {
       console.error(`Kunne ikke hente Google Kalender for ${ownerNameOf(account)}`, err);

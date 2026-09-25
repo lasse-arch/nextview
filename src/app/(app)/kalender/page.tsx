@@ -107,8 +107,11 @@ export default async function KalenderPage({ searchParams }: { searchParams: Pro
                 <div className="mt-2 space-y-1.5">
                   {dayMeetings.length === 0 && <p className="text-xs text-slate-300">Ingen møder</p>}
                   {dayMeetings.map((m) => {
+                    const invitedTitle =
+                      m.invitedNames && m.invitedNames.length > 0 ? `Også inviteret: ${m.invitedNames.join(", ")}` : undefined;
                     const content = (
                       <div
+                        title={invitedTitle}
                         className={`rounded-md border px-2 py-1.5 text-xs ${
                           m.source === "google" ? "border-blue-100 bg-blue-50" : "border-slate-200 bg-white"
                         }`}
@@ -124,7 +127,12 @@ export default async function KalenderPage({ searchParams }: { searchParams: Pro
                           )}
                         </div>
                         <p className="mt-0.5 truncate text-slate-700">{m.label}</p>
-                        <p className="truncate text-[11px] text-slate-400">{m.ownerName}</p>
+                        <p className="truncate text-[11px] text-slate-400">
+                          {m.ownerName}
+                          {m.invitedNames && m.invitedNames.length > 0 && (
+                            <span className="text-slate-300"> +{m.invitedNames.length}</span>
+                          )}
+                        </p>
                       </div>
                     );
                     return m.href ? (
