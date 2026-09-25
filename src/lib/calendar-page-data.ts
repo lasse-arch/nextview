@@ -311,6 +311,11 @@ export async function getMeetingStats(currentWeek?: CalendarWeek): Promise<{
   hoursThisWeek: number;
   hoursThisMonth: number;
   workHoursThisWeek: number;
+  /** Per-person reference for the current month - 37 timer scaled by how
+   * many weeks the month actually spans (~4.3 for a 30-day month), so
+   * "timer i møder denne måned" has something to be measured against, the
+   * same way the weekly figure is measured against 37. */
+  workHoursThisMonthPerPerson: number;
   bySeller: SellerMeetingStats[];
 }> {
   const now = new Date();
@@ -318,6 +323,8 @@ export async function getMeetingStats(currentWeek?: CalendarWeek): Promise<{
   const weekEnd = addUtcDays(weekStart, 7);
   const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
   const monthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+  const daysInMonth = Math.round((monthEnd.getTime() - monthStart.getTime()) / (24 * 60 * 60 * 1000));
+  const workHoursThisMonthPerPerson = round1(STANDARD_WORK_HOURS_PER_WEEK * (daysInMonth / 7));
 
   const [thisWeek, monthMeetings, users] = await Promise.all([
     currentWeek ?? getCalendarWeek(0),
@@ -353,5 +360,5 @@ export async function getMeetingStats(currentWeek?: CalendarWeek): Promise<{
     .filter((s) => s.thisMonth > 0 || s.thisWeek > 0)
     .sort((a, b) => b.thisMonth - a.thisMonth);
 
-  return { thisWeekTotal, thisMonthTotal, hoursThisWeek, hoursThisMonth, workHoursThisWeek, bySeller };
+  return { thisWeekTotal, thisMonthTotal, hoursThisWeek, hoursThisMonth, workHoursThisWeek, workHoursThisMonthPerPerson, bySeller };
 }

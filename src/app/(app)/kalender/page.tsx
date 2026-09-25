@@ -45,7 +45,7 @@ export default async function KalenderPage({ searchParams }: { searchParams: Pro
         <StatTile
           label="Arbejdstimer denne uge"
           value={String(stats.workHoursThisWeek)}
-          sub={`${stats.workHoursThisWeek / 37} sælger${stats.workHoursThisWeek / 37 === 1 ? "" : "e"} × 37 t (norm, ikke registreret fremmøde)`}
+          sub={`Norm: ${stats.workHoursThisWeek / 37} sælger${stats.workHoursThisWeek / 37 === 1 ? "" : "e"} × 37 t - ikke registreret fremmøde`}
         />
       </div>
 
@@ -71,24 +71,26 @@ export default async function KalenderPage({ searchParams }: { searchParams: Pro
         <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <h2 className="text-sm font-semibold text-slate-900">Møder booket pr. sælger</h2>
           <div className="mt-3 divide-y divide-slate-100">
-            <div className="flex items-center justify-between py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-              <span>Sælger</span>
-              <span className="flex gap-6">
-                <span className="w-16 text-right">Denne uge</span>
-                <span className="w-16 text-right">Denne måned</span>
-                <span className="w-20 text-right">Timer uge</span>
-                <span className="w-20 text-right">Timer måned</span>
-              </span>
-            </div>
             {stats.bySeller.map((s) => (
-              <div key={s.userId} className="flex items-center justify-between py-2 text-sm">
-                <span className="text-slate-700">{s.name}</span>
-                <span className="flex gap-6">
-                  <span className="w-16 text-right font-medium text-slate-900">{s.thisWeek}</span>
-                  <span className="w-16 text-right font-medium text-slate-900">{s.thisMonth}</span>
-                  <span className="w-20 text-right font-medium text-slate-900">{s.hoursThisWeek.toLocaleString("da-DK")}</span>
-                  <span className="w-20 text-right font-medium text-slate-900">{s.hoursThisMonth.toLocaleString("da-DK")}</span>
-                </span>
+              <div key={s.userId} className="py-3">
+                <p className="text-sm font-medium text-slate-900">{s.name}</p>
+                <div className="mt-1.5 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <div className="rounded-md bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                    <p className="font-semibold uppercase tracking-wide text-slate-400">Denne uge</p>
+                    <p className="mt-0.5">
+                      <span className="font-semibold text-slate-900">{s.thisWeek}</span> møder ·{" "}
+                      <span className="font-semibold text-slate-900">{s.hoursThisWeek.toLocaleString("da-DK")}</span> af 37 t
+                    </p>
+                  </div>
+                  <div className="rounded-md bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                    <p className="font-semibold uppercase tracking-wide text-slate-400">Denne måned</p>
+                    <p className="mt-0.5">
+                      <span className="font-semibold text-slate-900">{s.thisMonth}</span> møder ·{" "}
+                      <span className="font-semibold text-slate-900">{s.hoursThisMonth.toLocaleString("da-DK")}</span> af{" "}
+                      {stats.workHoursThisMonthPerPerson.toLocaleString("da-DK")} t
+                    </p>
+                  </div>
+                </div>
               </div>
             ))}
           </div>
