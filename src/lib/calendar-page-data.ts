@@ -52,6 +52,12 @@ export type CalendarMeeting = {
   source: "crm" | "google";
   /** 0 for an all-day event - not meaningful in minutes. */
   durationMinutes: number;
+  /** True when every participant (organizer + attendees) is one of our own
+   * users - an internal team meeting (standup, planning, etc.), not a
+   * customer meeting, so it's excluded from the meeting stats even though
+   * it still shows on the grid. A CRM-sourced meeting always has the
+   * customer contact as an attendee, so this is never true for those. */
+  isInternal: boolean;
   /** Other sellers invited to this meeting (excluding the organizer shown as
    * ownerName) - shown as a hover tooltip rather than a separate card, since
    * Google gives every attendee's calendar its own copy of the same event. */
@@ -106,6 +112,7 @@ export async function getCalendarWeek(weekOffset: number): Promise<CalendarWeek>
     ownerName: [d.owner.name, d.owner.lastName].filter(Boolean).join(" "),
     ownerUserId: d.ownerId,
     durationMinutes: d.meetingDurationMinutes,
+    isInternal: false,
     source: "crm",
   }));
 
@@ -156,6 +163,17 @@ export async function getCalendarWeek(weekOffset: number): Promise<CalendarWeek>
           ? 0
           : Math.max(0, Math.round((new Date(event.endIso).getTime() - start.getTime()) / 60_000));
 
+        // Internal (not a customer meeting) when every participant is one of
+        // our own users and there's at least one other attendee besides the
+        // organizer - a solo block on someone's calendar isn't a "meeting".
+        const otherAttendeeEmails = event.attendeeEmails.filter(
+          (email) => email.toLowerCase() !== event.organizerEmail?.toLowerCase()
+        );
+        const isInternal =
+          Boolean(organizer) &&
+          otherAttendeeEmails.length > 0 &&
+          otherAttendeeEmails.every((email) => userByEmail.has(email.toLowerCase()));
+
         const base = {
           id: `google-${event.id}`,
           label: event.summary,
@@ -163,6 +181,7 @@ export async function getCalendarWeek(weekOffset: number): Promise<CalendarWeek>
           ownerName: organizer?.name ?? fallbackOwnerName,
           ownerUserId: organizer?.id ?? null,
           durationMinutes,
+          isInternal,
           source: "google" as const,
           ...(invitedNames.length > 0 ? { invitedNames: [...new Set(invitedNames)] } : {}),
         };
@@ -258,15 +277,16 @@ export async function getMeetingStats(currentWeek?: CalendarWeek): Promise<{
     prisma.user.findMany({ select: { id: true, name: true, lastName: true }, orderBy: { name: "asc" } }),
   ]);
 
-  const timedMeetings = thisWeek.meetings.filter((m) => m.hour !== -1);
-  const thisWeekTotal = thisWeek.meetings.length;
+  const externalWeekMeetings = thisWeek.meetings.filter((m) => !m.isInternal);
+  const timedMeetings = externalWeekMeetings.filter((m) => m.hour !== -1);
+  const thisWeekTotal = externalWeekMeetings.length;
   const thisMonthTotal = monthDeals.length;
   const hoursThisWeek = round1(timedMeetings.reduce((sum, m) => sum + m.durationMinutes, 0) / 60);
   const workHoursThisWeek = users.length * STANDARD_WORK_HOURS_PER_WEEK;
 
   const bySeller = users
     .map((u) => {
-      const weekMeetings = thisWeek.meetings.filter((m) => m.ownerUserId === u.id);
+      const weekMeetings = externalWeekMeetings.filter((m) => m.ownerUserId === u.id);
       const weekTimedMeetings = weekMeetings.filter((m) => m.hour !== -1);
       return {
         userId: u.id,

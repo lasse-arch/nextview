@@ -118,8 +118,13 @@ export default async function KalenderPage({ searchParams }: { searchParams: Pro
                 <div className="mt-2 space-y-1.5">
                   {dayMeetings.length === 0 && <p className="text-xs text-slate-300">Ingen møder</p>}
                   {dayMeetings.map((m) => {
-                    const invitedTitle =
-                      m.invitedNames && m.invitedNames.length > 0 ? `Også inviteret: ${m.invitedNames.join(", ")}` : undefined;
+                    const invitedTitle = m.isInternal
+                      ? `Internt møde - tæller ikke med i møde-stats${
+                          m.invitedNames && m.invitedNames.length > 0 ? `. Også med: ${m.invitedNames.join(", ")}` : ""
+                        }`
+                      : m.invitedNames && m.invitedNames.length > 0
+                      ? `Også inviteret: ${m.invitedNames.join(", ")}`
+                      : undefined;
                     const content = (
                       <div
                         title={invitedTitle}
@@ -131,10 +136,16 @@ export default async function KalenderPage({ searchParams }: { searchParams: Pro
                           <span className="font-medium text-slate-900">
                             {m.hour === -1 ? "Hele dagen" : formatHour(m.hour, m.minute)}
                           </span>
-                          {m.source === "google" && (
-                            <span className="shrink-0 rounded-full bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium text-blue-700">
-                              Google
+                          {m.isInternal ? (
+                            <span className="shrink-0 rounded-full bg-slate-200 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">
+                              Internt
                             </span>
+                          ) : (
+                            m.source === "google" && (
+                              <span className="shrink-0 rounded-full bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium text-blue-700">
+                                Google
+                              </span>
+                            )
                           )}
                         </div>
                         <p className="mt-0.5 truncate text-slate-700">{m.label}</p>
