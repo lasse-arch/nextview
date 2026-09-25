@@ -81,3 +81,55 @@ export async function upsertCalendarEvent(account: EmailAccount, input: Calendar
   const event = (await res.json()) as { id: string };
   return event.id;
 }
+
+export type GoogleCalendarEvent = {
+  id: string;
+  summary: string;
+  /** Real, timezone-aware instant as returned by Google (has an offset, e.g.
+   * "2026-09-25T14:00:00+02:00") - unlike our own meetingDate field, this is
+   * safe to parse with `new Date(...)` directly. */
+  startIso: string;
+  endIso: string;
+  isAllDay: boolean;
+};
+
+/** Lists events on the account's primary calendar within [timeMinIso, timeMaxIso) - used
+ * to show meetings booked directly in Google Calendar (not via the CRM) on the calendar page. */
+export async function listCalendarEvents(
+  account: EmailAccount,
+  range: { timeMinIso: string; timeMaxIso: string }
+): Promise<GoogleCalendarEvent[]> {
+  const accessToken = await getValidAccessToken(account);
+  const params = new URLSearchParams({
+    timeMin: range.timeMinIso,
+    timeMax: range.timeMaxIso,
+    singleEvents: "true",
+    orderBy: "startTime",
+    maxResults: "250",
+  });
+
+  const res = await fetch(`${CALENDAR_API_BASE}/calendars/primary/events?${params}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) throw new Error(`Google Kalender-fejl (${res.status}): ${await res.text()}`);
+
+  const data = (await res.json()) as {
+    items?: {
+      id: string;
+      summary?: string;
+      status?: string;
+      start?: { date?: string; dateTime?: string };
+      end?: { date?: string; dateTime?: string };
+    }[];
+  };
+
+  return (data.items ?? [])
+    .filter((e) => e.status !== "cancelled" && (e.start?.dateTime || e.start?.date))
+    .map((e) => ({
+      id: e.id,
+      summary: e.summary?.trim() || "(uden titel)",
+      startIso: (e.start!.dateTime ?? e.start!.date)!,
+      endIso: e.end?.dateTime ?? e.end?.date ?? (e.start!.dateTime ?? e.start!.date)!,
+      isAllDay: !e.start!.dateTime,
+    }));
+}
