@@ -27,17 +27,26 @@ export async function createDeliveryTasksForSignedContract(
 
 const CONTRACT_FOLLOW_UP_TITLE = "Opfølgning på kontrakt tilbud";
 
-/** A one-week-out reminder for whoever just sent a contract, to chase the customer for a reply. */
-export async function createContractFollowUpTask(dealId: string, senderId: string): Promise<void> {
-  await prisma.task.create({
-    data: {
-      title: CONTRACT_FOLLOW_UP_TITLE,
-      assigneeId: senderId,
-      createdById: senderId,
-      dealId,
-      dueDate: addDays(new Date(), 7),
-    },
-  });
+/**
+ * A one-week-out reminder to chase the customer for a reply, assigned to the
+ * deal's owner (not necessarily whoever clicked send - an admin can send on
+ * someone else's deal). Resending a contract (e.g. an edit the same day)
+ * replaces any still-open follow-up from the previous send instead of piling
+ * up a second one for the same deal.
+ */
+export async function createContractFollowUpTask(dealId: string, assigneeId: string, createdById: string): Promise<void> {
+  await prisma.$transaction([
+    prisma.task.deleteMany({ where: { dealId, title: CONTRACT_FOLLOW_UP_TITLE, done: false } }),
+    prisma.task.create({
+      data: {
+        title: CONTRACT_FOLLOW_UP_TITLE,
+        assigneeId,
+        createdById,
+        dealId,
+        dueDate: addDays(new Date(), 7),
+      },
+    }),
+  ]);
 }
 
 /** Once the contract is actually signed, chasing the customer for a reply is

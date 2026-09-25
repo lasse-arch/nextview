@@ -24,6 +24,7 @@ import { CommissionSection } from "./commission-section";
 import { CommissionExcludedToggle } from "./commission-excluded-toggle";
 import { SendContractButton } from "./send-contract-button";
 import { DownloadContractButton } from "./download-contract-button";
+import { PreviewContractButton } from "./preview-contract-button";
 import { ArchiveContractButton } from "./archive-contract-button";
 import { ArchiveToDriveButton } from "./archive-to-drive-button";
 import { StageFields } from "./stage-fields";
@@ -389,6 +390,9 @@ export default async function DealDetailPage({
               {deal.contractStatus === "SIGNED" && <ArchiveToDriveButton dealId={deal.id} />}
               {deal.contractStatus === "SIGNED" && currentUser?.role === "ADMIN" && (
                 <ArchiveContractButton dealId={deal.id} />
+              )}
+              {(deal.contractStatus === "SENT" || deal.contractStatus === "VIEWED") && (
+                <PreviewContractButton dealId={deal.id} />
               )}
               {deal.contractStatus !== "SIGNED" && (
                 <SendContractButton

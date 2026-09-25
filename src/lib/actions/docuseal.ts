@@ -137,7 +137,7 @@ export async function buildAndSendContract(
     });
 
     await prisma.contractEvent.create({ data: { dealId, type: "SENT", occurredAt: new Date() } });
-    await createContractFollowUpTask(dealId, sender.id);
+    await createContractFollowUpTask(dealId, deal.ownerId, sender.id);
 
     revalidatePath(`/deals/${dealId}`);
     revalidatePath("/opgaver");
