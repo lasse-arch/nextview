@@ -12,6 +12,20 @@ function isOutOfOffice(event: Pick<GoogleCalendarEvent, "eventType" | "summary">
   return /\bout[\s-]?of[\s-]?office\b|\bo\.?o\.?o\.?\b/i.test(event.summary);
 }
 
+/**
+ * Whether a Google-only event is an internal team thing rather than a
+ * customer meeting - explicitly marked by whoever wrote the title, the same
+ * way OOO is detected, rather than guessed. An earlier version guessed this
+ * from "every attendee is one of our own users", which false-positived on
+ * things like a personal reminder ("Ring til Lars") that happened to have a
+ * colleague along - titling isn't a guess, it's what the person meant.
+ * Recognizes "internt" as a whole word anywhere in the title, so "[internt]",
+ * "(internt)" or just "internt mandagsmøde" all work.
+ */
+function isMarkedInternal(summary: string): boolean {
+  return /\binternt\b/i.test(summary);
+}
+
 /** Adds `days` via pure UTC date math - avoids any ambiguity from the
  * server's local timezone setting, unlike date-fns' local-getter-based helpers. */
 function addUtcDays(date: Date, days: number): Date {
@@ -52,11 +66,10 @@ export type CalendarMeeting = {
   source: "crm" | "google";
   /** 0 for an all-day event - not meaningful in minutes. */
   durationMinutes: number;
-  /** True when every participant (organizer + attendees) is one of our own
-   * users - an internal team meeting (standup, planning, etc.), not a
-   * customer meeting, so it's excluded from the meeting stats even though
-   * it still shows on the grid. A CRM-sourced meeting always has the
-   * customer contact as an attendee, so this is never true for those. */
+  /** True when the event's own title is marked "internt" (see
+   * isMarkedInternal) - an internal team thing, not a customer meeting, so
+   * it's excluded from the meeting stats even though it still shows on the
+   * grid. Always false for a CRM-sourced meeting. */
   isInternal: boolean;
   /** Other sellers invited to this meeting (excluding the organizer shown as
    * ownerName) - shown as a hover tooltip rather than a separate card, since
@@ -163,16 +176,7 @@ export async function getCalendarWeek(weekOffset: number): Promise<CalendarWeek>
           ? 0
           : Math.max(0, Math.round((new Date(event.endIso).getTime() - start.getTime()) / 60_000));
 
-        // Internal (not a customer meeting) when every participant is one of
-        // our own users and there's at least one other attendee besides the
-        // organizer - a solo block on someone's calendar isn't a "meeting".
-        const otherAttendeeEmails = event.attendeeEmails.filter(
-          (email) => email.toLowerCase() !== event.organizerEmail?.toLowerCase()
-        );
-        const isInternal =
-          Boolean(organizer) &&
-          otherAttendeeEmails.length > 0 &&
-          otherAttendeeEmails.every((email) => userByEmail.has(email.toLowerCase()));
+        const isInternal = isMarkedInternal(event.summary);
 
         const base = {
           id: `google-${event.id}`,
