@@ -251,12 +251,41 @@ function formatShortDate(date: Date): string {
   return new Intl.DateTimeFormat("da-DK", { day: "numeric", month: "short", timeZone: "UTC" }).format(date);
 }
 
+export type MonthBar = { label: string; value: number };
+
+/**
+ * Meetings actually booked per month, for the last `monthsBack` months
+ * including the current one - CRM + Google, Out-of-Office/internal
+ * excluded, same as everything else on this page. Fetched as a single
+ * merged range covering the whole window rather than one call per month:
+ * Google's events.list already covers an arbitrary date span in one request
+ * per connected account, so there's no need to repeat that per month.
+ */
+export async function getMeetingsPerMonth(monthsBack = 6): Promise<MonthBar[]> {
+  const now = new Date();
+  const currentMonthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const rangeStart = new Date(Date.UTC(currentMonthStart.getUTCFullYear(), currentMonthStart.getUTCMonth() - (monthsBack - 1), 1));
+  const rangeEnd = new Date(Date.UTC(currentMonthStart.getUTCFullYear(), currentMonthStart.getUTCMonth() + 1, 1));
+
+  const meetings = (await fetchMergedMeetings(rangeStart, rangeEnd)).filter((m) => !m.isInternal);
+
+  const bars: MonthBar[] = [];
+  for (let i = monthsBack - 1; i >= 0; i--) {
+    const m = new Date(Date.UTC(currentMonthStart.getUTCFullYear(), currentMonthStart.getUTCMonth() - i, 1));
+    const monthKey = `${m.getUTCFullYear()}-${String(m.getUTCMonth() + 1).padStart(2, "0")}`;
+    const label = new Intl.DateTimeFormat("da-DK", { month: "short", timeZone: "UTC" }).format(m);
+    bars.push({ label, value: meetings.filter((mt) => mt.dayKey.startsWith(monthKey)).length });
+  }
+  return bars;
+}
+
 export type SellerMeetingStats = {
   userId: string;
   name: string;
   thisWeek: number;
   thisMonth: number;
   hoursThisWeek: number;
+  hoursThisMonth: number;
 };
 
 /** Standard full-time work week - the reference "timer på arbejde" is measured against. */
@@ -280,6 +309,7 @@ export async function getMeetingStats(currentWeek?: CalendarWeek): Promise<{
   thisWeekTotal: number;
   thisMonthTotal: number;
   hoursThisWeek: number;
+  hoursThisMonth: number;
   workHoursThisWeek: number;
   bySeller: SellerMeetingStats[];
 }> {
@@ -298,26 +328,30 @@ export async function getMeetingStats(currentWeek?: CalendarWeek): Promise<{
   const externalWeekMeetings = thisWeek.meetings.filter((m) => !m.isInternal);
   const externalMonthMeetings = monthMeetings.filter((m) => !m.isInternal);
   const timedWeekMeetings = externalWeekMeetings.filter((m) => m.hour !== -1);
+  const timedMonthMeetings = externalMonthMeetings.filter((m) => m.hour !== -1);
 
   const thisWeekTotal = externalWeekMeetings.length;
   const thisMonthTotal = externalMonthMeetings.length;
   const hoursThisWeek = round1(timedWeekMeetings.reduce((sum, m) => sum + m.durationMinutes, 0) / 60);
+  const hoursThisMonth = round1(timedMonthMeetings.reduce((sum, m) => sum + m.durationMinutes, 0) / 60);
   const workHoursThisWeek = users.length * STANDARD_WORK_HOURS_PER_WEEK;
 
   const bySeller = users
     .map((u) => {
       const weekMeetings = externalWeekMeetings.filter((m) => m.ownerUserId === u.id);
       const weekTimedMeetings = weekMeetings.filter((m) => m.hour !== -1);
+      const monthTimedMeetings = timedMonthMeetings.filter((m) => m.ownerUserId === u.id);
       return {
         userId: u.id,
         name: [u.name, u.lastName].filter(Boolean).join(" "),
         thisWeek: weekMeetings.length,
         thisMonth: externalMonthMeetings.filter((m) => m.ownerUserId === u.id).length,
         hoursThisWeek: round1(weekTimedMeetings.reduce((sum, m) => sum + m.durationMinutes, 0) / 60),
+        hoursThisMonth: round1(monthTimedMeetings.reduce((sum, m) => sum + m.durationMinutes, 0) / 60),
       };
     })
     .filter((s) => s.thisMonth > 0 || s.thisWeek > 0)
     .sort((a, b) => b.thisMonth - a.thisMonth);
 
-  return { thisWeekTotal, thisMonthTotal, hoursThisWeek, workHoursThisWeek, bySeller };
+  return { thisWeekTotal, thisMonthTotal, hoursThisWeek, hoursThisMonth, workHoursThisWeek, bySeller };
 }

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getCalendarWeek, getMeetingStats } from "@/lib/calendar-page-data";
+import { getCalendarWeek, getMeetingStats, getMeetingsPerMonth } from "@/lib/calendar-page-data";
 import { StatTile } from "../stat-tile";
 
 type SearchParams = { week?: string };
@@ -20,7 +20,11 @@ export default async function KalenderPage({ searchParams }: { searchParams: Pro
   const weekOffset = Number.isFinite(Number(params.week)) ? Math.trunc(Number(params.week)) : 0;
 
   const week = await getCalendarWeek(weekOffset);
-  const stats = await getMeetingStats(weekOffset === 0 ? week : undefined);
+  const [stats, monthlyMeetings] = await Promise.all([
+    getMeetingStats(weekOffset === 0 ? week : undefined),
+    getMeetingsPerMonth(),
+  ]);
+  const monthlyMax = Math.max(1, ...monthlyMeetings.map((m) => m.value));
 
   const todayKey = new Intl.DateTimeFormat("en-CA", { timeZone: "UTC" }).format(new Date());
 
@@ -33,16 +37,35 @@ export default async function KalenderPage({ searchParams }: { searchParams: Pro
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <StatTile label="Møder denne uge" value={String(stats.thisWeekTotal)} />
         <StatTile label="Møder denne måned" value={String(stats.thisMonthTotal)} />
         <StatTile label="Timer i møder denne uge" value={stats.hoursThisWeek.toLocaleString("da-DK")} />
+        <StatTile label="Timer i møder denne måned" value={stats.hoursThisMonth.toLocaleString("da-DK")} />
         <StatTile
           label="Arbejdstimer denne uge"
           value={String(stats.workHoursThisWeek)}
-          sub={`${stats.workHoursThisWeek / 37} sælger${stats.workHoursThisWeek / 37 === 1 ? "" : "e"} × 37 t`}
+          sub={`${stats.workHoursThisWeek / 37} sælger${stats.workHoursThisWeek / 37 === 1 ? "" : "e"} × 37 t (norm, ikke registreret fremmøde)`}
         />
       </div>
+
+      <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <h2 className="text-sm font-semibold text-slate-900">Møder booket pr. måned</h2>
+        <div className="mt-4 flex h-32 items-end gap-3">
+          {monthlyMeetings.map((m) => (
+            <div key={m.label} className="flex flex-1 flex-col items-center gap-1">
+              <span className="text-[11px] font-medium text-slate-600">{m.value}</span>
+              <div className="flex h-24 w-full items-end">
+                <div
+                  className="w-full rounded-t-md bg-blue-600"
+                  style={{ height: `${Math.max(m.value > 0 ? 4 : 0, (m.value / monthlyMax) * 100)}%` }}
+                />
+              </div>
+              <span className="text-[11px] text-slate-400 capitalize">{m.label}</span>
+            </div>
+          ))}
+        </div>
+      </section>
 
       {stats.bySeller.length > 0 && (
         <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -53,7 +76,8 @@ export default async function KalenderPage({ searchParams }: { searchParams: Pro
               <span className="flex gap-6">
                 <span className="w-16 text-right">Denne uge</span>
                 <span className="w-16 text-right">Denne måned</span>
-                <span className="w-20 text-right">Timer / 37</span>
+                <span className="w-20 text-right">Timer uge</span>
+                <span className="w-20 text-right">Timer måned</span>
               </span>
             </div>
             {stats.bySeller.map((s) => (
@@ -62,9 +86,8 @@ export default async function KalenderPage({ searchParams }: { searchParams: Pro
                 <span className="flex gap-6">
                   <span className="w-16 text-right font-medium text-slate-900">{s.thisWeek}</span>
                   <span className="w-16 text-right font-medium text-slate-900">{s.thisMonth}</span>
-                  <span className="w-20 text-right font-medium text-slate-900">
-                    {s.hoursThisWeek.toLocaleString("da-DK")} / 37
-                  </span>
+                  <span className="w-20 text-right font-medium text-slate-900">{s.hoursThisWeek.toLocaleString("da-DK")}</span>
+                  <span className="w-20 text-right font-medium text-slate-900">{s.hoursThisMonth.toLocaleString("da-DK")}</span>
                 </span>
               </div>
             ))}
