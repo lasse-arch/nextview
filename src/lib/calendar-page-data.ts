@@ -49,6 +49,15 @@ function dayKeyOf(y: number, m: number, d: number): string {
   return `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 }
 
+/** "YYYY-MM-DD" sorts lexicographically the same as chronologically, so a
+ * plain string comparison against the range's own day keys is enough to
+ * check membership - no need to materialize every day in between. */
+function dayKeyInRange(dKey: string, rangeStart: Date, rangeEnd: Date): boolean {
+  const startKey = dayKeyOf(rangeStart.getUTCFullYear(), rangeStart.getUTCMonth(), rangeStart.getUTCDate());
+  const endKey = dayKeyOf(rangeEnd.getUTCFullYear(), rangeEnd.getUTCMonth(), rangeEnd.getUTCDate());
+  return dKey >= startKey && dKey < endKey;
+}
+
 export type CalendarMeeting = {
   id: string;
   dayKey: string;
@@ -77,31 +86,21 @@ export type CalendarMeeting = {
   invitedNames?: string[];
 };
 
-export type CalendarWeek = {
-  /** Each of the 7 days (Mon-Sun) as { dayKey, date }. */
-  days: { dayKey: string; date: Date }[];
-  meetings: CalendarMeeting[];
-  weekLabel: string;
-};
+function ownerNameOf(account: { user: { name: string; lastName: string | null } }): string {
+  return [account.user.name, account.user.lastName].filter(Boolean).join(" ");
+}
 
 /**
- * All CRM-booked meetings plus any Google Calendar events for the week not
- * already represented by a CRM deal (matched via googleCalendarEventId, so a
- * meeting synced out to Google via "Send kalenderinvitation" doesn't show
- * twice). `weekOffset` is relative to the current real week (0 = this week).
+ * All CRM-booked meetings in [rangeStart, rangeEnd) plus any Google Calendar
+ * events in that same window not already represented by a CRM deal (matched
+ * via googleCalendarEventId, so a meeting synced out to Google via "Send
+ * kalenderinvitation" doesn't show twice) - the single source both the week
+ * grid and the week/month stats read from, so a meeting is counted exactly
+ * the same way everywhere it's counted at all.
  */
-export async function getCalendarWeek(weekOffset: number): Promise<CalendarWeek> {
-  const now = new Date();
-  const weekStart = addUtcDays(utcWeekStart(now), weekOffset * 7);
-  const weekEnd = addUtcDays(weekStart, 7);
-
-  const days = Array.from({ length: 7 }, (_, i) => {
-    const date = addUtcDays(weekStart, i);
-    return { dayKey: dayKeyOf(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()), date };
-  });
-
+async function fetchMergedMeetings(rangeStart: Date, rangeEnd: Date): Promise<CalendarMeeting[]> {
   const deals = await prisma.deal.findMany({
-    where: { meetingDate: { gte: weekStart, lt: weekEnd } },
+    where: { meetingDate: { gte: rangeStart, lt: rangeEnd } },
     select: {
       id: true,
       companyName: true,
@@ -146,11 +145,10 @@ export async function getCalendarWeek(weekOffset: number): Promise<CalendarWeek>
   );
 
   // Padded by a day on each side so no real event can be clipped by a DST
-  // offset near the week boundary - events outside the 7 real days are
-  // filtered back out below via dayKeys.
-  const timeMinIso = addUtcDays(weekStart, -1).toISOString();
-  const timeMaxIso = addUtcDays(weekEnd, 1).toISOString();
-  const dayKeys = new Set(days.map((d) => d.dayKey));
+  // offset near the range boundary - events outside the real range are
+  // filtered back out below via dayKeyInRange.
+  const timeMinIso = addUtcDays(rangeStart, -1).toISOString();
+  const timeMaxIso = addUtcDays(rangeEnd, 1).toISOString();
 
   const seenGoogleEventIds = new Set<string>();
   const googleMeetings: CalendarMeeting[] = [];
@@ -193,7 +191,7 @@ export async function getCalendarWeek(weekOffset: number): Promise<CalendarWeek>
         if (event.isAllDay) {
           // All-day events come back as a bare "YYYY-MM-DD" (no timezone to convert).
           const dKey = event.startIso.slice(0, 10);
-          if (!dayKeys.has(dKey)) continue;
+          if (!dayKeyInRange(dKey, rangeStart, rangeEnd)) continue;
           googleMeetings.push({ ...base, dayKey: dKey, hour: -1, minute: 0 });
           continue;
         }
@@ -209,7 +207,7 @@ export async function getCalendarWeek(weekOffset: number): Promise<CalendarWeek>
         }).formatToParts(start);
         const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "00";
         const dKey = `${get("year")}-${get("month")}-${get("day")}`;
-        if (!dayKeys.has(dKey)) continue;
+        if (!dayKeyInRange(dKey, rangeStart, rangeEnd)) continue;
 
         googleMeetings.push({ ...base, dayKey: dKey, hour: Number(get("hour")), minute: Number(get("minute")) });
       }
@@ -218,19 +216,35 @@ export async function getCalendarWeek(weekOffset: number): Promise<CalendarWeek>
     }
   }
 
-  const meetings = [...crmMeetings, ...googleMeetings].sort((a, b) => {
+  return [...crmMeetings, ...googleMeetings].sort((a, b) => {
     if (a.dayKey !== b.dayKey) return a.dayKey < b.dayKey ? -1 : 1;
     if (a.hour !== b.hour) return a.hour - b.hour;
     return a.minute - b.minute;
   });
+}
 
+export type CalendarWeek = {
+  /** Each of the 7 days (Mon-Sun) as { dayKey, date }. */
+  days: { dayKey: string; date: Date }[];
+  meetings: CalendarMeeting[];
+  weekLabel: string;
+};
+
+/** `weekOffset` is relative to the current real week (0 = this week). */
+export async function getCalendarWeek(weekOffset: number): Promise<CalendarWeek> {
+  const now = new Date();
+  const weekStart = addUtcDays(utcWeekStart(now), weekOffset * 7);
+  const weekEnd = addUtcDays(weekStart, 7);
+
+  const days = Array.from({ length: 7 }, (_, i) => {
+    const date = addUtcDays(weekStart, i);
+    return { dayKey: dayKeyOf(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()), date };
+  });
+
+  const meetings = await fetchMergedMeetings(weekStart, weekEnd);
   const weekLabel = `${formatShortDate(days[0].date)} - ${formatShortDate(days[6].date)} ${days[6].date.getUTCFullYear()}`;
 
   return { days, meetings, weekLabel };
-}
-
-function ownerNameOf(account: { user: { name: string; lastName: string | null } }): string {
-  return [account.user.name, account.user.lastName].filter(Boolean).join(" ");
 }
 
 function formatShortDate(date: Date): string {
@@ -254,12 +268,13 @@ function round1(n: number): number {
 
 /**
  * Meeting counts/hours for the current real week/month (independent of
- * which week the calendar grid above is currently showing). The weekly
- * figures - both the count and the hours - are read from the same merged
- * CRM+Google, Out-of-Office-filtered calendar the grid renders, so they line
- * up with what's actually shown there; the monthly count stays CRM-only
- * (a month of Google Calendar fetches across every seller isn't worth the
- * cost just for one extra number).
+ * which week the calendar grid above is currently showing). Both the weekly
+ * and the monthly figures are read from the same merged CRM+Google,
+ * Out-of-Office/internal-filtered calendar the grid renders - fetched
+ * separately for the week and for the month (a month can't just reuse the
+ * week's data, since it covers more than the week), so "denne uge" can never
+ * come out larger than "denne måned" the way it did when the monthly number
+ * was CRM-only and the weekly one already included Google Calendar meetings.
  */
 export async function getMeetingStats(currentWeek?: CalendarWeek): Promise<{
   thisWeekTotal: number;
@@ -269,23 +284,24 @@ export async function getMeetingStats(currentWeek?: CalendarWeek): Promise<{
   bySeller: SellerMeetingStats[];
 }> {
   const now = new Date();
+  const weekStart = utcWeekStart(now);
+  const weekEnd = addUtcDays(weekStart, 7);
   const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
   const monthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
 
-  const [thisWeek, monthDeals, users] = await Promise.all([
+  const [thisWeek, monthMeetings, users] = await Promise.all([
     currentWeek ?? getCalendarWeek(0),
-    prisma.deal.findMany({
-      where: { meetingDate: { gte: monthStart, lt: monthEnd } },
-      select: { ownerId: true },
-    }),
+    fetchMergedMeetings(monthStart, monthEnd),
     prisma.user.findMany({ select: { id: true, name: true, lastName: true }, orderBy: { name: "asc" } }),
   ]);
 
   const externalWeekMeetings = thisWeek.meetings.filter((m) => !m.isInternal);
-  const timedMeetings = externalWeekMeetings.filter((m) => m.hour !== -1);
+  const externalMonthMeetings = monthMeetings.filter((m) => !m.isInternal);
+  const timedWeekMeetings = externalWeekMeetings.filter((m) => m.hour !== -1);
+
   const thisWeekTotal = externalWeekMeetings.length;
-  const thisMonthTotal = monthDeals.length;
-  const hoursThisWeek = round1(timedMeetings.reduce((sum, m) => sum + m.durationMinutes, 0) / 60);
+  const thisMonthTotal = externalMonthMeetings.length;
+  const hoursThisWeek = round1(timedWeekMeetings.reduce((sum, m) => sum + m.durationMinutes, 0) / 60);
   const workHoursThisWeek = users.length * STANDARD_WORK_HOURS_PER_WEEK;
 
   const bySeller = users
@@ -296,7 +312,7 @@ export async function getMeetingStats(currentWeek?: CalendarWeek): Promise<{
         userId: u.id,
         name: [u.name, u.lastName].filter(Boolean).join(" "),
         thisWeek: weekMeetings.length,
-        thisMonth: monthDeals.filter((d) => d.ownerId === u.id).length,
+        thisMonth: externalMonthMeetings.filter((m) => m.ownerUserId === u.id).length,
         hoursThisWeek: round1(weekTimedMeetings.reduce((sum, m) => sum + m.durationMinutes, 0) / 60),
       };
     })
