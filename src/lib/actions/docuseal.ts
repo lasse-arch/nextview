@@ -16,6 +16,8 @@ import {
 import { buildContractHtml } from "@/lib/contract-html-template";
 import { renderContractPdf } from "@/lib/contract-pdf-renderer";
 import { createContractFollowUpTask } from "@/lib/task-automation";
+import { logActivity } from "@/lib/activity";
+import { dealName } from "@/lib/labels";
 
 /**
  * Pre-flight check before opening the contract-builder page: the master
@@ -138,6 +140,12 @@ export async function buildAndSendContract(
 
     await prisma.contractEvent.create({ data: { dealId, type: "SENT", occurredAt: new Date() } });
     await createContractFollowUpTask(dealId, deal.ownerId, sender.id);
+    await logActivity({
+      type: "CONTRACT_SENT",
+      message: `${sender.name} sendte en kontrakt til ${dealName(deal)}`,
+      actorId: sender.id,
+      dealId,
+    });
 
     revalidatePath(`/deals/${dealId}`);
     revalidatePath("/opgaver");

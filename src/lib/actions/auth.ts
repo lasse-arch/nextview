@@ -27,6 +27,7 @@ export async function login(_prevState: LoginState, formData: FormData): Promise
   }
 
   await createSession(user.id);
+  await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
   redirect(next.startsWith("/") ? next : "/");
 }
 

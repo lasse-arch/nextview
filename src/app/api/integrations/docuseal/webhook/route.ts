@@ -8,6 +8,8 @@ import { archiveSignedContractToDrive, findArchivingGoogleAccount } from "@/lib/
 import { findOrCreateContractsFolder, uploadPdfToDrive } from "@/lib/google-drive";
 import { isIntegrationEnabled } from "@/lib/integration-settings";
 import { createDeliveryTasksForSignedContract, completeContractFollowUpTasks } from "@/lib/task-automation";
+import { logActivity } from "@/lib/activity";
+import { dealName } from "@/lib/labels";
 
 type DocuSealEvent = {
   event_type?: string;
@@ -121,6 +123,11 @@ export async function POST(request: NextRequest) {
     });
     await logEvent("SIGNED");
     await completeContractFollowUpTasks(deal!.id);
+    await logActivity({
+      type: "CONTRACT_SIGNED",
+      message: `${dealName(deal!)} underskrev kontrakten`,
+      dealId: deal!.id,
+    });
 
     // Carry each product on the now-signed contract down into "Ydelser" as
     // its own line - including ones given away for free - so once there are

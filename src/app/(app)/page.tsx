@@ -10,6 +10,9 @@ import { DenmarkMap } from "./denmark-map";
 import { StatTile } from "./stat-tile";
 import { SoldTotalReportButton } from "./sold-total-report-button";
 import { MonthlySalesChart } from "./monthly-sales-chart";
+import { getRecentActivity, getUserLastLogins } from "@/lib/activity";
+import { ActivityFeed } from "./activity-feed";
+import { LastLoginsCard } from "./last-logins-card";
 
 const FUNNEL_SHADES = [
   "bg-blue-200",
@@ -31,11 +34,13 @@ const INVOICE_STATUS_STYLE: Record<string, { dot: string; text: string }> = {
 export default async function DashboardPage() {
   const user = await getCurrentUser();
   const isAdmin = user?.role === "ADMIN";
-  const [data, goals, users, customerMapPoints] = await Promise.all([
+  const [data, goals, users, customerMapPoints, activity, lastLogins] = await Promise.all([
     getDashboardData(isAdmin ? undefined : user?.id),
     user ? getGoalsForDashboard(user) : Promise.resolve([]),
     prisma.user.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
     getCustomerMapPoints(),
+    getRecentActivity(),
+    getUserLastLogins(),
   ]);
 
   const funnelMax = Math.max(1, ...data.funnel.map((f) => f.count));
@@ -93,6 +98,13 @@ export default async function DashboardPage() {
           sub={data.failedInvoices > 0 ? "Kræver handling" : "Alt kører"}
           tone={data.failedInvoices > 0 ? "critical" : "good"}
         />
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <ActivityFeed items={activity} />
+        </div>
+        <LastLoginsCard users={lastLogins} />
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">

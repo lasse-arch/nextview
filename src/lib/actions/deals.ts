@@ -11,6 +11,8 @@ import { findDuplicateDeals } from "@/lib/duplicates";
 import { syncDealMeetingToCalendar, type CalendarSyncResult } from "@/lib/calendar-service";
 import { resolveCustomerMentions } from "@/lib/customer-mentions";
 import { sendContractSignedNotification } from "@/lib/notification-service";
+import { logActivity } from "@/lib/activity";
+import { dealName } from "@/lib/labels";
 import type { DealStage, CommissionFrequency, CommissionStatus } from "@prisma/client";
 
 const CONTRACT_MANAGED_STAGES: DealStage[] = ["CONTRACT_SENT", "CONTRACT_SIGNED"];
@@ -54,6 +56,13 @@ export async function createDealManual(formData: FormData) {
   await prisma.deal.update({
     where: { id: deal.id },
     data: { dealEmailAddress: buildDealEmailAddress(deal.id) },
+  });
+
+  await logActivity({
+    type: "DEAL_CREATED",
+    message: `${user.name} oprettede lead ${dealName(deal)}`,
+    actorId: user.id,
+    dealId: deal.id,
   });
 
   revalidatePath("/deals");
@@ -368,6 +377,20 @@ export async function updateDealStage(dealId: string, newStage: DealStage) {
     data: { stage: newStage, ...stageDateUpdates },
   });
 
+  if (newStage !== existing.stage) {
+    const name = dealName(existing);
+    const stageActivityMessage: Partial<Record<DealStage, string>> = {
+      MEETING_BOOKED: `${user.name} bookede møde med ${name}`,
+      FILMED: `${user.name} markerede ${name} som filmet`,
+      LIVE: `${name} gik live`,
+      LOST: `${user.name} markerede ${name} som tabt`,
+    };
+    const message = stageActivityMessage[newStage];
+    if (message) {
+      await logActivity({ type: `DEAL_STAGE_${newStage}`, message, actorId: user.id, dealId });
+    }
+  }
+
   revalidatePath("/deals");
   revalidatePath(`/deals/${dealId}`);
   revalidatePath("/commission");
@@ -379,14 +402,21 @@ export async function updateDealStage(dealId: string, newStage: DealStage) {
  * trip to the full edit form first (which updateDealStage otherwise demands).
  */
 export async function setMeetingDateAndStage(dealId: string, meetingDateIso: string) {
-  await requireUser();
+  const user = await requireUser();
 
   const meetingDate = new Date(meetingDateIso);
   if (isNaN(meetingDate.getTime())) throw new Error("Ugyldig mødedato.");
 
-  await prisma.deal.update({
+  const deal = await prisma.deal.update({
     where: { id: dealId },
     data: { stage: "MEETING_BOOKED", meetingDate },
+  });
+
+  await logActivity({
+    type: "DEAL_STAGE_MEETING_BOOKED",
+    message: `${user.name} bookede møde med ${dealName(deal)}`,
+    actorId: user.id,
+    dealId,
   });
 
   revalidatePath("/deals");
@@ -438,8 +468,14 @@ export async function sendCalendarInvite(
 }
 
 export async function markDealLost(dealId: string) {
-  await requireUser();
-  await prisma.deal.update({ where: { id: dealId }, data: { stage: "LOST" } });
+  const user = await requireUser();
+  const deal = await prisma.deal.update({ where: { id: dealId }, data: { stage: "LOST" } });
+  await logActivity({
+    type: "DEAL_STAGE_LOST",
+    message: `${user.name} markerede ${dealName(deal)} som tabt`,
+    actorId: user.id,
+    dealId,
+  });
   revalidatePath("/deals");
   revalidatePath(`/deals/${dealId}`);
 }

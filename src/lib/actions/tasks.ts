@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
+import { logActivity } from "@/lib/activity";
 
 export type TaskResult = { ok: true; id: string } | { ok: false; error: string };
 
@@ -56,7 +57,7 @@ export async function createTask(formData: FormData): Promise<TaskResult> {
  * DealItem so it shows up under Live kunder.
  */
 export async function toggleTaskDone(taskId: string, deliveryUrl?: string | null): Promise<void> {
-  await requireUser();
+  const user = await requireUser();
   const task = await prisma.task.findUniqueOrThrow({ where: { id: taskId } });
   const done = !task.done;
   await prisma.task.update({ where: { id: taskId }, data: { done } });
@@ -65,6 +66,15 @@ export async function toggleTaskDone(taskId: string, deliveryUrl?: string | null
     const productType = task.title.slice("Aflever ".length);
     const item = await prisma.dealItem.findFirst({ where: { dealId: task.dealId, productType } });
     if (item) await prisma.dealItem.update({ where: { id: item.id }, data: { url: deliveryUrl } });
+  }
+
+  if (done) {
+    await logActivity({
+      type: "TASK_DONE",
+      message: `${user.name} fuldførte opgaven "${task.title}"`,
+      actorId: user.id,
+      dealId: task.dealId,
+    });
   }
 
   revalidateTaskPaths(task.dealId);
