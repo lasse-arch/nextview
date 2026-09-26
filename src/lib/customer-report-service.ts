@@ -1,5 +1,5 @@
 import { addMonths, subDays } from "date-fns";
-import type { ReportInterval, ReportSendMethod } from "@prisma/client";
+import type { ReportInterval, ReportLanguage, ReportSendMethod } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { isIntegrationEnabled } from "@/lib/integration-settings";
 import { fetchExploreTourData } from "@/lib/explore-nextview360";
@@ -30,6 +30,7 @@ export type ReportableDeal = {
   reportInterval: ReportInterval | null;
   nextReportDueAt: Date | null;
   reportCcEmails: string | null;
+  reportLanguage: ReportLanguage;
 };
 
 /** Splits the deal's comma-separated CC field into trimmed, non-empty addresses. */
@@ -51,7 +52,19 @@ function parseMpSkinIds(raw: string | null): string[] {
 /** The report email's body, matching the signature/wording Lasse uses when sending manually. */
 /** Describes the period the report covers to match how often it's actually sent -
  * a quarterly customer shouldn't be told their report is "for the latest month". */
-function periodPhrase(interval: ReportInterval | null): string {
+function periodPhrase(interval: ReportInterval | null, language: ReportLanguage): string {
+  if (language === "EN") {
+    switch (interval) {
+      case "MONTHLY":
+        return "for the past month";
+      case "BIMONTHLY":
+        return "for the past 2 months";
+      case "QUARTERLY":
+        return "for the past quarter";
+      default:
+        return "for the most recent period";
+    }
+  }
   switch (interval) {
     case "MONTHLY":
       return "for den seneste måned";
@@ -64,18 +77,45 @@ function periodPhrase(interval: ReportInterval | null): string {
   }
 }
 
-function buildReportEmailHtml(customerName: string, interval: ReportInterval | null): string {
+function buildReportEmailText(
+  customerName: string,
+  interval: ReportInterval | null,
+  language: ReportLanguage
+): { subject: string; bodyText: string; bodyHtml: string } {
   const name = escapeHtml(customerName);
-  return `<div style="font-family: Arial, sans-serif; font-size: 14px; color: #1d1d1f; line-height: 1.5;">
+  const period = periodPhrase(interval, language);
+
+  if (language === "EN") {
+    return {
+      subject: `Visitor report for your virtual tour – ${currentMonthLabel("EN")}`,
+      bodyText: `Dear ${customerName}\n\nWe're pleased to share a visitor report for your virtual tour, ${period}.\n\nPlease see the attached PDF.\n\nIf you have any questions, are considering updating your material, or have other spaces that would make sense to showcase with a virtual tour, please don't hesitate to contact us.\n\nBest regards,\nLasse Larsen\nNextview360\nPhone: +45 23 27 07 86`,
+      bodyHtml: `<div style="font-family: Arial, sans-serif; font-size: 14px; color: #1d1d1f; line-height: 1.5;">
+<p>Dear ${name}</p>
+<p>We're pleased to share a visitor report for your virtual tour, ${period}.</p>
+<p>Please see the attached PDF.</p>
+<p>If you have any questions, are considering updating your material, or have other spaces that would make sense to showcase with a virtual tour, please don't hesitate to contact us.</p>
+<p>Best regards,<br>
+<b>Lasse Larsen</b><br>
+Nextview360<br>
+Phone: +45 23 27 07 86</p>
+</div>`,
+    };
+  }
+
+  return {
+    subject: `Besøgsrapport for jeres virtuelle tour – ${currentMonthLabel("DA")}`,
+    bodyText: `Kære ${customerName}\n\nVi er nu klar med en besøgsrapport for jeres virtuelle tour, ${period}.\n\nSe vedhæftede PDF\n\nHvis I har nogle spørgsmål, eller overvejer at få opdateret jeres materiale, eller har andre lokaler, som giver mening at vise frem med en virtuel tour, så er I meget velkommen til at kontakte os.\n\nMed venlig hilsen\nLasse Larsen\nNextview360\nTlf: 23 27 07 86`,
+    bodyHtml: `<div style="font-family: Arial, sans-serif; font-size: 14px; color: #1d1d1f; line-height: 1.5;">
 <p>Kære ${name}</p>
-<p>Vi er nu klar med en besøgsrapport for jeres virtuelle tour, ${periodPhrase(interval)}.</p>
+<p>Vi er nu klar med en besøgsrapport for jeres virtuelle tour, ${period}.</p>
 <p>Se vedhæftede PDF</p>
 <p>Hvis I har nogle spørgsmål, eller overvejer at få opdateret jeres materiale, eller har andre lokaler, som giver mening at vise frem med en virtuel tour, så er I meget velkommen til at kontakte os.</p>
 <p>Med venlig hilsen<br>
 <b>Lasse Larsen</b><br>
 Nextview360<br>
 Tlf: 23 27 07 86</p>
-</div>`;
+</div>`,
+  };
 }
 
 async function findReportSenderAccount() {
@@ -142,7 +182,8 @@ export async function generateAndSendCustomerReport(
     if (!recipient) throw new Error("Dealen har ingen e-mail at sende rapporten til.");
 
     const customerName = deal.displayName || deal.companyName;
-    const monthLabel = currentMonthLabel();
+    const language = deal.reportLanguage;
+    const monthLabel = currentMonthLabel(language);
 
     const tourData = await fetchExploreTourData(mpSkinIds);
     const html = buildCustomerReportHtml({
@@ -150,11 +191,12 @@ export async function generateAndSendCustomerReport(
       monthLabel,
       coverImage: tourData.coverImage,
       stats: tourData.stats,
+      language,
     });
     const pdf = await renderCustomerReportPdf(html);
 
     const account = await findReportSenderAccount();
-    const fileName = `${customerName} - besøgsrapport ${monthLabel}.pdf`;
+    const fileName = `${customerName} - ${language === "EN" ? "visitor report" : "besøgsrapport"} ${monthLabel}.pdf`;
 
     let pdfDriveUrl: string | null = null;
     try {
@@ -166,12 +208,13 @@ export async function generateAndSendCustomerReport(
       console.error("Kunne ikke arkivere besøgsrapport i Google Drev", err);
     }
 
+    const emailText = buildReportEmailText(customerName, deal.reportInterval, language);
     await sendGmailMessage(account, {
       to: [recipient],
       cc: parseCcEmails(deal.reportCcEmails),
-      subject: `Besøgsrapport for jeres virtuelle tour – ${monthLabel}`,
-      bodyText: `Kære ${customerName}\n\nVi er nu klar med en besøgsrapport for jeres virtuelle tour, ${periodPhrase(deal.reportInterval)}.\n\nSe vedhæftede PDF\n\nHvis I har nogle spørgsmål, eller overvejer at få opdateret jeres materiale, eller har andre lokaler, som giver mening at vise frem med en virtuel tour, så er I meget velkommen til at kontakte os.\n\nMed venlig hilsen\nLasse Larsen\nNextview360\nTlf: 23 27 07 86`,
-      bodyHtml: buildReportEmailHtml(customerName, deal.reportInterval),
+      subject: emailText.subject,
+      bodyText: emailText.bodyText,
+      bodyHtml: emailText.bodyHtml,
       attachment: { filename: fileName, contentType: "application/pdf", data: pdf },
       fromName: "Nextview360 ApS",
     });
@@ -232,6 +275,7 @@ export async function runScheduledCustomerReports(): Promise<{ checked: number; 
       reportInterval: true,
       nextReportDueAt: true,
       reportCcEmails: true,
+      reportLanguage: true,
     },
   });
 

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
-import type { ReportInterval } from "@prisma/client";
+import type { ReportInterval, ReportLanguage } from "@prisma/client";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { generateAndSendCustomerReport, REPORT_INTERVAL_MONTHS } from "@/lib/customer-report-service";
@@ -45,6 +45,19 @@ export async function updateReportCcEmailsAction(
   if (invalid) return { ok: false, error: `"${invalid}" ser ikke ud som en gyldig e-mail.` };
 
   await prisma.deal.update({ where: { id: dealId }, data: { reportCcEmails: addresses.join(", ") || null } });
+  revalidatePath("/stats");
+  revalidatePath(`/deals/${dealId}`);
+  return { ok: true };
+}
+
+export async function updateReportLanguageAction(
+  dealId: string,
+  language: ReportLanguage
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const user = await requireUser();
+  if (user.role !== "ADMIN") throw new Error("Kun admin kan ændre rapportsprog");
+
+  await prisma.deal.update({ where: { id: dealId }, data: { reportLanguage: language } });
   revalidatePath("/stats");
   revalidatePath(`/deals/${dealId}`);
   return { ok: true };

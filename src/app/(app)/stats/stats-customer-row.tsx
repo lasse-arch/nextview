@@ -6,13 +6,14 @@ import {
   updateMpSkinIdAction,
   updateReportCcEmailsAction,
   updateReportIntervalAction,
+  updateReportLanguageAction,
   sendCustomerReportNowAction,
 } from "@/lib/actions/customer-reports";
 import { formatDate } from "@/lib/labels";
 import { useToast } from "@/components/toast";
 import { usePollWhilePending } from "../use-poll-while-pending";
 import { ReportHistoryTooltip, type ReportHistoryEntry } from "./report-history-tooltip";
-import type { ReportInterval, ReportSendStatus } from "@prisma/client";
+import type { ReportInterval, ReportLanguage, ReportSendStatus } from "@prisma/client";
 
 const INTERVAL_LABELS: Record<ReportInterval, string> = {
   MONTHLY: "Hver måned",
@@ -26,6 +27,7 @@ export function StatsCustomerRow({
   mpSkinId,
   reportCcEmails,
   reportInterval,
+  reportLanguage,
   nextReportDueAt,
   lastSentAt,
   lastSentMethod,
@@ -38,6 +40,7 @@ export function StatsCustomerRow({
   mpSkinId: string | null;
   reportCcEmails: string | null;
   reportInterval: ReportInterval | null;
+  reportLanguage: ReportLanguage;
   nextReportDueAt: string | null;
   lastSentAt: string | null;
   lastSentMethod: "MANUAL" | "AUTOMATIC" | null;
@@ -50,6 +53,7 @@ export function StatsCustomerRow({
   const [savingId, startSavingId] = useTransition();
   const [savingCc, startSavingCc] = useTransition();
   const [pending, startTransition] = useTransition();
+  const [savingLanguage, startSavingLanguage] = useTransition();
   const [sending, startSendTransition] = useTransition();
   const showToast = useToast();
 
@@ -84,6 +88,17 @@ export function StatsCustomerRow({
     startTransition(async () => {
       try {
         const result = await updateReportIntervalAction(dealId, interval);
+        if (!result.ok) showToast(result.error);
+      } catch (err) {
+        showToast(err instanceof Error ? err.message : "Der opstod en fejl.");
+      }
+    });
+  }
+
+  function changeLanguage(value: string) {
+    startSavingLanguage(async () => {
+      try {
+        const result = await updateReportLanguageAction(dealId, value as ReportLanguage);
         if (!result.ok) showToast(result.error);
       } catch (err) {
         showToast(err instanceof Error ? err.message : "Der opstod en fejl.");
@@ -143,6 +158,17 @@ export function StatsCustomerRow({
           <option value="MONTHLY">{INTERVAL_LABELS.MONTHLY}</option>
           <option value="BIMONTHLY">{INTERVAL_LABELS.BIMONTHLY}</option>
           <option value="QUARTERLY">{INTERVAL_LABELS.QUARTERLY}</option>
+        </select>
+      </td>
+      <td className="px-3 py-2">
+        <select
+          defaultValue={reportLanguage}
+          disabled={savingLanguage}
+          onChange={(e) => changeLanguage(e.target.value)}
+          className="rounded-md border border-slate-300 px-2 py-1 text-xs disabled:opacity-50"
+        >
+          <option value="DA">Dansk</option>
+          <option value="EN">Engelsk</option>
         </select>
       </td>
       <td className="px-3 py-2 text-slate-600">

@@ -1,10 +1,16 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { ExploreTourStats } from "@/lib/explore-nextview360";
+import type { ReportLanguage } from "@prisma/client";
 
 const DANISH_MONTHS = [
   "januar", "februar", "marts", "april", "maj", "juni",
   "juli", "august", "september", "oktober", "november", "december",
+];
+
+const ENGLISH_MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
 ];
 
 function toDataUri(buffer: Buffer, mime: string): string {
@@ -16,19 +22,108 @@ function logoDataUri(): string {
   return toDataUri(fs.readFileSync(filePath), "image/png");
 }
 
-function fmtInt(n: number): string {
-  return new Intl.NumberFormat("da-DK").format(n);
+function fmtInt(n: number, language: ReportLanguage): string {
+  return new Intl.NumberFormat(language === "EN" ? "en-US" : "da-DK").format(n);
 }
 
-function periodCard(label: string, stats: ExploreTourStats["last7Days"], highlight = false): string {
+const TEXT: Record<ReportLanguage, {
+  eyebrow: string;
+  viewsHeading: string;
+  last7: string;
+  last30: string;
+  last90: string;
+  since: (label: string) => string;
+  sessions: string;
+  users: string;
+  avgTime: string;
+  footnote: string;
+  tipsHeading: string;
+  tips: { title: string; body: string }[];
+}> = {
+  DA: {
+    eyebrow: "Besøgsrapport for jeres virtuelle tour",
+    viewsHeading: "Visninger",
+    last7: "Seneste 7 dage",
+    last30: "Seneste 30 dage",
+    last90: "Seneste 90 dage",
+    since: (label) => `Siden ${label}`,
+    sessions: "sessions",
+    users: "brugere",
+    avgTime: "gns. tid",
+    footnote:
+      "Tallene er udelukkende baseret på visninger via explore.nextview360.dk og bør derfor afspejle reelle visninger fra interesserede kunder.",
+    tipsHeading: "5 gode råd til flere besøgende",
+    tips: [
+      {
+        title: "Sæt QR-koder på jeres fysiske materiale",
+        body: "Læg en QR-kode på skilte, foldere, visitkort og på selve stedet — så går folk direkte ind i touren fra den virkelige verden.",
+      },
+      {
+        title: "Lav et nyhedsbrev med touren",
+        body: "Inkludér den virtuelle tour i jeres næste nyhedsbrev, så I når abonnenterne direkte.",
+      },
+      {
+        title: "Vis touren på en skærm hos jer",
+        body: "Sæt touren på en skærm i receptionen eller ved indgangen, så besøgende også oplever den, når de er hos jer fysisk.",
+      },
+      {
+        title: "Del touren i jeres dialog med kunder",
+        body: "Send linket direkte, når I er i kontakt — så kan folk i ro og mag opleve stedet hjemmefra.",
+      },
+      {
+        title: "Gør linket nemt at finde",
+        body: "Sæt linket til touren tydeligt på forsiden af jeres hjemmeside og på jeres sociale profiler — alle besøg kommer ind via det ene link.",
+      },
+    ],
+  },
+  EN: {
+    eyebrow: "Visitor report for your virtual tour",
+    viewsHeading: "Views",
+    last7: "Last 7 days",
+    last30: "Last 30 days",
+    last90: "Last 90 days",
+    since: (label) => `Since ${label}`,
+    sessions: "sessions",
+    users: "users",
+    avgTime: "avg. time",
+    footnote:
+      "These figures are based solely on views via explore.nextview360.dk and should therefore reflect genuine views from interested customers.",
+    tipsHeading: "5 tips to get more visitors",
+    tips: [
+      {
+        title: "Add QR codes to your physical materials",
+        body: "Put a QR code on signs, brochures, business cards and at the location itself — so people can jump straight into the tour from the real world.",
+      },
+      {
+        title: "Feature the tour in a newsletter",
+        body: "Include the virtual tour in your next newsletter so your subscribers see it directly.",
+      },
+      {
+        title: "Show the tour on a screen on-site",
+        body: "Put the tour on a screen in reception or by the entrance, so visitors also experience it while they're physically there.",
+      },
+      {
+        title: "Share the tour in customer conversations",
+        body: "Send the link directly whenever you're in touch - so people can explore the place at their own pace from home.",
+      },
+      {
+        title: "Make the link easy to find",
+        body: "Put the link to the tour prominently on your website's front page and on your social profiles - every visit comes in through that one link.",
+      },
+    ],
+  },
+};
+
+function periodCard(label: string, stats: ExploreTourStats["last7Days"], language: ReportLanguage, highlight = false): string {
+  const t = TEXT[language];
   return `
     <div class="period-card${highlight ? " highlight" : ""}">
       <div class="period-label">${label}</div>
-      <div class="visits">${fmtInt(stats.visits)}</div>
+      <div class="visits">${fmtInt(stats.visits, language)}</div>
       <div class="submetrics">
-        <div><span>${fmtInt(stats.sessions)}</span> sessions</div>
-        <div><span>${fmtInt(stats.users)}</span> brugere</div>
-        <div><span>${stats.avgTime}</span> gns. tid</div>
+        <div><span>${fmtInt(stats.sessions, language)}</span> ${t.sessions}</div>
+        <div><span>${fmtInt(stats.users, language)}</span> ${t.users}</div>
+        <div><span>${stats.avgTime}</span> ${t.avgTime}</div>
       </div>
     </div>`;
 }
@@ -38,35 +133,14 @@ export type CustomerReportData = {
   monthLabel: string;
   coverImage: Buffer;
   stats: ExploreTourStats;
+  language: ReportLanguage;
 };
 
-/** "september 2026" for the current date, matching Danish lowercase month convention. */
-export function currentMonthLabel(date: Date = new Date()): string {
-  return `${DANISH_MONTHS[date.getMonth()]} ${date.getFullYear()}`;
+/** "september 2026" / "September 2026" for the current date, matching each language's month-name convention. */
+export function currentMonthLabel(language: ReportLanguage, date: Date = new Date()): string {
+  const months = language === "EN" ? ENGLISH_MONTHS : DANISH_MONTHS;
+  return `${months[date.getMonth()]} ${date.getFullYear()}`;
 }
-
-const TIPS = [
-  {
-    title: "Sæt QR-koder på jeres fysiske materiale",
-    body: "Læg en QR-kode på skilte, foldere, visitkort og på selve stedet — så går folk direkte ind i touren fra den virkelige verden.",
-  },
-  {
-    title: "Lav et nyhedsbrev med touren",
-    body: "Inkludér den virtuelle tour i jeres næste nyhedsbrev, så I når abonnenterne direkte.",
-  },
-  {
-    title: "Vis touren på en skærm hos jer",
-    body: "Sæt touren på en skærm i receptionen eller ved indgangen, så besøgende også oplever den, når de er hos jer fysisk.",
-  },
-  {
-    title: "Del touren i jeres dialog med kunder",
-    body: "Send linket direkte, når I er i kontakt — så kan folk i ro og mag opleve stedet hjemmefra.",
-  },
-  {
-    title: "Gør linket nemt at finde",
-    body: "Sæt linket til touren tydeligt på forsiden af jeres hjemmeside og på jeres sociale profiler — alle besøg kommer ind via det ene link.",
-  },
-];
 
 /**
  * Builds the visitor-stats report as a 3-page HTML deck (rendered to PDF by
@@ -77,9 +151,11 @@ const TIPS = [
 export function buildCustomerReportHtml(data: CustomerReportData): string {
   const logo = logoDataUri();
   const cover = toDataUri(data.coverImage, "image/png");
+  const t = TEXT[data.language];
+  const htmlLang = data.language === "EN" ? "en" : "da";
 
   return `<!DOCTYPE html>
-<html lang="da">
+<html lang="${htmlLang}">
 <head>
 <meta charset="utf-8">
 <style>
@@ -132,7 +208,7 @@ export function buildCustomerReportHtml(data: CustomerReportData): string {
     <img class="bg" src="${cover}">
     <div class="scrim"></div>
     <div class="content">
-      <p class="eyebrow">Besøgsrapport for jeres virtuelle tour</p>
+      <p class="eyebrow">${t.eyebrow}</p>
       <h1>${escapeHtml(data.customerName)}</h1>
       <p class="subtitle">${escapeHtml(data.monthLabel)}</p>
     </div>
@@ -140,27 +216,29 @@ export function buildCustomerReportHtml(data: CustomerReportData): string {
 
   <div class="page content-page">
     <div class="top-row"><div></div><div class="brand">${escapeHtml(data.customerName)}</div></div>
-    <h2>Visninger</h2>
+    <h2>${t.viewsHeading}</h2>
     <div class="period-grid">
-      ${periodCard("Seneste 7 dage", data.stats.last7Days)}
-      ${periodCard("Seneste 30 dage", data.stats.last30Days)}
-      ${periodCard("Seneste 90 dage", data.stats.last90Days)}
-      ${periodCard(`Siden ${data.stats.sinceLabel}`, data.stats.sinceStats, true)}
+      ${periodCard(t.last7, data.stats.last7Days, data.language)}
+      ${periodCard(t.last30, data.stats.last30Days, data.language)}
+      ${periodCard(t.last90, data.stats.last90Days, data.language)}
+      ${periodCard(t.since(data.stats.sinceLabel), data.stats.sinceStats, data.language, true)}
     </div>
-    <p class="footnote">Tallene er udelukkende baseret på visninger via explore.nextview360.dk og bør derfor afspejle reelle visninger fra interesserede kunder.</p>
+    <p class="footnote">${t.footnote}</p>
     <div class="page-footer"><img src="${logo}"></div>
   </div>
 
   <div class="page content-page">
-    <h2>5 gode råd til flere besøgende</h2>
+    <h2>${t.tipsHeading}</h2>
     <div class="tips">
-      ${TIPS.map(
-        (tip, i) => `
+      ${t.tips
+        .map(
+          (tip, i) => `
       <div class="tip">
         <div class="num">${i + 1}</div>
         <div class="txt"><h3>${escapeHtml(tip.title)}</h3><p>${escapeHtml(tip.body)}</p></div>
       </div>`
-      ).join("")}
+        )
+        .join("")}
     </div>
     <div class="page-footer"><img src="${logo}"></div>
   </div>

@@ -98,6 +98,13 @@ enum ReportSendMethod {
   AUTOMATIC
 }
 
+/// Language the visitor-stats report (email + PDF) is written in. Defaults
+/// to Danish for every deal; set per customer when they need it in English.
+enum ReportLanguage {
+  DA
+  EN
+}
+
 enum ReportSendStatus {
   /// A manual send's row is created with this status immediately (before the
   /// background job even starts), so the UI has something real in the
@@ -311,6 +318,10 @@ model Deal {
   /// Optional - the report always goes to the deal's own contact/invoice
   /// email regardless.
   reportCcEmails String?
+
+  /// Language the visitor-stats report is written in for this customer.
+  /// Defaults to Danish for everyone; switched to English per customer as needed.
+  reportLanguage ReportLanguage @default(DA)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
