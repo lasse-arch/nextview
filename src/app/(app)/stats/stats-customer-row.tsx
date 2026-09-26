@@ -21,6 +21,21 @@ const INTERVAL_LABELS: Record<ReportInterval, string> = {
   QUARTERLY: "Hvert kvartal",
 };
 
+export type StatsCustomerRowData = {
+  dealId: string;
+  name: string;
+  mpSkinId: string | null;
+  reportCcEmails: string | null;
+  reportInterval: ReportInterval | null;
+  reportLanguage: ReportLanguage;
+  nextReportDueAt: string | null;
+  lastSentAt: string | null;
+  lastSentMethod: "MANUAL" | "AUTOMATIC" | null;
+  lastStatus: ReportSendStatus | null;
+  lastErrorMessage: string | null;
+  history: ReportHistoryEntry[];
+};
+
 export function StatsCustomerRow({
   dealId,
   name,
@@ -34,20 +49,9 @@ export function StatsCustomerRow({
   lastStatus,
   lastErrorMessage,
   history,
-}: {
-  dealId: string;
-  name: string;
-  mpSkinId: string | null;
-  reportCcEmails: string | null;
-  reportInterval: ReportInterval | null;
-  reportLanguage: ReportLanguage;
-  nextReportDueAt: string | null;
-  lastSentAt: string | null;
-  lastSentMethod: "MANUAL" | "AUTOMATIC" | null;
-  lastStatus: ReportSendStatus | null;
-  lastErrorMessage: string | null;
-  history: ReportHistoryEntry[];
-}) {
+  selected,
+  onToggleSelected,
+}: StatsCustomerRowData & { selected: boolean; onToggleSelected: () => void }) {
   const [mpSkinIdValue, setMpSkinIdValue] = useState(mpSkinId ?? "");
   const [ccValue, setCcValue] = useState(reportCcEmails ?? "");
   const [savingId, startSavingId] = useTransition();
@@ -121,10 +125,18 @@ export function StatsCustomerRow({
 
   return (
     <tr className="border-t border-slate-100">
-      <td className="px-3 py-2">
-        <Link href={`/deals/${dealId}`} className="font-medium text-slate-900 hover:underline">
-          {name}
-        </Link>
+      <td className="sticky left-0 z-10 bg-white px-3 py-2">
+        <div className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={onToggleSelected}
+            aria-label={`Vælg ${name}`}
+          />
+          <Link href={`/deals/${dealId}`} className="font-medium text-slate-900 hover:underline">
+            {name}
+          </Link>
+        </div>
       </td>
       <td className="px-3 py-2">
         <input
@@ -211,7 +223,7 @@ export function StatsCustomerRow({
           "Aldrig sendt"
         )}
       </td>
-      <td className="px-3 py-2 text-right">
+      <td className="sticky right-0 z-10 bg-white px-3 py-2 text-right">
         <button
           type="button"
           disabled={isSending}

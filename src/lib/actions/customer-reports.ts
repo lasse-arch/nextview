@@ -122,3 +122,43 @@ export async function sendCustomerReportNowAction(
   revalidatePath("/stats");
   return { ok: true, queued: true };
 }
+
+/**
+ * Bulk "Send nu" for the checkboxes on /stats - same PENDING-row-up-front +
+ * after() pattern as the single-deal action, just for several deals at once.
+ * Deals without an MP-Skin nummer are silently skipped (reported back as
+ * `skipped`) rather than failing the whole batch over one bad row. Sends run
+ * one at a time in the background (not in parallel), matching the daily
+ * scheduler, since each one drives its own headless-Chromium scrape of
+ * explore.nextview360.dk - several at once would be needlessly heavy.
+ */
+export async function sendCustomerReportsNowAction(
+  dealIds: string[]
+): Promise<{ ok: true; queued: number; skipped: number } | { ok: false; error: string }> {
+  const user = await requireUser();
+  if (user.role !== "ADMIN") throw new Error("Kun admin kan sende besøgsrapporter");
+
+  if (dealIds.length === 0) return { ok: false, error: "Ingen kunder valgt." };
+
+  const deals = await prisma.deal.findMany({ where: { id: { in: dealIds } } });
+  const sendable = deals.filter((d) => d.mpSkinId);
+  const skipped = deals.length - sendable.length;
+  if (sendable.length === 0) return { ok: false, error: "Ingen af de valgte kunder har et MP-Skin nummer udfyldt." };
+
+  const pendingReports = await Promise.all(
+    sendable.map((deal) => prisma.customerReport.create({ data: { dealId: deal.id, method: "MANUAL", status: "PENDING" } }))
+  );
+
+  after(async () => {
+    for (let i = 0; i < sendable.length; i++) {
+      const deal = sendable[i];
+      const result = await generateAndSendCustomerReport(deal, "MANUAL", pendingReports[i].id);
+      if (!result.ok) console.error(`Besøgsrapport til deal ${deal.id} fejlede:`, result.error);
+    }
+    revalidatePath("/stats");
+    for (const deal of sendable) revalidatePath(`/deals/${deal.id}`);
+  });
+
+  revalidatePath("/stats");
+  return { ok: true, queued: sendable.length, skipped };
+}

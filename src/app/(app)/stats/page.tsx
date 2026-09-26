@@ -2,7 +2,7 @@ import { prisma } from "@/lib/db";
 import { isIntegrationEnabled } from "@/lib/integration-settings";
 import { dealName } from "@/lib/labels";
 import { IntegrationToggle } from "../settings/integration-toggle";
-import { StatsCustomerRow } from "./stats-customer-row";
+import { LiveCustomersTable } from "./live-customers-table";
 
 // "Send nu" schedules its actual scraping/PDF/email work via next/server's
 // `after()`, which keeps running past this page's own response but is still
@@ -48,53 +48,27 @@ export default async function StatsPage() {
 
       <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <h2 className="text-sm font-semibold text-slate-900">Live kunder</h2>
-        <div className="mt-3 overflow-hidden rounded-md border border-slate-100">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[980px] text-sm">
-              <thead className="bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                <tr>
-                  <th className="px-3 py-2 font-medium">Kunde</th>
-                  <th className="px-3 py-2 font-medium">MP-Skin nummer</th>
-                  <th className="px-3 py-2 font-medium">CC</th>
-                  <th className="px-3 py-2 font-medium">Interval</th>
-                  <th className="px-3 py-2 font-medium">Sprog</th>
-                  <th className="px-3 py-2 font-medium">Næste afsendelse</th>
-                  <th className="px-3 py-2 font-medium">Sidst sendt</th>
-                  <th className="px-3 py-2 font-medium"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {deals.map((deal) => (
-                  <StatsCustomerRow
-                    key={deal.id}
-                    dealId={deal.id}
-                    name={deal.displayName || deal.companyName}
-                    mpSkinId={deal.mpSkinId}
-                    reportCcEmails={deal.reportCcEmails}
-                    reportInterval={deal.reportInterval}
-                    reportLanguage={deal.reportLanguage}
-                    nextReportDueAt={deal.nextReportDueAt ? deal.nextReportDueAt.toISOString() : null}
-                    lastSentAt={deal.reports[0] ? deal.reports[0].sentAt.toISOString() : null}
-                    lastSentMethod={deal.reports[0]?.method ?? null}
-                    lastStatus={deal.reports[0]?.status ?? null}
-                    lastErrorMessage={deal.reports[0]?.errorMessage ?? null}
-                    history={deal.reports.map((r) => ({
-                      sentAt: r.sentAt.toISOString(),
-                      method: r.method,
-                      status: r.status,
-                    }))}
-                  />
-                ))}
-                {deals.length === 0 && (
-                  <tr>
-                    <td colSpan={8} className="px-3 py-6 text-center text-slate-400">
-                      Ingen live kunder endnu.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+        <div className="mt-3">
+          <LiveCustomersTable
+            rows={deals.map((deal) => ({
+              dealId: deal.id,
+              name: deal.displayName || deal.companyName,
+              mpSkinId: deal.mpSkinId,
+              reportCcEmails: deal.reportCcEmails,
+              reportInterval: deal.reportInterval,
+              reportLanguage: deal.reportLanguage,
+              nextReportDueAt: deal.nextReportDueAt ? deal.nextReportDueAt.toISOString() : null,
+              lastSentAt: deal.reports[0] ? deal.reports[0].sentAt.toISOString() : null,
+              lastSentMethod: deal.reports[0]?.method ?? null,
+              lastStatus: deal.reports[0]?.status ?? null,
+              lastErrorMessage: deal.reports[0]?.errorMessage ?? null,
+              history: deal.reports.map((r) => ({
+                sentAt: r.sentAt.toISOString(),
+                method: r.method,
+                status: r.status,
+              })),
+            }))}
+          />
         </div>
       </section>
     </div>
