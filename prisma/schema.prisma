@@ -392,6 +392,11 @@ model CustomerReport {
   /// Google Drive link to the generated PDF, if archiving succeeded - best-effort,
   /// same pattern as signed-contract archiving.
   pdfDriveUrl String?
+  /// Set (comma-separated deal IDs) when this is a combined report for a
+  /// linked customer - dealId is the parent, this lists which of its
+  /// branches' stats were included in the one PDF/email. Null for an
+  /// ordinary single-deal report.
+  branchDealIds String?
   createdAt  DateTime          @default(now())
 
   @@index([dealId, sentAt])

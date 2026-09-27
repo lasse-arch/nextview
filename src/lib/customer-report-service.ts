@@ -3,7 +3,13 @@ import type { ReportInterval, ReportLanguage, ReportSendMethod } from "@prisma/c
 import { prisma } from "@/lib/db";
 import { isIntegrationEnabled } from "@/lib/integration-settings";
 import { fetchExploreTourData } from "@/lib/explore-nextview360";
-import { buildCustomerReportHtml, currentMonthLabel, escapeHtml } from "@/lib/customer-report-template";
+import {
+  buildCustomerReportHtml,
+  buildCombinedCustomerReportHtml,
+  currentMonthLabel,
+  escapeHtml,
+  type CombinedCustomerReportBranch,
+} from "@/lib/customer-report-template";
 import { renderCustomerReportPdf } from "@/lib/customer-report-pdf";
 import { sendGmailMessage } from "@/lib/gmail";
 import { findOrCreateCustomerReportsFolder, uploadPdfToDrive } from "@/lib/google-drive";
@@ -112,6 +118,47 @@ Phone: +45 23 27 07 86</p>
 <p>Kære ${name}</p>
 <p>Vi er nu klar med en besøgsrapport for jeres virtuelle tour, ${period}.</p>
 <p>Se vedhæftede PDF</p>
+<p>Hvis I har nogle spørgsmål, eller overvejer at få opdateret jeres materiale, eller har andre lokaler, som giver mening at vise frem med en virtuel tour, så er I meget velkommen til at kontakte os.</p>
+<p>Med venlig hilsen<br>
+<b>Lasse Larsen</b><br>
+Nextview360<br>
+Tlf: 23 27 07 86</p>
+</div>`,
+  };
+}
+
+function buildCombinedReportEmailText(
+  customerName: string,
+  interval: ReportInterval | null,
+  language: ReportLanguage
+): { subject: string; bodyText: string; bodyHtml: string } {
+  const name = escapeHtml(customerName);
+  const period = periodPhrase(interval, language);
+
+  if (language === "EN") {
+    return {
+      subject: `Visitor report for your virtual tours – ${currentMonthLabel("EN")}`,
+      bodyText: `Dear ${customerName}\n\nWe're pleased to share a combined visitor report covering all your virtual tours, ${period}.\n\nPlease see the attached PDF - it has one section per location.\n\nIf you have any questions, are considering updating your material, or have other spaces that would make sense to showcase with a virtual tour, please don't hesitate to contact us.\n\nBest regards,\nLasse Larsen\nNextview360\nPhone: +45 23 27 07 86`,
+      bodyHtml: `<div style="font-family: Arial, sans-serif; font-size: 14px; color: #1d1d1f; line-height: 1.5;">
+<p>Dear ${name}</p>
+<p>We're pleased to share a combined visitor report covering all your virtual tours, ${period}.</p>
+<p>Please see the attached PDF - it has one section per location.</p>
+<p>If you have any questions, are considering updating your material, or have other spaces that would make sense to showcase with a virtual tour, please don't hesitate to contact us.</p>
+<p>Best regards,<br>
+<b>Lasse Larsen</b><br>
+Nextview360<br>
+Phone: +45 23 27 07 86</p>
+</div>`,
+    };
+  }
+
+  return {
+    subject: `Besøgsrapport for jeres virtuelle tours – ${currentMonthLabel("DA")}`,
+    bodyText: `Kære ${customerName}\n\nVi er nu klar med en samlet besøgsrapport for alle jeres virtuelle tours, ${period}.\n\nSe vedhæftede PDF - den har et afsnit pr. lokation.\n\nHvis I har nogle spørgsmål, eller overvejer at få opdateret jeres materiale, eller har andre lokaler, som giver mening at vise frem med en virtuel tour, så er I meget velkommen til at kontakte os.\n\nMed venlig hilsen\nLasse Larsen\nNextview360\nTlf: 23 27 07 86`,
+    bodyHtml: `<div style="font-family: Arial, sans-serif; font-size: 14px; color: #1d1d1f; line-height: 1.5;">
+<p>Kære ${name}</p>
+<p>Vi er nu klar med en samlet besøgsrapport for alle jeres virtuelle tours, ${period}.</p>
+<p>Se vedhæftede PDF - den har et afsnit pr. lokation.</p>
 <p>Hvis I har nogle spørgsmål, eller overvejer at få opdateret jeres materiale, eller har andre lokaler, som giver mening at vise frem med en virtuel tour, så er I meget velkommen til at kontakte os.</p>
 <p>Med venlig hilsen<br>
 <b>Lasse Larsen</b><br>
@@ -261,6 +308,133 @@ export async function generateAndSendCustomerReport(
   }
 }
 
+/**
+ * Same as generateAndSendCustomerReport, but for a linked customer (parent +
+ * branches, see the customer-linking feature) whose stats should go out as
+ * ONE combined email with ONE PDF - one stats section per included branch -
+ * instead of a separate report per branch. `branches` is every OTHER deal
+ * being folded into this report (the parent itself is `deal`); each of them
+ * keeps its own independent contract/CVR, only the reporting is merged here.
+ *
+ * The email goes to the parent deal's contact/invoice address; any branch
+ * whose own contact/invoice email differs is added as CC, so a branch with
+ * its own on-site contact still gets the report even though it's not the
+ * primary recipient.
+ */
+export async function generateAndSendCombinedCustomerReport(
+  deal: ReportableDeal,
+  branches: ReportableDeal[],
+  method: ReportSendMethod,
+  existingReportId?: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const allDeals = [deal, ...branches];
+    const reportableDeals = allDeals.filter((d) => parseMpSkinIds(d.mpSkinId).length > 0);
+    if (reportableDeals.length === 0) throw new Error("Ingen af de sammenkoblede deals har et MP-Skin nummer udfyldt.");
+
+    const recipient = deal.invoiceEmail || deal.contactEmail;
+    if (!recipient) throw new Error("Dealen har ingen e-mail at sende rapporten til.");
+
+    const customerName = deal.displayName || deal.companyName;
+    const language = deal.reportLanguage;
+    const monthLabel = currentMonthLabel(language);
+
+    const branchReports: CombinedCustomerReportBranch[] = [];
+    let coverImage: Buffer | null = null;
+    for (const d of reportableDeals) {
+      const tourData = await fetchExploreTourData(parseMpSkinIds(d.mpSkinId));
+      branchReports.push({ name: d.displayName || d.companyName, stats: tourData.stats });
+      if (!coverImage) coverImage = tourData.coverImage;
+    }
+    if (!coverImage) throw new Error("Kunne ikke hente et cover-billede for nogen af de sammenkoblede deals.");
+
+    const html = buildCombinedCustomerReportHtml({
+      customerName,
+      monthLabel,
+      coverImage,
+      language,
+      branches: branchReports,
+    });
+    const pdf = await renderCustomerReportPdf(html);
+
+    const account = await findReportSenderAccount();
+    const fileName = `${customerName} - ${language === "EN" ? "combined visitor report" : "samlet besøgsrapport"} ${monthLabel}.pdf`;
+
+    let pdfDriveUrl: string | null = null;
+    try {
+      const folderId = await findOrCreateCustomerReportsFolder(account);
+      const uploaded = await uploadPdfToDrive(account, folderId, fileName, pdf);
+      pdfDriveUrl = uploaded.webViewLink;
+    } catch (err) {
+      console.error("Kunne ikke arkivere samlet besøgsrapport i Google Drev", err);
+    }
+
+    const ccEmails = new Set<string>();
+    for (const d of allDeals) {
+      for (const cc of parseCcEmails(d.reportCcEmails)) ccEmails.add(cc);
+      if (d !== deal) {
+        const branchEmail = d.invoiceEmail || d.contactEmail;
+        if (branchEmail && branchEmail !== recipient) ccEmails.add(branchEmail);
+      }
+    }
+
+    const emailText = buildCombinedReportEmailText(customerName, deal.reportInterval, language);
+    await sendGmailMessage(account, {
+      to: [recipient],
+      cc: [...ccEmails],
+      subject: emailText.subject,
+      bodyText: emailText.bodyText,
+      bodyHtml: emailText.bodyHtml,
+      attachment: { filename: fileName, contentType: "application/pdf", data: pdf },
+      fromName: "Nextview360 ApS",
+    });
+
+    const branchDealIds = branches.map((b) => b.id).join(",") || null;
+    await prisma.$transaction([
+      existingReportId
+        ? prisma.customerReport.update({
+            where: { id: existingReportId },
+            data: { status: "SENT", pdfDriveUrl, branchDealIds, errorMessage: null, sentAt: new Date() },
+          })
+        : prisma.customerReport.create({
+            data: { dealId: deal.id, method, status: "SENT", pdfDriveUrl, branchDealIds },
+          }),
+      // Sending the combined report fulfils the schedule for every included
+      // deal, not just the parent - otherwise a branch would still show up
+      // as "due" again right away even though its stats just went out.
+      ...allDeals.map((d) =>
+        prisma.deal.update({ where: { id: d.id }, data: { nextReportDueAt: computeNextReportDueAt(d, method) } })
+      ),
+    ]);
+
+    await logActivity({
+      type: "CUSTOMER_REPORT_SENT",
+      message:
+        method === "AUTOMATIC"
+          ? `Samlet besøgsrapport sendt automatisk til ${dealName(deal)} (${reportableDeals.length} lokationer)`
+          : `Samlet besøgsrapport sendt til ${dealName(deal)} (${reportableDeals.length} lokationer)`,
+      dealId: deal.id,
+    });
+
+    return { ok: true };
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : "Ukendt fejl";
+    try {
+      if (existingReportId) {
+        await prisma.customerReport.update({
+          where: { id: existingReportId },
+          data: { status: "FAILED", errorMessage, sentAt: new Date() },
+        });
+      } else {
+        await prisma.customerReport.create({ data: { dealId: deal.id, method, status: "FAILED", errorMessage } });
+      }
+    } catch (recordErr) {
+      console.error("Kunne ikke gemme fejlet samlet besøgsrapport-forsøg", recordErr);
+    }
+    return { ok: false, error: errorMessage };
+  }
+}
+
 const REPORTABLE_STAGES = ["FILMED", "LIVE"] as const;
 
 /**
@@ -312,7 +486,13 @@ export async function processOneQueuedReport(): Promise<{ processed: boolean; re
 
   if (!report) return { processed: false, remaining: 0 };
 
-  await generateAndSendCustomerReport(report.deal, report.method, report.id);
+  if (report.branchDealIds) {
+    const branchIds = report.branchDealIds.split(",").filter(Boolean);
+    const branches = await prisma.deal.findMany({ where: { id: { in: branchIds } } });
+    await generateAndSendCombinedCustomerReport(report.deal, branches, report.method, report.id);
+  } else {
+    await generateAndSendCustomerReport(report.deal, report.method, report.id);
+  }
 
   const remaining = await prisma.customerReport.count({ where: { status: "PENDING" } });
   return { processed: true, remaining };

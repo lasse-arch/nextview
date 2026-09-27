@@ -123,6 +123,51 @@ export async function sendCustomerReportNowAction(
  * can't blow past any single request's timeout the way looping through all
  * of them in one request could.
  */
+/**
+ * "Send samlet rapport" - for a customer with linked branches (see the
+ * customer-linking feature), sends ONE email with ONE PDF covering the
+ * parent deal plus every one of its branches, instead of a separate report
+ * per branch. Same PENDING-row-up-front + self-chaining-queue pattern as the
+ * single-deal send, since scraping several deals' stats in one go is even
+ * more likely to run long.
+ */
+export async function sendCombinedCustomerReportAction(
+  parentDealId: string
+): Promise<{ ok: true; queued: true; branchCount: number } | { ok: false; error: string }> {
+  const user = await requireUser();
+  if (user.role !== "ADMIN") throw new Error("Kun admin kan sende besøgsrapporter");
+
+  const parent = await prisma.deal.findUniqueOrThrow({
+    where: { id: parentDealId },
+    include: { branches: true },
+  });
+  if (parent.branches.length === 0) {
+    return { ok: false, error: "Denne kunde har ingen sammenkoblede afdelinger." };
+  }
+
+  const reportable = [parent, ...parent.branches].filter((d) => d.mpSkinId);
+  if (reportable.length === 0) {
+    return { ok: false, error: "Hverken kunden eller dens afdelinger har et MP-Skin nummer udfyldt." };
+  }
+  if (!parent.invoiceEmail && !parent.contactEmail) {
+    return { ok: false, error: "Kunden har ingen e-mail at sende rapporten til." };
+  }
+
+  await prisma.customerReport.create({
+    data: {
+      dealId: parentDealId,
+      method: "MANUAL",
+      status: "PENDING",
+      branchDealIds: parent.branches.map((b) => b.id).join(","),
+    },
+  });
+  after(() => kickCustomerReportQueue());
+
+  revalidatePath(`/deals/${parentDealId}`);
+  revalidatePath("/stats");
+  return { ok: true, queued: true, branchCount: parent.branches.length };
+}
+
 export async function sendCustomerReportsNowAction(
   dealIds: string[]
 ): Promise<{ ok: true; queued: number; skipped: number } | { ok: false; error: string }> {

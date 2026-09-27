@@ -142,23 +142,7 @@ export function currentMonthLabel(language: ReportLanguage, date: Date = new Dat
   return `${months[date.getMonth()]} ${date.getFullYear()}`;
 }
 
-/**
- * Builds the visitor-stats report as a 3-page HTML deck (rendered to PDF by
- * customer-report-pdf.ts): cover with the tour's real cover photo, a stats
- * page with the 4 period cards, and a fixed "5 gode råd" tips page. Landscape
- * 1280x720 - a screen-sized report, not a printed document.
- */
-export function buildCustomerReportHtml(data: CustomerReportData): string {
-  const logo = logoDataUri();
-  const cover = toDataUri(data.coverImage, "image/png");
-  const t = TEXT[data.language];
-  const htmlLang = data.language === "EN" ? "en" : "da";
-
-  return `<!DOCTYPE html>
-<html lang="${htmlLang}">
-<head>
-<meta charset="utf-8">
-<style>
+const REPORT_STYLE = `
   @page { margin: 0; size: 1280px 720px; }
   * { box-sizing: border-box; }
   html, body {
@@ -200,33 +184,11 @@ export function buildCustomerReportHtml(data: CustomerReportData): string {
   .tip .num { flex-shrink: 0; width: 36px; height: 36px; border-radius: 50%; background: #1d3f9e; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 700; }
   .tip .txt h3 { margin: 0 0 4px 0; font-size: 17px; font-weight: 700; color: #1d1d1f; }
   .tip .txt p { margin: 0; font-size: 14.5px; color: #48484a; line-height: 1.5; }
-</style>
-</head>
-<body>
+`;
 
-  <div class="page cover">
-    <img class="bg" src="${cover}">
-    <div class="scrim"></div>
-    <div class="content">
-      <p class="eyebrow">${t.eyebrow}</p>
-      <h1>${escapeHtml(data.customerName)}</h1>
-      <p class="subtitle">${escapeHtml(data.monthLabel)}</p>
-    </div>
-  </div>
-
-  <div class="page content-page">
-    <div class="top-row"><div></div><div class="brand">${escapeHtml(data.customerName)}</div></div>
-    <h2>${t.viewsHeading}</h2>
-    <div class="period-grid">
-      ${periodCard(t.last7, data.stats.last7Days, data.language)}
-      ${periodCard(t.last30, data.stats.last30Days, data.language)}
-      ${periodCard(t.last90, data.stats.last90Days, data.language)}
-      ${periodCard(t.since(data.stats.sinceLabel), data.stats.sinceStats, data.language, true)}
-    </div>
-    <p class="footnote">${t.footnote}</p>
-    <div class="page-footer"><img src="${logo}"></div>
-  </div>
-
+function tipsPageHtml(language: ReportLanguage, logo: string): string {
+  const t = TEXT[language];
+  return `
   <div class="page content-page">
     <h2>${t.tipsHeading}</h2>
     <div class="tips">
@@ -241,7 +203,110 @@ export function buildCustomerReportHtml(data: CustomerReportData): string {
         .join("")}
     </div>
     <div class="page-footer"><img src="${logo}"></div>
+  </div>`;
+}
+
+function statsPageHtml(heading: string, brand: string, stats: ExploreTourStats, language: ReportLanguage, logo: string): string {
+  const t = TEXT[language];
+  return `
+  <div class="page content-page">
+    <div class="top-row"><div></div><div class="brand">${escapeHtml(brand)}</div></div>
+    <h2>${escapeHtml(heading)}</h2>
+    <div class="period-grid">
+      ${periodCard(t.last7, stats.last7Days, language)}
+      ${periodCard(t.last30, stats.last30Days, language)}
+      ${periodCard(t.last90, stats.last90Days, language)}
+      ${periodCard(t.since(stats.sinceLabel), stats.sinceStats, language, true)}
+    </div>
+    <p class="footnote">${t.footnote}</p>
+    <div class="page-footer"><img src="${logo}"></div>
+  </div>`;
+}
+
+/**
+ * Builds the visitor-stats report as a 3-page HTML deck (rendered to PDF by
+ * customer-report-pdf.ts): cover with the tour's real cover photo, a stats
+ * page with the 4 period cards, and a fixed "5 gode råd" tips page. Landscape
+ * 1280x720 - a screen-sized report, not a printed document.
+ */
+export function buildCustomerReportHtml(data: CustomerReportData): string {
+  const logo = logoDataUri();
+  const cover = toDataUri(data.coverImage, "image/png");
+  const t = TEXT[data.language];
+  const htmlLang = data.language === "EN" ? "en" : "da";
+
+  return `<!DOCTYPE html>
+<html lang="${htmlLang}">
+<head>
+<meta charset="utf-8">
+<style>${REPORT_STYLE}</style>
+</head>
+<body>
+
+  <div class="page cover">
+    <img class="bg" src="${cover}">
+    <div class="scrim"></div>
+    <div class="content">
+      <p class="eyebrow">${t.eyebrow}</p>
+      <h1>${escapeHtml(data.customerName)}</h1>
+      <p class="subtitle">${escapeHtml(data.monthLabel)}</p>
+    </div>
   </div>
+
+  ${statsPageHtml(t.viewsHeading, data.customerName, data.stats, data.language, logo)}
+  ${tipsPageHtml(data.language, logo)}
+
+</body>
+</html>`;
+}
+
+export type CombinedCustomerReportBranch = {
+  /** The linked deal's own display name (e.g. an afdeling's kaldenavn). */
+  name: string;
+  stats: ExploreTourStats;
+};
+
+export type CombinedCustomerReportData = {
+  /** The parent customer's name (e.g. "Yumi") - shown on the cover, once. */
+  customerName: string;
+  monthLabel: string;
+  coverImage: Buffer;
+  language: ReportLanguage;
+  branches: CombinedCustomerReportBranch[];
+};
+
+/**
+ * Same deck as buildCustomerReportHtml, but with one stats page per linked
+ * branch (see the deal parent/branch customer-linking feature) instead of
+ * just one - a customer with several afdelinger gets a single combined PDF
+ * covering all of them, rather than a separate report per branch.
+ */
+export function buildCombinedCustomerReportHtml(data: CombinedCustomerReportData): string {
+  const logo = logoDataUri();
+  const cover = toDataUri(data.coverImage, "image/png");
+  const t = TEXT[data.language];
+  const htmlLang = data.language === "EN" ? "en" : "da";
+
+  return `<!DOCTYPE html>
+<html lang="${htmlLang}">
+<head>
+<meta charset="utf-8">
+<style>${REPORT_STYLE}</style>
+</head>
+<body>
+
+  <div class="page cover">
+    <img class="bg" src="${cover}">
+    <div class="scrim"></div>
+    <div class="content">
+      <p class="eyebrow">${t.eyebrow}</p>
+      <h1>${escapeHtml(data.customerName)}</h1>
+      <p class="subtitle">${escapeHtml(data.monthLabel)}</p>
+    </div>
+  </div>
+
+  ${data.branches.map((b) => statsPageHtml(b.name, data.customerName, b.stats, data.language, logo)).join("\n")}
+  ${tipsPageHtml(data.language, logo)}
 
 </body>
 </html>`;

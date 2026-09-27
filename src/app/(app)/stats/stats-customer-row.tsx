@@ -8,6 +8,7 @@ import {
   updateReportIntervalAction,
   updateReportLanguageAction,
   sendCustomerReportNowAction,
+  sendCombinedCustomerReportAction,
 } from "@/lib/actions/customer-reports";
 import { formatDate } from "@/lib/labels";
 import { useToast } from "@/components/toast";
@@ -34,6 +35,8 @@ export type StatsCustomerRowData = {
   lastStatus: ReportSendStatus | null;
   lastErrorMessage: string | null;
   history: ReportHistoryEntry[];
+  /** Linked branches (see customer linking) that also have an MP-Skin nummer - lets a "Send samlet rapport" button appear. */
+  branches: { id: string; name: string }[];
 };
 
 export function StatsCustomerRow({
@@ -49,6 +52,7 @@ export function StatsCustomerRow({
   lastStatus,
   lastErrorMessage,
   history,
+  branches,
   selected,
   onToggleSelected,
 }: StatsCustomerRowData & { selected: boolean; onToggleSelected: () => void }) {
@@ -59,6 +63,7 @@ export function StatsCustomerRow({
   const [pending, startTransition] = useTransition();
   const [savingLanguage, startSavingLanguage] = useTransition();
   const [sending, startSendTransition] = useTransition();
+  const [sendingCombined, startSendCombinedTransition] = useTransition();
   const showToast = useToast();
 
   usePollWhilePending(lastStatus === "PENDING");
@@ -115,6 +120,21 @@ export function StatsCustomerRow({
       try {
         const result = await sendCustomerReportNowAction(dealId);
         if (!result.ok) showToast(result.error);
+      } catch (err) {
+        showToast(err instanceof Error ? err.message : "Der opstod en fejl.");
+      }
+    });
+  }
+
+  function sendCombined() {
+    startSendCombinedTransition(async () => {
+      try {
+        const result = await sendCombinedCustomerReportAction(dealId);
+        if (!result.ok) {
+          showToast(result.error);
+          return;
+        }
+        showToast(`Samlet rapport sat i kø for ${result.branchCount + 1} lokationer.`);
       } catch (err) {
         showToast(err instanceof Error ? err.message : "Der opstod en fejl.");
       }
@@ -224,14 +244,27 @@ export function StatsCustomerRow({
         {reportInterval && nextReportDueAt ? formatDate(nextReportDueAt) : "–"}
       </td>
       <td className="sticky right-0 z-10 bg-white px-3 py-2 text-right">
-        <button
-          type="button"
-          disabled={isSending}
-          onClick={sendNow}
-          className="shrink-0 whitespace-nowrap rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
-        >
-          {isSending ? "Sender…" : "Send nu"}
-        </button>
+        <div className="flex justify-end gap-1.5">
+          {branches.length > 0 && (
+            <button
+              type="button"
+              disabled={isSending || sendingCombined}
+              onClick={sendCombined}
+              title={`Sender én samlet mail/PDF med stats for denne og: ${branches.map((b) => b.name).join(", ")}`}
+              className="shrink-0 whitespace-nowrap rounded-md border border-violet-300 px-2 py-1 text-xs font-medium text-violet-700 hover:bg-violet-50 disabled:opacity-50"
+            >
+              {sendingCombined ? "Sender…" : `Send samlet (${branches.length + 1})`}
+            </button>
+          )}
+          <button
+            type="button"
+            disabled={isSending}
+            onClick={sendNow}
+            className="shrink-0 whitespace-nowrap rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+          >
+            {isSending ? "Sender…" : "Send nu"}
+          </button>
+        </div>
       </td>
     </tr>
   );

@@ -20,7 +20,10 @@ export default async function StatsPage() {
   const deals = (
     await prisma.deal.findMany({
       where: { stage: { in: ["FILMED", "LIVE"] }, churnedAt: null },
-      include: { reports: { orderBy: { sentAt: "desc" }, take: 10 } },
+      include: {
+        reports: { orderBy: { sentAt: "desc" }, take: 10 },
+        branches: { select: { id: true, displayName: true, companyName: true, mpSkinId: true } },
+      },
     })
   ).sort((a, b) => dealName(a).localeCompare(dealName(b), "da"));
 
@@ -67,6 +70,9 @@ export default async function StatsPage() {
                 method: r.method,
                 status: r.status,
               })),
+              branches: deal.branches
+                .filter((b) => b.mpSkinId)
+                .map((b) => ({ id: b.id, name: b.displayName || b.companyName })),
             }))}
           />
         </div>
