@@ -177,6 +177,7 @@ model User {
   tasksCreated  Task[] @relation("TaskCreatedBy")
   taskComments  TaskComment[]
   activityEvents ActivityEvent[]
+  leadFilters   LeadFilter[]
 }
 
 /// One entry per notable thing that happened in the CRM (deal created,
@@ -566,4 +567,68 @@ model TaskComment {
 
   body      String
   createdAt DateTime @default(now())
+}
+
+/// A saved search against the official CVR register (branche/kommune/aktiv-status) -
+/// can be run on demand ("Kør nu") and, when `enabled`, is re-run daily by the
+/// lead-generation cron so new matches (newly registered or newly-found
+/// companies) surface on their own without anyone remembering to search again.
+model LeadFilter {
+  id     String @id @default(cuid())
+  name   String
+
+  /// Comma-separated free-text terms matched (any-of) against the company's
+  /// branchetekst, e.g. "restaurant, café" - deliberately loose substring
+  /// matching rather than exact DB07 branchekoder, since sellers think in
+  /// plain words, not industry classification codes.
+  industryQuery String?
+  /// Comma-separated municipality names (kommune), matched any-of.
+  municipality  String?
+  /// Only companies with sammensatStatus "NORMAL" (still active) - almost
+  /// always wanted, since a dissolved company isn't a lead.
+  activeOnly    Boolean @default(true)
+
+  enabled    Boolean   @default(true)
+  lastRunAt  DateTime?
+
+  createdBy   User   @relation(fields: [createdById], references: [id])
+  createdById String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  candidates LeadCandidate[]
+}
+
+enum LeadCandidateStatus {
+  NEW
+  ADDED
+  DISMISSED
+}
+
+/// One company a LeadFilter has turned up. `cvrNumber` is globally unique so
+/// the same company is never surfaced twice, however many filters or runs
+/// would otherwise have found it again - once reviewed (added or dismissed),
+/// it's done.
+model LeadCandidate {
+  id     String @id @default(cuid())
+
+  filter   LeadFilter? @relation(fields: [filterId], references: [id], onDelete: SetNull)
+  filterId String?
+
+  cvrNumber    String  @unique
+  companyName  String
+  address      String?
+  industryText String?
+  foundedDate  DateTime?
+  contactEmail String?
+  contactPhone String?
+
+  status LeadCandidateStatus @default(NEW)
+  /// Set once turned into a real Deal via "Tilføj som deal".
+  dealId String?
+
+  createdAt DateTime @default(now())
+
+  @@index([status, createdAt])
 }

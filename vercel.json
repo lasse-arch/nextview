@@ -15,6 +15,10 @@
     {
       "path": "/api/cron/deal-follow-up",
       "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/cron/lead-generation",
+      "schedule": "0 8 * * *"
     }
   ]
 }
