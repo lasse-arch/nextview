@@ -18,17 +18,20 @@ export type LeadFilterData = {
   activeOnly: boolean;
   foundedFrom: string | null;
   foundedTo: string | null;
+  maxResults: number;
   enabled: boolean;
   lastRunAt: string | null;
   newCandidateCount: number;
 };
+
+const MAX_RESULTS_OPTIONS = [25, 50, 100, 200] as const;
 
 function formatDateShort(iso: string): string {
   return new Intl.DateTimeFormat("da-DK", { dateStyle: "medium" }).format(new Date(iso));
 }
 
 function criteriaSummary(
-  f: Pick<LeadFilterData, "industryQuery" | "municipality" | "activeOnly" | "foundedFrom" | "foundedTo">
+  f: Pick<LeadFilterData, "industryQuery" | "municipality" | "activeOnly" | "foundedFrom" | "foundedTo" | "maxResults">
 ): string {
   const parts: string[] = [];
   if (f.industryQuery) parts.push(`Branche: ${f.industryQuery}`);
@@ -39,6 +42,7 @@ function criteriaSummary(
     parts.push(`Stiftet: ${from} – ${to}`);
   }
   parts.push(f.activeOnly ? "Kun aktive" : "Inkl. ophørte");
+  parts.push(`Op til ${f.maxResults} pr. kørsel`);
   return parts.join(" · ");
 }
 
@@ -127,6 +131,20 @@ function FilterForm({
             className="mt-1 w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-sm"
           />
         </div>
+      </div>
+      <div>
+        <label className="block text-xs font-medium text-slate-600">Antal resultater pr. kørsel</label>
+        <select
+          name="maxResults"
+          defaultValue={initial?.maxResults ?? 50}
+          className="mt-1 w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-sm sm:w-40"
+        >
+          {MAX_RESULTS_OPTIONS.map((n) => (
+            <option key={n} value={n}>
+              {n}
+            </option>
+          ))}
+        </select>
       </div>
       <label className="flex items-center gap-2 text-sm text-slate-700">
         <input type="checkbox" name="activeOnly" defaultChecked={initial?.activeOnly ?? true} />

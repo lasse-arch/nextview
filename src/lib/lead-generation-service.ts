@@ -7,6 +7,20 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/** Runs `fn` over `items` with at most `concurrency` in flight at once. */
+async function mapWithConcurrency<T, R>(items: T[], concurrency: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let next = 0;
+  async function worker() {
+    while (next < items.length) {
+      const i = next++;
+      results[i] = await fn(items[i]);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, worker));
+  return results;
+}
+
 /**
  * Runs one saved filter: searches the CVR register, then inserts a
  * LeadCandidate for every hit not already known - `cvrNumber` is globally
@@ -18,13 +32,16 @@ function sleep(ms: number): Promise<void> {
 export async function runLeadFilter(filterId: string): Promise<{ ok: true; added: number } | { ok: false; error: string }> {
   const filter = await prisma.leadFilter.findUniqueOrThrow({ where: { id: filterId } });
 
-  const result = await searchCvr({
-    industryQuery: filter.industryQuery,
-    municipality: filter.municipality,
-    activeOnly: filter.activeOnly,
-    foundedFrom: filter.foundedFrom ? filter.foundedFrom.toISOString().slice(0, 10) : null,
-    foundedTo: filter.foundedTo ? filter.foundedTo.toISOString().slice(0, 10) : null,
-  });
+  const result = await searchCvr(
+    {
+      industryQuery: filter.industryQuery,
+      municipality: filter.municipality,
+      activeOnly: filter.activeOnly,
+      foundedFrom: filter.foundedFrom ? filter.foundedFrom.toISOString().slice(0, 10) : null,
+      foundedTo: filter.foundedTo ? filter.foundedTo.toISOString().slice(0, 10) : null,
+    },
+    filter.maxResults
+  );
   if (!result.ok) return result;
 
   const cvrNumbers = result.hits.map((h) => h.cvr);
@@ -40,13 +57,16 @@ export async function runLeadFilter(filterId: string): Promise<{ ok: true; added
   const fresh = result.hits.filter((h) => !known.has(h.cvr));
 
   // The ES search doesn't expose an owner name the way the single-CVR lookup
-  // does - only worth the extra round-trip for genuinely new finds (usually
-  // just a handful per run), not the whole search-result page.
-  const ownerNames = new Map<string, string | null>();
-  for (const h of fresh) {
+  // does - only worth the extra round-trip for genuinely new finds, not the
+  // whole search-result page. Now that a filter can pull up to
+  // MAX_LEAD_FILTER_RESULTS fresh hits in one run (not just "usually a
+  // handful"), these run a few at a time instead of one-by-one so a big
+  // first run doesn't eat into the route's own time budget.
+  const ownerLookups = await mapWithConcurrency(fresh, 5, async (h) => {
     const lookup = await lookupCvrNumber(h.cvr);
-    ownerNames.set(h.cvr, lookup.ok ? lookup.data.contactName : null);
-  }
+    return { cvr: h.cvr, ownerName: lookup.ok ? lookup.data.contactName : null };
+  });
+  const ownerNames = new Map(ownerLookups.map((l) => [l.cvr, l.ownerName]));
 
   if (fresh.length > 0) {
     await prisma.leadCandidate.createMany({

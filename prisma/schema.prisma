@@ -631,6 +631,11 @@ model LeadFilter {
   foundedFrom DateTime?
   foundedTo   DateTime?
 
+  /// How many matches a single run pulls from the CVR register - a single
+  /// ES query either way, so raising this doesn't add extra round-trips,
+  /// just a bigger page (see MAX_LEAD_FILTER_RESULTS for the hard cap).
+  maxResults Int @default(50)
+
   enabled    Boolean   @default(true)
   lastRunAt  DateTime?
 

@@ -8,6 +8,7 @@ import { findDuplicateDeals } from "@/lib/duplicates";
 import { logActivity } from "@/lib/activity";
 import { dealName } from "@/lib/labels";
 import { runLeadFilter } from "@/lib/lead-generation-service";
+import { MAX_LEAD_FILTER_RESULTS } from "@/lib/cvr-search";
 
 function parseFormDate(raw: FormDataEntryValue | null): Date | null {
   const value = String(raw || "").trim();
@@ -23,7 +24,9 @@ function readFilterFields(formData: FormData) {
   const activeOnly = formData.get("activeOnly") === "on";
   const foundedFrom = parseFormDate(formData.get("foundedFrom"));
   const foundedTo = parseFormDate(formData.get("foundedTo"));
-  return { name, industryQuery, municipality, activeOnly, foundedFrom, foundedTo };
+  const maxResultsRaw = Number(formData.get("maxResults"));
+  const maxResults = Math.min(Math.max(1, Number.isFinite(maxResultsRaw) && maxResultsRaw > 0 ? maxResultsRaw : 50), MAX_LEAD_FILTER_RESULTS);
+  return { name, industryQuery, municipality, activeOnly, foundedFrom, foundedTo, maxResults };
 }
 
 function validateFilterFields(fields: ReturnType<typeof readFilterFields>): string | null {

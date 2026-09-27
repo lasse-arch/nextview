@@ -75,11 +75,15 @@ function isConfigured(): boolean {
 export type CvrSearchResult = { ok: true; hits: CvrSearchHit[] } | { ok: false; error: string };
 
 /**
- * `limit` is kept modest by every caller - this is a shared, rate-sensitive
- * government service also used by the plain CVR-number lookup elsewhere in
- * the app, so a filter run pulls a reasonable page of matches, not everything.
+ * Hard upper bound on `limit` below - this is still a single ES query
+ * regardless of size, so raising it doesn't add extra round-trips against
+ * the shared government service, but a runaway value (e.g. a bad manual
+ * edit) shouldn't be able to ask it for everything at once either.
  */
-export async function searchCvr(filter: CvrSearchFilter, limit = 25): Promise<CvrSearchResult> {
+export const MAX_LEAD_FILTER_RESULTS = 200;
+
+export async function searchCvr(filter: CvrSearchFilter, limit = 50): Promise<CvrSearchResult> {
+  limit = Math.min(Math.max(1, limit), MAX_LEAD_FILTER_RESULTS);
   if (!isConfigured()) {
     return { ok: false, error: "Officiel CVR-adgang er ikke konfigureret (CVR_API_USERNAME/CVR_API_PASSWORD)." };
   }

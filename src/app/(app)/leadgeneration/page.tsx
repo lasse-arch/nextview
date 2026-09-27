@@ -15,7 +15,11 @@ export default async function LeadGenerationPage() {
     prisma.leadCandidate.findMany({
       where: { status: "NEW" },
       orderBy: { createdAt: "desc" },
-      take: 100,
+      // A single filter run can now surface up to MAX_LEAD_FILTER_RESULTS
+      // (200) candidates on its own - keep the review list from silently
+      // truncating below that just because several filters found leads the
+      // same day.
+      take: 500,
       include: { filter: { select: { name: true } } },
     }),
   ]);
@@ -39,6 +43,7 @@ export default async function LeadGenerationPage() {
           activeOnly: f.activeOnly,
           foundedFrom: f.foundedFrom ? f.foundedFrom.toISOString() : null,
           foundedTo: f.foundedTo ? f.foundedTo.toISOString() : null,
+          maxResults: f.maxResults,
           enabled: f.enabled,
           lastRunAt: f.lastRunAt ? f.lastRunAt.toISOString() : null,
           newCandidateCount: f._count.candidates,
