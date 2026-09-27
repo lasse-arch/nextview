@@ -37,6 +37,8 @@ export default async function LeadGenerationPage() {
           industryQuery: f.industryQuery,
           municipality: f.municipality,
           activeOnly: f.activeOnly,
+          foundedFrom: f.foundedFrom ? f.foundedFrom.toISOString() : null,
+          foundedTo: f.foundedTo ? f.foundedTo.toISOString() : null,
           enabled: f.enabled,
           lastRunAt: f.lastRunAt ? f.lastRunAt.toISOString() : null,
           newCandidateCount: f._count.candidates,

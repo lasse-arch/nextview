@@ -16,15 +16,28 @@ export type LeadFilterData = {
   industryQuery: string | null;
   municipality: string | null;
   activeOnly: boolean;
+  foundedFrom: string | null;
+  foundedTo: string | null;
   enabled: boolean;
   lastRunAt: string | null;
   newCandidateCount: number;
 };
 
-function criteriaSummary(f: Pick<LeadFilterData, "industryQuery" | "municipality" | "activeOnly">): string {
+function formatDateShort(iso: string): string {
+  return new Intl.DateTimeFormat("da-DK", { dateStyle: "medium" }).format(new Date(iso));
+}
+
+function criteriaSummary(
+  f: Pick<LeadFilterData, "industryQuery" | "municipality" | "activeOnly" | "foundedFrom" | "foundedTo">
+): string {
   const parts: string[] = [];
   if (f.industryQuery) parts.push(`Branche: ${f.industryQuery}`);
   if (f.municipality) parts.push(`Område: ${f.municipality}`);
+  if (f.foundedFrom || f.foundedTo) {
+    const from = f.foundedFrom ? formatDateShort(f.foundedFrom) : "…";
+    const to = f.foundedTo ? formatDateShort(f.foundedTo) : "nu";
+    parts.push(`Stiftet: ${from} – ${to}`);
+  }
   parts.push(f.activeOnly ? "Kun aktive" : "Inkl. ophørte");
   return parts.join(" · ");
 }
@@ -91,6 +104,26 @@ function FilterForm({
             name="municipality"
             defaultValue={initial?.municipality ?? ""}
             placeholder="fx Aarhus, Odense"
+            className="mt-1 w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-sm"
+          />
+        </div>
+      </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div>
+          <label className="block text-xs font-medium text-slate-600">Stiftet fra</label>
+          <input
+            type="date"
+            name="foundedFrom"
+            defaultValue={initial?.foundedFrom ? initial.foundedFrom.slice(0, 10) : ""}
+            className="mt-1 w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-sm"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-slate-600">Stiftet til</label>
+          <input
+            type="date"
+            name="foundedTo"
+            defaultValue={initial?.foundedTo ? initial.foundedTo.slice(0, 10) : ""}
             className="mt-1 w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-sm"
           />
         </div>

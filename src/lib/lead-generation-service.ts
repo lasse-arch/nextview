@@ -22,6 +22,8 @@ export async function runLeadFilter(filterId: string): Promise<{ ok: true; added
     industryQuery: filter.industryQuery,
     municipality: filter.municipality,
     activeOnly: filter.activeOnly,
+    foundedFrom: filter.foundedFrom ? filter.foundedFrom.toISOString().slice(0, 10) : null,
+    foundedTo: filter.foundedTo ? filter.foundedTo.toISOString().slice(0, 10) : null,
   });
   if (!result.ok) return result;
 

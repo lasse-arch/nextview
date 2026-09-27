@@ -9,12 +9,32 @@ import { logActivity } from "@/lib/activity";
 import { dealName } from "@/lib/labels";
 import { runLeadFilter } from "@/lib/lead-generation-service";
 
+function parseFormDate(raw: FormDataEntryValue | null): Date | null {
+  const value = String(raw || "").trim();
+  if (!value) return null;
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 function readFilterFields(formData: FormData) {
   const name = String(formData.get("name") || "").trim();
   const industryQuery = String(formData.get("industryQuery") || "").trim() || null;
   const municipality = String(formData.get("municipality") || "").trim() || null;
   const activeOnly = formData.get("activeOnly") === "on";
-  return { name, industryQuery, municipality, activeOnly };
+  const foundedFrom = parseFormDate(formData.get("foundedFrom"));
+  const foundedTo = parseFormDate(formData.get("foundedTo"));
+  return { name, industryQuery, municipality, activeOnly, foundedFrom, foundedTo };
+}
+
+function validateFilterFields(fields: ReturnType<typeof readFilterFields>): string | null {
+  if (!fields.name) return "Giv filteret et navn.";
+  if (!fields.industryQuery && !fields.municipality && !fields.foundedFrom && !fields.foundedTo) {
+    return "Angiv mindst branche, område eller en periode.";
+  }
+  if (fields.foundedFrom && fields.foundedTo && fields.foundedFrom > fields.foundedTo) {
+    return "Periodens \"fra\"-dato skal være før \"til\"-datoen.";
+  }
+  return null;
 }
 
 export async function createLeadFilter(
@@ -22,10 +42,8 @@ export async function createLeadFilter(
 ): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const user = await requireUser();
   const fields = readFilterFields(formData);
-  if (!fields.name) return { ok: false, error: "Giv filteret et navn." };
-  if (!fields.industryQuery && !fields.municipality) {
-    return { ok: false, error: "Angiv mindst branche eller område." };
-  }
+  const error = validateFilterFields(fields);
+  if (error) return { ok: false, error };
 
   const filter = await prisma.leadFilter.create({
     data: { ...fields, createdById: user.id },
@@ -41,10 +59,8 @@ export async function updateLeadFilter(
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   await requireUser();
   const fields = readFilterFields(formData);
-  if (!fields.name) return { ok: false, error: "Giv filteret et navn." };
-  if (!fields.industryQuery && !fields.municipality) {
-    return { ok: false, error: "Angiv mindst branche eller område." };
-  }
+  const error = validateFilterFields(fields);
+  if (error) return { ok: false, error };
 
   await prisma.leadFilter.update({ where: { id: filterId }, data: fields });
   revalidatePath("/leadgeneration");

@@ -46,6 +46,9 @@ export type CvrSearchFilter = {
   /** Comma-separated municipality names, any-of. */
   municipality?: string | null;
   activeOnly?: boolean;
+  /** Founding-date window, "YYYY-MM-DD" - either or both bounds may be set. */
+  foundedFrom?: string | null;
+  foundedTo?: string | null;
 };
 
 export type CvrSearchHit = {
@@ -111,8 +114,15 @@ export async function searchCvr(filter: CvrSearchFilter, limit = 25): Promise<Cv
     must.push({ match: { "Vrvirksomhed.virksomhedMetadata.sammensatStatus": "NORMAL" } });
   }
 
-  if (must.length === 0) {
-    return { ok: false, error: "Angiv mindst ét kriterie (branche eller område)." };
+  if (filter.foundedFrom || filter.foundedTo) {
+    const range: Record<string, string> = {};
+    if (filter.foundedFrom) range.gte = filter.foundedFrom;
+    if (filter.foundedTo) range.lte = filter.foundedTo;
+    must.push({ range: { "Vrvirksomhed.virksomhedMetadata.stiftelsesDato": range } });
+  }
+
+  if (industryTerms.length === 0 && municipalities.length === 0 && !filter.foundedFrom && !filter.foundedTo) {
+    return { ok: false, error: "Angiv mindst ét kriterie (branche, område eller periode)." };
   }
 
   const username = process.env.CVR_API_USERNAME!;

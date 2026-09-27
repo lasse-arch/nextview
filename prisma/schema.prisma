@@ -625,6 +625,12 @@ model LeadFilter {
   /// always wanted, since a dissolved company isn't a lead.
   activeOnly    Boolean @default(true)
 
+  /// Optional stiftelsesdato-periode (founding-date window) - lets a filter
+  /// target companies founded within a specific range instead of just
+  /// whichever ones happen to be the newest matches right now.
+  foundedFrom DateTime?
+  foundedTo   DateTime?
+
   enabled    Boolean   @default(true)
   lastRunAt  DateTime?
 
