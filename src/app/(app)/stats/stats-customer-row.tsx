@@ -138,6 +138,43 @@ export function StatsCustomerRow({
           </Link>
         </div>
       </td>
+      <td className="px-3 py-2 text-slate-600">
+        {isSending ? (
+          <span className="flex items-center gap-1.5 text-slate-500">
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-slate-400" />
+            Sender…
+          </span>
+        ) : lastStatus === "FAILED" ? (
+          <ReportHistoryTooltip
+            history={history}
+            label={
+              <span className="text-red-600" title={lastErrorMessage ?? "ukendt fejl"}>
+                Fejlede {lastSentAt ? formatDate(lastSentAt) : ""}
+              </span>
+            }
+          />
+        ) : lastSentAt ? (
+          <ReportHistoryTooltip
+            history={history}
+            label={
+              <>
+                {formatDate(lastSentAt)}{" "}
+                <span
+                  className={
+                    lastSentMethod === "AUTOMATIC"
+                      ? "ml-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600"
+                      : "ml-1 rounded-full bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-700"
+                  }
+                >
+                  {lastSentMethod === "AUTOMATIC" ? "Automatisk" : "Manuelt"}
+                </span>
+              </>
+            }
+          />
+        ) : (
+          "Aldrig sendt"
+        )}
+      </td>
       <td className="px-3 py-2">
         <input
           value={mpSkinIdValue}
@@ -185,43 +222,6 @@ export function StatsCustomerRow({
       </td>
       <td className="px-3 py-2 text-slate-600">
         {reportInterval && nextReportDueAt ? formatDate(nextReportDueAt) : "–"}
-      </td>
-      <td className="px-3 py-2 text-slate-600">
-        {isSending ? (
-          <span className="flex items-center gap-1.5 text-slate-500">
-            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-slate-400" />
-            Sender…
-          </span>
-        ) : lastStatus === "FAILED" ? (
-          <ReportHistoryTooltip
-            history={history}
-            label={
-              <span className="text-red-600" title={lastErrorMessage ?? "ukendt fejl"}>
-                Fejlede {lastSentAt ? formatDate(lastSentAt) : ""}
-              </span>
-            }
-          />
-        ) : lastSentAt ? (
-          <ReportHistoryTooltip
-            history={history}
-            label={
-              <>
-                {formatDate(lastSentAt)}{" "}
-                <span
-                  className={
-                    lastSentMethod === "AUTOMATIC"
-                      ? "ml-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600"
-                      : "ml-1 rounded-full bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-700"
-                  }
-                >
-                  {lastSentMethod === "AUTOMATIC" ? "Automatisk" : "Manuelt"}
-                </span>
-              </>
-            }
-          />
-        ) : (
-          "Aldrig sendt"
-        )}
       </td>
       <td className="sticky right-0 z-10 bg-white px-3 py-2 text-right">
         <button

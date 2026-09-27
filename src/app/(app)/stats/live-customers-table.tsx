@@ -81,12 +81,12 @@ export function LiveCustomersTable({ rows }: { rows: StatsCustomerRowData[] }) {
                     <span>Kunde</span>
                   </div>
                 </th>
+                <th className="px-3 py-2 font-medium">Sidst sendt</th>
                 <th className="px-3 py-2 font-medium">MP-Skin nummer</th>
                 <th className="px-3 py-2 font-medium">CC</th>
                 <th className="px-3 py-2 font-medium">Interval</th>
                 <th className="px-3 py-2 font-medium">Sprog</th>
                 <th className="px-3 py-2 font-medium">Næste afsendelse</th>
-                <th className="px-3 py-2 font-medium">Sidst sendt</th>
                 <th className="sticky right-0 z-10 bg-slate-50 px-3 py-2 font-medium"></th>
               </tr>
             </thead>
