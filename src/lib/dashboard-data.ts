@@ -110,7 +110,7 @@ export async function getDashboardData(ownerId?: string) {
     .sort((a, b) => b.value - a.value);
 
   const lostDeals = deals.filter((d) => d.stage === "LOST");
-  const lostValue = lostDeals.reduce((sum, d) => sum + totalContractValue(d), 0);
+  const lostValue = lostDeals.reduce((sum, d) => sum + soldTotalValue(d), 0);
 
   const funnel: FunnelBar[] = FUNNEL_STAGES.map((stage) => {
     const stageDeals = deals.filter((d) => d.stage === stage);
@@ -118,7 +118,7 @@ export async function getDashboardData(ownerId?: string) {
       stage,
       label: stage,
       count: stageDeals.length,
-      value: stageDeals.reduce((sum, d) => sum + totalContractValue(d), 0),
+      value: stageDeals.reduce((sum, d) => sum + soldTotalValue(d), 0),
     };
   });
 
@@ -149,7 +149,7 @@ export async function getDashboardData(ownerId?: string) {
     if (d.stage === "LIVE" && !d.churnedAt) {
       const row = sellerMap.get(d.ownerId)!;
       row.wonCount++;
-      row.wonValue += totalContractValue(d);
+      row.wonValue += soldTotalValue(d);
     }
   }
   for (const c of commissions) {
