@@ -58,3 +58,24 @@ export async function completeContractFollowUpTasks(dealId: string): Promise<voi
     data: { done: true },
   });
 }
+
+const EMAIL_FOLLOW_UP_DAYS = 3;
+
+/**
+ * A short reminder to check back in after sending a one-off email from a
+ * deal (see sendTemplatedEmailAction) - assigned to whoever sent it, due a
+ * few days out. Unlike the contract follow-up, several of these can exist
+ * at once on the same deal (each email sent is its own thing worth
+ * following up on), so nothing here replaces or dedupes against the others.
+ */
+export async function createEmailFollowUpTask(dealId: string, assigneeId: string, subject: string): Promise<void> {
+  await prisma.task.create({
+    data: {
+      title: `Følg op på mail: "${subject}"`,
+      assigneeId,
+      createdById: assigneeId,
+      dealId,
+      dueDate: addDays(new Date(), EMAIL_FOLLOW_UP_DAYS),
+    },
+  });
+}

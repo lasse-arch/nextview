@@ -14,6 +14,7 @@ export type LeadCandidateData = {
   foundedDate: string | null;
   contactEmail: string | null;
   contactPhone: string | null;
+  ownerName: string | null;
   sourceLabel: string | null;
   createdAt: string;
 };
@@ -56,7 +57,15 @@ function CandidateCard({ candidate }: { candidate: LeadCandidateData }) {
         <div className="min-w-0">
           <p className="font-medium text-slate-900">{candidate.companyName}</p>
           <p className="mt-0.5 text-xs text-slate-500">
-            CVR {candidate.cvrNumber}
+            <a
+              href={`https://datacvr.virk.dk/enhed/virksomhed/${candidate.cvrNumber}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-slate-600 underline decoration-dotted hover:text-slate-900"
+              onClick={(e) => e.stopPropagation()}
+            >
+              CVR {candidate.cvrNumber}
+            </a>
             {candidate.industryText && <> · {candidate.industryText}</>}
             {candidate.address && <> · {candidate.address}</>}
           </p>
@@ -64,10 +73,24 @@ function CandidateCard({ candidate }: { candidate: LeadCandidateData }) {
             Stiftet {formatDate(candidate.foundedDate)}
             {candidate.sourceLabel && <> · Fundet via &quot;{candidate.sourceLabel}&quot;</>}
           </p>
-          {(candidate.contactEmail || candidate.contactPhone) && (
-            <p className="mt-0.5 text-xs text-slate-400">
-              {[candidate.contactEmail, candidate.contactPhone].filter(Boolean).join(" · ")}
-            </p>
+          {(candidate.ownerName || candidate.contactPhone || candidate.contactEmail) && (
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+              {candidate.ownerName && (
+                <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
+                  {candidate.ownerName}
+                </span>
+              )}
+              {candidate.contactPhone && (
+                <a
+                  href={`tel:${candidate.contactPhone.replace(/\s/g, "")}`}
+                  onClick={(e) => e.stopPropagation()}
+                  className="text-sm font-semibold text-slate-900 hover:underline"
+                >
+                  {candidate.contactPhone}
+                </a>
+              )}
+              {candidate.contactEmail && <span className="text-xs text-slate-400">{candidate.contactEmail}</span>}
+            </div>
           )}
         </div>
         <div className="flex shrink-0 gap-1.5">

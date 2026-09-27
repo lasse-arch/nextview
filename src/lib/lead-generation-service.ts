@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { searchCvr } from "@/lib/cvr-search";
 import { scanUrlForCvrLeads } from "@/lib/url-lead-scan";
+import { lookupCvrNumber } from "@/lib/cvr";
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -36,6 +37,15 @@ export async function runLeadFilter(filterId: string): Promise<{ ok: true; added
 
   const fresh = result.hits.filter((h) => !known.has(h.cvr));
 
+  // The ES search doesn't expose an owner name the way the single-CVR lookup
+  // does - only worth the extra round-trip for genuinely new finds (usually
+  // just a handful per run), not the whole search-result page.
+  const ownerNames = new Map<string, string | null>();
+  for (const h of fresh) {
+    const lookup = await lookupCvrNumber(h.cvr);
+    ownerNames.set(h.cvr, lookup.ok ? lookup.data.contactName : null);
+  }
+
   if (fresh.length > 0) {
     await prisma.leadCandidate.createMany({
       data: fresh.map((h) => ({
@@ -47,6 +57,7 @@ export async function runLeadFilter(filterId: string): Promise<{ ok: true; added
         foundedDate: h.foundedDate ? new Date(h.foundedDate) : null,
         contactEmail: h.contactEmail,
         contactPhone: h.contactPhone,
+        ownerName: ownerNames.get(h.cvr) ?? null,
       })),
       skipDuplicates: true,
     });
@@ -117,6 +128,7 @@ export async function runWatchedUrl(
         address: h.address,
         contactEmail: h.contactEmail,
         contactPhone: h.contactPhone,
+        ownerName: h.ownerName,
       })),
       skipDuplicates: true,
     });

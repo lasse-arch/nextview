@@ -8,12 +8,42 @@ type Email = {
   direction: "INBOUND" | "OUTBOUND";
   fromAddress: string;
   toAddresses: string;
+  ccAddresses: string | null;
   subject: string | null;
   bodyText: string | null;
   sentAt: Date;
   trackingId: string | null;
   openedAt: Date | null;
+  openCount: number;
 };
+
+/** Same hover-tooltip pattern as the contract status row - a small dark box
+ * on hover, here showing how many times (and when first) the mail was opened. */
+function OpenBadge({ openedAt, openCount }: { openedAt: Date; openCount: number }) {
+  const [hovered, setHovered] = useState(false);
+
+  return (
+    <span
+      className="relative"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      <span className="rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700">Åbnet</span>
+      {hovered && (
+        <div className="pointer-events-none absolute right-0 top-full z-10 mt-1 whitespace-nowrap rounded-md bg-slate-900 px-3 py-2 text-left text-xs font-medium text-white shadow-lg">
+          <p className="flex justify-between gap-4">
+            <span className="text-slate-300">Åbnet i alt</span>
+            <span>{openCount} gang{openCount === 1 ? "" : "e"}</span>
+          </p>
+          <p className="flex justify-between gap-4">
+            <span className="text-slate-300">Først åbnet</span>
+            <span>{formatDateTime(openedAt)}</span>
+          </p>
+        </div>
+      )}
+    </span>
+  );
+}
 
 function EmailRow({ email }: { email: Email }) {
   const [open, setOpen] = useState(false);
@@ -30,18 +60,18 @@ function EmailRow({ email }: { email: Email }) {
           <p className="mt-0.5 truncate text-xs text-slate-500">
             {email.direction === "INBOUND" ? "Fra" : "Til"}:{" "}
             {email.direction === "INBOUND" ? email.fromAddress : email.toAddresses}
+            {email.direction === "OUTBOUND" && email.ccAddresses && <> · Cc: {email.ccAddresses}</>}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2 text-xs text-slate-400">
           {email.direction === "OUTBOUND" && email.trackingId && (
-            <span
-              className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
-                email.openedAt ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"
-              }`}
-              title={email.openedAt ? formatDateTime(email.openedAt) : undefined}
-            >
-              {email.openedAt ? "Åbnet" : "Ikke åbnet endnu"}
-            </span>
+            email.openedAt ? (
+              <OpenBadge openedAt={email.openedAt} openCount={email.openCount} />
+            ) : (
+              <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-500">
+                Ikke åbnet endnu
+              </span>
+            )
           )}
           <span>{formatDateTime(email.sentAt)}</span>
           <svg

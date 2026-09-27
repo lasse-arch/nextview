@@ -59,8 +59,17 @@ export function hashContent(text: string): string {
   return crypto.createHash("sha256").update(text).digest("hex");
 }
 
+export type CvrLeadHit = {
+  cvr: string;
+  name: string;
+  address: string | null;
+  contactEmail: string | null;
+  contactPhone: string | null;
+  ownerName: string | null;
+};
+
 export type UrlScanResult =
-  | { ok: true; cvrNumbers: string[]; hits: { cvr: string; name: string; address: string | null; contactEmail: string | null; contactPhone: string | null }[]; contentHash: string; title: string | null }
+  | { ok: true; cvrNumbers: string[]; hits: CvrLeadHit[]; contentHash: string; title: string | null }
   | { ok: false; error: string };
 
 /**
@@ -75,12 +84,19 @@ export async function scanUrlForCvrLeads(url: string): Promise<UrlScanResult> {
   if (!page.ok) return page;
 
   const cvrNumbers = extractCvrNumbers(page.text);
-  const hits: { cvr: string; name: string; address: string | null; contactEmail: string | null; contactPhone: string | null }[] = [];
+  const hits: CvrLeadHit[] = [];
 
   for (const cvr of cvrNumbers) {
     const result = await lookupCvrNumber(cvr);
     if (result.ok) {
-      hits.push({ cvr, name: result.data.name, address: result.data.address, contactEmail: result.data.email, contactPhone: result.data.phone });
+      hits.push({
+        cvr,
+        name: result.data.name,
+        address: result.data.address,
+        contactEmail: result.data.email,
+        contactPhone: result.data.phone,
+        ownerName: result.data.contactName,
+      });
     }
   }
 

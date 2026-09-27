@@ -41,6 +41,7 @@ export async function scanUrlNowAction(
         address: h.address,
         contactEmail: h.contactEmail,
         contactPhone: h.contactPhone,
+        ownerName: h.ownerName,
       })),
       skipDuplicates: true,
     });

@@ -9,17 +9,23 @@ import { getAppBaseUrl } from "@/lib/email-oauth";
 import { resolveTemplatePlaceholders } from "@/lib/email-templates";
 import { logActivity } from "@/lib/activity";
 import { dealName } from "@/lib/labels";
+import { createEmailFollowUpTask } from "@/lib/task-automation";
 
 /**
  * Sends an email from the deal page, as the CURRENT user's own connected
  * Gmail (not a shared company inbox) - {{placeholders}} in the subject/body
  * are resolved first, then a tracking pixel is appended so the deal's email
- * history can show whether/when it was opened.
+ * history can show whether/when it was opened. `ccUserIds` cc's colleagues
+ * (e.g. Gustav or Victor) by their own account email, not arbitrary text -
+ * so it's always a real, connected person on the team, not a typo. Creates a
+ * short follow-up task on the deal, assigned to the sender, so a sent email
+ * doesn't just disappear into the void if the customer never replies.
  */
 export async function sendTemplatedEmailAction(
   dealId: string,
   subjectRaw: string,
-  bodyHtmlRaw: string
+  bodyHtmlRaw: string,
+  ccUserIds: string[] = []
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const user = await requireUser();
 
@@ -31,6 +37,9 @@ export async function sendTemplatedEmailAction(
   const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId } });
   const recipient = deal.contactEmail || deal.invoiceEmail;
   if (!recipient) return { ok: false, error: "Dealen har ingen kontakt-e-mail at sende til." };
+
+  const ccUsers = ccUserIds.length > 0 ? await prisma.user.findMany({ where: { id: { in: ccUserIds } }, select: { email: true } }) : [];
+  const ccEmails = ccUsers.map((u) => u.email);
 
   const ctx = {
     deal: { companyName: deal.companyName, displayName: deal.displayName, contactName: deal.contactName },
@@ -48,6 +57,7 @@ export async function sendTemplatedEmailAction(
   try {
     sendResult = await sendGmailMessage(account, {
       to: [recipient],
+      cc: ccEmails,
       subject,
       bodyText: plainText,
       bodyHtml,
@@ -65,12 +75,15 @@ export async function sendTemplatedEmailAction(
       direction: "OUTBOUND",
       fromAddress: account.email,
       toAddresses: recipient,
+      ccAddresses: ccEmails.length > 0 ? ccEmails.join(", ") : null,
       subject,
       bodyText: plainText,
       sentAt: new Date(),
       trackingId,
     },
   });
+
+  await createEmailFollowUpTask(dealId, user.id, subject);
 
   await logActivity({
     type: "EMAIL_SENT",
@@ -80,5 +93,6 @@ export async function sendTemplatedEmailAction(
   });
 
   revalidatePath(`/deals/${dealId}`);
+  revalidatePath("/opgaver");
   return { ok: true };
 }

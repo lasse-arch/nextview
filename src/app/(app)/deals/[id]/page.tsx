@@ -376,7 +376,12 @@ export default async function DealDetailPage({
               Mails der modtages fra <span className="font-medium">{deal.contactEmail || "kontaktpersonens e-mail"}</span>{" "}
               i en forbundet Gmail-indbakke vises automatisk her for hele teamet - ingen CC eller andet nødvendigt.
             </p>
-            <SendEmailSection dealId={deal.id} hasGoogleAccount={Boolean(currentUserGoogleAccount)} templates={emailTemplates} />
+            <SendEmailSection
+              dealId={deal.id}
+              hasGoogleAccount={Boolean(currentUserGoogleAccount)}
+              templates={emailTemplates}
+              teamMembers={users.filter((u) => u.id !== currentUser?.id).map((u) => ({ id: u.id, name: u.name }))}
+            />
             <EmailList emails={deal.emails} />
           </section>
         </div>

@@ -506,6 +506,9 @@ model EmailMessage {
   direction   EmailDirection
   fromAddress String
   toAddresses String
+  /// Cc'd recipients, comma-separated - only ever set for an OUTBOUND email
+  /// sent via the template composer (e.g. cc'ing a colleague on the deal).
+  ccAddresses String?
   subject     String?
   bodyText    String?
   sentAt      DateTime
@@ -655,6 +658,10 @@ model LeadCandidate {
   foundedDate  DateTime?
   contactEmail String?
   contactPhone String?
+  /// The registered owner's name, when the register exposes one (mainly for
+  /// sole proprietorships) - fetched via the same lookup the single-CVR
+  /// "Slå op" field on a deal uses, so it's the exact same data source.
+  ownerName    String?
 
   status LeadCandidateStatus @default(NEW)
   /// Set once turned into a real Deal via "Tilføj som deal".

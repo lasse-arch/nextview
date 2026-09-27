@@ -63,6 +63,7 @@ export default async function LeadGenerationPage() {
           foundedDate: c.foundedDate ? c.foundedDate.toISOString() : null,
           contactEmail: c.contactEmail,
           contactPhone: c.contactPhone,
+          ownerName: c.ownerName,
           sourceLabel: c.filter?.name ?? c.sourceUrl ?? null,
           createdAt: c.createdAt.toISOString(),
         }))}
