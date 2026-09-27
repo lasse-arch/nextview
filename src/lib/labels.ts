@@ -136,6 +136,7 @@ export const commissionFrequencyLabels: Record<string, string> = {
   MONTHLY: "Månedligt",
   QUARTERLY: "Kvartalsvist",
   ONE_TIME: "Engangsudbetaling",
+  SEMI_MONTHLY: "Halvmånedligt (1.-15. / 16.-ultimo)",
 };
 
 export const commissionStatusLabels: Record<string, string> = {

@@ -16,6 +16,10 @@ enum CommissionFrequency {
   MONTHLY
   QUARTERLY
   ONE_TIME
+  /// Settled twice a month, for the 1st-15th and 16th-end-of-month periods
+  /// (a seller invoicing their own commission + moms, rather than being on
+  /// payroll) - see getSemiMonthlyPeriod in commission.ts.
+  SEMI_MONTHLY
 }
 
 enum ImportType {

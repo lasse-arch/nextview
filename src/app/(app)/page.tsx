@@ -14,6 +14,8 @@ import { getRecentActivity, getUserLastActive } from "@/lib/activity";
 import { ActivityFeed } from "./activity-feed";
 import { LastActiveCard } from "./last-active-card";
 import { getDashboardGreeting } from "@/lib/greeting";
+import { getCommissionPeriodReminder } from "@/lib/commission-period-reminder-data";
+import { CommissionPeriodReminderCard } from "./commission-period-reminder-card";
 
 const FUNNEL_SHADES = [
   "bg-blue-200",
@@ -35,13 +37,14 @@ const INVOICE_STATUS_STYLE: Record<string, { dot: string; text: string }> = {
 export default async function DashboardPage() {
   const user = await getCurrentUser();
   const isAdmin = user?.role === "ADMIN";
-  const [data, goals, users, customerMapPoints, activity, lastActive] = await Promise.all([
+  const [data, goals, users, customerMapPoints, activity, lastActive, commissionPeriodReminder] = await Promise.all([
     getDashboardData(isAdmin ? undefined : user?.id),
     user ? getGoalsForDashboard(user) : Promise.resolve([]),
     prisma.user.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
     getCustomerMapPoints(),
     getRecentActivity(),
     getUserLastActive(),
+    user ? getCommissionPeriodReminder(user) : Promise.resolve(null),
   ]);
 
   const funnelMax = Math.max(1, ...data.funnel.map((f) => f.count));
@@ -63,6 +66,8 @@ export default async function DashboardPage() {
         <p className="text-sm italic leading-relaxed">&ldquo;{quote.text}&rdquo;</p>
         <p className="mt-1 text-xs text-slate-300">— {quote.author}</p>
       </div>
+
+      {commissionPeriodReminder && <CommissionPeriodReminderCard reminder={commissionPeriodReminder} />}
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <StatTile
