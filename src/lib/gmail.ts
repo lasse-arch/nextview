@@ -22,7 +22,7 @@ export async function sendGmailMessage(
     /** Shown as the sender's display name (e.g. "Nextview360 ApS") instead of the raw account email. */
     fromName?: string;
   }
-): Promise<void> {
+): Promise<{ id: string }> {
   const accessToken = await getValidAccessToken(account);
 
   const bodyContentType = params.bodyHtml ? "text/html" : "text/plain";
@@ -74,4 +74,7 @@ export async function sendGmailMessage(
   if (!res.ok) {
     throw new Error(`Gmail: kunne ikke sende mail (${res.status}): ${await res.text()}`);
   }
+
+  const result: { id: string } = await res.json();
+  return { id: result.id };
 }

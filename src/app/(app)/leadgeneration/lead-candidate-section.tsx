@@ -14,7 +14,7 @@ export type LeadCandidateData = {
   foundedDate: string | null;
   contactEmail: string | null;
   contactPhone: string | null;
-  filterName: string | null;
+  sourceLabel: string | null;
   createdAt: string;
 };
 
@@ -62,7 +62,7 @@ function CandidateCard({ candidate }: { candidate: LeadCandidateData }) {
           </p>
           <p className="mt-0.5 text-xs text-slate-400">
             Stiftet {formatDate(candidate.foundedDate)}
-            {candidate.filterName && <> · Fundet via &quot;{candidate.filterName}&quot;</>}
+            {candidate.sourceLabel && <> · Fundet via &quot;{candidate.sourceLabel}&quot;</>}
           </p>
           {(candidate.contactEmail || candidate.contactPhone) && (
             <p className="mt-0.5 text-xs text-slate-400">

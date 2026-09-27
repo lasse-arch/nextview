@@ -33,6 +33,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: "/profile", label: "Min profil" },
     { href: "/deals/import", label: "Importér" },
     { href: "/settings/email", label: "E-mail" },
+    { href: "/settings/email-templates", label: "E-mail-skabeloner" },
     { href: "/settings/docuseal", label: "Kontrakter" },
     { href: "/settings/dinero", label: "Fakturaer" },
   ];

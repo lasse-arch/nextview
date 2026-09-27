@@ -182,6 +182,8 @@ model User {
   taskComments  TaskComment[]
   activityEvents ActivityEvent[]
   leadFilters   LeadFilter[]
+  watchedUrls   WatchedUrl[]
+  emailTemplates EmailTemplate[]
 }
 
 /// One entry per notable thing that happened in the CRM (deal created,
@@ -509,7 +511,30 @@ model EmailMessage {
   sentAt      DateTime
   createdAt   DateTime       @default(now())
 
+  /// Set only for an OUTBOUND email sent via the template composer - the id
+  /// embedded in its tracking pixel, hit when the recipient's mail client
+  /// loads images (see /api/track/email-open/[trackingId]).
+  trackingId String?   @unique
+  openedAt   DateTime?
+  openCount  Int       @default(0)
+
   @@unique([provider, messageId])
+}
+
+/// A reusable, shared email you can send from a deal's page (see
+/// send-email-section.tsx) - {{placeholders}} are resolved against the deal
+/// and the sending seller at send time (see resolveTemplatePlaceholders).
+model EmailTemplate {
+  id       String @id @default(cuid())
+  name     String
+  subject  String
+  bodyHtml String
+
+  createdBy   User   @relation(fields: [createdById], references: [id])
+  createdById String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model IntegrationSetting {
@@ -619,6 +644,9 @@ model LeadCandidate {
 
   filter   LeadFilter? @relation(fields: [filterId], references: [id], onDelete: SetNull)
   filterId String?
+  /// Set instead of `filter` when this was found by scanning a page rather
+  /// than a branche/område filter (see WatchedUrl / url-lead-scan.ts).
+  sourceUrl String?
 
   cvrNumber    String  @unique
   companyName  String
@@ -635,4 +663,24 @@ model LeadCandidate {
   createdAt DateTime @default(now())
 
   @@index([status, createdAt])
+}
+
+/// A page (news article, industry listing, ...) re-scanned daily for
+/// mentions of a CVR number - each one found is resolved via the official
+/// lookup and surfaced as a LeadCandidate the same way a LeadFilter's finds
+/// are. `lastContentHash` lets a scan skip the CVR-extraction pass entirely
+/// when the page hasn't changed since last time.
+model WatchedUrl {
+  id    String  @id @default(cuid())
+  url   String
+  label String?
+
+  enabled         Boolean   @default(true)
+  lastScannedAt   DateTime?
+  lastContentHash String?
+
+  createdBy   User   @relation(fields: [createdById], references: [id])
+  createdById String
+
+  createdAt DateTime @default(now())
 }

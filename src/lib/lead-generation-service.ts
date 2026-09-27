@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { searchCvr } from "@/lib/cvr-search";
+import { scanUrlForCvrLeads } from "@/lib/url-lead-scan";
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -75,4 +76,72 @@ export async function runAllEnabledLeadFilters(): Promise<{ checked: number; add
   }
 
   return { checked: filters.length, added, failed };
+}
+
+/**
+ * Re-scans one watched page for CVR-number mentions - skips the (slower,
+ * per-CVR-lookup) processing entirely when the page's text hasn't changed
+ * since the last scan (`lastContentHash`), which is the common case for a
+ * daily re-check of most pages.
+ */
+export async function runWatchedUrl(
+  watchedUrlId: string
+): Promise<{ ok: true; added: number; unchanged: boolean } | { ok: false; error: string }> {
+  const watched = await prisma.watchedUrl.findUniqueOrThrow({ where: { id: watchedUrlId } });
+
+  const scan = await scanUrlForCvrLeads(watched.url);
+  if (!scan.ok) return scan;
+
+  if (scan.contentHash === watched.lastContentHash) {
+    await prisma.watchedUrl.update({ where: { id: watchedUrlId }, data: { lastScannedAt: new Date() } });
+    return { ok: true, added: 0, unchanged: true };
+  }
+
+  const cvrNumbers = scan.hits.map((h) => h.cvr);
+  const [existingCandidates, existingDeals] = await Promise.all([
+    prisma.leadCandidate.findMany({ where: { cvrNumber: { in: cvrNumbers } }, select: { cvrNumber: true } }),
+    prisma.deal.findMany({ where: { cvrNumber: { in: cvrNumbers } }, select: { cvrNumber: true } }),
+  ]);
+  const known = new Set([
+    ...existingCandidates.map((c) => c.cvrNumber),
+    ...existingDeals.map((d) => d.cvrNumber).filter((c): c is string => Boolean(c)),
+  ]);
+  const fresh = scan.hits.filter((h) => !known.has(h.cvr));
+
+  if (fresh.length > 0) {
+    await prisma.leadCandidate.createMany({
+      data: fresh.map((h) => ({
+        sourceUrl: watched.url,
+        cvrNumber: h.cvr,
+        companyName: h.name,
+        address: h.address,
+        contactEmail: h.contactEmail,
+        contactPhone: h.contactPhone,
+      })),
+      skipDuplicates: true,
+    });
+  }
+
+  await prisma.watchedUrl.update({
+    where: { id: watchedUrlId },
+    data: { lastScannedAt: new Date(), lastContentHash: scan.contentHash },
+  });
+
+  return { ok: true, added: fresh.length, unchanged: false };
+}
+
+/** Daily cron entry point for watched pages - same one-at-a-time, paced pattern as the filters. */
+export async function runAllEnabledWatchedUrls(): Promise<{ checked: number; added: number; failed: number }> {
+  const urls = await prisma.watchedUrl.findMany({ where: { enabled: true }, select: { id: true } });
+
+  let added = 0;
+  let failed = 0;
+  for (let i = 0; i < urls.length; i++) {
+    const result = await runWatchedUrl(urls[i].id);
+    if (result.ok) added += result.added;
+    else failed++;
+    if (i < urls.length - 1) await sleep(2000);
+  }
+
+  return { checked: urls.length, added, failed };
 }

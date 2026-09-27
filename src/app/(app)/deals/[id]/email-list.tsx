@@ -11,6 +11,8 @@ type Email = {
   subject: string | null;
   bodyText: string | null;
   sentAt: Date;
+  trackingId: string | null;
+  openedAt: Date | null;
 };
 
 function EmailRow({ email }: { email: Email }) {
@@ -31,6 +33,16 @@ function EmailRow({ email }: { email: Email }) {
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2 text-xs text-slate-400">
+          {email.direction === "OUTBOUND" && email.trackingId && (
+            <span
+              className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
+                email.openedAt ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"
+              }`}
+              title={email.openedAt ? formatDateTime(email.openedAt) : undefined}
+            >
+              {email.openedAt ? "Åbnet" : "Ikke åbnet endnu"}
+            </span>
+          )}
           <span>{formatDateTime(email.sentAt)}</span>
           <svg
             width="14"

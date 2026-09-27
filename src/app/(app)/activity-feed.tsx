@@ -13,6 +13,7 @@ const TYPE_ICON: Record<string, string> = {
   CONTRACT_SIGNED: "✍️",
   TASK_DONE: "✅",
   CUSTOMER_REPORT_SENT: "📊",
+  EMAIL_SENT: "✉️",
 };
 
 function timeAgo(date: Date): string {

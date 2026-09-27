@@ -42,6 +42,7 @@ import { DealInfoForm } from "./deal-info-form";
 import { NoteForm } from "./note-form";
 import { CreateTaskFromNoteButton } from "./create-task-from-note-button";
 import { EmailList } from "./email-list";
+import { SendEmailSection } from "./send-email-section";
 import { DealTasksSection } from "./deal-tasks-section";
 import { CreateInvoiceButton } from "./create-invoice-button";
 import { SendCalendarInviteButton } from "./send-calendar-invite-button";
@@ -90,7 +91,7 @@ export default async function DealDetailPage({
   const { id } = await params;
   const { dup } = await searchParams;
 
-  const [deal, users, currentUser, duplicateDeal, docuSealEnabled] = await Promise.all([
+  const [deal, users, currentUser, duplicateDeal, docuSealEnabled, emailTemplates] = await Promise.all([
     prisma.deal.findUnique({
       where: { id },
       include: {
@@ -112,7 +113,12 @@ export default async function DealDetailPage({
     getCurrentUser(),
     dup ? prisma.deal.findUnique({ where: { id: dup } }) : Promise.resolve(null),
     isDocuSealConfigured(),
+    prisma.emailTemplate.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, subject: true, bodyHtml: true } }),
   ]);
+
+  const currentUserGoogleAccount = currentUser
+    ? await prisma.emailAccount.findFirst({ where: { userId: currentUser.id, provider: "GOOGLE" } })
+    : null;
 
   const linkableDeals = (
     await prisma.deal.findMany({
@@ -370,6 +376,7 @@ export default async function DealDetailPage({
               Mails der modtages fra <span className="font-medium">{deal.contactEmail || "kontaktpersonens e-mail"}</span>{" "}
               i en forbundet Gmail-indbakke vises automatisk her for hele teamet - ingen CC eller andet nødvendigt.
             </p>
+            <SendEmailSection dealId={deal.id} hasGoogleAccount={Boolean(currentUserGoogleAccount)} templates={emailTemplates} />
             <EmailList emails={deal.emails} />
           </section>
         </div>
