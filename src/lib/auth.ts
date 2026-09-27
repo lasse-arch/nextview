@@ -1,8 +1,23 @@
 import "server-only";
 import { cookies } from "next/headers";
+import { after } from "next/server";
 import { SignJWT, jwtVerify } from "jose";
 import { prisma } from "@/lib/db";
 import type { User } from "@prisma/client";
+
+/** Only bother writing lastActiveAt if it's this stale - getCurrentUser runs
+ * on almost every request, so without throttling this would mean a write on
+ * every single page load/action instead of roughly once per active session. */
+const ACTIVE_TOUCH_THROTTLE_MS = 5 * 60 * 1000;
+
+function touchLastActive(user: User): void {
+  if (user.lastActiveAt && Date.now() - user.lastActiveAt.getTime() < ACTIVE_TOUCH_THROTTLE_MS) return;
+  after(() =>
+    prisma.user.update({ where: { id: user.id }, data: { lastActiveAt: new Date() } }).catch((err) => {
+      console.error("Kunne ikke opdatere lastActiveAt", err);
+    })
+  );
+}
 
 const SESSION_COOKIE = "nv360_session";
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30; // 30 days
@@ -50,7 +65,9 @@ async function getUserIdFromSession(): Promise<string | null> {
 export async function getCurrentUser(): Promise<User | null> {
   const userId = await getUserIdFromSession();
   if (!userId) return null;
-  return prisma.user.findUnique({ where: { id: userId } });
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (user) touchLastActive(user);
+  return user;
 }
 
 export async function requireUser(): Promise<User> {

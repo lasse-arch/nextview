@@ -5,7 +5,7 @@ import { after } from "next/server";
 import type { ReportInterval, ReportLanguage } from "@prisma/client";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { generateAndSendCustomerReport, REPORT_INTERVAL_MONTHS } from "@/lib/customer-report-service";
+import { REPORT_INTERVAL_MONTHS, kickCustomerReportQueue } from "@/lib/customer-report-service";
 import { addMonths } from "date-fns";
 
 export async function updateMpSkinIdAction(
@@ -86,17 +86,13 @@ export async function updateReportIntervalAction(
 /**
  * "Send nu"/"Send stats" button - scraping + PDF rendering + emailing easily
  * takes 30-60+ seconds (headless Chromium, several page loads on a slow
- * third-party site), far past what a button click should block on and
- * uncomfortably close to a serverless function's request timeout. `after()`
- * lets the actual work keep running past this action's own response, so the
- * click returns immediately and the send happens in the background.
- *
- * A PENDING CustomerReport row is created synchronously, before after() even
- * starts, so the UI has a real, persisted "sending..." state to show (and
- * poll for) rather than just a client-side spinner that would otherwise
- * vanish the instant this fast-returning action resolves - and if the
- * background job fails, that same row flips to FAILED with the real reason,
- * instead of the failure disappearing into server logs nobody sees.
+ * third-party site), far past what a button click should block on. A
+ * PENDING CustomerReport row is created synchronously, so the UI has a real,
+ * persisted "sending..." state to show (and poll for) rather than just a
+ * client-side spinner - and the actual send happens via the self-chaining
+ * /api/internal/process-customer-reports queue (kicked off here, not run
+ * inline), so this returns immediately regardless of how backed up that
+ * queue already is.
  */
 export async function sendCustomerReportNowAction(
   dealId: string
@@ -107,16 +103,8 @@ export async function sendCustomerReportNowAction(
   const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId } });
   if (!deal.mpSkinId) return { ok: false, error: "Dealen har intet MP-Skin nummer udfyldt." };
 
-  const pendingReport = await prisma.customerReport.create({
-    data: { dealId, method: "MANUAL", status: "PENDING" },
-  });
-
-  after(async () => {
-    const result = await generateAndSendCustomerReport(deal, "MANUAL", pendingReport.id);
-    if (!result.ok) console.error(`Besøgsrapport til deal ${dealId} fejlede:`, result.error);
-    revalidatePath(`/deals/${dealId}`);
-    revalidatePath("/stats");
-  });
+  await prisma.customerReport.create({ data: { dealId, method: "MANUAL", status: "PENDING" } });
+  after(() => kickCustomerReportQueue());
 
   revalidatePath(`/deals/${dealId}`);
   revalidatePath("/stats");
@@ -124,13 +112,16 @@ export async function sendCustomerReportNowAction(
 }
 
 /**
- * Bulk "Send nu" for the checkboxes on /stats - same PENDING-row-up-front +
- * after() pattern as the single-deal action, just for several deals at once.
- * Deals without an MP-Skin nummer are silently skipped (reported back as
- * `skipped`) rather than failing the whole batch over one bad row. Sends run
- * one at a time in the background (not in parallel), matching the daily
- * scheduler, since each one drives its own headless-Chromium scrape of
- * explore.nextview360.dk - several at once would be needlessly heavy.
+ * Bulk "Send nu" for the checkboxes on /stats - same PENDING-row-up-front
+ * pattern as the single-deal action, just for several deals at once. Deals
+ * without an MP-Skin nummer are silently skipped (reported back as
+ * `skipped`) rather than failing the whole batch over one bad row.
+ *
+ * All queued reports (however many) are processed one at a time by the same
+ * self-chaining queue as the single-send action and the daily scheduler -
+ * each report gets its own fresh serverless invocation, so a batch of 30
+ * can't blow past any single request's timeout the way looping through all
+ * of them in one request could.
  */
 export async function sendCustomerReportsNowAction(
   dealIds: string[]
@@ -145,19 +136,10 @@ export async function sendCustomerReportsNowAction(
   const skipped = deals.length - sendable.length;
   if (sendable.length === 0) return { ok: false, error: "Ingen af de valgte kunder har et MP-Skin nummer udfyldt." };
 
-  const pendingReports = await Promise.all(
-    sendable.map((deal) => prisma.customerReport.create({ data: { dealId: deal.id, method: "MANUAL", status: "PENDING" } }))
-  );
-
-  after(async () => {
-    for (let i = 0; i < sendable.length; i++) {
-      const deal = sendable[i];
-      const result = await generateAndSendCustomerReport(deal, "MANUAL", pendingReports[i].id);
-      if (!result.ok) console.error(`Besøgsrapport til deal ${deal.id} fejlede:`, result.error);
-    }
-    revalidatePath("/stats");
-    for (const deal of sendable) revalidatePath(`/deals/${deal.id}`);
+  await prisma.customerReport.createMany({
+    data: sendable.map((deal) => ({ dealId: deal.id, method: "MANUAL" as const, status: "PENDING" as const })),
   });
+  after(() => kickCustomerReportQueue());
 
   revalidatePath("/stats");
   return { ok: true, queued: sendable.length, skipped };

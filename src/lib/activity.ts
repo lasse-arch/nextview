@@ -59,16 +59,16 @@ export async function getRecentActivity(limit = 25): Promise<ActivityFeedItem[]>
   }));
 }
 
-export type UserLastLogin = {
+export type UserLastActive = {
   id: string;
   name: string;
   avatarUrl: string | null;
-  lastLoginAt: Date | null;
+  lastActiveAt: Date | null;
 };
 
-export async function getUserLastLogins(): Promise<UserLastLogin[]> {
+export async function getUserLastActive(): Promise<UserLastActive[]> {
   const users = await prisma.user.findMany({
-    select: { id: true, name: true, lastName: true, avatarUrl: true, lastLoginAt: true },
+    select: { id: true, name: true, lastName: true, avatarUrl: true, lastActiveAt: true },
     orderBy: { name: "asc" },
   });
 
@@ -77,7 +77,7 @@ export async function getUserLastLogins(): Promise<UserLastLogin[]> {
       id: u.id,
       name: [u.name, u.lastName].filter(Boolean).join(" "),
       avatarUrl: u.avatarUrl,
-      lastLoginAt: u.lastLoginAt,
+      lastActiveAt: u.lastActiveAt,
     }))
-    .sort((a, b) => (b.lastLoginAt?.getTime() ?? 0) - (a.lastLoginAt?.getTime() ?? 0));
+    .sort((a, b) => (b.lastActiveAt?.getTime() ?? 0) - (a.lastActiveAt?.getTime() ?? 0));
 }

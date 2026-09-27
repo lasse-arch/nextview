@@ -158,9 +158,11 @@ model User {
   phone             String?
   /// Shown together with `name` as the seller's full name on generated contracts.
   lastName          String?
-  /// Updated on every successful login - shown on the dashboard so it's
-  /// visible at a glance who's actively using the CRM.
-  lastLoginAt       DateTime?
+  /// Updated (throttled - see touchLastActive in auth.ts) whenever the user
+  /// makes an authenticated request, not just at login - sessions last 30
+  /// days, so "last login" would barely ever change and say very little
+  /// about who's actually using the CRM day to day.
+  lastActiveAt      DateTime?
   createdAt         DateTime            @default(now())
 
   deals         Deal[]         @relation("DealOwner")

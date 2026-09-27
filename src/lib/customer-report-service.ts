@@ -7,6 +7,9 @@ import { buildCustomerReportHtml, currentMonthLabel, escapeHtml } from "@/lib/cu
 import { renderCustomerReportPdf } from "@/lib/customer-report-pdf";
 import { sendGmailMessage } from "@/lib/gmail";
 import { findOrCreateCustomerReportsFolder, uploadPdfToDrive } from "@/lib/google-drive";
+import { getAppBaseUrl } from "@/lib/email-oauth";
+import { logActivity } from "@/lib/activity";
+import { dealName } from "@/lib/labels";
 
 /** All visitor-stats reports go out from this one fixed address, regardless of which seller owns the deal. */
 const REPORT_SENDER_EMAIL = "lasse@nextview360.dk";
@@ -230,6 +233,15 @@ export async function generateAndSendCustomerReport(
       prisma.deal.update({ where: { id: deal.id }, data: { nextReportDueAt } }),
     ]);
 
+    await logActivity({
+      type: "CUSTOMER_REPORT_SENT",
+      message:
+        method === "AUTOMATIC"
+          ? `Besøgsrapport sendt automatisk til ${dealName(deal)}`
+          : `Besøgsrapport sendt til ${dealName(deal)}`,
+      dealId: deal.id,
+    });
+
     return { ok: true };
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : "Ukendt fejl";
@@ -251,10 +263,15 @@ export async function generateAndSendCustomerReport(
 
 const REPORTABLE_STAGES = ["FILMED", "LIVE"] as const;
 
-/** Daily cron entry point: sends every deal whose nextReportDueAt has arrived. */
-export async function runScheduledCustomerReports(): Promise<{ checked: number; sent: number; failed: number }> {
+/**
+ * Queues every deal whose nextReportDueAt has arrived as a PENDING
+ * CustomerReport row - the actual sending happens afterwards via the
+ * one-report-at-a-time queue (see processOneQueuedReport/kickCustomerReportQueue),
+ * not here, so this returns almost instantly regardless of how many are due.
+ */
+export async function enqueueScheduledCustomerReports(): Promise<{ queued: number }> {
   if (!(await isIntegrationEnabled("CUSTOMER_REPORTS_AUTO_RUN"))) {
-    return { checked: 0, sent: 0, failed: 0 };
+    return { queued: 0 };
   }
 
   const deals = await prisma.deal.findMany({
@@ -265,26 +282,58 @@ export async function runScheduledCustomerReports(): Promise<{ checked: number; 
       churnedAt: null,
       stage: { in: [...REPORTABLE_STAGES] },
     },
-    select: {
-      id: true,
-      companyName: true,
-      displayName: true,
-      mpSkinId: true,
-      contactEmail: true,
-      invoiceEmail: true,
-      reportInterval: true,
-      nextReportDueAt: true,
-      reportCcEmails: true,
-      reportLanguage: true,
-    },
+    select: { id: true },
   });
 
-  let sent = 0;
-  let failed = 0;
-  for (const deal of deals) {
-    const result = await generateAndSendCustomerReport(deal, "AUTOMATIC");
-    if (result.ok) sent++;
-    else failed++;
+  if (deals.length > 0) {
+    await prisma.customerReport.createMany({
+      data: deals.map((d) => ({ dealId: d.id, method: "AUTOMATIC" as const, status: "PENDING" as const })),
+    });
   }
-  return { checked: deals.length, sent, failed };
+
+  return { queued: deals.length };
+}
+
+/**
+ * Processes exactly one PENDING CustomerReport (the oldest first) and
+ * reports how many are still waiting - the unit of work each invocation of
+ * the self-chaining /api/internal/process-customer-reports route performs.
+ * Kept to a single report per call so no single request's duration depends
+ * on how many are queued: a batch of 3 and a batch of 30 both process at the
+ * same safe, bounded pace, one after another, instead of one request trying
+ * (and risking a timeout) to get through all of them at once.
+ */
+export async function processOneQueuedReport(): Promise<{ processed: boolean; remaining: number }> {
+  const report = await prisma.customerReport.findFirst({
+    where: { status: "PENDING" },
+    orderBy: { createdAt: "asc" },
+    include: { deal: true },
+  });
+
+  if (!report) return { processed: false, remaining: 0 };
+
+  await generateAndSendCustomerReport(report.deal, report.method, report.id);
+
+  const remaining = await prisma.customerReport.count({ where: { status: "PENDING" } });
+  return { processed: true, remaining };
+}
+
+/**
+ * Fires (without blocking on the result) the internal route that processes
+ * one queued report and re-triggers itself while more remain - a real HTTP
+ * call rather than an in-process loop, so each report is processed by its
+ * own fresh serverless invocation with a full, un-eaten-into maxDuration
+ * budget. Call this once after queuing new PENDING rows (or to nudge a
+ * stalled queue) - it's a no-op if nothing is PENDING.
+ */
+export async function kickCustomerReportQueue(): Promise<void> {
+  try {
+    const secret = process.env.CRON_SECRET;
+    await fetch(`${getAppBaseUrl()}/api/internal/process-customer-reports`, {
+      method: "POST",
+      headers: secret ? { Authorization: `Bearer ${secret}` } : undefined,
+    });
+  } catch (err) {
+    console.error("Kunne ikke starte kø for besøgsrapporter", err);
+  }
 }
