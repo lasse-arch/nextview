@@ -19,6 +19,8 @@ export function isAiConfigured(): boolean {
 
 const SYSTEM_PROMPT = `Du hjælper en sælger i et dansk CRM-system (Nextview360, der sælger virtuelle 360-graders rundvisninger) med at omsætte en e-mail til en kort CRM-note.
 
+Vigtigst af alt: notens indhold skal være 100% baseret på det, der faktisk står i e-mailen. Opfind eller antag ALDRIG et svar, en beslutning, en indvending eller et udfald, som ikke direkte fremgår af teksten - heller ikke selvom det ville være et "typisk" forløb. Hvis "Retning" er "Sendt til kunden", beskriver noten hvad SÆLGEREN skrev/tilbød/spurgte om - ikke en formodet reaktion fra kunden, som ikke er nævnt. Hvis mailen ikke indeholder noget særligt nyt (fx bare et standard-tilbud), er en kort, neutral gengivelse af hvad der blev sendt bedre end at digte noget dramatisk.
+
 Skriv noten på dansk, i samme knappe, praktiske stil som erfarne sælgere selv skriver noter i - korte sætninger, ingen overflødige høflighedsfraser, fokusér kun på det der er relevant at huske: aftaler, datoer, indvendinger, ønsker, eller næste skridt. Typisk 1-3 sætninger.
 
 Svar KUN med selve note-teksten, ingen indledning, ingen anførselstegn, intet markdown.`;
@@ -70,7 +72,13 @@ export async function suggestNoteFromEmail(email: EmailForSuggestion): Promise<S
       body: JSON.stringify({
         system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
         contents: [{ role: "user", parts: [{ text: userMessage }] }],
-        generationConfig: { maxOutputTokens: 300 },
+        // Gemini 3.8 Flash spends part of maxOutputTokens on hidden "thinking"
+        // before writing the visible answer - with thinkingLevel left at its
+        // default, that ate almost the whole 300-token budget and cut the
+        // actual note off mid-sentence. This task needs no real reasoning
+        // (it's a short rewrite, not a puzzle), so thinking is set to "low"
+        // and the budget raised generously as a margin either way.
+        generationConfig: { maxOutputTokens: 1024, thinkingConfig: { thinkingLevel: "low" } },
       }),
       signal: AbortSignal.timeout(20_000),
     });
@@ -84,10 +92,16 @@ export async function suggestNoteFromEmail(email: EmailForSuggestion): Promise<S
   }
 
   const data = (await res.json()) as {
-    candidates?: { content?: { parts?: { text?: string }[] } }[];
+    candidates?: { content?: { parts?: { text?: string }[] }; finishReason?: string }[];
   };
-  const text = data.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("").trim();
+  const candidate = data.candidates?.[0];
+  const text = candidate?.content?.parts?.map((p) => p.text ?? "").join("").trim();
   if (!text) return { ok: false, error: "AI-tjenesten returnerede intet forslag." };
+  // A cut-off note that reads as a finished sentence is worse than an error -
+  // surface it explicitly rather than letting a broken suggestion through.
+  if (candidate?.finishReason === "MAX_TOKENS") {
+    return { ok: false, error: "AI-svaret blev afbrudt undervejs. Prøv igen." };
+  }
 
   return { ok: true, suggestion: text };
 }
