@@ -1,11 +1,17 @@
 /**
  * Google's Gemini API (not Anthropic's) - deliberately chosen because it has
- * a genuinely free tier (Gemini 2.5 Flash: no credit card required, several
- * hundred requests/day), which comfortably covers this feature's actual
- * usage pattern - a seller manually clicking "AI-referat" on one e-mail at a
- * time, not a high-volume automated job.
+ * a genuinely free tier (Gemini 3.8 Flash: no credit card required, 1500
+ * requests/day), which comfortably covers this feature's actual usage
+ * pattern - a seller manually clicking "AI-referat" on one e-mail at a time,
+ * not a high-volume automated job.
+ *
+ * Was gemini-2.5-flash originally - Google retired that model for new API
+ * keys shortly after this was built ("no longer available to new users"),
+ * so if this starts 404ing again on its own model name, that's almost
+ * certainly what happened again - check ai.google.dev/gemini-api/docs for
+ * whatever the current flash model is called.
  */
-const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
+const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent";
 
 export function isAiConfigured(): boolean {
   return Boolean(process.env.GEMINI_API_KEY);
