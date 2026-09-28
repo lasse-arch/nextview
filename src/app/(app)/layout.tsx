@@ -9,7 +9,7 @@ import { SidebarNav, type SidebarNavItem } from "./sidebar-nav";
 import { MobileNav } from "./mobile-nav";
 import { PresentationModeToggle } from "./presentation-mode-toggle";
 import { isPresentationMode } from "@/lib/presentation-mode";
-import { IconHome, IconDeals, IconUsers, IconPercent, IconGrowth, IconTasks, IconStats, IconCalendar, IconRadar } from "./nav-icons";
+import { IconHome, IconDeals, IconUsers, IconPercent, IconGrowth, IconTasks, IconStats, IconCalendar, IconRadar, IconPhone } from "./nav-icons";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const [user, presenting] = await Promise.all([getCurrentUser(), isPresentationMode()]);
@@ -19,6 +19,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: "/", label: "Oversigt", icon: <IconHome /> },
     { href: "/deals", label: "Deals", icon: <IconDeals /> },
     { href: "/leadgeneration", label: "Leadgeneration", icon: <IconRadar /> },
+    { href: "/ringeliste", label: "Ringeliste", icon: <IconPhone /> },
     { href: "/kunder-live", label: "Live kunder", icon: <IconUsers /> },
     { href: "/kalender", label: "Kalender", icon: <IconCalendar /> },
     { href: "/opgaver", label: "Opgaver", icon: <IconTasks /> },

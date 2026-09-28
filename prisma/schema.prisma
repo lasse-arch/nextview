@@ -185,6 +185,7 @@ model User {
   leadFilters   LeadFilter[]
   watchedUrls   WatchedUrl[]
   emailTemplates EmailTemplate[]
+  callLists     CallList[]
 }
 
 /// One entry per notable thing that happened in the CRM (deal created,
@@ -229,6 +230,20 @@ model Goal {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+/// A daily batch of pasted leads (CVR-opslag, Facebook-sider, hjemmesider, ...)
+/// to ringe igennem i én omgang - erstatter den tidligere arbejdsgang med at
+/// dele links i en WhatsApp-gruppe, så leadsene i stedet lander som rigtige
+/// Deals man kan filtrere til "dagens liste" og markere hurtigt tabt/booket.
+model CallList {
+  id          String   @id @default(cuid())
+  name        String
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  createdById String
+  createdAt   DateTime @default(now())
+
+  deals Deal[]
 }
 
 model ImportBatch {
@@ -320,6 +335,12 @@ model Deal {
   importType    ImportType   @default(MANUAL)
   importBatch   ImportBatch? @relation(fields: [importBatchId], references: [id])
   importBatchId String?
+
+  /// Set when this deal came from a Ringeliste quick-add (see CallList) -
+  /// lets the call-queue view filter to "only today's/this list's leads"
+  /// instead of showing every open deal.
+  callList   CallList? @relation(fields: [callListId], references: [id], onDelete: SetNull)
+  callListId String?
 
   dealEmailAddress String? @unique
 
