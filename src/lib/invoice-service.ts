@@ -214,24 +214,6 @@ function buildInvoiceContent(
 }
 
 /**
- * The Netto+8 date for a recurring period, floored so it never lands in a
- * calendar year before the period itself starts. The only case this
- * actually changes anything is a period starting 1 January, where
- * scheduledDate-8-days would otherwise be 24 December the year before -
- * mis-dating a new year's first invoice into the old year's accounts, even
- * though the revenue it covers belongs to the new year regardless of when
- * the invoice itself is dated or drafted. Unconditional: the draft can
- * still be created as early as its normal lead time allows (see
- * computeBillingPeriods' draftTriggerDate) - only the date written on it is
- * floored, to 1 January itself (Netto+8 landing 9 January instead).
- */
-function computeRecurringInvoiceDate(periodStart: Date): Date {
-  const netto8Date = addDays(periodStart, -8);
-  const yearStart = new Date(periodStart.getFullYear(), 0, 1);
-  return netto8Date < yearStart ? yearStart : netto8Date;
-}
-
-/**
  * Attempts to draft one invoice line in Dinero and records the outcome on
  * its Invoice row. Shared by the bulk quarterly run and the single-invoice
  * "Prøv igen" retry, so both go through the exact same success/failure
@@ -251,15 +233,14 @@ async function draftInvoiceLine(
 ): Promise<{ success: true; contactGuid: string } | { success: false; error: string }> {
   try {
     const { note, lines } = buildInvoiceContent(deal, invoiceRow.quarterIndex, invoiceRow.amount, invoiceRow.scheduledDate);
-    // For a recurring period, the Dinero invoice date is normally set so
-    // Netto+8 lands exactly on the period's start date, regardless of which
-    // day within the draft's eligible window it actually gets created on -
-    // except a period starting 1 January is floored to that same 1 January
-    // instead (see computeRecurringInvoiceDate), so its invoice can never be
-    // dated into the year before the service it covers. The one-off
-    // establishment fee has no such period to align to, so it's simply
-    // dated whenever it's actually drafted.
-    const invoiceDate = invoiceRow.quarterIndex === 0 ? new Date() : computeRecurringInvoiceDate(invoiceRow.scheduledDate);
+    // A recurring period's invoice is dated on the period's own start date,
+    // regardless of which day within the draft's lead-time window it's
+    // actually drafted on - Dinero's own Netto+8 payment terms (see
+    // createQuarterlyInvoiceDraft) then land the due date 8 days after that,
+    // never before the period (and its revenue) actually begins. The
+    // one-off establishment fee has no such period to align to, so it's
+    // simply dated whenever it's actually drafted.
+    const invoiceDate = invoiceRow.quarterIndex === 0 ? new Date() : invoiceRow.scheduledDate;
     const result = await createQuarterlyInvoiceDraft({
       existingContactGuid: contactGuidHint,
       companyName: deal.companyName,

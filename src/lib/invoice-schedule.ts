@@ -28,13 +28,11 @@ export type BillingPeriod = {
  * 1 October can be drafted from 24 September onwards) - giving sellers a
  * little room to prepare invoices ahead of time without having to wait
  * until the last minute. The invoice's actual Dinero date is a separate
- * concern (see `computeRecurringInvoiceDate` in invoice-service.ts): it's
- * normally set so Netto+8 lands exactly on the period's start date,
- * regardless of which day within that eligible window the draft actually
- * gets created - except a period starting 1 January, which is always dated
- * that same 1 January (Netto+8 landing 9 January instead), so a new year's
- * first invoice can be drafted ahead of time in December without its
- * booking date falling in the wrong fiscal year. For a
+ * concern (see `draftInvoiceLine` in invoice-service.ts): it's always the
+ * period's own start date, regardless of which day within that eligible
+ * window the draft actually gets created - Dinero's own Netto+8 payment
+ * terms then land the due date 8 days after that, never earlier than the
+ * period (and the revenue it covers) actually starts. For a
  * billingStartDate already in the past (the overwhelmingly common case -
  * it's normally set to "today" when a deal goes Live), that lookback is
  * also already in the past, so the draft is simply due immediately either
