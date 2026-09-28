@@ -12,12 +12,93 @@ type GmailMessageMeta = {
   to: string;
   subject: string;
   date: string;
-  snippet: string;
+  body: string;
+};
+
+type GmailMessagePart = {
+  mimeType?: string;
+  body?: { data?: string };
+  parts?: GmailMessagePart[];
 };
 
 function extractEmailAddress(headerValue: string): string {
   const match = headerValue.match(/<([^>]+)>/);
   return (match ? match[1] : headerValue).trim().toLowerCase();
+}
+
+function decodeBase64Url(data: string): string {
+  return Buffer.from(data.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf-8");
+}
+
+/** Depth-first search for the first part of the given MIME type - Gmail nests
+ * the real content under `payload.parts` for anything but the simplest plain-
+ * text-only messages (multipart/alternative, multipart/mixed with attachments, ...). */
+function findMimePart(part: GmailMessagePart, mimeType: string): string | null {
+  if (part.mimeType === mimeType && part.body?.data) return decodeBase64Url(part.body.data);
+  for (const child of part.parts ?? []) {
+    const found = findMimePart(child, mimeType);
+    if (found) return found;
+  }
+  return null;
+}
+
+/** Named HTML entities worth decoding here - beyond the universal amp/lt/gt/
+ * quot/apos/nbsp, this is specifically the Danish letters (æ/ø/å in both
+ * cases), since some mail clients still encode a Danish HTML body with named
+ * entities instead of raw UTF-8, and a note or e-mail full of "&aelig;" where
+ * "æ" belongs reads far worse than any layout issue. Numeric entities
+ * (&#248; / &#xF8;) are handled generically below, not via this table. */
+const NAMED_ENTITIES: Record<string, string> = {
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+  nbsp: " ",
+  aelig: "æ",
+  Aelig: "Æ",
+  oslash: "ø",
+  Oslash: "Ø",
+  aring: "å",
+  Aring: "Å",
+};
+
+function decodeHtmlEntities(text: string): string {
+  return text.replace(/&(#\d+|#x[0-9a-fA-F]+|[a-zA-Z]+);/g, (match, entity: string) => {
+    if (entity[0] === "#") {
+      const code = entity[1] === "x" || entity[1] === "X" ? parseInt(entity.slice(2), 16) : parseInt(entity.slice(1), 10);
+      return Number.isNaN(code) ? match : String.fromCodePoint(code);
+    }
+    return NAMED_ENTITIES[entity] ?? match;
+  });
+}
+
+/** Turns the (much more common) text/html body into readable plain text -
+ * converting block-level tags to line breaks first, unlike a plain "strip all
+ * tags" pass, so paragraphs and signature lines don't all run together on one line. */
+function htmlToReadableText(html: string): string {
+  return decodeHtmlEntities(
+    html
+      .replace(/<(br|br\/)\s*\/?>/gi, "\n")
+      .replace(/<\/(p|div|li|tr|h[1-6])>/gi, "\n")
+      .replace(/<script[\s\S]*?<\/script>/gi, " ")
+      .replace(/<style[\s\S]*?<\/style>/gi, " ")
+      .replace(/<[^>]+>/g, "")
+  )
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n[ \t]+/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+/** Prefers the real text/plain part (already has proper line breaks); falls
+ * back to converting text/html when a message has no plain-text alternative -
+ * common for anything composed in Outlook/Gmail's rich-text editor. */
+function extractReadableBody(payload: GmailMessagePart): string | null {
+  const plain = findMimePart(payload, "text/plain");
+  if (plain) return plain.trim();
+  const html = findMimePart(payload, "text/html");
+  return html ? htmlToReadableText(html) : null;
 }
 
 async function fetchRecentGmailMessages(account: EmailAccount): Promise<GmailMessageMeta[]> {
@@ -31,13 +112,13 @@ async function fetchRecentGmailMessages(account: EmailAccount): Promise<GmailMes
   const listData = await listRes.json();
   const ids: string[] = (listData.messages ?? []).map((m: { id: string }) => m.id);
 
-  const headerParams = ["From", "To", "Subject", "Date"]
-    .map((h) => `metadataHeaders=${h}`)
-    .join("&");
-
   const messages: GmailMessageMeta[] = [];
   for (const id of ids) {
-    const res = await fetch(`${GMAIL_API_BASE}/messages/${id}?format=metadata&${headerParams}`, {
+    // format=full (not metadata) - the actual message body only comes down
+    // this way; metadata-only responses have just a short auto-generated
+    // "snippet" with no real line breaks, which is why the note/e-mail body
+    // used to render as one long run-on sentence.
+    const res = await fetch(`${GMAIL_API_BASE}/messages/${id}?format=full`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
     if (!res.ok) continue;
@@ -50,7 +131,7 @@ async function fetchRecentGmailMessages(account: EmailAccount): Promise<GmailMes
       to: headers["To"] ?? "",
       subject: headers["Subject"] ?? "",
       date: headers["Date"] ?? "",
-      snippet: data.snippet ?? "",
+      body: (data.payload ? extractReadableBody(data.payload) : null) ?? data.snippet ?? "",
     });
   }
   return messages;
@@ -116,7 +197,7 @@ export async function syncInboundEmails(): Promise<EmailSyncSummary> {
           fromAddress: senderEmail,
           toAddresses: msg.to,
           subject: msg.subject || null,
-          bodyText: msg.snippet || null,
+          bodyText: msg.body || null,
           sentAt: isNaN(sentAt.getTime()) ? new Date() : sentAt,
         },
       });
