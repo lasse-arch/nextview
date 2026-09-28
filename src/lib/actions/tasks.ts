@@ -16,10 +16,10 @@ function revalidateTaskPaths(dealId: string | null) {
 /**
  * "Opret opgave"-knap på en note - lidt hurtigere end at åbne opgave-
  * formularen og selv skrive titlen ud igen, når det man vil huske allerede
- * står i noten. Tildeles den der skrev noten (ikke nødvendigvis den der
- * klikker "+ Opgave") - det er trods alt dem der ved hvad opfølgningen
- * drejer sig om. Forfaldsdato gættes ud fra en dato/ugenummer/ferienavn i
- * notetekstens eget indhold, hvis der står en - se task-date-parser.ts.
+ * står i noten. Tildeles den der klikker knappen (samme som når man selv
+ * opretter en opgave manuelt), ikke nødvendigvis den der skrev noten.
+ * Forfaldsdato gættes ud fra en dato/ugenummer/ferienavn i notetekstens eget
+ * indhold, hvis der står en - se task-date-parser.ts.
  */
 export async function createTaskFromNote(noteId: string): Promise<TaskResult> {
   const user = await requireUser();
@@ -31,7 +31,7 @@ export async function createTaskFromNote(noteId: string): Promise<TaskResult> {
   const dueDate = parseDueDateFromText(note.body);
 
   const task = await prisma.task.create({
-    data: { title, description: note.body, dealId: note.dealId, assigneeId: note.authorId, createdById: user.id, dueDate },
+    data: { title, description: note.body, dealId: note.dealId, assigneeId: user.id, createdById: user.id, dueDate },
   });
 
   revalidateTaskPaths(note.dealId);
