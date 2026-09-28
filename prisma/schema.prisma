@@ -300,6 +300,9 @@ model Deal {
   contactPhone String?
   /// Where invoices should be sent, if different from contactEmail (e.g. an accounting inbox).
   invoiceEmail String?
+  /// The lead's own website/source link - captured automatically when added
+  /// via Ringeliste from a pasted URL, and editable there too.
+  websiteUrl   String?
 
   owner   User   @relation("DealOwner", fields: [ownerId], references: [id])
   ownerId String

@@ -19,15 +19,30 @@ function sleep(ms: number): Promise<void> {
 
 export type PageFetchResult = { ok: true; html: string; text: string; title: string | null } | { ok: false; error: string };
 
-function stripHtml(html: string): string {
-  return html
-    .replace(/<script[\s\S]*?<\/script>/gi, " ")
-    .replace(/<style[\s\S]*?<\/style>/gi, " ")
-    .replace(/<[^>]+>/g, " ")
+/** Just the handful of entities that show up in a <title> tag or plain body
+ * text often enough to matter - full named-entity coverage lives in
+ * email-sync-service.ts for actual e-mail bodies, which see a wider range. */
+function decodeCommonEntities(text: string): string {
+  return text
     .replace(/&nbsp;/g, " ")
     .replace(/&amp;/g, "&")
-    .replace(/\s+/g, " ")
-    .trim();
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#0*39;|&apos;/g, "'")
+    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(parseInt(code, 10)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
+}
+
+function stripHtml(html: string): string {
+  return decodeCommonEntities(
+    html
+      .replace(/<script[\s\S]*?<\/script>/gi, " ")
+      .replace(/<style[\s\S]*?<\/style>/gi, " ")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+  );
 }
 
 export async function fetchPageText(url: string): Promise<PageFetchResult> {
@@ -50,7 +65,12 @@ export async function fetchPageText(url: string): Promise<PageFetchResult> {
 
     const html = await res.text();
     const titleMatch = html.match(/<title[^>]*>([^<]*)<\/title>/i);
-    return { ok: true, html, text: stripHtml(html), title: titleMatch ? titleMatch[1].trim() : null };
+    return {
+      ok: true,
+      html,
+      text: stripHtml(html),
+      title: titleMatch ? decodeCommonEntities(titleMatch[1]).trim() : null,
+    };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? `Kunne ikke hente siden: ${err.message}` : "Kunne ikke hente siden." };
   }

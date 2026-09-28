@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createCallList, addLeadsToCallList, deleteCallList } from "@/lib/actions/call-lists";
-import { updateDealStage, setMeetingDateAndStage, renameDeal, updateDealPhone } from "@/lib/actions/deals";
+import { updateDealStage, setMeetingDateAndStage, renameDeal, updateDealPhone, updateDealWebsite } from "@/lib/actions/deals";
 import { addDealItem } from "@/lib/actions/deal-items";
 import { dealName, stageLabels } from "@/lib/labels";
 import { useToast } from "@/components/toast";
@@ -24,6 +24,7 @@ type QueueDeal = {
   contactName: string | null;
   contactPhone: string | null;
   contactEmail: string | null;
+  websiteUrl: string | null;
   stage: DealStage;
 };
 
@@ -170,6 +171,9 @@ function QueueCard({ deal }: { deal: QueueDeal }) {
   const [editingPhone, setEditingPhone] = useState(false);
   const [phoneInput, setPhoneInput] = useState(deal.contactPhone ?? "");
   const [displayedPhone, setDisplayedPhone] = useState(deal.contactPhone);
+  const [editingWebsite, setEditingWebsite] = useState(false);
+  const [websiteInput, setWebsiteInput] = useState(deal.websiteUrl ?? "");
+  const [displayedWebsite, setDisplayedWebsite] = useState(deal.websiteUrl);
   const [addedProducts, setAddedProducts] = useState<string[]>([]);
   const router = useRouter();
   const showToast = useToast();
@@ -204,6 +208,23 @@ function QueueCard({ deal }: { deal: QueueDeal }) {
         setEditingPhone(false);
       } catch (err) {
         showToast(err instanceof Error ? err.message : "Kunne ikke gemme telefonnummeret.");
+      }
+    });
+  }
+
+  function saveWebsite() {
+    const trimmed = websiteInput.trim();
+    if (!trimmed) {
+      setEditingWebsite(false);
+      return;
+    }
+    startTransition(async () => {
+      try {
+        await updateDealWebsite(deal.id, trimmed);
+        setDisplayedWebsite(trimmed.startsWith("http") ? trimmed : `https://${trimmed}`);
+        setEditingWebsite(false);
+      } catch (err) {
+        showToast(err instanceof Error ? err.message : "Kunne ikke gemme linket.");
       }
     });
   }
@@ -339,6 +360,58 @@ function QueueCard({ deal }: { deal: QueueDeal }) {
             ) : (
               <button type="button" onClick={() => setEditingPhone(true)} className="text-xs text-slate-400 underline hover:text-slate-600">
                 + Tilføj telefon
+              </button>
+            )}
+          </div>
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs">
+            {editingWebsite ? (
+              <span className="inline-flex items-center gap-1">
+                <input
+                  value={websiteInput}
+                  onChange={(e) => setWebsiteInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") saveWebsite();
+                    if (e.key === "Escape") setEditingWebsite(false);
+                  }}
+                  autoFocus
+                  placeholder="firma.dk"
+                  className="w-40 rounded-md border border-slate-300 px-1.5 py-0.5 text-xs"
+                />
+                <button type="button" onClick={saveWebsite} disabled={busy} className="font-medium text-slate-900 hover:underline">
+                  Gem
+                </button>
+                <button type="button" onClick={() => setEditingWebsite(false)} className="text-slate-400 hover:text-slate-600">
+                  Annullér
+                </button>
+              </span>
+            ) : displayedWebsite ? (
+              // Marked (a filled blue badge) once a link exists, same idea as the
+              // phone badge - click the link to open the site, or the pencil to
+              // correct it.
+              <span className="inline-flex items-center gap-1">
+                <a
+                  href={displayedWebsite}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-0.5 text-[11px] font-medium text-sky-700 ring-1 ring-inset ring-sky-600/10 hover:bg-sky-100"
+                >
+                  🔗 {displayedWebsite.replace(/^https?:\/\//, "")}
+                </a>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setWebsiteInput(displayedWebsite);
+                    setEditingWebsite(true);
+                  }}
+                  title="Ret link"
+                  className="text-slate-300 hover:text-slate-600"
+                >
+                  ✏️
+                </button>
+              </span>
+            ) : (
+              <button type="button" onClick={() => setEditingWebsite(true)} className="text-slate-400 underline hover:text-slate-600">
+                + Tilføj link
               </button>
             )}
           </div>

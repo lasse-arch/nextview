@@ -114,6 +114,7 @@ export async function addLeadsToCallList(
         contactName,
         contactEmail,
         contactPhone,
+        websiteUrl: line.url,
         ownerId: user.id,
         importType: "MANUAL",
         callListId,

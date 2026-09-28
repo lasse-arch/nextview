@@ -31,6 +31,7 @@ export default async function RingelistePage({
           contactName: true,
           contactPhone: true,
           contactEmail: true,
+          websiteUrl: true,
           stage: true,
         },
       })

@@ -627,6 +627,26 @@ export async function updateDealPhone(dealId: string, phone: string) {
   revalidatePath(`/deals/${dealId}`);
 }
 
+/** Quick inline website-link add/edit from the Ringeliste queue - a pasted
+ * URL is stored automatically when the lead is created, but this lets it be
+ * added afterwards (e.g. a lead typed in as a bare name) or corrected. */
+export async function updateDealWebsite(dealId: string, url: string) {
+  await requireUser();
+  const trimmed = url.trim();
+  if (!trimmed) throw new Error("Linket må ikke være tomt.");
+  const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  try {
+    new URL(withScheme);
+  } catch {
+    throw new Error("Det ligner ikke et gyldigt link.");
+  }
+
+  await prisma.deal.update({ where: { id: dealId }, data: { websiteUrl: withScheme } });
+  revalidatePath("/deals");
+  revalidatePath("/ringeliste");
+  revalidatePath(`/deals/${dealId}`);
+}
+
 /** Used by the board view's Quick-note popup - adds a note without navigating away. */
 export async function addQuickNote(dealId: string, body: string) {
   const user = await requireUser();
