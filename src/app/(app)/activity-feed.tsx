@@ -5,7 +5,7 @@ import type { ActivityFeedItem } from "@/lib/activity";
 
 const TYPE_ICON: Record<string, string> = {
   DEAL_CREATED: "✨",
-  DEAL_STAGE_MEETING_BOOKED: "📅",
+  DEAL_STAGE_MEETING_BOOKED: "👑",
   DEAL_STAGE_FILMED: "🎬",
   DEAL_STAGE_LIVE: "🚀",
   DEAL_STAGE_LOST: "❌",
