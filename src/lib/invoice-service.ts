@@ -40,7 +40,15 @@ export type InvoiceRunSummary = {
   nextDueDateLabel?: string;
 };
 
-type DueLine = { quarterIndex: number; amount: number; scheduledDate: Date };
+type DueLine = {
+  quarterIndex: number;
+  amount: number;
+  scheduledDate: Date;
+  /** True when this line only became due because a seller manually jumped
+   * ahead via sendPeriodsNow, not because its own schedule actually arrived -
+   * see draftInvoiceLine's allowInvoiceDateBeforePeriodYear. */
+  forced?: boolean;
+};
 
 /**
  * Due lines for a deal's *current* contract term: a one-time establishment
@@ -131,21 +139,26 @@ function computeDueLines(
   // jump the gun on the very next period's own lead time the same way
   // sendEstablishmentNow already does for the establishment fee - but only
   // the single next one, not every period in the rolling horizon at once.
+  // `forced` only actually means "jumped the gun" (isDue was still false) -
+  // a period that was already due gets included either way and isn't the
+  // one being forced, which matters now that `forced` also decides whether
+  // this line is allowed to bypass the year floor below.
   let forcedOnePeriod = false;
   periods.forEach((period, i) => {
     if (i < firstRelevantIndex) return;
     if (handledQuarterIndexes.has(period.index)) return;
     const isDue = period.draftTriggerDate <= now;
-    const forceThisOne = options.sendPeriodsNow && !forcedOnePeriod;
+    const forceThisOne = !isDue && Boolean(options.sendPeriodsNow) && !forcedOnePeriod;
     if (!isDue && !forceThisOne) {
       if (!nextDueDate || period.draftTriggerDate < nextDueDate) nextDueDate = period.draftTriggerDate;
       return;
     }
-    forcedOnePeriod = true;
+    if (forceThisOne) forcedOnePeriod = true;
     lines.push({
       quarterIndex: period.index,
       amount: amounts[i],
       scheduledDate: period.startDate,
+      forced: forceThisOne,
     });
   });
 
@@ -214,6 +227,24 @@ function buildInvoiceContent(
 }
 
 /**
+ * The Netto+8 date for a recurring period, floored so it never lands in a
+ * calendar year before the period itself starts - the only case this
+ * actually changes anything is a period starting 1 January, where
+ * scheduledDate-8-days would otherwise be 24 December the year before,
+ * mis-dating a new year's first invoice into the old year's accounts. See
+ * the AGENTS.md-adjacent note in invoice-schedule.ts for why the automatic
+ * scheduler avoids this case entirely rather than relying on this floor -
+ * this is the backstop for the one path that can still bypass that
+ * (sendPeriodsNow), when `allowBeforePeriodYear` isn't set.
+ */
+function computeRecurringInvoiceDate(periodStart: Date, allowBeforePeriodYear: boolean): Date {
+  const netto8Date = addDays(periodStart, -8);
+  if (allowBeforePeriodYear) return netto8Date;
+  const yearStart = new Date(periodStart.getFullYear(), 0, 1);
+  return netto8Date < yearStart ? yearStart : netto8Date;
+}
+
+/**
  * Attempts to draft one invoice line in Dinero and records the outcome on
  * its Invoice row. Shared by the bulk quarterly run and the single-invoice
  * "Prøv igen" retry, so both go through the exact same success/failure
@@ -225,21 +256,32 @@ function buildInvoiceContent(
  * carry forward the contact just created by an earlier line in the same
  * batch - otherwise a fresh contact might not show up yet in Dinero's own
  * CVR lookup by the time the very next line runs, creating a duplicate.
+ *
+ * `allowInvoiceDateBeforePeriodYear` - set when a seller manually forced this
+ * line via sendPeriodsNow (see computeDueLines' `forced`): they've
+ * deliberately chosen to send it ahead of schedule, so the old "always
+ * Netto+8" dating still applies instead of the automatic year floor.
  */
 async function draftInvoiceLine(
   deal: DraftableDeal,
   invoiceRow: { id: string; amount: number; quarterIndex: number; scheduledDate: Date },
-  contactGuidHint: string | null
+  contactGuidHint: string | null,
+  options: { allowInvoiceDateBeforePeriodYear?: boolean } = {}
 ): Promise<{ success: true; contactGuid: string } | { success: false; error: string }> {
   try {
     const { note, lines } = buildInvoiceContent(deal, invoiceRow.quarterIndex, invoiceRow.amount, invoiceRow.scheduledDate);
-    // For a recurring period, the Dinero invoice date must land the customer's
-    // Netto+8 due date exactly on the period's start date, regardless of which
-    // day the draft actually gets created on (drafts can now be made up to a
-    // month ahead - see computeBillingPeriods' draftTriggerDate). The
-    // one-off establishment fee has no such period to align to, so it's
-    // simply dated whenever it's actually drafted.
-    const invoiceDate = invoiceRow.quarterIndex === 0 ? new Date() : addDays(invoiceRow.scheduledDate, -8);
+    // For a recurring period, the Dinero invoice date is normally set so
+    // Netto+8 lands exactly on the period's start date, regardless of which
+    // day within the draft's eligible window it actually gets created on -
+    // except a period starting 1 January is floored to that same 1 January
+    // instead (see computeRecurringInvoiceDate), so its invoice can never be
+    // dated into the year before the service it covers. The one-off
+    // establishment fee has no such period to align to, so it's simply
+    // dated whenever it's actually drafted.
+    const invoiceDate =
+      invoiceRow.quarterIndex === 0
+        ? new Date()
+        : computeRecurringInvoiceDate(invoiceRow.scheduledDate, options.allowInvoiceDateBeforePeriodYear ?? false);
     const result = await createQuarterlyInvoiceDraft({
       existingContactGuid: contactGuidHint,
       companyName: deal.companyName,
@@ -348,7 +390,9 @@ async function processDealDueInvoices(
           },
         });
 
-    const result = await draftInvoiceLine(deal, invoiceRow, contactGuidHint);
+    const result = await draftInvoiceLine(deal, invoiceRow, contactGuidHint, {
+      allowInvoiceDateBeforePeriodYear: line.forced,
+    });
     if (result.success) {
       created++;
       contactGuidHint = result.contactGuid;

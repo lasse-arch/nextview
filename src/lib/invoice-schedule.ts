@@ -25,7 +25,7 @@ export type BillingPeriod = {
  * starting 1 October can be drafted anytime from 1 September) - giving
  * sellers room to prepare invoices ahead of time without having to wait
  * until the last minute. The invoice's actual Dinero date is a separate
- * concern (see `draftInvoiceLine` in invoice-service.ts): it's always set
+ * concern (see `draftInvoiceLine` in invoice-service.ts): it's normally set
  * so Netto+8 lands exactly on the period's start date, regardless of which
  * day within that eligible window the draft actually gets created. For a
  * billingStartDate already in the past (the overwhelmingly common case -
@@ -33,6 +33,18 @@ export type BillingPeriod = {
  * also already in the past, so the draft is simply due immediately either
  * way - the lead time only actually matters, and only ever helps, when
  * billingStartDate is set ahead of time for a future start.
+ *
+ * Exception: a period starting on 1 January would otherwise have its
+ * draftTriggerDate fall in December the year before (1 month back from
+ * January is December) - meaning the *automatic* scheduler could draft (and
+ * invoice-date, see invoice-service.ts) a new year's first quarter while
+ * it's still the old year. Revenue for a period belongs to the year it's
+ * delivered in regardless of invoice date, but there's no reason to invite
+ * the bookkeeping complication of a prepaid-revenue accrual entry when it's
+ * this easy to just not draft it early automatically - so the trigger date
+ * is floored at 1 January of the period's own start year. A seller can
+ * still jump ahead of this manually (see sendPeriodsNow in
+ * invoice-service.ts), same as they can for any other period's lead time.
  */
 export function computeBillingPeriods(billingStartDate: Date, bindingMonths: number, until: Date): BillingPeriod[] {
   const contractEnd = addMonths(billingStartDate, bindingMonths);
@@ -51,7 +63,9 @@ export function computeBillingPeriods(billingStartDate: Date, bindingMonths: num
       periodEnd = contractEnd;
     }
 
-    const draftTriggerDate = startOfMonth(subMonths(cursor, 1));
+    const oneMonthBack = startOfMonth(subMonths(cursor, 1));
+    const yearStart = new Date(cursor.getFullYear(), 0, 1);
+    const draftTriggerDate = oneMonthBack < yearStart ? yearStart : oneMonthBack;
 
     periods.push({ index, startDate: cursor, endDate: periodEnd, draftTriggerDate });
     cursor = addDays(periodEnd, 1);
