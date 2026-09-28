@@ -607,6 +607,20 @@ model TaskComment {
   createdAt DateTime @default(now())
 }
 
+/// One row per successful (billed) call to an external AI provider - used
+/// purely to enforce a daily usage cap (see checkAiNoteLimit in
+/// actions/ai-notes.ts), not shown anywhere in the UI. Only successful calls
+/// are recorded - a request rejected before it ever reached the provider
+/// (e.g. "not configured", empty e-mail) never actually cost anything, so it
+/// shouldn't count against the cap.
+model AiUsageEvent {
+  id        String   @id @default(cuid())
+  kind      String
+  createdAt DateTime @default(now())
+
+  @@index([kind, createdAt])
+}
+
 /// A saved search against the official CVR register (branche/kommune/aktiv-status) -
 /// can be run on demand ("Kør nu") and, when `enabled`, is re-run daily by the
 /// lead-generation cron so new matches (newly registered or newly-found
