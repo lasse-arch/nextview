@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { formatDateTime } from "@/lib/labels";
+import { suggestNoteFromEmailAction, saveEmailNoteSuggestion } from "@/lib/actions/ai-notes";
+import { useToast } from "@/components/toast";
 
 type Email = {
   id: string;
@@ -74,7 +76,86 @@ function DirectionAvatar({ direction }: { direction: "INBOUND" | "OUTBOUND" }) {
   );
 }
 
-function EmailRow({ email }: { email: Email }) {
+/**
+ * "AI-referat" on an e-mail's body - asks Claude for a short note suggestion,
+ * then shows it as an editable draft (same "review before it becomes real"
+ * pattern as the inline "Gem som ny skabelon" on the e-mail-compose form)
+ * rather than saving it straight away.
+ */
+function AiNoteSuggestion({ dealId, emailId }: { dealId: string; emailId: string }) {
+  const [suggesting, startSuggest] = useTransition();
+  const [saving, startSave] = useTransition();
+  const [draft, setDraft] = useState<string | null>(null);
+  const showToast = useToast();
+
+  function generate() {
+    startSuggest(async () => {
+      const result = await suggestNoteFromEmailAction(emailId);
+      if (!result.ok) {
+        showToast(result.error);
+        return;
+      }
+      setDraft(result.suggestion);
+    });
+  }
+
+  function save() {
+    if (draft === null) return;
+    startSave(async () => {
+      const result = await saveEmailNoteSuggestion(dealId, draft);
+      if (!result.ok) {
+        showToast(result.error);
+        return;
+      }
+      showToast("Note gemt.");
+      setDraft(null);
+    });
+  }
+
+  if (draft === null) {
+    return (
+      <button
+        type="button"
+        onClick={generate}
+        disabled={suggesting}
+        className="mt-2.5 inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+      >
+        ✨ {suggesting ? "Laver referat…" : "AI-referat til note"}
+      </button>
+    );
+  }
+
+  return (
+    <div className="mt-2.5 rounded-lg border border-violet-200 bg-violet-50/50 p-2.5">
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-violet-700">Forslag til note</p>
+      <textarea
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        rows={3}
+        className="mt-1.5 w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-700"
+      />
+      <div className="mt-2 flex gap-2">
+        <button
+          type="button"
+          onClick={save}
+          disabled={saving}
+          className="rounded-md bg-slate-900 px-2.5 py-1 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+        >
+          {saving ? "Gemmer…" : "Gem som note"}
+        </button>
+        <button
+          type="button"
+          onClick={() => setDraft(null)}
+          className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-white"
+        >
+          Annullér
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function EmailRow({ dealId, email }: { dealId: string; email: Email }) {
   const [open, setOpen] = useState(false);
   const counterparty = email.direction === "INBOUND" ? email.fromAddress : email.toAddresses;
 
@@ -126,17 +207,18 @@ function EmailRow({ email }: { email: Email }) {
       {open && email.bodyText && (
         <div className="border-t border-slate-100 bg-slate-50/60 px-3.5 py-3 pl-[3.25rem]">
           <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{email.bodyText}</p>
+          <AiNoteSuggestion dealId={dealId} emailId={email.id} />
         </div>
       )}
     </li>
   );
 }
 
-export function EmailList({ emails }: { emails: Email[] }) {
+export function EmailList({ dealId, emails }: { dealId: string; emails: Email[] }) {
   return (
     <ul className="mt-4 space-y-2.5">
       {emails.map((email) => (
-        <EmailRow key={email.id} email={email} />
+        <EmailRow key={email.id} dealId={dealId} email={email} />
       ))}
       {emails.length === 0 && (
         <p className="text-sm text-slate-400">

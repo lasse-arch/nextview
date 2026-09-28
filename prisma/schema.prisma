@@ -43,6 +43,7 @@ enum DealStage {
 enum NoteKind {
   MANUAL
   AI_MEETING
+  AI_EMAIL
 }
 
 enum GoalMetric {

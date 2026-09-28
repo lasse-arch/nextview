@@ -130,6 +130,7 @@ export const importTypeLabels: Record<string, string> = {
 export const noteKindLabels: Record<string, string> = {
   MANUAL: "Note",
   AI_MEETING: "AI-mødenote",
+  AI_EMAIL: "AI-mailreferat",
 };
 
 export const commissionFrequencyLabels: Record<string, string> = {

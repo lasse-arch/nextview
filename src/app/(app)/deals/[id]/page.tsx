@@ -382,7 +382,7 @@ export default async function DealDetailPage({
               templates={emailTemplates}
               teamMembers={users.filter((u) => u.id !== currentUser?.id).map((u) => ({ id: u.id, name: u.name }))}
             />
-            <EmailList emails={deal.emails} />
+            <EmailList dealId={deal.id} emails={deal.emails} />
           </section>
         </div>
 
