@@ -222,7 +222,7 @@ export function EmailList({ dealId, emails }: { dealId: string; emails: Email[] 
       ))}
       {emails.length === 0 && (
         <p className="text-sm text-slate-400">
-          Ingen mails endnu. Forbind Gmail/Outlook under Indstillinger → E-mail for at aktivere automatisk match.
+          Ingen mails endnu. Forbind Gmail under Indstillinger → E-mail for at aktivere automatisk match.
         </p>
       )}
     </ul>

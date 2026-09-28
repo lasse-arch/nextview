@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { disconnectEmailAccount } from "@/lib/actions/email";
-import { isGoogleConfigured, isMicrosoftConfigured } from "@/lib/email-oauth";
+import { isGoogleConfigured } from "@/lib/email-oauth";
 import { isIntegrationEnabled } from "@/lib/integration-settings";
 import { formatDate } from "@/lib/labels";
 import { SyncNowButton } from "./sync-now-button";
@@ -9,11 +9,8 @@ import { IntegrationToggle } from "../integration-toggle";
 
 const errorMessages: Record<string, string> = {
   google_not_configured: "Google-integration er ikke konfigureret endnu (mangler GOOGLE_CLIENT_ID/SECRET).",
-  microsoft_not_configured: "Outlook-integration er ikke konfigureret endnu (mangler MICROSOFT_CLIENT_ID/SECRET).",
   google_denied: "Google-godkendelse blev afbrudt eller afvist.",
-  microsoft_denied: "Microsoft-godkendelse blev afbrudt eller afvist.",
   google_failed: "Der opstod en fejl under forbindelse til Google.",
-  microsoft_failed: "Der opstod en fejl under forbindelse til Microsoft.",
 };
 
 export default async function EmailSettingsPage({
@@ -27,27 +24,23 @@ export default async function EmailSettingsPage({
 
   const accounts = await prisma.emailAccount.findMany({ where: { userId: user.id } });
   const google = accounts.find((a) => a.provider === "GOOGLE");
-  const microsoft = accounts.find((a) => a.provider === "MICROSOFT");
   const anyGoogleConnected = await prisma.emailAccount.findFirst({ where: { provider: "GOOGLE" } });
   const driveEnabled = await isIntegrationEnabled("GOOGLE_DRIVE");
 
   const disconnectGoogle = disconnectEmailAccount.bind(null, "GOOGLE");
-  const disconnectMicrosoft = disconnectEmailAccount.bind(null, "MICROSOFT");
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
         <h1 className="text-2xl font-semibold text-slate-900">E-mail-integration</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Forbind din Gmail eller Outlook-konto, så mails sendt til en deals e-mailadresse automatisk vises på
-          dealen for hele teamet.
+          Forbind din Gmail-konto, så mails sendt til en deals e-mailadresse automatisk vises på dealen for hele
+          teamet.
         </p>
       </div>
 
       {connected && (
-        <div className="rounded-md bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-          {connected === "google" ? "Gmail" : "Outlook"} blev forbundet.
-        </div>
+        <div className="rounded-md bg-emerald-50 px-4 py-3 text-sm text-emerald-700">Gmail blev forbundet.</div>
       )}
       {error && <div className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">{errorMessages[error] ?? error}</div>}
 
@@ -111,42 +104,6 @@ export default async function EmailSettingsPage({
         )}
       </section>
 
-      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-sm font-semibold text-slate-900">Outlook (Microsoft)</h2>
-            {microsoft ? (
-              <p className="mt-1 text-sm text-slate-600">
-                Forbundet som <span className="font-medium">{microsoft.email}</span> · siden{" "}
-                {formatDate(microsoft.connectedAt)}
-              </p>
-            ) : (
-              <p className="mt-1 text-sm text-slate-400">Ikke forbundet endnu.</p>
-            )}
-          </div>
-          {microsoft ? (
-            <form action={disconnectMicrosoft}>
-              <button type="submit" className="rounded-md border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-50">
-                Afbryd
-              </button>
-            </form>
-          ) : (
-            <a
-              href="/api/integrations/microsoft/authorize"
-              className="rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-800"
-            >
-              Forbind Outlook
-            </a>
-          )}
-        </div>
-        {!isMicrosoftConfigured() && (
-          <p className="mt-3 text-xs text-amber-600">
-            Kræver MICROSOFT_CLIENT_ID og MICROSOFT_CLIENT_SECRET i miljøvariabler (App Registration i Azure Portal,
-            redirect-URI: <span className="font-mono">{"{APP_BASE_URL}"}/api/integrations/microsoft/callback</span>).
-          </p>
-        )}
-      </section>
-
       {google && (
         <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           <h2 className="text-sm font-semibold text-slate-900">Indgående mails</h2>
@@ -162,9 +119,7 @@ export default async function EmailSettingsPage({
       )}
 
       <p className="text-xs text-slate-400">
-        Når I har oprettet OAuth-app&apos;erne, tilføjer I nøglerne i serverens miljøvariabler (.env) og genstarter.
-        Indgående mail-matching virker for Gmail. Outlook-forbindelsen (login + kalender) virker, men mail-matching
-        for Outlook er endnu ikke bygget.
+        Når I har oprettet OAuth-app&apos;en, tilføjer I nøglerne i serverens miljøvariabler (.env) og genstarter.
       </p>
     </div>
   );
