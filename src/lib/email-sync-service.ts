@@ -160,7 +160,7 @@ export async function syncInboundEmails(): Promise<EmailSyncSummary> {
   });
   const dealIdByEmail = new Map<string, string>();
   for (const d of deals) {
-    if (d.contactEmail) dealIdByEmail.set(d.contactEmail.toLowerCase(), d.id);
+    if (d.contactEmail) dealIdByEmail.set(d.contactEmail.trim().toLowerCase(), d.id);
   }
 
   let matched = 0;
