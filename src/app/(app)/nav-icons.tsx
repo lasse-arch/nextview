@@ -114,6 +114,15 @@ export function IconPhone({ className }: { className?: string }) {
   );
 }
 
+export function IconMegaphone({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 11v2a2 2 0 0 0 2 2h1l1 5h2l-1-5h2l8 4V7l-8 4H5a2 2 0 0 0-2 2z" />
+      <path d="M18 9v6M21 8v8" />
+    </svg>
+  );
+}
+
 export function IconRadar({ className }: { className?: string }) {
   return (
     <svg className={className} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">

@@ -169,6 +169,10 @@ model User {
   /// about who's actually using the CRM day to day.
   lastActiveAt      DateTime?
   createdAt         DateTime            @default(now())
+  /// When this user last opened /nyheder - posts created after this are
+  /// counted as unread for the little badge on the news icon. Null means
+  /// "never opened it", so every post ever made counts as unread.
+  newsReadAt        DateTime?
 
   deals         Deal[]         @relation("DealOwner")
   notes         Note[]
@@ -186,6 +190,7 @@ model User {
   watchedUrls   WatchedUrl[]
   emailTemplates EmailTemplate[]
   callLists     CallList[]
+  newsPosts     NewsPost[]
 }
 
 /// One entry per notable thing that happened in the CRM (deal created,
@@ -244,6 +249,25 @@ model CallList {
   createdAt   DateTime @default(now())
 
   deals Deal[]
+}
+
+/// A "what's new" post shown on the /nyheder blog - lets an admin announce a
+/// new feature to the rest of the team (with an optional screenshot and
+/// usage notes) instead of explaining it ad hoc, and drives the unread-badge
+/// on the header's news icon.
+model NewsPost {
+  id            String   @id @default(cuid())
+  title         String
+  body          String
+  /// Small resized screenshot, stored the same way as User.avatarUrl (a data
+  /// URL, client-side resized before upload) - no file storage needed for
+  /// the modest volume of feature-announcement screenshots this produces.
+  screenshotUrl String?
+
+  createdBy   User   @relation(fields: [createdById], references: [id])
+  createdById String
+
+  createdAt DateTime @default(now())
 }
 
 model ImportBatch {

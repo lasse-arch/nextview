@@ -9,11 +9,15 @@ import { SidebarNav, type SidebarNavItem } from "./sidebar-nav";
 import { MobileNav } from "./mobile-nav";
 import { PresentationModeToggle } from "./presentation-mode-toggle";
 import { isPresentationMode } from "@/lib/presentation-mode";
+import { NewsBell } from "./news-bell";
+import { getUnreadNewsCount } from "@/lib/actions/news";
 import { IconHome, IconDeals, IconUsers, IconPercent, IconGrowth, IconTasks, IconStats, IconCalendar, IconRadar, IconPhone } from "./nav-icons";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const [user, presenting] = await Promise.all([getCurrentUser(), isPresentationMode()]);
   if (!user) redirect("/login");
+
+  const unreadNewsCount = await getUnreadNewsCount(user.id, user.newsReadAt ?? null);
 
   const navItems: SidebarNavItem[] = [
     { href: "/", label: "Oversigt", icon: <IconHome /> },
@@ -94,6 +98,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           />
 
           <div className="flex items-center justify-end gap-2.5 px-4 pt-4 sm:px-6 md:px-10 md:pt-6">
+            <NewsBell unreadCount={unreadNewsCount} />
             <PresentationModeToggle enabled={presenting} />
             <Link
               href="/deals/new"
