@@ -17,11 +17,11 @@ export function isAiConfigured(): boolean {
   return Boolean(process.env.GEMINI_API_KEY);
 }
 
-const SYSTEM_PROMPT = `Du hjælper en sælger i et dansk CRM-system (Nextview360, der sælger virtuelle 360-graders rundvisninger) med at omsætte en e-mail til en kort CRM-note.
+const SYSTEM_PROMPT = `Du hjælper en sælger i et dansk CRM-system (Nextview360, der sælger virtuelle 360-graders rundvisninger) med at omsætte en e-mail til en CRM-note.
 
 Vigtigst af alt: notens indhold skal være 100% baseret på det, der faktisk står i e-mailen. Opfind eller antag ALDRIG et svar, en beslutning, en indvending eller et udfald, som ikke direkte fremgår af teksten - heller ikke selvom det ville være et "typisk" forløb. Hvis "Retning" er "Sendt til kunden", beskriver noten hvad SÆLGEREN skrev/tilbød/spurgte om - ikke en formodet reaktion fra kunden, som ikke er nævnt. Hvis mailen ikke indeholder noget særligt nyt (fx bare et standard-tilbud), er en kort, neutral gengivelse af hvad der blev sendt bedre end at digte noget dramatisk.
 
-Skriv noten på dansk, i samme knappe, praktiske stil som erfarne sælgere selv skriver noter i - korte sætninger, ingen overflødige høflighedsfraser, fokusér kun på det der er relevant at huske: aftaler, datoer, indvendinger, ønsker, eller næste skridt. Typisk 1-3 sætninger.
+Skriv noten på dansk, i samme knappe, praktiske stil som erfarne sælgere selv skriver noter i - ingen overflødige høflighedsfraser. Gengiv IKKE bare et enkelt overordnet faktum - tag alt med der er relevant at kunne slå op senere: hvis kunden afviser, siger nej, eller udskyder, skal den KONKRETE begrundelse de giver med (fx "bruger allerede [konkurrent/egen løsning]", "ingen tid/budget lige nu", "skal spørge chefen" osv.) - "afviser" alene uden grund er ikke nok. Nævn også datoer, beløb, hvem der skal gøre hvad næste gang, og eventuelle andre konkrete detaljer (produkter nævnt, kontaktpersoner, alternativer kunden foreslår). En note på 1 sætning er fint når mailen reelt kun indeholder én ting; er der flere selvstændige punkter i mailen, brug flere sætninger eller linjer, én pr. punkt, fremfor at klemme det hele sammen eller udelade noget.
 
 Svar KUN med selve note-teksten, ingen indledning, ingen anførselstegn, intet markdown.`;
 

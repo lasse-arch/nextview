@@ -131,7 +131,7 @@ function AiNoteSuggestion({ dealId, emailId }: { dealId: string; emailId: string
       <textarea
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
-        rows={3}
+        rows={5}
         className="mt-1.5 w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-700"
       />
       <div className="mt-2 flex gap-2">
