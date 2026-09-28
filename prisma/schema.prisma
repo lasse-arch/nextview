@@ -717,6 +717,15 @@ model WatchedUrl {
   lastScannedAt   DateTime?
   lastContentHash String?
 
+  /// Results of the most recent scan - shown on the "Overvågede sider" row so
+  /// it's obvious what a scan actually turned up, not just that one happened.
+  /// All null until the first scan runs; `lastError` is cleared on the next
+  /// successful scan, so a stale failure doesn't linger forever once fixed.
+  lastCvrCount         Int?
+  lastArticlesScanned  Int?
+  lastAddedCount       Int?
+  lastError            String?
+
   createdBy   User   @relation(fields: [createdById], references: [id])
   createdById String
 

@@ -57,6 +57,10 @@ export default async function LeadGenerationPage() {
           label: w.label,
           enabled: w.enabled,
           lastScannedAt: w.lastScannedAt ? w.lastScannedAt.toISOString() : null,
+          lastCvrCount: w.lastCvrCount,
+          lastArticlesScanned: w.lastArticlesScanned,
+          lastAddedCount: w.lastAddedCount,
+          lastError: w.lastError,
         }))}
       />
 

@@ -123,10 +123,22 @@ export async function runWatchedUrl(
   const watched = await prisma.watchedUrl.findUniqueOrThrow({ where: { id: watchedUrlId } });
 
   const scan = await scanUrlForCvrLeads(watched.url);
-  if (!scan.ok) return scan;
+  if (!scan.ok) {
+    await prisma.watchedUrl.update({ where: { id: watchedUrlId }, data: { lastScannedAt: new Date(), lastError: scan.error } });
+    return scan;
+  }
 
   if (scan.contentHash === watched.lastContentHash) {
-    await prisma.watchedUrl.update({ where: { id: watchedUrlId }, data: { lastScannedAt: new Date() } });
+    await prisma.watchedUrl.update({
+      where: { id: watchedUrlId },
+      data: {
+        lastScannedAt: new Date(),
+        lastCvrCount: scan.cvrNumbers.length,
+        lastArticlesScanned: scan.articlesScanned,
+        lastAddedCount: 0,
+        lastError: null,
+      },
+    });
     return { ok: true, added: 0, unchanged: true };
   }
 
@@ -158,7 +170,14 @@ export async function runWatchedUrl(
 
   await prisma.watchedUrl.update({
     where: { id: watchedUrlId },
-    data: { lastScannedAt: new Date(), lastContentHash: scan.contentHash },
+    data: {
+      lastScannedAt: new Date(),
+      lastContentHash: scan.contentHash,
+      lastCvrCount: scan.cvrNumbers.length,
+      lastArticlesScanned: scan.articlesScanned,
+      lastAddedCount: fresh.length,
+      lastError: null,
+    },
   });
 
   return { ok: true, added: fresh.length, unchanged: false };

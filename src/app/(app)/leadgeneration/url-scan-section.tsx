@@ -16,6 +16,10 @@ export type WatchedUrlData = {
   label: string | null;
   enabled: boolean;
   lastScannedAt: string | null;
+  lastCvrCount: number | null;
+  lastArticlesScanned: number | null;
+  lastAddedCount: number | null;
+  lastError: string | null;
 };
 
 function formatRelative(iso: string | null): string {
@@ -25,6 +29,27 @@ function formatRelative(iso: string | null): string {
   if (hours < 24) return `Scannet for ${hours} t. siden`;
   const days = Math.round(hours / 24);
   return `Scannet for ${days} dag${days === 1 ? "" : "e"} siden`;
+}
+
+/** What the last scan actually found - shown under the relative-time line so
+ * "Scannet for lidt siden" doesn't sit there with no indication of the
+ * result, which was easy to mistake for the scan not having found anything
+ * at all (or not having run properly). */
+function lastResultSummary(watched: WatchedUrlData): string | null {
+  if (watched.lastError) return null; // shown separately, in red
+  if (watched.lastCvrCount === null) return null; // never scanned yet
+  if (watched.lastCvrCount === 0) return "Ingen CVR-numre fundet på siden";
+
+  const articlesSuffix =
+    watched.lastArticlesScanned && watched.lastArticlesScanned > 0
+      ? ` (${watched.lastArticlesScanned} artikel${watched.lastArticlesScanned === 1 ? "" : "er"} gennemsøgt)`
+      : "";
+  const addedSuffix =
+    watched.lastAddedCount && watched.lastAddedCount > 0
+      ? ` · ${watched.lastAddedCount} ny${watched.lastAddedCount === 1 ? "t" : "e"} lead${watched.lastAddedCount === 1 ? "" : "s"} - se nedenfor under "Fundne leads"`
+      : " · ingen nye (allerede kendt eller uændret)";
+
+  return `${watched.lastCvrCount} CVR-nummer${watched.lastCvrCount === 1 ? "" : "e"} fundet${articlesSuffix}${addedSuffix}`;
 }
 
 function WatchedUrlRow({ watched }: { watched: WatchedUrlData }) {
@@ -58,6 +83,13 @@ function WatchedUrlRow({ watched }: { watched: WatchedUrlData }) {
         <p className="truncate font-medium text-slate-900">{watched.label || watched.url}</p>
         {watched.label && <p className="truncate text-xs text-slate-500">{watched.url}</p>}
         <p className="mt-0.5 text-xs text-slate-400">{formatRelative(watched.lastScannedAt)}</p>
+        {watched.lastError ? (
+          <p className="mt-0.5 text-xs text-red-600" title={watched.lastError}>
+            Sidste scan fejlede: {watched.lastError}
+          </p>
+        ) : (
+          lastResultSummary(watched) && <p className="mt-0.5 text-xs text-slate-500">{lastResultSummary(watched)}</p>
+        )}
       </div>
       <div className="flex shrink-0 items-center gap-1.5">
         <label className="flex items-center gap-1.5 text-xs text-slate-500" title="Scan automatisk hver dag">
