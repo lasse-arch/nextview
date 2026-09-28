@@ -4,10 +4,15 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createCallList, addLeadsToCallList, deleteCallList } from "@/lib/actions/call-lists";
-import { updateDealStage, setMeetingDateAndStage } from "@/lib/actions/deals";
+import { updateDealStage, setMeetingDateAndStage, renameDeal } from "@/lib/actions/deals";
+import { addDealItem } from "@/lib/actions/deal-items";
 import { dealName, stageLabels } from "@/lib/labels";
 import { useToast } from "@/components/toast";
 import type { DealStage } from "@prisma/client";
+
+// Same 4 fixed products as the deal-page's own quick-add (deal-items-section.tsx)
+// - kept in sync there since there's no shared source of truth for it yet.
+const PRODUCT_SUGGESTIONS = ["Visitkort", "Drone-optagelse", "Nextview360 Tour", "Hjemmeside"];
 
 type CallListSummary = { id: string; name: string; openCount: number };
 type QueueDeal = {
@@ -159,7 +164,44 @@ function QueueCard({ deal }: { deal: QueueDeal }) {
   const [bookingMeeting, setBookingMeeting] = useState(false);
   const [meetingDateInput, setMeetingDateInput] = useState("");
   const [gone, setGone] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [nameInput, setNameInput] = useState(dealName(deal));
+  const [displayedName, setDisplayedName] = useState(dealName(deal));
+  const [addedProducts, setAddedProducts] = useState<string[]>([]);
+  const router = useRouter();
   const showToast = useToast();
+
+  function saveName() {
+    const trimmed = nameInput.trim();
+    if (!trimmed || trimmed === displayedName) {
+      setEditingName(false);
+      return;
+    }
+    startTransition(async () => {
+      try {
+        await renameDeal(deal.id, trimmed);
+        setDisplayedName(trimmed);
+        setEditingName(false);
+      } catch (err) {
+        showToast(err instanceof Error ? err.message : "Kunne ikke omdøbe.");
+      }
+    });
+  }
+
+  function addProduct(product: string) {
+    startTransition(async () => {
+      const formData = new FormData();
+      formData.set("productType", product);
+      const result = await addDealItem(deal.id, formData);
+      if (!result.ok) {
+        showToast(result.error);
+        return;
+      }
+      setAddedProducts((prev) => [...prev, product]);
+      showToast(`${product} tilføjet`);
+      router.refresh();
+    });
+  }
 
   function markLost() {
     if (!confirm(`Markér ${dealName(deal)} som tabt?`)) return;
@@ -195,9 +237,43 @@ function QueueCard({ deal }: { deal: QueueDeal }) {
     <li className="rounded-xl border border-slate-200 bg-white p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <Link href={`/deals/${deal.id}`} className="font-semibold text-slate-900 hover:underline">
-            {dealName(deal)}
-          </Link>
+          {editingName ? (
+            <div className="flex items-center gap-1.5">
+              <input
+                value={nameInput}
+                onChange={(e) => setNameInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") saveName();
+                  if (e.key === "Escape") setEditingName(false);
+                }}
+                autoFocus
+                className="rounded-md border border-slate-300 px-2 py-1 text-sm font-semibold text-slate-900"
+              />
+              <button type="button" onClick={saveName} disabled={busy} className="text-xs font-medium text-slate-900 hover:underline">
+                Gem
+              </button>
+              <button type="button" onClick={() => setEditingName(false)} className="text-xs text-slate-400 hover:text-slate-600">
+                Annullér
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5">
+              <Link href={`/deals/${deal.id}`} className="font-semibold text-slate-900 hover:underline">
+                {displayedName}
+              </Link>
+              <button
+                type="button"
+                onClick={() => {
+                  setNameInput(displayedName);
+                  setEditingName(true);
+                }}
+                title="Skift navn"
+                className="text-slate-300 hover:text-slate-600"
+              >
+                ✏️
+              </button>
+            </div>
+          )}
           <p className="mt-0.5 text-xs text-slate-500">
             {[deal.cvrNumber ? `CVR ${deal.cvrNumber}` : null, deal.address].filter(Boolean).join(" · ") || "Ingen adresse"}
           </p>
@@ -205,6 +281,28 @@ function QueueCard({ deal }: { deal: QueueDeal }) {
             {[deal.contactName, deal.contactPhone, deal.contactEmail].filter(Boolean).join(" · ") || "Ingen kontaktoplysninger endnu"}
           </p>
           <p className="mt-1 text-[11px] font-medium uppercase tracking-wide text-slate-400">{stageLabels[deal.stage]}</p>
+
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {PRODUCT_SUGGESTIONS.map((product) => {
+              const added = addedProducts.includes(product);
+              return (
+                <button
+                  key={product}
+                  type="button"
+                  onClick={() => addProduct(product)}
+                  disabled={busy || added}
+                  className={`rounded-full border px-2 py-0.5 text-[11px] font-medium disabled:opacity-60 ${
+                    added
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                      : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
+                  }`}
+                >
+                  {added ? "✓ " : "+ "}
+                  {product}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {!bookingMeeting ? (

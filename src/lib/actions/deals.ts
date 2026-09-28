@@ -600,6 +600,20 @@ export async function addNote(
   return { ok: true };
 }
 
+/** Quick inline rename (e.g. from the Ringeliste queue, where a lead often
+ * starts out named after a guessed URL slug) - sets displayName rather than
+ * touching companyName, so a CVR-verified legal name is never overwritten. */
+export async function renameDeal(dealId: string, name: string) {
+  await requireUser();
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error("Navnet må ikke være tomt.");
+
+  await prisma.deal.update({ where: { id: dealId }, data: { displayName: trimmed } });
+  revalidatePath("/deals");
+  revalidatePath("/ringeliste");
+  revalidatePath(`/deals/${dealId}`);
+}
+
 /** Used by the board view's Quick-note popup - adds a note without navigating away. */
 export async function addQuickNote(dealId: string, body: string) {
   const user = await requireUser();

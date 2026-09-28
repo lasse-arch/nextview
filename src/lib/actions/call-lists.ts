@@ -9,6 +9,9 @@ import { findDuplicateDeals } from "@/lib/duplicates";
 import { logActivity } from "@/lib/activity";
 import { dealName } from "@/lib/labels";
 import { parseCallListText, guessNameFromUrl } from "@/lib/call-list-parser";
+import { scrapeBasicContactInfo } from "@/lib/website-contact-scrape";
+
+const SOCIAL_LINK_PATTERN = /facebook\.com|instagram\.com|linkedin\.com/i;
 
 function defaultListName(): string {
   const formatted = new Intl.DateTimeFormat("da-DK", {
@@ -74,8 +77,18 @@ export async function addLeadsToCallList(
         companyName = `CVR ${line.cvrNumber}`;
         cvrNumber = line.cvrNumber;
       }
-    } else if (line.url) {
+    } else if (line.url && SOCIAL_LINK_PATTERN.test(line.url)) {
+      // Facebook/Instagram/LinkedIn pages are client-rendered/login-walled -
+      // scraping them wouldn't find anything real, so just guess from the slug.
       companyName = guessNameFromUrl(line.url);
+    } else if (line.url) {
+      // A plain business website has no official register to ask, unlike a
+      // CVR number - a best-effort scrape of its front page is the closest
+      // equivalent (see website-contact-scrape.ts for what it can/can't find).
+      const scraped = await scrapeBasicContactInfo(line.url);
+      companyName = scraped.name || guessNameFromUrl(line.url);
+      contactPhone = scraped.phone;
+      contactName = scraped.ownerName;
     } else {
       companyName = line.raw.slice(0, 120);
     }
