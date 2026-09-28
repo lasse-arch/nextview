@@ -159,6 +159,14 @@ export async function POST(request: NextRequest) {
           where: { id: deal.id },
           data: { contractStatus: "VIEWED", contractViewedAt: changedAt },
         });
+        // Only the first open, same as contractViewedAt itself - otherwise a
+        // customer opening it several times before signing would flood the
+        // dashboard feed with repeat entries.
+        await logActivity({
+          type: "CONTRACT_VIEWED",
+          message: `${dealName(deal)} åbnede kontrakten`,
+          dealId: deal.id,
+        });
       }
     }
   } else if (type === "form.completed" && isCustomer) {
