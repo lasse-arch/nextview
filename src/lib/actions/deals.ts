@@ -614,6 +614,19 @@ export async function renameDeal(dealId: string, name: string) {
   revalidatePath(`/deals/${dealId}`);
 }
 
+/** Quick inline phone-number add/edit from the Ringeliste queue, where a
+ * scraped or Facebook/CVR-guessed lead often starts out with none. */
+export async function updateDealPhone(dealId: string, phone: string) {
+  await requireUser();
+  const trimmed = phone.trim();
+  if (!trimmed) throw new Error("Telefonnummeret må ikke være tomt.");
+
+  await prisma.deal.update({ where: { id: dealId }, data: { contactPhone: trimmed } });
+  revalidatePath("/deals");
+  revalidatePath("/ringeliste");
+  revalidatePath(`/deals/${dealId}`);
+}
+
 /** Used by the board view's Quick-note popup - adds a note without navigating away. */
 export async function addQuickNote(dealId: string, body: string) {
   const user = await requireUser();

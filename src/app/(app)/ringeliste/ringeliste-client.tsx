@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createCallList, addLeadsToCallList, deleteCallList } from "@/lib/actions/call-lists";
-import { updateDealStage, setMeetingDateAndStage, renameDeal } from "@/lib/actions/deals";
+import { updateDealStage, setMeetingDateAndStage, renameDeal, updateDealPhone } from "@/lib/actions/deals";
 import { addDealItem } from "@/lib/actions/deal-items";
 import { dealName, stageLabels } from "@/lib/labels";
 import { useToast } from "@/components/toast";
@@ -167,6 +167,9 @@ function QueueCard({ deal }: { deal: QueueDeal }) {
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState(dealName(deal));
   const [displayedName, setDisplayedName] = useState(dealName(deal));
+  const [editingPhone, setEditingPhone] = useState(false);
+  const [phoneInput, setPhoneInput] = useState(deal.contactPhone ?? "");
+  const [displayedPhone, setDisplayedPhone] = useState(deal.contactPhone);
   const [addedProducts, setAddedProducts] = useState<string[]>([]);
   const router = useRouter();
   const showToast = useToast();
@@ -184,6 +187,23 @@ function QueueCard({ deal }: { deal: QueueDeal }) {
         setEditingName(false);
       } catch (err) {
         showToast(err instanceof Error ? err.message : "Kunne ikke omdøbe.");
+      }
+    });
+  }
+
+  function savePhone() {
+    const trimmed = phoneInput.trim();
+    if (!trimmed) {
+      setEditingPhone(false);
+      return;
+    }
+    startTransition(async () => {
+      try {
+        await updateDealPhone(deal.id, trimmed);
+        setDisplayedPhone(trimmed);
+        setEditingPhone(false);
+      } catch (err) {
+        showToast(err instanceof Error ? err.message : "Kunne ikke gemme telefonnummeret.");
       }
     });
   }
@@ -277,9 +297,51 @@ function QueueCard({ deal }: { deal: QueueDeal }) {
           <p className="mt-0.5 text-xs text-slate-500">
             {[deal.cvrNumber ? `CVR ${deal.cvrNumber}` : null, deal.address].filter(Boolean).join(" · ") || "Ingen adresse"}
           </p>
-          <p className="mt-0.5 text-xs text-slate-500">
-            {[deal.contactName, deal.contactPhone, deal.contactEmail].filter(Boolean).join(" · ") || "Ingen kontaktoplysninger endnu"}
-          </p>
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-slate-500">
+            {[deal.contactName, deal.contactEmail].filter(Boolean).length > 0 && (
+              <span>{[deal.contactName, deal.contactEmail].filter(Boolean).join(" · ")}</span>
+            )}
+            {editingPhone ? (
+              <span className="inline-flex items-center gap-1">
+                <input
+                  value={phoneInput}
+                  onChange={(e) => setPhoneInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") savePhone();
+                    if (e.key === "Escape") setEditingPhone(false);
+                  }}
+                  autoFocus
+                  placeholder="Telefonnummer"
+                  className="w-32 rounded-md border border-slate-300 px-1.5 py-0.5 text-xs"
+                />
+                <button type="button" onClick={savePhone} disabled={busy} className="font-medium text-slate-900 hover:underline">
+                  Gem
+                </button>
+                <button type="button" onClick={() => setEditingPhone(false)} className="text-slate-400 hover:text-slate-600">
+                  Annullér
+                </button>
+              </span>
+            ) : displayedPhone ? (
+              // Once a phone number is added it's shown "marked" (a filled green
+              // badge) instead of plain text, so it's visibly done during a fast
+              // calling session - click it to correct a typo.
+              <button
+                type="button"
+                onClick={() => {
+                  setPhoneInput(displayedPhone);
+                  setEditingPhone(true);
+                }}
+                title="Ret telefonnummer"
+                className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/10 hover:bg-emerald-100"
+              >
+                ☎ {displayedPhone}
+              </button>
+            ) : (
+              <button type="button" onClick={() => setEditingPhone(true)} className="text-xs text-slate-400 underline hover:text-slate-600">
+                + Tilføj telefon
+              </button>
+            )}
+          </div>
           <p className="mt-1 text-[11px] font-medium uppercase tracking-wide text-slate-400">{stageLabels[deal.stage]}</p>
 
           <div className="mt-2 flex flex-wrap gap-1.5">
