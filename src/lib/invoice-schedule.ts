@@ -1,4 +1,7 @@
-import { addMonths, subMonths, addDays, endOfQuarter, startOfMonth, endOfMonth, differenceInCalendarDays } from "date-fns";
+import { addMonths, addDays, subDays, endOfQuarter, startOfMonth, endOfMonth, differenceInCalendarDays } from "date-fns";
+
+/** How many days before a period starts its draft is allowed to be created. */
+const DRAFT_LEAD_TIME_DAYS = 7;
 
 export type BillingPeriod = {
   /** 1-based sequential order within the term (never a literal calendar quarter number). */
@@ -21,9 +24,9 @@ export type BillingPeriod = {
  *
  * Every period - including the first - is due on the 1st of the quarter it
  * covers. `draftTriggerDate` is when a draft is *allowed* to be created for
- * it - from the 1st of the preceding calendar month onwards (e.g. a quarter
- * starting 1 October can be drafted anytime from 1 September) - giving
- * sellers room to prepare invoices ahead of time without having to wait
+ * it - DRAFT_LEAD_TIME_DAYS before it starts (e.g. a quarter starting
+ * 1 October can be drafted from 24 September onwards) - giving sellers a
+ * little room to prepare invoices ahead of time without having to wait
  * until the last minute. The invoice's actual Dinero date is a separate
  * concern (see `computeRecurringInvoiceDate` in invoice-service.ts): it's
  * normally set so Netto+8 lands exactly on the period's start date,
@@ -55,7 +58,7 @@ export function computeBillingPeriods(billingStartDate: Date, bindingMonths: num
       periodEnd = contractEnd;
     }
 
-    const draftTriggerDate = startOfMonth(subMonths(cursor, 1));
+    const draftTriggerDate = subDays(cursor, DRAFT_LEAD_TIME_DAYS);
 
     periods.push({ index, startDate: cursor, endDate: periodEnd, draftTriggerDate });
     cursor = addDays(periodEnd, 1);

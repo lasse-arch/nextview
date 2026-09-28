@@ -45,9 +45,9 @@ type DueLine = { quarterIndex: number; amount: number; scheduledDate: Date };
 /**
  * Due lines for a deal's *current* contract term: a one-time establishment
  * fee (quarterIndex 0) plus calendar-quarter-aligned recurring periods
- * (quarterIndex 1+), each draftable from the 1st of the month before it
- * starts (see computeBillingPeriods). Only lines whose trigger date has
- * passed are returned.
+ * (quarterIndex 1+), each draftable a short lead time before it starts (see
+ * DRAFT_LEAD_TIME_DAYS in invoice-schedule.ts). Only lines whose trigger
+ * date has passed are returned.
  *
  * The establishment fee bills the day after the contract is signed -
  * independent of billingStartDate, since that's the delivery/go-live date
