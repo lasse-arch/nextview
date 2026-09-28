@@ -1,12 +1,14 @@
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
-import { markNewsRead } from "@/lib/actions/news";
+import { markNewsRead, ensureDefaultNewsPosts } from "@/lib/actions/news";
 import { formatDateTime } from "@/lib/labels";
 import { NewsPostForm } from "./news-post-form";
 import { DeleteNewsButton } from "./delete-news-button";
 
 export default async function NewsPage() {
   const user = await requireUser();
+
+  if (user.role === "ADMIN") await ensureDefaultNewsPosts(user.id);
 
   const posts = await prisma.newsPost.findMany({
     orderBy: { createdAt: "desc" },
