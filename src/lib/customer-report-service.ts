@@ -208,6 +208,39 @@ export function computeNextReportDueAt(
   return deal.nextReportDueAt;
 }
 
+export type ReportPdfDeal = {
+  companyName: string;
+  displayName: string | null;
+  mpSkinId: string | null;
+  reportLanguage: ReportLanguage;
+};
+
+/**
+ * Just the rendering half of generateAndSendCustomerReport - scrapes
+ * explore.nextview360.dk and renders the PDF, with none of the email/Drive-
+ * archiving/schedule side effects. Used by the /stats page's "Download PDF"
+ * button, which is a plain export a seller can grab on demand and isn't a
+ * "send" in any sense that should touch nextReportDueAt or the send history.
+ */
+export async function generateCustomerReportPdfBuffer(deal: ReportPdfDeal): Promise<Buffer> {
+  const mpSkinIds = parseMpSkinIds(deal.mpSkinId);
+  if (mpSkinIds.length === 0) throw new Error("Dealen har intet MP-Skin nummer udfyldt.");
+
+  const customerName = deal.displayName || deal.companyName;
+  const language = deal.reportLanguage;
+  const monthLabel = currentMonthLabel(language);
+
+  const tourData = await fetchExploreTourData(mpSkinIds);
+  const html = buildCustomerReportHtml({
+    customerName,
+    monthLabel,
+    coverImage: tourData.coverImage,
+    stats: tourData.stats,
+    language,
+  });
+  return renderCustomerReportPdf(html);
+}
+
 /**
  * Generates a visitor-stats report for one deal (scraping explore.nextview360.dk,
  * rendering the PDF, archiving it to Drive, and emailing it) and records the

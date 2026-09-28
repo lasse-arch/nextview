@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { sendCustomerReportsNowAction } from "@/lib/actions/customer-reports";
 import { useToast } from "@/components/toast";
+import { downloadCustomerReportPdf } from "./download-report-client";
 import { StatsCustomerRow, type StatsCustomerRowData } from "./stats-customer-row";
 
 /**
@@ -14,6 +15,7 @@ import { StatsCustomerRow, type StatsCustomerRowData } from "./stats-customer-ro
 export function LiveCustomersTable({ rows }: { rows: StatsCustomerRowData[] }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [sendingAll, startSendAll] = useTransition();
+  const [downloading, startDownload] = useTransition();
   const showToast = useToast();
 
   const allIds = rows.map((r) => r.dealId);
@@ -54,20 +56,36 @@ export function LiveCustomersTable({ rows }: { rows: StatsCustomerRowData[] }) {
     });
   }
 
+  function downloadSelected() {
+    const ids = [...selected];
+    if (ids.length === 0) return;
+    startDownload(() => downloadCustomerReportPdf(ids, showToast));
+  }
+
   return (
     <div>
       <div className="mb-3 flex items-center justify-between gap-3">
         <p className="text-xs text-slate-500">
-          {selected.size > 0 ? `${selected.size} valgt` : "Vælg en eller flere kunder for at sende samlet"}
+          {selected.size > 0 ? `${selected.size} valgt` : "Vælg en eller flere kunder for at sende eller downloade samlet"}
         </p>
-        <button
-          type="button"
-          disabled={selected.size === 0 || sendingAll}
-          onClick={sendSelected}
-          className="shrink-0 whitespace-nowrap rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-40"
-        >
-          {sendingAll ? "Sender…" : `Send nu (${selected.size})`}
-        </button>
+        <div className="flex shrink-0 gap-2">
+          <button
+            type="button"
+            disabled={selected.size === 0 || downloading}
+            onClick={downloadSelected}
+            className="whitespace-nowrap rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+          >
+            {downloading ? "Henter…" : `Download PDF (${selected.size})`}
+          </button>
+          <button
+            type="button"
+            disabled={selected.size === 0 || sendingAll}
+            onClick={sendSelected}
+            className="whitespace-nowrap rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-40"
+          >
+            {sendingAll ? "Sender…" : `Send nu (${selected.size})`}
+          </button>
+        </div>
       </div>
 
       <div className="overflow-hidden rounded-md border border-slate-100">

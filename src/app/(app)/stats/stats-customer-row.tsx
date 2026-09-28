@@ -13,6 +13,7 @@ import {
 import { formatDate } from "@/lib/labels";
 import { useToast } from "@/components/toast";
 import { usePollWhilePending } from "../use-poll-while-pending";
+import { downloadCustomerReportPdf } from "./download-report-client";
 import { ReportHistoryTooltip, type ReportHistoryEntry } from "./report-history-tooltip";
 import type { ReportInterval, ReportLanguage, ReportSendStatus } from "@prisma/client";
 
@@ -64,6 +65,7 @@ export function StatsCustomerRow({
   const [savingLanguage, startSavingLanguage] = useTransition();
   const [sending, startSendTransition] = useTransition();
   const [sendingCombined, startSendCombinedTransition] = useTransition();
+  const [downloading, startDownloadTransition] = useTransition();
   const showToast = useToast();
 
   usePollWhilePending(lastStatus === "PENDING");
@@ -139,6 +141,10 @@ export function StatsCustomerRow({
         showToast(err instanceof Error ? err.message : "Der opstod en fejl.");
       }
     });
+  }
+
+  function downloadPdf() {
+    startDownloadTransition(() => downloadCustomerReportPdf([dealId], showToast));
   }
 
   const isSending = sending || lastStatus === "PENDING";
@@ -256,6 +262,15 @@ export function StatsCustomerRow({
               {sendingCombined ? "Sender…" : `Send samlet (${branches.length + 1})`}
             </button>
           )}
+          <button
+            type="button"
+            disabled={downloading || !mpSkinId}
+            onClick={downloadPdf}
+            title={!mpSkinId ? "Udfyld MP-Skin nummer først" : "Download PDF uden at sende"}
+            className="shrink-0 whitespace-nowrap rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+          >
+            {downloading ? "Henter…" : "PDF"}
+          </button>
           <button
             type="button"
             disabled={isSending}
