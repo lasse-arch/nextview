@@ -14,7 +14,10 @@ import { runWatchedUrl } from "@/lib/lead-generation-service";
  */
 export async function scanUrlNowAction(
   url: string
-): Promise<{ ok: true; added: number; cvrCount: number; title: string | null } | { ok: false; error: string }> {
+): Promise<
+  | { ok: true; added: number; cvrCount: number; title: string | null; articlesScanned: number }
+  | { ok: false; error: string }
+> {
   await requireUser();
   if (!url.trim()) return { ok: false, error: "Angiv en URL." };
 
@@ -48,7 +51,13 @@ export async function scanUrlNowAction(
   }
 
   revalidatePath("/leadgeneration");
-  return { ok: true, added: fresh.length, cvrCount: scan.cvrNumbers.length, title: scan.title };
+  return {
+    ok: true,
+    added: fresh.length,
+    cvrCount: scan.cvrNumbers.length,
+    title: scan.title,
+    articlesScanned: scan.articlesScanned,
+  };
 }
 
 export async function createWatchedUrl(

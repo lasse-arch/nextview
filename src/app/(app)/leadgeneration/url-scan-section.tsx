@@ -108,10 +108,12 @@ export function UrlScanSection({ watchedUrls }: { watchedUrls: WatchedUrlData[] 
         formData.set("label", label);
         await createWatchedUrl(formData);
       }
+      const articlesSuffix =
+        result.articlesScanned > 0 ? ` (inkl. ${result.articlesScanned} artikel${result.articlesScanned === 1 ? "" : "er"})` : "";
       showToast(
         result.cvrCount === 0
-          ? "Fandt intet CVR-nummer nævnt på siden."
-          : `Fandt ${result.cvrCount} CVR-nummer${result.cvrCount === 1 ? "" : "e"} - ${result.added} nye leads.`
+          ? `Fandt intet CVR-nummer nævnt på siden${articlesSuffix}.`
+          : `Fandt ${result.cvrCount} CVR-nummer${result.cvrCount === 1 ? "" : "e"}${articlesSuffix} - ${result.added} nye leads.`
       );
       setUrl("");
       setLabel("");
