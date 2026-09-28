@@ -1,4 +1,4 @@
-import { addMonths, addDays, max as maxDate, startOfDay } from "date-fns";
+import { addMonths, subMonths, addDays, startOfMonth, max as maxDate, startOfDay } from "date-fns";
 import { prisma } from "@/lib/db";
 import { isDineroConfigured, createQuarterlyInvoiceDraft, getInvoicePaymentStatus, type DineroInvoiceLine } from "@/lib/dinero";
 import { computeBillingPeriods, computePeriodAmounts } from "@/lib/invoice-schedule";
@@ -128,25 +128,36 @@ function computeDueLines(
   const firstRelevantIndex = firstRelevantIndexRaw === -1 ? periods.length : firstRelevantIndexRaw;
 
   // A seller manually clicking "Opret faktura-kladde" (sendPeriodsNow) can
-  // jump the gun on the very next period's own lead time the same way
-  // sendEstablishmentNow already does for the establishment fee - but only
-  // the single next one, not every period in the rolling horizon at once.
-  let forcedOnePeriod = false;
+  // jump the gun on the very next NOT-YET-DUE period's own lead time, the
+  // same way sendEstablishmentNow already does for the establishment fee -
+  // but only that single one: `sawFirstNotDuePeriod` makes sure a period
+  // further out is never forced just because an earlier one it was blocked
+  // on (see below) wasn't - it's either that period or nothing this run,
+  // not "skip ahead to whichever period after it happens to be forceable".
+  //
+  // A period starting 1 January additionally can't be forced at all until
+  // December (the last month of the preceding quarter) has actually
+  // started - jumping it earlier would risk a seller sending a new year's
+  // first invoice while still deep in the old year.
+  let sawFirstNotDuePeriod = false;
   periods.forEach((period, i) => {
     if (i < firstRelevantIndex) return;
     if (handledQuarterIndexes.has(period.index)) return;
-    const isDue = period.draftTriggerDate <= now;
-    const forceThisOne = options.sendPeriodsNow && !forcedOnePeriod;
-    if (!isDue && !forceThisOne) {
-      if (!nextDueDate || period.draftTriggerDate < nextDueDate) nextDueDate = period.draftTriggerDate;
+
+    if (period.draftTriggerDate <= now) {
+      lines.push({ quarterIndex: period.index, amount: amounts[i], scheduledDate: period.startDate });
       return;
     }
-    forcedOnePeriod = true;
-    lines.push({
-      quarterIndex: period.index,
-      amount: amounts[i],
-      scheduledDate: period.startDate,
-    });
+
+    if (!nextDueDate || period.draftTriggerDate < nextDueDate) nextDueDate = period.draftTriggerDate;
+    if (sawFirstNotDuePeriod) return;
+    sawFirstNotDuePeriod = true;
+
+    const isCalendarYearStart = period.startDate.getMonth() === 0 && period.startDate.getDate() === 1;
+    const canForceThisPeriod = !isCalendarYearStart || now >= startOfMonth(subMonths(period.startDate, 1));
+    if (options.sendPeriodsNow && canForceThisPeriod) {
+      lines.push({ quarterIndex: period.index, amount: amounts[i], scheduledDate: period.startDate });
+    }
   });
 
   return { lines, nextDueDate };
@@ -214,6 +225,21 @@ function buildInvoiceContent(
 }
 
 /**
+ * A recurring period's Dinero invoice date. Normally backdated 8 days
+ * (Dinero's own Netto+8 payment terms, see createQuarterlyInvoiceDraft) so
+ * the due date lands exactly on the period's own start date, regardless of
+ * which day within the draft's lead-time window it's actually drafted on -
+ * except a period starting 1 January, which is dated that same 1 January
+ * with no backdating (due date landing 9 January instead), so a new
+ * calendar year's first invoice is never dated into the year before the
+ * revenue it covers.
+ */
+function computeRecurringInvoiceDate(periodStart: Date): Date {
+  const isCalendarYearStart = periodStart.getMonth() === 0 && periodStart.getDate() === 1;
+  return isCalendarYearStart ? periodStart : addDays(periodStart, -8);
+}
+
+/**
  * Attempts to draft one invoice line in Dinero and records the outcome on
  * its Invoice row. Shared by the bulk quarterly run and the single-invoice
  * "Prøv igen" retry, so both go through the exact same success/failure
@@ -233,14 +259,10 @@ async function draftInvoiceLine(
 ): Promise<{ success: true; contactGuid: string } | { success: false; error: string }> {
   try {
     const { note, lines } = buildInvoiceContent(deal, invoiceRow.quarterIndex, invoiceRow.amount, invoiceRow.scheduledDate);
-    // A recurring period's invoice is dated on the period's own start date,
-    // regardless of which day within the draft's lead-time window it's
-    // actually drafted on - Dinero's own Netto+8 payment terms (see
-    // createQuarterlyInvoiceDraft) then land the due date 8 days after that,
-    // never before the period (and its revenue) actually begins. The
-    // one-off establishment fee has no such period to align to, so it's
-    // simply dated whenever it's actually drafted.
-    const invoiceDate = invoiceRow.quarterIndex === 0 ? new Date() : invoiceRow.scheduledDate;
+    // See computeRecurringInvoiceDate. The one-off establishment fee has no
+    // period to align a due date to, so it's simply dated whenever it's
+    // actually drafted.
+    const invoiceDate = invoiceRow.quarterIndex === 0 ? new Date() : computeRecurringInvoiceDate(invoiceRow.scheduledDate);
     const result = await createQuarterlyInvoiceDraft({
       existingContactGuid: contactGuidHint,
       companyName: deal.companyName,
