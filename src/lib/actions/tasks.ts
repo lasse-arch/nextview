@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { logActivity } from "@/lib/activity";
+import { parseDueDateFromText } from "@/lib/task-date-parser";
 
 export type TaskResult = { ok: true; id: string } | { ok: false; error: string };
 
@@ -12,8 +13,14 @@ function revalidateTaskPaths(dealId: string | null) {
   if (dealId) revalidatePath(`/deals/${dealId}`);
 }
 
-/** "Opret opgave"-knap på en note - lidt hurtigere end at åbne opgave-formularen
- * og selv skrive titlen ud igen, når det man vil huske allerede står i noten. */
+/**
+ * "Opret opgave"-knap på en note - lidt hurtigere end at åbne opgave-
+ * formularen og selv skrive titlen ud igen, når det man vil huske allerede
+ * står i noten. Tildeles den der skrev noten (ikke nødvendigvis den der
+ * klikker "+ Opgave") - det er trods alt dem der ved hvad opfølgningen
+ * drejer sig om. Forfaldsdato gættes ud fra en dato/ugenummer/ferienavn i
+ * notetekstens eget indhold, hvis der står en - se task-date-parser.ts.
+ */
 export async function createTaskFromNote(noteId: string): Promise<TaskResult> {
   const user = await requireUser();
 
@@ -21,9 +28,10 @@ export async function createTaskFromNote(noteId: string): Promise<TaskResult> {
 
   const oneLine = note.body.replace(/\s+/g, " ").trim();
   const title = oneLine.length > 60 ? `${oneLine.slice(0, 60)}…` : oneLine || "Opgave fra note";
+  const dueDate = parseDueDateFromText(note.body);
 
   const task = await prisma.task.create({
-    data: { title, description: note.body, dealId: note.dealId, createdById: user.id },
+    data: { title, description: note.body, dealId: note.dealId, assigneeId: note.authorId, createdById: user.id, dueDate },
   });
 
   revalidateTaskPaths(note.dealId);
