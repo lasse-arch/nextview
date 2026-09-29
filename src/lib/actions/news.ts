@@ -78,6 +78,12 @@ const DEFAULT_POSTS: { title: string; body: string; minutesAgo: number; screensh
     body: "Erstatter WhatsApp-tråden vi plejer at sende links i på ringedage. Gå til \"Ringeliste\" i menuen, og indsæt links - CVR-opslag, Facebook-sider, almindelige hjemmesider, eller bare et navn - ét pr. linje i boksen øverst. De bliver automatisk til rigtige leads: et CVR-link slår firmaet op i registret, en almindelig hjemmeside bliver scannet for navn/telefon/ejer, og en Facebook-side får et gæt på navn ud fra linket.\n\nOpret en ny liste for hver ringedag (\"+ Ny liste\"), så du kan skifte mellem dagens liste og tidligere lister. Under listen ser du en ring-kø med kun de leads der stadig mangler at blive ringet til - klik \"❌ Tabt\" eller \"📅 Book møde\" for at opdatere med det samme, uden at åbne dealen. Du kan også rette et gættet navn direkte i køen (blyant-ikonet), tilføje et telefonnummer (vises som en grøn markeret badge, når det er gemt) og tilføje et produkt med ét klik.",
     screenshotUrl: "/news/ringeliste.png",
   },
+  {
+    minutesAgo: 0,
+    title: "Book møde på ét trin - lige ved firmanavnet",
+    body: "Før krævede det at åbne \"Stadie\"-dropdownen langt nede i redigeringsformularen, vælge \"Møde booket\", udfylde et mødedato-felt der først dukkede op der, gemme hele formularen - og så separat åbne \"Send kalender invitation\" for rent faktisk at give kunden/kollegaer besked. Akavet, især midt i et telefonopkald.\n\nNu er der en lilla \"Book møde\"-knap lige ved siden af firmanavnet øverst på dealens side. Klik den, vælg dato/tid, lad kryds-feltet \"Send kalenderinvitation med det samme\" stå som det er (sat til som standard) - dealen rykker med det samme til Møde booket, og kalenderinvitationen sendes i samme trin. Virker uanset hvilket stadie dealen kommer fra. Den gamle \"Send kalender invitation\"-knap findes stadig, hvis du vil tilføje en kollega eller en besked bagefter.",
+    screenshotUrl: "/news/book-meeting.png",
+  },
 ];
 
 /**
