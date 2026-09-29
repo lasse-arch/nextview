@@ -393,9 +393,10 @@ function QueueCard({ deal }: { deal: QueueDeal }) {
                   href={displayedWebsite}
                   target="_blank"
                   rel="noopener noreferrer"
+                  title={displayedWebsite}
                   className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-0.5 text-[11px] font-medium text-sky-700 ring-1 ring-inset ring-sky-600/10 hover:bg-sky-100"
                 >
-                  🔗 {displayedWebsite.replace(/^https?:\/\//, "")}
+                  🔗 Link
                 </a>
                 <button
                   type="button"
