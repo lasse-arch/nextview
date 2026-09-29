@@ -15,22 +15,31 @@ import { useToast } from "@/components/toast";
  * "Møde booket" and (checkbox, on by default) sends the calendar invite in
  * the same action, using sensible defaults - no extra colleagues, no custom
  * message, 30 minutes. The separate "Send kalender invitation" button
- * further down the page still exists for adding colleagues or a message
- * afterwards; this is just the fast path for the common case.
+ * further down the page still exists for adding a custom message
+ * afterwards; this is just the fast path for the common case - including
+ * picking which colleagues (if any) should be invited along with the
+ * customer.
  */
 export function BookMeetingButton({
   dealId,
   currentMeetingDateIso,
+  colleagues,
 }: {
   dealId: string;
   currentMeetingDateIso: string | null;
+  colleagues: { id: string; name: string }[];
 }) {
   const [open, setOpen] = useState(false);
   const [dateInput, setDateInput] = useState(currentMeetingDateIso ? currentMeetingDateIso.slice(0, 16) : "");
   const [sendInvite, setSendInvite] = useState(true);
+  const [selectedColleagues, setSelectedColleagues] = useState<string[]>([]);
   const [pending, startTransition] = useTransition();
   const router = useRouter();
   const showToast = useToast();
+
+  function toggleColleague(id: string) {
+    setSelectedColleagues((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
 
   function book() {
     if (!dateInput) {
@@ -43,7 +52,7 @@ export function BookMeetingButton({
         await setMeetingDateAndStage(dealId, iso);
 
         if (sendInvite) {
-          const result = await sendCalendarInvite(dealId, [], iso, undefined, 30);
+          const result = await sendCalendarInvite(dealId, selectedColleagues, iso, undefined, 30);
           showToast(result.synced ? "Møde booket og kalenderinvitation sendt." : `Møde booket. ${result.reason ?? "Kalenderinvitation kunne ikke sendes."}`);
         } else {
           showToast("Møde booket");
@@ -86,6 +95,24 @@ export function BookMeetingButton({
             />
             Send kalenderinvitation med det samme
           </label>
+          {sendInvite && colleagues.length > 0 && (
+            <div className="mt-2 pl-6">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Inviter også</p>
+              <div className="mt-1 space-y-1">
+                {colleagues.map((c) => (
+                  <label key={c.id} className="flex items-center gap-2 text-sm text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={selectedColleagues.includes(c.id)}
+                      onChange={() => toggleColleague(c.id)}
+                      className="h-4 w-4"
+                    />
+                    {c.name}
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="mt-3 flex gap-2">
             <button
               type="button"

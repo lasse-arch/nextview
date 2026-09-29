@@ -156,6 +156,7 @@ export default async function DealDetailPage({
           <BookMeetingButton
             dealId={deal.id}
             currentMeetingDateIso={deal.meetingDate ? deal.meetingDate.toISOString() : null}
+            colleagues={users.filter((u) => u.id !== deal.ownerId).map((u) => ({ id: u.id, name: u.name }))}
           />
           <InactiveToggleButton dealId={deal.id} isChurned={Boolean(deal.churnedAt)} />
           <DealDangerActions
