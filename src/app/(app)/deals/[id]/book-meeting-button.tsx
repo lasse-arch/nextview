@@ -2,17 +2,21 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { setMeetingDateAndStage } from "@/lib/actions/deals";
+import { setMeetingDateAndStage, sendCalendarInvite } from "@/lib/actions/deals";
 import { useToast } from "@/components/toast";
 
 /**
  * A dedicated, always-clickable "Book møde" action on the deal page itself -
- * previously the only way to book a meeting here was to open the "Stadie"
- * dropdown deep in the edit form, pick "Møde booket", fill in a date field
- * that only then appeared, and save the whole form. This mirrors the one-
- * click flow Ringeliste and the board's drag-and-drop already use
- * (setMeetingDateAndStage) - works from any current stage, no dropdown
- * needed, and moves the deal straight to "Møde booket".
+ * previously booking a meeting meant opening the "Stadie" dropdown deep in
+ * the edit form, filling in a date field that only then appeared, saving
+ * the whole form, and THEN separately opening "Send kalender invitation" to
+ * actually notify anyone - three steps, awkward on a phone mid-call. One
+ * pick-a-time-and-tap panel now does the whole job: moves the deal to
+ * "Møde booket" and (checkbox, on by default) sends the calendar invite in
+ * the same action, using sensible defaults - no extra colleagues, no custom
+ * message, 30 minutes. The separate "Send kalender invitation" button
+ * further down the page still exists for adding colleagues or a message
+ * afterwards; this is just the fast path for the common case.
  */
 export function BookMeetingButton({
   dealId,
@@ -23,6 +27,7 @@ export function BookMeetingButton({
 }) {
   const [open, setOpen] = useState(false);
   const [dateInput, setDateInput] = useState(currentMeetingDateIso ? currentMeetingDateIso.slice(0, 16) : "");
+  const [sendInvite, setSendInvite] = useState(true);
   const [pending, startTransition] = useTransition();
   const router = useRouter();
   const showToast = useToast();
@@ -34,8 +39,15 @@ export function BookMeetingButton({
     }
     startTransition(async () => {
       try {
-        await setMeetingDateAndStage(dealId, new Date(dateInput).toISOString());
-        showToast("Møde booket");
+        const iso = new Date(dateInput).toISOString();
+        await setMeetingDateAndStage(dealId, iso);
+
+        if (sendInvite) {
+          const result = await sendCalendarInvite(dealId, [], iso, undefined, 30);
+          showToast(result.synced ? "Møde booket og kalenderinvitation sendt." : `Møde booket. ${result.reason ?? "Kalenderinvitation kunne ikke sendes."}`);
+        } else {
+          showToast("Møde booket");
+        }
         setOpen(false);
         router.refresh();
       } catch (err) {
@@ -44,38 +56,55 @@ export function BookMeetingButton({
     });
   }
 
-  if (!open) {
-    return (
+  return (
+    <div className="relative inline-block shrink-0">
       <button
         type="button"
-        onClick={() => setOpen(true)}
-        className="shrink-0 rounded-lg bg-indigo-600 px-4 py-2 text-[13px] font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700"
+        onClick={() => setOpen((o) => !o)}
+        className="rounded-lg bg-indigo-600 px-4 py-2 text-[13px] font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700"
       >
         📅 Book møde
       </button>
-    );
-  }
-
-  return (
-    <span className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1.5">
-      <input
-        type="datetime-local"
-        value={dateInput}
-        onChange={(e) => setDateInput(e.target.value)}
-        autoFocus
-        className="rounded-md border border-slate-300 px-2 py-1 text-xs"
-      />
-      <button
-        type="button"
-        onClick={book}
-        disabled={pending}
-        className="rounded-md bg-indigo-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
-      >
-        {pending ? "Booker…" : "Book"}
-      </button>
-      <button type="button" onClick={() => setOpen(false)} className="text-xs text-slate-400 hover:text-slate-600">
-        Annullér
-      </button>
-    </span>
+      {open && (
+        <div className="absolute left-0 top-full z-20 mt-2 w-72 rounded-lg border border-indigo-200 bg-white p-4 shadow-lg">
+          <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+            Mødetidspunkt
+          </label>
+          <input
+            type="datetime-local"
+            value={dateInput}
+            onChange={(e) => setDateInput(e.target.value)}
+            autoFocus
+            className="mt-1.5 w-full rounded-md border border-slate-300 px-3 py-2.5 text-base"
+          />
+          <label className="mt-3 flex items-center gap-2 text-sm text-slate-700">
+            <input
+              type="checkbox"
+              checked={sendInvite}
+              onChange={(e) => setSendInvite(e.target.checked)}
+              className="h-4 w-4"
+            />
+            Send kalenderinvitation med det samme
+          </label>
+          <div className="mt-3 flex gap-2">
+            <button
+              type="button"
+              onClick={book}
+              disabled={pending}
+              className="flex-1 rounded-md bg-indigo-600 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+            >
+              {pending ? "Booker…" : "Book møde"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              className="rounded-md border border-slate-300 px-3 py-2.5 text-sm text-slate-600 hover:bg-slate-50"
+            >
+              Annullér
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
