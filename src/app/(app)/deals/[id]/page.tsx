@@ -29,6 +29,7 @@ import { ArchiveContractButton } from "./archive-contract-button";
 import { ArchiveToDriveButton } from "./archive-to-drive-button";
 import { StageFields } from "./stage-fields";
 import { InactiveToggleButton } from "./inactive-toggle-button";
+import { BookMeetingButton } from "./book-meeting-button";
 import { TerminationSection } from "./termination-section";
 import { DealItemsSection } from "./deal-items-section";
 import { DealDangerActions } from "./danger-actions";
@@ -152,6 +153,10 @@ export default async function DealDetailPage({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 lg:shrink-0">
+          <BookMeetingButton
+            dealId={deal.id}
+            currentMeetingDateIso={deal.meetingDate ? deal.meetingDate.toISOString() : null}
+          />
           <InactiveToggleButton dealId={deal.id} isChurned={Boolean(deal.churnedAt)} />
           <DealDangerActions
             dealId={deal.id}
