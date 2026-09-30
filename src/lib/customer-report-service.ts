@@ -2,7 +2,7 @@ import { addMonths, subDays } from "date-fns";
 import type { ReportInterval, ReportLanguage, ReportSendMethod } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { isIntegrationEnabled } from "@/lib/integration-settings";
-import { fetchExploreTourData } from "@/lib/explore-nextview360";
+import { fetchMatterportTourData } from "@/lib/explore-matterport";
 import {
   buildCustomerReportHtml,
   buildCombinedCustomerReportHtml,
@@ -230,7 +230,7 @@ export async function generateCustomerReportPdfBuffer(deal: ReportPdfDeal): Prom
   const language = deal.reportLanguage;
   const monthLabel = currentMonthLabel(language);
 
-  const tourData = await fetchExploreTourData(mpSkinIds);
+  const tourData = await fetchMatterportTourData(mpSkinIds);
   const html = buildCustomerReportHtml({
     customerName,
     monthLabel,
@@ -268,7 +268,7 @@ export async function generateAndSendCustomerReport(
     const language = deal.reportLanguage;
     const monthLabel = currentMonthLabel(language);
 
-    const tourData = await fetchExploreTourData(mpSkinIds);
+    const tourData = await fetchMatterportTourData(mpSkinIds);
     const html = buildCustomerReportHtml({
       customerName,
       monthLabel,
@@ -375,7 +375,7 @@ export async function generateAndSendCombinedCustomerReport(
     const branchReports: CombinedCustomerReportBranch[] = [];
     let coverImage: Buffer | null = null;
     for (const d of reportableDeals) {
-      const tourData = await fetchExploreTourData(parseMpSkinIds(d.mpSkinId));
+      const tourData = await fetchMatterportTourData(parseMpSkinIds(d.mpSkinId));
       branchReports.push({ name: d.displayName || d.companyName, stats: tourData.stats });
       if (!coverImage) coverImage = tourData.coverImage;
     }
