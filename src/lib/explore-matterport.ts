@@ -306,14 +306,30 @@ function parseNumber(raw: string): number {
   return Number(raw.replace(/[.,](?=\d{3}\b)/g, "").replace(",", ".")) || 0;
 }
 
+/** Every one of the confirmed card descriptions ("Times your 3D tour was
+ * opened and viewed.", "People who viewed your 3D tour.", "Times your 3D
+ * tour was shown on a page.") says "3D" - a real digit character. Stripped
+ * out before any number extraction runs, confirmed necessary from two real
+ * production reports that both came back with every single metric/period
+ * reading exactly "3": findMetric's old, looser regex was grabbing that "3"
+ * (from "3D") as if it were the metric's actual value, since it's the first
+ * digit reachable after the card's heading - real numbers like "2,004"
+ * further down were never even reached. */
+function stripKnownNoise(text: string): string {
+  return text.replace(/\b3D\b/gi, "");
+}
+
 /** Matches a confirmed card label ("Total Views", "Visitors") followed by
- * its one-line description text and then the number - the description
- * ("Times your 3D tour was opened and viewed.", etc.) runs up to ~45 chars,
- * hence the generous gap allowance. Returns null (not 0) when the label
- * isn't found at all, so callers can tell "found zero" from "page layout
- * changed / didn't load". */
+ * its one-line description text and then the real number. The captured
+ * group must START with an actual digit (`\d[\d.,]*`, not `[\d.,]+`) -
+ * without that, a second real bug (also confirmed from production) had it
+ * grabbing the sentence-ending period in "...opened and viewed." as a
+ * one-character "number" before ever reaching the real one on the next
+ * line, since a lone "." satisfies `[\d.,]+` just fine. Returns null (not
+ * 0) when the label isn't found at all, so callers can tell "found zero"
+ * from "page layout changed / didn't load". */
 function findMetric(text: string, label: string): number | null {
-  const re = new RegExp(`${label}[^\\d]{0,150}?([\\d.,]+)`, "i");
+  const re = new RegExp(`${label}[^\\d]{0,150}?(\\d[\\d.,]*)`, "i");
   const match = text.match(re);
   return match ? parseNumber(match[1]) : null;
 }
@@ -321,8 +337,9 @@ function findMetric(text: string, label: string): number | null {
 /** Reads whichever period is currently selected on the Analytics tab
  * (confirmed layout: "Total Views" and "Visitors" cards near the top). */
 function parseVisibleMetrics(text: string): ExplorePeriodStats | null {
-  const views = findMetric(text, "Total Views");
-  const visitors = findMetric(text, "Visitors");
+  const clean = stripKnownNoise(text);
+  const views = findMetric(clean, "Total Views");
+  const visitors = findMetric(clean, "Visitors");
   if (views === null && visitors === null) return null;
   return { visits: views ?? 0, sessions: views ?? 0, users: visitors ?? 0, avgTime: "–" };
 }
@@ -344,40 +361,57 @@ const zeroPeriod: ExplorePeriodStats = { visits: 0, sessions: 0, users: 0, avgTi
 
 /** Selects one period (clicking the matching button when present - the
  * period shown on first page load, "30 days", needs no click) and reads
- * back its Total Views / Visitors numbers. */
+ * back its Total Views / Visitors numbers. Polls for up to ~4s for the
+ * numbers to actually change from what was showing before the click,
+ * rather than trusting one fixed sleep - the period switch likely re-fetches
+ * its data asynchronously, so a too-short fixed wait risks reading the
+ * PREVIOUS period's still-displayed numbers (harmless if two periods
+ * genuinely have identical traffic - this just polls the full timeout
+ * without finding a change in that case). */
 async function fetchPeriodMetrics(page: Page, buttonLabel: string): Promise<ExplorePeriodStats> {
+  const beforeText = await page.evaluate(() => document.body.innerText).catch(() => "");
+  const before = parseVisibleMetrics(beforeText);
+
   const clicked = await clickPeriodButton(page, buttonLabel);
-  if (clicked) await sleep(1500);
-  const text = await page.evaluate(() => document.body.innerText).catch(() => "");
-  return parseVisibleMetrics(text) ?? zeroPeriod;
+  if (!clicked) return before ?? zeroPeriod;
+
+  let after = before;
+  for (let i = 0; i < 10; i++) {
+    await sleep(400);
+    const text = await page.evaluate(() => document.body.innerText).catch(() => "");
+    after = parseVisibleMetrics(text);
+    if (!before || !after || after.visits !== before.visits || after.users !== before.users) break;
+  }
+  return after ?? zeroPeriod;
 }
 
 /**
- * Grabs the model's own cover photo straight from its Space tab (the
- * default `my.matterport.com/models/<sid>` page, already authenticated -
- * see ensureAuthenticatedOn) rather than a guessed REST API endpoint, which
- * a real production run confirmed doesn't exist ("Kunne ikke hente et
- * cover-billede fra Matterport" - the old `/api/v1/models/.../thumbnail`
- * call never returned ok). Reading the actual rendered largest `<img>` on
- * the page it already knows exists needs no new guess about API shape, and
- * reuses the same already-logged-in browser session rather than adding a
- * second site/login just for a photo. Relies on the caller already having
- * authenticated this page (fetchMatterportTourData always calls
- * fetchOneModelStats - which does - for the same sid first).
+ * Grabs the model's own cover photo from its Media tab
+ * (`my.matterport.com/models/<sid>?section=media`, already authenticated -
+ * see ensureAuthenticatedOn), where the model's actual photos are expected
+ * to live as plain `<img>` thumbnails. NOT the default Space tab (tried
+ * first, confirmed wrong from a real report showing a decorative Matterport
+ * marketing/brand graphic instead of the tour's own photo) - the Space
+ * tab's real content is the interactive 3D viewer itself, almost certainly
+ * rendered as a canvas/iframe rather than a plain image, so scanning that
+ * page for "the biggest `<img>`" was finding some unrelated page chrome
+ * instead. Also excludes anything whose src/alt suggests it's Matterport's
+ * own branding rather than tour content. Throws instead of silently
+ * returning null on failure - unlike stats, this has no confirmed structure
+ * to fall back on yet, so it's worth knowing exactly which step failed (no
+ * suitable image found vs. the image request itself failing) rather than a
+ * single generic "didn't work" once this bubbles up to
+ * fetchMatterportTourData.
  */
-/** Throws instead of silently returning null on failure - unlike stats,
- * this has no confirmed structure to fall back on yet, so it's worth
- * knowing exactly which step failed (no big-enough image on the page vs.
- * the image request itself failing) rather than a single generic "didn't
- * work" once this bubbles up to fetchMatterportTourData. */
 async function fetchCoverImageOrThrow(page: Page, sid: string): Promise<Buffer> {
-  await gotoRetry(page, `https://my.matterport.com/models/${sid}`);
+  await gotoRetry(page, `https://my.matterport.com/models/${sid}?section=media`);
   await sleep(2000);
   await dismissCookieBanner(page);
 
   const imgUrl = await page.evaluate(() => {
+    const isBrandAsset = (img: HTMLImageElement) => /logo|brand|matterport-icon/i.test(img.currentSrc + " " + (img.alt ?? ""));
     const images = Array.from(document.querySelectorAll("img")).filter(
-      (img) => img.currentSrc && img.naturalWidth >= 200 && img.naturalHeight >= 120
+      (img) => img.currentSrc && img.naturalWidth >= 200 && img.naturalHeight >= 120 && !isBrandAsset(img)
     );
     const largest = images.sort((a, b) => b.naturalWidth * b.naturalHeight - a.naturalWidth * a.naturalHeight)[0];
     return largest?.currentSrc ?? null;
