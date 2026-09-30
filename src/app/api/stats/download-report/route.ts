@@ -38,19 +38,29 @@ export async function GET(request: NextRequest) {
 
   let skipped = deals.length < dealIds.length ? dealIds.length - deals.length : 0;
   const pdfBuffers: Buffer[] = [];
+  let lastError: unknown;
 
   for (const deal of deals) {
     try {
       pdfBuffers.push(await generateCustomerReportPdfBuffer(deal));
     } catch (err) {
       console.error(`Kunne ikke generere besøgsrapport-PDF for ${dealName(deal)}`, err);
+      lastError = err;
       skipped++;
     }
   }
 
   if (pdfBuffers.length === 0) {
+    // Surface the actual underlying error (not just a generic fallback) -
+    // needed to debug e.g. the Matterport scraper from the real message it
+    // throws, rather than guessing blind.
+    const detail = lastError instanceof Error ? lastError.message : null;
     return NextResponse.json(
-      { error: "Ingen af de valgte kunder har et gyldigt MP-Skin nummer, eller PDF-generering fejlede." },
+      {
+        error: detail
+          ? `Ingen af de valgte kunder kunne hente statistik. Sidste fejl: ${detail}`
+          : "Ingen af de valgte kunder har et gyldigt MP-Skin nummer, eller PDF-generering fejlede.",
+      },
       { status: 400 }
     );
   }
