@@ -7,6 +7,7 @@ import { formatDateTime } from "@/lib/labels";
 import { useToast } from "@/components/toast";
 import { Avatar } from "@/components/avatar";
 import { WEEKDAY_OPTIONS, resolveDueDate } from "./opgaver/task-board";
+import { extractDueDateFromTitle } from "@/lib/task-date-parser";
 
 export type ModalTask = {
   id: string;
@@ -43,7 +44,22 @@ export function TaskDetailModal({
   const [error, setError] = useState<string | null>(null);
   const [comments, setComments] = useState<TaskCommentView[] | null>(null);
   const [commentText, setCommentText] = useState("");
+  const [title, setTitle] = useState(task.title);
+  const [dueDate, setDueDate] = useState(toDateInputValue(task.dueDate));
   const showToast = useToast();
+
+  /** Same auto-extraction as the "Ny opgave"-modal: typing a date/week
+   * number into the title fills Forfaldsdato and strips it back out of the
+   * title - only when Forfaldsdato isn't already set, so an existing date
+   * is never silently overwritten. */
+  function handleTitleBlur() {
+    if (dueDate) return;
+    const result = extractDueDateFromTitle(title);
+    if (result.dueDate) {
+      setTitle(result.cleanedTitle);
+      setDueDate(toDateInputValue(result.dueDate));
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -119,7 +135,9 @@ export function TaskDetailModal({
             <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Titel *</label>
             <input
               name="title"
-              defaultValue={task.title}
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              onBlur={handleTitleBlur}
               required
               className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
             />
@@ -145,7 +163,8 @@ export function TaskDetailModal({
               <input
                 name="dueDate"
                 type="date"
-                defaultValue={toDateInputValue(task.dueDate)}
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
                 className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
               />
             </div>

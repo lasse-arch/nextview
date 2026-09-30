@@ -5,6 +5,12 @@ import { createTask, toggleTaskDone, bulkReassignTasks } from "@/lib/actions/tas
 import { formatDate, needsDeliveryLink } from "@/lib/labels";
 import { useToast } from "@/components/toast";
 import { TaskDetailModal, type ModalTask } from "../../task-detail-modal";
+import { extractDueDateFromTitle } from "@/lib/task-date-parser";
+
+/** "2026-10-06", for a <input type="date">'s value. */
+function toDateInputValue(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
 
 type DealTask = {
   id: string;
@@ -96,9 +102,15 @@ export function DealTasksSection({
     const form = e.currentTarget;
     const formData = new FormData(form);
     formData.set("dealId", dealId);
-    const title = String(formData.get("title") || "").trim();
+    const rawTitle = String(formData.get("title") || "").trim();
     const assigneeId = String(formData.get("assigneeId") || "") || null;
-    if (!title) return;
+    if (!rawTitle) return;
+
+    // No separate due-date field here, so a date/week number typed into the
+    // title (e.g. "Ring op i uge 43") is extracted and applied automatically.
+    const { cleanedTitle: title, dueDate } = extractDueDateFromTitle(rawTitle);
+    formData.set("title", title);
+    if (dueDate) formData.set("dueDate", toDateInputValue(dueDate));
 
     setAdding(false);
     startTransition(async () => {
@@ -107,7 +119,7 @@ export function DealTasksSection({
         if (result.ok) {
           setTasks((prev) => [
             ...prev,
-            { id: result.id, title, description: null, done: false, dueDate: null, assigneeId, recurringWeekday: null },
+            { id: result.id, title, description: null, done: false, dueDate: dueDate ?? null, assigneeId, recurringWeekday: null },
           ]);
           showToast("Opgave oprettet");
         } else {

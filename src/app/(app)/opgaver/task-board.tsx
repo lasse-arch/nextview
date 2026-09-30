@@ -7,6 +7,12 @@ import { formatDate, needsDeliveryLink } from "@/lib/labels";
 import { useToast } from "@/components/toast";
 import { TaskDetailModal, type ModalTask } from "../task-detail-modal";
 import { Avatar } from "@/components/avatar";
+import { extractDueDateFromTitle } from "@/lib/task-date-parser";
+
+/** "2026-10-06", for a <input type="date">'s value. */
+export function toDateInputValue(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
 
 export type BoardTask = {
   id: string;
@@ -75,7 +81,22 @@ function NewTaskModal({
 }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [title, setTitle] = useState("");
+  const [dueDate, setDueDate] = useState("");
   const showToast = useToast();
+
+  /** Typing a date/week number/weekday into the title (e.g. "Status på
+   * Hotel Royal 6 oktober") fills Forfaldsdato automatically and strips it
+   * back out of the title - only when Forfaldsdato isn't already set by
+   * hand, so this never overwrites a date the user picked deliberately. */
+  function handleTitleBlur() {
+    if (dueDate) return;
+    const result = extractDueDateFromTitle(title);
+    if (result.dueDate) {
+      setTitle(result.cleanedTitle);
+      setDueDate(toDateInputValue(result.dueDate));
+    }
+  }
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -121,6 +142,9 @@ function NewTaskModal({
           <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Titel *</label>
           <input
             name="title"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            onBlur={handleTitleBlur}
             required
             autoFocus
             className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
@@ -140,7 +164,13 @@ function NewTaskModal({
           </div>
           <div>
             <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Forfaldsdato</label>
-            <input name="dueDate" type="date" className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm" />
+            <input
+              name="dueDate"
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+            />
           </div>
         </div>
         <div>
@@ -331,11 +361,15 @@ export function TaskBoard({
   }
 
   function submitQuickAdd(columnKey: string) {
-    const title = quickAddText.trim();
+    const raw = quickAddText.trim();
     setQuickAddColumn(null);
     setQuickAddText("");
-    if (!title) return;
+    if (!raw) return;
 
+    // Quick-add has no separate due-date field to fill in by hand, so a
+    // date/week number typed into the title (e.g. "Ring op i uge 43") is
+    // extracted and applied automatically rather than just left in the text.
+    const { cleanedTitle: title, dueDate } = extractDueDateFromTitle(raw);
     const assigneeId = groupBy === "person" && columnKey !== UNASSIGNED ? columnKey : null;
     const dealId = groupBy === "deal" && columnKey !== NO_DEAL ? columnKey : null;
 
@@ -343,13 +377,14 @@ export function TaskBoard({
     formData.set("title", title);
     if (assigneeId) formData.set("assigneeId", assigneeId);
     if (dealId) formData.set("dealId", dealId);
+    if (dueDate) formData.set("dueDate", toDateInputValue(dueDate));
 
     startTransition(async () => {
       const result = await createTask(formData);
       if (result.ok) {
         setTasks((prev) => [
           ...prev,
-          { id: result.id, title, description: null, done: false, dueDate: null, assigneeId, dealId, recurringWeekday: null },
+          { id: result.id, title, description: null, done: false, dueDate: dueDate ?? null, assigneeId, dealId, recurringWeekday: null },
         ]);
       } else {
         showToast(result.error);
