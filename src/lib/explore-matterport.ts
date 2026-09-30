@@ -1,6 +1,6 @@
 import puppeteer, { type Browser, type ElementHandle, type Page } from "puppeteer-core";
 import chromium from "@sparticuz/chromium";
-import type { ExploreTourData, ExploreTourStats, ExplorePeriodStats } from "./explore-nextview360";
+import { fetchExploreCoverImage, type ExploreTourData, type ExploreTourStats, type ExplorePeriodStats } from "./explore-nextview360";
 
 /**
  * Pulls visitor stats straight from Matterport's own dashboard
@@ -404,72 +404,45 @@ async function fetchPeriodMetrics(page: Page, buttonLabel: string): Promise<Expl
   return after ?? zeroPeriod;
 }
 
-/**
- * Grabs the model's own cover photo from its Media tab
- * (`my.matterport.com/models/<sid>?section=media`, already authenticated -
- * see ensureAuthenticatedOn), where the model's actual photos are expected
- * to live as plain `<img>` thumbnails. NOT the default Space tab (tried
- * first, confirmed wrong from a real report showing a decorative Matterport
- * marketing/brand graphic instead of the tour's own photo) - the Space
- * tab's real content is the interactive 3D viewer itself, almost certainly
- * rendered as a canvas/iframe rather than a plain image, so scanning that
- * page for "the biggest `<img>`" was finding some unrelated page chrome
- * instead. Also excludes anything whose src/alt suggests it's Matterport's
- * own branding rather than tour content. Throws instead of silently
- * returning null on failure - unlike stats, this has no confirmed structure
- * to fall back on yet, so it's worth knowing exactly which step failed (no
- * suitable image found vs. the image request itself failing) rather than a
- * single generic "didn't work" once this bubbles up to
- * fetchMatterportTourData.
- */
-async function fetchCoverImageOrThrow(page: Page, sid: string): Promise<Buffer> {
-  await gotoRetry(page, `https://my.matterport.com/models/${sid}?section=media`);
-  await sleep(2000);
-  await dismissCookieBanner(page);
-
-  const imgUrl = await page.evaluate(() => {
-    const isBrandAsset = (img: HTMLImageElement) => /logo|brand|matterport-icon/i.test(img.currentSrc + " " + (img.alt ?? ""));
-    const images = Array.from(document.querySelectorAll("img")).filter(
-      (img) => img.currentSrc && img.naturalWidth >= 200 && img.naturalHeight >= 120 && !isBrandAsset(img)
-    );
-    const largest = images.sort((a, b) => b.naturalWidth * b.naturalHeight - a.naturalWidth * a.naturalHeight)[0];
-    return largest?.currentSrc ?? null;
-  });
-  if (!imgUrl) {
-    const text = await page.evaluate(() => document.body.innerText).catch(() => "");
-    throw new Error(`Fandt intet billede stort nok til at være et cover-foto for model "${sid}" (url: ${page.url()}, uddrag: "${pageSnippet(text)}").`);
-  }
-
-  const base64 = await page.evaluate(async (url: string) => {
-    const res = await fetch(url);
-    if (!res.ok) return { ok: false as const, status: res.status };
-    const buf = await res.arrayBuffer();
-    const bytes = new Uint8Array(buf);
-    let binary = "";
-    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-    return { ok: true as const, data: btoa(binary) };
-  }, imgUrl);
-  if (!base64.ok) {
-    throw new Error(`Kunne ikke hente billedet "${imgUrl}" for model "${sid}" (status ${base64.status}).`);
-  }
-  return Buffer.from(base64.data, "base64");
-}
-
 /** Confirmed URL for a model's Analytics tab (from a real screenshot). */
 function statsUrl(sid: string): string {
   return `https://my.matterport.com/models/${sid}?section=statistics`;
 }
 
+const ENGLISH_MONTHS = [
+  "january", "february", "march", "april", "may", "june",
+  "july", "august", "september", "october", "november", "december",
+];
+
+/** Reads the Lifetime view's own "First Impression" date (confirmed layout:
+ * "First Impression" heading followed by e.g. "Sep 10, 2026") and formats it
+ * as "10.09.2026" - the format ExploreTourStats.sinceLabel already expects
+ * (matching explore.nextview360.dk's own convention). Matches both the
+ * abbreviated ("Sep") and full ("September") month spelling, since it's not
+ * confirmed which one Matterport always uses. Returns "" (not a guess) when
+ * the label isn't found, matching the empty-string fallback this field
+ * already had. */
+function parseFirstImpressionLabel(text: string): string {
+  const match = text.match(/First Impression\s*\n?\s*([A-Za-z]+)\s+(\d{1,2}),?\s*(\d{4})/i);
+  if (!match) return "";
+  const monthAbbr = match[1].slice(0, 3).toLowerCase();
+  const monthIndex = ENGLISH_MONTHS.findIndex((m) => m.startsWith(monthAbbr));
+  if (monthIndex === -1) return "";
+  const day = match[2].padStart(2, "0");
+  const month = String(monthIndex + 1).padStart(2, "0");
+  return `${day}.${month}.${match[3]}`;
+}
+
 async function fetchOneModelStats(page: Page, sid: string): Promise<ExploreTourStats> {
   await ensureAuthenticatedOn(page, statsUrl(sid), /Total Views/i);
 
-  return {
-    last7Days: await fetchPeriodMetrics(page, "7 days"),
-    last30Days: await fetchPeriodMetrics(page, "30 days"),
-    last90Days: await fetchPeriodMetrics(page, "90 days"),
-    sinceLabel: "",
-    sinceStats: await fetchPeriodMetrics(page, "Lifetime"),
-  };
+  const last7Days = await fetchPeriodMetrics(page, "7 days");
+  const last30Days = await fetchPeriodMetrics(page, "30 days");
+  const last90Days = await fetchPeriodMetrics(page, "90 days");
+  const sinceStats = await fetchPeriodMetrics(page, "Lifetime");
+  const lifetimeText = await page.evaluate(() => document.body.innerText).catch(() => "");
+
+  return { last7Days, last30Days, last90Days, sinceLabel: parseFirstImpressionLabel(lifetimeText), sinceStats };
 }
 
 export async function fetchMatterportTourData(mpSkinIds: string | string[]): Promise<ExploreTourData> {
@@ -479,27 +452,16 @@ export async function fetchMatterportTourData(mpSkinIds: string | string[]): Pro
     const page = await browser.newPage();
     await page.setViewport({ width: 1600, height: 1000 });
 
-    let coverImage: Buffer | null = null;
-    let coverImageError: unknown;
     const allStats: ExploreTourStats[] = [];
     for (const sid of ids) {
-      // fetchOneModelStats always runs first - it's what actually
-      // establishes the authenticated session (see ensureAuthenticatedOn) -
-      // so fetchCoverImageOrThrow can assume the page is already logged in.
       allStats.push(await fetchOneModelStats(page, sid));
-      if (!coverImage) {
-        try {
-          coverImage = await fetchCoverImageOrThrow(page, sid);
-        } catch (err) {
-          coverImageError = err;
-        }
-      }
     }
 
-    if (!coverImage) {
-      const detail = coverImageError instanceof Error ? coverImageError.message : "ukendt fejl";
-      throw new Error(`Kunne ikke hente et cover-billede fra Matterport: ${detail}`);
-    }
+    // Cover photo comes from explore.nextview360.dk's own cache instead of
+    // Matterport - that system holds a specifically chosen cover photo per
+    // tour, more reliable than guessing one out of Matterport's own UI
+    // (tried, confirmed wrong - see git history).
+    const coverImage = await fetchExploreCoverImage(ids[0]);
 
     const visits = allStats.reduce((sum, s) => sum + s.sinceStats.visits, 0);
     const sessions = allStats.reduce((sum, s) => sum + s.sinceStats.sessions, 0);
@@ -510,7 +472,7 @@ export async function fetchMatterportTourData(mpSkinIds: string | string[]): Pro
         last7Days: sumAll(allStats.map((s) => s.last7Days)),
         last30Days: sumAll(allStats.map((s) => s.last30Days)),
         last90Days: sumAll(allStats.map((s) => s.last90Days)),
-        sinceLabel: "",
+        sinceLabel: earliestLabel(allStats.map((s) => s.sinceLabel)),
         sinceStats: { visits, sessions, users, avgTime: allStats[0]?.sinceStats.avgTime ?? "–" },
       },
       coverImage,
@@ -527,4 +489,23 @@ function sumAll(periods: ExplorePeriodStats[]): ExplorePeriodStats {
     users: periods.reduce((sum, p) => sum + p.users, 0),
     avgTime: periods.find((p) => p.avgTime !== "–")?.avgTime ?? "–",
   };
+}
+
+/** "10.09.2026" -> a comparable Date, for picking the earliest of several
+ * tours' First Impression dates (a customer with more than one MP-Skin
+ * nummer under one deal has been present since whichever tour went live
+ * first, not the last one checked). */
+function parseLabelDate(label: string): Date | null {
+  const match = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec(label);
+  if (!match) return null;
+  return new Date(Number(match[3]), Number(match[2]) - 1, Number(match[1]));
+}
+
+function earliestLabel(labels: string[]): string {
+  let best: { label: string; date: Date } | null = null;
+  for (const label of labels) {
+    const date = parseLabelDate(label);
+    if (date && (!best || date < best.date)) best = { label, date };
+  }
+  return best?.label ?? "";
 }

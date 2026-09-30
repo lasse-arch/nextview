@@ -378,6 +378,26 @@ async function fetchOneTourStats(page: Page, mpSkinId: string, resultIndex: numb
  * rooms). Every case sums into one set of numbers; the first tour's cover
  * photo is used as the report's hero image.
  */
+/**
+ * Fetches just one tour's cover photo from explore.nextview360.dk's own
+ * cache - used as the visitor-stats report's hero image even when the
+ * numeric stats themselves come from Matterport directly (see
+ * explore-matterport.ts). This system's own cache holds a specifically
+ * chosen cover photo per tour, which is more reliable than trying to guess
+ * a cover photo out of Matterport's own UI (tried, confirmed wrong).
+ */
+export async function fetchExploreCoverImage(mpSkinId: string): Promise<Buffer> {
+  const browser = await launchBrowser();
+  try {
+    const page = await browser.newPage();
+    await page.setViewport({ width: 1600, height: 1000 });
+    await ensureOnSearchPage(page);
+    return await fetchImageAsBuffer(page, `${BASE_URL}/cache/tour-cache-mpApi-${mpSkinId}-cover-.png`);
+  } finally {
+    await browser.close();
+  }
+}
+
 export async function fetchExploreTourData(mpSkinIds: string | string[]): Promise<ExploreTourData> {
   const ids = Array.isArray(mpSkinIds) ? mpSkinIds : [mpSkinIds];
   const browser = await launchBrowser();

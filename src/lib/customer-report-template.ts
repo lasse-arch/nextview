@@ -29,13 +29,12 @@ function fmtInt(n: number, language: ReportLanguage): string {
 const TEXT: Record<ReportLanguage, {
   eyebrow: string;
   viewsHeading: string;
+  viewsCaption: string;
   last7: string;
   last30: string;
   last90: string;
   since: (label: string) => string;
-  sessions: string;
   users: string;
-  avgTime: string;
   footnote: string;
   tipsHeading: string;
   tips: { title: string; body: string }[];
@@ -43,13 +42,12 @@ const TEXT: Record<ReportLanguage, {
   DA: {
     eyebrow: "Besøgsrapport for jeres virtuelle tour",
     viewsHeading: "Visninger",
+    viewsCaption: "visninger",
     last7: "Seneste 7 dage",
     last30: "Seneste 30 dage",
     last90: "Seneste 90 dage",
     since: (label) => `Siden ${label}`,
-    sessions: "sessions",
     users: "brugere",
-    avgTime: "gns. tid",
     footnote:
       "Tallene er udelukkende baseret på visninger via explore.nextview360.dk og bør derfor afspejle reelle visninger fra interesserede kunder.",
     tipsHeading: "5 gode råd til flere besøgende",
@@ -79,13 +77,12 @@ const TEXT: Record<ReportLanguage, {
   EN: {
     eyebrow: "Visitor report for your virtual tour",
     viewsHeading: "Views",
+    viewsCaption: "views",
     last7: "Last 7 days",
     last30: "Last 30 days",
     last90: "Last 90 days",
     since: (label) => `Since ${label}`,
-    sessions: "sessions",
     users: "users",
-    avgTime: "avg. time",
     footnote:
       "These figures are based solely on views via explore.nextview360.dk and should therefore reflect genuine views from interested customers.",
     tipsHeading: "5 tips to get more visitors",
@@ -120,10 +117,9 @@ function periodCard(label: string, stats: ExploreTourStats["last7Days"], languag
     <div class="period-card${highlight ? " highlight" : ""}">
       <div class="period-label">${label}</div>
       <div class="visits">${fmtInt(stats.visits, language)}</div>
+      <div class="visits-caption">${t.viewsCaption}</div>
       <div class="submetrics">
-        <div><span>${fmtInt(stats.sessions, language)}</span> ${t.sessions}</div>
-        <div><span>${fmtInt(stats.users, language)}</span> ${t.users}</div>
-        <div><span>${stats.avgTime}</span> ${t.avgTime}</div>
+        <span>${fmtInt(stats.users, language)}</span> ${t.users}
       </div>
     </div>`;
 }
@@ -166,13 +162,15 @@ const REPORT_STYLE = `
   .content-page h2 { font-size: 34px; font-weight: 700; letter-spacing: -0.01em; margin: 0 0 22px 0; color: #1d1d1f; }
 
   .period-grid { display: flex; gap: 20px; margin-bottom: 40px; }
-  .period-card { flex: 1; background: #f5f5f7; border-radius: 20px; padding: 26px 24px; }
-  .period-card.highlight { background: linear-gradient(160deg, #eef4ff 0%, #e4edff 100%); }
+  .period-card { flex: 1; background: #f5f5f7; border-radius: 20px; padding: 28px 24px 24px 24px; display: flex; flex-direction: column; }
+  .period-card.highlight { background: linear-gradient(160deg, #eef4ff 0%, #e4edff 100%); box-shadow: 0 8px 24px -12px rgba(47,95,214,0.35); }
   .period-card .period-label { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; color: #86868b; text-transform: uppercase; }
   .period-card.highlight .period-label { color: #2f5fd6; }
-  .period-card .visits { font-size: 46px; font-weight: 700; letter-spacing: -0.02em; color: #1d1d1f; margin: 10px 0 18px 0; }
+  .period-card .visits { font-size: 48px; font-weight: 700; letter-spacing: -0.02em; color: #1d1d1f; margin: 12px 0 0 0; line-height: 1; }
   .period-card.highlight .visits { color: #1d3f9e; }
-  .period-card .submetrics { border-top: 1px solid rgba(0,0,0,0.08); padding-top: 14px; font-size: 14px; color: #48484a; display: flex; flex-direction: column; gap: 7px; }
+  .period-card .visits-caption { font-size: 13px; color: #86868b; margin: 5px 0 20px 0; }
+  .period-card.highlight .visits-caption { color: #5b7bc9; }
+  .period-card .submetrics { margin-top: auto; border-top: 1px solid rgba(0,0,0,0.08); padding-top: 14px; font-size: 14px; color: #48484a; }
   .period-card .submetrics span { font-weight: 600; color: #1d1d1f; }
 
   .footnote { font-size: 13px; color: #86868b; font-style: italic; margin-top: 8px; }

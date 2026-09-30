@@ -3,6 +3,7 @@ import { PDFDocument } from "pdf-lib";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { generateCustomerReportPdfBuffer } from "@/lib/customer-report-service";
+import { currentMonthLabel } from "@/lib/customer-report-template";
 import { dealName } from "@/lib/labels";
 
 // Rendering each PDF (headless Chromium) can take a few seconds per deal -
@@ -80,8 +81,8 @@ export async function GET(request: NextRequest) {
 
   const fileName =
     pdfBuffers.length === 1 && deals.length === 1
-      ? `${dealName(deals[0])} - besøgsrapport.pdf`
-      : `Besøgsrapporter.pdf`;
+      ? `Besøgsrapport ${dealName(deals[0])} ${currentMonthLabel(deals[0].reportLanguage)}.pdf`
+      : `Besøgsrapporter ${currentMonthLabel("DA")}.pdf`;
 
   return new NextResponse(new Blob([new Uint8Array(finalBytes)], { type: "application/pdf" }), {
     status: 200,
