@@ -269,20 +269,40 @@ async function login(page: Page): Promise<void> {
  * having to independently judge "does this look like a logged-in session"
  * (which is what kept breaking in new ways - see file-level doc comment).
  */
+/** Polls for up to ~8s for either `expectedMarker` to show up or a login
+ * form to appear, instead of a single fixed sleep - confirmed necessary: a
+ * real run redirected to a dedicated auth subdomain (`authn.matterport.com`,
+ * separate from `my.matterport.com`) whose SPA apparently hadn't finished
+ * booting yet after only 1.5s (the page's own text was still completely
+ * empty), so neither check had anything real to go on. Returns which case
+ * was found (or neither, if both timed out), along with the last text/url
+ * seen, for the caller to act on. */
+async function waitForMarkerOrLoginForm(
+  page: Page,
+  expectedMarker: RegExp
+): Promise<{ found: "marker" | "loginForm" | "neither"; text: string }> {
+  let text = "";
+  for (let i = 0; i < 16; i++) {
+    await sleep(500);
+    text = await page.evaluate(() => document.body.innerText).catch(() => "");
+    if (expectedMarker.test(text)) return { found: "marker", text };
+    const looksLikeLoginForm =
+      (await page.$('input[type="password"]')) !== null ||
+      (await page.$('input[type="email"], input[name="email"], input[name="username"], #email')) !== null;
+    if (looksLikeLoginForm) return { found: "loginForm", text };
+  }
+  return { found: "neither", text };
+}
+
 async function ensureAuthenticatedOn(page: Page, targetUrl: string, expectedMarker: RegExp): Promise<void> {
   await gotoRetry(page, targetUrl);
-  await sleep(1500);
   await dismissCookieBanner(page);
 
-  let text = await page.evaluate(() => document.body.innerText).catch(() => "");
-  if (expectedMarker.test(text)) return;
-
-  const looksLikeLoginForm =
-    (await page.$('input[type="password"]')) !== null ||
-    (await page.$('input[type="email"], input[name="email"], input[name="username"], #email')) !== null;
-  if (!looksLikeLoginForm) {
+  let result = await waitForMarkerOrLoginForm(page, expectedMarker);
+  if (result.found === "marker") return;
+  if (result.found === "neither") {
     throw new Error(
-      `Landede hverken på login-formularen eller den ønskede side (url: ${page.url()}, uddrag: "${pageSnippet(text)}").`
+      `Landede hverken på login-formularen eller den ønskede side (url: ${page.url()}, uddrag: "${pageSnippet(result.text)}").`
     );
   }
 
@@ -292,12 +312,11 @@ async function ensureAuthenticatedOn(page: Page, targetUrl: string, expectedMark
   // successful submit - re-navigating explicitly too is cheap insurance
   // against it landing somewhere generic instead.
   await gotoRetry(page, targetUrl);
-  await sleep(1500);
-  text = await page.evaluate(() => document.body.innerText).catch(() => "");
-  if (!expectedMarker.test(text)) {
+  result = await waitForMarkerOrLoginForm(page, expectedMarker);
+  if (result.found !== "marker") {
     const bannerStillUp = await cookieBannerVisible(page);
     throw new Error(
-      `Stadig ikke logget ind efter forsøg (url: ${page.url()}, cookie-banner stadig synligt: ${bannerStillUp ? "ja" : "nej"}, uddrag: "${pageSnippet(text)}").`
+      `Stadig ikke logget ind efter forsøg (url: ${page.url()}, cookie-banner stadig synligt: ${bannerStillUp ? "ja" : "nej"}, uddrag: "${pageSnippet(result.text)}").`
     );
   }
 }
