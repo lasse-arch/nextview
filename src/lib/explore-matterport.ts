@@ -1,6 +1,12 @@
 import puppeteer, { type Browser, type ElementHandle, type Page } from "puppeteer-core";
 import chromium from "@sparticuz/chromium";
-import { fetchExploreCoverImage, type ExploreTourData, type ExploreTourStats, type ExplorePeriodStats } from "./explore-nextview360";
+import {
+  fetchExploreCoverImage,
+  fetchExploreTourData,
+  type ExploreTourData,
+  type ExploreTourStats,
+  type ExplorePeriodStats,
+} from "./explore-nextview360";
 
 /**
  * Pulls visitor stats straight from Matterport's own dashboard
@@ -468,20 +474,41 @@ export async function fetchMatterportTourData(mpSkinIds: string | string[]): Pro
     // Cover photo comes from explore.nextview360.dk's own cache instead of
     // Matterport - that system holds a specifically chosen cover photo per
     // tour, more reliable than guessing one out of Matterport's own UI
-    // (tried, confirmed wrong - see git history).
-    const coverImage = await fetchExploreCoverImage(ids[0]);
+    // (tried, confirmed wrong - see git history). While we're logging into
+    // that same account anyway, its own stats page also has a real average-
+    // time-on-tour figure Matterport's dashboard doesn't expose at all - so
+    // the full fetchExploreTourData is tried first (cover + real avgTime
+    // per period), falling back to just the cover photo alone if that
+    // scrape fails, since explore.nextview360.dk's flow has historically
+    // been the flakier of the two sites and shouldn't be able to sink an
+    // otherwise-successful Matterport-based report over a "nice to have".
+    let coverImage: Buffer;
+    let avgTimeByPeriod: Pick<ExploreTourStats, "last7Days" | "last30Days" | "last90Days" | "sinceStats"> | null = null;
+    try {
+      const exploreData = await fetchExploreTourData(ids);
+      coverImage = exploreData.coverImage;
+      avgTimeByPeriod = exploreData.stats;
+    } catch (err) {
+      console.error("Kunne ikke hente gns. tid fra explore.nextview360.dk - fortsætter uden", err);
+      coverImage = await fetchExploreCoverImage(ids[0]);
+    }
 
     const visits = allStats.reduce((sum, s) => sum + s.sinceStats.visits, 0);
     const sessions = allStats.reduce((sum, s) => sum + s.sinceStats.sessions, 0);
     const users = allStats.reduce((sum, s) => sum + s.sinceStats.users, 0);
 
+    const withAvgTime = (period: ExplorePeriodStats, avgTime: string | undefined): ExplorePeriodStats => ({
+      ...period,
+      avgTime: avgTime ?? period.avgTime,
+    });
+
     return {
       stats: {
-        last7Days: sumAll(allStats.map((s) => s.last7Days)),
-        last30Days: sumAll(allStats.map((s) => s.last30Days)),
-        last90Days: sumAll(allStats.map((s) => s.last90Days)),
+        last7Days: withAvgTime(sumAll(allStats.map((s) => s.last7Days)), avgTimeByPeriod?.last7Days.avgTime),
+        last30Days: withAvgTime(sumAll(allStats.map((s) => s.last30Days)), avgTimeByPeriod?.last30Days.avgTime),
+        last90Days: withAvgTime(sumAll(allStats.map((s) => s.last90Days)), avgTimeByPeriod?.last90Days.avgTime),
         sinceLabel: earliestLabel(allStats.map((s) => s.sinceLabel)),
-        sinceStats: { visits, sessions, users, avgTime: allStats[0]?.sinceStats.avgTime ?? "–" },
+        sinceStats: withAvgTime({ visits, sessions, users, avgTime: "–" }, avgTimeByPeriod?.sinceStats.avgTime),
       },
       coverImage,
     };
