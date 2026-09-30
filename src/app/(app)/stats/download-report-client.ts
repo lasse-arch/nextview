@@ -1,3 +1,24 @@
+/** Pulls the real filename (deal name + date) out of the response's own
+ * Content-Disposition header - set by the API route, e.g.
+ * `attachment; filename="report.pdf"; filename*=UTF-8''Bes%C3%B8gsrapport...` -
+ * rather than a hardcoded generic name, which was silently overriding the
+ * server's filename entirely (the `download` attribute on a manually
+ * created `<a>` wins over anything in the response headers). Falls back to
+ * a generic name only if the header is missing/unparseable. */
+function filenameFromContentDisposition(header: string | null, fallback: string): string {
+  if (!header) return fallback;
+  const utf8Match = header.match(/filename\*=UTF-8''([^;]+)/i);
+  if (utf8Match) {
+    try {
+      return decodeURIComponent(utf8Match[1]);
+    } catch {
+      // fall through to the plain filename below
+    }
+  }
+  const plainMatch = header.match(/filename="([^"]+)"/i);
+  return plainMatch ? plainMatch[1] : fallback;
+}
+
 /**
  * Fetches the merged/single PDF from /api/stats/download-report and triggers
  * a normal browser download - a plain `<a href>` can't show an error toast or
@@ -22,11 +43,13 @@ export async function downloadCustomerReportPdf(dealIds: string[], showToast: (m
   }
 
   const skippedCount = Number(res.headers.get("X-Skipped-Count") || "0");
+  const fallbackName = dealIds.length === 1 ? "besøgsrapport.pdf" : "besøgsrapporter.pdf";
+  const fileName = filenameFromContentDisposition(res.headers.get("Content-Disposition"), fallbackName);
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = dealIds.length === 1 ? "besøgsrapport.pdf" : "besøgsrapporter.pdf";
+  link.download = fileName;
   document.body.appendChild(link);
   link.click();
   link.remove();

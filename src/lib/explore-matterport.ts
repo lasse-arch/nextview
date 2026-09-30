@@ -451,6 +451,14 @@ export async function fetchMatterportTourData(mpSkinIds: string | string[]): Pro
   try {
     const page = await browser.newPage();
     await page.setViewport({ width: 1600, height: 1000 });
+    // Matterport's "First Impression" date renders using the browser's own
+    // local timezone - a headless Chromium instance otherwise defaults to
+    // UTC, which can roll a late-night Danish timestamp back a calendar day
+    // (confirmed suspect: a real report showed 09.09.2026 where the account's
+    // own UI showed Sep 10). Emulating Danish local time keeps the date the
+    // report shows in sync with what the account owner sees when checking
+    // manually.
+    await page.emulateTimezone("Europe/Copenhagen");
 
     const allStats: ExploreTourStats[] = [];
     for (const sid of ids) {

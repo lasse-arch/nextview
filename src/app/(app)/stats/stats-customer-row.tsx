@@ -198,7 +198,7 @@ export function StatsCustomerRow({
             }
           />
         ) : (
-          "Aldrig sendt"
+          <span className="italic text-slate-400">Aldrig sendt</span>
         )}
       </td>
       <td className="px-3 py-2">

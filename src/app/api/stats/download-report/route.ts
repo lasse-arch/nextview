@@ -6,9 +6,14 @@ import { generateCustomerReportPdfBuffer } from "@/lib/customer-report-service";
 import { currentMonthLabel } from "@/lib/customer-report-template";
 import { dealName } from "@/lib/labels";
 
-// Rendering each PDF (headless Chromium) can take a few seconds per deal -
-// generous ceiling for a handful of customers downloaded together.
-export const maxDuration = 120;
+// Each deal's stats now come from a real Matterport browser-scrape (login +
+// several page loads), not the old faster bulk system - noticeably slower
+// per deal, so this ceiling is set high to give a "download all" attempt a
+// real chance; Vercel will clamp it to whatever the plan actually allows.
+// A very large customer list can still realistically exceed even this - if
+// it does in practice, downloading all of them in one request isn't viable
+// and this should move to some kind of background/chunked approach instead.
+export const maxDuration = 300;
 
 /**
  * "Download PDF" on the /stats page - one or several deal ids (comma-

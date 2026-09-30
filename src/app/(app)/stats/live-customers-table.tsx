@@ -62,6 +62,20 @@ export function LiveCustomersTable({ rows }: { rows: StatsCustomerRowData[] }) {
     startDownload(() => downloadCustomerReportPdf(ids, showToast));
   }
 
+  /** Downloads every live customer that actually has an MP-Skin nummer, as
+   * one merged PDF - a dedicated one-click action rather than requiring
+   * "select all" first. Each deal now needs its own real Matterport
+   * browser-scrape (much slower than the old bulk system), so this can take
+   * a while for a large customer list - the download route's own
+   * maxDuration is set generously to match. */
+  function downloadAll() {
+    const ids = rows.filter((r) => r.mpSkinId).map((r) => r.dealId);
+    if (ids.length === 0) return;
+    startDownload(() => downloadCustomerReportPdf(ids, showToast));
+  }
+
+  const eligibleCount = rows.filter((r) => r.mpSkinId).length;
+
   return (
     <div>
       <div className="mb-3 flex items-center justify-between gap-3">
@@ -69,6 +83,15 @@ export function LiveCustomersTable({ rows }: { rows: StatsCustomerRowData[] }) {
           {selected.size > 0 ? `${selected.size} valgt` : "Vælg en eller flere kunder for at sende eller downloade samlet"}
         </p>
         <div className="flex shrink-0 gap-2">
+          <button
+            type="button"
+            disabled={eligibleCount === 0 || downloading}
+            onClick={downloadAll}
+            title="Download én samlet PDF med alle live kunder der har et MP-Skin nummer"
+            className="whitespace-nowrap rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+          >
+            {downloading ? "Henter…" : `Download alle (${eligibleCount})`}
+          </button>
           <button
             type="button"
             disabled={selected.size === 0 || downloading}

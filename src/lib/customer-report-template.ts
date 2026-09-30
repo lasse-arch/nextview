@@ -111,16 +111,18 @@ const TEXT: Record<ReportLanguage, {
   },
 };
 
+const EYE_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"/><circle cx="12" cy="12" r="3"/></svg>`;
+const USERS_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="10" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`;
+
 function periodCard(label: string, stats: ExploreTourStats["last7Days"], language: ReportLanguage, highlight = false): string {
   const t = TEXT[language];
   return `
     <div class="period-card${highlight ? " highlight" : ""}">
+      <div class="icon-badge">${EYE_ICON}</div>
       <div class="period-label">${label}</div>
       <div class="visits">${fmtInt(stats.visits, language)}</div>
       <div class="visits-caption">${t.viewsCaption}</div>
-      <div class="submetrics">
-        <span>${fmtInt(stats.users, language)}</span> ${t.users}
-      </div>
+      <div class="submetrics"><span class="submetric-icon">${USERS_ICON}</span><span>${fmtInt(stats.users, language)}</span> ${t.users}</div>
     </div>`;
 }
 
@@ -162,16 +164,28 @@ const REPORT_STYLE = `
   .content-page h2 { font-size: 34px; font-weight: 700; letter-spacing: -0.01em; margin: 0 0 22px 0; color: #1d1d1f; }
 
   .period-grid { display: flex; gap: 20px; margin-bottom: 40px; }
-  .period-card { flex: 1; background: #f5f5f7; border-radius: 20px; padding: 28px 24px 24px 24px; display: flex; flex-direction: column; }
-  .period-card.highlight { background: linear-gradient(160deg, #eef4ff 0%, #e4edff 100%); box-shadow: 0 8px 24px -12px rgba(47,95,214,0.35); }
+  .period-card {
+    flex: 1; position: relative; overflow: hidden; background: #fff;
+    border: 1px solid rgba(0,0,0,0.05); border-radius: 20px; padding: 26px 24px 22px 24px;
+    display: flex; flex-direction: column;
+    box-shadow: 0 6px 20px -12px rgba(20,20,40,0.14);
+  }
+  .period-card::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 5px; background: linear-gradient(90deg, #a9c3f7, #2f5fd6); }
+  .period-card.highlight { background: linear-gradient(160deg, #eef4ff 0%, #e4edff 100%); box-shadow: 0 10px 28px -12px rgba(47,95,214,0.4); }
+  .period-card.highlight::before { background: linear-gradient(90deg, #2f5fd6, #16297a); }
+  .period-card .icon-badge { width: 30px; height: 30px; border-radius: 9px; background: #eef4ff; display: flex; align-items: center; justify-content: center; margin-bottom: 14px; }
+  .period-card .icon-badge svg { width: 15px; height: 15px; color: #2f5fd6; }
+  .period-card.highlight .icon-badge { background: rgba(255,255,255,0.6); }
   .period-card .period-label { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; color: #86868b; text-transform: uppercase; }
   .period-card.highlight .period-label { color: #2f5fd6; }
   .period-card .visits { font-size: 48px; font-weight: 700; letter-spacing: -0.02em; color: #1d1d1f; margin: 12px 0 0 0; line-height: 1; }
   .period-card.highlight .visits { color: #1d3f9e; }
   .period-card .visits-caption { font-size: 13px; color: #86868b; margin: 5px 0 20px 0; }
   .period-card.highlight .visits-caption { color: #5b7bc9; }
-  .period-card .submetrics { margin-top: auto; border-top: 1px solid rgba(0,0,0,0.08); padding-top: 14px; font-size: 14px; color: #48484a; }
-  .period-card .submetrics span { font-weight: 600; color: #1d1d1f; }
+  .period-card .submetrics { margin-top: auto; border-top: 1px solid rgba(0,0,0,0.08); padding-top: 14px; font-size: 14px; color: #48484a; display: flex; align-items: center; gap: 6px; }
+  .period-card .submetrics span:not(.submetric-icon) { font-weight: 600; color: #1d1d1f; }
+  .period-card .submetric-icon { display: inline-flex; }
+  .period-card .submetric-icon svg { width: 13px; height: 13px; color: #86868b; }
 
   .footnote { font-size: 13px; color: #86868b; font-style: italic; margin-top: 8px; }
   .page-footer { position: absolute; left: 72px; bottom: 40px; }
