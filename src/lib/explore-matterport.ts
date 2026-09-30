@@ -97,15 +97,51 @@ async function cookieBannerVisible(page: Page): Promise<boolean> {
 }
 
 /**
- * Dismisses a OneTrust-style cookie-consent banner if one is showing - see
- * jsClick's doc comment for why a banner ended up a suspect at all. Tries
- * OneTrust's own well-known button id first, then falls back to matching an
- * accept-style button by its text (deliberately excluding "Manage
- * Preferences", which opens a settings panel rather than dismissing it).
+ * Forcibly removes whatever element is showing the cookie-consent boilerplate
+ * from the DOM, rather than trying to click a specific "accept"-labelled
+ * button - the confirmed production text ("utilizes technologies such as
+ * cookies...") doesn't match any well-known consent platform's default
+ * button id/text closely enough to guess reliably (OneTrust's own id didn't
+ * match, and a follow-up run showed the text-based "accept"-label click
+ * didn't work either, immediately after a DIFFERENT run where the exact
+ * same approach succeeded - i.e. flaky/unreliable, not consistently wrong in
+ * the same way). Removing the element outright sidesteps needing to guess
+ * its real button's exact wording at all: finds the smallest element whose
+ * own text contains the banner's boilerplate phrase (walking down from
+ * `document.body` to the most specific containing element, not just any
+ * ancestor) and deletes it, which also means findActionButton's own button
+ * search can no longer land on anything that used to be inside it.
+ */
+async function removeCookieBanner(page: Page): Promise<boolean> {
+  return page
+    .evaluate(() => {
+      const marker = /cookie policy|manage preferences|utilizes technologies such as cookies/i;
+      let el: Element | null = document.body;
+      // Descend into the most specific single child that still contains the
+      // marker text, so we remove just the banner - not `<body>` itself.
+      while (el) {
+        const child: Element | undefined = Array.from(el.children).find((c) => marker.test(c.textContent ?? ""));
+        if (!child) break;
+        el = child;
+      }
+      if (el && el !== document.body) {
+        el.remove();
+        return true;
+      }
+      return false;
+    })
+    .catch(() => false);
+}
+
+/**
+ * Dismisses a cookie-consent banner if one is showing - see jsClick's doc
+ * comment for why a banner ended up a suspect at all. Tries a real click
+ * first (OneTrust's well-known button id, then an accept-labelled button by
+ * text), then - since which of those actually works has proven inconsistent
+ * across real runs - forcibly removes the banner element outright as a
+ * fallback that doesn't depend on guessing its exact button correctly.
  * Returns whether the banner's own text is confirmed gone afterwards, not
- * just whether a click happened - a click that missed (wrong button,
- * nothing matched) should be visible as "still showing" rather than
- * silently assumed to have worked.
+ * just whether a click/removal was attempted.
  */
 async function dismissCookieBanner(page: Page): Promise<boolean> {
   if (!(await cookieBannerVisible(page))) return true;
@@ -129,7 +165,9 @@ async function dismissCookieBanner(page: Page): Promise<boolean> {
     await sleep(500);
     if (!(await cookieBannerVisible(page))) return true;
   }
-  return false;
+
+  await removeCookieBanner(page);
+  return !(await cookieBannerVisible(page));
 }
 
 /**
@@ -229,6 +267,7 @@ async function login(page: Page): Promise<void> {
     );
   }
   await passwordField.type(password, { delay: 30 });
+  await dismissCookieBanner(page);
 
   const submitBtn = await findActionButton(page);
   if (submitBtn) await jsClick(page, submitBtn);
