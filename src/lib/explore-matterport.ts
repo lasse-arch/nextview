@@ -16,15 +16,22 @@ import type { ExploreTourData, ExploreTourStats, ExplorePeriodStats } from "./ex
  * Lifetime period toggle (buttons with that exact text). That part of this
  * file is built directly off that confirmed layout, not a guess.
  *
- * Still UNVERIFIED: the login flow (login() below) and the cover-image
- * fetch, since no screenshot of either has been seen yet - the sandbox this
- * runs in can't reach my.matterport.com with a trusted TLS chain from
- * headless Chromium (see the CA-import note in git history), so those two
- * pieces are still a best-effort guess and may need adjusting from the
- * first real error message Vercel's production run throws.
+ * AUTH APPROACH: rather than visiting a separate hardcoded /login page
+ * first and then separately judging whether that succeeded (which is what
+ * this used to do, and which kept breaking in new ways - see git history:
+ * an organization-scoped post-login URL still containing the literal text
+ * "login", a cookie banner that was actually irrelevant noise by that
+ * point, ...), every call now navigates straight to the real page it
+ * wants (a model's stats page). If already authenticated, that page loads
+ * directly. If not, Matterport's own auth wall redirects to a login form
+ * and - after a successful submit - redirects back to that exact
+ * originally-requested page, so success is judged by the real target
+ * content actually showing up (see ensureAuthenticatedOn), not by a
+ * generic "looks logged in" signal that has proven to vary.
+ *
+ * Still UNVERIFIED: the cover-image fetch, since no screenshot of it has
+ * been seen yet.
  */
-
-const LOGIN_URL = "https://my.matterport.com/login";
 
 function credentials(): { email: string; password: string } {
   const email = process.env.MATTERPORT_EMAIL;
@@ -196,46 +203,17 @@ async function findActionButton(page: Page): Promise<ElementHandle<Element> | nu
 }
 
 /**
- * Whether the page currently shows signs of being logged in - checked by
- * actual page content, not by the URL. CONFIRMED necessary from a real
- * production run: after a successful login, Matterport redirected to
- * `/login?organization=<id>` (apparently a normal post-login landing
- * variant for an organization/business account) - the URL kept the literal
- * substring "login" even though the page's own sidebar nav (the same
- * authenticated chrome seen in the confirmed Analytics-tab screenshots -
- * "Your Spaces", "Analytics", "Capture Services", "Account", "Users", ...)
- * was already showing, so a URL-substring check misreported a genuine
- * success as a failure. A leftover password field is the one reliable
- * negative signal left.
- */
-async function isLoggedIn(page: Page): Promise<boolean> {
-  if (await page.$('input[type="password"]')) return false;
-  const text = await page.evaluate(() => document.body.innerText).catch(() => "");
-  return /your spaces|all spaces|capture services/i.test(text);
-}
-
-/** Polls for up to ~8s for isLoggedIn to become true, rather than a single
- * fixed sleep - a client-side redirect after a successful submit can take a
- * moment, and a fixed too-short wait would misreport a genuine
- * success-in-progress as a failure. */
-async function waitForLoginToResolve(page: Page): Promise<void> {
-  for (let i = 0; i < 16; i++) {
-    if (await isLoggedIn(page)) return;
-    await sleep(500);
-  }
-}
-
-/**
- * Logs into my.matterport.com - see the file-level doc comment: these
- * selectors are an educated guess, not confirmed against the real site.
- * Tries a two-step (email, then password appears) flow first since that's
- * the more common modern pattern, falling back to a single combined form.
+ * Fills and submits Matterport's login form on the CURRENT page - assumes
+ * the caller already navigated somewhere showing a login form (see
+ * ensureAuthenticatedOn, which drives this by hitting a protected page
+ * directly rather than a separate hardcoded /login page). Only checks that
+ * it could interact with the form at all; whether the login actually
+ * succeeded is judged by the caller re-checking its real target page, not
+ * by anything checked in here.
  */
 async function login(page: Page): Promise<void> {
   const { email, password } = credentials();
-  await gotoRetry(page, LOGIN_URL);
-  await sleep(2000);
-  const bannerGoneInitially = await dismissCookieBanner(page);
+  await dismissCookieBanner(page);
 
   const emailField = await firstMatch(page, [
     'input[type="email"]',
@@ -246,7 +224,7 @@ async function login(page: Page): Promise<void> {
   if (!emailField) {
     const text = await page.evaluate(() => document.body.innerText).catch(() => "");
     throw new Error(
-      `Kunne ikke finde e-mail-feltet på Matterports login-side (url: ${page.url()}, cookie-banner lukket: ${bannerGoneInitially ? "ja" : "nej"}, uddrag: "${pageSnippet(text)}").`
+      `Kunne ikke finde e-mail-feltet på Matterports login-side (url: ${page.url()}, uddrag: "${pageSnippet(text)}").`
     );
   }
   await emailField.type(email, { delay: 30 });
@@ -271,13 +249,55 @@ async function login(page: Page): Promise<void> {
 
   const submitBtn = await findActionButton(page);
   if (submitBtn) await jsClick(page, submitBtn);
-  await waitForLoginToResolve(page);
 
-  if (!(await isLoggedIn(page))) {
-    const bannerStillUp = await cookieBannerVisible(page);
-    const text = await page.evaluate(() => document.body.innerText).catch(() => "");
+  // Give the submit's redirect a moment to start before handing control
+  // back - the real success check happens in ensureAuthenticatedOn against
+  // the actual target page, not a generic "looks logged in" signal here.
+  for (let i = 0; i < 10; i++) {
+    if (!(await page.$('input[type="password"]'))) break;
+    await sleep(500);
+  }
+}
+
+/**
+ * Navigates straight to a protected page (the real target - e.g. a model's
+ * stats page) instead of a separate hardcoded /login page first. If not
+ * authenticated, Matterport's own auth wall redirects to a login form and,
+ * after a successful submit, should redirect back to that exact originally-
+ * requested page - success is judged purely by whether `expectedMarker`
+ * (the target page's own confirmed content) shows up, sidestepping ever
+ * having to independently judge "does this look like a logged-in session"
+ * (which is what kept breaking in new ways - see file-level doc comment).
+ */
+async function ensureAuthenticatedOn(page: Page, targetUrl: string, expectedMarker: RegExp): Promise<void> {
+  await gotoRetry(page, targetUrl);
+  await sleep(1500);
+  await dismissCookieBanner(page);
+
+  let text = await page.evaluate(() => document.body.innerText).catch(() => "");
+  if (expectedMarker.test(text)) return;
+
+  const looksLikeLoginForm =
+    (await page.$('input[type="password"]')) !== null ||
+    (await page.$('input[type="email"], input[name="email"], input[name="username"], #email')) !== null;
+  if (!looksLikeLoginForm) {
     throw new Error(
-      `Login på Matterport lykkedes tilsyneladende ikke (url: ${page.url()}, cookie-banner stadig synligt: ${bannerStillUp ? "ja" : "nej"}, uddrag: "${pageSnippet(text)}").`
+      `Landede hverken på login-formularen eller den ønskede side (url: ${page.url()}, uddrag: "${pageSnippet(text)}").`
+    );
+  }
+
+  await login(page);
+
+  // Matterport should redirect back to targetUrl on its own after a
+  // successful submit - re-navigating explicitly too is cheap insurance
+  // against it landing somewhere generic instead.
+  await gotoRetry(page, targetUrl);
+  await sleep(1500);
+  text = await page.evaluate(() => document.body.innerText).catch(() => "");
+  if (!expectedMarker.test(text)) {
+    const bannerStillUp = await cookieBannerVisible(page);
+    throw new Error(
+      `Stadig ikke logget ind efter forsøg (url: ${page.url()}, cookie-banner stadig synligt: ${bannerStillUp ? "ja" : "nej"}, uddrag: "${pageSnippet(text)}").`
     );
   }
 }
@@ -332,21 +352,54 @@ async function fetchPeriodMetrics(page: Page, buttonLabel: string): Promise<Expl
   return parseVisibleMetrics(text) ?? zeroPeriod;
 }
 
-async function fetchCoverImage(page: Page, sid: string): Promise<Buffer | null> {
-  try {
-    const base64 = await page.evaluate(async (modelSid: string) => {
-      const res = await fetch(`https://my.matterport.com/api/v1/models/${modelSid}/thumbnail`);
-      if (!res.ok) return null;
-      const buf = await res.arrayBuffer();
-      const bytes = new Uint8Array(buf);
-      let binary = "";
-      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-      return btoa(binary);
-    }, sid);
-    return base64 ? Buffer.from(base64, "base64") : null;
-  } catch {
-    return null;
+/**
+ * Grabs the model's own cover photo straight from its Space tab (the
+ * default `my.matterport.com/models/<sid>` page, already authenticated -
+ * see ensureAuthenticatedOn) rather than a guessed REST API endpoint, which
+ * a real production run confirmed doesn't exist ("Kunne ikke hente et
+ * cover-billede fra Matterport" - the old `/api/v1/models/.../thumbnail`
+ * call never returned ok). Reading the actual rendered largest `<img>` on
+ * the page it already knows exists needs no new guess about API shape, and
+ * reuses the same already-logged-in browser session rather than adding a
+ * second site/login just for a photo. Relies on the caller already having
+ * authenticated this page (fetchMatterportTourData always calls
+ * fetchOneModelStats - which does - for the same sid first).
+ */
+/** Throws instead of silently returning null on failure - unlike stats,
+ * this has no confirmed structure to fall back on yet, so it's worth
+ * knowing exactly which step failed (no big-enough image on the page vs.
+ * the image request itself failing) rather than a single generic "didn't
+ * work" once this bubbles up to fetchMatterportTourData. */
+async function fetchCoverImageOrThrow(page: Page, sid: string): Promise<Buffer> {
+  await gotoRetry(page, `https://my.matterport.com/models/${sid}`);
+  await sleep(2000);
+  await dismissCookieBanner(page);
+
+  const imgUrl = await page.evaluate(() => {
+    const images = Array.from(document.querySelectorAll("img")).filter(
+      (img) => img.currentSrc && img.naturalWidth >= 200 && img.naturalHeight >= 120
+    );
+    const largest = images.sort((a, b) => b.naturalWidth * b.naturalHeight - a.naturalWidth * a.naturalHeight)[0];
+    return largest?.currentSrc ?? null;
+  });
+  if (!imgUrl) {
+    const text = await page.evaluate(() => document.body.innerText).catch(() => "");
+    throw new Error(`Fandt intet billede stort nok til at være et cover-foto for model "${sid}" (url: ${page.url()}, uddrag: "${pageSnippet(text)}").`);
   }
+
+  const base64 = await page.evaluate(async (url: string) => {
+    const res = await fetch(url);
+    if (!res.ok) return { ok: false as const, status: res.status };
+    const buf = await res.arrayBuffer();
+    const bytes = new Uint8Array(buf);
+    let binary = "";
+    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+    return { ok: true as const, data: btoa(binary) };
+  }, imgUrl);
+  if (!base64.ok) {
+    throw new Error(`Kunne ikke hente billedet "${imgUrl}" for model "${sid}" (status ${base64.status}).`);
+  }
+  return Buffer.from(base64.data, "base64");
 }
 
 /** Confirmed URL for a model's Analytics tab (from a real screenshot). */
@@ -355,15 +408,7 @@ function statsUrl(sid: string): string {
 }
 
 async function fetchOneModelStats(page: Page, sid: string): Promise<ExploreTourStats> {
-  await gotoRetry(page, statsUrl(sid));
-  await sleep(2500);
-
-  const initialText = await page.evaluate(() => document.body.innerText).catch(() => "");
-  if (!/Total Views/i.test(initialText)) {
-    throw new Error(
-      `Statistik-siden for model "${sid}" indeholdt ikke "Total Views" (uddrag: "${pageSnippet(initialText)}") - er MP-Skin nummeret korrekt, og er kontoen logget ind?`
-    );
-  }
+  await ensureAuthenticatedOn(page, statsUrl(sid), /Total Views/i);
 
   return {
     last7Days: await fetchPeriodMetrics(page, "7 days"),
@@ -381,16 +426,27 @@ export async function fetchMatterportTourData(mpSkinIds: string | string[]): Pro
     const page = await browser.newPage();
     await page.setViewport({ width: 1600, height: 1000 });
 
-    await login(page);
-
     let coverImage: Buffer | null = null;
+    let coverImageError: unknown;
     const allStats: ExploreTourStats[] = [];
     for (const sid of ids) {
-      if (!coverImage) coverImage = await fetchCoverImage(page, sid);
+      // fetchOneModelStats always runs first - it's what actually
+      // establishes the authenticated session (see ensureAuthenticatedOn) -
+      // so fetchCoverImageOrThrow can assume the page is already logged in.
       allStats.push(await fetchOneModelStats(page, sid));
+      if (!coverImage) {
+        try {
+          coverImage = await fetchCoverImageOrThrow(page, sid);
+        } catch (err) {
+          coverImageError = err;
+        }
+      }
     }
 
-    if (!coverImage) throw new Error("Kunne ikke hente et cover-billede fra Matterport.");
+    if (!coverImage) {
+      const detail = coverImageError instanceof Error ? coverImageError.message : "ukendt fejl";
+      throw new Error(`Kunne ikke hente et cover-billede fra Matterport: ${detail}`);
+    }
 
     const visits = allStats.reduce((sum, s) => sum + s.sinceStats.visits, 0);
     const sessions = allStats.reduce((sum, s) => sum + s.sinceStats.sessions, 0);
