@@ -31,6 +31,19 @@ export const WEEKDAY_OPTIONS = [
   { value: 0, label: "søndag" },
 ];
 
+/** Mirrors resolveDueDate in lib/actions/tasks.ts - a recurring task with no
+ * due date typed in gets one filled in immediately (nearest upcoming
+ * occurrence of its weekday), so the optimistically-added card shows a date
+ * right away instead of blank until the next server round-trip. */
+export function resolveDueDate(dueDate: Date | null, recurringWeekday: number | null): Date | null {
+  if (dueDate || recurringWeekday === null) return dueDate;
+  const base = new Date();
+  base.setHours(0, 0, 0, 0);
+  const diff = (recurringWeekday - base.getDay() + 7) % 7;
+  base.setDate(base.getDate() + diff);
+  return base;
+}
+
 export type BoardUser = { id: string; name: string; avatarUrl?: string | null };
 export type BoardDealOption = { id: string; name: string };
 
@@ -80,15 +93,16 @@ function NewTaskModal({
         setError(result.error);
         return;
       }
+      const recurringWeekday = recurringWeekdayRaw ? Number(recurringWeekdayRaw) : null;
       onCreated({
         id: result.id,
         title,
         description: String(formData.get("description") || "").trim() || null,
         done: false,
-        dueDate: dueDateRaw ? new Date(dueDateRaw) : null,
+        dueDate: resolveDueDate(dueDateRaw ? new Date(dueDateRaw) : null, recurringWeekday),
         assigneeId,
         dealId,
-        recurringWeekday: recurringWeekdayRaw ? Number(recurringWeekdayRaw) : null,
+        recurringWeekday,
       });
       showToast("Opgave oprettet");
       onClose();

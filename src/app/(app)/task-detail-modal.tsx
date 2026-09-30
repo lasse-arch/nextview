@@ -6,7 +6,7 @@ import { updateTask, deleteTask, addTaskComment, getTaskComments, type TaskComme
 import { formatDateTime } from "@/lib/labels";
 import { useToast } from "@/components/toast";
 import { Avatar } from "@/components/avatar";
-import { WEEKDAY_OPTIONS } from "./opgaver/task-board";
+import { WEEKDAY_OPTIONS, resolveDueDate } from "./opgaver/task-board";
 
 export type ModalTask = {
   id: string;
@@ -67,15 +67,16 @@ export function TaskDetailModal({
       }
       const dueDateRaw = String(formData.get("dueDate") || "");
       const recurringWeekdayRaw = String(formData.get("recurringWeekday") || "");
+      const recurringWeekday = recurringWeekdayRaw ? Number(recurringWeekdayRaw) : null;
       onUpdated({
         id: task.id,
         title: String(formData.get("title") || "").trim(),
         description: String(formData.get("description") || "").trim() || null,
         done: task.done,
-        dueDate: dueDateRaw ? new Date(dueDateRaw) : null,
+        dueDate: resolveDueDate(dueDateRaw ? new Date(dueDateRaw) : null, recurringWeekday),
         assigneeId: String(formData.get("assigneeId") || "") || null,
         dealId: String(formData.get("dealId") || "") || null,
-        recurringWeekday: recurringWeekdayRaw ? Number(recurringWeekdayRaw) : null,
+        recurringWeekday,
       });
       showToast("Opgave gemt");
     });

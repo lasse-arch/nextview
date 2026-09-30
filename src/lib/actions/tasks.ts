@@ -32,6 +32,26 @@ function nextWeekdayAfter(from: Date, targetWeekday: number): Date {
   return base;
 }
 
+/** Nearest occurrence of `targetWeekday` on or after `from` (today counts) -
+ * used to fill in a starting due date for a newly-recurring task that was
+ * left without one, so it shows a date on the board right away instead of
+ * staying blank until it's completed once. */
+function nearestWeekdayOnOrAfter(from: Date, targetWeekday: number): Date {
+  const base = new Date(from);
+  base.setHours(0, 0, 0, 0);
+  const diff = (targetWeekday - base.getDay() + 7) % 7;
+  base.setDate(base.getDate() + diff);
+  return base;
+}
+
+/** A recurring task with no explicit due date gets one auto-filled (the
+ * nearest upcoming occurrence of its weekday) - a due date the user did type
+ * in is always respected as-is, even if it doesn't land on that weekday. */
+function resolveDueDate(dueDate: Date | null, recurringWeekday: number | null): Date | null {
+  if (dueDate || recurringWeekday === null) return dueDate;
+  return nearestWeekdayOnOrAfter(new Date(), recurringWeekday);
+}
+
 /**
  * "Opret opgave"-knap på en note - lidt hurtigere end at åbne opgave-
  * formularen og selv skrive titlen ud igen, når det man vil huske allerede
@@ -67,8 +87,8 @@ export async function createTask(formData: FormData): Promise<TaskResult> {
   const dealId = String(formData.get("dealId") || "").trim() || null;
   const description = String(formData.get("description") || "").trim() || null;
   const dueDateRaw = String(formData.get("dueDate") || "").trim();
-  const dueDate = dueDateRaw ? new Date(dueDateRaw) : null;
   const recurringWeekday = parseRecurringWeekday(formData);
+  const dueDate = resolveDueDate(dueDateRaw ? new Date(dueDateRaw) : null, recurringWeekday);
 
   const task = await prisma.task.create({
     data: { title, description, assigneeId, dealId, dueDate, recurringWeekday, createdById: user.id },
@@ -153,8 +173,8 @@ export async function updateTask(taskId: string, formData: FormData): Promise<Ta
   const dealId = String(formData.get("dealId") || "").trim() || null;
   const description = String(formData.get("description") || "").trim() || null;
   const dueDateRaw = String(formData.get("dueDate") || "").trim();
-  const dueDate = dueDateRaw ? new Date(dueDateRaw) : null;
   const recurringWeekday = parseRecurringWeekday(formData);
+  const dueDate = resolveDueDate(dueDateRaw ? new Date(dueDateRaw) : null, recurringWeekday);
 
   const existing = await prisma.task.findUniqueOrThrow({ where: { id: taskId } });
   await prisma.task.update({
