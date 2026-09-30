@@ -122,6 +122,30 @@ export function extractCvrNumbers(text: string): string[] {
   return [...found];
 }
 
+/** Rough path depth of a URL (number of non-empty `/`-separated segments) -
+ * used to prefer likely article/content pages over a hub page's own
+ * navigation chrome. Confirmed necessary against a real site: the first
+ * MAX_ARTICLE_LINKS links in raw DOM order on a news homepage were entirely
+ * top-level nav (region switchers, category tabs, login/newsletter links -
+ * all depth 0-1), while every real article link was several segments deep
+ * (e.g. "/broenderslev/nyheder/some-article-slug/123456", depth 4) and
+ * appeared much further down the page - so "just take the first N links"
+ * followed zero actual articles, regardless of how many the page linked to. */
+function pathDepth(url: string): number {
+  try {
+    return new URL(url).pathname.split("/").filter(Boolean).length;
+  } catch {
+    return 0;
+  }
+}
+
+/** Picks the links most likely to be real content/article pages rather than
+ * a hub page's own navigation chrome, by sorting deepest-path-first before
+ * the MAX_ARTICLE_LINKS cap is applied - see pathDepth's doc comment. */
+function selectLikelyArticleLinks(links: string[]): string[] {
+  return [...links].sort((a, b) => pathDepth(b) - pathDepth(a));
+}
+
 export function hashContent(text: string): string {
   return crypto.createHash("sha256").update(text).digest("hex");
 }
@@ -130,6 +154,9 @@ export type CvrLeadHit = {
   cvr: string;
   name: string;
   address: string | null;
+  industryText: string | null;
+  industryCode: string | null;
+  website: string | null;
   contactEmail: string | null;
   contactPhone: string | null;
   ownerName: string | null;
@@ -157,7 +184,7 @@ export async function scanUrlForCvrLeads(url: string): Promise<UrlScanResult> {
   const page = await fetchPageText(url);
   if (!page.ok) return page;
 
-  const articleLinks = extractLinks(page.html, url).slice(0, MAX_ARTICLE_LINKS);
+  const articleLinks = selectLikelyArticleLinks(extractLinks(page.html, url)).slice(0, MAX_ARTICLE_LINKS);
   const pageTexts = [page.text];
   for (const link of articleLinks) {
     const article = await fetchPageText(link);
@@ -175,6 +202,9 @@ export async function scanUrlForCvrLeads(url: string): Promise<UrlScanResult> {
         cvr,
         name: result.data.name,
         address: result.data.address,
+        industryText: result.data.industryText,
+        industryCode: result.data.industryCode,
+        website: result.data.website,
         contactEmail: result.data.email,
         contactPhone: result.data.phone,
         ownerName: result.data.contactName,

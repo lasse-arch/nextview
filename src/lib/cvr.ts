@@ -6,7 +6,25 @@ export type CvrCompanyData = {
   email: string | null;
   /** Owner's name, when the register exposes one (mainly sole proprietorships). */
   contactName: string | null;
+  /** Free-text branche description (e.g. "Restauranter"). */
+  industryText: string | null;
+  /** The branche/DB07 code behind `industryText` (e.g. "561010"). */
+  industryCode: string | null;
+  /** Only ever populated from the official register's own contact-info list
+   * (when it happens to include one) - cvrapi.dk doesn't reliably expose a
+   * website field at all, so this stays null via that fallback. */
+  website: string | null;
 };
+
+/** A "phone number" entry in the register's own contact-info list that's
+ * actually a website - confirmed real risk: that list is just an untyped
+ * array of strings, and a bare domain/URL in it would otherwise get
+ * wrongly assigned as the phone number, since the only existing filter was
+ * "doesn't contain @" (true of a phone AND a website). */
+export function looksLikeWebsite(value: string): boolean {
+  const v = value.trim().toLowerCase();
+  return /^(https?:\/\/|www\.)/.test(v) || /\.(dk|com|net|org|nu|eu)(\/|$)/.test(v);
+}
 
 export type CvrLookupResult =
   | { ok: true; data: CvrCompanyData }
@@ -84,7 +102,9 @@ async function lookupViaOfficialApi(cvrNumber: string): Promise<CvrLookupResult>
 
   const contactInfo: string[] = Array.isArray(meta.nyesteKontaktoplysninger) ? meta.nyesteKontaktoplysninger : [];
   const email = contactInfo.find((c) => c.includes("@")) ?? null;
-  const phone = contactInfo.find((c) => !c.includes("@")) ?? null;
+  const website = contactInfo.find((c) => !c.includes("@") && looksLikeWebsite(c)) ?? null;
+  const phone = contactInfo.find((c) => !c.includes("@") && !looksLikeWebsite(c)) ?? null;
+  const hovedbranche = meta.nyesteHovedbranche;
 
   return {
     ok: true,
@@ -95,6 +115,9 @@ async function lookupViaOfficialApi(cvrNumber: string): Promise<CvrLookupResult>
       phone,
       email,
       contactName: null,
+      industryText: hovedbranche?.branchetekst ?? null,
+      industryCode: hovedbranche?.branchekode ?? null,
+      website,
     },
   };
 }
@@ -156,6 +179,10 @@ async function lookupViaCvrApiDk(cvrNumber: string): Promise<CvrLookupResult> {
       phone: typeof json.phone === "string" ? json.phone : json.phone != null ? String(json.phone) : null,
       email: typeof json.email === "string" ? json.email : null,
       contactName,
+      industryText: typeof json.industrydesc === "string" ? json.industrydesc : null,
+      industryCode: typeof json.industrycode === "string" ? json.industrycode : json.industrycode != null ? String(json.industrycode) : null,
+      // cvrapi.dk doesn't reliably expose a website field.
+      website: null,
     },
   };
 }

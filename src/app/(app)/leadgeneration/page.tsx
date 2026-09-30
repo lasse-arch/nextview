@@ -6,7 +6,7 @@ import { LeadCandidateSection } from "./lead-candidate-section";
 export const maxDuration = 300;
 
 export default async function LeadGenerationPage() {
-  const [filters, watchedUrls, candidates] = await Promise.all([
+  const [filters, watchedUrls, candidates, callLists] = await Promise.all([
     prisma.leadFilter.findMany({
       orderBy: { createdAt: "desc" },
       include: { _count: { select: { candidates: { where: { status: "NEW" } } } } },
@@ -22,6 +22,10 @@ export default async function LeadGenerationPage() {
       take: 500,
       include: { filter: { select: { name: true } } },
     }),
+    // For the "Tilføj til ringeliste" quick-action - lets a candidate go
+    // straight into whichever Ringeliste list is currently being worked
+    // from, without leaving Leadgeneration first.
+    prisma.callList.findMany({ orderBy: { createdAt: "desc" }, select: { id: true, name: true } }),
   ]);
 
   return (
@@ -71,6 +75,8 @@ export default async function LeadGenerationPage() {
           cvrNumber: c.cvrNumber,
           address: c.address,
           industryText: c.industryText,
+          industryCode: c.industryCode,
+          website: c.website,
           foundedDate: c.foundedDate ? c.foundedDate.toISOString() : null,
           contactEmail: c.contactEmail,
           contactPhone: c.contactPhone,
@@ -78,6 +84,7 @@ export default async function LeadGenerationPage() {
           sourceLabel: c.filter?.name ?? c.sourceUrl ?? null,
           createdAt: c.createdAt.toISOString(),
         }))}
+        callLists={callLists}
       />
     </div>
   );

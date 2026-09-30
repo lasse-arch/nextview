@@ -92,43 +92,137 @@ export async function runLeadFilterNowAction(
 }
 
 /**
+ * Atomically claims a NEW lead candidate (so two near-simultaneous clicks on
+ * the same candidate can't both succeed - a plain read-then-write here would
+ * let both pass a `status !== "NEW"` check before either one wrote back),
+ * then either attaches it to an existing Deal sharing the same CVR number or
+ * creates a brand-new one. A CVR number is the one genuinely reliable
+ * identity for a company - checking it here (not just the company's name)
+ * is what actually stops "flere filtre laver deals oveni hinanden": several
+ * overlapping filters (or a filter re-matching a company already added
+ * under a slightly different name) used to each spawn their own new Deal
+ * for what was really the same company, since the old code only ran a
+ * cosmetic name-similarity check that never blocked anything.
+ */
+async function claimCandidateAndUpsertDeal(
+  candidateId: string,
+  userId: string,
+  extraDealData: { callListId?: string } = {}
+): Promise<{ dealId: string; created: boolean } | { error: string }> {
+  const candidate = await prisma.leadCandidate.findUniqueOrThrow({ where: { id: candidateId } });
+  if (candidate.status !== "NEW") return { error: "Dette lead er allerede behandlet." };
+
+  const existingDeal = await prisma.deal.findFirst({ where: { cvrNumber: candidate.cvrNumber } });
+
+  const claimed = await prisma.leadCandidate.updateMany({
+    where: { id: candidateId, status: "NEW" },
+    data: { status: "ADDED" },
+  });
+  if (claimed.count === 0) return { error: "Dette lead er allerede behandlet." };
+
+  let dealId: string;
+  let created = false;
+  if (existingDeal) {
+    if (extraDealData.callListId) {
+      await prisma.deal.update({ where: { id: existingDeal.id }, data: { callListId: extraDealData.callListId } });
+    }
+    dealId = existingDeal.id;
+  } else {
+    const deal = await prisma.deal.create({
+      data: {
+        companyName: candidate.companyName,
+        cvrNumber: candidate.cvrNumber,
+        address: candidate.address,
+        contactEmail: candidate.contactEmail,
+        contactPhone: candidate.contactPhone,
+        websiteUrl: candidate.website,
+        ownerId: userId,
+        importType: "MANUAL",
+        ...extraDealData,
+      },
+    });
+    await prisma.deal.update({ where: { id: deal.id }, data: { dealEmailAddress: buildDealEmailAddress(deal.id) } });
+    dealId = deal.id;
+    created = true;
+  }
+
+  await prisma.leadCandidate.update({ where: { id: candidateId }, data: { dealId } });
+  return { dealId, created };
+}
+
+/**
  * "Tilføj som deal" on a found lead - creates a real Deal the same way the
- * manual "Ny deal" form does (owner defaults to whoever clicked it), then
- * marks the candidate ADDED so it drops out of the review list for good.
+ * manual "Ny deal" form does (owner defaults to whoever clicked it), unless
+ * a deal for the same CVR number already exists (see claimCandidateAndUpsertDeal),
+ * in which case the candidate is just linked to that one instead of spawning
+ * a duplicate.
  */
 export async function addLeadCandidateAsDeal(
   candidateId: string
-): Promise<{ ok: true; dealId: string; duplicateId: string | null } | { ok: false; error: string }> {
+): Promise<
+  { ok: true; dealId: string; duplicateId: string | null; alreadyExisted: boolean } | { ok: false; error: string }
+> {
   const user = await requireUser();
   const candidate = await prisma.leadCandidate.findUniqueOrThrow({ where: { id: candidateId } });
-  if (candidate.status !== "NEW") return { ok: false, error: "Dette lead er allerede behandlet." };
-
   const duplicates = await findDuplicateDeals(candidate.companyName);
 
-  const deal = await prisma.deal.create({
-    data: {
-      companyName: candidate.companyName,
-      cvrNumber: candidate.cvrNumber,
-      address: candidate.address,
-      contactEmail: candidate.contactEmail,
-      contactPhone: candidate.contactPhone,
-      ownerId: user.id,
-      importType: "MANUAL",
-    },
-  });
-  await prisma.deal.update({ where: { id: deal.id }, data: { dealEmailAddress: buildDealEmailAddress(deal.id) } });
-  await prisma.leadCandidate.update({ where: { id: candidateId }, data: { status: "ADDED", dealId: deal.id } });
+  const result = await claimCandidateAndUpsertDeal(candidateId, user.id);
+  if ("error" in result) return { ok: false, error: result.error };
 
-  await logActivity({
-    type: "DEAL_CREATED",
-    message: `${user.name} tilføjede ${dealName(deal)} som lead fra Leadgeneration`,
-    actorId: user.id,
-    dealId: deal.id,
-  });
+  if (result.created) {
+    const deal = await prisma.deal.findUniqueOrThrow({ where: { id: result.dealId } });
+    await logActivity({
+      type: "DEAL_CREATED",
+      message: `${user.name} tilføjede ${dealName(deal)} som lead fra Leadgeneration`,
+      actorId: user.id,
+      dealId: deal.id,
+    });
+  }
 
   revalidatePath("/leadgeneration");
   revalidatePath("/deals");
-  return { ok: true, dealId: deal.id, duplicateId: duplicates[0]?.id ?? null };
+  // A name-similarity "possible duplicate" hint only makes sense for a
+  // genuinely new deal - when the CVR number already matched an existing
+  // one (alreadyExisted), that IS the same company, not just a similarly-
+  // named one, so there's nothing useful to flag.
+  return {
+    ok: true,
+    dealId: result.dealId,
+    duplicateId: result.created ? duplicates[0]?.id ?? null : null,
+    alreadyExisted: !result.created,
+  };
+}
+
+/**
+ * "Tilføj til ringeliste" on a found lead - same CVR-based dedup as "Tilføj
+ * som deal", but attaches the resulting deal to a chosen CallList (see
+ * Ringeliste) instead of leaving it unassigned.
+ */
+export async function addLeadCandidateToCallList(
+  candidateId: string,
+  callListId: string
+): Promise<{ ok: true; dealId: string; alreadyExisted: boolean } | { ok: false; error: string }> {
+  const user = await requireUser();
+  const list = await prisma.callList.findUnique({ where: { id: callListId } });
+  if (!list) return { ok: false, error: "Listen findes ikke længere." };
+
+  const result = await claimCandidateAndUpsertDeal(candidateId, user.id, { callListId });
+  if ("error" in result) return { ok: false, error: result.error };
+
+  if (result.created) {
+    const deal = await prisma.deal.findUniqueOrThrow({ where: { id: result.dealId } });
+    await logActivity({
+      type: "DEAL_CREATED",
+      message: `${user.name} tilføjede ${dealName(deal)} til ${list.name} fra Leadgeneration`,
+      actorId: user.id,
+      dealId: deal.id,
+    });
+  }
+
+  revalidatePath("/leadgeneration");
+  revalidatePath("/ringeliste");
+  revalidatePath("/deals");
+  return { ok: true, dealId: result.dealId, alreadyExisted: !result.created };
 }
 
 export async function dismissLeadCandidate(candidateId: string): Promise<void> {

@@ -740,9 +740,16 @@ model LeadCandidate {
   companyName  String
   address      String?
   industryText String?
+  /// The branche/DB07 code (e.g. "561010") behind `industryText`'s free-text
+  /// description - shown alongside it so the exact registered branche is
+  /// unambiguous, not just its label.
+  industryCode String?
   foundedDate  DateTime?
   contactEmail String?
   contactPhone String?
+  /// Only ever populated when the register's own contact-info list happens
+  /// to include one - not reliably available for every company.
+  website      String?
   /// The registered owner's name, when the register exposes one (mainly for
   /// sole proprietorships) - fetched via the same lookup the single-CVR
   /// "Slå op" field on a deal uses, so it's the exact same data source.

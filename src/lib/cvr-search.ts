@@ -28,6 +28,8 @@ type VirkAddress = {
   kommune?: { kommuneNavn?: string | null } | null;
 };
 
+import { looksLikeWebsite } from "@/lib/cvr";
+
 function formatVirkAddress(addr: VirkAddress | null | undefined): string | null {
   if (!addr) return null;
   let houseNumber = "";
@@ -56,9 +58,12 @@ export type CvrSearchHit = {
   name: string;
   address: string | null;
   industryText: string | null;
+  /** The branche/DB07 code behind `industryText` (e.g. "561010"). */
+  industryCode: string | null;
   foundedDate: string | null;
   contactEmail: string | null;
   contactPhone: string | null;
+  website: string | null;
 };
 
 function splitTerms(raw: string | null | undefined): string[] {
@@ -166,7 +171,7 @@ export async function searchCvr(filter: CvrSearchFilter, limit = 50): Promise<Cv
         | {
             nyesteNavn?: { navn?: string | null } | null;
             nyesteBeliggenhedsadresse?: VirkAddress | null;
-            nyesteHovedbranche?: { branchetekst?: string | null } | null;
+            nyesteHovedbranche?: { branchetekst?: string | null; branchekode?: string | null } | null;
             stiftelsesDato?: string | null;
             nyesteKontaktoplysninger?: string[] | null;
           }
@@ -180,9 +185,11 @@ export async function searchCvr(filter: CvrSearchFilter, limit = 50): Promise<Cv
         name: meta.nyesteNavn.navn,
         address: formatVirkAddress(meta.nyesteBeliggenhedsadresse),
         industryText: meta.nyesteHovedbranche?.branchetekst ?? null,
+        industryCode: meta.nyesteHovedbranche?.branchekode ?? null,
         foundedDate: meta.stiftelsesDato ?? null,
         contactEmail: contactInfo.find((c) => c.includes("@")) ?? null,
-        contactPhone: contactInfo.find((c) => !c.includes("@")) ?? null,
+        contactPhone: contactInfo.find((c) => !c.includes("@") && !looksLikeWebsite(c)) ?? null,
+        website: contactInfo.find((c) => !c.includes("@") && looksLikeWebsite(c)) ?? null,
       };
     })
     .filter((h): h is CvrSearchHit => h !== null);

@@ -9,6 +9,53 @@ import {
   runLeadFilterNowAction,
 } from "@/lib/actions/lead-generation";
 import { useToast } from "@/components/toast";
+import { DANISH_MUNICIPALITIES } from "@/lib/danish-municipalities";
+
+/** Checkbox multi-select for `municipality` (kept as the same comma-separated
+ * string the form field always was, via a hidden input) - a plain free-text
+ * field was too easy to mistype/misspell against the CVR register's own
+ * exact kommuneNavn spelling, silently matching nothing. */
+function MunicipalityPicker({ name, defaultValue }: { name: string; defaultValue: string }) {
+  const [open, setOpen] = useState(false);
+  const [selected, setSelected] = useState<string[]>(() =>
+    defaultValue
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
+  );
+
+  function toggle(m: string) {
+    setSelected((prev) => (prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m]));
+  }
+
+  return (
+    <div className="relative">
+      <input type="hidden" name={name} value={selected.join(", ")} />
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="mt-1 w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-left text-sm text-slate-700"
+      >
+        {selected.length > 0
+          ? `${selected.length} valgt: ${selected.slice(0, 3).join(", ")}${selected.length > 3 ? "…" : ""}`
+          : "Vælg kommuner…"}
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-md border border-slate-300 bg-white p-2 shadow-lg">
+            {DANISH_MUNICIPALITIES.map((m) => (
+              <label key={m} className="flex items-center gap-2 rounded px-2 py-1 text-sm hover:bg-slate-50">
+                <input type="checkbox" checked={selected.includes(m)} onChange={() => toggle(m)} />
+                {m}
+              </label>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 export type LeadFilterData = {
   id: string;
@@ -103,13 +150,8 @@ function FilterForm({
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-slate-600">Område / kommune (kommasepareret)</label>
-          <input
-            name="municipality"
-            defaultValue={initial?.municipality ?? ""}
-            placeholder="fx Aarhus, Odense"
-            className="mt-1 w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-sm"
-          />
+          <label className="block text-xs font-medium text-slate-600">Kommune(r)</label>
+          <MunicipalityPicker name="municipality" defaultValue={initial?.municipality ?? ""} />
         </div>
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
