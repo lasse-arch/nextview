@@ -84,32 +84,88 @@ async function jsClick(page: Page, el: ElementHandle<Element>): Promise<void> {
   await page.evaluate((node) => (node as HTMLElement).click(), el);
 }
 
+/** True if the page's cookie-consent boilerplate text is still visible -
+ * used both to decide whether dismissCookieBanner actually worked and to
+ * tell a genuinely still-on-login-page failure apart from one where the
+ * banner (now irrelevant, since every click below is DOM-based - see
+ * jsClick) just happens to still be sitting there unrelated to the real
+ * problem. */
+async function cookieBannerVisible(page: Page): Promise<boolean> {
+  return page
+    .evaluate(() => /cookie policy|manage preferences|utilizes technologies such as cookies/i.test(document.body.innerText))
+    .catch(() => false);
+}
+
 /**
  * Dismisses a OneTrust-style cookie-consent banner if one is showing - see
- * jsClick's doc comment for why this turned out to be necessary. Tries
+ * jsClick's doc comment for why a banner ended up a suspect at all. Tries
  * OneTrust's own well-known button id first, then falls back to matching an
  * accept-style button by its text (deliberately excluding "Manage
  * Preferences", which opens a settings panel rather than dismissing it).
+ * Returns whether the banner's own text is confirmed gone afterwards, not
+ * just whether a click happened - a click that missed (wrong button,
+ * nothing matched) should be visible as "still showing" rather than
+ * silently assumed to have worked.
  */
-async function dismissCookieBanner(page: Page): Promise<void> {
+async function dismissCookieBanner(page: Page): Promise<boolean> {
+  if (!(await cookieBannerVisible(page))) return true;
+
   const el = await firstMatch(page, ["#onetrust-accept-btn-handler", "#onetrust-accept-btn"]);
   if (el) {
     await jsClick(page, el);
-    await sleep(800);
-    return;
+  } else {
+    await page
+      .evaluate(() => {
+        const btn = Array.from(document.querySelectorAll("button")).find((b) => {
+          const t = b.textContent?.trim().toLowerCase() ?? "";
+          return /^(accept|accept all|accept all cookies|godkend alle|godkend|i accept|allow all)$/.test(t);
+        }) as HTMLElement | undefined;
+        btn?.click();
+      })
+      .catch(() => {});
   }
-  const clicked = await page
-    .evaluate(() => {
-      const btn = Array.from(document.querySelectorAll("button")).find((b) => {
-        const t = b.textContent?.trim().toLowerCase() ?? "";
-        return /^(accept|accept all|accept all cookies|godkend alle|godkend|i accept|allow all)$/.test(t);
-      }) as HTMLElement | undefined;
-      if (!btn) return false;
-      btn.click();
-      return true;
-    })
-    .catch(() => false);
-  if (clicked) await sleep(800);
+
+  for (let i = 0; i < 6; i++) {
+    await sleep(500);
+    if (!(await cookieBannerVisible(page))) return true;
+  }
+  return false;
+}
+
+/**
+ * Finds the button most likely to be the real form-submit/continue button -
+ * prefers `button[type="submit"]`, then any visible `<button>` whose own
+ * text reads like a login/continue action, and as a last resort the first
+ * `<button>` at all. Always excludes anything inside a cookie-consent
+ * banner container (by id/class), so a banner dismissCookieBanner failed to
+ * close can't get clicked by mistake instead of the real form - a generic
+ * "just grab the first <button>" fallback would very plausibly hit the
+ * banner's own button first, since consent banners are typically injected
+ * early in the DOM.
+ */
+async function findActionButton(page: Page): Promise<ElementHandle<Element> | null> {
+  const handle = await page.evaluateHandle(() => {
+    const inConsentBanner = (el: Element) =>
+      !!el.closest('[id*="onetrust" i], [id*="cookie" i], [class*="cookie" i], [class*="consent" i]');
+    const candidates = Array.from(document.querySelectorAll("button")).filter((b) => !inConsentBanner(b));
+    const submitTyped = candidates.find((b) => b.getAttribute("type") === "submit");
+    if (submitTyped) return submitTyped;
+    const labelMatch = candidates.find((b) => /log ?in|sign ?in|continue|log ind|fortsæt/i.test(b.textContent ?? ""));
+    return labelMatch ?? candidates[0] ?? null;
+  });
+  const el = handle.asElement();
+  return (el as ElementHandle<Element>) ?? null;
+}
+
+/** Polls page.url() for up to ~8s for it to move off /login, rather than a
+ * single fixed sleep - a client-side redirect after a successful submit can
+ * take a moment, and a fixed too-short wait would misreport a genuine
+ * success-in-progress as a failure. */
+async function waitForLoginToResolve(page: Page): Promise<void> {
+  for (let i = 0; i < 16; i++) {
+    if (!/\/login/i.test(page.url())) return;
+    await sleep(500);
+  }
 }
 
 /**
@@ -122,7 +178,7 @@ async function login(page: Page): Promise<void> {
   const { email, password } = credentials();
   await gotoRetry(page, LOGIN_URL);
   await sleep(2000);
-  await dismissCookieBanner(page);
+  const bannerGoneInitially = await dismissCookieBanner(page);
 
   const emailField = await firstMatch(page, [
     'input[type="email"]',
@@ -132,14 +188,16 @@ async function login(page: Page): Promise<void> {
   ]);
   if (!emailField) {
     const text = await page.evaluate(() => document.body.innerText).catch(() => "");
-    throw new Error(`Kunne ikke finde e-mail-feltet på Matterports login-side (uddrag: "${pageSnippet(text)}").`);
+    throw new Error(
+      `Kunne ikke finde e-mail-feltet på Matterports login-side (url: ${page.url()}, cookie-banner lukket: ${bannerGoneInitially ? "ja" : "nej"}, uddrag: "${pageSnippet(text)}").`
+    );
   }
   await emailField.type(email, { delay: 30 });
 
   let passwordField = await firstMatch(page, ['input[type="password"]']);
   if (!passwordField) {
     // Two-step flow: email submitted first, password field appears after.
-    const continueBtn = await firstMatch(page, ['button[type="submit"]', "button"]);
+    const continueBtn = await findActionButton(page);
     if (continueBtn) await jsClick(page, continueBtn);
     await sleep(2000);
     await dismissCookieBanner(page);
@@ -147,17 +205,22 @@ async function login(page: Page): Promise<void> {
   }
   if (!passwordField) {
     const text = await page.evaluate(() => document.body.innerText).catch(() => "");
-    throw new Error(`Kunne ikke finde password-feltet på Matterports login-side (uddrag: "${pageSnippet(text)}").`);
+    throw new Error(
+      `Kunne ikke finde password-feltet på Matterports login-side (url: ${page.url()}, uddrag: "${pageSnippet(text)}").`
+    );
   }
   await passwordField.type(password, { delay: 30 });
 
-  const submitBtn = await firstMatch(page, ['button[type="submit"]', "button"]);
+  const submitBtn = await findActionButton(page);
   if (submitBtn) await jsClick(page, submitBtn);
-  await sleep(4000);
+  await waitForLoginToResolve(page);
 
   if (/\/login/i.test(page.url())) {
+    const bannerStillUp = await cookieBannerVisible(page);
     const text = await page.evaluate(() => document.body.innerText).catch(() => "");
-    throw new Error(`Login på Matterport lykkedes tilsyneladende ikke - stadig på login-siden (uddrag: "${pageSnippet(text)}").`);
+    throw new Error(
+      `Login på Matterport lykkedes tilsyneladende ikke - stadig på login-siden (url: ${page.url()}, cookie-banner stadig synligt: ${bannerStillUp ? "ja" : "nej"}, uddrag: "${pageSnippet(text)}").`
+    );
   }
 }
 
