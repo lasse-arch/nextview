@@ -16,7 +16,20 @@ export type BoardTask = {
   dueDate: Date | null;
   assigneeId: string | null;
   dealId: string | null;
+  recurringWeekday: number | null;
 };
+
+/** Monday-first display order, but values match Date.getDay() (0=søndag)
+ * so they compose directly with plain Date arithmetic elsewhere. */
+export const WEEKDAY_OPTIONS = [
+  { value: 1, label: "mandag" },
+  { value: 2, label: "tirsdag" },
+  { value: 3, label: "onsdag" },
+  { value: 4, label: "torsdag" },
+  { value: 5, label: "fredag" },
+  { value: 6, label: "lørdag" },
+  { value: 0, label: "søndag" },
+];
 
 export type BoardUser = { id: string; name: string; avatarUrl?: string | null };
 export type BoardDealOption = { id: string; name: string };
@@ -59,6 +72,7 @@ function NewTaskModal({
     const assigneeId = String(formData.get("assigneeId") || "") || null;
     const dealId = String(formData.get("dealId") || "") || null;
     const dueDateRaw = String(formData.get("dueDate") || "");
+    const recurringWeekdayRaw = String(formData.get("recurringWeekday") || "");
 
     startTransition(async () => {
       const result = await createTask(formData);
@@ -74,6 +88,7 @@ function NewTaskModal({
         dueDate: dueDateRaw ? new Date(dueDateRaw) : null,
         assigneeId,
         dealId,
+        recurringWeekday: recurringWeekdayRaw ? Number(recurringWeekdayRaw) : null,
       });
       showToast("Opgave oprettet");
       onClose();
@@ -113,6 +128,17 @@ function NewTaskModal({
             <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Forfaldsdato</label>
             <input name="dueDate" type="date" className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm" />
           </div>
+        </div>
+        <div>
+          <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Gentages (valgfri)</label>
+          <select name="recurringWeekday" defaultValue="" className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+            <option value="">Gentages ikke</option>
+            {WEEKDAY_OPTIONS.map((w) => (
+              <option key={w.value} value={w.value}>
+                Hver {w.label}
+              </option>
+            ))}
+          </select>
         </div>
         <div>
           <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Koblet til deal (valgfri)</label>
@@ -227,12 +253,24 @@ export function TaskBoard({
   const columns = groupBy === "person" ? personColumns : dealColumns;
   const selectedTask = tasks.find((t) => t.id === selectedTaskId) ?? null;
 
+  /** Soonest due date first (most urgent at top) - tasks without a due date
+   * have no urgency signal, so they sit below the dated ones rather than
+   * being scattered by creation order. Array.sort is stable, so within
+   * either group the original (creation) order is preserved. */
+  function byDueDate(a: BoardTask, b: BoardTask): number {
+    if (a.dueDate && b.dueDate) return a.dueDate.getTime() - b.dueDate.getTime();
+    if (a.dueDate) return -1;
+    if (b.dueDate) return 1;
+    return 0;
+  }
+
   function tasksForColumn(key: string) {
     const inColumn =
       groupBy === "person"
         ? tasks.filter((t) => (t.assigneeId ?? UNASSIGNED) === key)
         : tasks.filter((t) => (t.dealId ?? NO_DEAL) === key);
-    return showDone ? inColumn : inColumn.filter((t) => !t.done);
+    const visible = showDone ? inColumn : inColumn.filter((t) => !t.done);
+    return [...visible].sort(byDueDate);
   }
 
   function handleDrop(columnKey: string) {
@@ -297,7 +335,7 @@ export function TaskBoard({
       if (result.ok) {
         setTasks((prev) => [
           ...prev,
-          { id: result.id, title, description: null, done: false, dueDate: null, assigneeId, dealId },
+          { id: result.id, title, description: null, done: false, dueDate: null, assigneeId, dealId, recurringWeekday: null },
         ]);
       } else {
         showToast(result.error);
@@ -480,6 +518,11 @@ export function TaskBoard({
                           </Link>
                         )}
                         {task.dueDate && <span>{formatDate(task.dueDate)}</span>}
+                        {task.recurringWeekday !== null && (
+                          <span title={`Gentages hver ${WEEKDAY_OPTIONS.find((w) => w.value === task.recurringWeekday)?.label}`}>
+                            🔁
+                          </span>
+                        )}
                       </div>
                     </div>
                   );

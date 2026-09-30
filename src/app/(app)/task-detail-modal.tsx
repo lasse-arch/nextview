@@ -6,6 +6,7 @@ import { updateTask, deleteTask, addTaskComment, getTaskComments, type TaskComme
 import { formatDateTime } from "@/lib/labels";
 import { useToast } from "@/components/toast";
 import { Avatar } from "@/components/avatar";
+import { WEEKDAY_OPTIONS } from "./opgaver/task-board";
 
 export type ModalTask = {
   id: string;
@@ -15,6 +16,7 @@ export type ModalTask = {
   dueDate: Date | null;
   assigneeId: string | null;
   dealId: string | null;
+  recurringWeekday: number | null;
 };
 
 function toDateInputValue(date: Date | null): string {
@@ -64,6 +66,7 @@ export function TaskDetailModal({
         return;
       }
       const dueDateRaw = String(formData.get("dueDate") || "");
+      const recurringWeekdayRaw = String(formData.get("recurringWeekday") || "");
       onUpdated({
         id: task.id,
         title: String(formData.get("title") || "").trim(),
@@ -72,6 +75,7 @@ export function TaskDetailModal({
         dueDate: dueDateRaw ? new Date(dueDateRaw) : null,
         assigneeId: String(formData.get("assigneeId") || "") || null,
         dealId: String(formData.get("dealId") || "") || null,
+        recurringWeekday: recurringWeekdayRaw ? Number(recurringWeekdayRaw) : null,
       });
       showToast("Opgave gemt");
     });
@@ -144,6 +148,21 @@ export function TaskDetailModal({
                 className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
               />
             </div>
+          </div>
+          <div>
+            <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Gentages</label>
+            <select
+              name="recurringWeekday"
+              defaultValue={task.recurringWeekday ?? ""}
+              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+            >
+              <option value="">Gentages ikke</option>
+              {WEEKDAY_OPTIONS.map((w) => (
+                <option key={w.value} value={w.value}>
+                  Hver {w.label}
+                </option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Koblet til deal</label>

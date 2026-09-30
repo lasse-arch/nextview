@@ -13,6 +13,25 @@ function revalidateTaskPaths(dealId: string | null) {
   if (dealId) revalidatePath(`/deals/${dealId}`);
 }
 
+function parseRecurringWeekday(formData: FormData): number | null {
+  const raw = String(formData.get("recurringWeekday") || "").trim();
+  if (!raw) return null;
+  const n = Number(raw);
+  return Number.isInteger(n) && n >= 0 && n <= 6 ? n : null;
+}
+
+/** Next date strictly after `from` that falls on `targetWeekday` (0=søndag..6=lørdag) -
+ * always at least a week out if `from` itself is already that weekday, since this is
+ * for advancing a just-completed recurring task to its next occurrence, not today's. */
+function nextWeekdayAfter(from: Date, targetWeekday: number): Date {
+  const base = new Date(from);
+  base.setHours(0, 0, 0, 0);
+  let diff = (targetWeekday - base.getDay() + 7) % 7;
+  if (diff === 0) diff = 7;
+  base.setDate(base.getDate() + diff);
+  return base;
+}
+
 /**
  * "Opret opgave"-knap på en note - lidt hurtigere end at åbne opgave-
  * formularen og selv skrive titlen ud igen, når det man vil huske allerede
@@ -49,9 +68,10 @@ export async function createTask(formData: FormData): Promise<TaskResult> {
   const description = String(formData.get("description") || "").trim() || null;
   const dueDateRaw = String(formData.get("dueDate") || "").trim();
   const dueDate = dueDateRaw ? new Date(dueDateRaw) : null;
+  const recurringWeekday = parseRecurringWeekday(formData);
 
   const task = await prisma.task.create({
-    data: { title, description, assigneeId, dealId, dueDate, createdById: user.id },
+    data: { title, description, assigneeId, dealId, dueDate, recurringWeekday, createdById: user.id },
   });
 
   revalidateTaskPaths(dealId);
@@ -63,20 +83,31 @@ export async function createTask(formData: FormData): Promise<TaskResult> {
  * with a deliveryUrl given (prompted client-side for Hjemmeside/tour
  * products - see needsDeliveryLink), saves that link onto the matching
  * DealItem so it shows up under Live kunder.
+ *
+ * A recurring task (recurringWeekday set) never actually ends up checked off -
+ * completing it advances dueDate to its next weekly occurrence and leaves
+ * done false instead, so it stays on the board rather than disappearing.
  */
 export async function toggleTaskDone(taskId: string, deliveryUrl?: string | null): Promise<void> {
   const user = await requireUser();
   const task = await prisma.task.findUniqueOrThrow({ where: { id: taskId } });
-  const done = !task.done;
-  await prisma.task.update({ where: { id: taskId }, data: { done } });
+  const completing = !task.done;
 
-  if (done && deliveryUrl && task.dealId && task.title.startsWith("Aflever ")) {
+  if (completing && task.recurringWeekday !== null) {
+    const reference = task.dueDate && task.dueDate > new Date() ? task.dueDate : new Date();
+    const nextDueDate = nextWeekdayAfter(reference, task.recurringWeekday);
+    await prisma.task.update({ where: { id: taskId }, data: { done: false, dueDate: nextDueDate } });
+  } else {
+    await prisma.task.update({ where: { id: taskId }, data: { done: completing } });
+  }
+
+  if (completing && deliveryUrl && task.dealId && task.title.startsWith("Aflever ")) {
     const productType = task.title.slice("Aflever ".length);
     const item = await prisma.dealItem.findFirst({ where: { dealId: task.dealId, productType } });
     if (item) await prisma.dealItem.update({ where: { id: item.id }, data: { url: deliveryUrl } });
   }
 
-  if (done) {
+  if (completing) {
     await logActivity({
       type: "TASK_DONE",
       message: `${user.name} fuldførte opgaven "${task.title}"`,
@@ -123,11 +154,12 @@ export async function updateTask(taskId: string, formData: FormData): Promise<Ta
   const description = String(formData.get("description") || "").trim() || null;
   const dueDateRaw = String(formData.get("dueDate") || "").trim();
   const dueDate = dueDateRaw ? new Date(dueDateRaw) : null;
+  const recurringWeekday = parseRecurringWeekday(formData);
 
   const existing = await prisma.task.findUniqueOrThrow({ where: { id: taskId } });
   await prisma.task.update({
     where: { id: taskId },
-    data: { title, description, assigneeId, dealId, dueDate },
+    data: { title, description, assigneeId, dealId, dueDate, recurringWeekday },
   });
 
   revalidateTaskPaths(existing.dealId);

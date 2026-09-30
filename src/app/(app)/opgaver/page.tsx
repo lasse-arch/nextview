@@ -18,6 +18,7 @@ export default async function TasksPage() {
     dueDate: t.dueDate,
     assigneeId: t.assigneeId,
     dealId: t.dealId,
+    recurringWeekday: t.recurringWeekday,
   }));
 
   const boardUsers = users.map((u) => ({ id: u.id, name: u.name, avatarUrl: u.avatarUrl }));

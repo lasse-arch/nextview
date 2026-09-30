@@ -313,6 +313,7 @@ export default async function DealDetailPage({
               done: t.done,
               dueDate: t.dueDate,
               assigneeId: t.assigneeId,
+              recurringWeekday: t.recurringWeekday,
             }))}
             users={users.map((u) => ({ id: u.id, name: u.name }))}
             deals={[{ id: deal.id, name: dealName(deal) }, ...linkableDeals.map((d) => ({ id: d.id, name: dealName(d) }))]}

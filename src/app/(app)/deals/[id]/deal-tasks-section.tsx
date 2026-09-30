@@ -13,6 +13,7 @@ type DealTask = {
   done: boolean;
   dueDate: Date | null;
   assigneeId: string | null;
+  recurringWeekday: number | null;
 };
 
 export function DealTasksSection({
@@ -104,7 +105,10 @@ export function DealTasksSection({
       try {
         const result = await createTask(formData);
         if (result.ok) {
-          setTasks((prev) => [...prev, { id: result.id, title, description: null, done: false, dueDate: null, assigneeId }]);
+          setTasks((prev) => [
+            ...prev,
+            { id: result.id, title, description: null, done: false, dueDate: null, assigneeId, recurringWeekday: null },
+          ]);
           showToast("Opgave oprettet");
         } else {
           showToast(result.error);

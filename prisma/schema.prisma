@@ -628,6 +628,12 @@ model Task {
   done        Boolean   @default(false)
   dueDate     DateTime?
 
+  /// When set (0=søndag..6=lørdag, matching Date.getDay()), this task
+  /// repeats weekly on that day - completing it advances dueDate to the
+  /// next occurrence and resets done to false instead of staying checked
+  /// off, so a recurring task never actually disappears from the board.
+  recurringWeekday Int?
+
   assignee   User?   @relation("TaskAssignee", fields: [assigneeId], references: [id])
   assigneeId String?
 
