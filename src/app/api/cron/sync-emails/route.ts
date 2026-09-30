@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { syncInboundEmails } from "@/lib/email-sync-service";
+import { syncDealEmails } from "@/lib/email-sync-service";
 
 export async function GET(request: NextRequest) {
   const secret = process.env.CRON_SECRET;
@@ -10,6 +10,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const summary = await syncInboundEmails();
+  const summary = await syncDealEmails();
   return NextResponse.json(summary);
 }

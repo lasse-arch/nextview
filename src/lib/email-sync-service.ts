@@ -26,6 +26,16 @@ function extractEmailAddress(headerValue: string): string {
   return (match ? match[1] : headerValue).trim().toLowerCase();
 }
 
+/** A "To"/"Cc" header can list several recipients ("Navn <a@b.dk>, c@d.dk") -
+ * splits on comma and extracts each one, unlike extractEmailAddress which
+ * only handles the single-address "From" header. */
+function extractEmailAddresses(headerValue: string): string[] {
+  return headerValue
+    .split(",")
+    .map((part) => extractEmailAddress(part))
+    .filter(Boolean);
+}
+
 function decodeBase64Url(data: string): string {
   return Buffer.from(data.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf-8");
 }
@@ -101,9 +111,9 @@ function extractReadableBody(payload: GmailMessagePart): string | null {
   return html ? htmlToReadableText(html) : null;
 }
 
-async function fetchRecentGmailMessages(account: EmailAccount): Promise<GmailMessageMeta[]> {
+async function fetchRecentGmailMessages(account: EmailAccount, gmailQuery: string): Promise<GmailMessageMeta[]> {
   const accessToken = await getValidAccessToken(account);
-  const query = encodeURIComponent(`in:inbox newer_than:${LOOKBACK_DAYS}d`);
+  const query = encodeURIComponent(`${gmailQuery} newer_than:${LOOKBACK_DAYS}d`);
 
   const listRes = await fetch(`${GMAIL_API_BASE}/messages?q=${query}&maxResults=50`, {
     headers: { Authorization: `Bearer ${accessToken}` },
@@ -145,13 +155,19 @@ export type EmailSyncSummary = {
 };
 
 /**
- * Polls each connected Gmail account's inbox for recent mail and, when the
- * sender matches a deal's contact e-mail, stores it as an EmailMessage so
- * it shows up on that deal - the actual "add an e-mail to a deal, and mail
- * from it lands there automatically" behavior. Safe to re-run: already-
- * stored messages are skipped via the (provider, messageId) unique key.
+ * Polls each connected Gmail account's inbox AND sent folder for recent
+ * mail, and when it matches a deal's contact e-mail, stores it as an
+ * EmailMessage so it shows up on that deal - the actual "add an e-mail to a
+ * deal, and mail to/from it lands there automatically" behavior. Inbound
+ * mail matches by sender; outbound (sent) mail matches by recipient (to or
+ * cc) - this is what picks up a reply a colleague sent straight from their
+ * own Gmail rather than through the CRM's own "Send e-mail" button (which
+ * already records its own EmailMessage directly at send time - the same
+ * Gmail message turning up again here just gets skipped as a duplicate via
+ * the (provider, messageId) unique key, same as any other already-stored
+ * message on a re-run).
  */
-export async function syncInboundEmails(): Promise<EmailSyncSummary> {
+export async function syncDealEmails(): Promise<EmailSyncSummary> {
   const accounts = await prisma.emailAccount.findMany({ where: { provider: "GOOGLE" } });
 
   const deals = await prisma.deal.findMany({
@@ -168,15 +184,19 @@ export async function syncInboundEmails(): Promise<EmailSyncSummary> {
   const errors: string[] = [];
 
   for (const account of accounts) {
-    let messages: GmailMessageMeta[];
+    let inbox: GmailMessageMeta[];
+    let sent: GmailMessageMeta[];
     try {
-      messages = await fetchRecentGmailMessages(account);
+      [inbox, sent] = await Promise.all([
+        fetchRecentGmailMessages(account, "in:inbox"),
+        fetchRecentGmailMessages(account, "in:sent"),
+      ]);
     } catch (err) {
       errors.push(`${account.email}: ${err instanceof Error ? err.message : "ukendt fejl"}`);
       continue;
     }
 
-    for (const msg of messages) {
+    for (const msg of inbox) {
       const senderEmail = extractEmailAddress(msg.from);
       const dealId = dealIdByEmail.get(senderEmail);
       if (!dealId) continue;
@@ -195,6 +215,34 @@ export async function syncInboundEmails(): Promise<EmailSyncSummary> {
           messageId: msg.id,
           direction: "INBOUND",
           fromAddress: senderEmail,
+          toAddresses: msg.to,
+          subject: msg.subject || null,
+          bodyText: msg.body || null,
+          sentAt: isNaN(sentAt.getTime()) ? new Date() : sentAt,
+        },
+      });
+      created++;
+    }
+
+    for (const msg of sent) {
+      const recipientEmails = [...extractEmailAddresses(msg.to)];
+      const dealId = recipientEmails.map((e) => dealIdByEmail.get(e)).find(Boolean);
+      if (!dealId) continue;
+      matched++;
+
+      const existing = await prisma.emailMessage.findUnique({
+        where: { provider_messageId: { provider: "GOOGLE", messageId: msg.id } },
+      });
+      if (existing) continue;
+
+      const sentAt = new Date(msg.date);
+      await prisma.emailMessage.create({
+        data: {
+          dealId,
+          provider: "GOOGLE",
+          messageId: msg.id,
+          direction: "OUTBOUND",
+          fromAddress: extractEmailAddress(msg.from),
           toAddresses: msg.to,
           subject: msg.subject || null,
           bodyText: msg.body || null,

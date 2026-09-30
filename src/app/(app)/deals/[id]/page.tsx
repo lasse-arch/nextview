@@ -380,8 +380,8 @@ export default async function DealDetailPage({
           <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="text-sm font-semibold text-slate-900">E-mail på dealen</h2>
             <p className="mt-1 text-xs text-slate-500">
-              Mails der modtages fra <span className="font-medium">{deal.contactEmail || "kontaktpersonens e-mail"}</span>{" "}
-              i en forbundet Gmail-indbakke vises automatisk her for hele teamet - ingen CC eller andet nødvendigt.
+              Mails der sendes til og modtages fra <span className="font-medium">{deal.contactEmail || "kontaktpersonens e-mail"}</span>{" "}
+              i en forbundet Gmail-konto vises automatisk her for hele teamet - ingen CC eller andet nødvendigt.
             </p>
             <SendEmailSection
               dealId={deal.id}
