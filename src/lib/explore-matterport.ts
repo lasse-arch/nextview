@@ -157,13 +157,32 @@ async function findActionButton(page: Page): Promise<ElementHandle<Element> | nu
   return (el as ElementHandle<Element>) ?? null;
 }
 
-/** Polls page.url() for up to ~8s for it to move off /login, rather than a
- * single fixed sleep - a client-side redirect after a successful submit can
- * take a moment, and a fixed too-short wait would misreport a genuine
+/**
+ * Whether the page currently shows signs of being logged in - checked by
+ * actual page content, not by the URL. CONFIRMED necessary from a real
+ * production run: after a successful login, Matterport redirected to
+ * `/login?organization=<id>` (apparently a normal post-login landing
+ * variant for an organization/business account) - the URL kept the literal
+ * substring "login" even though the page's own sidebar nav (the same
+ * authenticated chrome seen in the confirmed Analytics-tab screenshots -
+ * "Your Spaces", "Analytics", "Capture Services", "Account", "Users", ...)
+ * was already showing, so a URL-substring check misreported a genuine
+ * success as a failure. A leftover password field is the one reliable
+ * negative signal left.
+ */
+async function isLoggedIn(page: Page): Promise<boolean> {
+  if (await page.$('input[type="password"]')) return false;
+  const text = await page.evaluate(() => document.body.innerText).catch(() => "");
+  return /your spaces|all spaces|capture services/i.test(text);
+}
+
+/** Polls for up to ~8s for isLoggedIn to become true, rather than a single
+ * fixed sleep - a client-side redirect after a successful submit can take a
+ * moment, and a fixed too-short wait would misreport a genuine
  * success-in-progress as a failure. */
 async function waitForLoginToResolve(page: Page): Promise<void> {
   for (let i = 0; i < 16; i++) {
-    if (!/\/login/i.test(page.url())) return;
+    if (await isLoggedIn(page)) return;
     await sleep(500);
   }
 }
@@ -215,11 +234,11 @@ async function login(page: Page): Promise<void> {
   if (submitBtn) await jsClick(page, submitBtn);
   await waitForLoginToResolve(page);
 
-  if (/\/login/i.test(page.url())) {
+  if (!(await isLoggedIn(page))) {
     const bannerStillUp = await cookieBannerVisible(page);
     const text = await page.evaluate(() => document.body.innerText).catch(() => "");
     throw new Error(
-      `Login på Matterport lykkedes tilsyneladende ikke - stadig på login-siden (url: ${page.url()}, cookie-banner stadig synligt: ${bannerStillUp ? "ja" : "nej"}, uddrag: "${pageSnippet(text)}").`
+      `Login på Matterport lykkedes tilsyneladende ikke (url: ${page.url()}, cookie-banner stadig synligt: ${bannerStillUp ? "ja" : "nej"}, uddrag: "${pageSnippet(text)}").`
     );
   }
 }
