@@ -1,4 +1,4 @@
-import puppeteer, { type Browser, type Page } from "puppeteer-core";
+import puppeteer, { type Browser, type ElementHandle, type Page } from "puppeteer-core";
 import chromium from "@sparticuz/chromium";
 import type { ExploreTourData, ExploreTourStats, ExplorePeriodStats } from "./explore-nextview360";
 
@@ -74,6 +74,44 @@ function pageSnippet(text: string): string {
   return text.replace(/\s+/g, " ").trim().slice(0, 300);
 }
 
+/** Clicks an element via the DOM directly (`el.click()` inside the page)
+ * rather than Puppeteer's coordinate-based click, which hit-tests whatever
+ * is visually on top at those coordinates - confirmed necessary: a real
+ * production error showed the cookie-consent banner's own text back instead
+ * of the login form failing normally, meaning the coordinate click on the
+ * real submit button was landing on the banner overlaying it instead. */
+async function jsClick(page: Page, el: ElementHandle<Element>): Promise<void> {
+  await page.evaluate((node) => (node as HTMLElement).click(), el);
+}
+
+/**
+ * Dismisses a OneTrust-style cookie-consent banner if one is showing - see
+ * jsClick's doc comment for why this turned out to be necessary. Tries
+ * OneTrust's own well-known button id first, then falls back to matching an
+ * accept-style button by its text (deliberately excluding "Manage
+ * Preferences", which opens a settings panel rather than dismissing it).
+ */
+async function dismissCookieBanner(page: Page): Promise<void> {
+  const el = await firstMatch(page, ["#onetrust-accept-btn-handler", "#onetrust-accept-btn"]);
+  if (el) {
+    await jsClick(page, el);
+    await sleep(800);
+    return;
+  }
+  const clicked = await page
+    .evaluate(() => {
+      const btn = Array.from(document.querySelectorAll("button")).find((b) => {
+        const t = b.textContent?.trim().toLowerCase() ?? "";
+        return /^(accept|accept all|accept all cookies|godkend alle|godkend|i accept|allow all)$/.test(t);
+      }) as HTMLElement | undefined;
+      if (!btn) return false;
+      btn.click();
+      return true;
+    })
+    .catch(() => false);
+  if (clicked) await sleep(800);
+}
+
 /**
  * Logs into my.matterport.com - see the file-level doc comment: these
  * selectors are an educated guess, not confirmed against the real site.
@@ -84,6 +122,7 @@ async function login(page: Page): Promise<void> {
   const { email, password } = credentials();
   await gotoRetry(page, LOGIN_URL);
   await sleep(2000);
+  await dismissCookieBanner(page);
 
   const emailField = await firstMatch(page, [
     'input[type="email"]',
@@ -101,8 +140,9 @@ async function login(page: Page): Promise<void> {
   if (!passwordField) {
     // Two-step flow: email submitted first, password field appears after.
     const continueBtn = await firstMatch(page, ['button[type="submit"]', "button"]);
-    if (continueBtn) await continueBtn.click();
+    if (continueBtn) await jsClick(page, continueBtn);
     await sleep(2000);
+    await dismissCookieBanner(page);
     passwordField = await firstMatch(page, ['input[type="password"]']);
   }
   if (!passwordField) {
@@ -112,7 +152,7 @@ async function login(page: Page): Promise<void> {
   await passwordField.type(password, { delay: 30 });
 
   const submitBtn = await firstMatch(page, ['button[type="submit"]', "button"]);
-  if (submitBtn) await submitBtn.click();
+  if (submitBtn) await jsClick(page, submitBtn);
   await sleep(4000);
 
   if (/\/login/i.test(page.url())) {
