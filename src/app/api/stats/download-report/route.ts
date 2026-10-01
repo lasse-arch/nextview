@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { PDFDocument } from "pdf-lib";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { generateCustomerReportPdfBuffer } from "@/lib/customer-report-service";
+import { generateCustomerReportPdfBuffer, generateCombinedCustomerReportPdfBuffer } from "@/lib/customer-report-service";
 import { currentMonthLabel } from "@/lib/customer-report-template";
 import { dealName } from "@/lib/labels";
 
@@ -35,6 +35,36 @@ export async function GET(request: NextRequest) {
     .filter(Boolean);
   if (dealIds.length === 0) {
     return NextResponse.json({ error: "Ingen kunder valgt." }, { status: 400 });
+  }
+
+  // Mirrors "Send samlet" but for a download - one combined PDF (one cover,
+  // one stats page per linked branch) for a single deal + its linked
+  // branches, instead of the deal's own separate report. Only makes sense
+  // for exactly one selected deal (the parent); ignored otherwise.
+  const combined = request.nextUrl.searchParams.get("combined") === "1";
+  if (combined && dealIds.length === 1) {
+    const parent = await prisma.deal.findUnique({
+      where: { id: dealIds[0] },
+      include: { branches: { select: { companyName: true, displayName: true, mpSkinId: true } } },
+    });
+    if (!parent) return NextResponse.json({ error: "Dealen findes ikke." }, { status: 404 });
+
+    try {
+      const pdf = await generateCombinedCustomerReportPdfBuffer(parent, parent.branches);
+      const fileName = `Besøgsrapport ${dealName(parent)} (samlet) ${currentMonthLabel(parent.reportLanguage)}.pdf`;
+      return new NextResponse(new Blob([new Uint8Array(pdf)], { type: "application/pdf" }), {
+        status: 200,
+        headers: {
+          "Content-Type": "application/pdf",
+          "Content-Disposition": `attachment; filename="report.pdf"; filename*=UTF-8''${encodeURIComponent(fileName)}`,
+          "X-Skipped-Count": "0",
+        },
+      });
+    } catch (err) {
+      console.error(`Kunne ikke generere samlet besøgsrapport-PDF for ${dealName(parent)}`, err);
+      const detail = err instanceof Error ? err.message : "ukendt fejl";
+      return NextResponse.json({ error: `Kunne ikke hente samlet statistik. Sidste fejl: ${detail}` }, { status: 400 });
+    }
   }
 
   const deals = await prisma.deal.findMany({

@@ -144,7 +144,17 @@ export function StatsCustomerRow({
   }
 
   function downloadPdf() {
-    startDownloadTransition(() => downloadCustomerReportPdf([dealId], showToast));
+    // Mirrors "Send samlet": a deal with linked branches gets asked whether
+    // this download should be just for it, or one combined PDF (one stats
+    // page per branch) for it and every linked branch together.
+    const combined =
+      branches.length > 0 &&
+      confirm(
+        `Denne kunde har ${branches.length} sammenkoblede afdeling${branches.length === 1 ? "" : "er"} (${branches
+          .map((b) => b.name)
+          .join(", ")}).\n\nTryk OK for én samlet PDF med alle ${branches.length + 1}, eller Annullér for kun denne.`
+      );
+    startDownloadTransition(() => downloadCustomerReportPdf([dealId], showToast, combined));
   }
 
   const isSending = sending || lastStatus === "PENDING";

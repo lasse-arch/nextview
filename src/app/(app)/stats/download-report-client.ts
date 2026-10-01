@@ -25,12 +25,17 @@ function filenameFromContentDisposition(header: string | null, fallback: string)
  * report skipped deals, so this goes through fetch+blob instead. Shared by
  * the per-row single download and the bulk-selection download.
  */
-export async function downloadCustomerReportPdf(dealIds: string[], showToast: (message: string) => void): Promise<void> {
+export async function downloadCustomerReportPdf(
+  dealIds: string[],
+  showToast: (message: string) => void,
+  combined = false
+): Promise<void> {
   if (dealIds.length === 0) return;
 
   let res: Response;
   try {
-    res = await fetch(`/api/stats/download-report?dealIds=${dealIds.map(encodeURIComponent).join(",")}`);
+    const combinedParam = combined ? "&combined=1" : "";
+    res = await fetch(`/api/stats/download-report?dealIds=${dealIds.map(encodeURIComponent).join(",")}${combinedParam}`);
   } catch {
     showToast("Kunne ikke hente PDF'en.");
     return;

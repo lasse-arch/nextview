@@ -242,6 +242,39 @@ export async function generateCustomerReportPdfBuffer(deal: ReportPdfDeal): Prom
 }
 
 /**
+ * Just the rendering half of generateAndSendCombinedCustomerReport - one
+ * combined PDF (one cover, one stats page per included branch) for a deal
+ * and its linked branches, with none of the email/Drive-archiving/schedule
+ * side effects. Used by the /stats page's "PDF" button when the deal has
+ * linked branches, mirroring how "Send samlet" already offers a combined
+ * report for email - the same choice, just for a download instead of a send.
+ */
+export async function generateCombinedCustomerReportPdfBuffer(
+  deal: ReportPdfDeal,
+  branches: Pick<ReportPdfDeal, "companyName" | "displayName" | "mpSkinId">[]
+): Promise<Buffer> {
+  const allDeals = [deal, ...branches];
+  const reportableDeals = allDeals.filter((d) => parseMpSkinIds(d.mpSkinId).length > 0);
+  if (reportableDeals.length === 0) throw new Error("Ingen af de sammenkoblede deals har et MP-Skin nummer udfyldt.");
+
+  const customerName = deal.displayName || deal.companyName;
+  const language = deal.reportLanguage;
+  const monthLabel = currentMonthLabel(language);
+
+  const branchReports: CombinedCustomerReportBranch[] = [];
+  let coverImage: Buffer | null = null;
+  for (const d of reportableDeals) {
+    const tourData = await fetchMatterportTourData(parseMpSkinIds(d.mpSkinId));
+    branchReports.push({ name: d.displayName || d.companyName, stats: tourData.stats });
+    if (!coverImage) coverImage = tourData.coverImage;
+  }
+  if (!coverImage) throw new Error("Kunne ikke hente et cover-billede for nogen af de sammenkoblede deals.");
+
+  const html = buildCombinedCustomerReportHtml({ customerName, monthLabel, coverImage, language, branches: branchReports });
+  return renderCustomerReportPdf(html);
+}
+
+/**
  * Generates a visitor-stats report for one deal (scraping explore.nextview360.dk,
  * rendering the PDF, archiving it to Drive, and emailing it) and records the
  * outcome + advances the schedule. Used by both the manual "Send nu" button
@@ -372,23 +405,7 @@ export async function generateAndSendCombinedCustomerReport(
     const language = deal.reportLanguage;
     const monthLabel = currentMonthLabel(language);
 
-    const branchReports: CombinedCustomerReportBranch[] = [];
-    let coverImage: Buffer | null = null;
-    for (const d of reportableDeals) {
-      const tourData = await fetchMatterportTourData(parseMpSkinIds(d.mpSkinId));
-      branchReports.push({ name: d.displayName || d.companyName, stats: tourData.stats });
-      if (!coverImage) coverImage = tourData.coverImage;
-    }
-    if (!coverImage) throw new Error("Kunne ikke hente et cover-billede for nogen af de sammenkoblede deals.");
-
-    const html = buildCombinedCustomerReportHtml({
-      customerName,
-      monthLabel,
-      coverImage,
-      language,
-      branches: branchReports,
-    });
-    const pdf = await renderCustomerReportPdf(html);
+    const pdf = await generateCombinedCustomerReportPdfBuffer(deal, branches);
 
     const account = await findReportSenderAccount();
     const fileName = `${customerName} - ${language === "EN" ? "combined visitor report" : "samlet besøgsrapport"} ${monthLabel}.pdf`;
