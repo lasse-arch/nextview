@@ -13,6 +13,7 @@ import { resolveCustomerMentions } from "@/lib/customer-mentions";
 import { sendContractSignedNotification } from "@/lib/notification-service";
 import { logActivity } from "@/lib/activity";
 import { dealName } from "@/lib/labels";
+import { isPocketShareUrl, fetchPocketTranscript } from "@/lib/pocket-transcript";
 import type { DealStage, CommissionFrequency, CommissionStatus } from "@prisma/client";
 
 const CONTRACT_MANAGED_STAGES: DealStage[] = ["CONTRACT_SENT", "CONTRACT_SIGNED"];
@@ -588,9 +589,24 @@ export async function addNote(
   formData: FormData
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const user = await requireUser();
-  const body = String(formData.get("body") || "").trim();
+  let body = String(formData.get("body") || "").trim();
   const kind = String(formData.get("kind") || "MANUAL") === "AI_MEETING" ? "AI_MEETING" : "MANUAL";
   if (!body) return { ok: false, error: "Skriv en note først." };
+
+  // A bare Pocket share link pasted into the AI-mødenote field means "fetch
+  // the whole thing for me" - expand it server-side (all tabs: summary,
+  // to-dos, full transcript) instead of saving just the link.
+  if (kind === "AI_MEETING") {
+    const pocketUrl = isPocketShareUrl(body);
+    if (pocketUrl) {
+      try {
+        const { body: transcriptBody } = await fetchPocketTranscript(pocketUrl);
+        body = transcriptBody;
+      } catch {
+        return { ok: false, error: "Kunne ikke hente mødereferatet fra Pocket-linket. Prøv igen, eller indsæt teksten manuelt." };
+      }
+    }
+  }
 
   await prisma.note.create({
     data: { dealId, authorId: user.id, body, kind },
