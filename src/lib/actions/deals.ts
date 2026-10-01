@@ -625,6 +625,20 @@ export async function addNote(
   return { ok: true };
 }
 
+/** Only the note's own author or an admin can delete it - same rule as
+ * everywhere else in the app a note/comment-style record can be removed. */
+export async function deleteNote(noteId: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const user = await requireUser();
+  const note = await prisma.note.findUniqueOrThrow({ where: { id: noteId } });
+  if (user.role !== "ADMIN" && note.authorId !== user.id) {
+    return { ok: false, error: "Du kan kun slette dine egne noter." };
+  }
+
+  await prisma.note.delete({ where: { id: noteId } });
+  revalidatePath(`/deals/${note.dealId}`);
+  return { ok: true };
+}
+
 /** Quick inline rename (e.g. from the Ringeliste queue, where a lead often
  * starts out named after a guessed URL slug) - sets displayName rather than
  * touching companyName, so a CVR-verified legal name is never overwritten. */

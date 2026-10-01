@@ -43,6 +43,7 @@ import { DealInfoForm } from "./deal-info-form";
 import { NoteForm } from "./note-form";
 import { NoteBody } from "./note-body";
 import { CreateTaskFromNoteButton } from "./create-task-from-note-button";
+import { DeleteNoteButton } from "./delete-note-button";
 import { EmailList } from "./email-list";
 import { SendEmailSection } from "./send-email-section";
 import { DealTasksSection } from "./deal-tasks-section";
@@ -369,6 +370,9 @@ export default async function DealDetailPage({
                     <span className="flex items-center gap-2">
                       {noteKindLabels[note.kind]} · {formatDate(note.createdAt)}
                       <CreateTaskFromNoteButton noteId={note.id} />
+                      {(currentUser?.role === "ADMIN" || currentUser?.id === note.authorId) && (
+                        <DeleteNoteButton noteId={note.id} />
+                      )}
                     </span>
                   </div>
                   <NoteBody body={note.body} />
