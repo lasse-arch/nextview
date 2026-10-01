@@ -120,6 +120,36 @@ enum ReportSendStatus {
   FAILED
 }
 
+enum DownloadJobStatus {
+  PENDING
+  READY
+  FAILED
+}
+
+/// A "Download PDF" click on /stats - same one-at-a-time background queue
+/// pattern as CustomerReport's send flow (see customer-report-service.ts),
+/// since one report's own Matterport/explore.nextview360.dk scrape can
+/// easily take a minute or more and a single blocking request risks the
+/// route's maxDuration on a big "download all". The generated PDF is held
+/// here as bytes until downloaded - short-lived by nature, not meant to
+/// accumulate indefinitely.
+model ReportDownloadJob {
+  id          String             @id @default(cuid())
+  /// Comma-separated deal ids (one for a single download, several for a
+  /// merged "download all"/bulk-selection download).
+  dealIds     String
+  /// Mirrors "Send samlet" for a download - one combined PDF (one stats
+  /// page per branch) for a deal and its linked branches, instead of each
+  /// deal's own separate report. Only meaningful with exactly one dealId.
+  combined    Boolean            @default(false)
+  status      DownloadJobStatus  @default(PENDING)
+  pdfData     Bytes?
+  fileName    String?
+  errorMessage String?
+  createdById String
+  createdAt   DateTime           @default(now())
+}
+
 
 model Invoice {
   id     String @id @default(cuid())

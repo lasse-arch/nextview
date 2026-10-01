@@ -3,7 +3,8 @@
 import { useState, useTransition } from "react";
 import { sendCustomerReportsNowAction } from "@/lib/actions/customer-reports";
 import { useToast } from "@/components/toast";
-import { downloadCustomerReportPdf } from "./download-report-client";
+import { startDownloadJob } from "./download-job-store";
+import { DownloadJobsCorner } from "./download-jobs-corner";
 import { StatsCustomerRow, type StatsCustomerRowData } from "./stats-customer-row";
 
 /**
@@ -59,19 +60,25 @@ export function LiveCustomersTable({ rows }: { rows: StatsCustomerRowData[] }) {
   function downloadSelected() {
     const ids = [...selected];
     if (ids.length === 0) return;
-    startDownload(() => downloadCustomerReportPdf(ids, showToast));
+    startDownload(async () => {
+      const result = await startDownloadJob(ids, false, `${ids.length} valgte kunder`, showToast);
+      if (!result.ok) showToast(result.error);
+    });
   }
 
   /** Downloads every live customer that actually has an MP-Skin nummer, as
    * one merged PDF - a dedicated one-click action rather than requiring
    * "select all" first. Each deal now needs its own real Matterport
-   * browser-scrape (much slower than the old bulk system), so this can take
-   * a while for a large customer list - the download route's own
-   * maxDuration is set generously to match. */
+   * browser-scrape (much slower than the old bulk system), so this runs as a
+   * background job (see download-job-store.ts) instead of a single blocking
+   * request, with its progress shown in the corner widget. */
   function downloadAll() {
     const ids = rows.filter((r) => r.mpSkinId).map((r) => r.dealId);
     if (ids.length === 0) return;
-    startDownload(() => downloadCustomerReportPdf(ids, showToast));
+    startDownload(async () => {
+      const result = await startDownloadJob(ids, false, `Alle live kunder (${ids.length})`, showToast);
+      if (!result.ok) showToast(result.error);
+    });
   }
 
   const eligibleCount = rows.filter((r) => r.mpSkinId).length;
@@ -133,6 +140,8 @@ export function LiveCustomersTable({ rows }: { rows: StatsCustomerRowData[] }) {
           </p>
         )}
       </div>
+
+      <DownloadJobsCorner />
     </div>
   );
 }

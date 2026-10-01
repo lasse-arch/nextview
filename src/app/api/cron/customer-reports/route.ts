@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest, after } from "next/server";
 import { enqueueScheduledCustomerReports, kickCustomerReportQueue } from "@/lib/customer-report-service";
+import { cleanupOldDownloadJobs } from "@/lib/report-download-service";
 
 /** Runs daily (like the Dinero cron) - most days this finds nothing due,
  * since reports only go out monthly/bimonthly/quarterly per deal. Only
@@ -19,5 +20,6 @@ export async function GET(request: NextRequest) {
 
   const result = await enqueueScheduledCustomerReports();
   after(() => kickCustomerReportQueue());
+  after(() => cleanupOldDownloadJobs());
   return NextResponse.json(result);
 }

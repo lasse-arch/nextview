@@ -13,7 +13,7 @@ import {
 import { formatDate } from "@/lib/labels";
 import { useToast } from "@/components/toast";
 import { usePollWhilePending } from "../use-poll-while-pending";
-import { downloadCustomerReportPdf } from "./download-report-client";
+import { startDownloadJob } from "./download-job-store";
 import { ReportHistoryTooltip, type ReportHistoryEntry } from "./report-history-tooltip";
 import type { ReportInterval, ReportLanguage, ReportSendStatus } from "@prisma/client";
 
@@ -154,7 +154,10 @@ export function StatsCustomerRow({
           .map((b) => b.name)
           .join(", ")}).\n\nTryk OK for én samlet PDF med alle ${branches.length + 1}, eller Annullér for kun denne.`
       );
-    startDownloadTransition(() => downloadCustomerReportPdf([dealId], showToast, combined));
+    startDownloadTransition(async () => {
+      const result = await startDownloadJob([dealId], combined, name, showToast);
+      if (!result.ok) showToast(result.error);
+    });
   }
 
   const isSending = sending || lastStatus === "PENDING";
