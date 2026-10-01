@@ -316,55 +316,37 @@ function aggregateTourStats(all: ExploreTourStats[]): ExploreTourStats {
 
 /**
  * Opens a tour's editor and reads back the real, currently-configured cover
- * photo from its own "Cover/Title" tab (specifically the "Cover - Landscape
- * (Desktop)" image, confirmed against a real screenshot of that tab) - not
- * the guessed `tour-cache-mpApi-<id>-cover-.png` cache URL this used to rely
- * on, which could return a stale or wrong cached variant. Earlier reasoning
- * for avoiding the Cover/Title tab noted it "never exposes the URL in the
- * server-rendered HTML" - true for a plain fetch, but this runs the tab's
- * real JS via Puppeteer and reads the live, rendered DOM instead, which does
- * not have that limitation. Returns null (not a guess) if the tab or image
- * can't be found, so the caller can fall back to the old cache URL rather
- * than fail outright - this exact approach was tried once before against a
- * different part of this site and confirmed wrong, so it isn't trusted
- * blindly yet.
+ * photo from its own "Cover/Title" tab's "Cover - Landscape (Desktop)"
+ * field - CONFIRMED live against the real account (Stidsholt Efterskole):
+ * the tab is a Bootstrap tab pane (`#model-cover`) that's present in the DOM
+ * regardless of which tab is visually active, so no tab-click is even
+ * needed - its first `<img>` is the field's thumbnail, served from
+ * `/en/login?crm=getImg&path=s3://img/crm/<account>/<filename>&w=200&h=150`.
+ * Stripping the `&w=&h=` resize params off that same URL returns the full-
+ * resolution original (verified: 3000x1688, ~830KB, matching the exact
+ * uploaded photo). Replaces the earlier guessed
+ * `tour-cache-mpApi-<id>-cover-.png` cache URL, which could return a stale
+ * or wrong cached variant - confirmed wrong by a real report screenshot.
+ * Returns null (not a guess) if the pane or image can't be found, so the
+ * caller can fall back to that old cache URL rather than fail outright.
  */
 async function fetchCoverImageUrlFromEditor(page: Page, editorHref: string): Promise<string | null> {
   try {
     await gotoRetry(page, editorHref);
     await sleep(2000);
-    // "Cover/Title" may already be the active tab by default (as seen in the
-    // confirmed screenshot) - a click that finds nothing isn't fatal, since
-    // the content could already be showing.
-    await clickButtonWithText(page, "Cover/Title");
 
-    for (let poll = 0; poll < 10; poll++) {
-      const text = await retryOnDestroyedContext(() => page.evaluate(() => document.body.innerText)).catch(() => "");
-      if (/cover/i.test(text)) break;
-      await sleep(500);
-    }
-
-    return await retryOnDestroyedContext(() =>
+    const thumbSrc = await retryOnDestroyedContext(() =>
       page.evaluate(() => {
-        const isLabelMatch = (text: string) => /landscape[\s\S]{0,20}desktop|desktop[\s\S]{0,20}landscape|cover[\s\S]{0,20}landscape/i.test(text);
-        const labelEls = Array.from(document.querySelectorAll("*")).filter(
-          (el) => el.children.length === 0 && isLabelMatch(el.textContent || "")
-        );
-        for (const label of labelEls) {
-          let container: Element | null = label;
-          for (let i = 0; i < 5 && container; i++) {
-            const img = container.querySelector("img") as HTMLImageElement | null;
-            if (img && img.src && !img.src.startsWith("data:")) return img.src;
-            container = container.parentElement;
-          }
-        }
-        // Fall back to the first reasonably large real image on the tab, in
-        // case the exact label text doesn't match what's actually rendered.
-        const imgs = Array.from(document.querySelectorAll("img")) as HTMLImageElement[];
-        const big = imgs.find((img) => (img.naturalWidth || img.width) > 300 && !img.src.startsWith("data:"));
-        return big ? big.src : null;
+        const pane = document.querySelector("#model-cover");
+        const img = pane?.querySelector("img") as HTMLImageElement | null;
+        return img?.src ?? null;
       })
     );
+    if (!thumbSrc) return null;
+
+    // The thumbnail URL's own `w`/`h` params control the resize - dropping
+    // them returns the original, full-resolution upload instead.
+    return thumbSrc.replace(/&w=\d+&h=\d+/, "");
   } catch {
     return null;
   }
