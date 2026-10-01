@@ -60,10 +60,22 @@ export async function sendTemplatedEmailAction(
   const subject = resolveTemplatePlaceholders(subjectRaw, ctx);
   const body = resolveTemplatePlaceholders(bodyHtmlRaw, ctx);
 
-  const plainText = body.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  // Always appended, regardless of whether the composed text (hand-typed or
+  // from a saved template) already has its own sign-off - the point is a
+  // signature being there is a guarantee, not something that depends on the
+  // sender remembering to type {{sælger}} or a template author having
+  // included one.
+  const sellerName = [user.name, user.lastName].filter(Boolean).join(" ");
+  const signatureLines = [sellerName, "Nextview360 ApS", user.phone ? `Tlf: ${user.phone}` : null].filter(
+    (line): line is string => Boolean(line)
+  );
+  const signatureText = `\n\nMed venlig hilsen\n${signatureLines.join("\n")}`;
+  const signatureHtml = `<p>Med venlig hilsen<br>${signatureLines.join("<br>")}</p>`;
+
+  const plainText = `${body.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim()}${signatureText}`;
   const trackingId = crypto.randomUUID();
   const pixel = `<img src="${getAppBaseUrl()}/api/track/email-open/${trackingId}" width="1" height="1" style="display:none" alt="" />`;
-  const bodyHtml = `${body}${pixel}`;
+  const bodyHtml = `${body}${signatureHtml}${pixel}`;
 
   const attachments = await Promise.all(
     files.map(async (f) => ({
