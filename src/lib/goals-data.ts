@@ -7,6 +7,7 @@ export const goalMetricLabels: Record<GoalMetric, string> = {
   ESTABLISHMENT_FEE: "Etableringsgebyr solgt",
   MRR_SOLD: "MRR solgt",
   DEALS_SOLD: "Antal solgt",
+  TOTAL_SOLD: "Solgt i alt",
 };
 
 export const goalMetricIsMoney: Record<GoalMetric, boolean> = {
@@ -14,6 +15,7 @@ export const goalMetricIsMoney: Record<GoalMetric, boolean> = {
   ESTABLISHMENT_FEE: true,
   MRR_SOLD: true,
   DEALS_SOLD: false,
+  TOTAL_SOLD: true,
 };
 
 export const goalPeriodLabels: Record<GoalPeriod, string> = {
@@ -109,6 +111,12 @@ export async function getGoalsForDashboard(viewer: { id: string; role: string })
         return scoped
           .filter((d) => d.soldAt && isWithinInterval(d.soldAt, { start, end }))
           .reduce((sum, d) => sum + (d.establishmentFee ?? 0), 0);
+      case "TOTAL_SOLD":
+        // Same "MRR + etableringspris" formula as the dashboard's own
+        // "Solgt i alt" stat tile, just scoped to this goal's own period.
+        return scoped
+          .filter((d) => d.soldAt && isWithinInterval(d.soldAt, { start, end }))
+          .reduce((sum, d) => sum + (d.saleAmount ?? 0) + (d.establishmentFee ?? 0), 0);
     }
   }
 

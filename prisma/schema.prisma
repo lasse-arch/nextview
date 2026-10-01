@@ -51,6 +51,10 @@ enum GoalMetric {
   ESTABLISHMENT_FEE
   MRR_SOLD
   DEALS_SOLD
+  /// Etableringsgebyr + MRR combined - same "Solgt i alt" formula as the
+  /// dashboard's own stat tile, just scoped to the goal's own period instead
+  /// of the customer's lifetime.
+  TOTAL_SOLD
 }
 
 enum CommissionStatus {
