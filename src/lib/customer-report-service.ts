@@ -337,7 +337,7 @@ export async function generateAndSendCustomerReport(
       subject: emailText.subject,
       bodyText: emailText.bodyText,
       bodyHtml: `${emailText.bodyHtml}${pixel}`,
-      attachment: { filename: fileName, contentType: "application/pdf", data: pdf },
+      attachments: [{ filename: fileName, contentType: "application/pdf", data: pdf }],
       fromName: "Nextview360 ApS",
     });
 
@@ -443,7 +443,7 @@ export async function generateAndSendCombinedCustomerReport(
       subject: emailText.subject,
       bodyText: emailText.bodyText,
       bodyHtml: `${emailText.bodyHtml}${pixel}`,
-      attachment: { filename: fileName, contentType: "application/pdf", data: pdf },
+      attachments: [{ filename: fileName, contentType: "application/pdf", data: pdf }],
       fromName: "Nextview360 ApS",
     });
 

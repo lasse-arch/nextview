@@ -11,23 +11,35 @@ import { logActivity } from "@/lib/activity";
 import { dealName } from "@/lib/labels";
 import { createEmailFollowUpTask } from "@/lib/task-automation";
 
+/** 25MB - Gmail's own limit on a single outgoing message (including the
+ * base64-inflated size of every attachment combined). */
+const MAX_ATTACHMENTS_BYTES = 25 * 1024 * 1024;
+
 /**
  * Sends an email from the deal page, as the CURRENT user's own connected
  * Gmail (not a shared company inbox) - {{placeholders}} in the subject/body
  * are resolved first, then a tracking pixel is appended so the deal's email
  * history can show whether/when it was opened. `ccUserIds` cc's colleagues
  * (e.g. Gustav or Victor) by their own account email, not arbitrary text -
- * so it's always a real, connected person on the team, not a typo. Creates a
- * short follow-up task on the deal, assigned to the sender, so a sent email
- * doesn't just disappear into the void if the customer never replies.
+ * so it's always a real, connected person on the team, not a typo. `files`
+ * are whatever the sender picked in the composer's file input, attached
+ * as-is. Creates a short follow-up task on the deal, assigned to the sender,
+ * so a sent email doesn't just disappear into the void if the customer
+ * never replies.
  */
 export async function sendTemplatedEmailAction(
   dealId: string,
   subjectRaw: string,
   bodyHtmlRaw: string,
-  ccUserIds: string[] = []
+  ccUserIds: string[] = [],
+  files: File[] = []
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const user = await requireUser();
+
+  const totalBytes = files.reduce((sum, f) => sum + f.size, 0);
+  if (totalBytes > MAX_ATTACHMENTS_BYTES) {
+    return { ok: false, error: "Vedhæftede filer fylder for meget samlet (maks. 25 MB) - Gmail afviser den." };
+  }
 
   const account = await prisma.emailAccount.findFirst({ where: { userId: user.id, provider: "GOOGLE" } });
   if (!account) {
@@ -53,6 +65,14 @@ export async function sendTemplatedEmailAction(
   const pixel = `<img src="${getAppBaseUrl()}/api/track/email-open/${trackingId}" width="1" height="1" style="display:none" alt="" />`;
   const bodyHtml = `${body}${pixel}`;
 
+  const attachments = await Promise.all(
+    files.map(async (f) => ({
+      filename: f.name,
+      contentType: f.type || "application/octet-stream",
+      data: Buffer.from(await f.arrayBuffer()),
+    }))
+  );
+
   let sendResult: { id: string };
   try {
     sendResult = await sendGmailMessage(account, {
@@ -61,6 +81,7 @@ export async function sendTemplatedEmailAction(
       subject,
       bodyText: plainText,
       bodyHtml,
+      attachments: attachments.length > 0 ? attachments : undefined,
       fromName: [user.name, user.lastName].filter(Boolean).join(" "),
     });
   } catch (err) {

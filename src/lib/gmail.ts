@@ -18,7 +18,9 @@ export async function sendGmailMessage(
     bodyText: string;
     /** Renders as the body instead of bodyText when set, for simple formatting (e.g. a bold signature name). */
     bodyHtml?: string;
-    attachment?: { filename: string; contentType: string; data: Buffer };
+    /** One or more files attached to the email - e.g. a generated report PDF,
+     * or whatever the sender picked in the composer's file picker. */
+    attachments?: { filename: string; contentType: string; data: Buffer }[];
     /** Shown as the sender's display name (e.g. "Nextview360 ApS") instead of the raw account email. */
     fromName?: string;
   }
@@ -36,12 +38,24 @@ export async function sendGmailMessage(
   ];
 
   let mime: string;
-  if (params.attachment) {
+  if (params.attachments && params.attachments.length > 0) {
     const boundary = `nv360_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-    // Gmail's raw message is a single flat string, so a binary attachment has
-    // to be inlined as base64 text within the multipart body - wrapped at 76
-    // chars/line per the MIME spec, not because Gmail requires it strictly.
-    const attachmentB64 = params.attachment.data.toString("base64").replace(/(.{76})/g, "$1\r\n");
+    // Gmail's raw message is a single flat string, so each binary attachment
+    // has to be inlined as base64 text within the multipart body - wrapped
+    // at 76 chars/line per the MIME spec, not because Gmail requires it
+    // strictly. One part per attachment, all sharing the same boundary.
+    const attachmentParts = params.attachments.flatMap((a) => {
+      const dataB64 = a.data.toString("base64").replace(/(.{76})/g, "$1\r\n");
+      return [
+        `--${boundary}`,
+        `Content-Type: ${a.contentType}; name="${a.filename}"`,
+        `Content-Disposition: attachment; filename="${a.filename}"`,
+        `Content-Transfer-Encoding: base64`,
+        "",
+        dataB64,
+        "",
+      ];
+    });
     mime = [
       ...headerLines,
       `MIME-Version: 1.0`,
@@ -52,13 +66,7 @@ export async function sendGmailMessage(
       "",
       body,
       "",
-      `--${boundary}`,
-      `Content-Type: ${params.attachment.contentType}; name="${params.attachment.filename}"`,
-      `Content-Disposition: attachment; filename="${params.attachment.filename}"`,
-      `Content-Transfer-Encoding: base64`,
-      "",
-      attachmentB64,
-      "",
+      ...attachmentParts,
       `--${boundary}--`,
     ].join("\r\n");
   } else {

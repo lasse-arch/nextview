@@ -24,10 +24,24 @@ export function SendEmailSection({
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [ccUserIds, setCcUserIds] = useState<Set<string>>(new Set());
+  const [files, setFiles] = useState<File[]>([]);
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [pending, startTransition] = useTransition();
   const [saving, startSaveTransition] = useTransition();
   const showToast = useToast();
+
+  function addFiles(selected: FileList | null) {
+    if (!selected) return;
+    setFiles((prev) => [...prev, ...Array.from(selected)]);
+  }
+
+  function removeFile(index: number) {
+    setFiles((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  function formatFileSize(bytes: number): string {
+    return bytes < 1024 * 1024 ? `${Math.round(bytes / 1024)} KB` : `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
 
   function pickTemplate(templateId: string) {
     const template = templates.find((t) => t.id === templateId);
@@ -52,7 +66,7 @@ export function SendEmailSection({
       return;
     }
     startTransition(async () => {
-      const result = await sendTemplatedEmailAction(dealId, subject, body, [...ccUserIds]);
+      const result = await sendTemplatedEmailAction(dealId, subject, body, [...ccUserIds], files);
       if (!result.ok) {
         showToast(result.error);
         return;
@@ -62,6 +76,7 @@ export function SendEmailSection({
       setSubject("");
       setBody("");
       setCcUserIds(new Set());
+      setFiles([]);
     });
   }
 
@@ -151,6 +166,38 @@ export function SendEmailSection({
           </div>
         </div>
       )}
+
+      <div>
+        <label className="block text-xs font-medium text-slate-600">Vedhæft filer (valgfrit)</label>
+        <input
+          type="file"
+          multiple
+          onChange={(e) => {
+            addFiles(e.target.files);
+            e.target.value = "";
+          }}
+          className="mt-1 block w-full text-xs text-slate-600 file:mr-3 file:rounded-md file:border file:border-slate-300 file:bg-white file:px-2.5 file:py-1 file:text-xs file:font-medium file:text-slate-600 hover:file:bg-slate-50"
+        />
+        {files.length > 0 && (
+          <ul className="mt-1.5 space-y-1">
+            {files.map((f, i) => (
+              <li key={i} className="flex items-center justify-between gap-2 rounded-md bg-white px-2.5 py-1 text-xs text-slate-600">
+                <span className="truncate">
+                  {f.name} <span className="text-slate-400">({formatFileSize(f.size)})</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => removeFile(i)}
+                  className="shrink-0 text-slate-400 hover:text-red-600"
+                  title="Fjern"
+                >
+                  ×
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
 
       {savingTemplate ? (
         <div className="flex items-center gap-2">
