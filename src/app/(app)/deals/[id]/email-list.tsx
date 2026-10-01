@@ -168,7 +168,7 @@ function EmailRow({ dealId, email }: { dealId: string; email: Email }) {
   const counterparty = email.direction === "INBOUND" ? email.fromAddress : email.toAddresses;
 
   return (
-    <li className="group overflow-hidden rounded-xl border border-slate-200 bg-white transition-colors hover:border-slate-300">
+    <li className="group rounded-xl border border-slate-200 bg-white transition-colors hover:border-slate-300">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -213,7 +213,7 @@ function EmailRow({ dealId, email }: { dealId: string; email: Email }) {
         </svg>
       </button>
       {open && email.bodyText && (
-        <div className="border-t border-slate-100 bg-slate-50/60 px-3.5 py-3 pl-[3.25rem]">
+        <div className="rounded-b-xl border-t border-slate-100 bg-slate-50/60 px-3.5 py-3 pl-[3.25rem]">
           <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{email.bodyText}</p>
           <AiNoteSuggestion dealId={dealId} emailId={email.id} />
         </div>
