@@ -84,6 +84,18 @@ const DEFAULT_POSTS: { title: string; body: string; minutesAgo: number; screensh
     body: "Før krævede det at åbne \"Stadie\"-dropdownen langt nede i redigeringsformularen, vælge \"Møde booket\", udfylde et mødedato-felt der først dukkede op der, gemme hele formularen - og så separat åbne \"Send kalender invitation\" for rent faktisk at give kunden/kollegaer besked. Akavet, især midt i et telefonopkald.\n\nNu er der en lilla \"Book møde\"-knap lige ved siden af firmanavnet øverst på dealens side. Klik den, vælg dato/tid, lad kryds-feltet \"Send kalenderinvitation med det samme\" stå som det er (sat til som standard) - dealen rykker med det samme til Møde booket, og kalenderinvitationen sendes i samme trin. Virker uanset hvilket stadie dealen kommer fra. Den gamle \"Send kalender invitation\"-knap findes stadig, hvis du vil tilføje en kollega eller en besked bagefter.",
     screenshotUrl: "/news/book-meeting.png",
   },
+  {
+    minutesAgo: 0,
+    title: "Stats-siden som kort i stedet for en bred tabel",
+    body: "\"Live kunder\"-tabellen på Stats krævede før vandret scroll for at nå alle felter (MP-Skin nummer, CC, interval, sprog, næste afsendelse). Hver kunde er nu et kort i stedet, med felterne i et grid der bare bryder om på mindre skærme - intet scroll nødvendigt.\n\nSamtidig kan \"PDF\"-knappen nu downloade en samlet rapport for en kunde med sammenkoblede afdelinger (ligesom \"Send samlet\" allerede gjorde for mail) - den spørger om du vil have alle med, eller kun den ene. Og selve PDF-genereringen kører nu i baggrunden i stedet for at låse knappen: tryk \"PDF\", og den dukker op i nederste højre hjørne når den er klar, i stedet for at vente på en frossen knap i op til et minuts tid.",
+    screenshotUrl: "/news/stats-cards.png",
+  },
+  {
+    minutesAgo: 0,
+    title: "Lead-filtre kan nu fodre direkte til en ringeliste",
+    body: "Et filter under Leadgeneration kan sættes til automatisk at tilføje sine fundne leads som deals på en ringeliste, i stedet for at de bare samler sig under \"Fundne leads\" og skal tilføjes én for én. Åbn \"Redigér\" på et filter, og vælg under \"Ringeliste (automatisk)\": enten \"Opret ny liste hver dag\" (så dagens fund lander i en frisk liste, klar til at ringe på), eller en bestemt eksisterende liste. Gælder både den daglige automatiske kørsel og et manuelt \"Kør nu\".",
+    screenshotUrl: "/news/auto-ringeliste.png",
+  },
 ];
 
 /**
