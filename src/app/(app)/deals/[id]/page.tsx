@@ -41,6 +41,7 @@ import { LockedContractFields } from "./locked-contract-fields";
 import { ContractStatusRow } from "./contract-status-row";
 import { DealInfoForm } from "./deal-info-form";
 import { NoteForm } from "./note-form";
+import { NoteBody } from "./note-body";
 import { CreateTaskFromNoteButton } from "./create-task-from-note-button";
 import { EmailList } from "./email-list";
 import { SendEmailSection } from "./send-email-section";
@@ -370,7 +371,7 @@ export default async function DealDetailPage({
                       <CreateTaskFromNoteButton noteId={note.id} />
                     </span>
                   </div>
-                  <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">{note.body}</p>
+                  <NoteBody body={note.body} />
                 </li>
               ))}
               {deal.notes.length === 0 && <p className="text-sm text-slate-400">Ingen noter endnu.</p>}

@@ -43,24 +43,27 @@ export async function fetchPocketTranscript(url: string): Promise<{ title: strin
     await page.goto(url, { waitUntil: "networkidle2", timeout: 30000 });
     await sleep(2500);
 
+    // Summary tab is the default view - no click needed, but click anyway in
+    // case a previous run on the same page (unlikely, fresh browser each
+    // time) left it elsewhere. Also: the summary's heading (and all its
+    // content) only actually renders into the DOM once this tab is active -
+    // confirmed the hard way, via @sparticuz/chromium specifically (not
+    // Playwright's bundled chromium, which rendered it immediately) finding
+    // zero h1/h2/h3 elements at all before this click.
+    await clickTab(page, "Summary");
+    await sleep(1000);
+
     const title = await page
       .evaluate(() => {
-        // The page's own heading sits right above the Summary/To-Dos/... tab
-        // bar - confirmed from a real share link ("Salgsmøde om
-        // 360-graders virtuel tour").
-        const tabBarEl = Array.from(document.querySelectorAll("*")).find(
-          (el) => el.textContent?.trim() === "Summary" && el.children.length === 0
-        );
-        const heading = tabBarEl?.closest("div")?.previousElementSibling;
-        return heading?.textContent?.trim() || document.title || "Pocket-mødereferat";
+        // The first heading on the page is the AI-generated meeting title
+        // (confirmed from a real share link: "Salgsmøde om 360-graders
+        // virtuel tour") - document.title is useless, it's just "Pocket" for
+        // every share link.
+        const heading = document.querySelector("h1, h2, h3");
+        return heading?.textContent?.trim() || "Pocket-mødereferat";
       })
       .catch(() => "Pocket-mødereferat");
 
-    // Summary tab is the default view - no click needed, but click anyway in
-    // case a previous run on the same page (unlikely, fresh browser each
-    // time) left it elsewhere.
-    await clickTab(page, "Summary");
-    await sleep(1000);
     const summary = await extractMainText(page);
 
     let todos = "";
