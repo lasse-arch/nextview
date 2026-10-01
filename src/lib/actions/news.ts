@@ -102,6 +102,30 @@ const DEFAULT_POSTS: { title: string; body: string; minutesAgo: number; screensh
     body: "\"Fundne leads\" under Leadgeneration viste før alle filtres fund i én lang, blandet liste. Nu får hvert filter sin egen navngivne liste med eget antal - opret fx et filter kaldet \"Nye leads dagligt\" uden branche/område-begrænsning, så det selv kører CVR-registret igennem hver dag, og dets fund samler sig overskueligt for sig selv. Hver liste har sin egen \"Tilføj alle til ringeliste\"-knap, så du kan tilføje en hel dags fund til den valgte ringeliste med ét klik i stedet for én for én.",
     screenshotUrl: "/news/fundne-leads-grouped.png",
   },
+  {
+    minutesAgo: 0,
+    title: "Sæt mål for flere perioder - ikke kun denne måned",
+    body: "\"Mål\" på forsiden (tidligere \"Mål denne måned\") kan nu sættes for \"Denne måned\", \"Dette kvartal\", \"Resten af året\" eller \"Hele året\" - vælg bare perioden i dropdown'en, når du opretter et mål. Et mål forsvinder automatisk fra listen, når dets periode er omme, så den ikke bliver stående og vise forældet fremgang.\n\nDer er også en ny målmetrik: \"Solgt i alt\" - den matcher dashboardets egen \"Solgt i alt\"-boks (alle aktive kunders fulde kontraktværdi, ikke kun det der er solgt inden for perioden), så fx et \"Resten af året\"-mål på 1,5 mio. kr. viser jeres reelle status med det samme, i stedet for at starte ved 0 kr.",
+    screenshotUrl: "/news/goal-periods.png",
+  },
+  {
+    minutesAgo: 0,
+    title: "Se om kunden har åbnet jeres stats-rapport",
+    body: "Under hver kunde på Stats-siden (og i kundens afsendelses-historik) kan du nu se en grøn \"Åbnet\"-badge, så snart kunden har åbnet den e-mail de fik med deres besøgsrapport - eller en grå \"Ikke åbnet\", hvis den stadig ligger ulæst. Virker for både automatiske og manuelle afsendelser. Hold musen over badgen for at se præcis hvornår den blev åbnet første gang.",
+    screenshotUrl: "/news/report-open-tracking.png",
+  },
+  {
+    minutesAgo: 0,
+    title: "Vedhæft filer når du sender mails fra en deal",
+    body: "Mail-boksen på dealsiden har nu et \"Vedhæft filer\"-felt, så du kan sende fx et tilbud eller nogle billeder direkte med mailen i stedet for at skulle sende det separat. Vælg én eller flere filer, se dem listet med størrelse lige under, og fjern en igen med krydset hvis du fortrød. Op til 25 MB i alt pr. mail (Gmails egen grænse).",
+    screenshotUrl: "/news/email-attachments.png",
+  },
+  {
+    minutesAgo: 0,
+    title: "Indsæt et Pocket-link - få hele mødereferatet automatisk",
+    body: "\"AI-mødenote\"-feltet på en deal kan nu tage imod et rent Pocket-delelink (fra heypocket.com) i stedet for at du selv skal kopiere teksten ind. Indsæt linket alene og tryk \"Gem mødenote\", så henter den automatisk det hele i baggrunden - summary, to-dos og den fulde transskription, uanset hvilken fane der tilfældigvis er åben på Pocket-siden.\n\nNoten vises som én kompakt linje med mødets titel og en \"Åbn hele referatet\"-knap, så den ikke fylder resten af dealens noter ud - men hele referatet er stadig ét klik væk.",
+    screenshotUrl: "/news/pocket-integration.png",
+  },
 ];
 
 /**
