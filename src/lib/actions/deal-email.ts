@@ -60,17 +60,26 @@ export async function sendTemplatedEmailAction(
   const subject = resolveTemplatePlaceholders(subjectRaw, ctx);
   const body = resolveTemplatePlaceholders(bodyHtmlRaw, ctx);
 
-  // Always appended, regardless of whether the composed text (hand-typed or
-  // from a saved template) already has its own sign-off - the point is a
-  // signature being there is a guarantee, not something that depends on the
-  // sender remembering to type {{sælger}} or a template author having
-  // included one.
+  // Appended unless the composed text (hand-typed or from a saved template)
+  // already has its own sign-off - a signature being there is meant to be a
+  // guarantee, not something that depends on the sender remembering to type
+  // {{sælger}} or a template author having included one, but a template
+  // that already ends with "Med venlig hilsen ..." shouldn't get a second
+  // one stacked under it. Format matches the normal Nextview360 sign-off
+  // (bold name, "Nextview360", phone line) already used on visitor-stats
+  // report emails.
+  const alreadyHasSignature = /med venlig hilsen/i.test(body);
   const sellerName = [user.name, user.lastName].filter(Boolean).join(" ");
-  const signatureLines = [sellerName, "Nextview360 ApS", user.phone ? `Tlf: ${user.phone}` : null].filter(
+  const signatureLines = [sellerName, "Nextview360", user.phone ? `Tlf: ${user.phone}` : null].filter(
     (line): line is string => Boolean(line)
   );
-  const signatureText = `\n\nMed venlig hilsen\n${signatureLines.join("\n")}`;
-  const signatureHtml = `<p>Med venlig hilsen<br>${signatureLines.join("<br>")}</p>`;
+  const signatureText = alreadyHasSignature ? "" : `\n\nMed venlig hilsen\n${signatureLines.join("\n")}`;
+  const signatureHtml = alreadyHasSignature
+    ? ""
+    : `<p>Med venlig hilsen<br><b>${sellerName}</b>${signatureLines
+        .slice(1)
+        .map((line) => `<br>${line}`)
+        .join("")}</p>`;
 
   const plainText = `${body.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim()}${signatureText}`;
   const trackingId = crypto.randomUUID();

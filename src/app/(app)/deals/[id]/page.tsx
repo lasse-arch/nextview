@@ -393,6 +393,8 @@ export default async function DealDetailPage({
               hasGoogleAccount={Boolean(currentUserGoogleAccount)}
               templates={emailTemplates}
               teamMembers={users.filter((u) => u.id !== currentUser?.id).map((u) => ({ id: u.id, name: u.name }))}
+              sellerName={[currentUser?.name, currentUser?.lastName].filter(Boolean).join(" ")}
+              sellerPhone={currentUser?.phone ?? null}
             />
             <EmailList dealId={deal.id} emails={deal.emails} />
           </section>

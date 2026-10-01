@@ -14,11 +14,15 @@ export function SendEmailSection({
   hasGoogleAccount,
   templates,
   teamMembers,
+  sellerName,
+  sellerPhone,
 }: {
   dealId: string;
   hasGoogleAccount: boolean;
   templates: EmailTemplateOption[];
   teamMembers: TeamMemberOption[];
+  sellerName: string;
+  sellerPhone: string | null;
 }) {
   const [open, setOpen] = useState(false);
   const [subject, setSubject] = useState("");
@@ -158,6 +162,22 @@ export function SendEmailSection({
           className="mt-1 w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-sm"
         />
         <p className="mt-1 text-[11px] text-slate-400">Udfyldes automatisk: {TEMPLATE_PLACEHOLDER_HELP}</p>
+        <div className="mt-2 rounded-md border border-dashed border-slate-200 bg-slate-50 px-2.5 py-2 text-xs text-slate-500">
+          <p className="text-[11px] font-medium text-slate-400">Tilføjes automatisk nederst i mailen - skriv ikke din egen:</p>
+          <p className="mt-1 leading-snug">
+            Med venlig hilsen
+            <br />
+            <span className="font-semibold text-slate-600">{sellerName}</span>
+            <br />
+            Nextview360
+            {sellerPhone && (
+              <>
+                <br />
+                Tlf: {sellerPhone}
+              </>
+            )}
+          </p>
+        </div>
       </div>
 
       {teamMembers.length > 0 && (
