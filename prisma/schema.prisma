@@ -247,16 +247,30 @@ model ActivityEvent {
   @@index([createdAt])
 }
 
-/// A monthly target, either for one seller (userId set) or for the whole
-/// company (userId null), tracked live against that month's deal data for
-/// the chosen metric. Anyone can set their own; only an admin can set a
+enum GoalPeriod {
+  MONTH
+  QUARTER
+  REST_OF_YEAR
+  YEAR
+}
+
+/// A target over some period, either for one seller (userId set) or for the
+/// whole company (userId null), tracked live against that period's deal data
+/// for the chosen metric. Anyone can set their own; only an admin can set a
 /// company-wide goal or one for someone else.
 model Goal {
   id          String     @id @default(cuid())
   user        User?      @relation("GoalOwner", fields: [userId], references: [id], onDelete: Cascade)
   userId      String?
-  /// First day of the target month, e.g. 2026-09-01.
+  /// Start of the goal's period - recomputed fresh from `period` every time
+  /// the goal is saved (see upsertGoal), so re-saving e.g. "Denne måned"
+  /// always points at the current month rather than leaving a stale one
+  /// around. For MONTH/QUARTER/YEAR this is that period's own first day;
+  /// for REST_OF_YEAR it's the day the goal was (re-)set.
   month       DateTime
+  /// How long the goal runs for, anchored at `month` - see goalPeriodEnd in
+  /// goals-data.ts for where each period actually ends.
+  period      GoalPeriod @default(MONTH)
   metric      GoalMetric
   targetValue Int
 
@@ -479,6 +493,14 @@ model CustomerReport {
   /// ordinary single-deal report.
   branchDealIds String?
   createdAt  DateTime          @default(now())
+
+  /// Same open-tracking pattern as EmailMessage - the id embedded in this
+  /// report email's tracking pixel, hit when the recipient's mail client
+  /// loads images (see /api/track/report-open/[trackingId]). Null for a
+  /// FAILED send, which never actually reached an inbox to track.
+  trackingId String?   @unique
+  openedAt   DateTime?
+  openCount  Int       @default(0)
 
   @@index([dealId, sentAt])
 }

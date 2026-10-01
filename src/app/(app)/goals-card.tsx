@@ -3,12 +3,13 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { upsertGoal, deleteGoal } from "@/lib/actions/goals";
-import { goalMetricLabels, goalMetricIsMoney, type GoalWithProgress } from "@/lib/goals-data";
+import { goalMetricLabels, goalMetricIsMoney, goalPeriodLabels, type GoalWithProgress } from "@/lib/goals-data";
 import { formatDKK } from "@/lib/labels";
 import { useToast } from "@/components/toast";
-import type { GoalMetric } from "@prisma/client";
+import type { GoalMetric, GoalPeriod } from "@prisma/client";
 
 const METRICS = Object.keys(goalMetricLabels) as GoalMetric[];
+const PERIODS = Object.keys(goalPeriodLabels) as GoalPeriod[];
 const COMPANY_VALUE = "COMPANY";
 
 export function GoalsCard({
@@ -25,6 +26,7 @@ export function GoalsCard({
   const [showForm, setShowForm] = useState(false);
   const [targetUserId, setTargetUserId] = useState(isAdmin ? COMPANY_VALUE : currentUserId);
   const [metric, setMetric] = useState<GoalMetric>(METRICS[0]);
+  const [period, setPeriod] = useState<GoalPeriod>(PERIODS[0]);
   const [targetValue, setTargetValue] = useState("");
   const [pending, startTransition] = useTransition();
   const router = useRouter();
@@ -39,7 +41,7 @@ export function GoalsCard({
     const userId = targetUserId === COMPANY_VALUE ? null : targetUserId;
     startTransition(async () => {
       try {
-        await upsertGoal(userId, metric, targetValue);
+        await upsertGoal(userId, metric, targetValue, period);
         showToast("Mål gemt");
         setShowForm(false);
         setTargetValue("");
@@ -65,7 +67,7 @@ export function GoalsCard({
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-slate-900">Mål denne måned</h2>
+        <h2 className="text-sm font-semibold text-slate-900">Mål</h2>
         <button type="button" onClick={() => setShowForm((s) => !s)} className="text-xs font-medium text-blue-600 hover:underline">
           {showForm ? "Annullér" : "+ Sæt mål"}
         </button>
@@ -95,6 +97,17 @@ export function GoalsCard({
             {METRICS.map((m) => (
               <option key={m} value={m}>
                 {goalMetricLabels[m]}
+              </option>
+            ))}
+          </select>
+          <select
+            value={period}
+            onChange={(e) => setPeriod(e.target.value as GoalPeriod)}
+            className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-xs"
+          >
+            {PERIODS.map((p) => (
+              <option key={p} value={p}>
+                {goalPeriodLabels[p]}
               </option>
             ))}
           </select>
@@ -129,6 +142,7 @@ export function GoalsCard({
                 <span className="text-slate-700">
                   <span className="font-medium">{g.userName ?? "Hele virksomheden"}</span>
                   <span className="ml-1.5 text-slate-400">{goalMetricLabels[g.metric]}</span>
+                  <span className="ml-1.5 text-slate-300">· {goalPeriodLabels[g.period]}</span>
                 </span>
                 <span className="flex items-center gap-2">
                   <span className={`font-medium text-slate-600 ${goalMetricIsMoney[g.metric] ? "money" : ""}`}>
@@ -155,7 +169,7 @@ export function GoalsCard({
             </div>
           );
         })}
-        {goals.length === 0 && !showForm && <p className="text-xs text-slate-400">Ingen mål sat for denne måned endnu.</p>}
+        {goals.length === 0 && !showForm && <p className="text-xs text-slate-400">Ingen mål sat endnu.</p>}
       </div>
     </div>
   );

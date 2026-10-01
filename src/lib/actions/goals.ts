@@ -3,10 +3,10 @@
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
-import { startOfMonth } from "date-fns";
-import type { GoalMetric } from "@prisma/client";
+import { goalPeriodStart } from "@/lib/goals-data";
+import type { GoalMetric, GoalPeriod } from "@prisma/client";
 
-export async function upsertGoal(targetUserId: string | null, metric: GoalMetric, targetValueRaw: string) {
+export async function upsertGoal(targetUserId: string | null, metric: GoalMetric, targetValueRaw: string, period: GoalPeriod) {
   const user = await requireUser();
 
   const targetValue = Math.round(parseFloat(targetValueRaw));
@@ -19,14 +19,17 @@ export async function upsertGoal(targetUserId: string | null, metric: GoalMetric
     throw new Error("Kun admin kan sætte mål for andre eller for hele virksomheden.");
   }
 
-  const month = startOfMonth(new Date());
+  // Recomputed fresh on every save (not just the first time) - re-saving a
+  // goal always resets it to the current period rather than leaving a stale
+  // one running, and is what lets this double as the upsert key below.
+  const month = goalPeriodStart(period);
 
-  const existing = await prisma.goal.findFirst({ where: { userId: targetUserId, month, metric } });
+  const existing = await prisma.goal.findFirst({ where: { userId: targetUserId, metric, period } });
   if (existing) {
-    await prisma.goal.update({ where: { id: existing.id }, data: { targetValue } });
+    await prisma.goal.update({ where: { id: existing.id }, data: { targetValue, month } });
   } else {
     await prisma.goal.create({
-      data: { userId: targetUserId, month, metric, targetValue, createdById: user.id },
+      data: { userId: targetUserId, month, period, metric, targetValue, createdById: user.id },
     });
   }
 
