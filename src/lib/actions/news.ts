@@ -96,6 +96,12 @@ const DEFAULT_POSTS: { title: string; body: string; minutesAgo: number; screensh
     body: "Et filter under Leadgeneration kan sættes til automatisk at tilføje sine fundne leads som deals på en ringeliste, i stedet for at de bare samler sig under \"Fundne leads\" og skal tilføjes én for én. Åbn \"Redigér\" på et filter, og vælg under \"Ringeliste (automatisk)\": enten \"Opret ny liste hver dag\" (så dagens fund lander i en frisk liste, klar til at ringe på), eller en bestemt eksisterende liste. Gælder både den daglige automatiske kørsel og et manuelt \"Kør nu\".",
     screenshotUrl: "/news/auto-ringeliste.png",
   },
+  {
+    minutesAgo: 0,
+    title: "Fundne leads er nu grupperet pr. filter",
+    body: "\"Fundne leads\" under Leadgeneration viste før alle filtres fund i én lang, blandet liste. Nu får hvert filter sin egen navngivne liste med eget antal - opret fx et filter kaldet \"Nye leads dagligt\" uden branche/område-begrænsning, så det selv kører CVR-registret igennem hver dag, og dets fund samler sig overskueligt for sig selv. Hver liste har sin egen \"Tilføj alle til ringeliste\"-knap, så du kan tilføje en hel dags fund til den valgte ringeliste med ét klik i stedet for én for én.",
+    screenshotUrl: "/news/fundne-leads-grouped.png",
+  },
 ];
 
 /**

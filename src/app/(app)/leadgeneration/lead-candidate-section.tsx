@@ -33,11 +33,24 @@ function websiteHref(website: string): string {
   return website.startsWith("http") ? website : `https://${website}`;
 }
 
-function CandidateCard({ candidate, targetListId }: { candidate: LeadCandidateData; targetListId: string | null }) {
+function CandidateCard({
+  candidate,
+  targetListId,
+  onHidden,
+}: {
+  candidate: LeadCandidateData;
+  targetListId: string | null;
+  onHidden: () => void;
+}) {
   const [pending, startTransition] = useTransition();
   const [hidden, setHidden] = useState(false);
   const showToast = useToast();
   const router = useRouter();
+
+  function hide() {
+    setHidden(true);
+    onHidden();
+  }
 
   function addAsDeal() {
     startTransition(async () => {
@@ -46,7 +59,7 @@ function CandidateCard({ candidate, targetListId }: { candidate: LeadCandidateDa
         showToast(result.error);
         return;
       }
-      setHidden(true);
+      hide();
       if (result.alreadyExisted) showToast("Findes allerede som deal - åbner den eksisterende.");
       router.push(result.duplicateId ? `/deals/${result.dealId}?dup=${result.duplicateId}` : `/deals/${result.dealId}`);
     });
@@ -63,7 +76,7 @@ function CandidateCard({ candidate, targetListId }: { candidate: LeadCandidateDa
         showToast(result.error);
         return;
       }
-      setHidden(true);
+      hide();
       showToast(result.alreadyExisted ? "Fandtes allerede som deal - tilføjet til ringelisten." : "Tilføjet til ringelisten.");
       router.refresh();
     });
@@ -72,7 +85,7 @@ function CandidateCard({ candidate, targetListId }: { candidate: LeadCandidateDa
   function dismiss() {
     startTransition(async () => {
       await dismissLeadCandidate(candidate.id);
-      setHidden(true);
+      hide();
     });
   }
 
@@ -117,10 +130,7 @@ function CandidateCard({ candidate, targetListId }: { candidate: LeadCandidateDa
             )}
             {candidate.address && <> · {candidate.address}</>}
           </p>
-          <p className="mt-0.5 text-xs text-slate-400">
-            Stiftet {formatDate(candidate.foundedDate)}
-            {candidate.sourceLabel && <> · Fundet via &quot;{candidate.sourceLabel}&quot;</>}
-          </p>
+          <p className="mt-0.5 text-xs text-slate-400">Stiftet {formatDate(candidate.foundedDate)}</p>
           {(candidate.ownerName || candidate.contactPhone || candidate.contactEmail) && (
             <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
               {candidate.ownerName && (
@@ -173,6 +183,65 @@ function CandidateCard({ candidate, targetListId }: { candidate: LeadCandidateDa
   );
 }
 
+/** One filter's (or scanned URL's) own found-leads group, shown as its own
+ * named sub-list under "Fundne leads" - a filter called "Nye leads dagligt"
+ * gets its own heading and candidate list, instead of every filter's finds
+ * being mixed into one flat feed with just a small caption naming the
+ * source. */
+function CandidateGroup({
+  sourceLabel,
+  candidates,
+  targetListId,
+  onAddAll,
+}: {
+  sourceLabel: string;
+  candidates: LeadCandidateData[];
+  targetListId: string | null;
+  onAddAll: (ids: string[]) => Promise<void>;
+}) {
+  const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
+  const [addingAll, startAddingAll] = useTransition();
+  const visible = candidates.filter((c) => !hiddenIds.has(c.id));
+
+  function addAll() {
+    startAddingAll(async () => {
+      await onAddAll(visible.map((c) => c.id));
+      setHiddenIds(new Set(candidates.map((c) => c.id)));
+    });
+  }
+
+  if (visible.length === 0) return null;
+
+  return (
+    <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+          {sourceLabel} <span className="font-normal normal-case text-slate-400">({visible.length})</span>
+        </h3>
+        <button
+          type="button"
+          onClick={addAll}
+          disabled={addingAll || !targetListId}
+          title={!targetListId ? "Vælg eller opret en ringeliste først" : "Tilføj alle i denne liste til den valgte ringeliste"}
+          className="rounded-md border border-violet-300 px-2.5 py-1 text-xs font-medium text-violet-700 hover:bg-violet-50 disabled:opacity-50"
+        >
+          {addingAll ? "Tilføjer…" : "Tilføj alle til ringeliste"}
+        </button>
+      </div>
+      <div className="mt-2 space-y-2">
+        {visible.map((c) => (
+          <CandidateCard
+            key={c.id}
+            candidate={c}
+            targetListId={targetListId}
+            onHidden={() => setHiddenIds((prev) => new Set(prev).add(c.id))}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function LeadCandidateSection({
   candidates,
   callLists,
@@ -184,6 +253,7 @@ export function LeadCandidateSection({
   const [lists, setLists] = useState(callLists);
   const [targetListId, setTargetListId] = useState<string | null>(callLists[0]?.id ?? null);
   const [creating, startCreating] = useTransition();
+  const showToast = useToast();
 
   function handleListChange(value: string) {
     if (value === "__new__") {
@@ -196,6 +266,31 @@ export function LeadCandidateSection({
       return;
     }
     setTargetListId(value || null);
+  }
+
+  async function addAllToCallList(ids: string[]) {
+    if (!targetListId) {
+      showToast("Vælg eller opret en ringeliste først.");
+      return;
+    }
+    let added = 0;
+    for (const id of ids) {
+      const result = await addLeadCandidateToCallList(id, targetListId);
+      if (result.ok) added++;
+    }
+    showToast(`${added} af ${ids.length} tilføjet til ringelisten.`);
+    router.refresh();
+  }
+
+  // Grouped by which filter (or scanned URL) found them, so a filter like
+  // "Nye leads dagligt" shows as its own named list instead of blending
+  // into one flat feed - most-recently-found candidate's group sorts first.
+  const groups = new Map<string, LeadCandidateData[]>();
+  for (const c of candidates) {
+    const key = c.sourceLabel ?? "Uden kilde";
+    const existing = groups.get(key);
+    if (existing) existing.push(c);
+    else groups.set(key, [c]);
   }
 
   return (
@@ -220,9 +315,15 @@ export function LeadCandidateSection({
           </select>
         </label>
       </div>
-      <div className="mt-3 space-y-2">
-        {candidates.map((c) => (
-          <CandidateCard key={c.id} candidate={c} targetListId={targetListId} />
+      <div className="mt-3 space-y-4">
+        {[...groups.entries()].map(([sourceLabel, group]) => (
+          <CandidateGroup
+            key={sourceLabel}
+            sourceLabel={sourceLabel}
+            candidates={group}
+            targetListId={targetListId}
+            onAddAll={addAllToCallList}
+          />
         ))}
         {candidates.length === 0 && (
           <p className="py-4 text-center text-sm text-slate-400">
