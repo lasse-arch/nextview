@@ -2,6 +2,10 @@ import { prisma } from "@/lib/db";
 import { searchCvr } from "@/lib/cvr-search";
 import { scanUrlForCvrLeads } from "@/lib/url-lead-scan";
 import { lookupCvrNumber } from "@/lib/cvr";
+import { claimCandidateAndUpsertDeal } from "@/lib/actions/lead-generation";
+import { findOrCreateTodayCallList } from "@/lib/actions/call-lists";
+import { logActivity } from "@/lib/activity";
+import { dealName } from "@/lib/labels";
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -85,6 +89,35 @@ export async function runLeadFilter(filterId: string): Promise<{ ok: true; added
       })),
       skipDuplicates: true,
     });
+
+    // A filter configured to auto-feed a Ringeliste skips the "Fundne
+    // leads" review step entirely - every fresh match is promoted straight
+    // to a Deal on the chosen list, same as a manual "Tilføj til
+    // ringeliste" click would do.
+    if (filter.autoCreateDailyList || filter.targetCallListId) {
+      const callListId = filter.autoCreateDailyList
+        ? (await findOrCreateTodayCallList(filter.createdById)).id
+        : filter.targetCallListId!;
+      const list = await prisma.callList.findUniqueOrThrow({ where: { id: callListId } });
+      const freshCandidates = await prisma.leadCandidate.findMany({
+        where: { cvrNumber: { in: fresh.map((h) => h.cvr) }, filterId: filter.id },
+        select: { id: true },
+      });
+      for (const candidate of freshCandidates) {
+        const result = await claimCandidateAndUpsertDeal(candidate.id, filter.createdById, { callListId }).catch(
+          () => null
+        );
+        if (result && "created" in result && result.created) {
+          const deal = await prisma.deal.findUniqueOrThrow({ where: { id: result.dealId } });
+          await logActivity({
+            type: "DEAL_CREATED",
+            message: `Filteret "${filter.name}" tilføjede automatisk ${dealName(deal)} til ${list.name}`,
+            actorId: filter.createdById,
+            dealId: deal.id,
+          });
+        }
+      }
+    }
   }
 
   await prisma.leadFilter.update({ where: { id: filterId }, data: { lastRunAt: new Date() } });

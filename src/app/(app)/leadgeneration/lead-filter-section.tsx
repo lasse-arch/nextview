@@ -69,7 +69,11 @@ export type LeadFilterData = {
   enabled: boolean;
   lastRunAt: string | null;
   newCandidateCount: number;
+  autoCreateDailyList: boolean;
+  targetCallListId: string | null;
 };
+
+export type CallListOption = { id: string; name: string };
 
 const MAX_RESULTS_OPTIONS = [25, 50, 100, 200] as const;
 
@@ -105,9 +109,11 @@ function formatRelative(iso: string | null): string {
 
 function FilterForm({
   initial,
+  callLists,
   onDone,
 }: {
   initial?: LeadFilterData;
+  callLists: CallListOption[];
   onDone: () => void;
 }) {
   const [pending, startTransition] = useTransition();
@@ -192,6 +198,26 @@ function FilterForm({
         <input type="checkbox" name="activeOnly" defaultChecked={initial?.activeOnly ?? true} />
         Kun aktive virksomheder
       </label>
+      <div>
+        <label className="block text-xs font-medium text-slate-600">Ringeliste (automatisk)</label>
+        <select
+          name="ringelisteTarget"
+          defaultValue={initial?.autoCreateDailyList ? "__daily__" : initial?.targetCallListId ?? ""}
+          className="mt-1 w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-sm sm:w-72"
+        >
+          <option value="">Nej - vis kun under &quot;Fundne leads&quot;</option>
+          <option value="__daily__">Opret ny liste hver dag</option>
+          {callLists.map((l) => (
+            <option key={l.id} value={l.id}>
+              Tilføj til: {l.name}
+            </option>
+          ))}
+        </select>
+        <p className="mt-1 text-xs text-slate-400">
+          Når slået til, springer automatiske (og &quot;Kør nu&quot;) kørsler &quot;Fundne leads&quot; over og
+          opretter fundne leads direkte som deals på den valgte ringeliste.
+        </p>
+      </div>
       <div className="flex gap-2">
         <button
           type="submit"
@@ -212,7 +238,7 @@ function FilterForm({
   );
 }
 
-function FilterCard({ filter }: { filter: LeadFilterData }) {
+function FilterCard({ filter, callLists }: { filter: LeadFilterData; callLists: CallListOption[] }) {
   const [editing, setEditing] = useState(false);
   const [running, startRun] = useTransition();
   const [toggling, startToggle] = useTransition();
@@ -239,8 +265,10 @@ function FilterCard({ filter }: { filter: LeadFilterData }) {
   }
 
   if (editing) {
-    return <FilterForm initial={filter} onDone={() => setEditing(false)} />;
+    return <FilterForm initial={filter} callLists={callLists} onDone={() => setEditing(false)} />;
   }
+
+  const targetListName = filter.targetCallListId ? callLists.find((l) => l.id === filter.targetCallListId)?.name : null;
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3">
@@ -250,6 +278,14 @@ function FilterCard({ filter }: { filter: LeadFilterData }) {
           {filter.newCandidateCount > 0 && (
             <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
               {filter.newCandidateCount} nye
+            </span>
+          )}
+          {(filter.autoCreateDailyList || targetListName) && (
+            <span
+              className="rounded-full bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-700"
+              title="Fundne leads tilføjes automatisk som deals på denne ringeliste, uden om manuel gennemgang"
+            >
+              → {filter.autoCreateDailyList ? "Ny liste hver dag" : targetListName}
             </span>
           )}
         </div>
@@ -288,7 +324,7 @@ function FilterCard({ filter }: { filter: LeadFilterData }) {
   );
 }
 
-export function LeadFilterSection({ filters }: { filters: LeadFilterData[] }) {
+export function LeadFilterSection({ filters, callLists }: { filters: LeadFilterData[]; callLists: CallListOption[] }) {
   const [creating, setCreating] = useState(false);
 
   return (
@@ -306,11 +342,11 @@ export function LeadFilterSection({ filters }: { filters: LeadFilterData[] }) {
         )}
       </div>
 
-      {creating && <FilterForm onDone={() => setCreating(false)} />}
+      {creating && <FilterForm callLists={callLists} onDone={() => setCreating(false)} />}
 
       <div className="mt-3 space-y-2">
         {filters.map((f) => (
-          <FilterCard key={f.id} filter={f} />
+          <FilterCard key={f.id} filter={f} callLists={callLists} />
         ))}
         {filters.length === 0 && !creating && (
           <p className="py-4 text-center text-sm text-slate-400">Ingen filtre endnu - opret et for at komme i gang.</p>

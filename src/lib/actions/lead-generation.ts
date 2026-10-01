@@ -26,7 +26,12 @@ function readFilterFields(formData: FormData) {
   const foundedTo = parseFormDate(formData.get("foundedTo"));
   const maxResultsRaw = Number(formData.get("maxResults"));
   const maxResults = Math.min(Math.max(1, Number.isFinite(maxResultsRaw) && maxResultsRaw > 0 ? maxResultsRaw : 50), MAX_LEAD_FILTER_RESULTS);
-  return { name, industryQuery, municipality, activeOnly, foundedFrom, foundedTo, maxResults };
+  // "Ringeliste-mål" select: "" (slået fra, default), "__daily__" (ny liste
+  // hver dag) or an actual CallList id (fast valgt liste).
+  const ringelisteTarget = String(formData.get("ringelisteTarget") || "");
+  const autoCreateDailyList = ringelisteTarget === "__daily__";
+  const targetCallListId = !autoCreateDailyList && ringelisteTarget ? ringelisteTarget : null;
+  return { name, industryQuery, municipality, activeOnly, foundedFrom, foundedTo, maxResults, autoCreateDailyList, targetCallListId };
 }
 
 function validateFilterFields(fields: ReturnType<typeof readFilterFields>): string | null {
@@ -104,7 +109,7 @@ export async function runLeadFilterNowAction(
  * for what was really the same company, since the old code only ran a
  * cosmetic name-similarity check that never blocked anything.
  */
-async function claimCandidateAndUpsertDeal(
+export async function claimCandidateAndUpsertDeal(
   candidateId: string,
   userId: string,
   extraDealData: { callListId?: string } = {}

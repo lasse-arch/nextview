@@ -248,7 +248,9 @@ model CallList {
   createdById String
   createdAt   DateTime @default(now())
 
-  deals Deal[]
+  deals             Deal[]
+  /// Lead filters set to auto-feed their daily finds into this specific list.
+  targetingFilters  LeadFilter[]
 }
 
 /// A "what's new" post shown on the /nyheder blog - lets an admin announce a
@@ -707,6 +709,18 @@ model LeadFilter {
 
   enabled    Boolean   @default(true)
   lastRunAt  DateTime?
+
+  /// When set, a daily automatic run (see runAllEnabledLeadFilters) skips
+  /// the usual "Fundne leads" review step and promotes every fresh match
+  /// straight to a Deal on this Ringeliste - either a brand-new list
+  /// created fresh each day (autoCreateDailyList) or always this one fixed
+  /// list (targetCallListId). A manual "Kør nu" click still uses this too,
+  /// for the same reason: once a filter is configured to feed a list
+  /// automatically, there's no reason a manual run should behave
+  /// differently and dump into "Fundne leads" instead.
+  autoCreateDailyList Boolean   @default(false)
+  targetCallList      CallList? @relation(fields: [targetCallListId], references: [id], onDelete: SetNull)
+  targetCallListId    String?
 
   createdBy   User   @relation(fields: [createdById], references: [id])
   createdById String

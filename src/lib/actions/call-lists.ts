@@ -32,6 +32,23 @@ export async function createCallList(name?: string): Promise<{ id: string; name:
 }
 
 /**
+ * Finds today's auto-generated Ringeliste (same name convention as
+ * `createCallList()`'s own default, "Ringeliste <ugedag> <dato>") or creates
+ * it if this is the first automatic lead-filter run today - used by a
+ * LeadFilter with `autoCreateDailyList` set, so repeated runs on the same
+ * day (a manual "Kør nu" plus the nightly cron, say) land in one shared
+ * list instead of a fresh one each time.
+ */
+export async function findOrCreateTodayCallList(createdById: string): Promise<{ id: string; name: string }> {
+  const name = defaultListName();
+  const existing = await prisma.callList.findFirst({ where: { name, createdById } });
+  if (existing) return existing;
+  const list = await prisma.callList.create({ data: { name, createdById } });
+  revalidatePath("/ringeliste");
+  return list;
+}
+
+/**
  * The quick-add box on /ringeliste - one lead per pasted line. A CVR-register
  * link or bare CVR number gets the full official lookup (name/address/
  * contact); anything else (Facebook, a plain website, or just a typed

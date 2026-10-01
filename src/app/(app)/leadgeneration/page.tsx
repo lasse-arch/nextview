@@ -51,7 +51,10 @@ export default async function LeadGenerationPage() {
           enabled: f.enabled,
           lastRunAt: f.lastRunAt ? f.lastRunAt.toISOString() : null,
           newCandidateCount: f._count.candidates,
+          autoCreateDailyList: f.autoCreateDailyList,
+          targetCallListId: f.targetCallListId,
         }))}
+        callLists={callLists}
       />
 
       <UrlScanSection
