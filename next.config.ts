@@ -9,10 +9,13 @@ const nextConfig: NextConfig = {
     "/*": ["./public/logo.png", "./node_modules/@sparticuz/chromium/bin/**/*"],
   },
   experimental: {
-    // Visitkort photo uploads are compressed client-side but base64 still
-    // inflates size ~33% - the default 1MB limit was too tight for that.
+    // Deal-email attachments are allowed up to 25MB combined (Gmail's own
+    // limit, enforced in sendTemplatedEmailAction) - the body limit has to
+    // cover that on top of visitkort photo uploads (base64-inflated ~33%),
+    // or the framework silently rejects the request before our own code
+    // ever sees it.
     serverActions: {
-      bodySizeLimit: "4mb",
+      bodySizeLimit: "30mb",
     },
   },
 };
