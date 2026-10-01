@@ -471,17 +471,16 @@ export async function fetchMatterportTourData(mpSkinIds: string | string[]): Pro
       allStats.push(await fetchOneModelStats(page, sid));
     }
 
-    // Cover photo comes from explore.nextview360.dk's own cache instead of
-    // Matterport - that system holds a specifically chosen cover photo per
-    // tour, more reliable than guessing one out of Matterport's own UI
-    // (tried, confirmed wrong - see git history). While we're logging into
-    // that same account anyway, its own stats page also has a real average-
-    // time-on-tour figure Matterport's dashboard doesn't expose at all - so
-    // the full fetchExploreTourData is tried first (cover + real avgTime
-    // per period), falling back to just the cover photo alone if that
-    // scrape fails, since explore.nextview360.dk's flow has historically
-    // been the flakier of the two sites and shouldn't be able to sink an
-    // otherwise-successful Matterport-based report over a "nice to have".
+    // Cover photo comes from explore.nextview360.dk's own "Cover/Title" tab
+    // instead of Matterport's own UI (tried, confirmed wrong - see git
+    // history). While we're logging into that same account anyway, its own
+    // stats page also has a real average-time-on-tour figure Matterport's
+    // dashboard doesn't expose at all - so the full fetchExploreTourData is
+    // tried first (cover + real avgTime per period), falling back to just
+    // the cover photo alone if that scrape fails, since
+    // explore.nextview360.dk's flow has historically been the flakier of the
+    // two sites and shouldn't be able to sink an otherwise-successful
+    // Matterport-based report over a "nice to have".
     let coverImage: Buffer;
     let avgTimeByPeriod: Pick<ExploreTourStats, "last7Days" | "last30Days" | "last90Days" | "sinceStats"> | null = null;
     try {

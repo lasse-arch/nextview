@@ -315,6 +315,62 @@ function aggregateTourStats(all: ExploreTourStats[]): ExploreTourStats {
 }
 
 /**
+ * Opens a tour's editor and reads back the real, currently-configured cover
+ * photo from its own "Cover/Title" tab (specifically the "Cover - Landscape
+ * (Desktop)" image, confirmed against a real screenshot of that tab) - not
+ * the guessed `tour-cache-mpApi-<id>-cover-.png` cache URL this used to rely
+ * on, which could return a stale or wrong cached variant. Earlier reasoning
+ * for avoiding the Cover/Title tab noted it "never exposes the URL in the
+ * server-rendered HTML" - true for a plain fetch, but this runs the tab's
+ * real JS via Puppeteer and reads the live, rendered DOM instead, which does
+ * not have that limitation. Returns null (not a guess) if the tab or image
+ * can't be found, so the caller can fall back to the old cache URL rather
+ * than fail outright - this exact approach was tried once before against a
+ * different part of this site and confirmed wrong, so it isn't trusted
+ * blindly yet.
+ */
+async function fetchCoverImageUrlFromEditor(page: Page, editorHref: string): Promise<string | null> {
+  try {
+    await gotoRetry(page, editorHref);
+    await sleep(2000);
+    // "Cover/Title" may already be the active tab by default (as seen in the
+    // confirmed screenshot) - a click that finds nothing isn't fatal, since
+    // the content could already be showing.
+    await clickButtonWithText(page, "Cover/Title");
+
+    for (let poll = 0; poll < 10; poll++) {
+      const text = await retryOnDestroyedContext(() => page.evaluate(() => document.body.innerText)).catch(() => "");
+      if (/cover/i.test(text)) break;
+      await sleep(500);
+    }
+
+    return await retryOnDestroyedContext(() =>
+      page.evaluate(() => {
+        const isLabelMatch = (text: string) => /landscape[\s\S]{0,20}desktop|desktop[\s\S]{0,20}landscape|cover[\s\S]{0,20}landscape/i.test(text);
+        const labelEls = Array.from(document.querySelectorAll("*")).filter(
+          (el) => el.children.length === 0 && isLabelMatch(el.textContent || "")
+        );
+        for (const label of labelEls) {
+          let container: Element | null = label;
+          for (let i = 0; i < 5 && container; i++) {
+            const img = container.querySelector("img") as HTMLImageElement | null;
+            if (img && img.src && !img.src.startsWith("data:")) return img.src;
+            container = container.parentElement;
+          }
+        }
+        // Fall back to the first reasonably large real image on the tab, in
+        // case the exact label text doesn't match what's actually rendered.
+        const imgs = Array.from(document.querySelectorAll("img")) as HTMLImageElement[];
+        const big = imgs.find((img) => (img.naturalWidth || img.width) > 300 && !img.src.startsWith("data:"));
+        return big ? big.src : null;
+      })
+    );
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Opens one specific result row's editor (by its position among the search's
  * matches for mpSkinId) and reads back its Stats tab's 4 period cards,
  * retrying the whole flow on failure.
@@ -379,20 +435,22 @@ async function fetchOneTourStats(page: Page, mpSkinId: string, resultIndex: numb
  * photo is used as the report's hero image.
  */
 /**
- * Fetches just one tour's cover photo from explore.nextview360.dk's own
- * cache - used as the visitor-stats report's hero image even when the
- * numeric stats themselves come from Matterport directly (see
- * explore-matterport.ts). This system's own cache holds a specifically
- * chosen cover photo per tour, which is more reliable than trying to guess
- * a cover photo out of Matterport's own UI (tried, confirmed wrong).
+ * Fetches just one tour's cover photo - used as the visitor-stats report's
+ * hero image even when the numeric stats themselves come from Matterport
+ * directly (see explore-matterport.ts). Prefers the real, currently-
+ * configured image from the tour's own "Cover/Title" tab (see
+ * fetchCoverImageUrlFromEditor); falls back to the older guessed cache URL
+ * if that tab can't be reached or parsed, so a scrape failure there doesn't
+ * leave the report without any cover image at all.
  */
 export async function fetchExploreCoverImage(mpSkinId: string): Promise<Buffer> {
   const browser = await launchBrowser();
   try {
     const page = await browser.newPage();
     await page.setViewport({ width: 1600, height: 1000 });
-    await ensureOnSearchPage(page);
-    return await fetchImageAsBuffer(page, `${BASE_URL}/cache/tour-cache-mpApi-${mpSkinId}-cover-.png`);
+    const editorHrefs = await findEditorHrefs(page, mpSkinId).catch(() => []);
+    const coverUrl = editorHrefs.length > 0 ? await fetchCoverImageUrlFromEditor(page, editorHrefs[0]) : null;
+    return await fetchImageAsBuffer(page, coverUrl ?? `${BASE_URL}/cache/tour-cache-mpApi-${mpSkinId}-cover-.png`);
   } finally {
     await browser.close();
   }
@@ -414,10 +472,11 @@ export async function fetchExploreTourData(mpSkinIds: string | string[]): Promis
       // matching row's stats are fetched and summed in, not just the first.
       const editorHrefs = await findEditorHrefs(page, mpSkinId);
       if (!coverImage) {
-        // Cover image lives at a predictable authenticated URL per MP-Space
-        // ID - far more reliable than the JS-rendered "Cover/Title" tab,
-        // which never exposes the URL in the server-rendered HTML.
-        coverImage = await fetchImageAsBuffer(page, `${BASE_URL}/cache/tour-cache-mpApi-${mpSkinId}-cover-.png`);
+        // Prefer the real, currently-configured cover from the tour's own
+        // "Cover/Title" tab; fall back to the guessed cache URL if that
+        // can't be found (see fetchCoverImageUrlFromEditor's doc comment).
+        const coverUrl = await fetchCoverImageUrlFromEditor(page, editorHrefs[0]);
+        coverImage = await fetchImageAsBuffer(page, coverUrl ?? `${BASE_URL}/cache/tour-cache-mpApi-${mpSkinId}-cover-.png`);
       }
       for (let i = 0; i < editorHrefs.length; i++) {
         allStats.push(await fetchOneTourStats(page, mpSkinId, i, editorHrefs[i]));
