@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { addMonths, subDays } from "date-fns";
 import type { ReportInterval, ReportLanguage, ReportSendMethod } from "@prisma/client";
 import { prisma } from "@/lib/db";
@@ -325,12 +326,17 @@ export async function generateAndSendCustomerReport(
     }
 
     const emailText = buildReportEmailText(customerName, deal.reportInterval, language);
+    // Same open-tracking pattern as the deal-email composer (see
+    // sendTemplatedEmailAction) - lets the Stats page show whether/when the
+    // customer actually opened this report.
+    const trackingId = crypto.randomUUID();
+    const pixel = `<img src="${getAppBaseUrl()}/api/track/report-open/${trackingId}" width="1" height="1" style="display:none" alt="" />`;
     await sendGmailMessage(account, {
       to: [recipient],
       cc: parseCcEmails(deal.reportCcEmails),
       subject: emailText.subject,
       bodyText: emailText.bodyText,
-      bodyHtml: emailText.bodyHtml,
+      bodyHtml: `${emailText.bodyHtml}${pixel}`,
       attachment: { filename: fileName, contentType: "application/pdf", data: pdf },
       fromName: "Nextview360 ApS",
     });
@@ -340,9 +346,9 @@ export async function generateAndSendCustomerReport(
       existingReportId
         ? prisma.customerReport.update({
             where: { id: existingReportId },
-            data: { status: "SENT", pdfDriveUrl, errorMessage: null, sentAt: new Date() },
+            data: { status: "SENT", pdfDriveUrl, errorMessage: null, sentAt: new Date(), trackingId },
           })
-        : prisma.customerReport.create({ data: { dealId: deal.id, method, status: "SENT", pdfDriveUrl } }),
+        : prisma.customerReport.create({ data: { dealId: deal.id, method, status: "SENT", pdfDriveUrl, trackingId } }),
       prisma.deal.update({ where: { id: deal.id }, data: { nextReportDueAt } }),
     ]);
 
@@ -429,12 +435,14 @@ export async function generateAndSendCombinedCustomerReport(
     }
 
     const emailText = buildCombinedReportEmailText(customerName, deal.reportInterval, language);
+    const trackingId = crypto.randomUUID();
+    const pixel = `<img src="${getAppBaseUrl()}/api/track/report-open/${trackingId}" width="1" height="1" style="display:none" alt="" />`;
     await sendGmailMessage(account, {
       to: [recipient],
       cc: [...ccEmails],
       subject: emailText.subject,
       bodyText: emailText.bodyText,
-      bodyHtml: emailText.bodyHtml,
+      bodyHtml: `${emailText.bodyHtml}${pixel}`,
       attachment: { filename: fileName, contentType: "application/pdf", data: pdf },
       fromName: "Nextview360 ApS",
     });
@@ -444,10 +452,10 @@ export async function generateAndSendCombinedCustomerReport(
       existingReportId
         ? prisma.customerReport.update({
             where: { id: existingReportId },
-            data: { status: "SENT", pdfDriveUrl, branchDealIds, errorMessage: null, sentAt: new Date() },
+            data: { status: "SENT", pdfDriveUrl, branchDealIds, errorMessage: null, sentAt: new Date(), trackingId },
           })
         : prisma.customerReport.create({
-            data: { dealId: deal.id, method, status: "SENT", pdfDriveUrl, branchDealIds },
+            data: { dealId: deal.id, method, status: "SENT", pdfDriveUrl, branchDealIds, trackingId },
           }),
       // Sending the combined report fulfils the schedule for every included
       // deal, not just the parent - otherwise a branch would still show up

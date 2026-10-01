@@ -65,10 +65,12 @@ export default async function StatsPage() {
               lastSentMethod: deal.reports[0]?.method ?? null,
               lastStatus: deal.reports[0]?.status ?? null,
               lastErrorMessage: deal.reports[0]?.errorMessage ?? null,
+              lastOpenedAt: deal.reports[0]?.openedAt ? deal.reports[0].openedAt.toISOString() : null,
               history: deal.reports.map((r) => ({
                 sentAt: r.sentAt.toISOString(),
                 method: r.method,
                 status: r.status,
+                openedAt: r.openedAt ? r.openedAt.toISOString() : null,
               })),
               branches: deal.branches
                 .filter((b) => b.mpSkinId)

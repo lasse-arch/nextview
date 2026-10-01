@@ -35,6 +35,7 @@ export type StatsCustomerRowData = {
   lastSentMethod: "MANUAL" | "AUTOMATIC" | null;
   lastStatus: ReportSendStatus | null;
   lastErrorMessage: string | null;
+  lastOpenedAt: string | null;
   history: ReportHistoryEntry[];
   /** Linked branches (see customer linking) that also have an MP-Skin nummer - lets a "Send samlet rapport" button appear. */
   branches: { id: string; name: string }[];
@@ -52,6 +53,7 @@ export function StatsCustomerRow({
   lastSentMethod,
   lastStatus,
   lastErrorMessage,
+  lastOpenedAt,
   history,
   branches,
   selected,
@@ -206,6 +208,16 @@ export function StatsCustomerRow({
                         }
                       >
                         {lastSentMethod === "AUTOMATIC" ? "Automatisk" : "Manuelt"}
+                      </span>{" "}
+                      <span
+                        className={
+                          lastOpenedAt
+                            ? "rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700"
+                            : "rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-400"
+                        }
+                        title={lastOpenedAt ? `Åbnet ${formatDate(lastOpenedAt)}` : "Ikke åbnet endnu"}
+                      >
+                        {lastOpenedAt ? "Åbnet" : "Ikke åbnet"}
                       </span>
                     </>
                   }

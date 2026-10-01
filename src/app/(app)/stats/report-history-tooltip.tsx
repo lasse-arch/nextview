@@ -7,6 +7,7 @@ export type ReportHistoryEntry = {
   sentAt: string;
   method: "MANUAL" | "AUTOMATIC";
   status: "PENDING" | "SENT" | "FAILED";
+  openedAt: string | null;
 };
 
 /** Hover tooltip listing earlier report sends for a customer, styled like the
@@ -38,8 +39,15 @@ export function ReportHistoryTooltip({
             {earlier.map((entry, i) => (
               <p key={i} className="flex justify-between gap-4 whitespace-nowrap">
                 <span>{formatDate(entry.sentAt)}</span>
-                <span className={entry.status === "FAILED" ? "text-red-400" : "text-slate-300"}>
-                  {entry.status === "FAILED" ? "Fejlede" : entry.method === "AUTOMATIC" ? "Automatisk" : "Manuelt"}
+                <span className="flex items-center gap-1.5">
+                  <span className={entry.status === "FAILED" ? "text-red-400" : "text-slate-300"}>
+                    {entry.status === "FAILED" ? "Fejlede" : entry.method === "AUTOMATIC" ? "Automatisk" : "Manuelt"}
+                  </span>
+                  {entry.status === "SENT" && (
+                    <span className={entry.openedAt ? "text-emerald-400" : "text-slate-500"}>
+                      {entry.openedAt ? "· Åbnet" : "· Ikke åbnet"}
+                    </span>
+                  )}
                 </span>
               </p>
             ))}
