@@ -1,6 +1,13 @@
 import { prisma } from "@/lib/db";
 import { startOfMonth, startOfQuarter, startOfYear, startOfDay, endOfMonth, endOfQuarter, endOfYear, isWithinInterval } from "date-fns";
 import type { GoalMetric, GoalPeriod } from "@prisma/client";
+import { contractedContractValue } from "@/lib/labels";
+
+/// Same definition of "currently sold/active" as the dashboard's own "Solgt
+/// i alt" stat tile (src/lib/dashboard-data.ts) - kept in sync by hand since
+/// duplicating a 3-item array beats importing a whole dashboard-data module
+/// just for this one constant.
+const SOLD_STAGES = ["LIVE", "CONTRACT_SIGNED", "FILMED"] as const;
 
 export const goalMetricLabels: Record<GoalMetric, string> = {
   MEETINGS_BOOKED: "Møder booket",
@@ -96,6 +103,27 @@ export async function getGoalsForDashboard(viewer: { id: string; role: string })
     select: { ownerId: true, meetingDate: true, soldAt: true, saleAmount: true, establishmentFee: true },
   });
 
+  // TOTAL_SOLD ("Solgt i alt") is a running total, not "how much happened in
+  // this window" - same currently-sold/active snapshot as the dashboard's
+  // own stat tile, independent of the goal's own period (which only sets
+  // the deadline, e.g. "reach this by year end", not a filter on which
+  // deals count). Needs its own query: the one above excludes anything sold
+  // before this year, which would silently undercount a company whose
+  // existing customer base predates it.
+  const soldSnapshotDeals = await prisma.deal.findMany({
+    where: { stage: { in: [...SOLD_STAGES] } },
+    select: {
+      ownerId: true,
+      saleAmount: true,
+      establishmentFee: true,
+      bindingMonths: true,
+      billingStartDate: true,
+      liveAt: true,
+      churnedAt: true,
+      contractEndDate: true,
+    },
+  });
+
   function computeValue(metric: GoalMetric, ownerId: string | null, start: Date, end: Date): number {
     const scoped = ownerId ? deals.filter((d) => d.ownerId === ownerId) : deals;
     switch (metric) {
@@ -111,12 +139,10 @@ export async function getGoalsForDashboard(viewer: { id: string; role: string })
         return scoped
           .filter((d) => d.soldAt && isWithinInterval(d.soldAt, { start, end }))
           .reduce((sum, d) => sum + (d.establishmentFee ?? 0), 0);
-      case "TOTAL_SOLD":
-        // Same "MRR + etableringspris" formula as the dashboard's own
-        // "Solgt i alt" stat tile, just scoped to this goal's own period.
-        return scoped
-          .filter((d) => d.soldAt && isWithinInterval(d.soldAt, { start, end }))
-          .reduce((sum, d) => sum + (d.saleAmount ?? 0) + (d.establishmentFee ?? 0), 0);
+      case "TOTAL_SOLD": {
+        const snapshot = ownerId ? soldSnapshotDeals.filter((d) => d.ownerId === ownerId) : soldSnapshotDeals;
+        return snapshot.reduce((sum, d) => sum + (d.establishmentFee ?? 0) + contractedContractValue(d, now), 0);
+      }
     }
   }
 
