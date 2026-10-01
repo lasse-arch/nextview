@@ -143,7 +143,13 @@ function NewTaskModal({
         className="relative max-h-[85vh] w-full max-w-md space-y-3 overflow-y-auto rounded-xl bg-white p-6 shadow-xl"
       >
         <h2 className="text-sm font-semibold text-slate-900">Ny opgave</h2>
-        <div>
+        {/* scroll-mt reserves space above this field for when the mobile
+           keyboard opening makes the browser auto-scroll the focused input
+           into view - without it, the scroll lands flush at the very top
+           (cutting the "Ny opgave"/"Titel *" labels off awkwardly against
+           the edge) instead of leaving them visible with some breathing
+           room. */}
+        <div className="scroll-mt-6">
           <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Titel *</label>
           <input
             name="title"
