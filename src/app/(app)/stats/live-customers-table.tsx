@@ -78,11 +78,18 @@ export function LiveCustomersTable({ rows }: { rows: StatsCustomerRowData[] }) {
 
   return (
     <div>
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <p className="text-xs text-slate-500">
-          {selected.size > 0 ? `${selected.size} valgt` : "Vælg en eller flere kunder for at sende eller downloade samlet"}
-        </p>
-        <div className="flex shrink-0 gap-2">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <label className="flex items-center gap-2 text-xs text-slate-500">
+          <input
+            type="checkbox"
+            checked={allSelected}
+            onChange={toggleAll}
+            aria-label="Vælg alle"
+            disabled={allIds.length === 0}
+          />
+          {selected.size > 0 ? `${selected.size} valgt` : "Vælg alle"}
+        </label>
+        <div className="flex shrink-0 flex-wrap gap-2">
           <button
             type="button"
             disabled={eligibleCount === 0 || downloading}
@@ -111,45 +118,20 @@ export function LiveCustomersTable({ rows }: { rows: StatsCustomerRowData[] }) {
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-md border border-slate-100">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1040px] text-sm">
-            <thead className="bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-              <tr>
-                <th className="sticky left-0 z-10 bg-slate-50 px-3 py-2 font-medium">
-                  <div className="flex items-center gap-2">
-                    <input type="checkbox" checked={allSelected} onChange={toggleAll} aria-label="Vælg alle" />
-                    <span>Kunde</span>
-                  </div>
-                </th>
-                <th className="px-3 py-2 font-medium">Sidst sendt</th>
-                <th className="px-3 py-2 font-medium">MP-Skin nummer</th>
-                <th className="px-3 py-2 font-medium">CC</th>
-                <th className="px-3 py-2 font-medium">Interval</th>
-                <th className="px-3 py-2 font-medium">Sprog</th>
-                <th className="px-3 py-2 font-medium">Næste afsendelse</th>
-                <th className="sticky right-0 z-10 bg-slate-50 px-3 py-2 font-medium"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <StatsCustomerRow
-                  key={row.dealId}
-                  {...row}
-                  selected={selected.has(row.dealId)}
-                  onToggleSelected={() => toggleOne(row.dealId)}
-                />
-              ))}
-              {rows.length === 0 && (
-                <tr>
-                  <td colSpan={8} className="px-3 py-6 text-center text-slate-400">
-                    Ingen live kunder endnu.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+      <div className="space-y-2">
+        {rows.map((row) => (
+          <StatsCustomerRow
+            key={row.dealId}
+            {...row}
+            selected={selected.has(row.dealId)}
+            onToggleSelected={() => toggleOne(row.dealId)}
+          />
+        ))}
+        {rows.length === 0 && (
+          <p className="rounded-md border border-slate-100 px-3 py-6 text-center text-slate-400">
+            Ingen live kunder endnu.
+          </p>
+        )}
       </div>
     </div>
   );

@@ -160,107 +160,60 @@ export function StatsCustomerRow({
   const isSending = sending || lastStatus === "PENDING";
 
   return (
-    <tr className="border-t border-slate-100">
-      <td className="sticky left-0 z-10 bg-white px-3 py-2">
-        <div className="flex items-center gap-2">
+    <div className="rounded-lg border border-slate-200 bg-white p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex min-w-0 items-start gap-2">
           <input
             type="checkbox"
             checked={selected}
             onChange={onToggleSelected}
             aria-label={`Vælg ${name}`}
+            className="mt-1"
           />
-          <Link href={`/deals/${dealId}`} className="font-medium text-slate-900 hover:underline">
-            {name}
-          </Link>
-        </div>
-      </td>
-      <td className="px-3 py-2 text-slate-600">
-        {isSending ? (
-          <span className="flex items-center gap-1.5 text-slate-500">
-            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-slate-400" />
-            Sender…
-          </span>
-        ) : lastStatus === "FAILED" ? (
-          <ReportHistoryTooltip
-            history={history}
-            label={
-              <span className="text-red-600" title={lastErrorMessage ?? "ukendt fejl"}>
-                Fejlede {lastSentAt ? formatDate(lastSentAt) : ""}
-              </span>
-            }
-          />
-        ) : lastSentAt ? (
-          <ReportHistoryTooltip
-            history={history}
-            label={
-              <>
-                {formatDate(lastSentAt)}{" "}
-                <span
-                  className={
-                    lastSentMethod === "AUTOMATIC"
-                      ? "ml-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600"
-                      : "ml-1 rounded-full bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-700"
-                  }
-                >
-                  {lastSentMethod === "AUTOMATIC" ? "Automatisk" : "Manuelt"}
+          <div className="min-w-0">
+            <Link href={`/deals/${dealId}`} className="font-medium text-slate-900 hover:underline">
+              {name}
+            </Link>
+            <div className="mt-0.5 text-xs">
+              {isSending ? (
+                <span className="flex items-center gap-1.5 text-slate-500">
+                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-slate-400" />
+                  Sender…
                 </span>
-              </>
-            }
-          />
-        ) : (
-          <span className="italic text-slate-400">Aldrig sendt</span>
-        )}
-      </td>
-      <td className="px-3 py-2">
-        <input
-          value={mpSkinIdValue}
-          onChange={(e) => setMpSkinIdValue(e.target.value)}
-          onBlur={saveMpSkinId}
-          disabled={savingId}
-          placeholder="fx SuPVjGiRx8q"
-          title="Flere MP-Skin numre kan adskilles med komma, hvis kunden har mere end én tour"
-          className="w-40 rounded-md border border-slate-300 px-2 py-1 text-xs disabled:opacity-50"
-        />
-      </td>
-      <td className="px-3 py-2">
-        <input
-          value={ccValue}
-          onChange={(e) => setCcValue(e.target.value)}
-          onBlur={saveCc}
-          disabled={savingCc}
-          placeholder="cc@firma.dk, ..."
-          className="w-40 rounded-md border border-slate-300 px-2 py-1 text-xs disabled:opacity-50"
-        />
-      </td>
-      <td className="px-3 py-2">
-        <select
-          defaultValue={reportInterval ?? "OFF"}
-          disabled={pending}
-          onChange={(e) => changeInterval(e.target.value)}
-          className="rounded-md border border-slate-300 px-2 py-1 text-xs disabled:opacity-50"
-        >
-          <option value="OFF">Slået fra</option>
-          <option value="MONTHLY">{INTERVAL_LABELS.MONTHLY}</option>
-          <option value="BIMONTHLY">{INTERVAL_LABELS.BIMONTHLY}</option>
-          <option value="QUARTERLY">{INTERVAL_LABELS.QUARTERLY}</option>
-        </select>
-      </td>
-      <td className="px-3 py-2">
-        <select
-          defaultValue={reportLanguage}
-          disabled={savingLanguage}
-          onChange={(e) => changeLanguage(e.target.value)}
-          className="rounded-md border border-slate-300 px-2 py-1 text-xs disabled:opacity-50"
-        >
-          <option value="DA">Dansk</option>
-          <option value="EN">Engelsk</option>
-        </select>
-      </td>
-      <td className="px-3 py-2 text-slate-600">
-        {reportInterval && nextReportDueAt ? formatDate(nextReportDueAt) : "–"}
-      </td>
-      <td className="sticky right-0 z-10 bg-white px-3 py-2 text-right">
-        <div className="flex justify-end gap-1.5">
+              ) : lastStatus === "FAILED" ? (
+                <ReportHistoryTooltip
+                  history={history}
+                  label={
+                    <span className="text-red-600" title={lastErrorMessage ?? "ukendt fejl"}>
+                      Fejlede {lastSentAt ? formatDate(lastSentAt) : ""}
+                    </span>
+                  }
+                />
+              ) : lastSentAt ? (
+                <ReportHistoryTooltip
+                  history={history}
+                  label={
+                    <>
+                      <span className="text-slate-500">{formatDate(lastSentAt)}</span>{" "}
+                      <span
+                        className={
+                          lastSentMethod === "AUTOMATIC"
+                            ? "ml-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600"
+                            : "ml-1 rounded-full bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-700"
+                        }
+                      >
+                        {lastSentMethod === "AUTOMATIC" ? "Automatisk" : "Manuelt"}
+                      </span>
+                    </>
+                  }
+                />
+              ) : (
+                <span className="italic text-slate-400">Aldrig sendt</span>
+              )}
+            </div>
+          </div>
+        </div>
+        <div className="flex shrink-0 gap-1.5">
           {branches.length > 0 && (
             <button
               type="button"
@@ -290,7 +243,65 @@ export function StatsCustomerRow({
             {isSending ? "Sender…" : "Send nu"}
           </button>
         </div>
-      </td>
-    </tr>
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <div>
+          <label className="block text-[11px] font-medium text-slate-500">MP-Skin nummer</label>
+          <input
+            value={mpSkinIdValue}
+            onChange={(e) => setMpSkinIdValue(e.target.value)}
+            onBlur={saveMpSkinId}
+            disabled={savingId}
+            placeholder="fx SuPVjGiRx8q"
+            title="Flere MP-Skin numre kan adskilles med komma, hvis kunden har mere end én tour"
+            className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-xs disabled:opacity-50"
+          />
+        </div>
+        <div>
+          <label className="block text-[11px] font-medium text-slate-500">CC</label>
+          <input
+            value={ccValue}
+            onChange={(e) => setCcValue(e.target.value)}
+            onBlur={saveCc}
+            disabled={savingCc}
+            placeholder="cc@firma.dk, ..."
+            className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-xs disabled:opacity-50"
+          />
+        </div>
+        <div>
+          <label className="block text-[11px] font-medium text-slate-500">Interval</label>
+          <select
+            defaultValue={reportInterval ?? "OFF"}
+            disabled={pending}
+            onChange={(e) => changeInterval(e.target.value)}
+            className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-xs disabled:opacity-50"
+          >
+            <option value="OFF">Slået fra</option>
+            <option value="MONTHLY">{INTERVAL_LABELS.MONTHLY}</option>
+            <option value="BIMONTHLY">{INTERVAL_LABELS.BIMONTHLY}</option>
+            <option value="QUARTERLY">{INTERVAL_LABELS.QUARTERLY}</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-[11px] font-medium text-slate-500">Sprog</label>
+          <select
+            defaultValue={reportLanguage}
+            disabled={savingLanguage}
+            onChange={(e) => changeLanguage(e.target.value)}
+            className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-xs disabled:opacity-50"
+          >
+            <option value="DA">Dansk</option>
+            <option value="EN">Engelsk</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-[11px] font-medium text-slate-500">Næste afsendelse</label>
+          <p className="mt-1.5 text-xs text-slate-600">
+            {reportInterval && nextReportDueAt ? formatDate(nextReportDueAt) : "–"}
+          </p>
+        </div>
+      </div>
+    </div>
   );
 }
