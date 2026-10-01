@@ -5,14 +5,6 @@ import { formatDateTime } from "@/lib/labels";
 import { suggestNoteFromEmailAction, saveEmailNoteSuggestion } from "@/lib/actions/ai-notes";
 import { useToast } from "@/components/toast";
 
-type RecipientOpen = {
-  address: string;
-  isPrimary: boolean;
-  openedAt: Date | null;
-  openCount: number;
-  openTimestamps: Date[];
-};
-
 type Email = {
   id: string;
   direction: "INBOUND" | "OUTBOUND";
@@ -25,51 +17,14 @@ type Email = {
   trackingId: string | null;
   openedAt: Date | null;
   openCount: number;
-  recipientOpens: RecipientOpen[];
 };
 
-/** One badge per actual recipient (the primary contact, and each Cc'ed
- * colleague separately) - each sent their own separately-tracked copy of the
- * mail (see deal-email.ts), so unlike the old single shared-pixel badge this
- * can honestly say exactly who opened it and list every individual open's
- * timestamp, not just the first. */
-function RecipientBadge({ recipient }: { recipient: RecipientOpen }) {
-  const [hovered, setHovered] = useState(false);
-  const opened = recipient.openCount > 0;
-
-  return (
-    <span className="relative" onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
-      <span
-        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ring-1 ring-inset ${
-          opened ? "bg-emerald-50 text-emerald-700 ring-emerald-600/10" : "bg-slate-50 text-slate-500 ring-slate-200"
-        }`}
-      >
-        <span className={`h-1.5 w-1.5 rounded-full ${opened ? "bg-emerald-500" : "bg-slate-300"}`} />
-        {recipient.isPrimary ? "Modtager" : "Cc"} {opened ? `· Åbnet ${recipient.openCount}×` : "· Ikke åbnet"}
-      </span>
-      {hovered && (
-        <div className="pointer-events-none absolute bottom-full left-0 z-10 mb-1.5 w-64 whitespace-normal rounded-lg bg-slate-900 px-3 py-2 text-left text-xs font-medium text-white shadow-lg">
-          <p className="truncate font-semibold">{recipient.address}</p>
-          {opened ? (
-            <ul className="mt-1.5 space-y-0.5 font-normal text-slate-300">
-              {recipient.openTimestamps.slice(0, 6).map((t, i) => (
-                <li key={i}>{formatDateTime(t)}</li>
-              ))}
-              {recipient.openTimestamps.length > 6 && <li>+{recipient.openTimestamps.length - 6} mere</li>}
-            </ul>
-          ) : (
-            <p className="mt-1 font-normal text-slate-300">Ikke åbnet endnu.</p>
-          )}
-        </div>
-      )}
-    </span>
-  );
-}
-
-/** Fallback for mails sent before per-recipient tracking shipped - all it
- * ever had was one shared pixel, so the count is right on the badge but who
- * specifically opened it (customer vs. a Cc'ed colleague) can't be said. */
-function LegacySharedOpenBadge({ openedAt, openCount, hasCc }: { openedAt: Date; openCount: number; hasCc: boolean }) {
+/** The open count used to be hidden behind a hover-only tooltip - invisible
+ * on mobile (no hover at all) and easy to miss even on desktop. The count
+ * itself is now right on the badge; hovering (where available) still adds
+ * the exact first-opened timestamp and, for a Cc'ed mail, a note that one
+ * shared tracking pixel can't say whose mail client actually loaded it. */
+function OpenBadge({ openedAt, openCount, hasCc }: { openedAt: Date; openCount: number; hasCc: boolean }) {
   const [hovered, setHovered] = useState(false);
 
   return (
@@ -83,7 +38,7 @@ function LegacySharedOpenBadge({ openedAt, openCount, hasCc }: { openedAt: Date;
         Åbnet {openCount}×
       </span>
       {hovered && (
-        <div className="pointer-events-none absolute bottom-full left-0 z-10 mb-1.5 w-56 whitespace-normal rounded-lg bg-slate-900 px-3 py-2 text-left text-xs font-medium text-white shadow-lg">
+        <div className="pointer-events-none absolute right-0 top-full z-10 mt-1.5 w-56 whitespace-normal rounded-lg bg-slate-900 px-3 py-2 text-left text-xs font-medium text-white shadow-lg">
           <p className="flex justify-between gap-4">
             <span className="text-slate-300">Åbnet i alt</span>
             <span>{openCount} gang{openCount === 1 ? "" : "e"}</span>
@@ -230,20 +185,16 @@ function EmailRow({ dealId, email }: { dealId: string; email: Email }) {
             {counterparty}
             {email.direction === "OUTBOUND" && email.ccAddresses && <> · Cc: {email.ccAddresses}</>}
           </p>
-          <div className="mt-2 flex flex-wrap items-center gap-1.5">
-            {email.direction === "OUTBOUND" && email.recipientOpens.length > 0 ? (
-              email.recipientOpens.map((r) => <RecipientBadge key={r.address} recipient={r} />)
-            ) : (
-              email.direction === "OUTBOUND" &&
-              email.trackingId &&
-              (email.openedAt ? (
-                <LegacySharedOpenBadge openedAt={email.openedAt} openCount={email.openCount} hasCc={Boolean(email.ccAddresses)} />
+          <div className="mt-2 flex items-center gap-2">
+            {email.direction === "OUTBOUND" && email.trackingId && (
+              email.openedAt ? (
+                <OpenBadge openedAt={email.openedAt} openCount={email.openCount} hasCc={Boolean(email.ccAddresses)} />
               ) : (
                 <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2 py-0.5 text-[10px] font-medium text-slate-500 ring-1 ring-inset ring-slate-200">
                   <span className="h-1.5 w-1.5 rounded-full bg-slate-300" />
                   Ikke åbnet endnu
                 </span>
-              ))
+              )
             )}
           </div>
         </div>

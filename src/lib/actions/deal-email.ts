@@ -105,7 +105,10 @@ export async function sendTemplatedEmailAction(
 
   const plainTextBody = looksLikeHtml(body) ? body.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ") : body;
   const plainText = `${plainTextBody.trim()}${signatureText}`;
+  const trackingId = crypto.randomUUID();
+  const pixel = `<img src="${getAppBaseUrl()}/api/track/email-open/${trackingId}" width="1" height="1" style="display:none" alt="" />`;
   const bodyForHtml = looksLikeHtml(body) ? body : plainTextToHtml(body);
+  const bodyHtml = `${bodyForHtml}${signatureHtml}${pixel}`;
 
   const attachments = await Promise.all(
     files.map(async (f) => ({
@@ -115,68 +118,26 @@ export async function sendTemplatedEmailAction(
     }))
   );
 
-  // A single shared email (one Gmail message, To+Cc headers) can't say whose
-  // mail client loaded its pixel - every recipient sees the exact same
-  // message. The only way to know specifically who opened it is to send the
-  // primary contact and each Cc'ed colleague their OWN separate copy, each
-  // with its own uniquely-tracked pixel. The trade-off: no copy's own
-  // headers show the others anymore, so the full distribution list is
-  // written into the body text instead, for every copy, so nobody loses
-  // visibility into who else was included.
-  const recipients = [
-    { address: recipient, isPrimary: true },
-    ...ccEmails.map((address) => ({ address, isPrimary: false })),
-  ];
-  const distributionLine =
-    recipients.length > 1
-      ? `Sendt til: ${recipient}${ccEmails.length > 0 ? ` · Cc: ${ccEmails.join(", ")}` : ""}`
-      : null;
-
-  const fromName = [user.name, user.lastName].filter(Boolean).join(" ");
-  const recipientRows: { address: string; isPrimary: boolean; gmailMessageId: string; trackingId: string }[] = [];
-  let primaryGmailMessageId: string | null = null;
-
-  for (const r of recipients) {
-    const recipientTrackingId = crypto.randomUUID();
-    const recipientPixel = `<img src="${getAppBaseUrl()}/api/track/email-open/${recipientTrackingId}" width="1" height="1" style="display:none" alt="" />`;
-    const recipientBodyHtml = `${bodyForHtml}${signatureHtml}${
-      distributionLine ? `<p style="margin-top:12px;color:#94a3b8;font-size:11px;">${distributionLine}</p>` : ""
-    }${recipientPixel}`;
-    const recipientPlainText = `${plainText}${distributionLine ? `\n\n${distributionLine}` : ""}`;
-
-    try {
-      const sendResult = await sendGmailMessage(account, {
-        to: [r.address],
-        subject,
-        bodyText: recipientPlainText,
-        bodyHtml: recipientBodyHtml,
-        attachments: attachments.length > 0 ? attachments : undefined,
-        fromName,
-      });
-      recipientRows.push({ address: r.address, isPrimary: r.isPrimary, gmailMessageId: sendResult.id, trackingId: recipientTrackingId });
-      if (r.isPrimary) primaryGmailMessageId = sendResult.id;
-    } catch (err) {
-      // The primary contact not receiving the mail is a real failure; a
-      // Cc'ed colleague's copy failing to send isn't worth blocking on, since
-      // the actual customer still got theirs.
-      if (r.isPrimary) {
-        return { ok: false, error: err instanceof Error ? err.message : "Kunne ikke sende e-mailen." };
-      }
-      console.error(`Kunne ikke sende Cc-kopi til ${r.address}`, err);
-    }
+  let sendResult: { id: string };
+  try {
+    sendResult = await sendGmailMessage(account, {
+      to: [recipient],
+      cc: ccEmails,
+      subject,
+      bodyText: plainText,
+      bodyHtml,
+      attachments: attachments.length > 0 ? attachments : undefined,
+      fromName: [user.name, user.lastName].filter(Boolean).join(" "),
+    });
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Kunne ikke sende e-mailen." };
   }
 
-  if (!primaryGmailMessageId) {
-    return { ok: false, error: "Kunne ikke sende e-mailen." };
-  }
-
-  const primaryTrackingId = recipientRows.find((r) => r.isPrimary)?.trackingId ?? null;
-
-  const message = await prisma.emailMessage.create({
+  await prisma.emailMessage.create({
     data: {
       dealId,
       provider: "GOOGLE",
-      messageId: primaryGmailMessageId,
+      messageId: sendResult.id,
       direction: "OUTBOUND",
       fromAddress: account.email,
       toAddresses: recipient,
@@ -184,21 +145,9 @@ export async function sendTemplatedEmailAction(
       subject,
       bodyText: plainText,
       sentAt: new Date(),
-      trackingId: primaryTrackingId,
+      trackingId,
     },
   });
-
-  if (recipientRows.length > 0) {
-    await prisma.emailRecipientOpen.createMany({
-      data: recipientRows.map((r) => ({
-        messageId: message.id,
-        address: r.address,
-        isPrimary: r.isPrimary,
-        gmailMessageId: r.gmailMessageId,
-        trackingId: r.trackingId,
-      })),
-    });
-  }
 
   await createEmailFollowUpTask(dealId, user.id, subject);
 

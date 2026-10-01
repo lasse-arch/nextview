@@ -102,7 +102,7 @@ export default async function DealDetailPage({
         importBatch: true,
         commission: { include: { seller: true } },
         notes: { include: { author: true }, orderBy: { createdAt: "desc" } },
-        emails: { orderBy: { sentAt: "desc" }, include: { recipientOpens: { orderBy: { isPrimary: "desc" } } } },
+        emails: { orderBy: { sentAt: "desc" } },
         invoices: { orderBy: { quarterIndex: "asc" } },
         items: { orderBy: { createdAt: "asc" } },
         parent: true,

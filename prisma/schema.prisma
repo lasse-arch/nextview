@@ -626,56 +626,14 @@ model EmailMessage {
   sentAt      DateTime
   createdAt   DateTime       @default(now())
 
-  /// Set only for an OUTBOUND email sent via the template composer - mirrors
-  /// the PRIMARY recipient's own row in `recipientOpens` below, kept here too
-  /// so existing code reading these fields directly still reflects "did the
-  /// actual recipient open it" (not a Cc'ed colleague) without needing the
-  /// join - see the comment on EmailRecipientOpen for why a shared pixel
-  /// can't do this on its own.
+  /// Set only for an OUTBOUND email sent via the template composer - the id
+  /// embedded in its tracking pixel, hit when the recipient's mail client
+  /// loads images (see /api/track/email-open/[trackingId]).
   trackingId String?   @unique
   openedAt   DateTime?
   openCount  Int       @default(0)
 
-  /// One row per actual address the mail went out to (the primary contact
-  /// plus each Cc'ed colleague) - only populated for mails sent after
-  /// per-recipient tracking shipped; older rows just have the shared fields
-  /// above.
-  recipientOpens EmailRecipientOpen[]
-
   @@unique([provider, messageId])
-}
-
-/// Per-recipient open tracking for an OUTBOUND templated email. A single
-/// shared email (one Gmail message with To+Cc headers) can't tell you whose
-/// mail client loaded its embedded pixel - every recipient sees the exact
-/// same message. To get real per-address attribution, the primary contact
-/// and each Cc'ed colleague are now sent their OWN separate copy, each with
-/// its own uniquely-tracked pixel - this is the only technically possible
-/// way to know specifically who opened it (confirmed: Pipedrive and every
-/// other pixel-based tracker hits the same wall for a genuinely shared
-/// message). The trade-off, by the user's own choice: each copy no longer
-/// shows the others in its own To/Cc headers - the full distribution list is
-/// instead written into the body text itself, so nobody loses visibility
-/// into who else was included.
-model EmailRecipientOpen {
-  id             String    @id @default(cuid())
-  message        EmailMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
-  messageId      String
-  address        String
-  isPrimary      Boolean   @default(false)
-  /// This recipient's own copy's real Gmail message id - distinct per
-  /// recipient now that each gets a separately-sent copy.
-  gmailMessageId String
-  trackingId     String    @unique
-  openedAt       DateTime?
-  openCount      Int       @default(0)
-  /// Every individual open event's timestamp, not just the first - so "see
-  /// exactly when" (not only "opened, N times") is answerable without a
-  /// second child table.
-  openTimestamps DateTime[] @default([])
-  createdAt      DateTime  @default(now())
-
-  @@index([messageId])
 }
 
 /// A reusable, shared email you can send from a deal's page (see
