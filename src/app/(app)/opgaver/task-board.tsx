@@ -604,6 +604,7 @@ export function TaskBoard({
                       }
                     }}
                     placeholder="Titel…"
+                    autoComplete="off"
                     className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-xs"
                   />
                 ) : (
