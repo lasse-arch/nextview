@@ -15,6 +15,28 @@ import { createEmailFollowUpTask } from "@/lib/task-automation";
  * base64-inflated size of every attachment combined). */
 const MAX_ATTACHMENTS_BYTES = 25 * 1024 * 1024;
 
+/** The "Indhold" box is a plain `<textarea>` - what's typed (or saved as a
+ * template) is ordinary text with real line breaks, not HTML. Dropped
+ * straight into an HTML email body as-is, those line breaks just vanish
+ * (HTML collapses whitespace), so a multi-paragraph, bulleted email reads as
+ * one unbroken wall of text in the recipient's inbox - confirmed from a real
+ * sent email. Escapes HTML special characters first (so a stray "<" or "&"
+ * in someone's text can't break the markup), then turns blank-line gaps into
+ * paragraphs and single line breaks into <br>. Skipped for the rare body
+ * that already contains real markup (e.g. an older template written with
+ * actual <p>/<br> tags), left untouched rather than double-escaped. */
+function looksLikeHtml(text: string): boolean {
+  return /<[a-z][\s\S]*>/i.test(text);
+}
+
+function plainTextToHtml(text: string): string {
+  const escaped = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return escaped
+    .split(/\n{2,}/)
+    .map((paragraph) => `<p>${paragraph.replace(/\n/g, "<br>")}</p>`)
+    .join("");
+}
+
 /**
  * Sends an email from the deal page, as the CURRENT user's own connected
  * Gmail (not a shared company inbox) - {{placeholders}} in the subject/body
@@ -81,10 +103,12 @@ export async function sendTemplatedEmailAction(
         .map((line) => `<br>${line}`)
         .join("")}</p>`;
 
-  const plainText = `${body.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim()}${signatureText}`;
+  const plainTextBody = looksLikeHtml(body) ? body.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ") : body;
+  const plainText = `${plainTextBody.trim()}${signatureText}`;
   const trackingId = crypto.randomUUID();
   const pixel = `<img src="${getAppBaseUrl()}/api/track/email-open/${trackingId}" width="1" height="1" style="display:none" alt="" />`;
-  const bodyHtml = `${body}${signatureHtml}${pixel}`;
+  const bodyForHtml = looksLikeHtml(body) ? body : plainTextToHtml(body);
+  const bodyHtml = `${bodyForHtml}${signatureHtml}${pixel}`;
 
   const attachments = await Promise.all(
     files.map(async (f) => ({
