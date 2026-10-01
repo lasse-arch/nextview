@@ -167,7 +167,12 @@ const REPORT_STYLE = `
 
   .period-grid { display: flex; gap: 20px; margin-bottom: 40px; }
   .period-card { flex: 1; background: #f5f5f7; border-radius: 20px; padding: 28px 24px 24px 24px; display: flex; flex-direction: column; }
-  .period-card.highlight { background: linear-gradient(160deg, #eef4ff 0%, #e4edff 100%); box-shadow: 0 8px 24px -12px rgba(47,95,214,0.35); }
+  /* A box-shadow here used to render as a solid, hard-edged rectangle
+     around the card in some PDF viewers (Chromium's print-to-PDF renders
+     shadows via a soft-mask/transparency group that not every PDF reader
+     interprets the same way) - a plain border has no such ambiguity and
+     renders identically everywhere. */
+  .period-card.highlight { background: linear-gradient(160deg, #eef4ff 0%, #e4edff 100%); border: 1.5px solid rgba(47,95,214,0.3); }
   .period-card .period-label { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; color: #86868b; text-transform: uppercase; }
   .period-card.highlight .period-label { color: #2f5fd6; }
   .period-card .visits { font-size: 48px; font-weight: 700; letter-spacing: -0.02em; color: #1d1d1f; margin: 12px 0 0 0; line-height: 1; }
