@@ -32,7 +32,14 @@ export function SendEmailSection({
 
   function addFiles(selected: FileList | null) {
     if (!selected) return;
-    setFiles((prev) => [...prev, ...Array.from(selected)]);
+    // Snapshot into a plain array right away - `selected` is a *live*
+    // FileList tied to the input, so if this read were deferred into the
+    // setFiles updater, it would run after the input's onChange handler
+    // resets e.target.value (to allow re-picking the same file), by which
+    // point the same FileList object has already been emptied out from
+    // under us - Array.from(selected) would then always yield [].
+    const picked = Array.from(selected);
+    setFiles((prev) => [...prev, ...picked]);
   }
 
   function removeFile(index: number) {
