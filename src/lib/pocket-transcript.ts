@@ -49,9 +49,23 @@ export async function fetchPocketTranscript(url: string): Promise<{ title: strin
     // content) only actually renders into the DOM once this tab is active -
     // confirmed the hard way, via @sparticuz/chromium specifically (not
     // Playwright's bundled chromium, which rendered it immediately) finding
-    // zero h1/h2/h3 elements at all before this click.
+    // zero h1/h2/h3 elements at all before this click. The container itself
+    // (`.summary-reading-prose`) exists before its content does - Pocket
+    // reveals the AI summary with a typing/streaming animation and marks
+    // progress via `data-summary-animating` - so waiting for the selector
+    // alone is still a race; wait for that flag to flip to "false" and for
+    // actual child content to exist.
     await clickTab(page, "Summary");
-    await sleep(1000);
+    await page
+      .waitForFunction(
+        () => {
+          const el = document.querySelector(".summary-reading-prose");
+          return !!el && el.getAttribute("data-summary-animating") === "false" && el.children.length > 0;
+        },
+        { timeout: 15000 }
+      )
+      .catch(() => {});
+    await sleep(500);
 
     const title = await page
       .evaluate(() => {
@@ -64,12 +78,12 @@ export async function fetchPocketTranscript(url: string): Promise<{ title: strin
       })
       .catch(() => "Pocket-mødereferat");
 
-    const summary = await extractMainText(page);
+    const summary = (await extractStructuredSummary(page)) || (await extractMainText(page));
 
     let todos = "";
     if (await clickTab(page, "To-Dos")) {
       await sleep(1000);
-      todos = await extractMainText(page);
+      todos = (await extractStructuredTodos(page)) || (await extractMainText(page));
     }
 
     let transcript = "";
@@ -98,6 +112,73 @@ async function clickTab(page: import("puppeteer-core").Page, label: string): Pro
     el.click();
     return true;
   }, label);
+}
+
+/**
+ * The Summary tab renders its AI-generated content as real semantic HTML
+ * (`.summary-reading-prose`: an opening overview `<p>`, then `<h3>` section
+ * headings each followed by a `<ul>`) - confirmed from a real share link,
+ * alongside a trailing interactive chart widget that isn't part of the
+ * summary itself. Walking that structure directly gives a properly
+ * sectioned, labeled note instead of the flat wall of text innerText alone
+ * would produce (and sidesteps the chart's own SVG/axis-label text, which
+ * innerText would otherwise sweep in as noise). Returns "" if Pocket's
+ * markup doesn't match (caller falls back to extractMainText).
+ */
+async function extractStructuredSummary(page: import("puppeteer-core").Page): Promise<string> {
+  return page.evaluate(() => {
+    const prose = document.querySelector(".summary-reading-prose");
+    if (!prose) return "";
+
+    const overview: string[] = [];
+    const sections: { heading: string; lines: string[] }[] = [];
+    let current: { heading: string; lines: string[] } | null = null;
+
+    for (const child of Array.from(prose.children)) {
+      const tag = child.tagName.toLowerCase();
+      if (tag === "p") {
+        const text = child.textContent?.trim();
+        if (!text) continue;
+        if (current) current.lines.push(text);
+        else overview.push(text);
+      } else if (/^h[1-6]$/.test(tag)) {
+        current = { heading: child.textContent?.trim() || "", lines: [] };
+        sections.push(current);
+      } else if (tag === "ul" || tag === "ol") {
+        const items = Array.from(child.children)
+          .filter((li) => li.tagName.toLowerCase() === "li")
+          .map((li) => `- ${li.textContent?.trim()}`);
+        if (current) current.lines.push(...items);
+        else overview.push(...items);
+      }
+      // Anything else (the "Ask Pocket" chart widget, etc.) is UI chrome,
+      // not summary content - deliberately skipped.
+    }
+
+    if (sections.length === 0 && overview.length === 0) return "";
+
+    const out: string[] = [];
+    if (overview.length > 0) out.push(`Opsummering\n${overview.join("\n")}`);
+    for (const s of sections) out.push(`${s.heading}\n${s.lines.join("\n")}`);
+    return out.join("\n\n");
+  });
+}
+
+/**
+ * The To-Dos tab renders each item as a button whose accessible name is
+ * "Open <task text>" (confirmed from a real share link) rather than as
+ * plain visible text next to a checkbox - innerText alone misses it
+ * entirely. "Open composer options" is the tab's own compose button, not a
+ * task, and is filtered out. Returns "" if none found (caller falls back to
+ * extractMainText).
+ */
+async function extractStructuredTodos(page: import("puppeteer-core").Page): Promise<string> {
+  return page.evaluate(() => {
+    const items = Array.from(document.querySelectorAll('button[aria-label^="Open "]'))
+      .map((b) => (b.getAttribute("aria-label") || "").replace(/^Open /, "").trim())
+      .filter((t) => t.length > 0 && t.toLowerCase() !== "composer options");
+    return items.map((t) => `- ${t}`).join("\n");
+  });
 }
 
 /** Grabs the page's visible text, trimmed of the fixed share-page chrome
