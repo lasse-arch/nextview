@@ -19,9 +19,12 @@ type Email = {
   openCount: number;
 };
 
-/** Same hover-tooltip pattern as the contract status row - a small dark box
- * on hover, here showing how many times (and when first) the mail was opened. */
-function OpenBadge({ openedAt, openCount }: { openedAt: Date; openCount: number }) {
+/** The open count used to be hidden behind a hover-only tooltip - invisible
+ * on mobile (no hover at all) and easy to miss even on desktop. The count
+ * itself is now right on the badge; hovering (where available) still adds
+ * the exact first-opened timestamp and, for a Cc'ed mail, a note that one
+ * shared tracking pixel can't say whose mail client actually loaded it. */
+function OpenBadge({ openedAt, openCount, hasCc }: { openedAt: Date; openCount: number; hasCc: boolean }) {
   const [hovered, setHovered] = useState(false);
 
   return (
@@ -32,10 +35,10 @@ function OpenBadge({ openedAt, openCount }: { openedAt: Date; openCount: number 
     >
       <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/10">
         <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-        Åbnet
+        Åbnet {openCount}×
       </span>
       {hovered && (
-        <div className="pointer-events-none absolute right-0 top-full z-10 mt-1.5 whitespace-nowrap rounded-lg bg-slate-900 px-3 py-2 text-left text-xs font-medium text-white shadow-lg">
+        <div className="pointer-events-none absolute right-0 top-full z-10 mt-1.5 w-56 whitespace-normal rounded-lg bg-slate-900 px-3 py-2 text-left text-xs font-medium text-white shadow-lg">
           <p className="flex justify-between gap-4">
             <span className="text-slate-300">Åbnet i alt</span>
             <span>{openCount} gang{openCount === 1 ? "" : "e"}</span>
@@ -44,6 +47,11 @@ function OpenBadge({ openedAt, openCount }: { openedAt: Date; openCount: number 
             <span className="text-slate-300">Først åbnet</span>
             <span>{formatDateTime(openedAt)}</span>
           </p>
+          {hasCc && (
+            <p className="mt-1.5 border-t border-slate-700 pt-1.5 font-normal text-slate-300">
+              Til og Cc deler samme mail - kan ikke se om det var modtageren eller en Cc'et kollega.
+            </p>
+          )}
         </div>
       )}
     </span>
@@ -180,7 +188,7 @@ function EmailRow({ dealId, email }: { dealId: string; email: Email }) {
           <div className="mt-2 flex items-center gap-2">
             {email.direction === "OUTBOUND" && email.trackingId && (
               email.openedAt ? (
-                <OpenBadge openedAt={email.openedAt} openCount={email.openCount} />
+                <OpenBadge openedAt={email.openedAt} openCount={email.openCount} hasCc={Boolean(email.ccAddresses)} />
               ) : (
                 <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2 py-0.5 text-[10px] font-medium text-slate-500 ring-1 ring-inset ring-slate-200">
                   <span className="h-1.5 w-1.5 rounded-full bg-slate-300" />
