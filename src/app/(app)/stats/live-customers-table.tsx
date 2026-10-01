@@ -15,11 +15,15 @@ import { StatsCustomerRow, type StatsCustomerRowData } from "./stats-customer-ro
  */
 export function LiveCustomersTable({ rows }: { rows: StatsCustomerRowData[] }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [search, setSearch] = useState("");
   const [sendingAll, startSendAll] = useTransition();
   const [downloading, startDownload] = useTransition();
   const showToast = useToast();
 
-  const allIds = rows.map((r) => r.dealId);
+  const query = search.trim().toLowerCase();
+  const visibleRows = query ? rows.filter((r) => r.name.toLowerCase().includes(query)) : rows;
+
+  const allIds = visibleRows.map((r) => r.dealId);
   const allSelected = allIds.length > 0 && allIds.every((id) => selected.has(id));
 
   function toggleAll() {
@@ -86,16 +90,25 @@ export function LiveCustomersTable({ rows }: { rows: StatsCustomerRowData[] }) {
   return (
     <div>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <label className="flex items-center gap-2 text-xs text-slate-500">
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="flex items-center gap-2 text-xs text-slate-500">
+            <input
+              type="checkbox"
+              checked={allSelected}
+              onChange={toggleAll}
+              aria-label="Vælg alle"
+              disabled={allIds.length === 0}
+            />
+            {selected.size > 0 ? `${selected.size} valgt` : "Vælg alle"}
+          </label>
           <input
-            type="checkbox"
-            checked={allSelected}
-            onChange={toggleAll}
-            aria-label="Vælg alle"
-            disabled={allIds.length === 0}
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Søg efter kunde…"
+            className="w-48 rounded-md border border-slate-300 px-2.5 py-1.5 text-xs"
           />
-          {selected.size > 0 ? `${selected.size} valgt` : "Vælg alle"}
-        </label>
+        </div>
         <div className="flex shrink-0 flex-wrap gap-2">
           <button
             type="button"
@@ -126,7 +139,7 @@ export function LiveCustomersTable({ rows }: { rows: StatsCustomerRowData[] }) {
       </div>
 
       <div className="space-y-2">
-        {rows.map((row) => (
+        {visibleRows.map((row) => (
           <StatsCustomerRow
             key={row.dealId}
             {...row}
@@ -137,6 +150,11 @@ export function LiveCustomersTable({ rows }: { rows: StatsCustomerRowData[] }) {
         {rows.length === 0 && (
           <p className="rounded-md border border-slate-100 px-3 py-6 text-center text-slate-400">
             Ingen live kunder endnu.
+          </p>
+        )}
+        {rows.length > 0 && visibleRows.length === 0 && (
+          <p className="rounded-md border border-slate-100 px-3 py-6 text-center text-slate-400">
+            Ingen kunder matcher &quot;{search}&quot;.
           </p>
         )}
       </div>
