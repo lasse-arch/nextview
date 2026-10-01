@@ -408,17 +408,26 @@ export async function setMeetingDateAndStage(dealId: string, meetingDateIso: str
   const meetingDate = new Date(meetingDateIso);
   if (isNaN(meetingDate.getTime())) throw new Error("Ugyldig mødedato.");
 
+  const existing = await prisma.deal.findUniqueOrThrow({ where: { id: dealId } });
+  const wasAlreadyBooked = existing.stage === "MEETING_BOOKED";
+
   const deal = await prisma.deal.update({
     where: { id: dealId },
     data: { stage: "MEETING_BOOKED", meetingDate },
   });
 
-  await logActivity({
-    type: "DEAL_STAGE_MEETING_BOOKED",
-    message: `${user.name} bookede møde med ${dealName(deal)}`,
-    actorId: user.id,
-    dealId,
-  });
+  // Only the actual booking is activity-worthy - this action is also used to
+  // reschedule a meeting that's already booked (e.g. re-opening "Book møde"
+  // to pick a new time), which shouldn't re-log the same "bookede møde med"
+  // line every time.
+  if (!wasAlreadyBooked) {
+    await logActivity({
+      type: "DEAL_STAGE_MEETING_BOOKED",
+      message: `${user.name} bookede møde med ${dealName(deal)}`,
+      actorId: user.id,
+      dealId,
+    });
+  }
 
   revalidatePath("/deals");
   revalidatePath(`/deals/${dealId}`);
