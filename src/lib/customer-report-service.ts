@@ -97,12 +97,12 @@ function buildReportEmailText(
   if (language === "EN") {
     return {
       subject: `Visitor report for your virtual tour – ${currentMonthLabel("EN")}`,
-      bodyText: `Dear ${customerName}\n\nWe're pleased to share a visitor report for your virtual tour, ${period}.\n\nPlease see the attached PDF.\n\nIf you have any questions, are considering updating your material, or have other spaces that would make sense to showcase with a virtual tour, please don't hesitate to contact us.\n\nBest regards,\nLasse Larsen\nNextview360\nPhone: +45 23 27 07 86`,
+      bodyText: `Dear ${customerName}\n\nWe're pleased to share a visitor report for your virtual tour, ${period}.\n\nPlease see the attached PDF.\n\nIf you have any questions, or have other spaces that would make sense to showcase with a virtual tour, please don't hesitate to contact us.\n\nBest regards,\nLasse Larsen\nNextview360\nPhone: +45 23 27 07 86`,
       bodyHtml: `<div style="font-family: Arial, sans-serif; font-size: 14px; color: #1d1d1f; line-height: 1.5;">
 <p>Dear ${name}</p>
 <p>We're pleased to share a visitor report for your virtual tour, ${period}.</p>
 <p>Please see the attached PDF.</p>
-<p>If you have any questions, are considering updating your material, or have other spaces that would make sense to showcase with a virtual tour, please don't hesitate to contact us.</p>
+<p>If you have any questions, or have other spaces that would make sense to showcase with a virtual tour, please don't hesitate to contact us.</p>
 <p>Best regards,<br>
 <b>Lasse Larsen</b><br>
 Nextview360<br>
@@ -113,12 +113,12 @@ Phone: +45 23 27 07 86</p>
 
   return {
     subject: `Besøgsrapport for jeres virtuelle tour – ${currentMonthLabel("DA")}`,
-    bodyText: `Kære ${customerName}\n\nVi er nu klar med en besøgsrapport for jeres virtuelle tour, ${period}.\n\nSe vedhæftede PDF\n\nHvis I har nogle spørgsmål, eller overvejer at få opdateret jeres materiale, eller har andre lokaler, som giver mening at vise frem med en virtuel tour, så er I meget velkommen til at kontakte os.\n\nMed venlig hilsen\nLasse Larsen\nNextview360\nTlf: 23 27 07 86`,
+    bodyText: `Kære ${customerName}\n\nVi er nu klar med en besøgsrapport for jeres virtuelle tour, ${period}.\n\nSe vedhæftede PDF\n\nHvis I har nogle spørgsmål, eller har andre lokaler, som giver mening at vise frem med en virtuel tour, så er I meget velkommen til at kontakte os.\n\nMed venlig hilsen\nLasse Larsen\nNextview360\nTlf: 23 27 07 86`,
     bodyHtml: `<div style="font-family: Arial, sans-serif; font-size: 14px; color: #1d1d1f; line-height: 1.5;">
 <p>Kære ${name}</p>
 <p>Vi er nu klar med en besøgsrapport for jeres virtuelle tour, ${period}.</p>
 <p>Se vedhæftede PDF</p>
-<p>Hvis I har nogle spørgsmål, eller overvejer at få opdateret jeres materiale, eller har andre lokaler, som giver mening at vise frem med en virtuel tour, så er I meget velkommen til at kontakte os.</p>
+<p>Hvis I har nogle spørgsmål, eller har andre lokaler, som giver mening at vise frem med en virtuel tour, så er I meget velkommen til at kontakte os.</p>
 <p>Med venlig hilsen<br>
 <b>Lasse Larsen</b><br>
 Nextview360<br>
@@ -138,12 +138,12 @@ function buildCombinedReportEmailText(
   if (language === "EN") {
     return {
       subject: `Visitor report for your virtual tours – ${currentMonthLabel("EN")}`,
-      bodyText: `Dear ${customerName}\n\nWe're pleased to share a combined visitor report covering all your virtual tours, ${period}.\n\nPlease see the attached PDF - it has one section per location.\n\nIf you have any questions, are considering updating your material, or have other spaces that would make sense to showcase with a virtual tour, please don't hesitate to contact us.\n\nBest regards,\nLasse Larsen\nNextview360\nPhone: +45 23 27 07 86`,
+      bodyText: `Dear ${customerName}\n\nWe're pleased to share a combined visitor report covering all your virtual tours, ${period}.\n\nPlease see the attached PDF - it has one section per location.\n\nIf you have any questions, or have other spaces that would make sense to showcase with a virtual tour, please don't hesitate to contact us.\n\nBest regards,\nLasse Larsen\nNextview360\nPhone: +45 23 27 07 86`,
       bodyHtml: `<div style="font-family: Arial, sans-serif; font-size: 14px; color: #1d1d1f; line-height: 1.5;">
 <p>Dear ${name}</p>
 <p>We're pleased to share a combined visitor report covering all your virtual tours, ${period}.</p>
 <p>Please see the attached PDF - it has one section per location.</p>
-<p>If you have any questions, are considering updating your material, or have other spaces that would make sense to showcase with a virtual tour, please don't hesitate to contact us.</p>
+<p>If you have any questions, or have other spaces that would make sense to showcase with a virtual tour, please don't hesitate to contact us.</p>
 <p>Best regards,<br>
 <b>Lasse Larsen</b><br>
 Nextview360<br>
@@ -154,12 +154,12 @@ Phone: +45 23 27 07 86</p>
 
   return {
     subject: `Besøgsrapport for jeres virtuelle tours – ${currentMonthLabel("DA")}`,
-    bodyText: `Kære ${customerName}\n\nVi er nu klar med en samlet besøgsrapport for alle jeres virtuelle tours, ${period}.\n\nSe vedhæftede PDF - den har et afsnit pr. lokation.\n\nHvis I har nogle spørgsmål, eller overvejer at få opdateret jeres materiale, eller har andre lokaler, som giver mening at vise frem med en virtuel tour, så er I meget velkommen til at kontakte os.\n\nMed venlig hilsen\nLasse Larsen\nNextview360\nTlf: 23 27 07 86`,
+    bodyText: `Kære ${customerName}\n\nVi er nu klar med en samlet besøgsrapport for alle jeres virtuelle tours, ${period}.\n\nSe vedhæftede PDF - den har et afsnit pr. lokation.\n\nHvis I har nogle spørgsmål, eller har andre lokaler, som giver mening at vise frem med en virtuel tour, så er I meget velkommen til at kontakte os.\n\nMed venlig hilsen\nLasse Larsen\nNextview360\nTlf: 23 27 07 86`,
     bodyHtml: `<div style="font-family: Arial, sans-serif; font-size: 14px; color: #1d1d1f; line-height: 1.5;">
 <p>Kære ${name}</p>
 <p>Vi er nu klar med en samlet besøgsrapport for alle jeres virtuelle tours, ${period}.</p>
 <p>Se vedhæftede PDF - den har et afsnit pr. lokation.</p>
-<p>Hvis I har nogle spørgsmål, eller overvejer at få opdateret jeres materiale, eller har andre lokaler, som giver mening at vise frem med en virtuel tour, så er I meget velkommen til at kontakte os.</p>
+<p>Hvis I har nogle spørgsmål, eller har andre lokaler, som giver mening at vise frem med en virtuel tour, så er I meget velkommen til at kontakte os.</p>
 <p>Med venlig hilsen<br>
 <b>Lasse Larsen</b><br>
 Nextview360<br>
