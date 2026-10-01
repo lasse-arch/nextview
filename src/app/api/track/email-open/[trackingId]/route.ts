@@ -26,9 +26,10 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   try {
     const message = await prisma.emailMessage.findUnique({ where: { trackingId }, select: { openedAt: true } });
     if (message) {
+      const now = new Date();
       await prisma.emailMessage.update({
         where: { trackingId },
-        data: { openedAt: message.openedAt ?? new Date(), openCount: { increment: 1 } },
+        data: { openedAt: message.openedAt ?? now, openCount: { increment: 1 }, openTimestamps: { push: now } },
       });
     }
   } catch (err) {

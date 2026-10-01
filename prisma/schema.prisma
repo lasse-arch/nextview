@@ -632,6 +632,9 @@ model EmailMessage {
   trackingId String?   @unique
   openedAt   DateTime?
   openCount  Int       @default(0)
+  /// Every individual open's timestamp, not just the first (openedAt) - so
+  /// the full history is answerable, not only "opened, N times".
+  openTimestamps DateTime[] @default([])
 
   @@unique([provider, messageId])
 }

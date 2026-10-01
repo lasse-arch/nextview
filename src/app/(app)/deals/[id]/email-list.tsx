@@ -17,14 +17,18 @@ type Email = {
   trackingId: string | null;
   openedAt: Date | null;
   openCount: number;
+  openTimestamps: Date[];
 };
 
 /** The open count used to be hidden behind a hover-only tooltip - invisible
  * on mobile (no hover at all) and easy to miss even on desktop. The count
- * itself is now right on the badge; hovering (where available) still adds
- * the exact first-opened timestamp and, for a Cc'ed mail, a note that one
- * shared tracking pixel can't say whose mail client actually loaded it. */
-function OpenBadge({ openedAt, openCount, hasCc }: { openedAt: Date; openCount: number; hasCc: boolean }) {
+ * itself is now right on the badge; hovering (where available) lists every
+ * individual open's exact timestamp (not just the first), and, for a Cc'ed
+ * mail, a note that one shared tracking pixel can't say whose mail client
+ * actually loaded it. Opens upward (bottom-full) since this badge usually
+ * sits near the bottom of its card - opening downward got clipped by
+ * whatever sits below it on the page. */
+function OpenBadge({ openCount, openTimestamps, hasCc }: { openCount: number; openTimestamps: Date[]; hasCc: boolean }) {
   const [hovered, setHovered] = useState(false);
 
   return (
@@ -38,15 +42,15 @@ function OpenBadge({ openedAt, openCount, hasCc }: { openedAt: Date; openCount: 
         Åbnet {openCount}×
       </span>
       {hovered && (
-        <div className="pointer-events-none absolute right-0 top-full z-10 mt-1.5 w-56 whitespace-normal rounded-lg bg-slate-900 px-3 py-2 text-left text-xs font-medium text-white shadow-lg">
-          <p className="flex justify-between gap-4">
-            <span className="text-slate-300">Åbnet i alt</span>
-            <span>{openCount} gang{openCount === 1 ? "" : "e"}</span>
+        <div className="pointer-events-none absolute bottom-full left-0 z-10 mb-1.5 w-60 whitespace-normal rounded-lg bg-slate-900 px-3 py-2 text-left text-xs font-medium text-white shadow-lg">
+          <p className="font-semibold text-white">
+            Åbnet {openCount} gang{openCount === 1 ? "" : "e"}
           </p>
-          <p className="flex justify-between gap-4">
-            <span className="text-slate-300">Først åbnet</span>
-            <span>{formatDateTime(openedAt)}</span>
-          </p>
+          <ul className="mt-1 space-y-0.5 font-normal text-slate-300">
+            {openTimestamps.map((t, i) => (
+              <li key={i}>{formatDateTime(t)}</li>
+            ))}
+          </ul>
           {hasCc && (
             <p className="mt-1.5 border-t border-slate-700 pt-1.5 font-normal text-slate-300">
               Til og Cc deler samme mail - kan ikke se om det var modtageren eller en Cc'et kollega.
@@ -188,7 +192,13 @@ function EmailRow({ dealId, email }: { dealId: string; email: Email }) {
           <div className="mt-2 flex items-center gap-2">
             {email.direction === "OUTBOUND" && email.trackingId && (
               email.openedAt ? (
-                <OpenBadge openedAt={email.openedAt} openCount={email.openCount} hasCc={Boolean(email.ccAddresses)} />
+                <OpenBadge
+                  openCount={email.openCount}
+                  // Mails opened before this field existed only have the
+                  // single openedAt (first-opened) to fall back on.
+                  openTimestamps={email.openTimestamps.length > 0 ? email.openTimestamps : [email.openedAt]}
+                  hasCc={Boolean(email.ccAddresses)}
+                />
               ) : (
                 <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2 py-0.5 text-[10px] font-medium text-slate-500 ring-1 ring-inset ring-slate-200">
                   <span className="h-1.5 w-1.5 rounded-full bg-slate-300" />
