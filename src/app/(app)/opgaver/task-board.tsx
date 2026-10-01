@@ -133,9 +133,14 @@ function NewTaskModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
+      {/* max-h + overflow-y-auto (matching TaskDetailModal's already-proven
+         pattern) - without it, this modal's full height (title, assignee,
+         due date, recurring, deal, description, buttons) had nowhere to
+         shrink or scroll when the on-screen keyboard appeared on mobile,
+         pushing most of the form out of view. */}
       <form
         onSubmit={handleSubmit}
-        className="relative w-full max-w-md space-y-3 rounded-xl bg-white p-6 shadow-xl"
+        className="relative max-h-[85vh] w-full max-w-md space-y-3 overflow-y-auto rounded-xl bg-white p-6 shadow-xl"
       >
         <h2 className="text-sm font-semibold text-slate-900">Ny opgave</h2>
         <div>
@@ -147,6 +152,11 @@ function NewTaskModal({
             onBlur={handleTitleBlur}
             required
             autoFocus
+            // Suppresses iOS Safari's QuickType autofill bar (password/
+            // payment-card/address suggestions) - irrelevant for a task
+            // title and, combined with the keyboard, was eating even more
+            // of the already-tight mobile screen.
+            autoComplete="off"
             className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
           />
         </div>
