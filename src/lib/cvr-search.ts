@@ -83,9 +83,11 @@ export type CvrSearchResult = { ok: true; hits: CvrSearchHit[] } | { ok: false; 
  * Hard upper bound on `limit` below - this is still a single ES query
  * regardless of size, so raising it doesn't add extra round-trips against
  * the shared government service, but a runaway value (e.g. a bad manual
- * edit) shouldn't be able to ask it for everything at once either.
+ * edit) shouldn't be able to ask it for everything at once either. Well
+ * under Elasticsearch's own default 10,000 max_result_window, so there's no
+ * server-side ceiling to worry about at this size.
  */
-export const MAX_LEAD_FILTER_RESULTS = 200;
+export const MAX_LEAD_FILTER_RESULTS = 1000;
 
 export async function searchCvr(filter: CvrSearchFilter, limit = 50): Promise<CvrSearchResult> {
   limit = Math.min(Math.max(1, limit), MAX_LEAD_FILTER_RESULTS);

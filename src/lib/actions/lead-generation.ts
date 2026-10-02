@@ -9,6 +9,7 @@ import { logActivity } from "@/lib/activity";
 import { dealName } from "@/lib/labels";
 import { runLeadFilter } from "@/lib/lead-generation-service";
 import { MAX_LEAD_FILTER_RESULTS } from "@/lib/cvr-search";
+import type { DealStage } from "@prisma/client";
 
 function parseFormDate(raw: FormDataEntryValue | null): Date | null {
   const value = String(raw || "").trim();
@@ -113,7 +114,7 @@ export async function claimCandidateAndUpsertDeal(
   candidateId: string,
   userId: string,
   extraDealData: { callListId?: string } = {}
-): Promise<{ dealId: string; created: boolean } | { error: string }> {
+): Promise<{ dealId: string; created: boolean; existingStage?: DealStage } | { error: string }> {
   const candidate = await prisma.leadCandidate.findUniqueOrThrow({ where: { id: candidateId } });
   if (candidate.status !== "NEW") return { error: "Dette lead er allerede behandlet." };
 
@@ -127,10 +128,14 @@ export async function claimCandidateAndUpsertDeal(
 
   let dealId: string;
   let created = false;
+  let existingStage: DealStage | undefined;
   if (existingDeal) {
-    if (extraDealData.callListId) {
-      await prisma.deal.update({ where: { id: existingDeal.id }, data: { callListId: extraDealData.callListId } });
-    }
+    // Don't silently move an already-existing deal onto a different
+    // ringeliste here - whatever stage it's actually in (afvist/LOST, møde
+    // booket, or further along), reassigning it without saying so could rip
+    // it out of wherever someone is genuinely tracking it. The caller
+    // surfaces existingStage as an explicit warning instead of acting on it.
+    existingStage = existingDeal.stage;
     dealId = existingDeal.id;
   } else {
     const deal = await prisma.deal.create({
@@ -152,7 +157,7 @@ export async function claimCandidateAndUpsertDeal(
   }
 
   await prisma.leadCandidate.update({ where: { id: candidateId }, data: { dealId } });
-  return { dealId, created };
+  return { dealId, created, existingStage };
 }
 
 /**
@@ -206,7 +211,9 @@ export async function addLeadCandidateAsDeal(
 export async function addLeadCandidateToCallList(
   candidateId: string,
   callListId: string
-): Promise<{ ok: true; dealId: string; alreadyExisted: boolean } | { ok: false; error: string }> {
+): Promise<
+  { ok: true; dealId: string; alreadyExisted: boolean; existingStage?: DealStage } | { ok: false; error: string }
+> {
   const user = await requireUser();
   const list = await prisma.callList.findUnique({ where: { id: callListId } });
   if (!list) return { ok: false, error: "Listen findes ikke længere." };
@@ -227,11 +234,27 @@ export async function addLeadCandidateToCallList(
   revalidatePath("/leadgeneration");
   revalidatePath("/ringeliste");
   revalidatePath("/deals");
-  return { ok: true, dealId: result.dealId, alreadyExisted: !result.created };
+  return { ok: true, dealId: result.dealId, alreadyExisted: !result.created, existingStage: result.existingStage };
 }
 
 export async function dismissLeadCandidate(candidateId: string): Promise<void> {
   await requireUser();
   await prisma.leadCandidate.update({ where: { id: candidateId }, data: { status: "DISMISSED" } });
   revalidatePath("/leadgeneration");
+}
+
+/**
+ * "Slet liste" on a whole found-leads group in /leadgeneration - deletes
+ * every still-unreviewed (NEW) candidate in the given group in one go,
+ * instead of clicking "Afvis" on each one individually. Only ever targets
+ * candidates still NEW: one already turned into a real Deal (ADDED) is left
+ * alone, since this is for clearing out noise from a review queue, not for
+ * removing actual deals.
+ */
+export async function deleteLeadCandidates(candidateIds: string[]): Promise<{ deleted: number }> {
+  await requireUser();
+  if (candidateIds.length === 0) return { deleted: 0 };
+  const result = await prisma.leadCandidate.deleteMany({ where: { id: { in: candidateIds }, status: "NEW" } });
+  revalidatePath("/leadgeneration");
+  return { deleted: result.count };
 }

@@ -7,7 +7,7 @@ import { lookupCvrNumber } from "@/lib/cvr";
 import { buildDealEmailAddress } from "@/lib/email-address";
 import { findDuplicateDeals } from "@/lib/duplicates";
 import { logActivity } from "@/lib/activity";
-import { dealName } from "@/lib/labels";
+import { dealName, stageLabels } from "@/lib/labels";
 import { parseCallListText, guessNameFromUrl } from "@/lib/call-list-parser";
 import { scrapeBasicContactInfo } from "@/lib/website-contact-scrape";
 
@@ -60,7 +60,10 @@ export async function findOrCreateTodayCallList(createdById: string): Promise<{ 
 export async function addLeadsToCallList(
   callListId: string,
   rawText: string
-): Promise<{ ok: true; created: number; skipped: number } | { ok: false; error: string }> {
+): Promise<
+  | { ok: true; created: number; skipped: number; alreadyExisting: { name: string; stage: string }[] }
+  | { ok: false; error: string }
+> {
   const user = await requireUser();
   const lines = parseCallListText(rawText);
   if (lines.length === 0) return { ok: false, error: "Indsæt mindst én linje." };
@@ -70,6 +73,7 @@ export async function addLeadsToCallList(
 
   let created = 0;
   let skipped = 0;
+  const alreadyExisting: { name: string; stage: string }[] = [];
 
   for (const line of lines) {
     let companyName: string | null = null;
@@ -117,9 +121,12 @@ export async function addLeadsToCallList(
 
     const existingByCvr = cvrNumber ? await prisma.deal.findFirst({ where: { cvrNumber } }) : null;
     if (existingByCvr) {
-      // Already a deal - just attach it to today's list rather than creating a duplicate.
-      await prisma.deal.update({ where: { id: existingByCvr.id }, data: { callListId } });
-      created++;
+      // Already a deal somewhere - don't silently move it onto this list.
+      // Whatever stage it's actually in (afvist/LOST, møde booket, or
+      // further along), reassigning it here without saying so could rip it
+      // out of wherever someone is genuinely tracking it - flag it instead
+      // and let the person decide.
+      alreadyExisting.push({ name: existingByCvr.companyName, stage: stageLabels[existingByCvr.stage] ?? existingByCvr.stage });
       continue;
     }
 
@@ -155,7 +162,7 @@ export async function addLeadsToCallList(
 
   revalidatePath("/ringeliste");
   revalidatePath("/deals");
-  return { ok: true, created, skipped };
+  return { ok: true, created, skipped, alreadyExisting };
 }
 
 export async function deleteCallList(callListId: string): Promise<void> {

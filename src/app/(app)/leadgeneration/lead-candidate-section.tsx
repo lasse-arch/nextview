@@ -2,9 +2,20 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { addLeadCandidateAsDeal, addLeadCandidateToCallList, dismissLeadCandidate } from "@/lib/actions/lead-generation";
+import {
+  addLeadCandidateAsDeal,
+  addLeadCandidateToCallList,
+  dismissLeadCandidate,
+  deleteLeadCandidates,
+} from "@/lib/actions/lead-generation";
 import { createCallList } from "@/lib/actions/call-lists";
+import { stageLabels } from "@/lib/labels";
 import { useToast } from "@/components/toast";
+
+function alreadyExistsWarning(stage?: string): string | null {
+  if (!stage) return null;
+  return `⚠️ Findes allerede som deal (${stageLabels[stage] ?? stage}) - ikke flyttet til ringelisten.`;
+}
 
 export type LeadCandidateData = {
   id: string;
@@ -77,7 +88,11 @@ function CandidateCard({
         return;
       }
       hide();
-      showToast(result.alreadyExisted ? "Fandtes allerede som deal - tilføjet til ringelisten." : "Tilføjet til ringelisten.");
+      showToast(
+        result.alreadyExisted
+          ? (alreadyExistsWarning(result.existingStage) ?? "Fandtes allerede som deal.")
+          : "Tilføjet til ringelisten."
+      );
       router.refresh();
     });
   }
@@ -187,7 +202,9 @@ function CandidateCard({
  * named sub-list under "Fundne leads" - a filter called "Nye leads dagligt"
  * gets its own heading and candidate list, instead of every filter's finds
  * being mixed into one flat feed with just a small caption naming the
- * source. */
+ * source. Starts collapsed (just the heading + buttons), since a broad
+ * filter can easily turn up dozens of candidates at once - click the
+ * heading to expand and review them. */
 function CandidateGroup({
   sourceLabel,
   candidates,
@@ -201,6 +218,10 @@ function CandidateGroup({
 }) {
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
   const [addingAll, startAddingAll] = useTransition();
+  const [deleting, startDeleting] = useTransition();
+  const [expanded, setExpanded] = useState(false);
+  const router = useRouter();
+  const showToast = useToast();
   const visible = candidates.filter((c) => !hiddenIds.has(c.id));
 
   function addAll() {
@@ -210,34 +231,73 @@ function CandidateGroup({
     });
   }
 
+  function deleteList() {
+    if (!confirm(`Slet denne liste (${visible.length} leads)? De forsvinder fra Fundne leads og kan ikke genskabes.`)) return;
+    startDeleting(async () => {
+      const result = await deleteLeadCandidates(visible.map((c) => c.id));
+      showToast(`${result.deleted} leads slettet.`);
+      router.refresh();
+    });
+  }
+
   if (visible.length === 0) return null;
 
   return (
     <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-3">
       <div className="flex flex-wrap items-center justify-between gap-2 px-1">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-          {sourceLabel} <span className="font-normal normal-case text-slate-400">({visible.length})</span>
-        </h3>
         <button
           type="button"
-          onClick={addAll}
-          disabled={addingAll || !targetListId}
-          title={!targetListId ? "Vælg eller opret en ringeliste først" : "Tilføj alle i denne liste til den valgte ringeliste"}
-          className="rounded-md border border-violet-300 px-2.5 py-1 text-xs font-medium text-violet-700 hover:bg-violet-50 disabled:opacity-50"
+          onClick={() => setExpanded((v) => !v)}
+          className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500 hover:text-slate-700"
         >
-          {addingAll ? "Tilføjer…" : "Tilføj alle til ringeliste"}
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className={`shrink-0 transition-transform ${expanded ? "rotate-90" : ""}`}
+          >
+            <path d="M9 18l6-6-6-6" />
+          </svg>
+          {sourceLabel} <span className="font-normal normal-case text-slate-400">({visible.length})</span>
         </button>
+        <div className="flex gap-1.5">
+          <button
+            type="button"
+            onClick={deleteList}
+            disabled={deleting}
+            title="Slet alle leads i denne liste"
+            className="rounded-md border border-red-200 px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+          >
+            {deleting ? "Sletter…" : "Slet liste"}
+          </button>
+          <button
+            type="button"
+            onClick={addAll}
+            disabled={addingAll || !targetListId}
+            title={!targetListId ? "Vælg eller opret en ringeliste først" : "Tilføj alle i denne liste til den valgte ringeliste"}
+            className="rounded-md border border-violet-300 px-2.5 py-1 text-xs font-medium text-violet-700 hover:bg-violet-50 disabled:opacity-50"
+          >
+            {addingAll ? "Tilføjer…" : "Tilføj alle til ringeliste"}
+          </button>
+        </div>
       </div>
-      <div className="mt-2 space-y-2">
-        {visible.map((c) => (
-          <CandidateCard
-            key={c.id}
-            candidate={c}
-            targetListId={targetListId}
-            onHidden={() => setHiddenIds((prev) => new Set(prev).add(c.id))}
-          />
-        ))}
-      </div>
+      {expanded && (
+        <div className="mt-2 space-y-2">
+          {visible.map((c) => (
+            <CandidateCard
+              key={c.id}
+              candidate={c}
+              targetListId={targetListId}
+              onHidden={() => setHiddenIds((prev) => new Set(prev).add(c.id))}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -274,11 +334,17 @@ export function LeadCandidateSection({
       return;
     }
     let added = 0;
+    let alreadyExisted = 0;
     for (const id of ids) {
       const result = await addLeadCandidateToCallList(id, targetListId);
-      if (result.ok) added++;
+      if (result.ok && !result.alreadyExisted) added++;
+      else if (result.ok && result.alreadyExisted) alreadyExisted++;
     }
-    showToast(`${added} af ${ids.length} tilføjet til ringelisten.`);
+    let message = `${added} af ${ids.length} tilføjet til ringelisten.`;
+    if (alreadyExisted > 0) {
+      message += ` ⚠️ ${alreadyExisted} fandtes allerede som deal og blev ikke flyttet.`;
+    }
+    showToast(message);
     router.refresh();
   }
 

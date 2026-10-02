@@ -75,7 +75,7 @@ export type LeadFilterData = {
 
 export type CallListOption = { id: string; name: string };
 
-const MAX_RESULTS_OPTIONS = [25, 50, 100, 200] as const;
+const MAX_RESULTS_OPTIONS = [25, 50, 100, 200, 500, 1000] as const;
 
 function formatDateShort(iso: string): string {
   return new Intl.DateTimeFormat("da-DK", { dateStyle: "medium" }).format(new Date(iso));

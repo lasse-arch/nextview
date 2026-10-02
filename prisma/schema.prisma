@@ -744,10 +744,11 @@ model LeadFilter {
   id     String @id @default(cuid())
   name   String
 
-  /// Comma-separated free-text terms matched (any-of) against the company's
-  /// branchetekst, e.g. "restaurant, café" - deliberately loose substring
-  /// matching rather than exact DB07 branchekoder, since sellers think in
-  /// plain words, not industry classification codes.
+  /// Comma-separated terms matched (any-of) against the company's industry -
+  /// free text (e.g. "restaurant, café") does a loose substring match against
+  /// branchetekst, since sellers mostly think in plain words; a purely
+  /// numeric term is instead matched as a prefix against the DB07 branchekode
+  /// (e.g. "931300"), for the rarer case where the exact code is known.
   industryQuery String?
   /// Comma-separated municipality names (kommune), matched any-of.
   municipality  String?

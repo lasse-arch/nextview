@@ -51,11 +51,18 @@ function QuickAdd({ selectedListId }: { selectedListId: string | null }) {
         showToast(result.error);
         return;
       }
-      showToast(
-        `${result.created} lead${result.created === 1 ? "" : "s"} tilføjet${
-          result.skipped > 0 ? ` (${result.skipped} sprunget over)` : ""
-        }.`
-      );
+      const parts = [`${result.created} lead${result.created === 1 ? "" : "s"} tilføjet`];
+      if (result.skipped > 0) parts.push(`${result.skipped} sprunget over`);
+      let message = parts.join(", ") + ".";
+      if (result.alreadyExisting.length > 0) {
+        const names = result.alreadyExisting
+          .slice(0, 3)
+          .map((e) => `${e.name} (${e.stage})`)
+          .join(", ");
+        const more = result.alreadyExisting.length > 3 ? ` +${result.alreadyExisting.length - 3} mere` : "";
+        message += ` ⚠️ ${result.alreadyExisting.length} fandtes allerede som deal og blev IKKE flyttet hertil: ${names}${more}.`;
+      }
+      showToast(message);
       setText("");
       router.push(`/ringeliste?list=${listId}`);
       router.refresh();
