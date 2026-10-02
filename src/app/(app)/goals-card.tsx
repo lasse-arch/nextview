@@ -138,13 +138,13 @@ export function GoalsCard({
           const pct = g.targetValue > 0 ? Math.min(100, (g.currentValue / g.targetValue) * 100) : 0;
           return (
             <div key={g.id}>
-              <div className="flex items-center justify-between text-xs">
+              <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 text-xs">
                 <span className="text-slate-700">
                   <span className="font-medium">{g.userName ?? "Hele virksomheden"}</span>
                   <span className="ml-1.5 text-slate-400">{goalMetricLabels[g.metric]}</span>
                   <span className="ml-1.5 text-slate-300">· {goalPeriodLabels[g.period]}</span>
                 </span>
-                <span className="flex items-center gap-2">
+                <span className="flex shrink-0 items-center gap-2">
                   <span className={`font-medium text-slate-600 ${goalMetricIsMoney[g.metric] ? "money" : ""}`}>
                     {formatValue(g.metric, g.currentValue)} / {formatValue(g.metric, g.targetValue)}
                   </span>
