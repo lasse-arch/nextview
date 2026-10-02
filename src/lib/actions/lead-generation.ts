@@ -244,17 +244,25 @@ export async function dismissLeadCandidate(candidateId: string): Promise<void> {
 }
 
 /**
- * "Slet liste" on a whole found-leads group in /leadgeneration - deletes
+ * "Slet liste" on a whole found-leads group in /leadgeneration - dismisses
  * every still-unreviewed (NEW) candidate in the given group in one go,
- * instead of clicking "Afvis" on each one individually. Only ever targets
- * candidates still NEW: one already turned into a real Deal (ADDED) is left
- * alone, since this is for clearing out noise from a review queue, not for
- * removing actual deals.
+ * instead of clicking "Afvis" on each one individually. This is the same
+ * state change as a single "Afvis" (status -> DISMISSED), NOT a hard
+ * delete: a deleted row would stop being "known" (see runLeadFilter), so
+ * the same company would just come back as a brand-new "fresh" candidate
+ * the next time its filter runs - silently undoing the dedup protection
+ * that already keeps the CVR register search from suggesting a company
+ * twice. Only ever targets candidates still NEW: one already turned into a
+ * real Deal (ADDED) is left alone, since this is for clearing out noise
+ * from a review queue, not for removing actual deals.
  */
 export async function deleteLeadCandidates(candidateIds: string[]): Promise<{ deleted: number }> {
   await requireUser();
   if (candidateIds.length === 0) return { deleted: 0 };
-  const result = await prisma.leadCandidate.deleteMany({ where: { id: { in: candidateIds }, status: "NEW" } });
+  const result = await prisma.leadCandidate.updateMany({
+    where: { id: { in: candidateIds }, status: "NEW" },
+    data: { status: "DISMISSED" },
+  });
   revalidatePath("/leadgeneration");
   return { deleted: result.count };
 }

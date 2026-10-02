@@ -9,7 +9,7 @@ export async function findDuplicateDeals(companyName: string, excludeDealId?: st
       companyName: { equals: name, mode: "insensitive" },
       ...(excludeDealId ? { id: { not: excludeDealId } } : {}),
     },
-    select: { id: true, companyName: true },
+    select: { id: true, companyName: true, stage: true },
   });
 }
 

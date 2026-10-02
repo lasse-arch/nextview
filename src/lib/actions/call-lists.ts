@@ -133,14 +133,24 @@ export async function addLeadsToCallList(
       continue;
     }
 
+    // A CVR number is the reliable match; for leads without one (pasted
+    // Facebook/website links or a bare typed name), an exact case-insensitive
+    // name match is the next best thing. Either way, an existing deal is
+    // reused, never duplicated - this has to run BEFORE creating the deal,
+    // since checking for duplicates afterwards would always find the row
+    // just created (it matches its own name) and flag every single add as a
+    // "possible duplicate" of itself.
     const existingByCvr = cvrNumber ? await prisma.deal.findFirst({ where: { cvrNumber } }) : null;
-    if (existingByCvr) {
-      // Already a deal somewhere - don't silently move it onto this list.
-      // Whatever stage it's actually in (afvist/LOST, møde booket, or
-      // further along), reassigning it here without saying so could rip it
-      // out of wherever someone is genuinely tracking it - flag it instead
-      // and let the person decide.
-      alreadyExisting.push({ name: existingByCvr.companyName, stage: stageLabels[existingByCvr.stage] ?? existingByCvr.stage });
+    const existingByName = existingByCvr ? null : (await findDuplicateDeals(companyName))[0] ?? null;
+    const existingDeal = existingByCvr ?? existingByName;
+    if (existingDeal) {
+      // Already a deal somewhere - don't silently move it onto this list, or
+      // create a second deal for the same company. Whatever stage it's
+      // actually in (afvist/LOST, møde booket, or further along), reassigning
+      // or duplicating it here without saying so could rip it out of wherever
+      // someone is genuinely tracking it - flag it instead and let the
+      // person decide.
+      alreadyExisting.push({ name: existingDeal.companyName, stage: stageLabels[existingDeal.stage] ?? existingDeal.stage });
       continue;
     }
 
@@ -163,10 +173,9 @@ export async function addLeadsToCallList(
       data: { dealId: deal.id, authorId: user.id, body: `Kilde: ${line.raw}`, kind: "MANUAL" },
     });
 
-    const duplicates = await findDuplicateDeals(companyName);
     await logActivity({
       type: "DEAL_CREATED",
-      message: `${user.name} tilføjede ${dealName(deal)} som lead fra ${list.name}${duplicates.length > 0 ? " (mulig dublet)" : ""}`,
+      message: `${user.name} tilføjede ${dealName(deal)} som lead fra ${list.name}`,
       actorId: user.id,
       dealId: deal.id,
     });
