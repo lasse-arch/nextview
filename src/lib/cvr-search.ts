@@ -100,17 +100,23 @@ export async function searchCvr(filter: CvrSearchFilter, limit = 50): Promise<Cv
   // A purely numeric term (e.g. "931300") is a DB07 branchekode, not free
   // text to match against the industry's description - matched as a prefix
   // against branchekode instead, so a shorter code like "9313" still catches
-  // every code underneath it in the hierarchy. Mixed with ordinary text
-  // terms in the same comma-separated field, since a seller might know the
-  // code for one industry and only the name for another.
+  // every code underneath it in the hierarchy. The official branche-code
+  // lists (and copy-pasting from them) commonly write the code with dots as
+  // group separators instead ("87.99.10") - the indexed branchekode field
+  // itself has no dots, so those are stripped before the digits-only check
+  // and the search, or a dotted code would otherwise fall through to the
+  // free-text branch below and match nothing. Mixed with ordinary text terms
+  // in the same comma-separated field, since a seller might know the code
+  // for one industry and only the name for another.
   const industryTerms = splitTerms(filter.industryQuery);
   if (industryTerms.length > 0) {
     must.push({
       bool: {
         should: industryTerms.map((term) => {
           const trimmed = term.trim();
-          return /^\d+$/.test(trimmed)
-            ? { wildcard: { "Vrvirksomhed.virksomhedMetadata.nyesteHovedbranche.branchekode": `${trimmed}*` } }
+          const digitsOnly = trimmed.replace(/\./g, "");
+          return /^\d+$/.test(digitsOnly)
+            ? { wildcard: { "Vrvirksomhed.virksomhedMetadata.nyesteHovedbranche.branchekode": `${digitsOnly}*` } }
             : { wildcard: { "Vrvirksomhed.virksomhedMetadata.nyesteHovedbranche.branchetekst": `*${trimmed.toLowerCase()}*` } };
         }),
         minimum_should_match: 1,

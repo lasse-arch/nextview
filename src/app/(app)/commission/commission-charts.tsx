@@ -14,7 +14,7 @@ export function CommissionBarChart({ title, bars }: { title: string; bars: Commi
       {bars.length === 0 ? (
         <p className="mt-4 text-xs text-slate-400">Ingen provision med kendt salgsdato endnu.</p>
       ) : (
-        <div className="mt-4 flex h-32 items-end gap-2 overflow-x-auto">
+        <div className="mt-4 flex h-40 items-end gap-2 overflow-x-auto">
           {bars.map((b, i) => (
             <div key={i} className="flex min-w-[52px] flex-1 flex-col items-center gap-1" title={formatDKK(b.value)}>
               <span className="money text-[10px] font-medium text-slate-600">{formatDKK(b.value)}</span>

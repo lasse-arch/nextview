@@ -40,6 +40,40 @@ function formatDate(iso: string | null): string {
   return new Intl.DateTimeFormat("da-DK", { dateStyle: "medium" }).format(new Date(iso));
 }
 
+/** Calendar-day key (local time) a candidate was found on, for grouping a
+ * daily-running filter's finds by run instead of lumping every day's batch
+ * into one undifferentiated pile. */
+function foundDayKey(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}
+
+function foundDayLabel(iso: string): string {
+  const d = new Date(iso);
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+  if (foundDayKey(iso) === foundDayKey(today.toISOString())) return "Fundet i dag";
+  if (foundDayKey(iso) === foundDayKey(yesterday.toISOString())) return "Fundet i går";
+  return `Fundet ${new Intl.DateTimeFormat("da-DK", { dateStyle: "medium" }).format(d)}`;
+}
+
+/** Splits a filter's (already newest-first) candidates into same-day
+ * clusters, each labeled "Fundet i dag"/"Fundet i går"/the date - lets a
+ * daily-running filter's fresh batch stand out from leads that have been
+ * sitting unreviewed since an earlier run, instead of both looking identical
+ * inside the same group. */
+function groupByFoundDay(candidates: LeadCandidateData[]): [string, LeadCandidateData[]][] {
+  const buckets: [string, LeadCandidateData[]][] = [];
+  for (const c of candidates) {
+    const label = foundDayLabel(c.createdAt);
+    const last = buckets[buckets.length - 1];
+    if (last && last[0] === label) last[1].push(c);
+    else buckets.push([label, [c]]);
+  }
+  return buckets;
+}
+
 function websiteHref(website: string): string {
   return website.startsWith("http") ? website : `https://${website}`;
 }
@@ -287,14 +321,19 @@ function CandidateGroup({
         </div>
       </div>
       {expanded && (
-        <div className="mt-2 space-y-2">
-          {visible.map((c) => (
-            <CandidateCard
-              key={c.id}
-              candidate={c}
-              targetListId={targetListId}
-              onHidden={() => setHiddenIds((prev) => new Set(prev).add(c.id))}
-            />
+        <div className="mt-2 space-y-4">
+          {groupByFoundDay(visible).map(([dayLabel, dayCandidates]) => (
+            <div key={dayLabel} className="space-y-2">
+              <p className="px-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">{dayLabel}</p>
+              {dayCandidates.map((c) => (
+                <CandidateCard
+                  key={c.id}
+                  candidate={c}
+                  targetListId={targetListId}
+                  onHidden={() => setHiddenIds((prev) => new Set(prev).add(c.id))}
+                />
+              ))}
+            </div>
           ))}
         </div>
       )}
