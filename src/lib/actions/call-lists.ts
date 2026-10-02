@@ -31,6 +31,20 @@ export async function createCallList(name?: string): Promise<{ id: string; name:
   return { id: list.id, name: list.name };
 }
 
+/** Lets a ringeliste's name be changed after creation - the default
+ * "Ringeliste <ugedag> <dato>" naming is a convenient starting point, not
+ * meant to be permanent, e.g. once it's actually someone's own named list
+ * ("Victor fredags") rather than just that day's auto-created one. */
+export async function renameCallList(callListId: string, name: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireUser();
+  const trimmed = name.trim();
+  if (!trimmed) return { ok: false, error: "Navnet må ikke være tomt." };
+  await prisma.callList.update({ where: { id: callListId }, data: { name: trimmed } });
+  revalidatePath("/ringeliste");
+  revalidatePath("/leadgeneration");
+  return { ok: true };
+}
+
 /**
  * Finds today's auto-generated Ringeliste (same name convention as
  * `createCallList()`'s own default, "Ringeliste <ugedag> <dato>") or creates

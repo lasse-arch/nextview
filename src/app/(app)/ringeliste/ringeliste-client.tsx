@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { createCallList, addLeadsToCallList, deleteCallList } from "@/lib/actions/call-lists";
+import { createCallList, addLeadsToCallList, deleteCallList, renameCallList } from "@/lib/actions/call-lists";
 import { updateDealStage, setMeetingDateAndStage, renameDeal, updateDealPhone, updateDealWebsite } from "@/lib/actions/deals";
 import { addDealItem } from "@/lib/actions/deal-items";
 import { dealName, stageLabels } from "@/lib/labels";
@@ -125,6 +125,9 @@ function QuickAdd({ selectedListId }: { selectedListId: string | null }) {
 function ListPicker({ lists, selectedListId }: { lists: CallListSummary[]; selectedListId: string | null }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [nameInput, setNameInput] = useState("");
+  const showToast = useToast();
 
   function remove(id: string) {
     if (!confirm("Slet denne liste? Leadsene beholdes, men mister listetilknytningen.")) return;
@@ -135,34 +138,94 @@ function ListPicker({ lists, selectedListId }: { lists: CallListSummary[]; selec
     });
   }
 
+  function startEdit(l: CallListSummary) {
+    setEditingId(l.id);
+    setNameInput(l.name);
+  }
+
+  function saveRename(id: string) {
+    const trimmed = nameInput.trim();
+    if (!trimmed) {
+      setEditingId(null);
+      return;
+    }
+    startTransition(async () => {
+      const result = await renameCallList(id, trimmed);
+      if (!result.ok) {
+        showToast(result.error);
+        return;
+      }
+      setEditingId(null);
+      router.refresh();
+    });
+  }
+
   if (lists.length === 0) return null;
 
   return (
     <div className="flex flex-wrap gap-1.5">
-      {lists.map((l) => (
-        <div key={l.id} className="group relative">
-          <Link
-            href={`/ringeliste?list=${l.id}`}
-            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${
-              l.id === selectedListId
-                ? "bg-slate-900 text-white"
-                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-            }`}
-          >
-            {l.name}
-            <span className={l.id === selectedListId ? "text-slate-300" : "text-slate-400"}>{l.openCount} tilbage</span>
-          </Link>
-          <button
-            type="button"
-            onClick={() => remove(l.id)}
-            disabled={pending}
-            title="Slet liste"
-            className="absolute -right-1 -top-1 hidden h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] leading-none text-white group-hover:flex"
-          >
-            ×
-          </button>
-        </div>
-      ))}
+      {lists.map((l) =>
+        editingId === l.id ? (
+          <span key={l.id} className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-1">
+            <input
+              value={nameInput}
+              onChange={(e) => setNameInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") saveRename(l.id);
+                if (e.key === "Escape") setEditingId(null);
+              }}
+              autoFocus
+              className="w-36 rounded border border-slate-300 px-1.5 py-0.5 text-xs"
+            />
+            <button
+              type="button"
+              onClick={() => saveRename(l.id)}
+              disabled={pending}
+              className="text-xs font-medium text-slate-900 hover:underline"
+            >
+              Gem
+            </button>
+            <button
+              type="button"
+              onClick={() => setEditingId(null)}
+              className="text-xs text-slate-400 hover:text-slate-600"
+            >
+              Annullér
+            </button>
+          </span>
+        ) : (
+          <div key={l.id} className="group relative">
+            <Link
+              href={`/ringeliste?list=${l.id}`}
+              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${
+                l.id === selectedListId
+                  ? "bg-slate-900 text-white"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              }`}
+            >
+              {l.name}
+              <span className={l.id === selectedListId ? "text-slate-300" : "text-slate-400"}>{l.openCount} tilbage</span>
+            </Link>
+            <button
+              type="button"
+              onClick={() => startEdit(l)}
+              title="Omdøb liste"
+              className="absolute -left-1 -top-1 hidden h-4 w-4 items-center justify-center rounded-full bg-slate-500 text-[10px] leading-none text-white group-hover:flex"
+            >
+              ✎
+            </button>
+            <button
+              type="button"
+              onClick={() => remove(l.id)}
+              disabled={pending}
+              title="Slet liste"
+              className="absolute -right-1 -top-1 hidden h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] leading-none text-white group-hover:flex"
+            >
+              ×
+            </button>
+          </div>
+        )
+      )}
     </div>
   );
 }
