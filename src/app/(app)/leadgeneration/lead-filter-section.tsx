@@ -147,11 +147,11 @@ function FilterForm({
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
-          <label className="block text-xs font-medium text-slate-600">Branche (kommasepareret)</label>
+          <label className="block text-xs font-medium text-slate-600">Branche eller branchekode (kommasepareret)</label>
           <input
             name="industryQuery"
             defaultValue={initial?.industryQuery ?? ""}
-            placeholder="fx restaurant, café"
+            placeholder="fx restaurant, café, 931300"
             className="mt-1 w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-sm"
           />
         </div>

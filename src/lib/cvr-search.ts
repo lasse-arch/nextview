@@ -95,13 +95,22 @@ export async function searchCvr(filter: CvrSearchFilter, limit = 50): Promise<Cv
 
   const must: unknown[] = [];
 
+  // A purely numeric term (e.g. "931300") is a DB07 branchekode, not free
+  // text to match against the industry's description - matched as a prefix
+  // against branchekode instead, so a shorter code like "9313" still catches
+  // every code underneath it in the hierarchy. Mixed with ordinary text
+  // terms in the same comma-separated field, since a seller might know the
+  // code for one industry and only the name for another.
   const industryTerms = splitTerms(filter.industryQuery);
   if (industryTerms.length > 0) {
     must.push({
       bool: {
-        should: industryTerms.map((term) => ({
-          wildcard: { "Vrvirksomhed.virksomhedMetadata.nyesteHovedbranche.branchetekst": `*${term.toLowerCase()}*` },
-        })),
+        should: industryTerms.map((term) => {
+          const trimmed = term.trim();
+          return /^\d+$/.test(trimmed)
+            ? { wildcard: { "Vrvirksomhed.virksomhedMetadata.nyesteHovedbranche.branchekode": `${trimmed}*` } }
+            : { wildcard: { "Vrvirksomhed.virksomhedMetadata.nyesteHovedbranche.branchetekst": `*${trimmed.toLowerCase()}*` } };
+        }),
         minimum_should_match: 1,
       },
     });
