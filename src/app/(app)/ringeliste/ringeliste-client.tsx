@@ -32,10 +32,15 @@ function QuickAdd({ selectedListId }: { selectedListId: string | null }) {
   const [name, setName] = useState("");
   const [text, setText] = useState("");
   const [pending, startTransition] = useTransition();
+  // Set after a submit finds existing deals it skipped, so "Tilføj alligevel"
+  // can re-run the exact same paste with force=true - kept separate from the
+  // (ephemeral, 3s) toast since the person needs time to actually read the
+  // names and decide, not just a flash of text.
+  const [forcePrompt, setForcePrompt] = useState<{ listId: string; text: string; names: string[] } | null>(null);
   const router = useRouter();
   const showToast = useToast();
 
-  function submit() {
+  function submit(force = false) {
     if (!text.trim()) {
       showToast("Indsæt mindst ét link eller navn.");
       return;
@@ -46,12 +51,13 @@ function QuickAdd({ selectedListId }: { selectedListId: string | null }) {
         const list = await createCallList(name);
         listId = list.id;
       }
-      const result = await addLeadsToCallList(listId, text);
+      const result = await addLeadsToCallList(listId, text, force);
       if (!result.ok) {
         showToast(result.error);
         return;
       }
       const parts = [`${result.created} lead${result.created === 1 ? "" : "s"} tilføjet`];
+      if (result.moved > 0) parts.push(`${result.moved} eksisterende flyttet hertil`);
       if (result.skipped > 0) parts.push(`${result.skipped} sprunget over`);
       let message = parts.join(", ") + ".";
       if (result.alreadyExisting.length > 0) {
@@ -61,8 +67,28 @@ function QuickAdd({ selectedListId }: { selectedListId: string | null }) {
           .join(", ");
         const more = result.alreadyExisting.length > 3 ? ` +${result.alreadyExisting.length - 3} mere` : "";
         message += ` ⚠️ ${result.alreadyExisting.length} fandtes allerede som deal og blev IKKE flyttet hertil: ${names}${more}.`;
+        setForcePrompt({ listId, text, names: result.alreadyExisting.map((e) => e.name) });
+      } else {
+        setForcePrompt(null);
+        setText("");
       }
       showToast(message);
+      router.push(`/ringeliste?list=${listId}`);
+      router.refresh();
+    });
+  }
+
+  function forceAdd() {
+    if (!forcePrompt) return;
+    const { listId, text: pendingText } = forcePrompt;
+    startTransition(async () => {
+      const result = await addLeadsToCallList(listId, pendingText, true);
+      if (!result.ok) {
+        showToast(result.error);
+        return;
+      }
+      showToast(`${result.moved} eksisterende deal${result.moved === 1 ? "" : "s"} flyttet hertil.`);
+      setForcePrompt(null);
       setText("");
       router.push(`/ringeliste?list=${listId}`);
       router.refresh();
@@ -91,7 +117,7 @@ function QuickAdd({ selectedListId }: { selectedListId: string | null }) {
       <div className="mt-2 flex flex-wrap items-center gap-2">
         <button
           type="button"
-          onClick={submit}
+          onClick={() => submit(false)}
           disabled={pending}
           className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-50"
         >
@@ -101,6 +127,33 @@ function QuickAdd({ selectedListId }: { selectedListId: string | null }) {
           {selectedListId ? "Tilføjes til den valgte liste ovenfor." : "Der oprettes en ny liste automatisk."}
         </span>
       </div>
+
+      {forcePrompt && (
+        <div className="mt-2 flex flex-wrap items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          <span>
+            {forcePrompt.names.length} fandtes allerede som deal ({forcePrompt.names.slice(0, 3).join(", ")}
+            {forcePrompt.names.length > 3 ? ` +${forcePrompt.names.length - 3} mere` : ""}) og blev ikke flyttet.
+          </span>
+          <button
+            type="button"
+            onClick={forceAdd}
+            disabled={pending}
+            className="rounded-md border border-amber-400 bg-white px-2 py-1 font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-50"
+          >
+            {pending ? "Flytter…" : "Tilføj alligevel"}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setForcePrompt(null);
+              setText("");
+            }}
+            className="text-amber-700 hover:underline"
+          >
+            Nej tak
+          </button>
+        </div>
+      )}
 
       <div className="mt-3 flex items-center gap-2 border-t border-slate-100 pt-3">
         <input

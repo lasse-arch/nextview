@@ -73,9 +73,10 @@ export async function findOrCreateTodayCallList(createdById: string): Promise<{ 
  */
 export async function addLeadsToCallList(
   callListId: string,
-  rawText: string
+  rawText: string,
+  force = false
 ): Promise<
-  | { ok: true; created: number; skipped: number; alreadyExisting: { name: string; stage: string }[] }
+  | { ok: true; created: number; moved: number; skipped: number; alreadyExisting: { name: string; stage: string }[] }
   | { ok: false; error: string }
 > {
   const user = await requireUser();
@@ -86,6 +87,7 @@ export async function addLeadsToCallList(
   if (!list) return { ok: false, error: "Listen findes ikke længere." };
 
   let created = 0;
+  let moved = 0;
   let skipped = 0;
   const alreadyExisting: { name: string; stage: string }[] = [];
 
@@ -144,6 +146,21 @@ export async function addLeadsToCallList(
     const existingByName = existingByCvr ? null : (await findDuplicateDeals(companyName))[0] ?? null;
     const existingDeal = existingByCvr ?? existingByName;
     if (existingDeal) {
+      if (force) {
+        // The person has already seen the "findes allerede" warning and
+        // explicitly asked to move it here anyway (e.g. it was added as a
+        // bare lead by mistake and actually belongs in this ringeliste) -
+        // reuse the existing deal rather than creating a second one.
+        await prisma.deal.update({ where: { id: existingDeal.id }, data: { callListId } });
+        await logActivity({
+          type: "DEAL_UPDATED",
+          message: `${user.name} flyttede ${dealName(existingDeal)} til ${list.name}`,
+          actorId: user.id,
+          dealId: existingDeal.id,
+        });
+        moved++;
+        continue;
+      }
       // Already a deal somewhere - don't silently move it onto this list, or
       // create a second deal for the same company. Whatever stage it's
       // actually in (afvist/LOST, møde booket, or further along), reassigning
@@ -185,7 +202,7 @@ export async function addLeadsToCallList(
 
   revalidatePath("/ringeliste");
   revalidatePath("/deals");
-  return { ok: true, created, skipped, alreadyExisting };
+  return { ok: true, created, moved, skipped, alreadyExisting };
 }
 
 export async function deleteCallList(callListId: string): Promise<void> {
