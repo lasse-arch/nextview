@@ -24,6 +24,7 @@ type DealForGrowth = {
   contractSignedAt: Date | null;
   churnedAt: Date | null;
   contractEndDate: Date | null;
+  terminationNoticeAt: Date | null;
 };
 
 function monthlyRate(deal: { saleAmount: number | null }): number {
@@ -38,7 +39,7 @@ export async function getGrowthDashboardData() {
   const [deals, items, invoices] = await Promise.all([
     prisma.deal.findMany(),
     prisma.dealItem.findMany({ include: { deal: { select: { stage: true, churnedAt: true } } } }),
-    prisma.invoice.findMany({ select: { dealId: true, amount: true, status: true, paidAt: true } }),
+    prisma.invoice.findMany({ select: { dealId: true, amount: true, status: true, paidAt: true, quarterIndex: true } }),
   ]);
 
   const now = new Date();
@@ -166,20 +167,26 @@ export async function getGrowthDashboardData() {
   // own first invoice by not having gone live yet, and who HAS gone live but
   // has somehow never gotten an invoice at all (a gap in the automated
   // generator, not a scheduling delay - see runQuarterlyInvoiceGeneration).
-  // Both matter regardless of churnedAt - a churned deal can still owe
-  // unpaid invoices from while it was active.
+  // Excludes anyone already churned or already given/received a termination
+  // notice (terminationNoticeAt set) - someone on their way out isn't an
+  // invoicing gap to chase - and anyone with neither an establishment fee
+  // nor a recurring price (a free/trial deal was never going to be invoiced
+  // in the first place, so having no invoice isn't a gap for them either).
   const invoicesByDeal = new Map<string, typeof invoices>();
   for (const inv of invoices) {
     const list = invoicesByDeal.get(inv.dealId);
     if (list) list.push(inv);
     else invoicesByDeal.set(inv.dealId, [inv]);
   }
+  const stillActive = (d: DealForGrowth) => !d.churnedAt && !d.terminationNoticeAt;
+  const everBillable = (d: DealForGrowth) => Boolean(d.establishmentFee) || Boolean(d.saleAmount);
+
   const notLiveYet = soldDeals
-    .filter((d) => d.stage !== "LIVE" && !d.churnedAt)
+    .filter((d) => d.stage !== "LIVE" && stillActive(d) && everBillable(d))
     .map((d) => ({ id: d.id, name: dealName(d), stage: d.stage, soldAt: d.soldAt }));
   const liveWithoutInvoice = soldDeals
-    .filter((d) => d.stage === "LIVE" && !invoicesByDeal.has(d.id))
-    .map((d) => ({ id: d.id, name: dealName(d), liveAt: d.liveAt, churnedAt: d.churnedAt }));
+    .filter((d) => d.stage === "LIVE" && stillActive(d) && everBillable(d) && !invoicesByDeal.has(d.id))
+    .map((d) => ({ id: d.id, name: dealName(d), liveAt: d.liveAt }));
   // "Udestående" = an invoice that was actually issued (drafted in Dinero or
   // sent by hand) and isn't marked paid yet - a still-PENDING (not due/drafted
   // yet), FAILED (never actually reached the customer) or IMPORTED
@@ -188,11 +195,37 @@ export async function getGrowthDashboardData() {
   const outstandingInvoices = invoices.filter(
     (inv) => !inv.paidAt && (inv.status === "DRAFT_CREATED" || inv.status === "SENT_MANUALLY")
   );
+
+  // Etablering vi mangler at modtage: for every still-active deal with a
+  // real establishment fee, whatever of it hasn't been invoiced yet at all
+  // (no quarterIndex-0 Invoice row) PLUS whatever was invoiced but isn't
+  // paid yet - new customers are the usual source of this, since their
+  // establishment fee is the very first thing that's supposed to be billed.
+  const establishmentInvoiceByDeal = new Map<string, (typeof invoices)[number]>();
+  for (const inv of invoices) {
+    if (inv.quarterIndex === 0) establishmentInvoiceByDeal.set(inv.dealId, inv);
+  }
+  let missingEstablishmentTotal = 0;
+  let missingEstablishmentCount = 0;
+  for (const d of soldDeals) {
+    if (!stillActive(d) || !d.establishmentFee) continue;
+    const inv = establishmentInvoiceByDeal.get(d.id);
+    if (!inv) {
+      missingEstablishmentTotal += d.establishmentFee;
+      missingEstablishmentCount++;
+    } else if (!inv.paidAt && (inv.status === "DRAFT_CREATED" || inv.status === "SENT_MANUALLY")) {
+      missingEstablishmentTotal += inv.amount;
+      missingEstablishmentCount++;
+    }
+  }
+
   const paymentStatus = {
     notLiveYet,
     liveWithoutInvoice,
     outstandingCount: outstandingInvoices.length,
     outstandingTotal: outstandingInvoices.reduce((sum, inv) => sum + inv.amount, 0),
+    missingEstablishmentCount,
+    missingEstablishmentTotal,
   };
 
   return {

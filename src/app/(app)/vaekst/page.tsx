@@ -101,11 +101,17 @@ export default async function GrowthDashboardPage() {
 
       <div>
         <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Betaling</h2>
-        <div className="mt-2 grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="mt-2 grid grid-cols-1 gap-4 lg:grid-cols-4">
           <StatTile
             label="Udestående betaling"
             value={formatDKK(d.paymentStatus.outstandingTotal)}
             sub={`${d.paymentStatus.outstandingCount} faktura${d.paymentStatus.outstandingCount === 1 ? "" : "er"} ikke meldt betalt`}
+            money
+          />
+          <StatTile
+            label="Etablering vi mangler at modtage"
+            value={formatDKK(d.paymentStatus.missingEstablishmentTotal)}
+            sub={`${d.paymentStatus.missingEstablishmentCount} kunde${d.paymentStatus.missingEstablishmentCount === 1 ? "" : "r"} ikke faktureret/betalt endnu`}
             money
           />
 
@@ -136,10 +142,7 @@ export default async function GrowthDashboardPage() {
                   <Link href={`/deals/${deal.id}`} className="truncate font-medium text-slate-900 hover:underline">
                     {deal.name}
                   </Link>
-                  <span className="shrink-0 text-xs text-slate-400">
-                    {deal.liveAt ? `Live ${formatDate(deal.liveAt)}` : "–"}
-                    {deal.churnedAt && " · Opsagt"}
-                  </span>
+                  <span className="shrink-0 text-xs text-slate-400">{deal.liveAt ? `Live ${formatDate(deal.liveAt)}` : "–"}</span>
                 </div>
               ))}
               {d.paymentStatus.liveWithoutInvoice.length === 0 && (

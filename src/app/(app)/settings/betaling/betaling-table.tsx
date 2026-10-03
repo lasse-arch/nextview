@@ -13,19 +13,21 @@ export type BetalingRow = {
   lastPaidAt: string | null;
   lastInvoiceStatus: string | null;
   lastInvoiceFailureReason: string | null;
-  status: "BETALT" | "MANGLER_BETALING" | "INGEN_FAKTURA";
+  status: "BETALT" | "MANGLER_BETALING" | "INGEN_FAKTURA" | "GRATIS";
 };
 
 const STATUS_LABELS: Record<BetalingRow["status"], string> = {
   BETALT: "Betalt",
   MANGLER_BETALING: "Mangler betaling",
   INGEN_FAKTURA: "Ingen faktura endnu",
+  GRATIS: "Gratis",
 };
 
 const STATUS_BADGE_CLASS: Record<BetalingRow["status"], string> = {
   BETALT: "bg-emerald-50 text-emerald-700",
   MANGLER_BETALING: "bg-red-50 text-red-700",
   INGEN_FAKTURA: "bg-amber-50 text-amber-700",
+  GRATIS: "bg-slate-100 text-slate-500",
 };
 
 type SortKey = "name" | "liveAt" | "invoiceCount" | "unpaidAmount" | "status" | "lastPaidAt";
@@ -107,7 +109,7 @@ export function BetalingTable({ rows }: { rows: BetalingRow[] }) {
           className="w-full max-w-xs rounded-md border border-slate-300 px-3 py-1.5 text-sm"
         />
         <div className="flex rounded-md border border-slate-300 text-xs">
-          {(["ALL", "MANGLER_BETALING", "INGEN_FAKTURA", "BETALT"] as const).map((key, i, arr) => (
+          {(["ALL", "MANGLER_BETALING", "INGEN_FAKTURA", "BETALT", "GRATIS"] as const).map((key, i, arr) => (
             <button
               key={key}
               type="button"

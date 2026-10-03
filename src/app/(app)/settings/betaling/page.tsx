@@ -12,7 +12,11 @@ import { BetalingTable, type BetalingRow } from "./betaling-table";
  */
 export default async function BetalingPage() {
   const deals = await prisma.deal.findMany({
-    where: { stage: "LIVE", churnedAt: null },
+    // A customer that's already churned, or already has a termination
+    // notice registered (even if the actual end date hasn't passed yet),
+    // isn't someone to chase for invoicing gaps - they're on their way out,
+    // not an oversight.
+    where: { stage: "LIVE", churnedAt: null, terminationNoticeAt: null },
     include: { invoices: true },
   });
 
@@ -24,9 +28,14 @@ export default async function BetalingPage() {
       const paidDates = invoices.map((inv) => inv.paidAt).filter((d): d is Date => d !== null);
       const lastPaidAt = paidDates.length > 0 ? new Date(Math.max(...paidDates.map((d) => d.getTime()))) : null;
       const latestInvoice = [...invoices].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0] ?? null;
+      // A deal with no establishment fee and no recurring price was never
+      // going to be invoiced in the first place (a free/trial deal) - that's
+      // not a missing invoice to flag, so it gets its own neutral status
+      // instead of the "Ingen faktura endnu" warning.
+      const isFree = !deal.establishmentFee && !deal.saleAmount;
 
       const status: BetalingRow["status"] =
-        invoices.length === 0 ? "INGEN_FAKTURA" : unpaidAmount > 0 ? "MANGLER_BETALING" : "BETALT";
+        invoices.length === 0 ? (isFree ? "GRATIS" : "INGEN_FAKTURA") : unpaidAmount > 0 ? "MANGLER_BETALING" : "BETALT";
 
       return {
         dealId: deal.id,
