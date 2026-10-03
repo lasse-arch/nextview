@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { getGrowthDashboardData } from "@/lib/growth-dashboard-data";
 import { formatDKK, formatDate, stageLabels } from "@/lib/labels";
 import { NewCustomersChart } from "./new-customers-chart";
+import { CustomerStatTile } from "./customer-stat-tile";
 
 function StatTile({ label, value, sub, money }: { label: string; value: string; sub?: string; money?: boolean }) {
   return (
@@ -44,9 +45,14 @@ export default async function GrowthDashboardPage() {
       <div>
         <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Kunder</h2>
         <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <StatTile label="Aktive kunder" value={String(d.activeCount)} />
-          <StatTile label="Pipeline (afventer start)" value={String(d.pipelineCount)} />
-          <StatTile label="Kunder i alt" value={String(d.totalCount)} sub="Aktive + pipeline + udløbne" />
+          <CustomerStatTile label="Aktive kunder" value={String(d.activeCount)} customers={d.activeCustomers} />
+          <CustomerStatTile label="Pipeline (afventer start)" value={String(d.pipelineCount)} customers={d.pipelineCustomers} />
+          <CustomerStatTile
+            label="Kunder i alt"
+            value={String(d.totalCount)}
+            sub="Aktive + pipeline + udløbne"
+            customers={d.allCustomers}
+          />
           <StatTile label="Udløbne kontrakter" value={String(d.expiredCount)} />
         </div>
       </div>

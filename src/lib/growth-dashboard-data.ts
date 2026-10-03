@@ -228,6 +228,15 @@ export async function getGrowthDashboardData() {
     missingEstablishmentTotal,
   };
 
+  // Backs the "Rapport" drill-down on each of the three Kunder stat tiles -
+  // same underlying deal sets as the counts right below, just mapped down to
+  // what a customer list needs to link out and tell deals apart by stage.
+  const toCustomerList = (list: typeof deals) =>
+    list.map((d) => ({ id: d.id, name: dealName(d), stage: d.stage })).sort((a, b) => a.name.localeCompare(b.name, "da"));
+  const activeCustomers = toCustomerList(allActiveDeals);
+  const pipelineCustomers = toCustomerList(allPipelineDeals);
+  const allCustomers = toCustomerList(soldDeals);
+
   return {
     paymentStatus,
     // Counts every non-churned deal in the stage, billable or not - see the
@@ -235,6 +244,9 @@ export async function getGrowthDashboardData() {
     // from activeDeals/pipelineDeals (used for MRR below).
     activeCount: allActiveDeals.length,
     pipelineCount: allPipelineDeals.length,
+    activeCustomers,
+    pipelineCustomers,
+    allCustomers,
     // Matches the main dashboard's soldCount exactly (src/lib/dashboard-data.ts) -
     // all sold deals, including churned and ones without a recurring MRR, not
     // just the billable active+pipeline subset above. Always equals
