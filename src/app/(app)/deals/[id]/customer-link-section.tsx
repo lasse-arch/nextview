@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { linkDealToParent, linkBranchesToDeal, unlinkDealFromParent } from "@/lib/actions/deals";
+import { linkDealToParent, linkBranchesToDeal, unlinkDealFromParent, setCombinedInvoicing } from "@/lib/actions/deals";
 import { dealName } from "@/lib/labels";
 import { useToast } from "@/components/toast";
 
@@ -14,16 +14,32 @@ export function CustomerLinkSection({
   parent,
   branches,
   linkableDeals,
+  combinedInvoicing,
 }: {
   dealId: string;
   parent: LinkableDeal | null;
   branches: Branch[];
   linkableDeals: LinkableDeal[];
+  combinedInvoicing: boolean;
 }) {
   const [pending, startTransition] = useTransition();
   const [linkError, setLinkError] = useState<string | null>(null);
   const [branchError, setBranchError] = useState<string | null>(null);
+  const [combined, setCombined] = useState(combinedInvoicing);
   const showToast = useToast();
+
+  function toggleCombined(checked: boolean) {
+    setCombined(checked);
+    startTransition(async () => {
+      try {
+        await setCombinedInvoicing(dealId, checked);
+        showToast(checked ? "Fakturerer nu samlet for fælles CVR-numre" : "Fakturerer nu hver afdeling for sig");
+      } catch (err) {
+        setCombined(!checked);
+        showToast(err instanceof Error ? err.message : "Der opstod en fejl.");
+      }
+    });
+  }
 
   function handleLinkSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -158,7 +174,24 @@ export function CustomerLinkSection({
 
       {branches.length > 0 && (
         <div className="mt-4 border-t border-slate-100 pt-4">
-          <h3 className="text-xs font-semibold text-slate-500">Afdelinger under denne kunde</h3>
+          <label className="flex items-start gap-2 text-sm text-slate-700">
+            <input
+              type="checkbox"
+              checked={combined}
+              disabled={pending}
+              onChange={(e) => toggleCombined(e.target.checked)}
+              className="mt-0.5"
+            />
+            <span>
+              Fakturér samlet for afdelinger med samme CVR-nummer
+              <span className="block text-xs text-slate-400">
+                Kun relevant hvis denne kunde og en eller flere afdelinger reelt deler CVR-nummer (samme virksomhed,
+                flere deals) - afdelinger med deres eget CVR-nummer bliver ved med at blive faktureret hver for sig,
+                uanset dette valg.
+              </span>
+            </span>
+          </label>
+          <h3 className="mt-4 text-xs font-semibold text-slate-500">Afdelinger under denne kunde</h3>
           <ul className="mt-2 space-y-1.5">
             {branches.map((b) => (
               <li key={b.id} className="flex items-center justify-between text-sm">

@@ -593,6 +593,21 @@ export async function unlinkDealFromParent(dealId: string) {
   if (deal.parentDealId) revalidatePath(`/deals/${deal.parentDealId}`);
 }
 
+/**
+ * Opt-in toggle (set on the parent only) for billing linked branches that
+ * share this deal's exact cvrNumber as one combined Dinero invoice instead
+ * of one each - see Deal.combinedInvoicing. Deliberately per-group and
+ * off by default: most linked branches (e.g. a chain's locations) are
+ * independent legal entities with their own CVR and must stay billed
+ * separately, so this only ever needs flipping on for the rarer case of
+ * one company with several deals under the same CVR.
+ */
+export async function setCombinedInvoicing(dealId: string, enabled: boolean): Promise<void> {
+  await requireUser();
+  await prisma.deal.update({ where: { id: dealId }, data: { combinedInvoicing: enabled } });
+  revalidatePath(`/deals/${dealId}`);
+}
+
 export async function addNote(
   dealId: string,
   formData: FormData

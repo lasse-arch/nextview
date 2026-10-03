@@ -564,6 +564,7 @@ export default async function DealDetailPage({
             parent={deal.parent}
             branches={deal.branches}
             linkableDeals={linkableDeals}
+            combinedInvoicing={deal.combinedInvoicing}
           />
         </div>
       </div>

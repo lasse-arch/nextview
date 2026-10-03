@@ -167,7 +167,12 @@ model Invoice {
   scheduledDate DateTime
   status        InvoiceStatus @default(PENDING)
 
-  dineroInvoiceGuid   String? @unique
+  /// Usually one-to-one with an Invoice row, but NOT unique - a combined
+  /// invoice (see Deal.combinedInvoicing) deliberately shares one guid
+  /// across several Invoice rows (one per deal billed on that same physical
+  /// Dinero document), so each deal keeps its own amount/status/commission
+  /// history while still pointing at the one real invoice.
+  dineroInvoiceGuid   String?
   dineroInvoiceNumber String?
   failureReason       String?
 
@@ -359,10 +364,17 @@ model Deal {
 
   /// Links this deal as a branch/department of another deal (customer) - e.g.
   /// several locations of the same chain - while each keeps its own CVR
-  /// number, contract, and invoicing independently.
+  /// number, contract, and invoicing independently by default.
   parent       Deal?   @relation("DealBranches", fields: [parentDealId], references: [id])
   parentDealId String?
   branches     Deal[]  @relation("DealBranches")
+  /// Opt-in, set on the parent only: when true, invoice generation bills
+  /// this deal together with whichever of its branches share its exact
+  /// cvrNumber as ONE combined Dinero invoice, instead of one each - e.g. a
+  /// single company billed once for two separate tours/deals. Linked deals
+  /// that don't share a CVR (most branch setups - each is its own legal
+  /// entity) are never affected by this, regardless of the flag.
+  combinedInvoicing Boolean @default(false)
 
   stage DealStage @default(LEAD)
 

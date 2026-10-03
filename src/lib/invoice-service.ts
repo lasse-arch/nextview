@@ -2,7 +2,7 @@ import { addMonths, subMonths, addDays, startOfMonth, max as maxDate, startOfDay
 import { prisma } from "@/lib/db";
 import { isDineroConfigured, createQuarterlyInvoiceDraft, getInvoicePaymentStatus, type DineroInvoiceLine } from "@/lib/dinero";
 import { computeBillingPeriods, computePeriodAmounts } from "@/lib/invoice-schedule";
-import { totalContractValue, invoicePeriodLabel, formatDate } from "@/lib/labels";
+import { totalContractValue, invoicePeriodLabel, formatDate, dealName } from "@/lib/labels";
 import {
   parseContractProducts,
   establishmentLineItems,
@@ -225,6 +225,33 @@ function buildInvoiceContent(
 }
 
 /**
+ * Same as buildInvoiceContent, but merges several due lines - possibly from
+ * different deals - into ONE Dinero invoice's note + line items (see
+ * Deal.combinedInvoicing). Each deal's own line descriptions are prefixed
+ * with that deal's name whenever more than one distinct deal is actually
+ * involved, so a combined invoice still reads clearly as covering two
+ * separate things rather than looking like one doubled-up line item.
+ */
+function buildCombinedInvoiceContent(
+  items: { deal: { companyName: string; displayName: string | null; soldProduct: string | null; contractProducts: unknown }; quarterIndex: number; amount: number; scheduledDate: Date }[]
+): { note: string; lines: DineroInvoiceLine[] } {
+  const distinctDealNames = new Set(items.map((i) => dealName(i.deal)));
+  const multipleDeals = distinctDealNames.size > 1;
+
+  const parts = items.map((item) => ({
+    dealLabel: dealName(item.deal),
+    ...buildInvoiceContent(item.deal, item.quarterIndex, item.amount, item.scheduledDate),
+  }));
+
+  const lines = parts.flatMap((p) =>
+    p.lines.map((line) => ({ ...line, description: multipleDeals ? `${p.dealLabel} - ${line.description}` : line.description }))
+  );
+  const note = parts.map((p) => (multipleDeals ? `${p.dealLabel}: ${p.note}` : p.note)).join(" + ");
+
+  return { note, lines };
+}
+
+/**
  * A recurring period's Dinero invoice date. Normally backdated 8 days
  * (Dinero's own Netto+8 payment terms, see createQuarterlyInvoiceDraft) so
  * the due date lands exactly on the period's own start date, regardless of
@@ -318,6 +345,8 @@ export async function retrySingleInvoice(invoiceId: string): Promise<{ success: 
 
 type DealWithInvoices = DraftableDeal & {
   id: string;
+  displayName: string | null;
+  parentDealId: string | null;
   currentTermNumber: number;
   saleAmount: number | null;
   bindingMonths: number | null;
@@ -384,6 +413,154 @@ async function processDealDueInvoices(
 }
 
 /**
+ * Finds every group of 2+ deals that should be billed as one combined
+ * Dinero invoice (see Deal.combinedInvoicing): a parent with the flag set,
+ * clustered with whichever of its branches share its exact cvrNumber. Most
+ * linked branches (independent legal entities, each with their own CVR)
+ * never match anything here and keep billing separately, flag or no flag -
+ * only an actual CVR match inside an opted-in group forms a combined group.
+ */
+async function findCombinedBillingGroups(): Promise<string[][]> {
+  const parents = await prisma.deal.findMany({
+    where: { combinedInvoicing: true },
+    select: { id: true, cvrNumber: true, branches: { select: { id: true, cvrNumber: true } } },
+  });
+
+  const groups: string[][] = [];
+  for (const parent of parents) {
+    const family = [{ id: parent.id, cvrNumber: parent.cvrNumber }, ...parent.branches];
+    const byCvr = new Map<string, string[]>();
+    for (const member of family) {
+      if (!member.cvrNumber) continue;
+      const ids = byCvr.get(member.cvrNumber) ?? [];
+      ids.push(member.id);
+      byCvr.set(member.cvrNumber, ids);
+    }
+    for (const ids of byCvr.values()) {
+      if (ids.length >= 2) groups.push(ids);
+    }
+  }
+  return groups;
+}
+
+/**
+ * Same job as processDealDueInvoices, but across a whole combined-billing
+ * group (see findCombinedBillingGroups): every member's own due lines are
+ * computed exactly as normal (each deal still tracks its own term/billing
+ * dates independently), then - if 2+ deals actually have something due in
+ * this run - drafted as ONE Dinero invoice instead of one each. A group
+ * where only one member happens to have something due this run is just
+ * passed straight through to the normal single-deal path, since there's
+ * nothing to combine yet.
+ */
+async function processCombinedDueInvoices(
+  deals: DealWithInvoices[],
+  options: { sendEstablishmentNow?: boolean; sendPeriodsNow?: boolean } = {}
+): Promise<{ checked: number; created: number; failed: number }> {
+  const perDeal = deals.map((deal) => {
+    const termInvoices = deal.invoices.filter((inv) => inv.termNumber === deal.currentTermNumber);
+    const handledQuarterIndexes = new Set(
+      termInvoices.filter((inv) => HANDLED_STATUSES.includes(inv.status)).map((inv) => inv.quarterIndex)
+    );
+    const { lines } = computeDueLines(deal, options, handledQuarterIndexes);
+    const dueLines = lines.filter((line) => {
+      const existing = termInvoices.find((inv) => inv.quarterIndex === line.quarterIndex);
+      return !(existing && HANDLED_STATUSES.includes(existing.status));
+    });
+    return { deal, termInvoices, dueLines };
+  });
+
+  const withDue = perDeal.filter((p) => p.dueLines.length > 0);
+  if (withDue.length === 0) return { checked: 0, created: 0, failed: 0 };
+  if (withDue.length === 1) {
+    const { nextDueDate: _nextDueDate, ...rest } = await processDealDueInvoices(withDue[0].deal, options);
+    return rest;
+  }
+
+  let checked = 0;
+  const invoiceRows: { deal: DealWithInvoices; invoiceRow: { id: string; quarterIndex: number; amount: number; scheduledDate: Date } }[] = [];
+
+  for (const { deal, termInvoices, dueLines } of withDue) {
+    for (const line of dueLines) {
+      checked++;
+      const existing = termInvoices.find((inv) => inv.quarterIndex === line.quarterIndex);
+      const invoiceRow = existing
+        ? await prisma.invoice.update({
+            where: { id: existing.id },
+            data: { amount: line.amount, status: "PENDING", failureReason: null },
+          })
+        : await prisma.invoice.create({
+            data: {
+              dealId: deal.id,
+              termNumber: deal.currentTermNumber,
+              quarterIndex: line.quarterIndex,
+              amount: line.amount,
+              scheduledDate: line.scheduledDate,
+              status: "PENDING",
+            },
+          });
+      invoiceRows.push({ deal, invoiceRow });
+    }
+  }
+
+  // The parent (no parentDealId) carries the group's actual contact details
+  // - every member shares the same CVR by construction, but only the
+  // parent is guaranteed to be the one actually filled in/maintained.
+  const leadDeal = withDue.find((p) => !p.deal.parentDealId)?.deal ?? withDue[0].deal;
+  const { note, lines } = buildCombinedInvoiceContent(
+    invoiceRows.map(({ deal, invoiceRow }) => ({
+      deal,
+      quarterIndex: invoiceRow.quarterIndex,
+      amount: invoiceRow.amount,
+      scheduledDate: invoiceRow.scheduledDate,
+    }))
+  );
+  const anyRecurringLine = invoiceRows.find((r) => r.invoiceRow.quarterIndex > 0);
+  const invoiceDate = anyRecurringLine ? computeRecurringInvoiceDate(anyRecurringLine.invoiceRow.scheduledDate) : new Date();
+
+  try {
+    const result = await createQuarterlyInvoiceDraft({
+      existingContactGuid: leadDeal.dineroContactGuid,
+      companyName: leadDeal.companyName,
+      cvrNumber: leadDeal.cvrNumber,
+      contactEmail: leadDeal.invoiceEmail || leadDeal.contactEmail,
+      contactPhone: leadDeal.contactPhone,
+      address: leadDeal.address,
+      note,
+      lines,
+      invoiceDate,
+    });
+
+    await prisma.$transaction([
+      ...invoiceRows.map(({ invoiceRow }) =>
+        prisma.invoice.update({
+          where: { id: invoiceRow.id },
+          data: {
+            status: "DRAFT_CREATED",
+            dineroInvoiceGuid: result.invoiceGuid,
+            dineroInvoiceNumber: result.invoiceNumber,
+            failureReason: result.sendError ? `Oprettet, men ikke sendt automatisk: ${result.sendError}` : null,
+          },
+        })
+      ),
+      ...(result.isTest || leadDeal.dineroContactGuid === result.contactGuid
+        ? []
+        : [prisma.deal.update({ where: { id: leadDeal.id }, data: { dineroContactGuid: result.contactGuid } })]),
+    ]);
+
+    return { checked, created: invoiceRows.length, failed: 0 };
+  } catch (err) {
+    const error = err instanceof Error ? err.message : "Ukendt fejl";
+    await prisma.$transaction(
+      invoiceRows.map(({ invoiceRow }) =>
+        prisma.invoice.update({ where: { id: invoiceRow.id }, data: { status: "FAILED", failureReason: error } })
+      )
+    );
+    return { checked, created: 0, failed: invoiceRows.length };
+  }
+}
+
+/**
  * Creates Dinero invoice drafts for every due line (establishment fee +
  * calendar-aligned recurring periods) across all active, non-churned
  * deals. Safe to call repeatedly (e.g. from a daily cron): lines already
@@ -395,21 +572,45 @@ export async function runQuarterlyInvoiceGeneration(): Promise<InvoiceRunSummary
     return { configured: false, checked: 0, created: 0, failed: 0 };
   }
 
-  const deals = await prisma.deal.findMany({
-    where: {
-      stage: { in: ACTIVE_CUSTOMER_STAGES },
-      saleAmount: { not: null },
-      bindingMonths: { not: null },
-      churnedAt: null,
-    },
-    include: { invoices: true },
-  });
+  const [deals, combinedGroups] = await Promise.all([
+    prisma.deal.findMany({
+      where: {
+        stage: { in: ACTIVE_CUSTOMER_STAGES },
+        saleAmount: { not: null },
+        bindingMonths: { not: null },
+        churnedAt: null,
+      },
+      include: { invoices: true },
+    }),
+    findCombinedBillingGroups(),
+  ]);
+  const dealById = new Map(deals.map((d) => [d.id, d]));
 
   let checked = 0;
   let created = 0;
   let failed = 0;
+  const involvedIds = new Set<string>();
+
+  for (const group of combinedGroups) {
+    const groupDeals = group.map((id) => dealById.get(id)).filter((d): d is (typeof deals)[number] => Boolean(d));
+    // Fewer than 2 of this group's members are actually billable right now
+    // (e.g. one has since churned, or never got saleAmount/bindingMonths
+    // filled in) - nothing to combine, so leave them for the normal
+    // per-deal loop below instead of marking them "handled" here.
+    if (groupDeals.length < 2) continue;
+    groupDeals.forEach((d) => involvedIds.add(d.id));
+
+    const result = await processCombinedDueInvoices(groupDeals);
+    checked += result.checked;
+    created += result.created;
+    failed += result.failed;
+    if (result.checked > 0) {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    }
+  }
 
   for (const deal of deals) {
+    if (involvedIds.has(deal.id)) continue;
     const result = await processDealDueInvoices(deal);
     checked += result.checked;
     created += result.created;
@@ -436,10 +637,26 @@ export async function runQuarterlyInvoiceGeneration(): Promise<InvoiceRunSummary
  * hasn't started yet (sendEstablishmentNow/sendPeriodsNow) - a seller
  * clicking this button has already decided it's time, regardless of what
  * the automatic schedule would otherwise wait for.
+ *
+ * If this deal is part of a combined-billing group (Deal.combinedInvoicing
+ * + a shared cvrNumber with at least one linked branch), clicking the
+ * button on EITHER member drafts one combined invoice for the whole group,
+ * not just this one deal.
  */
 export async function generateInvoiceForDeal(dealId: string): Promise<InvoiceRunSummary> {
   if (!(await isDineroConfigured())) {
     return { configured: false, checked: 0, created: 0, failed: 0 };
+  }
+
+  const combinedGroups = await findCombinedBillingGroups();
+  const myGroup = combinedGroups.find((group) => group.includes(dealId));
+  if (myGroup) {
+    const groupDeals = await prisma.deal.findMany({ where: { id: { in: myGroup } }, include: { invoices: true } });
+    const eligible = groupDeals.filter((d) => d.saleAmount && d.bindingMonths && !d.churnedAt);
+    if (eligible.length >= 2) {
+      const result = await processCombinedDueInvoices(eligible, { sendEstablishmentNow: true, sendPeriodsNow: true });
+      return { configured: true, ...result };
+    }
   }
 
   const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId }, include: { invoices: true } });
