@@ -55,11 +55,17 @@ export function DealsBoard({ initialDeals, isAdmin }: { initialDeals: BoardDeal[
     setDeals((prev) => prev.map((d) => (d.id === dealId ? { ...d, stage: newStage } : d)));
   }
 
-  function handleDrop(newStage: DealStage) {
+  function handleDrop(newStage: DealStage | "CHURNED_VIRTUAL") {
     if (!draggingId) return;
     const deal = deals.find((d) => d.id === draggingId);
     setDraggingId(null);
-    if (!deal || deal.stage === newStage) return;
+    if (!deal) return;
+
+    if (newStage === "CHURNED_VIRTUAL") {
+      setError("Opsagt sættes automatisk ud fra opsigelsen på dealens side - ikke ved at trække den hertil.");
+      return;
+    }
+    if (deal.stage === newStage) return;
 
     if (!isAdmin && CONTRACT_MANAGED_STAGES.includes(newStage)) {
       setError("Denne fase styres automatisk via kontrakten på dealens side.");
@@ -136,10 +142,22 @@ export function DealsBoard({ initialDeals, isAdmin }: { initialDeals: BoardDeal[
     });
   }, [deals, search]);
 
-  const columns = stageOrder.map((stage) => ({
-    stage,
-    deals: filteredDeals.filter((d) => d.stage === stage),
-  }));
+  // "Live" deals whose contract has been terminated (isChurned, set
+  // automatically once the termination notice's computed end date passes -
+  // see runAutoChurn) get pulled out into their own "Opsagt" column instead
+  // of sitting dimmed inside "Live" - a terminated customer is a materially
+  // different thing to look at than an active one, not just a visual detail
+  // on the same pile.
+  type ColumnStage = DealStage | "CHURNED_VIRTUAL";
+  const columns: { stage: ColumnStage; deals: BoardDeal[] }[] = [];
+  for (const stage of stageOrder) {
+    if (stage === "LIVE") {
+      columns.push({ stage: "LIVE", deals: filteredDeals.filter((d) => d.stage === "LIVE" && !d.isChurned) });
+      columns.push({ stage: "CHURNED_VIRTUAL", deals: filteredDeals.filter((d) => d.stage === "LIVE" && d.isChurned) });
+    } else {
+      columns.push({ stage, deals: filteredDeals.filter((d) => d.stage === stage) });
+    }
+  }
 
   return (
     <div>
@@ -233,7 +251,7 @@ export function DealsBoard({ initialDeals, isAdmin }: { initialDeals: BoardDeal[
       <div className="flex gap-3 overflow-x-auto pb-4">
         {columns.map(({ stage, deals: colDeals }) => {
           const total = colDeals.reduce((sum, d) => sum + totalContractValue(d) + (d.establishmentFee ?? 0), 0);
-          const managed = CONTRACT_MANAGED_STAGES.includes(stage);
+          const managed = stage !== "CHURNED_VIRTUAL" && CONTRACT_MANAGED_STAGES.includes(stage);
           return (
             <div
               key={stage}
@@ -242,7 +260,9 @@ export function DealsBoard({ initialDeals, isAdmin }: { initialDeals: BoardDeal[
               className="flex h-[calc(100vh-260px)] w-48 flex-shrink-0 flex-col rounded-lg bg-slate-100"
             >
               <div className="px-2 py-1.5">
-                <h3 className="truncate text-xs font-semibold text-slate-800">{stageLabels[stage]}</h3>
+                <h3 className="truncate text-xs font-semibold text-slate-800">
+                  {stage === "CHURNED_VIRTUAL" ? "Opsagt" : stageLabels[stage]}
+                </h3>
                 <p className="text-[11px] text-slate-500">
                   <span className="money">{formatDKK(total)}</span> · {colDeals.length}
                   {managed && " · Kontrakt"}

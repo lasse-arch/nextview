@@ -41,6 +41,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: "/settings/email-templates", label: "E-mail-skabeloner" },
     { href: "/settings/docuseal", label: "Kontrakter" },
     { href: "/settings/dinero", label: "Fakturaer" },
+    { href: "/settings/betaling", label: "Betalingsstatus" },
   ];
   if (user.role === "ADMIN") {
     settingsItems.push({ href: "/users", label: "Brugere" });

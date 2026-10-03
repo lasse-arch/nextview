@@ -1,6 +1,7 @@
+import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { isIntegrationEnabled } from "@/lib/integration-settings";
-import { dealName } from "@/lib/labels";
+import { dealName, formatDate } from "@/lib/labels";
 import { IntegrationToggle } from "../settings/integration-toggle";
 import { LiveCustomersTable } from "./live-customers-table";
 
@@ -26,6 +27,23 @@ export default async function StatsPage() {
       },
     })
   ).sort((a, b) => dealName(a).localeCompare(dealName(b), "da"));
+
+  // Opsagte kunder - a deal stays "LIVE" forever (that's its real pipeline
+  // history), but once its termination notice's computed end date has
+  // passed, runAutoChurn sets churnedAt and it silently drops out of "Live
+  // kunder" above with nowhere else showing it actually left - this gives
+  // opsagte kunder their own visible home instead.
+  const churnedDeals = (
+    await prisma.deal.findMany({
+      where: { stage: "LIVE", churnedAt: { not: null } },
+      orderBy: { churnedAt: "desc" },
+    })
+  ).map((deal) => ({
+    id: deal.id,
+    name: dealName(deal),
+    churnedAt: deal.churnedAt!,
+    terminationNoticeAt: deal.terminationNoticeAt,
+  }));
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -77,6 +95,28 @@ export default async function StatsPage() {
                 .map((b) => ({ id: b.id, name: b.displayName || b.companyName })),
             }))}
           />
+        </div>
+      </section>
+
+      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 className="text-sm font-semibold text-slate-900">Opsagte kunder</h2>
+        <p className="mt-1 text-xs text-slate-500">
+          Kunder hvis opsigelse er trådt i kraft (kontrakten er ophørt) og som derfor ikke længere tæller med under
+          Live kunder.
+        </p>
+        <div className="mt-3 divide-y divide-slate-100">
+          {churnedDeals.map((deal) => (
+            <div key={deal.id} className="flex items-center justify-between py-2 text-sm">
+              <Link href={`/deals/${deal.id}`} className="font-medium text-slate-900 hover:underline">
+                {deal.name}
+              </Link>
+              <span className="text-xs text-slate-500">
+                Opsagt {formatDate(deal.churnedAt)}
+                {deal.terminationNoticeAt && ` · Varsel givet ${formatDate(deal.terminationNoticeAt)}`}
+              </span>
+            </div>
+          ))}
+          {churnedDeals.length === 0 && <p className="py-2 text-sm text-slate-400">Ingen opsagte kunder endnu.</p>}
         </div>
       </section>
     </div>

@@ -324,6 +324,15 @@ export function TaskBoard({
     return 0;
   }
 
+  /** A done task is never "overdue" regardless of its date - only an
+   * unfinished one whose due date has already passed. */
+  function isOverdue(task: BoardTask): boolean {
+    if (!task.dueDate || task.done) return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return task.dueDate.getTime() < today.getTime();
+  }
+
   function tasksForColumn(key: string) {
     const inColumn =
       groupBy === "person"
@@ -582,7 +591,12 @@ export function TaskBoard({
                             {deal}
                           </Link>
                         )}
-                        {task.dueDate && <span>{formatDate(task.dueDate)}</span>}
+                        {task.dueDate && (
+                          <span className={isOverdue(task) ? "font-semibold text-red-600" : ""}>
+                            {isOverdue(task) ? "Forfalden " : ""}
+                            {formatDate(task.dueDate)}
+                          </span>
+                        )}
                         {task.recurringWeekday !== null && (
                           <span title={`Gentages hver ${WEEKDAY_OPTIONS.find((w) => w.value === task.recurringWeekday)?.label}`}>
                             🔁

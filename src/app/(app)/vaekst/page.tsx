@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
 import { getGrowthDashboardData } from "@/lib/growth-dashboard-data";
-import { formatDKK } from "@/lib/labels";
+import { formatDKK, formatDate, stageLabels } from "@/lib/labels";
 import { NewCustomersChart } from "./new-customers-chart";
 
 function StatTile({ label, value, sub, money }: { label: string; value: string; sub?: string; money?: boolean }) {
@@ -94,6 +95,57 @@ export default async function GrowthDashboardPage() {
               money
             />
             <Row label="Samlet booket værdi" value={formatDKK(d.totalBookedValue)} strong money />
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Betaling</h2>
+        <div className="mt-2 grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <StatTile
+            label="Udestående betaling"
+            value={formatDKK(d.paymentStatus.outstandingTotal)}
+            sub={`${d.paymentStatus.outstandingCount} faktura${d.paymentStatus.outstandingCount === 1 ? "" : "er"} ikke meldt betalt`}
+            money
+          />
+
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-1">
+            <h3 className="text-sm font-semibold text-slate-900">Solgt, men ikke gået live</h3>
+            <p className="mt-1 text-xs text-slate-500">Fakturering starter først fra Live-datoen.</p>
+            <div className="mt-3 max-h-56 divide-y divide-slate-100 overflow-y-auto">
+              {d.paymentStatus.notLiveYet.map((deal) => (
+                <div key={deal.id} className="flex items-center justify-between gap-2 py-1.5 text-sm">
+                  <Link href={`/deals/${deal.id}`} className="truncate font-medium text-slate-900 hover:underline">
+                    {deal.name}
+                  </Link>
+                  <span className="shrink-0 text-xs text-slate-400">{stageLabels[deal.stage] ?? deal.stage}</span>
+                </div>
+              ))}
+              {d.paymentStatus.notLiveYet.length === 0 && (
+                <p className="py-2 text-sm text-slate-400">Ingen - alle solgte kunder er gået live.</p>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-1">
+            <h3 className="text-sm font-semibold text-slate-900">Live, men mangler faktura</h3>
+            <p className="mt-1 text-xs text-slate-500">Gået live, men har aldrig fået en etablerings- eller løbende faktura.</p>
+            <div className="mt-3 max-h-56 divide-y divide-slate-100 overflow-y-auto">
+              {d.paymentStatus.liveWithoutInvoice.map((deal) => (
+                <div key={deal.id} className="flex items-center justify-between gap-2 py-1.5 text-sm">
+                  <Link href={`/deals/${deal.id}`} className="truncate font-medium text-slate-900 hover:underline">
+                    {deal.name}
+                  </Link>
+                  <span className="shrink-0 text-xs text-slate-400">
+                    {deal.liveAt ? `Live ${formatDate(deal.liveAt)}` : "–"}
+                    {deal.churnedAt && " · Opsagt"}
+                  </span>
+                </div>
+              ))}
+              {d.paymentStatus.liveWithoutInvoice.length === 0 && (
+                <p className="py-2 text-sm text-slate-400">Ingen - alle live kunder har mindst én faktura.</p>
+              )}
+            </div>
           </div>
         </div>
       </div>

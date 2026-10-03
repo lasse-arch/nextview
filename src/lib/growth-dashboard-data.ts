@@ -9,7 +9,7 @@ import {
   format,
 } from "date-fns";
 import { da } from "date-fns/locale";
-import { totalContractValue, contractedContractValue } from "@/lib/labels";
+import { totalContractValue, contractedContractValue, dealName } from "@/lib/labels";
 
 const PIPELINE_STAGES = ["CONTRACT_SIGNED", "FILMED"] as const;
 const RISK_WINDOWS = [30, 60, 90] as const;
@@ -35,9 +35,10 @@ function isBillable(deal: DealForGrowth): boolean {
 }
 
 export async function getGrowthDashboardData() {
-  const [deals, items] = await Promise.all([
+  const [deals, items, invoices] = await Promise.all([
     prisma.deal.findMany(),
     prisma.dealItem.findMany({ include: { deal: { select: { stage: true, churnedAt: true } } } }),
+    prisma.invoice.findMany({ select: { dealId: true, amount: true, status: true, paidAt: true } }),
   ]);
 
   const now = new Date();
@@ -161,7 +162,41 @@ export async function getGrowthDashboardData() {
     .map(([productType, v]) => ({ productType, ...v }))
     .sort((a, b) => b.total - a.total);
 
+  // Betaling - sold-but-not-billing-yet visibility: who's holding up their
+  // own first invoice by not having gone live yet, and who HAS gone live but
+  // has somehow never gotten an invoice at all (a gap in the automated
+  // generator, not a scheduling delay - see runQuarterlyInvoiceGeneration).
+  // Both matter regardless of churnedAt - a churned deal can still owe
+  // unpaid invoices from while it was active.
+  const invoicesByDeal = new Map<string, typeof invoices>();
+  for (const inv of invoices) {
+    const list = invoicesByDeal.get(inv.dealId);
+    if (list) list.push(inv);
+    else invoicesByDeal.set(inv.dealId, [inv]);
+  }
+  const notLiveYet = soldDeals
+    .filter((d) => d.stage !== "LIVE" && !d.churnedAt)
+    .map((d) => ({ id: d.id, name: dealName(d), stage: d.stage, soldAt: d.soldAt }));
+  const liveWithoutInvoice = soldDeals
+    .filter((d) => d.stage === "LIVE" && !invoicesByDeal.has(d.id))
+    .map((d) => ({ id: d.id, name: dealName(d), liveAt: d.liveAt, churnedAt: d.churnedAt }));
+  // "Udestående" = an invoice that was actually issued (drafted in Dinero or
+  // sent by hand) and isn't marked paid yet - a still-PENDING (not due/drafted
+  // yet), FAILED (never actually reached the customer) or IMPORTED
+  // (pre-CRM, handled by the old system) row isn't money we're owed on a
+  // real issued invoice, so those are excluded from the sum.
+  const outstandingInvoices = invoices.filter(
+    (inv) => !inv.paidAt && (inv.status === "DRAFT_CREATED" || inv.status === "SENT_MANUALLY")
+  );
+  const paymentStatus = {
+    notLiveYet,
+    liveWithoutInvoice,
+    outstandingCount: outstandingInvoices.length,
+    outstandingTotal: outstandingInvoices.reduce((sum, inv) => sum + inv.amount, 0),
+  };
+
   return {
+    paymentStatus,
     // Counts every non-churned deal in the stage, billable or not - see the
     // comment above allActiveDeals/allPipelineDeals for why this differs
     // from activeDeals/pipelineDeals (used for MRR below).
