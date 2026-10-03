@@ -10,7 +10,7 @@ import { CommissionBarChart, type CommissionBar } from "./commission-charts";
 import { CommissionFilters } from "./commission-filters";
 
 const MONTHS_BACK = 6;
-const WEEKS_BACK = 10;
+const WEEKS_BACK = 6;
 
 export default async function CommissionPage({
   searchParams,
