@@ -50,10 +50,10 @@ export default async function GrowthDashboardPage() {
           <CustomerStatTile
             label="Kunder i alt"
             value={String(d.totalCount)}
-            sub="Aktive + pipeline + udløbne"
+            sub="Aktive + pipeline + opsagt"
             customers={d.allCustomers}
           />
-          <StatTile label="Udløbne kontrakter" value={String(d.expiredCount)} />
+          <CustomerStatTile label="Opsagt" value={String(d.expiredCount)} customers={d.expiredCustomers} />
         </div>
       </div>
 

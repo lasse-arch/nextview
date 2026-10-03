@@ -228,14 +228,20 @@ export async function getGrowthDashboardData() {
     missingEstablishmentTotal,
   };
 
-  // Backs the "Rapport" drill-down on each of the three Kunder stat tiles -
+  // Backs the "Rapport" drill-down on each of the four Kunder stat tiles -
   // same underlying deal sets as the counts right below, just mapped down to
   // what a customer list needs to link out and tell deals apart by stage.
-  const toCustomerList = (list: typeof deals) =>
-    list.map((d) => ({ id: d.id, name: dealName(d), stage: d.stage })).sort((a, b) => a.name.localeCompare(b.name, "da"));
+  const toCustomerList = (list: typeof deals, note?: (d: (typeof deals)[number]) => string) =>
+    list
+      .map((d) => ({ id: d.id, name: dealName(d), stage: d.stage, note: note?.(d) }))
+      .sort((a, b) => a.name.localeCompare(b.name, "da"));
   const activeCustomers = toCustomerList(allActiveDeals);
   const pipelineCustomers = toCustomerList(allPipelineDeals);
   const allCustomers = toCustomerList(soldDeals);
+  const expiredCustomers = toCustomerList(
+    deals.filter((d) => d.churnedAt),
+    (d) => `Opsagt ${d.churnedAt ? d.churnedAt.toLocaleDateString("da-DK") : ""}`
+  );
 
   return {
     paymentStatus,
@@ -253,6 +259,7 @@ export async function getGrowthDashboardData() {
     // activeCount + pipelineCount + expiredCount.
     totalCount: soldDeals.length,
     expiredCount,
+    expiredCustomers,
     activeMRR,
     pipelineMRR,
     totalMRR,

@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { stageLabels } from "@/lib/labels";
 
-export type StatCustomer = { id: string; name: string; stage: string };
+export type StatCustomer = { id: string; name: string; stage: string; note?: string };
 
 /**
  * Same stat tile as the plain one elsewhere on this page, but with a
@@ -70,7 +70,7 @@ export function CustomerStatTile({
                           {c.name}
                         </Link>
                       </td>
-                      <td className="py-1.5 text-right text-slate-500">{stageLabels[c.stage] ?? c.stage}</td>
+                      <td className="py-1.5 text-right text-slate-500">{c.note ?? stageLabels[c.stage] ?? c.stage}</td>
                     </tr>
                   ))}
                   {customers.length === 0 && (
