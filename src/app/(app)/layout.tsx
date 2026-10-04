@@ -11,7 +11,6 @@ import { PresentationModeToggle } from "./presentation-mode-toggle";
 import { isPresentationMode } from "@/lib/presentation-mode";
 import { NewsBell } from "./news-bell";
 import { getUnreadNewsCount } from "@/lib/actions/news";
-import { IconHome, IconDeals, IconUsers, IconPercent, IconGrowth, IconTasks, IconStats, IconCalendar, IconRadar, IconPhone, IconBuilding, IconInbox } from "./nav-icons";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const [user, presenting] = await Promise.all([getCurrentUser(), isPresentationMode()]);
@@ -22,24 +21,24 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // Company-level pages (commission, visitor stats, growth) grouped under
   // one collapsible "Virksomheden" entry, so the day-to-day sales pages
   // stay at the top of the sidebar.
-  const companyItems: SidebarNavLink[] = [{ href: "/commission", label: "Provision", icon: <IconPercent /> }];
+  const companyItems: SidebarNavLink[] = [{ href: "/commission", label: "Provision", icon: "percent" }];
   if (user.canAccessBilling) {
-    companyItems.push({ href: "/stats", label: "Stats", icon: <IconStats /> });
+    companyItems.push({ href: "/stats", label: "Stats", icon: "stats" });
   }
   if (user.role === "ADMIN") {
-    companyItems.push({ href: "/vaekst", label: "Vækst", icon: <IconGrowth /> });
+    companyItems.push({ href: "/vaekst", label: "Vækst", icon: "growth" });
   }
 
   const navItems: SidebarNavItem[] = [
-    { href: "/", label: "Oversigt", icon: <IconHome /> },
-    { href: "/deals", label: "Deals", icon: <IconDeals /> },
-    { href: "/leadindbakke", label: "Leadindbakke", icon: <IconInbox /> },
-    { href: "/leadgeneration", label: "Leadgeneration", icon: <IconRadar /> },
-    { href: "/ringeliste", label: "Ringeliste", icon: <IconPhone /> },
-    { href: "/kunder-live", label: "Live kunder", icon: <IconUsers /> },
-    { href: "/kalender", label: "Kalender", icon: <IconCalendar /> },
-    { href: "/opgaver", label: "Opgaver", icon: <IconTasks /> },
-    { label: "Virksomheden", icon: <IconBuilding />, children: companyItems },
+    { href: "/", label: "Oversigt", icon: "home" },
+    { href: "/deals", label: "Deals", icon: "deals" },
+    { href: "/leadindbakke", label: "Leadindbakke", icon: "inbox" },
+    { href: "/leadgeneration", label: "Leadgeneration", icon: "radar" },
+    { href: "/ringeliste", label: "Ringeliste", icon: "phone" },
+    { href: "/kunder-live", label: "Live kunder", icon: "users" },
+    { href: "/kalender", label: "Kalender", icon: "calendar" },
+    { href: "/opgaver", label: "Opgaver", icon: "tasks" },
+    { label: "Virksomheden", icon: "building", children: companyItems },
   ];
 
   const settingsItems = [

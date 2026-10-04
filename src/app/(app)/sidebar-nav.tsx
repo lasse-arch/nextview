@@ -2,13 +2,56 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { cloneElement, useState, type ReactElement } from "react";
-import { IconChevronDown } from "./nav-icons";
+import { useState } from "react";
+import {
+  IconChevronDown,
+  IconHome,
+  IconDeals,
+  IconUsers,
+  IconPercent,
+  IconGrowth,
+  IconTasks,
+  IconStats,
+  IconCalendar,
+  IconRadar,
+  IconPhone,
+  IconBuilding,
+  IconInbox,
+} from "./nav-icons";
+
+/**
+ * Nav icons are passed by name and drawn here, on the client - passing the
+ * icon elements themselves down from the server layout broke in production
+ * builds for items that only render later (a group's links, shown once it's
+ * opened): React error #130, "element type is undefined", taking the whole
+ * page down.
+ */
+const NAV_ICONS = {
+  home: IconHome,
+  deals: IconDeals,
+  users: IconUsers,
+  percent: IconPercent,
+  growth: IconGrowth,
+  tasks: IconTasks,
+  stats: IconStats,
+  calendar: IconCalendar,
+  radar: IconRadar,
+  phone: IconPhone,
+  building: IconBuilding,
+  inbox: IconInbox,
+} as const;
+
+export type NavIconName = keyof typeof NAV_ICONS;
+
+function NavIcon({ name, className }: { name: NavIconName; className: string }) {
+  const Icon = NAV_ICONS[name];
+  return <Icon className={className} />;
+}
 
 export type SidebarNavLink = {
   href: string;
   label: string;
-  icon: ReactElement<{ className?: string }>;
+  icon: NavIconName;
 };
 
 /** A collapsible group of links (e.g. "Virksomheden" holding Provision/Stats/
@@ -16,7 +59,7 @@ export type SidebarNavLink = {
  * pages stay one click away with their own icons, like top-level items. */
 export type SidebarNavGroup = {
   label: string;
-  icon: ReactElement<{ className?: string }>;
+  icon: NavIconName;
   children: SidebarNavLink[];
 };
 
@@ -38,7 +81,7 @@ function NavLink({ item, onNavigate, nested }: { item: SidebarNavLink; onNavigat
         active ? "bg-blue-50 font-semibold text-blue-600" : "font-medium text-slate-700 hover:bg-slate-100"
       }`}
     >
-      {cloneElement(item.icon, { className: active ? "text-blue-600" : "text-slate-500" })}
+      <NavIcon name={item.icon} className={active ? "text-blue-600" : "text-slate-500"} />
       {item.label}
     </Link>
   );
@@ -67,7 +110,7 @@ function NavGroup({ group, onNavigate }: { group: SidebarNavGroup; onNavigate?: 
           containsActive ? "font-semibold text-slate-900" : "font-medium text-slate-700"
         }`}
       >
-        {cloneElement(group.icon, { className: "text-slate-500" })}
+        <NavIcon name={group.icon} className="text-slate-500" />
         <span className="flex-1 text-left">{group.label}</span>
         <IconChevronDown className={`text-slate-400 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
