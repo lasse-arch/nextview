@@ -136,8 +136,20 @@ export async function searchCvr(filter: CvrSearchFilter, limit = 50): Promise<Cv
     });
   }
 
+  // A running company's sammensatStatus is "NORMAL" only for those with a
+  // registered status at Erhvervsstyrelsen (ApS, A/S, ...) - enkeltmands-
+  // virksomheder, foreninger and selvejende institutioner (efterskoler,
+  // friskoler, ...) read "AKTIV" instead, so matching "NORMAL" alone silently
+  // dropped every one of those from an "only active" filter.
   if (filter.activeOnly !== false) {
-    must.push({ match: { "Vrvirksomhed.virksomhedMetadata.sammensatStatus": "NORMAL" } });
+    must.push({
+      bool: {
+        should: ["NORMAL", "AKTIV"].map((status) => ({
+          match: { "Vrvirksomhed.virksomhedMetadata.sammensatStatus": status },
+        })),
+        minimum_should_match: 1,
+      },
+    });
   }
 
   if (filter.foundedFrom || filter.foundedTo) {
