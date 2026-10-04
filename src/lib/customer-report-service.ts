@@ -366,8 +366,10 @@ export async function generateAndSendCustomerReport(
     const errorMessage = err instanceof Error ? err.message : "Ukendt fejl";
     try {
       if (existingReportId) {
-        await prisma.customerReport.update({
-          where: { id: existingReportId },
+        // Only a report still waiting is marked failed - never one already
+        // marked SENT, so a failure can't hide an email that did go out.
+        await prisma.customerReport.updateMany({
+          where: { id: existingReportId, status: "PENDING" },
           data: { status: "FAILED", errorMessage, sentAt: new Date() },
         });
       } else {
@@ -479,8 +481,10 @@ export async function generateAndSendCombinedCustomerReport(
     const errorMessage = err instanceof Error ? err.message : "Ukendt fejl";
     try {
       if (existingReportId) {
-        await prisma.customerReport.update({
-          where: { id: existingReportId },
+        // Only a report still waiting is marked failed - never one already
+        // marked SENT, so a failure can't hide an email that did go out.
+        await prisma.customerReport.updateMany({
+          where: { id: existingReportId, status: "PENDING" },
           data: { status: "FAILED", errorMessage, sentAt: new Date() },
         });
       } else {
