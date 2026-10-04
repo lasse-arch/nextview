@@ -181,6 +181,13 @@ model Invoice {
   /// nothing to check yet.
   paidAt DateTime?
 
+  /// When the invoice was created, booked and emailed via Dinero - shown on
+  /// hover over the deal's "Sendt" pill. Null while it isn't actually sent
+  /// (e.g. the automatic send step failed, or it was marked sent manually).
+  sentAt  DateTime?
+  /// Dinero due date: the invoice date + Netto 8 (see dinero.ts).
+  dueDate DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

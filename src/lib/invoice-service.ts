@@ -266,6 +266,11 @@ function computeRecurringInvoiceDate(periodStart: Date): Date {
   return isCalendarYearStart ? periodStart : addDays(periodStart, -8);
 }
 
+/** Every Dinero invoice is created with Netto 8 payment terms (dinero.ts). */
+function invoiceDueDate(invoiceDate: Date): Date {
+  return addDays(invoiceDate, 8);
+}
+
 /**
  * Attempts to draft one invoice line in Dinero and records the outcome on
  * its Invoice row. Shared by the bulk quarterly run and the single-invoice
@@ -309,6 +314,8 @@ async function draftInvoiceLine(
           status: "DRAFT_CREATED",
           dineroInvoiceGuid: result.invoiceGuid,
           dineroInvoiceNumber: result.invoiceNumber,
+          sentAt: result.sendError ? null : new Date(),
+          dueDate: invoiceDueDate(invoiceDate),
           // The draft itself was created successfully - keep that status even
           // if the automatic booking/emailing step afterwards failed, so a
           // retry never creates a second, duplicate draft for the same
@@ -539,6 +546,8 @@ async function processCombinedDueInvoices(
             status: "DRAFT_CREATED",
             dineroInvoiceGuid: result.invoiceGuid,
             dineroInvoiceNumber: result.invoiceNumber,
+            sentAt: result.sendError ? null : new Date(),
+            dueDate: invoiceDueDate(invoiceDate),
             failureReason: result.sendError ? `Oprettet, men ikke sendt automatisk: ${result.sendError}` : null,
           },
         })

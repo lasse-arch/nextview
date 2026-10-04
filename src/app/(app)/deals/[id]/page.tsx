@@ -484,8 +484,8 @@ export default async function DealDetailPage({
                       <span className="money font-medium text-slate-800">{formatDKK(inv.amount)}</span>
                     </div>
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <span
-                        className={
+                      {(() => {
+                        const pillClass =
                           inv.status === "DRAFT_CREATED"
                             ? "shrink-0 whitespace-nowrap rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700"
                             : inv.status === "FAILED"
@@ -494,23 +494,36 @@ export default async function DealDetailPage({
                             ? "shrink-0 whitespace-nowrap rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700"
                             : inv.status === "SENT_MANUALLY"
                             ? "shrink-0 whitespace-nowrap rounded-full bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-700"
-                            : "shrink-0 whitespace-nowrap rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600"
-                        }
-                        title={inv.failureReason ?? undefined}
-                      >
-                        {invoiceStatusLabel(inv)}
-                      </span>
+                            : "shrink-0 whitespace-nowrap rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600";
+                        // Sent through Dinero: hover shows when it went out and when it falls due.
+                        const sentRows = [
+                          ...(inv.sentAt ? [{ label: "Sendt", value: formatDate(inv.sentAt) }] : []),
+                          ...(inv.dueDate ? [{ label: "Forfalder", value: formatDate(inv.dueDate) }] : []),
+                        ];
+                        return inv.status === "DRAFT_CREATED" && sentRows.length > 0 ? (
+                          <InvoiceLabelTooltip
+                            label={invoiceStatusLabel(inv)}
+                            heading={inv.dineroInvoiceNumber ? `Faktura nr. ${inv.dineroInvoiceNumber}` : "Faktura i Dinero"}
+                            rows={sentRows}
+                            className={pillClass}
+                          />
+                        ) : (
+                          <span className={pillClass} title={inv.failureReason ?? undefined}>
+                            {invoiceStatusLabel(inv)}
+                          </span>
+                        );
+                      })()}
                       {inv.paidAt && (
                         <span className="shrink-0 whitespace-nowrap rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800">
                           Betalt {formatDate(inv.paidAt)}
                         </span>
                       )}
                       {!inv.paidAt && inv.status === "DRAFT_CREATED" && inv.quarterIndex >= 1 && (
-                        // Netto+8 is set so it lands exactly on the period's start date
-                        // (see draftInvoiceLine in invoice-service.ts) - scheduledDate
-                        // *is* the due date here, no separate field needed.
+                        // Netto+8 is set so it lands on the period's start date (see
+                        // draftInvoiceLine in invoice-service.ts) - dueDate is stored
+                        // since that change, scheduledDate covers older rows.
                         <span className="shrink-0 whitespace-nowrap rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
-                          Forfalder {formatDate(inv.scheduledDate)}
+                          Forfalder {formatDate(inv.dueDate ?? inv.scheduledDate)}
                         </span>
                       )}
                       {currentUser?.role === "ADMIN" && !inv.paidAt && inv.dineroInvoiceGuid && !inv.dineroInvoiceGuid.startsWith("TEST-") && (
