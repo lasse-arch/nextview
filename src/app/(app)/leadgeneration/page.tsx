@@ -2,8 +2,41 @@ import { prisma } from "@/lib/db";
 import { LeadFilterSection } from "./lead-filter-section";
 import { UrlScanSection } from "./url-scan-section";
 import { LeadCandidateSection } from "./lead-candidate-section";
+import { MAX_LEAD_FILTER_RESULTS } from "@/lib/cvr-search";
 
 export const maxDuration = 300;
+
+/**
+ * Unreviewed candidates, loaded per list (filter or scanned page) rather than
+ * as one global newest-N slice - a single big list (a broad filter's 400+
+ * finds) used to fill that whole slice on its own and push every other list
+ * off the page entirely. Each list now gets up to one full run's worth of its
+ * own newest candidates, plus its true total so the heading count stays right
+ * even when the rest are older finds beyond that cap. Lists come back
+ * newest-first by their most recent find.
+ */
+async function loadNewCandidatesByGroup() {
+  const groups = await prisma.leadCandidate.groupBy({
+    by: ["filterId", "sourceUrl"],
+    where: { status: "NEW" },
+    _count: { _all: true },
+    _max: { createdAt: true },
+  });
+  groups.sort((a, b) => (b._max.createdAt?.getTime() ?? 0) - (a._max.createdAt?.getTime() ?? 0));
+
+  const perGroup = await Promise.all(
+    groups.map(async (g) => {
+      const candidates = await prisma.leadCandidate.findMany({
+        where: { status: "NEW", filterId: g.filterId, sourceUrl: g.sourceUrl },
+        orderBy: { createdAt: "desc" },
+        take: MAX_LEAD_FILTER_RESULTS,
+        include: { filter: { select: { name: true } } },
+      });
+      return candidates.map((c) => ({ ...c, groupTotal: g._count._all }));
+    })
+  );
+  return perGroup.flat();
+}
 
 export default async function LeadGenerationPage() {
   const [filters, watchedUrls, candidates, callLists] = await Promise.all([
@@ -12,16 +45,7 @@ export default async function LeadGenerationPage() {
       include: { _count: { select: { candidates: { where: { status: "NEW" } } } } },
     }),
     prisma.watchedUrl.findMany({ orderBy: { createdAt: "desc" } }),
-    prisma.leadCandidate.findMany({
-      where: { status: "NEW" },
-      orderBy: { createdAt: "desc" },
-      // A single filter run can now surface up to MAX_LEAD_FILTER_RESULTS
-      // (200) candidates on its own - keep the review list from silently
-      // truncating below that just because several filters found leads the
-      // same day.
-      take: 500,
-      include: { filter: { select: { name: true } } },
-    }),
+    loadNewCandidatesByGroup(),
     // For the "Tilføj til ringeliste" quick-action - lets a candidate go
     // straight into whichever Ringeliste list is currently being worked
     // from, without leaving Leadgeneration first.
@@ -92,6 +116,7 @@ export default async function LeadGenerationPage() {
             contactPhone: c.contactPhone,
             ownerName: c.ownerName,
             sourceLabel: c.filter?.name ?? watchedLabel ?? c.sourceUrl ?? null,
+            groupTotal: c.groupTotal,
             // Groups by the filter/page itself rather than its display name, so
             // two filters that happen to share a name stay separate lists and
             // a list can be renamed (see CandidateGroup's "Omdøb").

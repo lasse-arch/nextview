@@ -39,6 +39,9 @@ export type LeadCandidateData = {
    * label. Null for finds with nothing renameable behind them (a one-off
    * "Scan nu" of an unwatched page, or a since-deleted filter). */
   renameTarget: RenameTarget | null;
+  /** How many unreviewed candidates the whole group has - can exceed the
+   * ones actually loaded, since each group only loads its newest finds. */
+  groupTotal: number;
   createdAt: string;
 };
 
@@ -273,6 +276,8 @@ function CandidateGroup({
   const router = useRouter();
   const showToast = useToast();
   const visible = candidates.filter((c) => !hiddenIds.has(c.id));
+  const total = (candidates[0]?.groupTotal ?? candidates.length) - (candidates.length - visible.length);
+  const notLoaded = total - visible.length;
 
   function addAll() {
     startAddingAll(async () => {
@@ -380,7 +385,7 @@ function CandidateGroup({
             >
               <path d="M9 18l6-6-6-6" />
             </svg>
-            {sourceLabel} <span className="font-normal normal-case text-slate-400">({visible.length})</span>
+            {sourceLabel} <span className="font-normal normal-case text-slate-400">({total})</span>
           </button>
         )}
         <div className="flex gap-1.5">
@@ -433,6 +438,11 @@ function CandidateGroup({
               ))}
             </div>
           ))}
+          {notLoaded > 0 && (
+            <p className="px-1 text-center text-xs text-slate-400">
+              Viser de {visible.length} nyeste - {notLoaded} ældre vises, når disse er gennemgået.
+            </p>
+          )}
         </div>
       )}
     </div>
