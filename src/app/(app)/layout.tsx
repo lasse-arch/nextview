@@ -28,8 +28,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: "/kalender", label: "Kalender", icon: <IconCalendar /> },
     { href: "/opgaver", label: "Opgaver", icon: <IconTasks /> },
     { href: "/commission", label: "Provision", icon: <IconPercent /> },
-    { href: "/stats", label: "Stats", icon: <IconStats /> },
   ];
+  if (user.canAccessBilling) {
+    navItems.push({ href: "/stats", label: "Stats", icon: <IconStats /> });
+  }
   if (user.role === "ADMIN") {
     navItems.push({ href: "/vaekst", label: "Vækst", icon: <IconGrowth /> });
   }
@@ -40,9 +42,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: "/settings/email", label: "E-mail" },
     { href: "/settings/email-templates", label: "E-mail-skabeloner" },
     { href: "/settings/docuseal", label: "Kontrakter" },
-    { href: "/settings/dinero", label: "Fakturaer" },
-    { href: "/settings/betaling", label: "Betalingsstatus" },
   ];
+  if (user.canAccessBilling) {
+    settingsItems.push({ href: "/settings/dinero", label: "Fakturaer" }, { href: "/settings/betaling", label: "Betalingsstatus" });
+  }
   if (user.role === "ADMIN") {
     settingsItems.push({ href: "/users", label: "Brugere" });
   }

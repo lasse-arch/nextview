@@ -1,4 +1,6 @@
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { getCurrentUser } from "@/lib/auth";
 import { isDineroConfigured } from "@/lib/dinero";
 import { isIntegrationEnabled, isDineroTestMode } from "@/lib/integration-settings";
 import { formatDKK, formatDate, invoiceStatusLabel, dealName } from "@/lib/labels";
@@ -18,6 +20,10 @@ const hasCredentials = Boolean(
 );
 
 export default async function DineroSettingsPage() {
+  const currentUser = await getCurrentUser();
+  if (!currentUser) redirect("/login");
+  if (!currentUser.canAccessBilling) redirect("/");
+
   const [configured, enabled, autoRunEnabled, testMode] = await Promise.all([
     isDineroConfigured(),
     isIntegrationEnabled("DINERO"),

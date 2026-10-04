@@ -42,6 +42,12 @@ export default async function UsersPage() {
                       Provisionslønnet
                     </label>
                   </div>
+                  <div className="flex items-end gap-2">
+                    <input type="checkbox" name="canAccessBilling" id={`billing-${u.id}`} defaultChecked={u.canAccessBilling} />
+                    <label htmlFor={`billing-${u.id}`} className="text-xs font-medium text-slate-600">
+                      Kan se Stats/Faktura
+                    </label>
+                  </div>
                   <div>
                     <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Provisionssats (%)</label>
                     <input
@@ -105,10 +111,16 @@ export default async function UsersPage() {
             <option value="SALES">Sælger</option>
             <option value="ADMIN">Admin</option>
           </select>
-          <div className="col-span-2 flex items-center gap-2">
+          <div className="flex items-center gap-2">
             <input type="checkbox" name="isCommissionBased" id="new-comm" defaultChecked />
             <label htmlFor="new-comm" className="text-xs font-medium text-slate-600">
               Provisionslønnet
+            </label>
+          </div>
+          <div className="flex items-center gap-2">
+            <input type="checkbox" name="canAccessBilling" id="new-billing" defaultChecked />
+            <label htmlFor="new-billing" className="text-xs font-medium text-slate-600">
+              Kan se Stats/Faktura
             </label>
           </div>
           <input

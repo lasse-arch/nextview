@@ -1,5 +1,7 @@
+import { redirect } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
+import { getCurrentUser } from "@/lib/auth";
 import { isIntegrationEnabled } from "@/lib/integration-settings";
 import { dealName, formatDate } from "@/lib/labels";
 import { IntegrationToggle } from "../settings/integration-toggle";
@@ -16,6 +18,10 @@ export const maxDuration = 300;
  * last send) so the deal page itself only needs a couple of quick controls.
  */
 export default async function StatsPage() {
+  const currentUser = await getCurrentUser();
+  if (!currentUser) redirect("/login");
+  if (!currentUser.canAccessBilling) redirect("/");
+
   const autoRunEnabled = await isIntegrationEnabled("CUSTOMER_REPORTS_AUTO_RUN");
 
   const deals = (

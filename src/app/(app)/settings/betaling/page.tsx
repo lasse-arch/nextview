@@ -1,4 +1,6 @@
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { getCurrentUser } from "@/lib/auth";
 import { dealName } from "@/lib/labels";
 import { BetalingTable, type BetalingRow } from "./betaling-table";
 
@@ -11,6 +13,10 @@ import { BetalingTable, type BetalingRow } from "./betaling-table";
  * pages rather than a new top-level nav entry.
  */
 export default async function BetalingPage() {
+  const currentUser = await getCurrentUser();
+  if (!currentUser) redirect("/login");
+  if (!currentUser.canAccessBilling) redirect("/");
+
   const deals = await prisma.deal.findMany({
     // A customer that's already churned, or already has a termination
     // notice registered (even if the actual end date hasn't passed yet),

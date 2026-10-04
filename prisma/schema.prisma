@@ -194,6 +194,12 @@ model User {
   passwordHash      String
   role              Role                @default(SALES)
   isCommissionBased Boolean             @default(true)
+  /// Gates Stats (/stats) and the invoicing pages (Fakturaer, Betalingsstatus
+  /// under Indstillinger) - per-user, not role-based, since some sellers
+  /// should stay out of billing-adjacent pages without needing a whole
+  /// separate role. Defaults true so adding this never silently locks
+  /// anyone out - an admin opts someone out explicitly per person.
+  canAccessBilling  Boolean             @default(true)
   commissionRate    Float               @default(10)
   payoutFrequency   CommissionFrequency @default(MONTHLY)
   /// Profile picture as a data URL (small, resized client-side before upload).

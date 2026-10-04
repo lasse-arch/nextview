@@ -22,6 +22,7 @@ export async function createUser(formData: FormData) {
   const password = String(formData.get("password") || "");
   const role = String(formData.get("role") || "SALES") as Role;
   const isCommissionBased = formData.get("isCommissionBased") === "on";
+  const canAccessBilling = formData.get("canAccessBilling") === "on";
   const commissionRate = parseFloat(String(formData.get("commissionRate") || "0"));
   const payoutFrequency = String(formData.get("payoutFrequency") || "MONTHLY") as CommissionFrequency;
 
@@ -30,7 +31,7 @@ export async function createUser(formData: FormData) {
   const passwordHash = await hashPassword(password);
 
   await prisma.user.create({
-    data: { name, email, passwordHash, role, isCommissionBased, commissionRate, payoutFrequency },
+    data: { name, email, passwordHash, role, isCommissionBased, canAccessBilling, commissionRate, payoutFrequency },
   });
 
   revalidatePath("/users");
@@ -43,12 +44,13 @@ export async function updateUser(userId: string, formData: FormData) {
   const name = String(formData.get("name") || "").trim();
   const role = String(formData.get("role") || "SALES") as Role;
   const isCommissionBased = formData.get("isCommissionBased") === "on";
+  const canAccessBilling = formData.get("canAccessBilling") === "on";
   const commissionRate = parseFloat(String(formData.get("commissionRate") || "0"));
   const payoutFrequency = String(formData.get("payoutFrequency") || "MONTHLY") as CommissionFrequency;
   const newPassword = String(formData.get("newPassword") || "");
   const recalcExisting = formData.get("recalcExisting") === "on";
 
-  const data: Record<string, unknown> = { name, role, isCommissionBased, commissionRate, payoutFrequency };
+  const data: Record<string, unknown> = { name, role, isCommissionBased, canAccessBilling, commissionRate, payoutFrequency };
   if (newPassword) {
     data.passwordHash = await hashPassword(newPassword);
   }
