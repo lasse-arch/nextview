@@ -7,7 +7,9 @@ import {
   addLeadCandidateToCallList,
   dismissLeadCandidate,
   deleteLeadCandidates,
+  renameLeadFilter,
 } from "@/lib/actions/lead-generation";
+import { renameWatchedUrl } from "@/lib/actions/lead-url-scan";
 import { createCallList } from "@/lib/actions/call-lists";
 import { stageLabels } from "@/lib/labels";
 import { useToast } from "@/components/toast";
@@ -30,8 +32,17 @@ export type LeadCandidateData = {
   contactPhone: string | null;
   ownerName: string | null;
   sourceLabel: string | null;
+  /** Which filter/page found it - candidates are grouped by this, not by the
+   * display name. */
+  groupKey: string;
+  /** What the group's "Omdøb" renames: the filter itself, or a watched page's
+   * label. Null for finds with nothing renameable behind them (a one-off
+   * "Scan nu" of an unwatched page, or a since-deleted filter). */
+  renameTarget: RenameTarget | null;
   createdAt: string;
 };
+
+export type RenameTarget = { kind: "filter"; id: string } | { kind: "url"; url: string };
 
 export type CallListOption = { id: string; name: string };
 
@@ -241,11 +252,13 @@ function CandidateCard({
  * heading to expand and review them. */
 function CandidateGroup({
   sourceLabel,
+  renameTarget,
   candidates,
   targetListId,
   onAddAll,
 }: {
   sourceLabel: string;
+  renameTarget: RenameTarget | null;
   candidates: LeadCandidateData[];
   targetListId: string | null;
   onAddAll: (ids: string[]) => Promise<void>;
@@ -254,6 +267,9 @@ function CandidateGroup({
   const [addingAll, startAddingAll] = useTransition();
   const [deleting, startDeleting] = useTransition();
   const [expanded, setExpanded] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [draftName, setDraftName] = useState(sourceLabel);
+  const [renaming, startRenaming] = useTransition();
   const router = useRouter();
   const showToast = useToast();
   const visible = candidates.filter((c) => !hiddenIds.has(c.id));
@@ -274,32 +290,114 @@ function CandidateGroup({
     });
   }
 
+  function startEditing() {
+    setDraftName(sourceLabel);
+    setEditing(true);
+  }
+
+  function saveName() {
+    if (!renameTarget) return;
+    const name = draftName.trim();
+    if (name === sourceLabel) {
+      setEditing(false);
+      return;
+    }
+    if (!name && renameTarget.kind === "filter") {
+      showToast("Giv listen et navn.");
+      return;
+    }
+    startRenaming(async () => {
+      const result =
+        renameTarget.kind === "filter"
+          ? await renameLeadFilter(renameTarget.id, name)
+          : await renameWatchedUrl(renameTarget.url, name);
+      if (!result.ok) {
+        showToast(result.error);
+        return;
+      }
+      setEditing(false);
+      router.refresh();
+    });
+  }
+
   if (visible.length === 0) return null;
 
   return (
     <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-3">
       <div className="flex flex-wrap items-center justify-between gap-2 px-1">
-        <button
-          type="button"
-          onClick={() => setExpanded((v) => !v)}
-          className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500 hover:text-slate-700"
-        >
-          <svg
-            width="12"
-            height="12"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className={`shrink-0 transition-transform ${expanded ? "rotate-90" : ""}`}
+        {editing ? (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              saveName();
+            }}
+            className="flex w-full min-w-0 items-center gap-1.5 sm:w-auto sm:flex-1"
           >
-            <path d="M9 18l6-6-6-6" />
-          </svg>
-          {sourceLabel} <span className="font-normal normal-case text-slate-400">({visible.length})</span>
-        </button>
+            <input
+              autoFocus
+              value={draftName}
+              onChange={(e) => setDraftName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") setEditing(false);
+              }}
+              disabled={renaming}
+              maxLength={100}
+              aria-label="Listens navn"
+              className="min-w-0 flex-1 rounded-md border border-slate-300 px-2 py-1 text-sm sm:max-w-xs"
+            />
+            <button
+              type="submit"
+              disabled={renaming}
+              className="rounded-md bg-slate-900 px-2.5 py-1 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+            >
+              {renaming ? "Gemmer…" : "Gem"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setEditing(false)}
+              disabled={renaming}
+              className="rounded-md px-2 py-1 text-xs font-medium text-slate-500 hover:text-slate-700"
+            >
+              Annuller
+            </button>
+          </form>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500 hover:text-slate-700"
+          >
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className={`shrink-0 transition-transform ${expanded ? "rotate-90" : ""}`}
+            >
+              <path d="M9 18l6-6-6-6" />
+            </svg>
+            {sourceLabel} <span className="font-normal normal-case text-slate-400">({visible.length})</span>
+          </button>
+        )}
         <div className="flex gap-1.5">
+          {renameTarget && !editing && (
+            <button
+              type="button"
+              onClick={startEditing}
+              title={
+                renameTarget.kind === "filter"
+                  ? "Omdøb listen (ændrer også filterets navn, så fremtidige fund lander her)"
+                  : "Omdøb listen (vises i stedet for sidens URL)"
+              }
+              className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+            >
+              Omdøb
+            </button>
+          )}
           <button
             type="button"
             onClick={deleteList}
@@ -392,7 +490,7 @@ export function LeadCandidateSection({
   // into one flat feed - most-recently-found candidate's group sorts first.
   const groups = new Map<string, LeadCandidateData[]>();
   for (const c of candidates) {
-    const key = c.sourceLabel ?? "Uden kilde";
+    const key = c.groupKey;
     const existing = groups.get(key);
     if (existing) existing.push(c);
     else groups.set(key, [c]);
@@ -421,10 +519,11 @@ export function LeadCandidateSection({
         </label>
       </div>
       <div className="mt-3 space-y-4">
-        {[...groups.entries()].map(([sourceLabel, group]) => (
+        {[...groups.entries()].map(([groupKey, group]) => (
           <CandidateGroup
-            key={sourceLabel}
-            sourceLabel={sourceLabel}
+            key={groupKey}
+            sourceLabel={group[0].sourceLabel ?? "Uden kilde"}
+            renameTarget={group[0].renameTarget}
             candidates={group}
             targetListId={targetListId}
             onAddAll={addAllToCallList}

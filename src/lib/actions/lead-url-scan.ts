@@ -79,6 +79,21 @@ export async function createWatchedUrl(
   return { ok: true, id: watched.id };
 }
 
+/** Sets the display label of a watched page - used by the "Omdøb" button on
+ * its list under "Fundne leads", which shows the label instead of the raw URL
+ * once one is set. Keyed by URL since that's what candidates record as their
+ * source; an empty name clears the label (back to showing the URL). */
+export async function renameWatchedUrl(
+  url: string,
+  label: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireUser();
+  const result = await prisma.watchedUrl.updateMany({ where: { url }, data: { label: label.trim() || null } });
+  if (result.count === 0) return { ok: false, error: "Siden overvåges ikke længere og kan ikke omdøbes." };
+  revalidatePath("/leadgeneration");
+  return { ok: true };
+}
+
 export async function setWatchedUrlEnabled(id: string, enabled: boolean): Promise<void> {
   await requireUser();
   await prisma.watchedUrl.update({ where: { id }, data: { enabled } });
