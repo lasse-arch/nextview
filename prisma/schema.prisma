@@ -296,6 +296,9 @@ model Goal {
   period      GoalPeriod @default(MONTH)
   metric      GoalMetric
   targetValue Int
+  /// Position on the dashboard's "Mål" card (ascending) - set with the ↑/↓
+  /// arrows there; a new goal goes to the bottom.
+  sortOrder   Int        @default(0)
 
   createdBy   User   @relation("GoalCreatedBy", fields: [createdById], references: [id])
   createdById String

@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { upsertGoal, deleteGoal } from "@/lib/actions/goals";
+import { upsertGoal, deleteGoal, reorderGoals } from "@/lib/actions/goals";
 import { goalMetricLabels, goalMetricIsMoney, goalPeriodLabels, type GoalWithProgress } from "@/lib/goals-data";
 import { formatDKK } from "@/lib/labels";
 import { useToast } from "@/components/toast";
@@ -13,7 +13,7 @@ const PERIODS = Object.keys(goalPeriodLabels) as GoalPeriod[];
 const COMPANY_VALUE = "COMPANY";
 
 export function GoalsCard({
-  goals,
+  goals: initialGoals,
   isAdmin,
   currentUserId,
   users,
@@ -24,6 +24,14 @@ export function GoalsCard({
   users: { id: string; name: string }[];
 }) {
   const [showForm, setShowForm] = useState(false);
+  // Local copy so the ↑/↓ arrows reorder instantly; re-synced whenever the
+  // server sends a new list (after saving/deleting a goal).
+  const [goals, setGoals] = useState(initialGoals);
+  const [syncedFrom, setSyncedFrom] = useState(initialGoals);
+  if (syncedFrom !== initialGoals) {
+    setSyncedFrom(initialGoals);
+    setGoals(initialGoals);
+  }
   const [targetUserId, setTargetUserId] = useState(isAdmin ? COMPANY_VALUE : currentUserId);
   const [metric, setMetric] = useState<GoalMetric>(METRICS[0]);
   const [period, setPeriod] = useState<GoalPeriod>(PERIODS[0]);
@@ -48,6 +56,22 @@ export function GoalsCard({
         router.refresh();
       } catch (err) {
         showToast(err instanceof Error ? err.message : "Kunne ikke gemme målet.");
+      }
+    });
+  }
+
+  function move(index: number, delta: -1 | 1) {
+    const target = index + delta;
+    if (target < 0 || target >= goals.length) return;
+    const next = [...goals];
+    [next[index], next[target]] = [next[target], next[index]];
+    setGoals(next);
+    startTransition(async () => {
+      try {
+        await reorderGoals(next.map((g) => g.id));
+      } catch (err) {
+        setGoals(goals);
+        showToast(err instanceof Error ? err.message : "Kunne ikke ændre rækkefølgen.");
       }
     });
   }
@@ -134,7 +158,7 @@ export function GoalsCard({
       )}
 
       <div className="mt-4 space-y-3">
-        {goals.map((g) => {
+        {goals.map((g, index) => {
           const pct = g.targetValue > 0 ? Math.min(100, (g.currentValue / g.targetValue) * 100) : 0;
           return (
             <div key={g.id}>
@@ -145,6 +169,30 @@ export function GoalsCard({
                   <span className="ml-1.5 text-slate-300">· {goalPeriodLabels[g.period]}</span>
                 </span>
                 <span className="flex shrink-0 items-center gap-2">
+                  {isAdmin && goals.length > 1 && (
+                    <span className="flex items-center">
+                      <button
+                        type="button"
+                        onClick={() => move(index, -1)}
+                        disabled={index === 0}
+                        className="px-0.5 text-slate-300 hover:text-slate-700 disabled:invisible"
+                        title="Flyt op"
+                        aria-label="Flyt op"
+                      >
+                        ↑
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => move(index, 1)}
+                        disabled={index === goals.length - 1}
+                        className="px-0.5 text-slate-300 hover:text-slate-700 disabled:invisible"
+                        title="Flyt ned"
+                        aria-label="Flyt ned"
+                      >
+                        ↓
+                      </button>
+                    </span>
+                  )}
                   <span className={`font-medium text-slate-600 ${goalMetricIsMoney[g.metric] ? "money" : ""}`}>
                     {formatValue(g.metric, g.currentValue)} / {formatValue(g.metric, g.targetValue)}
                   </span>

@@ -87,7 +87,7 @@ export async function getGoalsForDashboard(viewer: { id: string; role: string })
   const allGoals = await prisma.goal.findMany({
     where: viewer.role === "ADMIN" ? {} : { OR: [{ userId: viewer.id }, { userId: null }] },
     include: { user: true },
-    orderBy: [{ userId: { sort: "asc", nulls: "first" } }],
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
   });
 
   // Only goals whose own period actually covers today - an old "Denne
