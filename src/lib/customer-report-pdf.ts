@@ -1,5 +1,4 @@
-import puppeteer from "puppeteer-core";
-import chromium from "@sparticuz/chromium";
+import { launchHeadlessChromium } from "@/lib/headless-chromium";
 
 /**
  * Renders the customer visitor-stats report (customer-report-template.ts) to
@@ -7,11 +6,7 @@ import chromium from "@sparticuz/chromium";
  * sized to fit Vercel's serverless function limits.
  */
 export async function renderCustomerReportPdf(html: string): Promise<Buffer> {
-  const browser = await puppeteer.launch({
-    args: chromium.args,
-    executablePath: await chromium.executablePath(),
-    headless: true,
-  });
+  const browser = await launchHeadlessChromium();
 
   try {
     const page = await browser.newPage();

@@ -1,5 +1,4 @@
-import puppeteer from "puppeteer-core";
-import chromium from "@sparticuz/chromium";
+import { launchHeadlessChromium } from "@/lib/headless-chromium";
 
 /**
  * Recognizes a pasted Pocket (heypocket.com) share link, confirmed live
@@ -22,11 +21,7 @@ function sleep(ms: number): Promise<void> {
 }
 
 async function launchBrowser() {
-  return puppeteer.launch({
-    args: chromium.args,
-    executablePath: await chromium.executablePath(),
-    headless: true,
-  });
+  return launchHeadlessChromium();
 }
 
 /**

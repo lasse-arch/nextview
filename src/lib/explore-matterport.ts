@@ -1,5 +1,5 @@
-import puppeteer, { type Browser, type ElementHandle, type Page } from "puppeteer-core";
-import chromium from "@sparticuz/chromium";
+import { type Browser, type ElementHandle, type Page } from "puppeteer-core";
+import { launchHeadlessChromium } from "@/lib/headless-chromium";
 import {
   fetchExploreCoverImage,
   fetchExploreTourData,
@@ -53,11 +53,7 @@ function sleep(ms: number): Promise<void> {
 }
 
 async function launchBrowser(): Promise<Browser> {
-  return puppeteer.launch({
-    args: chromium.args,
-    executablePath: await chromium.executablePath(),
-    headless: true,
-  });
+  return launchHeadlessChromium();
 }
 
 async function gotoRetry(page: Page, url: string, tries = 5): Promise<void> {

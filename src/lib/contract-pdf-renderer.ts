@@ -1,5 +1,4 @@
-import puppeteer from "puppeteer-core";
-import chromium from "@sparticuz/chromium";
+import { launchHeadlessChromium } from "@/lib/headless-chromium";
 
 /**
  * Renders contract HTML (see contract-html-template.ts) to a PDF buffer.
@@ -10,11 +9,7 @@ import chromium from "@sparticuz/chromium";
  * embedded in the HTML the same way for a PDF as it does for a docx.
  */
 export async function renderContractPdf(html: string): Promise<Buffer> {
-  const browser = await puppeteer.launch({
-    args: chromium.args,
-    executablePath: await chromium.executablePath(),
-    headless: true,
-  });
+  const browser = await launchHeadlessChromium();
 
   try {
     const page = await browser.newPage();

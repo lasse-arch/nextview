@@ -1,5 +1,5 @@
-import puppeteer, { type Browser, type Page } from "puppeteer-core";
-import chromium from "@sparticuz/chromium";
+import { type Browser, type Page } from "puppeteer-core";
+import { launchHeadlessChromium } from "@/lib/headless-chromium";
 
 const BASE_URL = "https://explore.nextview360.dk";
 
@@ -39,11 +39,7 @@ function credentials(): { username: string; password: string } {
 }
 
 async function launchBrowser(): Promise<Browser> {
-  return puppeteer.launch({
-    args: chromium.args,
-    executablePath: await chromium.executablePath(),
-    headless: true,
-  });
+  return launchHeadlessChromium();
 }
 
 /**

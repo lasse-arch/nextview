@@ -211,14 +211,18 @@ export function StatsCustomerRow({
                   Sender…
                 </span>
               ) : lastStatus === "FAILED" ? (
-                <ReportHistoryTooltip
-                  history={history}
-                  label={
-                    <span className="text-red-600" title={lastErrorMessage ?? "ukendt fejl"}>
-                      Fejlede {lastSentAt ? formatDate(lastSentAt) : ""}
-                    </span>
-                  }
-                />
+                <>
+                  <ReportHistoryTooltip
+                    history={history}
+                    label={
+                      <span className="text-red-600" title={lastErrorMessage ?? "ukendt fejl"}>
+                        Fejlede {lastSentAt ? formatDate(lastSentAt) : ""}
+                      </span>
+                    }
+                  />
+                  {/* Shown outright, not just on hover - it's what says how to fix it. */}
+                  <p className="mt-0.5 max-w-xl text-xs text-red-500">{lastErrorMessage ?? "Ukendt fejl"}</p>
+                </>
               ) : lastSentAt ? (
                 <ReportHistoryTooltip
                   history={history}
