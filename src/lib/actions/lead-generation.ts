@@ -7,7 +7,7 @@ import { buildDealEmailAddress } from "@/lib/email-address";
 import { findDuplicateDeals } from "@/lib/duplicates";
 import { logActivity } from "@/lib/activity";
 import { dealName } from "@/lib/labels";
-import { runLeadFilter } from "@/lib/lead-generation-service";
+import { runLeadFilter, type RunLeadFilterResult } from "@/lib/lead-generation-service";
 import { MAX_LEAD_FILTER_RESULTS } from "@/lib/cvr-search";
 import type { DealStage } from "@prisma/client";
 
@@ -104,9 +104,7 @@ export async function deleteLeadFilter(filterId: string): Promise<void> {
   revalidatePath("/leadgeneration");
 }
 
-export async function runLeadFilterNowAction(
-  filterId: string
-): Promise<{ ok: true; added: number } | { ok: false; error: string }> {
+export async function runLeadFilterNowAction(filterId: string): Promise<RunLeadFilterResult> {
   await requireUser();
   const result = await runLeadFilter(filterId);
   revalidatePath("/leadgeneration");

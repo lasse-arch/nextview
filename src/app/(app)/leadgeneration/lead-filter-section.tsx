@@ -251,7 +251,14 @@ function FilterCard({ filter, callLists }: { filter: LeadFilterData; callLists: 
         showToast(result.error);
         return;
       }
-      showToast(result.added > 0 ? `${result.added} nye leads fundet.` : "Ingen nye leads denne gang.");
+      // Says how many the register matched and how many were already in the
+      // CRM, so a low "nye" count reads as "the rest were found earlier",
+      // not as the filter being broken.
+      const found = result.added > 0 ? `${result.added} nye leads fundet.` : "Ingen nye leads denne gang.";
+      const parts: string[] = [];
+      if (result.matched != null) parts.push(`${result.matched.toLocaleString("da-DK")} matcher i CVR`);
+      if (result.alreadyKnown > 0) parts.push(`${result.alreadyKnown.toLocaleString("da-DK")} fandtes allerede`);
+      showToast(parts.length > 0 ? `${found} (${parts.join(", ")})` : found);
     });
   }
 

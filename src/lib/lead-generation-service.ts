@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { searchCvr } from "@/lib/cvr-search";
+import { searchCvr, MAX_LEAD_FILTER_RESULTS, MAX_CVR_SEARCH_WINDOW, type CvrSearchHit } from "@/lib/cvr-search";
 import { scanUrlForCvrLeads } from "@/lib/url-lead-scan";
 import { lookupCvrNumber } from "@/lib/cvr";
 import { claimCandidateAndUpsertDeal } from "@/lib/actions/lead-generation";
@@ -33,32 +33,56 @@ async function mapWithConcurrency<T, R>(items: T[], concurrency: number, fn: (it
  * skipped rather than shown again. Also skips any CVR number that's already
  * an existing Deal, so a current lead/customer never gets re-suggested.
  */
-export async function runLeadFilter(filterId: string): Promise<{ ok: true; added: number } | { ok: false; error: string }> {
+export type RunLeadFilterResult =
+  | { ok: true; added: number; matched: number | null; alreadyKnown: number }
+  | { ok: false; error: string };
+
+export async function runLeadFilter(filterId: string): Promise<RunLeadFilterResult> {
   const filter = await prisma.leadFilter.findUniqueOrThrow({ where: { id: filterId } });
+  const search = {
+    industryQuery: filter.industryQuery,
+    municipality: filter.municipality,
+    activeOnly: filter.activeOnly,
+    foundedFrom: filter.foundedFrom ? filter.foundedFrom.toISOString().slice(0, 10) : null,
+    foundedTo: filter.foundedTo ? filter.foundedTo.toISOString().slice(0, 10) : null,
+  };
 
-  const result = await searchCvr(
-    {
-      industryQuery: filter.industryQuery,
-      municipality: filter.municipality,
-      activeOnly: filter.activeOnly,
-      foundedFrom: filter.foundedFrom ? filter.foundedFrom.toISOString().slice(0, 10) : null,
-      foundedTo: filter.foundedTo ? filter.foundedTo.toISOString().slice(0, 10) : null,
-    },
-    filter.maxResults
-  );
-  if (!result.ok) return result;
+  // "Op til N pr. kørsel" means N leads that are *new* to the CRM, not the
+  // first N matches - a broad filter matching more than N companies would
+  // otherwise get the same newest-N page back every run, all already known,
+  // and never reach the older matches behind it. Pages through the register
+  // (newest-founded first) skipping known CVR numbers until N fresh ones are
+  // collected or the matches run out.
+  const fresh: CvrSearchHit[] = [];
+  const seen = new Set<string>();
+  let alreadyKnown = 0;
+  let matched: number | null = null;
+  for (let from = 0; from < MAX_CVR_SEARCH_WINDOW && fresh.length < filter.maxResults; from += MAX_LEAD_FILTER_RESULTS) {
+    const page = await searchCvr(search, MAX_LEAD_FILTER_RESULTS, from);
+    if (!page.ok) {
+      if (from === 0) return page;
+      break; // keep what earlier pages found rather than losing the whole run
+    }
+    matched ??= page.total;
 
-  const cvrNumbers = result.hits.map((h) => h.cvr);
-  const [existingCandidates, existingDeals] = await Promise.all([
-    prisma.leadCandidate.findMany({ where: { cvrNumber: { in: cvrNumbers } }, select: { cvrNumber: true } }),
-    prisma.deal.findMany({ where: { cvrNumber: { in: cvrNumbers } }, select: { cvrNumber: true } }),
-  ]);
-  const known = new Set([
-    ...existingCandidates.map((c) => c.cvrNumber),
-    ...existingDeals.map((d) => d.cvrNumber).filter((c): c is string => Boolean(c)),
-  ]);
+    const pageHits = page.hits.filter((h) => !seen.has(h.cvr));
+    pageHits.forEach((h) => seen.add(h.cvr));
+    const cvrNumbers = pageHits.map((h) => h.cvr);
+    const [existingCandidates, existingDeals] = await Promise.all([
+      prisma.leadCandidate.findMany({ where: { cvrNumber: { in: cvrNumbers } }, select: { cvrNumber: true } }),
+      prisma.deal.findMany({ where: { cvrNumber: { in: cvrNumbers } }, select: { cvrNumber: true } }),
+    ]);
+    const known = new Set([
+      ...existingCandidates.map((c) => c.cvrNumber),
+      ...existingDeals.map((d) => d.cvrNumber).filter((c): c is string => Boolean(c)),
+    ]);
+    for (const h of pageHits) {
+      if (known.has(h.cvr)) alreadyKnown++;
+      else if (fresh.length < filter.maxResults) fresh.push(h);
+    }
 
-  const fresh = result.hits.filter((h) => !known.has(h.cvr));
+    if (page.hits.length < MAX_LEAD_FILTER_RESULTS) break; // last page
+  }
 
   // The ES search doesn't expose an owner name the way the single-CVR lookup
   // does - only worth the extra round-trip for genuinely new finds, not the
@@ -122,7 +146,7 @@ export async function runLeadFilter(filterId: string): Promise<{ ok: true; added
 
   await prisma.leadFilter.update({ where: { id: filterId }, data: { lastRunAt: new Date() } });
 
-  return { ok: true, added: fresh.length };
+  return { ok: true, added: fresh.length, matched, alreadyKnown };
 }
 
 /**
