@@ -807,6 +807,7 @@ model LeadFilter {
   updatedAt DateTime @updatedAt
 
   candidates LeadCandidate[]
+  matches    LeadFilterMatch[]
 }
 
 enum LeadCandidateStatus {
@@ -853,7 +854,31 @@ model LeadCandidate {
 
   createdAt DateTime @default(now())
 
+  matches LeadFilterMatch[]
+
   @@index([status, createdAt])
+}
+
+/// One row per (filter, company) a filter run has turned up. A company is
+/// one LeadCandidate (cvrNumber is unique), but several overlapping filters
+/// can each find it - this is what lets it show in every matching filter's
+/// list under "Fundne leads", even when another filter found it first or it
+/// is already a deal (then shown with a note saying so, instead of the
+/// filter silently reporting "fandtes allerede" and showing nothing).
+model LeadFilterMatch {
+  filter      LeadFilter    @relation(fields: [filterId], references: [id], onDelete: Cascade)
+  filterId    String
+  candidate   LeadCandidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  candidateId String
+
+  /// Set once reviewed from this filter's list (Afvis, Skjul, Tilføj, Slet
+  /// liste) - drops it from this list only. Never cleared again, so a later
+  /// run re-finding the same company doesn't resurface it.
+  handledAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@id([filterId, candidateId])
+  @@index([filterId, handledAt])
 }
 
 /// A page (news article, industry listing, ...) re-scanned daily for

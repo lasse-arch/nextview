@@ -258,6 +258,9 @@ function FilterCard({ filter, callLists }: { filter: LeadFilterData; callLists: 
       const parts: string[] = [];
       if (result.matched != null) parts.push(`${result.matched.toLocaleString("da-DK")} matcher i CVR`);
       if (result.alreadyKnown > 0) parts.push(`${result.alreadyKnown.toLocaleString("da-DK")} fandtes allerede`);
+      if (result.alreadyKnownShown > 0) {
+        parts.push(`${result.alreadyKnownShown.toLocaleString("da-DK")} af dem er sat på listen med en besked`);
+      }
       showToast(parts.length > 0 ? `${found} (${parts.join(", ")})` : found);
     });
   }

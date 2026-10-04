@@ -126,6 +126,12 @@ const DEFAULT_POSTS: { title: string; body: string; minutesAgo: number; screensh
     body: "\"AI-mødenote\"-feltet på en deal kan nu tage imod et rent Pocket-delelink (fra heypocket.com) i stedet for at du selv skal kopiere teksten ind. Indsæt linket alene og tryk \"Gem mødenote\", så henter den automatisk det hele i baggrunden - summary, to-dos og den fulde transskription, uanset hvilken fane der tilfældigvis er åben på Pocket-siden.\n\nNoten vises som én kompakt linje med mødets titel og en \"Åbn hele referatet\"-knap, så den ikke fylder resten af dealens noter ud - men hele referatet er stadig ét klik væk.",
     screenshotUrl: "/news/pocket-integration.png",
   },
+  {
+    minutesAgo: 0,
+    title: "Fundne leads viser nu også virksomheder, der allerede er tilføjet",
+    body: "Før forsvandt en virksomhed helt fra et filters liste under \"Fundne leads\", hvis et andet filter havde fundet den først, eller den allerede var en deal - \"Kør nu\" sagde bare \"fandtes allerede\". Nu står den på listen hos hvert filter, der finder den, med en gul besked om hvorfor: \"Allerede tilføjet til ringelisten …\", \"Findes allerede som deal (stadie)\" eller \"Afvist tidligere\".\n\nEr den allerede en deal, kan du åbne den direkte eller trykke \"Skjul\" for at fjerne den fra listen - dealen røres ikke. Tilføjer du en virksomhed fra én liste, forsvinder den kun fra den liste; står den også på et andet filters liste, får den beskeden dér. Samtidig kan \"Op til 1000 pr. kørsel\" nu også nå virksomheder længere nede i CVR, i stedet for at få de samme 1000 nyeste tilbage hver gang.",
+    screenshotUrl: "/news/fundne-leads-already-added.png",
+  },
 ];
 
 /**

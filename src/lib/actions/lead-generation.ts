@@ -174,6 +174,35 @@ export async function claimCandidateAndUpsertDeal(
   return { dealId, created, existingStage };
 }
 
+/** Drops these candidates from one filter's list under "Fundne leads" (see
+ * LeadFilterMatch) - called alongside every review action taken from a
+ * filter's list, so the card leaves that list but stays in any other
+ * filter's list that also found it (there with a note saying it's handled). */
+async function markMatchesHandled(filterId: string | null | undefined, candidateIds: string[]) {
+  if (!filterId || candidateIds.length === 0) return;
+  await prisma.leadFilterMatch.updateMany({
+    where: { filterId, candidateId: { in: candidateIds }, handledAt: null },
+    data: { handledAt: new Date() },
+  });
+}
+
+/** A lead "Afvis"'d earlier can still be added after all, from another
+ * filter's list where it turned up again - reopens it first so the usual
+ * claim (which only takes NEW candidates) goes through. */
+async function reopenIfDismissed(candidateId: string) {
+  await prisma.leadCandidate.updateMany({ where: { id: candidateId, status: "DISMISSED" }, data: { status: "NEW" } });
+}
+
+/**
+ * "Skjul" on an already-handled lead in a filter's list - just takes it off
+ * that list, without touching the lead or its deal.
+ */
+export async function hideLeadMatch(filterId: string, candidateId: string): Promise<void> {
+  await requireUser();
+  await markMatchesHandled(filterId, [candidateId]);
+  revalidatePath("/leadgeneration");
+}
+
 /**
  * "Tilføj som deal" on a found lead - creates a real Deal the same way the
  * manual "Ny deal" form does (owner defaults to whoever clicked it), unless
@@ -182,7 +211,8 @@ export async function claimCandidateAndUpsertDeal(
  * a duplicate.
  */
 export async function addLeadCandidateAsDeal(
-  candidateId: string
+  candidateId: string,
+  filterId?: string | null
 ): Promise<
   { ok: true; dealId: string; duplicateId: string | null; alreadyExisted: boolean } | { ok: false; error: string }
 > {
@@ -190,8 +220,10 @@ export async function addLeadCandidateAsDeal(
   const candidate = await prisma.leadCandidate.findUniqueOrThrow({ where: { id: candidateId } });
   const duplicates = await findDuplicateDeals(candidate.companyName);
 
+  await reopenIfDismissed(candidateId);
   const result = await claimCandidateAndUpsertDeal(candidateId, user.id);
   if ("error" in result) return { ok: false, error: result.error };
+  await markMatchesHandled(filterId, [candidateId]);
 
   if (result.created) {
     const deal = await prisma.deal.findUniqueOrThrow({ where: { id: result.dealId } });
@@ -224,7 +256,8 @@ export async function addLeadCandidateAsDeal(
  */
 export async function addLeadCandidateToCallList(
   candidateId: string,
-  callListId: string
+  callListId: string,
+  filterId?: string | null
 ): Promise<
   { ok: true; dealId: string; alreadyExisted: boolean; existingStage?: DealStage } | { ok: false; error: string }
 > {
@@ -232,8 +265,10 @@ export async function addLeadCandidateToCallList(
   const list = await prisma.callList.findUnique({ where: { id: callListId } });
   if (!list) return { ok: false, error: "Listen findes ikke længere." };
 
+  await reopenIfDismissed(candidateId);
   const result = await claimCandidateAndUpsertDeal(candidateId, user.id, { callListId });
   if ("error" in result) return { ok: false, error: result.error };
+  await markMatchesHandled(filterId, [candidateId]);
 
   if (result.created) {
     const deal = await prisma.deal.findUniqueOrThrow({ where: { id: result.dealId } });
@@ -251,9 +286,10 @@ export async function addLeadCandidateToCallList(
   return { ok: true, dealId: result.dealId, alreadyExisted: !result.created, existingStage: result.existingStage };
 }
 
-export async function dismissLeadCandidate(candidateId: string): Promise<void> {
+export async function dismissLeadCandidate(candidateId: string, filterId?: string | null): Promise<void> {
   await requireUser();
-  await prisma.leadCandidate.update({ where: { id: candidateId }, data: { status: "DISMISSED" } });
+  await prisma.leadCandidate.updateMany({ where: { id: candidateId, status: "NEW" }, data: { status: "DISMISSED" } });
+  await markMatchesHandled(filterId, [candidateId]);
   revalidatePath("/leadgeneration");
 }
 
@@ -270,13 +306,17 @@ export async function dismissLeadCandidate(candidateId: string): Promise<void> {
  * real Deal (ADDED) is left alone, since this is for clearing out noise
  * from a review queue, not for removing actual deals.
  */
-export async function deleteLeadCandidates(candidateIds: string[]): Promise<{ deleted: number }> {
+export async function deleteLeadCandidates(
+  candidateIds: string[],
+  filterId?: string | null
+): Promise<{ deleted: number }> {
   await requireUser();
   if (candidateIds.length === 0) return { deleted: 0 };
   const result = await prisma.leadCandidate.updateMany({
     where: { id: { in: candidateIds }, status: "NEW" },
     data: { status: "DISMISSED" },
   });
+  await markMatchesHandled(filterId, candidateIds);
   revalidatePath("/leadgeneration");
   return { deleted: result.count };
 }

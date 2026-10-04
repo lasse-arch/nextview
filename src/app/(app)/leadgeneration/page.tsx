@@ -1,51 +1,112 @@
 import { prisma } from "@/lib/db";
 import { LeadFilterSection } from "./lead-filter-section";
 import { UrlScanSection } from "./url-scan-section";
-import { LeadCandidateSection } from "./lead-candidate-section";
+import { LeadCandidateSection, type KnownLeadStatus } from "./lead-candidate-section";
 import { MAX_LEAD_FILTER_RESULTS } from "@/lib/cvr-search";
 
 export const maxDuration = 300;
 
 /**
- * Unreviewed candidates, loaded per list (filter or scanned page) rather than
- * as one global newest-N slice - a single big list (a broad filter's 400+
- * finds) used to fill that whole slice on its own and push every other list
- * off the page entirely. Each list now gets up to one full run's worth of its
- * own newest candidates, plus its true total so the heading count stays right
- * even when the rest are older finds beyond that cap. Lists come back
- * newest-first by their most recent find.
+ * Each list under "Fundne leads", loaded per list rather than as one global
+ * newest-N slice - a single big list (a broad filter's 400+ finds) used to
+ * fill that whole slice on its own and push every other list off the page.
+ * Each list gets up to one full run's worth of its own newest entries, plus
+ * its true total so the heading count stays right beyond that cap. Lists come
+ * back newest-first by their most recent find.
+ *
+ * A filter's list is its unreviewed LeadFilterMatch rows - which can include
+ * a company another filter found first or that is already a deal (see
+ * LeadFilterMatch). A scanned page's list (no filter) is still just its NEW
+ * candidates.
  */
-async function loadNewCandidatesByGroup() {
-  const groups = await prisma.leadCandidate.groupBy({
-    by: ["filterId", "sourceUrl"],
-    where: { status: "NEW" },
-    _count: { _all: true },
-    _max: { createdAt: true },
-  });
-  groups.sort((a, b) => (b._max.createdAt?.getTime() ?? 0) - (a._max.createdAt?.getTime() ?? 0));
+async function loadFoundLeadLists() {
+  const [filterGroups, pageGroups] = await Promise.all([
+    prisma.leadFilterMatch.groupBy({
+      by: ["filterId"],
+      where: { handledAt: null },
+      _count: { _all: true },
+      _max: { createdAt: true },
+    }),
+    prisma.leadCandidate.groupBy({
+      by: ["sourceUrl"],
+      where: { status: "NEW", filterId: null },
+      _count: { _all: true },
+      _max: { createdAt: true },
+    }),
+  ]);
 
-  const perGroup = await Promise.all(
-    groups.map(async (g) => {
-      const candidates = await prisma.leadCandidate.findMany({
-        where: { status: "NEW", filterId: g.filterId, sourceUrl: g.sourceUrl },
+  const lists = [
+    ...filterGroups.map((g) => ({ newest: g._max.createdAt, load: async () => {
+      const matches = await prisma.leadFilterMatch.findMany({
+        where: { filterId: g.filterId, handledAt: null },
         orderBy: { createdAt: "desc" },
         take: MAX_LEAD_FILTER_RESULTS,
-        include: { filter: { select: { name: true } } },
+        include: { candidate: true, filter: { select: { name: true } } },
       });
-      return candidates.map((c) => ({ ...c, groupTotal: g._count._all }));
-    })
-  );
-  return perGroup.flat();
+      return matches.map((m) => ({
+        candidate: m.candidate,
+        listFilterId: m.filterId,
+        listFilterName: m.filter.name,
+        sourceUrl: null,
+        listedAt: m.createdAt,
+        groupTotal: g._count._all,
+      }));
+    } })),
+    ...pageGroups.map((g) => ({ newest: g._max.createdAt, load: async () => {
+      const candidates = await prisma.leadCandidate.findMany({
+        where: { status: "NEW", filterId: null, sourceUrl: g.sourceUrl },
+        orderBy: { createdAt: "desc" },
+        take: MAX_LEAD_FILTER_RESULTS,
+      });
+      return candidates.map((c) => ({
+        candidate: c,
+        listFilterId: null,
+        listFilterName: null,
+        sourceUrl: g.sourceUrl,
+        listedAt: c.createdAt,
+        groupTotal: g._count._all,
+      }));
+    } })),
+  ];
+  lists.sort((a, b) => (b.newest?.getTime() ?? 0) - (a.newest?.getTime() ?? 0));
+  const rows = (await Promise.all(lists.map((l) => l.load()))).flat();
+
+  // For the "allerede tilføjet" note on a lead that's already a deal -
+  // matched by CVR number as well as the candidate's own dealId, since a
+  // deal can exist for the company without ever having come from here.
+  const deals = await prisma.deal.findMany({
+    where: {
+      OR: [
+        { id: { in: rows.map((r) => r.candidate.dealId).filter((id): id is string => Boolean(id)) } },
+        { cvrNumber: { in: rows.map((r) => r.candidate.cvrNumber) } },
+      ],
+    },
+    select: { id: true, cvrNumber: true, stage: true, callList: { select: { name: true } } },
+  });
+  const dealById = new Map(deals.map((d) => [d.id, d]));
+  const dealByCvr = new Map(deals.filter((d) => d.cvrNumber).map((d) => [d.cvrNumber as string, d]));
+
+  return rows.map((r) => {
+    const deal = (r.candidate.dealId && dealById.get(r.candidate.dealId)) || dealByCvr.get(r.candidate.cvrNumber);
+    const known: KnownLeadStatus | null = deal
+      ? { kind: "deal", dealId: deal.id, stage: deal.stage, callListName: deal.callList?.name ?? null }
+      : r.candidate.status === "DISMISSED"
+        ? { kind: "dismissed" }
+        : null;
+    return { ...r, known };
+  });
 }
 
 export default async function LeadGenerationPage() {
   const [filters, watchedUrls, candidates, callLists] = await Promise.all([
     prisma.leadFilter.findMany({
       orderBy: { createdAt: "desc" },
-      include: { _count: { select: { candidates: { where: { status: "NEW" } } } } },
+      include: {
+        _count: { select: { matches: { where: { handledAt: null, candidate: { status: "NEW", dealId: null } } } } },
+      },
     }),
     prisma.watchedUrl.findMany({ orderBy: { createdAt: "desc" } }),
-    loadNewCandidatesByGroup(),
+    loadFoundLeadLists(),
     // For the "Tilføj til ringeliste" quick-action - lets a candidate go
     // straight into whichever Ringeliste list is currently being worked
     // from, without leaving Leadgeneration first.
@@ -79,7 +140,7 @@ export default async function LeadGenerationPage() {
           maxResults: f.maxResults,
           enabled: f.enabled,
           lastRunAt: f.lastRunAt ? f.lastRunAt.toISOString() : null,
-          newCandidateCount: f._count.candidates,
+          newCandidateCount: f._count.matches,
           autoCreateDailyList: f.autoCreateDailyList,
           targetCallListId: f.targetCallListId,
         }))}
@@ -101,8 +162,8 @@ export default async function LeadGenerationPage() {
       />
 
       <LeadCandidateSection
-        candidates={candidates.map((c) => {
-          const watchedLabel = c.sourceUrl ? watchedLabels.get(c.sourceUrl) : undefined;
+        candidates={candidates.map(({ candidate: c, listFilterId, listFilterName, sourceUrl, listedAt, groupTotal, known }) => {
+          const watchedLabel = sourceUrl ? watchedLabels.get(sourceUrl) : undefined;
           return {
             id: c.id,
             companyName: c.companyName,
@@ -115,18 +176,20 @@ export default async function LeadGenerationPage() {
             contactEmail: c.contactEmail,
             contactPhone: c.contactPhone,
             ownerName: c.ownerName,
-            sourceLabel: c.filter?.name ?? watchedLabel ?? c.sourceUrl ?? null,
-            groupTotal: c.groupTotal,
+            sourceLabel: listFilterName ?? watchedLabel ?? sourceUrl ?? null,
+            groupTotal,
+            listFilterId,
+            known,
             // Groups by the filter/page itself rather than its display name, so
             // two filters that happen to share a name stay separate lists and
             // a list can be renamed (see CandidateGroup's "Omdøb").
-            groupKey: c.filterId ? `filter:${c.filterId}` : c.sourceUrl ? `url:${c.sourceUrl}` : "none",
-            renameTarget: c.filterId
-              ? { kind: "filter" as const, id: c.filterId }
-              : c.sourceUrl && watchedUrlSet.has(c.sourceUrl)
-                ? { kind: "url" as const, url: c.sourceUrl }
+            groupKey: listFilterId ? `filter:${listFilterId}` : sourceUrl ? `url:${sourceUrl}` : "none",
+            renameTarget: listFilterId
+              ? { kind: "filter" as const, id: listFilterId }
+              : sourceUrl && watchedUrlSet.has(sourceUrl)
+                ? { kind: "url" as const, url: sourceUrl }
                 : null,
-            createdAt: c.createdAt.toISOString(),
+            createdAt: listedAt.toISOString(),
           };
         })}
         callLists={callLists}

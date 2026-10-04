@@ -8,11 +8,13 @@ import {
   dismissLeadCandidate,
   deleteLeadCandidates,
   renameLeadFilter,
+  hideLeadMatch,
 } from "@/lib/actions/lead-generation";
 import { renameWatchedUrl } from "@/lib/actions/lead-url-scan";
 import { createCallList } from "@/lib/actions/call-lists";
 import { stageLabels } from "@/lib/labels";
 import { useToast } from "@/components/toast";
+import Link from "next/link";
 
 function alreadyExistsWarning(stage?: string): string | null {
   if (!stage) return null;
@@ -39,6 +41,10 @@ export type LeadCandidateData = {
    * label. Null for finds with nothing renameable behind them (a one-off
    * "Scan nu" of an unwatched page, or a since-deleted filter). */
   renameTarget: RenameTarget | null;
+  /** The filter whose list this entry is in (null for a scanned page's
+   * list) - review actions only drop it from this list. */
+  listFilterId: string | null;
+  known: KnownLeadStatus | null;
   /** How many unreviewed candidates the whole group has - can exceed the
    * ones actually loaded, since each group only loads its newest finds. */
   groupTotal: number;
@@ -46,6 +52,19 @@ export type LeadCandidateData = {
 };
 
 export type RenameTarget = { kind: "filter"; id: string } | { kind: "url"; url: string };
+
+/** Why a lead in a filter's list has already been dealt with elsewhere -
+ * another filter's list, or a deal that existed already. Null for a lead
+ * that's genuinely new. */
+export type KnownLeadStatus =
+  | { kind: "deal"; dealId: string; stage: string; callListName: string | null }
+  | { kind: "dismissed" };
+
+function knownLeadNote(known: KnownLeadStatus): string {
+  if (known.kind === "dismissed") return "Afvist tidligere";
+  if (known.callListName) return `Allerede tilføjet til ringelisten "${known.callListName}"`;
+  return `Findes allerede som deal (${stageLabels[known.stage] ?? known.stage})`;
+}
 
 export type CallListOption = { id: string; name: string };
 
@@ -113,7 +132,7 @@ function CandidateCard({
 
   function addAsDeal() {
     startTransition(async () => {
-      const result = await addLeadCandidateAsDeal(candidate.id);
+      const result = await addLeadCandidateAsDeal(candidate.id, candidate.listFilterId);
       if (!result.ok) {
         showToast(result.error);
         return;
@@ -130,7 +149,7 @@ function CandidateCard({
       return;
     }
     startTransition(async () => {
-      const result = await addLeadCandidateToCallList(candidate.id, targetListId);
+      const result = await addLeadCandidateToCallList(candidate.id, targetListId, candidate.listFilterId);
       if (!result.ok) {
         showToast(result.error);
         return;
@@ -147,18 +166,34 @@ function CandidateCard({
 
   function dismiss() {
     startTransition(async () => {
-      await dismissLeadCandidate(candidate.id);
+      await dismissLeadCandidate(candidate.id, candidate.listFilterId);
+      hide();
+    });
+  }
+
+  function hideFromList() {
+    if (!candidate.listFilterId) return;
+    const filterId = candidate.listFilterId;
+    startTransition(async () => {
+      await hideLeadMatch(filterId, candidate.id);
       hide();
     });
   }
 
   if (hidden) return null;
 
+  const known = candidate.known;
+
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4">
+    <div className={`rounded-lg border bg-white p-4 ${known ? "border-amber-200" : "border-slate-200"}`}>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 sm:flex-1">
           <p className="font-medium text-slate-900">{candidate.companyName}</p>
+          {known && (
+            <p className="mt-1 inline-block rounded-md bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">
+              ⚠️ {knownLeadNote(known)}
+            </p>
+          )}
           <p className="mt-0.5 text-xs text-slate-500">
             <a
               href={`https://datacvr.virk.dk/enhed/virksomhed/${candidate.cvrNumber}`}
@@ -214,33 +249,53 @@ function CandidateCard({
             </div>
           )}
         </div>
-        <div className="flex shrink-0 flex-wrap gap-1.5 whitespace-nowrap">
-          <button
-            type="button"
-            onClick={dismiss}
-            disabled={pending}
-            className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
-          >
-            Afvis
-          </button>
-          <button
-            type="button"
-            onClick={addToCallList}
-            disabled={pending}
-            title="Tilføj til den valgte ringeliste ovenfor"
-            className="rounded-md border border-violet-300 px-2.5 py-1 text-xs font-medium text-violet-700 hover:bg-violet-50 disabled:opacity-50"
-          >
-            {pending ? "Tilføjer…" : "Tilføj til ringeliste"}
-          </button>
-          <button
-            type="button"
-            onClick={addAsDeal}
-            disabled={pending}
-            className="rounded-md bg-slate-900 px-2.5 py-1 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-50"
-          >
-            {pending ? "Tilføjer…" : "Tilføj som deal"}
-          </button>
-        </div>
+        {known?.kind === "deal" ? (
+          <div className="flex shrink-0 flex-wrap gap-1.5 whitespace-nowrap">
+            <button
+              type="button"
+              onClick={hideFromList}
+              disabled={pending}
+              title="Fjern fra denne liste - dealen røres ikke"
+              className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+            >
+              Skjul
+            </button>
+            <Link
+              href={`/deals/${known.dealId}`}
+              className="rounded-md bg-slate-900 px-2.5 py-1 text-xs font-medium text-white hover:bg-slate-800"
+            >
+              Åbn deal
+            </Link>
+          </div>
+        ) : (
+          <div className="flex shrink-0 flex-wrap gap-1.5 whitespace-nowrap">
+            <button
+              type="button"
+              onClick={known ? hideFromList : dismiss}
+              disabled={pending}
+              className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+            >
+              {known ? "Skjul" : "Afvis"}
+            </button>
+            <button
+              type="button"
+              onClick={addToCallList}
+              disabled={pending}
+              title="Tilføj til den valgte ringeliste ovenfor"
+              className="rounded-md border border-violet-300 px-2.5 py-1 text-xs font-medium text-violet-700 hover:bg-violet-50 disabled:opacity-50"
+            >
+              {pending ? "Tilføjer…" : "Tilføj til ringeliste"}
+            </button>
+            <button
+              type="button"
+              onClick={addAsDeal}
+              disabled={pending}
+              className="rounded-md bg-slate-900 px-2.5 py-1 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+            >
+              {pending ? "Tilføjer…" : "Tilføj som deal"}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -264,7 +319,7 @@ function CandidateGroup({
   renameTarget: RenameTarget | null;
   candidates: LeadCandidateData[];
   targetListId: string | null;
-  onAddAll: (ids: string[]) => Promise<void>;
+  onAddAll: (ids: string[], filterId: string | null) => Promise<void>;
 }) {
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
   const [addingAll, startAddingAll] = useTransition();
@@ -279,18 +334,22 @@ function CandidateGroup({
   const total = (candidates[0]?.groupTotal ?? candidates.length) - (candidates.length - visible.length);
   const notLoaded = total - visible.length;
 
+  // Leads already handled elsewhere (see KnownLeadStatus) are left alone by
+  // "Tilføj alle" - they're only listed here for information.
+  const addable = visible.filter((c) => !c.known);
+
   function addAll() {
     startAddingAll(async () => {
-      await onAddAll(visible.map((c) => c.id));
-      setHiddenIds(new Set(candidates.map((c) => c.id)));
+      await onAddAll(addable.map((c) => c.id), candidates[0]?.listFilterId ?? null);
+      setHiddenIds((prev) => new Set([...prev, ...addable.map((c) => c.id)]));
     });
   }
 
   function deleteList() {
-    if (!confirm(`Slet denne liste (${visible.length} leads)? De forsvinder fra Fundne leads og kan ikke genskabes.`)) return;
+    if (!confirm(`Slet denne liste (${visible.length} leads)? De forsvinder fra listen og kan ikke genskabes.`)) return;
     startDeleting(async () => {
-      const result = await deleteLeadCandidates(visible.map((c) => c.id));
-      showToast(`${result.deleted} leads slettet.`);
+      await deleteLeadCandidates(visible.map((c) => c.id), candidates[0]?.listFilterId ?? null);
+      showToast(`${visible.length} leads fjernet fra listen.`);
       router.refresh();
     });
   }
@@ -415,7 +474,7 @@ function CandidateGroup({
           <button
             type="button"
             onClick={addAll}
-            disabled={addingAll || !targetListId}
+            disabled={addingAll || !targetListId || addable.length === 0}
             title={!targetListId ? "Vælg eller opret en ringeliste først" : "Tilføj alle i denne liste til den valgte ringeliste"}
             className="rounded-md border border-violet-300 px-2.5 py-1 text-xs font-medium text-violet-700 hover:bg-violet-50 disabled:opacity-50"
           >
@@ -475,7 +534,7 @@ export function LeadCandidateSection({
     setTargetListId(value || null);
   }
 
-  async function addAllToCallList(ids: string[]) {
+  async function addAllToCallList(ids: string[], filterId: string | null) {
     if (!targetListId) {
       showToast("Vælg eller opret en ringeliste først.");
       return;
@@ -483,7 +542,7 @@ export function LeadCandidateSection({
     let added = 0;
     let alreadyExisted = 0;
     for (const id of ids) {
-      const result = await addLeadCandidateToCallList(id, targetListId);
+      const result = await addLeadCandidateToCallList(id, targetListId, filterId);
       if (result.ok && !result.alreadyExisted) added++;
       else if (result.ok && result.alreadyExisted) alreadyExisted++;
     }
