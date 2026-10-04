@@ -153,8 +153,8 @@ function CandidateCard({
 
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 sm:flex-1">
           <p className="font-medium text-slate-900">{candidate.companyName}</p>
           <p className="mt-0.5 text-xs text-slate-500">
             <a
@@ -211,7 +211,7 @@ function CandidateCard({
             </div>
           )}
         </div>
-        <div className="flex shrink-0 gap-1.5">
+        <div className="flex shrink-0 flex-wrap gap-1.5 whitespace-nowrap">
           <button
             type="button"
             onClick={dismiss}
