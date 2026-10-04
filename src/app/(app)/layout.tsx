@@ -5,19 +5,30 @@ import { getCurrentUser } from "@/lib/auth";
 import { logout } from "@/lib/actions/auth";
 import { ToastProvider } from "@/components/toast";
 import { SettingsMenu } from "./settings-menu";
-import { SidebarNav, type SidebarNavItem } from "./sidebar-nav";
+import { SidebarNav, type SidebarNavItem, type SidebarNavLink } from "./sidebar-nav";
 import { MobileNav } from "./mobile-nav";
 import { PresentationModeToggle } from "./presentation-mode-toggle";
 import { isPresentationMode } from "@/lib/presentation-mode";
 import { NewsBell } from "./news-bell";
 import { getUnreadNewsCount } from "@/lib/actions/news";
-import { IconHome, IconDeals, IconUsers, IconPercent, IconGrowth, IconTasks, IconStats, IconCalendar, IconRadar, IconPhone } from "./nav-icons";
+import { IconHome, IconDeals, IconUsers, IconPercent, IconGrowth, IconTasks, IconStats, IconCalendar, IconRadar, IconPhone, IconBuilding } from "./nav-icons";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const [user, presenting] = await Promise.all([getCurrentUser(), isPresentationMode()]);
   if (!user) redirect("/login");
 
   const unreadNewsCount = await getUnreadNewsCount(user.id, user.newsReadAt ?? null);
+
+  // Company-level pages (commission, visitor stats, growth) grouped under
+  // one collapsible "Virksomheden" entry, so the day-to-day sales pages
+  // stay at the top of the sidebar.
+  const companyItems: SidebarNavLink[] = [{ href: "/commission", label: "Provision", icon: <IconPercent /> }];
+  if (user.canAccessBilling) {
+    companyItems.push({ href: "/stats", label: "Stats", icon: <IconStats /> });
+  }
+  if (user.role === "ADMIN") {
+    companyItems.push({ href: "/vaekst", label: "Vækst", icon: <IconGrowth /> });
+  }
 
   const navItems: SidebarNavItem[] = [
     { href: "/", label: "Oversigt", icon: <IconHome /> },
@@ -27,14 +38,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: "/kunder-live", label: "Live kunder", icon: <IconUsers /> },
     { href: "/kalender", label: "Kalender", icon: <IconCalendar /> },
     { href: "/opgaver", label: "Opgaver", icon: <IconTasks /> },
-    { href: "/commission", label: "Provision", icon: <IconPercent /> },
+    { label: "Virksomheden", icon: <IconBuilding />, children: companyItems },
   ];
-  if (user.canAccessBilling) {
-    navItems.push({ href: "/stats", label: "Stats", icon: <IconStats /> });
-  }
-  if (user.role === "ADMIN") {
-    navItems.push({ href: "/vaekst", label: "Vækst", icon: <IconGrowth /> });
-  }
 
   const settingsItems = [
     { href: "/profile", label: "Min profil" },
