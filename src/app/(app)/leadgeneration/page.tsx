@@ -28,6 +28,11 @@ export default async function LeadGenerationPage() {
     prisma.callList.findMany({ orderBy: { createdAt: "desc" }, select: { id: true, name: true } }),
   ]);
 
+  const watchedUrlSet = new Set(watchedUrls.map((w) => w.url));
+  const watchedLabels = new Map(
+    watchedUrls.filter((w) => w.label).map((w) => [w.url, w.label as string])
+  );
+
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <div>
@@ -72,21 +77,33 @@ export default async function LeadGenerationPage() {
       />
 
       <LeadCandidateSection
-        candidates={candidates.map((c) => ({
-          id: c.id,
-          companyName: c.companyName,
-          cvrNumber: c.cvrNumber,
-          address: c.address,
-          industryText: c.industryText,
-          industryCode: c.industryCode,
-          website: c.website,
-          foundedDate: c.foundedDate ? c.foundedDate.toISOString() : null,
-          contactEmail: c.contactEmail,
-          contactPhone: c.contactPhone,
-          ownerName: c.ownerName,
-          sourceLabel: c.filter?.name ?? c.sourceUrl ?? null,
-          createdAt: c.createdAt.toISOString(),
-        }))}
+        candidates={candidates.map((c) => {
+          const watchedLabel = c.sourceUrl ? watchedLabels.get(c.sourceUrl) : undefined;
+          return {
+            id: c.id,
+            companyName: c.companyName,
+            cvrNumber: c.cvrNumber,
+            address: c.address,
+            industryText: c.industryText,
+            industryCode: c.industryCode,
+            website: c.website,
+            foundedDate: c.foundedDate ? c.foundedDate.toISOString() : null,
+            contactEmail: c.contactEmail,
+            contactPhone: c.contactPhone,
+            ownerName: c.ownerName,
+            sourceLabel: c.filter?.name ?? watchedLabel ?? c.sourceUrl ?? null,
+            // Groups by the filter/page itself rather than its display name, so
+            // two filters that happen to share a name stay separate lists and
+            // a list can be renamed (see CandidateGroup's "Omdøb").
+            groupKey: c.filterId ? `filter:${c.filterId}` : c.sourceUrl ? `url:${c.sourceUrl}` : "none",
+            renameTarget: c.filterId
+              ? { kind: "filter" as const, id: c.filterId }
+              : c.sourceUrl && watchedUrlSet.has(c.sourceUrl)
+                ? { kind: "url" as const, url: c.sourceUrl }
+                : null,
+            createdAt: c.createdAt.toISOString(),
+          };
+        })}
         callLists={callLists}
       />
     </div>

@@ -76,6 +76,22 @@ export async function updateLeadFilter(
   return { ok: true };
 }
 
+/** Renames just a filter - used by the "Omdøb" button on its list under
+ * "Fundne leads", where the list's heading is the filter's name. Renaming the
+ * filter itself (rather than relabeling its current candidates) keeps future
+ * runs' finds landing in the same, renamed list. */
+export async function renameLeadFilter(
+  filterId: string,
+  name: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireUser();
+  const trimmed = name.trim();
+  if (!trimmed) return { ok: false, error: "Giv listen et navn." };
+  await prisma.leadFilter.update({ where: { id: filterId }, data: { name: trimmed } });
+  revalidatePath("/leadgeneration");
+  return { ok: true };
+}
+
 export async function setLeadFilterEnabled(filterId: string, enabled: boolean): Promise<void> {
   await requireUser();
   await prisma.leadFilter.update({ where: { id: filterId }, data: { enabled } });
