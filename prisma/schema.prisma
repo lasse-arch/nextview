@@ -532,6 +532,10 @@ model CustomerReport {
   /// ordinary single-deal report.
   branchDealIds String?
   createdAt  DateTime          @default(now())
+  /// Set atomically by the one queue worker that takes this PENDING report
+  /// (see claimNextQueuedReport) - nothing else may process it after that,
+  /// so the same report can never be emailed twice by overlapping workers.
+  claimedAt  DateTime?
 
   /// Same open-tracking pattern as EmailMessage - the id embedded in this
   /// report email's tracking pixel, hit when the recipient's mail client
