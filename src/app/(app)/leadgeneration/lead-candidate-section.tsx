@@ -10,6 +10,7 @@ import {
   renameLeadFilter,
   hideLeadMatch,
   moveLeadDealsToCallList,
+  addLeadCandidatesToCallList,
 } from "@/lib/actions/lead-generation";
 import { renameWatchedUrl } from "@/lib/actions/lead-url-scan";
 import { importLeadCsv, renameLeadImportList } from "@/lib/actions/lead-import";
@@ -362,7 +363,7 @@ function CandidateGroup({
   renameTarget: RenameTarget | null;
   candidates: LeadCandidateData[];
   targetListId: string | null;
-  onAddAll: (ids: string[], filterId: string | null) => Promise<void>;
+  onAddAll: (ids: string[], filterId: string | null) => Promise<string[]>;
 }) {
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
   const [addingAll, startAddingAll] = useTransition();
@@ -390,8 +391,9 @@ function CandidateGroup({
   function addAll() {
     startAddingAll(async () => {
       if (addable.length > 0) {
-        await onAddAll(addable.map((c) => c.id), listFilterId);
-        setHiddenIds((prev) => new Set([...prev, ...addable.map((c) => c.id)]));
+        const done = await onAddAll(addable.map((c) => c.id), listFilterId);
+        setHiddenIds((prev) => new Set([...prev, ...done]));
+        if (done.length < addable.length) return;
       }
       setMovePromptIds(existingDeals.length > 0 ? existingDeals.map((c) => c.id) : null);
     });
@@ -712,24 +714,45 @@ export function LeadCandidateSection({
     setTargetListId(value || null);
   }
 
-  async function addAllToCallList(ids: string[], filterId: string | null) {
+  /** Adds the leads in chunks (see addLeadCandidatesToCallList) and returns
+   * the ids actually processed - on a failed request (network blip, a new
+   * deploy going live mid-run, ...) it stops there and says so, instead of
+   * the error taking the whole page down with the rest left in limbo. */
+  async function addAllToCallList(ids: string[], filterId: string | null): Promise<string[]> {
     if (!targetListId) {
       showToast("Vælg eller opret en ringeliste først.");
-      return;
+      return [];
     }
+    const CHUNK = 50;
     let added = 0;
     let alreadyExisted = 0;
-    for (const id of ids) {
-      const result = await addLeadCandidateToCallList(id, targetListId, filterId);
-      if (result.ok && !result.alreadyExisted) added++;
-      else if (result.ok && result.alreadyExisted) alreadyExisted++;
+    const done: string[] = [];
+    let failed = false;
+    for (let i = 0; i < ids.length; i += CHUNK) {
+      const chunk = ids.slice(i, i + CHUNK);
+      try {
+        const result = await addLeadCandidatesToCallList(chunk, targetListId, filterId);
+        if (!result.ok) {
+          showToast(result.error);
+          failed = true;
+          break;
+        }
+        added += result.added;
+        alreadyExisted += result.alreadyExisted;
+        done.push(...chunk);
+      } catch {
+        failed = true;
+        break;
+      }
     }
     let message = `${added} af ${ids.length} tilføjet til ringelisten.`;
     if (alreadyExisted > 0) {
       message += ` ⚠️ ${alreadyExisted} fandtes allerede som deal og blev ikke flyttet.`;
     }
+    if (failed) message += " Resten blev ikke tilføjet - genindlæs siden og tryk igen.";
     showToast(message);
     router.refresh();
+    return done;
   }
 
   // Grouped by which filter (or scanned URL) found them, so a filter like

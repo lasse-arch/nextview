@@ -338,6 +338,54 @@ export async function addLeadCandidateToCallList(
   return { ok: true, dealId: result.dealId, alreadyExisted: !result.created, existingStage: result.existingStage };
 }
 
+/**
+ * "Tilføj alle til ringeliste" - the same as addLeadCandidateToCallList for
+ * a batch of leads in one request. The client sends a long list in chunks
+ * of these, so a list of hundreds is a handful of requests instead of one
+ * per lead (which took minutes, and one failed request took the page down).
+ * A lead that can't be added (e.g. already handled meanwhile) is counted
+ * and skipped rather than failing the batch.
+ */
+export async function addLeadCandidatesToCallList(
+  candidateIds: string[],
+  callListId: string,
+  filterId?: string | null
+): Promise<{ ok: true; added: number; alreadyExisted: number; skipped: number } | { ok: false; error: string }> {
+  const user = await requireUser();
+  const list = await prisma.callList.findUnique({ where: { id: callListId } });
+  if (!list) return { ok: false, error: "Listen findes ikke længere." };
+
+  let added = 0;
+  let alreadyExisted = 0;
+  let skipped = 0;
+  for (const candidateId of candidateIds) {
+    await reopenIfDismissed(candidateId);
+    const result = await claimCandidateAndUpsertDeal(candidateId, user.id, { callListId });
+    if ("error" in result) {
+      skipped++;
+      continue;
+    }
+    if (result.created) {
+      added++;
+      const deal = await prisma.deal.findUniqueOrThrow({ where: { id: result.dealId } });
+      await logActivity({
+        type: "DEAL_CREATED",
+        message: `${user.name} tilføjede ${dealName(deal)} til ${list.name} fra Leadgeneration`,
+        actorId: user.id,
+        dealId: deal.id,
+      });
+    } else {
+      alreadyExisted++;
+    }
+  }
+  await markMatchesHandled(filterId, candidateIds);
+
+  revalidatePath("/leadgeneration");
+  revalidatePath("/ringeliste");
+  revalidatePath("/deals");
+  return { ok: true, added, alreadyExisted, skipped };
+}
+
 export async function dismissLeadCandidate(candidateId: string, filterId?: string | null): Promise<void> {
   await requireUser();
   await prisma.leadCandidate.updateMany({ where: { id: candidateId, status: "NEW" }, data: { status: "DISMISSED" } });
