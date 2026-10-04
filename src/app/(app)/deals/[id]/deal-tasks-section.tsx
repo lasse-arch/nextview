@@ -56,12 +56,24 @@ export function DealTasksSection({
         ? window.prompt(`Link til ${productType} (valgfrit - vises under Live kunder):`)
         : null;
 
-    setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, done: turningDone } : t)));
+    // A recurring task stays checked off as this occurrence, and the server
+    // creates the next one (see toggleTaskDone) - added here once it exists.
+    const recurringWeekday = task?.recurringWeekday ?? null;
+    const recurring = turningDone && recurringWeekday !== null;
+    setTasks((prev) =>
+      prev.map((t) => (t.id === taskId ? { ...t, done: turningDone, ...(recurring ? { recurringWeekday: null } : {}) } : t))
+    );
     startTransition(async () => {
       try {
-        await toggleTaskDone(taskId, deliveryUrl);
+        const { nextTask } = await toggleTaskDone(taskId, deliveryUrl);
+        if (nextTask) {
+          setTasks((prev) => [...prev, nextTask]);
+          showToast(`Næste gang oprettet: ${formatDate(nextTask.dueDate)}`);
+        }
       } catch (err) {
-        setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, done: !turningDone } : t)));
+        setTasks((prev) =>
+          prev.map((t) => (t.id === taskId ? { ...t, done: !turningDone, recurringWeekday } : t))
+        );
         showToast(err instanceof Error ? err.message : "Der opstod en fejl.");
       }
     });

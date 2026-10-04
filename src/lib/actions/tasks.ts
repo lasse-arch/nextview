@@ -98,25 +98,67 @@ export async function createTask(formData: FormData): Promise<TaskResult> {
   return { ok: true, id: task.id };
 }
 
+/** The next occurrence a completed recurring task creates (see toggleTaskDone). */
+export type RecurredTask = {
+  id: string;
+  title: string;
+  description: string | null;
+  done: boolean;
+  dueDate: Date | null;
+  assigneeId: string | null;
+  dealId: string | null;
+  recurringWeekday: number | null;
+};
+
 /**
  * Toggles a task's done state. When completing an "Aflever X" delivery task
  * with a deliveryUrl given (prompted client-side for Hjemmeside/tour
  * products - see needsDeliveryLink), saves that link onto the matching
  * DealItem so it shows up under Live kunder.
  *
- * A recurring task (recurringWeekday set) never actually ends up checked off -
- * completing it advances dueDate to its next weekly occurrence and leaves
- * done false instead, so it stays on the board rather than disappearing.
+ * Completing a recurring task (recurringWeekday set) checks this occurrence
+ * off like any other task - it stays as a done task, comments and all - and
+ * creates a fresh copy for its next weekly occurrence, which carries the
+ * recurrence on from there. The completed one stops recurring itself, so
+ * un-checking it again later can't spawn a second copy. The new task is
+ * returned so the board can show it straight away.
  */
-export async function toggleTaskDone(taskId: string, deliveryUrl?: string | null): Promise<void> {
+export async function toggleTaskDone(
+  taskId: string,
+  deliveryUrl?: string | null
+): Promise<{ nextTask: RecurredTask | null }> {
   const user = await requireUser();
   const task = await prisma.task.findUniqueOrThrow({ where: { id: taskId } });
   const completing = !task.done;
+  let nextTask: RecurredTask | null = null;
 
   if (completing && task.recurringWeekday !== null) {
     const reference = task.dueDate && task.dueDate > new Date() ? task.dueDate : new Date();
     const nextDueDate = nextWeekdayAfter(reference, task.recurringWeekday);
-    await prisma.task.update({ where: { id: taskId }, data: { done: false, dueDate: nextDueDate } });
+    const [, created] = await prisma.$transaction([
+      prisma.task.update({ where: { id: taskId }, data: { done: true, recurringWeekday: null } }),
+      prisma.task.create({
+        data: {
+          title: task.title,
+          description: task.description,
+          assigneeId: task.assigneeId,
+          dealId: task.dealId,
+          createdById: task.createdById,
+          recurringWeekday: task.recurringWeekday,
+          dueDate: nextDueDate,
+        },
+      }),
+    ]);
+    nextTask = {
+      id: created.id,
+      title: created.title,
+      description: created.description,
+      done: false,
+      dueDate: created.dueDate,
+      assigneeId: created.assigneeId,
+      dealId: created.dealId,
+      recurringWeekday: created.recurringWeekday,
+    };
   } else {
     await prisma.task.update({ where: { id: taskId }, data: { done: completing } });
   }
@@ -137,6 +179,7 @@ export async function toggleTaskDone(taskId: string, deliveryUrl?: string | null
   }
 
   revalidateTaskPaths(task.dealId);
+  return { nextTask };
 }
 
 export async function updateTaskAssignee(taskId: string, assigneeId: string | null): Promise<void> {
