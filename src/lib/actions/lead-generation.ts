@@ -132,7 +132,14 @@ export async function claimCandidateAndUpsertDeal(
   const candidate = await prisma.leadCandidate.findUniqueOrThrow({ where: { id: candidateId } });
   if (candidate.status !== "NEW") return { error: "Dette lead er allerede behandlet." };
 
-  const existingDeal = await prisma.deal.findFirst({ where: { cvrNumber: candidate.cvrNumber } });
+  // A CSV-imported lead may have no CVR number - matching on a null one
+  // would hit any deal without a CVR, so it falls back to the deal the
+  // import already linked it to (see importLeadCsv), if any.
+  const existingDeal = candidate.cvrNumber
+    ? await prisma.deal.findFirst({ where: { cvrNumber: candidate.cvrNumber } })
+    : candidate.dealId
+      ? await prisma.deal.findUnique({ where: { id: candidate.dealId } })
+      : null;
 
   const claimed = await prisma.leadCandidate.updateMany({
     where: { id: candidateId, status: "NEW" },

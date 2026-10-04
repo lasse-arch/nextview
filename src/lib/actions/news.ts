@@ -132,6 +132,12 @@ const DEFAULT_POSTS: { title: string; body: string; minutesAgo: number; screensh
     body: "Før forsvandt en virksomhed helt fra et filters liste under \"Fundne leads\", hvis et andet filter havde fundet den først, eller den allerede var en deal - \"Kør nu\" sagde bare \"fandtes allerede\". Nu står den på listen hos hvert filter, der finder den, med en gul besked om hvorfor: \"Allerede tilføjet til ringelisten …\", \"Findes allerede som deal (stadie)\" eller \"Afvist tidligere\".\n\nEr den allerede en deal, kan du åbne den direkte eller trykke \"Skjul\" for at fjerne den fra listen - dealen røres ikke. Tilføjer du en virksomhed fra én liste, forsvinder den kun fra den liste; står den også på et andet filters liste, får den beskeden dér. Samtidig kan \"Op til 1000 pr. kørsel\" nu også nå virksomheder længere nede i CVR, i stedet for at få de samme 1000 nyeste tilbage hver gang.",
     screenshotUrl: "/news/fundne-leads-already-added.png",
   },
+  {
+    minutesAgo: 0,
+    title: "Importér en CSV-fil som fundne leads",
+    body: "Har du en liste over fx alle højskoler med telefon, e-mail og hjemmeside, kan du nu lægge den ind under Leadgeneration → \"Fundne leads\" med knappen \"Importér CSV\". Filen bliver sin egen liste (opkaldt efter filen, men du kan give den et andet navn), og hver række kan tilføjes til ringelisten, tilføjes som deal eller afvises - præcis som et filters fund. \"Tilføj alle til ringeliste\" virker også.\n\nFilen skal bare have en \"Navn\"-kolonne. Telefon, Email, Hjemmeside, Adresse, Postnr, By og Land bruges, hvis de er der, og et CVR-nummer er ikke nødvendigt. Både semikolon og komma virker som skilletegn. Findes en virksomhed allerede som deal (samme navn eller e-mail), står den med en gul besked i stedet for at blive oprettet to gange.",
+    screenshotUrl: "/news/csv-import.png",
+  },
 ];
 
 /**

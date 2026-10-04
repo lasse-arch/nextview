@@ -232,6 +232,7 @@ model User {
   taskComments  TaskComment[]
   activityEvents ActivityEvent[]
   leadFilters   LeadFilter[]
+  leadImportLists LeadImportList[]
   watchedUrls   WatchedUrl[]
   emailTemplates EmailTemplate[]
   callLists     CallList[]
@@ -828,8 +829,13 @@ model LeadCandidate {
   /// Set instead of `filter` when this was found by scanning a page rather
   /// than a branche/område filter (see WatchedUrl / url-lead-scan.ts).
   sourceUrl String?
+  /// Set instead when this came from an uploaded CSV (see LeadImportList).
+  importList   LeadImportList? @relation(fields: [importListId], references: [id], onDelete: SetNull)
+  importListId String?
 
-  cvrNumber    String  @unique
+  /// Always set for filter/page-scan finds; optional only for CSV imports,
+  /// whose lists (e.g. a list of højskoler) often carry no CVR numbers.
+  cvrNumber    String? @unique
   companyName  String
   address      String?
   industryText String?
@@ -857,6 +863,18 @@ model LeadCandidate {
   matches LeadFilterMatch[]
 
   @@index([status, createdAt])
+}
+
+/// A CSV file imported under "Fundne leads" - its rows become that list's
+/// candidates, reviewed (Tilføj til ringeliste / Afvis) like any filter's.
+model LeadImportList {
+  id          String   @id @default(cuid())
+  name        String
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  createdById String
+  createdAt   DateTime @default(now())
+
+  candidates LeadCandidate[]
 }
 
 /// One row per (filter, company) a filter run has turned up. A company is

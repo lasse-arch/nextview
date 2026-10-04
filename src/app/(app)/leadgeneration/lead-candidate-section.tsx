@@ -11,6 +11,7 @@ import {
   hideLeadMatch,
 } from "@/lib/actions/lead-generation";
 import { renameWatchedUrl } from "@/lib/actions/lead-url-scan";
+import { importLeadCsv, renameLeadImportList } from "@/lib/actions/lead-import";
 import { createCallList } from "@/lib/actions/call-lists";
 import { stageLabels } from "@/lib/labels";
 import { useToast } from "@/components/toast";
@@ -24,7 +25,8 @@ function alreadyExistsWarning(stage?: string): string | null {
 export type LeadCandidateData = {
   id: string;
   companyName: string;
-  cvrNumber: string;
+  /** Null only for a CSV-imported lead without a CVR column. */
+  cvrNumber: string | null;
   address: string | null;
   industryText: string | null;
   industryCode: string | null;
@@ -51,7 +53,10 @@ export type LeadCandidateData = {
   createdAt: string;
 };
 
-export type RenameTarget = { kind: "filter"; id: string } | { kind: "url"; url: string };
+export type RenameTarget =
+  | { kind: "filter"; id: string }
+  | { kind: "import"; id: string }
+  | { kind: "url"; url: string };
 
 /** Why a lead in a filter's list has already been dealt with elsewhere -
  * another filter's list, or a deal that existed already. Null for a lead
@@ -172,7 +177,12 @@ function CandidateCard({
   }
 
   function hideFromList() {
-    if (!candidate.listFilterId) return;
+    // Outside a filter's list (an imported CSV or scanned page) a lead
+    // belongs to just that one list, so hiding it is simply dismissing it.
+    if (!candidate.listFilterId) {
+      dismiss();
+      return;
+    }
     const filterId = candidate.listFilterId;
     startTransition(async () => {
       await hideLeadMatch(filterId, candidate.id);
@@ -195,27 +205,28 @@ function CandidateCard({
             </p>
           )}
           <p className="mt-0.5 text-xs text-slate-500">
-            <a
-              href={`https://datacvr.virk.dk/enhed/virksomhed/${candidate.cvrNumber}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-slate-600 underline decoration-dotted hover:text-slate-900"
-              onClick={(e) => e.stopPropagation()}
-            >
-              CVR {candidate.cvrNumber}
-            </a>
-            {candidate.industryText && (
-              <>
-                {" "}
-                · {candidate.industryText}
-                {candidate.industryCode && ` (${candidate.industryCode})`}
-              </>
-            )}
-            {candidate.website && (
-              <>
-                {" "}
-                ·{" "}
+            {[
+              candidate.cvrNumber && (
                 <a
+                  key="cvr"
+                  href={`https://datacvr.virk.dk/enhed/virksomhed/${candidate.cvrNumber}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-slate-600 underline decoration-dotted hover:text-slate-900"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  CVR {candidate.cvrNumber}
+                </a>
+              ),
+              candidate.industryText && (
+                <span key="industry">
+                  {candidate.industryText}
+                  {candidate.industryCode && ` (${candidate.industryCode})`}
+                </span>
+              ),
+              candidate.website && (
+                <a
+                  key="website"
                   href={websiteHref(candidate.website)}
                   target="_blank"
                   rel="noopener noreferrer"
@@ -224,11 +235,16 @@ function CandidateCard({
                 >
                   {candidate.website}
                 </a>
-              </>
-            )}
-            {candidate.address && <> · {candidate.address}</>}
+              ),
+              candidate.address && <span key="address">{candidate.address}</span>,
+            ]
+              .filter(Boolean)
+              .flatMap((part, i) => (i === 0 ? [part] : [" · ", part]))}
           </p>
-          <p className="mt-0.5 text-xs text-slate-400">Stiftet {formatDate(candidate.foundedDate)}</p>
+          {/* A CSV import rarely carries a founding date - only shown when known. */}
+          {(candidate.cvrNumber || candidate.foundedDate) && (
+            <p className="mt-0.5 text-xs text-slate-400">Stiftet {formatDate(candidate.foundedDate)}</p>
+          )}
           {(candidate.ownerName || candidate.contactPhone || candidate.contactEmail) && (
             <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
               {candidate.ownerName && (
@@ -366,7 +382,7 @@ function CandidateGroup({
       setEditing(false);
       return;
     }
-    if (!name && renameTarget.kind === "filter") {
+    if (!name && renameTarget.kind !== "url") {
       showToast("Giv listen et navn.");
       return;
     }
@@ -374,7 +390,9 @@ function CandidateGroup({
       const result =
         renameTarget.kind === "filter"
           ? await renameLeadFilter(renameTarget.id, name)
-          : await renameWatchedUrl(renameTarget.url, name);
+          : renameTarget.kind === "import"
+            ? await renameLeadImportList(renameTarget.id, name)
+            : await renameWatchedUrl(renameTarget.url, name);
       if (!result.ok) {
         showToast(result.error);
         return;
@@ -455,7 +473,9 @@ function CandidateGroup({
               title={
                 renameTarget.kind === "filter"
                   ? "Omdøb listen (ændrer også filterets navn, så fremtidige fund lander her)"
-                  : "Omdøb listen (vises i stedet for sidens URL)"
+                  : renameTarget.kind === "import"
+                    ? "Omdøb den importerede liste"
+                    : "Omdøb listen (vises i stedet for sidens URL)"
               }
               className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
             >
@@ -508,6 +528,87 @@ function CandidateGroup({
   );
 }
 
+/** "Importér CSV" - uploads a lead list (e.g. every højskole with phone,
+ * email and website) as its own list under Fundne leads; see importLeadCsv
+ * for which columns are understood. */
+function ImportCsvForm({ onClose }: { onClose: () => void }) {
+  const [listName, setListName] = useState("");
+  const [importing, startImport] = useTransition();
+  const showToast = useToast();
+  const router = useRouter();
+
+  function submit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    startImport(async () => {
+      const result = await importLeadCsv(formData);
+      if (!result.ok) {
+        showToast(result.error);
+        return;
+      }
+      let message = `${result.imported} leads importeret.`;
+      if (result.alreadyKnown > 0) message += ` ${result.alreadyKnown} findes allerede som deal og er markeret.`;
+      if (result.skipped > 0) message += ` ${result.skipped} rækker sprunget over (uden navn eller dubletter).`;
+      showToast(message);
+      onClose();
+      router.refresh();
+    });
+  }
+
+  return (
+    <form
+      onSubmit={submit}
+      className="mt-3 w-full space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600"
+    >
+      <p>
+        Vælg en CSV-fil med en <span className="font-medium">Navn</span>-kolonne - Telefon, Email, Hjemmeside, Adresse,
+        Postnr, By og CVR bruges også, hvis de er der. Den bliver sin egen liste her under Fundne leads.
+      </p>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <input
+          type="file"
+          name="file"
+          accept=".csv,text/csv"
+          required
+          disabled={importing}
+          onChange={(e) => {
+            const fileName = e.target.files?.[0]?.name;
+            if (fileName && !listName) setListName(fileName.replace(/\.[^.]+$/, ""));
+          }}
+          className="min-w-0 text-xs"
+        />
+        <input
+          type="text"
+          name="name"
+          value={listName}
+          onChange={(e) => setListName(e.target.value)}
+          placeholder="Listens navn"
+          maxLength={100}
+          disabled={importing}
+          className="min-w-0 rounded-md border border-slate-300 px-2 py-1 text-sm sm:w-56"
+        />
+        <div className="flex gap-1.5">
+          <button
+            type="submit"
+            disabled={importing}
+            className="rounded-md bg-slate-900 px-2.5 py-1 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+          >
+            {importing ? "Importerer…" : "Importér"}
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={importing}
+            className="rounded-md px-2 py-1 text-xs font-medium text-slate-500 hover:text-slate-700"
+          >
+            Annuller
+          </button>
+        </div>
+      </div>
+    </form>
+  );
+}
+
 export function LeadCandidateSection({
   candidates,
   callLists,
@@ -519,6 +620,7 @@ export function LeadCandidateSection({
   const [lists, setLists] = useState(callLists);
   const [targetListId, setTargetListId] = useState<string | null>(callLists[0]?.id ?? null);
   const [creating, startCreating] = useTransition();
+  const [importOpen, setImportOpen] = useState(false);
   const showToast = useToast();
 
   function handleListChange(value: string) {
@@ -568,7 +670,18 @@ export function LeadCandidateSection({
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-sm font-semibold text-slate-900">Fundne leads</h2>
+        <div className="flex items-center gap-3">
+          <h2 className="text-sm font-semibold text-slate-900">Fundne leads</h2>
+          {!importOpen && (
+            <button
+              type="button"
+              onClick={() => setImportOpen(true)}
+              className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+            >
+              Importér CSV
+            </button>
+          )}
+        </div>
         <label className="flex items-center gap-2 text-xs text-slate-500">
           Tilføj til ringeliste:
           <select
@@ -587,6 +700,7 @@ export function LeadCandidateSection({
           </select>
         </label>
       </div>
+      {importOpen && <ImportCsvForm onClose={() => setImportOpen(false)} />}
       <div className="mt-3 space-y-4">
         {[...groups.entries()].map(([groupKey, group]) => (
           <CandidateGroup
@@ -600,7 +714,7 @@ export function LeadCandidateSection({
         ))}
         {candidates.length === 0 && (
           <p className="py-4 text-center text-sm text-slate-400">
-            Ingen fundne leads endnu - opret et filter og tryk &quot;Kør nu&quot;.
+            Ingen fundne leads endnu - opret et filter og tryk &quot;Kør nu&quot;, eller importér en CSV-fil.
           </p>
         )}
       </div>
