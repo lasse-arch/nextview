@@ -770,7 +770,7 @@ model LeadFilter {
   industryQuery String?
   /// Comma-separated municipality names (kommune), matched any-of.
   municipality  String?
-  /// Only companies with sammensatStatus "NORMAL" (still active) - almost
+  /// Only companies with sammensatStatus "NORMAL" or "AKTIV" (still active) - almost
   /// always wanted, since a dissolved company isn't a lead.
   activeOnly    Boolean @default(true)
 
