@@ -447,7 +447,33 @@ async function fetchOneModelStats(page: Page, sid: string): Promise<ExploreTourS
   return { last7Days, last30Days, last90Days, sinceLabel: parseFirstImpressionLabel(lifetimeText), sinceStats };
 }
 
+/**
+ * Puppeteer errors that mean the page moved under the scrape (a reload or
+ * redirect mid-read, e.g. the shared Matterport login being refreshed) -
+ * transient, so worth one fresh attempt rather than failing the report.
+ */
+function isTransientScrapeError(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err);
+  return /Execution context was destroyed|Protocol error|Target closed|detached Frame|Navigation timeout|ETXTBSY/i.test(message);
+}
+
+/**
+ * Scrapes the tour stats + cover photo, retrying once on a transient browser
+ * error. Safe to retry: this only reads - every caller sends its email only
+ * after this has returned.
+ */
 export async function fetchMatterportTourData(mpSkinIds: string | string[]): Promise<ExploreTourData> {
+  try {
+    return await fetchMatterportTourDataOnce(mpSkinIds);
+  } catch (err) {
+    if (!isTransientScrapeError(err)) throw err;
+    console.error("Midlertidig fejl under hentning af tour-stats - prøver igen", err);
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+    return fetchMatterportTourDataOnce(mpSkinIds);
+  }
+}
+
+async function fetchMatterportTourDataOnce(mpSkinIds: string | string[]): Promise<ExploreTourData> {
   const ids = Array.isArray(mpSkinIds) ? mpSkinIds : [mpSkinIds];
   const browser = await launchBrowser();
   try {
