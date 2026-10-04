@@ -1,4 +1,6 @@
+import { after } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
+import { resumeStalledReportQueue } from "@/lib/customer-report-service";
 import { prisma } from "@/lib/db";
 import { getDashboardData } from "@/lib/dashboard-data";
 import { stageLabels, invoiceStatusLabels, formatDKK } from "@/lib/labels";
@@ -36,6 +38,9 @@ const INVOICE_STATUS_STYLE: Record<string, { dot: string; text: string }> = {
 
 export default async function DashboardPage() {
   const user = await getCurrentUser();
+  // The dashboard is opened far more often than Stats - also restarts a
+  // stalled visitor-report queue (see resumeStalledReportQueue).
+  after(() => resumeStalledReportQueue());
   const isAdmin = user?.role === "ADMIN";
   const [data, goals, users, customerMapPoints, activity, lastActive, commissionPeriodReminder] = await Promise.all([
     getDashboardData(isAdmin ? undefined : user?.id),

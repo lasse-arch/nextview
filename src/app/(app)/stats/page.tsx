@@ -1,4 +1,6 @@
 import { redirect } from "next/navigation";
+import { after } from "next/server";
+import { resumeStalledReportQueue } from "@/lib/customer-report-service";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
@@ -23,6 +25,9 @@ export default async function StatsPage() {
   if (!currentUser.canAccessBilling) redirect("/");
 
   const autoRunEnabled = await isIntegrationEnabled("CUSTOMER_REPORTS_AUTO_RUN");
+  // Restarts a report queue whose self-chaining got cut off (see
+  // resumeStalledReportQueue) - this page polls while reports are pending.
+  after(() => resumeStalledReportQueue());
 
   const deals = (
     await prisma.deal.findMany({

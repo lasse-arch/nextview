@@ -581,6 +581,42 @@ export async function processOneQueuedReport(): Promise<{ processed: boolean; re
 }
 
 /**
+ * How long the queue may go without progress before it counts as stalled -
+ * just past the processing route's own 300s maxDuration, so a report that
+ * is genuinely still being worked on is never picked up a second time.
+ */
+const STALLED_QUEUE_AFTER_MS = 6 * 60 * 1000;
+
+/**
+ * Watchdog for the self-chaining queue: each processed report triggers the
+ * next one itself, so if that chain is cut (a new deployment going live
+ * mid-run, a timed-out invocation, a failed internal request) the remaining
+ * reports would sit PENDING until something else kicks it. Called on page
+ * loads (Stats, the dashboard) - restarts the queue when there's work
+ * waiting but nothing has finished for a while. Returns whether it kicked.
+ */
+export async function resumeStalledReportQueue(): Promise<boolean> {
+  const oldestPending = await prisma.customerReport.findFirst({
+    where: { status: "PENDING" },
+    orderBy: { createdAt: "asc" },
+    select: { createdAt: true },
+  });
+  if (!oldestPending) return false;
+
+  // Finished reports get their sentAt stamped on completion.
+  const lastFinished = await prisma.customerReport.findFirst({
+    where: { status: { not: "PENDING" } },
+    orderBy: { sentAt: "desc" },
+    select: { sentAt: true },
+  });
+  const lastProgress = Math.max(oldestPending.createdAt.getTime(), lastFinished?.sentAt.getTime() ?? 0);
+  if (Date.now() - lastProgress < STALLED_QUEUE_AFTER_MS) return false;
+
+  await kickCustomerReportQueue();
+  return true;
+}
+
+/**
  * Fires (without blocking on the result) the internal route that processes
  * one queued report and re-triggers itself while more remain - a real HTTP
  * call rather than an in-process loop, so each report is processed by its
