@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { buildDealEmailAddress } from "@/lib/email-address";
-import { findDuplicateDeals } from "@/lib/duplicates";
+import { findPossibleDuplicates } from "@/lib/duplicates";
 import { logActivity } from "@/lib/activity";
 import { dealName } from "@/lib/labels";
 import { runLeadFilter, type RunLeadFilterResult } from "@/lib/lead-generation-service";
@@ -170,6 +170,9 @@ export async function claimCandidateAndUpsertDeal(
         ownerId: userId,
         importType: "MANUAL",
         ...extraDealData,
+        // Added straight to a ringeliste: a lead to call, so it starts in
+        // Leadindbakken; a plain "Tilføj som deal" goes on the Deals board.
+        inLeadInbox: Boolean(extraDealData.callListId),
       },
     });
     await prisma.deal.update({ where: { id: deal.id }, data: { dealEmailAddress: buildDealEmailAddress(deal.id) } });
@@ -270,7 +273,11 @@ export async function addLeadCandidateAsDeal(
 > {
   const user = await requireUser();
   const candidate = await prisma.leadCandidate.findUniqueOrThrow({ where: { id: candidateId } });
-  const duplicates = await findDuplicateDeals(candidate.companyName);
+  const duplicates = await findPossibleDuplicates({
+    companyName: candidate.companyName,
+    cvrNumber: candidate.cvrNumber,
+    address: candidate.address,
+  });
 
   await reopenIfDismissed(candidateId);
   const result = await claimCandidateAndUpsertDeal(candidateId, user.id);

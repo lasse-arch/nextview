@@ -394,6 +394,12 @@ model Deal {
   combinedInvoicing Boolean @default(false)
 
   stage DealStage @default(LEAD)
+  /// True for a lead that came in through a ringeliste (quick-add, or added
+  /// to one from Leadgeneration) and hasn't been worked into a real deal yet
+  /// - it lives in Leadindbakken instead of cluttering the Deals board.
+  /// Cleared once it moves past Kontaktet (a meeting booked, or anything
+  /// later), or by "Flyt til Deals". Manually created deals never start here.
+  inLeadInbox Boolean @default(false)
 
   meetingDate           DateTime?
   /// Length of the booked meeting in minutes (30/45/60, chosen when the
@@ -506,6 +512,8 @@ model Deal {
   tasks          Task[]
   reports        CustomerReport[]
   activityEvents ActivityEvent[]
+
+  @@index([inLeadInbox, stage])
 }
 
 /// One row per visitor-stats report attempt for a customer (manually or by

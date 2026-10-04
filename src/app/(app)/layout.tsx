@@ -11,7 +11,7 @@ import { PresentationModeToggle } from "./presentation-mode-toggle";
 import { isPresentationMode } from "@/lib/presentation-mode";
 import { NewsBell } from "./news-bell";
 import { getUnreadNewsCount } from "@/lib/actions/news";
-import { IconHome, IconDeals, IconUsers, IconPercent, IconGrowth, IconTasks, IconStats, IconCalendar, IconRadar, IconPhone, IconBuilding } from "./nav-icons";
+import { IconHome, IconDeals, IconUsers, IconPercent, IconGrowth, IconTasks, IconStats, IconCalendar, IconRadar, IconPhone, IconBuilding, IconInbox } from "./nav-icons";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const [user, presenting] = await Promise.all([getCurrentUser(), isPresentationMode()]);
@@ -33,6 +33,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const navItems: SidebarNavItem[] = [
     { href: "/", label: "Oversigt", icon: <IconHome /> },
     { href: "/deals", label: "Deals", icon: <IconDeals /> },
+    { href: "/leadindbakke", label: "Leadindbakke", icon: <IconInbox /> },
     { href: "/leadgeneration", label: "Leadgeneration", icon: <IconRadar /> },
     { href: "/ringeliste", label: "Ringeliste", icon: <IconPhone /> },
     { href: "/kunder-live", label: "Live kunder", icon: <IconUsers /> },

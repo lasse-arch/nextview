@@ -138,6 +138,12 @@ const DEFAULT_POSTS: { title: string; body: string; minutesAgo: number; screensh
     body: "Har du en liste over fx alle højskoler med telefon, e-mail og hjemmeside, kan du nu lægge den ind under Leadgeneration → \"Fundne leads\" med knappen \"Importér CSV\". Filen bliver sin egen liste (opkaldt efter filen, men du kan give den et andet navn), og hver række kan tilføjes til ringelisten, tilføjes som deal eller afvises - præcis som et filters fund. \"Tilføj alle til ringeliste\" virker også.\n\nFilen skal bare have en \"Navn\"-kolonne. Telefon, Email, Hjemmeside, Adresse, Postnr, By og Land bruges, hvis de er der, og et CVR-nummer er ikke nødvendigt. Både semikolon og komma virker som skilletegn. Findes en virksomhed allerede som deal (samme navn eller e-mail), står den med en gul besked i stedet for at blive oprettet to gange.",
     screenshotUrl: "/news/csv-import.png",
   },
+  {
+    minutesAgo: 0,
+    title: "Ny side: Leadindbakke - Deals-tavlen er nu til de deals, I arbejder på",
+    body: "Alle leads, der kommer ind via ringelisterne (indsat på Ringeliste, eller tilføjet til en ringeliste fra Leadgeneration), lander nu i den nye \"Leadindbakke\" i menuen i stedet for at fylde Lead-kolonnen på Deals. Her kan du søge på navn, telefon, adresse og CVR, filtrere på ringeliste og sælger, og se dem som Ikke ringet, Kontaktet eller Tabt.\n\nSå snart der bookes et møde, rykker leadet selv over på Deals med alle noter og historik. Vil du arbejde videre med et lead før et møde (fx en der ikke havde tid lige nu), så tryk \"Flyt til Deals\" - enkeltvis eller for flere på én gang. Leads du selv opretter med \"+ Ny lead\" kommer stadig direkte på Deals.\n\nDublet-tjekket er også blevet skarpere: opretter du en deal med samme CVR, navn, kaldenavn eller adresse som en eksisterende - også én der ligger som Tabt i leadindbakken - får du en advarsel med link til den, så I ikke starter forfra på en, I allerede har ringet til.",
+    screenshotUrl: "/news/leadindbakke.png",
+  },
 ];
 
 /**

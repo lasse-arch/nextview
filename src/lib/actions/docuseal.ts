@@ -128,6 +128,7 @@ export async function buildAndSendContract(
         contractViewedAt: null,
         contractSignedAt: null,
         stage: "CONTRACT_SENT",
+        inLeadInbox: false,
         saleAmount: computeMonthlyTotal(products),
         establishmentFee: computeSetupTotal(products),
         bindingMonths: products.bindingMonths,

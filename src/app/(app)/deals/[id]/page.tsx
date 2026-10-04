@@ -7,8 +7,11 @@ import { prisma } from "@/lib/db";
 export const maxDuration = 300;
 import { getCurrentUser } from "@/lib/auth";
 import Link from "next/link";
+import { findPossibleDuplicates } from "@/lib/duplicates";
+import { MoveToDealsButton } from "./move-to-deals-button";
 import {
   importTypeLabels,
+  stageLabels,
   noteKindLabels,
   contractStatusLabels,
   invoiceStatusLabel,
@@ -94,7 +97,7 @@ export default async function DealDetailPage({
   const { id } = await params;
   const { dup } = await searchParams;
 
-  const [deal, users, currentUser, duplicateDeal, docuSealEnabled, emailTemplates] = await Promise.all([
+  const [deal, users, currentUser, docuSealEnabled, emailTemplates] = await Promise.all([
     prisma.deal.findUnique({
       where: { id },
       include: {
@@ -114,7 +117,6 @@ export default async function DealDetailPage({
     }),
     prisma.user.findMany({ orderBy: { name: "asc" } }),
     getCurrentUser(),
-    dup ? prisma.deal.findUnique({ where: { id: dup } }) : Promise.resolve(null),
     isDocuSealConfigured(),
     prisma.emailTemplate.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, subject: true, bodyHtml: true } }),
   ]);
@@ -131,6 +133,10 @@ export default async function DealDetailPage({
   ).sort((a, b) => dealName(a).localeCompare(dealName(b), "da"));
 
   if (!deal) notFound();
+  // Set right after creating a deal that may already exist (see
+  // findPossibleDuplicates) - matched on CVR, name/kaldenavn or address,
+  // including leads lying as Tabt in Leadindbakken.
+  const possibleDuplicates = dup ? await findPossibleDuplicates(deal) : [];
   // Sorted by whatever's actually shown (kaldenavn when set, else the CVR
   // name) - sorting by companyName alone left the list looking scrambled
   // whenever a branch's displayed name differs from its legal name.
@@ -169,13 +175,31 @@ export default async function DealDetailPage({
         </div>
       </div>
 
-      {duplicateDeal && (
+      {possibleDuplicates.length > 0 && (
         <div className="mt-4 rounded-md bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          Bemærk: Der findes allerede en anden deal med navnet &quot;{duplicateDeal.companyName}&quot; —{" "}
-          <Link href={`/deals/${duplicateDeal.id}`} className="font-medium underline">
-            se dealen her
-          </Link>
-          .
+          <p className="font-medium">Bemærk: Denne kan være en dublet af:</p>
+          <ul className="mt-1 space-y-0.5">
+            {possibleDuplicates.map((d) => (
+              <li key={d.id}>
+                <Link href={`/deals/${d.id}`} className="font-medium underline">
+                  {d.name}
+                </Link>{" "}
+                ({d.reasons.join(", ")}) -{" "}
+                {d.inLeadInbox
+                  ? `ligger som ${d.stage === "LOST" ? "Tabt" : (stageLabels[d.stage] ?? d.stage)} i leadindbakken${d.callListName ? ` (${d.callListName})` : ""}`
+                  : `${stageLabels[d.stage] ?? d.stage} på Deals`}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {deal.inLeadInbox && (
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-md bg-slate-100 px-4 py-2.5 text-sm text-slate-700">
+          <span>
+            Ligger i <Link href="/leadindbakke" className="font-medium underline">leadindbakken</Link> - rykker selv
+            over på Deals, når der bookes et møde.
+          </span>
+          <MoveToDealsButton dealId={deal.id} />
         </div>
       )}
 

@@ -119,6 +119,7 @@ export async function POST(request: NextRequest) {
         contractSignedAt: changedAt,
         soldAt: deal!.soldAt ?? changedAt,
         stage: "CONTRACT_SIGNED",
+        inLeadInbox: false,
       },
     });
     await logEvent("SIGNED");

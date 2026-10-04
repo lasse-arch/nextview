@@ -1,5 +1,6 @@
 "use server";
 
+import { leadInboxExitData } from "@/lib/lead-inbox";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { addMonths } from "date-fns";
@@ -7,7 +8,7 @@ import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { recalcCommission } from "@/lib/commission-service";
 import { buildDealEmailAddress } from "@/lib/email-address";
-import { findDuplicateDeals } from "@/lib/duplicates";
+import { findDuplicateDeals, findPossibleDuplicates } from "@/lib/duplicates";
 import { syncDealMeetingToCalendar, type CalendarSyncResult } from "@/lib/calendar-service";
 import { resolveCustomerMentions } from "@/lib/customer-mentions";
 import { sendContractSignedNotification } from "@/lib/notification-service";
@@ -36,7 +37,7 @@ export async function createDealManual(formData: FormData) {
   const contactEmail = String(formData.get("contactEmail") || "") || null;
   const contactPhone = String(formData.get("contactPhone") || "") || null;
 
-  const duplicates = await findDuplicateDeals(companyName);
+  const duplicates = await findPossibleDuplicates({ companyName, displayName, cvrNumber, address });
 
   const deal = await prisma.deal.create({
     data: {
@@ -67,7 +68,7 @@ export async function createDealManual(formData: FormData) {
   });
 
   revalidatePath("/deals");
-  redirect(duplicates.length > 0 ? `/deals/${deal.id}?dup=${duplicates[0].id}` : `/deals/${deal.id}`);
+  redirect(duplicates.length > 0 ? `/deals/${deal.id}?dup=1` : `/deals/${deal.id}`);
 }
 
 /**
@@ -290,6 +291,7 @@ async function updateDealInner(
       invoiceEmail,
       ownerId,
       stage,
+      ...leadInboxExitData(stage),
       meetingDate,
       soldProduct,
       bindingMonths,
@@ -375,7 +377,7 @@ export async function updateDealStage(dealId: string, newStage: DealStage) {
 
   await prisma.deal.update({
     where: { id: dealId },
-    data: { stage: newStage, ...stageDateUpdates },
+    data: { stage: newStage, ...stageDateUpdates, ...leadInboxExitData(newStage) },
   });
 
   if (newStage !== existing.stage) {
@@ -413,7 +415,7 @@ export async function setMeetingDateAndStage(dealId: string, meetingDateIso: str
 
   const deal = await prisma.deal.update({
     where: { id: dealId },
-    data: { stage: "MEETING_BOOKED", meetingDate },
+    data: { stage: "MEETING_BOOKED", meetingDate, inLeadInbox: false },
   });
 
   // Only the actual booking is activity-worthy - this action is also used to

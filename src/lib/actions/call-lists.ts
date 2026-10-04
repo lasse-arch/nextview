@@ -183,6 +183,9 @@ export async function addLeadsToCallList(
         ownerId: user.id,
         importType: "MANUAL",
         callListId,
+        // Fresh off a ringeliste - a lead to call, not a deal being worked
+        // yet, so it starts in Leadindbakken (see Deal.inLeadInbox).
+        inLeadInbox: true,
       },
     });
     await prisma.deal.update({ where: { id: deal.id }, data: { dealEmailAddress: buildDealEmailAddress(deal.id) } });
