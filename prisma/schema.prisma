@@ -488,6 +488,12 @@ model Deal {
   /// Defaults to Danish for everyone; switched to English per customer as needed.
   reportLanguage ReportLanguage @default(DA)
 
+  /// Set on a parent with linked branches: the automatic run sends ONE
+  /// combined report (this deal + its branches with an MP-Skin nummer) on
+  /// this deal's own interval, the same as "Send samlet" - and those
+  /// branches are then never sent on their own automatically.
+  reportCombineBranches Boolean @default(false)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

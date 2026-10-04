@@ -510,20 +510,44 @@ export async function enqueueScheduledCustomerReports(): Promise<{ queued: numbe
     where: {
       reportInterval: { not: null },
       nextReportDueAt: { lte: new Date() },
-      mpSkinId: { not: null },
+      // A parent sending combined may have no MP-Skin nummer of its own -
+      // its branches' stats are what goes out.
+      OR: [{ mpSkinId: { not: null } }, { reportCombineBranches: true }],
       churnedAt: null,
       stage: { in: [...REPORTABLE_STAGES] },
     },
-    select: { id: true },
+    select: {
+      id: true,
+      mpSkinId: true,
+      reportCombineBranches: true,
+      parent: { select: { reportCombineBranches: true } },
+      branches: {
+        where: { mpSkinId: { not: null }, churnedAt: null, stage: { in: [...REPORTABLE_STAGES] } },
+        select: { id: true },
+      },
+    },
   });
 
-  if (deals.length > 0) {
+  // A parent with reportCombineBranches sends one combined report covering
+  // its branches (see generateAndSendCombinedCustomerReport) - so those
+  // branches are skipped here rather than also getting their own.
+  const rows: { dealId: string; branchDealIds: string | null }[] = [];
+  for (const d of deals) {
+    if (d.parent?.reportCombineBranches) continue;
+    if (d.reportCombineBranches && d.branches.length > 0) {
+      rows.push({ dealId: d.id, branchDealIds: d.branches.map((b) => b.id).join(",") });
+    } else if (d.mpSkinId) {
+      rows.push({ dealId: d.id, branchDealIds: null });
+    }
+  }
+
+  if (rows.length > 0) {
     await prisma.customerReport.createMany({
-      data: deals.map((d) => ({ dealId: d.id, method: "AUTOMATIC" as const, status: "PENDING" as const })),
+      data: rows.map((r) => ({ ...r, method: "AUTOMATIC" as const, status: "PENDING" as const })),
     });
   }
 
-  return { queued: deals.length };
+  return { queued: rows.length };
 }
 
 /**
