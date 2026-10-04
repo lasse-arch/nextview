@@ -201,6 +201,51 @@ async function reopenIfDismissed(candidateId: string) {
 }
 
 /**
+ * "Flyt til ringeliste" on found leads that are already deals - moves those
+ * existing deals onto the chosen ringeliste, the same explicit "Tilføj
+ * alligevel" the Ringeliste quick-add offers. Never done implicitly (see
+ * claimCandidateAndUpsertDeal): only after the person has seen which
+ * deals they are and asked for it. The leads then leave this list.
+ */
+export async function moveLeadDealsToCallList(
+  candidateIds: string[],
+  callListId: string,
+  filterId?: string | null
+): Promise<{ ok: true; moved: number } | { ok: false; error: string }> {
+  const user = await requireUser();
+  const list = await prisma.callList.findUnique({ where: { id: callListId } });
+  if (!list) return { ok: false, error: "Listen findes ikke længere." };
+
+  const candidates = await prisma.leadCandidate.findMany({ where: { id: { in: candidateIds } } });
+  let moved = 0;
+  for (const candidate of candidates) {
+    const deal = candidate.dealId
+      ? await prisma.deal.findUnique({ where: { id: candidate.dealId } })
+      : candidate.cvrNumber
+        ? await prisma.deal.findFirst({ where: { cvrNumber: candidate.cvrNumber } })
+        : null;
+    if (!deal) continue;
+    if (deal.callListId !== callListId) {
+      await prisma.deal.update({ where: { id: deal.id }, data: { callListId } });
+      await logActivity({
+        type: "DEAL_UPDATED",
+        message: `${user.name} flyttede ${dealName(deal)} til ${list.name} fra Leadgeneration`,
+        actorId: user.id,
+        dealId: deal.id,
+      });
+    }
+    await prisma.leadCandidate.update({ where: { id: candidate.id }, data: { status: "ADDED", dealId: deal.id } });
+    moved++;
+  }
+  await markMatchesHandled(filterId, candidateIds);
+
+  revalidatePath("/leadgeneration");
+  revalidatePath("/ringeliste");
+  revalidatePath("/deals");
+  return { ok: true, moved };
+}
+
+/**
  * "Skjul" on an already-handled lead in a filter's list - just takes it off
  * that list, without touching the lead or its deal.
  */

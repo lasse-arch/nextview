@@ -9,6 +9,7 @@ import {
   deleteLeadCandidates,
   renameLeadFilter,
   hideLeadMatch,
+  moveLeadDealsToCallList,
 } from "@/lib/actions/lead-generation";
 import { renameWatchedUrl } from "@/lib/actions/lead-url-scan";
 import { importLeadCsv, renameLeadImportList } from "@/lib/actions/lead-import";
@@ -176,6 +177,23 @@ function CandidateCard({
     });
   }
 
+  function moveToCallList() {
+    if (!targetListId) {
+      showToast("Vælg eller opret en ringeliste først.");
+      return;
+    }
+    startTransition(async () => {
+      const result = await moveLeadDealsToCallList([candidate.id], targetListId, candidate.listFilterId);
+      if (!result.ok) {
+        showToast(result.error);
+        return;
+      }
+      hide();
+      showToast("Dealen er flyttet til ringelisten.");
+      router.refresh();
+    });
+  }
+
   function hideFromList() {
     // Outside a filter's list (an imported CSV or scanned page) a lead
     // belongs to just that one list, so hiding it is simply dismissing it.
@@ -276,6 +294,15 @@ function CandidateCard({
             >
               Skjul
             </button>
+            <button
+              type="button"
+              onClick={moveToCallList}
+              disabled={pending}
+              title="Flyt den eksisterende deal til den valgte ringeliste ovenfor"
+              className="rounded-md border border-violet-300 px-2.5 py-1 text-xs font-medium text-violet-700 hover:bg-violet-50 disabled:opacity-50"
+            >
+              {pending ? "Flytter…" : "Flyt til ringeliste"}
+            </button>
             <Link
               href={`/deals/${known.dealId}`}
               className="rounded-md bg-slate-900 px-2.5 py-1 text-xs font-medium text-white hover:bg-slate-800"
@@ -350,14 +377,39 @@ function CandidateGroup({
   const total = (candidates[0]?.groupTotal ?? candidates.length) - (candidates.length - visible.length);
   const notLoaded = total - visible.length;
 
-  // Leads already handled elsewhere (see KnownLeadStatus) are left alone by
-  // "Tilføj alle" - they're only listed here for information.
-  const addable = visible.filter((c) => !c.known);
+  const listFilterId = candidates[0]?.listFilterId ?? null;
+  // "Tilføj alle" adds every lead that isn't a deal yet (one dismissed
+  // earlier included). Ones that are already deals are never moved onto the
+  // ringeliste silently - after adding the rest, it asks first, like the
+  // Ringeliste quick-add's "Tilføj alligevel".
+  const addable = visible.filter((c) => c.known?.kind !== "deal");
+  const existingDeals = visible.filter((c) => c.known?.kind === "deal");
+  const [movePromptIds, setMovePromptIds] = useState<string[] | null>(null);
+  const movePrompt = movePromptIds ? visible.filter((c) => movePromptIds.includes(c.id)) : [];
 
   function addAll() {
     startAddingAll(async () => {
-      await onAddAll(addable.map((c) => c.id), candidates[0]?.listFilterId ?? null);
-      setHiddenIds((prev) => new Set([...prev, ...addable.map((c) => c.id)]));
+      if (addable.length > 0) {
+        await onAddAll(addable.map((c) => c.id), listFilterId);
+        setHiddenIds((prev) => new Set([...prev, ...addable.map((c) => c.id)]));
+      }
+      setMovePromptIds(existingDeals.length > 0 ? existingDeals.map((c) => c.id) : null);
+    });
+  }
+
+  function moveExistingDeals() {
+    if (!targetListId || movePrompt.length === 0) return;
+    const ids = movePrompt.map((c) => c.id);
+    startAddingAll(async () => {
+      const result = await moveLeadDealsToCallList(ids, targetListId, listFilterId);
+      if (!result.ok) {
+        showToast(result.error);
+        return;
+      }
+      showToast(`${result.moved} eksisterende deal${result.moved === 1 ? "" : "s"} flyttet til ringelisten.`);
+      setHiddenIds((prev) => new Set([...prev, ...ids]));
+      setMovePromptIds(null);
+      router.refresh();
     });
   }
 
@@ -494,7 +546,7 @@ function CandidateGroup({
           <button
             type="button"
             onClick={addAll}
-            disabled={addingAll || !targetListId || addable.length === 0}
+            disabled={addingAll || !targetListId}
             title={!targetListId ? "Vælg eller opret en ringeliste først" : "Tilføj alle i denne liste til den valgte ringeliste"}
             className="rounded-md border border-violet-300 px-2.5 py-1 text-xs font-medium text-violet-700 hover:bg-violet-50 disabled:opacity-50"
           >
@@ -502,6 +554,30 @@ function CandidateGroup({
           </button>
         </div>
       </div>
+      {movePrompt.length > 0 && (
+        <div className="mt-2 flex flex-wrap items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          <span>
+            {movePrompt.length} findes allerede som deal ({movePrompt.slice(0, 3).map((c) => c.companyName).join(", ")}
+            {movePrompt.length > 3 ? ` +${movePrompt.length - 3} mere` : ""}) og blev ikke flyttet.
+          </span>
+          <button
+            type="button"
+            onClick={moveExistingDeals}
+            disabled={addingAll}
+            className="rounded-md border border-amber-400 bg-white px-2 py-1 font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-50"
+          >
+            {addingAll ? "Flytter…" : "Flyt dem også til ringelisten"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setMovePromptIds(null)}
+            disabled={addingAll}
+            className="px-1 py-1 font-medium text-amber-700 hover:text-amber-900"
+          >
+            Nej tak
+          </button>
+        </div>
+      )}
       {expanded && (
         <div className="mt-2 space-y-4">
           {groupByFoundDay(visible).map(([dayLabel, dayCandidates]) => (
