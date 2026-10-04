@@ -581,6 +581,28 @@ export async function processOneQueuedReport(): Promise<{ processed: boolean; re
 }
 
 /**
+ * "Sender rapporter: 3/20 sendt" on Stats - the batch is every report queued
+ * since the oldest one still waiting, so it covers a bulk "Send nu" as well
+ * as the automatic morning run. Null when nothing is waiting.
+ */
+export async function getReportQueueProgress(): Promise<{ done: number; failed: number; total: number } | null> {
+  const oldestPending = await prisma.customerReport.findFirst({
+    where: { status: "PENDING" },
+    orderBy: { createdAt: "asc" },
+    select: { createdAt: true },
+  });
+  if (!oldestPending) return null;
+  const batch = await prisma.customerReport.groupBy({
+    by: ["status"],
+    where: { createdAt: { gte: oldestPending.createdAt } },
+    _count: { _all: true },
+  });
+  const count = (status: string) => batch.find((b) => b.status === status)?._count._all ?? 0;
+  const total = batch.reduce((sum, b) => sum + b._count._all, 0);
+  return { done: total - count("PENDING"), failed: count("FAILED"), total };
+}
+
+/**
  * How long the queue may go without progress before it counts as stalled -
  * just past the processing route's own 300s maxDuration, so a report that
  * is genuinely still being worked on is never picked up a second time.

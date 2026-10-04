@@ -6,6 +6,7 @@ import { useToast } from "@/components/toast";
 import { startDownloadJob } from "./download-job-store";
 import { DownloadJobsCorner } from "./download-jobs-corner";
 import { StatsCustomerRow, type StatsCustomerRowData } from "./stats-customer-row";
+import { usePollWhilePending } from "../use-poll-while-pending";
 
 /**
  * Wraps the "Live kunder" table in one client component so checkbox
@@ -13,8 +14,20 @@ import { StatsCustomerRow, type StatsCustomerRowData } from "./stats-customer-ro
  * manages only its own local state) - lets an admin queue several, or all,
  * visitor-stats reports in one "Send nu" click instead of one row at a time.
  */
-export function LiveCustomersTable({ rows }: { rows: StatsCustomerRowData[] }) {
+/** Progress of the report queue currently being worked through - counted
+ * from the database (see getReportQueueProgress), so it's right after a
+ * reload and for the automatic morning run too, not just this click. */
+export type ReportQueueProgress = { done: number; failed: number; total: number };
+
+export function LiveCustomersTable({
+  rows,
+  queueProgress,
+}: {
+  rows: StatsCustomerRowData[];
+  queueProgress: ReportQueueProgress | null;
+}) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  usePollWhilePending(queueProgress !== null);
   const [search, setSearch] = useState("");
   const [sendingAll, startSendAll] = useTransition();
   const [downloading, startDownload] = useTransition();
@@ -137,6 +150,24 @@ export function LiveCustomersTable({ rows }: { rows: StatsCustomerRowData[] }) {
           </button>
         </div>
       </div>
+
+      {queueProgress && (
+        <div className="mb-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+            <span className="flex items-center gap-1.5 font-medium text-slate-700">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-blue-500" />
+              Sender rapporter: {queueProgress.done - queueProgress.failed}/{queueProgress.total} sendt
+            </span>
+            {queueProgress.failed > 0 && <span className="text-red-600">{queueProgress.failed} fejlede</span>}
+          </div>
+          <div className="mt-1.5 h-1.5 rounded-full bg-slate-200">
+            <div
+              className="h-1.5 rounded-full bg-blue-500 transition-all"
+              style={{ width: `${Math.max(3, (queueProgress.done / queueProgress.total) * 100)}%` }}
+            />
+          </div>
+        </div>
+      )}
 
       <div className="space-y-2">
         {visibleRows.map((row) => (
