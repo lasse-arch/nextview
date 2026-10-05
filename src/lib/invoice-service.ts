@@ -297,12 +297,13 @@ function copenhagenToday(now: Date): Date {
 
 /**
  * Dinero date, payment terms and due date for an invoice. A normal customer
- * gets Netto 8 (see computeRecurringInvoiceDate). A Betalingsservice
- * customer's invoice is dated today and due on its collection date - the
- * first banking day of the quarter, or for the establishment fee (and a
- * quarter drafted too late for its own month's BS deadline) the first
- * reachable first-of-month - with a note telling them not to pay by bank
- * transfer, since the amount is collected through Betalingsservice.
+ * - and every establishment fee - gets Netto 8 (see
+ * computeRecurringInvoiceDate). A Betalingsservice customer's quarterly
+ * invoice is dated today and due on its collection date - the first banking
+ * day of the quarter, or for a quarter drafted too late for its own month's
+ * BS deadline the first reachable first-of-month - with a note telling them
+ * not to pay by bank transfer, since the amount is collected through
+ * Betalingsservice.
  */
 export function invoiceTerms(
   paymentMethod: PaymentMethod,
@@ -311,13 +312,15 @@ export function invoiceTerms(
   language: "da" | "en",
   now = new Date()
 ): InvoiceTerms {
-  if (paymentMethod !== "BETALINGSSERVICE") {
+  // The establishment fee is always a normal invoice the customer pays
+  // themselves - only the recurring quarters go through Betalingsservice.
+  if (paymentMethod !== "BETALINGSSERVICE" || quarterIndex === 0) {
     const invoiceDate = quarterIndex === 0 ? new Date() : computeRecurringInvoiceDate(scheduledDate);
     return { invoiceDate, paymentDays: 8, dueDate: invoiceDueDate(invoiceDate), collectViaBs: false, noteSuffix: null };
   }
 
   const today = copenhagenToday(now);
-  let collectionDate = quarterIndex === 0 ? earliestCollectionDate(now) : collectionDateForPeriod(scheduledDate);
+  let collectionDate = collectionDateForPeriod(scheduledDate);
   if (deliveryDeadline(collectionDate).getTime() - now.getTime() < 24 * 60 * 60 * 1000) {
     collectionDate = earliestCollectionDate(now);
   }
@@ -606,8 +609,12 @@ async function processCombinedDueInvoices(
     }))
   );
   const anyRecurringLine = invoiceRows.find((r) => r.invoiceRow.quarterIndex > 0);
+  // A combined invoice that includes an establishment fee is a normal
+  // invoice as a whole, since the establishment fee is never collected
+  // through Betalingsservice.
+  const hasEstablishmentLine = invoiceRows.some((r) => r.invoiceRow.quarterIndex === 0);
   const terms = invoiceTerms(
-    leadDeal.paymentMethod,
+    hasEstablishmentLine ? "INVOICE" : leadDeal.paymentMethod,
     anyRecurringLine ? anyRecurringLine.invoiceRow.quarterIndex : 0,
     (anyRecurringLine ?? invoiceRows[0]).invoiceRow.scheduledDate,
     invoiceLanguage(leadDeal)
