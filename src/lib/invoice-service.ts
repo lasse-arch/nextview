@@ -10,7 +10,8 @@ import {
   allSelectedProductLabels,
   recurringProductLabels,
 } from "@/lib/contract-template-data";
-import type { DealStage } from "@prisma/client";
+import type { DealStage, PaymentMethod } from "@prisma/client";
+import { collectionDateForPeriod, deliveryDeadline, earliestCollectionDate, utcDay } from "@/lib/betalingsservice/banking-days";
 
 const ACTIVE_CUSTOMER_STAGES: DealStage[] = ["CONTRACT_SIGNED", "FILMED", "LIVE"];
 const HANDLED_STATUSES = ["DRAFT_CREATED", "IMPORTED", "SENT_MANUALLY"];
@@ -81,7 +82,7 @@ function computeDueLines(
     contractSignedAt: Date | null;
     contractEndDate: Date | null;
   },
-  options: { sendEstablishmentNow?: boolean; sendPeriodsNow?: boolean } = {},
+  options: { sendEstablishmentNow?: boolean; sendPeriodsNow?: boolean; betalingsservice?: boolean } = {},
   handledQuarterIndexes: Set<number> = new Set()
 ): { lines: DueLine[]; nextDueDate: Date | null } {
   const now = new Date();
@@ -144,12 +145,19 @@ function computeDueLines(
     if (i < firstRelevantIndex) return;
     if (handledQuarterIndexes.has(period.index)) return;
 
-    if (period.draftTriggerDate <= now) {
+    // A Betalingsservice customer's quarter has to be in a BS file by the
+    // 6th last banking day of the month before it starts, so its invoice is
+    // made from the 1st of that month instead of a week before.
+    const draftTriggerDate = options.betalingsservice
+      ? startOfMonth(subMonths(period.startDate, 1))
+      : period.draftTriggerDate;
+
+    if (draftTriggerDate <= now) {
       lines.push({ quarterIndex: period.index, amount: amounts[i], scheduledDate: period.startDate });
       return;
     }
 
-    if (!nextDueDate || period.draftTriggerDate < nextDueDate) nextDueDate = period.draftTriggerDate;
+    if (!nextDueDate || draftTriggerDate < nextDueDate) nextDueDate = draftTriggerDate;
     if (sawFirstNotDuePeriod) return;
     sawFirstNotDuePeriod = true;
 
@@ -174,6 +182,7 @@ type DraftableDeal = {
   dineroContactGuid: string | null;
   soldProduct: string | null;
   contractProducts: unknown;
+  paymentMethod: PaymentMethod;
 };
 
 /**
@@ -271,6 +280,69 @@ function invoiceDueDate(invoiceDate: Date): Date {
   return addDays(invoiceDate, 8);
 }
 
+type InvoiceTerms = {
+  invoiceDate: Date;
+  paymentDays: number;
+  dueDate: Date;
+  collectViaBs: boolean;
+  /** Appended to the invoice's note (Dinero "Kommentarer"). */
+  noteSuffix: string | null;
+};
+
+/** Today's calendar day in Copenhagen, as UTC midnight (see banking-days.ts). */
+function copenhagenToday(now: Date): Date {
+  const [y, m, d] = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Copenhagen" }).format(now).split("-").map(Number);
+  return utcDay(y, m - 1, d);
+}
+
+/**
+ * Dinero date, payment terms and due date for an invoice. A normal customer
+ * gets Netto 8 (see computeRecurringInvoiceDate). A Betalingsservice
+ * customer's invoice is dated today and due on its collection date - the
+ * first banking day of the quarter, or for the establishment fee (and a
+ * quarter drafted too late for its own month's BS deadline) the first
+ * reachable first-of-month - with a note telling them not to pay by bank
+ * transfer, since the amount is collected through Betalingsservice.
+ */
+export function invoiceTerms(
+  paymentMethod: PaymentMethod,
+  quarterIndex: number,
+  scheduledDate: Date,
+  language: "da" | "en",
+  now = new Date()
+): InvoiceTerms {
+  if (paymentMethod !== "BETALINGSSERVICE") {
+    const invoiceDate = quarterIndex === 0 ? new Date() : computeRecurringInvoiceDate(scheduledDate);
+    return { invoiceDate, paymentDays: 8, dueDate: invoiceDueDate(invoiceDate), collectViaBs: false, noteSuffix: null };
+  }
+
+  const today = copenhagenToday(now);
+  let collectionDate = quarterIndex === 0 ? earliestCollectionDate(now) : collectionDateForPeriod(scheduledDate);
+  if (deliveryDeadline(collectionDate).getTime() - now.getTime() < 24 * 60 * 60 * 1000) {
+    collectionDate = earliestCollectionDate(now);
+  }
+  const paymentDays = Math.round((collectionDate.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
+  const dateLabel = new Intl.DateTimeFormat(language === "en" ? "en-GB" : "da-DK", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(collectionDate);
+  const noteSuffix =
+    language === "en"
+      ? `The amount will be collected via Betalingsservice on ${dateLabel} - please do not pay by bank transfer.`
+      : `Beløbet opkræves via Betalingsservice d. ${dateLabel} - betal venligst ikke via bankoverførsel.`;
+  return { invoiceDate: today, paymentDays, dueDate: collectionDate, collectViaBs: true, noteSuffix };
+}
+
+function withNoteSuffix(note: string, suffix: string | null): string {
+  return suffix ? `${note}\n\n${suffix}` : note;
+}
+
+function invoiceLanguage(deal: { contractProducts: unknown }): "da" | "en" {
+  return parseContractProducts(deal.contractProducts)?.language === "en" ? "en" : "da";
+}
+
 /**
  * Attempts to draft one invoice line in Dinero and records the outcome on
  * its Invoice row. Shared by the bulk quarterly run and the single-invoice
@@ -294,7 +366,8 @@ async function draftInvoiceLine(
     // See computeRecurringInvoiceDate. The one-off establishment fee has no
     // period to align a due date to, so it's simply dated whenever it's
     // actually drafted.
-    const invoiceDate = invoiceRow.quarterIndex === 0 ? new Date() : computeRecurringInvoiceDate(invoiceRow.scheduledDate);
+    const terms = invoiceTerms(deal.paymentMethod, invoiceRow.quarterIndex, invoiceRow.scheduledDate, invoiceLanguage(deal));
+    const { invoiceDate } = terms;
     const result = await createQuarterlyInvoiceDraft({
       existingContactGuid: contactGuidHint,
       companyName: deal.companyName,
@@ -302,9 +375,10 @@ async function draftInvoiceLine(
       contactEmail: deal.invoiceEmail || deal.contactEmail,
       contactPhone: deal.contactPhone,
       address: deal.address,
-      note,
+      note: withNoteSuffix(note, terms.noteSuffix),
       lines,
       invoiceDate,
+      paymentDays: terms.paymentDays,
     });
 
     await prisma.$transaction([
@@ -315,7 +389,8 @@ async function draftInvoiceLine(
           dineroInvoiceGuid: result.invoiceGuid,
           dineroInvoiceNumber: result.invoiceNumber,
           sentAt: result.sendError ? null : new Date(),
-          dueDate: invoiceDueDate(invoiceDate),
+          dueDate: terms.dueDate,
+          collectViaBs: terms.collectViaBs,
           // The draft itself was created successfully - keep that status even
           // if the automatic booking/emailing step afterwards failed, so a
           // retry never creates a second, duplicate draft for the same
@@ -374,7 +449,11 @@ async function processDealDueInvoices(
   const handledQuarterIndexes = new Set(
     termInvoices.filter((inv) => HANDLED_STATUSES.includes(inv.status)).map((inv) => inv.quarterIndex)
   );
-  const { lines: dueLines, nextDueDate } = computeDueLines(deal, options, handledQuarterIndexes);
+  const { lines: dueLines, nextDueDate } = computeDueLines(
+    deal,
+    { ...options, betalingsservice: deal.paymentMethod === "BETALINGSSERVICE" },
+    handledQuarterIndexes
+  );
 
   let checked = 0;
   let created = 0;
@@ -469,7 +548,11 @@ async function processCombinedDueInvoices(
     const handledQuarterIndexes = new Set(
       termInvoices.filter((inv) => HANDLED_STATUSES.includes(inv.status)).map((inv) => inv.quarterIndex)
     );
-    const { lines } = computeDueLines(deal, options, handledQuarterIndexes);
+    const { lines } = computeDueLines(
+      deal,
+      { ...options, betalingsservice: deal.paymentMethod === "BETALINGSSERVICE" },
+      handledQuarterIndexes
+    );
     const dueLines = lines.filter((line) => {
       const existing = termInvoices.find((inv) => inv.quarterIndex === line.quarterIndex);
       return !(existing && HANDLED_STATUSES.includes(existing.status));
@@ -523,7 +606,13 @@ async function processCombinedDueInvoices(
     }))
   );
   const anyRecurringLine = invoiceRows.find((r) => r.invoiceRow.quarterIndex > 0);
-  const invoiceDate = anyRecurringLine ? computeRecurringInvoiceDate(anyRecurringLine.invoiceRow.scheduledDate) : new Date();
+  const terms = invoiceTerms(
+    leadDeal.paymentMethod,
+    anyRecurringLine ? anyRecurringLine.invoiceRow.quarterIndex : 0,
+    (anyRecurringLine ?? invoiceRows[0]).invoiceRow.scheduledDate,
+    invoiceLanguage(leadDeal)
+  );
+  const { invoiceDate } = terms;
 
   try {
     const result = await createQuarterlyInvoiceDraft({
@@ -533,9 +622,10 @@ async function processCombinedDueInvoices(
       contactEmail: leadDeal.invoiceEmail || leadDeal.contactEmail,
       contactPhone: leadDeal.contactPhone,
       address: leadDeal.address,
-      note,
+      note: withNoteSuffix(note, terms.noteSuffix),
       lines,
       invoiceDate,
+      paymentDays: terms.paymentDays,
     });
 
     await prisma.$transaction([
@@ -547,7 +637,8 @@ async function processCombinedDueInvoices(
             dineroInvoiceGuid: result.invoiceGuid,
             dineroInvoiceNumber: result.invoiceNumber,
             sentAt: result.sendError ? null : new Date(),
-            dueDate: invoiceDueDate(invoiceDate),
+            dueDate: terms.dueDate,
+            collectViaBs: terms.collectViaBs,
             failureReason: result.sendError ? `Oprettet, men ikke sendt automatisk: ${result.sendError}` : null,
           },
         })

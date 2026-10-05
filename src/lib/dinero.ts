@@ -344,6 +344,9 @@ type DineroInvoiceInput = {
   note: string;
   lines: DineroInvoiceLine[];
   invoiceDate: Date;
+  /** Netto payment days - 8 unless the due date has to land on a specific
+   * day (a Betalingsservice collection date). */
+  paymentDays?: number;
 };
 
 /** Thrown when Dinero rejects a contact GUID as nonexistent (e.g. it was
@@ -371,7 +374,7 @@ async function createInvoiceDraft(
       // "Faktura" when left unset, which is what we want there.
       Comment: input.note,
       PaymentConditionType: "Netto",
-      PaymentConditionNumberOfDays: 8,
+      PaymentConditionNumberOfDays: input.paymentDays ?? 8,
       ProductLines: input.lines.map((line) => ({
         Description: line.description,
         Quantity: 1,
@@ -540,6 +543,7 @@ export async function createQuarterlyInvoiceDraft(params: {
   note: string;
   lines: DineroInvoiceLine[];
   invoiceDate: Date;
+  paymentDays?: number;
 }): Promise<DineroDraftResult> {
   if (await isDineroTestMode()) {
     const fake = Math.random().toString(36).slice(2, 8);
@@ -581,6 +585,7 @@ export async function createQuarterlyInvoiceDraft(params: {
       note: params.note,
       lines: params.lines,
       invoiceDate: params.invoiceDate,
+      paymentDays: params.paymentDays,
     });
     const sendError = await bookAndSendOrCapture(accessToken, invoice.guid, invoice.timestamp, params.contactEmail);
     return { contactGuid, invoiceGuid: invoice.guid, invoiceNumber: invoice.number, sendError };
@@ -608,8 +613,56 @@ export async function createQuarterlyInvoiceDraft(params: {
       note: params.note,
       lines: params.lines,
       invoiceDate: params.invoiceDate,
+      paymentDays: params.paymentDays,
     });
     const sendError = await bookAndSendOrCapture(accessToken, invoice.guid, invoice.timestamp, params.contactEmail);
     return { contactGuid: freshContactGuid, invoiceGuid: invoice.guid, invoiceNumber: invoice.number, sendError };
   }
+}
+
+/** A booked invoice's total incl. VAT and current concurrency timestamp. */
+export async function getInvoiceTotals(
+  invoiceGuid: string
+): Promise<{ totalInclVat: number; number: string | null; timestamp: string | null }> {
+  const accessToken = await getAccessToken();
+  const orgId = process.env.DINERO_ORGANIZATION_ID!;
+  const res = await dineroFetch(`${DINERO_API_BASE}/${orgId}/invoices/${invoiceGuid}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) throw new Error(`Dinero: kunne ikke hente faktura (${res.status}): ${await res.text()}`);
+  const data = (await res.json()) as { TotalInclVat?: number; Number?: number | string; TimeStamp?: string };
+  if (typeof data.TotalInclVat !== "number") throw new Error("Dinero: fakturaen har intet totalbeløb.");
+  return {
+    totalInclVat: data.TotalInclVat,
+    number: data.Number != null ? String(data.Number) : null,
+    timestamp: data.TimeStamp ?? null,
+  };
+}
+
+/**
+ * Registers a payment on a booked invoice (POST .../invoices/{guid}/payments)
+ * against `depositAccountNumber` - for Betalingsservice that's the
+ * mellemregningskonto the bank's lump-sum deposit is reconciled against.
+ */
+export async function registerInvoicePayment(
+  invoiceGuid: string,
+  payment: { amount: number; depositAccountNumber: number; paymentDate: Date; description: string; externalReference: string }
+): Promise<void> {
+  const accessToken = await getAccessToken();
+  const orgId = process.env.DINERO_ORGANIZATION_ID!;
+  const { timestamp } = await getInvoiceTotals(invoiceGuid);
+  const res = await dineroFetch(`${DINERO_API_BASE}/${orgId}/invoices/${invoiceGuid}/payments`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      Timestamp: timestamp,
+      DepositAccountNumber: payment.depositAccountNumber,
+      ExternalReference: payment.externalReference,
+      PaymentDate: payment.paymentDate.toISOString().slice(0, 10),
+      Description: payment.description,
+      Amount: payment.amount,
+      RemainderIsFee: false,
+    }),
+  });
+  if (!res.ok) throw new Error(`Dinero: kunne ikke registrere betaling (${res.status}): ${await res.text()}`);
 }

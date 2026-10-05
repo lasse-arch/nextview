@@ -144,6 +144,12 @@ const DEFAULT_POSTS: { title: string; body: string; minutesAgo: number; screensh
     body: "Alle leads, der kommer ind via ringelisterne (indsat på Ringeliste, eller tilføjet til en ringeliste fra Leadgeneration), lander nu i den nye \"Leadindbakke\" i menuen i stedet for at fylde Lead-kolonnen på Deals. Her kan du søge på navn, telefon, adresse og CVR, filtrere på ringeliste og sælger, og se dem som Ikke ringet, Kontaktet eller Tabt.\n\nSå snart der bookes et møde, rykker leadet selv over på Deals med alle noter og historik. Vil du arbejde videre med et lead før et møde (fx en der ikke havde tid lige nu), så tryk \"Flyt til Deals\" - enkeltvis eller for flere på én gang. Leads du selv opretter med \"+ Ny lead\" kommer stadig direkte på Deals.\n\nDublet-tjekket er også blevet skarpere: opretter du en deal med samme CVR, navn, kaldenavn eller adresse som en eksisterende - også én der ligger som Tabt i leadindbakken - får du en advarsel med link til den, så I ikke starter forfra på en, I allerede har ringet til.",
     screenshotUrl: "/news/leadindbakke.png",
   },
+  {
+    minutesAgo: 0,
+    title: "Ny side: Betalingsservice - kunder kan betale via indbetalingskort og automatisk betaling",
+    body: "En kunde kan nu sættes på Betalingsservice under \"Fakturaer\" på dealen (\"Betaling: Betalingsservice\"). Kunden får et fast kundenummer (fx NV00012) og får stadig sin faktura fra Dinero som før - men den forfalder d. 1. i kvartalet og har teksten \"Beløbet opkræves via Betalingsservice - betal venligst ikke via bankoverførsel\". Fakturaen til en Betalingsservice-kunde laves fra d. 1. i måneden før kvartalet, så den kan nå Betalingsservices frist.\n\nUnder Indstillinger → Betalingsservice ligger alle fakturaer, der venter på at blive opkrævet. \"Lav betalingsfil\" laver filen, som du downloader og uploader hos Betalingsservice - senest kl. 11 på 6.-sidste bankdag i måneden før (siden viser fristen). Når Betalingsservice sender resultatfilen tilbage, indlæser du den samme sted: betalte fakturaer markeres som betalt, også i Dinero (på mellemregningskontoen), og afviste eller tilbageførte står med rødt, så I kan rykke. Kunder uden aftale får indbetalingskort; når de tilmelder sig automatisk betaling i netbanken, opdateres de selv, når aftalefilen indlæses.",
+    screenshotUrl: "/news/betalingsservice.png",
+  },
 ];
 
 /**

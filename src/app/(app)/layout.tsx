@@ -49,7 +49,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: "/settings/docuseal", label: "Kontrakter" },
   ];
   if (user.canAccessBilling) {
-    settingsItems.push({ href: "/settings/dinero", label: "Fakturaer" }, { href: "/settings/betaling", label: "Betalingsstatus" });
+    settingsItems.push({ href: "/settings/dinero", label: "Fakturaer" }, { href: "/settings/betaling", label: "Betalingsstatus" }, { href: "/settings/betalingsservice", label: "Betalingsservice" });
   }
   if (user.role === "ADMIN") {
     settingsItems.push({ href: "/users", label: "Brugere" });

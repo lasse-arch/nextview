@@ -32,6 +32,7 @@ import { ArchiveContractButton } from "./archive-contract-button";
 import { ArchiveToDriveButton } from "./archive-to-drive-button";
 import { StageFields } from "./stage-fields";
 import { InactiveToggleButton } from "./inactive-toggle-button";
+import { PaymentMethodControl } from "./payment-method-control";
 import { BookMeetingButton } from "./book-meeting-button";
 import { TerminationSection } from "./termination-section";
 import { DealItemsSection } from "./deal-items-section";
@@ -87,6 +88,16 @@ function authorInitials(name: string): string {
     .toUpperCase();
 }
 
+/** Where a Betalingsservice invoice is in the collection flow. */
+const BS_PILL_LABEL: Record<string, string> = {
+  NONE: "Betalingsservice: venter på fil",
+  IN_FILE: "Betalingsservice: sendt til opkrævning",
+  PAID: "Betalingsservice: betalt",
+  REJECTED: "Betalingsservice: afvist",
+  CANCELLED: "Betalingsservice: annulleret",
+  CHARGED_BACK: "Betalingsservice: tilbageført",
+};
+
 export default async function DealDetailPage({
   params,
   searchParams,
@@ -97,7 +108,7 @@ export default async function DealDetailPage({
   const { id } = await params;
   const { dup } = await searchParams;
 
-  const [deal, users, currentUser, docuSealEnabled, emailTemplates] = await Promise.all([
+  const [deal, users, currentUser, docuSealEnabled, emailTemplates, bsSettings] = await Promise.all([
     prisma.deal.findUnique({
       where: { id },
       include: {
@@ -106,7 +117,7 @@ export default async function DealDetailPage({
         commission: { include: { seller: true } },
         notes: { include: { author: true }, orderBy: { createdAt: "desc" } },
         emails: { orderBy: { sentAt: "desc" } },
-        invoices: { orderBy: { quarterIndex: "asc" } },
+        invoices: { orderBy: { quarterIndex: "asc" }, include: { bsCollection: { select: { status: true } } } },
         items: { orderBy: { createdAt: "asc" } },
         parent: true,
         branches: true,
@@ -119,6 +130,7 @@ export default async function DealDetailPage({
     getCurrentUser(),
     isDocuSealConfigured(),
     prisma.emailTemplate.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, subject: true, bodyHtml: true } }),
+    prisma.bsSettings.findUnique({ where: { id: "default" }, select: { pbsNumber: true, debtorGroupNumber: true } }),
   ]);
 
   const currentUserGoogleAccount = currentUser
@@ -484,6 +496,16 @@ export default async function DealDetailPage({
 
           <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="text-sm font-semibold text-slate-900">Fakturaer (Dinero)</h2>
+            {currentUser?.canAccessBilling && (
+              <PaymentMethodControl
+                dealId={deal.id}
+                method={deal.paymentMethod}
+                customerNumber={deal.bsCustomerNumber}
+                mandateActive={deal.bsMandateStatus === "ACTIVE"}
+                pbsNumber={bsSettings?.pbsNumber ?? null}
+                debtorGroupNumber={bsSettings?.debtorGroupNumber ?? null}
+              />
+            )}
             {currentUser?.role === "ADMIN" && (
               <div className="mt-3 flex flex-wrap items-stretch gap-2">
                 {(deal.establishmentFee ?? 0) > 0 &&
@@ -537,6 +559,22 @@ export default async function DealDetailPage({
                           </span>
                         );
                       })()}
+                      {inv.collectViaBs && (
+                        <span
+                          className={`shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${
+                            !inv.bsCollection
+                              ? "bg-sky-50 text-sky-700"
+                              : inv.bsCollection.status === "PAID"
+                              ? "bg-emerald-50 text-emerald-700"
+                              : inv.bsCollection.status === "IN_FILE"
+                              ? "bg-sky-50 text-sky-700"
+                              : "bg-red-50 text-red-700"
+                          }`}
+                          title={inv.bsPaymentError ?? undefined}
+                        >
+                          {BS_PILL_LABEL[inv.bsCollection?.status ?? "NONE"]}
+                        </span>
+                      )}
                       {inv.paidAt && (
                         <span className="shrink-0 whitespace-nowrap rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800">
                           Betalt {formatDate(inv.paidAt)}
