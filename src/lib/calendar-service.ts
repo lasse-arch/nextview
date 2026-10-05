@@ -87,6 +87,7 @@ export async function syncDealMeetingToCalendar(
       endIso: toWallClockDateTime(end),
       timeZone: MEETING_TIME_ZONE,
       attendeeEmails: [deal.owner.email, deal.contactEmail, ...extraAttendeeEmails],
+      acceptedEmails: [deal.owner.email],
     });
 
     if (eventId !== deal.googleCalendarEventId) {
