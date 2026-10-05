@@ -171,6 +171,14 @@ async function updateDealInner(
 
   // An empty field means "leave unchanged", not "clear".
   const meetingDate = meetingDateRaw ? parseMeetingDate(meetingDateRaw) : existing.meetingDate;
+  // A newly set/changed meeting time on a deal still at Lead/Kontaktet means
+  // the meeting is booked (the form's own onChange does the same on screen).
+  // Only on an actual date change, so a deal deliberately moved back to Lead
+  // with its old date still in the field stays where it was put.
+  const meetingDateChanged = Boolean(meetingDateRaw) && meetingDate?.getTime() !== existing.meetingDate?.getTime();
+  if (meetingDateChanged && (stage === "LEAD" || stage === "CONTACTED")) {
+    stage = "MEETING_BOOKED";
+  }
   // Only block the save when the stage is actually changing into Møde
   // booket without a date - a deal that's already sitting in that stage
   // (e.g. one imported without a meeting date ever set) must still be
@@ -482,7 +490,10 @@ export async function sendCalendarInvite(
   const meetingDate = meetingDateRaw ? parseMeetingDate(meetingDateRaw) : deal.meetingDate;
   if (!meetingDate || isNaN(meetingDate.getTime())) return { synced: false, reason: "Angiv en mødedato først." };
 
-  if (meetingDate.getTime() !== deal.meetingDate?.getTime()) {
+  // Sending the invite for a deal still at Lead/Kontaktet books the meeting.
+  if (deal.stage === "LEAD" || deal.stage === "CONTACTED") {
+    await setMeetingDateAndStage(dealId, meetingDate.toISOString());
+  } else if (meetingDate.getTime() !== deal.meetingDate?.getTime()) {
     await prisma.deal.update({ where: { id: dealId }, data: { meetingDate } });
   }
 

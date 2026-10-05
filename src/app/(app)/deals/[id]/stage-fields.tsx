@@ -49,6 +49,11 @@ export function StageFields({
             type="datetime-local"
             required={stage === "MEETING_BOOKED"}
             defaultValue={toDateTimeInputValue(meetingDateIso)}
+            // Picking a meeting time on a deal that's still Lead/Kontaktet
+            // means the meeting is booked - move the stage along with it.
+            onChange={(e) => {
+              if (e.target.value && (stage === "LEAD" || stage === "CONTACTED")) setStage("MEETING_BOOKED");
+            }}
             className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
           />
         </div>
