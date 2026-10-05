@@ -80,6 +80,7 @@ export default async function DealsPage({
     establishmentFee: d.establishmentFee,
     stage: d.stage,
     isChurned: Boolean(d.churnedAt),
+    hasMeetingDate: Boolean(d.meetingDate),
   }));
 
   return (

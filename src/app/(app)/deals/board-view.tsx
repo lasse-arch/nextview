@@ -20,6 +20,8 @@ export type BoardDeal = {
   establishmentFee: number | null;
   stage: DealStage;
   isChurned: boolean;
+  /** Already has a mødedato - moving it to Møde booket then just keeps that date. */
+  hasMeetingDate: boolean;
 };
 
 function ownerInitials(name: string): string {
@@ -74,7 +76,7 @@ export function DealsBoard({ initialDeals, isAdmin }: { initialDeals: BoardDeal[
       return;
     }
 
-    if (newStage === "MEETING_BOOKED") {
+    if (newStage === "MEETING_BOOKED" && !deal.hasMeetingDate) {
       setMeetingDateInput(toDateTimeLocalDefault());
       setMeetingPromptDealId(deal.id);
       return;
