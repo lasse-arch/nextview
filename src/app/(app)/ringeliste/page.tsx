@@ -1,7 +1,9 @@
 import { prisma } from "@/lib/db";
 import { RingelisteClient } from "./ringeliste-client";
 
-const OPEN_STAGES = ["LEAD", "CONTACTED", "FOLLOW_UP"] as const;
+// Only leads not yet worked: once a deal moves on (Kontaktet, Opfølgning,
+// Møde booket, ...) from here or anywhere else, it drops off the list.
+const OPEN_STAGES = ["LEAD"] as const;
 
 export default async function RingelistePage({
   searchParams,
