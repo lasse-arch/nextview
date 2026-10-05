@@ -6,7 +6,7 @@ import Link from "next/link";
 import { createCallList, addLeadsToCallList, deleteCallList, renameCallList, markVoicemail } from "@/lib/actions/call-lists";
 import { markDealLost, setMeetingDateAndStage, sendCalendarInvite, renameDeal, updateDealPhone, updateDealWebsite } from "@/lib/actions/deals";
 import { addDealItem } from "@/lib/actions/deal-items";
-import { dealName, stageLabels } from "@/lib/labels";
+import { dealName, stageLabels, telHref } from "@/lib/labels";
 import { useToast } from "@/components/toast";
 import { LostReasonDialog } from "@/components/lost-reason-dialog";
 import type { DealStage } from "@prisma/client";
@@ -518,18 +518,28 @@ function QueueCard({ deal, users }: { deal: QueueDeal; users: Colleague[] }) {
             ) : displayedPhone ? (
               // Once a phone number is added it's shown "marked" (a filled green
               // badge) instead of plain text, so it's visibly done during a fast
-              // calling session - click it to correct a typo.
-              <button
-                type="button"
-                onClick={() => {
-                  setPhoneInput(displayedPhone);
-                  setEditingPhone(true);
-                }}
-                title="Ret telefonnummer"
-                className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/10 hover:bg-emerald-100"
-              >
-                ☎ {displayedPhone}
-              </button>
+              // calling session. Clicking it calls the number from the person's
+              // own phone (see telHref); the pencil corrects a typo.
+              <span className="inline-flex items-center gap-1">
+                <a
+                  href={telHref(displayedPhone)}
+                  title="Ring op fra din egen telefon"
+                  className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/10 hover:bg-emerald-100"
+                >
+                  ☎ {displayedPhone}
+                </a>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPhoneInput(displayedPhone);
+                    setEditingPhone(true);
+                  }}
+                  title="Ret telefonnummer"
+                  className="text-slate-300 hover:text-slate-600"
+                >
+                  ✏️
+                </button>
+              </span>
             ) : (
               <button type="button" onClick={() => setEditingPhone(true)} className="text-xs text-slate-400 underline hover:text-slate-600">
                 + Tilføj telefon

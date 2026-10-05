@@ -20,6 +20,7 @@ import {
   dealName,
   invoicePeriodLabel,
   invoiceQuarterShortLabel,
+  telHref,
 } from "@/lib/labels";
 import { parseContractProducts, establishmentLineItems, recurringLineItems } from "@/lib/contract-template-data";
 import { isDocuSealConfigured } from "@/lib/docuseal";
@@ -258,7 +259,18 @@ export default async function DealDetailPage({
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Telefon</label>
+                  <div className="flex items-center justify-between gap-2">
+                    <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Telefon</label>
+                    {deal.contactPhone && (
+                      <a
+                        href={telHref(deal.contactPhone)}
+                        title="Ring op fra din egen telefon"
+                        className="text-[11px] font-semibold text-emerald-700 hover:underline"
+                      >
+                        📞 Ring op
+                      </a>
+                    )}
+                  </div>
                   <input
                     name="contactPhone"
                     defaultValue={deal.contactPhone ?? ""}

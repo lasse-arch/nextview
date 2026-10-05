@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { moveLeadsToDeals, reopenInboxLead } from "@/lib/actions/lead-inbox";
-import { formatDate, stageLabels } from "@/lib/labels";
+import { formatDate, stageLabels, telHref } from "@/lib/labels";
 import { useToast } from "@/components/toast";
 
 export type InboxLead = {
@@ -119,7 +119,7 @@ export function LeadInboxList({ leads, total }: { leads: InboxLead[]; total: num
                 {(lead.contactPhone || lead.contactEmail) && (
                   <p className="mt-0.5 text-xs">
                     {lead.contactPhone && (
-                      <a href={`tel:${lead.contactPhone.replace(/\s/g, "")}`} className="font-semibold text-slate-900 hover:underline">
+                      <a href={telHref(lead.contactPhone)} className="font-semibold text-slate-900 hover:underline">
                         {lead.contactPhone}
                       </a>
                     )}

@@ -162,6 +162,12 @@ const DEFAULT_POSTS: { title: string; body: string; minutesAgo: number; screensh
     body: "Forsiden viser nu, hvor mange møder der er booket gennem systemet denne uge, og hvem der har booket dem, med en søjle for hver dag mandag til søndag. Hold musen over en søjle for at se dagens fordeling pr. sælger. Det tæller den dag, mødet blev booket - ikke den dag, mødet holdes.",
     screenshotUrl: "/news/moder-booket-uge.png",
   },
+  {
+    minutesAgo: 0,
+    title: "Ring op direkte fra computeren",
+    body: "Telefonnumre i Arpo kan nu klikkes - det grønne nummer på ringelisten, \"📞 Ring op\" ved telefonfeltet på dealen og numrene i Leadindbakke og Leadgeneration. Opkaldet går ud fra din egen mobil med dit eget nummer: på en Mac med iPhone (slå \"Opkald på andre enheder\" til på iPhonen, samme Apple-ID), og på Windows via Phone Link. Du taler i computerens mikrofon/headset. Blyanten ved nummeret på ringelisten retter nummeret.",
+    screenshotUrl: "/news/ring-op.png",
+  },
 ];
 
 /**

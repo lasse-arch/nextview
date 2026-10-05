@@ -15,7 +15,7 @@ import {
 import { renameWatchedUrl } from "@/lib/actions/lead-url-scan";
 import { importLeadCsv, renameLeadImportList } from "@/lib/actions/lead-import";
 import { createCallList } from "@/lib/actions/call-lists";
-import { stageLabels } from "@/lib/labels";
+import { stageLabels, telHref } from "@/lib/labels";
 import { useToast } from "@/components/toast";
 import Link from "next/link";
 
@@ -273,7 +273,7 @@ function CandidateCard({
               )}
               {candidate.contactPhone && (
                 <a
-                  href={`tel:${candidate.contactPhone.replace(/\s/g, "")}`}
+                  href={telHref(candidate.contactPhone)}
                   onClick={(e) => e.stopPropagation()}
                   className="text-sm font-semibold text-slate-900 hover:underline"
                 >
