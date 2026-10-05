@@ -4,10 +4,11 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createCallList, addLeadsToCallList, deleteCallList, renameCallList, markVoicemail } from "@/lib/actions/call-lists";
-import { updateDealStage, setMeetingDateAndStage, sendCalendarInvite, renameDeal, updateDealPhone, updateDealWebsite } from "@/lib/actions/deals";
+import { markDealLost, setMeetingDateAndStage, sendCalendarInvite, renameDeal, updateDealPhone, updateDealWebsite } from "@/lib/actions/deals";
 import { addDealItem } from "@/lib/actions/deal-items";
 import { dealName, stageLabels } from "@/lib/labels";
 import { useToast } from "@/components/toast";
+import { LostReasonDialog } from "@/components/lost-reason-dialog";
 import type { DealStage } from "@prisma/client";
 
 // Same 4 fixed products as the deal-page's own quick-add (deal-items-section.tsx)
@@ -305,6 +306,7 @@ function QueueCard({ deal, users }: { deal: QueueDeal; users: Colleague[] }) {
   const [selectedColleagues, setSelectedColleagues] = useState<string[]>([]);
   const colleagues = users.filter((u) => u.id !== deal.ownerId);
   const [gone, setGone] = useState(false);
+  const [askingLostReason, setAskingLostReason] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState(dealName(deal));
   const [displayedName, setDisplayedName] = useState(dealName(deal));
@@ -399,11 +401,11 @@ function QueueCard({ deal, users }: { deal: QueueDeal; users: Colleague[] }) {
     });
   }
 
-  function markLost() {
-    if (!confirm(`Markér ${dealName(deal)} som tabt?`)) return;
+  function markLost(reason: string) {
     startTransition(async () => {
       try {
-        await updateDealStage(deal.id, "LOST");
+        await markDealLost(deal.id, reason);
+        setAskingLostReason(false);
         setGone(true);
       } catch (err) {
         showToast(err instanceof Error ? err.message : "Kunne ikke opdatere dealen.");
@@ -640,7 +642,7 @@ function QueueCard({ deal, users }: { deal: QueueDeal; users: Colleague[] }) {
             </button>
             <button
               type="button"
-              onClick={markLost}
+              onClick={() => setAskingLostReason(true)}
               disabled={busy}
               className="rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-100 disabled:opacity-50"
             >
@@ -649,6 +651,15 @@ function QueueCard({ deal, users }: { deal: QueueDeal; users: Colleague[] }) {
           </div>
         ) : null}
       </div>
+
+      {askingLostReason && (
+        <LostReasonDialog
+          dealName={dealName(deal)}
+          pending={busy}
+          onCancel={() => setAskingLostReason(false)}
+          onConfirm={markLost}
+        />
+      )}
 
       {bookingMeeting && (
         <div className="mt-3 space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-3">

@@ -348,6 +348,11 @@ async function updateDealInner(
     await logStageActivity(user, { ...existing, companyName, displayName }, stage);
   }
 
+  const lostReason = String(formData.get("lostReason") || "").trim();
+  if (stage === "LOST" && existing.stage !== "LOST" && lostReason) {
+    await prisma.note.create({ data: { dealId, authorId: user.id, body: `Tabt: ${lostReason}`, kind: "MANUAL" } });
+  }
+
   if (stage === "CONTRACT_SIGNED" && existing.stage !== "CONTRACT_SIGNED") {
     await sendContractSignedNotification(dealId);
   }
@@ -529,16 +534,14 @@ export async function sendCalendarInvite(
   return result;
 }
 
-export async function markDealLost(dealId: string) {
+/** Marks a deal Tabt with the reason saved as a note on it ("Tabt: ...") -
+ * every "Markér som tabt" (ringeliste, board, deal page) asks for one. */
+export async function markDealLost(dealId: string, reason: string) {
   const user = await requireUser();
-  const deal = await prisma.deal.update({ where: { id: dealId }, data: { stage: "LOST" } });
-  await logActivity({
-    type: "DEAL_STAGE_LOST",
-    message: `${user.name} markerede ${dealName(deal)} som tabt`,
-    actorId: user.id,
-    dealId,
-  });
-  revalidatePath("/deals");
+  const trimmed = reason.trim();
+  if (!trimmed) throw new Error("Skriv en årsag til, at dealen er tabt.");
+  await updateDealStage(dealId, "LOST");
+  await prisma.note.create({ data: { dealId, authorId: user.id, body: `Tabt: ${trimmed}`, kind: "MANUAL" } });
   revalidatePath(`/deals/${dealId}`);
 }
 

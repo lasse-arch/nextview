@@ -150,6 +150,18 @@ const DEFAULT_POSTS: { title: string; body: string; minutesAgo: number; screensh
     body: "En kunde kan nu sættes på Betalingsservice under \"Fakturaer\" på dealen (\"Betaling: Betalingsservice\"). Kunden får et fast kundenummer (fx NV00012) og får stadig sin faktura fra Dinero som før - men den forfalder d. 1. i kvartalet og har teksten \"Beløbet opkræves via Betalingsservice - betal venligst ikke via bankoverførsel\". Fakturaen til en Betalingsservice-kunde laves fra d. 1. i måneden før kvartalet, så den kan nå Betalingsservices frist.\n\nUnder Indstillinger → Betalingsservice ligger alle fakturaer, der venter på at blive opkrævet. \"Lav betalingsfil\" laver filen, som du downloader og uploader hos Betalingsservice - senest kl. 11 på 6.-sidste bankdag i måneden før (siden viser fristen). Når Betalingsservice sender resultatfilen tilbage, indlæser du den samme sted: betalte fakturaer markeres som betalt, også i Dinero (på mellemregningskontoen), og afviste eller tilbageførte står med rødt, så I kan rykke. Kunder uden aftale får indbetalingskort; når de tilmelder sig automatisk betaling i netbanken, opdateres de selv, når aftalefilen indlæses.",
     screenshotUrl: "/news/betalingsservice.png",
   },
+  {
+    minutesAgo: 0,
+    title: "Skriv en årsag, når en deal markeres som tabt",
+    body: "Når du markerer en deal som tabt - med \"❌ Tabt\" på ringelisten, \"Markér som tabt\" på dealen, ved at trække den til Tabt på Deals-tavlen eller ved at vælge Tabt i stadie-feltet - kommer der nu et felt, hvor du skriver hvorfor. Årsagen gemmes som en note på dealen (\"Tabt: ...\"), så den, der tager fat i kunden senere, kan se hvad der skete.",
+    screenshotUrl: "/news/tabt-aarsag.png",
+  },
+  {
+    minutesAgo: 0,
+    title: "Møder booket i dag - på forsiden",
+    body: "Forsiden viser nu, hvor mange møder der er booket i dag gennem systemet, og hvem der har booket dem, med de sidste 14 dage som søjler nedenunder og et tal for de sidste 7 dage. Hold musen over en søjle for at se dagens fordeling pr. sælger. Det tæller den dag, mødet blev booket - ikke den dag, mødet holdes.",
+    screenshotUrl: "/news/moder-booket-pr-dag.png",
+  },
 ];
 
 /**

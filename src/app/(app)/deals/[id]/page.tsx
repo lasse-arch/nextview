@@ -180,6 +180,7 @@ export default async function DealDetailPage({
           />
           <InactiveToggleButton dealId={deal.id} isChurned={Boolean(deal.churnedAt)} />
           <DealDangerActions
+            dealName={dealName(deal)}
             dealId={deal.id}
             stage={deal.stage}
             canDelete={currentUser?.role === "ADMIN" || currentUser?.id === deal.ownerId}

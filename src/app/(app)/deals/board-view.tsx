@@ -2,7 +2,8 @@
 
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
-import { updateDealStage, setMeetingDateAndStage, addQuickNote } from "@/lib/actions/deals";
+import { updateDealStage, setMeetingDateAndStage, addQuickNote, markDealLost } from "@/lib/actions/deals";
+import { LostReasonDialog } from "@/components/lost-reason-dialog";
 import { stageLabels, stageOrder, formatDKK, dealName, totalContractValue } from "@/lib/labels";
 import { useToast } from "@/components/toast";
 import type { DealStage } from "@prisma/client";
@@ -45,6 +46,7 @@ export function DealsBoard({ initialDeals, isAdmin }: { initialDeals: BoardDeal[
   const [error, setError] = useState<string | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [meetingPromptDealId, setMeetingPromptDealId] = useState<string | null>(null);
+  const [lostPromptDealId, setLostPromptDealId] = useState<string | null>(null);
   const [meetingDateInput, setMeetingDateInput] = useState(toDateTimeLocalDefault());
   const [quickNoteDealId, setQuickNoteDealId] = useState<string | null>(null);
   const [quickNoteText, setQuickNoteText] = useState("");
@@ -78,6 +80,11 @@ export function DealsBoard({ initialDeals, isAdmin }: { initialDeals: BoardDeal[
       return;
     }
 
+    if (newStage === "LOST") {
+      setLostPromptDealId(deal.id);
+      return;
+    }
+
     const previousStage = deal.stage;
     setError(null);
     moveDealLocally(deal.id, newStage);
@@ -88,6 +95,27 @@ export function DealsBoard({ initialDeals, isAdmin }: { initialDeals: BoardDeal[
         showToast("Deal flyttet");
       } catch (err) {
         moveDealLocally(deal.id, previousStage);
+        setError(err instanceof Error ? err.message : "Kunne ikke flytte dealen.");
+      }
+    });
+  }
+
+  function confirmLost(reason: string) {
+    const dealId = lostPromptDealId;
+    const deal = deals.find((d) => d.id === dealId);
+    if (!dealId || !deal) return;
+
+    const previousStage = deal.stage;
+    setLostPromptDealId(null);
+    setError(null);
+    moveDealLocally(dealId, "LOST");
+
+    startTransition(async () => {
+      try {
+        await markDealLost(dealId, reason);
+        showToast("Deal markeret som tabt");
+      } catch (err) {
+        moveDealLocally(dealId, previousStage);
         setError(err instanceof Error ? err.message : "Kunne ikke flytte dealen.");
       }
     });
@@ -200,6 +228,17 @@ export function DealsBoard({ initialDeals, isAdmin }: { initialDeals: BoardDeal[
             </div>
           </div>
         </div>
+      )}
+
+      {lostPromptDealId && (
+        <LostReasonDialog
+          dealName={(() => {
+            const d = deals.find((x) => x.id === lostPromptDealId);
+            return d ? dealName(d) : "dealen";
+          })()}
+          onCancel={() => setLostPromptDealId(null)}
+          onConfirm={confirmLost}
+        />
       )}
 
       {quickNoteDealId && (
