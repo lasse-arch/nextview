@@ -214,3 +214,23 @@ export async function deleteCallList(callListId: string): Promise<void> {
   await prisma.callList.delete({ where: { id: callListId } });
   revalidatePath("/ringeliste");
 }
+
+/**
+ * "Telefonsvar" on a Ringeliste card - called, no answer. Records when (the
+ * card shows the latest time) and sends the lead to the back of the call
+ * queue (see the ordering on /ringeliste). Can be pressed any number of
+ * times; only the latest time is kept.
+ */
+export async function markVoicemail(dealId: string): Promise<{ at: string }> {
+  const user = await requireUser();
+  const at = new Date();
+  const deal = await prisma.deal.update({ where: { id: dealId }, data: { lastVoicemailAt: at } });
+  await logActivity({
+    type: "DEAL_VOICEMAIL",
+    message: `${user.name} ringede til ${dealName(deal)} - telefonsvar`,
+    actorId: user.id,
+    dealId,
+  });
+  revalidatePath("/ringeliste");
+  return { at: at.toISOString() };
+}

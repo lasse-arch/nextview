@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { createCallList, addLeadsToCallList, deleteCallList, renameCallList } from "@/lib/actions/call-lists";
+import { createCallList, addLeadsToCallList, deleteCallList, renameCallList, markVoicemail } from "@/lib/actions/call-lists";
 import { updateDealStage, setMeetingDateAndStage, renameDeal, updateDealPhone, updateDealWebsite } from "@/lib/actions/deals";
 import { addDealItem } from "@/lib/actions/deal-items";
 import { dealName, stageLabels } from "@/lib/labels";
@@ -26,7 +26,16 @@ type QueueDeal = {
   contactEmail: string | null;
   websiteUrl: string | null;
   stage: DealStage;
+  lastVoicemailAt: Date | string | null;
 };
+
+/** "5. okt. kl. 14:32" for the latest "Telefonsvar" press. */
+function formatVoicemailTime(at: Date | string): string {
+  const d = new Date(at);
+  const date = new Intl.DateTimeFormat("da-DK", { day: "numeric", month: "short" }).format(d);
+  const time = new Intl.DateTimeFormat("da-DK", { hour: "2-digit", minute: "2-digit" }).format(d);
+  return `${date} kl. ${time}`;
+}
 
 function QuickAdd({ selectedListId }: { selectedListId: string | null }) {
   const [name, setName] = useState("");
@@ -298,6 +307,7 @@ function QueueCard({ deal }: { deal: QueueDeal }) {
   const [websiteInput, setWebsiteInput] = useState(deal.websiteUrl ?? "");
   const [displayedWebsite, setDisplayedWebsite] = useState(deal.websiteUrl);
   const [addedProducts, setAddedProducts] = useState<string[]>([]);
+  const [voicemailAt, setVoicemailAt] = useState(deal.lastVoicemailAt);
   const router = useRouter();
   const showToast = useToast();
 
@@ -364,6 +374,20 @@ function QueueCard({ deal }: { deal: QueueDeal }) {
       setAddedProducts((prev) => [...prev, product]);
       showToast(`${product} tilføjet`);
       router.refresh();
+    });
+  }
+
+  function voicemail() {
+    startTransition(async () => {
+      try {
+        const { at } = await markVoicemail(deal.id);
+        setVoicemailAt(at);
+        showToast("Telefonsvar noteret - rykket ned i listen");
+        // Re-sorts the queue so the lead moves to the back.
+        router.refresh();
+      } catch (err) {
+        showToast(err instanceof Error ? err.message : "Kunne ikke gemme telefonsvar.");
+      }
     });
   }
 
@@ -539,7 +563,14 @@ function QueueCard({ deal }: { deal: QueueDeal }) {
               </button>
             )}
           </div>
-          <p className="mt-1 text-[11px] font-medium uppercase tracking-wide text-slate-400">{stageLabels[deal.stage]}</p>
+          <p className="mt-1 text-[11px] font-medium uppercase tracking-wide text-slate-400">
+            {stageLabels[deal.stage]}
+            {voicemailAt && (
+              <span className="ml-2 rounded-full bg-amber-50 px-2 py-0.5 normal-case tracking-normal text-amber-700 ring-1 ring-inset ring-amber-600/15">
+                📞 Telefonsvar {formatVoicemailTime(voicemailAt)}
+              </span>
+            )}
+          </p>
 
           <div className="mt-2 flex flex-wrap gap-1.5">
             {PRODUCT_SUGGESTIONS.map((product) => {
@@ -573,6 +604,15 @@ function QueueCard({ deal }: { deal: QueueDeal }) {
               className="rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
             >
               📅 Book møde
+            </button>
+            <button
+              type="button"
+              onClick={voicemail}
+              disabled={busy}
+              title="Ringet uden svar - noterer tidspunktet og rykker leadet bagerst i listen"
+              className="rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-100 disabled:opacity-50"
+            >
+              📞 Telefonsvar
             </button>
             <button
               type="button"

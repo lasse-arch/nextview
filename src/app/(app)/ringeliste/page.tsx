@@ -21,7 +21,10 @@ export default async function RingelistePage({
   const deals = selectedListId
     ? await prisma.deal.findMany({
         where: { callListId: selectedListId, stage: { in: [...OPEN_STAGES] } },
-        orderBy: { createdAt: "asc" },
+        // Not-yet-tried leads first (in the order they were added), then those
+        // that went to voicemail - longest ago first, so "Telefonsvar" sends a
+        // lead to the back of the queue.
+        orderBy: [{ lastVoicemailAt: { sort: "asc", nulls: "first" } }, { createdAt: "asc" }],
         select: {
           id: true,
           companyName: true,
@@ -33,6 +36,7 @@ export default async function RingelistePage({
           contactEmail: true,
           websiteUrl: true,
           stage: true,
+          lastVoicemailAt: true,
         },
       })
     : [];

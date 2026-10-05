@@ -400,6 +400,10 @@ model Deal {
   /// Cleared once it moves past Kontaktet (a meeting booked, or anything
   /// later), or by "Flyt til Deals". Manually created deals never start here.
   inLeadInbox Boolean @default(false)
+  /// Last time "Telefonsvar" was pressed for this lead on Ringeliste (called,
+  /// no answer). Puts it at the back of the call queue; pressing it again
+  /// just moves the time (and the lead) on.
+  lastVoicemailAt DateTime?
 
   meetingDate           DateTime?
   /// Length of the booked meeting in minutes (30/45/60, chosen when the
