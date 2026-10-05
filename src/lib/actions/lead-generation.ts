@@ -23,8 +23,11 @@ function readFilterFields(formData: FormData) {
   const industryQuery = String(formData.get("industryQuery") || "").trim() || null;
   const municipality = String(formData.get("municipality") || "").trim() || null;
   const activeOnly = formData.get("activeOnly") === "on";
-  const foundedFrom = parseFormDate(formData.get("foundedFrom"));
-  const foundedTo = parseFormDate(formData.get("foundedTo"));
+  const foundedWithinRaw = Number(formData.get("foundedWithinDays"));
+  const foundedWithinDays = Number.isInteger(foundedWithinRaw) && foundedWithinRaw > 0 ? foundedWithinRaw : null;
+  // A rolling window replaces any fixed dates.
+  const foundedFrom = foundedWithinDays ? null : parseFormDate(formData.get("foundedFrom"));
+  const foundedTo = foundedWithinDays ? null : parseFormDate(formData.get("foundedTo"));
   const maxResultsRaw = Number(formData.get("maxResults"));
   const maxResults = Math.min(Math.max(1, Number.isFinite(maxResultsRaw) && maxResultsRaw > 0 ? maxResultsRaw : 50), MAX_LEAD_FILTER_RESULTS);
   // "Ringeliste-mål" select: "" (slået fra, default), "__daily__" (ny liste
@@ -32,12 +35,12 @@ function readFilterFields(formData: FormData) {
   const ringelisteTarget = String(formData.get("ringelisteTarget") || "");
   const autoCreateDailyList = ringelisteTarget === "__daily__";
   const targetCallListId = !autoCreateDailyList && ringelisteTarget ? ringelisteTarget : null;
-  return { name, industryQuery, municipality, activeOnly, foundedFrom, foundedTo, maxResults, autoCreateDailyList, targetCallListId };
+  return { name, industryQuery, municipality, activeOnly, foundedFrom, foundedTo, foundedWithinDays, maxResults, autoCreateDailyList, targetCallListId };
 }
 
 function validateFilterFields(fields: ReturnType<typeof readFilterFields>): string | null {
   if (!fields.name) return "Giv filteret et navn.";
-  if (!fields.industryQuery && !fields.municipality && !fields.foundedFrom && !fields.foundedTo) {
+  if (!fields.industryQuery && !fields.municipality && !fields.foundedFrom && !fields.foundedTo && !fields.foundedWithinDays) {
     return "Angiv mindst branche, område eller en periode.";
   }
   if (fields.foundedFrom && fields.foundedTo && fields.foundedFrom > fields.foundedTo) {

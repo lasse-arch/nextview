@@ -65,6 +65,7 @@ export type LeadFilterData = {
   activeOnly: boolean;
   foundedFrom: string | null;
   foundedTo: string | null;
+  foundedWithinDays: number | null;
   maxResults: number;
   enabled: boolean;
   lastRunAt: string | null;
@@ -76,18 +77,21 @@ export type LeadFilterData = {
 export type CallListOption = { id: string; name: string };
 
 const MAX_RESULTS_OPTIONS = [25, 50, 100, 200, 500, 1000] as const;
+const FOUNDED_WITHIN_OPTIONS = [7, 14, 30, 60, 90, 180, 365] as const;
 
 function formatDateShort(iso: string): string {
   return new Intl.DateTimeFormat("da-DK", { dateStyle: "medium" }).format(new Date(iso));
 }
 
 function criteriaSummary(
-  f: Pick<LeadFilterData, "industryQuery" | "municipality" | "activeOnly" | "foundedFrom" | "foundedTo" | "maxResults">
+  f: Pick<LeadFilterData, "industryQuery" | "municipality" | "activeOnly" | "foundedFrom" | "foundedTo" | "foundedWithinDays" | "maxResults">
 ): string {
   const parts: string[] = [];
   if (f.industryQuery) parts.push(`Branche: ${f.industryQuery}`);
   if (f.municipality) parts.push(`Område: ${f.municipality}`);
-  if (f.foundedFrom || f.foundedTo) {
+  if (f.foundedWithinDays) {
+    parts.push(`Stiftet inden for de sidste ${f.foundedWithinDays} dage`);
+  } else if (f.foundedFrom || f.foundedTo) {
     const from = f.foundedFrom ? formatDateShort(f.foundedFrom) : "…";
     const to = f.foundedTo ? formatDateShort(f.foundedTo) : "nu";
     parts.push(`Stiftet: ${from} – ${to}`);
@@ -117,6 +121,9 @@ function FilterForm({
   onDone: () => void;
 }) {
   const [pending, startTransition] = useTransition();
+  const [foundedWithinDays, setFoundedWithinDays] = useState(
+    initial?.foundedWithinDays ? String(initial.foundedWithinDays) : ""
+  );
   const showToast = useToast();
 
   function submit(formData: FormData) {
@@ -160,26 +167,49 @@ function FilterForm({
           <MunicipalityPicker name="municipality" defaultValue={initial?.municipality ?? ""} />
         </div>
       </div>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div>
-          <label className="block text-xs font-medium text-slate-600">Stiftet fra</label>
-          <input
-            type="date"
-            name="foundedFrom"
-            defaultValue={initial?.foundedFrom ? initial.foundedFrom.slice(0, 10) : ""}
-            className="mt-1 w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-sm"
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-slate-600">Stiftet til</label>
-          <input
-            type="date"
-            name="foundedTo"
-            defaultValue={initial?.foundedTo ? initial.foundedTo.slice(0, 10) : ""}
-            className="mt-1 w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-sm"
-          />
-        </div>
+      <div>
+        <label className="block text-xs font-medium text-slate-600">Stiftet</label>
+        <select
+          name="foundedWithinDays"
+          value={foundedWithinDays}
+          onChange={(e) => setFoundedWithinDays(e.target.value)}
+          className="mt-1 w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-sm sm:w-72"
+        >
+          <option value="">Når som helst / fast periode</option>
+          {FOUNDED_WITHIN_OPTIONS.map((d) => (
+            <option key={d} value={d}>
+              Inden for de sidste {d} dage
+            </option>
+          ))}
+        </select>
+        {foundedWithinDays && (
+          <p className="mt-1 text-xs text-slate-400">
+            Tælles fra hver kørsel - slå filteret til, så finder det nystiftede virksomheder hver dag.
+          </p>
+        )}
       </div>
+      {!foundedWithinDays && (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div>
+            <label className="block text-xs font-medium text-slate-600">Stiftet fra</label>
+            <input
+              type="date"
+              name="foundedFrom"
+              defaultValue={initial?.foundedFrom ? initial.foundedFrom.slice(0, 10) : ""}
+              className="mt-1 w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-600">Stiftet til</label>
+            <input
+              type="date"
+              name="foundedTo"
+              defaultValue={initial?.foundedTo ? initial.foundedTo.slice(0, 10) : ""}
+              className="mt-1 w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-sm"
+            />
+          </div>
+        </div>
+      )}
       <div>
         <label className="block text-xs font-medium text-slate-600">Antal resultater pr. kørsel</label>
         <select

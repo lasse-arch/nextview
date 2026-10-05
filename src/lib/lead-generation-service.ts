@@ -51,8 +51,14 @@ export async function runLeadFilter(filterId: string): Promise<RunLeadFilterResu
     industryQuery: filter.industryQuery,
     municipality: filter.municipality,
     activeOnly: filter.activeOnly,
-    foundedFrom: filter.foundedFrom ? filter.foundedFrom.toISOString().slice(0, 10) : null,
-    foundedTo: filter.foundedTo ? filter.foundedTo.toISOString().slice(0, 10) : null,
+    // "Stiftet inden for de sidste N dage" is counted from each run, so a
+    // daily filter keeps rolling forward.
+    foundedFrom: filter.foundedWithinDays
+      ? new Date(Date.now() - filter.foundedWithinDays * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+      : filter.foundedFrom
+        ? filter.foundedFrom.toISOString().slice(0, 10)
+        : null,
+    foundedTo: filter.foundedWithinDays ? null : filter.foundedTo ? filter.foundedTo.toISOString().slice(0, 10) : null,
   };
 
   // "Op til N pr. kørsel" means N leads that are *new* to the CRM, not the

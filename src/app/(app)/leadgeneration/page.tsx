@@ -165,6 +165,7 @@ export default async function LeadGenerationPage() {
           activeOnly: f.activeOnly,
           foundedFrom: f.foundedFrom ? f.foundedFrom.toISOString() : null,
           foundedTo: f.foundedTo ? f.foundedTo.toISOString() : null,
+          foundedWithinDays: f.foundedWithinDays,
           maxResults: f.maxResults,
           enabled: f.enabled,
           lastRunAt: f.lastRunAt ? f.lastRunAt.toISOString() : null,

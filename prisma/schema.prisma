@@ -856,8 +856,12 @@ model LeadFilter {
   /// Optional stiftelsesdato-periode (founding-date window) - lets a filter
   /// target companies founded within a specific range instead of just
   /// whichever ones happen to be the newest matches right now.
-  foundedFrom DateTime?
-  foundedTo   DateTime?
+  foundedFrom       DateTime?
+  foundedTo         DateTime?
+  /// Rolling alternative to foundedFrom/To: only companies founded within the
+  /// last N days, counted from each run - so a daily filter keeps finding
+  /// newly founded companies instead of a fixed window going stale.
+  foundedWithinDays Int?
 
   /// How many matches a single run pulls from the CVR register - a single
   /// ES query either way, so raising this doesn't add extra round-trips,
