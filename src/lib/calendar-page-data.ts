@@ -26,6 +26,16 @@ function isMarkedInternal(summary: string): boolean {
   return /\binternt\b/i.test(summary);
 }
 
+/**
+ * Whether a Google-only event is a filming/recording job ("Filme hos ...",
+ * "Film", "Optagelse", "Drone-optagelse", ...) rather than a sales meeting -
+ * detected from the title the same way as "internt". Shown on the grid but
+ * not counted in the meeting stats.
+ */
+function isMarkedFilming(summary: string): boolean {
+  return /(^|[^a-zæøå])(film|optag)/i.test(summary);
+}
+
 /** Adds `days` via pure UTC date math - avoids any ambiguity from the
  * server's local timezone setting, unlike date-fns' local-getter-based helpers. */
 function addUtcDays(date: Date, days: number): Date {
@@ -80,11 +90,20 @@ export type CalendarMeeting = {
    * it's excluded from the meeting stats even though it still shows on the
    * grid. Always false for a CRM-sourced meeting. */
   isInternal: boolean;
+  /** True when the title is a filming/recording job (see isMarkedFilming) -
+   * shown on the grid but excluded from the meeting stats like isInternal.
+   * Always false for a CRM-sourced meeting. */
+  isFilming: boolean;
   /** Other sellers invited to this meeting (excluding the organizer shown as
    * ownerName) - shown as a hover tooltip rather than a separate card, since
    * Google gives every attendee's calendar its own copy of the same event. */
   invitedNames?: string[];
 };
+
+/** Internal team things and filming jobs show on the grid but aren't meetings. */
+function countsAsMeeting(m: CalendarMeeting): boolean {
+  return !m.isInternal && !m.isFilming;
+}
 
 function ownerNameOf(account: { user: { name: string; lastName: string | null } }): string {
   return [account.user.name, account.user.lastName].filter(Boolean).join(" ");
@@ -125,6 +144,7 @@ async function fetchMergedMeetings(rangeStart: Date, rangeEnd: Date): Promise<Ca
     ownerUserId: d.ownerId,
     durationMinutes: d.meetingDurationMinutes,
     isInternal: false,
+    isFilming: false,
     source: "crm",
   }));
 
@@ -175,6 +195,7 @@ async function fetchMergedMeetings(rangeStart: Date, rangeEnd: Date): Promise<Ca
           : Math.max(0, Math.round((new Date(event.endIso).getTime() - start.getTime()) / 60_000));
 
         const isInternal = isMarkedInternal(event.summary);
+        const isFilming = !isInternal && isMarkedFilming(event.summary);
 
         const base = {
           id: `google-${event.id}`,
@@ -184,6 +205,7 @@ async function fetchMergedMeetings(rangeStart: Date, rangeEnd: Date): Promise<Ca
           ownerUserId: organizer?.id ?? null,
           durationMinutes,
           isInternal,
+          isFilming,
           source: "google" as const,
           ...(invitedNames.length > 0 ? { invitedNames: [...new Set(invitedNames)] } : {}),
         };
@@ -267,7 +289,7 @@ export async function getMeetingsPerMonth(monthsBack = 6): Promise<MonthBar[]> {
   const rangeStart = new Date(Date.UTC(currentMonthStart.getUTCFullYear(), currentMonthStart.getUTCMonth() - (monthsBack - 1), 1));
   const rangeEnd = new Date(Date.UTC(currentMonthStart.getUTCFullYear(), currentMonthStart.getUTCMonth() + 1, 1));
 
-  const meetings = (await fetchMergedMeetings(rangeStart, rangeEnd)).filter((m) => !m.isInternal);
+  const meetings = (await fetchMergedMeetings(rangeStart, rangeEnd)).filter(countsAsMeeting);
 
   const bars: MonthBar[] = [];
   for (let i = monthsBack - 1; i >= 0; i--) {
@@ -332,8 +354,8 @@ export async function getMeetingStats(currentWeek?: CalendarWeek): Promise<{
     prisma.user.findMany({ select: { id: true, name: true, lastName: true }, orderBy: { name: "asc" } }),
   ]);
 
-  const externalWeekMeetings = thisWeek.meetings.filter((m) => !m.isInternal);
-  const externalMonthMeetings = monthMeetings.filter((m) => !m.isInternal);
+  const externalWeekMeetings = thisWeek.meetings.filter(countsAsMeeting);
+  const externalMonthMeetings = monthMeetings.filter(countsAsMeeting);
   const timedWeekMeetings = externalWeekMeetings.filter((m) => m.hour !== -1);
   const timedMonthMeetings = externalMonthMeetings.filter((m) => m.hour !== -1);
 
