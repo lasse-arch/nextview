@@ -1080,6 +1080,22 @@ model BsSettings {
   nextDeliverySequence Int     @default(1)
   nextCustomerNumber   Int     @default(1)
 
+  /// SFTP via the small relay server (fixed IP, see src/lib/betalingsservice/relay.ts).
+  /// Only a hash of the relay's token is kept - the token itself is shown once.
+  relayTokenHash     String?
+  relayPublicKey     String?
+  relayIp            String?
+  relayLastSeenAt    DateTime?
+  relayLastError     String?
+  sftpHost           String?
+  sftpPort           Int       @default(22)
+  sftpUser           String?
+  sftpUploadDir      String    @default("")
+  sftpDownloadDir    String    @default("")
+  /// Make and send the BS 0601 file by itself (once a day when invoices are ready).
+  autoSend           Boolean   @default(false)
+  lastAutoDeliveryAt DateTime?
+
   updatedAt DateTime @updatedAt
 }
 
@@ -1099,6 +1115,10 @@ model BsDelivery {
   createdById     String?
   /// Set when someone confirms the file has been uploaded to Betalingsservice.
   submittedAt     DateTime?
+  /// Queued for the relay server to upload via SFTP (automatic files, or "Send via SFTP").
+  sendViaSftp     Boolean        @default(false)
+  sftpSentAt      DateTime?
+  sftpError       String?
   collections     BsCollection[]
 
   createdAt DateTime @default(now())
@@ -1147,4 +1167,20 @@ model BsReturnImport {
   createdById  String?
 
   createdAt DateTime @default(now())
+}
+
+/// A file the relay server fetched from the Mastercard SFTP mailbox - result
+/// files (BS 0602/0603) are imported straight away, receipts are kept to show.
+model BsMailboxFile {
+  id          String   @id @default(cuid())
+  fileName    String
+  /// sha256 of the content - the same file is only ever taken in once, even
+  /// if the mailbox reuses a name.
+  contentHash String   @unique
+  size        Int
+  content     Bytes
+  /// "result" (imported BS 0602/0603), "receipt" or "unknown".
+  kind        String
+  note        String
+  receivedAt  DateTime @default(now())
 }

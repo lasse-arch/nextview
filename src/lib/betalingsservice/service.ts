@@ -238,7 +238,10 @@ export type CreateDeliveryResult =
   | { ok: false; error: string };
 
 /** Builds one BS 0601 file from every ready pending collection and stores it for download. */
-export async function createBsDelivery(userId: string): Promise<CreateDeliveryResult> {
+export async function createBsDelivery(
+  userId: string | null,
+  options: { sendViaSftp?: boolean } = {}
+): Promise<CreateDeliveryResult> {
   const settings = await getBsSettings();
   const missing = missingBsSettings(settings);
   if (missing.length > 0) return { ok: false, error: `Udfyld først: ${missing.join(", ")}.` };
@@ -319,6 +322,7 @@ export async function createBsDelivery(userId: string): Promise<CreateDeliveryRe
           totalOre: result.totals.amountOre,
           firstDueDate: new Date(Math.min(...built.map((b) => b.collection.dueDate.getTime()))),
           createdById: userId,
+          sendViaSftp: options.sendViaSftp ?? false,
         },
       });
       for (const b of built) {
@@ -449,7 +453,7 @@ export type ImportReturnResult =
   | { ok: false; error: string };
 
 /** Reads an uploaded BS 0602 (payments) or BS 0603 (mandates) file and applies it. */
-export async function importBsReturnFile(fileName: string, file: Buffer, userId: string): Promise<ImportReturnResult> {
+export async function importBsReturnFile(fileName: string, file: Buffer, userId: string | null): Promise<ImportReturnResult> {
   let parsed;
   try {
     parsed = parseBsReturnDelivery(file);
