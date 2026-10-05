@@ -106,7 +106,7 @@ export function DealsBoard({ initialDeals, isAdmin }: { initialDeals: BoardDeal[
 
     startTransition(async () => {
       try {
-        await setMeetingDateAndStage(dealId, new Date(meetingDateInput).toISOString());
+        await setMeetingDateAndStage(dealId, meetingDateInput);
         showToast("Møde booket");
       } catch (err) {
         moveDealLocally(dealId, previousStage);

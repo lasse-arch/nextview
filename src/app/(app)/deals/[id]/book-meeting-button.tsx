@@ -48,7 +48,7 @@ export function BookMeetingButton({
     }
     startTransition(async () => {
       try {
-        const iso = new Date(dateInput).toISOString();
+        const iso = dateInput;
         await setMeetingDateAndStage(dealId, iso);
 
         if (sendInvite) {

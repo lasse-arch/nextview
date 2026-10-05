@@ -19,6 +19,20 @@ import type { DealStage, CommissionFrequency, CommissionStatus } from "@prisma/c
 
 const CONTRACT_MANAGED_STAGES: DealStage[] = ["CONTRACT_SENT", "CONTRACT_SIGNED"];
 
+
+
+/**
+ * Parses a mødedato "datetime-local" value (e.g. "2026-10-06T10:00") as the
+ * intended Europe/Copenhagen wall-clock digits stored in UTC - the same
+ * convention calendar-service's toWallClockDateTime reads back. Explicit "Z"
+ * so it never depends on the server's own timezone. Clients must send the raw
+ * field value, not new Date(value).toISOString(): that converts from the
+ * browser's local time to real UTC and sent invites 2 hours early in summer.
+ */
+function parseMeetingDate(raw: string): Date {
+  const value = raw.trim();
+  return new Date(/(Z|[+-]\d\d:?\d\d)$/.test(value) ? value : `${value}Z`);
+}
 export async function createDealManual(formData: FormData) {
   const user = await requireUser();
 
@@ -156,7 +170,7 @@ async function updateDealInner(
   const existing = await prisma.deal.findUniqueOrThrow({ where: { id: dealId } });
 
   // An empty field means "leave unchanged", not "clear".
-  const meetingDate = meetingDateRaw ? new Date(meetingDateRaw) : existing.meetingDate;
+  const meetingDate = meetingDateRaw ? parseMeetingDate(meetingDateRaw) : existing.meetingDate;
   // Only block the save when the stage is actually changing into Møde
   // booket without a date - a deal that's already sitting in that stage
   // (e.g. one imported without a meeting date ever set) must still be
@@ -407,7 +421,7 @@ export async function updateDealStage(dealId: string, newStage: DealStage) {
 export async function setMeetingDateAndStage(dealId: string, meetingDateIso: string) {
   const user = await requireUser();
 
-  const meetingDate = new Date(meetingDateIso);
+  const meetingDate = parseMeetingDate(meetingDateIso);
   if (isNaN(meetingDate.getTime())) throw new Error("Ugyldig mødedato.");
 
   const existing = await prisma.deal.findUniqueOrThrow({ where: { id: dealId } });
@@ -456,7 +470,7 @@ export async function sendCalendarInvite(
   await requireUser();
   const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId } });
 
-  const meetingDate = meetingDateRaw ? new Date(meetingDateRaw) : deal.meetingDate;
+  const meetingDate = meetingDateRaw ? parseMeetingDate(meetingDateRaw) : deal.meetingDate;
   if (!meetingDate || isNaN(meetingDate.getTime())) return { synced: false, reason: "Angiv en mødedato først." };
 
   if (meetingDate.getTime() !== deal.meetingDate?.getTime()) {

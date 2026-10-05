@@ -410,7 +410,7 @@ function QueueCard({ deal }: { deal: QueueDeal }) {
     }
     startTransition(async () => {
       try {
-        await setMeetingDateAndStage(deal.id, new Date(meetingDateInput).toISOString());
+        await setMeetingDateAndStage(deal.id, meetingDateInput);
         showToast("Møde booket");
         setGone(true);
       } catch (err) {
