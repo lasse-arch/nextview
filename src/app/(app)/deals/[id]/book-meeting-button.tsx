@@ -14,7 +14,7 @@ import { useToast } from "@/components/toast";
  * pick-a-time-and-tap panel now does the whole job: moves the deal to
  * "Møde booket" and (checkbox, on by default) sends the calendar invite in
  * the same action, using sensible defaults - no extra colleagues, no custom
- * message, 30 minutes. The separate "Send kalender invitation" button
+ * message, 30 minutes unless another length is picked. The separate "Send kalender invitation" button
  * further down the page still exists for adding a custom message
  * afterwards; this is just the fast path for the common case - including
  * picking which colleagues (if any) should be invited along with the
@@ -31,6 +31,7 @@ export function BookMeetingButton({
 }) {
   const [open, setOpen] = useState(false);
   const [dateInput, setDateInput] = useState(currentMeetingDateIso ? currentMeetingDateIso.slice(0, 16) : "");
+  const [duration, setDuration] = useState(30);
   const [sendInvite, setSendInvite] = useState(true);
   const [selectedColleagues, setSelectedColleagues] = useState<string[]>([]);
   const [pending, startTransition] = useTransition();
@@ -52,7 +53,7 @@ export function BookMeetingButton({
         await setMeetingDateAndStage(dealId, iso);
 
         if (sendInvite) {
-          const result = await sendCalendarInvite(dealId, selectedColleagues, iso, undefined, 30);
+          const result = await sendCalendarInvite(dealId, selectedColleagues, iso, undefined, duration);
           showToast(result.synced ? "Møde booket og kalenderinvitation sendt." : `Møde booket. ${result.reason ?? "Kalenderinvitation kunne ikke sendes."}`);
         } else {
           showToast("Møde booket");
@@ -86,6 +87,20 @@ export function BookMeetingButton({
             autoFocus
             className="mt-1.5 w-full rounded-md border border-slate-300 px-3 py-2.5 text-base"
           />
+          <label className="mt-3 block text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+            Varighed
+          </label>
+          <select
+            value={duration}
+            onChange={(e) => setDuration(Number(e.target.value))}
+            className="mt-1.5 w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-base"
+          >
+            <option value={15}>15 minutter</option>
+            <option value={30}>30 minutter</option>
+            <option value={45}>45 minutter</option>
+            <option value={60}>60 minutter</option>
+            <option value={90}>90 minutter</option>
+          </select>
           <label className="mt-3 flex items-center gap-2 text-sm text-slate-700">
             <input
               type="checkbox"

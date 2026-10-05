@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createCallList, addLeadsToCallList, deleteCallList, renameCallList, markVoicemail } from "@/lib/actions/call-lists";
-import { updateDealStage, setMeetingDateAndStage, renameDeal, updateDealPhone, updateDealWebsite } from "@/lib/actions/deals";
+import { updateDealStage, setMeetingDateAndStage, sendCalendarInvite, renameDeal, updateDealPhone, updateDealWebsite } from "@/lib/actions/deals";
 import { addDealItem } from "@/lib/actions/deal-items";
 import { dealName, stageLabels } from "@/lib/labels";
 import { useToast } from "@/components/toast";
@@ -27,7 +27,10 @@ type QueueDeal = {
   websiteUrl: string | null;
   stage: DealStage;
   lastVoicemailAt: Date | string | null;
+  ownerId: string;
 };
+
+type Colleague = { id: string; name: string };
 
 /** "5. okt. kl. 14:32" for the latest "Telefonsvar" press. */
 function formatVoicemailTime(at: Date | string): string {
@@ -292,10 +295,15 @@ function ListPicker({ lists, selectedListId }: { lists: CallListSummary[]; selec
   );
 }
 
-function QueueCard({ deal }: { deal: QueueDeal }) {
+function QueueCard({ deal, users }: { deal: QueueDeal; users: Colleague[] }) {
   const [busy, startTransition] = useTransition();
   const [bookingMeeting, setBookingMeeting] = useState(false);
   const [meetingDateInput, setMeetingDateInput] = useState("");
+  const [duration, setDuration] = useState(30);
+  const [inviteEmail, setInviteEmail] = useState(deal.contactEmail ?? "");
+  const [sendInvite, setSendInvite] = useState(true);
+  const [selectedColleagues, setSelectedColleagues] = useState<string[]>([]);
+  const colleagues = users.filter((u) => u.id !== deal.ownerId);
   const [gone, setGone] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState(dealName(deal));
@@ -411,7 +419,23 @@ function QueueCard({ deal }: { deal: QueueDeal }) {
     startTransition(async () => {
       try {
         await setMeetingDateAndStage(deal.id, meetingDateInput);
-        showToast("Møde booket");
+        if (sendInvite) {
+          const result = await sendCalendarInvite(
+            deal.id,
+            selectedColleagues,
+            meetingDateInput,
+            undefined,
+            duration,
+            inviteEmail
+          );
+          showToast(
+            result.synced
+              ? "Møde booket og kalenderinvitation sendt."
+              : `Møde booket. ${result.reason ?? "Kalenderinvitation kunne ikke sendes."}`
+          );
+        } else {
+          showToast("Møde booket");
+        }
         setGone(true);
       } catch (err) {
         showToast(err instanceof Error ? err.message : "Kunne ikke booke mødet.");
@@ -623,32 +647,106 @@ function QueueCard({ deal }: { deal: QueueDeal }) {
               ❌ Tabt
             </button>
           </div>
-        ) : (
-          <div className="flex shrink-0 items-center gap-2">
+        ) : null}
+      </div>
+
+      {bookingMeeting && (
+        <div className="mt-3 space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Mødetidspunkt</span>
+              <input
+                type="datetime-local"
+                value={meetingDateInput}
+                onChange={(e) => setMeetingDateInput(e.target.value)}
+                autoFocus
+                className="mt-1 w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm"
+              />
+            </label>
+            <label className="block">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Varighed</span>
+              <select
+                value={duration}
+                onChange={(e) => setDuration(Number(e.target.value))}
+                className="mt-1 w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm"
+              >
+                <option value={15}>15 minutter</option>
+                <option value={30}>30 minutter</option>
+                <option value={45}>45 minutter</option>
+                <option value={60}>60 minutter</option>
+                <option value={90}>90 minutter</option>
+              </select>
+            </label>
+          </div>
+
+          <label className="flex items-center gap-2 text-sm text-slate-700">
             <input
-              type="datetime-local"
-              value={meetingDateInput}
-              onChange={(e) => setMeetingDateInput(e.target.value)}
-              className="rounded-md border border-slate-300 px-2 py-1.5 text-xs"
+              type="checkbox"
+              checked={sendInvite}
+              onChange={(e) => setSendInvite(e.target.checked)}
+              className="h-4 w-4"
             />
+            Send kalenderinvitation
+          </label>
+
+          {sendInvite && (
+            <>
+              <label className="block">
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                  Kundens e-mail (gemmes på dealen)
+                </span>
+                <input
+                  type="email"
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  placeholder="navn@firma.dk"
+                  className="mt-1 w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm"
+                />
+              </label>
+              {colleagues.length > 0 && (
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Inviter også</p>
+                  <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
+                    {colleagues.map((c) => (
+                      <label key={c.id} className="flex items-center gap-2 text-sm text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={selectedColleagues.includes(c.id)}
+                          onChange={() =>
+                            setSelectedColleagues((prev) =>
+                              prev.includes(c.id) ? prev.filter((x) => x !== c.id) : [...prev, c.id]
+                            )
+                          }
+                          className="h-4 w-4"
+                        />
+                        {c.name}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={bookMeeting}
               disabled={busy}
-              className="rounded-md bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+              className="rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
             >
-              Book
+              {busy ? "Booker…" : "Book møde"}
             </button>
             <button
               type="button"
               onClick={() => setBookingMeeting(false)}
-              className="text-xs text-slate-400 hover:text-slate-600"
+              className="text-sm text-slate-400 hover:text-slate-600"
             >
               Annullér
             </button>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </li>
   );
 }
@@ -657,10 +755,12 @@ export function RingelisteClient({
   lists,
   selectedListId,
   deals,
+  users,
 }: {
   lists: CallListSummary[];
   selectedListId: string | null;
   deals: QueueDeal[];
+  users: Colleague[];
 }) {
   return (
     <div className="space-y-6">
@@ -674,7 +774,7 @@ export function RingelisteClient({
         </h2>
         <ul className="mt-3 space-y-2.5">
           {deals.map((deal) => (
-            <QueueCard key={deal.id} deal={deal} />
+            <QueueCard key={deal.id} deal={deal} users={users} />
           ))}
           {selectedListId && deals.length === 0 && (
             <p className="text-sm text-slate-400">Ingen leads tilbage på denne liste - godt gået!</p>

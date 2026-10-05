@@ -465,10 +465,19 @@ export async function sendCalendarInvite(
   extraAttendeeUserIds: string[] = [],
   meetingDateRaw?: string,
   customBody?: string,
-  durationMinutes?: number
+  durationMinutes?: number,
+  contactEmail?: string
 ): Promise<CalendarSyncResult> {
   await requireUser();
   const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId } });
+
+  // The customer address the invite goes to, as typed in the booking panel -
+  // saved onto the deal itself so it's its contact email from then on.
+  const email = contactEmail?.trim();
+  if (email && email !== deal.contactEmail) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { synced: false, reason: `Ugyldig e-mail: ${email}` };
+    await prisma.deal.update({ where: { id: dealId }, data: { contactEmail: email } });
+  }
 
   const meetingDate = meetingDateRaw ? parseMeetingDate(meetingDateRaw) : deal.meetingDate;
   if (!meetingDate || isNaN(meetingDate.getTime())) return { synced: false, reason: "Angiv en mødedato først." };

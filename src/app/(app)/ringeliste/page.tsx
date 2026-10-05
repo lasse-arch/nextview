@@ -39,9 +39,12 @@ export default async function RingelistePage({
           websiteUrl: true,
           stage: true,
           lastVoicemailAt: true,
+          ownerId: true,
         },
       })
     : [];
+  // For "Inviter også" when booking a meeting straight from the list.
+  const users = await prisma.user.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } });
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -57,6 +60,7 @@ export default async function RingelistePage({
         lists={lists.map((l) => ({ id: l.id, name: l.name, openCount: l._count.deals }))}
         selectedListId={selectedListId}
         deals={deals}
+        users={users}
       />
     </div>
   );
