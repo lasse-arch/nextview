@@ -773,6 +773,22 @@ export function RingelisteClient({
   deals: QueueDeal[];
   users: Colleague[];
 }) {
+  const [search, setSearch] = useState("");
+  // Searches the whole list, not just what's on screen - name (and kaldenavn),
+  // phone (ignoring spaces), e-mail, address, CVR and website.
+  const query = search.trim().toLowerCase();
+  const visibleDeals = query
+    ? deals.filter((d) => {
+        const haystack = [d.companyName, d.displayName, d.contactName, d.contactEmail, d.address, d.cvrNumber, d.websiteUrl]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        const phoneQuery = query.replace(/[\s+-]/g, "");
+        const phone = (d.contactPhone ?? "").replace(/[\s+-]/g, "");
+        return haystack.includes(query) || (phoneQuery.length >= 3 && /^\d+$/.test(phoneQuery) && phone.includes(phoneQuery));
+      })
+    : deals;
+
   return (
     <div className="space-y-6">
       <QuickAdd selectedListId={selectedListId} />
@@ -780,15 +796,31 @@ export function RingelisteClient({
       <ListPicker lists={lists} selectedListId={selectedListId} />
 
       <section>
-        <h2 className="text-sm font-semibold text-slate-900">
-          {selectedListId ? `Tilbage at ringe (${deals.length})` : "Vælg eller opret en liste ovenfor"}
-        </h2>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold text-slate-900">
+            {selectedListId
+              ? `Tilbage at ringe (${query ? `${visibleDeals.length} af ${deals.length}` : deals.length})`
+              : "Vælg eller opret en liste ovenfor"}
+          </h2>
+          {selectedListId && deals.length > 0 && (
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Søg navn, telefon, e-mail, adresse, CVR…"
+              className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm sm:w-72"
+            />
+          )}
+        </div>
         <ul className="mt-3 space-y-2.5">
-          {deals.map((deal) => (
+          {visibleDeals.map((deal) => (
             <QueueCard key={deal.id} deal={deal} users={users} />
           ))}
           {selectedListId && deals.length === 0 && (
             <p className="text-sm text-slate-400">Ingen leads tilbage på denne liste - godt gået!</p>
+          )}
+          {query && deals.length > 0 && visibleDeals.length === 0 && (
+            <p className="text-sm text-slate-400">Ingen leads på listen matcher &quot;{search.trim()}&quot;.</p>
           )}
         </ul>
       </section>
