@@ -18,7 +18,7 @@ import { LastActiveCard } from "./last-active-card";
 import { getDashboardGreeting } from "@/lib/greeting";
 import { getCommissionPeriodReminder } from "@/lib/commission-period-reminder-data";
 import { CommissionPeriodReminderCard } from "./commission-period-reminder-card";
-import { getMeetingsBookedPerDay } from "@/lib/meetings-booked-data";
+import { getMeetingsBookedThisWeek } from "@/lib/meetings-booked-data";
 import { MeetingsBookedCard } from "./meetings-booked-card";
 
 const FUNNEL_SHADES = [
@@ -52,7 +52,7 @@ export default async function DashboardPage() {
     getRecentActivity(),
     getUserLastActive(),
     user ? getCommissionPeriodReminder(user) : Promise.resolve(null),
-    getMeetingsBookedPerDay(),
+    getMeetingsBookedThisWeek(),
   ]);
 
   const funnelMax = Math.max(1, ...data.funnel.map((f) => f.count));

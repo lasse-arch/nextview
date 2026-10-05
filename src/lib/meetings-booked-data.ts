@@ -10,21 +10,26 @@ export type MeetingsBookedDay = {
   /** "YYYY-MM-DD" in Copenhagen time. */
   dayKey: string;
   label: string;
+  isToday: boolean;
   count: number;
   bySeller: { name: string; count: number }[];
 };
 
 /**
- * Meetings booked through the CRM per day - counted from the "bookede møde
- * med ..." activity events (logged by every booking path: Book møde, the
- * ringeliste, the board, the deal form and sending an invite for a lead),
- * by the day the booking was made, not the day of the meeting itself.
+ * Meetings booked through the CRM this week (Monday-Sunday, Copenhagen
+ * time), per day - counted from the "bookede møde med ..." activity events
+ * (logged by every booking path: Book møde, the ringeliste, the board, the
+ * deal form and sending an invite for a lead), by the day the booking was
+ * made, not the day of the meeting itself.
  */
-export async function getMeetingsBookedPerDay(days = 14, now = new Date()): Promise<MeetingsBookedDay[]> {
-  const keys: string[] = [];
-  for (let i = days - 1; i >= 0; i--) keys.push(copenhagenDayKey(new Date(now.getTime() - i * 24 * 60 * 60 * 1000)));
-  // A day's margin so the oldest Copenhagen day is fully covered whatever the offset.
-  const since = new Date(now.getTime() - (days + 1) * 24 * 60 * 60 * 1000);
+export async function getMeetingsBookedThisWeek(now = new Date()): Promise<MeetingsBookedDay[]> {
+  const todayKey = copenhagenDayKey(now);
+  const [ty, tm, td] = todayKey.split("-").map(Number);
+  const today = new Date(Date.UTC(ty, tm - 1, td));
+  const monday = new Date(today.getTime() - ((today.getUTCDay() + 6) % 7) * 24 * 60 * 60 * 1000);
+  const keys = Array.from({ length: 7 }, (_, i) => new Date(monday.getTime() + i * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
+  // A day's margin so Monday is fully covered whatever the UTC offset.
+  const since = new Date(monday.getTime() - 24 * 60 * 60 * 1000);
 
   const events = await prisma.activityEvent.findMany({
     where: { type: "DEAL_STAGE_MEETING_BOOKED", createdAt: { gte: since } },
@@ -49,6 +54,7 @@ export async function getMeetingsBookedPerDay(days = 14, now = new Date()): Prom
     return {
       dayKey,
       label,
+      isToday: dayKey === todayKey,
       count: [...sellers.values()].reduce((s, n) => s + n, 0),
       bySeller: [...sellers.entries()].map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count),
     };

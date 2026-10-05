@@ -158,9 +158,9 @@ const DEFAULT_POSTS: { title: string; body: string; minutesAgo: number; screensh
   },
   {
     minutesAgo: 0,
-    title: "Møder booket i dag - på forsiden",
-    body: "Forsiden viser nu, hvor mange møder der er booket i dag gennem systemet, og hvem der har booket dem, med de sidste 14 dage som søjler nedenunder og et tal for de sidste 7 dage. Hold musen over en søjle for at se dagens fordeling pr. sælger. Det tæller den dag, mødet blev booket - ikke den dag, mødet holdes.",
-    screenshotUrl: "/news/moder-booket-pr-dag.png",
+    title: "Møder booket denne uge - på forsiden",
+    body: "Forsiden viser nu, hvor mange møder der er booket gennem systemet denne uge, og hvem der har booket dem, med en søjle for hver dag mandag til søndag. Hold musen over en søjle for at se dagens fordeling pr. sælger. Det tæller den dag, mødet blev booket - ikke den dag, mødet holdes.",
+    screenshotUrl: "/news/moder-booket-uge.png",
   },
 ];
 
@@ -172,6 +172,9 @@ const DEFAULT_POSTS: { title: string; body: string; minutesAgo: number; screensh
  * a later screenshot addition still reaches prod without direct DB access.
  */
 export async function ensureDefaultNewsPosts(adminUserId: string): Promise<void> {
+  // Replaced by "Møder booket denne uge - på forsiden" shortly after it went out.
+  await prisma.newsPost.deleteMany({ where: { title: "Møder booket i dag - på forsiden" } });
+
   for (const post of DEFAULT_POSTS) {
     const existing = await prisma.newsPost.findFirst({ where: { title: post.title } });
     if (!existing) {
