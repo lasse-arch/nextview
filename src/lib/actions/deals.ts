@@ -342,6 +342,12 @@ async function updateDealInner(
 
   await recalcCommission(dealId);
 
+  // Saving the form with a new stage (e.g. Lead -> Møde booket after picking
+  // a mødedato) is announced in the activity feed like any other stage move.
+  if (stage !== existing.stage) {
+    await logStageActivity(user, { ...existing, companyName, displayName }, stage);
+  }
+
   if (stage === "CONTRACT_SIGNED" && existing.stage !== "CONTRACT_SIGNED") {
     await sendContractSignedNotification(dealId);
   }
@@ -355,6 +361,26 @@ async function updateDealInner(
     message: blockedStageChange ? "Gemt (stadiet styres via kontrakten og blev ikke ændret)" : "Gemt",
     duplicate: duplicates.length > 0 ? { id: duplicates[0].id, companyName: duplicates[0].companyName } : null,
   };
+}
+
+/** The activity-feed line for a deal moving into a stage worth announcing -
+ * shared by every path that changes the stage (board, form, booking). */
+async function logStageActivity(
+  user: { id: string; name: string },
+  deal: Parameters<typeof dealName>[0] & { id: string },
+  newStage: DealStage
+) {
+  const name = dealName(deal);
+  const stageActivityMessage: Partial<Record<DealStage, string>> = {
+    MEETING_BOOKED: `${user.name} bookede møde med ${name}`,
+    FILMED: `${user.name} markerede ${name} som filmet`,
+    LIVE: `${name} gik live`,
+    LOST: `${user.name} markerede ${name} som tabt`,
+  };
+  const message = stageActivityMessage[newStage];
+  if (message) {
+    await logActivity({ type: `DEAL_STAGE_${newStage}`, message, actorId: user.id, dealId: deal.id });
+  }
 }
 
 export async function updateDealStage(dealId: string, newStage: DealStage) {
@@ -403,17 +429,7 @@ export async function updateDealStage(dealId: string, newStage: DealStage) {
   });
 
   if (newStage !== existing.stage) {
-    const name = dealName(existing);
-    const stageActivityMessage: Partial<Record<DealStage, string>> = {
-      MEETING_BOOKED: `${user.name} bookede møde med ${name}`,
-      FILMED: `${user.name} markerede ${name} som filmet`,
-      LIVE: `${name} gik live`,
-      LOST: `${user.name} markerede ${name} som tabt`,
-    };
-    const message = stageActivityMessage[newStage];
-    if (message) {
-      await logActivity({ type: `DEAL_STAGE_${newStage}`, message, actorId: user.id, dealId });
-    }
+    await logStageActivity(user, existing, newStage);
   }
 
   revalidatePath("/deals");
