@@ -9,7 +9,7 @@
     "lint": "eslint",
     "db:seed": "tsx prisma/seed.ts",
     "postinstall": "prisma generate",
-    "vercel-build": "if [ \"$VERCEL_ENV\" = \"production\" ]; then prisma migrate deploy; fi && next build"
+    "vercel-build": "if [ \"$VERCEL_ENV\" = \"production\" ]; then prisma db execute --file prisma/fixes/clear-failed-preview-migration.sql --schema prisma/schema.prisma && prisma migrate deploy; fi && next build"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
