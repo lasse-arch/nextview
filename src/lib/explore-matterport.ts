@@ -282,12 +282,15 @@ async function login(page: Page): Promise<void> {
 async function waitForMarkerOrLoginForm(
   page: Page,
   expectedMarker: RegExp
-): Promise<{ found: "marker" | "loginForm" | "neither"; text: string }> {
+): Promise<{ found: "marker" | "loginForm" | "noAccess" | "neither"; text: string }> {
   let text = "";
   for (let i = 0; i < 16; i++) {
     await sleep(500);
     text = await page.evaluate(() => document.body.innerText).catch(() => "");
     if (expectedMarker.test(text)) return { found: "marker", text };
+    // Logged in fine, but this account can't see the model - Matterport's
+    // own "Page unavailable / You do not have access to this page".
+    if (NO_ACCESS_PATTERN.test(text)) return { found: "noAccess", text };
     const looksLikeLoginForm =
       (await page.$('input[type="password"]')) !== null ||
       (await page.$('input[type="email"], input[name="email"], input[name="username"], #email')) !== null;
@@ -296,12 +299,22 @@ async function waitForMarkerOrLoginForm(
   return { found: "neither", text };
 }
 
+const NO_ACCESS_PATTERN = /you do not have access to this page|page unavailable/i;
+
+function noAccessError(targetUrl: string): Error {
+  const modelId = targetUrl.match(/\/models\/([^/?#]+)/)?.[1] ?? "?";
+  return new Error(
+    `Matterport-kontoen har ikke adgang til model ${modelId}. Tjek at MP-Skin nummeret på kunden er rigtigt, og at modellen ligger i den Matterport-organisation, systemet logger ind på (eller er delt med den).`
+  );
+}
+
 async function ensureAuthenticatedOn(page: Page, targetUrl: string, expectedMarker: RegExp): Promise<void> {
   await gotoRetry(page, targetUrl);
   await dismissCookieBanner(page);
 
   let result = await waitForMarkerOrLoginForm(page, expectedMarker);
   if (result.found === "marker") return;
+  if (result.found === "noAccess") throw noAccessError(targetUrl);
   if (result.found === "neither") {
     throw new Error(
       `Landede hverken på login-formularen eller den ønskede side (url: ${page.url()}, uddrag: "${pageSnippet(result.text)}").`
@@ -315,6 +328,7 @@ async function ensureAuthenticatedOn(page: Page, targetUrl: string, expectedMark
   // against it landing somewhere generic instead.
   await gotoRetry(page, targetUrl);
   result = await waitForMarkerOrLoginForm(page, expectedMarker);
+  if (result.found === "noAccess") throw noAccessError(targetUrl);
   if (result.found !== "marker") {
     const bannerStillUp = await cookieBannerVisible(page);
     throw new Error(
