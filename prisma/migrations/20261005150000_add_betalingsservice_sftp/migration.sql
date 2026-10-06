@@ -1,24 +1,26 @@
+-- Idempotent: an earlier preview build may already have applied parts of this
+-- to the production database under another name.
 -- AlterTable
-ALTER TABLE "BsDelivery" ADD COLUMN     "sendViaSftp" BOOLEAN NOT NULL DEFAULT false,
-ADD COLUMN     "sftpError" TEXT,
-ADD COLUMN     "sftpSentAt" TIMESTAMP(3);
+ALTER TABLE "BsDelivery" ADD COLUMN IF NOT EXISTS "sendViaSftp" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN IF NOT EXISTS "sftpError" TEXT,
+ADD COLUMN IF NOT EXISTS "sftpSentAt" TIMESTAMP(3);
 
 -- AlterTable
-ALTER TABLE "BsSettings" ADD COLUMN     "autoSend" BOOLEAN NOT NULL DEFAULT false,
-ADD COLUMN     "lastAutoDeliveryAt" TIMESTAMP(3),
-ADD COLUMN     "relayIp" TEXT,
-ADD COLUMN     "relayLastError" TEXT,
-ADD COLUMN     "relayLastSeenAt" TIMESTAMP(3),
-ADD COLUMN     "relayPublicKey" TEXT,
-ADD COLUMN     "relayTokenHash" TEXT,
-ADD COLUMN     "sftpDownloadDir" TEXT NOT NULL DEFAULT '',
-ADD COLUMN     "sftpHost" TEXT,
-ADD COLUMN     "sftpPort" INTEGER NOT NULL DEFAULT 22,
-ADD COLUMN     "sftpUploadDir" TEXT NOT NULL DEFAULT '',
-ADD COLUMN     "sftpUser" TEXT;
+ALTER TABLE "BsSettings" ADD COLUMN IF NOT EXISTS "autoSend" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN IF NOT EXISTS "lastAutoDeliveryAt" TIMESTAMP(3),
+ADD COLUMN IF NOT EXISTS "relayIp" TEXT,
+ADD COLUMN IF NOT EXISTS "relayLastError" TEXT,
+ADD COLUMN IF NOT EXISTS "relayLastSeenAt" TIMESTAMP(3),
+ADD COLUMN IF NOT EXISTS "relayPublicKey" TEXT,
+ADD COLUMN IF NOT EXISTS "relayTokenHash" TEXT,
+ADD COLUMN IF NOT EXISTS "sftpDownloadDir" TEXT NOT NULL DEFAULT '',
+ADD COLUMN IF NOT EXISTS "sftpHost" TEXT,
+ADD COLUMN IF NOT EXISTS "sftpPort" INTEGER NOT NULL DEFAULT 22,
+ADD COLUMN IF NOT EXISTS "sftpUploadDir" TEXT NOT NULL DEFAULT '',
+ADD COLUMN IF NOT EXISTS "sftpUser" TEXT;
 
 -- CreateTable
-CREATE TABLE "BsMailboxFile" (
+CREATE TABLE IF NOT EXISTS "BsMailboxFile" (
     "id" TEXT NOT NULL,
     "fileName" TEXT NOT NULL,
     "contentHash" TEXT NOT NULL,
@@ -32,5 +34,5 @@ CREATE TABLE "BsMailboxFile" (
 );
 
 -- CreateIndex
-CREATE UNIQUE INDEX "BsMailboxFile_contentHash_key" ON "BsMailboxFile"("contentHash");
+CREATE UNIQUE INDEX IF NOT EXISTS "BsMailboxFile_contentHash_key" ON "BsMailboxFile"("contentHash");
 
