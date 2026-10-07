@@ -18,6 +18,7 @@ import { renderContractPdf } from "@/lib/contract-pdf-renderer";
 import { createContractFollowUpTask } from "@/lib/task-automation";
 import { logActivity } from "@/lib/activity";
 import { dealName } from "@/lib/labels";
+import { contactNameProblem } from "@/lib/contact-name";
 
 /**
  * Pre-flight check before opening the contract-builder page: the master
@@ -30,10 +31,14 @@ export async function checkDealReadyForContract(
   await requireUser();
   const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId } });
 
-  if (!deal.cvrNumber) return { ok: false, error: "Udfyld CVR-nummer før kontrakten kan sendes." };
-  if (!deal.contactName) return { ok: false, error: "Udfyld kontaktperson før kontrakten kan sendes." };
-  if (!deal.contactEmail) return { ok: false, error: "Udfyld kontaktpersonens e-mail før kontrakten kan sendes." };
-  if (!deal.contactPhone) return { ok: false, error: "Udfyld kontaktpersonens telefonnummer før kontrakten kan sendes." };
+  // Checks what's saved on the deal - a field typed in but not saved yet
+  // doesn't count, hence the reminder.
+  const saveHint = " (Husk at gemme dealen først.)";
+  if (!deal.cvrNumber) return { ok: false, error: `Udfyld CVR-nummer før kontrakten kan sendes.${saveHint}` };
+  const nameProblem = contactNameProblem(deal.contactName);
+  if (nameProblem) return { ok: false, error: deal.contactName ? nameProblem : `${nameProblem}${saveHint}` };
+  if (!deal.contactEmail) return { ok: false, error: `Udfyld kontaktpersonens e-mail før kontrakten kan sendes.${saveHint}` };
+  if (!deal.contactPhone) return { ok: false, error: `Udfyld kontaktpersonens telefonnummer før kontrakten kan sendes.${saveHint}` };
 
   const cvrResult = await lookupCvrNumber(deal.cvrNumber);
   if (!cvrResult.ok) return { ok: false, error: `CVR-opslag fejlede: ${cvrResult.error}` };
@@ -69,7 +74,8 @@ export async function buildAndSendContract(
       throw new Error("Kontrakten er allerede underskrevet og kan ikke ændres herfra.");
     }
     if (!deal.cvrNumber) throw new Error("Udfyld CVR-nummer før kontrakten kan sendes.");
-    if (!deal.contactName) throw new Error("Dealen mangler et kontaktpersonnavn.");
+    const nameProblem = contactNameProblem(deal.contactName);
+    if (nameProblem || !deal.contactName) throw new Error(nameProblem ?? "Dealen mangler et kontaktpersonnavn.");
     if (!deal.contactEmail) throw new Error("Dealen mangler en kontakt-e-mail.");
     if (!deal.contactPhone) throw new Error("Dealen mangler et telefonnummer.");
 

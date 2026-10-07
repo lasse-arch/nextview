@@ -9,6 +9,7 @@ import { lookupCvrNumber } from "@/lib/cvr";
 import { recalcCommission } from "@/lib/commission-service";
 import { sendContractSignedNotification } from "@/lib/notification-service";
 import { createDeliveryTasksForSignedContract } from "@/lib/task-automation";
+import { contactNameProblem } from "@/lib/contact-name";
 import {
   buildContractHtmlData,
   computeMonthlyTotal,
@@ -50,7 +51,8 @@ export async function sendStandaloneContract(
     }
     if (!customer.companyName.trim()) throw new Error("Udfyld firmanavn.");
     if (!customer.cvrNumber.trim()) throw new Error("Udfyld CVR-nummer.");
-    if (!customer.contactName.trim()) throw new Error("Udfyld kontaktperson.");
+    const nameProblem = contactNameProblem(customer.contactName);
+    if (nameProblem) throw new Error(nameProblem);
     if (!customer.contactEmail.trim()) throw new Error("Udfyld kontakt-e-mail.");
     if (!customer.contactPhone.trim()) throw new Error("Udfyld telefonnummer.");
 
