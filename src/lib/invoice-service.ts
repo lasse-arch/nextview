@@ -98,7 +98,16 @@ function computeDueLines(
   const establishmentReady = options.sendEstablishmentNow
     ? Boolean(deal.contractSignedAt || deal.billingStartDate)
     : Boolean(establishmentDueDate && establishmentDueDate <= now);
-  if (deal.establishmentFee && deal.establishmentFee > 0 && !handledQuarterIndexes.has(0)) {
+  // A customer who signed before the CRM started invoicing (see
+  // INVOICING_FLOOR) was already billed their establishment fee outside it -
+  // there's just no record of that here, so it must never be billed again.
+  const establishmentPredatesInvoicing = Boolean(establishmentDueDate && establishmentDueDate < INVOICING_FLOOR);
+  if (
+    deal.establishmentFee &&
+    deal.establishmentFee > 0 &&
+    !handledQuarterIndexes.has(0) &&
+    !establishmentPredatesInvoicing
+  ) {
     if (establishmentReady) {
       lines.push({
         quarterIndex: 0,
