@@ -1,6 +1,6 @@
 import { addMonths, subMonths, addDays, startOfMonth, max as maxDate, startOfDay } from "date-fns";
 import { prisma } from "@/lib/db";
-import { isDineroConfigured, createQuarterlyInvoiceDraft, getInvoicePaymentStatus, type DineroInvoiceLine } from "@/lib/dinero";
+import { isDineroConfigured, createQuarterlyInvoiceDraft, getInvoicePaymentStatus, getInvoiceTotals, type DineroInvoiceLine } from "@/lib/dinero";
 import { computeBillingPeriods, computePeriodAmounts } from "@/lib/invoice-schedule";
 import { totalContractValue, invoicePeriodLabel, formatDate, dealName } from "@/lib/labels";
 import {
@@ -1012,9 +1012,16 @@ export async function checkInvoicePayment(
 
   try {
     const { paid, paidDate, rawStatus } = await getInvoicePaymentStatus(invoice.dineroInvoiceGuid);
+    // Invoices made before the number was read back after booking were
+    // stored without their Dinero invoice number - fill it in while here.
+    const number = invoice.dineroInvoiceNumber ?? (await getInvoiceTotals(invoice.dineroInvoiceGuid).then((t) => t.number).catch(() => null));
     await prisma.invoice.update({
       where: { id: invoice.id },
-      data: { paidAt: paid ? (paidDate ? new Date(paidDate) : new Date()) : null },
+      data: {
+        // Never un-mark a paid invoice here: only set it once Dinero says paid.
+        paidAt: paid ? invoice.paidAt ?? (paidDate ? new Date(paidDate) : new Date()) : invoice.paidAt,
+        ...(number && !invoice.dineroInvoiceNumber ? { dineroInvoiceNumber: number } : {}),
+      },
     });
     return { ok: true, paid, rawStatus, dealId: invoice.dealId };
   } catch (err) {

@@ -497,9 +497,14 @@ export async function getInvoicePaymentStatus(
   });
 
   if (!res.ok) throw new Error(`Dinero: kunne ikke hente fakturastatus (${res.status}): ${await res.text()}`);
-  const data = (await res.json()) as { Status?: string };
-  const paid = data.Status === "Paid" || data.Status === "OverPaid";
-  return { paid, paidDate: null, rawStatus: data.Status ?? null };
+  // Confirmed against a live Dinero test company: `Status` is only
+  // Draft/Booked; whether it's paid is in `PaymentStatus`
+  // (Draft/Booked/Paid/OverPaid/Overdue) - a paid invoice reads
+  // Status "Booked", PaymentStatus "Paid".
+  const data = (await res.json()) as { Status?: string; PaymentStatus?: string };
+  const status = data.PaymentStatus ?? data.Status ?? null;
+  const paid = status === "Paid" || status === "OverPaid";
+  return { paid, paidDate: null, rawStatus: status };
 }
 
 export type DineroDraftResult = {
@@ -534,6 +539,19 @@ async function bookAndSendOrCapture(
   } catch (err) {
     console.error(`Dinero: faktura ${invoiceGuid} oprettet, men bogføring/afsendelse fejlede`, err);
     return err instanceof Error ? err.message : "Ukendt fejl ved bogføring/afsendelse";
+  }
+}
+
+/**
+ * Dinero only numbers an invoice when it's booked - the create response
+ * (a draft) has no Number - so the real invoice number is read back after
+ * booking. Falls back to whatever the draft had if that lookup fails.
+ */
+async function bookedNumber(invoiceGuid: string, draftNumber: string | null): Promise<string | null> {
+  try {
+    return (await getInvoiceTotals(invoiceGuid)).number ?? draftNumber;
+  } catch {
+    return draftNumber;
   }
 }
 
@@ -594,7 +612,7 @@ export async function createQuarterlyInvoiceDraft(params: {
       collectedViaBetalingsservice: params.collectedViaBetalingsservice,
     });
     const sendError = await bookAndSendOrCapture(accessToken, invoice.guid, invoice.timestamp, params.contactEmail);
-    return { contactGuid, invoiceGuid: invoice.guid, invoiceNumber: invoice.number, sendError };
+    return { contactGuid, invoiceGuid: invoice.guid, invoiceNumber: await bookedNumber(invoice.guid, invoice.number), sendError };
   } catch (err) {
     // The cached/reused contact GUID no longer exists in Dinero (e.g. it was
     // deleted there directly) - re-run the CVR/name search once more before
@@ -623,7 +641,7 @@ export async function createQuarterlyInvoiceDraft(params: {
       collectedViaBetalingsservice: params.collectedViaBetalingsservice,
     });
     const sendError = await bookAndSendOrCapture(accessToken, invoice.guid, invoice.timestamp, params.contactEmail);
-    return { contactGuid: freshContactGuid, invoiceGuid: invoice.guid, invoiceNumber: invoice.number, sendError };
+    return { contactGuid: freshContactGuid, invoiceGuid: invoice.guid, invoiceNumber: await bookedNumber(invoice.guid, invoice.number), sendError };
   }
 }
 

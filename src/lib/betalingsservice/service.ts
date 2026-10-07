@@ -256,20 +256,37 @@ export async function createBsDelivery(
   const notes: string[] = [];
   const ready: PendingBsCollection[] = [];
   for (const p of candidates) {
-    let alreadyPaid = false;
+    // Checked per Dinero invoice: a collection can hold several (same
+    // customer, same date), and only the ones actually paid are dropped.
+    const paidGuids = new Set<string>();
     for (const guid of p.dineroGuids) {
       if (testMode || guid.startsWith("TEST-")) continue;
       try {
-        if ((await getInvoicePaymentStatus(guid)).paid) alreadyPaid = true;
+        if ((await getInvoicePaymentStatus(guid)).paid) paidGuids.add(guid);
       } catch (err) {
         return { ok: false, error: `Kunne ikke tjekke betalingsstatus i Dinero: ${err instanceof Error ? err.message : String(err)}` };
       }
     }
-    if (alreadyPaid) {
-      await prisma.invoice.updateMany({ where: { id: { in: p.invoiceIds }, paidAt: null }, data: { paidAt: new Date() } });
-      notes.push(`${p.dealName}: faktura ${p.invoiceNumbers.join(", ")} er allerede betalt i Dinero - ikke opkrævet via Betalingsservice.`);
-    } else {
+    if (paidGuids.size === 0) {
       ready.push(p);
+      continue;
+    }
+    const paidRows = await prisma.invoice.findMany({
+      where: { id: { in: p.invoiceIds }, dineroInvoiceGuid: { in: [...paidGuids] } },
+      select: { id: true },
+    });
+    await prisma.invoice.updateMany({ where: { id: { in: paidRows.map((r) => r.id) }, paidAt: null }, data: { paidAt: new Date() } });
+    const paidNumbers = p.dineroGuids.flatMap((g, i) => (paidGuids.has(g) ? [p.invoiceNumbers[i]] : []));
+    notes.push(`${p.dealName}: faktura ${paidNumbers.join(", ")} er allerede betalt i Dinero - ikke opkrævet via Betalingsservice.`);
+    const keep = p.dineroGuids.map((g, i) => ({ g, n: p.invoiceNumbers[i] })).filter((x) => !paidGuids.has(x.g));
+    if (keep.length > 0) {
+      const paidIds = new Set(paidRows.map((r) => r.id));
+      ready.push({
+        ...p,
+        dineroGuids: keep.map((x) => x.g),
+        invoiceNumbers: keep.map((x) => x.n),
+        invoiceIds: p.invoiceIds.filter((id) => !paidIds.has(id)),
+      });
     }
   }
   if (ready.length === 0) {
