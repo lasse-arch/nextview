@@ -17,6 +17,7 @@ import {
   ReturnFileUpload,
   RetryPaymentButton,
   SwitchAllCustomersButton,
+  PreviewDraftsButton,
 } from "./betalingsservice-client";
 
 const COLLECTION_STATUS: Record<string, { label: string; className: string }> = {
@@ -165,6 +166,7 @@ export default async function BetalingsservicePage() {
           selectedId={settings.dineroInvoiceTemplateId}
           error={invoiceTemplatesError}
         />
+        {currentUser.role === "ADMIN" && !invoiceTemplatesError && <PreviewDraftsButton />}
       </section>
 
       <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">

@@ -17,6 +17,7 @@ import {
   createBsTestDeliveryAction,
   saveBsInvoiceTemplate,
   switchAllCustomersToBsAction,
+  createBsPreviewDraftsAction,
 } from "@/lib/actions/betalingsservice";
 import { useToast } from "@/components/toast";
 
@@ -489,6 +490,40 @@ export function SwitchAllCustomersButton({ customers, other }: { customers: numb
     >
       {pending ? "Skifter…" : "Sæt alle kunder på Betalingsservice"}
     </button>
+  );
+}
+
+export function PreviewDraftsButton() {
+  const [pending, startTransition] = useTransition();
+  const [message, setMessage] = useState<string | null>(null);
+  return (
+    <div className="mt-3">
+      <button
+        type="button"
+        disabled={pending}
+        onClick={() => {
+          if (
+            !confirm(
+              "Lav 2 prøvekladder i jeres rigtige Dinero (til Nextview360 ApS selv)? De bliver hverken bogført eller sendt - slet dem i Dinero, når I har kigget på dem."
+            )
+          )
+            return;
+          setMessage(null);
+          startTransition(async () => {
+            const result = await createBsPreviewDraftsAction();
+            setMessage(
+              result.ok
+                ? `${result.count} prøvekladder lavet i Dinero under Fakturaer → Kladder (kunde: Nextview360 ApS). Den ene bruger Betalingsservice-skabelonen, den anden standardskabelonen.`
+                : result.error
+            );
+          });
+        }}
+        className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+      >
+        {pending ? "Laver kladder…" : "Lav prøvekladder i Dinero"}
+      </button>
+      {message && <p className="mt-2 text-xs text-slate-600">{message}</p>}
+    </div>
   );
 }
 

@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import type { PaymentMethod } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { createPreviewInvoiceDrafts, isDineroConfigured } from "@/lib/dinero";
+import { invoiceTerms } from "@/lib/invoice-service";
 import { requireUser } from "@/lib/auth";
 import {
   createBsTestDelivery,
@@ -178,4 +180,50 @@ export async function saveBsInvoiceTemplate(templateId: string | null) {
     update: { dineroInvoiceTemplateId: templateId || null },
   });
   revalidatePath(PAGE);
+}
+
+/**
+ * Admin only: two invoice drafts in the real Dinero (never booked or sent),
+ * made out to our own company, to check the layout - one collected via
+ * Betalingsservice (the chosen template, "not signed up" notice) and one
+ * normal invoice (default template with the FI code, sign-up text).
+ */
+export async function createBsPreviewDraftsAction(): Promise<{ ok: true; count: number } | { ok: false; error: string }> {
+  try {
+    const user = await requireBillingUser();
+    if (user.role !== "ADMIN") throw new Error("Kun administratorer kan lave prøvekladder.");
+    if (!(await isDineroConfigured())) throw new Error("Dinero er ikke sat op.");
+    const settings = await prisma.bsSettings.findUnique({ where: { id: "default" } });
+    if (!settings?.pbsNumber || !settings.debtorGroupNumber) throw new Error("Udfyld PBS-nr. og debitorgruppe under Aftale først.");
+    const info = {
+      mandateActive: false,
+      customerNumber: "NV00000",
+      pbsNumber: settings.pbsNumber,
+      debtorGroupNumber: settings.debtorGroupNumber,
+    };
+    const now = new Date();
+    const nextQuarter = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3 + 3, 1);
+    const lines = [{ description: "PRØVEKLADDE - slet mig (Nextview360 Tour)", amount: 3000 }];
+    const bs = invoiceTerms("BETALINGSSERVICE", 2, nextQuarter, "da", now, info);
+    const normal = invoiceTerms("INVOICE", 0, now, "da", now, info);
+    const created = await createPreviewInvoiceDrafts({ name: "Nextview360 ApS", cvr: "46452445" }, [
+      {
+        note: `${bs.noteSuffix}\n\nPRØVEKLADDE (Betalingsservice) - slet mig`,
+        lines,
+        invoiceDate: bs.invoiceDate,
+        paymentDays: bs.paymentDays,
+        collectedViaBetalingsservice: true,
+        invoiceTemplateId: settings.dineroInvoiceTemplateId,
+      },
+      {
+        note: `${normal.noteSuffix}\n\nPRØVEKLADDE (almindelig faktura) - slet mig`,
+        lines,
+        invoiceDate: normal.invoiceDate,
+        paymentDays: normal.paymentDays,
+      },
+    ]);
+    return { ok: true, count: created.length };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Kunne ikke lave prøvekladder." };
+  }
 }

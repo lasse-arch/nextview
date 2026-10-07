@@ -658,6 +658,30 @@ export async function createQuarterlyInvoiceDraft(params: {
   }
 }
 
+/**
+ * Creates invoice DRAFTS in the real Dinero - never booked, never sent - so
+ * the actual layout (template, payment details, comment text) can be looked
+ * at in Dinero before anything goes to a customer. Deliberately ignores test
+ * mode, since its whole point is to show the real thing. The drafts are
+ * made out to our own company (found by CVR, created once if missing) and
+ * can be deleted in Dinero afterwards.
+ */
+export async function createPreviewInvoiceDrafts(
+  ownCompany: { name: string; cvr: string },
+  drafts: Omit<DineroInvoiceInput, "contactGuid">[]
+): Promise<{ guid: string }[]> {
+  const accessToken = await getAccessToken();
+  const contactGuid =
+    (await findContactByCvr(accessToken, ownCompany.cvr, ownCompany.name)) ??
+    (await createContact(accessToken, { name: ownCompany.name, cvr: ownCompany.cvr, email: null, phone: null, address: null }));
+  const created: { guid: string }[] = [];
+  for (const draft of drafts) {
+    const invoice = await createInvoiceDraft(accessToken, { ...draft, contactGuid });
+    created.push({ guid: invoice.guid });
+  }
+  return created;
+}
+
 /** A booked invoice's total incl. VAT and current concurrency timestamp. */
 export async function getInvoiceTotals(
   invoiceGuid: string
