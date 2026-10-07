@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 // page's own response but is still bounded by its maxDuration.
 export const maxDuration = 300;
 import { getCurrentUser } from "@/lib/auth";
+import { bsPayerOf } from "@/lib/betalingsservice/service";
 import Link from "next/link";
 import { findPossibleDuplicates } from "@/lib/duplicates";
 import { MoveToDealsButton } from "./move-to-deals-button";
@@ -148,6 +149,9 @@ export default async function DealDetailPage({
   ).sort((a, b) => dealName(a).localeCompare(dealName(b), "da"));
 
   if (!deal) notFound();
+  // A branch billed together with its parent pays through the parent's
+  // Betalingsservice customer number (see bsPayerOf).
+  const bsPayer = bsPayerOf(deal);
   // Set right after creating a deal that may already exist (see
   // findPossibleDuplicates) - matched on CVR, name/kaldenavn or address,
   // including leads lying as Tabt in Leadindbakken.
@@ -533,8 +537,9 @@ export default async function DealDetailPage({
               <PaymentMethodControl
                 dealId={deal.id}
                 method={deal.paymentMethod}
-                customerNumber={deal.bsCustomerNumber}
-                mandateActive={deal.bsMandateStatus === "ACTIVE"}
+                customerNumber={bsPayer.bsCustomerNumber}
+                mandateActive={bsPayer.bsMandateStatus === "ACTIVE"}
+                paysViaName={bsPayer.id !== deal.id ? dealName(bsPayer) : null}
                 pbsNumber={bsSettings?.pbsNumber ?? null}
                 debtorGroupNumber={bsSettings?.debtorGroupNumber ?? null}
               />

@@ -16,6 +16,7 @@
  * - the same result file can't be imported twice (BsReturnImport.contentHash).
  */
 import { createHash } from "node:crypto";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { dealName } from "@/lib/labels";
 import { isDineroTestMode } from "@/lib/integration-settings";
@@ -107,21 +108,51 @@ export function splitDanishAddress(address: string | null): { street: string | n
   return { street: match[1].trim() || null, postalCode: match[2] };
 }
 
+const bsDealFields = {
+  id: true,
+  companyName: true,
+  displayName: true,
+  cvrNumber: true,
+  address: true,
+  parentDealId: true,
+  bsCustomerNumber: true,
+  bsMandateNumber: true,
+  bsMandateStatus: true,
+} as const;
+
+type BsDeal = Prisma.DealGetPayload<{ select: typeof bsDealFields }>;
+
 const pendingInvoiceInclude = {
   deal: {
-    select: {
-      id: true,
-      companyName: true,
-      displayName: true,
-      cvrNumber: true,
-      address: true,
-      parentDealId: true,
-      bsCustomerNumber: true,
-      bsMandateNumber: true,
-      bsMandateStatus: true,
-    },
+    select: { ...bsDealFields, parent: { select: { ...bsDealFields, combinedInvoicing: true } } },
   },
 } as const;
+
+function sameCvr(a: string | null, b: string | null): boolean {
+  const clean = (v: string | null) => (v ?? "").replace(/\D/g, "");
+  return Boolean(clean(a)) && clean(a) === clean(b);
+}
+
+/**
+ * The deal whose Betalingsservice customer number and mandate pay for this
+ * one. A branch billed together with its parent (combined invoicing, same
+ * CVR - see Deal.combinedInvoicing) always pays through the parent, even
+ * when one of its invoices happens to go out on its own: the customer signs
+ * up once, for the whole company.
+ */
+export function bsPayerOf(deal: BsDeal & { parent: (BsDeal & { combinedInvoicing: boolean }) | null }): BsDeal {
+  const parent = deal.parent;
+  return parent && parent.combinedInvoicing && sameCvr(parent.cvrNumber, deal.cvrNumber) ? parent : deal;
+}
+
+/** Same as bsPayerOf, looked up by deal id. */
+export async function resolveBsPayer(dealId: string) {
+  const deal = await prisma.deal.findUniqueOrThrow({
+    where: { id: dealId },
+    select: { ...bsDealFields, parent: { select: { ...bsDealFields, combinedInvoicing: true } } },
+  });
+  return bsPayerOf(deal);
+}
 
 export type PendingBsCollection = {
   key: string;
@@ -177,7 +208,7 @@ export async function listPendingBsCollections(now = new Date()): Promise<Pendin
   const collections = new Map<string, PendingBsCollection>();
   for (const [guid, invoiceRows] of byGuid) {
     const lead = invoiceRows.find((r) => !r.deal.parentDealId) ?? invoiceRows[0];
-    const deal = lead.deal;
+    const deal = bsPayerOf(lead.deal);
     const dueDate = lead.dueDate!;
     const key = `${deal.bsCustomerNumber ?? deal.id}|${dueDate.toISOString().slice(0, 10)}`;
     const existing = collections.get(key);

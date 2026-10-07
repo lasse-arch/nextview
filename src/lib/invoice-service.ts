@@ -12,7 +12,7 @@ import {
 } from "@/lib/contract-template-data";
 import type { BsMandateStatus, DealStage, PaymentMethod } from "@prisma/client";
 import { collectionDateForPeriod, deliveryDeadline, earliestCollectionDate, utcDay } from "@/lib/betalingsservice/banking-days";
-import { ensureBsCustomerNumber } from "@/lib/betalingsservice/service";
+import { ensureBsCustomerNumber, resolveBsPayer } from "@/lib/betalingsservice/service";
 
 const ACTIVE_CUSTOMER_STAGES: DealStage[] = ["CONTRACT_SIGNED", "FILMED", "LIVE"];
 const HANDLED_STATUSES = ["DRAFT_CREATED", "IMPORTED", "SENT_MANUALLY"];
@@ -191,6 +191,7 @@ function computeDueLines(
 type DraftableDeal = {
   id: string;
   companyName: string;
+  displayName: string | null;
   cvrNumber: string | null;
   invoiceEmail: string | null;
   contactEmail: string | null;
@@ -218,20 +219,19 @@ async function bsInvoiceTemplateId(): Promise<string | null> {
   return settings?.dineroInvoiceTemplateId ?? null;
 }
 
-async function bsInvoiceInfo(deal: {
-  id: string;
-  bsCustomerNumber: string | null;
-  bsMandateStatus: BsMandateStatus | null;
-}): Promise<BsInvoiceInfo> {
+async function bsInvoiceInfo(deal: { id: string }): Promise<BsInvoiceInfo> {
+  // A branch billed together with its parent signs up (and is collected)
+  // under the parent's customer number - see bsPayerOf.
+  const payer = await resolveBsPayer(deal.id);
   // Every deal starts out on Betalingsservice, so a new one may not have
   // its customer number yet - its invoice text needs it to sign up with.
-  const customerNumber = deal.bsCustomerNumber ?? (await ensureBsCustomerNumber(deal.id));
+  const customerNumber = payer.bsCustomerNumber ?? (await ensureBsCustomerNumber(payer.id));
   const settings = await prisma.bsSettings.findUnique({
     where: { id: "default" },
     select: { pbsNumber: true, debtorGroupNumber: true },
   });
   return {
-    mandateActive: deal.bsMandateStatus === "ACTIVE",
+    mandateActive: payer.bsMandateStatus === "ACTIVE",
     customerNumber,
     pbsNumber: settings?.pbsNumber ?? null,
     debtorGroupNumber: settings?.debtorGroupNumber ?? null,
@@ -475,7 +475,8 @@ async function draftInvoiceLine(
   contactGuidHint: string | null
 ): Promise<{ success: true; contactGuid: string } | { success: false; error: string }> {
   try {
-    const { note, lines } = buildInvoiceContent(deal, invoiceRow.quarterIndex, invoiceRow.amount, invoiceRow.scheduledDate);
+    const content = buildInvoiceContent(deal, invoiceRow.quarterIndex, invoiceRow.amount, invoiceRow.scheduledDate);
+    const { note, lines } = (await sharesCvrWithOtherCustomers(deal)) ? withLocationName(deal, content) : content;
     // See computeRecurringInvoiceDate. The one-off establishment fee has no
     // period to align a due date to, so it's simply dated whenever it's
     // actually drafted.
@@ -537,6 +538,37 @@ async function draftInvoiceLine(
     await prisma.invoice.update({ where: { id: invoiceRow.id }, data: { status: "FAILED", failureReason: error } });
     return { success: false, error };
   }
+}
+
+/**
+ * Whether another active customer has the same CVR - e.g. two locations of
+ * one company, each with its own tour. Their invoices all go to the same
+ * Dinero contact, so each one has to say which location it's for.
+ */
+async function sharesCvrWithOtherCustomers(deal: { id: string; cvrNumber: string | null }): Promise<boolean> {
+  if (!deal.cvrNumber?.trim()) return false;
+  const others = await prisma.deal.count({
+    where: {
+      id: { not: deal.id },
+      cvrNumber: deal.cvrNumber,
+      churnedAt: null,
+      stage: { in: ACTIVE_CUSTOMER_STAGES },
+    },
+  });
+  return others > 0;
+}
+
+/** Puts the deal's own name (e.g. "Boxdepotet Otterup") in front of the
+ * invoice's note and lines - same style as a combined invoice. */
+function withLocationName(
+  deal: { companyName: string; displayName: string | null },
+  content: { note: string; lines: DineroInvoiceLine[] }
+): { note: string; lines: DineroInvoiceLine[] } {
+  const name = dealName(deal);
+  return {
+    note: `${name}: ${content.note}`,
+    lines: content.lines.map((line) => ({ ...line, description: `${name} - ${line.description}` })),
+  };
 }
 
 /** Re-attempts drafting a single already-existing invoice row - e.g. after fixing a config

@@ -19,6 +19,7 @@ export function PaymentMethodControl({
   mandateActive,
   pbsNumber,
   debtorGroupNumber,
+  paysViaName = null,
 }: {
   dealId: string;
   method: "INVOICE" | "BETALINGSSERVICE";
@@ -26,6 +27,9 @@ export function PaymentMethodControl({
   mandateActive: boolean;
   pbsNumber: string | null;
   debtorGroupNumber: string | null;
+  /** Set when this branch is billed together with its parent and pays
+   * through the parent's customer number. */
+  paysViaName?: string | null;
 }) {
   const [pending, startTransition] = useTransition();
   const router = useRouter();
@@ -87,6 +91,7 @@ export function PaymentMethodControl({
           Kvartalerne opkræves via Betalingsservice - etableringen og første periode er almindelige fakturaer
           (FI/bankoverførsel) med tilmeldingsoplysningerne på. Kundenr.{" "}
           <span className="font-mono font-medium text-slate-700">{customerNumber ?? "-"}</span>
+          {paysViaName && <> (faktureres samlet med {paysViaName} - én tilmelding for begge)</>}
           {!mandateActive && (
             <>
               {" "}

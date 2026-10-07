@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { dealName, formatDKK } from "@/lib/labels";
-import { countSwitchableDeals, getBsSettings, isTestDeliveryFileName, listPendingBsCollections, missingBsSettings } from "@/lib/betalingsservice/service";
+import { bsPayerOf, countSwitchableDeals, getBsSettings, isTestDeliveryFileName, listPendingBsCollections, missingBsSettings } from "@/lib/betalingsservice/service";
 import { deliveryDeadline } from "@/lib/betalingsservice/banking-days";
 import { isDineroConfigured, listInvoiceTemplates } from "@/lib/dinero";
 import { MFT_DEFAULT_HOST, MFT_DEFAULT_PORT, publicKeyFileName } from "@/lib/betalingsservice/sftp";
@@ -61,7 +61,7 @@ export default async function BetalingsservicePage() {
   if (!currentUser.canAccessBilling) redirect("/");
 
   const now = new Date();
-  const [settings, pending, deliveries, results, customers, imports, mailboxFiles, switchable] = await Promise.all([
+  const [settings, pending, deliveries, results, allBsCustomers, imports, mailboxFiles, switchable] = await Promise.all([
     getBsSettings(),
     listPendingBsCollections(now),
     prisma.bsDelivery.findMany({
@@ -98,9 +98,27 @@ export default async function BetalingsservicePage() {
         id: true,
         companyName: true,
         displayName: true,
+        cvrNumber: true,
+        address: true,
+        parentDealId: true,
         bsCustomerNumber: true,
+        bsMandateNumber: true,
         bsMandateStatus: true,
         bsMandateChangedAt: true,
+        parent: {
+          select: {
+            id: true,
+            companyName: true,
+            displayName: true,
+            cvrNumber: true,
+            address: true,
+            parentDealId: true,
+            bsCustomerNumber: true,
+            bsMandateNumber: true,
+            bsMandateStatus: true,
+            combinedInvoicing: true,
+          },
+        },
       },
     }),
     prisma.bsReturnImport.findMany({ orderBy: { createdAt: "desc" }, take: 10 }),
@@ -127,6 +145,9 @@ export default async function BetalingsservicePage() {
   const visibleDeliveries =
     currentUser.role === "ADMIN" ? deliveries : deliveries.filter((d) => !isTestDeliveryFileName(d.fileName));
 
+  // A branch billed together with its parent pays (and signs up) through
+  // the parent - it isn't a customer of its own here (see bsPayerOf).
+  const customers = allBsCustomers.filter((c) => bsPayerOf(c).id === c.id);
   const missing = missingBsSettings(settings);
   const signedUp = customers.filter((c) => c.bsMandateStatus === "ACTIVE");
   // Not signed up first - they're the ones to follow up on.
