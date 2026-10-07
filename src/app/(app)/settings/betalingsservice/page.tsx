@@ -129,8 +129,9 @@ export default async function BetalingsservicePage() {
       <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <h2 className="text-sm font-semibold text-slate-900">Aftale</h2>
         <p className="mt-1 text-xs text-slate-500">
-          Fra jeres dataleverandøraftale med Betalingsservice. Mellemregningskontoen er kontoen i Dinero, betalingerne
-          registreres på - den samlede indbetaling fra Betalingsservice afstemmes bagefter mod den.
+          Fra jeres dataleverandøraftale med Betalingsservice. Mellemregningskontoen er den indbetalingskonto i Dinero
+          (55000-55999), betalingerne registreres på - den samlede indbetaling fra Betalingsservice afstemmes bagefter
+          mod den.
         </p>
         <BsSettingsForm
           initial={{

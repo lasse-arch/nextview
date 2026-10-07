@@ -27,6 +27,8 @@ test("collection date is the quarter's first banking day", () => {
   assert.equal(iso(collectionDateForPeriod(new Date(2026, 9, 1))), "2026-10-01");
   // 1 Jan 2027 is a holiday (Friday), so the 4th (Monday).
   assert.equal(iso(collectionDateForPeriod(new Date(2027, 0, 1))), "2027-01-04");
+  // A customer going live mid-month is collected from the next month's first banking day.
+  assert.equal(iso(collectionDateForPeriod(new Date(2026, 9, 10))), "2026-11-02");
   // 1 Apr 2028 is a Saturday -> Monday 3 Apr.
   assert.equal(iso(collectionDateForPeriod(new Date(2028, 3, 1))), "2028-04-03");
 });

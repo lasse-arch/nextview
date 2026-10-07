@@ -118,12 +118,15 @@ export function deliveryDeadline(collectionDate: Date): Date {
 
 /**
  * The collection date for a billing period starting `periodStart`: the first
- * banking day of that month (the 1st itself unless it's a weekend/holiday).
+ * banking day of that month when the period starts on the 1st (a normal
+ * quarter), otherwise the first banking day of the following month - a
+ * customer going live mid-month (e.g. the 10th) is never collected before
+ * their billing has actually started.
  */
 export function collectionDateForPeriod(periodStart: Date): Date {
-  return firstBankingDayOfMonth(
-    utcDay(periodStart.getFullYear(), periodStart.getMonth(), periodStart.getDate())
-  );
+  const y = periodStart.getFullYear();
+  const m = periodStart.getMonth();
+  return firstBankingDayOfMonth(utcDay(y, periodStart.getDate() === 1 ? m : m + 1, 1));
 }
 
 /**

@@ -69,7 +69,7 @@ export function BsSettingsForm({
           name="depositAccountNumber"
           defaultValue={initial.depositAccountNumber}
           inputMode="numeric"
-          placeholder="fx 5820 - Betalingsservice tilgodehavende"
+          placeholder="fx 55100 - indbetalingskonto i Dinero"
           className={inputClass}
         />
       </label>
