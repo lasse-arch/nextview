@@ -23,7 +23,7 @@ import { getInvoiceTotals, registerInvoicePayment } from "@/lib/dinero";
 import { buildBs0601, type Bs0601Collection } from "./bs0601";
 import { parseBsReturnDelivery, type BsPayment } from "./bs-returns";
 import { BsFormatError } from "./fixed-width";
-import { deliveryDeadline, earliestCollectionDate, nextBankingDayOnOrAfter } from "./banking-days";
+import { deliveryDeadline, firstBankingDayOfMonth, nextBankingDayOnOrAfter, utcDay } from "./banking-days";
 
 const MAX_DAYS_AHEAD = 90;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -381,8 +381,8 @@ export function isTestDeliveryFileName(fileName: string): boolean {
 /**
  * Builds a BS 0601 test file for Mastercard's free test (delsystem KR9):
  * 15 fictive customers (TEST001-TEST015) with made-up addresses and
- * amounts, all as indbetalingskort, due on the first reachable
- * first-of-month. Touches no real invoice, deal or customer - it's only
+ * amounts, all as indbetalingskort, due on the first banking day of next
+ * month (section 0112 requires the following month). Touches no real invoice, deal or customer - it's only
  * stored as a delivery so it can be downloaded or sent via SFTP.
  */
 export async function createBsTestDelivery(userId: string): Promise<CreateDeliveryResult> {
@@ -390,7 +390,11 @@ export async function createBsTestDelivery(userId: string): Promise<CreateDelive
   const missing = missingBsSettings(settings).filter((m) => m !== "mellemregningskonto i Dinero");
   if (missing.length > 0) return { ok: false, error: `Udfyld først: ${missing.join(", ")}.` };
 
-  const dueDate = earliestCollectionDate(new Date());
+  // Section 0112 test files must be due in the following month (and in the
+  // future), whatever the production deadline - so always the first banking
+  // day of next month, never the month after.
+  const now = new Date();
+  const dueDate = firstBankingDayOfMonth(utcDay(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
   const collections: Bs0601Collection[] = TEST_CUSTOMERS.map((c, i) => ({
     customerNumber: `TEST${String(i + 1).padStart(3, "0")}`,
     nameAndAddressLines: [c.name, c.street],
