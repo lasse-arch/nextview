@@ -28,7 +28,9 @@ export default async function DealsPage({
   const params = await searchParams;
   const isBoard = params.view !== "list";
 
-  const where: Prisma.DealWhereInput = {};
+  // Leads still being called off a ringeliste live in Leadindbakken, not here
+  // (see Deal.inLeadInbox) - the board is for deals actually being worked.
+  const where: Prisma.DealWhereInput = { inLeadInbox: false };
   if (params.owner) where.ownerId = params.owner;
   if (!isBoard && params.stage) where.stage = params.stage as DealStage;
   if (params.importType) where.importType = params.importType as ImportType;
@@ -41,7 +43,7 @@ export default async function DealsPage({
       ? { companyName: "asc" }
       : { createdAt: "desc" };
 
-  const [deals, users, importBatches, currentUser, duplicatePairs] = await Promise.all([
+  const [deals, users, importBatches, currentUser, duplicatePairs, inboxCount] = await Promise.all([
     prisma.deal.findMany({
       where,
       orderBy,
@@ -51,6 +53,7 @@ export default async function DealsPage({
     prisma.importBatch.findMany({ orderBy: { createdAt: "desc" } }),
     getCurrentUser(),
     params.importBatchId ? findDuplicatePairsForBatch(params.importBatchId) : Promise.resolve([]),
+    prisma.deal.count({ where: { inLeadInbox: true, stage: { in: ["LEAD", "CONTACTED"] } } }),
   ]);
 
   function toggleViewUrl(view: "list" | "board") {
@@ -77,6 +80,7 @@ export default async function DealsPage({
     establishmentFee: d.establishmentFee,
     stage: d.stage,
     isChurned: Boolean(d.churnedAt),
+    hasMeetingDate: Boolean(d.meetingDate),
   }));
 
   return (
@@ -84,6 +88,15 @@ export default async function DealsPage({
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-slate-900">Deals</h1>
         <div className="flex items-center gap-3">
+          {inboxCount > 0 && (
+            <Link
+              href="/leadindbakke"
+              title="Leads fra ringelisterne, der ikke har fået et møde endnu"
+              className="whitespace-nowrap text-sm text-slate-500 hover:text-slate-900"
+            >
+              Leadindbakke ({inboxCount}) →
+            </Link>
+          )}
           <div className="flex rounded-md border border-slate-300 text-sm">
             <Link
               href={toggleViewUrl("list")}

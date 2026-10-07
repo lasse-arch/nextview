@@ -1,7 +1,9 @@
 import { prisma } from "@/lib/db";
 import { RingelisteClient } from "./ringeliste-client";
 
-const OPEN_STAGES = ["LEAD", "CONTACTED", "FOLLOW_UP"] as const;
+// Only leads not yet worked: once a deal moves on (Kontaktet, Opfølgning,
+// Møde booket, ...) from here or anywhere else, it drops off the list.
+const OPEN_STAGES = ["LEAD"] as const;
 
 export default async function RingelistePage({
   searchParams,
@@ -21,7 +23,10 @@ export default async function RingelistePage({
   const deals = selectedListId
     ? await prisma.deal.findMany({
         where: { callListId: selectedListId, stage: { in: [...OPEN_STAGES] } },
-        orderBy: { createdAt: "asc" },
+        // Not-yet-tried leads first (in the order they were added), then those
+        // that went to voicemail - longest ago first, so "Telefonsvar" sends a
+        // lead to the back of the queue.
+        orderBy: [{ lastVoicemailAt: { sort: "asc", nulls: "first" } }, { createdAt: "asc" }],
         select: {
           id: true,
           companyName: true,
@@ -33,9 +38,13 @@ export default async function RingelistePage({
           contactEmail: true,
           websiteUrl: true,
           stage: true,
+          lastVoicemailAt: true,
+          ownerId: true,
         },
       })
     : [];
+  // For "Inviter også" when booking a meeting straight from the list.
+  const users = await prisma.user.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } });
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -51,6 +60,7 @@ export default async function RingelistePage({
         lists={lists.map((l) => ({ id: l.id, name: l.name, openCount: l._count.deals }))}
         selectedListId={selectedListId}
         deals={deals}
+        users={users}
       />
     </div>
   );

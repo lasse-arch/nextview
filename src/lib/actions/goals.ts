@@ -28,11 +28,34 @@ export async function upsertGoal(targetUserId: string | null, metric: GoalMetric
   if (existing) {
     await prisma.goal.update({ where: { id: existing.id }, data: { targetValue, month } });
   } else {
+    const last = await prisma.goal.aggregate({ _max: { sortOrder: true } });
     await prisma.goal.create({
-      data: { userId: targetUserId, month, period, metric, targetValue, createdById: user.id },
+      data: {
+        userId: targetUserId,
+        month,
+        period,
+        metric,
+        targetValue,
+        createdById: user.id,
+        sortOrder: (last._max.sortOrder ?? 0) + 1,
+      },
     });
   }
 
+  revalidatePath("/");
+}
+
+/**
+ * Saves the "Mål" card's order from its ↑/↓ arrows - `goalIds` is the full
+ * list as currently shown, top to bottom. Admin-only, since the order is
+ * shared by everyone who sees the card.
+ */
+export async function reorderGoals(goalIds: string[]) {
+  const user = await requireUser();
+  if (user.role !== "ADMIN") throw new Error("Kun admin kan ændre rækkefølgen.");
+  await prisma.$transaction(
+    goalIds.map((id, index) => prisma.goal.update({ where: { id }, data: { sortOrder: index + 1 } }))
+  );
   revalidatePath("/");
 }
 

@@ -91,6 +91,10 @@ export function WeekCalendarSection({ initialWeek }: { initialWeek: CalendarWeek
                     ? `Internt møde - tæller ikke med i møde-stats${
                         m.invitedNames && m.invitedNames.length > 0 ? `. Også med: ${m.invitedNames.join(", ")}` : ""
                       }`
+                    : m.isFilming
+                    ? `Filmning - tæller ikke med i møde-stats${
+                        m.invitedNames && m.invitedNames.length > 0 ? `. Også med: ${m.invitedNames.join(", ")}` : ""
+                      }`
                     : m.invitedNames && m.invitedNames.length > 0
                     ? `Også inviteret: ${m.invitedNames.join(", ")}`
                     : undefined;
@@ -108,6 +112,10 @@ export function WeekCalendarSection({ initialWeek }: { initialWeek: CalendarWeek
                         {m.isInternal ? (
                           <span className="shrink-0 rounded-full bg-slate-200 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">
                             Internt
+                          </span>
+                        ) : m.isFilming ? (
+                          <span className="shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+                            Filmning
                           </span>
                         ) : (
                           m.source === "google" && (

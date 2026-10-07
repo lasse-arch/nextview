@@ -77,7 +77,15 @@ function isConfigured(): boolean {
   return Boolean(process.env.CVR_API_USERNAME && process.env.CVR_API_PASSWORD);
 }
 
-export type CvrSearchResult = { ok: true; hits: CvrSearchHit[] } | { ok: false; error: string };
+/** `total` is how many companies match in the whole register (not just this
+ * page) - null if the index didn't report it. */
+export type CvrSearchResult = { ok: true; hits: CvrSearchHit[]; total: number | null } | { ok: false; error: string };
+
+/**
+ * Elasticsearch's default index.max_result_window - `from + size` past this
+ * is rejected, so paging through a filter's matches stops here.
+ */
+export const MAX_CVR_SEARCH_WINDOW = 10000;
 
 /**
  * Hard upper bound on `limit` below - this is still a single ES query
@@ -89,8 +97,11 @@ export type CvrSearchResult = { ok: true; hits: CvrSearchHit[] } | { ok: false; 
  */
 export const MAX_LEAD_FILTER_RESULTS = 1000;
 
-export async function searchCvr(filter: CvrSearchFilter, limit = 50): Promise<CvrSearchResult> {
+export async function searchCvr(filter: CvrSearchFilter, limit = 50, from = 0): Promise<CvrSearchResult> {
   limit = Math.min(Math.max(1, limit), MAX_LEAD_FILTER_RESULTS);
+  from = Math.max(0, from);
+  if (from + limit > MAX_CVR_SEARCH_WINDOW) limit = MAX_CVR_SEARCH_WINDOW - from;
+  if (limit <= 0) return { ok: true, hits: [], total: null };
   if (!isConfigured()) {
     return { ok: false, error: "Officiel CVR-adgang er ikke konfigureret (CVR_API_USERNAME/CVR_API_PASSWORD)." };
   }
@@ -136,8 +147,20 @@ export async function searchCvr(filter: CvrSearchFilter, limit = 50): Promise<Cv
     });
   }
 
+  // A running company's sammensatStatus is "NORMAL" only for those with a
+  // registered status at Erhvervsstyrelsen (ApS, A/S, ...) - enkeltmands-
+  // virksomheder, foreninger and selvejende institutioner (efterskoler,
+  // friskoler, ...) read "AKTIV" instead, so matching "NORMAL" alone silently
+  // dropped every one of those from an "only active" filter.
   if (filter.activeOnly !== false) {
-    must.push({ match: { "Vrvirksomhed.virksomhedMetadata.sammensatStatus": "NORMAL" } });
+    must.push({
+      bool: {
+        should: ["NORMAL", "AKTIV"].map((status) => ({
+          match: { "Vrvirksomhed.virksomhedMetadata.sammensatStatus": status },
+        })),
+        minimum_should_match: 1,
+      },
+    });
   }
 
   if (filter.foundedFrom || filter.foundedTo) {
@@ -161,9 +184,16 @@ export async function searchCvr(filter: CvrSearchFilter, limit = 50): Promise<Cv
       method: "POST",
       headers: { Authorization: `Basic ${auth}`, "Content-Type": "application/json" },
       body: JSON.stringify({
+        from,
         size: limit,
         query: { bool: { must } },
-        sort: [{ "Vrvirksomhed.virksomhedMetadata.stiftelsesDato": "desc" }],
+        // cvrNummer as tiebreaker so paging (`from`) is stable across
+        // companies sharing a founding date - otherwise a page boundary
+        // could skip or repeat some of them.
+        sort: [
+          { "Vrvirksomhed.virksomhedMetadata.stiftelsesDato": "desc" },
+          { "Vrvirksomhed.cvrNummer": "asc" },
+        ],
       }),
     });
   } catch {
@@ -179,6 +209,9 @@ export async function searchCvr(filter: CvrSearchFilter, limit = 50): Promise<Cv
 
   const json = await res.json();
   const hits: unknown[] = json?.hits?.hits ?? [];
+  // ES 6 reports the total as a plain number, ES 7+ as { value, relation }.
+  const rawTotal = json?.hits?.total;
+  const total = typeof rawTotal === "number" ? rawTotal : typeof rawTotal?.value === "number" ? rawTotal.value : null;
 
   const results: CvrSearchHit[] = hits
     .map((hit) => {
@@ -211,5 +244,5 @@ export async function searchCvr(filter: CvrSearchFilter, limit = 50): Promise<Cv
     })
     .filter((h): h is CvrSearchHit => h !== null);
 
-  return { ok: true, hits: results };
+  return { ok: true, hits: results, total };
 }

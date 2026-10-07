@@ -1,5 +1,6 @@
 "use server";
 
+import { leadInboxExitData } from "@/lib/lead-inbox";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { addMonths } from "date-fns";
@@ -7,7 +8,7 @@ import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { recalcCommission } from "@/lib/commission-service";
 import { buildDealEmailAddress } from "@/lib/email-address";
-import { findDuplicateDeals } from "@/lib/duplicates";
+import { findDuplicateDeals, findPossibleDuplicates } from "@/lib/duplicates";
 import { syncDealMeetingToCalendar, type CalendarSyncResult } from "@/lib/calendar-service";
 import { resolveCustomerMentions } from "@/lib/customer-mentions";
 import { sendContractSignedNotification } from "@/lib/notification-service";
@@ -18,6 +19,20 @@ import type { DealStage, CommissionFrequency, CommissionStatus } from "@prisma/c
 
 const CONTRACT_MANAGED_STAGES: DealStage[] = ["CONTRACT_SENT", "CONTRACT_SIGNED"];
 
+
+
+/**
+ * Parses a mødedato "datetime-local" value (e.g. "2026-10-06T10:00") as the
+ * intended Europe/Copenhagen wall-clock digits stored in UTC - the same
+ * convention calendar-service's toWallClockDateTime reads back. Explicit "Z"
+ * so it never depends on the server's own timezone. Clients must send the raw
+ * field value, not new Date(value).toISOString(): that converts from the
+ * browser's local time to real UTC and sent invites 2 hours early in summer.
+ */
+function parseMeetingDate(raw: string): Date {
+  const value = raw.trim();
+  return new Date(/(Z|[+-]\d\d:?\d\d)$/.test(value) ? value : `${value}Z`);
+}
 export async function createDealManual(formData: FormData) {
   const user = await requireUser();
 
@@ -36,7 +51,7 @@ export async function createDealManual(formData: FormData) {
   const contactEmail = String(formData.get("contactEmail") || "") || null;
   const contactPhone = String(formData.get("contactPhone") || "") || null;
 
-  const duplicates = await findDuplicateDeals(companyName);
+  const duplicates = await findPossibleDuplicates({ companyName, displayName, cvrNumber, address });
 
   const deal = await prisma.deal.create({
     data: {
@@ -67,7 +82,7 @@ export async function createDealManual(formData: FormData) {
   });
 
   revalidatePath("/deals");
-  redirect(duplicates.length > 0 ? `/deals/${deal.id}?dup=${duplicates[0].id}` : `/deals/${deal.id}`);
+  redirect(duplicates.length > 0 ? `/deals/${deal.id}?dup=1` : `/deals/${deal.id}`);
 }
 
 /**
@@ -155,7 +170,15 @@ async function updateDealInner(
   const existing = await prisma.deal.findUniqueOrThrow({ where: { id: dealId } });
 
   // An empty field means "leave unchanged", not "clear".
-  const meetingDate = meetingDateRaw ? new Date(meetingDateRaw) : existing.meetingDate;
+  const meetingDate = meetingDateRaw ? parseMeetingDate(meetingDateRaw) : existing.meetingDate;
+  // A newly set/changed meeting time on a deal still at Lead/Kontaktet means
+  // the meeting is booked (the form's own onChange does the same on screen).
+  // Only on an actual date change, so a deal deliberately moved back to Lead
+  // with its old date still in the field stays where it was put.
+  const meetingDateChanged = Boolean(meetingDateRaw) && meetingDate?.getTime() !== existing.meetingDate?.getTime();
+  if (meetingDateChanged && (stage === "LEAD" || stage === "CONTACTED")) {
+    stage = "MEETING_BOOKED";
+  }
   // Only block the save when the stage is actually changing into Møde
   // booket without a date - a deal that's already sitting in that stage
   // (e.g. one imported without a meeting date ever set) must still be
@@ -290,6 +313,7 @@ async function updateDealInner(
       invoiceEmail,
       ownerId,
       stage,
+      ...leadInboxExitData(stage),
       meetingDate,
       soldProduct,
       bindingMonths,
@@ -318,6 +342,17 @@ async function updateDealInner(
 
   await recalcCommission(dealId);
 
+  // Saving the form with a new stage (e.g. Lead -> Møde booket after picking
+  // a mødedato) is announced in the activity feed like any other stage move.
+  if (stage !== existing.stage) {
+    await logStageActivity(user, { ...existing, companyName, displayName }, stage);
+  }
+
+  const lostReason = String(formData.get("lostReason") || "").trim();
+  if (stage === "LOST" && existing.stage !== "LOST" && lostReason) {
+    await prisma.note.create({ data: { dealId, authorId: user.id, body: `Tabt: ${lostReason}`, kind: "MANUAL" } });
+  }
+
   if (stage === "CONTRACT_SIGNED" && existing.stage !== "CONTRACT_SIGNED") {
     await sendContractSignedNotification(dealId);
   }
@@ -331,6 +366,26 @@ async function updateDealInner(
     message: blockedStageChange ? "Gemt (stadiet styres via kontrakten og blev ikke ændret)" : "Gemt",
     duplicate: duplicates.length > 0 ? { id: duplicates[0].id, companyName: duplicates[0].companyName } : null,
   };
+}
+
+/** The activity-feed line for a deal moving into a stage worth announcing -
+ * shared by every path that changes the stage (board, form, booking). */
+async function logStageActivity(
+  user: { id: string; name: string },
+  deal: Parameters<typeof dealName>[0] & { id: string },
+  newStage: DealStage
+) {
+  const name = dealName(deal);
+  const stageActivityMessage: Partial<Record<DealStage, string>> = {
+    MEETING_BOOKED: `${user.name} bookede møde med ${name}`,
+    FILMED: `${user.name} markerede ${name} som filmet`,
+    LIVE: `${name} gik live`,
+    LOST: `${user.name} markerede ${name} som tabt`,
+  };
+  const message = stageActivityMessage[newStage];
+  if (message) {
+    await logActivity({ type: `DEAL_STAGE_${newStage}`, message, actorId: user.id, dealId: deal.id });
+  }
 }
 
 export async function updateDealStage(dealId: string, newStage: DealStage) {
@@ -375,21 +430,11 @@ export async function updateDealStage(dealId: string, newStage: DealStage) {
 
   await prisma.deal.update({
     where: { id: dealId },
-    data: { stage: newStage, ...stageDateUpdates },
+    data: { stage: newStage, ...stageDateUpdates, ...leadInboxExitData(newStage) },
   });
 
   if (newStage !== existing.stage) {
-    const name = dealName(existing);
-    const stageActivityMessage: Partial<Record<DealStage, string>> = {
-      MEETING_BOOKED: `${user.name} bookede møde med ${name}`,
-      FILMED: `${user.name} markerede ${name} som filmet`,
-      LIVE: `${name} gik live`,
-      LOST: `${user.name} markerede ${name} som tabt`,
-    };
-    const message = stageActivityMessage[newStage];
-    if (message) {
-      await logActivity({ type: `DEAL_STAGE_${newStage}`, message, actorId: user.id, dealId });
-    }
+    await logStageActivity(user, existing, newStage);
   }
 
   revalidatePath("/deals");
@@ -405,7 +450,7 @@ export async function updateDealStage(dealId: string, newStage: DealStage) {
 export async function setMeetingDateAndStage(dealId: string, meetingDateIso: string) {
   const user = await requireUser();
 
-  const meetingDate = new Date(meetingDateIso);
+  const meetingDate = parseMeetingDate(meetingDateIso);
   if (isNaN(meetingDate.getTime())) throw new Error("Ugyldig mødedato.");
 
   const existing = await prisma.deal.findUniqueOrThrow({ where: { id: dealId } });
@@ -413,7 +458,7 @@ export async function setMeetingDateAndStage(dealId: string, meetingDateIso: str
 
   const deal = await prisma.deal.update({
     where: { id: dealId },
-    data: { stage: "MEETING_BOOKED", meetingDate },
+    data: { stage: "MEETING_BOOKED", meetingDate, inLeadInbox: false },
   });
 
   // Only the actual booking is activity-worthy - this action is also used to
@@ -449,15 +494,27 @@ export async function sendCalendarInvite(
   extraAttendeeUserIds: string[] = [],
   meetingDateRaw?: string,
   customBody?: string,
-  durationMinutes?: number
+  durationMinutes?: number,
+  contactEmail?: string
 ): Promise<CalendarSyncResult> {
   await requireUser();
   const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId } });
 
-  const meetingDate = meetingDateRaw ? new Date(meetingDateRaw) : deal.meetingDate;
+  // The customer address the invite goes to, as typed in the booking panel -
+  // saved onto the deal itself so it's its contact email from then on.
+  const email = contactEmail?.trim();
+  if (email && email !== deal.contactEmail) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { synced: false, reason: `Ugyldig e-mail: ${email}` };
+    await prisma.deal.update({ where: { id: dealId }, data: { contactEmail: email } });
+  }
+
+  const meetingDate = meetingDateRaw ? parseMeetingDate(meetingDateRaw) : deal.meetingDate;
   if (!meetingDate || isNaN(meetingDate.getTime())) return { synced: false, reason: "Angiv en mødedato først." };
 
-  if (meetingDate.getTime() !== deal.meetingDate?.getTime()) {
+  // Sending the invite for a deal still at Lead/Kontaktet books the meeting.
+  if (deal.stage === "LEAD" || deal.stage === "CONTACTED") {
+    await setMeetingDateAndStage(dealId, meetingDate.toISOString());
+  } else if (meetingDate.getTime() !== deal.meetingDate?.getTime()) {
     await prisma.deal.update({ where: { id: dealId }, data: { meetingDate } });
   }
 
@@ -477,16 +534,14 @@ export async function sendCalendarInvite(
   return result;
 }
 
-export async function markDealLost(dealId: string) {
+/** Marks a deal Tabt with the reason saved as a note on it ("Tabt: ...") -
+ * every "Markér som tabt" (ringeliste, board, deal page) asks for one. */
+export async function markDealLost(dealId: string, reason: string) {
   const user = await requireUser();
-  const deal = await prisma.deal.update({ where: { id: dealId }, data: { stage: "LOST" } });
-  await logActivity({
-    type: "DEAL_STAGE_LOST",
-    message: `${user.name} markerede ${dealName(deal)} som tabt`,
-    actorId: user.id,
-    dealId,
-  });
-  revalidatePath("/deals");
+  const trimmed = reason.trim();
+  if (!trimmed) throw new Error("Skriv en årsag til, at dealen er tabt.");
+  await updateDealStage(dealId, "LOST");
+  await prisma.note.create({ data: { dealId, authorId: user.id, body: `Tabt: ${trimmed}`, kind: "MANUAL" } });
   revalidatePath(`/deals/${dealId}`);
 }
 

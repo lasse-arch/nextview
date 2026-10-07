@@ -1,4 +1,6 @@
+import { after } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
+import { resumeStalledReportQueue } from "@/lib/customer-report-service";
 import { prisma } from "@/lib/db";
 import { getDashboardData } from "@/lib/dashboard-data";
 import { stageLabels, invoiceStatusLabels, formatDKK } from "@/lib/labels";
@@ -16,6 +18,8 @@ import { LastActiveCard } from "./last-active-card";
 import { getDashboardGreeting } from "@/lib/greeting";
 import { getCommissionPeriodReminder } from "@/lib/commission-period-reminder-data";
 import { CommissionPeriodReminderCard } from "./commission-period-reminder-card";
+import { getMeetingsBookedThisWeek } from "@/lib/meetings-booked-data";
+import { MeetingsBookedCard } from "./meetings-booked-card";
 
 const FUNNEL_SHADES = [
   "bg-blue-200",
@@ -36,8 +40,11 @@ const INVOICE_STATUS_STYLE: Record<string, { dot: string; text: string }> = {
 
 export default async function DashboardPage() {
   const user = await getCurrentUser();
+  // The dashboard is opened far more often than Stats - also restarts a
+  // stalled visitor-report queue (see resumeStalledReportQueue).
+  after(() => resumeStalledReportQueue());
   const isAdmin = user?.role === "ADMIN";
-  const [data, goals, users, customerMapPoints, activity, lastActive, commissionPeriodReminder] = await Promise.all([
+  const [data, goals, users, customerMapPoints, activity, lastActive, commissionPeriodReminder, meetingsBooked] = await Promise.all([
     getDashboardData(isAdmin ? undefined : user?.id),
     user ? getGoalsForDashboard(user) : Promise.resolve([]),
     prisma.user.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
@@ -45,6 +52,7 @@ export default async function DashboardPage() {
     getRecentActivity(),
     getUserLastActive(),
     user ? getCommissionPeriodReminder(user) : Promise.resolve(null),
+    getMeetingsBookedThisWeek(),
   ]);
 
   const funnelMax = Math.max(1, ...data.funnel.map((f) => f.count));
@@ -105,6 +113,8 @@ export default async function DashboardPage() {
           tone={data.failedInvoices > 0 ? "critical" : "good"}
         />
       </div>
+
+      <MeetingsBookedCard days={meetingsBooked} />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2">

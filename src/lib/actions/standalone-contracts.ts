@@ -1,5 +1,6 @@
 "use server";
 
+import { leadInboxExitData } from "@/lib/lead-inbox";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
@@ -196,6 +197,7 @@ export async function linkStandaloneContractToDeal(
         additionalTerms: contract.additionalTerms,
         contractProducts: contract.contractProducts ?? undefined,
         stage: newStage,
+        ...leadInboxExitData(newStage),
       },
     });
 

@@ -9,10 +9,13 @@ export function InvoiceLabelTooltip({
   label,
   heading,
   rows,
+  className = "text-slate-600",
 }: {
   label: string;
   heading: string;
   rows: { label: string; value: string }[];
+  /** Styling for the hover target itself - e.g. a status pill. */
+  className?: string;
 }) {
   const [hovered, setHovered] = useState(false);
   // A tooltip that would just repeat the label back (no product breakdown,
@@ -23,14 +26,16 @@ export function InvoiceLabelTooltip({
   const hasExtraInfo = rows.length > 0 || heading !== label;
 
   if (!hasExtraInfo) {
-    return <span className="text-slate-600">{label}</span>;
+    return <span className={className}>{label}</span>;
   }
 
   return (
     <span
-      className="relative inline-block text-slate-600"
+      className={`relative inline-block cursor-default ${className}`}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      // Tap to show on touch screens, which have no hover.
+      onClick={() => setHovered((v) => !v)}
     >
       {label}
       {hovered && (

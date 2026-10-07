@@ -39,6 +39,22 @@ export function StageFields({
         </select>
       </div>
 
+      {stage === "LOST" && initialStage !== "LOST" && (
+        <div className="sm:col-span-2">
+          <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+            Hvorfor er dealen tabt? *
+          </label>
+          <textarea
+            name="lostReason"
+            required
+            rows={2}
+            autoFocus
+            placeholder="Gemmes som en note på dealen"
+            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+          />
+        </div>
+      )}
+
       {showMeetingDate && (
         <div>
           <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">
@@ -49,6 +65,11 @@ export function StageFields({
             type="datetime-local"
             required={stage === "MEETING_BOOKED"}
             defaultValue={toDateTimeInputValue(meetingDateIso)}
+            // Picking a meeting time on a deal that's still Lead/Kontaktet
+            // means the meeting is booked - move the stage along with it.
+            onChange={(e) => {
+              if (e.target.value && (stage === "LEAD" || stage === "CONTACTED")) setStage("MEETING_BOOKED");
+            }}
             className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
           />
         </div>

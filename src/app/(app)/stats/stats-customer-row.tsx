@@ -9,6 +9,7 @@ import {
   updateReportLanguageAction,
   sendCustomerReportNowAction,
   sendCombinedCustomerReportAction,
+  updateReportCombineBranchesAction,
 } from "@/lib/actions/customer-reports";
 import { formatDate } from "@/lib/labels";
 import { useToast } from "@/components/toast";
@@ -39,6 +40,10 @@ export type StatsCustomerRowData = {
   history: ReportHistoryEntry[];
   /** Linked branches (see customer linking) that also have an MP-Skin nummer - lets a "Send samlet rapport" button appear. */
   branches: { id: string; name: string }[];
+  /** Automatic sends go out as one combined report with the branches (see Deal.reportCombineBranches). */
+  reportCombineBranches: boolean;
+  /** Set on a branch whose parent sends combined - it's then never sent on its own automatically. */
+  combinedIntoParentName: string | null;
 };
 
 export function StatsCustomerRow({
@@ -56,6 +61,8 @@ export function StatsCustomerRow({
   lastOpenedAt,
   history,
   branches,
+  reportCombineBranches,
+  combinedIntoParentName,
   selected,
   onToggleSelected,
 }: StatsCustomerRowData & { selected: boolean; onToggleSelected: () => void }) {
@@ -68,6 +75,8 @@ export function StatsCustomerRow({
   const [sending, startSendTransition] = useTransition();
   const [sendingCombined, startSendCombinedTransition] = useTransition();
   const [downloading, startDownloadTransition] = useTransition();
+  const [savingCombine, startSavingCombine] = useTransition();
+  const [combineValue, setCombineValue] = useState(reportCombineBranches);
   const showToast = useToast();
 
   usePollWhilePending(lastStatus === "PENDING");
@@ -103,6 +112,22 @@ export function StatsCustomerRow({
         const result = await updateReportIntervalAction(dealId, interval);
         if (!result.ok) showToast(result.error);
       } catch (err) {
+        showToast(err instanceof Error ? err.message : "Der opstod en fejl.");
+      }
+    });
+  }
+
+  function changeCombine(combine: boolean) {
+    setCombineValue(combine);
+    startSavingCombine(async () => {
+      try {
+        const result = await updateReportCombineBranchesAction(dealId, combine);
+        if (!result.ok) {
+          setCombineValue(!combine);
+          showToast(result.error);
+        }
+      } catch (err) {
+        setCombineValue(!combine);
         showToast(err instanceof Error ? err.message : "Der opstod en fejl.");
       }
     });
@@ -186,14 +211,18 @@ export function StatsCustomerRow({
                   Sender…
                 </span>
               ) : lastStatus === "FAILED" ? (
-                <ReportHistoryTooltip
-                  history={history}
-                  label={
-                    <span className="text-red-600" title={lastErrorMessage ?? "ukendt fejl"}>
-                      Fejlede {lastSentAt ? formatDate(lastSentAt) : ""}
-                    </span>
-                  }
-                />
+                <>
+                  <ReportHistoryTooltip
+                    history={history}
+                    label={
+                      <span className="text-red-600" title={lastErrorMessage ?? "ukendt fejl"}>
+                        Fejlede {lastSentAt ? formatDate(lastSentAt) : ""}
+                      </span>
+                    }
+                  />
+                  {/* Shown outright, not just on hover - it's what says how to fix it. */}
+                  <p className="mt-0.5 max-w-xl text-xs text-red-500">{lastErrorMessage ?? "Ukendt fejl"}</p>
+                </>
               ) : lastSentAt ? (
                 <ReportHistoryTooltip
                   history={history}
@@ -313,10 +342,30 @@ export function StatsCustomerRow({
         <div>
           <label className="block text-[11px] font-medium text-slate-500">Næste afsendelse</label>
           <p className="mt-1.5 text-xs text-slate-600">
-            {reportInterval && nextReportDueAt ? formatDate(nextReportDueAt) : "–"}
+            {combinedIntoParentName
+              ? `Samlet med ${combinedIntoParentName}`
+              : reportInterval && nextReportDueAt
+                ? formatDate(nextReportDueAt)
+                : "–"}
           </p>
         </div>
       </div>
+      {branches.length > 0 && (
+        <label className="mt-3 flex items-start gap-2 text-xs text-slate-600">
+          <input
+            type="checkbox"
+            checked={combineValue}
+            disabled={savingCombine}
+            onChange={(e) => changeCombine(e.target.checked)}
+            className="mt-0.5"
+          />
+          <span>
+            <span className="font-medium text-slate-700">Send samlet automatisk</span> - den automatiske afsendelse
+            sender én samlet rapport med {branches.map((b) => b.name).join(", ")} efter dette interval, i stedet for
+            en rapport til hver.
+          </span>
+        </label>
+      )}
     </div>
   );
 }

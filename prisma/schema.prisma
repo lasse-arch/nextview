@@ -90,6 +90,25 @@ enum ContractStatus {
   VOIDED
 }
 
+enum PaymentMethod {
+  INVOICE
+  BETALINGSSERVICE
+}
+
+enum BsMandateStatus {
+  ACTIVE
+  CANCELLED
+}
+
+enum BsCollectionStatus {
+  /// In a generated BS 0601 delivery, waiting for the result.
+  IN_FILE
+  PAID
+  REJECTED
+  CANCELLED
+  CHARGED_BACK
+}
+
 enum InvoiceStatus {
   PENDING
   DRAFT_CREATED
@@ -146,22 +165,21 @@ enum DownloadJobStatus {
 /// here as bytes until downloaded - short-lived by nature, not meant to
 /// accumulate indefinitely.
 model ReportDownloadJob {
-  id          String             @id @default(cuid())
+  id           String            @id @default(cuid())
   /// Comma-separated deal ids (one for a single download, several for a
   /// merged "download all"/bulk-selection download).
-  dealIds     String
+  dealIds      String
   /// Mirrors "Send samlet" for a download - one combined PDF (one stats
   /// page per branch) for a deal and its linked branches, instead of each
   /// deal's own separate report. Only meaningful with exactly one dealId.
-  combined    Boolean            @default(false)
-  status      DownloadJobStatus  @default(PENDING)
-  pdfData     Bytes?
-  fileName    String?
+  combined     Boolean           @default(false)
+  status       DownloadJobStatus @default(PENDING)
+  pdfData      Bytes?
+  fileName     String?
   errorMessage String?
-  createdById String
-  createdAt   DateTime           @default(now())
+  createdById  String
+  createdAt    DateTime          @default(now())
 }
-
 
 model Invoice {
   id     String @id @default(cuid())
@@ -188,6 +206,27 @@ model Invoice {
   /// not automatically, since most invoices sit as unsent drafts and have
   /// nothing to check yet.
   paidAt DateTime?
+
+  /// When the invoice was created, booked and emailed via Dinero - shown on
+  /// hover over the deal's "Sendt" pill. Null while it isn't actually sent
+  /// (e.g. the automatic send step failed, or it was marked sent manually).
+  sentAt  DateTime?
+  /// Dinero due date: the invoice date + Netto 8 (see dinero.ts).
+  dueDate DateTime?
+
+  /// The Betalingsservice collection this invoice is drawn through, once it's
+  /// been put in a BS 0601 delivery (see BsCollection).
+  /// Set when the invoice was created for a Betalingsservice customer (due on
+  /// the collection date, "betal ikke via bankoverførsel" on it) - only these
+  /// ever go in a BS 0601 file, so an invoice emailed with normal payment
+  /// terms can never also be collected.
+  collectViaBs          Boolean       @default(false)
+  bsCollection          BsCollection? @relation(fields: [bsCollectionId], references: [id], onDelete: SetNull)
+  bsCollectionId        String?
+  /// When the BS payment was registered on the invoice in Dinero (against the
+  /// Betalingsservice mellemregningskonto) - never registered twice.
+  bsPaymentRegisteredAt DateTime?
+  bsPaymentError        String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -227,25 +266,28 @@ model User {
   /// "never opened it", so every post ever made counts as unread.
   newsReadAt        DateTime?
 
-  deals         Deal[]         @relation("DealOwner")
-  notes         Note[]
-  importBatches ImportBatch[]
-  commissions   Commission[]
-  emailAccounts EmailAccount[]
-  goals         Goal[]         @relation("GoalOwner")
-  createdGoals  Goal[]         @relation("GoalCreatedBy")
+  deals               Deal[]               @relation("DealOwner")
+  notes               Note[]
+  importBatches       ImportBatch[]
+  commissions         Commission[]
+  emailAccounts       EmailAccount[]
+  goals               Goal[]               @relation("GoalOwner")
+  createdGoals        Goal[]               @relation("GoalCreatedBy")
   standaloneContracts StandaloneContract[]
-  tasksAssigned Task[] @relation("TaskAssignee")
-  tasksCreated  Task[] @relation("TaskCreatedBy")
-  taskComments  TaskComment[]
-  activityEvents ActivityEvent[]
-  leadFilters   LeadFilter[]
-  watchedUrls   WatchedUrl[]
-  emailTemplates EmailTemplate[]
-  callLists     CallList[]
-  newsPosts     NewsPost[]
-  timeEntries        TimeEntry[]
-  timeEntriesCreated TimeEntry[] @relation("TimeEntryCreatedBy")
+  tasksAssigned       Task[]               @relation("TaskAssignee")
+  tasksCreated        Task[]               @relation("TaskCreatedBy")
+  taskComments        TaskComment[]
+  activityEvents      ActivityEvent[]
+  leadFilters         LeadFilter[]
+  leadImportLists     LeadImportList[]
+  watchedUrls         WatchedUrl[]
+  emailTemplates      EmailTemplate[]
+  callLists           CallList[]
+  newsPosts           NewsPost[]
+  bsDeliveriesCreated BsDelivery[]         @relation("BsDeliveryCreatedBy")
+  bsReturnImports     BsReturnImport[]     @relation("BsReturnImportCreatedBy")
+  timeEntries         TimeEntry[]
+  timeEntriesCreated  TimeEntry[]          @relation("TimeEntryCreatedBy")
 }
 
 /// One entry per notable thing that happened in the CRM (deal created,
@@ -257,7 +299,7 @@ model User {
 /// removed - `actor`/`deal` are only kept for avatars/links and are safe to
 /// lose (SetNull) without breaking the historical text.
 model ActivityEvent {
-  id      String  @id @default(cuid())
+  id      String @id @default(cuid())
   type    String
   message String
 
@@ -298,6 +340,9 @@ model Goal {
   period      GoalPeriod @default(MONTH)
   metric      GoalMetric
   targetValue Int
+  /// Position on the dashboard's "Mål" card (ascending) - set with the ↑/↓
+  /// arrows there; a new goal goes to the bottom.
+  sortOrder   Int        @default(0)
 
   createdBy   User   @relation("GoalCreatedBy", fields: [createdById], references: [id])
   createdById String
@@ -317,9 +362,9 @@ model CallList {
   createdById String
   createdAt   DateTime @default(now())
 
-  deals             Deal[]
+  deals            Deal[]
   /// Lead filters set to auto-feed their daily finds into this specific list.
-  targetingFilters  LeadFilter[]
+  targetingFilters LeadFilter[]
 }
 
 /// A "what's new" post shown on the /nyheder blog - lets an admin announce a
@@ -327,7 +372,7 @@ model CallList {
 /// usage notes) instead of explaining it ad hoc, and drives the unread-badge
 /// on the header's news icon.
 model NewsPost {
-  id            String   @id @default(cuid())
+  id            String  @id @default(cuid())
   title         String
   body          String
   /// Small resized screenshot, stored the same way as User.avatarUrl (a data
@@ -381,9 +426,9 @@ model Deal {
   /// Links this deal as a branch/department of another deal (customer) - e.g.
   /// several locations of the same chain - while each keeps its own CVR
   /// number, contract, and invoicing independently by default.
-  parent       Deal?   @relation("DealBranches", fields: [parentDealId], references: [id])
-  parentDealId String?
-  branches     Deal[]  @relation("DealBranches")
+  parent            Deal?   @relation("DealBranches", fields: [parentDealId], references: [id])
+  parentDealId      String?
+  branches          Deal[]  @relation("DealBranches")
   /// Opt-in, set on the parent only: when true, invoice generation bills
   /// this deal together with whichever of its branches share its exact
   /// cvrNumber as ONE combined Dinero invoice, instead of one each - e.g. a
@@ -392,13 +437,23 @@ model Deal {
   /// entity) are never affected by this, regardless of the flag.
   combinedInvoicing Boolean @default(false)
 
-  stage DealStage @default(LEAD)
+  stage           DealStage @default(LEAD)
+  /// True for a lead that came in through a ringeliste (quick-add, or added
+  /// to one from Leadgeneration) and hasn't been worked into a real deal yet
+  /// - it lives in Leadindbakken instead of cluttering the Deals board.
+  /// Cleared once it moves past Kontaktet (a meeting booked, or anything
+  /// later), or by "Flyt til Deals". Manually created deals never start here.
+  inLeadInbox     Boolean   @default(false)
+  /// Last time "Telefonsvar" was pressed for this lead on Ringeliste (called,
+  /// no answer). Puts it at the back of the call queue; pressing it again
+  /// just moves the time (and the lead) on.
+  lastVoicemailAt DateTime?
 
-  meetingDate           DateTime?
+  meetingDate            DateTime?
   /// Length of the booked meeting in minutes (30/45/60, chosen when the
   /// calendar invite is sent) - also used to compute "timer i møder" stats.
-  meetingDurationMinutes Int      @default(30)
-  googleCalendarEventId String?   @unique
+  meetingDurationMinutes Int       @default(30)
+  googleCalendarEventId  String?   @unique
 
   soldProduct   String?
   bindingMonths Int?
@@ -424,18 +479,18 @@ model Deal {
 
   /// Notice period required to terminate (months). Editable per deal;
   /// most contracts use 6 months.
-  noticePeriodMonths  Int       @default(6)
+  noticePeriodMonths    Int       @default(6)
   /// When the customer/we gave notice to terminate.
-  terminationNoticeAt DateTime?
+  terminationNoticeAt   DateTime?
   /// Computed effective end date: max(binding period end, noticeAt + noticePeriodMonths).
   /// Billing continues (rolling past the binding period if needed) until this date,
   /// after which the deal is auto-marked inactive.
-  contractEndDate     DateTime?
+  contractEndDate       DateTime?
   /// True once an admin has manually overridden contractEndDate (e.g. a
   /// negotiated exception to the usual tacit-renewal terms) - stops the
   /// automatic recompute-on-save from clobbering it. Cleared whenever a
   /// fresh opsigelse is registered or withdrawn.
-  contractEndDateManual Boolean @default(false)
+  contractEndDateManual Boolean   @default(false)
 
   importType    ImportType   @default(MANUAL)
   importBatch   ImportBatch? @relation(fields: [importBatchId], references: [id])
@@ -449,16 +504,28 @@ model Deal {
 
   dealEmailAddress String? @unique
 
-  contractStatus     ContractStatus @default(NONE)
+  contractStatus       ContractStatus @default(NONE)
   /// Historical - contracts sent before the switch to the self-built PandaDoc/SignWell flows.
-  pandaDocDocumentId String?        @unique
-  signWellDocumentId String?        @unique
-  docusealSubmissionId String?      @unique
-  contractSentAt     DateTime?
-  contractViewedAt   DateTime?
-  contractSignedAt   DateTime?
+  pandaDocDocumentId   String?        @unique
+  signWellDocumentId   String?        @unique
+  docusealSubmissionId String?        @unique
+  contractSentAt       DateTime?
+  contractViewedAt     DateTime?
+  contractSignedAt     DateTime?
 
   dineroContactGuid String?
+
+  /// How this customer pays its Dinero invoices: a normal emailed invoice,
+  /// or collected through Betalingsservice (automatically once a mandate is
+  /// active, otherwise by indbetalingskort). See src/lib/betalingsservice.
+  paymentMethod      PaymentMethod    @default(INVOICE)
+  /// The customer's number with us in Betalingsservice (e.g. "NV00012") -
+  /// assigned once and never changed, since a mandate is tied to it.
+  bsCustomerNumber   String?          @unique
+  bsMandateNumber    String?
+  bsMandateStatus    BsMandateStatus?
+  bsMandateChangedAt DateTime?
+  bsCollections      BsCollection[]
 
   /// Excludes this deal from provision entirely, e.g. so the owner can stay
   /// on the deal for pipeline tracking without it generating commission.
@@ -487,6 +554,12 @@ model Deal {
   /// Defaults to Danish for everyone; switched to English per customer as needed.
   reportLanguage ReportLanguage @default(DA)
 
+  /// Set on a parent with linked branches: the automatic run sends ONE
+  /// combined report (this deal + its branches with an MP-Skin nummer) on
+  /// this deal's own interval, the same as "Send samlet" - and those
+  /// branches are then never sent on their own automatically.
+  reportCombineBranches Boolean @default(false)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -500,6 +573,8 @@ model Deal {
   reports        CustomerReport[]
   activityEvents ActivityEvent[]
   timeEntries    TimeEntry[]
+
+  @@index([inLeadInbox, stage])
 }
 
 /// How many "mandetimer" (man-hours) the team has spent on a customer, one
@@ -544,22 +619,26 @@ model TimeEntry {
 /// can't otherwise see, a silent failure there would look exactly like
 /// nothing happened at all.
 model CustomerReport {
-  id         String            @id @default(cuid())
-  deal       Deal              @relation(fields: [dealId], references: [id], onDelete: Cascade)
-  dealId     String
-  sentAt     DateTime          @default(now())
-  method     ReportSendMethod
-  status     ReportSendStatus  @default(SENT)
-  errorMessage String?
+  id            String           @id @default(cuid())
+  deal          Deal             @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  dealId        String
+  sentAt        DateTime         @default(now())
+  method        ReportSendMethod
+  status        ReportSendStatus @default(SENT)
+  errorMessage  String?
   /// Google Drive link to the generated PDF, if archiving succeeded - best-effort,
   /// same pattern as signed-contract archiving.
-  pdfDriveUrl String?
+  pdfDriveUrl   String?
   /// Set (comma-separated deal IDs) when this is a combined report for a
   /// linked customer - dealId is the parent, this lists which of its
   /// branches' stats were included in the one PDF/email. Null for an
   /// ordinary single-deal report.
   branchDealIds String?
-  createdAt  DateTime          @default(now())
+  createdAt     DateTime         @default(now())
+  /// Set atomically by the one queue worker that takes this PENDING report
+  /// (see claimNextQueuedReport) - nothing else may process it after that,
+  /// so the same report can never be emailed twice by overlapping workers.
+  claimedAt     DateTime?
 
   /// Same open-tracking pattern as EmailMessage - the id embedded in this
   /// report email's tracking pixel, hit when the recipient's mail client
@@ -692,9 +771,9 @@ model EmailMessage {
   /// Set only for an OUTBOUND email sent via the template composer - the id
   /// embedded in its tracking pixel, hit when the recipient's mail client
   /// loads images (see /api/track/email-open/[trackingId]).
-  trackingId String?   @unique
-  openedAt   DateTime?
-  openCount  Int       @default(0)
+  trackingId     String?    @unique
+  openedAt       DateTime?
+  openCount      Int        @default(0)
   /// Every individual open's timestamp, not just the first (openedAt) - so
   /// the full history is answerable, not only "opened, N times".
   openTimestamps DateTime[] @default([])
@@ -804,8 +883,8 @@ model AiUsageEvent {
 /// lead-generation cron so new matches (newly registered or newly-found
 /// companies) surface on their own without anyone remembering to search again.
 model LeadFilter {
-  id     String @id @default(cuid())
-  name   String
+  id   String @id @default(cuid())
+  name String
 
   /// Comma-separated terms matched (any-of) against the company's industry -
   /// free text (e.g. "restaurant, café") does a loose substring match against
@@ -815,23 +894,27 @@ model LeadFilter {
   industryQuery String?
   /// Comma-separated municipality names (kommune), matched any-of.
   municipality  String?
-  /// Only companies with sammensatStatus "NORMAL" (still active) - almost
+  /// Only companies with sammensatStatus "NORMAL" or "AKTIV" (still active) - almost
   /// always wanted, since a dissolved company isn't a lead.
   activeOnly    Boolean @default(true)
 
   /// Optional stiftelsesdato-periode (founding-date window) - lets a filter
   /// target companies founded within a specific range instead of just
   /// whichever ones happen to be the newest matches right now.
-  foundedFrom DateTime?
-  foundedTo   DateTime?
+  foundedFrom       DateTime?
+  foundedTo         DateTime?
+  /// Rolling alternative to foundedFrom/To: only companies founded within the
+  /// last N days, counted from each run - so a daily filter keeps finding
+  /// newly founded companies instead of a fixed window going stale.
+  foundedWithinDays Int?
 
   /// How many matches a single run pulls from the CVR register - a single
   /// ES query either way, so raising this doesn't add extra round-trips,
   /// just a bigger page (see MAX_LEAD_FILTER_RESULTS for the hard cap).
   maxResults Int @default(50)
 
-  enabled    Boolean   @default(true)
-  lastRunAt  DateTime?
+  enabled   Boolean   @default(true)
+  lastRunAt DateTime?
 
   /// When set, a daily automatic run (see runAllEnabledLeadFilters) skips
   /// the usual "Fundne leads" review step and promotes every fresh match
@@ -852,6 +935,7 @@ model LeadFilter {
   updatedAt DateTime @updatedAt
 
   candidates LeadCandidate[]
+  matches    LeadFilterMatch[]
 }
 
 enum LeadCandidateStatus {
@@ -865,15 +949,20 @@ enum LeadCandidateStatus {
 /// would otherwise have found it again - once reviewed (added or dismissed),
 /// it's done.
 model LeadCandidate {
-  id     String @id @default(cuid())
+  id String @id @default(cuid())
 
-  filter   LeadFilter? @relation(fields: [filterId], references: [id], onDelete: SetNull)
-  filterId String?
+  filter       LeadFilter?     @relation(fields: [filterId], references: [id], onDelete: SetNull)
+  filterId     String?
   /// Set instead of `filter` when this was found by scanning a page rather
   /// than a branche/område filter (see WatchedUrl / url-lead-scan.ts).
-  sourceUrl String?
+  sourceUrl    String?
+  /// Set instead when this came from an uploaded CSV (see LeadImportList).
+  importList   LeadImportList? @relation(fields: [importListId], references: [id], onDelete: SetNull)
+  importListId String?
 
-  cvrNumber    String  @unique
+  /// Always set for filter/page-scan finds; optional only for CSV imports,
+  /// whose lists (e.g. a list of højskoler) often carry no CVR numbers.
+  cvrNumber    String?   @unique
   companyName  String
   address      String?
   industryText String?
@@ -898,7 +987,43 @@ model LeadCandidate {
 
   createdAt DateTime @default(now())
 
+  matches LeadFilterMatch[]
+
   @@index([status, createdAt])
+}
+
+/// A CSV file imported under "Fundne leads" - its rows become that list's
+/// candidates, reviewed (Tilføj til ringeliste / Afvis) like any filter's.
+model LeadImportList {
+  id          String   @id @default(cuid())
+  name        String
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  createdById String
+  createdAt   DateTime @default(now())
+
+  candidates LeadCandidate[]
+}
+
+/// One row per (filter, company) a filter run has turned up. A company is
+/// one LeadCandidate (cvrNumber is unique), but several overlapping filters
+/// can each find it - this is what lets it show in every matching filter's
+/// list under "Fundne leads", even when another filter found it first or it
+/// is already a deal (then shown with a note saying so, instead of the
+/// filter silently reporting "fandtes allerede" and showing nothing).
+model LeadFilterMatch {
+  filter      LeadFilter    @relation(fields: [filterId], references: [id], onDelete: Cascade)
+  filterId    String
+  candidate   LeadCandidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  candidateId String
+
+  /// Set once reviewed from this filter's list (Afvis, Skjul, Tilføj, Slet
+  /// liste) - drops it from this list only. Never cleared again, so a later
+  /// run re-finding the same company doesn't resurface it.
+  handledAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@id([filterId, candidateId])
+  @@index([filterId, handledAt])
 }
 
 /// A page (news article, industry listing, ...) re-scanned daily for
@@ -919,13 +1044,95 @@ model WatchedUrl {
   /// it's obvious what a scan actually turned up, not just that one happened.
   /// All null until the first scan runs; `lastError` is cleared on the next
   /// successful scan, so a stale failure doesn't linger forever once fixed.
-  lastCvrCount         Int?
-  lastArticlesScanned  Int?
-  lastAddedCount       Int?
-  lastError            String?
+  lastCvrCount        Int?
+  lastArticlesScanned Int?
+  lastAddedCount      Int?
+  lastError           String?
 
   createdBy   User   @relation(fields: [createdById], references: [id])
   createdById String
+
+  createdAt DateTime @default(now())
+}
+
+/// Betalingsservice agreement values + running counters. A single row (id "default").
+model BsSettings {
+  id                   String  @id @default("default")
+  dataSupplierNumber   String?
+  subsystem            String  @default("BS1")
+  pbsNumber            String?
+  debtorGroupNumber    String?
+  /// Dinero account the BS payments are registered against (the
+  /// mellemregningskonto the bank deposit is later reconciled with).
+  depositAccountNumber Int?
+  nextDeliverySequence Int     @default(1)
+  nextCustomerNumber   Int     @default(1)
+
+  updatedAt DateTime @updatedAt
+}
+
+/// One generated BS 0601 file. Deleting it (only before it's been uploaded)
+/// releases its collections' invoices so they can go in a new file.
+model BsDelivery {
+  id              String         @id @default(cuid())
+  sequence        Int            @unique
+  fileName        String
+  content         Bytes
+  collectionCount Int
+  totalOre        Int
+  /// The earliest collection date in the file - the upload deadline is the
+  /// 6th last banking day of the month before it.
+  firstDueDate    DateTime
+  createdBy       User?          @relation("BsDeliveryCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdById     String?
+  /// Set when someone confirms the file has been uploaded to Betalingsservice.
+  submittedAt     DateTime?
+  collections     BsCollection[]
+
+  createdAt DateTime @default(now())
+}
+
+/// One collection line in a BS 0601 delivery - one Dinero invoice (several
+/// Invoice rows when it's a combined invoice), matched back by
+/// customerNumber + reference when the BS 0602 result arrives.
+model BsCollection {
+  id             String             @id @default(cuid())
+  delivery       BsDelivery         @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+  deliveryId     String
+  deal           Deal               @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  dealId         String
+  customerNumber String
+  mandateNumber  String?
+  dueDate        DateTime
+  amountOre      Int
+  /// The Dinero invoice number - max 9 characters, since payment slips only return those.
+  reference      String
+  status         BsCollectionStatus @default(IN_FILE)
+  statusAt       DateTime?
+  /// "automatic" or "slip", from the result file.
+  channel        String?
+  paidAmountOre  Int?
+  paymentDate    DateTime?
+  invoices       Invoice[]
+
+  createdAt DateTime @default(now())
+
+  @@index([customerNumber, reference])
+}
+
+/// An uploaded BS 0602/0603 result file - the hash makes re-uploading the
+/// same file a no-op instead of processing it twice.
+model BsReturnImport {
+  id           String  @id @default(cuid())
+  fileName     String
+  contentHash  String  @unique
+  deliveryType String
+  paymentCount Int
+  mandateCount Int
+  /// Human-readable outcome lines, one per line.
+  summary      String
+  createdBy    User?   @relation("BsReturnImportCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdById  String?
 
   createdAt DateTime @default(now())
 }

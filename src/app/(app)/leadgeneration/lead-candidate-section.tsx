@@ -7,10 +7,17 @@ import {
   addLeadCandidateToCallList,
   dismissLeadCandidate,
   deleteLeadCandidates,
+  renameLeadFilter,
+  hideLeadMatch,
+  moveLeadDealsToCallList,
+  addLeadCandidatesToCallList,
 } from "@/lib/actions/lead-generation";
+import { renameWatchedUrl } from "@/lib/actions/lead-url-scan";
+import { importLeadCsv, renameLeadImportList } from "@/lib/actions/lead-import";
 import { createCallList } from "@/lib/actions/call-lists";
-import { stageLabels } from "@/lib/labels";
+import { stageLabels, telHref } from "@/lib/labels";
 import { useToast } from "@/components/toast";
+import Link from "next/link";
 
 function alreadyExistsWarning(stage?: string): string | null {
   if (!stage) return null;
@@ -20,7 +27,8 @@ function alreadyExistsWarning(stage?: string): string | null {
 export type LeadCandidateData = {
   id: string;
   companyName: string;
-  cvrNumber: string;
+  /** Null only for a CSV-imported lead without a CVR column. */
+  cvrNumber: string | null;
   address: string | null;
   industryText: string | null;
   industryCode: string | null;
@@ -30,8 +38,40 @@ export type LeadCandidateData = {
   contactPhone: string | null;
   ownerName: string | null;
   sourceLabel: string | null;
+  /** Which filter/page found it - candidates are grouped by this, not by the
+   * display name. */
+  groupKey: string;
+  /** What the group's "Omdøb" renames: the filter itself, or a watched page's
+   * label. Null for finds with nothing renameable behind them (a one-off
+   * "Scan nu" of an unwatched page, or a since-deleted filter). */
+  renameTarget: RenameTarget | null;
+  /** The filter whose list this entry is in (null for a scanned page's
+   * list) - review actions only drop it from this list. */
+  listFilterId: string | null;
+  known: KnownLeadStatus | null;
+  /** How many unreviewed candidates the whole group has - can exceed the
+   * ones actually loaded, since each group only loads its newest finds. */
+  groupTotal: number;
   createdAt: string;
 };
+
+export type RenameTarget =
+  | { kind: "filter"; id: string }
+  | { kind: "import"; id: string }
+  | { kind: "url"; url: string };
+
+/** Why a lead in a filter's list has already been dealt with elsewhere -
+ * another filter's list, or a deal that existed already. Null for a lead
+ * that's genuinely new. */
+export type KnownLeadStatus =
+  | { kind: "deal"; dealId: string; stage: string; callListName: string | null }
+  | { kind: "dismissed" };
+
+function knownLeadNote(known: KnownLeadStatus): string {
+  if (known.kind === "dismissed") return "Afvist tidligere";
+  if (known.callListName) return `Allerede tilføjet til ringelisten "${known.callListName}"`;
+  return `Findes allerede som deal (${stageLabels[known.stage] ?? known.stage})`;
+}
 
 export type CallListOption = { id: string; name: string };
 
@@ -99,7 +139,7 @@ function CandidateCard({
 
   function addAsDeal() {
     startTransition(async () => {
-      const result = await addLeadCandidateAsDeal(candidate.id);
+      const result = await addLeadCandidateAsDeal(candidate.id, candidate.listFilterId);
       if (!result.ok) {
         showToast(result.error);
         return;
@@ -116,7 +156,7 @@ function CandidateCard({
       return;
     }
     startTransition(async () => {
-      const result = await addLeadCandidateToCallList(candidate.id, targetListId);
+      const result = await addLeadCandidateToCallList(candidate.id, targetListId, candidate.listFilterId);
       if (!result.ok) {
         showToast(result.error);
         return;
@@ -133,40 +173,79 @@ function CandidateCard({
 
   function dismiss() {
     startTransition(async () => {
-      await dismissLeadCandidate(candidate.id);
+      await dismissLeadCandidate(candidate.id, candidate.listFilterId);
+      hide();
+    });
+  }
+
+  function moveToCallList() {
+    if (!targetListId) {
+      showToast("Vælg eller opret en ringeliste først.");
+      return;
+    }
+    startTransition(async () => {
+      const result = await moveLeadDealsToCallList([candidate.id], targetListId, candidate.listFilterId);
+      if (!result.ok) {
+        showToast(result.error);
+        return;
+      }
+      hide();
+      showToast("Dealen er flyttet til ringelisten.");
+      router.refresh();
+    });
+  }
+
+  function hideFromList() {
+    // Outside a filter's list (an imported CSV or scanned page) a lead
+    // belongs to just that one list, so hiding it is simply dismissing it.
+    if (!candidate.listFilterId) {
+      dismiss();
+      return;
+    }
+    const filterId = candidate.listFilterId;
+    startTransition(async () => {
+      await hideLeadMatch(filterId, candidate.id);
       hide();
     });
   }
 
   if (hidden) return null;
 
+  const known = candidate.known;
+
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
+    <div className={`rounded-lg border bg-white p-4 ${known ? "border-amber-200" : "border-slate-200"}`}>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 sm:flex-1">
           <p className="font-medium text-slate-900">{candidate.companyName}</p>
+          {known && (
+            <p className="mt-1 inline-block rounded-md bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">
+              ⚠️ {knownLeadNote(known)}
+            </p>
+          )}
           <p className="mt-0.5 text-xs text-slate-500">
-            <a
-              href={`https://datacvr.virk.dk/enhed/virksomhed/${candidate.cvrNumber}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-slate-600 underline decoration-dotted hover:text-slate-900"
-              onClick={(e) => e.stopPropagation()}
-            >
-              CVR {candidate.cvrNumber}
-            </a>
-            {candidate.industryText && (
-              <>
-                {" "}
-                · {candidate.industryText}
-                {candidate.industryCode && ` (${candidate.industryCode})`}
-              </>
-            )}
-            {candidate.website && (
-              <>
-                {" "}
-                ·{" "}
+            {[
+              candidate.cvrNumber && (
                 <a
+                  key="cvr"
+                  href={`https://datacvr.virk.dk/enhed/virksomhed/${candidate.cvrNumber}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-slate-600 underline decoration-dotted hover:text-slate-900"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  CVR {candidate.cvrNumber}
+                </a>
+              ),
+              candidate.industryText && (
+                <span key="industry">
+                  {candidate.industryText}
+                  {candidate.industryCode && ` (${candidate.industryCode})`}
+                </span>
+              ),
+              candidate.website && (
+                <a
+                  key="website"
                   href={websiteHref(candidate.website)}
                   target="_blank"
                   rel="noopener noreferrer"
@@ -175,11 +254,16 @@ function CandidateCard({
                 >
                   {candidate.website}
                 </a>
-              </>
-            )}
-            {candidate.address && <> · {candidate.address}</>}
+              ),
+              candidate.address && <span key="address">{candidate.address}</span>,
+            ]
+              .filter(Boolean)
+              .flatMap((part, i) => (i === 0 ? [part] : [" · ", part]))}
           </p>
-          <p className="mt-0.5 text-xs text-slate-400">Stiftet {formatDate(candidate.foundedDate)}</p>
+          {/* A CSV import rarely carries a founding date - only shown when known. */}
+          {(candidate.cvrNumber || candidate.foundedDate) && (
+            <p className="mt-0.5 text-xs text-slate-400">Stiftet {formatDate(candidate.foundedDate)}</p>
+          )}
           {(candidate.ownerName || candidate.contactPhone || candidate.contactEmail) && (
             <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
               {candidate.ownerName && (
@@ -189,7 +273,7 @@ function CandidateCard({
               )}
               {candidate.contactPhone && (
                 <a
-                  href={`tel:${candidate.contactPhone.replace(/\s/g, "")}`}
+                  href={telHref(candidate.contactPhone)}
                   onClick={(e) => e.stopPropagation()}
                   className="text-sm font-semibold text-slate-900 hover:underline"
                 >
@@ -200,33 +284,62 @@ function CandidateCard({
             </div>
           )}
         </div>
-        <div className="flex shrink-0 gap-1.5">
-          <button
-            type="button"
-            onClick={dismiss}
-            disabled={pending}
-            className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
-          >
-            Afvis
-          </button>
-          <button
-            type="button"
-            onClick={addToCallList}
-            disabled={pending}
-            title="Tilføj til den valgte ringeliste ovenfor"
-            className="rounded-md border border-violet-300 px-2.5 py-1 text-xs font-medium text-violet-700 hover:bg-violet-50 disabled:opacity-50"
-          >
-            {pending ? "Tilføjer…" : "Tilføj til ringeliste"}
-          </button>
-          <button
-            type="button"
-            onClick={addAsDeal}
-            disabled={pending}
-            className="rounded-md bg-slate-900 px-2.5 py-1 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-50"
-          >
-            {pending ? "Tilføjer…" : "Tilføj som deal"}
-          </button>
-        </div>
+        {known?.kind === "deal" ? (
+          <div className="flex shrink-0 flex-wrap gap-1.5 whitespace-nowrap">
+            <button
+              type="button"
+              onClick={hideFromList}
+              disabled={pending}
+              title="Fjern fra denne liste - dealen røres ikke"
+              className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+            >
+              Skjul
+            </button>
+            <button
+              type="button"
+              onClick={moveToCallList}
+              disabled={pending}
+              title="Flyt den eksisterende deal til den valgte ringeliste ovenfor"
+              className="rounded-md border border-violet-300 px-2.5 py-1 text-xs font-medium text-violet-700 hover:bg-violet-50 disabled:opacity-50"
+            >
+              {pending ? "Flytter…" : "Flyt til ringeliste"}
+            </button>
+            <Link
+              href={`/deals/${known.dealId}`}
+              className="rounded-md bg-slate-900 px-2.5 py-1 text-xs font-medium text-white hover:bg-slate-800"
+            >
+              Åbn deal
+            </Link>
+          </div>
+        ) : (
+          <div className="flex shrink-0 flex-wrap gap-1.5 whitespace-nowrap">
+            <button
+              type="button"
+              onClick={known ? hideFromList : dismiss}
+              disabled={pending}
+              className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+            >
+              {known ? "Skjul" : "Afvis"}
+            </button>
+            <button
+              type="button"
+              onClick={addToCallList}
+              disabled={pending}
+              title="Tilføj til den valgte ringeliste ovenfor"
+              className="rounded-md border border-violet-300 px-2.5 py-1 text-xs font-medium text-violet-700 hover:bg-violet-50 disabled:opacity-50"
+            >
+              {pending ? "Tilføjer…" : "Tilføj til ringeliste"}
+            </button>
+            <button
+              type="button"
+              onClick={addAsDeal}
+              disabled={pending}
+              className="rounded-md bg-slate-900 px-2.5 py-1 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+            >
+              {pending ? "Tilføjer…" : "Tilføj som deal"}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -241,35 +354,104 @@ function CandidateCard({
  * heading to expand and review them. */
 function CandidateGroup({
   sourceLabel,
+  renameTarget,
   candidates,
   targetListId,
   onAddAll,
 }: {
   sourceLabel: string;
+  renameTarget: RenameTarget | null;
   candidates: LeadCandidateData[];
   targetListId: string | null;
-  onAddAll: (ids: string[]) => Promise<void>;
+  onAddAll: (ids: string[], filterId: string | null) => Promise<string[]>;
 }) {
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
   const [addingAll, startAddingAll] = useTransition();
   const [deleting, startDeleting] = useTransition();
   const [expanded, setExpanded] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [draftName, setDraftName] = useState(sourceLabel);
+  const [renaming, startRenaming] = useTransition();
   const router = useRouter();
   const showToast = useToast();
   const visible = candidates.filter((c) => !hiddenIds.has(c.id));
+  const total = (candidates[0]?.groupTotal ?? candidates.length) - (candidates.length - visible.length);
+  const notLoaded = total - visible.length;
+
+  const listFilterId = candidates[0]?.listFilterId ?? null;
+  // "Tilføj alle" adds every lead that isn't a deal yet (one dismissed
+  // earlier included). Ones that are already deals are never moved onto the
+  // ringeliste silently - after adding the rest, it asks first, like the
+  // Ringeliste quick-add's "Tilføj alligevel".
+  const addable = visible.filter((c) => c.known?.kind !== "deal");
+  const existingDeals = visible.filter((c) => c.known?.kind === "deal");
+  const [movePromptIds, setMovePromptIds] = useState<string[] | null>(null);
+  const movePrompt = movePromptIds ? visible.filter((c) => movePromptIds.includes(c.id)) : [];
 
   function addAll() {
     startAddingAll(async () => {
-      await onAddAll(visible.map((c) => c.id));
-      setHiddenIds(new Set(candidates.map((c) => c.id)));
+      if (addable.length > 0) {
+        const done = await onAddAll(addable.map((c) => c.id), listFilterId);
+        setHiddenIds((prev) => new Set([...prev, ...done]));
+        if (done.length < addable.length) return;
+      }
+      setMovePromptIds(existingDeals.length > 0 ? existingDeals.map((c) => c.id) : null);
+    });
+  }
+
+  function moveExistingDeals() {
+    if (!targetListId || movePrompt.length === 0) return;
+    const ids = movePrompt.map((c) => c.id);
+    startAddingAll(async () => {
+      const result = await moveLeadDealsToCallList(ids, targetListId, listFilterId);
+      if (!result.ok) {
+        showToast(result.error);
+        return;
+      }
+      showToast(`${result.moved} eksisterende deal${result.moved === 1 ? "" : "s"} flyttet til ringelisten.`);
+      setHiddenIds((prev) => new Set([...prev, ...ids]));
+      setMovePromptIds(null);
+      router.refresh();
     });
   }
 
   function deleteList() {
-    if (!confirm(`Slet denne liste (${visible.length} leads)? De forsvinder fra Fundne leads og kan ikke genskabes.`)) return;
+    if (!confirm(`Slet denne liste (${visible.length} leads)? De forsvinder fra listen og kan ikke genskabes.`)) return;
     startDeleting(async () => {
-      const result = await deleteLeadCandidates(visible.map((c) => c.id));
-      showToast(`${result.deleted} leads slettet.`);
+      await deleteLeadCandidates(visible.map((c) => c.id), candidates[0]?.listFilterId ?? null);
+      showToast(`${visible.length} leads fjernet fra listen.`);
+      router.refresh();
+    });
+  }
+
+  function startEditing() {
+    setDraftName(sourceLabel);
+    setEditing(true);
+  }
+
+  function saveName() {
+    if (!renameTarget) return;
+    const name = draftName.trim();
+    if (name === sourceLabel) {
+      setEditing(false);
+      return;
+    }
+    if (!name && renameTarget.kind !== "url") {
+      showToast("Giv listen et navn.");
+      return;
+    }
+    startRenaming(async () => {
+      const result =
+        renameTarget.kind === "filter"
+          ? await renameLeadFilter(renameTarget.id, name)
+          : renameTarget.kind === "import"
+            ? await renameLeadImportList(renameTarget.id, name)
+            : await renameWatchedUrl(renameTarget.url, name);
+      if (!result.ok) {
+        showToast(result.error);
+        return;
+      }
+      setEditing(false);
       router.refresh();
     });
   }
@@ -279,27 +461,81 @@ function CandidateGroup({
   return (
     <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-3">
       <div className="flex flex-wrap items-center justify-between gap-2 px-1">
-        <button
-          type="button"
-          onClick={() => setExpanded((v) => !v)}
-          className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500 hover:text-slate-700"
-        >
-          <svg
-            width="12"
-            height="12"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className={`shrink-0 transition-transform ${expanded ? "rotate-90" : ""}`}
+        {editing ? (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              saveName();
+            }}
+            className="flex w-full min-w-0 items-center gap-1.5 sm:w-auto sm:flex-1"
           >
-            <path d="M9 18l6-6-6-6" />
-          </svg>
-          {sourceLabel} <span className="font-normal normal-case text-slate-400">({visible.length})</span>
-        </button>
+            <input
+              autoFocus
+              value={draftName}
+              onChange={(e) => setDraftName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") setEditing(false);
+              }}
+              disabled={renaming}
+              maxLength={100}
+              aria-label="Listens navn"
+              className="min-w-0 flex-1 rounded-md border border-slate-300 px-2 py-1 text-sm sm:max-w-xs"
+            />
+            <button
+              type="submit"
+              disabled={renaming}
+              className="rounded-md bg-slate-900 px-2.5 py-1 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+            >
+              {renaming ? "Gemmer…" : "Gem"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setEditing(false)}
+              disabled={renaming}
+              className="rounded-md px-2 py-1 text-xs font-medium text-slate-500 hover:text-slate-700"
+            >
+              Annuller
+            </button>
+          </form>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500 hover:text-slate-700"
+          >
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className={`shrink-0 transition-transform ${expanded ? "rotate-90" : ""}`}
+            >
+              <path d="M9 18l6-6-6-6" />
+            </svg>
+            {sourceLabel} <span className="font-normal normal-case text-slate-400">({total})</span>
+          </button>
+        )}
         <div className="flex gap-1.5">
+          {renameTarget && !editing && (
+            <button
+              type="button"
+              onClick={startEditing}
+              title={
+                renameTarget.kind === "filter"
+                  ? "Omdøb listen (ændrer også filterets navn, så fremtidige fund lander her)"
+                  : renameTarget.kind === "import"
+                    ? "Omdøb den importerede liste"
+                    : "Omdøb listen (vises i stedet for sidens URL)"
+              }
+              className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+            >
+              Omdøb
+            </button>
+          )}
           <button
             type="button"
             onClick={deleteList}
@@ -320,6 +556,30 @@ function CandidateGroup({
           </button>
         </div>
       </div>
+      {movePrompt.length > 0 && (
+        <div className="mt-2 flex flex-wrap items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          <span>
+            {movePrompt.length} findes allerede som deal ({movePrompt.slice(0, 3).map((c) => c.companyName).join(", ")}
+            {movePrompt.length > 3 ? ` +${movePrompt.length - 3} mere` : ""}) og blev ikke flyttet.
+          </span>
+          <button
+            type="button"
+            onClick={moveExistingDeals}
+            disabled={addingAll}
+            className="rounded-md border border-amber-400 bg-white px-2 py-1 font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-50"
+          >
+            {addingAll ? "Flytter…" : "Flyt dem også til ringelisten"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setMovePromptIds(null)}
+            disabled={addingAll}
+            className="px-1 py-1 font-medium text-amber-700 hover:text-amber-900"
+          >
+            Nej tak
+          </button>
+        </div>
+      )}
       {expanded && (
         <div className="mt-2 space-y-4">
           {groupByFoundDay(visible).map(([dayLabel, dayCandidates]) => (
@@ -335,9 +595,95 @@ function CandidateGroup({
               ))}
             </div>
           ))}
+          {notLoaded > 0 && (
+            <p className="px-1 text-center text-xs text-slate-400">
+              Viser de {visible.length} nyeste - {notLoaded} ældre vises, når disse er gennemgået.
+            </p>
+          )}
         </div>
       )}
     </div>
+  );
+}
+
+/** "Importér CSV" - uploads a lead list (e.g. every højskole with phone,
+ * email and website) as its own list under Fundne leads; see importLeadCsv
+ * for which columns are understood. */
+function ImportCsvForm({ onClose }: { onClose: () => void }) {
+  const [listName, setListName] = useState("");
+  const [importing, startImport] = useTransition();
+  const showToast = useToast();
+  const router = useRouter();
+
+  function submit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    startImport(async () => {
+      const result = await importLeadCsv(formData);
+      if (!result.ok) {
+        showToast(result.error);
+        return;
+      }
+      let message = `${result.imported} leads importeret.`;
+      if (result.alreadyKnown > 0) message += ` ${result.alreadyKnown} findes allerede som deal og er markeret.`;
+      if (result.skipped > 0) message += ` ${result.skipped} rækker sprunget over (uden navn eller dubletter).`;
+      showToast(message);
+      onClose();
+      router.refresh();
+    });
+  }
+
+  return (
+    <form
+      onSubmit={submit}
+      className="mt-3 w-full space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600"
+    >
+      <p>
+        Vælg en CSV-fil med en <span className="font-medium">Navn</span>-kolonne - Telefon, Email, Hjemmeside, Adresse,
+        Postnr, By og CVR bruges også, hvis de er der. Den bliver sin egen liste her under Fundne leads.
+      </p>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <input
+          type="file"
+          name="file"
+          accept=".csv,text/csv"
+          required
+          disabled={importing}
+          onChange={(e) => {
+            const fileName = e.target.files?.[0]?.name;
+            if (fileName && !listName) setListName(fileName.replace(/\.[^.]+$/, ""));
+          }}
+          className="min-w-0 text-xs"
+        />
+        <input
+          type="text"
+          name="name"
+          value={listName}
+          onChange={(e) => setListName(e.target.value)}
+          placeholder="Listens navn"
+          maxLength={100}
+          disabled={importing}
+          className="min-w-0 rounded-md border border-slate-300 px-2 py-1 text-sm sm:w-56"
+        />
+        <div className="flex gap-1.5">
+          <button
+            type="submit"
+            disabled={importing}
+            className="rounded-md bg-slate-900 px-2.5 py-1 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+          >
+            {importing ? "Importerer…" : "Importér"}
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={importing}
+            className="rounded-md px-2 py-1 text-xs font-medium text-slate-500 hover:text-slate-700"
+          >
+            Annuller
+          </button>
+        </div>
+      </div>
+    </form>
   );
 }
 
@@ -352,6 +698,7 @@ export function LeadCandidateSection({
   const [lists, setLists] = useState(callLists);
   const [targetListId, setTargetListId] = useState<string | null>(callLists[0]?.id ?? null);
   const [creating, startCreating] = useTransition();
+  const [importOpen, setImportOpen] = useState(false);
   const showToast = useToast();
 
   function handleListChange(value: string) {
@@ -367,24 +714,45 @@ export function LeadCandidateSection({
     setTargetListId(value || null);
   }
 
-  async function addAllToCallList(ids: string[]) {
+  /** Adds the leads in chunks (see addLeadCandidatesToCallList) and returns
+   * the ids actually processed - on a failed request (network blip, a new
+   * deploy going live mid-run, ...) it stops there and says so, instead of
+   * the error taking the whole page down with the rest left in limbo. */
+  async function addAllToCallList(ids: string[], filterId: string | null): Promise<string[]> {
     if (!targetListId) {
       showToast("Vælg eller opret en ringeliste først.");
-      return;
+      return [];
     }
+    const CHUNK = 50;
     let added = 0;
     let alreadyExisted = 0;
-    for (const id of ids) {
-      const result = await addLeadCandidateToCallList(id, targetListId);
-      if (result.ok && !result.alreadyExisted) added++;
-      else if (result.ok && result.alreadyExisted) alreadyExisted++;
+    const done: string[] = [];
+    let failed = false;
+    for (let i = 0; i < ids.length; i += CHUNK) {
+      const chunk = ids.slice(i, i + CHUNK);
+      try {
+        const result = await addLeadCandidatesToCallList(chunk, targetListId, filterId);
+        if (!result.ok) {
+          showToast(result.error);
+          failed = true;
+          break;
+        }
+        added += result.added;
+        alreadyExisted += result.alreadyExisted;
+        done.push(...chunk);
+      } catch {
+        failed = true;
+        break;
+      }
     }
     let message = `${added} af ${ids.length} tilføjet til ringelisten.`;
     if (alreadyExisted > 0) {
       message += ` ⚠️ ${alreadyExisted} fandtes allerede som deal og blev ikke flyttet.`;
     }
+    if (failed) message += " Resten blev ikke tilføjet - genindlæs siden og tryk igen.";
     showToast(message);
     router.refresh();
+    return done;
   }
 
   // Grouped by which filter (or scanned URL) found them, so a filter like
@@ -392,7 +760,7 @@ export function LeadCandidateSection({
   // into one flat feed - most-recently-found candidate's group sorts first.
   const groups = new Map<string, LeadCandidateData[]>();
   for (const c of candidates) {
-    const key = c.sourceLabel ?? "Uden kilde";
+    const key = c.groupKey;
     const existing = groups.get(key);
     if (existing) existing.push(c);
     else groups.set(key, [c]);
@@ -401,7 +769,18 @@ export function LeadCandidateSection({
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-sm font-semibold text-slate-900">Fundne leads</h2>
+        <div className="flex items-center gap-3">
+          <h2 className="text-sm font-semibold text-slate-900">Fundne leads</h2>
+          {!importOpen && (
+            <button
+              type="button"
+              onClick={() => setImportOpen(true)}
+              className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+            >
+              Importér CSV
+            </button>
+          )}
+        </div>
         <label className="flex items-center gap-2 text-xs text-slate-500">
           Tilføj til ringeliste:
           <select
@@ -420,11 +799,13 @@ export function LeadCandidateSection({
           </select>
         </label>
       </div>
+      {importOpen && <ImportCsvForm onClose={() => setImportOpen(false)} />}
       <div className="mt-3 space-y-4">
-        {[...groups.entries()].map(([sourceLabel, group]) => (
+        {[...groups.entries()].map(([groupKey, group]) => (
           <CandidateGroup
-            key={sourceLabel}
-            sourceLabel={sourceLabel}
+            key={groupKey}
+            sourceLabel={group[0].sourceLabel ?? "Uden kilde"}
+            renameTarget={group[0].renameTarget}
             candidates={group}
             targetListId={targetListId}
             onAddAll={addAllToCallList}
@@ -432,7 +813,7 @@ export function LeadCandidateSection({
         ))}
         {candidates.length === 0 && (
           <p className="py-4 text-center text-sm text-slate-400">
-            Ingen fundne leads endnu - opret et filter og tryk &quot;Kør nu&quot;.
+            Ingen fundne leads endnu - opret et filter og tryk &quot;Kør nu&quot;, eller importér en CSV-fil.
           </p>
         )}
       </div>

@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { searchCvr } from "@/lib/cvr-search";
+import { searchCvr, MAX_LEAD_FILTER_RESULTS, MAX_CVR_SEARCH_WINDOW, type CvrSearchHit } from "@/lib/cvr-search";
 import { scanUrlForCvrLeads } from "@/lib/url-lead-scan";
 import { lookupCvrNumber } from "@/lib/cvr";
 import { claimCandidateAndUpsertDeal } from "@/lib/actions/lead-generation";
@@ -33,32 +33,75 @@ async function mapWithConcurrency<T, R>(items: T[], concurrency: number, fn: (it
  * skipped rather than shown again. Also skips any CVR number that's already
  * an existing Deal, so a current lead/customer never gets re-suggested.
  */
-export async function runLeadFilter(filterId: string): Promise<{ ok: true; added: number } | { ok: false; error: string }> {
+export type RunLeadFilterResult =
+  | {
+      ok: true;
+      added: number;
+      matched: number | null;
+      alreadyKnown: number;
+      /** Already-known companies newly added to this filter's own list
+       * (shown there with a note that they were already added elsewhere). */
+      alreadyKnownShown: number;
+    }
+  | { ok: false; error: string };
+
+export async function runLeadFilter(filterId: string): Promise<RunLeadFilterResult> {
   const filter = await prisma.leadFilter.findUniqueOrThrow({ where: { id: filterId } });
+  const search = {
+    industryQuery: filter.industryQuery,
+    municipality: filter.municipality,
+    activeOnly: filter.activeOnly,
+    // "Stiftet inden for de sidste N dage" is counted from each run, so a
+    // daily filter keeps rolling forward.
+    foundedFrom: filter.foundedWithinDays
+      ? new Date(Date.now() - filter.foundedWithinDays * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+      : filter.foundedFrom
+        ? filter.foundedFrom.toISOString().slice(0, 10)
+        : null,
+    foundedTo: filter.foundedWithinDays ? null : filter.foundedTo ? filter.foundedTo.toISOString().slice(0, 10) : null,
+  };
 
-  const result = await searchCvr(
-    {
-      industryQuery: filter.industryQuery,
-      municipality: filter.municipality,
-      activeOnly: filter.activeOnly,
-      foundedFrom: filter.foundedFrom ? filter.foundedFrom.toISOString().slice(0, 10) : null,
-      foundedTo: filter.foundedTo ? filter.foundedTo.toISOString().slice(0, 10) : null,
-    },
-    filter.maxResults
-  );
-  if (!result.ok) return result;
+  // "Op til N pr. kørsel" means N leads that are *new* to the CRM, not the
+  // first N matches - a broad filter matching more than N companies would
+  // otherwise get the same newest-N page back every run, all already known,
+  // and never reach the older matches behind it. Pages through the register
+  // (newest-founded first) skipping known CVR numbers until N fresh ones are
+  // collected or the matches run out.
+  const fresh: CvrSearchHit[] = [];
+  // Matches the CRM already knows - another filter's candidate, or an
+  // existing deal (dealId set when there's no candidate row for it yet).
+  const knownHits: { hit: CvrSearchHit; dealIdWithoutCandidate: string | null }[] = [];
+  const seen = new Set<string>();
+  let alreadyKnown = 0;
+  let matched: number | null = null;
+  for (let from = 0; from < MAX_CVR_SEARCH_WINDOW && fresh.length < filter.maxResults; from += MAX_LEAD_FILTER_RESULTS) {
+    const page = await searchCvr(search, MAX_LEAD_FILTER_RESULTS, from);
+    if (!page.ok) {
+      if (from === 0) return page;
+      break; // keep what earlier pages found rather than losing the whole run
+    }
+    matched ??= page.total;
 
-  const cvrNumbers = result.hits.map((h) => h.cvr);
-  const [existingCandidates, existingDeals] = await Promise.all([
-    prisma.leadCandidate.findMany({ where: { cvrNumber: { in: cvrNumbers } }, select: { cvrNumber: true } }),
-    prisma.deal.findMany({ where: { cvrNumber: { in: cvrNumbers } }, select: { cvrNumber: true } }),
-  ]);
-  const known = new Set([
-    ...existingCandidates.map((c) => c.cvrNumber),
-    ...existingDeals.map((d) => d.cvrNumber).filter((c): c is string => Boolean(c)),
-  ]);
+    const pageHits = page.hits.filter((h) => !seen.has(h.cvr));
+    pageHits.forEach((h) => seen.add(h.cvr));
+    const cvrNumbers = pageHits.map((h) => h.cvr);
+    const [existingCandidates, existingDeals] = await Promise.all([
+      prisma.leadCandidate.findMany({ where: { cvrNumber: { in: cvrNumbers } }, select: { cvrNumber: true } }),
+      prisma.deal.findMany({ where: { cvrNumber: { in: cvrNumbers } }, select: { id: true, cvrNumber: true } }),
+    ]);
+    const candidateCvrs = new Set(existingCandidates.map((c) => c.cvrNumber));
+    const dealIdByCvr = new Map(existingDeals.map((d) => [d.cvrNumber, d.id]));
+    for (const h of pageHits) {
+      if (candidateCvrs.has(h.cvr) || dealIdByCvr.has(h.cvr)) {
+        alreadyKnown++;
+        knownHits.push({ hit: h, dealIdWithoutCandidate: candidateCvrs.has(h.cvr) ? null : dealIdByCvr.get(h.cvr)! });
+      } else if (fresh.length < filter.maxResults) {
+        fresh.push(h);
+      }
+    }
 
-  const fresh = result.hits.filter((h) => !known.has(h.cvr));
+    if (page.hits.length < MAX_LEAD_FILTER_RESULTS) break; // last page
+  }
 
   // The ES search doesn't expose an owner name the way the single-CVR lookup
   // does - only worth the extra round-trip for genuinely new finds, not the
@@ -120,9 +163,58 @@ export async function runLeadFilter(filterId: string): Promise<{ ok: true; added
     }
   }
 
+  // Every company this run turned up goes on this filter's own list, not
+  // just the fresh ones - one already found by another filter, or already a
+  // deal, still shows there (with a note saying so) instead of vanishing
+  // into "fandtes allerede". An existing deal with no candidate row yet gets
+  // one (already ADDED, linked to that deal) so it has something to list.
+  const dealOnly = knownHits.filter((k) => k.dealIdWithoutCandidate);
+  if (dealOnly.length > 0) {
+    await prisma.leadCandidate.createMany({
+      data: dealOnly.map(({ hit: h, dealIdWithoutCandidate }) => ({
+        filterId: filter.id,
+        cvrNumber: h.cvr,
+        companyName: h.name,
+        address: h.address,
+        industryText: h.industryText,
+        industryCode: h.industryCode,
+        website: h.website,
+        foundedDate: h.foundedDate ? new Date(h.foundedDate) : null,
+        contactEmail: h.contactEmail,
+        contactPhone: h.contactPhone,
+        status: "ADDED" as const,
+        dealId: dealIdWithoutCandidate,
+      })),
+      skipDuplicates: true,
+    });
+  }
+
+  // An auto-feeding filter skips "Fundne leads" altogether, so its matches
+  // are recorded as already handled - kept only so a later run doesn't
+  // treat them as unseen.
+  const handledAt = filter.autoCreateDailyList || filter.targetCallListId ? new Date() : null;
+  const candidateIdsFor = async (cvrs: string[]) =>
+    cvrs.length === 0
+      ? []
+      : (await prisma.leadCandidate.findMany({ where: { cvrNumber: { in: cvrs } }, select: { id: true } })).map((c) => c.id);
+  const [freshIds, knownIds] = await Promise.all([
+    candidateIdsFor(fresh.map((h) => h.cvr)),
+    candidateIdsFor(knownHits.map((k) => k.hit.cvr)),
+  ]);
+  await prisma.leadFilterMatch.createMany({
+    data: freshIds.map((candidateId) => ({ filterId: filter.id, candidateId, handledAt })),
+    skipDuplicates: true,
+  });
+  // skipDuplicates leaves a match this list already has (or had and was
+  // reviewed) untouched, so the count is only the newly listed ones.
+  const knownShown = await prisma.leadFilterMatch.createMany({
+    data: knownIds.map((candidateId) => ({ filterId: filter.id, candidateId, handledAt })),
+    skipDuplicates: true,
+  });
+
   await prisma.leadFilter.update({ where: { id: filterId }, data: { lastRunAt: new Date() } });
 
-  return { ok: true, added: fresh.length };
+  return { ok: true, added: fresh.length, matched, alreadyKnown, alreadyKnownShown: handledAt ? 0 : knownShown.count };
 }
 
 /**

@@ -1,5 +1,5 @@
-import puppeteer, { type Browser, type Page } from "puppeteer-core";
-import chromium from "@sparticuz/chromium";
+import { type Browser, type Page } from "puppeteer-core";
+import { launchHeadlessChromium } from "@/lib/headless-chromium";
 
 const BASE_URL = "https://explore.nextview360.dk";
 
@@ -39,11 +39,7 @@ function credentials(): { username: string; password: string } {
 }
 
 async function launchBrowser(): Promise<Browser> {
-  return puppeteer.launch({
-    args: chromium.args,
-    executablePath: await chromium.executablePath(),
-    headless: true,
-  });
+  return launchHeadlessChromium();
 }
 
 /**
@@ -200,6 +196,15 @@ async function findEditorHrefs(page: Page, mpSkinId: string): Promise<string[]> 
   return hrefs;
 }
 
+/**
+ * The average-time value as the Stats tab may print it. The confirmed form is
+ * "01min 47 sec" (optionally with a leading "Xh"), but a short or long visit
+ * can drop a part - "45 sec", "2 min", "1h 05min" - and a clock-style
+ * "2:30" is accepted too, so one of those can't blank out the whole figure.
+ */
+const AVG_TIME_PATTERN =
+  "(?:\\d+\\s*h\\s*)?(?:\\d+\\s*min\\s*)?\\d+\\s*sec|(?:\\d+\\s*h\\s*)?\\d+\\s*min|\\d{1,2}:\\d{2}(?::\\d{2})?";
+
 function parseDanishNumber(raw: string): number {
   return Number(raw.replace(/\./g, "").replace(",", ".")) || 0;
 }
@@ -215,7 +220,7 @@ function parseDanishNumber(raw: string): number {
 function parseStatsText(text: string): ExploreTourStats {
   const periodBlock = (label: string) => {
     const re = new RegExp(
-      `${label}[\\s\\S]{0,20}?([\\d.,]+)[\\s\\S]{0,20}?VISITS[\\s\\S]{0,60}?([\\d.,]+)\\s*Sessions[\\s\\S]{0,40}?([\\d.,]+)\\s*Users[\\s\\S]{0,60}?([\\dhmins:]+(?:min)?\\s*\\d*\\s*sec)\\s*Average time`,
+      `${label}[\\s\\S]{0,20}?([\\d.,]+)[\\s\\S]{0,20}?VISITS[\\s\\S]{0,60}?([\\d.,]+)\\s*Sessions[\\s\\S]{0,40}?([\\d.,]+)\\s*Users[\\s\\S]{0,60}?(${AVG_TIME_PATTERN})\\s*Average time`,
       "i"
     );
     const match = text.match(re);
@@ -224,7 +229,8 @@ function parseStatsText(text: string): ExploreTourStats {
       visits: parseDanishNumber(match[1]),
       sessions: parseDanishNumber(match[2]),
       users: parseDanishNumber(match[3]),
-      avgTime: match[4].trim(),
+      // Normalized to the one "01min 47 sec" form the rest of the report uses.
+      avgTime: formatSecondsAsAvgTime(parseAvgTimeToSeconds(match[4])),
     };
   };
 
@@ -255,6 +261,12 @@ async function fetchImageAsBuffer(page: Page, url: string): Promise<Buffer> {
 
 /** "01min 47 sec" (or similar, with an optional leading "Xh") -> total seconds. */
 function parseAvgTimeToSeconds(avgTime: string): number {
+  const clock = /^\s*(\d{1,2}):(\d{2})(?::(\d{2}))?\s*$/.exec(avgTime);
+  if (clock) {
+    return clock[3]
+      ? Number(clock[1]) * 3600 + Number(clock[2]) * 60 + Number(clock[3])
+      : Number(clock[1]) * 60 + Number(clock[2]);
+  }
   const hours = /(\d+)\s*h/i.exec(avgTime);
   const minutes = /(\d+)\s*min/i.exec(avgTime);
   const seconds = /(\d+)\s*sec/i.exec(avgTime);

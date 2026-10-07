@@ -7,8 +7,11 @@ import { prisma } from "@/lib/db";
 export const maxDuration = 300;
 import { getCurrentUser } from "@/lib/auth";
 import Link from "next/link";
+import { findPossibleDuplicates } from "@/lib/duplicates";
+import { MoveToDealsButton } from "./move-to-deals-button";
 import {
   importTypeLabels,
+  stageLabels,
   noteKindLabels,
   contractStatusLabels,
   invoiceStatusLabel,
@@ -17,6 +20,7 @@ import {
   dealName,
   invoicePeriodLabel,
   invoiceQuarterShortLabel,
+  telHref,
 } from "@/lib/labels";
 import { parseContractProducts, establishmentLineItems, recurringLineItems } from "@/lib/contract-template-data";
 import { isDocuSealConfigured } from "@/lib/docuseal";
@@ -29,6 +33,7 @@ import { ArchiveContractButton } from "./archive-contract-button";
 import { ArchiveToDriveButton } from "./archive-to-drive-button";
 import { StageFields } from "./stage-fields";
 import { InactiveToggleButton } from "./inactive-toggle-button";
+import { PaymentMethodControl } from "./payment-method-control";
 import { BookMeetingButton } from "./book-meeting-button";
 import { TerminationSection } from "./termination-section";
 import { DealItemsSection } from "./deal-items-section";
@@ -85,6 +90,16 @@ function authorInitials(name: string): string {
     .toUpperCase();
 }
 
+/** Where a Betalingsservice invoice is in the collection flow. */
+const BS_PILL_LABEL: Record<string, string> = {
+  NONE: "Betalingsservice: venter på fil",
+  IN_FILE: "Betalingsservice: sendt til opkrævning",
+  PAID: "Betalingsservice: betalt",
+  REJECTED: "Betalingsservice: afvist",
+  CANCELLED: "Betalingsservice: annulleret",
+  CHARGED_BACK: "Betalingsservice: tilbageført",
+};
+
 export default async function DealDetailPage({
   params,
   searchParams,
@@ -95,7 +110,7 @@ export default async function DealDetailPage({
   const { id } = await params;
   const { dup } = await searchParams;
 
-  const [deal, users, currentUser, duplicateDeal, docuSealEnabled, emailTemplates] = await Promise.all([
+  const [deal, users, currentUser, docuSealEnabled, emailTemplates, bsSettings] = await Promise.all([
     prisma.deal.findUnique({
       where: { id },
       include: {
@@ -104,7 +119,7 @@ export default async function DealDetailPage({
         commission: { include: { seller: true } },
         notes: { include: { author: true }, orderBy: { createdAt: "desc" } },
         emails: { orderBy: { sentAt: "desc" } },
-        invoices: { orderBy: { quarterIndex: "asc" } },
+        invoices: { orderBy: { quarterIndex: "asc" }, include: { bsCollection: { select: { status: true } } } },
         items: { orderBy: { createdAt: "asc" } },
         parent: true,
         branches: true,
@@ -116,9 +131,9 @@ export default async function DealDetailPage({
     }),
     prisma.user.findMany({ orderBy: { name: "asc" } }),
     getCurrentUser(),
-    dup ? prisma.deal.findUnique({ where: { id: dup } }) : Promise.resolve(null),
     isDocuSealConfigured(),
     prisma.emailTemplate.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, subject: true, bodyHtml: true } }),
+    prisma.bsSettings.findUnique({ where: { id: "default" }, select: { pbsNumber: true, debtorGroupNumber: true } }),
   ]);
 
   const currentUserGoogleAccount = currentUser
@@ -133,6 +148,10 @@ export default async function DealDetailPage({
   ).sort((a, b) => dealName(a).localeCompare(dealName(b), "da"));
 
   if (!deal) notFound();
+  // Set right after creating a deal that may already exist (see
+  // findPossibleDuplicates) - matched on CVR, name/kaldenavn or address,
+  // including leads lying as Tabt in Leadindbakken.
+  const possibleDuplicates = dup ? await findPossibleDuplicates(deal) : [];
   // Sorted by whatever's actually shown (kaldenavn when set, else the CVR
   // name) - sorting by companyName alone left the list looking scrambled
   // whenever a branch's displayed name differs from its legal name.
@@ -164,6 +183,7 @@ export default async function DealDetailPage({
           />
           <InactiveToggleButton dealId={deal.id} isChurned={Boolean(deal.churnedAt)} />
           <DealDangerActions
+            dealName={dealName(deal)}
             dealId={deal.id}
             stage={deal.stage}
             canDelete={currentUser?.role === "ADMIN" || currentUser?.id === deal.ownerId}
@@ -171,13 +191,31 @@ export default async function DealDetailPage({
         </div>
       </div>
 
-      {duplicateDeal && (
+      {possibleDuplicates.length > 0 && (
         <div className="mt-4 rounded-md bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          Bemærk: Der findes allerede en anden deal med navnet &quot;{duplicateDeal.companyName}&quot; —{" "}
-          <Link href={`/deals/${duplicateDeal.id}`} className="font-medium underline">
-            se dealen her
-          </Link>
-          .
+          <p className="font-medium">Bemærk: Denne kan være en dublet af:</p>
+          <ul className="mt-1 space-y-0.5">
+            {possibleDuplicates.map((d) => (
+              <li key={d.id}>
+                <Link href={`/deals/${d.id}`} className="font-medium underline">
+                  {d.name}
+                </Link>{" "}
+                ({d.reasons.join(", ")}) -{" "}
+                {d.inLeadInbox
+                  ? `ligger som ${d.stage === "LOST" ? "Tabt" : (stageLabels[d.stage] ?? d.stage)} i leadindbakken${d.callListName ? ` (${d.callListName})` : ""}`
+                  : `${stageLabels[d.stage] ?? d.stage} på Deals`}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {deal.inLeadInbox && (
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-md bg-slate-100 px-4 py-2.5 text-sm text-slate-700">
+          <span>
+            Ligger i <Link href="/leadindbakke" className="font-medium underline">leadindbakken</Link> - rykker selv
+            over på Deals, når der bookes et møde.
+          </span>
+          <MoveToDealsButton dealId={deal.id} />
         </div>
       )}
 
@@ -223,7 +261,18 @@ export default async function DealDetailPage({
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Telefon</label>
+                  <div className="flex items-center justify-between gap-2">
+                    <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Telefon</label>
+                    {deal.contactPhone && (
+                      <a
+                        href={telHref(deal.contactPhone)}
+                        title="Ring op fra din egen telefon"
+                        className="text-[11px] font-semibold text-emerald-700 hover:underline"
+                      >
+                        📞 Ring op
+                      </a>
+                    )}
+                  </div>
                   <input
                     name="contactPhone"
                     defaultValue={deal.contactPhone ?? ""}
@@ -479,6 +528,16 @@ export default async function DealDetailPage({
 
           <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="text-sm font-semibold text-slate-900">Fakturaer (Dinero)</h2>
+            {currentUser?.canAccessBilling && (
+              <PaymentMethodControl
+                dealId={deal.id}
+                method={deal.paymentMethod}
+                customerNumber={deal.bsCustomerNumber}
+                mandateActive={deal.bsMandateStatus === "ACTIVE"}
+                pbsNumber={bsSettings?.pbsNumber ?? null}
+                debtorGroupNumber={bsSettings?.debtorGroupNumber ?? null}
+              />
+            )}
             {currentUser?.role === "ADMIN" && (
               <div className="mt-3 flex flex-wrap items-stretch gap-2">
                 {(deal.establishmentFee ?? 0) > 0 &&
@@ -503,8 +562,8 @@ export default async function DealDetailPage({
                       <span className="money font-medium text-slate-800">{formatDKK(inv.amount)}</span>
                     </div>
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <span
-                        className={
+                      {(() => {
+                        const pillClass =
                           inv.status === "DRAFT_CREATED"
                             ? "shrink-0 whitespace-nowrap rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700"
                             : inv.status === "FAILED"
@@ -513,23 +572,52 @@ export default async function DealDetailPage({
                             ? "shrink-0 whitespace-nowrap rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700"
                             : inv.status === "SENT_MANUALLY"
                             ? "shrink-0 whitespace-nowrap rounded-full bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-700"
-                            : "shrink-0 whitespace-nowrap rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600"
-                        }
-                        title={inv.failureReason ?? undefined}
-                      >
-                        {invoiceStatusLabel(inv)}
-                      </span>
+                            : "shrink-0 whitespace-nowrap rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600";
+                        // Sent through Dinero: hover shows when it went out and when it falls due.
+                        const sentRows = [
+                          ...(inv.sentAt ? [{ label: "Sendt", value: formatDate(inv.sentAt) }] : []),
+                          ...(inv.dueDate ? [{ label: "Forfalder", value: formatDate(inv.dueDate) }] : []),
+                        ];
+                        return inv.status === "DRAFT_CREATED" && sentRows.length > 0 ? (
+                          <InvoiceLabelTooltip
+                            label={invoiceStatusLabel(inv)}
+                            heading={inv.dineroInvoiceNumber ? `Faktura nr. ${inv.dineroInvoiceNumber}` : "Faktura i Dinero"}
+                            rows={sentRows}
+                            className={pillClass}
+                          />
+                        ) : (
+                          <span className={pillClass} title={inv.failureReason ?? undefined}>
+                            {invoiceStatusLabel(inv)}
+                          </span>
+                        );
+                      })()}
+                      {inv.collectViaBs && (
+                        <span
+                          className={`shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${
+                            !inv.bsCollection
+                              ? "bg-sky-50 text-sky-700"
+                              : inv.bsCollection.status === "PAID"
+                              ? "bg-emerald-50 text-emerald-700"
+                              : inv.bsCollection.status === "IN_FILE"
+                              ? "bg-sky-50 text-sky-700"
+                              : "bg-red-50 text-red-700"
+                          }`}
+                          title={inv.bsPaymentError ?? undefined}
+                        >
+                          {BS_PILL_LABEL[inv.bsCollection?.status ?? "NONE"]}
+                        </span>
+                      )}
                       {inv.paidAt && (
                         <span className="shrink-0 whitespace-nowrap rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800">
                           Betalt {formatDate(inv.paidAt)}
                         </span>
                       )}
                       {!inv.paidAt && inv.status === "DRAFT_CREATED" && inv.quarterIndex >= 1 && (
-                        // Netto+8 is set so it lands exactly on the period's start date
-                        // (see draftInvoiceLine in invoice-service.ts) - scheduledDate
-                        // *is* the due date here, no separate field needed.
+                        // Netto+8 is set so it lands on the period's start date (see
+                        // draftInvoiceLine in invoice-service.ts) - dueDate is stored
+                        // since that change, scheduledDate covers older rows.
                         <span className="shrink-0 whitespace-nowrap rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
-                          Forfalder {formatDate(inv.scheduledDate)}
+                          Forfalder {formatDate(inv.dueDate ?? inv.scheduledDate)}
                         </span>
                       )}
                       {currentUser?.role === "ADMIN" && !inv.paidAt && inv.dineroInvoiceGuid && !inv.dineroInvoiceGuid.startsWith("TEST-") && (

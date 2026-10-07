@@ -1,4 +1,6 @@
 import { redirect } from "next/navigation";
+import { after } from "next/server";
+import { resumeStalledReportQueue, getReportQueueProgress } from "@/lib/customer-report-service";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
@@ -22,7 +24,13 @@ export default async function StatsPage() {
   if (!currentUser) redirect("/login");
   if (!currentUser.canAccessBilling) redirect("/");
 
-  const autoRunEnabled = await isIntegrationEnabled("CUSTOMER_REPORTS_AUTO_RUN");
+  const [autoRunEnabled, queueProgress] = await Promise.all([
+    isIntegrationEnabled("CUSTOMER_REPORTS_AUTO_RUN"),
+    getReportQueueProgress(),
+  ]);
+  // Restarts a report queue whose self-chaining got cut off (see
+  // resumeStalledReportQueue) - this page polls while reports are pending.
+  after(() => resumeStalledReportQueue());
 
   const deals = (
     await prisma.deal.findMany({
@@ -30,6 +38,7 @@ export default async function StatsPage() {
       include: {
         reports: { orderBy: { sentAt: "desc" }, take: 10 },
         branches: { select: { id: true, displayName: true, companyName: true, mpSkinId: true } },
+        parent: { select: { displayName: true, companyName: true, reportCombineBranches: true } },
       },
     })
   ).sort((a, b) => dealName(a).localeCompare(dealName(b), "da"));
@@ -77,6 +86,7 @@ export default async function StatsPage() {
         <h2 className="text-sm font-semibold text-slate-900">Live kunder</h2>
         <div className="mt-3">
           <LiveCustomersTable
+            queueProgress={queueProgress}
             rows={deals.map((deal) => ({
               dealId: deal.id,
               name: deal.displayName || deal.companyName,
@@ -99,6 +109,8 @@ export default async function StatsPage() {
               branches: deal.branches
                 .filter((b) => b.mpSkinId)
                 .map((b) => ({ id: b.id, name: b.displayName || b.companyName })),
+              reportCombineBranches: deal.reportCombineBranches,
+              combinedIntoParentName: deal.parent?.reportCombineBranches ? dealName(deal.parent) : null,
             }))}
           />
         </div>

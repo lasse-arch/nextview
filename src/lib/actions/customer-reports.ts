@@ -63,6 +63,21 @@ export async function updateReportLanguageAction(
   return { ok: true };
 }
 
+/** "Send samlet automatisk" on a parent with linked branches - see
+ * Deal.reportCombineBranches. */
+export async function updateReportCombineBranchesAction(
+  dealId: string,
+  combine: boolean
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const user = await requireUser();
+  if (user.role !== "ADMIN") throw new Error("Kun admin kan ændre rapport-indstillinger");
+
+  await prisma.deal.update({ where: { id: dealId }, data: { reportCombineBranches: combine } });
+  revalidatePath("/stats");
+  revalidatePath(`/deals/${dealId}`);
+  return { ok: true };
+}
+
 export async function updateReportIntervalAction(
   dealId: string,
   interval: ReportInterval | null

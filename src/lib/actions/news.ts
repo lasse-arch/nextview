@@ -126,6 +126,48 @@ const DEFAULT_POSTS: { title: string; body: string; minutesAgo: number; screensh
     body: "\"AI-mødenote\"-feltet på en deal kan nu tage imod et rent Pocket-delelink (fra heypocket.com) i stedet for at du selv skal kopiere teksten ind. Indsæt linket alene og tryk \"Gem mødenote\", så henter den automatisk det hele i baggrunden - summary, to-dos og den fulde transskription, uanset hvilken fane der tilfældigvis er åben på Pocket-siden.\n\nNoten vises som én kompakt linje med mødets titel og en \"Åbn hele referatet\"-knap, så den ikke fylder resten af dealens noter ud - men hele referatet er stadig ét klik væk.",
     screenshotUrl: "/news/pocket-integration.png",
   },
+  {
+    minutesAgo: 0,
+    title: "Fundne leads viser nu også virksomheder, der allerede er tilføjet",
+    body: "Før forsvandt en virksomhed helt fra et filters liste under \"Fundne leads\", hvis et andet filter havde fundet den først, eller den allerede var en deal - \"Kør nu\" sagde bare \"fandtes allerede\". Nu står den på listen hos hvert filter, der finder den, med en gul besked om hvorfor: \"Allerede tilføjet til ringelisten …\", \"Findes allerede som deal (stadie)\" eller \"Afvist tidligere\".\n\nEr den allerede en deal, kan du åbne den direkte eller trykke \"Skjul\" for at fjerne den fra listen - dealen røres ikke. Tilføjer du en virksomhed fra én liste, forsvinder den kun fra den liste; står den også på et andet filters liste, får den beskeden dér. Samtidig kan \"Op til 1000 pr. kørsel\" nu også nå virksomheder længere nede i CVR, i stedet for at få de samme 1000 nyeste tilbage hver gang.",
+    screenshotUrl: "/news/fundne-leads-already-added.png",
+  },
+  {
+    minutesAgo: 0,
+    title: "Importér en CSV-fil som fundne leads",
+    body: "Har du en liste over fx alle højskoler med telefon, e-mail og hjemmeside, kan du nu lægge den ind under Leadgeneration → \"Fundne leads\" med knappen \"Importér CSV\". Filen bliver sin egen liste (opkaldt efter filen, men du kan give den et andet navn), og hver række kan tilføjes til ringelisten, tilføjes som deal eller afvises - præcis som et filters fund. \"Tilføj alle til ringeliste\" virker også.\n\nFilen skal bare have en \"Navn\"-kolonne. Telefon, Email, Hjemmeside, Adresse, Postnr, By og Land bruges, hvis de er der, og et CVR-nummer er ikke nødvendigt. Både semikolon og komma virker som skilletegn. Findes en virksomhed allerede som deal (samme navn eller e-mail), står den med en gul besked i stedet for at blive oprettet to gange.",
+    screenshotUrl: "/news/csv-import.png",
+  },
+  {
+    minutesAgo: 0,
+    title: "Ny side: Leadindbakke - Deals-tavlen er nu til de deals, I arbejder på",
+    body: "Alle leads, der kommer ind via ringelisterne (indsat på Ringeliste, eller tilføjet til en ringeliste fra Leadgeneration), lander nu i den nye \"Leadindbakke\" i menuen i stedet for at fylde Lead-kolonnen på Deals. Her kan du søge på navn, telefon, adresse og CVR, filtrere på ringeliste og sælger, og se dem som Ikke ringet, Kontaktet eller Tabt.\n\nSå snart der bookes et møde, rykker leadet selv over på Deals med alle noter og historik. Vil du arbejde videre med et lead før et møde (fx en der ikke havde tid lige nu), så tryk \"Flyt til Deals\" - enkeltvis eller for flere på én gang. Leads du selv opretter med \"+ Ny lead\" kommer stadig direkte på Deals.\n\nDublet-tjekket er også blevet skarpere: opretter du en deal med samme CVR, navn, kaldenavn eller adresse som en eksisterende - også én der ligger som Tabt i leadindbakken - får du en advarsel med link til den, så I ikke starter forfra på en, I allerede har ringet til.",
+    screenshotUrl: "/news/leadindbakke.png",
+  },
+  {
+    minutesAgo: 0,
+    title: "Ny side: Betalingsservice - kunder kan betale via indbetalingskort og automatisk betaling",
+    body: "En kunde kan nu sættes på Betalingsservice under \"Fakturaer\" på dealen (\"Betaling: Betalingsservice\"). Kunden får et fast kundenummer (fx NV00012) og får stadig sin faktura fra Dinero som før - men kvartalsfakturaen forfalder d. 1. i kvartalet og har teksten \"Beløbet opkræves via Betalingsservice - betal venligst ikke via bankoverførsel\". Kvartalsfakturaen til en Betalingsservice-kunde laves fra d. 1. i måneden før kvartalet, så den kan nå Betalingsservices frist. Etableringen sendes altid som en almindelig faktura, som kunden selv betaler.\n\nUnder Indstillinger → Betalingsservice ligger alle fakturaer, der venter på at blive opkrævet. \"Lav betalingsfil\" laver filen, som du downloader og uploader hos Betalingsservice - senest kl. 11 på 6.-sidste bankdag i måneden før (siden viser fristen). Når Betalingsservice sender resultatfilen tilbage, indlæser du den samme sted: betalte fakturaer markeres som betalt, også i Dinero (på mellemregningskontoen), og afviste eller tilbageførte står med rødt, så I kan rykke. Kunder uden aftale får indbetalingskort; når de tilmelder sig automatisk betaling i netbanken, opdateres de selv, når aftalefilen indlæses.",
+    screenshotUrl: "/news/betalingsservice.png",
+  },
+  {
+    minutesAgo: 0,
+    title: "Skriv en årsag, når en deal markeres som tabt",
+    body: "Når du markerer en deal som tabt - med \"❌ Tabt\" på ringelisten, \"Markér som tabt\" på dealen, ved at trække den til Tabt på Deals-tavlen eller ved at vælge Tabt i stadie-feltet - kommer der nu et felt, hvor du skriver hvorfor. Årsagen gemmes som en note på dealen (\"Tabt: ...\"), så den, der tager fat i kunden senere, kan se hvad der skete.",
+    screenshotUrl: "/news/tabt-aarsag.png",
+  },
+  {
+    minutesAgo: 0,
+    title: "Møder booket denne uge - på forsiden",
+    body: "Forsiden viser nu, hvor mange møder der er booket gennem systemet denne uge, og hvem der har booket dem, med en søjle for hver dag mandag til søndag. Hold musen over en søjle for at se dagens fordeling pr. sælger. Det tæller den dag, mødet blev booket - ikke den dag, mødet holdes.",
+    screenshotUrl: "/news/moder-booket-uge.png",
+  },
+  {
+    minutesAgo: 0,
+    title: "Ring op direkte fra computeren",
+    body: "Telefonnumre i Arpo kan nu klikkes - det grønne nummer på ringelisten, \"📞 Ring op\" ved telefonfeltet på dealen og numrene i Leadindbakke og Leadgeneration. Opkaldet går ud fra din egen mobil med dit eget nummer: på en Mac med iPhone (slå \"Opkald på andre enheder\" til på iPhonen, samme Apple-ID), og på Windows via Phone Link. Du taler i computerens mikrofon/headset. Blyanten ved nummeret på ringelisten retter nummeret.",
+    screenshotUrl: "/news/ring-op.png",
+  },
 ];
 
 /**
@@ -136,6 +178,9 @@ const DEFAULT_POSTS: { title: string; body: string; minutesAgo: number; screensh
  * a later screenshot addition still reaches prod without direct DB access.
  */
 export async function ensureDefaultNewsPosts(adminUserId: string): Promise<void> {
+  // Replaced by "Møder booket denne uge - på forsiden" shortly after it went out.
+  await prisma.newsPost.deleteMany({ where: { title: "Møder booket i dag - på forsiden" } });
+
   for (const post of DEFAULT_POSTS) {
     const existing = await prisma.newsPost.findFirst({ where: { title: post.title } });
     if (!existing) {

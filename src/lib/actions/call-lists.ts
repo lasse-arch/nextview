@@ -183,6 +183,9 @@ export async function addLeadsToCallList(
         ownerId: user.id,
         importType: "MANUAL",
         callListId,
+        // Fresh off a ringeliste - a lead to call, not a deal being worked
+        // yet, so it starts in Leadindbakken (see Deal.inLeadInbox).
+        inLeadInbox: true,
       },
     });
     await prisma.deal.update({ where: { id: deal.id }, data: { dealEmailAddress: buildDealEmailAddress(deal.id) } });
@@ -210,4 +213,24 @@ export async function deleteCallList(callListId: string): Promise<void> {
   // Deals stay - they just lose their list tag (onDelete: SetNull on the relation).
   await prisma.callList.delete({ where: { id: callListId } });
   revalidatePath("/ringeliste");
+}
+
+/**
+ * "Telefonsvar" on a Ringeliste card - called, no answer. Records when (the
+ * card shows the latest time) and sends the lead to the back of the call
+ * queue (see the ordering on /ringeliste). Can be pressed any number of
+ * times; only the latest time is kept.
+ */
+export async function markVoicemail(dealId: string): Promise<{ at: string }> {
+  const user = await requireUser();
+  const at = new Date();
+  const deal = await prisma.deal.update({ where: { id: dealId }, data: { lastVoicemailAt: at } });
+  await logActivity({
+    type: "DEAL_VOICEMAIL",
+    message: `${user.name} ringede til ${dealName(deal)} - telefonsvar`,
+    actorId: user.id,
+    dealId,
+  });
+  revalidatePath("/ringeliste");
+  return { at: at.toISOString() };
 }

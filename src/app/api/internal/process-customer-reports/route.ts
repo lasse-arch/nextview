@@ -26,7 +26,10 @@ export async function POST(request: NextRequest) {
 
   const result = await processOneQueuedReport();
 
-  if (result.remaining > 0) {
+  // Only the worker that just processed a report chains on - one that found
+  // another worker busy leaves the queue to that worker, so there is only
+  // ever one chain running.
+  if (result.processed && result.remaining > 0) {
     after(() => kickCustomerReportQueue());
   }
 

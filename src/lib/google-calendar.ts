@@ -49,12 +49,41 @@ export type CalendarEventInput = {
    * they need to be listed explicitly to show up as a guest with an RSVP,
    * same as the customer. */
   attendeeEmails: (string | null | undefined)[];
+  /** Attendees to mark as already accepted - the seller sending the invite
+   * (their CRM login email, which can differ from the Google account's). */
+  acceptedEmails?: (string | null | undefined)[];
 };
 
 export async function upsertCalendarEvent(account: EmailAccount, input: CalendarEventInput): Promise<string> {
   const accessToken = await getValidAccessToken(account);
   const uniqueEmails = [...new Set(input.attendeeEmails.filter((email): email is string => Boolean(email)).map((e) => e.trim()))];
-  const attendees = uniqueEmails.map((email) => ({ email }));
+
+  // PATCH replaces the whole attendee list, so an update would otherwise
+  // reset everyone's existing RSVP back to "awaiting" - carry each guest's
+  // current answer over from the event as it stands.
+  const existingResponses = new Map<string, string>();
+  if (input.eventId) {
+    const current = await fetch(`${CALENDAR_API_BASE}/calendars/primary/events/${input.eventId}`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (current.ok) {
+      const data = (await current.json()) as { attendees?: { email?: string; responseStatus?: string }[] };
+      for (const a of data.attendees ?? []) {
+        if (a.email && a.responseStatus) existingResponses.set(a.email.toLowerCase(), a.responseStatus);
+      }
+    }
+  }
+  // The seller sending the invite is the organizer - they're going to the
+  // meeting they booked, so they're marked "Ja" straight away instead of
+  // showing up as awaiting their own invitation.
+  const acceptedEmails = new Set(
+    [account.email, ...(input.acceptedEmails ?? [])].filter((e): e is string => Boolean(e)).map((e) => e.trim().toLowerCase())
+  );
+  const attendees = uniqueEmails.map((email) => {
+    const key = email.toLowerCase();
+    const responseStatus = acceptedEmails.has(key) ? "accepted" : existingResponses.get(key);
+    return responseStatus ? { email, responseStatus } : { email };
+  });
 
   const body = {
     summary: input.summary,

@@ -292,3 +292,15 @@ export function formatMinutesAsHours(minutes: number): string {
   if (rest === 0) return `${hours} t`;
   return `${hours} t ${rest} min`;
 }
+
+/**
+ * A tel: link for a phone number - clicking it on a computer hands the call
+ * to the person's own phone (iPhone via "Opkald på andre enheder" on a Mac,
+ * Phone Link on Windows), so it goes out from their own number. A plain
+ * 8-digit Danish number gets +45 so it also dials correctly from abroad.
+ */
+export function telHref(phone: string): string {
+  const digits = phone.replace(/[^\d+]/g, "");
+  const normalized = /^\d{8}$/.test(digits) ? `+45${digits}` : digits.replace(/^00/, "+");
+  return `tel:${normalized}`;
+}

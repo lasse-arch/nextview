@@ -366,8 +366,10 @@ export async function generateAndSendCustomerReport(
     const errorMessage = err instanceof Error ? err.message : "Ukendt fejl";
     try {
       if (existingReportId) {
-        await prisma.customerReport.update({
-          where: { id: existingReportId },
+        // Only a report still waiting is marked failed - never one already
+        // marked SENT, so a failure can't hide an email that did go out.
+        await prisma.customerReport.updateMany({
+          where: { id: existingReportId, status: "PENDING" },
           data: { status: "FAILED", errorMessage, sentAt: new Date() },
         });
       } else {
@@ -479,8 +481,10 @@ export async function generateAndSendCombinedCustomerReport(
     const errorMessage = err instanceof Error ? err.message : "Ukendt fejl";
     try {
       if (existingReportId) {
-        await prisma.customerReport.update({
-          where: { id: existingReportId },
+        // Only a report still waiting is marked failed - never one already
+        // marked SENT, so a failure can't hide an email that did go out.
+        await prisma.customerReport.updateMany({
+          where: { id: existingReportId, status: "PENDING" },
           data: { status: "FAILED", errorMessage, sentAt: new Date() },
         });
       } else {
@@ -510,20 +514,105 @@ export async function enqueueScheduledCustomerReports(): Promise<{ queued: numbe
     where: {
       reportInterval: { not: null },
       nextReportDueAt: { lte: new Date() },
-      mpSkinId: { not: null },
+      // A parent sending combined may have no MP-Skin nummer of its own -
+      // its branches' stats are what goes out.
+      OR: [{ mpSkinId: { not: null } }, { reportCombineBranches: true }],
       churnedAt: null,
       stage: { in: [...REPORTABLE_STAGES] },
     },
-    select: { id: true },
+    select: {
+      id: true,
+      mpSkinId: true,
+      reportCombineBranches: true,
+      parent: { select: { reportCombineBranches: true } },
+      branches: {
+        where: { mpSkinId: { not: null }, churnedAt: null, stage: { in: [...REPORTABLE_STAGES] } },
+        select: { id: true },
+      },
+    },
   });
 
-  if (deals.length > 0) {
+  // A parent with reportCombineBranches sends one combined report covering
+  // its branches (see generateAndSendCombinedCustomerReport) - so those
+  // branches are skipped here rather than also getting their own.
+  const rows: { dealId: string; branchDealIds: string | null }[] = [];
+  for (const d of deals) {
+    if (d.parent?.reportCombineBranches) continue;
+    if (d.reportCombineBranches && d.branches.length > 0) {
+      rows.push({ dealId: d.id, branchDealIds: d.branches.map((b) => b.id).join(",") });
+    } else if (d.mpSkinId) {
+      rows.push({ dealId: d.id, branchDealIds: null });
+    }
+  }
+
+  if (rows.length > 0) {
     await prisma.customerReport.createMany({
-      data: deals.map((d) => ({ dealId: d.id, method: "AUTOMATIC" as const, status: "PENDING" as const })),
+      data: rows.map((r) => ({ ...r, method: "AUTOMATIC" as const, status: "PENDING" as const })),
     });
   }
 
-  return { queued: deals.length };
+  return { queued: rows.length };
+}
+
+/**
+ * How long a claimed report may be in progress - just past the processing
+ * route's own 300s maxDuration. A claim older than this belongs to a worker
+ * that was cut off (timeout, a deployment going live mid-run).
+ */
+const CLAIM_EXPIRES_AFTER_MS = 6 * 60 * 1000;
+
+/**
+ * A report to the same customer this recently already went out - any second
+ * send inside this window is treated as a duplicate and skipped, whatever
+ * path it came from (a double "Send nu", an overlapping run, ...).
+ */
+const DUPLICATE_SEND_WINDOW_MS = 30 * 60 * 1000;
+
+/**
+ * A report claimed by a worker that never finished it is NOT retried - the
+ * email may well have gone out before the worker died, and sending a
+ * customer the same report twice is worse than not at all. It's marked
+ * FAILED instead, saying to check before sending again by hand.
+ */
+async function failAbandonedClaims(): Promise<void> {
+  await prisma.customerReport.updateMany({
+    where: { status: "PENDING", claimedAt: { lt: new Date(Date.now() - CLAIM_EXPIRES_AFTER_MS) } },
+    data: {
+      status: "FAILED",
+      sentAt: new Date(),
+      errorMessage: "Afbrudt undervejs - tjek i Sendt-mappen om den nåede ud, før du sender den igen.",
+    },
+  });
+}
+
+/**
+ * Takes the oldest waiting report for this worker alone. The claim is a
+ * conditional update (only succeeds while claimedAt is still null), so two
+ * workers racing for the same report can never both get it. Only one report
+ * is ever in progress at a time: while another worker holds a live claim,
+ * this returns null and leaves the queue to that worker's own chain.
+ */
+async function claimNextQueuedReport() {
+  await failAbandonedClaims();
+  const inProgress = await prisma.customerReport.count({ where: { status: "PENDING", claimedAt: { not: null } } });
+  if (inProgress > 0) return null;
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const next = await prisma.customerReport.findFirst({
+      where: { status: "PENDING", claimedAt: null },
+      orderBy: { createdAt: "asc" },
+      select: { id: true },
+    });
+    if (!next) return null;
+    const claimed = await prisma.customerReport.updateMany({
+      where: { id: next.id, status: "PENDING", claimedAt: null },
+      data: { claimedAt: new Date() },
+    });
+    if (claimed.count === 1) {
+      return prisma.customerReport.findUniqueOrThrow({ where: { id: next.id }, include: { deal: true } });
+    }
+  }
+  return null;
 }
 
 /**
@@ -534,17 +623,35 @@ export async function enqueueScheduledCustomerReports(): Promise<{ queued: numbe
  * on how many are queued: a batch of 3 and a batch of 30 both process at the
  * same safe, bounded pace, one after another, instead of one request trying
  * (and risking a timeout) to get through all of them at once.
+ *
+ * `processed: false` with work remaining means another worker is busy - the
+ * caller must not chain on in that case (that worker chains itself).
  */
 export async function processOneQueuedReport(): Promise<{ processed: boolean; remaining: number }> {
-  const report = await prisma.customerReport.findFirst({
-    where: { status: "PENDING" },
-    orderBy: { createdAt: "asc" },
-    include: { deal: true },
-  });
-
+  const report = await claimNextQueuedReport();
   if (!report) return { processed: false, remaining: 0 };
 
-  if (report.branchDealIds) {
+  const coveredDealIds = [report.dealId, ...(report.branchDealIds?.split(",").filter(Boolean) ?? [])];
+  const recentlySent = await prisma.customerReport.findFirst({
+    where: {
+      id: { not: report.id },
+      status: "SENT",
+      sentAt: { gte: new Date(Date.now() - DUPLICATE_SEND_WINDOW_MS) },
+      OR: [{ dealId: { in: coveredDealIds } }, ...coveredDealIds.map((id) => ({ branchDealIds: { contains: id } }))],
+    },
+    select: { sentAt: true },
+  });
+
+  if (recentlySent) {
+    await prisma.customerReport.update({
+      where: { id: report.id },
+      data: {
+        status: "FAILED",
+        sentAt: new Date(),
+        errorMessage: `Sprunget over - kunden fik allerede en rapport kl. ${recentlySent.sentAt.toLocaleTimeString("da-DK", { timeZone: "Europe/Copenhagen", hour: "2-digit", minute: "2-digit" })}.`,
+      },
+    });
+  } else if (report.branchDealIds) {
     const branchIds = report.branchDealIds.split(",").filter(Boolean);
     const branches = await prisma.deal.findMany({ where: { id: { in: branchIds } } });
     await generateAndSendCombinedCustomerReport(report.deal, branches, report.method, report.id);
@@ -554,6 +661,66 @@ export async function processOneQueuedReport(): Promise<{ processed: boolean; re
 
   const remaining = await prisma.customerReport.count({ where: { status: "PENDING" } });
   return { processed: true, remaining };
+}
+
+/**
+ * "Sender rapporter: 3/20 sendt" on Stats - the batch is every report queued
+ * since the oldest one still waiting, so it covers a bulk "Send nu" as well
+ * as the automatic morning run. Null when nothing is waiting.
+ */
+export async function getReportQueueProgress(): Promise<{ done: number; failed: number; total: number } | null> {
+  const oldestPending = await prisma.customerReport.findFirst({
+    where: { status: "PENDING" },
+    orderBy: { createdAt: "asc" },
+    select: { createdAt: true },
+  });
+  if (!oldestPending) return null;
+  const batch = await prisma.customerReport.groupBy({
+    by: ["status"],
+    where: { createdAt: { gte: oldestPending.createdAt } },
+    _count: { _all: true },
+  });
+  const count = (status: string) => batch.find((b) => b.status === status)?._count._all ?? 0;
+  const total = batch.reduce((sum, b) => sum + b._count._all, 0);
+  return { done: total - count("PENDING"), failed: count("FAILED"), total };
+}
+
+/**
+ * Watchdog for the self-chaining queue: each processed report triggers the
+ * next one itself, so if that chain is cut (a new deployment going live
+ * mid-run, a timed-out invocation, a failed internal request) the remaining
+ * reports would sit PENDING until something else kicks it. Called on page
+ * loads (Stats - which reloads every few seconds while reports are waiting -
+ * and the dashboard), so it must be cheap and must never start a second
+ * worker: it only kicks when reports are waiting and none is in progress.
+ * Even if it did, the claim in claimNextQueuedReport keeps a report from
+ * ever being taken twice. Returns whether it kicked.
+ */
+export async function resumeStalledReportQueue(): Promise<boolean> {
+  await failAbandonedClaims();
+  const [waiting, inProgress] = await Promise.all([
+    prisma.customerReport.count({ where: { status: "PENDING", claimedAt: null } }),
+    prisma.customerReport.count({ where: { status: "PENDING", claimedAt: { not: null } } }),
+  ]);
+  if (waiting === 0 || inProgress > 0) return false;
+
+  // Freshly queued work is kicked by whatever queued it - only step in once
+  // it has clearly been left sitting.
+  const newestFinished = await prisma.customerReport.findFirst({
+    where: { status: { not: "PENDING" } },
+    orderBy: { sentAt: "desc" },
+    select: { sentAt: true },
+  });
+  const oldestWaiting = await prisma.customerReport.findFirst({
+    where: { status: "PENDING", claimedAt: null },
+    orderBy: { createdAt: "asc" },
+    select: { createdAt: true },
+  });
+  const lastProgress = Math.max(oldestWaiting?.createdAt.getTime() ?? 0, newestFinished?.sentAt.getTime() ?? 0);
+  if (Date.now() - lastProgress < 60_000) return false;
+
+  await kickCustomerReportQueue();
+  return true;
 }
 
 /**
