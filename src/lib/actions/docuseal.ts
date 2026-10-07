@@ -117,6 +117,7 @@ export async function buildAndSendContract(
         { role: "Customer", name: deal.contactName, email: deal.contactEmail, externalId: "customer" },
       ],
       metadata: { dealId: deal.id },
+      emailSubject: `Skriv under på kontrakten til ${dealName(deal)}`,
     });
 
     await prisma.deal.update({
