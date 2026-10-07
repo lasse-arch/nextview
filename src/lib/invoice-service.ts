@@ -98,10 +98,15 @@ function computeDueLines(
   const establishmentReady = options.sendEstablishmentNow
     ? Boolean(deal.contractSignedAt || deal.billingStartDate)
     : Boolean(establishmentDueDate && establishmentDueDate <= now);
-  // A customer who signed before the CRM started invoicing (see
-  // INVOICING_FLOOR) was already billed their establishment fee outside it -
-  // there's just no record of that here, so it must never be billed again.
-  const establishmentPredatesInvoicing = Boolean(establishmentDueDate && establishmentDueDate < INVOICING_FLOOR);
+  // A customer who was already live and being billed before the CRM started
+  // invoicing (see INVOICING_FLOOR), or whose contract has already ended,
+  // had their establishment fee billed outside it - there's just no record
+  // of that here, so it must never be billed again. Signing before the floor
+  // alone doesn't count: a customer signed in late September and not live
+  // yet still owes it.
+  const establishmentPredatesInvoicing =
+    Boolean(deal.billingStartDate && deal.billingStartDate < INVOICING_FLOOR) ||
+    Boolean(deal.contractEndDate && deal.contractEndDate < now);
   if (
     deal.establishmentFee &&
     deal.establishmentFee > 0 &&
