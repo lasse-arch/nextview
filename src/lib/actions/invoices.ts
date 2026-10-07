@@ -164,9 +164,12 @@ export async function deleteInvoiceDraft(invoiceId: string): Promise<ActionResul
  * the feature is still being finished - a one-time reset, not something run
  * routinely.
  */
-export async function clearAllInvoices(): Promise<{ deleted: number }> {
+export async function clearAllInvoices(confirmation: string): Promise<{ deleted: number }> {
   const user = await requireUser();
   if (user.role !== "ADMIN") throw new Error("Kun admin kan nulstille fakturaer");
+  // Typed by hand in the confirmation box - also checked here, so the action
+  // can never run without it.
+  if (confirmation.trim().toLowerCase() !== "sletslet") throw new Error('Ikke slettet - du skal skrive "sletslet".');
 
   const { count } = await prisma.invoice.deleteMany({});
   revalidatePath("/settings/dinero");

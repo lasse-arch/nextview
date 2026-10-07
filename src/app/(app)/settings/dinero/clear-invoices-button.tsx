@@ -3,6 +3,8 @@
 import { useState, useTransition } from "react";
 import { clearAllInvoices } from "@/lib/actions/invoices";
 
+const CONFIRM_WORD = "sletslet";
+
 export function ClearInvoicesButton() {
   const [pending, startTransition] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
@@ -13,11 +15,18 @@ export function ClearInvoicesButton() {
         type="button"
         disabled={pending}
         onClick={() => {
-          if (!window.confirm("Slet alle fakturaer (inkl. importerede/historiske) fra alle deals? Kan ikke fortrydes.")) return;
+          const typed = window.prompt(
+            'Slet alle fakturaer (inkl. importerede/historiske) fra alle deals? Kan ikke fortrydes.\n\nSkriv "sletslet" for at fortsætte.'
+          );
+          if (typed === null) return;
+          if (typed.trim().toLowerCase() !== CONFIRM_WORD) {
+            setMessage(`Ikke slettet - du skal skrive "${CONFIRM_WORD}".`);
+            return;
+          }
           setMessage(null);
           startTransition(async () => {
             try {
-              const result = await clearAllInvoices();
+              const result = await clearAllInvoices(CONFIRM_WORD);
               setMessage(`${result.deleted} faktura(er) slettet.`);
             } catch (err) {
               setMessage(err instanceof Error ? err.message : "Der opstod en fejl.");
