@@ -228,8 +228,12 @@ async function dineroContactsSearch(accessToken: string, queryFilter: string): P
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   if (!res.ok) throw new Error(`Dinero: kunne ikke søge kontakter (${res.status}): ${await res.text()}`);
-  const data = (await res.json()) as { Collection: { ContactGuid?: string }[] };
-  return data.Collection.map((c) => c.ContactGuid).filter((g): g is string => Boolean(g));
+  // v2 answers in camelCase ("contactGuid") - confirmed against a live
+  // Dinero company - unlike v1's PascalCase. Reading only "ContactGuid"
+  // made every search come back empty, so a new duplicate contact was
+  // created for every invoice. Both spellings are accepted.
+  const data = (await res.json()) as { Collection: { contactGuid?: string; ContactGuid?: string }[] };
+  return data.Collection.map((c) => c.contactGuid ?? c.ContactGuid).filter((g): g is string => Boolean(g));
 }
 
 /**
