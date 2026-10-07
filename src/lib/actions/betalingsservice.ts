@@ -5,6 +5,7 @@ import type { PaymentMethod } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import {
+  createBsTestDelivery,
   createBsDelivery,
   deleteBsDelivery,
   ensureBsCustomerNumber,
@@ -147,6 +148,15 @@ export async function sendBsDeliveryViaSftpAction(deliveryId: string) {
   await requireBillingUser();
   await prisma.bsDelivery.update({ where: { id: deliveryId }, data: { sendViaSftp: true, sftpError: null } });
   const result = await runSftpExchange();
+  revalidatePath(PAGE);
+  return result;
+}
+
+/** Admin only: a BS 0601 file with fictive customers for Mastercard's test (delsystem KR9). */
+export async function createBsTestDeliveryAction() {
+  const user = await requireBillingUser();
+  if (user.role !== "ADMIN") throw new Error("Kun administratorer kan lave en testfil.");
+  const result = await createBsTestDelivery(user.id);
   revalidatePath(PAGE);
   return result;
 }

@@ -23,7 +23,7 @@ import { getInvoiceTotals, registerInvoicePayment } from "@/lib/dinero";
 import { buildBs0601, type Bs0601Collection } from "./bs0601";
 import { parseBsReturnDelivery, type BsPayment } from "./bs-returns";
 import { BsFormatError } from "./fixed-width";
-import { deliveryDeadline, nextBankingDayOnOrAfter } from "./banking-days";
+import { deliveryDeadline, earliestCollectionDate, nextBankingDayOnOrAfter } from "./banking-days";
 
 const MAX_DAYS_AHEAD = 90;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -351,6 +351,87 @@ export async function createBsDelivery(
     });
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Kunne ikke lave betalingsfilen." };
+  }
+}
+
+const TEST_SUBSYSTEM = "KR9";
+const TEST_CUSTOMERS: { name: string; street: string; postalCode: string }[] = [
+  { name: "Testkunde Et ApS", street: "Testvej 1", postalCode: "8000" },
+  { name: "Testkunde To ApS", street: "Prøvegade 2", postalCode: "9000" },
+  { name: "Testkunde Tre ApS", street: "Eksempelvej 3", postalCode: "5000" },
+  { name: "Testkunde Fire ApS", street: "Dummyvej 4", postalCode: "2100" },
+  { name: "Testkunde Fem ApS", street: "Testvej 5", postalCode: "7100" },
+  { name: "Testkunde Seks ApS", street: "Prøvegade 6", postalCode: "6700" },
+  { name: "Testkunde Syv ApS", street: "Eksempelvej 7", postalCode: "4000" },
+  { name: "Testkunde Otte ApS", street: "Dummyvej 8", postalCode: "8700" },
+  { name: "Testkunde Ni ApS", street: "Testvej 9", postalCode: "9200" },
+  { name: "Testkunde Ti ApS", street: "Prøvegade 10", postalCode: "3000" },
+  { name: "Testkunde Elleve ApS", street: "Eksempelvej 11", postalCode: "8600" },
+  { name: "Testkunde Tolv ApS", street: "Dummyvej 12", postalCode: "7400" },
+  { name: "Testkunde Tretten ApS", street: "Testvej 13", postalCode: "6000" },
+  { name: "Testkunde Fjorten ApS", street: "Prøvegade 14", postalCode: "2800" },
+  { name: "Testkunde Femten ApS", street: "Eksempelvej 15", postalCode: "9440" },
+];
+
+/** A file is a test file when its name says so - see createBsTestDelivery. */
+export function isTestDeliveryFileName(fileName: string): boolean {
+  return fileName.includes("-TEST-");
+}
+
+/**
+ * Builds a BS 0601 test file for Mastercard's free test (delsystem KR9):
+ * 15 fictive customers (TEST001-TEST015) with made-up addresses and
+ * amounts, all as indbetalingskort, due on the first reachable
+ * first-of-month. Touches no real invoice, deal or customer - it's only
+ * stored as a delivery so it can be downloaded or sent via SFTP.
+ */
+export async function createBsTestDelivery(userId: string): Promise<CreateDeliveryResult> {
+  const settings = await getBsSettings();
+  const missing = missingBsSettings(settings).filter((m) => m !== "mellemregningskonto i Dinero");
+  if (missing.length > 0) return { ok: false, error: `Udfyld først: ${missing.join(", ")}.` };
+
+  const dueDate = earliestCollectionDate(new Date());
+  const collections: Bs0601Collection[] = TEST_CUSTOMERS.map((c, i) => ({
+    customerNumber: `TEST${String(i + 1).padStart(3, "0")}`,
+    nameAndAddressLines: [c.name, c.street],
+    postalCode: c.postalCode,
+    dueDate,
+    amountOre: (1000 + i * 125) * 100,
+    reference: `T${String(i + 1).padStart(3, "0")}`,
+    textLines: [`Nextview360 - testopkrævning ${i + 1}`, "Dette er en test - ikke en rigtig regning."],
+  }));
+
+  try {
+    return await prisma.$transaction(async (tx) => {
+      const s = await tx.bsSettings.update({ where: { id: "default" }, data: { nextDeliverySequence: { increment: 1 } } });
+      const sequence = s.nextDeliverySequence - 1;
+      const result = buildBs0601(
+        {
+          dataSupplierNumber: settings.dataSupplierNumber!,
+          subsystem: TEST_SUBSYSTEM,
+          pbsNumber: settings.pbsNumber!,
+          debtorGroupNumber: settings.debtorGroupNumber!,
+          deliveryId: sequence,
+          mainText: "Nextview360 - TEST",
+        },
+        collections
+      );
+      const today = new Date().toISOString().slice(0, 10).replaceAll("-", "");
+      const delivery = await tx.bsDelivery.create({
+        data: {
+          sequence,
+          fileName: `BS0601-TEST-${TEST_SUBSYSTEM}-${String(sequence).padStart(4, "0")}-${today}.txt`,
+          content: new Uint8Array(result.file),
+          collectionCount: result.totals.collections,
+          totalOre: result.totals.amountOre,
+          firstDueDate: dueDate,
+          createdById: userId,
+        },
+      });
+      return { ok: true as const, deliveryId: delivery.id, collections: collections.length, skipped: 0 };
+    });
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Kunne ikke lave testfilen." };
   }
 }
 

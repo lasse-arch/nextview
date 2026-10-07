@@ -3,11 +3,12 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { dealName, formatDKK } from "@/lib/labels";
-import { getBsSettings, listPendingBsCollections, missingBsSettings } from "@/lib/betalingsservice/service";
+import { getBsSettings, isTestDeliveryFileName, listPendingBsCollections, missingBsSettings } from "@/lib/betalingsservice/service";
 import { deliveryDeadline } from "@/lib/betalingsservice/banking-days";
 import { MFT_DEFAULT_HOST, MFT_DEFAULT_PORT, publicKeyFileName } from "@/lib/betalingsservice/sftp";
 import {
   SftpPanel,
+  CreateTestDeliveryButton,
   BsSettingsForm,
   CreateDeliveryButton,
   DeliveryActions,
@@ -106,6 +107,9 @@ export default async function BetalingsservicePage() {
     }),
   ]);
   const sftpReady = Boolean(settings.sftpUser && settings.sftpPrivateKeyEnc);
+  // Test files (KR9) are an admin-only tool - other billing users never see them.
+  const visibleDeliveries =
+    currentUser.role === "ADMIN" ? deliveries : deliveries.filter((d) => !isTestDeliveryFileName(d.fileName));
 
   const missing = missingBsSettings(settings);
   const ready = pending.filter((p) => p.problems.length === 0 && !p.notYet);
@@ -254,19 +258,27 @@ export default async function BetalingsservicePage() {
       </section>
 
       <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="text-sm font-semibold text-slate-900">Betalingsfiler</h2>
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <h2 className="text-sm font-semibold text-slate-900">Betalingsfiler</h2>
+          {currentUser.role === "ADMIN" && <CreateTestDeliveryButton />}
+        </div>
         <p className="mt-1 text-xs text-slate-500">
           Download filen og upload den hos Betalingsservice (MFT). Markér den som uploadet bagefter. En fil, der ikke
           er uploadet endnu, kan slettes - så kommer fakturaerne tilbage på listen ovenfor.
         </p>
-        {deliveries.length > 0 ? (
+        {visibleDeliveries.length > 0 ? (
           <ul className="mt-3 divide-y divide-slate-100 text-sm">
-            {deliveries.map((d) => {
+            {visibleDeliveries.map((d) => {
               const results = d.collections.filter((c) => c.status !== "IN_FILE").length;
               return (
                 <li key={d.id} className="flex flex-wrap items-center justify-between gap-3 py-2.5">
                   <div>
                     <div className="font-medium text-slate-900">
+                      {isTestDeliveryFileName(d.fileName) && (
+                        <span className="mr-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">
+                          TEST (KR9)
+                        </span>
+                      )}
                       Fil nr. {d.sequence} · {d.collectionCount} opkrævning{d.collectionCount === 1 ? "" : "er"} ·{" "}
                       {kr(d.totalOre)}
                     </div>

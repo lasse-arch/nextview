@@ -14,6 +14,7 @@ import {
   testSftpConnectionAction,
   runSftpExchangeAction,
   sendBsDeliveryViaSftpAction,
+  createBsTestDeliveryAction,
 } from "@/lib/actions/betalingsservice";
 import { useToast } from "@/components/toast";
 
@@ -423,5 +424,34 @@ export function SftpPanel({
         </div>
       )}
     </div>
+  );
+}
+
+/** Admin only - see createBsTestDelivery. */
+export function CreateTestDeliveryButton() {
+  const [pending, startTransition] = useTransition();
+  const showToast = useToast();
+  const router = useRouter();
+  return (
+    <button
+      type="button"
+      disabled={pending}
+      title="BS 0601 med 15 fiktive testkunder og delsystem KR9 til Mastercards testforløb - rører ingen rigtige fakturaer"
+      onClick={() => {
+        if (!confirm("Lav en testfil med 15 fiktive kunder og delsystem KR9? Den rører ingen rigtige fakturaer eller kunder.")) return;
+        startTransition(async () => {
+          try {
+            const result = await createBsTestDeliveryAction();
+            showToast(result.ok ? "Testfil lavet - download den eller send den via SFTP." : result.error);
+            router.refresh();
+          } catch (err) {
+            showToast(err instanceof Error ? err.message : "Kunne ikke lave testfilen.");
+          }
+        });
+      }}
+      className="rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800 hover:bg-amber-100 disabled:opacity-50"
+    >
+      {pending ? "Laver testfil…" : "Lav testfil (KR9)"}
+    </button>
   );
 }
