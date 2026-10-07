@@ -16,12 +16,22 @@ export function ClearTestInvoicesButton() {
         type="button"
         disabled={pending}
         onClick={() => {
-          if (!window.confirm("Slet alle testkladder (dem med TEST-mærke)? Rigtige fakturaer røres ikke.")) return;
+          if (
+            !window.confirm(
+              "Slet alle testkladder (dem med TEST-mærke) - både i Arpo og kladderne i Dinero? Rigtige fakturaer røres ikke."
+            )
+          )
+            return;
           setMessage(null);
           startTransition(async () => {
             try {
               const result = await clearTestInvoices();
-              setMessage(`${result.deleted} testkladde(r) slettet.`);
+              setMessage(
+                `${result.deleted} testkladde(r) slettet i Arpo, ${result.deletedInDinero} kladde(r) slettet i Dinero.` +
+                  (result.keptBooked > 0
+                    ? ` ${result.keptBooked} var blevet bogført i Dinero og er ikke rørt - tjek dem i Dinero.`
+                    : "")
+              );
               router.refresh();
             } catch (err) {
               setMessage(err instanceof Error ? err.message : "Der opstod en fejl.");

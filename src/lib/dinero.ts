@@ -579,17 +579,10 @@ export async function createQuarterlyInvoiceDraft(params: {
   collectedViaBetalingsservice?: boolean;
   invoiceTemplateId?: string | null;
 }): Promise<DineroDraftResult> {
-  if (await isDineroTestMode()) {
-    const fake = Math.random().toString(36).slice(2, 8);
-    return {
-      contactGuid: params.existingContactGuid ?? `TEST-CONTACT-${fake}`,
-      invoiceGuid: `TEST-INVOICE-${fake}`,
-      invoiceNumber: `TEST-${fake.toUpperCase()}`,
-      isTest: true,
-    };
-  }
-
   const accessToken = await getAccessToken();
+
+  if (await isDineroTestMode()) return createTestModeDraft(accessToken, params);
+
   const contactInput: DineroContactInput = {
     name: params.companyName,
     cvr: params.cvrNumber,
@@ -680,6 +673,75 @@ export async function createPreviewInvoiceDrafts(
     created.push({ guid: invoice.guid });
   }
   return created;
+}
+
+/** Marks a test-mode draft's guid in the CRM ("TEST-<real Dinero guid>"),
+ * so it's never collected, payment-checked or mistaken for a real invoice. */
+export const TEST_DRAFT_PREFIX = "TEST-";
+
+/**
+ * Test mode: a real DRAFT in Dinero, on the customer's real contact (found
+ * by CVR/name, or created if it doesn't exist yet), so the actual invoice
+ * can be looked at in Dinero - but never booked or sent, and an existing
+ * contact is never changed. Deleted again with "Slet testkladder".
+ */
+async function createTestModeDraft(
+  accessToken: string,
+  params: Parameters<typeof createQuarterlyInvoiceDraft>[0]
+): Promise<DineroDraftResult> {
+  const contactGuid =
+    (await findContactByCvr(accessToken, params.cvrNumber ?? "", params.companyName)) ??
+    (await createContact(accessToken, {
+      name: params.companyName,
+      cvr: params.cvrNumber,
+      email: params.contactEmail,
+      phone: params.contactPhone,
+      address: params.address,
+    }));
+  const invoice = await createInvoiceDraft(accessToken, {
+    contactGuid,
+    note: params.note,
+    lines: params.lines,
+    invoiceDate: params.invoiceDate,
+    paymentDays: params.paymentDays,
+    collectedViaBetalingsservice: params.collectedViaBetalingsservice,
+    invoiceTemplateId: params.invoiceTemplateId,
+  });
+  return { contactGuid, invoiceGuid: `${TEST_DRAFT_PREFIX}${invoice.guid}`, invoiceNumber: "TEST-KLADDE", isTest: true };
+}
+
+/**
+ * Deletes a test-mode draft from Dinero. Only ever a draft: an invoice that
+ * has been booked in the meantime (by hand in Dinero) is left alone.
+ * Returns what happened, for the "Slet testkladder" summary.
+ */
+export async function deleteTestModeDraft(storedGuid: string): Promise<"deleted" | "gone" | "booked" | "skipped"> {
+  const guid = storedGuid.slice(TEST_DRAFT_PREFIX.length);
+  // Older test drafts ("TEST-INVOICE-xxxx") were never in Dinero at all.
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(guid)) return "skipped";
+  const accessToken = await getAccessToken();
+  const orgId = process.env.DINERO_ORGANIZATION_ID!;
+  const res = await dineroFetch(`${DINERO_API_BASE}/${orgId}/invoices/${guid}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (res.status === 404) return "gone";
+  if (!res.ok) throw new Error(`Dinero: kunne ikke hente testkladde (${res.status}): ${await res.text()}`);
+  const data = (await res.json()) as { Status?: string; TimeStamp?: string };
+  if (data.Status && data.Status !== "Draft") return "booked";
+  const del = await dineroFetch(`${DINERO_API_BASE}/${orgId}/invoices/${guid}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ Timestamp: data.TimeStamp }),
+  });
+  if (del.status === 404) return "gone";
+  if (!del.ok) {
+    const body = await del.text();
+    // Already deleted by hand in Dinero: it still reads fine, but deleting
+    // it again is refused with "Item is deleted" (code 65).
+    if (del.status === 400 && /is deleted/i.test(body)) return "gone";
+    throw new Error(`Dinero: kunne ikke slette testkladde (${del.status}): ${body}`);
+  }
+  return "deleted";
 }
 
 /** A booked invoice's total incl. VAT and current concurrency timestamp. */

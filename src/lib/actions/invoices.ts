@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { deleteTestModeDraft, TEST_DRAFT_PREFIX } from "@/lib/dinero";
 import {
   runQuarterlyInvoiceGeneration,
   runAutoChurn,
@@ -183,12 +184,26 @@ export async function clearAllInvoices(confirmation: string): Promise<{ deleted:
  * invoices for those periods be created, instead of the periods looking
  * already invoiced. Real invoices are never touched.
  */
-export async function clearTestInvoices(): Promise<{ deleted: number }> {
+export async function clearTestInvoices(): Promise<{ deleted: number; deletedInDinero: number; keptBooked: number }> {
   const user = await requireUser();
   if (user.role !== "ADMIN") throw new Error("Kun admin kan slette testkladder");
 
-  const { count } = await prisma.invoice.deleteMany({ where: { dineroInvoiceGuid: { startsWith: "TEST-" } } });
+  // Test drafts also exist as drafts in Dinero (see createTestModeDraft) -
+  // removed there too. A combined invoice shares one draft across rows.
+  const rows = await prisma.invoice.findMany({
+    where: { dineroInvoiceGuid: { startsWith: TEST_DRAFT_PREFIX } },
+    select: { dineroInvoiceGuid: true },
+  });
+  let deletedInDinero = 0;
+  let keptBooked = 0;
+  for (const guid of new Set(rows.map((r) => r.dineroInvoiceGuid!))) {
+    const outcome = await deleteTestModeDraft(guid);
+    if (outcome === "deleted") deletedInDinero++;
+    if (outcome === "booked") keptBooked++;
+  }
+
+  const { count } = await prisma.invoice.deleteMany({ where: { dineroInvoiceGuid: { startsWith: TEST_DRAFT_PREFIX } } });
   revalidatePath("/settings/dinero");
   revalidatePath("/deals");
-  return { deleted: count };
+  return { deleted: count, deletedInDinero, keptBooked };
 }

@@ -105,14 +105,15 @@ export default async function DineroSettingsPage() {
         </div>
         <p className={`mt-2 text-sm ${testMode ? "text-amber-700" : "text-slate-500"}`}>
           {testMode
-            ? "Slået til — der oprettes ALDRIG rigtige kladder i Dinero lige nu. Kladder herunder med et \"TEST\"-mærke er kun gemt i CRM'et."
+            ? "Slået til — fakturaer oprettes kun som KLADDER i Dinero på den rigtige kunde, og de bliver ALDRIG bogført eller sendt. De har et \"TEST\"-mærke herunder."
             : "Slået fra — kladder oprettes normalt i det rigtige Dinero-regnskab."}
         </p>
         <p className="mt-2 text-xs text-slate-400">
-          Brug denne mens I tester fakturaberegningen (fx med "Kør nu" ovenfor), så I kan se hvilke kladder der ville
-          blive oprettet, uden at røre det rigtige regnskab eller oprette rigtige kontakter/fakturaer i Dinero.
-          Slet testkladderne bagefter, før testtilstand slås fra - ellers ser de kvartaler ud, som om de allerede er
-          faktureret, og de rigtige fakturaer bliver ikke lavet.
+          Brug denne mens I tester fakturaerne (fx med &quot;Kør nu&quot; ovenfor): kladderne ligger i Dinero under Fakturaer →
+          Kladder, så I kan se den rigtige faktura og kunde. Findes kunden ikke i Dinero, oprettes kontakten; en
+          eksisterende kontakt ændres ikke. Tryk &quot;Slet testkladder&quot; bagefter, før testtilstand slås fra - det sletter
+          dem både her og i Dinero. Ellers ser de kvartaler ud, som om de allerede er faktureret, og de rigtige
+          fakturaer bliver ikke lavet.
         </p>
         <div className="mt-3">
           <ClearTestInvoicesButton />
