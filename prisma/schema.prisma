@@ -654,6 +654,10 @@ model CustomerReport {
   /// (see claimNextQueuedReport) - nothing else may process it after that,
   /// so the same report can never be emailed twice by overlapping workers.
   claimedAt     DateTime?
+  /// A combined report's tour stats gathered so far (one linked deal per
+  /// queue step - all of them in one go would outrun a request's time
+  /// limit). See processOneQueuedReport.
+  collectedData Json?
 
   /// Same open-tracking pattern as EmailMessage - the id embedded in this
   /// report email's tracking pixel, hit when the recipient's mail client

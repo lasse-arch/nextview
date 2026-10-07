@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import { createPreviewInvoiceDrafts, isDineroConfigured } from "@/lib/dinero";
 import { invoiceTerms } from "@/lib/invoice-service";
 import { previewSignupMail, sendSignupMails } from "@/lib/betalingsservice/signup-mail";
+import { BS_SIGNUP_TEMPLATE } from "@/lib/email-templates";
 import { requireUser } from "@/lib/auth";
 import {
   createBsTestDelivery,
@@ -233,7 +234,7 @@ export async function createBsPreviewDraftsAction(): Promise<{ ok: true; count: 
 /** The BS Tilmeldingslink from Mastercard Connect (BS Customer Portal). */
 export async function saveBsSignupLink(link: string): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
-    await requireBillingUser();
+    const user = await requireBillingUser();
     const value = link.trim();
     if (value && !/^https:\/\/\S+$/i.test(value)) throw new Error("Linket skal starte med https://");
     await prisma.bsSettings.upsert({
@@ -241,6 +242,11 @@ export async function saveBsSignupLink(link: string): Promise<{ ok: true } | { o
       create: { id: "default", signupLink: value || null },
       update: { signupLink: value || null },
     });
+    // A ready-made e-mail template for sending the link from a deal - made
+    // once, the first time a link is saved; edit or delete it like any other.
+    if (value && !(await prisma.emailTemplate.findFirst({ where: { name: BS_SIGNUP_TEMPLATE.name } }))) {
+      await prisma.emailTemplate.create({ data: { ...BS_SIGNUP_TEMPLATE, createdById: user.id } });
+    }
     revalidatePath(PAGE);
     return { ok: true };
   } catch (err) {

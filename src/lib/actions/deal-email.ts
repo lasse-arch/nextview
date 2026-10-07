@@ -6,7 +6,9 @@ import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { sendGmailMessage } from "@/lib/gmail";
 import { getAppBaseUrl } from "@/lib/email-oauth";
-import { resolveTemplatePlaceholders } from "@/lib/email-templates";
+import { resolveTemplatePlaceholders, usesBetalingsservicePlaceholders } from "@/lib/email-templates";
+import { ensureBsCustomerNumber, getBsSettings, resolveBsPayer } from "@/lib/betalingsservice/service";
+import { signupLinkFor } from "@/lib/betalingsservice/signup-mail";
 import { logActivity } from "@/lib/activity";
 import { dealName } from "@/lib/labels";
 import { createEmailFollowUpTask } from "@/lib/task-automation";
@@ -26,12 +28,23 @@ const MAX_ATTACHMENTS_BYTES = 25 * 1024 * 1024;
  * paragraphs and single line breaks into <br>. Skipped for the rare body
  * that already contains real markup (e.g. an older template written with
  * actual <p>/<br> tags), left untouched rather than double-escaped. */
+/** The bare link, for the subject line (never HTML). */
+function signupLinkPlain(values: Record<string, string>): string {
+  const match = values.tilmeldingslink.match(/href="([^"]+)"/);
+  return match ? match[1] : values.tilmeldingslink;
+}
+
 function looksLikeHtml(text: string): boolean {
   return /<[a-z][\s\S]*>/i.test(text);
 }
 
 function plainTextToHtml(text: string): string {
-  const escaped = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const escaped = text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    // Bare links clickable in every mail client (e.g. {{tilmeldingslink}}).
+    .replace(/https?:\/\/[^\s<]+/g, (url) => `<a href="${url}">${url}</a>`);
   return escaped
     .split(/\n{2,}/)
     .map((paragraph) => `<p>${paragraph.replace(/\n/g, "<br>")}</p>`)
@@ -80,8 +93,26 @@ export async function sendTemplatedEmailAction(
     deal: { companyName: deal.companyName, displayName: deal.displayName, contactName: deal.contactName },
     seller: { name: user.name, lastName: user.lastName, phone: user.phone, email: user.email },
   };
-  const subject = resolveTemplatePlaceholders(subjectRaw, ctx);
-  const body = resolveTemplatePlaceholders(bodyHtmlRaw, ctx);
+  // {{tilmeldingslink}} etc. - the deal's (or, for a branch billed with its
+  // parent, the parent's) Betalingsservice sign-up details.
+  let bsValues: Record<string, string> = {};
+  if (usesBetalingsservicePlaceholders(subjectRaw + bodyHtmlRaw)) {
+    const settings = await getBsSettings();
+    if (/\{\{\s*tilmeldingslink\s*\}\}/i.test(subjectRaw + bodyHtmlRaw) && !settings.signupLink) {
+      return { ok: false, error: "Indsæt tilmeldingslinket under Indstillinger → Betalingsservice først." };
+    }
+    const payer = await resolveBsPayer(deal.id);
+    const customerNumber = payer.bsCustomerNumber ?? (await ensureBsCustomerNumber(payer.id));
+    const link = settings.signupLink ? signupLinkFor(settings.signupLink, customerNumber) : "";
+    bsValues = {
+      tilmeldingslink: looksLikeHtml(bodyHtmlRaw) ? `<a href="${link}">${link}</a>` : link,
+      kundenummer: customerNumber,
+      pbsnr: settings.pbsNumber ?? "",
+      debitorgruppe: settings.debtorGroupNumber ?? "",
+    };
+  }
+  const subject = resolveTemplatePlaceholders(subjectRaw, ctx, { ...bsValues, tilmeldingslink: bsValues.tilmeldingslink ? signupLinkPlain(bsValues) : "" });
+  const body = resolveTemplatePlaceholders(bodyHtmlRaw, ctx, bsValues);
 
   // Appended unless the composed text (hand-typed or from a saved template)
   // already has its own sign-off - a signature being there is meant to be a

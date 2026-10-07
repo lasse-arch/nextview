@@ -252,7 +252,9 @@ export async function generateCustomerReportPdfBuffer(deal: ReportPdfDeal): Prom
  */
 export async function generateCombinedCustomerReportPdfBuffer(
   deal: ReportPdfDeal,
-  branches: Pick<ReportPdfDeal, "companyName" | "displayName" | "mpSkinId">[]
+  branches: Pick<ReportPdfDeal, "companyName" | "displayName" | "mpSkinId">[],
+  /** Already gathered (see collectCombinedReportData) - skips the scraping. */
+  prefetched?: { branches: CombinedCustomerReportBranch[]; coverImage: Buffer }
 ): Promise<Buffer> {
   const allDeals = [deal, ...branches];
   const reportableDeals = allDeals.filter((d) => parseMpSkinIds(d.mpSkinId).length > 0);
@@ -262,12 +264,14 @@ export async function generateCombinedCustomerReportPdfBuffer(
   const language = deal.reportLanguage;
   const monthLabel = currentMonthLabel(language);
 
-  const branchReports: CombinedCustomerReportBranch[] = [];
-  let coverImage: Buffer | null = null;
-  for (const d of reportableDeals) {
-    const tourData = await fetchMatterportTourData(parseMpSkinIds(d.mpSkinId));
-    branchReports.push({ name: d.displayName || d.companyName, stats: tourData.stats });
-    if (!coverImage) coverImage = tourData.coverImage;
+  const branchReports: CombinedCustomerReportBranch[] = prefetched?.branches ?? [];
+  let coverImage: Buffer | null = prefetched?.coverImage ?? null;
+  if (!prefetched) {
+    for (const d of reportableDeals) {
+      const tourData = await fetchMatterportTourData(parseMpSkinIds(d.mpSkinId));
+      branchReports.push({ name: d.displayName || d.companyName, stats: tourData.stats });
+      if (!coverImage) coverImage = tourData.coverImage;
+    }
   }
   if (!coverImage) throw new Error("Kunne ikke hente et cover-billede for nogen af de sammenkoblede deals.");
 
@@ -399,7 +403,8 @@ export async function generateAndSendCombinedCustomerReport(
   deal: ReportableDeal,
   branches: ReportableDeal[],
   method: ReportSendMethod,
-  existingReportId?: string
+  existingReportId?: string,
+  prefetched?: { branches: CombinedCustomerReportBranch[]; coverImage: Buffer }
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
     const allDeals = [deal, ...branches];
@@ -413,7 +418,7 @@ export async function generateAndSendCombinedCustomerReport(
     const language = deal.reportLanguage;
     const monthLabel = currentMonthLabel(language);
 
-    const pdf = await generateCombinedCustomerReportPdfBuffer(deal, branches);
+    const pdf = await generateCombinedCustomerReportPdfBuffer(deal, branches, prefetched);
 
     const account = await findReportSenderAccount();
     const fileName = `${customerName} - ${language === "EN" ? "combined visitor report" : "samlet besøgsrapport"} ${monthLabel}.pdf`;
@@ -654,13 +659,87 @@ export async function processOneQueuedReport(): Promise<{ processed: boolean; re
   } else if (report.branchDealIds) {
     const branchIds = report.branchDealIds.split(",").filter(Boolean);
     const branches = await prisma.deal.findMany({ where: { id: { in: branchIds } } });
-    await generateAndSendCombinedCustomerReport(report.deal, branches, report.method, report.id);
+    // Gathered over several queue steps (see collectCombinedReportData); the
+    // report is only rendered and sent once every linked deal's stats are in
+    // - in a step of its own if gathering already used up much of this one.
+    const started = Date.now();
+    let collected: Awaited<ReturnType<typeof collectCombinedReportData>> | null;
+    try {
+      collected = await collectCombinedReportData(report.id, report.deal, branches, started);
+    } catch (err) {
+      await prisma.customerReport.update({
+        where: { id: report.id },
+        data: { status: "FAILED", sentAt: new Date(), errorMessage: err instanceof Error ? err.message : "Ukendt fejl" },
+      });
+      collected = null;
+    }
+    if (collected && collected.complete && (!collected.fetchedNow || Date.now() - started < SEND_STEP_MIN_REMAINING_MS)) {
+      await generateAndSendCombinedCustomerReport(report.deal, branches, report.method, report.id, collected.data);
+    } else if (collected) {
+      // Not done yet: hand the report back to the queue, which picks it up
+      // again in a fresh invocation right away.
+      await prisma.customerReport.update({ where: { id: report.id }, data: { claimedAt: null } });
+    }
   } else {
     await generateAndSendCustomerReport(report.deal, report.method, report.id);
   }
 
   const remaining = await prisma.customerReport.count({ where: { status: "PENDING" } });
   return { processed: true, remaining };
+}
+
+/** Another tour is only started while a queue step has used less than this
+ * - one tour takes up to about a minute and a half (two logins, retries), so
+ * a step never gets near the route's 5-minute limit. */
+const COLLECT_BUDGET_MS = 90_000;
+/** Rendering + archiving + sending runs in the same step only if gathering
+ * finished this early; otherwise in the next one. */
+const SEND_STEP_MIN_REMAINING_MS = 90_000;
+
+type CollectedCombinedData = { branches: (CombinedCustomerReportBranch & { dealId: string })[]; coverImage?: string };
+
+/**
+ * Gathers a combined report's tour stats one linked deal at a time, saving
+ * each on the report as it goes, and stops once the step's time budget is
+ * used - the next queue step carries on where it left off. With several
+ * tours (e.g. 6 linked locations) doing them all in one request ran past
+ * the time limit every time.
+ */
+export async function collectCombinedReportData(
+  reportId: string,
+  deal: ReportPdfDeal & { id: string },
+  branches: (ReportPdfDeal & { id: string })[],
+  started: number,
+  fetchTour: typeof fetchMatterportTourData = fetchMatterportTourData,
+  budgetMs = COLLECT_BUDGET_MS
+): Promise<
+  | { complete: true; fetchedNow: boolean; data: { branches: CombinedCustomerReportBranch[]; coverImage: Buffer } }
+  | { complete: false }
+> {
+  const reportable = [deal, ...branches].filter((d) => parseMpSkinIds(d.mpSkinId).length > 0);
+  if (reportable.length === 0) throw new Error("Ingen af de sammenkoblede deals har et MP-Skin nummer udfyldt.");
+  const row = await prisma.customerReport.findUniqueOrThrow({ where: { id: reportId }, select: { collectedData: true } });
+  const collected: CollectedCombinedData = (row.collectedData as CollectedCombinedData | null) ?? { branches: [] };
+
+  let fetchedNow = false;
+  for (const d of reportable) {
+    if (collected.branches.some((b) => b.dealId === d.id)) continue;
+    if (fetchedNow && Date.now() - started > budgetMs) return { complete: false };
+    const tourData = await fetchTour(parseMpSkinIds(d.mpSkinId));
+    collected.branches.push({ dealId: d.id, name: d.displayName || d.companyName, stats: tourData.stats });
+    if (!collected.coverImage) collected.coverImage = tourData.coverImage.toString("base64");
+    await prisma.customerReport.update({ where: { id: reportId }, data: { collectedData: collected } });
+    fetchedNow = true;
+  }
+  if (!collected.coverImage) throw new Error("Kunne ikke hente et cover-billede for nogen af de sammenkoblede deals.");
+  return {
+    complete: true,
+    fetchedNow,
+    data: {
+      branches: reportable.map((d) => collected.branches.find((b) => b.dealId === d.id)!).map(({ name, stats }) => ({ name, stats })),
+      coverImage: Buffer.from(collected.coverImage, "base64"),
+    },
+  };
 }
 
 /**
