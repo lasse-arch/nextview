@@ -10,6 +10,7 @@ import { resolveTemplatePlaceholders } from "@/lib/email-templates";
 import { logActivity } from "@/lib/activity";
 import { dealName } from "@/lib/labels";
 import { createEmailFollowUpTask } from "@/lib/task-automation";
+import { logEmailTimeEntry } from "@/lib/actions/time-entries";
 
 /** 25MB - Gmail's own limit on a single outgoing message (including the
  * base64-inflated size of every attachment combined). */
@@ -148,6 +149,13 @@ export async function sendTemplatedEmailAction(
       trackingId,
     },
   });
+
+  // Only when the deal actually has its own contact e-mail set (not just
+  // falling back to invoiceEmail) - ties the auto-logged time to real
+  // customer contact, not administrative/accounting correspondence.
+  if (deal.contactEmail) {
+    await logEmailTimeEntry(dealId, user.id);
+  }
 
   await createEmailFollowUpTask(dealId, user.id, subject);
 

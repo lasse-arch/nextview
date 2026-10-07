@@ -56,6 +56,7 @@ import { CheckPaymentButton } from "./check-payment-button";
 import { MarkInvoicePaidButton } from "./mark-invoice-paid-button";
 import { CustomerReportSection } from "./customer-report-section";
 import { DeleteInvoiceButton } from "@/components/delete-invoice-button";
+import { TimeTrackingSection } from "./time-tracking-section";
 
 /** Hover-tooltip content for an invoice's short label: the precise period
  * (since the visible label is now just "Q3 Kvartal") plus, where the deal's
@@ -110,6 +111,7 @@ export default async function DealDetailPage({
         contractEvents: { orderBy: { occurredAt: "desc" }, take: 5 },
         tasks: { orderBy: { createdAt: "asc" } },
         reports: { orderBy: { sentAt: "desc" }, take: 1 },
+        timeEntries: { include: { user: true }, orderBy: { date: "desc" } },
       },
     }),
     prisma.user.findMany({ orderBy: { name: "asc" } }),
@@ -320,6 +322,23 @@ export default async function DealDetailPage({
             users={users.map((u) => ({ id: u.id, name: u.name }))}
             deals={[{ id: deal.id, name: dealName(deal) }, ...linkableDeals.map((d) => ({ id: d.id, name: dealName(d) }))]}
           />
+
+          {deal.contractSignedAt && (
+            <TimeTrackingSection
+              dealId={deal.id}
+              entries={deal.timeEntries.map((t) => ({
+                id: t.id,
+                date: t.date.toISOString().slice(0, 10),
+                minutes: t.minutes,
+                source: t.source,
+                userId: t.userId,
+                userName: t.user.name,
+                canDelete: currentUser?.role === "ADMIN" || t.createdById === currentUser?.id,
+              }))}
+              users={users.map((u) => ({ id: u.id, name: u.name }))}
+              currentUserId={currentUser?.id ?? null}
+            />
+          )}
 
           <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="text-sm font-semibold text-slate-900">Noter</h2>

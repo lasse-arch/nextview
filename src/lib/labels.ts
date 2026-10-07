@@ -282,3 +282,13 @@ export function formatDateTime(date: Date | string | null | undefined): string {
   const d = typeof date === "string" ? new Date(date) : date;
   return new Intl.DateTimeFormat("da-DK", { dateStyle: "medium", timeStyle: "short" }).format(d);
 }
+
+/** Minutes always being a multiple of 15 (see TimeEntry) means this is never
+ * a messier fraction than quarter-hours - "1 t 45 min" rather than "105 min". */
+export function formatMinutesAsHours(minutes: number): string {
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  if (hours === 0) return `${rest} min`;
+  if (rest === 0) return `${hours} t`;
+  return `${hours} t ${rest} min`;
+}

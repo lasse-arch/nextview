@@ -28,6 +28,14 @@ enum ImportType {
   GOOGLE_DOCS
 }
 
+enum TimeEntrySource {
+  /// Logged by hand on the deal page (e.g. a day spent filming on-site).
+  MANUAL
+  /// Auto-added (a fixed 15 minutes) whenever an email is sent to the deal's
+  /// contact from the deal page - see sendTemplatedEmailAction.
+  EMAIL
+}
+
 enum DealStage {
   LEAD
   CONTACTED
@@ -236,6 +244,8 @@ model User {
   emailTemplates EmailTemplate[]
   callLists     CallList[]
   newsPosts     NewsPost[]
+  timeEntries        TimeEntry[]
+  timeEntriesCreated TimeEntry[] @relation("TimeEntryCreatedBy")
 }
 
 /// One entry per notable thing that happened in the CRM (deal created,
@@ -489,6 +499,41 @@ model Deal {
   tasks          Task[]
   reports        CustomerReport[]
   activityEvents ActivityEvent[]
+  timeEntries    TimeEntry[]
+}
+
+/// How many "mandetimer" (man-hours) the team has spent on a customer, one
+/// row per person per day - two people filming together the same day are two
+/// rows (e.g. 7t + 7t = 14 man-hours), not one row with a doubled number.
+/// Only shown on the deal page once a contract is actually signed, so it
+/// tracks delivery/service work rather than the sales process itself.
+/// `minutes` is always a multiple of 15 - every manual entry is rounded UP to
+/// the next quarter-hour, and every auto (EMAIL) entry is a flat 15.
+model TimeEntry {
+  id     String @id @default(cuid())
+  deal   Deal   @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  dealId String
+
+  /// Whose time this is - for a MANUAL entry, who actually did the work; for
+  /// an EMAIL entry, who sent the email.
+  user   User   @relation(fields: [userId], references: [id])
+  userId String
+
+  /// The day the work happened (date only - time-of-day isn't tracked).
+  date    DateTime
+  minutes Int
+  source  TimeEntrySource @default(MANUAL)
+
+  /// Who logged this row - usually the same as `user`, except when one
+  /// person enters a shared day's hours for a colleague too (e.g. Lasse
+  /// logging both his own and Victor's hours from the same shoot). Used to
+  /// decide who's allowed to delete the entry again.
+  createdBy   User   @relation("TimeEntryCreatedBy", fields: [createdById], references: [id])
+  createdById String
+
+  createdAt DateTime @default(now())
+
+  @@index([dealId])
 }
 
 /// One row per visitor-stats report attempt for a customer (manually or by
