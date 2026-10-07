@@ -526,8 +526,9 @@ model Deal {
 
   /// How this customer pays its Dinero invoices: a normal emailed invoice,
   /// or collected through Betalingsservice (automatically once a mandate is
-  /// active, otherwise by indbetalingskort). See src/lib/betalingsservice.
-  paymentMethod      PaymentMethod    @default(INVOICE)
+  /// active, otherwise by indbetalingskort). Every customer is on
+  /// Betalingsservice unless deliberately opted out. See src/lib/betalingsservice.
+  paymentMethod      PaymentMethod    @default(BETALINGSSERVICE)
   /// The customer's number with us in Betalingsservice (e.g. "NV00012") -
   /// assigned once and never changed, since a mandate is tied to it.
   bsCustomerNumber   String?          @unique
@@ -1083,6 +1084,9 @@ model BsSettings {
   dineroInvoiceTemplateId String?
   nextDeliverySequence    Int     @default(1)
   nextCustomerNumber      Int     @default(1)
+  /// When every existing customer was moved to Betalingsservice in one go
+  /// (a one-off - customers opted out afterwards stay opted out).
+  allCustomersSwitchedAt  DateTime?
 
   /// SFTP to Mastercard's My File Transfer (see src/lib/betalingsservice/sftp.ts).
   /// The private key is stored encrypted (AES-GCM keyed from AUTH_SECRET) and

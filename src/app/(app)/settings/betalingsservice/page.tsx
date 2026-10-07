@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { dealName, formatDKK } from "@/lib/labels";
-import { getBsSettings, isTestDeliveryFileName, listPendingBsCollections, missingBsSettings } from "@/lib/betalingsservice/service";
+import { countSwitchableDeals, getBsSettings, isTestDeliveryFileName, listPendingBsCollections, missingBsSettings } from "@/lib/betalingsservice/service";
 import { deliveryDeadline } from "@/lib/betalingsservice/banking-days";
 import { isDineroConfigured, listInvoiceTemplates } from "@/lib/dinero";
 import { MFT_DEFAULT_HOST, MFT_DEFAULT_PORT, publicKeyFileName } from "@/lib/betalingsservice/sftp";
@@ -16,6 +16,7 @@ import {
   DeliveryActions,
   ReturnFileUpload,
   RetryPaymentButton,
+  SwitchAllCustomersButton,
 } from "./betalingsservice-client";
 
 const COLLECTION_STATUS: Record<string, { label: string; className: string }> = {
@@ -59,7 +60,7 @@ export default async function BetalingsservicePage() {
   if (!currentUser.canAccessBilling) redirect("/");
 
   const now = new Date();
-  const [settings, pending, deliveries, results, customers, imports, mailboxFiles] = await Promise.all([
+  const [settings, pending, deliveries, results, customers, imports, mailboxFiles, switchable] = await Promise.all([
     getBsSettings(),
     listPendingBsCollections(now),
     prisma.bsDelivery.findMany({
@@ -90,7 +91,7 @@ export default async function BetalingsservicePage() {
       },
     }),
     prisma.deal.findMany({
-      where: { paymentMethod: "BETALINGSSERVICE" },
+      where: { paymentMethod: "BETALINGSSERVICE", churnedAt: null, stage: { in: ["CONTRACT_SIGNED", "FILMED", "LIVE"] } },
       orderBy: { bsCustomerNumber: "asc" },
       select: {
         id: true,
@@ -107,6 +108,7 @@ export default async function BetalingsservicePage() {
       take: 20,
       select: { id: true, fileName: true, kind: true, note: true, receivedAt: true },
     }),
+    countSwitchableDeals(),
   ]);
   const sftpReady = Boolean(settings.sftpUser && settings.sftpPrivateKeyEnc);
   let invoiceTemplates: { id: string; name: string; isDefault: boolean }[] = [];
@@ -125,6 +127,9 @@ export default async function BetalingsservicePage() {
     currentUser.role === "ADMIN" ? deliveries : deliveries.filter((d) => !isTestDeliveryFileName(d.fileName));
 
   const missing = missingBsSettings(settings);
+  const signedUp = customers.filter((c) => c.bsMandateStatus === "ACTIVE");
+  // Not signed up first - they're the ones to follow up on.
+  const customerList = [...customers.filter((c) => c.bsMandateStatus !== "ACTIVE"), ...signedUp];
   const ready = pending.filter((p) => p.problems.length === 0 && !p.notYet);
   const nextDeadline = ready.length > 0 ? new Date(Math.min(...ready.map((p) => p.deadline.getTime()))) : null;
 
@@ -383,15 +388,31 @@ export default async function BetalingsservicePage() {
       </section>
 
       <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="text-sm font-semibold text-slate-900">Kunder på Betalingsservice ({customers.length})</h2>
-        <p className="mt-1 text-xs text-slate-500">
-          Sæt en kunde på Betalingsservice under &quot;Fakturaer&quot; på dealen. Kunden tilmelder sig automatisk betaling i
-          sin netbank med PBS-nr. {settings.pbsNumber ?? "(ikke angivet)"}, debitorgruppe{" "}
-          {settings.debtorGroupNumber ?? "(ikke angivet)"} og sit kundenummer.
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold text-slate-900">Kunder på Betalingsservice ({customers.length})</h2>
+            {customers.length > 0 && (
+              <p className="mt-1 text-sm">
+                <span className="font-medium text-emerald-700">{signedUp.length} tilmeldt</span>
+                <span className="text-slate-400"> · </span>
+                <span className="font-medium text-amber-700">{customers.length - signedUp.length} mangler tilmelding</span>
+              </p>
+            )}
+          </div>
+          {!settings.allCustomersSwitchedAt && switchable.customers + switchable.other > 0 && (
+            <SwitchAllCustomersButton customers={switchable.customers} other={switchable.other} />
+          )}
+        </div>
+        <p className="mt-2 text-xs text-slate-500">
+          Alle kunder er på Betalingsservice, medmindre de er sat til almindelig faktura på dealen. Etableringen og
+          første periode er almindelige fakturaer (FI/bankoverførsel) med tilmeldingsoplysningerne på - derefter
+          opkræves hvert kvartal via Betalingsservice: automatisk for dem, der er tilmeldt, ellers med
+          indbetalingskort. Kunden tilmelder sig i netbanken med PBS-nr. {settings.pbsNumber ?? "(ikke angivet)"},
+          debitorgruppe {settings.debtorGroupNumber ?? "(ikke angivet)"} og sit kundenummer.
         </p>
         {customers.length > 0 ? (
           <ul className="mt-3 divide-y divide-slate-100 text-sm">
-            {customers.map((c) => (
+            {customerList.map((c) => (
               <li key={c.id} className="flex items-center justify-between gap-2 py-2">
                 <div>
                   <Link href={`/deals/${c.id}`} className="font-medium text-slate-900 hover:underline">
@@ -400,7 +421,7 @@ export default async function BetalingsservicePage() {
                   <span className="font-mono text-xs text-slate-400"> {c.bsCustomerNumber}</span>
                 </div>
                 <span
-                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                  className={`shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${
                     c.bsMandateStatus === "ACTIVE" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
                   }`}
                 >

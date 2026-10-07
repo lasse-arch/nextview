@@ -12,6 +12,7 @@ import {
 } from "@/lib/contract-template-data";
 import type { BsMandateStatus, DealStage, PaymentMethod } from "@prisma/client";
 import { collectionDateForPeriod, deliveryDeadline, earliestCollectionDate, utcDay } from "@/lib/betalingsservice/banking-days";
+import { ensureBsCustomerNumber } from "@/lib/betalingsservice/service";
 
 const ACTIVE_CUSTOMER_STAGES: DealStage[] = ["CONTRACT_SIGNED", "FILMED", "LIVE"];
 const HANDLED_STATUSES = ["DRAFT_CREATED", "IMPORTED", "SENT_MANUALLY"];
@@ -82,7 +83,7 @@ function computeDueLines(
     contractSignedAt: Date | null;
     contractEndDate: Date | null;
   },
-  options: { sendEstablishmentNow?: boolean; sendPeriodsNow?: boolean; betalingsservice?: boolean } = {},
+  options: { sendEstablishmentNow?: boolean; sendPeriodsNow?: boolean; betalingsservice?: boolean; termNumber?: number } = {},
   handledQuarterIndexes: Set<number> = new Set()
 ): { lines: DueLine[]; nextDueDate: Date | null } {
   const now = new Date();
@@ -147,10 +148,12 @@ function computeDueLines(
 
     // A Betalingsservice customer's quarter has to be in a BS file by the
     // 6th last banking day of the month before it starts, so its invoice is
-    // made from the 1st of that month instead of a week before.
-    const draftTriggerDate = options.betalingsservice
-      ? startOfMonth(subMonths(period.startDate, 1))
-      : period.draftTriggerDate;
+    // made from the 1st of that month instead of a week before - except the
+    // first period, which is a normal invoice (see collectsViaBs).
+    const draftTriggerDate =
+      options.betalingsservice && collectsViaBs("BETALINGSSERVICE", options.termNumber ?? 1, period.index)
+        ? startOfMonth(subMonths(period.startDate, 1))
+        : period.draftTriggerDate;
 
     if (draftTriggerDate <= now) {
       lines.push({ quarterIndex: period.index, amount: amounts[i], scheduledDate: period.startDate });
@@ -201,14 +204,21 @@ async function bsInvoiceTemplateId(): Promise<string | null> {
   return settings?.dineroInvoiceTemplateId ?? null;
 }
 
-async function bsInvoiceInfo(deal: { bsCustomerNumber: string | null; bsMandateStatus: BsMandateStatus | null }): Promise<BsInvoiceInfo> {
+async function bsInvoiceInfo(deal: {
+  id: string;
+  bsCustomerNumber: string | null;
+  bsMandateStatus: BsMandateStatus | null;
+}): Promise<BsInvoiceInfo> {
+  // Every deal starts out on Betalingsservice, so a new one may not have
+  // its customer number yet - its invoice text needs it to sign up with.
+  const customerNumber = deal.bsCustomerNumber ?? (await ensureBsCustomerNumber(deal.id));
   const settings = await prisma.bsSettings.findUnique({
     where: { id: "default" },
     select: { pbsNumber: true, debtorGroupNumber: true },
   });
   return {
     mandateActive: deal.bsMandateStatus === "ACTIVE",
-    customerNumber: deal.bsCustomerNumber,
+    customerNumber,
     pbsNumber: settings?.pbsNumber ?? null,
     debtorGroupNumber: settings?.debtorGroupNumber ?? null,
   };
@@ -235,6 +245,27 @@ export function bsInvoiceNotice(info: BsInvoiceInfo | undefined, dateLabel: stri
   return language === "en"
     ? `This invoice is NOT signed up for automatic payment.\nYou will receive a payment slip from Betalingsservice with payment on ${dateLabel} - please do NOT pay this invoice by bank transfer.${signUp}`
     : `Denne faktura er IKKE tilmeldt automatisk betaling.\nDu modtager et indbetalingskort fra Betalingsservice med betaling d. ${dateLabel} - betal IKKE denne faktura via bankoverførsel.${signUp}`;
+}
+
+/**
+ * Whether an invoice for a Betalingsservice customer is collected through
+ * Betalingsservice. The establishment fee and the very first period are
+ * normal invoices the customer pays straight away (FI code / bank
+ * transfer) - a new customer would otherwise wait up to a month for the
+ * next BS deadline - and every period after that goes through BS.
+ */
+export function collectsViaBs(paymentMethod: PaymentMethod, termNumber: number, quarterIndex: number): boolean {
+  return paymentMethod === "BETALINGSSERVICE" && quarterIndex > 0 && !(termNumber === 1 && quarterIndex === 1);
+}
+
+/** On a Betalingsservice customer's normal invoices (establishment, first
+ * period) while they haven't signed up yet: pay this one as usual, and
+ * sign up so the next ones are paid automatically. */
+export function bsSignupNotice(info: BsInvoiceInfo | undefined, language: "da" | "en"): string | null {
+  if (!info || info.mandateActive || !info.pbsNumber || !info.debtorGroupNumber || !info.customerNumber) return null;
+  return language === "en"
+    ? `Please pay this invoice as usual by the due date.\nFuture invoices are paid automatically via Betalingsservice - sign up in your online banking or at www.betalingsservice.dk with:\nPBS no.: ${info.pbsNumber}   Debtor group no.: ${info.debtorGroupNumber}   PBS customer no.: ${info.customerNumber}`
+    : `Denne faktura betales som normalt inden forfaldsdatoen.\nFremover betales jeres fakturaer automatisk via Betalingsservice - tilmeld jer i netbanken eller på www.betalingsservice.dk med:\nPBS-nr.: ${info.pbsNumber}   Deb.gr.nr.: ${info.debtorGroupNumber}   PBS-kundenr.: ${info.customerNumber}`;
 }
 
 /**
@@ -320,9 +351,14 @@ function buildCombinedInvoiceContent(
  * except a period starting 1 January, which is dated that same 1 January
  * with no backdating (due date landing 9 January instead), so a new
  * calendar year's first invoice is never dated into the year before the
- * revenue it covers.
+ * revenue it covers, and a period that has already started, which is dated
+ * today.
  */
-function computeRecurringInvoiceDate(periodStart: Date): Date {
+function computeRecurringInvoiceDate(periodStart: Date, now = new Date()): Date {
+  // A period that has already started (e.g. a customer going live mid-month
+  // and invoiced that same day) can't be due on its start date - it's dated
+  // today with the normal 8 days to pay instead.
+  if (periodStart <= now) return now;
   const isCalendarYearStart = periodStart.getMonth() === 0 && periodStart.getDate() === 1;
   return isCalendarYearStart ? periodStart : addDays(periodStart, -8);
 }
@@ -366,10 +402,18 @@ export function invoiceTerms(
   bs?: BsInvoiceInfo
 ): InvoiceTerms {
   // The establishment fee is always a normal invoice the customer pays
-  // themselves - only the recurring quarters go through Betalingsservice.
+  // themselves - only the recurring quarters go through Betalingsservice
+  // (callers pass "INVOICE" for a BS customer's first period too, see
+  // collectsViaBs). A BS customer not signed up yet is told how to.
   if (paymentMethod !== "BETALINGSSERVICE" || quarterIndex === 0) {
     const invoiceDate = quarterIndex === 0 ? new Date() : computeRecurringInvoiceDate(scheduledDate);
-    return { invoiceDate, paymentDays: 8, dueDate: invoiceDueDate(invoiceDate), collectViaBs: false, noteSuffix: null };
+    return {
+      invoiceDate,
+      paymentDays: 8,
+      dueDate: invoiceDueDate(invoiceDate),
+      collectViaBs: false,
+      noteSuffix: bsSignupNotice(bs, language),
+    };
   }
 
   const today = copenhagenToday(now);
@@ -413,7 +457,7 @@ function invoiceLanguage(deal: { contractProducts: unknown }): "da" | "en" {
  */
 async function draftInvoiceLine(
   deal: DraftableDeal,
-  invoiceRow: { id: string; amount: number; quarterIndex: number; scheduledDate: Date },
+  invoiceRow: { id: string; amount: number; termNumber: number; quarterIndex: number; scheduledDate: Date },
   contactGuidHint: string | null
 ): Promise<{ success: true; contactGuid: string } | { success: false; error: string }> {
   try {
@@ -422,7 +466,7 @@ async function draftInvoiceLine(
     // period to align a due date to, so it's simply dated whenever it's
     // actually drafted.
     const terms = invoiceTerms(
-      deal.paymentMethod,
+      collectsViaBs(deal.paymentMethod, invoiceRow.termNumber, invoiceRow.quarterIndex) ? "BETALINGSSERVICE" : "INVOICE",
       invoiceRow.quarterIndex,
       invoiceRow.scheduledDate,
       invoiceLanguage(deal),
@@ -515,7 +559,7 @@ async function processDealDueInvoices(
   );
   const { lines: dueLines, nextDueDate } = computeDueLines(
     deal,
-    { ...options, betalingsservice: deal.paymentMethod === "BETALINGSSERVICE" },
+    { ...options, betalingsservice: deal.paymentMethod === "BETALINGSSERVICE", termNumber: deal.currentTermNumber },
     handledQuarterIndexes
   );
 
@@ -614,7 +658,7 @@ async function processCombinedDueInvoices(
     );
     const { lines } = computeDueLines(
       deal,
-      { ...options, betalingsservice: deal.paymentMethod === "BETALINGSSERVICE" },
+      { ...options, betalingsservice: deal.paymentMethod === "BETALINGSSERVICE", termNumber: deal.currentTermNumber },
       handledQuarterIndexes
     );
     const dueLines = lines.filter((line) => {
@@ -632,7 +676,10 @@ async function processCombinedDueInvoices(
   }
 
   let checked = 0;
-  const invoiceRows: { deal: DealWithInvoices; invoiceRow: { id: string; quarterIndex: number; amount: number; scheduledDate: Date } }[] = [];
+  const invoiceRows: {
+    deal: DealWithInvoices;
+    invoiceRow: { id: string; termNumber: number; quarterIndex: number; amount: number; scheduledDate: Date };
+  }[] = [];
 
   for (const { deal, termInvoices, dueLines } of withDue) {
     for (const line of dueLines) {
@@ -670,12 +717,14 @@ async function processCombinedDueInvoices(
     }))
   );
   const anyRecurringLine = invoiceRows.find((r) => r.invoiceRow.quarterIndex > 0);
-  // A combined invoice that includes an establishment fee is a normal
-  // invoice as a whole, since the establishment fee is never collected
-  // through Betalingsservice.
-  const hasEstablishmentLine = invoiceRows.some((r) => r.invoiceRow.quarterIndex === 0);
+  // A combined invoice is only collected through Betalingsservice when every
+  // line on it would be - one that includes an establishment fee or a
+  // first period is a normal invoice as a whole (see collectsViaBs).
+  const allViaBs = invoiceRows.every((r) =>
+    collectsViaBs(leadDeal.paymentMethod, r.invoiceRow.termNumber, r.invoiceRow.quarterIndex)
+  );
   const terms = invoiceTerms(
-    hasEstablishmentLine ? "INVOICE" : leadDeal.paymentMethod,
+    allViaBs ? "BETALINGSSERVICE" : "INVOICE",
     anyRecurringLine ? anyRecurringLine.invoiceRow.quarterIndex : 0,
     (anyRecurringLine ?? invoiceRows[0]).invoiceRow.scheduledDate,
     invoiceLanguage(leadDeal),

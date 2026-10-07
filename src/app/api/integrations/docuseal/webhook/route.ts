@@ -10,6 +10,9 @@ import { isIntegrationEnabled } from "@/lib/integration-settings";
 import { createDeliveryTasksForSignedContract, completeContractFollowUpTasks } from "@/lib/task-automation";
 import { logActivity } from "@/lib/activity";
 import { dealName } from "@/lib/labels";
+import { INVOICE_EMAIL_FIELD } from "@/lib/contract-html-template";
+
+type DocuSealFieldValue = { field?: string; value?: unknown };
 
 type DocuSealEvent = {
   event_type?: string;
@@ -19,8 +22,21 @@ type DocuSealEvent = {
     status?: string;
     submission?: { id?: number };
     submission_id?: number;
+    /** form.completed: what this submitter filled in. */
+    values?: DocuSealFieldValue[];
+    /** submission.completed: every submitter, with their values. */
+    submitters?: { external_id?: string; values?: DocuSealFieldValue[] }[];
   };
 };
+
+/** The invoice e-mail the customer typed into the contract, if any. */
+function invoiceEmailFromPayload(payload: DocuSealEvent): string | null {
+  const values =
+    payload.data?.values ?? payload.data?.submitters?.find((s) => s.external_id === "customer")?.values ?? [];
+  const raw = values.find((v) => v.field === INVOICE_EMAIL_FIELD)?.value;
+  const email = typeof raw === "string" ? raw.trim().toLowerCase() : "";
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : null;
+}
 
 // DocuSeal webhooks are configured manually in their Console (no API to
 // register one) - a GET here just lets us sanity-check the URL is reachable.
@@ -111,6 +127,10 @@ export async function POST(request: NextRequest) {
   }
 
   async function markSigned() {
+    const invoiceEmail = invoiceEmailFromPayload(payload);
+    if (invoiceEmail && invoiceEmail !== deal!.invoiceEmail) {
+      await prisma.deal.update({ where: { id: deal!.id }, data: { invoiceEmail } });
+    }
     if (deal!.contractSignedAt) return;
     await prisma.deal.update({
       where: { id: deal!.id },

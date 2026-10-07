@@ -9,8 +9,8 @@ import { useToast } from "@/components/toast";
  * How this customer pays: a normal Dinero invoice, or Betalingsservice
  * (automatic payment once they've signed up with their bank, indbetalingskort
  * until then). Only quarterly invoices created after switching are collected
- * through Betalingsservice - the establishment fee, and any invoice already
- * sent, stays a normal invoice.
+ * through Betalingsservice - the establishment fee, the first period and any
+ * invoice already sent stay normal invoices (see collectsViaBs).
  */
 export function PaymentMethodControl({
   dealId,
@@ -84,7 +84,8 @@ export function PaymentMethodControl({
       </div>
       {method === "BETALINGSSERVICE" && (
         <p className="mt-2 text-xs text-slate-500">
-          Kvartalsfakturaerne opkræves via Betalingsservice - etableringen er altid en almindelig faktura. Kundenr.{" "}
+          Kvartalerne opkræves via Betalingsservice - etableringen og første periode er almindelige fakturaer
+          (FI/bankoverførsel) med tilmeldingsoplysningerne på. Kundenr.{" "}
           <span className="font-mono font-medium text-slate-700">{customerNumber ?? "-"}</span>
           {!mandateActive && (
             <>

@@ -51,6 +51,7 @@ type Labels = {
   section6Title: string;
   section6Body: string;
   signaturesTitle: string;
+  invoiceEmailLabel: string;
 };
 
 const LABELS: Record<ContractLanguage, Labels> = {
@@ -144,6 +145,7 @@ const LABELS: Record<ContractLanguage, Labels> = {
     section6Body:
       "Leverandørens ansvar er begrænset til direkte tab forårsaget af grov uagtsomhed eller forsæt. Eventuel erstatning kan ikke overstige det samlede beløb, kunden har betalt inden for de seneste 12 måneder under denne aftale.",
     signaturesTitle: "Underskrifter",
+    invoiceEmailLabel: "E-mail til fakturaer",
   },
   en: {
     docTitle: "Subscription Agreement",
@@ -235,6 +237,7 @@ const LABELS: Record<ContractLanguage, Labels> = {
     section6Body:
       "The Supplier's liability is limited to direct losses caused by gross negligence or intent. Any damages cannot exceed the total amount paid by the Customer within the preceding 12 months under this agreement.",
     signaturesTitle: "Signatures",
+    invoiceEmailLabel: "Email for invoices",
   },
 };
 
@@ -265,6 +268,10 @@ function bulletList(bullets: string[]): string {
  * pass through untouched - they're auto-detected by DocuSeal regardless of
  * whether the source document is a docx or, as here, a PDF.
  */
+/** The customer fills in where their invoices go when signing - picked up
+ * by the DocuSeal webhook and saved as the deal's invoice e-mail. */
+export const INVOICE_EMAIL_FIELD = "Fakturamail";
+
 export function buildContractHtml(data: ContractHtmlData, language: ContractLanguage): string {
   const t = LABELS[language];
   const p = data.products;
@@ -482,6 +489,10 @@ export function buildContractHtml(data: ContractHtmlData, language: ContractLang
         <b>${esc(data.client.name)}</b><br>
         ${esc(data.client.email)}<br>
         {{Date;type=date;role=Customer;format=DD/MM/YYYY}}
+      </p>
+      <p class="sig-meta" style="margin-top:10px">
+        ${esc(t.invoiceEmailLabel)}:<br>
+        {{${INVOICE_EMAIL_FIELD};type=text;role=Customer;required=true}}
       </p>
     </div>
   </div>

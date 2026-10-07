@@ -174,6 +174,12 @@ const DEFAULT_POSTS: { title: string; body: string; minutesAgo: number; screensh
     body: "Under Indstillinger → Betalingsservice kan Arpo nu selv sende betalingsfilerne til Mastercard og hente kvitteringer og resultater - uden at nogen skal logge ind med MitID. Opsætning én gang: skriv jeres UserID, tryk \"Generér SSH-nøgle\", download nøglefilen og upload den til postkassen i My File Transfer i browseren. Når der kommer en .OK-kvittering, kan du trykke \"Test forbindelse\".\n\nDerefter kører det én gang om dagen: med \"Lav og send betalingsfilen automatisk\" slået til laves og sendes filen selv, og betalinger og tilmeldinger fra Betalingsservice indlæses af sig selv - betalte fakturaer markeres som betalt, også i Dinero. Kvitteringer kan ses under \"Hentet fra postkassen\".",
     screenshotUrl: "/news/betalingsservice-sftp.png",
   },
+  {
+    minutesAgo: 0,
+    title: "Alle kunder på Betalingsservice",
+    body: "Alle kunder betaler nu via Betalingsservice, medmindre de er sat til \"Almindelig faktura\" på dealen - også nye deals. Under Indstillinger → Betalingsservice flytter \"Sæt alle kunder på Betalingsservice\" de nuværende kunder over én gang og giver dem et kundenummer. Listen viser, hvor mange der er tilmeldt, og hvem der mangler.\n\nEn ny kunde venter ikke på Betalingsservice: etableringen og første periode er almindelige fakturaer (FI/bankoverførsel) med tilmeldingsoplysningerne på, og først kvartalet efter opkræves via Betalingsservice - automatisk for dem, der er tilmeldt, ellers med indbetalingskort. Kontrakten har nu et felt, hvor kunden skriver sin fakturamail, som lægges ind på dealen af sig selv. Afviser en kunde en betaling i Betalingsservice, bliver fakturaen markeret med rødt, og der kommer en opgave på dealen om at rykke kunden.",
+    screenshotUrl: "/news/alle-paa-betalingsservice.png",
+  },
 ];
 
 /**

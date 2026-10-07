@@ -59,6 +59,46 @@ export async function ensureBsCustomerNumber(dealId: string): Promise<string> {
   });
 }
 
+const CUSTOMER_STAGES = ["CONTRACT_SIGNED", "FILMED", "LIVE"] as const;
+
+/** Deals the one-off "move everyone to Betalingsservice" would switch:
+ * every deal still on normal invoices, except churned and lost ones. */
+const switchableDealsWhere = {
+  paymentMethod: "INVOICE" as const,
+  churnedAt: null,
+  stage: { not: "LOST" as const },
+};
+
+export async function countSwitchableDeals(): Promise<{ customers: number; other: number }> {
+  const [customers, all] = await Promise.all([
+    prisma.deal.count({ where: { ...switchableDealsWhere, stage: { in: [...CUSTOMER_STAGES] } } }),
+    prisma.deal.count({ where: switchableDealsWhere }),
+  ]);
+  return { customers, other: all - customers };
+}
+
+/**
+ * Moves every existing customer (and every open deal, so it's on
+ * Betalingsservice once signed) to Betalingsservice and gives each customer
+ * its customer number. Done once: afterwards a customer set back to normal
+ * invoices on the deal page stays that way.
+ */
+export async function switchAllCustomersToBs(): Promise<{ switched: number }> {
+  const deals = await prisma.deal.findMany({ where: switchableDealsWhere, select: { id: true, stage: true } });
+  for (const deal of deals) {
+    if ((CUSTOMER_STAGES as readonly string[]).includes(deal.stage)) await ensureBsCustomerNumber(deal.id);
+  }
+  await prisma.$transaction([
+    prisma.deal.updateMany({ where: { id: { in: deals.map((d) => d.id) } }, data: { paymentMethod: "BETALINGSSERVICE" } }),
+    prisma.bsSettings.upsert({
+      where: { id: "default" },
+      create: { id: "default", allCustomersSwitchedAt: new Date() },
+      update: { allCustomersSwitchedAt: new Date() },
+    }),
+  ]);
+  return { switched: deals.length };
+}
+
 /** "Centralgårdsvej 121, 9440 Aabybro" -> street + 4-digit postcode. */
 export function splitDanishAddress(address: string | null): { street: string | null; postalCode: string | null } {
   if (!address) return { street: null, postalCode: null };
@@ -520,6 +560,49 @@ const OUTCOME_LABEL: Record<BsPayment["outcome"], string> = {
   CHARGED_BACK: "tilbageført",
 };
 
+/**
+ * A collection that didn't go through (rejected by the customer, cancelled,
+ * or charged back) leaves the customer with a Betalingsservice invoice and
+ * no payment - someone has to chase them. Marks the invoices and puts a
+ * task on the deal, assigned to whoever imported the file (or an admin
+ * with billing access when it came in by itself over SFTP).
+ */
+async function flagFailedCollection(
+  collection: { id: string; dealId: string; dueDate: Date },
+  name: string,
+  outcomeLabel: string,
+  amountOre: number,
+  userId: string | null
+): Promise<void> {
+  const invoices = await prisma.invoice.findMany({
+    where: { bsCollectionId: collection.id },
+    select: { dineroInvoiceNumber: true },
+  });
+  const numbers = invoices.map((i) => i.dineroInvoiceNumber).filter(Boolean).join(", ") || "-";
+  const due = new Intl.DateTimeFormat("da-DK", { day: "numeric", month: "long", timeZone: "UTC" }).format(collection.dueDate);
+  await prisma.invoice.updateMany({
+    where: { bsCollectionId: collection.id },
+    data: { bsPaymentError: `Betalingsservice: ${outcomeLabel} (opkrævning d. ${due}) - ikke betalt.` },
+  });
+  const assignee =
+    (userId && (await prisma.user.findUnique({ where: { id: userId }, select: { id: true } }))) ||
+    (await prisma.user.findFirst({ where: { role: "ADMIN", canAccessBilling: true }, orderBy: { createdAt: "asc" }, select: { id: true } }));
+  if (!assignee) return;
+  await prisma.task.create({
+    data: {
+      title: `Ryk ${name}: Betalingsservice-betaling ${outcomeLabel} (faktura ${numbers}, ${kr(amountOre)})`,
+      description:
+        `Betalingen d. ${due} via Betalingsservice blev ${outcomeLabel}, så fakturaen er stadig ubetalt. ` +
+        `Kontakt kunden og få dem til at betale ved bankoverførsel - fx ved at sende en rykker fra Dinero. ` +
+        `Fakturaen bliver markeret betalt i Arpo, når betalingen er registreret i Dinero.`,
+      assigneeId: assignee.id,
+      createdById: assignee.id,
+      dealId: collection.dealId,
+      dueDate: new Date(),
+    },
+  });
+}
+
 function kr(ore: number): string {
   return `${(ore / 100).toLocaleString("da-DK", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kr`;
 }
@@ -690,10 +773,14 @@ export async function importBsReturnFile(fileName: string, file: Buffer, userId:
         lines.push(
           `${name}: TILBAGEFØRT (${kr(payment.amountOre)}) - fakturaen står som ubetalt igen.${
             registered > 0 ? " Fjern betalingen på fakturaen i Dinero manuelt og ryk kunden." : " Ryk kunden."
-          }`
+          } Der er lavet en opgave på dealen.`
         );
+        await flagFailedCollection(collection, name, OUTCOME_LABEL[payment.outcome], payment.amountOre, userId);
       } else {
-        lines.push(`${name}: ${OUTCOME_LABEL[payment.outcome].toUpperCase()} via ${via} (${kr(payment.amountOre)}) - fakturaen er ikke betalt, ryk kunden.`);
+        lines.push(
+          `${name}: ${OUTCOME_LABEL[payment.outcome].toUpperCase()} via ${via} (${kr(payment.amountOre)}) - fakturaen er ikke betalt. Der er lavet en opgave på dealen om at rykke kunden.`
+        );
+        await flagFailedCollection(collection, name, OUTCOME_LABEL[payment.outcome], payment.amountOre, userId);
       }
     }
 

@@ -16,6 +16,7 @@ import {
   sendBsDeliveryViaSftpAction,
   createBsTestDeliveryAction,
   saveBsInvoiceTemplate,
+  switchAllCustomersToBsAction,
 } from "@/lib/actions/betalingsservice";
 import { useToast } from "@/components/toast";
 
@@ -455,6 +456,38 @@ export function CreateTestDeliveryButton() {
       className="rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800 hover:bg-amber-100 disabled:opacity-50"
     >
       {pending ? "Laver testfil…" : "Lav testfil (KR9)"}
+    </button>
+  );
+}
+
+export function SwitchAllCustomersButton({ customers, other }: { customers: number; other: number }) {
+  const [pending, startTransition] = useTransition();
+  const showToast = useToast();
+  const router = useRouter();
+  return (
+    <button
+      type="button"
+      disabled={pending}
+      onClick={() => {
+        if (
+          !confirm(
+            `Sæt ${customers} kunde(r) på Betalingsservice? Næste kvartal opkræves så via Betalingsservice - automatisk for dem, der er tilmeldt, ellers med indbetalingskort. De ${other} leads og åbne deals kommer også på Betalingsservice, så de er det, når de skriver under. Kunder, I bagefter sætter tilbage til almindelig faktura, bliver ved med at være det.`
+          )
+        )
+          return;
+        startTransition(async () => {
+          try {
+            const result = await switchAllCustomersToBsAction();
+            showToast(`${result.switched} deal(s) er nu på Betalingsservice.`);
+            router.refresh();
+          } catch (err) {
+            showToast(err instanceof Error ? err.message : "Kunne ikke skifte kunderne.");
+          }
+        });
+      }}
+      className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+    >
+      {pending ? "Skifter…" : "Sæt alle kunder på Betalingsservice"}
     </button>
   );
 }

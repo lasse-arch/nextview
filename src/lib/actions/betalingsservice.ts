@@ -12,6 +12,7 @@ import {
   importBsReturnFile,
   markBsDeliverySubmitted,
   retryBsPaymentRegistration,
+  switchAllCustomersToBs,
 } from "@/lib/betalingsservice/service";
 import {
   MFT_DEFAULT_PORT,
@@ -68,6 +69,14 @@ export async function setDealPaymentMethod(dealId: string, method: PaymentMethod
   await prisma.deal.update({ where: { id: dealId }, data: { paymentMethod: method } });
   revalidatePath(`/deals/${dealId}`);
   revalidatePath(PAGE);
+}
+
+/** The one-off move of every existing customer to Betalingsservice. */
+export async function switchAllCustomersToBsAction() {
+  await requireBillingUser();
+  const result = await switchAllCustomersToBs();
+  revalidatePath(PAGE);
+  return result;
 }
 
 export async function createBsDeliveryAction() {
