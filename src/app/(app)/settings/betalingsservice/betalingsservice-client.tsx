@@ -18,6 +18,9 @@ import {
   saveBsInvoiceTemplate,
   switchAllCustomersToBsAction,
   createBsPreviewDraftsAction,
+  saveBsSignupLink,
+  previewSignupMailAction,
+  sendSignupMailsAction,
 } from "@/lib/actions/betalingsservice";
 import { useToast } from "@/components/toast";
 
@@ -568,5 +571,155 @@ export function InvoiceTemplatePicker({
         Vælg en skabelon uden betalingsbetingelser/bankoplysninger, så fakturaen ikke opfordrer til bankoverførsel.
       </span>
     </label>
+  );
+}
+
+export function SignupLinkForm({ initial }: { initial: string }) {
+  const [pending, startTransition] = useTransition();
+  const [value, setValue] = useState(initial);
+  const showToast = useToast();
+  const router = useRouter();
+  return (
+    <div className="mt-4">
+      <label className="block">
+        <span className={labelClass}>Tilmeldingslink (BS Tilmeldingslink)</span>
+        <div className="mt-1 flex gap-2">
+          <input
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            placeholder="https://… (fra Mastercard Connect)"
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+          />
+          <button
+            type="button"
+            disabled={pending || value.trim() === initial}
+            onClick={() =>
+              startTransition(async () => {
+                const result = await saveBsSignupLink(value);
+                showToast(result.ok ? "Gemt" : result.error);
+                if (result.ok) router.refresh();
+              })
+            }
+            className="shrink-0 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+          >
+            Gem
+          </button>
+        </div>
+      </label>
+      <p className="mt-1 text-xs text-slate-500">
+        Lav linket i Mastercard Connect → BS Customer Portal → Tilmeldingslink og indsæt det her. Det kommer i
+        tilmeldingsmailen og på fakturaerne, så kunden kan tilmelde sig med MitID. Har linket plads til kundenummeret,
+        så skriv <span className="font-mono">{"{kundenr}"}</span> dér - så udfyldes det for hver kunde.
+      </p>
+    </div>
+  );
+}
+
+export function SignupMailPanel({ unsent, withoutEmail, hasLink }: { unsent: number; withoutEmail: string[]; hasLink: boolean }) {
+  const [pending, startTransition] = useTransition();
+  const [preview, setPreview] = useState<{ to: string; subject: string; bodyText: string } | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const router = useRouter();
+
+  function sendAll() {
+    if (!confirm(`Send tilmeldingsmailen fra lasse@nextview360.dk til ${unsent} kunde(r), der ikke er tilmeldt og ikke har fået den endnu?`)) return;
+    setMessage(null);
+    startTransition(async () => {
+      let total = 0;
+      const failed: string[] = [];
+      for (;;) {
+        const result = await sendSignupMailsAction();
+        if (!result.ok) {
+          failed.push(result.error);
+          break;
+        }
+        total += result.sent;
+        failed.push(...result.failed.map((f) => `${f.name}: ${f.error}`));
+        setMessage(`Sendt ${total} af ${unsent}…`);
+        if (result.remaining === 0) break;
+      }
+      setMessage(`${total} mail(s) sendt.${failed.length > 0 ? ` Fejl: ${failed.join(" · ")}` : ""}`);
+      router.refresh();
+    });
+  }
+
+  return (
+    <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
+      <p className="font-medium text-slate-900">Tilmeldingsmail</p>
+      <p className="mt-1 text-xs text-slate-500">
+        Sendes fra lasse@nextview360.dk til kunder, der ikke er tilmeldt endnu - med en knap til tilmeldingslinket og
+        kundens eget kundenummer. Afdelinger, der faktureres samlet, får den via hovedkunden.
+      </p>
+      {!hasLink ? (
+        <p className="mt-2 text-xs text-amber-700">Indsæt tilmeldingslinket ovenfor først.</p>
+      ) : (
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() =>
+              startTransition(async () => {
+                const result = await previewSignupMailAction();
+                if ("error" in result) setMessage(result.error);
+                else setPreview(preview ? null : result);
+              })
+            }
+            className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+          >
+            {preview ? "Skjul mailen" : "Se mailen"}
+          </button>
+          <button
+            type="button"
+            disabled={pending || unsent === 0}
+            onClick={sendAll}
+            className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+          >
+            {pending ? "Sender…" : unsent > 0 ? `Send til ${unsent} kunde(r)` : "Ingen mangler mailen"}
+          </button>
+        </div>
+      )}
+      {preview && (
+        <div className="mt-3 rounded-md border border-slate-200 bg-white p-3 text-xs text-slate-700">
+          <p>
+            <span className="text-slate-400">Til:</span> {preview.to} <span className="text-slate-400">(eksempel)</span>
+          </p>
+          <p>
+            <span className="text-slate-400">Emne:</span> {preview.subject}
+          </p>
+          <pre className="mt-2 whitespace-pre-wrap font-sans">{preview.bodyText}</pre>
+        </div>
+      )}
+      {withoutEmail.length > 0 && (
+        <p className="mt-2 text-xs text-amber-700">Ingen e-mail på dealen: {withoutEmail.join(", ")}</p>
+      )}
+      {message && <p className="mt-2 text-xs text-slate-600">{message}</p>}
+    </div>
+  );
+}
+
+export function SendSignupMailButton({ dealId, sentAt }: { dealId: string; sentAt: string | null }) {
+  const [pending, startTransition] = useTransition();
+  const showToast = useToast();
+  const router = useRouter();
+  return (
+    <span className="flex items-center gap-1.5 text-xs text-slate-400">
+      {sentAt && <span>Mail sendt {sentAt}</span>}
+      <button
+        type="button"
+        disabled={pending}
+        onClick={() =>
+          startTransition(async () => {
+            const result = await sendSignupMailsAction(dealId);
+            showToast(
+              !result.ok ? result.error : result.failed.length > 0 ? result.failed[0].error : "Tilmeldingsmail sendt"
+            );
+            router.refresh();
+          })
+        }
+        className="rounded border border-slate-300 px-1.5 py-0.5 text-[11px] text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+      >
+        {pending ? "Sender…" : sentAt ? "Send igen" : "Send mail"}
+      </button>
+    </span>
   );
 }

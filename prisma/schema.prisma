@@ -535,6 +535,8 @@ model Deal {
   bsMandateNumber    String?
   bsMandateStatus    BsMandateStatus?
   bsMandateChangedAt DateTime?
+  /// When the "tilmeld Betalingsservice" e-mail was last sent to this customer.
+  bsSignupMailSentAt DateTime?
   bsCollections      BsCollection[]
 
   /// Excludes this deal from provision entirely, e.g. so the owner can stay
@@ -1084,6 +1086,9 @@ model BsSettings {
   dineroInvoiceTemplateId String?
   nextDeliverySequence    Int     @default(1)
   nextCustomerNumber      Int     @default(1)
+  /// The BS Tilmeldingslink made in Mastercard Connect (BS Customer Portal) -
+  /// sign-up with MitID. Put in the sign-up e-mail and on invoices.
+  signupLink              String?
   /// When every existing customer was moved to Betalingsservice in one go
   /// (a one-off - customers opted out afterwards stay opted out).
   allCustomersSwitchedAt  DateTime?

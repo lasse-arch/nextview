@@ -5,6 +5,7 @@ import type { PaymentMethod } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { createPreviewInvoiceDrafts, isDineroConfigured } from "@/lib/dinero";
 import { invoiceTerms } from "@/lib/invoice-service";
+import { previewSignupMail, sendSignupMails } from "@/lib/betalingsservice/signup-mail";
 import { requireUser } from "@/lib/auth";
 import {
   createBsTestDelivery,
@@ -200,6 +201,7 @@ export async function createBsPreviewDraftsAction(): Promise<{ ok: true; count: 
       customerNumber: "NV00000",
       pbsNumber: settings.pbsNumber,
       debtorGroupNumber: settings.debtorGroupNumber,
+      signupLink: settings.signupLink,
     };
     const now = new Date();
     const nextQuarter = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3 + 3, 1);
@@ -225,5 +227,42 @@ export async function createBsPreviewDraftsAction(): Promise<{ ok: true; count: 
     return { ok: true, count: created.length };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Kunne ikke lave prøvekladder." };
+  }
+}
+
+/** The BS Tilmeldingslink from Mastercard Connect (BS Customer Portal). */
+export async function saveBsSignupLink(link: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    await requireBillingUser();
+    const value = link.trim();
+    if (value && !/^https:\/\/\S+$/i.test(value)) throw new Error("Linket skal starte med https://");
+    await prisma.bsSettings.upsert({
+      where: { id: "default" },
+      create: { id: "default", signupLink: value || null },
+      update: { signupLink: value || null },
+    });
+    revalidatePath(PAGE);
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Kunne ikke gemme linket." };
+  }
+}
+
+export async function previewSignupMailAction() {
+  await requireBillingUser();
+  return previewSignupMail();
+}
+
+/** Sends the sign-up e-mail - to one customer, or the next batch of those who haven't had it. */
+export async function sendSignupMailsAction(
+  dealId?: string
+): Promise<{ ok: true; sent: number; failed: { name: string; error: string }[]; remaining: number } | { ok: false; error: string }> {
+  try {
+    await requireBillingUser();
+    const result = await sendSignupMails(dealId);
+    revalidatePath(PAGE);
+    return { ok: true, ...result };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Kunne ikke sende mails." };
   }
 }

@@ -18,7 +18,11 @@ import {
   RetryPaymentButton,
   SwitchAllCustomersButton,
   PreviewDraftsButton,
+  SignupLinkForm,
+  SignupMailPanel,
+  SendSignupMailButton,
 } from "./betalingsservice-client";
+import { signupMailOverview } from "@/lib/betalingsservice/signup-mail";
 
 const COLLECTION_STATUS: Record<string, { label: string; className: string }> = {
   IN_FILE: { label: "Afventer resultat", className: "bg-sky-50 text-sky-700" },
@@ -61,7 +65,7 @@ export default async function BetalingsservicePage() {
   if (!currentUser.canAccessBilling) redirect("/");
 
   const now = new Date();
-  const [settings, pending, deliveries, results, allBsCustomers, imports, mailboxFiles, switchable] = await Promise.all([
+  const [settings, pending, deliveries, results, allBsCustomers, imports, mailboxFiles, switchable, mailOverview] = await Promise.all([
     getBsSettings(),
     listPendingBsCollections(now),
     prisma.bsDelivery.findMany({
@@ -105,6 +109,7 @@ export default async function BetalingsservicePage() {
         bsMandateNumber: true,
         bsMandateStatus: true,
         bsMandateChangedAt: true,
+        bsSignupMailSentAt: true,
         parent: {
           select: {
             id: true,
@@ -128,6 +133,7 @@ export default async function BetalingsservicePage() {
       select: { id: true, fileName: true, kind: true, note: true, receivedAt: true },
     }),
     countSwitchableDeals(),
+    signupMailOverview(),
   ]);
   const sftpReady = Boolean(settings.sftpUser && settings.sftpPrivateKeyEnc);
   let invoiceTemplates: { id: string; name: string; isDefault: boolean }[] = [];
@@ -443,9 +449,16 @@ export default async function BetalingsservicePage() {
           Alle kunder er på Betalingsservice, medmindre de er sat til almindelig faktura på dealen. Etableringen og
           første periode er almindelige fakturaer (FI/bankoverførsel) med tilmeldingsoplysningerne på - derefter
           opkræves hvert kvartal via Betalingsservice: automatisk for dem, der er tilmeldt, ellers med
-          indbetalingskort. Kunden tilmelder sig i netbanken med PBS-nr. {settings.pbsNumber ?? "(ikke angivet)"},
-          debitorgruppe {settings.debtorGroupNumber ?? "(ikke angivet)"} og sit kundenummer.
+          indbetalingskort. Kunden tilmelder sig med MitID via tilmeldingslinket eller i netbanken med PBS-nr.{" "}
+          {settings.pbsNumber ?? "(ikke angivet)"}, debitorgruppe {settings.debtorGroupNumber ?? "(ikke angivet)"} og sit
+          kundenummer.
         </p>
+        <SignupLinkForm initial={settings.signupLink ?? ""} />
+        <SignupMailPanel
+          unsent={mailOverview.unsent}
+          withoutEmail={mailOverview.withoutEmail}
+          hasLink={Boolean(settings.signupLink)}
+        />
         {customers.length > 0 ? (
           <ul className="mt-3 divide-y divide-slate-100 text-sm">
             {customerList.map((c) => (
@@ -462,17 +475,25 @@ export default async function BetalingsservicePage() {
                       </span>
                     )}
                   </div>
-                  <span
-                    className={`shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${
-                      c.bsMandateStatus === "ACTIVE" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
-                    }`}
-                  >
-                    {c.bsMandateStatus === "ACTIVE"
-                      ? "Automatisk betaling"
-                      : c.bsMandateStatus === "CANCELLED"
-                      ? "Afmeldt - indbetalingskort"
-                      : "Indbetalingskort"}
-                  </span>
+                  <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                    {c.bsMandateStatus !== "ACTIVE" && settings.signupLink && (
+                      <SendSignupMailButton
+                        dealId={c.id}
+                        sentAt={c.bsSignupMailSentAt ? day(c.bsSignupMailSentAt) : null}
+                      />
+                    )}
+                    <span
+                      className={`shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${
+                        c.bsMandateStatus === "ACTIVE" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
+                      }`}
+                    >
+                      {c.bsMandateStatus === "ACTIVE"
+                        ? "Automatisk betaling"
+                        : c.bsMandateStatus === "CANCELLED"
+                        ? "Afmeldt - indbetalingskort"
+                        : "Indbetalingskort"}
+                    </span>
+                  </div>
                 </div>
                 {(branchesByPayer.get(c.id) ?? []).length > 0 && (
                   <ul className="mt-1.5 space-y-1 border-l-2 border-slate-200 pl-3">

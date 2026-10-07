@@ -212,6 +212,8 @@ export type BsInvoiceInfo = {
   customerNumber: string | null;
   pbsNumber: string | null;
   debtorGroupNumber: string | null;
+  /** The BS Tilmeldingslink (sign-up with MitID), if set up. */
+  signupLink?: string | null;
 };
 
 async function bsInvoiceTemplateId(): Promise<string | null> {
@@ -228,14 +230,26 @@ async function bsInvoiceInfo(deal: { id: string }): Promise<BsInvoiceInfo> {
   const customerNumber = payer.bsCustomerNumber ?? (await ensureBsCustomerNumber(payer.id));
   const settings = await prisma.bsSettings.findUnique({
     where: { id: "default" },
-    select: { pbsNumber: true, debtorGroupNumber: true },
+    select: { pbsNumber: true, debtorGroupNumber: true, signupLink: true },
   });
   return {
     mandateActive: payer.bsMandateStatus === "ACTIVE",
     customerNumber,
     pbsNumber: settings?.pbsNumber ?? null,
     debtorGroupNumber: settings?.debtorGroupNumber ?? null,
+    signupLink: settings?.signupLink ?? null,
   };
+}
+
+/** Where to sign up: the BS Tilmeldingslink (MitID) when set up, otherwise
+ * the online bank. (betalingsservice.dk itself has no sign-up.) */
+function signUpWhere(info: BsInvoiceInfo, language: "da" | "en"): string {
+  if (info.signupLink) {
+    return language === "en"
+      ? `Sign up with MitID here: ${info.signupLink} - or in your online banking.`
+      : `Tilmeld jer med MitID her: ${info.signupLink} - eller i jeres netbank.`;
+  }
+  return language === "en" ? "Sign up in your online banking." : "Tilmelding sker i jeres netbank.";
 }
 
 /**
@@ -248,8 +262,8 @@ export function bsInvoiceNotice(info: BsInvoiceInfo | undefined, dateLabel: stri
   const signUp =
     info?.pbsNumber && info.debtorGroupNumber && info.customerNumber
       ? language === "en"
-        ? `\nTo sign up for automatic payment via Betalingsservice, use:\nPBS no.: ${info.pbsNumber}   Debtor group no.: ${info.debtorGroupNumber}   PBS customer no.: ${info.customerNumber}\nSign up in your online banking or at www.betalingsservice.dk`
-        : `\nVed tilmelding til Betalingsservice skal følgende oplysninger benyttes:\nPBS-nr.: ${info.pbsNumber}   Deb.gr.nr.: ${info.debtorGroupNumber}   PBS-kundenr.: ${info.customerNumber}\nTilmelding kan ske i din netbank eller på www.betalingsservice.dk`
+        ? `\nTo sign up for automatic payment via Betalingsservice, use:\nPBS no.: ${info.pbsNumber}   Debtor group no.: ${info.debtorGroupNumber}   PBS customer no.: ${info.customerNumber}\n${signUpWhere(info, "en")}`
+        : `\nVed tilmelding til Betalingsservice skal følgende oplysninger benyttes:\nPBS-nr.: ${info.pbsNumber}   Deb.gr.nr.: ${info.debtorGroupNumber}   PBS-kundenr.: ${info.customerNumber}\n${signUpWhere(info, "da")}`
       : "";
   if (info?.mandateActive) {
     return language === "en"
@@ -278,8 +292,8 @@ export function collectsViaBs(paymentMethod: PaymentMethod, termNumber: number, 
 export function bsSignupNotice(info: BsInvoiceInfo | undefined, language: "da" | "en"): string | null {
   if (!info || info.mandateActive || !info.pbsNumber || !info.debtorGroupNumber || !info.customerNumber) return null;
   return language === "en"
-    ? `Sign up your invoices for automatic payment via Betalingsservice - sign up in your online banking or at www.betalingsservice.dk with:\nPBS no.: ${info.pbsNumber}   Debtor group no.: ${info.debtorGroupNumber}   PBS customer no.: ${info.customerNumber}\nThis invoice is paid as usual by the due date.`
-    : `Tilmeld jeres fakturaer til automatisk betaling via Betalingsservice - tilmeld jer i netbanken eller på www.betalingsservice.dk med:\nPBS-nr.: ${info.pbsNumber}   Deb.gr.nr.: ${info.debtorGroupNumber}   PBS-kundenr.: ${info.customerNumber}\nDenne faktura betales som normalt inden forfaldsdatoen.`;
+    ? `Sign up your invoices for automatic payment via Betalingsservice with:\nPBS no.: ${info.pbsNumber}   Debtor group no.: ${info.debtorGroupNumber}   PBS customer no.: ${info.customerNumber}\n${signUpWhere(info, "en")}\nThis invoice is paid as usual by the due date.`
+    : `Tilmeld jeres fakturaer til automatisk betaling via Betalingsservice med:\nPBS-nr.: ${info.pbsNumber}   Deb.gr.nr.: ${info.debtorGroupNumber}   PBS-kundenr.: ${info.customerNumber}\n${signUpWhere(info, "da")}\nDenne faktura betales som normalt inden forfaldsdatoen.`;
 }
 
 /**
