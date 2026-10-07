@@ -23,13 +23,20 @@ export async function sendGmailMessage(
     attachments?: { filename: string; contentType: string; data: Buffer }[];
     /** Shown as the sender's display name (e.g. "Nextview360 ApS") instead of the raw account email. */
     fromName?: string;
+    /** Sends as a different address than the connected account's own e-mail
+     * - only works if that address is already set up as a verified "Send
+     * mail as" alias on this Gmail account (Gmail silently rejects/rewrites
+     * it otherwise), e.g. sending as the shared info@nextview360.dk through
+     * whichever admin's personal Google account has that alias configured. */
+    fromAddress?: string;
   }
 ): Promise<{ id: string }> {
   const accessToken = await getValidAccessToken(account);
 
   const bodyContentType = params.bodyHtml ? "text/html" : "text/plain";
   const body = params.bodyHtml ?? params.bodyText;
-  const from = params.fromName ? `${encodeHeaderUtf8(params.fromName)} <${account.email}>` : account.email;
+  const fromAddress = params.fromAddress ?? account.email;
+  const from = params.fromName ? `${encodeHeaderUtf8(params.fromName)} <${fromAddress}>` : fromAddress;
   const headerLines = [
     `From: ${from}`,
     `To: ${params.to.join(", ")}`,
