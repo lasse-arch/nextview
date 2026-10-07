@@ -164,7 +164,7 @@ export async function runSftpExchange(options: { autoCreate?: boolean } = {}): P
       const created = await createBsDelivery(null, { sendViaSftp: true });
       lines.push(
         created.ok
-          ? `Betalingsfil lavet automatisk med ${created.collections} opkrævning(er).`
+          ? [`Betalingsfil lavet automatisk med ${created.collections} opkrævning(er).`, ...(created.notes ?? [])].join(" ")
           : `Kunne ikke lave betalingsfil automatisk: ${created.error}`
       );
       if (created.ok) await prisma.bsSettings.update({ where: { id: "default" }, data: { lastAutoDeliveryAt: new Date() } });

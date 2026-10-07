@@ -347,6 +347,9 @@ type DineroInvoiceInput = {
   /** Netto payment days - 8 unless the due date has to land on a specific
    * day (a Betalingsservice collection date). */
   paymentDays?: number;
+  /** Collected through Betalingsservice - turn off the invoice's own online
+   * payment options (MobilePay/PensoPay), so it can't also be paid there. */
+  collectedViaBetalingsservice?: boolean;
 };
 
 /** Thrown when Dinero rejects a contact GUID as nonexistent (e.g. it was
@@ -375,6 +378,7 @@ async function createInvoiceDraft(
       Comment: input.note,
       PaymentConditionType: "Netto",
       PaymentConditionNumberOfDays: input.paymentDays ?? 8,
+      ...(input.collectedViaBetalingsservice ? { IsMobilePayInvoiceEnabled: false, IsPensoPayEnabled: false } : {}),
       ProductLines: input.lines.map((line) => ({
         Description: line.description,
         Quantity: 1,
@@ -544,6 +548,7 @@ export async function createQuarterlyInvoiceDraft(params: {
   lines: DineroInvoiceLine[];
   invoiceDate: Date;
   paymentDays?: number;
+  collectedViaBetalingsservice?: boolean;
 }): Promise<DineroDraftResult> {
   if (await isDineroTestMode()) {
     const fake = Math.random().toString(36).slice(2, 8);
@@ -586,6 +591,7 @@ export async function createQuarterlyInvoiceDraft(params: {
       lines: params.lines,
       invoiceDate: params.invoiceDate,
       paymentDays: params.paymentDays,
+      collectedViaBetalingsservice: params.collectedViaBetalingsservice,
     });
     const sendError = await bookAndSendOrCapture(accessToken, invoice.guid, invoice.timestamp, params.contactEmail);
     return { contactGuid, invoiceGuid: invoice.guid, invoiceNumber: invoice.number, sendError };
@@ -614,6 +620,7 @@ export async function createQuarterlyInvoiceDraft(params: {
       lines: params.lines,
       invoiceDate: params.invoiceDate,
       paymentDays: params.paymentDays,
+      collectedViaBetalingsservice: params.collectedViaBetalingsservice,
     });
     const sendError = await bookAndSendOrCapture(accessToken, invoice.guid, invoice.timestamp, params.contactEmail);
     return { contactGuid: freshContactGuid, invoiceGuid: invoice.guid, invoiceNumber: invoice.number, sendError };

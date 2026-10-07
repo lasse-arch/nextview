@@ -100,7 +100,9 @@ export function CreateDeliveryButton({ readyCount, blockedReason }: { readyCount
           startTransition(async () => {
             const result = await createBsDeliveryAction();
             if (result.ok) {
-              showToast(`Betalingsfil lavet med ${result.collections} opkrævning${result.collections === 1 ? "" : "er"}.`);
+              showToast(
+                [`Betalingsfil lavet med ${result.collections} opkrævning${result.collections === 1 ? "" : "er"}.`, ...(result.notes ?? [])].join(" ")
+              );
               router.refresh();
             } else {
               showToast(result.error);

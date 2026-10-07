@@ -352,7 +352,7 @@ export default async function BetalingsservicePage() {
                     {error && <p className="text-xs text-red-600">Dinero: {error}</p>}
                   </div>
                   <div className="flex items-center gap-2">
-                    {error && c.status === "PAID" && <RetryPaymentButton collectionId={c.id} />}
+                    {error && c.status === "PAID" && !error.startsWith("Dobbeltbetaling") && <RetryPaymentButton collectionId={c.id} />}
                     <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${status.className}`}>{status.label}</span>
                   </div>
                 </li>

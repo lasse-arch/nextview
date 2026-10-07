@@ -333,13 +333,15 @@ export function invoiceTerms(
   }).format(collectionDate);
   const noteSuffix =
     language === "en"
-      ? `The amount will be collected via Betalingsservice on ${dateLabel} - please do not pay by bank transfer.`
-      : `Beløbet opkræves via Betalingsservice d. ${dateLabel} - betal venligst ikke via bankoverførsel.`;
+      ? `NB: This invoice is paid via Betalingsservice on ${dateLabel} - please do NOT pay it by bank transfer.`
+      : `NB: Denne faktura betales via Betalingsservice d. ${dateLabel} - betal den IKKE via bankoverførsel.`;
   return { invoiceDate: today, paymentDays, dueDate: collectionDate, collectViaBs: true, noteSuffix };
 }
 
+/** The Betalingsservice notice goes first, so it's the first thing the
+ * customer reads on the invoice. */
 function withNoteSuffix(note: string, suffix: string | null): string {
-  return suffix ? `${note}\n\n${suffix}` : note;
+  return suffix ? `${suffix}\n\n${note}` : note;
 }
 
 function invoiceLanguage(deal: { contractProducts: unknown }): "da" | "en" {
@@ -382,6 +384,7 @@ async function draftInvoiceLine(
       lines,
       invoiceDate,
       paymentDays: terms.paymentDays,
+      collectedViaBetalingsservice: terms.collectViaBs,
     });
 
     await prisma.$transaction([
@@ -633,6 +636,7 @@ async function processCombinedDueInvoices(
       lines,
       invoiceDate,
       paymentDays: terms.paymentDays,
+      collectedViaBetalingsservice: terms.collectViaBs,
     });
 
     await prisma.$transaction([

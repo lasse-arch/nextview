@@ -19,7 +19,7 @@ import { createHash } from "node:crypto";
 import { prisma } from "@/lib/db";
 import { dealName } from "@/lib/labels";
 import { isDineroTestMode } from "@/lib/integration-settings";
-import { getInvoiceTotals, registerInvoicePayment } from "@/lib/dinero";
+import { getInvoicePaymentStatus, getInvoiceTotals, registerInvoicePayment } from "@/lib/dinero";
 import { buildBs0601, type Bs0601Collection } from "./bs0601";
 import { parseBsReturnDelivery, type BsPayment } from "./bs-returns";
 import { BsFormatError } from "./fixed-width";
@@ -234,7 +234,7 @@ async function invoiceTotalOre(guid: string, fallbackExclVat: number, testMode: 
 }
 
 export type CreateDeliveryResult =
-  | { ok: true; deliveryId: string; collections: number; skipped: number }
+  | { ok: true; deliveryId: string; collections: number; skipped: number; notes?: string[] }
   | { ok: false; error: string };
 
 /** Builds one BS 0601 file from every ready pending collection and stores it for download. */
@@ -247,10 +247,37 @@ export async function createBsDelivery(
   if (missing.length > 0) return { ok: false, error: `Udfyld først: ${missing.join(", ")}.` };
 
   const pending = await listPendingBsCollections();
-  const ready = pending.filter((p) => p.problems.length === 0 && !p.notYet);
-  if (ready.length === 0) return { ok: false, error: "Ingen fakturaer er klar til en betalingsfil lige nu." };
-
   const testMode = await isDineroTestMode();
+  const candidates = pending.filter((p) => p.problems.length === 0 && !p.notYet);
+
+  // Last check against Dinero right before collecting: an invoice the
+  // customer has already paid by bank transfer (registered in Dinero) is
+  // marked paid here and left out, so it's never also collected.
+  const notes: string[] = [];
+  const ready: PendingBsCollection[] = [];
+  for (const p of candidates) {
+    let alreadyPaid = false;
+    for (const guid of p.dineroGuids) {
+      if (testMode || guid.startsWith("TEST-")) continue;
+      try {
+        if ((await getInvoicePaymentStatus(guid)).paid) alreadyPaid = true;
+      } catch (err) {
+        return { ok: false, error: `Kunne ikke tjekke betalingsstatus i Dinero: ${err instanceof Error ? err.message : String(err)}` };
+      }
+    }
+    if (alreadyPaid) {
+      await prisma.invoice.updateMany({ where: { id: { in: p.invoiceIds }, paidAt: null }, data: { paidAt: new Date() } });
+      notes.push(`${p.dealName}: faktura ${p.invoiceNumbers.join(", ")} er allerede betalt i Dinero - ikke opkrævet via Betalingsservice.`);
+    } else {
+      ready.push(p);
+    }
+  }
+  if (ready.length === 0) {
+    return {
+      ok: false,
+      error: notes.length > 0 ? notes.join(" ") : "Ingen fakturaer er klar til en betalingsfil lige nu.",
+    };
+  }
   const deals = await prisma.deal.findMany({
     where: { id: { in: ready.map((p) => p.dealId) } },
     select: { id: true, companyName: true, cvrNumber: true, address: true, bsMandateNumber: true },
@@ -347,7 +374,13 @@ export async function createBsDelivery(
           throw new BsFormatError("Nogle af fakturaerne er lige blevet lagt i en anden betalingsfil - prøv igen.");
         }
       }
-      return { ok: true as const, deliveryId: delivery.id, collections: built.length, skipped: pending.length - ready.length };
+      return {
+        ok: true as const,
+        deliveryId: delivery.id,
+        collections: built.length,
+        skipped: pending.length - ready.length,
+        notes,
+      };
     });
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Kunne ikke lave betalingsfilen." };
@@ -499,6 +532,26 @@ async function registerCollectionPayments(collectionId: string, lines: string[])
       lines.push(`  ${name}: faktura ${number} - IKKE registreret i Dinero (ingen mellemregningskonto angivet).`);
       continue;
     }
+    if (rows.every((r) => r.bsPaymentRegisteredAt)) continue;
+
+    // Paid through Betalingsservice, but Dinero already has the invoice as
+    // paid (the customer also paid by bank transfer) - don't register a
+    // second payment; flag it so the money is refunded.
+    try {
+      const status = await getInvoicePaymentStatus(guid);
+      if (status.paid) {
+        const error = `Dobbeltbetaling: faktura ${number} var allerede betalt i Dinero (bankoverførsel), og kunden har nu også betalt via Betalingsservice - refundér det ene beløb.`;
+        await prisma.invoice.updateMany({ where: { id: { in: rows.map((r) => r.id) } }, data: { bsPaymentError: error } });
+        lines.push(`  ${name}: ${error.toUpperCase().slice(0, 15)}${error.slice(15)}`);
+        continue;
+      }
+    } catch (err) {
+      const error = `Kunne ikke tjekke Dinero før registrering: ${err instanceof Error ? err.message : String(err)}`;
+      await prisma.invoice.updateMany({ where: { id: { in: rows.map((r) => r.id) } }, data: { bsPaymentError: error } });
+      lines.push(`  ${name}: faktura ${number} - ${error}`);
+      continue;
+    }
+
     // Claim before calling Dinero, so two imports racing can't both register it.
     const claimed = await prisma.invoice.updateMany({
       where: { id: { in: rows.map((r) => r.id) }, bsPaymentRegisteredAt: null },
