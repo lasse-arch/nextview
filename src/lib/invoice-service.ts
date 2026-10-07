@@ -10,7 +10,7 @@ import {
   allSelectedProductLabels,
   recurringProductLabels,
 } from "@/lib/contract-template-data";
-import type { DealStage, PaymentMethod } from "@prisma/client";
+import type { BsMandateStatus, DealStage, PaymentMethod } from "@prisma/client";
 import { collectionDateForPeriod, deliveryDeadline, earliestCollectionDate, utcDay } from "@/lib/betalingsservice/banking-days";
 
 const ACTIVE_CUSTOMER_STAGES: DealStage[] = ["CONTRACT_SIGNED", "FILMED", "LIVE"];
@@ -183,7 +183,54 @@ type DraftableDeal = {
   soldProduct: string | null;
   contractProducts: unknown;
   paymentMethod: PaymentMethod;
+  bsCustomerNumber: string | null;
+  bsMandateStatus: BsMandateStatus | null;
 };
+
+/** What a Betalingsservice customer's invoice text needs: whether they're
+ * signed up for automatic payment, and the numbers to sign up with if not. */
+export type BsInvoiceInfo = {
+  mandateActive: boolean;
+  customerNumber: string | null;
+  pbsNumber: string | null;
+  debtorGroupNumber: string | null;
+};
+
+async function bsInvoiceInfo(deal: { bsCustomerNumber: string | null; bsMandateStatus: BsMandateStatus | null }): Promise<BsInvoiceInfo> {
+  const settings = await prisma.bsSettings.findUnique({
+    where: { id: "default" },
+    select: { pbsNumber: true, debtorGroupNumber: true },
+  });
+  return {
+    mandateActive: deal.bsMandateStatus === "ACTIVE",
+    customerNumber: deal.bsCustomerNumber,
+    pbsNumber: settings?.pbsNumber ?? null,
+    debtorGroupNumber: settings?.debtorGroupNumber ?? null,
+  };
+}
+
+/**
+ * The Betalingsservice block at the top of the invoice - modelled on how
+ * utilities word it: automatic payment says so; otherwise it says the
+ * invoice is NOT on automatic payment, that a payment slip is coming, not to
+ * pay by bank transfer, and exactly what to sign up with.
+ */
+export function bsInvoiceNotice(info: BsInvoiceInfo | undefined, dateLabel: string, language: "da" | "en"): string {
+  const signUp =
+    info?.pbsNumber && info.debtorGroupNumber && info.customerNumber
+      ? language === "en"
+        ? `\nTo sign up for automatic payment via Betalingsservice, use:\nPBS no.: ${info.pbsNumber}   Debtor group no.: ${info.debtorGroupNumber}   PBS customer no.: ${info.customerNumber}\nSign up in your online banking or at www.betalingsservice.dk`
+        : `\nVed tilmelding til Betalingsservice skal følgende oplysninger benyttes:\nPBS-nr.: ${info.pbsNumber}   Deb.gr.nr.: ${info.debtorGroupNumber}   PBS-kundenr.: ${info.customerNumber}\nTilmelding kan ske i din netbank eller på www.betalingsservice.dk`
+      : "";
+  if (info?.mandateActive) {
+    return language === "en"
+      ? `This invoice is paid automatically via Betalingsservice on ${dateLabel} - you don't need to do anything. Please do NOT pay it by bank transfer.`
+      : `Denne faktura betales automatisk via Betalingsservice d. ${dateLabel} - du skal ikke foretage dig noget. Betal den IKKE via bankoverførsel.`;
+  }
+  return language === "en"
+    ? `This invoice is NOT signed up for automatic payment.\nYou will receive a payment slip from Betalingsservice with payment on ${dateLabel} - please do NOT pay this invoice by bank transfer.${signUp}`
+    : `Denne faktura er IKKE tilmeldt automatisk betaling.\nDu modtager et indbetalingskort fra Betalingsservice med betaling d. ${dateLabel} - betal IKKE denne faktura via bankoverførsel.${signUp}`;
+}
 
 /**
  * Builds the invoice-level note and per-product line items for a due line.
@@ -310,7 +357,8 @@ export function invoiceTerms(
   quarterIndex: number,
   scheduledDate: Date,
   language: "da" | "en",
-  now = new Date()
+  now = new Date(),
+  bs?: BsInvoiceInfo
 ): InvoiceTerms {
   // The establishment fee is always a normal invoice the customer pays
   // themselves - only the recurring quarters go through Betalingsservice.
@@ -331,10 +379,7 @@ export function invoiceTerms(
     year: "numeric",
     timeZone: "UTC",
   }).format(collectionDate);
-  const noteSuffix =
-    language === "en"
-      ? `NB: This invoice is paid via Betalingsservice on ${dateLabel} - please do NOT pay it by bank transfer.`
-      : `NB: Denne faktura betales via Betalingsservice d. ${dateLabel} - betal den IKKE via bankoverførsel.`;
+  const noteSuffix = bsInvoiceNotice(bs, dateLabel, language);
   return { invoiceDate: today, paymentDays, dueDate: collectionDate, collectViaBs: true, noteSuffix };
 }
 
@@ -371,7 +416,14 @@ async function draftInvoiceLine(
     // See computeRecurringInvoiceDate. The one-off establishment fee has no
     // period to align a due date to, so it's simply dated whenever it's
     // actually drafted.
-    const terms = invoiceTerms(deal.paymentMethod, invoiceRow.quarterIndex, invoiceRow.scheduledDate, invoiceLanguage(deal));
+    const terms = invoiceTerms(
+      deal.paymentMethod,
+      invoiceRow.quarterIndex,
+      invoiceRow.scheduledDate,
+      invoiceLanguage(deal),
+      new Date(),
+      deal.paymentMethod === "BETALINGSSERVICE" ? await bsInvoiceInfo(deal) : undefined
+    );
     const { invoiceDate } = terms;
     const result = await createQuarterlyInvoiceDraft({
       existingContactGuid: contactGuidHint,
@@ -620,7 +672,9 @@ async function processCombinedDueInvoices(
     hasEstablishmentLine ? "INVOICE" : leadDeal.paymentMethod,
     anyRecurringLine ? anyRecurringLine.invoiceRow.quarterIndex : 0,
     (anyRecurringLine ?? invoiceRows[0]).invoiceRow.scheduledDate,
-    invoiceLanguage(leadDeal)
+    invoiceLanguage(leadDeal),
+    new Date(),
+    leadDeal.paymentMethod === "BETALINGSSERVICE" ? await bsInvoiceInfo(leadDeal) : undefined
   );
   const { invoiceDate } = terms;
 
