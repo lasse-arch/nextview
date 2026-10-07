@@ -98,7 +98,6 @@ export async function sendStandaloneContract(
         { role: "Customer", name: customer.contactName, email: customer.contactEmail, externalId: "customer" },
       ],
       metadata: { standalone: "true" },
-      emailSubject: `Skriv under på kontrakten til ${customer.displayName || customer.companyName}`,
     });
 
     const created = await prisma.standaloneContract.create({

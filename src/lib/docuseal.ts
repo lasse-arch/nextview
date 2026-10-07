@@ -45,12 +45,6 @@ export async function createAndSendSubmission(params: {
   documentName: string;
   submitters: DocuSealSubmitter[];
   metadata?: Record<string, string>;
-  /** Overrides DocuSeal's default "you have a document to sign" subject on
-   * the invite e-mail it sends every submitter - e.g. so the director
-   * opening his inbox sees which customer it's for without opening the
-   * mail first. Body is left as DocuSeal's own default (it contains the
-   * actual signing link). */
-  emailSubject?: string;
 }): Promise<DocuSealSubmission> {
   const res = await fetch(`${DOCUSEAL_API_BASE}/submissions/pdf`, {
     method: "POST",
@@ -69,7 +63,6 @@ export async function createAndSendSubmission(params: {
       // customer isn't stuck waiting on someone here to sign first.
       order: "random",
       metadata: params.metadata,
-      ...(params.emailSubject ? { message: { subject: params.emailSubject } } : {}),
     }),
   });
 
