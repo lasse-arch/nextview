@@ -173,3 +173,19 @@ export async function clearAllInvoices(): Promise<{ deleted: number }> {
   revalidatePath("/deals");
   return { deleted: count };
 }
+
+/**
+ * Deletes only the test drafts made while "Testtilstand" was on (Dinero
+ * guid "TEST-...") - so turning test mode off afterwards lets the real
+ * invoices for those periods be created, instead of the periods looking
+ * already invoiced. Real invoices are never touched.
+ */
+export async function clearTestInvoices(): Promise<{ deleted: number }> {
+  const user = await requireUser();
+  if (user.role !== "ADMIN") throw new Error("Kun admin kan slette testkladder");
+
+  const { count } = await prisma.invoice.deleteMany({ where: { dineroInvoiceGuid: { startsWith: "TEST-" } } });
+  revalidatePath("/settings/dinero");
+  revalidatePath("/deals");
+  return { deleted: count };
+}

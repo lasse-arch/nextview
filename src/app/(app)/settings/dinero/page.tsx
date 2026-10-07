@@ -6,6 +6,7 @@ import { isIntegrationEnabled, isDineroTestMode } from "@/lib/integration-settin
 import { formatDKK, formatDate, invoiceStatusLabel, dealName } from "@/lib/labels";
 import { RunNowButton } from "./run-now-button";
 import { ClearInvoicesButton } from "./clear-invoices-button";
+import { ClearTestInvoicesButton } from "./clear-test-invoices-button";
 import { RetryInvoiceButton } from "./retry-invoice-button";
 import { DeleteInvoiceButton } from "@/components/delete-invoice-button";
 import { IntegrationToggle } from "../integration-toggle";
@@ -110,7 +111,12 @@ export default async function DineroSettingsPage() {
         <p className="mt-2 text-xs text-slate-400">
           Brug denne mens I tester fakturaberegningen (fx med "Kør nu" ovenfor), så I kan se hvilke kladder der ville
           blive oprettet, uden at røre det rigtige regnskab eller oprette rigtige kontakter/fakturaer i Dinero.
+          Slet testkladderne bagefter, før testtilstand slås fra - ellers ser de kvartaler ud, som om de allerede er
+          faktureret, og de rigtige fakturaer bliver ikke lavet.
         </p>
+        <div className="mt-3">
+          <ClearTestInvoicesButton />
+        </div>
       </section>
 
       <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">

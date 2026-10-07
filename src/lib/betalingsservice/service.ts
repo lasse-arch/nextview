@@ -119,6 +119,8 @@ export async function listPendingBsCollections(now = new Date()): Promise<Pendin
       paidAt: null,
       status: "DRAFT_CREATED",
       dineroInvoiceGuid: { not: null },
+      // Test drafts from Dinero's Testtilstand are never collected.
+      NOT: { dineroInvoiceGuid: { startsWith: "TEST-" } },
       dueDate: { not: null },
     },
     include: pendingInvoiceInclude,
