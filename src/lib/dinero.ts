@@ -276,7 +276,11 @@ const DANISH_TRANSLITERATIONS: [RegExp, string][] = [
   [/Å/g, "Aa"],
 ];
 
-async function findContactGuidsByName(accessToken: string, companyName: string): Promise<string[]> {
+async function findContactGuidsByName(
+  accessToken: string,
+  companyName: string,
+  allowFirstWordOnly: boolean
+): Promise<string[]> {
   const trimmed = companyName.trim();
   if (!trimmed) return [];
 
@@ -294,8 +298,11 @@ async function findContactGuidsByName(accessToken: string, companyName: string):
     if (byTransliterated.length > 0) return byTransliterated;
   }
 
+  // Just the first word is a loose match ("Din" in "Din Vinbutik Hobro"
+  // also hits "KJÆRULFF HOLDING") - only tried when the caller can rule out
+  // the wrong companies by CVR afterwards.
   const firstWord = trimmed.split(/\s+/)[0];
-  if (firstWord && firstWord !== trimmed && firstWord.length >= 3) {
+  if (allowFirstWordOnly && firstWord && firstWord !== trimmed && firstWord.length >= 3) {
     return nameContainsSearch(accessToken, firstWord);
   }
   return [];
@@ -319,19 +326,25 @@ async function findContactByCvr(accessToken: string, cvr: string, companyName?: 
 
   if (!companyName) return null;
   try {
-    const guids = await findContactGuidsByName(accessToken, companyName);
+    const guids = await findContactGuidsByName(accessToken, companyName, Boolean(sanitizeCvr(cvr)));
     if (guids.length === 0) return null;
-    if (guids.length === 1) return guids[0];
 
-    // More than one name match (e.g. two duplicate contacts) - prefer
-    // whichever one's CVR actually matches this deal's, if we can tell.
+    // A name match is only a guess (the search also tries just the first
+    // word of the name), so when the deal has a CVR, a contact registered
+    // under a DIFFERENT CVR is never used - that's another company, and the
+    // invoice would go to the wrong customer. One with the same CVR wins;
+    // otherwise only a contact with no CVR at all can be taken.
     const cleanCvr = sanitizeCvr(cvr);
     if (!cleanCvr) return guids[0];
+    let withoutCvr: string | null = null;
     for (const guid of guids) {
       const detail = await fetchContactDetail(accessToken, guid);
-      if (detail && (sanitizeCvr(detail.vatNumber) === cleanCvr || sanitizeCvr(detail.cvr) === cleanCvr)) return guid;
+      if (!detail) continue;
+      const contactCvrs = [sanitizeCvr(detail.vatNumber), sanitizeCvr(detail.cvr)].filter(Boolean);
+      if (contactCvrs.includes(cleanCvr)) return guid;
+      if (contactCvrs.length === 0 && !withoutCvr) withoutCvr = guid;
     }
-    return guids[0];
+    return withoutCvr;
   } catch (err) {
     // This search is a best-effort optimization to avoid creating a
     // duplicate contact - it must never be the reason an invoice draft
