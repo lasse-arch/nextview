@@ -264,8 +264,8 @@ export function collectsViaBs(paymentMethod: PaymentMethod, termNumber: number, 
 export function bsSignupNotice(info: BsInvoiceInfo | undefined, language: "da" | "en"): string | null {
   if (!info || info.mandateActive || !info.pbsNumber || !info.debtorGroupNumber || !info.customerNumber) return null;
   return language === "en"
-    ? `Please pay this invoice as usual by the due date.\nFuture invoices are paid automatically via Betalingsservice - sign up in your online banking or at www.betalingsservice.dk with:\nPBS no.: ${info.pbsNumber}   Debtor group no.: ${info.debtorGroupNumber}   PBS customer no.: ${info.customerNumber}`
-    : `Denne faktura betales som normalt inden forfaldsdatoen.\nFremover betales jeres fakturaer automatisk via Betalingsservice - tilmeld jer i netbanken eller på www.betalingsservice.dk med:\nPBS-nr.: ${info.pbsNumber}   Deb.gr.nr.: ${info.debtorGroupNumber}   PBS-kundenr.: ${info.customerNumber}`;
+    ? `Sign up your invoices for automatic payment via Betalingsservice - sign up in your online banking or at www.betalingsservice.dk with:\nPBS no.: ${info.pbsNumber}   Debtor group no.: ${info.debtorGroupNumber}   PBS customer no.: ${info.customerNumber}\nThis invoice is paid as usual by the due date.`
+    : `Tilmeld jeres fakturaer til automatisk betaling via Betalingsservice - tilmeld jer i netbanken eller på www.betalingsservice.dk med:\nPBS-nr.: ${info.pbsNumber}   Deb.gr.nr.: ${info.debtorGroupNumber}   PBS-kundenr.: ${info.customerNumber}\nDenne faktura betales som normalt inden forfaldsdatoen.`;
 }
 
 /**
@@ -1071,14 +1071,30 @@ export async function checkInvoicePayment(
     // Invoices made before the number was read back after booking were
     // stored without their Dinero invoice number - fill it in while here.
     const number = invoice.dineroInvoiceNumber ?? (await getInvoiceTotals(invoice.dineroInvoiceGuid).then((t) => t.number).catch(() => null));
+    const newlyPaid = paid && !invoice.paidAt;
     await prisma.invoice.update({
       where: { id: invoice.id },
       data: {
         // Never un-mark a paid invoice here: only set it once Dinero says paid.
         paidAt: paid ? invoice.paidAt ?? (paidDate ? new Date(paidDate) : new Date()) : invoice.paidAt,
         ...(number && !invoice.dineroInvoiceNumber ? { dineroInvoiceNumber: number } : {}),
+        // A Betalingsservice collection that failed and was then paid some
+        // other way (e.g. bank transfer after a reminder) is settled.
+        ...(newlyPaid && invoice.bsPaymentError ? { bsPaymentError: null } : {}),
       },
     });
+    if (newlyPaid && invoice.bsPaymentError && (number ?? invoice.dineroInvoiceNumber)) {
+      // ...and the "chase the customer" task made for it is done too.
+      await prisma.task.updateMany({
+        where: {
+          dealId: invoice.dealId,
+          done: false,
+          title: { startsWith: "Ryk ", contains: `Betalingsservice-betaling` },
+          AND: { title: { contains: `faktura ${number ?? invoice.dineroInvoiceNumber},` } },
+        },
+        data: { done: true },
+      });
+    }
     return { ok: true, paid, rawStatus, dealId: invoice.dealId };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Ukendt fejl", dealId: invoice.dealId };
