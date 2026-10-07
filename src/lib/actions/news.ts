@@ -168,6 +168,12 @@ const DEFAULT_POSTS: { title: string; body: string; minutesAgo: number; screensh
     body: "Telefonnumre i Arpo kan nu klikkes - det grønne nummer på ringelisten, \"📞 Ring op\" ved telefonfeltet på dealen og numrene i Leadindbakke og Leadgeneration. Opkaldet går ud fra din egen mobil med dit eget nummer: på en Mac med iPhone (slå \"Opkald på andre enheder\" til på iPhonen, samme Apple-ID), og på Windows via Phone Link. Du taler i computerens mikrofon/headset. Blyanten ved nummeret på ringelisten retter nummeret.",
     screenshotUrl: "/news/ring-op.png",
   },
+  {
+    minutesAgo: 0,
+    title: "Betalingsservice kører nu automatisk via SFTP",
+    body: "Under Indstillinger → Betalingsservice kan Arpo nu selv sende betalingsfilerne til Mastercard og hente kvitteringer og resultater - uden at nogen skal logge ind med MitID. Opsætning én gang: skriv jeres UserID, tryk \"Generér SSH-nøgle\", download nøglefilen og upload den til postkassen i My File Transfer i browseren. Når der kommer en .OK-kvittering, kan du trykke \"Test forbindelse\".\n\nDerefter kører det én gang om dagen: med \"Lav og send betalingsfilen automatisk\" slået til laves og sendes filen selv, og betalinger og tilmeldinger fra Betalingsservice indlæses af sig selv - betalte fakturaer markeres som betalt, også i Dinero. Kvitteringer kan ses under \"Hentet fra postkassen\".",
+    screenshotUrl: "/news/betalingsservice-sftp.png",
+  },
 ];
 
 /**

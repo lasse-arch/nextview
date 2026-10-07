@@ -12,6 +12,12 @@ import {
   markBsDeliverySubmitted,
   retryBsPaymentRegistration,
 } from "@/lib/betalingsservice/service";
+import {
+  MFT_DEFAULT_PORT,
+  generateSftpKey,
+  runSftpExchange,
+  testSftpConnection,
+} from "@/lib/betalingsservice/sftp";
 
 const PAGE = "/settings/betalingsservice";
 
@@ -99,4 +105,48 @@ export async function retryBsPaymentRegistrationAction(collectionId: string) {
   const lines = await retryBsPaymentRegistration(collectionId);
   revalidatePath(PAGE);
   return lines;
+}
+
+export async function saveBsSftpSettings(formData: FormData): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireBillingUser();
+  const sftpUser = String(formData.get("sftpUser") || "").trim() || null;
+  const sftpHost = String(formData.get("sftpHost") || "").trim() || null;
+  const portRaw = Number(formData.get("sftpPort") || MFT_DEFAULT_PORT);
+  if (!Number.isInteger(portRaw) || portRaw <= 0 || portRaw > 65535) return { ok: false, error: "Ugyldig port." };
+  const autoSend = formData.get("autoSend") === "on";
+  await prisma.bsSettings.upsert({
+    where: { id: "default" },
+    create: { id: "default", sftpUser, sftpHost, sftpPort: portRaw, autoSend },
+    update: { sftpUser, sftpHost, sftpPort: portRaw, autoSend },
+  });
+  revalidatePath(PAGE);
+  return { ok: true };
+}
+
+export async function generateSftpKeyAction() {
+  await requireBillingUser();
+  const publicKey = await generateSftpKey();
+  revalidatePath(PAGE);
+  return publicKey;
+}
+
+export async function testSftpConnectionAction() {
+  await requireBillingUser();
+  return testSftpConnection();
+}
+
+export async function runSftpExchangeAction() {
+  await requireBillingUser();
+  const result = await runSftpExchange();
+  revalidatePath(PAGE);
+  return result;
+}
+
+/** Queues a generated file for the next SFTP exchange and runs it right away. */
+export async function sendBsDeliveryViaSftpAction(deliveryId: string) {
+  await requireBillingUser();
+  await prisma.bsDelivery.update({ where: { id: deliveryId }, data: { sendViaSftp: true, sftpError: null } });
+  const result = await runSftpExchange();
+  revalidatePath(PAGE);
+  return result;
 }

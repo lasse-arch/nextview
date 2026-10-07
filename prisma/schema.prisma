@@ -604,9 +604,9 @@ model TimeEntry {
   userId String
 
   /// The day the work happened (date only - time-of-day isn't tracked).
-  date    DateTime
-  minutes Int
-  source  TimeEntrySource    @default(MANUAL)
+  date     DateTime
+  minutes  Int
+  source   TimeEntrySource    @default(MANUAL)
   /// What the hours were spent on - required for a MANUAL entry (see
   /// addManualTimeEntry), null for an auto-logged EMAIL entry.
   category TimeEntryCategory?
@@ -1080,18 +1080,19 @@ model BsSettings {
   nextDeliverySequence Int     @default(1)
   nextCustomerNumber   Int     @default(1)
 
-  /// SFTP via the small relay server (fixed IP, see src/lib/betalingsservice/relay.ts).
-  /// Only a hash of the relay's token is kept - the token itself is shown once.
-  relayTokenHash     String?
-  relayPublicKey     String?
-  relayIp            String?
-  relayLastSeenAt    DateTime?
-  relayLastError     String?
+  /// SFTP to Mastercard's My File Transfer (see src/lib/betalingsservice/sftp.ts).
+  /// The private key is stored encrypted (AES-GCM keyed from AUTH_SECRET) and
+  /// itself passphrase-protected; only the public half ever leaves Arpo.
   sftpHost           String?
-  sftpPort           Int       @default(22)
+  sftpPort           Int       @default(10022)
+  /// The mailbox UserID in My File Transfer.
   sftpUser           String?
-  sftpUploadDir      String    @default("")
-  sftpDownloadDir    String    @default("")
+  sftpPrivateKeyEnc  String?
+  sftpPassphraseEnc  String?
+  sftpPublicKey      String?
+  sftpKeyCreatedAt   DateTime?
+  sftpLastRunAt      DateTime?
+  sftpLastError      String?
   /// Make and send the BS 0601 file by itself (once a day when invoices are ready).
   autoSend           Boolean   @default(false)
   lastAutoDeliveryAt DateTime?

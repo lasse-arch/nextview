@@ -9,6 +9,11 @@ import {
   markBsDeliverySubmittedAction,
   retryBsPaymentRegistrationAction,
   saveBsSettings,
+  saveBsSftpSettings,
+  generateSftpKeyAction,
+  testSftpConnectionAction,
+  runSftpExchangeAction,
+  sendBsDeliveryViaSftpAction,
 } from "@/lib/actions/betalingsservice";
 import { useToast } from "@/components/toast";
 
@@ -114,17 +119,38 @@ export function DeliveryActions({
   deliveryId,
   submittedAt,
   canDelete,
+  canSendViaSftp = false,
 }: {
   deliveryId: string;
   submittedAt: string | null;
   canDelete: boolean;
+  canSendViaSftp?: boolean;
 }) {
   const [pending, startTransition] = useTransition();
   const showToast = useToast();
   const router = useRouter();
 
+  function sendViaSftp() {
+    if (submittedAt && !confirm("Filen er markeret som uploadet. Send den alligevel via SFTP? Send kun igen, hvis Betalingsservice har afvist den.")) return;
+    startTransition(async () => {
+      const result = await sendBsDeliveryViaSftpAction(deliveryId);
+      showToast(result.lines.join(" "));
+      router.refresh();
+    });
+  }
+
   return (
     <div className="flex flex-wrap items-center gap-2">
+      {canSendViaSftp && (
+        <button
+          type="button"
+          disabled={pending}
+          onClick={sendViaSftp}
+          className="rounded-md bg-indigo-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+        >
+          {pending ? "Sender…" : "Send via SFTP"}
+        </button>
+      )}
       <a
         href={`/api/betalingsservice/deliveries/${deliveryId}`}
         className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
@@ -235,5 +261,167 @@ export function RetryPaymentButton({ collectionId }: { collectionId: string }) {
     >
       {pending ? "Prøver…" : "Registrér i Dinero igen"}
     </button>
+  );
+}
+
+export function SftpPanel({
+  initial,
+  publicKey,
+  publicKeyFileName,
+  lastRunAt,
+  lastError,
+  ready,
+}: {
+  initial: { sftpUser: string; sftpHost: string; sftpPort: string; autoSend: boolean };
+  publicKey: string | null;
+  publicKeyFileName: string | null;
+  lastRunAt: string | null;
+  lastError: string | null;
+  ready: boolean;
+}) {
+  const [pending, startTransition] = useTransition();
+  const [output, setOutput] = useState<{ ok: boolean; lines: string[] } | null>(null);
+  const showToast = useToast();
+  const router = useRouter();
+
+  function downloadPublicKey() {
+    if (!publicKey || !publicKeyFileName) return;
+    const blob = new Blob([publicKey + "\n"], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = publicKeyFileName;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  return (
+    <div className="mt-4 space-y-4">
+      <form
+        action={(formData) =>
+          startTransition(async () => {
+            const result = await saveBsSftpSettings(formData);
+            showToast(result.ok ? "Gemt" : result.error);
+            if (result.ok) router.refresh();
+          })
+        }
+        className="grid gap-4 sm:grid-cols-3"
+      >
+        <label className="block">
+          <span className={labelClass}>UserID (postkasse)</span>
+          <input name="sftpUser" defaultValue={initial.sftpUser} placeholder="fra Mastercard Connect" className={inputClass} />
+        </label>
+        <label className="block">
+          <span className={labelClass}>Server</span>
+          <input name="sftpHost" defaultValue={initial.sftpHost} placeholder="185.96.138.21" className={inputClass} />
+        </label>
+        <label className="block">
+          <span className={labelClass}>Port</span>
+          <input name="sftpPort" defaultValue={initial.sftpPort} inputMode="numeric" className={inputClass} />
+        </label>
+        <label className="flex items-center gap-2 text-sm text-slate-700 sm:col-span-3">
+          <input type="checkbox" name="autoSend" defaultChecked={initial.autoSend} className="h-4 w-4" />
+          Lav og send betalingsfilen automatisk (dagligt, når der er fakturaer klar)
+        </label>
+        <div className="sm:col-span-3">
+          <button
+            type="submit"
+            disabled={pending}
+            className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+          >
+            Gem
+          </button>
+        </div>
+      </form>
+
+      <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
+        <p className="font-medium text-slate-900">SSH-nøgle</p>
+        {publicKey ? (
+          <>
+            <p className="mt-1 text-xs text-slate-500">
+              Upload den offentlige nøgle én gang til jeres postkasse via My File Transfer i browseren (HTTPS). Der
+              kommer en kvittering, der ender på <span className="font-mono">.OK</span>, når nøglen er godkendt.
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={downloadPublicKey}
+                className="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700"
+              >
+                Download {publicKeyFileName}
+              </button>
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => {
+                  if (!confirm("Lav en ny nøgle? Den nye skal uploades til postkassen igen, før SFTP virker.")) return;
+                  startTransition(async () => {
+                    await generateSftpKeyAction();
+                    router.refresh();
+                  });
+                }}
+                className="rounded-md border border-slate-300 px-3 py-1.5 text-xs text-slate-600 hover:bg-white disabled:opacity-50"
+              >
+                Lav ny nøgle
+              </button>
+            </div>
+          </>
+        ) : (
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() =>
+              startTransition(async () => {
+                await generateSftpKeyAction();
+                showToast("Nøgle lavet - download den offentlige nøgle og upload den til postkassen.");
+                router.refresh();
+              })
+            }
+            className="mt-2 rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+          >
+            Generér SSH-nøgle
+          </button>
+        )}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          disabled={pending || !ready}
+          onClick={() => startTransition(async () => setOutput(await testSftpConnectionAction()))}
+          className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+        >
+          Test forbindelse
+        </button>
+        <button
+          type="button"
+          disabled={pending || !ready}
+          onClick={() =>
+            startTransition(async () => {
+              setOutput(await runSftpExchangeAction());
+              router.refresh();
+            })
+          }
+          className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+        >
+          {pending ? "Arbejder…" : "Send/hent nu"}
+        </button>
+        <span className="text-xs text-slate-500">
+          {lastRunAt ? `Sidst kørt ${lastRunAt}` : "Ikke kørt endnu"}
+          {lastError && <span className="text-red-600"> · fejl: {lastError}</span>}
+        </span>
+      </div>
+      {output && (
+        <div
+          className={`rounded-lg border p-3 text-sm ${
+            output.ok ? "border-slate-200 bg-slate-50 text-slate-700" : "border-red-200 bg-red-50 text-red-700"
+          }`}
+        >
+          {output.lines.map((line, i) => (
+            <p key={i}>{line}</p>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

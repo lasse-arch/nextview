@@ -8,16 +8,29 @@ ADD COLUMN IF NOT EXISTS "sftpSentAt" TIMESTAMP(3);
 -- AlterTable
 ALTER TABLE "BsSettings" ADD COLUMN IF NOT EXISTS "autoSend" BOOLEAN NOT NULL DEFAULT false,
 ADD COLUMN IF NOT EXISTS "lastAutoDeliveryAt" TIMESTAMP(3),
-ADD COLUMN IF NOT EXISTS "relayIp" TEXT,
-ADD COLUMN IF NOT EXISTS "relayLastError" TEXT,
-ADD COLUMN IF NOT EXISTS "relayLastSeenAt" TIMESTAMP(3),
-ADD COLUMN IF NOT EXISTS "relayPublicKey" TEXT,
-ADD COLUMN IF NOT EXISTS "relayTokenHash" TEXT,
-ADD COLUMN IF NOT EXISTS "sftpDownloadDir" TEXT NOT NULL DEFAULT '',
 ADD COLUMN IF NOT EXISTS "sftpHost" TEXT,
-ADD COLUMN IF NOT EXISTS "sftpPort" INTEGER NOT NULL DEFAULT 22,
-ADD COLUMN IF NOT EXISTS "sftpUploadDir" TEXT NOT NULL DEFAULT '',
-ADD COLUMN IF NOT EXISTS "sftpUser" TEXT;
+ADD COLUMN IF NOT EXISTS "sftpPort" INTEGER NOT NULL DEFAULT 10022,
+ADD COLUMN IF NOT EXISTS "sftpUser" TEXT,
+ADD COLUMN IF NOT EXISTS "sftpPrivateKeyEnc" TEXT,
+ADD COLUMN IF NOT EXISTS "sftpPassphraseEnc" TEXT,
+ADD COLUMN IF NOT EXISTS "sftpPublicKey" TEXT,
+ADD COLUMN IF NOT EXISTS "sftpKeyCreatedAt" TIMESTAMP(3),
+ADD COLUMN IF NOT EXISTS "sftpLastRunAt" TIMESTAMP(3),
+ADD COLUMN IF NOT EXISTS "sftpLastError" TEXT;
+
+-- Columns from an earlier relay-server design that an old preview build may
+-- have created in production - no longer used.
+ALTER TABLE "BsSettings" DROP COLUMN IF EXISTS "relayTokenHash",
+DROP COLUMN IF EXISTS "relayPublicKey",
+DROP COLUMN IF EXISTS "relayIp",
+DROP COLUMN IF EXISTS "relayLastSeenAt",
+DROP COLUMN IF EXISTS "relayLastError",
+DROP COLUMN IF EXISTS "sftpUploadDir",
+DROP COLUMN IF EXISTS "sftpDownloadDir";
+
+-- My File Transfer listens on port 10022 (an earlier version defaulted to 22).
+ALTER TABLE "BsSettings" ALTER COLUMN "sftpPort" SET DEFAULT 10022;
+UPDATE "BsSettings" SET "sftpPort" = 10022 WHERE "sftpPort" = 22;
 
 -- CreateTable
 CREATE TABLE IF NOT EXISTS "BsMailboxFile" (

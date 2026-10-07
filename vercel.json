@@ -24,6 +24,10 @@
     {
       "path": "/api/cron/lead-generation",
       "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/betalingsservice",
+      "schedule": "30 7 * * *"
     }
   ]
 }

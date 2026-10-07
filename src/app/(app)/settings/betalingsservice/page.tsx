@@ -5,7 +5,9 @@ import { getCurrentUser } from "@/lib/auth";
 import { dealName, formatDKK } from "@/lib/labels";
 import { getBsSettings, listPendingBsCollections, missingBsSettings } from "@/lib/betalingsservice/service";
 import { deliveryDeadline } from "@/lib/betalingsservice/banking-days";
+import { MFT_DEFAULT_HOST, MFT_DEFAULT_PORT, publicKeyFileName } from "@/lib/betalingsservice/sftp";
 import {
+  SftpPanel,
   BsSettingsForm,
   CreateDeliveryButton,
   DeliveryActions,
@@ -54,7 +56,7 @@ export default async function BetalingsservicePage() {
   if (!currentUser.canAccessBilling) redirect("/");
 
   const now = new Date();
-  const [settings, pending, deliveries, results, customers, imports] = await Promise.all([
+  const [settings, pending, deliveries, results, customers, imports, mailboxFiles] = await Promise.all([
     getBsSettings(),
     listPendingBsCollections(now),
     prisma.bsDelivery.findMany({
@@ -68,6 +70,9 @@ export default async function BetalingsservicePage() {
         totalOre: true,
         firstDueDate: true,
         submittedAt: true,
+        sendViaSftp: true,
+        sftpSentAt: true,
+        sftpError: true,
         createdAt: true,
         createdBy: { select: { name: true } },
         collections: { select: { status: true } },
@@ -94,7 +99,13 @@ export default async function BetalingsservicePage() {
       },
     }),
     prisma.bsReturnImport.findMany({ orderBy: { createdAt: "desc" }, take: 10 }),
+    prisma.bsMailboxFile.findMany({
+      orderBy: { receivedAt: "desc" },
+      take: 20,
+      select: { id: true, fileName: true, kind: true, note: true, receivedAt: true },
+    }),
   ]);
+  const sftpReady = Boolean(settings.sftpUser && settings.sftpPrivateKeyEnc);
 
   const missing = missingBsSettings(settings);
   const ready = pending.filter((p) => p.problems.length === 0 && !p.notYet);
@@ -126,6 +137,52 @@ export default async function BetalingsservicePage() {
             depositAccountNumber: settings.depositAccountNumber ? String(settings.depositAccountNumber) : "",
           }}
         />
+      </section>
+
+      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 className="text-sm font-semibold text-slate-900">Automatisk via SFTP (My File Transfer)</h2>
+        <p className="mt-1 text-xs text-slate-500">
+          Arpo sender betalingsfilerne og henter kvitteringer og resultatfiler selv - én gang om dagen, og når du trykker
+          &quot;Send/hent nu&quot;. Forbinder til Mastercards server {settings.sftpHost || MFT_DEFAULT_HOST}:
+          {settings.sftpPort || MFT_DEFAULT_PORT} med jeres UserID og en SSH-nøgle.
+        </p>
+        <SftpPanel
+          initial={{
+            sftpUser: settings.sftpUser ?? "",
+            sftpHost: settings.sftpHost ?? "",
+            sftpPort: String(settings.sftpPort || MFT_DEFAULT_PORT),
+            autoSend: settings.autoSend,
+          }}
+          publicKey={settings.sftpPublicKey}
+          publicKeyFileName={settings.sftpKeyCreatedAt ? publicKeyFileName(settings.sftpKeyCreatedAt) : null}
+          lastRunAt={settings.sftpLastRunAt ? deadline(settings.sftpLastRunAt) : null}
+          lastError={settings.sftpLastError}
+          ready={sftpReady}
+        />
+        {mailboxFiles.length > 0 && (
+          <div className="mt-4">
+            <h3 className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Hentet fra postkassen</h3>
+            <ul className="mt-1 divide-y divide-slate-100 text-sm">
+              {mailboxFiles.map((f) => (
+                <li key={f.id} className="py-1.5">
+                  <details>
+                    <summary className="cursor-pointer text-slate-700">
+                      <span className="font-mono text-xs">{f.fileName}</span>
+                      <span className="text-xs text-slate-400">
+                        {" "}
+                        · {deadline(f.receivedAt)} ·{" "}
+                        {f.kind === "data" ? "data" : f.kind === "receipt" ? "kvittering" : "fil"}
+                      </span>
+                    </summary>
+                    <pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap rounded bg-slate-50 p-2 text-[11px] text-slate-600">
+                      {f.note || "(tom)"}
+                    </pre>
+                  </details>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </section>
 
       <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -220,11 +277,17 @@ export default async function BetalingsservicePage() {
                       {results > 0 && ` · ${results} resultat${results === 1 ? "" : "er"} modtaget`}
                     </div>
                   </div>
-                  <DeliveryActions
-                    deliveryId={d.id}
-                    submittedAt={d.submittedAt ? d.submittedAt.toISOString() : null}
-                    canDelete={!d.submittedAt && results === 0}
-                  />
+                  <div className="flex flex-col items-end gap-1">
+                    <DeliveryActions
+                      deliveryId={d.id}
+                      submittedAt={d.submittedAt ? d.submittedAt.toISOString() : null}
+                      canDelete={!d.submittedAt && results === 0 && !d.sftpSentAt}
+                      canSendViaSftp={sftpReady && !d.sftpSentAt && !d.sendViaSftp}
+                    />
+                    {d.sftpSentAt && <span className="text-[11px] text-emerald-700">Sendt via SFTP {deadline(d.sftpSentAt)}</span>}
+                    {!d.sftpSentAt && d.sendViaSftp && <span className="text-[11px] text-sky-700">I kø til SFTP</span>}
+                    {d.sftpError && <span className="max-w-xs text-right text-[11px] text-red-600">SFTP-fejl: {d.sftpError}</span>}
+                  </div>
                 </li>
               );
             })}
