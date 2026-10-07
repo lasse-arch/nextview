@@ -36,6 +36,15 @@ enum TimeEntrySource {
   EMAIL
 }
 
+/// What a manual TimeEntry's hours were actually spent on - null for an
+/// EMAIL-source entry, which isn't categorized work.
+enum TimeEntryCategory {
+  FILMING
+  TOUR_EDITING
+  REFILMING
+  CORRECTIONS
+}
+
 enum DealStage {
   LEAD
   CONTACTED
@@ -597,7 +606,10 @@ model TimeEntry {
   /// The day the work happened (date only - time-of-day isn't tracked).
   date    DateTime
   minutes Int
-  source  TimeEntrySource @default(MANUAL)
+  source  TimeEntrySource    @default(MANUAL)
+  /// What the hours were spent on - required for a MANUAL entry (see
+  /// addManualTimeEntry), null for an auto-logged EMAIL entry.
+  category TimeEntryCategory?
 
   /// Who logged this row - usually the same as `user`, except when one
   /// person enters a shared day's hours for a colleague too (e.g. Lasse

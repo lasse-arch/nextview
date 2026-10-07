@@ -3,8 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
+import type { TimeEntryCategory } from "@prisma/client";
 
 const QUARTER_HOUR_MINUTES = 15;
+const VALID_CATEGORIES: TimeEntryCategory[] = ["FILMING", "TOUR_EDITING", "REFILMING", "CORRECTIONS"];
 
 /** Every manual entry rounds UP to the next quarter-hour (15/30/45/60/...) -
  * never down, so a slightly-over day (e.g. "7,1 timer") never under-counts. */
@@ -28,13 +30,16 @@ export async function addManualTimeEntry(
   const dateRaw = String(formData.get("date") || "");
   const hoursRaw = String(formData.get("hours") || "").replace(",", ".");
   const userIds = formData.getAll("userIds").map(String).filter(Boolean);
+  const categoryRaw = String(formData.get("category") || "");
 
   const date = dateRaw ? new Date(dateRaw) : null;
   const hours = parseFloat(hoursRaw);
+  const category = VALID_CATEGORIES.includes(categoryRaw as TimeEntryCategory) ? (categoryRaw as TimeEntryCategory) : null;
 
   if (!date || Number.isNaN(date.getTime())) return { ok: false, error: "Vælg en dato." };
   if (!hoursRaw || Number.isNaN(hours) || hours <= 0) return { ok: false, error: "Angiv antal timer." };
   if (userIds.length === 0) return { ok: false, error: "Vælg mindst én person." };
+  if (!category) return { ok: false, error: "Vælg hvad tiden er brugt på." };
 
   const minutes = roundUpToQuarterHour(hours * 60);
 
@@ -45,6 +50,7 @@ export async function addManualTimeEntry(
       date,
       minutes,
       source: "MANUAL",
+      category,
       createdById: currentUser.id,
     })),
   });

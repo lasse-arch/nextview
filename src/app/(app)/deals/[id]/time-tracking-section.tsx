@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { addManualTimeEntry, deleteTimeEntry } from "@/lib/actions/time-entries";
+import { timeEntryCategoryLabels } from "@/lib/labels";
 import { useToast } from "@/components/toast";
 
 export type TimeEntryRow = {
@@ -10,6 +11,7 @@ export type TimeEntryRow = {
   date: string;
   minutes: number;
   source: "MANUAL" | "EMAIL";
+  category: string | null;
   userId: string;
   userName: string;
   canDelete: boolean;
@@ -135,6 +137,24 @@ export function TimeTrackingSection({
           />
         </div>
         <div>
+          <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Brugt på</label>
+          <select
+            name="category"
+            required
+            defaultValue=""
+            className="mt-1 rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+          >
+            <option value="" disabled>
+              Vælg…
+            </option>
+            {Object.entries(timeEntryCategoryLabels).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
           <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Hvem</label>
           <div className="mt-1 flex flex-wrap gap-2">
             {users.map((u) => (
@@ -179,6 +199,11 @@ export function TimeTrackingSection({
                 <li key={entry.id} className="flex items-center justify-between text-sm text-slate-700">
                   <span>
                     {entry.userName}
+                    {entry.category && (
+                      <span className="ml-1.5 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">
+                        {timeEntryCategoryLabels[entry.category] ?? entry.category}
+                      </span>
+                    )}
                     {entry.source === "EMAIL" && (
                       <span className="ml-1.5 rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700">
                         mail

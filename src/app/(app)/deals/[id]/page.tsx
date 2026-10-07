@@ -380,6 +380,7 @@ export default async function DealDetailPage({
                 date: t.date.toISOString().slice(0, 10),
                 minutes: t.minutes,
                 source: t.source,
+                category: t.category,
                 userId: t.userId,
                 userName: t.user.name,
                 canDelete: currentUser?.role === "ADMIN" || t.createdById === currentUser?.id,

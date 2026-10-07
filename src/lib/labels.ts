@@ -133,6 +133,13 @@ export const noteKindLabels: Record<string, string> = {
   AI_EMAIL: "AI-mailreferat",
 };
 
+export const timeEntryCategoryLabels: Record<string, string> = {
+  FILMING: "Filming",
+  TOUR_EDITING: "Redigering af tour",
+  REFILMING: "Genfilming",
+  CORRECTIONS: "Rettelser",
+};
+
 export const commissionFrequencyLabels: Record<string, string> = {
   MONTHLY: "Månedligt",
   QUARTERLY: "Kvartalsvist",
