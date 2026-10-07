@@ -267,6 +267,14 @@ async function nameContainsSearch(accessToken: string, term: string): Promise<st
   return dineroContactsSearch(accessToken, `Name contains '${escaped}'`);
 }
 
+/** "Din Vinbutik Hobro ApS" and "din vinbutik hobro aps" (or with æ/ae,
+ * punctuation and extra spaces differing) count as the same name. */
+function normalizeCompanyName(name: string): string {
+  return DANISH_TRANSLITERATIONS.reduce((s, [pattern, repl]) => s.replace(pattern, repl), name)
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+}
+
 const DANISH_TRANSLITERATIONS: [RegExp, string][] = [
   [/æ/g, "ae"],
   [/ø/g, "oe"],
@@ -326,25 +334,24 @@ async function findContactByCvr(accessToken: string, cvr: string, companyName?: 
 
   if (!companyName) return null;
   try {
-    const guids = await findContactGuidsByName(accessToken, companyName, Boolean(sanitizeCvr(cvr)));
-    if (guids.length === 0) return null;
-
-    // A name match is only a guess (the search also tries just the first
-    // word of the name), so when the deal has a CVR, a contact registered
-    // under a DIFFERENT CVR is never used - that's another company, and the
-    // invoice would go to the wrong customer. One with the same CVR wins;
-    // otherwise only a contact with no CVR at all can be taken.
     const cleanCvr = sanitizeCvr(cvr);
-    if (!cleanCvr) return guids[0];
-    let withoutCvr: string | null = null;
-    for (const guid of guids) {
+    const guids = await findContactGuidsByName(accessToken, companyName, Boolean(cleanCvr));
+    // Dinero's search is a loose, case-insensitive "contains" - and may be
+    // on just the first word ("Din" also hits "KJÆRULFF HOLDING" and
+    // "Voxeværket Kolding") - so a hit is only a candidate. It's used only
+    // when its CVR is the deal's, or, for a contact with no CVR at all, when
+    // its name is exactly the company's name. Anything else is another
+    // company, and the caller creates a new contact instead.
+    const wantedName = normalizeCompanyName(companyName);
+    let sameName: string | null = null;
+    for (const guid of guids.slice(0, 25)) {
       const detail = await fetchContactDetail(accessToken, guid);
       if (!detail) continue;
       const contactCvrs = [sanitizeCvr(detail.vatNumber), sanitizeCvr(detail.cvr)].filter(Boolean);
-      if (contactCvrs.includes(cleanCvr)) return guid;
-      if (contactCvrs.length === 0 && !withoutCvr) withoutCvr = guid;
+      if (cleanCvr && contactCvrs.includes(cleanCvr)) return guid;
+      if (contactCvrs.length === 0 && !sameName && normalizeCompanyName(detail.name ?? "") === wantedName) sameName = guid;
     }
-    return withoutCvr;
+    return sameName;
   } catch (err) {
     // This search is a best-effort optimization to avoid creating a
     // duplicate contact - it must never be the reason an invoice draft
