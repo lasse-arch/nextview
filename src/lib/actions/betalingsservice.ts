@@ -160,3 +160,13 @@ export async function createBsTestDeliveryAction() {
   revalidatePath(PAGE);
   return result;
 }
+
+export async function saveBsInvoiceTemplate(templateId: string | null) {
+  await requireBillingUser();
+  await prisma.bsSettings.upsert({
+    where: { id: "default" },
+    create: { id: "default", dineroInvoiceTemplateId: templateId || null },
+    update: { dineroInvoiceTemplateId: templateId || null },
+  });
+  revalidatePath(PAGE);
+}

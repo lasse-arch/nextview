@@ -1069,16 +1069,20 @@ model WatchedUrl {
 
 /// Betalingsservice agreement values + running counters. A single row (id "default").
 model BsSettings {
-  id                   String  @id @default("default")
-  dataSupplierNumber   String?
-  subsystem            String  @default("BS1")
-  pbsNumber            String?
-  debtorGroupNumber    String?
+  id                      String  @id @default("default")
+  dataSupplierNumber      String?
+  subsystem               String  @default("BS1")
+  pbsNumber               String?
+  debtorGroupNumber       String?
   /// Dinero account the BS payments are registered against (the
   /// mellemregningskonto the bank deposit is later reconciled with).
-  depositAccountNumber Int?
-  nextDeliverySequence Int     @default(1)
-  nextCustomerNumber   Int     @default(1)
+  depositAccountNumber    Int?
+  /// Dinero invoice template (design) used for Betalingsservice invoices -
+  /// one without the bank payment details, so the invoice doesn't invite a
+  /// bank transfer. Null: Dinero's default template.
+  dineroInvoiceTemplateId String?
+  nextDeliverySequence    Int     @default(1)
+  nextCustomerNumber      Int     @default(1)
 
   /// SFTP to Mastercard's My File Transfer (see src/lib/betalingsservice/sftp.ts).
   /// The private key is stored encrypted (AES-GCM keyed from AUTH_SECRET) and

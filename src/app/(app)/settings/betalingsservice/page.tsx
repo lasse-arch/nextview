@@ -5,10 +5,12 @@ import { getCurrentUser } from "@/lib/auth";
 import { dealName, formatDKK } from "@/lib/labels";
 import { getBsSettings, isTestDeliveryFileName, listPendingBsCollections, missingBsSettings } from "@/lib/betalingsservice/service";
 import { deliveryDeadline } from "@/lib/betalingsservice/banking-days";
+import { isDineroConfigured, listInvoiceTemplates } from "@/lib/dinero";
 import { MFT_DEFAULT_HOST, MFT_DEFAULT_PORT, publicKeyFileName } from "@/lib/betalingsservice/sftp";
 import {
   SftpPanel,
   CreateTestDeliveryButton,
+  InvoiceTemplatePicker,
   BsSettingsForm,
   CreateDeliveryButton,
   DeliveryActions,
@@ -107,6 +109,17 @@ export default async function BetalingsservicePage() {
     }),
   ]);
   const sftpReady = Boolean(settings.sftpUser && settings.sftpPrivateKeyEnc);
+  let invoiceTemplates: { id: string; name: string; isDefault: boolean }[] = [];
+  let invoiceTemplatesError: string | null = null;
+  if (await isDineroConfigured()) {
+    try {
+      invoiceTemplates = await listInvoiceTemplates();
+    } catch (err) {
+      invoiceTemplatesError = err instanceof Error ? err.message : String(err);
+    }
+  } else {
+    invoiceTemplatesError = "Dinero er ikke sat op.";
+  }
   // Test files (KR9) are an admin-only tool - other billing users never see them.
   const visibleDeliveries =
     currentUser.role === "ADMIN" ? deliveries : deliveries.filter((d) => !isTestDeliveryFileName(d.fileName));
@@ -141,6 +154,11 @@ export default async function BetalingsservicePage() {
             subsystem: settings.subsystem,
             depositAccountNumber: settings.depositAccountNumber ? String(settings.depositAccountNumber) : "",
           }}
+        />
+        <InvoiceTemplatePicker
+          templates={invoiceTemplates}
+          selectedId={settings.dineroInvoiceTemplateId}
+          error={invoiceTemplatesError}
         />
       </section>
 

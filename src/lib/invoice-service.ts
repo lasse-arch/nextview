@@ -196,6 +196,11 @@ export type BsInvoiceInfo = {
   debtorGroupNumber: string | null;
 };
 
+async function bsInvoiceTemplateId(): Promise<string | null> {
+  const settings = await prisma.bsSettings.findUnique({ where: { id: "default" }, select: { dineroInvoiceTemplateId: true } });
+  return settings?.dineroInvoiceTemplateId ?? null;
+}
+
 async function bsInvoiceInfo(deal: { bsCustomerNumber: string | null; bsMandateStatus: BsMandateStatus | null }): Promise<BsInvoiceInfo> {
   const settings = await prisma.bsSettings.findUnique({
     where: { id: "default" },
@@ -437,6 +442,7 @@ async function draftInvoiceLine(
       invoiceDate,
       paymentDays: terms.paymentDays,
       collectedViaBetalingsservice: terms.collectViaBs,
+      invoiceTemplateId: terms.collectViaBs ? await bsInvoiceTemplateId() : null,
     });
 
     await prisma.$transaction([
@@ -691,6 +697,7 @@ async function processCombinedDueInvoices(
       invoiceDate,
       paymentDays: terms.paymentDays,
       collectedViaBetalingsservice: terms.collectViaBs,
+      invoiceTemplateId: terms.collectViaBs ? await bsInvoiceTemplateId() : null,
     });
 
     await prisma.$transaction([

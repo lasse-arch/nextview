@@ -15,6 +15,7 @@ import {
   runSftpExchangeAction,
   sendBsDeliveryViaSftpAction,
   createBsTestDeliveryAction,
+  saveBsInvoiceTemplate,
 } from "@/lib/actions/betalingsservice";
 import { useToast } from "@/components/toast";
 
@@ -455,5 +456,49 @@ export function CreateTestDeliveryButton() {
     >
       {pending ? "Laver testfil…" : "Lav testfil (KR9)"}
     </button>
+  );
+}
+
+export function InvoiceTemplatePicker({
+  templates,
+  selectedId,
+  error,
+}: {
+  templates: { id: string; name: string; isDefault: boolean }[];
+  selectedId: string | null;
+  error: string | null;
+}) {
+  const [pending, startTransition] = useTransition();
+  const showToast = useToast();
+  const router = useRouter();
+  if (error) return <p className="mt-2 text-xs text-red-600">Kunne ikke hente skabeloner fra Dinero: {error}</p>;
+  return (
+    <label className="mt-4 block">
+      <span className={labelClass}>Fakturaskabelon i Dinero til Betalingsservice-fakturaer</span>
+      <select
+        defaultValue={selectedId ?? ""}
+        disabled={pending}
+        onChange={(e) => {
+          const value = e.target.value || null;
+          startTransition(async () => {
+            await saveBsInvoiceTemplate(value);
+            showToast("Gemt");
+            router.refresh();
+          });
+        }}
+        className={inputClass}
+      >
+        <option value="">Dineros standardskabelon</option>
+        {templates.map((t) => (
+          <option key={t.id} value={t.id}>
+            {t.name}
+            {t.isDefault ? " (standard)" : ""}
+          </option>
+        ))}
+      </select>
+      <span className="mt-1 block text-xs text-slate-500">
+        Vælg en skabelon uden betalingsbetingelser/bankoplysninger, så fakturaen ikke opfordrer til bankoverførsel.
+      </span>
+    </label>
   );
 }

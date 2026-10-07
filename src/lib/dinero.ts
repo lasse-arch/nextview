@@ -222,18 +222,21 @@ async function fetchContactDetail(accessToken: string, contactGuid: string): Pro
  */
 async function dineroContactsSearch(accessToken: string, queryFilter: string): Promise<string[]> {
   const orgId = process.env.DINERO_ORGANIZATION_ID!;
-  const query = new URLSearchParams({ queryFilter, pageSize: "1000" });
+  // The v2 list also returns contacts deleted in Dinero (deletedOnly=false
+  // doesn't change that - checked against a live company), so DeletedAt is
+  // asked for and deleted contacts are skipped; otherwise an invoice could be
+  // put on a contact someone has deleted. Fields come back spelled exactly as
+  // requested ("ContactGuid", "DeletedAt").
+  const query = new URLSearchParams({ queryFilter, pageSize: "1000", fields: "ContactGuid,DeletedAt" });
 
   const res = await dineroFetch(`https://api.dinero.dk/v2/${orgId}/contacts?${query}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   if (!res.ok) throw new Error(`Dinero: kunne ikke søge kontakter (${res.status}): ${await res.text()}`);
-  // v2 answers in camelCase ("contactGuid") - confirmed against a live
-  // Dinero company - unlike v1's PascalCase. Reading only "ContactGuid"
-  // made every search come back empty, so a new duplicate contact was
-  // created for every invoice. Both spellings are accepted.
-  const data = (await res.json()) as { Collection: { contactGuid?: string; ContactGuid?: string }[] };
-  return data.Collection.map((c) => c.contactGuid ?? c.ContactGuid).filter((g): g is string => Boolean(g));
+  const data = (await res.json()) as { Collection: { ContactGuid?: string; contactGuid?: string; DeletedAt?: string | null }[] };
+  return data.Collection.filter((c) => !c.DeletedAt)
+    .map((c) => c.ContactGuid ?? c.contactGuid)
+    .filter((g): g is string => Boolean(g));
 }
 
 /**
@@ -354,6 +357,8 @@ type DineroInvoiceInput = {
   /** Collected through Betalingsservice - turn off the invoice's own online
    * payment options (MobilePay/PensoPay), so it can't also be paid there. */
   collectedViaBetalingsservice?: boolean;
+  /** Dinero invoice template (design) to use instead of the default. */
+  invoiceTemplateId?: string | null;
 };
 
 /** Thrown when Dinero rejects a contact GUID as nonexistent (e.g. it was
@@ -383,6 +388,7 @@ async function createInvoiceDraft(
       PaymentConditionType: "Netto",
       PaymentConditionNumberOfDays: input.paymentDays ?? 8,
       ...(input.collectedViaBetalingsservice ? { IsMobilePayInvoiceEnabled: false, IsPensoPayEnabled: false } : {}),
+      ...(input.invoiceTemplateId ? { InvoiceTemplateId: input.invoiceTemplateId } : {}),
       ProductLines: input.lines.map((line) => ({
         Description: line.description,
         Quantity: 1,
@@ -571,6 +577,7 @@ export async function createQuarterlyInvoiceDraft(params: {
   invoiceDate: Date;
   paymentDays?: number;
   collectedViaBetalingsservice?: boolean;
+  invoiceTemplateId?: string | null;
 }): Promise<DineroDraftResult> {
   if (await isDineroTestMode()) {
     const fake = Math.random().toString(36).slice(2, 8);
@@ -614,6 +621,7 @@ export async function createQuarterlyInvoiceDraft(params: {
       invoiceDate: params.invoiceDate,
       paymentDays: params.paymentDays,
       collectedViaBetalingsservice: params.collectedViaBetalingsservice,
+      invoiceTemplateId: params.invoiceTemplateId,
     });
     const sendError = await bookAndSendOrCapture(accessToken, invoice.guid, invoice.timestamp, params.contactEmail);
     return { contactGuid, invoiceGuid: invoice.guid, invoiceNumber: await bookedNumber(invoice.guid, invoice.number), sendError };
@@ -643,6 +651,7 @@ export async function createQuarterlyInvoiceDraft(params: {
       invoiceDate: params.invoiceDate,
       paymentDays: params.paymentDays,
       collectedViaBetalingsservice: params.collectedViaBetalingsservice,
+      invoiceTemplateId: params.invoiceTemplateId,
     });
     const sendError = await bookAndSendOrCapture(accessToken, invoice.guid, invoice.timestamp, params.contactEmail);
     return { contactGuid: freshContactGuid, invoiceGuid: invoice.guid, invoiceNumber: await bookedNumber(invoice.guid, invoice.number), sendError };
@@ -694,4 +703,17 @@ export async function registerInvoicePayment(
     }),
   });
   if (!res.ok) throw new Error(`Dinero: kunne ikke registrere betaling (${res.status}): ${await res.text()}`);
+}
+
+/** The organization's invoice templates (designs) - for picking the one
+ * Betalingsservice invoices use. */
+export async function listInvoiceTemplates(): Promise<{ id: string; name: string; isDefault: boolean }[]> {
+  const accessToken = await getAccessToken();
+  const orgId = process.env.DINERO_ORGANIZATION_ID!;
+  const res = await dineroFetch(`${DINERO_API_BASE}/${orgId}/invoices/templates`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) throw new Error(`Dinero: kunne ikke hente fakturaskabeloner (${res.status}): ${await res.text()}`);
+  const data = (await res.json()) as { Id: string; Name: string; IsDefault?: boolean }[];
+  return data.map((t) => ({ id: t.Id, name: t.Name, isDefault: Boolean(t.IsDefault) }));
 }
