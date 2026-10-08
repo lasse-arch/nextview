@@ -67,8 +67,6 @@ const CUSTOMER_STAGES = ["CONTRACT_SIGNED", "FILMED", "LIVE"] as const;
 const switchableDealsWhere = {
   paymentMethod: "INVOICE" as const,
   churnedAt: null,
-  // EAN customers (public institutions) get e-invoices - never Betalingsservice.
-  eanNumber: null,
   stage: { not: "LOST" as const },
 };
 
