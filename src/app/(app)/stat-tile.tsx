@@ -42,7 +42,9 @@ export function StatTile({
           {tooltipRows!.map((row) => (
             <p key={row.label} className="flex justify-between gap-4 whitespace-nowrap">
               <span className="text-slate-300">{row.label}</span>
-              <span className="money">{row.value}</span>
+              {/* Mono, so the amounts' digits line up under each other - the
+                  app's Geist font has no tabular figures. */}
+              <span className="money font-mono">{row.value}</span>
             </p>
           ))}
         </div>
