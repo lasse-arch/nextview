@@ -35,11 +35,34 @@ function isBillable(deal: DealForGrowth): boolean {
   return Boolean(deal.saleAmount && deal.bindingMonths);
 }
 
+export type PaymentReportRow = { key: string; id: string; name: string; stage: string; note: string; amount: number };
+
+/** "Faktura 123 · forfald 12.10.2026 (overskredet)" - what an unpaid invoice row says in a report. */
+function invoiceNote(inv: { dineroInvoiceNumber: string | null; dueDate: Date | null; status: string }, now: Date): string {
+  const parts = [inv.dineroInvoiceNumber ? `Faktura ${inv.dineroInvoiceNumber}` : inv.status === "SENT_MANUALLY" ? "Sendt manuelt" : "Kladde"];
+  if (inv.dueDate) {
+    const due = inv.dueDate.toLocaleDateString("da-DK", { timeZone: "Europe/Copenhagen" });
+    parts.push(inv.dueDate < now ? `forfaldt ${due}` : `forfald ${due}`);
+  }
+  return parts.join(" · ");
+}
+
 export async function getGrowthDashboardData() {
   const [deals, items, invoices] = await Promise.all([
     prisma.deal.findMany(),
     prisma.dealItem.findMany({ include: { deal: { select: { stage: true, churnedAt: true } } } }),
-    prisma.invoice.findMany({ select: { dealId: true, amount: true, status: true, paidAt: true, quarterIndex: true } }),
+    prisma.invoice.findMany({
+      select: {
+        id: true,
+        dealId: true,
+        amount: true,
+        status: true,
+        paidAt: true,
+        quarterIndex: true,
+        dineroInvoiceNumber: true,
+        dueDate: true,
+      },
+    }),
   ]);
 
   const now = new Date();
@@ -207,21 +230,43 @@ export async function getGrowthDashboardData() {
   }
   let missingEstablishmentTotal = 0;
   let missingEstablishmentCount = 0;
+  const missingEstablishment: PaymentReportRow[] = [];
   for (const d of soldDeals) {
     if (!stillActive(d) || !d.establishmentFee) continue;
     const inv = establishmentInvoiceByDeal.get(d.id);
     if (!inv) {
       missingEstablishmentTotal += d.establishmentFee;
       missingEstablishmentCount++;
+      missingEstablishment.push({ key: d.id, id: d.id, name: dealName(d), stage: d.stage, note: "Ikke faktureret", amount: d.establishmentFee });
     } else if (!inv.paidAt && (inv.status === "DRAFT_CREATED" || inv.status === "SENT_MANUALLY")) {
       missingEstablishmentTotal += inv.amount;
       missingEstablishmentCount++;
+      missingEstablishment.push({ key: d.id, id: d.id, name: dealName(d), stage: d.stage, note: invoiceNote(inv, now), amount: inv.amount });
     }
   }
+  missingEstablishment.sort((a, b) => a.name.localeCompare(b.name, "da"));
+
+  // The Udestående report: one row per unpaid invoice, oldest due date first.
+  const dealById = new Map(deals.map((d) => [d.id, d]));
+  const outstanding: PaymentReportRow[] = [...outstandingInvoices]
+    .sort((a, b) => (a.dueDate?.getTime() ?? Infinity) - (b.dueDate?.getTime() ?? Infinity))
+    .map((inv) => {
+      const deal = dealById.get(inv.dealId);
+      return {
+        key: inv.id,
+        id: inv.dealId,
+        name: deal ? dealName(deal) : "Ukendt kunde",
+        stage: deal?.stage ?? "",
+        note: invoiceNote(inv, now),
+        amount: inv.amount,
+      };
+    });
 
   const paymentStatus = {
     notLiveYet,
     liveWithoutInvoice,
+    outstanding,
+    missingEstablishment,
     outstandingCount: outstandingInvoices.length,
     outstandingTotal: outstandingInvoices.reduce((sum, inv) => sum + inv.amount, 0),
     missingEstablishmentCount,

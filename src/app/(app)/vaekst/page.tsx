@@ -108,16 +108,20 @@ export default async function GrowthDashboardPage() {
       <div>
         <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Betaling</h2>
         <div className="mt-2 grid grid-cols-1 gap-4 lg:grid-cols-4">
-          <StatTile
+          <CustomerStatTile
             label="Udestående betaling"
             value={formatDKK(d.paymentStatus.outstandingTotal)}
             sub={`${d.paymentStatus.outstandingCount} faktura${d.paymentStatus.outstandingCount === 1 ? "" : "er"} ikke meldt betalt`}
+            customers={d.paymentStatus.outstanding}
+            noteHeader="Faktura"
             money
           />
-          <StatTile
+          <CustomerStatTile
             label="Etablering vi mangler at modtage"
             value={formatDKK(d.paymentStatus.missingEstablishmentTotal)}
             sub={`${d.paymentStatus.missingEstablishmentCount} kunde${d.paymentStatus.missingEstablishmentCount === 1 ? "" : "r"} ikke faktureret/betalt endnu`}
+            customers={d.paymentStatus.missingEstablishment}
+            noteHeader="Status"
             money
           />
 

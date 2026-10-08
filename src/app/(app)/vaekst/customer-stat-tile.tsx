@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { stageLabels } from "@/lib/labels";
+import { formatDKK, stageLabels } from "@/lib/labels";
 
-export type StatCustomer = { id: string; name: string; stage: string; note?: string };
+/** `key` when one customer can have several rows (e.g. several unpaid invoices). */
+export type StatCustomer = { key?: string; id: string; name: string; stage: string; note?: string; amount?: number };
 
 /**
  * Same stat tile as the plain one elsewhere on this page, but with a
@@ -18,13 +19,20 @@ export function CustomerStatTile({
   value,
   sub,
   customers,
+  money,
+  noteHeader = "Stadie",
 }: {
   label: string;
   value: string;
   sub?: string;
   customers: StatCustomer[];
+  /** Amount value in the tile (money-styled) - rows with an amount get a Beløb column and a total. */
+  money?: boolean;
+  noteHeader?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const hasAmounts = customers.some((c) => c.amount != null);
+  const columns = hasAmounts ? 3 : 2;
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -38,13 +46,13 @@ export function CustomerStatTile({
           Rapport
         </button>
       </div>
-      <div className="mt-1 text-xl font-semibold text-slate-900">{value}</div>
+      <div className={`mt-1 font-semibold text-slate-900 text-xl ${money ? "money" : ""}`}>{value}</div>
       {sub && <div className="mt-0.5 text-xs text-slate-400">{sub}</div>}
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setOpen(false)}>
           <div
-            className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6 shadow-xl"
+            className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-6 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between">
@@ -59,23 +67,39 @@ export function CustomerStatTile({
                 <thead className="text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                   <tr className="border-b border-slate-200">
                     <th className="py-1.5 font-medium">Kunde</th>
-                    <th className="py-1.5 text-right font-medium">Stadie</th>
+                    <th className="py-1.5 text-right font-medium">{noteHeader}</th>
+                    {hasAmounts && <th className="py-1.5 pl-4 text-right font-medium">Beløb</th>}
                   </tr>
                 </thead>
                 <tbody>
                   {customers.map((c) => (
-                    <tr key={c.id} className="border-b border-slate-100">
+                    <tr key={c.key ?? c.id} className="border-b border-slate-100">
                       <td className="py-1.5">
                         <Link href={`/deals/${c.id}`} className="text-blue-700 hover:underline">
                           {c.name}
                         </Link>
                       </td>
                       <td className="py-1.5 text-right text-slate-500">{c.note ?? stageLabels[c.stage] ?? c.stage}</td>
+                      {hasAmounts && (
+                        <td className="money whitespace-nowrap py-1.5 pl-4 text-right font-mono text-slate-900">
+                          {c.amount != null ? formatDKK(c.amount) : ""}
+                        </td>
+                      )}
                     </tr>
                   ))}
+                  {hasAmounts && customers.length > 0 && (
+                    <tr>
+                      <td colSpan={2} className="py-2 font-semibold text-slate-900">
+                        I alt
+                      </td>
+                      <td className="money whitespace-nowrap py-2 pl-4 text-right font-mono font-semibold text-slate-900">
+                        {formatDKK(customers.reduce((sum, c) => sum + (c.amount ?? 0), 0))}
+                      </td>
+                    </tr>
+                  )}
                   {customers.length === 0 && (
                     <tr>
-                      <td colSpan={2} className="py-4 text-center text-slate-400">
+                      <td colSpan={columns} className="py-4 text-center text-slate-400">
                         Ingen kunder.
                       </td>
                     </tr>
