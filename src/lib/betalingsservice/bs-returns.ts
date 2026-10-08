@@ -72,6 +72,13 @@ const MANDATE_EVENTS: Record<string, BsMandateEvent> = {
 };
 
 const numberAt = (r: string, from: number, to: number) => Number(field(r, from, to).trim() || "0");
+/**
+ * Mastercard returns the customer number right-aligned and padded with
+ * zeros ("00000000TEST001" for TEST001, as seen in a real BS 0603 from the
+ * test system) - not as it was sent in BS 0601. Our numbers never start
+ * with a zero (NV00012), so the padding is simply dropped.
+ */
+const customerAt = (r: string, from: number, to: number) => field(r, from, to).trim().replace(/^0+(?=.)/, "");
 const mandateAt = (r: string) => {
   const m = field(r, 41, 49).trim();
   return m && !/^0+$/.test(m) ? m : null;
@@ -110,7 +117,7 @@ export function parseBsReturnDelivery(file: Buffer | string): BsReturnDelivery {
         outcome: AUTOMATIC_OUTCOMES[code],
         channel: "automatic",
         transactionCode: code,
-        customerNumber: field(r, 26, 40).trim(),
+        customerNumber: customerAt(r, 26, 40),
         mandateNumber: mandateAt(r),
         dueDate: parseBsDate(field(r, 50, 55)),
         amountOre: numberAt(r, 57, 69),
@@ -125,7 +132,7 @@ export function parseBsReturnDelivery(file: Buffer | string): BsReturnDelivery {
         outcome: SLIP_OUTCOMES[code],
         channel: "slip",
         transactionCode: code,
-        customerNumber: field(r, 30, 44).trim(),
+        customerNumber: customerAt(r, 30, 44),
         mandateNumber: null,
         dueDate: parseBsDate(field(r, 53, 58)),
         amountOre: numberAt(r, 60, 72),
@@ -139,7 +146,7 @@ export function parseBsReturnDelivery(file: Buffer | string): BsReturnDelivery {
       result.mandates.push({
         event: MANDATE_EVENTS[code],
         transactionCode: code,
-        customerNumber: field(r, 26, 40).trim(),
+        customerNumber: customerAt(r, 26, 40),
         mandateNumber: field(r, 41, 49).trim(),
         date: parseBsDate(field(r, 50, 55)),
         endDate: parseBsDate(field(r, 56, 61)),

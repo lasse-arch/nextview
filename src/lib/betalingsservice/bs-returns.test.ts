@@ -44,6 +44,17 @@ test("BS 0602: automatic payment completed and payment slip completed", () => {
   assert.equal(slip.paidAmountOre, 899700);
 });
 
+test("BS 0603: zero-padded customer numbers, as Mastercard really returns them", () => {
+  const file = [
+    start("0603"),
+    sectionStart("0212"),
+    rec([[1, "BS042"], [6, "87654321"], [14, "0230"], [18, "000"], [21, "00001"], [26, "00000000TEST001"], [41, "123456789"], [50, "201026"], [56, "000000"]]),
+    rec([[1, "BS042"], [6, "87654321"], [14, "0230"], [18, "000"], [21, "00001"], [26, "00000000NV00012"], [41, "123456790"], [50, "201026"], [56, "000000"]]),
+    end("0603", 2),
+  ].join("\n");
+  assert.deepEqual(parseBsReturnDelivery(file).mandates.map((m) => m.customerNumber), ["TEST001", "NV00012"]);
+});
+
 test("BS 0603: registered and cancelled mandates", () => {
   const file = [
     start("0603"),
