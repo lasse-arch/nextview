@@ -39,6 +39,18 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: "/kalender", label: "Kalender", icon: "calendar" },
     { href: "/opgaver", label: "Opgaver", icon: "tasks" },
     { label: "Virksomheden", icon: "building", children: companyItems },
+    // Everything about invoicing and getting paid, in one place.
+    {
+      label: "Betaling",
+      icon: "wallet",
+      children: user.canAccessBilling
+        ? [
+            { href: "/settings/dinero", label: "Fakturaer", icon: "receipt" },
+            { href: "/settings/betaling", label: "Betalingsstatus", icon: "checkCircle" },
+            { href: "/settings/betalingsservice", label: "Betalingsservice", icon: "bank" },
+          ]
+        : [],
+    },
   ];
 
   const settingsItems = [
@@ -48,9 +60,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: "/settings/email-templates", label: "E-mail-skabeloner" },
     { href: "/settings/docuseal", label: "Kontrakter" },
   ];
-  if (user.canAccessBilling) {
-    settingsItems.push({ href: "/settings/dinero", label: "Fakturaer" }, { href: "/settings/betaling", label: "Betalingsstatus" }, { href: "/settings/betalingsservice", label: "Betalingsservice" });
-  }
   if (user.role === "ADMIN") {
     settingsItems.push({ href: "/users", label: "Brugere" });
   }

@@ -17,6 +17,10 @@ import {
   IconPhone,
   IconBuilding,
   IconInbox,
+  IconWallet,
+  IconReceipt,
+  IconCheckCircle,
+  IconBank,
 } from "./nav-icons";
 
 /**
@@ -39,6 +43,10 @@ const NAV_ICONS = {
   phone: IconPhone,
   building: IconBuilding,
   inbox: IconInbox,
+  wallet: IconWallet,
+  receipt: IconReceipt,
+  checkCircle: IconCheckCircle,
+  bank: IconBank,
 } as const;
 
 export type NavIconName = keyof typeof NAV_ICONS;
