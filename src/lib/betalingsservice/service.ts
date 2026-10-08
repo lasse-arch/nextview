@@ -510,6 +510,28 @@ export function isTestDeliveryFileName(fileName: string): boolean {
  * month (section 0112 requires the following month). Touches no real invoice, deal or customer - it's only
  * stored as a delivery so it can be downloaded or sent via SFTP.
  */
+/**
+ * The mandates Mastercard's test system registered for our 15 test customers
+ * (its BS 0603 of 8 Oct 2026, D3808688001-603.KR9).
+ */
+const TEST_MANDATES: Record<string, string> = {
+  TEST001: "000101529",
+  TEST002: "000101531",
+  TEST003: "000101533",
+  TEST004: "000101535",
+  TEST005: "000101537",
+  TEST006: "000101539",
+  TEST007: "000101540",
+  TEST008: "000101541",
+  TEST009: "000101542",
+  TEST010: "000101543",
+  TEST011: "000101530",
+  TEST012: "000101532",
+  TEST013: "000101534",
+  TEST014: "000101536",
+  TEST015: "000101538",
+};
+
 export async function createBsTestDelivery(userId: string): Promise<CreateDeliveryResult> {
   const settings = await getBsSettings();
   const missing = missingBsSettings(settings).filter((m) => m !== "mellemregningskonto i Dinero");
@@ -522,6 +544,9 @@ export async function createBsTestDelivery(userId: string): Promise<CreateDelive
   const dueDate = firstBankingDayOfMonth(utcDay(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
   const collections: Bs0601Collection[] = TEST_CUSTOMERS.map((c, i) => ({
     customerNumber: `TEST${String(i + 1).padStart(3, "0")}`,
+    // TEST001-TEST010 as automatic payments (with the mandates Mastercard
+    // registered for them), the rest as payment slips - so both are tested.
+    mandateNumber: i < 10 ? TEST_MANDATES[`TEST${String(i + 1).padStart(3, "0")}`] : null,
     nameAndAddressLines: [c.name, c.street],
     postalCode: c.postalCode,
     dueDate,
