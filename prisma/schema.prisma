@@ -524,6 +524,10 @@ model Deal {
 
   dineroContactGuid String?
 
+  /// EAN (GLN) number of a public institution (e.g. an efterskole): its
+  /// invoices go as e-invoices via NemHandel instead of by e-mail, and it's
+  /// never on Betalingsservice.
+  eanNumber          String?
   /// How this customer pays its Dinero invoices: a normal emailed invoice,
   /// or collected through Betalingsservice (automatically once a mandate is
   /// active, otherwise by indbetalingskort). Every customer is on

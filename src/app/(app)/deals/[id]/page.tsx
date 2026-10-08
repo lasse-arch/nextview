@@ -294,6 +294,18 @@ export default async function DealDetailPage({
                   />
                 </div>
                 <div>
+                  <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                    EAN-nummer (offentlige institutioner)
+                  </label>
+                  <input
+                    name="eanNumber"
+                    inputMode="numeric"
+                    placeholder="13 cifre - fakturaer sendes så som e-faktura"
+                    defaultValue={deal.eanNumber ?? ""}
+                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
                   <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Ejer af deal</label>
                   <select
                     name="ownerId"
@@ -544,6 +556,7 @@ export default async function DealDetailPage({
                 customerNumber={bsPayer.bsCustomerNumber}
                 mandateActive={bsPayer.bsMandateStatus === "ACTIVE"}
                 paysViaName={bsPayer.id !== deal.id ? dealName(bsPayer) : null}
+                eanNumber={deal.eanNumber}
                 pbsNumber={bsSettings?.pbsNumber ?? null}
                 debtorGroupNumber={bsSettings?.debtorGroupNumber ?? null}
               />

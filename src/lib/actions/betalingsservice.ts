@@ -73,7 +73,11 @@ export async function saveBsSettings(formData: FormData): Promise<{ ok: true } |
  * only invoices created from then on are collected through Betalingsservice. */
 export async function setDealPaymentMethod(dealId: string, method: PaymentMethod) {
   await requireBillingUser();
-  if (method === "BETALINGSSERVICE") await ensureBsCustomerNumber(dealId);
+  if (method === "BETALINGSSERVICE") {
+    const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId }, select: { eanNumber: true } });
+    if (deal.eanNumber) throw new Error("En EAN-kunde får e-faktura og kan ikke være på Betalingsservice.");
+    await ensureBsCustomerNumber(dealId);
+  }
   await prisma.deal.update({ where: { id: dealId }, data: { paymentMethod: method } });
   revalidatePath(`/deals/${dealId}`);
   revalidatePath(PAGE);

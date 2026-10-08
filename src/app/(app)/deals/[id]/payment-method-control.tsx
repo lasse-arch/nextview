@@ -20,6 +20,7 @@ export function PaymentMethodControl({
   pbsNumber,
   debtorGroupNumber,
   paysViaName = null,
+  eanNumber = null,
 }: {
   dealId: string;
   method: "INVOICE" | "BETALINGSSERVICE";
@@ -30,6 +31,8 @@ export function PaymentMethodControl({
   /** Set when this branch is billed together with its parent and pays
    * through the parent's customer number. */
   paysViaName?: string | null;
+  /** An EAN customer gets e-invoices via NemHandel - never Betalingsservice. */
+  eanNumber?: string | null;
 }) {
   const [pending, startTransition] = useTransition();
   const router = useRouter();
@@ -66,7 +69,7 @@ export function PaymentMethodControl({
             <button
               key={value}
               type="button"
-              disabled={pending}
+              disabled={pending || (Boolean(eanNumber) && value === "BETALINGSSERVICE")}
               onClick={() => change(value)}
               className={`px-2.5 py-1 text-xs font-medium disabled:opacity-50 ${
                 method === value ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-50"
@@ -86,6 +89,12 @@ export function PaymentMethodControl({
           </span>
         )}
       </div>
+      {eanNumber && (
+        <p className="mt-2 text-xs text-slate-500">
+          EAN-kunde (<span className="font-mono">{eanNumber}</span>): fakturaerne sendes automatisk som e-faktura via
+          NemHandel - ikke på mail og ikke via Betalingsservice.
+        </p>
+      )}
       {method === "BETALINGSSERVICE" && (
         <p className="mt-2 text-xs text-slate-500">
           Kvartalerne opkræves via Betalingsservice - etableringen og første periode er almindelige fakturaer
