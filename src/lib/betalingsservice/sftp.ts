@@ -137,7 +137,7 @@ export async function testSftpConnection(): Promise<SftpRunResult> {
  * uploaded BS 0601 files, which Mastercard may not have picked up yet - is
  * never read or deleted.
  */
-function classify(fileName: string): "receipt" | "data" | null {
+export function classifyMailboxFile(fileName: string): "receipt" | "data" | null {
   if (/\.(OK|ERROR|REJECTED)$/i.test(fileName)) return "receipt";
   if (/^BS0601-/i.test(fileName) || /^sshPublicKey/i.test(fileName)) return null;
   const first = fileName.charAt(0).toUpperCase();
@@ -146,11 +146,72 @@ function classify(fileName: string): "receipt" | "data" | null {
   return null;
 }
 
+/** Deliveries waiting to go to Mastercard over SFTP, oldest first. */
+export function queuedSftpUploads() {
+  return prisma.bsDelivery.findMany({ where: { sendViaSftp: true, sftpSentAt: null }, orderBy: { sequence: "asc" } });
+}
+
+/**
+ * Records an upload's outcome. A failed one is never retried by itself: the
+ * upload may still have reached Mastercard, and a delivery must not be sent
+ * twice unless a negative receipt says so - someone checks the receipts and
+ * sends it again by hand.
+ */
+export async function recordSftpUpload(deliveryId: string, error: string | null): Promise<string> {
+  const d = await prisma.bsDelivery.findUniqueOrThrow({ where: { id: deliveryId } });
+  if (error) {
+    await prisma.bsDelivery.update({ where: { id: d.id }, data: { sftpError: error, sendViaSftp: false } });
+    return `FEJL ved afsendelse af ${d.fileName}: ${error} - tjek kvitteringerne før den sendes igen.`;
+  }
+  await prisma.bsDelivery.update({
+    where: { id: d.id },
+    data: { sftpSentAt: new Date(), submittedAt: d.submittedAt ?? new Date(), sftpError: null },
+  });
+  return `Sendt: ${d.fileName}`;
+}
+
+/**
+ * Takes in one file found in the mailbox: stored first, then (for BS
+ * 0602/0603 data files) imported. Says whether it may now be deleted from
+ * the mailbox - only Mastercard's own files that are safely stored, so
+ * nothing is ever lost if a step fails half-way.
+ */
+export async function takeInMailboxFile(fileName: string, buffer: Buffer): Promise<{ delete: boolean; line: string | null }> {
+  const kind = classifyMailboxFile(fileName);
+  if (!kind) return { delete: false, line: null };
+  if (await prisma.bsDelivery.findFirst({ where: { fileName }, select: { id: true } })) return { delete: false, line: null };
+  const contentHash = createHash("sha256").update(buffer).digest("hex");
+  const existing = await prisma.bsMailboxFile.findUnique({ where: { contentHash } });
+  if (existing) return { delete: true, line: null };
+  let note: string;
+  if (kind === "data" && fileName.charAt(0).toUpperCase() === "D") {
+    const result = await importBsReturnFile(fileName, buffer, null);
+    note = result.ok ? result.lines.join("\n") : `Kunne ikke indlæses: ${result.error}`;
+  } else {
+    note = buffer.toString("latin1").slice(0, 2000);
+  }
+  await prisma.bsMailboxFile.create({
+    data: { fileName, contentHash, size: buffer.length, content: new Uint8Array(buffer), kind, note },
+  });
+  return { delete: true, line: `Hentet: ${fileName}` };
+}
+
+/** "Lav og send automatisk": makes the day's BS 0601 file (queued for SFTP) when invoices are ready. */
+export async function autoCreateDelivery(): Promise<string | null> {
+  const s = await getBsSettings();
+  if (!s.autoSend || missingBsSettings(s).length > 0) return null;
+  const ready = (await listPendingBsCollections()).filter((p) => p.problems.length === 0 && !p.notYet);
+  if (ready.length === 0) return null;
+  const created = await createBsDelivery(null, { sendViaSftp: true });
+  if (created.ok) await prisma.bsSettings.update({ where: { id: "default" }, data: { lastAutoDeliveryAt: new Date() } });
+  return created.ok
+    ? [`Betalingsfil lavet automatisk med ${created.collections} opkrævning(er).`, ...(created.notes ?? [])].join(" ")
+    : `Kunne ikke lave betalingsfil automatisk: ${created.error}`;
+}
+
 /**
  * One exchange with the mailbox: upload every delivery queued for SFTP, then
- * take in everything waiting in the mailbox - stored first, then (for BS
- * 0602/0603 data files) imported, and only then deleted from the mailbox,
- * so nothing is ever lost if a step fails half-way.
+ * take in everything waiting in the mailbox (see takeInMailboxFile).
  */
 export async function runSftpExchange(options: { autoCreate?: boolean } = {}): Promise<SftpRunResult> {
   const s = await getBsSettings();
@@ -158,70 +219,36 @@ export async function runSftpExchange(options: { autoCreate?: boolean } = {}): P
   const problem = connectionProblem(s);
   if (problem) return { ok: false, lines: [problem] };
 
-  if (options.autoCreate && s.autoSend && missingBsSettings(s).length === 0) {
-    const ready = (await listPendingBsCollections()).filter((p) => p.problems.length === 0 && !p.notYet);
-    if (ready.length > 0) {
-      const created = await createBsDelivery(null, { sendViaSftp: true });
-      lines.push(
-        created.ok
-          ? [`Betalingsfil lavet automatisk med ${created.collections} opkrævning(er).`, ...(created.notes ?? [])].join(" ")
-          : `Kunne ikke lave betalingsfil automatisk: ${created.error}`
-      );
-      if (created.ok) await prisma.bsSettings.update({ where: { id: "default" }, data: { lastAutoDeliveryAt: new Date() } });
-    }
+  if (options.autoCreate) {
+    const line = await autoCreateDelivery();
+    if (line) lines.push(line);
   }
 
   try {
     await withSftp(s, async (sftp) => {
-      const queued = await prisma.bsDelivery.findMany({
-        where: { sendViaSftp: true, sftpSentAt: null },
-        orderBy: { sequence: "asc" },
-      });
+      const queued = await queuedSftpUploads();
       for (const d of queued) {
+        let error: string | null = null;
         try {
           // Uploaded last and never touched again afterwards (Mastercard's
           // own advice) - the receipts arrive as separate T/V files.
           await sftp.put(Buffer.from(d.content), `/${d.fileName}`);
-          await prisma.bsDelivery.update({
-            where: { id: d.id },
-            data: { sftpSentAt: new Date(), submittedAt: d.submittedAt ?? new Date(), sftpError: null },
-          });
-          lines.push(`Sendt: ${d.fileName}`);
         } catch (err) {
-          const error = err instanceof Error ? err.message : String(err);
-          // Never retried by itself: the upload may still have reached
-          // Mastercard, and a delivery must not be sent twice unless a
-          // negative receipt says so. Someone checks the receipts and sends
-          // it again by hand.
-          await prisma.bsDelivery.update({ where: { id: d.id }, data: { sftpError: error, sendViaSftp: false } });
-          lines.push(`FEJL ved afsendelse af ${d.fileName}: ${error} - tjek kvitteringerne før den sendes igen.`);
+          error = err instanceof Error ? err.message : String(err);
         }
+        lines.push(await recordSftpUpload(d.id, error));
       }
 
-      const ownFiles = new Set((await prisma.bsDelivery.findMany({ select: { fileName: true } })).map((d) => d.fileName));
-      const files = (await sftp.list("/")).filter((f) => f.type === "-" && !ownFiles.has(f.name) && classify(f.name));
+      const files = (await sftp.list("/")).filter((f) => f.type === "-" && classifyMailboxFile(f.name));
       for (const f of files) {
         const buffer = (await sftp.get(`/${f.name}`)) as Buffer;
-        const contentHash = createHash("sha256").update(buffer).digest("hex");
-        const kind = classify(f.name)!;
-        const existing = await prisma.bsMailboxFile.findUnique({ where: { contentHash } });
-        let note = existing?.note ?? "";
-        if (!existing) {
-          if (kind === "data" && f.name.charAt(0).toUpperCase() === "D") {
-            const result = await importBsReturnFile(f.name, buffer, null);
-            note = result.ok ? result.lines.join("\n") : `Kunne ikke indlæses: ${result.error}`;
-          } else {
-            note = buffer.toString("latin1").slice(0, 2000);
-          }
-          await prisma.bsMailboxFile.create({
-            data: { fileName: f.name, contentHash, size: buffer.length, content: new Uint8Array(buffer), kind, note },
+        const taken = await takeInMailboxFile(f.name, buffer);
+        if (taken.line) lines.push(taken.line);
+        if (taken.delete) {
+          await sftp.delete(`/${f.name}`).catch((err: unknown) => {
+            lines.push(`Kunne ikke slette ${f.name} fra postkassen: ${err instanceof Error ? err.message : String(err)}`);
           });
-          lines.push(`Hentet: ${f.name}`);
         }
-        // Stored (now or on an earlier run) - safe to clear from the mailbox.
-        await sftp.delete(`/${f.name}`).catch((err: unknown) => {
-          lines.push(`Kunne ikke slette ${f.name} fra postkassen: ${err instanceof Error ? err.message : String(err)}`);
-        });
       }
       if (files.length === 0 && queued.length === 0) lines.push("Intet at sende eller hente.");
     });

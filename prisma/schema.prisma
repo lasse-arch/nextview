@@ -1110,6 +1110,16 @@ model BsSettings {
   sftpKeyCreatedAt   DateTime?
   sftpLastRunAt      DateTime?
   sftpLastError      String?
+  /// Relay server with a fixed IP (e.g. Hetzner) doing the SFTP exchange on
+  /// Arpo's behalf - Mastercard only accepts SFTP from a whitelisted IP, and
+  /// Vercel has none. It polls Arpo with this token (only its hash is kept);
+  /// see src/lib/betalingsservice/relay.ts.
+  relayTokenHash           String?
+  relayPublicKey           String?
+  relayIp                  String?
+  relayLastSeenAt          DateTime?
+  /// "Send/hent nu" while on the relay: picked up at its next poll.
+  relayExchangeRequestedAt DateTime?
   /// Make and send the BS 0601 file by itself (once a day when invoices are ready).
   autoSend           Boolean   @default(false)
   lastAutoDeliveryAt DateTime?

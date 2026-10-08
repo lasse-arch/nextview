@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getBsSettings } from "@/lib/betalingsservice/service";
-import { runSftpExchange } from "@/lib/betalingsservice/sftp";
+import { autoCreateDelivery, runSftpExchange } from "@/lib/betalingsservice/sftp";
 
 export const maxDuration = 120;
 
@@ -13,6 +13,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
   const settings = await getBsSettings();
+  // Through the relay server, the file is only made and queued here - the
+  // relay sends it (and takes in the mailbox) at its next check-in.
+  if (settings.relayTokenHash) {
+    return NextResponse.json({ relay: true, line: await autoCreateDelivery() });
+  }
   if (!settings.sftpUser || !settings.sftpPrivateKeyEnc) {
     return NextResponse.json({ skipped: true, reason: "SFTP er ikke sat op" });
   }

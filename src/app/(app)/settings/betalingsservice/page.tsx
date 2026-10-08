@@ -135,7 +135,8 @@ export default async function BetalingsservicePage() {
     countSwitchableDeals(),
     signupMailOverview(),
   ]);
-  const sftpReady = Boolean(settings.sftpUser && settings.sftpPrivateKeyEnc);
+  // Through the relay server, the key lives on the server - only the UserID is needed here.
+  const sftpReady = Boolean(settings.sftpUser && (settings.relayTokenHash || settings.sftpPrivateKeyEnc));
   let invoiceTemplates: { id: string; name: string; isDefault: boolean }[] = [];
   let invoiceTemplatesError: string | null = null;
   if (await isDineroConfigured()) {
@@ -225,6 +226,15 @@ export default async function BetalingsservicePage() {
           lastRunAt={settings.sftpLastRunAt ? deadline(settings.sftpLastRunAt) : null}
           lastError={settings.sftpLastError}
           ready={sftpReady}
+          relay={{
+            configured: Boolean(settings.relayTokenHash),
+            isAdmin: currentUser.role === "ADMIN",
+            ip: settings.relayIp,
+            lastSeen: settings.relayLastSeenAt ? deadline(settings.relayLastSeenAt) : null,
+            stale: !settings.relayLastSeenAt || now.getTime() - settings.relayLastSeenAt.getTime() > 15 * 60 * 1000,
+            publicKey: settings.relayPublicKey,
+            publicKeyFileName: publicKeyFileName(settings.relayLastSeenAt ?? now),
+          }}
         />
         {mailboxFiles.length > 0 && (
           <div className="mt-4">

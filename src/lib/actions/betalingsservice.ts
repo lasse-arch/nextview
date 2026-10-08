@@ -17,13 +17,17 @@ import {
   markBsDeliverySubmitted,
   retryBsPaymentRegistration,
   switchAllCustomersToBs,
+  getBsSettings,
 } from "@/lib/betalingsservice/service";
 import {
   MFT_DEFAULT_PORT,
   generateSftpKey,
   runSftpExchange,
   testSftpConnection,
+  type SftpRunResult,
 } from "@/lib/betalingsservice/sftp";
+import { createRelayToken, relayCloudConfig } from "@/lib/betalingsservice/relay";
+import { getAppBaseUrl } from "@/lib/email-oauth";
 
 const PAGE = "/settings/betalingsservice";
 
@@ -144,13 +148,27 @@ export async function generateSftpKeyAction() {
   return publicKey;
 }
 
+/** Through the relay server, an exchange is asked for and happens at its next check-in. */
+async function requestRelayExchange(): Promise<SftpRunResult | null> {
+  const s = await getBsSettings();
+  if (!s.relayTokenHash) return null;
+  await prisma.bsSettings.update({ where: { id: "default" }, data: { relayExchangeRequestedAt: new Date() } });
+  revalidatePath(PAGE);
+  return {
+    ok: true,
+    lines: ["Bestilt - serveren forbinder til Mastercard inden for 5 minutter. Genindlæs siden for at se resultatet."],
+  };
+}
+
 export async function testSftpConnectionAction() {
   await requireBillingUser();
-  return testSftpConnection();
+  return (await requestRelayExchange()) ?? testSftpConnection();
 }
 
 export async function runSftpExchangeAction() {
   await requireBillingUser();
+  const relayed = await requestRelayExchange();
+  if (relayed) return relayed;
   const result = await runSftpExchange();
   revalidatePath(PAGE);
   return result;
@@ -160,9 +178,35 @@ export async function runSftpExchangeAction() {
 export async function sendBsDeliveryViaSftpAction(deliveryId: string) {
   await requireBillingUser();
   await prisma.bsDelivery.update({ where: { id: deliveryId }, data: { sendViaSftp: true, sftpError: null } });
+  const relayed = await requestRelayExchange();
+  if (relayed) return relayed;
   const result = await runSftpExchange();
   revalidatePath(PAGE);
   return result;
+}
+
+/** Admin only: a new relay token and the server's setup (cloud-init), shown once. */
+export async function createRelaySetupAction(): Promise<{ ok: true; cloudConfig: string } | { ok: false; error: string }> {
+  try {
+    const user = await requireBillingUser();
+    if (user.role !== "ADMIN") throw new Error("Kun administratorer kan sætte serveren op.");
+    const token = await createRelayToken();
+    revalidatePath(PAGE);
+    return { ok: true, cloudConfig: relayCloudConfig(getAppBaseUrl(), token) };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Kunne ikke lave opsætningen." };
+  }
+}
+
+/** Admin only: stop using the relay server (its token stops working). */
+export async function disconnectRelayAction() {
+  const user = await requireBillingUser();
+  if (user.role !== "ADMIN") throw new Error("Kun administratorer kan fjerne serveren.");
+  await prisma.bsSettings.update({
+    where: { id: "default" },
+    data: { relayTokenHash: null, relayPublicKey: null, relayIp: null, relayLastSeenAt: null, relayExchangeRequestedAt: null },
+  });
+  revalidatePath(PAGE);
 }
 
 /** Admin only: a BS 0601 file with fictive customers for Mastercard's test (delsystem KR9). */

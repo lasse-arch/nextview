@@ -18,6 +18,8 @@ import {
   saveBsInvoiceTemplate,
   switchAllCustomersToBsAction,
   createBsPreviewDraftsAction,
+  createRelaySetupAction,
+  disconnectRelayAction,
   saveBsSignupLink,
   previewSignupMailAction,
   sendSignupMailsAction,
@@ -280,6 +282,7 @@ export function SftpPanel({
   lastRunAt,
   lastError,
   ready,
+  relay,
 }: {
   initial: { sftpUser: string; sftpHost: string; sftpPort: string; autoSend: boolean };
   publicKey: string | null;
@@ -287,6 +290,7 @@ export function SftpPanel({
   lastRunAt: string | null;
   lastError: string | null;
   ready: boolean;
+  relay: RelayInfo;
 }) {
   const [pending, startTransition] = useTransition();
   const [output, setOutput] = useState<{ ok: boolean; lines: string[] } | null>(null);
@@ -343,55 +347,59 @@ export function SftpPanel({
         </div>
       </form>
 
-      <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
-        <p className="font-medium text-slate-900">SSH-nøgle</p>
-        {publicKey ? (
-          <>
-            <p className="mt-1 text-xs text-slate-500">
-              Upload den offentlige nøgle én gang til jeres postkasse via My File Transfer i browseren (HTTPS). Der
-              kommer en kvittering, der ender på <span className="font-mono">.OK</span>, når nøglen er godkendt.
-            </p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={downloadPublicKey}
-                className="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700"
-              >
-                Download {publicKeyFileName}
-              </button>
-              <button
-                type="button"
-                disabled={pending}
-                onClick={() => {
-                  if (!confirm("Lav en ny nøgle? Den nye skal uploades til postkassen igen, før SFTP virker.")) return;
-                  startTransition(async () => {
-                    await generateSftpKeyAction();
-                    router.refresh();
-                  });
-                }}
-                className="rounded-md border border-slate-300 px-3 py-1.5 text-xs text-slate-600 hover:bg-white disabled:opacity-50"
-              >
-                Lav ny nøgle
-              </button>
-            </div>
-          </>
-        ) : (
-          <button
-            type="button"
-            disabled={pending}
-            onClick={() =>
-              startTransition(async () => {
-                await generateSftpKeyAction();
-                showToast("Nøgle lavet - download den offentlige nøgle og upload den til postkassen.");
-                router.refresh();
-              })
-            }
-            className="mt-2 rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
-          >
-            Generér SSH-nøgle
-          </button>
-        )}
-      </div>
+      <RelayBox relay={relay} />
+
+      {!relay.configured && (
+        <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
+          <p className="font-medium text-slate-900">SSH-nøgle (direkte fra Arpo, uden fast IP)</p>
+          {publicKey ? (
+            <>
+              <p className="mt-1 text-xs text-slate-500">
+                Upload den offentlige nøgle én gang til jeres postkasse via My File Transfer i browseren (HTTPS). Der
+                kommer en kvittering, der ender på <span className="font-mono">.OK</span>, når nøglen er godkendt.
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={downloadPublicKey}
+                  className="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700"
+                >
+                  Download {publicKeyFileName}
+                </button>
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={() => {
+                    if (!confirm("Lav en ny nøgle? Den nye skal uploades til postkassen igen, før SFTP virker.")) return;
+                    startTransition(async () => {
+                      await generateSftpKeyAction();
+                      router.refresh();
+                    });
+                  }}
+                  className="rounded-md border border-slate-300 px-3 py-1.5 text-xs text-slate-600 hover:bg-white disabled:opacity-50"
+                >
+                  Lav ny nøgle
+                </button>
+              </div>
+            </>
+          ) : (
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() =>
+                startTransition(async () => {
+                  await generateSftpKeyAction();
+                  showToast("Nøgle lavet - download den offentlige nøgle og upload den til postkassen.");
+                  router.refresh();
+                })
+              }
+              className="mt-2 rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+            >
+              Generér SSH-nøgle
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center gap-2">
         <button
@@ -721,5 +729,166 @@ export function SendSignupMailButton({ dealId, sentAt }: { dealId: string; sentA
         {pending ? "Sender…" : sentAt ? "Send igen" : "Send mail"}
       </button>
     </span>
+  );
+}
+
+export type RelayInfo = {
+  configured: boolean;
+  isAdmin: boolean;
+  ip: string | null;
+  lastSeen: string | null;
+  /** Not heard from in over 15 minutes (or never). */
+  stale: boolean;
+  publicKey: string | null;
+  publicKeyFileName: string;
+};
+
+/**
+ * The relay server with a fixed IP that does the SFTP exchange for Arpo
+ * (Mastercard only accepts SFTP from a whitelisted IP) - setting it up, and
+ * its status, IP and key once it runs. See src/lib/betalingsservice/relay.ts.
+ */
+function RelayBox({ relay }: { relay: RelayInfo }) {
+  const [pending, startTransition] = useTransition();
+  const [cloudConfig, setCloudConfig] = useState<string | null>(null);
+  const showToast = useToast();
+  const router = useRouter();
+
+  function setup() {
+    if (
+      relay.configured &&
+      !confirm("Lav en ny opsætning? Den nuværende server holder op med at virke, indtil den er sat op igen.")
+    )
+      return;
+    startTransition(async () => {
+      const result = await createRelaySetupAction();
+      if (result.ok) setCloudConfig(result.cloudConfig);
+      else showToast(result.error);
+      router.refresh();
+    });
+  }
+
+  function downloadKey() {
+    if (!relay.publicKey) return;
+    const url = URL.createObjectURL(new Blob([relay.publicKey + "\n"], { type: "text/plain" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = relay.publicKeyFileName;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  return (
+    <div className="rounded-lg border border-indigo-200 bg-indigo-50/50 p-3 text-sm">
+      <p className="font-medium text-slate-900">Server med fast IP (Hetzner)</p>
+      <p className="mt-1 text-xs text-slate-600">
+        Mastercard tillader kun SFTP fra en godkendt, fast IP-adresse - det har Arpo ikke selv. En lille server (fx Hetzner
+        CX22) med fast IP sender og henter filerne for Arpo. Den tjekker hvert 5. minut, om der er noget at gøre, og
+        forbinder kun til Mastercard, når der er en fil at sende, når du trykker &quot;Send/hent nu&quot;, og hver morgen.
+      </p>
+
+      {relay.configured && !cloudConfig && (
+        <div className="mt-2 space-y-1 text-xs">
+          <p>
+            <span className="text-slate-500">Status:</span>{" "}
+            {relay.lastSeen ? (
+              <span className={relay.stale ? "font-medium text-red-600" : "font-medium text-emerald-700"}>
+                {relay.stale ? "Ikke hørt fra siden" : "Kører - sidst set"} {relay.lastSeen}
+              </span>
+            ) : (
+              <span className="font-medium text-amber-700">Venter på, at serveren melder sig (ca. 5 min efter oprettelse)</span>
+            )}
+          </p>
+          {relay.ip && (
+            <p>
+              <span className="text-slate-500">Serverens IP-adresse:</span>{" "}
+              <span className="font-mono font-medium text-slate-900">{relay.ip}</span>{" "}
+              <span className="text-slate-500">- den skal Mastercard godkende (whitelist).</span>
+            </p>
+          )}
+          {relay.publicKey && (
+            <div className="pt-1">
+              <button
+                type="button"
+                onClick={downloadKey}
+                className="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700"
+              >
+                Download {relay.publicKeyFileName}
+              </button>
+              <p className="mt-1 text-slate-500">
+                Serverens SSH-nøgle - upload den én gang til postkassen i My File Transfer i browseren. Der kommer en
+                kvittering, der ender på <span className="font-mono">.OK</span>, når den er godkendt.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {cloudConfig && (
+        <div className="mt-3 space-y-2 text-xs text-slate-700">
+          <ol className="list-decimal space-y-1 pl-4">
+            <li>
+              I Hetzner Cloud: <b>Opret server</b> → billede <b>Ubuntu 24.04</b>, type <b>CX22</b>, med en <b>fast IPv4</b>{" "}
+              (Primary IP).
+            </li>
+            <li>
+              Under <b>Cloud config</b>: indsæt hele teksten herunder. Opret serveren - mere skal du ikke gøre på den.
+            </li>
+            <li>Efter ca. 5 minutter viser Arpo her serverens IP-adresse og SSH-nøgle.</li>
+            <li>Send IP-adressen til Mastercard, og upload nøglefilen til postkassen i My File Transfer.</li>
+          </ol>
+          <p className="font-medium text-red-700">
+            Teksten indeholder serverens adgangskode til Arpo og vises kun nu - kopiér den direkte ind i Hetzner.
+          </p>
+          <textarea
+            readOnly
+            value={cloudConfig}
+            rows={8}
+            className="w-full rounded-md border border-slate-300 bg-white p-2 font-mono text-[11px]"
+            onFocus={(e) => e.currentTarget.select()}
+          />
+          <button
+            type="button"
+            onClick={() => {
+              void navigator.clipboard.writeText(cloudConfig);
+              showToast("Kopieret");
+            }}
+            className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800"
+          >
+            Kopiér
+          </button>
+        </div>
+      )}
+
+      {relay.isAdmin && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            disabled={pending}
+            onClick={setup}
+            className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+          >
+            {relay.configured ? "Lav ny opsætning" : "Sæt server op"}
+          </button>
+          {relay.configured && (
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => {
+                if (!confirm("Stop med at bruge serveren? Arpo afviser den herefter.")) return;
+                startTransition(async () => {
+                  await disconnectRelayAction();
+                  setCloudConfig(null);
+                  router.refresh();
+                });
+              }}
+              className="rounded-md border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
+            >
+              Fjern server
+            </button>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
