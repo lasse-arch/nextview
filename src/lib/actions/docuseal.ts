@@ -15,7 +15,7 @@ import {
 } from "@/lib/contract-template-data";
 import { buildContractHtml } from "@/lib/contract-html-template";
 import { renderContractPdf } from "@/lib/contract-pdf-renderer";
-import { createContractFollowUpTask } from "@/lib/task-automation";
+import { completeContractFollowUpTasks, createContractFollowUpTask } from "@/lib/task-automation";
 import { logActivity } from "@/lib/activity";
 import { dealName } from "@/lib/labels";
 import { contactNameProblem } from "@/lib/contact-name";
@@ -208,5 +208,50 @@ export async function archiveSignedContract(
     return { ok: true };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Der opstod en fejl ved arkivering af kontrakten." };
+  }
+}
+
+/**
+ * Withdraws a contract that's been sent but not signed yet: archived in
+ * DocuSeal (the customer's signing link stops working) and taken off the
+ * deal, so a new one can be sent. The deal goes back from "Kontrakt sendt"
+ * to "Opfølgning", and the follow-up task for the contract is closed.
+ * Same "slet" confirmation as archiving a signed one.
+ */
+export async function archiveSentContract(
+  dealId: string,
+  confirmationText: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    await requireUser();
+    if (confirmationText.trim().toLowerCase() !== "slet") {
+      throw new Error('Skriv "slet" for at bekræfte.');
+    }
+    const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId } });
+    if (deal.contractStatus !== "SENT" && deal.contractStatus !== "VIEWED") {
+      throw new Error("Der er ingen sendt, uunderskrevet kontrakt at slette.");
+    }
+
+    if (deal.docusealSubmissionId) {
+      await cancelDocuSealSubmission(deal.docusealSubmissionId);
+    }
+
+    await prisma.deal.update({
+      where: { id: dealId },
+      data: {
+        contractStatus: "VOIDED",
+        docusealSubmissionId: null,
+        contractSentAt: null,
+        contractViewedAt: null,
+        ...(deal.stage === "CONTRACT_SENT" ? { stage: "FOLLOW_UP" as const } : {}),
+      },
+    });
+    await prisma.contractEvent.create({ data: { dealId, type: "SENT_CONTRACT_ARCHIVED", occurredAt: new Date() } });
+    await completeContractFollowUpTasks(dealId);
+
+    revalidatePath(`/deals/${dealId}`);
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Der opstod en fejl ved sletning af kontrakten." };
   }
 }

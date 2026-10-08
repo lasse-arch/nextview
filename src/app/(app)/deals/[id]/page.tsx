@@ -500,6 +500,10 @@ export default async function DealDetailPage({
                   isEdit={deal.contractStatus === "SENT" || deal.contractStatus === "VIEWED"}
                 />
               )}
+              {/* Only a sent, not yet signed contract - never a signed one. */}
+              {(deal.contractStatus === "SENT" || deal.contractStatus === "VIEWED") && (
+                <ArchiveContractButton dealId={deal.id} signed={false} />
+              )}
               {!docuSealEnabled && (
                 <p className="text-xs text-amber-600">
                   DocuSeal er ikke konfigureret eller er slået fra under Indstillinger → Kontrakter.

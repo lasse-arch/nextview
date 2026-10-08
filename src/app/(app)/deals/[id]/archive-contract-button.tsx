@@ -2,9 +2,11 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { archiveSignedContract } from "@/lib/actions/docuseal";
+import { archiveSentContract, archiveSignedContract } from "@/lib/actions/docuseal";
 
-export function ArchiveContractButton({ dealId }: { dealId: string }) {
+/** Archives the deal's contract - a signed one (admins), or one that's been
+ * sent but not signed yet (withdrawn in DocuSeal). */
+export function ArchiveContractButton({ dealId, signed = true }: { dealId: string; signed?: boolean }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [confirmText, setConfirmText] = useState("");
@@ -24,16 +26,20 @@ export function ArchiveContractButton({ dealId }: { dealId: string }) {
         onClick={() => setOpen(true)}
         className="block w-full rounded-md border border-red-200 px-3 py-2 text-center text-sm text-red-700 hover:bg-red-50"
       >
-        Arkivér kontrakt (send ny)
+        {signed ? "Arkivér kontrakt (send ny)" : "Slet sendt kontrakt"}
       </button>
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4" onClick={close}>
           <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-base font-semibold text-slate-900">Arkivér underskrevet kontrakt</h2>
+            <h2 className="text-base font-semibold text-slate-900">
+              {signed ? "Arkivér underskrevet kontrakt" : "Slet sendt kontrakt"}
+            </h2>
             <p className="mt-2 text-sm text-slate-600">
-              Dette arkiverer den nuværende underskrevne kontrakt, så der kan sendes en ny til kunden. Handlingen kan
-              ikke fortrydes herfra. Skriv <span className="font-semibold">slet</span> for at bekræfte.
+              {signed
+                ? "Dette arkiverer den nuværende underskrevne kontrakt, så der kan sendes en ny til kunden."
+                : "Kontrakten trækkes tilbage og arkiveres i DocuSeal, så kunden ikke længere kan skrive under på den. Dealen rykkes tilbage til Opfølgning, og der kan sendes en ny."}{" "}
+              Handlingen kan ikke fortrydes herfra. Skriv <span className="font-semibold">slet</span> for at bekræfte.
             </p>
             <input
               type="text"
@@ -59,7 +65,9 @@ export function ArchiveContractButton({ dealId }: { dealId: string }) {
                   setError(null);
                   startTransition(async () => {
                     try {
-                      const result = await archiveSignedContract(dealId, confirmText);
+                      const result = signed
+                        ? await archiveSignedContract(dealId, confirmText)
+                        : await archiveSentContract(dealId, confirmText);
                       if (!result.ok) {
                         setError(result.error);
                         return;
@@ -73,7 +81,7 @@ export function ArchiveContractButton({ dealId }: { dealId: string }) {
                 }}
                 className="rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
               >
-                {pending ? "Arkiverer..." : "Arkivér"}
+                {pending ? "Arkiverer..." : signed ? "Arkivér" : "Slet kontrakt"}
               </button>
             </div>
           </div>
