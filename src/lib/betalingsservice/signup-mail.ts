@@ -27,6 +27,8 @@ export function buildSignupMail(input: {
   contactName: string | null;
   customerName: string;
   customerNumber: string;
+  /** The customer's own CVR - the Standard sign-up link asks for it. */
+  cvrNumber?: string | null;
   pbsNumber: string;
   debtorGroupNumber: string;
   signupLink: string;
@@ -62,7 +64,13 @@ export function buildSignupMail(input: {
         questions: "Har I spørgsmål, så svar bare på denne mail.",
         bye: "Med venlig hilsen",
       };
-  const values = [input.pbsNumber, input.debtorGroupNumber, input.customerNumber];
+  const cvr = (input.cvrNumber ?? "").replace(/\D/g, "");
+  const rows: [string, string][] = [
+    ...(cvr.length === 8 ? [[en ? "Your CVR no." : "Jeres CVR-nr.", cvr] as [string, string]] : []),
+    [t.labels[2], input.customerNumber],
+    [t.labels[0], input.pbsNumber],
+    [t.labels[1], input.debtorGroupNumber],
+  ];
 
   const bodyText = [
     t.greeting,
@@ -73,7 +81,7 @@ export function buildSignupMail(input: {
     link,
     "",
     t.numbers,
-    ...t.labels.map((label, i) => `${label}: ${values[i]}`),
+    ...rows.map(([label, value]) => `${label}: ${value}`),
     "",
     t.bank,
     "",
@@ -89,10 +97,10 @@ export function buildSignupMail(input: {
 <p>${esc(t.cta)}</p>
 <p style="margin:20px 0"><a href="${esc(link)}" style="background:#b91c1c;color:#ffffff;text-decoration:none;font-weight:bold;padding:12px 22px;border-radius:999px;display:inline-block">${esc(t.button)}</a></p>
 <p style="margin-bottom:4px">${esc(t.numbers)}</p>
-<table style="border-collapse:collapse;font-size:14px">${t.labels
+<table style="border-collapse:collapse;font-size:14px">${rows
     .map(
-      (label, i) =>
-        `<tr><td style="padding:2px 16px 2px 0;color:#64748b">${esc(label)}</td><td style="padding:2px 0;font-family:monospace;font-weight:bold">${esc(values[i])}</td></tr>`
+      ([label, value]) =>
+        `<tr><td style="padding:2px 16px 2px 0;color:#64748b">${esc(label)}</td><td style="padding:2px 0;font-family:monospace;font-weight:bold">${esc(value)}</td></tr>`
     )
     .join("")}</table>
 <p>${esc(t.bank)}</p>
@@ -170,6 +178,7 @@ export async function previewSignupMail(): Promise<{ to: string; subject: string
     contactName: deal?.contactName ?? "Hans Hansen",
     customerName: deal ? dealName(deal) : "Eksempel ApS",
     customerNumber: deal?.bsCustomerNumber ?? "NV00000",
+    cvrNumber: deal ? deal.cvrNumber : "12345678",
     pbsNumber: settings.pbsNumber,
     debtorGroupNumber: settings.debtorGroupNumber,
     signupLink: settings.signupLink,
@@ -209,6 +218,7 @@ export async function sendSignupMails(dealId?: string): Promise<{
         contactName: deal.contactName,
         customerName: dealName(deal),
         customerNumber,
+        cvrNumber: deal.cvrNumber,
         pbsNumber: settings.pbsNumber,
         debtorGroupNumber: settings.debtorGroupNumber,
         signupLink: settings.signupLink,
