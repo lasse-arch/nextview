@@ -256,7 +256,7 @@ export async function archiveSentContract(
   }
 }
 
-/** "(Etablering: 10.000, MRR: 500, Kontraktværdi: 16.000)" for 12 months -
+/** "(Etablering: 10.000, MRR: 500, Binding: 12 måneder, Kontraktværdi: 16.000)" -
  * the feed's at-a-glance numbers for a sent contract. Kontraktværdi is the
  * whole contract: establishment + MRR × binding. */
 function contractSummary(products: ContractProducts): string {
@@ -264,5 +264,5 @@ function contractSummary(products: ContractProducts): string {
   const setup = computeSetupTotal(products);
   const mrr = computeMonthlyTotal(products);
   const value = setup + totalContractValue({ saleAmount: mrr, bindingMonths: products.bindingMonths });
-  return `(Etablering: ${n(setup)}, MRR: ${n(mrr)}, Kontraktværdi: ${n(value)})`;
+  return `(Etablering: ${n(setup)}, MRR: ${n(mrr)}, Binding: ${products.bindingMonths} måneder, Kontraktværdi: ${n(value)})`;
 }
