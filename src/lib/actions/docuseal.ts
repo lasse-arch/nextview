@@ -256,12 +256,13 @@ export async function archiveSentContract(
   }
 }
 
-/** "(Etablering: 10.000, MRR: 500, Kontraktværdi: 6.000)" for 12 months - the feed's
- * at-a-glance numbers for a sent contract. Kontraktværdi is MRR × binding,
- * as everywhere else in the app (totalContractValue). */
+/** "(Etablering: 10.000, MRR: 500, Kontraktværdi: 16.000)" for 12 months -
+ * the feed's at-a-glance numbers for a sent contract. Kontraktværdi is the
+ * whole contract: establishment + MRR × binding. */
 function contractSummary(products: ContractProducts): string {
   const n = (v: number) => new Intl.NumberFormat("da-DK", { maximumFractionDigits: 0 }).format(v);
+  const setup = computeSetupTotal(products);
   const mrr = computeMonthlyTotal(products);
-  const value = totalContractValue({ saleAmount: mrr, bindingMonths: products.bindingMonths });
-  return `(Etablering: ${n(computeSetupTotal(products))}, MRR: ${n(mrr)}, Kontraktværdi: ${n(value)})`;
+  const value = setup + totalContractValue({ saleAmount: mrr, bindingMonths: products.bindingMonths });
+  return `(Etablering: ${n(setup)}, MRR: ${n(mrr)}, Kontraktværdi: ${n(value)})`;
 }
