@@ -359,7 +359,7 @@ export default async function DealDetailPage({
             </DealInfoForm>
           </section>
 
-          <DealItemsSection dealId={deal.id} items={deal.items} />
+          <DealItemsSection dealId={deal.id} items={deal.items} isAdmin={currentUser?.role === "ADMIN"} />
 
           <DealTasksSection
             dealId={deal.id}

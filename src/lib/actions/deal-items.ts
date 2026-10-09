@@ -41,9 +41,14 @@ export async function removeDealItem(dealId: string, itemId: string) {
   revalidatePath(`/deals/${dealId}`);
 }
 
+/** Anyone can add a missing link; changing or removing one that's set is admin only. */
 export async function updateDealItemUrl(dealId: string, itemId: string, url: string) {
-  await requireUser();
-  await prisma.dealItem.update({ where: { id: itemId }, data: { url: url.trim() || null } });
+  const user = await requireUser();
+  const item = await prisma.dealItem.findFirstOrThrow({ where: { id: itemId, dealId }, select: { url: true } });
+  const next = url.trim() || null;
+  if (next && !/^https?:\/\//i.test(next)) throw new Error("Linket skal starte med https://");
+  if (item.url && next !== item.url && user.role !== "ADMIN") throw new Error("Kun administratorer kan rette et link.");
+  await prisma.dealItem.update({ where: { id: itemId }, data: { url: next } });
   revalidatePath(`/deals/${dealId}`);
 }
 

@@ -75,7 +75,7 @@ function RemoveItemButton({ dealId, itemId }: { dealId: string; itemId: string }
   );
 }
 
-function ItemLink({ dealId, item }: { dealId: string; item: DealItem }) {
+function ItemLink({ dealId, item, isAdmin }: { dealId: string; item: DealItem; isAdmin: boolean }) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(item.url ?? "");
   const [pending, startTransition] = useTransition();
@@ -91,7 +91,7 @@ function ItemLink({ dealId, item }: { dealId: string; item: DealItem }) {
           startTransition(async () => {
             try {
               await updateDealItemUrl(dealId, item.id, value);
-              showToast("Link gemt");
+              showToast(value.trim() ? "Link gemt" : "Link fjernet");
               setEditing(false);
             } catch (err) {
               showToast(err instanceof Error ? err.message : "Der opstod en fejl.");
@@ -111,20 +111,44 @@ function ItemLink({ dealId, item }: { dealId: string; item: DealItem }) {
         <button type="submit" disabled={pending} className="text-xs font-medium text-slate-600 hover:text-slate-900">
           Gem
         </button>
+        <button
+          type="button"
+          onClick={() => {
+            setValue(item.url ?? "");
+            setEditing(false);
+          }}
+          className="text-xs text-slate-400 hover:text-slate-600"
+        >
+          Annullér
+        </button>
       </form>
     );
   }
 
   return item.url ? (
-    <a
-      href={item.url}
-      target="_blank"
-      rel="noopener noreferrer"
-      onClick={(e) => e.stopPropagation()}
-      className="text-xs font-medium text-blue-600 hover:underline"
-    >
-      Åbn link
-    </a>
+    <span className="inline-flex items-center gap-2">
+      <a
+        href={item.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={(e) => e.stopPropagation()}
+        className="text-xs font-medium text-blue-600 hover:underline"
+      >
+        Åbn link
+      </a>
+      {isAdmin && (
+        <button
+          type="button"
+          onClick={() => {
+            setValue(item.url ?? "");
+            setEditing(true);
+          }}
+          className="text-xs text-slate-400 hover:text-slate-700"
+        >
+          Ret
+        </button>
+      )}
+    </span>
   ) : (
     <button type="button" onClick={() => setEditing(true)} className="text-xs font-medium text-amber-600 hover:underline">
       + Tilføj link
@@ -177,7 +201,7 @@ function ItemImage({ dealId, item }: { dealId: string; item: DealItem }) {
   );
 }
 
-export function DealItemsSection({ dealId, items }: { dealId: string; items: DealItem[] }) {
+export function DealItemsSection({ dealId, items, isAdmin }: { dealId: string; items: DealItem[]; isAdmin: boolean }) {
   const [adding, setAdding] = useState(false);
   const [isFree, setIsFree] = useState(false);
   const [productType, setProductType] = useState("");
@@ -314,7 +338,7 @@ export function DealItemsSection({ dealId, items }: { dealId: string; items: Dea
             </div>
             <div className="flex items-center gap-3">
               <div className="min-w-16 shrink-0 text-right">
-                <ItemLink dealId={dealId} item={item} />
+                <ItemLink dealId={dealId} item={item} isAdmin={isAdmin} />
               </div>
               <ItemImage dealId={dealId} item={item} />
               <div className="w-16 shrink-0 text-right">
