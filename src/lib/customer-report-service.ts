@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import { addMonths, subDays } from "date-fns";
-import type { ReportInterval, ReportLanguage, ReportSendMethod } from "@prisma/client";
+import type { Prisma, ReportInterval, ReportLanguage, ReportSendMethod } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { isIntegrationEnabled } from "@/lib/integration-settings";
 import { fetchMatterportTourData } from "@/lib/explore-matterport";
@@ -665,7 +665,7 @@ export async function processOneQueuedReport(): Promise<{ processed: boolean; re
     const started = Date.now();
     let collected: Awaited<ReturnType<typeof collectCombinedReportData>> | null;
     try {
-      collected = await collectCombinedReportData(report.id, report.deal, branches, started);
+      collected = await collectCombinedReportData(customerReportStore(report.id), report.deal, branches, started);
     } catch (err) {
       await prisma.customerReport.update({
         where: { id: report.id },
@@ -691,10 +691,26 @@ export async function processOneQueuedReport(): Promise<{ processed: boolean; re
 /** Another tour is only started while a queue step has used less than this
  * - one tour takes up to about a minute and a half (two logins, retries), so
  * a step never gets near the route's 5-minute limit. */
-const COLLECT_BUDGET_MS = 90_000;
+export const COLLECT_BUDGET_MS = 90_000;
 /** Rendering + archiving + sending runs in the same step only if gathering
  * finished this early; otherwise in the next one. */
-const SEND_STEP_MIN_REMAINING_MS = 90_000;
+export const SEND_STEP_MIN_REMAINING_MS = 90_000;
+
+/** Where a combined report's gathered stats are kept between steps - the
+ * collectedData column of a CustomerReport (sending) or a ReportDownloadJob
+ * (downloading). */
+export type CollectedDataStore = { load(): Promise<unknown>; save(data: Prisma.InputJsonValue): Promise<void> };
+
+/** The CustomerReport row's collectedData as a CollectedDataStore. */
+function customerReportStore(reportId: string): CollectedDataStore {
+  return {
+    load: async () =>
+      (await prisma.customerReport.findUniqueOrThrow({ where: { id: reportId }, select: { collectedData: true } })).collectedData,
+    save: async (collectedData) => {
+      await prisma.customerReport.update({ where: { id: reportId }, data: { collectedData } });
+    },
+  };
+}
 
 type CollectedCombinedData = { branches: (CombinedCustomerReportBranch & { dealId: string })[]; coverImage?: string };
 
@@ -706,7 +722,7 @@ type CollectedCombinedData = { branches: (CombinedCustomerReportBranch & { dealI
  * the time limit every time.
  */
 export async function collectCombinedReportData(
-  reportId: string,
+  store: CollectedDataStore,
   deal: ReportPdfDeal & { id: string },
   branches: (ReportPdfDeal & { id: string })[],
   started: number,
@@ -718,8 +734,7 @@ export async function collectCombinedReportData(
 > {
   const reportable = [deal, ...branches].filter((d) => parseMpSkinIds(d.mpSkinId).length > 0);
   if (reportable.length === 0) throw new Error("Ingen af de sammenkoblede deals har et MP-Skin nummer udfyldt.");
-  const row = await prisma.customerReport.findUniqueOrThrow({ where: { id: reportId }, select: { collectedData: true } });
-  const collected: CollectedCombinedData = (row.collectedData as CollectedCombinedData | null) ?? { branches: [] };
+  const collected: CollectedCombinedData = ((await store.load()) as CollectedCombinedData | null) ?? { branches: [] };
 
   let fetchedNow = false;
   for (const d of reportable) {
@@ -728,7 +743,7 @@ export async function collectCombinedReportData(
     const tourData = await fetchTour(parseMpSkinIds(d.mpSkinId));
     collected.branches.push({ dealId: d.id, name: d.displayName || d.companyName, stats: tourData.stats });
     if (!collected.coverImage) collected.coverImage = tourData.coverImage.toString("base64");
-    await prisma.customerReport.update({ where: { id: reportId }, data: { collectedData: collected } });
+    await store.save(collected);
     fetchedNow = true;
   }
   if (!collected.coverImage) throw new Error("Kunne ikke hente et cover-billede for nogen af de sammenkoblede deals.");

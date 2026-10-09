@@ -1,0 +1,2 @@
+ALTER TABLE "ReportDownloadJob" ADD COLUMN IF NOT EXISTS "claimedAt" TIMESTAMP(3);
+ALTER TABLE "ReportDownloadJob" ADD COLUMN IF NOT EXISTS "collectedData" JSONB;

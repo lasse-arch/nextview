@@ -186,6 +186,12 @@ model ReportDownloadJob {
   pdfData      Bytes?
   fileName     String?
   errorMessage String?
+  /// Set while a queue step works on the job - a big download is split
+  /// over several steps (each its own request, under the route's time
+  /// limit), with what's done so far kept in collectedData: a combined
+  /// report's gathered stats, or the deals already merged into pdfData.
+  claimedAt     DateTime?
+  collectedData Json?
   createdById  String
   createdAt    DateTime          @default(now())
 }

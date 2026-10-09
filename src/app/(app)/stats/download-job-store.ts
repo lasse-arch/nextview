@@ -94,8 +94,10 @@ export async function startDownloadJob(
   // Polls in the background - this async work continues independently of
   // whatever triggered it, which is the whole point: the caller doesn't
   // await this part.
+  // Up to 30 minutes: a big download (a combined report for many locations,
+  // or "download all") is made over several server steps.
   (async () => {
-    for (let i = 0; i < 200; i++) {
+    for (let i = 0; i < 600; i++) {
       await sleep(3000);
       let statusRes: Response;
       try {
