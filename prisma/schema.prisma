@@ -43,6 +43,7 @@ enum TimeEntryCategory {
   TOUR_EDITING
   REFILMING
   CORRECTIONS
+  WEBSITE
 }
 
 enum DealStage {

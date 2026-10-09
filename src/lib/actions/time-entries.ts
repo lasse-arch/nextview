@@ -6,7 +6,7 @@ import { requireUser } from "@/lib/auth";
 import type { TimeEntryCategory } from "@prisma/client";
 
 const QUARTER_HOUR_MINUTES = 15;
-const VALID_CATEGORIES: TimeEntryCategory[] = ["FILMING", "TOUR_EDITING", "REFILMING", "CORRECTIONS"];
+const VALID_CATEGORIES: TimeEntryCategory[] = ["FILMING", "TOUR_EDITING", "REFILMING", "CORRECTIONS", "WEBSITE"];
 
 /** Every manual entry rounds UP to the next quarter-hour (15/30/45/60/...) -
  * never down, so a slightly-over day (e.g. "7,1 timer") never under-counts. */

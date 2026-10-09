@@ -138,6 +138,7 @@ export const timeEntryCategoryLabels: Record<string, string> = {
   TOUR_EDITING: "Redigering af tour",
   REFILMING: "Genfilming",
   CORRECTIONS: "Rettelser",
+  WEBSITE: "Hjemmeside",
 };
 
 export const commissionFrequencyLabels: Record<string, string> = {
