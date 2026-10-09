@@ -17,7 +17,7 @@ import { buildContractHtml } from "@/lib/contract-html-template";
 import { renderContractPdf } from "@/lib/contract-pdf-renderer";
 import { completeContractFollowUpTasks, createContractFollowUpTask } from "@/lib/task-automation";
 import { logActivity } from "@/lib/activity";
-import { dealName } from "@/lib/labels";
+import { dealName, totalContractValue } from "@/lib/labels";
 import { contactNameProblem } from "@/lib/contact-name";
 
 /**
@@ -149,7 +149,7 @@ export async function buildAndSendContract(
     await createContractFollowUpTask(dealId, deal.ownerId, sender.id);
     await logActivity({
       type: "CONTRACT_SENT",
-      message: `${sender.name} sendte en kontrakt til ${dealName(deal)}`,
+      message: `${sender.name} sendte en kontrakt til ${dealName(deal)}. ${contractSummary(products)}`,
       actorId: sender.id,
       dealId,
     });
@@ -254,4 +254,14 @@ export async function archiveSentContract(
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Der opstod en fejl ved sletning af kontrakten." };
   }
+}
+
+/** "(Etablering: 10.000, MRR: 500, Kontraktværdi: 6.000)" for 12 months - the feed's
+ * at-a-glance numbers for a sent contract. Kontraktværdi is MRR × binding,
+ * as everywhere else in the app (totalContractValue). */
+function contractSummary(products: ContractProducts): string {
+  const n = (v: number) => new Intl.NumberFormat("da-DK", { maximumFractionDigits: 0 }).format(v);
+  const mrr = computeMonthlyTotal(products);
+  const value = totalContractValue({ saleAmount: mrr, bindingMonths: products.bindingMonths });
+  return `(Etablering: ${n(computeSetupTotal(products))}, MRR: ${n(mrr)}, Kontraktværdi: ${n(value)})`;
 }
