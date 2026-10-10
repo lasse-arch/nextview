@@ -13,7 +13,7 @@ import {
 } from "@/lib/customer-report-template";
 import { renderCustomerReportPdf } from "@/lib/customer-report-pdf";
 import { sendGmailMessage } from "@/lib/gmail";
-import { findOrCreateCustomerReportsFolder, uploadPdfToDrive } from "@/lib/google-drive";
+import { findOrCreateCustomerStatsFolder, uploadPdfToDrive } from "@/lib/google-drive";
 import { getAppBaseUrl } from "@/lib/email-oauth";
 import { logActivity } from "@/lib/activity";
 import { dealName } from "@/lib/labels";
@@ -321,7 +321,7 @@ export async function generateAndSendCustomerReport(
 
     let pdfDriveUrl: string | null = null;
     try {
-      const folderId = await findOrCreateCustomerReportsFolder(account);
+      const folderId = await findOrCreateCustomerStatsFolder(account, customerName);
       const uploaded = await uploadPdfToDrive(account, folderId, fileName, pdf);
       pdfDriveUrl = uploaded.webViewLink;
     } catch (err) {
@@ -425,7 +425,7 @@ export async function generateAndSendCombinedCustomerReport(
 
     let pdfDriveUrl: string | null = null;
     try {
-      const folderId = await findOrCreateCustomerReportsFolder(account);
+      const folderId = await findOrCreateCustomerStatsFolder(account, customerName);
       const uploaded = await uploadPdfToDrive(account, folderId, fileName, pdf);
       pdfDriveUrl = uploaded.webViewLink;
     } catch (err) {
@@ -740,7 +740,14 @@ export async function collectCombinedReportData(
   for (const d of reportable) {
     if (collected.branches.some((b) => b.dealId === d.id)) continue;
     if (fetchedNow && Date.now() - started > budgetMs) return { complete: false };
-    const tourData = await fetchTour(parseMpSkinIds(d.mpSkinId));
+    let tourData: Awaited<ReturnType<typeof fetchTour>>;
+    try {
+      tourData = await fetchTour(parseMpSkinIds(d.mpSkinId));
+    } catch (err) {
+      // Says which location - with 6 of them, "kunne ikke hente" alone doesn't
+      // tell anyone which MP-Skin nummer to check.
+      throw new Error(`${d.displayName || d.companyName}: ${err instanceof Error ? err.message : String(err)}`);
+    }
     collected.branches.push({ dealId: d.id, name: d.displayName || d.companyName, stats: tourData.stats });
     if (!collected.coverImage) collected.coverImage = tourData.coverImage.toString("base64");
     await store.save(collected);

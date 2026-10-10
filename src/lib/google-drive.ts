@@ -7,8 +7,9 @@ const DRIVE_UPLOAD_BASE = "https://www.googleapis.com/upload/drive/v3";
 /** Folder every signed contract gets filed into - created on first use. */
 export const CONTRACTS_FOLDER_NAME = "Nextview360 - Underskrevne kontrakter";
 
-/** Folder every generated customer visitor-stats report gets filed into. */
-export const CUSTOMER_REPORTS_FOLDER_NAME = "Nextview360 - Besøgsrapporter";
+/** Folder every visitor-stats report sent to a customer gets filed into -
+ * one subfolder per customer (Stats / <kundens navn> / <rapport>.pdf). */
+export const CUSTOMER_STATS_FOLDER_NAME = "Stats";
 
 /**
  * Finds a named folder among files this app has created, or creates it if it
@@ -16,10 +17,14 @@ export const CUSTOMER_REPORTS_FOLDER_NAME = "Nextview360 - Besøgsrapporter";
  * files the app itself owns - never the connected account's other Drive
  * content.
  */
-export async function findOrCreateFolder(account: EmailAccount, folderName: string): Promise<string> {
+export async function findOrCreateFolder(account: EmailAccount, folderName: string, parentId?: string): Promise<string> {
   const accessToken = await getValidAccessToken(account);
 
-  const query = `mimeType='application/vnd.google-apps.folder' and name='${folderName}' and trashed=false`;
+  // Escaped for the query string - customer names can hold ' (e.g. "Jensen's").
+  const quoted = folderName.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+  const query =
+    `mimeType='application/vnd.google-apps.folder' and name='${quoted}' and trashed=false` +
+    (parentId ? ` and '${parentId}' in parents` : "");
   const listRes = await fetch(`${DRIVE_API_BASE}/files?q=${encodeURIComponent(query)}&fields=files(id,name)`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
@@ -30,7 +35,11 @@ export async function findOrCreateFolder(account: EmailAccount, folderName: stri
   const createRes = await fetch(`${DRIVE_API_BASE}/files`, {
     method: "POST",
     headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ name: folderName, mimeType: "application/vnd.google-apps.folder" }),
+    body: JSON.stringify({
+      name: folderName,
+      mimeType: "application/vnd.google-apps.folder",
+      ...(parentId ? { parents: [parentId] } : {}),
+    }),
   });
   if (!createRes.ok) throw new Error(`Google Drev-fejl ved oprettelse af mappe (${createRes.status}): ${await createRes.text()}`);
   const created = (await createRes.json()) as { id: string };
@@ -41,8 +50,10 @@ export async function findOrCreateContractsFolder(account: EmailAccount): Promis
   return findOrCreateFolder(account, CONTRACTS_FOLDER_NAME);
 }
 
-export async function findOrCreateCustomerReportsFolder(account: EmailAccount): Promise<string> {
-  return findOrCreateFolder(account, CUSTOMER_REPORTS_FOLDER_NAME);
+/** The customer's own folder under Stats, made on first use. */
+export async function findOrCreateCustomerStatsFolder(account: EmailAccount, customerName: string): Promise<string> {
+  const statsFolderId = await findOrCreateFolder(account, CUSTOMER_STATS_FOLDER_NAME);
+  return findOrCreateFolder(account, customerName.trim() || "Ukendt kunde", statsFolderId);
 }
 
 /** Uploads a PDF into the given Drive folder, returning its file ID and a viewable link. */

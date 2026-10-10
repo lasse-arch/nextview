@@ -33,6 +33,14 @@ export async function requestReportDownload(
   combined: boolean,
   createdById: string
 ): Promise<{ jobId: string }> {
+  // The same download already under way (a second click, or a retry after
+  // the browser gave up) carries on from where it got to instead of
+  // starting over behind it.
+  const existing = await prisma.reportDownloadJob.findFirst({
+    where: { status: "PENDING", dealIds: dealIds.join(","), combined, createdAt: { gte: new Date(Date.now() - ABANDONED_AFTER_MS) } },
+    select: { id: true },
+  });
+  if (existing) return { jobId: existing.id };
   const job = await prisma.reportDownloadJob.create({
     data: { dealIds: dealIds.join(","), combined, createdById, status: "PENDING" },
   });
@@ -42,6 +50,8 @@ export async function requestReportDownload(
 /** Just past the processing route's own 300s maxDuration - a claim older
  * than this belongs to a step that was cut off. */
 const CLAIM_EXPIRES_AFTER_MS = 6 * 60 * 1000;
+/** Just past how long the browser keeps waiting for a download (30 min). */
+const ABANDONED_AFTER_MS = 35 * 60 * 1000;
 
 /** What a multi-deal download has done so far: the deals already merged
  * into pdfData, and the ones that failed (with the last error). */
@@ -58,6 +68,20 @@ async function failAbandonedClaims(): Promise<void> {
     where: { status: "PENDING", claimedAt: { lt: new Date(Date.now() - CLAIM_EXPIRES_AFTER_MS) } },
     data: { status: "FAILED", claimedAt: null, errorMessage: "Afbrudt undervejs - prøv igen." },
   });
+  // Nobody is waiting for these any more (the browser stops after 30
+  // minutes) - they'd only hold up the downloads queued after them.
+  await prisma.reportDownloadJob.updateMany({
+    where: { status: "PENDING", createdAt: { lt: new Date(Date.now() - ABANDONED_AFTER_MS) } },
+    data: { status: "FAILED", claimedAt: null, errorMessage: "Opgivet - ingen ventede på den længere." },
+  });
+}
+
+/** True while a queue step is working - otherwise a waiting job needs a kick. */
+export async function downloadQueueIsRunning(): Promise<boolean> {
+  const live = await prisma.reportDownloadJob.count({
+    where: { status: "PENDING", claimedAt: { gte: new Date(Date.now() - CLAIM_EXPIRES_AFTER_MS) } },
+  });
+  return live > 0;
 }
 
 /** Takes the oldest waiting job - one at a time, like the send queue. */

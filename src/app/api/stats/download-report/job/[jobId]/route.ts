@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
+import { after } from "next/server";
+import { downloadQueueIsRunning, kickDownloadJobQueue } from "@/lib/report-download-service";
 
 /** Polled by the browser every few seconds while a download job is PENDING -
  * see download-report-client.ts. Once READY, the client switches to
@@ -18,6 +20,14 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     select: { status: true, errorMessage: true, fileName: true },
   });
   if (!job) return NextResponse.json({ error: "Jobbet findes ikke (eller er allerede hentet)." }, { status: 404 });
+
+  // The queue chains itself from step to step; if that chain ever breaks
+  // (a lost request between steps), the browser's polling restarts it.
+  if (job.status === "PENDING") {
+    after(async () => {
+      if (!(await downloadQueueIsRunning())) await kickDownloadJobQueue();
+    });
+  }
 
   const wantsFile = request.nextUrl.searchParams.get("file") === "1";
   if (!wantsFile || job.status !== "READY") {

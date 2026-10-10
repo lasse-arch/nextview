@@ -37,6 +37,8 @@ export type StatsCustomerRowData = {
   lastStatus: ReportSendStatus | null;
   lastErrorMessage: string | null;
   lastOpenedAt: string | null;
+  /** The sent report's PDF, archived in Google Drev (Stats / kunde / fil). */
+  lastPdfUrl: string | null;
   history: ReportHistoryEntry[];
   /** Linked branches (see customer linking) that also have an MP-Skin nummer - lets a "Send samlet rapport" button appear. */
   branches: { id: string; name: string }[];
@@ -59,6 +61,7 @@ export function StatsCustomerRow({
   lastStatus,
   lastErrorMessage,
   lastOpenedAt,
+  lastPdfUrl,
   history,
   branches,
   reportCombineBranches,
@@ -248,6 +251,17 @@ export function StatsCustomerRow({
                       >
                         {lastOpenedAt ? "Åbnet" : "Ikke åbnet"}
                       </span>
+                      {lastPdfUrl && (
+                        <a
+                          href={lastPdfUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="ml-2 font-medium text-blue-600 hover:underline"
+                          title="Den sendte rapport i Google Drev (Stats / kunde)"
+                        >
+                          Se sendt PDF
+                        </a>
+                      )}
                     </>
                   }
                 />

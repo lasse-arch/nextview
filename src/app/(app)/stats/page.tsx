@@ -100,6 +100,7 @@ export default async function StatsPage() {
               lastStatus: deal.reports[0]?.status ?? null,
               lastErrorMessage: deal.reports[0]?.errorMessage ?? null,
               lastOpenedAt: deal.reports[0]?.openedAt ? deal.reports[0].openedAt.toISOString() : null,
+              lastPdfUrl: deal.reports[0]?.pdfDriveUrl ?? null,
               history: deal.reports.map((r) => ({
                 sentAt: r.sentAt.toISOString(),
                 method: r.method,
