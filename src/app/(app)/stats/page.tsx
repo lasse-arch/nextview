@@ -38,7 +38,16 @@ export default async function StatsPage() {
       include: {
         reports: { orderBy: { sentAt: "desc" }, take: 10 },
         branches: { select: { id: true, displayName: true, companyName: true, mpSkinId: true } },
-        parent: { select: { displayName: true, companyName: true, reportCombineBranches: true } },
+        parent: {
+          select: {
+            id: true,
+            displayName: true,
+            companyName: true,
+            mpSkinId: true,
+            reportCombineBranches: true,
+            branches: { select: { mpSkinId: true } },
+          },
+        },
       },
     })
   ).sort((a, b) => dealName(a).localeCompare(dealName(b), "da"));
@@ -112,6 +121,13 @@ export default async function StatsPage() {
                 .map((b) => ({ id: b.id, name: b.displayName || b.companyName })),
               reportCombineBranches: deal.reportCombineBranches,
               combinedIntoParentName: deal.parent?.reportCombineBranches ? dealName(deal.parent) : null,
+              groupParent: deal.parent
+                ? {
+                    id: deal.parent.id,
+                    name: dealName(deal.parent),
+                    count: [deal.parent, ...deal.parent.branches].filter((d) => d.mpSkinId).length,
+                  }
+                : null,
             }))}
           />
         </div>

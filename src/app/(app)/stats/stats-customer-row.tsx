@@ -46,6 +46,8 @@ export type StatsCustomerRowData = {
   reportCombineBranches: boolean;
   /** Set on a branch whose parent sends combined - it's then never sent on its own automatically. */
   combinedIntoParentName: string | null;
+  /** A branch's main customer - its "PDF" can then also make the combined one for the whole group. */
+  groupParent: { id: string; name: string; count: number } | null;
 };
 
 export function StatsCustomerRow({
@@ -66,6 +68,7 @@ export function StatsCustomerRow({
   branches,
   reportCombineBranches,
   combinedIntoParentName,
+  groupParent,
   selected,
   onToggleSelected,
 }: StatsCustomerRowData & { selected: boolean; onToggleSelected: () => void }) {
@@ -78,6 +81,7 @@ export function StatsCustomerRow({
   const [sending, startSendTransition] = useTransition();
   const [sendingCombined, startSendCombinedTransition] = useTransition();
   const [downloading, startDownloadTransition] = useTransition();
+  const [pdfMenuOpen, setPdfMenuOpen] = useState(false);
   const [savingCombine, startSavingCombine] = useTransition();
   const [combineValue, setCombineValue] = useState(reportCombineBranches);
   const showToast = useToast();
@@ -173,22 +177,23 @@ export function StatsCustomerRow({
     });
   }
 
-  function downloadPdf() {
-    // Mirrors "Send samlet": a deal with linked branches gets asked whether
-    // this download should be just for it, or one combined PDF (one stats
-    // page per branch) for it and every linked branch together.
-    const combined =
-      branches.length > 0 &&
-      confirm(
-        `Denne kunde har ${branches.length} sammenkoblede afdeling${branches.length === 1 ? "" : "er"} (${branches
-          .map((b) => b.name)
-          .join(", ")}).\n\nTryk OK for én samlet PDF med alle ${branches.length + 1}, eller Annullér for kun denne.`
-      );
+  function downloadPdf(ids: string[], combined: boolean, label: string) {
+    setPdfMenuOpen(false);
     startDownloadTransition(async () => {
-      const result = await startDownloadJob([dealId], combined, name, showToast);
+      const result = await startDownloadJob(ids, combined, label, showToast);
       if (!result.ok) showToast(result.error);
     });
   }
+
+  // With linked locations (this is the main customer, or one of its
+  // branches) the PDF button asks: just this one, or one combined PDF for
+  // all of them - otherwise it just downloads.
+  const combinedChoice =
+    branches.length > 0
+      ? { ids: [dealId], label: name, count: branches.length + 1 }
+      : groupParent && groupParent.count > 1
+        ? { ids: [groupParent.id], label: groupParent.name, count: groupParent.count }
+        : null;
 
   const isSending = sending || lastStatus === "PENDING";
 
@@ -283,15 +288,45 @@ export function StatsCustomerRow({
               {sendingCombined ? "Sender…" : `Send samlet (${branches.length + 1})`}
             </button>
           )}
-          <button
-            type="button"
-            disabled={downloading || !mpSkinId}
-            onClick={downloadPdf}
-            title={!mpSkinId ? "Udfyld MP-Skin nummer først" : "Download PDF uden at sende"}
-            className="shrink-0 whitespace-nowrap rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
-          >
-            {downloading ? "Henter…" : "PDF"}
-          </button>
+          <div className="relative shrink-0">
+            <button
+              type="button"
+              disabled={downloading || !mpSkinId}
+              onClick={() => (combinedChoice ? setPdfMenuOpen((v) => !v) : downloadPdf([dealId], false, name))}
+              title={!mpSkinId ? "Udfyld MP-Skin nummer først" : "Download PDF uden at sende"}
+              className="whitespace-nowrap rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+            >
+              {downloading ? "Henter…" : "PDF"}
+            </button>
+            {pdfMenuOpen && combinedChoice && (
+              <>
+                <button
+                  type="button"
+                  aria-label="Luk"
+                  className="fixed inset-0 z-10 cursor-default"
+                  onClick={() => setPdfMenuOpen(false)}
+                />
+                <div className="absolute right-0 top-full z-20 mt-1 w-64 rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
+                  <button
+                    type="button"
+                    onClick={() => downloadPdf([dealId], false, name)}
+                    className="block w-full rounded-md px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50"
+                  >
+                    <span className="font-medium">Kun denne</span>
+                    <span className="block text-slate-500">{name}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => downloadPdf(combinedChoice.ids, true, `${combinedChoice.label} (samlet)`)}
+                    className="block w-full rounded-md px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50"
+                  >
+                    <span className="font-medium">Samlet for alle {combinedChoice.count}</span>
+                    <span className="block text-slate-500">Én PDF med alle lokationer under {combinedChoice.label}</span>
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
           <button
             type="button"
             disabled={isSending}
