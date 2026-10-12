@@ -257,6 +257,12 @@ model User {
   passwordHash      String
   role              Role                @default(SALES)
   isCommissionBased Boolean             @default(true)
+  /// Leadgeneration's "N nye tilføjet siden sidst": when this user last had
+  /// the page open, and the start of the visit before that (what's counted
+  /// from). A new visit only begins after a 30-minute gap, so refreshes
+  /// within one visit don't reset the count.
+  leadgenSeenAt     DateTime?
+  leadgenBaselineAt DateTime?
   /// Gates Stats (/stats) and the invoicing pages (Fakturaer, Betalingsstatus
   /// under Indstillinger) - per-user, not role-based, since some sellers
   /// should stay out of billing-adjacent pages without needing a whole

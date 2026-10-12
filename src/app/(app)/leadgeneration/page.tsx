@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { requireUser } from "@/lib/auth";
 import { LeadFilterSection } from "./lead-filter-section";
 import { UrlScanSection } from "./url-scan-section";
 import { LeadCandidateSection, type KnownLeadStatus } from "./lead-candidate-section";
@@ -125,8 +126,22 @@ async function loadFoundLeadLists() {
   });
 }
 
+/** A visit ends after this long away - see User.leadgenSeenAt. */
+const VISIT_GAP_MS = 30 * 60 * 1000;
+
+/** Marks this visit and returns what "siden sidst" counts from (null on a first ever visit). */
+async function leadgenVisitBaseline(user: { id: string; leadgenSeenAt: Date | null; leadgenBaselineAt: Date | null }) {
+  const now = new Date();
+  const newVisit = !user.leadgenSeenAt || now.getTime() - user.leadgenSeenAt.getTime() > VISIT_GAP_MS;
+  const baseline = newVisit ? user.leadgenSeenAt : user.leadgenBaselineAt;
+  await prisma.user.update({ where: { id: user.id }, data: { leadgenSeenAt: now, leadgenBaselineAt: baseline } });
+  return baseline;
+}
+
 export default async function LeadGenerationPage() {
-  const [filters, watchedUrls, candidates, callLists] = await Promise.all([
+  const user = await requireUser();
+  const baseline = await leadgenVisitBaseline(user);
+  const [filters, watchedUrls, candidates, callLists, addedSinceLast] = await Promise.all([
     prisma.leadFilter.findMany({
       orderBy: { createdAt: "desc" },
       include: {
@@ -139,7 +154,15 @@ export default async function LeadGenerationPage() {
     // straight into whichever Ringeliste list is currently being worked
     // from, without leaving Leadgeneration first.
     prisma.callList.findMany({ orderBy: { createdAt: "desc" }, select: { id: true, name: true } }),
+    baseline
+      ? prisma.leadFilterMatch.groupBy({
+          by: ["filterId"],
+          where: { createdAt: { gt: baseline }, handledAt: null, candidate: { status: "NEW", dealId: null } },
+          _count: { _all: true },
+        })
+      : Promise.resolve([]),
   ]);
+  const addedSinceLastByFilter = new Map(addedSinceLast.map((g) => [g.filterId, g._count._all]));
 
   const watchedUrlSet = new Set(watchedUrls.map((w) => w.url));
   const watchedLabels = new Map(
@@ -170,6 +193,7 @@ export default async function LeadGenerationPage() {
           enabled: f.enabled,
           lastRunAt: f.lastRunAt ? f.lastRunAt.toISOString() : null,
           newCandidateCount: f._count.matches,
+          addedSinceLastVisit: addedSinceLastByFilter.get(f.id) ?? 0,
           autoCreateDailyList: f.autoCreateDailyList,
           targetCallListId: f.targetCallListId,
         }))}

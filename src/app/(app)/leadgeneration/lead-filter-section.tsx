@@ -70,6 +70,8 @@ export type LeadFilterData = {
   enabled: boolean;
   lastRunAt: string | null;
   newCandidateCount: number;
+  /** Found since this user's last visit to Leadgeneration (still unreviewed). */
+  addedSinceLastVisit: number;
   autoCreateDailyList: boolean;
   targetCallListId: string | null;
 };
@@ -315,9 +317,17 @@ function FilterCard({ filter, callLists }: { filter: LeadFilterData; callLists: 
       <div className="min-w-0">
         <div className="flex items-center gap-2">
           <p className="font-medium text-slate-900">{filter.name}</p>
-          {filter.newCandidateCount > 0 && (
+          {filter.addedSinceLastVisit > 0 && (
             <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
-              {filter.newCandidateCount} nye
+              {filter.addedSinceLastVisit} nye tilføjet siden sidst
+            </span>
+          )}
+          {filter.newCandidateCount > 0 && (
+            <span
+              className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600"
+              title="Fundne leads, der endnu ikke er gennemgået"
+            >
+              {filter.newCandidateCount} til gennemgang
             </span>
           )}
           {(filter.autoCreateDailyList || targetListName) && (
