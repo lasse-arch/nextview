@@ -12,7 +12,7 @@ import { signupLinkFor } from "@/lib/betalingsservice/signup-mail";
 import { logActivity } from "@/lib/activity";
 import { dealName } from "@/lib/labels";
 import { createEmailFollowUpTask } from "@/lib/task-automation";
-import { logEmailTimeEntry } from "@/lib/actions/time-entries";
+import { logEmailTimeEntry } from "@/lib/time-entry-service";
 
 /** 25MB - Gmail's own limit on a single outgoing message (including the
  * base64-inflated size of every attachment combined). */

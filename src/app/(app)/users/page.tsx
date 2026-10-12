@@ -17,10 +17,49 @@ export default async function UsersPage() {
   const users = await prisma.user.findMany({ orderBy: { name: "asc" } });
   const googleRequired = await isGoogleLoginRequired();
   const notYetGoogle = users.filter((u) => !u.lastGoogleLoginAt);
+  // Secrets whose absence leaves a door open (the routes they guard accept
+  // anyone without them) - checked here since they live in Vercel, not Arpo.
+  const securityChecks = [
+    {
+      ok: Boolean(process.env.CRON_SECRET),
+      label: "CRON_SECRET er sat",
+      fix: "Uden den kan alle udefra starte de automatiske kørsler (fakturaer, Betalingsservice, rapporter). Sæt en lang tilfældig værdi i Vercel.",
+    },
+    {
+      ok: !process.env.DOCUSEAL_API_KEY || Boolean(process.env.DOCUSEAL_WEBHOOK_SECRET),
+      label: "DOCUSEAL_WEBHOOK_SECRET er sat",
+      fix: "Uden den kan alle udefra melde en kontrakt underskrevet. Kopiér HMAC-nøglen fra DocuSeal → Webhooks til Vercel.",
+    },
+    {
+      ok: (process.env.AUTH_SECRET?.length ?? 0) >= 32,
+      label: "AUTH_SECRET er lang nok (mindst 32 tegn)",
+      fix: "Den signerer login-sessioner - lav en ny med `openssl rand -base64 32` i Vercel (alle bliver logget ud).",
+    },
+    {
+      ok: googleRequired,
+      label: "Kræv Google-login er slået til",
+      fix: "Adgangskoder virker stadig - slå det til nedenfor, når alle har logget ind med Google.",
+    },
+  ];
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <h1 className="text-2xl font-semibold text-slate-900">Brugere</h1>
+
+      <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <h2 className="text-sm font-semibold text-slate-900">Sikkerhedstjek</h2>
+        <ul className="mt-2 space-y-1 text-sm">
+          {securityChecks.map((c) => (
+            <li key={c.label} className="flex items-start gap-2">
+              <span className={c.ok ? "text-emerald-600" : "text-red-600"}>{c.ok ? "✓" : "✗"}</span>
+              <span className={c.ok ? "text-slate-700" : "text-slate-900"}>
+                {c.label}
+                {!c.ok && <span className="block text-xs text-red-600">{c.fix}</span>}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </section>
 
       <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <h2 className="text-sm font-semibold text-slate-900">Login med Google</h2>

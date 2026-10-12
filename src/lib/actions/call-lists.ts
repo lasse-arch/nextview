@@ -1,5 +1,5 @@
 "use server";
-
+import { defaultListName } from "@/lib/call-list-service";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
@@ -13,14 +13,6 @@ import { scrapeBasicContactInfo } from "@/lib/website-contact-scrape";
 
 const SOCIAL_LINK_PATTERN = /facebook\.com|instagram\.com|linkedin\.com/i;
 
-function defaultListName(): string {
-  const formatted = new Intl.DateTimeFormat("da-DK", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-  }).format(new Date());
-  return `Ringeliste ${formatted}`;
-}
 
 export async function createCallList(name?: string): Promise<{ id: string; name: string }> {
   const user = await requireUser();
@@ -43,23 +35,6 @@ export async function renameCallList(callListId: string, name: string): Promise<
   revalidatePath("/ringeliste");
   revalidatePath("/leadgeneration");
   return { ok: true };
-}
-
-/**
- * Finds today's auto-generated Ringeliste (same name convention as
- * `createCallList()`'s own default, "Ringeliste <ugedag> <dato>") or creates
- * it if this is the first automatic lead-filter run today - used by a
- * LeadFilter with `autoCreateDailyList` set, so repeated runs on the same
- * day (a manual "Kør nu" plus the nightly cron, say) land in one shared
- * list instead of a fresh one each time.
- */
-export async function findOrCreateTodayCallList(createdById: string): Promise<{ id: string; name: string }> {
-  const name = defaultListName();
-  const existing = await prisma.callList.findFirst({ where: { name, createdById } });
-  if (existing) return existing;
-  const list = await prisma.callList.create({ data: { name, createdById } });
-  revalidatePath("/ringeliste");
-  return list;
 }
 
 /**

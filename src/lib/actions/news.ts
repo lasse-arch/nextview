@@ -46,6 +46,7 @@ export async function markNewsRead(): Promise<void> {
 }
 
 export async function getUnreadNewsCount(userId: string, newsReadAt: Date | null): Promise<number> {
+  await requireUser();
   return prisma.newsPost.count({
     where: { createdAt: { gt: newsReadAt ?? new Date(0) }, createdById: { not: userId } },
   });
@@ -202,6 +203,8 @@ const DEFAULT_POSTS: { title: string; body: string; minutesAgo: number; screensh
  * a later screenshot addition still reaches prod without direct DB access.
  */
 export async function ensureDefaultNewsPosts(adminUserId: string): Promise<void> {
+  const user = await requireUser();
+  if (user.role !== "ADMIN" || user.id !== adminUserId) return;
   // Replaced by "Møder booket denne uge - på forsiden" shortly after it went out.
   await prisma.newsPost.deleteMany({ where: { title: "Møder booket i dag - på forsiden" } });
 

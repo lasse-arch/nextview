@@ -1,5 +1,6 @@
 "use server";
 
+import { requireUser } from "@/lib/auth";
 import { getCalendarWeek, type CalendarMeeting } from "@/lib/calendar-page-data";
 
 /**
@@ -21,6 +22,7 @@ export type CalendarWeekClientData = {
  * the whole page's data fetching (stats tiles, monthly chart, per-seller
  * cards included) just to change which week is shown. */
 export async function getCalendarWeekAction(weekOffset: number): Promise<CalendarWeekClientData> {
+  await requireUser();
   const week = await getCalendarWeek(weekOffset);
   return {
     weekOffset,

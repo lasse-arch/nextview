@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { recalcCommission } from "@/lib/commission-service";
-import { createDuplicateDealRecord } from "@/lib/actions/deals";
+import { createDuplicateDealRecord } from "@/lib/deal-duplicate";
 
 export async function bulkUpdateSaleAmount(dealIds: string[], amountRaw: string) {
   await requireUser();

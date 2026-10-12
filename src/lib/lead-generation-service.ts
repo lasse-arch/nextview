@@ -2,8 +2,8 @@ import { prisma } from "@/lib/db";
 import { searchCvr, MAX_LEAD_FILTER_RESULTS, MAX_CVR_SEARCH_WINDOW, type CvrSearchHit } from "@/lib/cvr-search";
 import { scanUrlForCvrLeads } from "@/lib/url-lead-scan";
 import { lookupCvrNumber } from "@/lib/cvr";
-import { claimCandidateAndUpsertDeal } from "@/lib/actions/lead-generation";
-import { findOrCreateTodayCallList } from "@/lib/actions/call-lists";
+import { claimCandidateAndUpsertDeal } from "@/lib/lead-candidate-claim";
+import { findOrCreateTodayCallList } from "@/lib/call-list-service";
 import { logActivity } from "@/lib/activity";
 import { dealName } from "@/lib/labels";
 

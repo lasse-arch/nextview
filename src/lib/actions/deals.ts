@@ -1,5 +1,5 @@
 "use server";
-
+import { createDuplicateDealRecord } from "@/lib/deal-duplicate";
 import { leadInboxExitData } from "@/lib/lead-inbox";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -18,8 +18,6 @@ import { isPocketShareUrl, fetchPocketTranscript } from "@/lib/pocket-transcript
 import type { DealStage, CommissionFrequency, CommissionStatus } from "@prisma/client";
 
 const CONTRACT_MANAGED_STAGES: DealStage[] = ["CONTRACT_SENT", "CONTRACT_SIGNED"];
-
-
 
 /**
  * Parses a mødedato "datetime-local" value (e.g. "2026-10-06T10:00") as the
@@ -83,42 +81,6 @@ export async function createDealManual(formData: FormData) {
 
   revalidatePath("/deals");
   redirect(duplicates.length > 0 ? `/deals/${deal.id}?dup=1` : `/deals/${deal.id}`);
-}
-
-/**
- * Duplicates a deal as a fresh lead - copies the company/contact info so it
- * doesn't need retyping, but resets stage, sale info, contract/integration
- * fields and notes so the copy starts its own pipeline from scratch.
- */
-export async function createDuplicateDealRecord(dealId: string) {
-  const source = await prisma.deal.findUniqueOrThrow({ where: { id: dealId } });
-
-  const companyName = `${source.companyName} (kopi)`;
-  const displayName = source.displayName ? `${source.displayName} (kopi)` : null;
-
-  const deal = await prisma.deal.create({
-    data: {
-      companyName,
-      displayName,
-      cvrNumber: source.cvrNumber,
-      address: source.address,
-      latitude: source.latitude,
-      longitude: source.longitude,
-      contactName: source.contactName,
-      contactEmail: source.contactEmail,
-      contactPhone: source.contactPhone,
-      invoiceEmail: source.invoiceEmail,
-      ownerId: source.ownerId,
-      importType: "MANUAL",
-    },
-  });
-
-  await prisma.deal.update({
-    where: { id: deal.id },
-    data: { dealEmailAddress: buildDealEmailAddress(deal.id) },
-  });
-
-  return deal;
 }
 
 export async function duplicateDeal(dealId: string) {

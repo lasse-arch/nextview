@@ -11,6 +11,22 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     "/*": ["./public/logo.png", "./node_modules/@sparticuz/chromium/bin/**/*"],
   },
+  // Basic hardening on every response: no framing of Arpo by other sites
+  // (clickjacking), no MIME sniffing, no full URLs leaked to other sites,
+  // and browsers stick to HTTPS.
+  async headers() {
+    return [
+      {
+        source: "/(.*)",
+        headers: [
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "Strict-Transport-Security", value: "max-age=31536000" },
+        ],
+      },
+    ];
+  },
   experimental: {
     // Deal-email attachments are allowed up to 25MB combined (Gmail's own
     // limit, enforced in sendTemplatedEmailAction) - the body limit has to

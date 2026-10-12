@@ -4,7 +4,7 @@ import { verifyWebhookSignature, downloadCompletedPdf } from "@/lib/docuseal";
 import { recalcCommission } from "@/lib/commission-service";
 import { sendContractSignedNotification } from "@/lib/notification-service";
 import { contractProductsToDealItems, type ContractProducts } from "@/lib/contract-template-data";
-import { archiveSignedContractToDrive, findArchivingGoogleAccount } from "@/lib/actions/google-drive-archive";
+import { archiveSignedContractToDrive, findArchivingGoogleAccount } from "@/lib/contract-drive-archive";
 import { findOrCreateContractsFolder, uploadPdfToDrive } from "@/lib/google-drive";
 import { isIntegrationEnabled } from "@/lib/integration-settings";
 import { createDeliveryTasksForSignedContract, completeContractFollowUpTasks } from "@/lib/task-automation";
