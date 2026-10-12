@@ -186,6 +186,12 @@ const DEFAULT_POSTS: { title: string; body: string; minutesAgo: number; screensh
     body: "Under Indstillinger → Betalingsservice kan I nu indsætte jeres BS Tilmeldingslink fra Mastercard Connect og sende en tilmeldingsmail fra lasse@nextview360.dk til alle kunder, der ikke er tilmeldt endnu - med en rød \"Tilmeld Betalingsservice\"-knap (MitID) og kundens eget kundenummer. \"Se mailen\" viser den først, og hver kunde i listen har sin egen \"Send mail\"-knap og kan se, hvornår den sidst blev sendt.\n\nAfdelinger, der faktureres samlet med en hovedkunde, står nu under hovedkunden i listen og bruger hovedkundens tilmelding. Linket kommer også på fakturaerne i stedet for betalingsservice.dk, hvor man ikke kan tilmelde sig.",
     screenshotUrl: "/news/tilmeldingsmail.png",
   },
+  {
+    minutesAgo: 0,
+    title: "Log ind med Google",
+    body: "Du kan nu logge ind i Arpo med din Google-arbejdskonto - tryk \"Log ind med Google\" på login-siden og vælg kontoen med samme e-mail som din Arpo-bruger. Så gælder Googles egen sikkerhed (fx 2-trinsbekræftelse) også for Arpo.\n\nNår alle har prøvet det, kan en admin under Brugere slå \"Kræv Google-login\" til - så virker adgangskoder ikke længere, og alle der er logget ind med adgangskode bliver logget ud og skal ind med Google.",
+    screenshotUrl: "/news/google-login.png",
+  },
 ];
 
 /**

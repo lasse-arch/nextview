@@ -3,7 +3,8 @@
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { verifyPassword } from "@/lib/password";
-import { createSession, destroySession } from "@/lib/auth";
+import { createSession, destroySession, safeNextPath } from "@/lib/auth";
+import { isGoogleLoginRequired } from "@/lib/google-login";
 
 export type LoginState = { error?: string } | undefined;
 
@@ -11,6 +12,10 @@ export async function login(_prevState: LoginState, formData: FormData): Promise
   const email = String(formData.get("email") || "").trim().toLowerCase();
   const password = String(formData.get("password") || "");
   const next = String(formData.get("next") || "/");
+
+  if (await isGoogleLoginRequired()) {
+    return { error: "Log ind med Google - adgangskoder er slået fra." };
+  }
 
   if (!email || !password) {
     return { error: "Udfyld e-mail og adgangskode." };
@@ -26,8 +31,8 @@ export async function login(_prevState: LoginState, formData: FormData): Promise
     return { error: "Forkert e-mail eller adgangskode." };
   }
 
-  await createSession(user.id);
-  redirect(next.startsWith("/") ? next : "/");
+  await createSession(user.id, "password");
+  redirect(safeNextPath(next));
 }
 
 export async function logout() {

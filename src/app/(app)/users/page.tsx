@@ -4,17 +4,44 @@ import { getCurrentUser } from "@/lib/auth";
 import { createUser, updateUser } from "@/lib/actions/users";
 import { commissionFrequencyLabels } from "@/lib/labels";
 import { AvatarUploader } from "../avatar-uploader";
+import { RequireGoogleLoginToggle } from "./require-google-login-toggle";
+import { isGoogleLoginRequired, googleLoginRedirectUri } from "@/lib/google-login";
+import { getAppBaseUrl } from "@/lib/email-oauth";
+import { formatDate } from "@/lib/labels";
 
 export default async function UsersPage() {
   const currentUser = await getCurrentUser();
-  if (!currentUser) redirect("/login");
+  if (!currentUser) redirect("/api/auth/session-ended");
   if (currentUser.role !== "ADMIN") redirect("/");
 
   const users = await prisma.user.findMany({ orderBy: { name: "asc" } });
+  const googleRequired = await isGoogleLoginRequired();
+  const notYetGoogle = users.filter((u) => !u.lastGoogleLoginAt);
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <h1 className="text-2xl font-semibold text-slate-900">Brugere</h1>
+
+      <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <h2 className="text-sm font-semibold text-slate-900">Login med Google</h2>
+        <p className="mt-1 text-xs text-slate-500">
+          Alle kan logge ind med deres Google-arbejdskonto (samme e-mail som her). Med &quot;Kræv Google-login&quot;
+          virker adgangskoder ikke længere - så gælder Googles egen sikkerhed (2-trinsbekræftelse) for Arpo.
+        </p>
+        <div className="mt-3">
+          <RequireGoogleLoginToggle enabled={googleRequired} />
+        </div>
+        <p className="mt-3 text-xs text-slate-500">
+          {notYetGoogle.length === 0
+            ? "Alle brugere har logget ind med Google mindst én gang."
+            : `Har endnu ikke logget ind med Google: ${notYetGoogle.map((u) => u.name).join(", ")}.`}
+          {currentUser.lastGoogleLoginAt && ` Du loggede sidst ind med Google ${formatDate(currentUser.lastGoogleLoginAt)}.`}
+        </p>
+        <p className="mt-2 text-[11px] text-slate-400">
+          Google Cloud → OAuth-klienten → Authorized redirect URIs skal indeholde{" "}
+          <span className="font-mono">{googleLoginRedirectUri(getAppBaseUrl())}</span>
+        </p>
+      </section>
 
       <div className="space-y-4">
         {users.map((u) => {

@@ -22,7 +22,7 @@ const hasCredentials = Boolean(
 
 export default async function DineroSettingsPage() {
   const currentUser = await getCurrentUser();
-  if (!currentUser) redirect("/login");
+  if (!currentUser) redirect("/api/auth/session-ended");
   if (!currentUser.canAccessBilling) redirect("/");
 
   const [configured, enabled, autoRunEnabled, testMode] = await Promise.all([

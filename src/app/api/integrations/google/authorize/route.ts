@@ -6,7 +6,7 @@ export async function GET() {
   try {
     await requireUser();
   } catch {
-    return NextResponse.redirect(new URL("/login", getAppBaseUrl()));
+    return NextResponse.redirect(new URL("/api/auth/session-ended", getAppBaseUrl()));
   }
 
   if (!isGoogleConfigured()) {

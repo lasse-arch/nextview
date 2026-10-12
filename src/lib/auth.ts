@@ -4,6 +4,7 @@ import { after } from "next/server";
 import { SignJWT, jwtVerify } from "jose";
 import { prisma } from "@/lib/db";
 import type { User } from "@prisma/client";
+import { isGoogleLoginRequired } from "@/lib/google-login";
 
 /** Only bother writing lastActiveAt if it's this stale - getCurrentUser runs
  * on almost every request, so without throttling this would mean a write on
@@ -28,8 +29,12 @@ function getSecret() {
   return new TextEncoder().encode(secret);
 }
 
-export async function createSession(userId: string) {
-  const token = await new SignJWT({ userId })
+/** How the session was started - with "Kræv Google-login" on, password
+ * sessions stop working (see getCurrentUser). */
+export type LoginMethod = "password" | "google";
+
+export async function createSession(userId: string, method: LoginMethod) {
+  const token = await new SignJWT({ userId, method })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime(`${SESSION_TTL_SECONDS}s`)
@@ -50,22 +55,27 @@ export async function destroySession() {
   cookieStore.delete(SESSION_COOKIE);
 }
 
-async function getUserIdFromSession(): Promise<string | null> {
+async function getSessionFromCookie(): Promise<{ userId: string; method: LoginMethod } | null> {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE)?.value;
   if (!token) return null;
   try {
     const { payload } = await jwtVerify(token, getSecret());
-    return typeof payload.userId === "string" ? payload.userId : null;
+    if (typeof payload.userId !== "string") return null;
+    // Sessions from before login methods were recorded were all password ones.
+    return { userId: payload.userId, method: payload.method === "google" ? "google" : "password" };
   } catch {
     return null;
   }
 }
 
 export async function getCurrentUser(): Promise<User | null> {
-  const userId = await getUserIdFromSession();
-  if (!userId) return null;
-  const user = await prisma.user.findUnique({ where: { id: userId } });
+  const session = await getSessionFromCookie();
+  if (!session) return null;
+  // With "Kræv Google-login" on, a password session (even one started
+  // before it was turned on) no longer counts - log in again with Google.
+  if (session.method === "password" && (await isGoogleLoginRequired())) return null;
+  const user = await prisma.user.findUnique({ where: { id: session.userId } });
   if (user) touchLastActive(user);
   return user;
 }
@@ -74,4 +84,11 @@ export async function requireUser(): Promise<User> {
   const user = await getCurrentUser();
   if (!user) throw new Error("Unauthorized");
   return user;
+}
+
+/** Where to go after logging in - only a path on this site ("//evil.com"
+ * and "/\\evil.com" are other sites to a browser). */
+export function safeNextPath(next: string | null | undefined): string {
+  if (!next || !next.startsWith("/") || next.startsWith("//") || next.startsWith("/\\")) return "/";
+  return next;
 }

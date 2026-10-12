@@ -61,7 +61,7 @@ function kr(ore: number): string {
  */
 export default async function BetalingsservicePage() {
   const currentUser = await getCurrentUser();
-  if (!currentUser) redirect("/login");
+  if (!currentUser) redirect("/api/auth/session-ended");
   if (!currentUser.canAccessBilling) redirect("/");
 
   const now = new Date();

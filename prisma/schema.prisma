@@ -261,6 +261,9 @@ model User {
   /// the page open, and the start of the visit before that (what's counted
   /// from). A new visit only begins after a 30-minute gap, so refreshes
   /// within one visit don't reset the count.
+  /// Last "Log ind med Google" - an admin can only turn on "Kræv
+  /// Google-login" after logging in with Google themselves, proving it works.
+  lastGoogleLoginAt DateTime?
   leadgenSeenAt     DateTime?
   leadgenBaselineAt DateTime?
   /// Gates Stats (/stats) and the invoicing pages (Fakturaer, Betalingsstatus

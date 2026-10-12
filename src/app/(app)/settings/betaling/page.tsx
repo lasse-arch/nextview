@@ -14,7 +14,7 @@ import { BetalingTable, type BetalingRow } from "./betaling-table";
  */
 export default async function BetalingPage() {
   const currentUser = await getCurrentUser();
-  if (!currentUser) redirect("/login");
+  if (!currentUser) redirect("/api/auth/session-ended");
   if (!currentUser.canAccessBilling) redirect("/");
 
   const deals = await prisma.deal.findMany({

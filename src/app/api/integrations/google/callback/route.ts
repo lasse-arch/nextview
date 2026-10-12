@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
   try {
     user = await requireUser();
   } catch {
-    return NextResponse.redirect(new URL("/login", getAppBaseUrl()));
+    return NextResponse.redirect(new URL("/api/auth/session-ended", getAppBaseUrl()));
   }
 
   const code = request.nextUrl.searchParams.get("code");
