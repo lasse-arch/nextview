@@ -10,8 +10,15 @@ export async function GET(request: NextRequest) {
   const base = getAppBaseUrl();
   if (!isGoogleConfigured()) return NextResponse.redirect(new URL("/login?error=google_not_configured", base));
 
-  const state = randomBytes(24).toString("base64url");
   const next = safeNextPath(request.nextUrl.searchParams.get("next"));
+  // Google sends the answer to APP_BASE_URL's host - start from that host
+  // too (e.g. arpo.dk → www.arpo.dk), or the state cookie set here wouldn't
+  // be there when the answer comes back.
+  if (request.headers.get("host") && new URL(base).host !== request.headers.get("host")) {
+    return NextResponse.redirect(new URL(`/api/auth/google/start?next=${encodeURIComponent(next)}`, base));
+  }
+
+  const state = randomBytes(24).toString("base64url");
 
   const url = new URL("https://accounts.google.com/o/oauth2/v2/auth");
   url.searchParams.set("client_id", process.env.GOOGLE_CLIENT_ID!);
