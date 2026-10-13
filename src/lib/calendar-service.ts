@@ -40,18 +40,32 @@ export async function syncDealMeetingToCalendar(
   dealId: string,
   extraAttendeeEmails: string[] = [],
   customBody?: string,
-  durationMinutes?: number
+  durationMinutes?: number,
+  /** Who sends the invite (from their own Google calendar, signed with
+   * their name) - the deal's owner unless given, e.g. whoever booked the
+   * meeting from the ringeliste. */
+  organizerUserId?: string
 ): Promise<CalendarSyncResult> {
   const deal = await prisma.deal.findUnique({ where: { id: dealId }, include: { owner: true } });
   if (!deal || !deal.meetingDate) {
     return { synced: false, reason: "Ingen mødedato sat." };
   }
+  const organizer =
+    organizerUserId && organizerUserId !== deal.ownerId
+      ? await prisma.user.findUniqueOrThrow({ where: { id: organizerUserId } })
+      : deal.owner;
 
   const account = await prisma.emailAccount.findUnique({
-    where: { userId_provider: { userId: deal.ownerId, provider: "GOOGLE" } },
+    where: { userId_provider: { userId: organizer.id, provider: "GOOGLE" } },
   });
   if (!account) {
-    return { synced: false, reason: "Ejeren har ikke forbundet Google under Indstillinger → E-mail." };
+    return {
+      synced: false,
+      reason:
+        organizer.id === deal.ownerId
+          ? "Ejeren har ikke forbundet Google under Indstillinger → E-mail."
+          : "Du har ikke forbundet Google under Indstillinger → E-mail.",
+    };
   }
 
   if (durationMinutes && durationMinutes !== deal.meetingDurationMinutes) {
@@ -61,7 +75,7 @@ export async function syncDealMeetingToCalendar(
   const start = deal.meetingDate;
   const end = new Date(start.getTime() + (durationMinutes ?? deal.meetingDurationMinutes) * 60_000);
 
-  const sellerFullName = [deal.owner.name, deal.owner.lastName].filter(Boolean).join(" ");
+  const sellerFullName = [organizer.name, organizer.lastName].filter(Boolean).join(" ");
   const description = [
     "Hej,",
     "",
@@ -74,20 +88,22 @@ export async function syncDealMeetingToCalendar(
     "",
     "Med venlig hilsen",
     sellerFullName,
-    deal.owner.email,
-    deal.owner.phone ?? "",
+    organizer.email,
+    organizer.phone ?? "",
   ].join("\n");
 
   try {
     const eventId = await upsertCalendarEvent(account, {
-      eventId: deal.googleCalendarEventId,
+      // An event lives in its organizer's calendar - one made from the
+      // owner's can't be updated from someone else's, so that's a new one.
+      eventId: organizer.id === deal.ownerId ? deal.googleCalendarEventId : null,
       summary: `${dealName(deal)} x Nextview360`,
       description,
       startIso: toWallClockDateTime(start),
       endIso: toWallClockDateTime(end),
       timeZone: MEETING_TIME_ZONE,
-      attendeeEmails: [deal.owner.email, deal.contactEmail, ...extraAttendeeEmails],
-      acceptedEmails: [deal.owner.email],
+      attendeeEmails: [organizer.email, deal.contactEmail, ...extraAttendeeEmails],
+      acceptedEmails: [organizer.email],
     });
 
     if (eventId !== deal.googleCalendarEventId) {

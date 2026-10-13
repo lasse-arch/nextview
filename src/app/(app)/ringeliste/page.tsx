@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { requireUser } from "@/lib/auth";
 import { RingelisteClient } from "./ringeliste-client";
 
 // Only leads not yet worked: once a deal moves on (Kontaktet, Opfølgning,
@@ -11,6 +12,7 @@ export default async function RingelistePage({
   searchParams: Promise<{ list?: string }>;
 }) {
   const { list: listParam } = await searchParams;
+  const currentUser = await requireUser();
 
   const lists = await prisma.callList.findMany({
     orderBy: { createdAt: "desc" },
@@ -61,6 +63,7 @@ export default async function RingelistePage({
         selectedListId={selectedListId}
         deals={deals}
         users={users}
+        currentUserId={currentUser.id}
       />
     </div>
   );

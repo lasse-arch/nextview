@@ -457,9 +457,12 @@ export async function sendCalendarInvite(
   meetingDateRaw?: string,
   customBody?: string,
   durationMinutes?: number,
-  contactEmail?: string
+  contactEmail?: string,
+  /** Send it from the logged-in user's calendar instead of the deal owner's
+   * - the ringeliste, where whoever books the meeting is the one inviting. */
+  fromCurrentUser = false
 ): Promise<CalendarSyncResult> {
-  await requireUser();
+  const user = await requireUser();
   const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId } });
 
   // The customer address the invite goes to, as typed in the booking panel -
@@ -490,7 +493,8 @@ export async function sendCalendarInvite(
     dealId,
     extraUsers.map((u) => u.email),
     resolvedCustomBody,
-    durationMinutes
+    durationMinutes,
+    fromCurrentUser ? user.id : undefined
   );
   revalidatePath(`/deals/${dealId}`);
   return result;

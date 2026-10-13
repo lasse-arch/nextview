@@ -296,7 +296,7 @@ function ListPicker({ lists, selectedListId }: { lists: CallListSummary[]; selec
   );
 }
 
-function QueueCard({ deal, users }: { deal: QueueDeal; users: Colleague[] }) {
+function QueueCard({ deal, users, currentUserId }: { deal: QueueDeal; users: Colleague[]; currentUserId: string }) {
   const [busy, startTransition] = useTransition();
   const [bookingMeeting, setBookingMeeting] = useState(false);
   const [meetingDateInput, setMeetingDateInput] = useState("");
@@ -304,7 +304,8 @@ function QueueCard({ deal, users }: { deal: QueueDeal; users: Colleague[] }) {
   const [inviteEmail, setInviteEmail] = useState(deal.contactEmail ?? "");
   const [sendInvite, setSendInvite] = useState(true);
   const [selectedColleagues, setSelectedColleagues] = useState<string[]>([]);
-  const colleagues = users.filter((u) => u.id !== deal.ownerId);
+  // You send the invite yourself (from your own calendar), so the rest are the colleagues to add.
+  const colleagues = users.filter((u) => u.id !== currentUserId);
   const [gone, setGone] = useState(false);
   const [askingLostReason, setAskingLostReason] = useState(false);
   const [editingName, setEditingName] = useState(false);
@@ -428,7 +429,8 @@ function QueueCard({ deal, users }: { deal: QueueDeal; users: Colleague[] }) {
             meetingDateInput,
             undefined,
             duration,
-            inviteEmail
+            inviteEmail,
+            true
           );
           showToast(
             result.synced
@@ -777,11 +779,13 @@ export function RingelisteClient({
   selectedListId,
   deals,
   users,
+  currentUserId,
 }: {
   lists: CallListSummary[];
   selectedListId: string | null;
   deals: QueueDeal[];
   users: Colleague[];
+  currentUserId: string;
 }) {
   const [search, setSearch] = useState("");
   // Searches the whole list, not just what's on screen - name (and kaldenavn),
@@ -824,7 +828,7 @@ export function RingelisteClient({
         </div>
         <ul className="mt-3 space-y-2.5">
           {visibleDeals.map((deal) => (
-            <QueueCard key={deal.id} deal={deal} users={users} />
+            <QueueCard key={deal.id} deal={deal} users={users} currentUserId={currentUserId} />
           ))}
           {selectedListId && deals.length === 0 && (
             <p className="text-sm text-slate-400">Ingen leads tilbage på denne liste - godt gået!</p>
