@@ -1,4 +1,3 @@
-import Image from "next/image";
 import { LoginForm } from "./login-form";
 import { isGoogleLoginRequired } from "@/lib/google-login";
 import { isGoogleConfigured } from "@/lib/email-oauth";
@@ -26,7 +25,7 @@ export default async function LoginPage({
   return (
     <div className="flex min-h-screen items-center justify-center px-4">
       <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
-        <Image src="/logo.png" alt="Nextview360" width={942} height={219} className="h-8 w-auto" priority />
+        <p className="text-2xl font-semibold tracking-tight text-slate-900">Arpo</p>
         <p className="mt-3 text-sm text-slate-500">Log ind for at fortsætte</p>
         {error && ERRORS[error] && <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{ERRORS[error]}</p>}
         {googleAvailable && (

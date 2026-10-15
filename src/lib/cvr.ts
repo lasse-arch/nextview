@@ -134,7 +134,7 @@ function formatCvrApiAddress(raw: {
 /** Fallback: cvrapi.dk, a free wrapper around the CVR register. No signup
  * required for normal internal-tool volume, but subject to a per-IP quota. */
 async function lookupViaCvrApiDk(cvrNumber: string): Promise<CvrLookupResult> {
-  const userAgent = process.env.CVR_LOOKUP_USER_AGENT || "Nextview360 CRM (kontakt: admin@nextview360.dk)";
+  const userAgent = process.env.CVR_LOOKUP_USER_AGENT || "Arpo (kontakt: admin@nextview360.dk)";
 
   let res: Response;
   try {

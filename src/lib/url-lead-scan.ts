@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import { lookupCvrNumber } from "@/lib/cvr";
 
 const FETCH_TIMEOUT_MS = 15_000;
-const USER_AGENT = "Nextview360 CRM (leadgeneration; kontakt: admin@nextview360.dk)";
+const USER_AGENT = "Arpo (kontakt: admin@nextview360.dk)";
 
 /** How many linked article pages a single scan follows from a hub/list page -
  * capped so a big news site's frontpage doesn't turn one "Scan nu" click (or

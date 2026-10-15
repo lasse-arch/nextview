@@ -12,9 +12,17 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+// Arpo is an internal tool - a neutral title, no description, and search
+// engines told to leave every page out (the same goes out as an
+// X-Robots-Tag header on all responses, see next.config.ts).
 export const metadata: Metadata = {
-  title: "Nextview360",
-  description: "Nextview360 - lead og kundeoverblik CRM",
+  title: "Arpo",
+  robots: {
+    index: false,
+    follow: false,
+    nocache: true,
+    googleBot: { index: false, follow: false, noimageindex: true },
+  },
 };
 
 export const viewport: Viewport = {
