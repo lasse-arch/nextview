@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { createCallList, addLeadsToCallList, deleteCallList, renameCallList, markVoicemail } from "@/lib/actions/call-lists";
+import { createCallList, addLeadsToCallList, deleteCallList, renameCallList, markVoicemail, scheduleCallBack } from "@/lib/actions/call-lists";
 import { markDealLost, setMeetingDateAndStage, sendCalendarInvite, renameDeal, updateDealPhone, updateDealWebsite } from "@/lib/actions/deals";
 import { addDealItem } from "@/lib/actions/deal-items";
 import { dealName, stageLabels, telHref } from "@/lib/labels";
@@ -308,6 +308,9 @@ function QueueCard({ deal, users, currentUserId }: { deal: QueueDeal; users: Col
   const colleagues = users.filter((u) => u.id !== currentUserId);
   const [gone, setGone] = useState(false);
   const [askingLostReason, setAskingLostReason] = useState(false);
+  const [callingBack, setCallingBack] = useState(false);
+  const [callBackAt, setCallBackAt] = useState("");
+  const [callBackNote, setCallBackNote] = useState("");
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState(dealName(deal));
   const [displayedName, setDisplayedName] = useState(dealName(deal));
@@ -411,6 +414,18 @@ function QueueCard({ deal, users, currentUserId }: { deal: QueueDeal; users: Col
       } catch (err) {
         showToast(err instanceof Error ? err.message : "Kunne ikke opdatere dealen.");
       }
+    });
+  }
+
+  function callBack() {
+    startTransition(async () => {
+      const result = await scheduleCallBack(deal.id, callBackAt, callBackNote);
+      if (!result.ok) {
+        showToast(result.error);
+        return;
+      }
+      showToast(`Opgave oprettet: Ring tilbage til ${displayedName}`);
+      setGone(true);
     });
   }
 
@@ -633,7 +648,7 @@ function QueueCard({ deal, users, currentUserId }: { deal: QueueDeal; users: Col
           </div>
         </div>
 
-        {!bookingMeeting ? (
+        {!bookingMeeting && !callingBack ? (
           <div className="flex shrink-0 gap-2">
             <button
               type="button"
@@ -654,6 +669,15 @@ function QueueCard({ deal, users, currentUserId }: { deal: QueueDeal; users: Col
             </button>
             <button
               type="button"
+              onClick={() => setCallingBack(true)}
+              disabled={busy}
+              title="Kunden vil ringes op senere - opretter en opgave om at ringe tilbage"
+              className="rounded-md border border-sky-200 bg-sky-50 px-2.5 py-1.5 text-xs font-medium text-sky-700 hover:bg-sky-100 disabled:opacity-50"
+            >
+              🔁 Ring tilbage
+            </button>
+            <button
+              type="button"
               onClick={() => setAskingLostReason(true)}
               disabled={busy}
               className="rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-100 disabled:opacity-50"
@@ -671,6 +695,57 @@ function QueueCard({ deal, users, currentUserId }: { deal: QueueDeal; users: Col
           onCancel={() => setAskingLostReason(false)}
           onConfirm={markLost}
         />
+      )}
+
+      {callingBack && (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            callBack();
+          }}
+          className="mt-3 space-y-3 rounded-lg border border-sky-200 bg-sky-50/50 p-3"
+        >
+          <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+            <label className="block">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Note</span>
+              <input
+                value={callBackNote}
+                onChange={(e) => setCallBackNote(e.target.value)}
+                placeholder="Fx: Vil gerne høre mere, når chefen er hjemme"
+                maxLength={300}
+                required
+                autoFocus
+                className="mt-1 w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm"
+              />
+            </label>
+            <label className="block">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Ring tilbage</span>
+              <input
+                type="datetime-local"
+                value={callBackAt}
+                onChange={(e) => setCallBackAt(e.target.value)}
+                required
+                className="mt-1 w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm"
+              />
+            </label>
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="submit"
+              disabled={busy}
+              className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+            >
+              {busy ? "Opretter…" : "Opret opgave"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setCallingBack(false)}
+              className="rounded-md border border-slate-300 px-3 py-1.5 text-xs text-slate-600 hover:bg-white"
+            >
+              Annullér
+            </button>
+          </div>
+        </form>
       )}
 
       {bookingMeeting && (

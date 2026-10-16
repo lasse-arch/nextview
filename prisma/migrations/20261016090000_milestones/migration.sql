@@ -1,0 +1,5 @@
+CREATE TABLE IF NOT EXISTS "Milestone" (
+    "key" TEXT NOT NULL,
+    "reachedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "Milestone_pkey" PRIMARY KEY ("key")
+);

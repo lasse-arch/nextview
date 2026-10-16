@@ -1,6 +1,7 @@
 "use server";
 import { defaultListName } from "@/lib/call-list-service";
 import { revalidatePath } from "next/cache";
+import { updateDealStage } from "@/lib/actions/deals";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { lookupCvrNumber } from "@/lib/cvr";
@@ -208,4 +209,57 @@ export async function markVoicemail(dealId: string): Promise<{ at: string }> {
   });
   revalidatePath("/ringeliste");
   return { at: at.toISOString() };
+}
+
+/**
+ * "Ring tilbage" on the ringeliste: the customer asked to be called later.
+ * Creates the task "Ring tilbage til <deal>" for whoever pressed it, due on
+ * the chosen day with the time and their one-line note in the description,
+ * keeps the note on the deal, and moves a lead on to Kontaktet - so it
+ * leaves the list (it's been called) and the task brings it back.
+ */
+export async function scheduleCallBack(
+  dealId: string,
+  whenLocal: string,
+  note: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const user = await requireUser();
+  const match = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/.exec(whenLocal.trim());
+  if (!match) return { ok: false, error: "Vælg dato og klokkeslæt." };
+  const [, date, time] = match;
+  const text = note.trim().replace(/\s+/g, " ").slice(0, 300);
+  if (!text) return { ok: false, error: "Skriv en kort note." };
+
+  const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId } });
+  const when = new Intl.DateTimeFormat("da-DK", { day: "numeric", month: "short", timeZone: "UTC" }).format(
+    new Date(`${date}T00:00:00Z`)
+  );
+
+  await prisma.task.create({
+    data: {
+      title: `Ring tilbage til ${dealName(deal)}`,
+      description: `Kl. ${time} - ${text}`,
+      // Tasks are dated, not timed (like the ones made on Opgaver) - the
+      // time is in the description.
+      dueDate: new Date(`${date}T00:00:00Z`),
+      assigneeId: user.id,
+      createdById: user.id,
+      dealId,
+    },
+  });
+  await prisma.note.create({
+    data: { dealId, authorId: user.id, body: `Ring tilbage ${when} kl. ${time}: ${text}`, kind: "MANUAL" },
+  });
+  if (deal.stage === "LEAD") await updateDealStage(dealId, "CONTACTED");
+  await logActivity({
+    type: "DEAL_CALLBACK",
+    message: `${user.name} talte med ${dealName(deal)} - ringer tilbage ${when} kl. ${time}`,
+    actorId: user.id,
+    dealId,
+  });
+
+  revalidatePath("/ringeliste");
+  revalidatePath("/opgaver");
+  revalidatePath(`/deals/${dealId}`);
+  return { ok: true };
 }

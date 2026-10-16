@@ -1228,3 +1228,12 @@ model BsMailboxFile {
   note        String
   receivedAt  DateTime @default(now())
 }
+
+/// A company milestone (e.g. "Solgt i alt" passing 1 mio. kr.) and when it
+/// was first reached - the site celebrates for a week from then (see
+/// src/lib/milestones.ts). Kept once reached, so the party never restarts
+/// if the number later dips under and back over.
+model Milestone {
+  key       String   @id
+  reachedAt DateTime @default(now())
+}

@@ -10,6 +10,8 @@ const TYPE_ICON: Record<string, string> = {
   DEAL_STAGE_LIVE: "🚀",
   DEAL_STAGE_LOST: "❌",
   CONTRACT_SENT: "📄",
+  DEAL_VOICEMAIL: "📞",
+  DEAL_CALLBACK: "🔁",
   CONTRACT_VIEWED: "👀",
   CONTRACT_SIGNED: "✍️",
   TASK_DONE: "✅",

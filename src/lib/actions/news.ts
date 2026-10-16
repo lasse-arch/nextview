@@ -193,6 +193,12 @@ const DEFAULT_POSTS: { title: string; body: string; minutesAgo: number; screensh
     body: "Du kan nu logge ind i Arpo med din Google-arbejdskonto - tryk \"Log ind med Google\" på login-siden og vælg kontoen med samme e-mail som din Arpo-bruger. Så gælder Googles egen sikkerhed (fx 2-trinsbekræftelse) også for Arpo.\n\nNår alle har prøvet det, kan en admin under Brugere slå \"Kræv Google-login\" til - så virker adgangskoder ikke længere, og alle der er logget ind med adgangskode bliver logget ud og skal ind med Google.",
     screenshotUrl: "/news/google-login.png",
   },
+  {
+    minutesAgo: 0,
+    title: "Ring tilbage - direkte fra ringelisten",
+    body: "Siger kunden \"ring igen i næste uge\", så tryk den nye blå \"🔁 Ring tilbage\"-knap på ringelisten. Skriv en kort note og vælg dato og klokkeslæt - så opretter Arpo opgaven \"Ring tilbage til <firma>\" til dig på den dag, med tidspunktet og noten i beskrivelsen. Noten gemmes også på dealen, og leadet rykker videre til Kontaktet, så det ikke står og venter på listen - opgaven minder dig om det.",
+    screenshotUrl: "/news/ring-tilbage.png",
+  },
 ];
 
 /**
