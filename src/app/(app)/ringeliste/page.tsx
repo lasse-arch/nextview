@@ -6,6 +6,10 @@ import { RingelisteClient } from "./ringeliste-client";
 // Møde booket, ...) from here or anywhere else, it drops off the list.
 const OPEN_STAGES = ["LEAD"] as const;
 
+// Adding a directory link (e.g. all 176 DK-CAMP campsites) fetches each
+// business's page - room for that inside the "Tilføj til liste" request.
+export const maxDuration = 300;
+
 export default async function RingelistePage({
   searchParams,
 }: {

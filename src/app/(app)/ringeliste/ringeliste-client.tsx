@@ -124,7 +124,7 @@ function QuickAdd({ selectedListId }: { selectedListId: string | null }) {
         value={text}
         onChange={(e) => setText(e.target.value)}
         rows={5}
-        placeholder={"Indsæt links - ét pr. linje\nhttps://datacvr.virk.dk/enhed/virksomhed/12345678\nhttps://www.facebook.com/eksempelvirksomhed\nhttps://eksempel.dk"}
+        placeholder={"Indsæt links - ét pr. linje\nhttps://datacvr.virk.dk/enhed/virksomhed/12345678\nhttps://www.facebook.com/eksempelvirksomhed\nhttps://eksempel.dk\nhttps://www.dk-camp.dk/campingpladser/ (henter alle campingpladserne)"}
         className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
       />
       <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -138,6 +138,7 @@ function QuickAdd({ selectedListId }: { selectedListId: string | null }) {
         </button>
         <span className="text-xs text-slate-400">
           {selectedListId ? "Tilføjes til den valgte liste ovenfor." : "Der oprettes en ny liste automatisk."}
+          {pending && " En hel oversigt (fx dk-camp.dk) tager op til et halvt minut."}
         </span>
       </div>
 

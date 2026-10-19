@@ -11,6 +11,8 @@ import { logActivity } from "@/lib/activity";
 import { dealName, stageLabels } from "@/lib/labels";
 import { parseCallListText, guessNameFromUrl } from "@/lib/call-list-parser";
 import { scrapeBasicContactInfo } from "@/lib/website-contact-scrape";
+import { expandDirectoryLink, type DirectoryLead } from "@/lib/lead-directories";
+import type { ParsedCallListLine } from "@/lib/call-list-parser";
 
 const SOCIAL_LINK_PATTERN = /facebook\.com|instagram\.com|linkedin\.com/i;
 
@@ -67,7 +69,30 @@ export async function addLeadsToCallList(
   let skipped = 0;
   const alreadyExisting: { name: string; stage: string }[] = [];
 
+  // A directory link (e.g. dk-camp.dk/campingpladser/) stands for every
+  // business on it - each becomes its own lead, with the directory's
+  // contact details and its page there as the "Kilde".
+  const entries: { line: ParsedCallListLine; directory?: DirectoryLead }[] = [];
   for (const line of lines) {
+    let directory: DirectoryLead[] | null = null;
+    if (line.url && !line.cvrNumber) {
+      try {
+        directory = await expandDirectoryLink(line.url);
+      } catch (err) {
+        return { ok: false, error: err instanceof Error ? err.message : "Kunne ikke hente listen fra siden." };
+      }
+    }
+    if (!directory) {
+      entries.push({ line });
+      continue;
+    }
+    if (directory.length === 0) skipped++;
+    for (const d of directory) {
+      entries.push({ line: { raw: d.sourceUrl, cvrNumber: null, url: d.websiteUrl }, directory: d });
+    }
+  }
+
+  for (const { line, directory } of entries) {
     let companyName: string | null = null;
     let cvrNumber: string | null = null;
     let address: string | null = null;
@@ -75,7 +100,12 @@ export async function addLeadsToCallList(
     let contactPhone: string | null = null;
     let contactName: string | null = null;
 
-    if (line.cvrNumber) {
+    if (directory) {
+      companyName = directory.companyName;
+      address = directory.address;
+      contactEmail = directory.contactEmail;
+      contactPhone = directory.contactPhone;
+    } else if (line.cvrNumber) {
       const lookup = await lookupCvrNumber(line.cvrNumber);
       if (lookup.ok) {
         companyName = lookup.data.name;
