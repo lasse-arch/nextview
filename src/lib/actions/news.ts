@@ -199,6 +199,12 @@ const DEFAULT_POSTS: { title: string; body: string; minutesAgo: number; screensh
     body: "Siger kunden \"ring igen i næste uge\", så tryk den nye blå \"🔁 Ring tilbage\"-knap på ringelisten. Skriv en kort note og vælg dato og klokkeslæt - så opretter Arpo opgaven \"Ring tilbage til <firma>\" til dig på den dag, med tidspunktet og noten i beskrivelsen. Noten gemmes også på dealen, og leadet rykker videre til Kontaktet, så det ikke står og venter på listen - opgaven minder dig om det.",
     screenshotUrl: "/news/ring-tilbage.png",
   },
+  {
+    minutesAgo: 0,
+    title: "Etablering først når kunden er tilfreds",
+    body: "Har I lovet en kunde, at etableringen først faktureres, når produktet er leveret, og de er tilfredse? Fjern krydset i \"Etablering faktureres ved underskrift\", når I laver kontrakten - så står det i kontrakten, og Arpo fakturerer ikke etableringen af sig selv.\n\nPå dealen står der så \"Etablering afventer kundens godkendelse\". Når dealen går Live, får ejeren en opgave om at spørge, om kunden er tilfreds - og når de er det, trykker I \"Kunden er tilfreds - fakturér etablering\", så går den med ved næste fakturakørsel. På eksisterende deals kan I gøre det samme med knappen \"Vent til kunden er tilfreds\" under Fakturaer, så længe etableringen ikke er faktureret endnu.",
+    screenshotUrl: "/news/etablering-afventer.png",
+  },
 ];
 
 /**

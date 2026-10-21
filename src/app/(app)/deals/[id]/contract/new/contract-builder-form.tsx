@@ -206,6 +206,22 @@ export function ContractBuilderForm({
             className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
           />
         </div>
+        <label className="col-span-2 flex items-start gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
+          <input
+            type="checkbox"
+            checked={!products.establishmentOnApproval}
+            onChange={(e) => setProducts((p) => ({ ...p, establishmentOnApproval: !e.target.checked }))}
+            className="mt-0.5 h-4 w-4"
+          />
+          <span>
+            <span className="font-medium text-slate-800">Etablering faktureres ved underskrift</span>
+            <span className="block text-xs text-slate-500">
+              Slå fra, hvis kunden er lovet, at etableringen først faktureres, når produktet er leveret, og de er
+              tilfredse - så står det i kontrakten, og Arpo venter med at fakturere den, til I trykker &quot;Kunden er
+              tilfreds&quot; på dealen.
+            </span>
+          </span>
+        </label>
         <div className="col-span-2">
           <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Kontraktsprog</label>
           <div className="mt-1 flex rounded-md border border-slate-300 text-sm">

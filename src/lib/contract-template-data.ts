@@ -60,6 +60,10 @@ export type ContractProducts = {
   noticeMonths: number;
   additionalTerms: string;
   language: ContractLanguage;
+  /** The setup fee is invoiced once the product is delivered and approved,
+   * not on signing (see Deal.establishmentAwaitingApproval). Missing on
+   * contracts made before this existed = on signing. */
+  establishmentOnApproval?: boolean;
 };
 
 function splitZipCity(address: string | null): { street: string; zipCity: string } {
@@ -241,6 +245,8 @@ export type ContractHtmlData = {
   setupPriceTotal: string;
   priceTotal: string;
   additionalTerms: string;
+  /** The setup fee is invoiced on delivery + approval, not on signing. */
+  establishmentOnApproval: boolean;
   bindingMonths: number;
   noticeMonths: number;
   /** How many of the 4 products are selected - drives singular/plural wording ("the service" vs "the services"). */
@@ -308,6 +314,7 @@ export function buildContractHtmlData(deal: DealForContract, products: ContractP
     setupPriceTotal: formatDKK(computeSetupTotal(products)),
     priceTotal: formatDKK(computeMonthlyTotal(products)),
     additionalTerms: products.additionalTerms,
+    establishmentOnApproval: Boolean(products.establishmentOnApproval),
     bindingMonths: products.bindingMonths,
     noticeMonths: products.noticeMonths,
     selectedCount,

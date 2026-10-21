@@ -140,6 +140,7 @@ export async function buildAndSendContract(
         bindingMonths: products.bindingMonths,
         noticePeriodMonths: products.noticeMonths,
         additionalTerms: products.additionalTerms || null,
+        establishmentAwaitingApproval: Boolean(products.establishmentOnApproval),
         soldProduct: selectedKeys.map((key) => PRODUCT_LABELS[key]).join(", "),
         contractProducts: products,
       },

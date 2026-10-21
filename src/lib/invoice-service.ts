@@ -82,6 +82,7 @@ function computeDueLines(
     billingStartDate: Date | null;
     contractSignedAt: Date | null;
     contractEndDate: Date | null;
+    establishmentAwaitingApproval?: boolean;
   },
   options: { sendEstablishmentNow?: boolean; sendPeriodsNow?: boolean; betalingsservice?: boolean; termNumber?: number } = {},
   handledQuarterIndexes: Set<number> = new Set()
@@ -111,7 +112,10 @@ function computeDueLines(
     deal.establishmentFee &&
     deal.establishmentFee > 0 &&
     !handledQuarterIndexes.has(0) &&
-    !establishmentPredatesInvoicing
+    !establishmentPredatesInvoicing &&
+    // Agreed with the customer: only once they have the product and are
+    // happy with it - never by itself, whatever the date.
+    !deal.establishmentAwaitingApproval
   ) {
     if (establishmentReady) {
       lines.push({

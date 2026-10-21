@@ -563,6 +563,13 @@ model Deal {
   /// later (a new price, a signed contract). Null = the owner's rate.
   commissionRateOverride Float?
 
+  /// The setup fee waits until the customer has the product and is happy
+  /// with it (agreed when selling - "Etablering faktureres ved underskrift"
+  /// unticked on the contract, or switched on the deal later). Never
+  /// invoiced automatically while set; "Kunden er tilfreds - fakturér
+  /// etablering" on the deal clears it.
+  establishmentAwaitingApproval Boolean @default(false)
+
   /// The customer's tour(s) on explore.nextview360.dk (MP-Space ID, e.g.
   /// "SuPVjGiRx8q") - lets the visitor-stats report be pulled for this deal
   /// without relying on fuzzy name matching. Almost always one ID, but a few

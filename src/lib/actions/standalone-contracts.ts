@@ -197,6 +197,9 @@ export async function linkStandaloneContractToDeal(
         noticePeriodMonths: contract.noticePeriodMonths,
         additionalTerms: contract.additionalTerms,
         contractProducts: contract.contractProducts ?? undefined,
+        ...((contract.contractProducts as unknown as ContractProducts | null)?.establishmentOnApproval
+          ? { establishmentAwaitingApproval: true }
+          : {}),
         stage: newStage,
         ...leadInboxExitData(newStage),
       },

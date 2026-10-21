@@ -1,4 +1,6 @@
 "use server";
+
+import { remindApprovalOnLive } from "@/lib/establishment-approval";
 import { createDuplicateDealRecord } from "@/lib/deal-duplicate";
 import { leadInboxExitData } from "@/lib/lead-inbox";
 import { revalidatePath } from "next/cache";
@@ -309,6 +311,7 @@ async function updateDealInner(
   if (stage !== existing.stage) {
     await logStageActivity(user, { ...existing, companyName, displayName }, stage);
   }
+  await remindApprovalOnLive(dealId, existing.stage, stage);
 
   const lostReason = String(formData.get("lostReason") || "").trim();
   if (stage === "LOST" && existing.stage !== "LOST" && lostReason) {
@@ -398,6 +401,7 @@ export async function updateDealStage(dealId: string, newStage: DealStage) {
   if (newStage !== existing.stage) {
     await logStageActivity(user, existing, newStage);
   }
+  await remindApprovalOnLive(dealId, existing.stage, newStage);
 
   revalidatePath("/deals");
   revalidatePath(`/deals/${dealId}`);

@@ -38,6 +38,7 @@ type Labels = {
   overviewSetup: string;
   overviewPrice: string;
   overviewNote: string;
+  overviewNoteOnApproval: string;
   additionalTermsTitle: string;
   section3Title: string;
   section3Body: string;
@@ -126,6 +127,7 @@ const LABELS: Record<ContractLanguage, Labels> = {
     overviewSetup: "Samlet etableringspris (eks. moms)",
     overviewPrice: "Samlet månedlig pris (eks. moms)",
     overviewNote: "Etableringsprisen betales ved underskrift af kontrakten, med mindre andet er angivet i Yderligere betingelser.",
+    overviewNoteOnApproval: "Etableringsprisen faktureres, når produktet er leveret, og kunden har godkendt det.",
     additionalTermsTitle: "Yderligere betingelser",
     section3Title: "3) Løbetid og opsigelse",
     section3Body:
@@ -218,6 +220,7 @@ const LABELS: Record<ContractLanguage, Labels> = {
     overviewSetup: "Total setup fee (excl. VAT)",
     overviewPrice: "Total monthly price (excl. VAT)",
     overviewNote: "The setup fee is due on signing of the contract, unless otherwise stated under Additional Terms.",
+    overviewNoteOnApproval: "The setup fee is invoiced once the product has been delivered and approved by the customer.",
     additionalTermsTitle: "Additional Terms",
     section3Title: "3) Term and Termination",
     section3Body:
@@ -436,7 +439,7 @@ export function buildContractHtml(data: ContractHtmlData, language: ContractLang
     <div class="overview">
       ${fieldRow(t.overviewSetup, data.setupPriceTotal)}
       ${fieldRow(t.overviewPrice, data.priceTotal)}
-      <p class="overview-note">${esc(t.overviewNote)}</p>
+      <p class="overview-note">${esc(data.establishmentOnApproval ? t.overviewNoteOnApproval : t.overviewNote)}</p>
     </div>
 
     ${
