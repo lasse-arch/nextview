@@ -795,7 +795,9 @@ export async function terminateContract(
   dealId: string,
   formData: FormData
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  await requireUser();
+  const user = await requireUser();
+  // Opsigelse is handled by admins only (the section isn't shown to sellers).
+  if (user.role !== "ADMIN") return { ok: false, error: "Kun administratorer kan opsige kontrakter." };
 
   const noticeDateRaw = String(formData.get("noticeDate") || "");
   if (!noticeDateRaw) return { ok: false, error: "Angiv en opsigelsesdato." };
@@ -822,7 +824,9 @@ export async function terminateContract(
 }
 
 export async function withdrawTermination(dealId: string) {
-  await requireUser();
+  const user = await requireUser();
+  // Opsigelse is handled by admins only (the section isn't shown to sellers).
+  if (user.role !== "ADMIN") throw new Error("Kun administratorer kan opsige kontrakter.");
   await prisma.deal.update({
     where: { id: dealId },
     data: { terminationNoticeAt: null, contractEndDate: null, contractEndDateManual: false },

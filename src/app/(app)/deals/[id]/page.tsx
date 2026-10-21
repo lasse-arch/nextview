@@ -679,15 +679,18 @@ export default async function DealDetailPage({
             />
           )}
 
-          <TerminationSection
-            dealId={deal.id}
-            noticePeriodMonths={deal.noticePeriodMonths}
-            terminationNoticeAt={deal.terminationNoticeAt}
-            contractEndDate={deal.contractEndDate}
-            contractEndDateManual={deal.contractEndDateManual}
-            isChurned={Boolean(deal.churnedAt)}
-            isAdmin={currentUser?.role === "ADMIN"}
-          />
+          {/* Opsigelse is for admins only - sellers don't see it. */}
+          {currentUser?.role === "ADMIN" && (
+            <TerminationSection
+              dealId={deal.id}
+              noticePeriodMonths={deal.noticePeriodMonths}
+              terminationNoticeAt={deal.terminationNoticeAt}
+              contractEndDate={deal.contractEndDate}
+              contractEndDateManual={deal.contractEndDateManual}
+              isChurned={Boolean(deal.churnedAt)}
+              isAdmin
+            />
+          )}
 
           <CustomerLinkSection
             dealId={deal.id}
