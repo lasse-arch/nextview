@@ -1,0 +1,1 @@
+ALTER TABLE "Deal" ADD COLUMN IF NOT EXISTS "establishmentDisputedAt" TIMESTAMP(3);

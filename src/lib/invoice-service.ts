@@ -1,5 +1,6 @@
 import { addMonths, subMonths, addDays, startOfMonth, max as maxDate, startOfDay } from "date-fns";
 import { prisma } from "@/lib/db";
+import { autoApproveEstablishments } from "@/lib/establishment-approval";
 import { isDineroConfigured, createQuarterlyInvoiceDraft, getInvoicePaymentStatus, getInvoiceTotals, type DineroInvoiceLine } from "@/lib/dinero";
 import { computeBillingPeriods, computePeriodAmounts } from "@/lib/invoice-schedule";
 import { totalContractValue, invoicePeriodLabel, formatDate, dealName } from "@/lib/labels";
@@ -856,6 +857,9 @@ export async function runQuarterlyInvoiceGeneration(): Promise<InvoiceRunSummary
   if (!(await isDineroConfigured())) {
     return { configured: false, checked: 0, created: 0, failed: 0 };
   }
+  // Setup fees waiting for the customer's approval whose 7 days after
+  // delivery passed without defects are released first - billed below.
+  await autoApproveEstablishments();
 
   const [deals, combinedGroups] = await Promise.all([
     prisma.deal.findMany({

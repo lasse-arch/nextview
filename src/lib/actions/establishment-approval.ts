@@ -44,7 +44,10 @@ export async function approveEstablishment(dealId: string): Promise<{ ok: true }
   const user = await requireUser();
   const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId } });
   if (!deal.establishmentAwaitingApproval) return { ok: false, error: "Etableringen afventer ikke godkendelse." };
-  await prisma.deal.update({ where: { id: dealId }, data: { establishmentAwaitingApproval: false } });
+  await prisma.deal.update({
+    where: { id: dealId },
+    data: { establishmentAwaitingApproval: false, establishmentDisputedAt: null },
+  });
   await prisma.note.create({
     data: { dealId, authorId: user.id, body: "Kunden er tilfreds - etableringen frigivet til fakturering.", kind: "MANUAL" },
   });
@@ -58,5 +61,30 @@ export async function approveEstablishment(dealId: string): Promise<{ ok: true }
   });
   revalidatePath(`/deals/${dealId}`);
   revalidatePath("/opgaver");
+  return { ok: true };
+}
+
+/**
+ * "Kunden har påpeget mangler": the customer raised concrete defects within
+ * the 7 days after delivery - stops the automatic approval, so the setup fee
+ * waits for "Kunden er tilfreds" once they're fixed.
+ */
+export async function disputeEstablishment(dealId: string, defects: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const user = await requireUser();
+  const text = defects.trim();
+  if (!text) return { ok: false, error: "Skriv kort, hvilke mangler kunden har påpeget." };
+  const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId } });
+  if (!deal.establishmentAwaitingApproval) return { ok: false, error: "Etableringen afventer ikke godkendelse." };
+  await prisma.deal.update({ where: { id: dealId }, data: { establishmentDisputedAt: new Date() } });
+  await prisma.note.create({
+    data: { dealId, authorId: user.id, body: `Kunden har påpeget mangler: ${text}`, kind: "MANUAL" },
+  });
+  await logActivity({
+    type: "DEAL_UPDATED",
+    message: `${user.name}: ${dealName(deal)} har påpeget mangler - etableringen venter`,
+    actorId: user.id,
+    dealId,
+  });
+  revalidatePath(`/deals/${dealId}`);
   return { ok: true };
 }

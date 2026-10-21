@@ -1,8 +1,9 @@
 "use client";
 
 import { useTransition } from "react";
-import { approveEstablishment, holdEstablishmentForApproval } from "@/lib/actions/establishment-approval";
-import { formatDKK } from "@/lib/labels";
+import { useState } from "react";
+import { approveEstablishment, disputeEstablishment, holdEstablishmentForApproval } from "@/lib/actions/establishment-approval";
+import { formatDate, formatDKK } from "@/lib/labels";
 import { useToast } from "@/components/toast";
 
 /**
@@ -14,12 +15,19 @@ export function EstablishmentApprovalControl({
   dealId,
   fee,
   awaiting,
+  approvalDeadline,
+  disputedAt,
 }: {
   dealId: string;
   fee: number;
   awaiting: boolean;
+  /** 7 days after going Live - null while not delivered yet. */
+  approvalDeadline: string | null;
+  disputedAt: string | null;
 }) {
   const [pending, startTransition] = useTransition();
+  const [reportingDefects, setReportingDefects] = useState(false);
+  const [defects, setDefects] = useState("");
   const showToast = useToast();
 
   function run(action: () => Promise<{ ok: true } | { ok: false; error: string }>, done: string) {
@@ -34,7 +42,13 @@ export function EstablishmentApprovalControl({
       <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm">
         <p className="font-medium text-amber-900">Etablering ({formatDKK(fee)}) afventer kundens godkendelse</p>
         <p className="mt-0.5 text-xs text-amber-800">
-          Faktureres ikke automatisk - først når produktet er leveret, og kunden er tilfreds.
+          {disputedAt
+            ? `Kunden påpegede mangler ${formatDate(disputedAt)} - faktureres, når de er udbedret, og I trykker "Kunden er tilfreds".`
+            : approvalDeadline
+              ? new Date(approvalDeadline) <= new Date()
+                ? "Fristen på 7 dage er gået uden mangler - faktureres ved næste fakturakørsel."
+                : `Godkendes automatisk ${formatDate(approvalDeadline)} (7 dage efter levering), medmindre kunden påpeger konkrete mangler inden da.`
+              : "Fristen på 7 dage starter, når produktet er leveret (dealen går Live)."}
         </p>
         <button
           type="button"
@@ -47,6 +61,41 @@ export function EstablishmentApprovalControl({
         >
           {pending ? "Gemmer…" : "✓ Kunden er tilfreds - fakturér etablering"}
         </button>
+        {!disputedAt && !reportingDefects && (
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => setReportingDefects(true)}
+            className="ml-2 mt-2 rounded-md border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-800 hover:bg-amber-100 disabled:opacity-50"
+          >
+            Kunden har påpeget mangler
+          </button>
+        )}
+        {reportingDefects && (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              run(() => disputeEstablishment(dealId, defects), "Noteret - etableringen venter, til manglerne er udbedret");
+              setReportingDefects(false);
+            }}
+            className="mt-2 flex flex-wrap gap-2"
+          >
+            <input
+              value={defects}
+              onChange={(e) => setDefects(e.target.value)}
+              placeholder="Hvilke mangler? Fx: mangler billeder af værelserne"
+              required
+              autoFocus
+              className="min-w-0 flex-1 rounded-md border border-amber-300 bg-white px-2 py-1.5 text-xs"
+            />
+            <button type="submit" disabled={pending} className="rounded-md bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700">
+              Gem
+            </button>
+            <button type="button" onClick={() => setReportingDefects(false)} className="text-xs text-amber-800">
+              Annullér
+            </button>
+          </form>
+        )}
       </div>
     );
   }

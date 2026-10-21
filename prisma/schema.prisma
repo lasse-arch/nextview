@@ -569,6 +569,10 @@ model Deal {
   /// invoiced automatically while set; "Kunden er tilfreds - fakturér
   /// etablering" on the deal clears it.
   establishmentAwaitingApproval Boolean @default(false)
+  /// The customer pointed out concrete defects within the 7 days after
+  /// delivery (Live) - stops the automatic approval; it then waits for
+  /// "Kunden er tilfreds" once they're fixed.
+  establishmentDisputedAt       DateTime?
 
   /// The customer's tour(s) on explore.nextview360.dk (MP-Space ID, e.g.
   /// "SuPVjGiRx8q") - lets the visitor-stats report be pulled for this deal

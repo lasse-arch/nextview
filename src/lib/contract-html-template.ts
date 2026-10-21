@@ -127,7 +127,8 @@ const LABELS: Record<ContractLanguage, Labels> = {
     overviewSetup: "Samlet etableringspris (eks. moms)",
     overviewPrice: "Samlet månedlig pris (eks. moms)",
     overviewNote: "Etableringsprisen betales ved underskrift af kontrakten, med mindre andet er angivet i Yderligere betingelser.",
-    overviewNoteOnApproval: "Etableringsprisen faktureres, når produktet er leveret, og kunden har godkendt det.",
+    overviewNoteOnApproval:
+      "Etableringsprisen faktureres, når produktet er leveret og godkendt af kunden. Har kunden ikke inden for 7 dage efter levering skriftligt påpeget konkrete mangler, anses produktet for godkendt. Påpeger kunden mangler, udbedrer Nextview360 dem, hvorefter produktet anses for godkendt.",
     additionalTermsTitle: "Yderligere betingelser",
     section3Title: "3) Løbetid og opsigelse",
     section3Body:
@@ -220,7 +221,8 @@ const LABELS: Record<ContractLanguage, Labels> = {
     overviewSetup: "Total setup fee (excl. VAT)",
     overviewPrice: "Total monthly price (excl. VAT)",
     overviewNote: "The setup fee is due on signing of the contract, unless otherwise stated under Additional Terms.",
-    overviewNoteOnApproval: "The setup fee is invoiced once the product has been delivered and approved by the customer.",
+    overviewNoteOnApproval:
+      "The setup fee is invoiced once the product has been delivered and approved by the customer. If the customer has not pointed out specific defects in writing within 7 days of delivery, the product is deemed approved. If the customer points out defects, Nextview360 remedies them, after which the product is deemed approved.",
     additionalTermsTitle: "Additional Terms",
     section3Title: "3) Term and Termination",
     section3Body:

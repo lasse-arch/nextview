@@ -27,6 +27,7 @@ import { parseContractProducts, establishmentLineItems, recurringLineItems } fro
 import { isDocuSealConfigured } from "@/lib/docuseal";
 import { CommissionSection } from "./commission-section";
 import { EstablishmentApprovalControl } from "./establishment-approval-control";
+import { approvalDeadline } from "@/lib/establishment-approval";
 import { CommissionExcludedToggle } from "./commission-excluded-toggle";
 import { SendContractButton } from "./send-contract-button";
 import { DownloadContractButton } from "./download-contract-button";
@@ -547,6 +548,8 @@ export default async function DealDetailPage({
                   dealId={deal.id}
                   fee={deal.establishmentFee ?? 0}
                   awaiting={deal.establishmentAwaitingApproval}
+                  approvalDeadline={deal.liveAt ? approvalDeadline(deal.liveAt).toISOString() : null}
+                  disputedAt={deal.establishmentDisputedAt ? deal.establishmentDisputedAt.toISOString() : null}
                 />
               )}
             {currentUser?.canAccessBilling && (
