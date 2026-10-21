@@ -51,12 +51,18 @@ export async function saveBsSettings(formData: FormData): Promise<{ ok: true } |
     if (accountRaw && (!Number.isInteger(depositAccountNumber) || depositAccountNumber! <= 0)) {
       throw new Error("Kontonummeret skal være et helt tal, fx 5820.");
     }
+    const bankRaw = String(formData.get("bankAccountNumber") || "").trim();
+    const bankAccountNumber = bankRaw ? Number(bankRaw) : null;
+    if (bankRaw && (!Number.isInteger(bankAccountNumber) || bankAccountNumber! <= 0)) {
+      throw new Error("Bankkontoens nummer skal være et helt tal, fx 55000.");
+    }
     const data = {
       dataSupplierNumber: digits(formData.get("dataSupplierNumber"), 8, "Dataleverandørnummer"),
       pbsNumber: digits(formData.get("pbsNumber"), 8, "PBS-nummer"),
       debtorGroupNumber: digits(formData.get("debtorGroupNumber"), 5, "Debitorgruppenummer"),
       subsystem,
       depositAccountNumber,
+      bankAccountNumber,
     };
     await prisma.bsSettings.upsert({ where: { id: "default" }, create: { id: "default", ...data }, update: data });
     revalidatePath(PAGE);

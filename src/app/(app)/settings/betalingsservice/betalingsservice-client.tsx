@@ -37,6 +37,7 @@ export function BsSettingsForm({
     debtorGroupNumber: string;
     subsystem: string;
     depositAccountNumber: string;
+    bankAccountNumber: string;
   };
 }) {
   const [pending, startTransition] = useTransition();
@@ -70,15 +71,29 @@ export function BsSettingsForm({
         <span className={labelClass}>Delsystem</span>
         <input name="subsystem" defaultValue={initial.subsystem} placeholder="BS1" className={inputClass} />
       </label>
-      <label className="block sm:col-span-2">
+      <label className="block">
         <span className={labelClass}>Mellemregningskonto i Dinero (kontonummer)</span>
         <input
           name="depositAccountNumber"
           defaultValue={initial.depositAccountNumber}
           inputMode="numeric"
-          placeholder="fx 55100 - indbetalingskonto i Dinero"
+          placeholder="fx 55100"
           className={inputClass}
         />
+        <span className="mt-1 block text-xs text-slate-400">Betalinger via Betalingsservice registreres her.</span>
+      </label>
+      <label className="block">
+        <span className={labelClass}>Bankkonto i Dinero (kontonummer)</span>
+        <input
+          name="bankAccountNumber"
+          defaultValue={initial.bankAccountNumber}
+          inputMode="numeric"
+          placeholder="fx 55000"
+          className={inputClass}
+        />
+        <span className="mt-1 block text-xs text-slate-400">
+          Fakturaer betalt med FI-kort går direkte i banken - de registreres her.
+        </span>
       </label>
       <div className="sm:col-span-2">
         <button

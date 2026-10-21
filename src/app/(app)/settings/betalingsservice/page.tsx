@@ -197,6 +197,7 @@ export default async function BetalingsservicePage() {
             debtorGroupNumber: settings.debtorGroupNumber ?? "",
             subsystem: settings.subsystem,
             depositAccountNumber: settings.depositAccountNumber ? String(settings.depositAccountNumber) : "",
+            bankAccountNumber: settings.bankAccountNumber ? String(settings.bankAccountNumber) : "",
           }}
         />
         <InvoiceTemplatePicker

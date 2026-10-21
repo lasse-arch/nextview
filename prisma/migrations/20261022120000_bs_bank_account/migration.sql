@@ -1,0 +1,1 @@
+ALTER TABLE "BsSettings" ADD COLUMN IF NOT EXISTS "bankAccountNumber" INTEGER;

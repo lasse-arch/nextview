@@ -777,8 +777,10 @@ async function applyFiPayment(payment: BsPayment, lines: string[]): Promise<bool
     return true;
   }
   const settings = await getBsSettings();
-  if (!settings.depositAccountNumber) {
-    lines.push(`  ${name}: faktura ${invoiceNumber} - IKKE registreret i Dinero (ingen mellemregningskonto angivet).`);
+  // FI-kort payments go straight into the bank - not via the Betalingsservice
+  // clearing account - so they're registered on Dinero's bank account.
+  if (!settings.bankAccountNumber) {
+    lines.push(`  ${name}: faktura ${invoiceNumber} - IKKE registreret i Dinero (ingen bankkonto angivet under Aftale).`);
     return true;
   }
   try {
@@ -794,7 +796,7 @@ async function applyFiPayment(payment: BsPayment, lines: string[]): Promise<bool
     if (claimed.count === 0) return true;
     await registerInvoicePayment(guid, {
       amount: amountOre / 100,
-      depositAccountNumber: settings.depositAccountNumber,
+      depositAccountNumber: settings.bankAccountNumber,
       paymentDate: payment.paymentDate ?? new Date(),
       description: `FI-indbetaling - faktura ${invoiceNumber}`,
       externalReference: `FI-${payment.customerNumber.trim()}-${guid}`.slice(0, 128),

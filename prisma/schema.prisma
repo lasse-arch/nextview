@@ -1110,6 +1110,10 @@ model BsSettings {
   /// Dinero account the BS payments are registered against (the
   /// mellemregningskonto the bank deposit is later reconciled with).
   depositAccountNumber    Int?
+  /// Dinero's bank account (e.g. 55000 "Bank") - ordinary invoices paid
+  /// with their FI-kort land straight in the bank, so those payments are
+  /// registered here, not on the Betalingsservice clearing account above.
+  bankAccountNumber       Int?
   /// Dinero invoice template (design) used for Betalingsservice invoices -
   /// one without the bank payment details, so the invoice doesn't invite a
   /// bank transfer. Null: Dinero's default template.
