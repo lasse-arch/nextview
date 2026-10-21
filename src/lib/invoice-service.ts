@@ -612,6 +612,16 @@ type DealWithInvoices = DraftableDeal & {
   invoices: { id: string; termNumber: number; quarterIndex: number; status: string }[];
 };
 
+/** Splits rows into those collected via Betalingsservice and the rest (see collectsViaBs). */
+function groupByCollection<T extends { termNumber: number; quarterIndex: number }>(
+  paymentMethod: PaymentMethod,
+  rows: T[]
+): T[][] {
+  const viaBs = rows.filter((r) => collectsViaBs(paymentMethod, r.termNumber, r.quarterIndex));
+  const normal = rows.filter((r) => !collectsViaBs(paymentMethod, r.termNumber, r.quarterIndex));
+  return [normal, viaBs].filter((g) => g.length > 0);
+}
+
 /** Drafts every currently-due invoice line for one deal. Shared by the bulk
  * daily run and the "Opret faktura-kladde" button on the deal page. */
 async function processDealDueInvoices(
@@ -637,29 +647,48 @@ async function processDealDueInvoices(
   // not see a contact created moments earlier yet, creating a duplicate.
   let contactGuidHint = deal.dineroContactGuid;
 
+  const rows: { id: string; termNumber: number; quarterIndex: number; amount: number; scheduledDate: Date }[] = [];
   for (const line of dueLines) {
     const existingInvoice = termInvoices.find((inv) => inv.quarterIndex === line.quarterIndex);
     if (existingInvoice && HANDLED_STATUSES.includes(existingInvoice.status)) continue;
 
     checked++;
 
-    const invoiceRow = existingInvoice
-      ? await prisma.invoice.update({
-          where: { id: existingInvoice.id },
-          data: { amount: line.amount, status: "PENDING", failureReason: null },
-        })
-      : await prisma.invoice.create({
-          data: {
-            dealId: deal.id,
-            termNumber: deal.currentTermNumber,
-            quarterIndex: line.quarterIndex,
-            amount: line.amount,
-            scheduledDate: line.scheduledDate,
-            status: "PENDING",
-          },
-        });
+    rows.push(
+      existingInvoice
+        ? await prisma.invoice.update({
+            where: { id: existingInvoice.id },
+            data: { amount: line.amount, status: "PENDING", failureReason: null },
+          })
+        : await prisma.invoice.create({
+            data: {
+              dealId: deal.id,
+              termNumber: deal.currentTermNumber,
+              quarterIndex: line.quarterIndex,
+              amount: line.amount,
+              scheduledDate: line.scheduledDate,
+              status: "PENDING",
+            },
+          })
+    );
+  }
 
-    const result = await draftInvoiceLine(deal, invoiceRow, contactGuidHint);
+  // Lines due together go out as one invoice - e.g. the setup fee and the
+  // first period when a deal goes Live - as long as they're paid the same
+  // way: a Betalingsservice-collected quarter is never pulled onto a normal
+  // invoice (or the other way round).
+  for (const group of groupByCollection(deal.paymentMethod, rows)) {
+    if (group.length > 1) {
+      const result = await draftRowsAsOneInvoice(
+        deal,
+        group.map((invoiceRow) => ({ deal, invoiceRow }))
+      );
+      created += result.created;
+      failed += result.failed;
+      if (result.created > 0) contactGuidHint = (await prisma.deal.findUniqueOrThrow({ where: { id: deal.id } })).dineroContactGuid;
+      continue;
+    }
+    const result = await draftInvoiceLine(deal, group[0], contactGuidHint);
     if (result.success) {
       created++;
       contactGuidHint = result.contactGuid;
@@ -669,6 +698,100 @@ async function processDealDueInvoices(
   }
 
   return { checked, created, failed, nextDueDate };
+}
+
+/**
+ * Drafts several due invoice rows as ONE Dinero invoice - every row ends up
+ * pointing at the same invoice (guid/number), so each keeps its own amount,
+ * status and payment tracking. Used for a combined-invoicing group of
+ * deals (see Deal.combinedInvoicing), and for one deal with several lines
+ * due in the same run (e.g. its setup fee and first period, both released
+ * when it goes Live) - the customer then gets one invoice, not one each.
+ * The rows must agree on Betalingsservice (see groupByCollection).
+ */
+async function draftRowsAsOneInvoice(
+  leadDeal: DraftableDeal,
+  invoiceRows: {
+    deal: DraftableDeal;
+    invoiceRow: { id: string; termNumber: number; quarterIndex: number; amount: number; scheduledDate: Date };
+  }[]
+): Promise<{ created: number; failed: number }> {
+  const combined = buildCombinedInvoiceContent(
+    invoiceRows.map(({ deal, invoiceRow }) => ({
+      deal,
+      quarterIndex: invoiceRow.quarterIndex,
+      amount: invoiceRow.amount,
+      scheduledDate: invoiceRow.scheduledDate,
+    }))
+  );
+  // One deal's lines get the location name like its single invoices would
+  // (several deals' lines are already prefixed with each deal's name).
+  const singleDeal = new Set(invoiceRows.map((r) => r.deal.id)).size === 1;
+  const { note, lines } =
+    singleDeal && (await sharesCvrWithOtherCustomers(leadDeal)) ? withLocationName(leadDeal, combined) : combined;
+  const anyRecurringLine = invoiceRows.find((r) => r.invoiceRow.quarterIndex > 0);
+  // A combined invoice is only collected through Betalingsservice when every
+  // line on it would be - one that includes an establishment fee or a
+  // first period is a normal invoice as a whole (see collectsViaBs).
+  const allViaBs = invoiceRows.every((r) =>
+    collectsViaBs(leadDeal.paymentMethod, r.invoiceRow.termNumber, r.invoiceRow.quarterIndex)
+  );
+  const terms = invoiceTerms(
+    allViaBs ? "BETALINGSSERVICE" : "INVOICE",
+    anyRecurringLine ? anyRecurringLine.invoiceRow.quarterIndex : 0,
+    (anyRecurringLine ?? invoiceRows[0]).invoiceRow.scheduledDate,
+    invoiceLanguage(leadDeal),
+    new Date(),
+    leadDeal.paymentMethod === "BETALINGSSERVICE" ? await bsInvoiceInfo(leadDeal) : undefined
+  );
+  const { invoiceDate } = terms;
+
+  try {
+    const result = await createQuarterlyInvoiceDraft({
+      existingContactGuid: leadDeal.dineroContactGuid,
+      companyName: leadDeal.companyName,
+      cvrNumber: leadDeal.cvrNumber,
+      contactEmail: leadDeal.invoiceEmail || leadDeal.contactEmail,
+      contactPhone: leadDeal.contactPhone,
+      address: leadDeal.address,
+      note: withNoteSuffix(note, terms.noteSuffix),
+      lines,
+      invoiceDate,
+      paymentDays: terms.paymentDays,
+      collectedViaBetalingsservice: terms.collectViaBs,
+      invoiceTemplateId: terms.collectViaBs ? await bsInvoiceTemplateId() : null,
+    });
+
+    await prisma.$transaction([
+      ...invoiceRows.map(({ invoiceRow }) =>
+        prisma.invoice.update({
+          where: { id: invoiceRow.id },
+          data: {
+            status: "DRAFT_CREATED",
+            dineroInvoiceGuid: result.invoiceGuid,
+            dineroInvoiceNumber: result.invoiceNumber,
+            sentAt: result.sendError ? null : new Date(),
+            dueDate: terms.dueDate,
+            collectViaBs: terms.collectViaBs,
+            failureReason: result.sendError ? `Oprettet, men ikke sendt automatisk: ${result.sendError}` : null,
+          },
+        })
+      ),
+      ...(result.isTest || leadDeal.dineroContactGuid === result.contactGuid
+        ? []
+        : [prisma.deal.update({ where: { id: leadDeal.id }, data: { dineroContactGuid: result.contactGuid } })]),
+    ]);
+
+    return { created: invoiceRows.length, failed: 0 };
+  } catch (err) {
+    const error = err instanceof Error ? err.message : "Ukendt fejl";
+    await prisma.$transaction(
+      invoiceRows.map(({ invoiceRow }) =>
+        prisma.invoice.update({ where: { id: invoiceRow.id }, data: { status: "FAILED", failureReason: error } })
+      )
+    );
+    return { created: 0, failed: invoiceRows.length };
+  }
 }
 
 /**
@@ -773,77 +896,8 @@ async function processCombinedDueInvoices(
   // - every member shares the same CVR by construction, but only the
   // parent is guaranteed to be the one actually filled in/maintained.
   const leadDeal = withDue.find((p) => !p.deal.parentDealId)?.deal ?? withDue[0].deal;
-  const { note, lines } = buildCombinedInvoiceContent(
-    invoiceRows.map(({ deal, invoiceRow }) => ({
-      deal,
-      quarterIndex: invoiceRow.quarterIndex,
-      amount: invoiceRow.amount,
-      scheduledDate: invoiceRow.scheduledDate,
-    }))
-  );
-  const anyRecurringLine = invoiceRows.find((r) => r.invoiceRow.quarterIndex > 0);
-  // A combined invoice is only collected through Betalingsservice when every
-  // line on it would be - one that includes an establishment fee or a
-  // first period is a normal invoice as a whole (see collectsViaBs).
-  const allViaBs = invoiceRows.every((r) =>
-    collectsViaBs(leadDeal.paymentMethod, r.invoiceRow.termNumber, r.invoiceRow.quarterIndex)
-  );
-  const terms = invoiceTerms(
-    allViaBs ? "BETALINGSSERVICE" : "INVOICE",
-    anyRecurringLine ? anyRecurringLine.invoiceRow.quarterIndex : 0,
-    (anyRecurringLine ?? invoiceRows[0]).invoiceRow.scheduledDate,
-    invoiceLanguage(leadDeal),
-    new Date(),
-    leadDeal.paymentMethod === "BETALINGSSERVICE" ? await bsInvoiceInfo(leadDeal) : undefined
-  );
-  const { invoiceDate } = terms;
-
-  try {
-    const result = await createQuarterlyInvoiceDraft({
-      existingContactGuid: leadDeal.dineroContactGuid,
-      companyName: leadDeal.companyName,
-      cvrNumber: leadDeal.cvrNumber,
-      contactEmail: leadDeal.invoiceEmail || leadDeal.contactEmail,
-      contactPhone: leadDeal.contactPhone,
-      address: leadDeal.address,
-      note: withNoteSuffix(note, terms.noteSuffix),
-      lines,
-      invoiceDate,
-      paymentDays: terms.paymentDays,
-      collectedViaBetalingsservice: terms.collectViaBs,
-      invoiceTemplateId: terms.collectViaBs ? await bsInvoiceTemplateId() : null,
-    });
-
-    await prisma.$transaction([
-      ...invoiceRows.map(({ invoiceRow }) =>
-        prisma.invoice.update({
-          where: { id: invoiceRow.id },
-          data: {
-            status: "DRAFT_CREATED",
-            dineroInvoiceGuid: result.invoiceGuid,
-            dineroInvoiceNumber: result.invoiceNumber,
-            sentAt: result.sendError ? null : new Date(),
-            dueDate: terms.dueDate,
-            collectViaBs: terms.collectViaBs,
-            failureReason: result.sendError ? `Oprettet, men ikke sendt automatisk: ${result.sendError}` : null,
-          },
-        })
-      ),
-      ...(result.isTest || leadDeal.dineroContactGuid === result.contactGuid
-        ? []
-        : [prisma.deal.update({ where: { id: leadDeal.id }, data: { dineroContactGuid: result.contactGuid } })]),
-    ]);
-
-    return { checked, created: invoiceRows.length, failed: 0 };
-  } catch (err) {
-    const error = err instanceof Error ? err.message : "Ukendt fejl";
-    await prisma.$transaction(
-      invoiceRows.map(({ invoiceRow }) =>
-        prisma.invoice.update({ where: { id: invoiceRow.id }, data: { status: "FAILED", failureReason: error } })
-      )
-    );
-    return { checked, created: 0, failed: invoiceRows.length };
-  }
+  const result = await draftRowsAsOneInvoice(leadDeal, invoiceRows);
+  return { checked, ...result };
 }
 
 /**
