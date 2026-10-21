@@ -21,6 +21,7 @@ import {
   saveBsSignupLink,
   previewSignupMailAction,
   sendSignupMailsAction,
+  reimportMailboxFileAction,
 } from "@/lib/actions/betalingsservice";
 import { useToast } from "@/components/toast";
 
@@ -721,5 +722,28 @@ export function SendSignupMailButton({ dealId, sentAt }: { dealId: string; sentA
         {pending ? "Sender…" : sentAt ? "Send igen" : "Send mail"}
       </button>
     </span>
+  );
+}
+
+/** "Indlæs igen" on a mailbox payment file that had payments Arpo couldn't match the first time. */
+export function ReimportMailboxFileButton({ fileId }: { fileId: string }) {
+  const [pending, startTransition] = useTransition();
+  const showToast = useToast();
+  const router = useRouter();
+  return (
+    <button
+      type="button"
+      disabled={pending}
+      onClick={() =>
+        startTransition(async () => {
+          const result = await reimportMailboxFileAction(fileId);
+          showToast(result.ok ? "Filen er indlæst igen" : result.error);
+          if (result.ok) router.refresh();
+        })
+      }
+      className="ml-2 rounded border border-slate-300 px-1.5 py-0.5 text-[11px] text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+    >
+      {pending ? "Indlæser…" : "Indlæs igen"}
+    </button>
   );
 }

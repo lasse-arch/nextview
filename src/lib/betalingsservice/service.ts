@@ -24,6 +24,7 @@ import { getInvoicePaymentStatus, getInvoiceTotals, registerInvoicePayment } fro
 import { buildBs0601, type Bs0601Collection } from "./bs0601";
 import { parseBsReturnDelivery, type BsPayment } from "./bs-returns";
 import { BsFormatError } from "./fixed-width";
+import { invoiceNumberFromFiPaymentId } from "./fi-payment-id";
 import { deliveryDeadline, firstBankingDayOfMonth, nextBankingDayOnOrAfter, utcDay } from "./banking-days";
 
 const MAX_DAYS_AHEAD = 90;
@@ -737,6 +738,79 @@ async function registerCollectionPayments(collectionId: string, lines: string[])
   }
 }
 
+/**
+ * A payment-slip line (section 0215) that isn't one of our Betalingsservice
+ * collections: an ordinary invoice the customer paid with its FI-kort (+71)
+ * - Mastercard reports those in the same file. Matched to the invoice by
+ * its FI payment ID, marked paid, and registered as paid in Dinero (on the
+ * same clearing account as Betalingsservice payments). False when it isn't
+ * an FI payment for one of our invoices.
+ */
+async function applyFiPayment(payment: BsPayment, lines: string[]): Promise<boolean> {
+  if (payment.channel !== "slip") return false;
+  const invoiceNumber = invoiceNumberFromFiPaymentId(payment.customerNumber, process.env.DINERO_ORGANIZATION_ID);
+  if (!invoiceNumber) return false;
+  const amountOre = payment.paidAmountOre || payment.amountOre;
+  const rows = await prisma.invoice.findMany({
+    where: { dineroInvoiceNumber: invoiceNumber },
+    include: { deal: { select: { companyName: true, displayName: true } } },
+  });
+  if (rows.length === 0) {
+    lines.push(`FI-indbetaling på faktura ${invoiceNumber} (${kr(amountOre)}) - fakturaen findes ikke i Arpo, registrér betalingen i Dinero manuelt.`);
+    return true;
+  }
+  const name = dealName(rows[0].deal);
+  if (payment.outcome !== "PAID") {
+    lines.push(`${name}: FI-indbetaling på faktura ${invoiceNumber} ${OUTCOME_LABEL[payment.outcome]} (${kr(payment.amountOre)}).`);
+    return true;
+  }
+  await prisma.invoice.updateMany({
+    where: { id: { in: rows.map((r) => r.id) }, paidAt: null },
+    data: { paidAt: payment.paymentDate ?? new Date() },
+  });
+  lines.push(`${name}: faktura ${invoiceNumber} betalt med FI-kort, ${kr(amountOre)}.`);
+
+  const guid = rows[0].dineroInvoiceGuid;
+  if (!guid) return true;
+  if ((await isDineroTestMode()) || guid.startsWith("TEST-")) {
+    lines.push(`  ${name}: faktura ${invoiceNumber} - testtilstand, ingen betaling registreret i Dinero.`);
+    return true;
+  }
+  const settings = await getBsSettings();
+  if (!settings.depositAccountNumber) {
+    lines.push(`  ${name}: faktura ${invoiceNumber} - IKKE registreret i Dinero (ingen mellemregningskonto angivet).`);
+    return true;
+  }
+  try {
+    // Already paid in Dinero (e.g. matched from the bank statement) - nothing to add.
+    if ((await getInvoicePaymentStatus(guid)).paid) {
+      lines.push(`  ${name}: faktura ${invoiceNumber} står allerede som betalt i Dinero.`);
+      return true;
+    }
+    const claimed = await prisma.invoice.updateMany({
+      where: { id: { in: rows.map((r) => r.id) }, bsPaymentRegisteredAt: null },
+      data: { bsPaymentRegisteredAt: new Date(), bsPaymentError: null },
+    });
+    if (claimed.count === 0) return true;
+    await registerInvoicePayment(guid, {
+      amount: amountOre / 100,
+      depositAccountNumber: settings.depositAccountNumber,
+      paymentDate: payment.paymentDate ?? new Date(),
+      description: `FI-indbetaling - faktura ${invoiceNumber}`,
+      externalReference: `FI-${payment.customerNumber.trim()}-${guid}`.slice(0, 128),
+    });
+    lines.push(`  ${name}: faktura ${invoiceNumber} registreret som betalt i Dinero.`);
+  } catch (err) {
+    const error = err instanceof Error ? err.message : "Ukendt fejl";
+    await prisma.invoice.updateMany({
+      where: { id: { in: rows.map((r) => r.id) } },
+      data: { bsPaymentRegisteredAt: null, bsPaymentError: error },
+    });
+    lines.push(`  ${name}: faktura ${invoiceNumber} - FEJL ved registrering i Dinero: ${error}`);
+  }
+  return true;
+}
+
 /** "Prøv igen" for a paid collection whose Dinero registration failed. */
 export async function retryBsPaymentRegistration(collectionId: string): Promise<string[]> {
   const lines: string[] = [];
@@ -794,6 +868,7 @@ export async function importBsReturnFile(fileName: string, file: Buffer, userId:
         orderBy: { createdAt: "desc" },
         include: { deal: { select: { companyName: true, displayName: true } } },
       });
+      if (!collection && (await applyFiPayment(payment, lines))) continue;
       if (!collection) {
         lines.push(
           `Ukendt opkrævning: kunde ${payment.customerNumber.trim()}, reference "${reference}" (${OUTCOME_LABEL[payment.outcome]}, ${kr(payment.paidAmountOre || payment.amountOre)}) - tjek den i Betalingsservice.`

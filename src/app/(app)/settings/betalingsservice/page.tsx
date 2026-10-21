@@ -21,6 +21,7 @@ import {
   SignupLinkForm,
   SignupMailPanel,
   SendSignupMailButton,
+  ReimportMailboxFileButton,
 } from "./betalingsservice-client";
 import { signupMailOverview } from "@/lib/betalingsservice/signup-mail";
 
@@ -240,6 +241,7 @@ export default async function BetalingsservicePage() {
                         · {deadline(f.receivedAt)} ·{" "}
                         {f.kind === "data" ? "data" : f.kind === "receipt" ? "kvittering" : "fil"}
                       </span>
+                      {f.kind === "data" && f.note.includes("Ukendt opkrævning") && <ReimportMailboxFileButton fileId={f.id} />}
                     </summary>
                     <pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap rounded bg-slate-50 p-2 text-[11px] text-slate-600">
                       {f.note || "(tom)"}

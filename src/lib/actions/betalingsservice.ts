@@ -1,5 +1,6 @@
 "use server";
 
+import { createHash } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import type { PaymentMethod } from "@prisma/client";
 import { prisma } from "@/lib/db";
@@ -270,5 +271,29 @@ export async function sendSignupMailsAction(
     return { ok: true, ...result };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Kunne ikke sende mails." };
+  }
+}
+
+/**
+ * "Indlæs igen" on a payment file taken in from the mailbox - reads it once
+ * more, e.g. after Arpo learned to match FI-kort payments that were listed
+ * as "Ukendt opkrævning" the first time. Safe to repeat: paid invoices stay
+ * paid, and a payment is never registered in Dinero twice.
+ */
+export async function reimportMailboxFileAction(fileId: string): Promise<{ ok: true; lines: string[] } | { ok: false; error: string }> {
+  try {
+    const user = await requireBillingUser();
+    const file = await prisma.bsMailboxFile.findUniqueOrThrow({ where: { id: fileId } });
+    if (file.kind !== "data") return { ok: false, error: "Kun datafiler (0602/0603) kan indlæses." };
+    const buffer = Buffer.from(file.content);
+    const contentHash = createHash("sha256").update(buffer).digest("hex");
+    await prisma.bsReturnImport.deleteMany({ where: { contentHash } });
+    const result = await importBsReturnFile(file.fileName, buffer, user.id);
+    if (!result.ok) return { ok: false, error: result.error };
+    await prisma.bsMailboxFile.update({ where: { id: file.id }, data: { note: result.lines.join("\n") } });
+    revalidatePath(PAGE);
+    return { ok: true, lines: result.lines };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Kunne ikke indlæse filen igen." };
   }
 }
