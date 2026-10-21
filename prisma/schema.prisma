@@ -558,6 +558,10 @@ model Deal {
   /// Excludes this deal from provision entirely, e.g. so the owner can stay
   /// on the deal for pipeline tracking without it generating commission.
   commissionExcluded Boolean @default(false)
+  /// A provision rate (%) an admin set for this deal by hand - used instead
+  /// of the owner's own rate, also when the commission is recalculated
+  /// later (a new price, a signed contract). Null = the owner's rate.
+  commissionRateOverride Float?
 
   /// The customer's tour(s) on explore.nextview360.dk (MP-Space ID, e.g.
   /// "SuPVjGiRx8q") - lets the visitor-stats report be pulled for this deal

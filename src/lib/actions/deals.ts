@@ -884,6 +884,18 @@ export async function updateCommission(commissionId: string, formData: FormData)
     throw new Error("Angiv gyldige tal for sats, grundlag og provision.");
   }
 
+  // A rate other than the seller's own is kept on the deal, so a later
+  // recalculation (new price, signed contract) uses it instead of resetting
+  // it - setting it back to the seller's rate clears that again.
+  const existing = await prisma.commission.findUniqueOrThrow({
+    where: { id: commissionId },
+    include: { seller: { select: { commissionRate: true } } },
+  });
+  await prisma.deal.update({
+    where: { id: existing.dealId },
+    data: { commissionRateOverride: rate === existing.seller.commissionRate ? null : rate },
+  });
+
   const commission = await prisma.commission.update({
     where: { id: commissionId },
     data: {

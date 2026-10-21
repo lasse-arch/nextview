@@ -15,7 +15,8 @@ export async function recalcCommission(dealId: string) {
     await prisma.commission.deleteMany({ where: { dealId } });
     return;
   }
-  const amount = calculateCommissionAmount(baseAmount, deal.owner.commissionRate);
+  const rate = deal.commissionRateOverride ?? deal.owner.commissionRate;
+  const amount = calculateCommissionAmount(baseAmount, rate);
   const dueDate = calculateCommissionDueDate(deal.soldAt, deal.owner.payoutFrequency);
 
   await prisma.commission.upsert({
@@ -23,7 +24,7 @@ export async function recalcCommission(dealId: string) {
     create: {
       dealId,
       sellerId: deal.ownerId,
-      rate: deal.owner.commissionRate,
+      rate,
       baseAmount,
       amount,
       frequency: deal.owner.payoutFrequency,
@@ -31,7 +32,7 @@ export async function recalcCommission(dealId: string) {
     },
     update: {
       sellerId: deal.ownerId,
-      rate: deal.owner.commissionRate,
+      rate,
       baseAmount,
       amount,
       frequency: deal.owner.payoutFrequency,

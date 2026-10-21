@@ -526,6 +526,7 @@ export default async function DealDetailPage({
                 dealId={deal.id}
                 commission={deal.commission}
                 isAdmin={currentUser?.role === "ADMIN"}
+                rateIsOverride={deal.commissionRateOverride !== null}
               />
             ) : (
               <p className="mt-3 text-sm text-slate-400">

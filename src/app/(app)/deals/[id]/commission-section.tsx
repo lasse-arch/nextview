@@ -9,7 +9,7 @@ import type { CommissionFrequency, CommissionStatus } from "@prisma/client";
 
 type Commission = {
   id: string;
-  seller: { name: string };
+  seller: { name: string; commissionRate: number };
   rate: number;
   baseAmount: number;
   amount: number;
@@ -28,12 +28,26 @@ export function CommissionSection({
   dealId,
   commission,
   isAdmin,
+  rateIsOverride,
 }: {
   dealId: string;
   commission: Commission;
   isAdmin: boolean;
+  /** The rate was set by hand for this deal (Deal.commissionRateOverride). */
+  rateIsOverride: boolean;
 }) {
   const [editing, setEditing] = useState(false);
+  const [rate, setRate] = useState(String(commission.rate));
+  const [baseAmount, setBaseAmount] = useState(String(commission.baseAmount));
+  const [amount, setAmount] = useState(String(commission.amount));
+
+  // Provision follows sats × grundlag while either is changed - it can
+  // still be typed in by hand afterwards.
+  function recompute(nextRate: string, nextBase: string) {
+    const r = parseFloat(nextRate.replace(",", "."));
+    const b = parseFloat(nextBase);
+    if (!isNaN(r) && !isNaN(b)) setAmount(String(Math.round((b * r) / 100)));
+  }
   const [status, setStatus] = useState<CommissionStatus>(commission.status);
   const [pending, startTransition] = useTransition();
   const showToast = useToast();
@@ -72,9 +86,16 @@ export function CommissionSection({
               type="number"
               step="0.1"
               min="0"
-              defaultValue={commission.rate}
+              value={rate}
+              onChange={(e) => {
+                setRate(e.target.value);
+                recompute(e.target.value, baseAmount);
+              }}
               className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
             />
+            <p className="mt-1 text-[11px] text-slate-400">
+              Sælgerens egen sats: {commission.seller.commissionRate}% - en anden sats gælder fast for denne deal.
+            </p>
           </div>
           <div>
             <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Grundlag (DKK)</label>
@@ -83,7 +104,11 @@ export function CommissionSection({
               type="number"
               step="1"
               min="0"
-              defaultValue={commission.baseAmount}
+              value={baseAmount}
+              onChange={(e) => {
+                setBaseAmount(e.target.value);
+                recompute(rate, e.target.value);
+              }}
               className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
             />
           </div>
@@ -94,7 +119,8 @@ export function CommissionSection({
               type="number"
               step="1"
               min="0"
-              defaultValue={commission.amount}
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
               className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
             />
           </div>
@@ -176,7 +202,17 @@ export function CommissionSection({
       </div>
       <div className="flex justify-between">
         <dt className="text-slate-500">Sats</dt>
-        <dd className="text-slate-800">{commission.rate}%</dd>
+        <dd className="text-slate-800">
+          {commission.rate}%
+          {rateIsOverride && (
+            <span
+              className="ml-1.5 rounded-full bg-violet-50 px-1.5 py-0.5 text-[11px] font-medium text-violet-700"
+              title={`Rettet manuelt for denne deal - sælgerens egen sats er ${commission.seller.commissionRate}%`}
+            >
+              manuel
+            </span>
+          )}
+        </dd>
       </div>
       <div className="flex justify-between">
         <dt className="text-slate-500">Grundlag</dt>
@@ -222,6 +258,9 @@ export function CommissionSection({
             type="button"
             onClick={() => {
               setStatus(commission.status);
+              setRate(String(commission.rate));
+              setBaseAmount(String(commission.baseAmount));
+              setAmount(String(commission.amount));
               setEditing(true);
             }}
             className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"

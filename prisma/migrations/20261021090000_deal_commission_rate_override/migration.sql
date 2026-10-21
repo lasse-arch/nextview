@@ -1,0 +1,1 @@
+ALTER TABLE "Deal" ADD COLUMN IF NOT EXISTS "commissionRateOverride" DOUBLE PRECISION;
