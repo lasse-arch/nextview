@@ -1,6 +1,5 @@
 import { addMonths, subMonths, addDays, startOfMonth, max as maxDate, startOfDay } from "date-fns";
 import { prisma } from "@/lib/db";
-import { autoApproveEstablishments } from "@/lib/establishment-approval";
 import { isDineroConfigured, createQuarterlyInvoiceDraft, getInvoicePaymentStatus, getInvoiceTotals, type DineroInvoiceLine } from "@/lib/dinero";
 import { computeBillingPeriods, computePeriodAmounts } from "@/lib/invoice-schedule";
 import { totalContractValue, invoicePeriodLabel, formatDate, dealName } from "@/lib/labels";
@@ -83,6 +82,7 @@ function computeDueLines(
     billingStartDate: Date | null;
     contractSignedAt: Date | null;
     contractEndDate: Date | null;
+    stage?: string;
     establishmentAwaitingApproval?: boolean;
   },
   options: { sendEstablishmentNow?: boolean; sendPeriodsNow?: boolean; betalingsservice?: boolean; termNumber?: number } = {},
@@ -114,9 +114,9 @@ function computeDueLines(
     deal.establishmentFee > 0 &&
     !handledQuarterIndexes.has(0) &&
     !establishmentPredatesInvoicing &&
-    // Agreed with the customer: only once they have the product and are
-    // happy with it - never by itself, whatever the date.
-    !deal.establishmentAwaitingApproval
+    // Agreed with the customer: only once they've approved the product -
+    // which is when the deal is set Live. Never by itself before that.
+    !(deal.establishmentAwaitingApproval && deal.stage !== "LIVE")
   ) {
     if (establishmentReady) {
       lines.push({
@@ -857,9 +857,6 @@ export async function runQuarterlyInvoiceGeneration(): Promise<InvoiceRunSummary
   if (!(await isDineroConfigured())) {
     return { configured: false, checked: 0, created: 0, failed: 0 };
   }
-  // Setup fees waiting for the customer's approval whose 7 days after
-  // delivery passed without defects are released first - billed below.
-  await autoApproveEstablishments();
 
   const [deals, combinedGroups] = await Promise.all([
     prisma.deal.findMany({

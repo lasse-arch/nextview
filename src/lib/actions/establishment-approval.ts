@@ -3,35 +3,29 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
-import { logActivity } from "@/lib/activity";
-import { dealName, formatDKK } from "@/lib/labels";
-import { approvalTaskTitle } from "@/lib/establishment-approval";
-
-/** The setup fee's invoice for the current term, if it has gone out (or is handled) already. */
-async function establishmentAlreadyInvoiced(deal: { id: string; currentTermNumber: number }): Promise<boolean> {
-  const invoice = await prisma.invoice.findFirst({
-    where: { dealId: deal.id, termNumber: deal.currentTermNumber, quarterIndex: 0, status: { notIn: ["PENDING", "FAILED"] } },
-    select: { id: true },
-  });
-  return Boolean(invoice);
-}
 
 /**
- * "Afvent kundens godkendelse" on a deal: hold the setup fee back from the
- * automatic invoicing until the customer is happy with the product - also
- * for deals signed before this could be chosen on the contract.
+ * "Vent til kunden har godkendt" on a deal: hold the setup fee back from the
+ * automatic invoicing until the deal is set Live (= the customer approved
+ * the product) - also for deals signed before this could be chosen on the
+ * contract. Only while the setup fee hasn't been invoiced yet.
  */
 export async function holdEstablishmentForApproval(dealId: string): Promise<{ ok: true } | { ok: false; error: string }> {
   const user = await requireUser();
   const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId } });
   if (!deal.establishmentFee) return { ok: false, error: "Dealen har ingen etableringspris." };
-  if (await establishmentAlreadyInvoiced(deal)) return { ok: false, error: "Etableringen er allerede faktureret." };
+  if (deal.stage === "LIVE") return { ok: false, error: "Dealen er allerede Live - kunden har godkendt." };
+  const invoiced = await prisma.invoice.findFirst({
+    where: { dealId, termNumber: deal.currentTermNumber, quarterIndex: 0, status: { notIn: ["PENDING", "FAILED"] } },
+    select: { id: true },
+  });
+  if (invoiced) return { ok: false, error: "Etableringen er allerede faktureret." };
   await prisma.deal.update({ where: { id: dealId }, data: { establishmentAwaitingApproval: true } });
   await prisma.note.create({
     data: {
       dealId,
       authorId: user.id,
-      body: "Etableringen faktureres først, når produktet er leveret, og kunden er tilfreds.",
+      body: "Etableringen faktureres først, når kunden har godkendt produktet (dealen sættes Live).",
       kind: "MANUAL",
     },
   });
@@ -39,51 +33,12 @@ export async function holdEstablishmentForApproval(dealId: string): Promise<{ ok
   return { ok: true };
 }
 
-/** "Kunden er tilfreds - fakturér etablering": releases the setup fee to the next invoice run. */
-export async function approveEstablishment(dealId: string): Promise<{ ok: true } | { ok: false; error: string }> {
+/** Undoes the hold - the setup fee is invoiced as usual (after signing). */
+export async function releaseEstablishmentHold(dealId: string): Promise<{ ok: true } | { ok: false; error: string }> {
   const user = await requireUser();
-  const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId } });
-  if (!deal.establishmentAwaitingApproval) return { ok: false, error: "Etableringen afventer ikke godkendelse." };
-  await prisma.deal.update({
-    where: { id: dealId },
-    data: { establishmentAwaitingApproval: false, establishmentDisputedAt: null },
-  });
+  await prisma.deal.update({ where: { id: dealId }, data: { establishmentAwaitingApproval: false } });
   await prisma.note.create({
-    data: { dealId, authorId: user.id, body: "Kunden er tilfreds - etableringen frigivet til fakturering.", kind: "MANUAL" },
-  });
-  // The reminder made when it went Live is done now.
-  await prisma.task.updateMany({ where: { dealId, title: approvalTaskTitle(dealName(deal)), done: false }, data: { done: true } });
-  await logActivity({
-    type: "DEAL_UPDATED",
-    message: `${user.name}: ${dealName(deal)} er tilfredse - etablering (${formatDKK(deal.establishmentFee)}) faktureres`,
-    actorId: user.id,
-    dealId,
-  });
-  revalidatePath(`/deals/${dealId}`);
-  revalidatePath("/opgaver");
-  return { ok: true };
-}
-
-/**
- * "Kunden har påpeget mangler": the customer raised concrete defects within
- * the 7 days after delivery - stops the automatic approval, so the setup fee
- * waits for "Kunden er tilfreds" once they're fixed.
- */
-export async function disputeEstablishment(dealId: string, defects: string): Promise<{ ok: true } | { ok: false; error: string }> {
-  const user = await requireUser();
-  const text = defects.trim();
-  if (!text) return { ok: false, error: "Skriv kort, hvilke mangler kunden har påpeget." };
-  const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId } });
-  if (!deal.establishmentAwaitingApproval) return { ok: false, error: "Etableringen afventer ikke godkendelse." };
-  await prisma.deal.update({ where: { id: dealId }, data: { establishmentDisputedAt: new Date() } });
-  await prisma.note.create({
-    data: { dealId, authorId: user.id, body: `Kunden har påpeget mangler: ${text}`, kind: "MANUAL" },
-  });
-  await logActivity({
-    type: "DEAL_UPDATED",
-    message: `${user.name}: ${dealName(deal)} har påpeget mangler - etableringen venter`,
-    actorId: user.id,
-    dealId,
+    data: { dealId, authorId: user.id, body: "Etableringen faktureres alligevel som normalt (efter underskrift).", kind: "MANUAL" },
   });
   revalidatePath(`/deals/${dealId}`);
   return { ok: true };

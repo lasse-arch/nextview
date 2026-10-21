@@ -563,16 +563,11 @@ model Deal {
   /// later (a new price, a signed contract). Null = the owner's rate.
   commissionRateOverride Float?
 
-  /// The setup fee waits until the customer has the product and is happy
-  /// with it (agreed when selling - "Etablering faktureres ved underskrift"
-  /// unticked on the contract, or switched on the deal later). Never
-  /// invoiced automatically while set; "Kunden er tilfreds - fakturér
-  /// etablering" on the deal clears it.
+  /// The setup fee waits until the customer has approved the product
+  /// (agreed when selling - "Etablering faktureres ved underskrift" unticked
+  /// on the contract, or switched on the deal later). Setting the deal Live
+  /// is the approval: it's invoiced then, never before.
   establishmentAwaitingApproval Boolean @default(false)
-  /// The customer pointed out concrete defects within the 7 days after
-  /// delivery (Live) - stops the automatic approval; it then waits for
-  /// "Kunden er tilfreds" once they're fixed.
-  establishmentDisputedAt       DateTime?
 
   /// The customer's tour(s) on explore.nextview360.dk (MP-Space ID, e.g.
   /// "SuPVjGiRx8q") - lets the visitor-stats report be pulled for this deal

@@ -27,7 +27,6 @@ import { parseContractProducts, establishmentLineItems, recurringLineItems } fro
 import { isDocuSealConfigured } from "@/lib/docuseal";
 import { CommissionSection } from "./commission-section";
 import { EstablishmentApprovalControl } from "./establishment-approval-control";
-import { approvalDeadline } from "@/lib/establishment-approval";
 import { CommissionExcludedToggle } from "./commission-excluded-toggle";
 import { SendContractButton } from "./send-contract-button";
 import { DownloadContractButton } from "./download-contract-button";
@@ -541,6 +540,7 @@ export default async function DealDetailPage({
           <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="text-sm font-semibold text-slate-900">Fakturaer (Dinero)</h2>
             {(deal.establishmentFee ?? 0) > 0 &&
+              deal.stage !== "LIVE" &&
               !deal.invoices.some(
                 (i) => i.quarterIndex === 0 && i.termNumber === deal.currentTermNumber && i.status !== "PENDING" && i.status !== "FAILED"
               ) && (
@@ -548,8 +548,6 @@ export default async function DealDetailPage({
                   dealId={deal.id}
                   fee={deal.establishmentFee ?? 0}
                   awaiting={deal.establishmentAwaitingApproval}
-                  approvalDeadline={deal.liveAt ? approvalDeadline(deal.liveAt).toISOString() : null}
-                  disputedAt={deal.establishmentDisputedAt ? deal.establishmentDisputedAt.toISOString() : null}
                 />
               )}
             {currentUser?.canAccessBilling && (
