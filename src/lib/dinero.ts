@@ -82,6 +82,10 @@ type DineroContactInput = {
   email: string | null;
   phone: string | null;
   address: string | null;
+  /** EAN/GLN of a public institution - its invoices go as e-invoices. */
+  ean?: string | null;
+  /** Att. person on the contact (shown on e-invoices). */
+  attPerson?: string | null;
 };
 
 /** Splits a one-line Danish address ("Vesterbro 18, st, 9000 Aalborg") into the
@@ -141,6 +145,8 @@ function contactBody(input: DineroContactInput) {
     City: city || undefined,
     CountryKey: "DK",
     IsPerson: false,
+    EanNumber: input.ean || undefined,
+    AttPerson: input.attPerson || undefined,
     PaymentConditionType: "Netto",
     PaymentConditionNumberOfDays: 8,
   };
@@ -452,7 +458,8 @@ async function bookAndSendInvoice(
   accessToken: string,
   invoiceGuid: string,
   timestamp: string | null,
-  receiverEmail: string | null
+  receiverEmail: string | null,
+  eanNumber: string | null = null
 ): Promise<void> {
   const orgId = process.env.DINERO_ORGANIZATION_ID!;
 
@@ -477,6 +484,13 @@ async function bookAndSendInvoice(
   const bookData = (await bookRes.json()) as { TimeStamp?: string };
   const bookedTimestamp = bookData.TimeStamp ?? ts;
 
+  // An EAN customer (public institution) gets it as an e-invoice via
+  // NemHandel, not by e-mail.
+  if (eanNumber) {
+    await sendEInvoice(accessToken, invoiceGuid, eanNumber);
+    return;
+  }
+
   if (!receiverEmail) {
     console.error(`Dinero: faktura ${invoiceGuid} bogført, men ikke sendt - ingen kontakt-mail`);
     return;
@@ -499,6 +513,37 @@ async function bookAndSendInvoice(
     }),
   });
   if (!emailRes.ok) throw new Error(`Dinero: kunne ikke afsende faktura (${emailRes.status}): ${await emailRes.text()}`);
+}
+
+/**
+ * Sends a booked invoice as an e-invoice (OIOUBL via NemHandel) to the EAN
+ * number on its contact - POST /v3/{org}/invoices/{guid}/e-invoice, per
+ * Dinero's OpenAPI spec. The payment means is the FI code ("FIK", +71 - the
+ * organization has FI payment codes on), so the payment is matched
+ * automatically; if Dinero refuses that, plain bank transfer ("Domestic").
+ */
+async function sendEInvoice(accessToken: string, invoiceGuid: string, eanNumber: string): Promise<void> {
+  const orgId = process.env.DINERO_ORGANIZATION_ID!;
+  let lastError = "";
+  for (const paymentMean of ["FIK", "Domestic"]) {
+    const res = await dineroFetch(`https://api.dinero.dk/v3/${orgId}/invoices/${invoiceGuid}/e-invoice`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ PaymentMeanEnum: paymentMean }),
+    });
+    if (res.ok) return;
+    lastError = `${res.status}: ${await res.text()}`;
+    if (res.status !== 400) break;
+  }
+  // Dinero answers 404 (code 40) once the invoice is found but it can't
+  // send it - the EAN isn't registered in NemHandel, or the customer's (or
+  // our own) CVR number is missing in Dinero.
+  if (lastError.startsWith("404") && lastError.includes('"code":40')) {
+    throw new Error(
+      `E-fakturaen kunne ikke sendes til EAN ${eanNumber}. Tjek at EAN-nummeret er rigtigt og tilmeldt NemHandel, og at kunden har CVR-nummer i Dinero - og send den så som e-faktura i Dinero.`
+    );
+  }
+  throw new Error(`Dinero: kunne ikke sende e-faktura (${lastError}) - send den som e-faktura i Dinero.`);
 }
 
 /**
@@ -561,10 +606,11 @@ async function bookAndSendOrCapture(
   accessToken: string,
   invoiceGuid: string,
   timestamp: string | null,
-  receiverEmail: string | null
+  receiverEmail: string | null,
+  eanNumber: string | null = null
 ): Promise<string | undefined> {
   try {
-    await bookAndSendInvoice(accessToken, invoiceGuid, timestamp, receiverEmail);
+    await bookAndSendInvoice(accessToken, invoiceGuid, timestamp, receiverEmail, eanNumber);
     return undefined;
   } catch (err) {
     console.error(`Dinero: faktura ${invoiceGuid} oprettet, men bogføring/afsendelse fejlede`, err);
@@ -598,6 +644,10 @@ export async function createQuarterlyInvoiceDraft(params: {
   paymentDays?: number;
   collectedViaBetalingsservice?: boolean;
   invoiceTemplateId?: string | null;
+  /** Sent as an e-invoice to this EAN instead of by e-mail. */
+  eanNumber?: string | null;
+  /** Att. person for the contact (e.g. the deal's contact person). */
+  attPerson?: string | null;
 }): Promise<DineroDraftResult> {
   const accessToken = await getAccessToken();
 
@@ -609,6 +659,8 @@ export async function createQuarterlyInvoiceDraft(params: {
     email: params.contactEmail,
     phone: params.contactPhone,
     address: params.address,
+    ean: params.eanNumber ?? null,
+    attPerson: params.attPerson ?? null,
   };
 
   const reusedContactGuid =
@@ -636,7 +688,13 @@ export async function createQuarterlyInvoiceDraft(params: {
       collectedViaBetalingsservice: params.collectedViaBetalingsservice,
       invoiceTemplateId: params.invoiceTemplateId,
     });
-    const sendError = await bookAndSendOrCapture(accessToken, invoice.guid, invoice.timestamp, params.contactEmail);
+    const sendError = await bookAndSendOrCapture(
+      accessToken,
+      invoice.guid,
+      invoice.timestamp,
+      params.contactEmail,
+      params.eanNumber ?? null
+    );
     return { contactGuid, invoiceGuid: invoice.guid, invoiceNumber: await bookedNumber(invoice.guid, invoice.number), sendError };
   } catch (err) {
     // The cached/reused contact GUID no longer exists in Dinero (e.g. it was
@@ -666,7 +724,13 @@ export async function createQuarterlyInvoiceDraft(params: {
       collectedViaBetalingsservice: params.collectedViaBetalingsservice,
       invoiceTemplateId: params.invoiceTemplateId,
     });
-    const sendError = await bookAndSendOrCapture(accessToken, invoice.guid, invoice.timestamp, params.contactEmail);
+    const sendError = await bookAndSendOrCapture(
+      accessToken,
+      invoice.guid,
+      invoice.timestamp,
+      params.contactEmail,
+      params.eanNumber ?? null
+    );
     return { contactGuid: freshContactGuid, invoiceGuid: invoice.guid, invoiceNumber: await bookedNumber(invoice.guid, invoice.number), sendError };
   }
 }
@@ -717,6 +781,8 @@ async function createTestModeDraft(
       email: params.contactEmail,
       phone: params.contactPhone,
       address: params.address,
+      ean: params.eanNumber ?? null,
+      attPerson: params.attPerson ?? null,
     }));
   const invoice = await createInvoiceDraft(accessToken, {
     contactGuid,

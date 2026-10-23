@@ -202,6 +202,8 @@ type DraftableDeal = {
   contactEmail: string | null;
   contactPhone: string | null;
   address: string | null;
+  eanNumber: string | null;
+  contactName: string | null;
   dineroContactGuid: string | null;
   soldProduct: string | null;
   contractProducts: unknown;
@@ -278,6 +280,12 @@ export function bsInvoiceNotice(info: BsInvoiceInfo | undefined, dateLabel: stri
   return language === "en"
     ? `This invoice is NOT signed up for automatic payment.\nYou will receive a payment slip from Betalingsservice with payment on ${dateLabel} - please do NOT pay this invoice by bank transfer.${signUp}`
     : `Denne faktura er IKKE tilmeldt automatisk betaling.\nDu modtager et indbetalingskort fra Betalingsservice med betaling d. ${dateLabel} - betal IKKE denne faktura via bankoverførsel.${signUp}`;
+}
+
+/** An EAN customer (public institution) gets e-invoices - never
+ * Betalingsservice, whatever the deal's payment method says. */
+function effectivePaymentMethod(deal: { paymentMethod: PaymentMethod; eanNumber: string | null }): PaymentMethod {
+  return deal.eanNumber ? "INVOICE" : deal.paymentMethod;
 }
 
 /**
@@ -500,12 +508,12 @@ async function draftInvoiceLine(
     // period to align a due date to, so it's simply dated whenever it's
     // actually drafted.
     const terms = invoiceTerms(
-      collectsViaBs(deal.paymentMethod, invoiceRow.termNumber, invoiceRow.quarterIndex) ? "BETALINGSSERVICE" : "INVOICE",
+      collectsViaBs(effectivePaymentMethod(deal), invoiceRow.termNumber, invoiceRow.quarterIndex) ? "BETALINGSSERVICE" : "INVOICE",
       invoiceRow.quarterIndex,
       invoiceRow.scheduledDate,
       invoiceLanguage(deal),
       new Date(),
-      deal.paymentMethod === "BETALINGSSERVICE" ? await bsInvoiceInfo(deal) : undefined
+      effectivePaymentMethod(deal) === "BETALINGSSERVICE" ? await bsInvoiceInfo(deal) : undefined
     );
     const { invoiceDate } = terms;
     const result = await createQuarterlyInvoiceDraft({
@@ -515,6 +523,8 @@ async function draftInvoiceLine(
       contactEmail: deal.invoiceEmail || deal.contactEmail,
       contactPhone: deal.contactPhone,
       address: deal.address,
+      eanNumber: deal.eanNumber,
+      attPerson: deal.contactName,
       note: withNoteSuffix(note, terms.noteSuffix),
       lines,
       invoiceDate,
@@ -634,7 +644,7 @@ async function processDealDueInvoices(
   );
   const { lines: dueLines, nextDueDate } = computeDueLines(
     deal,
-    { ...options, betalingsservice: deal.paymentMethod === "BETALINGSSERVICE", termNumber: deal.currentTermNumber },
+    { ...options, betalingsservice: effectivePaymentMethod(deal) === "BETALINGSSERVICE", termNumber: deal.currentTermNumber },
     handledQuarterIndexes
   );
 
@@ -677,7 +687,7 @@ async function processDealDueInvoices(
   // first period when a deal goes Live - as long as they're paid the same
   // way: a Betalingsservice-collected quarter is never pulled onto a normal
   // invoice (or the other way round).
-  for (const group of groupByCollection(deal.paymentMethod, rows)) {
+  for (const group of groupByCollection(effectivePaymentMethod(deal), rows)) {
     if (group.length > 1) {
       const result = await draftRowsAsOneInvoice(
         deal,
@@ -734,7 +744,7 @@ async function draftRowsAsOneInvoice(
   // line on it would be - one that includes an establishment fee or a
   // first period is a normal invoice as a whole (see collectsViaBs).
   const allViaBs = invoiceRows.every((r) =>
-    collectsViaBs(leadDeal.paymentMethod, r.invoiceRow.termNumber, r.invoiceRow.quarterIndex)
+    collectsViaBs(effectivePaymentMethod(leadDeal), r.invoiceRow.termNumber, r.invoiceRow.quarterIndex)
   );
   const terms = invoiceTerms(
     allViaBs ? "BETALINGSSERVICE" : "INVOICE",
@@ -742,7 +752,7 @@ async function draftRowsAsOneInvoice(
     (anyRecurringLine ?? invoiceRows[0]).invoiceRow.scheduledDate,
     invoiceLanguage(leadDeal),
     new Date(),
-    leadDeal.paymentMethod === "BETALINGSSERVICE" ? await bsInvoiceInfo(leadDeal) : undefined
+    effectivePaymentMethod(leadDeal) === "BETALINGSSERVICE" ? await bsInvoiceInfo(leadDeal) : undefined
   );
   const { invoiceDate } = terms;
 
@@ -754,6 +764,8 @@ async function draftRowsAsOneInvoice(
       contactEmail: leadDeal.invoiceEmail || leadDeal.contactEmail,
       contactPhone: leadDeal.contactPhone,
       address: leadDeal.address,
+      eanNumber: leadDeal.eanNumber,
+      attPerson: leadDeal.contactName,
       note: withNoteSuffix(note, terms.noteSuffix),
       lines,
       invoiceDate,
@@ -846,7 +858,7 @@ async function processCombinedDueInvoices(
     );
     const { lines } = computeDueLines(
       deal,
-      { ...options, betalingsservice: deal.paymentMethod === "BETALINGSSERVICE", termNumber: deal.currentTermNumber },
+      { ...options, betalingsservice: effectivePaymentMethod(deal) === "BETALINGSSERVICE", termNumber: deal.currentTermNumber },
       handledQuarterIndexes
     );
     const dueLines = lines.filter((line) => {

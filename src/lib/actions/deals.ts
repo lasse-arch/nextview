@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { addMonths } from "date-fns";
 import { prisma } from "@/lib/db";
+import { normalizeEanNumber } from "@/lib/ean";
 import { requireUser } from "@/lib/auth";
 import { recalcCommission } from "@/lib/commission-service";
 import { buildDealEmailAddress } from "@/lib/email-address";
@@ -127,6 +128,9 @@ async function updateDealInner(
   const contactEmail = String(formData.get("contactEmail") || "") || null;
   const contactPhone = String(formData.get("contactPhone") || "") || null;
   const invoiceEmail = String(formData.get("invoiceEmail") || "").trim() || null;
+  const eanNumber = normalizeEanNumber(String(formData.get("eanNumber") ?? ""));
+  // Dinero only sends an e-invoice to a contact with a CVR number.
+  if (eanNumber && !cvrNumber) throw new Error("Udfyld CVR-nummer - Dinero kræver kundens CVR for at sende EAN-fakturaer.");
   const ownerId = String(formData.get("ownerId") || "");
   let stage = String(formData.get("stage") || "LEAD") as DealStage;
   const meetingDateRaw = String(formData.get("meetingDate") || "");
@@ -275,6 +279,9 @@ async function updateDealInner(
       contactEmail,
       contactPhone,
       invoiceEmail,
+      eanNumber,
+      // An EAN customer gets e-invoices via NemHandel - never Betalingsservice.
+      ...(eanNumber ? { paymentMethod: "INVOICE" as const } : {}),
       ownerId,
       stage,
       ...leadInboxExitData(stage),

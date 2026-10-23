@@ -27,6 +27,7 @@ import { parseContractProducts, establishmentLineItems, recurringLineItems } fro
 import { isDocuSealConfigured } from "@/lib/docuseal";
 import { CommissionSection } from "./commission-section";
 import { EstablishmentApprovalControl } from "./establishment-approval-control";
+import { lookupEanRecipient } from "@/lib/ean";
 import { CommissionExcludedToggle } from "./commission-excluded-toggle";
 import { SendContractButton } from "./send-contract-button";
 import { DownloadContractButton } from "./download-contract-button";
@@ -150,6 +151,8 @@ export default async function DealDetailPage({
   ).sort((a, b) => dealName(a).localeCompare(dealName(b), "da"));
 
   if (!deal) notFound();
+  // Can this EAN actually receive e-invoices? A warning on the deal, never a block.
+  const eanRecipient = deal.eanNumber ? await lookupEanRecipient(deal.eanNumber) : null;
   // A branch billed together with its parent pays through the parent's
   // Betalingsservice customer number (see bsPayerOf).
   const bsPayer = bsPayerOf(deal);
@@ -293,6 +296,28 @@ export default async function DealDetailPage({
                     defaultValue={deal.invoiceEmail ?? ""}
                     className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
                   />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                    EAN-nummer (offentlige institutioner)
+                  </label>
+                  <input
+                    name="eanNumber"
+                    inputMode="numeric"
+                    placeholder="13 cifre - fakturaer sendes så som e-faktura"
+                    defaultValue={deal.eanNumber ?? ""}
+                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  />
+                  {eanRecipient &&
+                    (eanRecipient.found ? (
+                      <p className="mt-1 text-xs text-emerald-700">
+                        ✓ Kan modtage e-faktura{eanRecipient.name ? `: ${eanRecipient.name}` : ""}
+                      </p>
+                    ) : (
+                      <p className="mt-1 text-xs text-amber-700">
+                        ⚠ Ikke fundet i NemHandel/Peppol - tjek nummeret med kunden, ellers kan e-fakturaen ikke sendes.
+                      </p>
+                    ))}
                 </div>
                 <div>
                   <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Ejer af deal</label>
@@ -557,6 +582,7 @@ export default async function DealDetailPage({
                 customerNumber={bsPayer.bsCustomerNumber}
                 mandateActive={bsPayer.bsMandateStatus === "ACTIVE"}
                 paysViaName={bsPayer.id !== deal.id ? dealName(bsPayer) : null}
+                eanNumber={deal.eanNumber}
                 pbsNumber={bsSettings?.pbsNumber ?? null}
                 debtorGroupNumber={bsSettings?.debtorGroupNumber ?? null}
               />
