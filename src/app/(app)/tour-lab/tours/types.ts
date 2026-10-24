@@ -58,7 +58,13 @@ export type TourConfig = {
   panos?: { basePath: string; maxLevel: number; cubeResolution: number };
   categories: Record<string, { name: string; color: string }>;
   points: TourPoint[];
-  /** The welcome tiles - leave out for no welcome. */
+  /**
+   * The menu's look: "side" = a list sliding in from the side, "tiles" = a
+   * full-screen tile menu (the "welcome" below plus every room as a button).
+   * Shown at start or not by menuOpenOnStart.
+   */
+  menuStyle: "side" | "tiles";
+  /** The tiles of the tile menu. */
   welcome?: {
     kicker: string;
     title: string;

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { resolveTourLink, saveMatterportSdkKey } from "@/lib/actions/tour-lab";
 import { connectSdk, modelIdFrom, showcaseUrl, sweepIdForIndex, uLinkTarget, type MpSdk, type Rotation, type SweepInfo } from "./matterport";
@@ -361,9 +362,9 @@ export function TourLab({ sdkKey }: { sdkKey: string | null }) {
           </p>
           <p className="mt-1 text-sm">
             Prototype-tours:{" "}
-            <a href="/tour-lab/halvorsminde" className="font-medium text-indigo-600 hover:underline">Halvorsminde (drone først)</a>
+            <Link href="/tour-lab/halvorsminde" className="font-medium text-indigo-600 hover:underline">Halvorsminde (drone først)</Link>
             {" · "}
-            <a href="/tour-lab/fitness-gronlandstorv" className="font-medium text-indigo-600 hover:underline">Fitness United Grønlands Torv (direkte i touren)</a>
+            <Link href="/tour-lab/fitness-gronlandstorv" className="font-medium text-indigo-600 hover:underline">Fitness United Grønlands Torv (direkte i touren)</Link>
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">

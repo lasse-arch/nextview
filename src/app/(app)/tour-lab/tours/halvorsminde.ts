@@ -105,7 +105,8 @@ export const halvorsminde: TourConfig = {
   /** Extra scan points to hide (sweep ids) - the ones hidden in MPSkins are picked up automatically. */
   hiddenSweeps: [],
   /** MPSkins "navOpenOnStart", per device. */
-  menuOpenOnStart: { desktop: false, mobile: false },
+  menuStyle: "tiles",
+  menuOpenOnStart: { desktop: true, mobile: true },
   /** The MPSkins menu, as it is today. */
   menu: [
     { title: "Velkommen til Halvorsminde", href: u(2, "-3.13,-.15") },

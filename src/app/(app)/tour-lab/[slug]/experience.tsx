@@ -175,11 +175,6 @@ export function Experience({
   const mobile = useRef(false);
 
   useEffect(() => {
-    const open = window.innerWidth <= 760 ? T.menuOpenOnStart.mobile : T.menuOpenOnStart.desktop;
-    if (open) requestAnimationFrame(() => setMenuOpen(true));
-  }, [T]);
-
-  useEffect(() => {
     const l = () => rerender((n) => n + 1);
     logListeners.add(l);
     return () => void logListeners.delete(l);
@@ -389,7 +384,21 @@ export function Experience({
     setTimeout(() => drone.current?.lookAt(start.pitch, start.yaw, start.hfov, 1200), 350);
   }
 
-  /* ----- Start: a link can say where to begin, otherwise the welcome. ----- */
+  /** Opens the tour's menu - the tile menu or the side menu - and closes an open point. */
+  function openMenu(place: string) {
+    setSelected(null);
+    track("menu_open", { style: T.menuStyle, place });
+    if (T.menuStyle === "tiles" && T.welcome) {
+      setLastRoom(readLastRoom(LAST_ROOM_KEY));
+      setWelcome(true);
+    } else setMenuOpen(true);
+  }
+  const openMenuRef = useRef(openMenu);
+  useEffect(() => {
+    openMenuRef.current = openMenu;
+  });
+
+  /* ----- Start: a link can say where to begin, otherwise the menu if it's open on start. ----- */
   const enterRef = useRef(enterTour);
   useEffect(() => {
     enterRef.current = enterTour;
@@ -421,10 +430,8 @@ export function Experience({
         enterRef.current(`${T.tourPage}?${q.toString()}`, "link", ROOM_NAMES[Number(ss)] ?? `ss=${ss}`);
         return;
       }
-      if (!T.welcome) return;
-      setLastRoom(readLastRoom(LAST_ROOM_KEY));
-      setWelcome(true);
-      track("welcome_view");
+      const open = window.innerWidth <= 760 ? T.menuOpenOnStart.mobile : T.menuOpenOnStart.desktop;
+      if (open) openMenuRef.current("start");
     });
   }, [openPoint, T, ROOM_NAMES, LAST_ROOM_KEY]);
 
@@ -600,6 +607,29 @@ export function Experience({
               </button>
             ))}
           </div>
+          <div className="hv-wel-all">
+            {T.menu.map((m) => (
+              <div key={m.title} className="hv-wel-group">
+                <h4>{m.title}</h4>
+                <div className="hv-wel-pills">
+                  {("items" in m ? m.items : [[m.title, m.href] as [string, string]]).map(([name, href]) => (
+                    <button
+                      key={name}
+                      type="button"
+                      className={room === name ? "here" : ""}
+                      onClick={() => {
+                        setWelcome(false);
+                        menuGo(name, m.title, href);
+                      }}
+                    >
+                      {name}
+                      {!href.includes("explore.nextview360.dk") && !href.startsWith("#") && " ↗"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
           <button type="button" className="hv-wel-x" aria-label="Luk" onClick={() => chooseWelcome("skip", "luk")}>
             ×
           </button>
@@ -631,8 +661,10 @@ export function Experience({
         type="button"
         className="hv-menuknap"
         onClick={() => {
-          if (!menuOpen) track("menu_open", { place: phase });
-          setMenuOpen((o) => !o);
+          if (menuOpen || welcome) {
+            setMenuOpen(false);
+            setWelcome(false);
+          } else openMenu(phase);
         }}
       >
         {menuOpen ? "Luk" : "Menu"}
@@ -942,6 +974,14 @@ const CSS = `
 .hv-tile-accent{background:var(--c-accent);color:#fff}.hv-tile-accent .hv-tile-plus{background:#fff;color:var(--c-accent)}
 .hv-tile-last{background:#e7eef0;color:var(--c-main)}.hv-tile-last .hv-tile-plus{background:var(--c-main);color:#fff}
 .hv-wel-x{position:absolute;top:16px;right:16px;width:44px;height:44px;border-radius:12px;border:0;background:rgba(255,255,255,.92);font-size:24px;cursor:pointer;color:var(--c-main)}
+.hv-wel{flex-direction:column;justify-content:flex-start;overflow-y:auto}
+.hv-wel>*:first-child{margin-top:auto}
+.hv-wel>*:last-child{margin-bottom:auto}
+.hv-wel-all{width:100%;max-width:1000px;margin-top:22px;display:flex;flex-direction:column;gap:14px;animation:hvUp .6s .2s cubic-bezier(.2,.7,.2,1) both}
+.hv-wel-group h4{margin:0 0 8px;font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.75)}
+.hv-wel-pills{display:flex;flex-wrap:wrap;gap:8px}
+.hv-wel-pills button{border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.12);color:#fff;border-radius:999px;padding:8px 14px;font:700 13.5px inherit;font-family:inherit;cursor:pointer;backdrop-filter:blur(4px)}
+.hv-wel-pills button:hover,.hv-wel-pills button.here{background:var(--c-accent);border-color:var(--c-accent)}
 .hv-welcome .hv-intro,.hv-welcome .hv-filtre,.hv-welcome .hv-menuknap{opacity:0;pointer-events:none}
 .hv-dev{position:absolute;right:12px;bottom:12px;z-index:20;font-family:system-ui,sans-serif}
 .hv-dev>button{background:rgba(0,0,0,.65);color:#fff;border:0;border-radius:8px;padding:5px 10px;font-size:11px;cursor:pointer}
