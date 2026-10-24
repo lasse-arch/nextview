@@ -99,12 +99,30 @@ export function showcaseUrl(modelId: string, sdkKey: string | null, extra: Recor
 }
 
 /**
- * Where a Matterport "U"-link points: the scan point number (`ss`) and the
- * view direction (`sr`). Resolved the same way as our MPSkins Script 4 (the
- * one Halvorsminde and Nymarksminde run on): the sweep whose `index` is the
- * ss number, and sr as two radians - normally pitch,yaw, swapped when the
- * first is outside the pitch range.
+ * A U-link's `sr` is the camera's rotation as Euler angles in X,Y order
+ * (radians, roll left out) - not "pitch,yaw". Read naively, links with a
+ * first value near ±3.1 (half of Halvorsminde's) turn into looking straight
+ * up or down. Converting the rotation to yaw-then-pitch (Euler Y,X - what
+ * Sweep.moveTo takes) gives the real view: in practice pitch within a few
+ * degrees of level. Same maths as three.js' Euler/Quaternion.
  */
+export function srToRotation(first: number, second: number): Rotation {
+  const c1 = Math.cos(first / 2), s1 = Math.sin(first / 2);
+  const c2 = Math.cos(second / 2), s2 = Math.sin(second / 2);
+  // Quaternion of Euler(first, second, 0, "XYZ").
+  const x = s1 * c2, y = c1 * s2, z = s1 * s2, w = c1 * c2;
+  // The rotation matrix elements the "YXZ" decomposition needs.
+  const m13 = 2 * (x * z + w * y);
+  const m23 = 2 * (y * z - w * x);
+  const m33 = 1 - 2 * (x * x + y * y);
+  const m31 = 2 * (x * z - w * y);
+  const m11 = 1 - 2 * (y * y + z * z);
+  const pitch = Math.asin(-Math.max(-1, Math.min(1, m23)));
+  const yaw = Math.abs(m23) < 0.9999999 ? Math.atan2(m13, m33) : Math.atan2(-m31, m11);
+  return { x: (pitch * 180) / Math.PI, y: (yaw * 180) / Math.PI };
+}
+
+/** Where a Matterport "U"-link points: the scan point number (`ss`) and the view direction (`sr`). */
 export function uLinkTarget(raw: string): { ss: number; rotation?: Rotation } | null {
   let params: URLSearchParams;
   try {
@@ -115,12 +133,7 @@ export function uLinkTarget(raw: string): { ss: number; rotation?: Rotation } | 
   const ss = Number(params.get("ss"));
   if (!params.get("ss") || !Number.isFinite(ss)) return null;
   const sr = (params.get("sr") ?? "").split(",").map(parseFloat);
-  let rotation: Rotation | undefined;
-  if (sr.length >= 2 && !isNaN(sr[0]) && !isNaN(sr[1])) {
-    let [a, b] = sr;
-    if (Math.abs(a) > 1.6) [a, b] = [b, a];
-    rotation = { x: (a * 180) / Math.PI, y: (b * 180) / Math.PI };
-  }
+  const rotation = sr.length >= 2 && !isNaN(sr[0]) && !isNaN(sr[1]) ? srToRotation(sr[0], sr[1]) : undefined;
   return { ss, rotation };
 }
 

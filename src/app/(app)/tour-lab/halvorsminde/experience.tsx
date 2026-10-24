@@ -181,12 +181,29 @@ export function Experience({
   );
 
   /* ----- The drone scene. ----- */
-  const openPoint = useCallback((p: Point) => {
-    setSelected(p);
-    track("drone_point_click", { point_name: p.name, category: H.categories[p.cat].name });
-    const v = drone.current;
-    if (v) v.lookAt(Math.max(p.pitch, -70), p.yaw, v.getHfov(), 700);
-  }, []);
+  // The tour is moved to a point's room as soon as its panel opens, so the
+  // room is already loaded behind the drone scene when "Gå ind" is pressed.
+  const prepared = useRef<{ href: string; done: Promise<boolean> } | null>(null);
+  const prepare = useCallback(
+    (href: string) => {
+      if (prepared.current?.href === href) return prepared.current.done;
+      const done = flyTo(href, "instant").catch(() => false);
+      prepared.current = { href, done };
+      return done;
+    },
+    [flyTo]
+  );
+
+  const openPoint = useCallback(
+    (p: Point) => {
+      setSelected(p);
+      track("drone_point_click", { point_name: p.name, category: H.categories[p.cat].name });
+      const v = drone.current;
+      if (v) v.lookAt(Math.max(p.pitch, -70), p.yaw, v.getHfov(), 700);
+      if (p.tour) prepare(p.tour);
+    },
+    [prepare]
+  );
 
   useEffect(() => {
     mobile.current = window.innerWidth <= 760;
@@ -252,18 +269,21 @@ export function Experience({
     if (entering) return;
     setEntering(true);
     track("tour_enter", { from, destination: pointName });
+    const started = now();
     const v = drone.current;
     const p = selected;
     const zoom = new Promise<void>((resolve) => {
-      if (v && p && phase === "drone") v.lookAt(Math.max(p.pitch - 6, -80), p.yaw, 32, 900, () => resolve());
+      if (v && p && phase === "drone") v.lookAt(Math.max(p.pitch - 6, -80), p.yaw, 34, 650, () => resolve());
       else resolve();
     });
-    const moved = flyTo(href, "instant").catch(() => false);
+    const moved = prepare(href);
     const [ok] = await Promise.all([moved, zoom]);
+    prepared.current = null;
     if (!ok) {
       setEntering(false);
       return;
     }
+    track("tour_enter_done", { destination: pointName, enter_ms: Math.round(now() - started) });
     setSelected(null);
     setMenuOpen(false);
     setPhase("tour");
@@ -271,6 +291,7 @@ export function Experience({
   }
 
   function backToDrone() {
+    prepared.current = null;
     track("back_to_drone", { room_name: room ?? "" });
     setMenuOpen(false);
     setPhase("drone");
@@ -308,13 +329,13 @@ export function Experience({
           ref={iframe}
           title="Matterport"
           src={showcaseUrl(modelId, sdkKey, { ...H.matterportParams, ...startParams(H.start) })}
-          className={`absolute inset-0 h-full w-full border-0 transition-opacity duration-700 ${phase === "tour" ? "opacity-100" : "pointer-events-none opacity-0"}`}
+          className={`absolute inset-0 h-full w-full border-0 transition-opacity duration-500 ${phase === "tour" ? "opacity-100" : "pointer-events-none opacity-0"}`}
           allow="fullscreen; xr-spatial-tracking; autoplay"
         />
       )}
 
       {/* The drone scene on top; fades away when going into the tour. */}
-      <div className={`absolute inset-0 transition-opacity duration-700 ${phase === "drone" ? "opacity-100" : "pointer-events-none opacity-0"}`}>
+      <div className={`absolute inset-0 transition-opacity duration-500 ${phase === "drone" ? "opacity-100" : "pointer-events-none opacity-0"}`}>
         <div ref={droneEl} className="absolute inset-0" />
 
         <div className="hv-intro">
@@ -602,7 +623,7 @@ const CSS = `
 .hv-pchips{display:flex;flex-wrap:wrap;gap:5px}
 .hv-pchips span{background:#e7eef0;color:${H.colors.petrol};font-size:12px;font-weight:700;padding:4px 9px;border-radius:999px}
 .hv-note{font-size:13px!important;color:#7a8a90!important;margin-top:12px!important}
-.hv-logo{position:absolute;top:13px;left:13px;width:200px;max-width:40vw;z-index:6;filter:drop-shadow(0 2px 6px rgba(0,0,0,.35))}
+.hv-logo{position:absolute;top:58px;left:16px;width:84px;z-index:6;filter:drop-shadow(0 2px 6px rgba(0,0,0,.35))}
 .hv-luften{position:absolute;left:16px;bottom:20px;z-index:6;display:flex;align-items:center;gap:8px;background:${H.colors.petrol};color:#fff;border:0;border-radius:999px;padding:11px 18px;font:800 14px inherit;font-family:inherit;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.3)}
 .hv-luften svg{width:18px;height:18px}
 .hv-room{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);z-index:6;background:rgba(255,255,255,.95);color:${H.colors.petrol};border-radius:999px;padding:8px 16px;font-weight:800;font-size:14px;box-shadow:0 4px 14px rgba(0,0,0,.25)}
@@ -645,7 +666,7 @@ const CSS = `
   .hv-panel{top:auto;bottom:0;left:0;right:0;width:auto;max-height:64%;border-radius:18px 18px 0 0}
   .hv-ikon{width:29px;height:29px;border-width:2px}.hv-ikon svg{width:14px;height:14px}
   .hv-navn{font-size:11px;padding:1px 8px}
-  .hv-logo{width:120px}
+  .hv-logo{width:56px;top:52px;left:12px}
   .hv-menu{width:100%}
   .hv-room{bottom:76px}
   .hv-dev{bottom:auto;top:56px}
