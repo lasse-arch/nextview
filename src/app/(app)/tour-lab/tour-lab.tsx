@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { saveMatterportSdkKey } from "@/lib/actions/tour-lab";
+import { resolveTourLink, saveMatterportSdkKey } from "@/lib/actions/tour-lab";
 import { connectSdk, modelIdFrom, showcaseUrl, sweepIdForIndex, uLinkTarget, type MpSdk, type Rotation, type SweepInfo } from "./matterport";
 
 // The 360° viewer (WebGL) only runs in the browser.
@@ -21,6 +21,8 @@ type Point = {
   /** Picked with "Brug dette sted" through the SDK - the exact spot and view direction. */
   sweepId?: string;
   rotation?: Rotation;
+  /** Matterport model id - from the link itself (m=), or looked up from an MPSkins explore link. */
+  modelId?: string;
 };
 
 const STORAGE_KEY = "tour-lab-v1";
@@ -226,8 +228,6 @@ function SdkKeyForm({ sdkKey }: { sdkKey: string | null }) {
 
 export function TourLab({ sdkKey }: { sdkKey: string | null }) {
   const [overview, setOverview] = useState<string | null>(null);
-  /** The tour every point opens unless its own link names another (explore.nextview360.dk U-links carry no model id). */
-  const [baseTour, setBaseTour] = useState("");
   const [points, setPoints] = useState<Point[]>([]);
   const [editing, setEditing] = useState(true);
   const [draft, setDraft] = useState<Point | null>(null);
@@ -236,6 +236,7 @@ export function TourLab({ sdkKey }: { sdkKey: string | null }) {
   const [jumpMs, setJumpMs] = useState<number | null>(null);
   const [jumpError, setJumpError] = useState<string | null>(null);
   const [picking, setPicking] = useState(false);
+  const [linkStatus, setLinkStatus] = useState<string | null>(null);
   const lastOpenModel = useRef<string | null>(null);
   const loaded = useRef(false);
 
@@ -246,7 +247,6 @@ export function TourLab({ sdkKey }: { sdkKey: string | null }) {
         if (saved) {
           setOverview(saved.overview ?? null);
           setPoints(saved.points ?? []);
-          setBaseTour(saved.baseTour ?? "");
         }
       } catch {}
       loaded.current = true;
@@ -256,15 +256,15 @@ export function TourLab({ sdkKey }: { sdkKey: string | null }) {
   useEffect(() => {
     if (!loaded.current) return;
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ overview, baseTour, points: points.filter((p) => !p.url.startsWith("blob:")) }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ overview, points: points.filter((p) => !p.url.startsWith("blob:")) }));
     } catch {}
-  }, [overview, points, baseTour]);
+  }, [overview, points]);
 
   const onPlayerState = useCallback((modelId: string, player: Player) => {
     setPlayers((prev) => ({ ...prev, [modelId]: player }));
   }, []);
 
-  const modelOf = (p: Point) => (p.kind === "matterport" ? modelIdFrom(p.url) ?? modelIdFrom(baseTour) : null);
+  const modelOf = (p: Point) => (p.kind === "matterport" ? p.modelId ?? modelIdFrom(p.url) : null);
 
   // Tours to keep loaded in the background: every tour a point leads into.
   const modelIds = sdkKey && !editing
@@ -285,7 +285,7 @@ export function TourLab({ sdkKey }: { sdkKey: string | null }) {
     const started = now();
     try {
       const sdk = await players[modelId].ready;
-      const fromLink = point.sweepId ? null : uLinkTarget(point.url);
+      const fromLink = uLinkTarget(point.url);
       const sweepId = point.sweepId ?? (fromLink ? sweepIdForIndex(players[modelId].sweeps, fromLink.ss) : null);
       if (!sweepId) {
         setJumpError(`Fandt ikke scanpunkt nr. ${fromLink?.ss} i touren.`);
@@ -324,7 +324,21 @@ export function TourLab({ sdkKey }: { sdkKey: string | null }) {
     const x = ((e.clientX - rect.left) / rect.width) * 100;
     const y = ((e.clientY - rect.top) / rect.height) * 100;
     setDraft({ id: crypto.randomUUID(), name: "", x, y, kind: "matterport", url: "" });
+    setLinkStatus(null);
     setPicking(false);
+  }
+
+  /** An MPSkins explore link: look up the tour and exact scan point automatically. */
+  async function resolveDraftLink(url: string) {
+    if (!draft || !/explore\.nextview360\.dk/.test(url)) return;
+    setLinkStatus("Henter touren fra MPSkins…");
+    const result = await resolveTourLink(url);
+    if ("error" in result) {
+      setLinkStatus(result.error);
+      return;
+    }
+    setDraft((d) => (d && d.url === url ? { ...d, modelId: result.modelId, sweepId: result.sweepId ?? undefined, rotation: undefined } : d));
+    setLinkStatus(result.ss != null ? `✓ Fundet automatisk: scanpunkt nr. ${result.ss} i touren ${result.modelId}.` : `✓ Fundet automatisk: touren ${result.modelId} - vælg stedet nedenfor.`);
   }
 
   function saveDraft() {
@@ -372,16 +386,7 @@ export function TourLab({ sdkKey }: { sdkKey: string | null }) {
 
       <SdkKeyForm sdkKey={sdkKey} />
 
-      <label className="flex flex-wrap items-center gap-2 text-sm">
-        <span className="font-medium text-slate-700">Matterport-tour</span>
-        <input
-          value={baseTour}
-          onChange={(e) => setBaseTour(e.target.value)}
-          placeholder="https://my.matterport.com/show/?m=… (bruges af alle punkter)"
-          className="min-w-0 flex-1 rounded-md border border-slate-300 px-3 py-1.5"
-        />
-        {baseTour && !modelIdFrom(baseTour) && <span className="text-xs text-red-600">Linket skal indeholde m=…</span>}
-      </label>
+
 
       {!editing && modelIds.length > 0 && (
         <p className="text-xs text-slate-500">
@@ -444,9 +449,7 @@ export function TourLab({ sdkKey }: { sdkKey: string | null }) {
       {editing && overview && !draft && (
         <p className="text-sm text-slate-500">
           Klik på billedet for at sætte et punkt.{" "}
-          {sdkKey
-            ? "For Matterport indsætter du tourens link og vælger så stedet direkte i touren."
-            : "Tryk U inde i Matterport-touren på det sted, punktet skal hoppe hen til - så kopieres et link til netop det sted."}
+          For Matterport: indsæt et link fra den nuværende MPSkins-tour (tour, sted og synsretning findes automatisk), eller indsæt tourens link og vælg stedet direkte i touren.
         </p>
       )}
 
@@ -481,17 +484,26 @@ export function TourLab({ sdkKey }: { sdkKey: string | null }) {
             </span>
             <input
               value={draft.url.startsWith("blob:") ? "(uploadet fil)" : draft.url}
-              onChange={(e) => setDraft({ ...draft, url: e.target.value, sweepId: undefined, rotation: undefined })}
+              onChange={(e) => {
+                setDraft({ ...draft, url: e.target.value, sweepId: undefined, rotation: undefined, modelId: undefined });
+                setLinkStatus(null);
+                resolveDraftLink(e.target.value);
+              }}
               placeholder={draft.kind === "matterport" ? "https://my.matterport.com/show/?m=…" : "https://…/drone-360.jpg"}
               className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
             />
           </label>
 
+          {draft.kind === "matterport" &&
+            (linkStatus ? (
+              <p className={`text-sm ${linkStatus.startsWith("✓") ? "text-emerald-700" : "text-slate-600"}`}>{linkStatus}</p>
+            ) : (
+              !draft.sweepId &&
+              uLinkTarget(draft.url) && <p className="text-sm text-emerald-700">✓ U-link med scanpunkt nr. {uLinkTarget(draft.url)!.ss}.</p>
+            ))}
+
           {draft.kind === "matterport" && sdkKey && draftModel && (
             <div className="space-y-2">
-              {!draft.sweepId && uLinkTarget(draft.url) && !picking && (
-                <p className="text-sm text-emerald-700">✓ U-link med scanpunkt nr. {uLinkTarget(draft.url)!.ss} - bruges direkte, eller vælg stedet selv nedenfor.</p>
-              )}
               {draft.sweepId && !picking ? (
                 <p className="text-sm text-emerald-700">
                   ✓ Sted valgt.{" "}
