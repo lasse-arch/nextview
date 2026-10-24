@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { saveMatterportSdkKey } from "@/lib/actions/tour-lab";
-import { connectSdk, modelIdFrom, showcaseUrl, type MpSdk, type Rotation } from "./matterport";
+import { connectSdk, modelIdFrom, showcaseUrl, sweepIdForIndex, uLinkTarget, type MpSdk, type Rotation, type SweepInfo } from "./matterport";
 
 // The 360° viewer (WebGL) only runs in the browser.
 const Pano = dynamic(() => import("./pano").then((m) => m.Pano), { ssr: false });
@@ -42,11 +42,32 @@ function plainEmbedUrl(raw: string): string {
 /** Wall-clock for the load/jump timings shown in the lab (only called from effects and click handlers). */
 const now = () => performance.now();
 
+/** Without the SDK: the tour itself, started at the U-link's spot (ss/sr) - an explore.nextview360.dk link carries no model id, so the lab's tour supplies it. */
+function fallbackEmbedUrl(url: string, modelId: string | null): string {
+  if (modelIdFrom(url) || !modelId) return plainEmbedUrl(url);
+  const extra: Record<string, string> = {};
+  try {
+    const params = new URL(url.trim()).searchParams;
+    for (const k of ["ss", "sr"]) {
+      const v = params.get(k);
+      if (v) extra[k] = v;
+    }
+  } catch {}
+  return showcaseUrl(modelId, null, extra);
+}
+
 function seconds(ms: number): string {
   return `${(ms / 1000).toFixed(1).replace(".", ",")} s`;
 }
 
-type Player = { sdk: MpSdk | null; ready: Promise<MpSdk>; readyMs: number | null; error: string | null };
+type Player = {
+  sdk: MpSdk | null;
+  ready: Promise<MpSdk>;
+  readyMs: number | null;
+  error: string | null;
+  /** The tour's scan points, for resolving U-links (ss=…) to a sweep. */
+  sweeps: Record<string, SweepInfo>;
+};
 
 /**
  * One Matterport tour, loaded in the background as soon as the overview is
@@ -74,22 +95,26 @@ function ModelPlayer({
     let reject!: (err: unknown) => void;
     const ready = new Promise<MpSdk>((res, rej) => ((resolve = res), (reject = rej)));
     ready.catch(() => {});
-    onState(modelId, { sdk: null, ready, readyMs: null, error: null });
+    const sweeps: Record<string, SweepInfo> = {};
+    onState(modelId, { sdk: null, ready, readyMs: null, error: null, sweeps });
     let cancelled = false;
+    let sub: { cancel(): void } | null = null;
     connectSdk(el, sdkKey)
       .then(async (sdk) => {
+        sub = sdk.Sweep.data.subscribe({ onCollectionUpdated: (c) => Object.assign(sweeps, c) });
         await sdk.App.state.waitUntil((s) => s.phase === sdk.App.Phase.PLAYING);
         if (cancelled) return;
-        onState(modelId, { sdk, ready, readyMs: now() - started, error: null });
+        onState(modelId, { sdk, ready, readyMs: now() - started, error: null, sweeps });
         resolve(sdk);
       })
       .catch((err) => {
         if (cancelled) return;
-        onState(modelId, { sdk: null, ready, readyMs: null, error: err instanceof Error ? err.message : String(err) });
+        onState(modelId, { sdk: null, ready, readyMs: null, error: err instanceof Error ? err.message : String(err), sweeps });
         reject(err);
       });
     return () => {
       cancelled = true;
+      sub?.cancel();
     };
   }, [modelId, sdkKey, onState]);
 
@@ -201,12 +226,15 @@ function SdkKeyForm({ sdkKey }: { sdkKey: string | null }) {
 
 export function TourLab({ sdkKey }: { sdkKey: string | null }) {
   const [overview, setOverview] = useState<string | null>(null);
+  /** The tour every point opens unless its own link names another (explore.nextview360.dk U-links carry no model id). */
+  const [baseTour, setBaseTour] = useState("");
   const [points, setPoints] = useState<Point[]>([]);
   const [editing, setEditing] = useState(true);
   const [draft, setDraft] = useState<Point | null>(null);
   const [open, setOpen] = useState<Point | null>(null);
   const [players, setPlayers] = useState<Record<string, Player>>({});
   const [jumpMs, setJumpMs] = useState<number | null>(null);
+  const [jumpError, setJumpError] = useState<string | null>(null);
   const [picking, setPicking] = useState(false);
   const lastOpenModel = useRef<string | null>(null);
   const loaded = useRef(false);
@@ -218,6 +246,7 @@ export function TourLab({ sdkKey }: { sdkKey: string | null }) {
         if (saved) {
           setOverview(saved.overview ?? null);
           setPoints(saved.points ?? []);
+          setBaseTour(saved.baseTour ?? "");
         }
       } catch {}
       loaded.current = true;
@@ -227,34 +256,46 @@ export function TourLab({ sdkKey }: { sdkKey: string | null }) {
   useEffect(() => {
     if (!loaded.current) return;
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ overview, points: points.filter((p) => !p.url.startsWith("blob:")) }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ overview, baseTour, points: points.filter((p) => !p.url.startsWith("blob:")) }));
     } catch {}
-  }, [overview, points]);
+  }, [overview, points, baseTour]);
 
   const onPlayerState = useCallback((modelId: string, player: Player) => {
     setPlayers((prev) => ({ ...prev, [modelId]: player }));
   }, []);
 
+  const modelOf = (p: Point) => (p.kind === "matterport" ? modelIdFrom(p.url) ?? modelIdFrom(baseTour) : null);
+
   // Tours to keep loaded in the background: every tour a point leads into.
   const modelIds = sdkKey && !editing
-    ? [...new Set(points.filter((p) => p.kind === "matterport" && p.sweepId).map((p) => modelIdFrom(p.url)).filter((m): m is string => Boolean(m)))]
+    ? [...new Set(points.filter((p) => p.kind === "matterport" && (p.sweepId || uLinkTarget(p.url))).map(modelOf).filter((m): m is string => Boolean(m)))]
     : [];
-  const openModel = open?.kind === "matterport" ? modelIdFrom(open.url) : null;
-  const viaSdk = Boolean(open && open.kind === "matterport" && open.sweepId && openModel && modelIds.includes(openModel));
+  const openModel = open ? modelOf(open) : null;
+  const canJump = (p: Point) => Boolean(p.sweepId || uLinkTarget(p.url));
+  const viaSdk = Boolean(
+    open && open.kind === "matterport" && canJump(open) && openModel && modelIds.includes(openModel) && !players[openModel]?.error
+  );
 
   async function openPoint(point: Point) {
     setOpen(point);
     setJumpMs(null);
-    const modelId = point.kind === "matterport" ? modelIdFrom(point.url) : null;
-    if (!modelId || !point.sweepId || !players[modelId]) return;
+    setJumpError(null);
+    const modelId = modelOf(point);
+    if (!modelId || !canJump(point) || !players[modelId] || players[modelId].error) return;
     const started = now();
     try {
       const sdk = await players[modelId].ready;
+      const fromLink = point.sweepId ? null : uLinkTarget(point.url);
+      const sweepId = point.sweepId ?? (fromLink ? sweepIdForIndex(players[modelId].sweeps, fromLink.ss) : null);
+      if (!sweepId) {
+        setJumpError(`Fandt ikke scanpunkt nr. ${fromLink?.ss} i touren.`);
+        return;
+      }
       // Arriving from the overview: straight to the spot. Moving between
       // points inside the tour: a short glide, like walking there.
       const inside = lastOpenModel.current === modelId;
-      await sdk.Sweep.moveTo(point.sweepId, {
-        rotation: point.rotation,
+      await sdk.Sweep.moveTo(sweepId, {
+        rotation: point.rotation ?? fromLink?.rotation,
         transition: inside ? sdk.Sweep.Transition.FLY : sdk.Sweep.Transition.INSTANT,
         transitionTime: inside ? 1200 : undefined,
       });
@@ -262,6 +303,7 @@ export function TourLab({ sdkKey }: { sdkKey: string | null }) {
       setJumpMs(now() - started);
     } catch (err) {
       console.error("Matterport moveTo failed", err);
+      setJumpError(err instanceof Error ? err.message : String(err));
     }
   }
 
@@ -292,7 +334,7 @@ export function TourLab({ sdkKey }: { sdkKey: string | null }) {
     setPicking(false);
   }
 
-  const draftModel = draft?.kind === "matterport" ? modelIdFrom(draft.url) : null;
+  const draftModel = draft ? modelOf(draft) : null;
   const openPlayer = openModel ? players[openModel] : undefined;
 
   return (
@@ -329,6 +371,17 @@ export function TourLab({ sdkKey }: { sdkKey: string | null }) {
       </div>
 
       <SdkKeyForm sdkKey={sdkKey} />
+
+      <label className="flex flex-wrap items-center gap-2 text-sm">
+        <span className="font-medium text-slate-700">Matterport-tour</span>
+        <input
+          value={baseTour}
+          onChange={(e) => setBaseTour(e.target.value)}
+          placeholder="https://my.matterport.com/show/?m=… (bruges af alle punkter)"
+          className="min-w-0 flex-1 rounded-md border border-slate-300 px-3 py-1.5"
+        />
+        {baseTour && !modelIdFrom(baseTour) && <span className="text-xs text-red-600">Linket skal indeholde m=…</span>}
+      </label>
 
       {!editing && modelIds.length > 0 && (
         <p className="text-xs text-slate-500">
@@ -424,7 +477,7 @@ export function TourLab({ sdkKey }: { sdkKey: string | null }) {
           </div>
           <label className="block text-sm">
             <span className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-              {draft.kind === "matterport" ? (sdkKey ? "Matterport-link (touren)" : "Matterport-link (tryk U i touren)") : "Link til 360°-billede"}
+              {draft.kind === "matterport" ? "U-link (tryk U i touren) - eller tourens link, og vælg så stedet" : "Link til 360°-billede"}
             </span>
             <input
               value={draft.url.startsWith("blob:") ? "(uploadet fil)" : draft.url}
@@ -436,6 +489,9 @@ export function TourLab({ sdkKey }: { sdkKey: string | null }) {
 
           {draft.kind === "matterport" && sdkKey && draftModel && (
             <div className="space-y-2">
+              {!draft.sweepId && uLinkTarget(draft.url) && !picking && (
+                <p className="text-sm text-emerald-700">✓ U-link med scanpunkt nr. {uLinkTarget(draft.url)!.ss} - bruges direkte, eller vælg stedet selv nedenfor.</p>
+              )}
               {draft.sweepId && !picking ? (
                 <p className="text-sm text-emerald-700">
                   ✓ Sted valgt.{" "}
@@ -523,18 +579,30 @@ export function TourLab({ sdkKey }: { sdkKey: string | null }) {
               {p.name}
             </button>
           ))}
-          {viaSdk && (
-            <span className="ml-auto shrink-0 pl-3 text-xs text-white/60">
-              {openPlayer?.readyMs == null ? "Touren indlæses…" : jumpMs != null ? `Hoppet på ${seconds(jumpMs)}` : ""}
-            </span>
-          )}
+          <span className="ml-auto shrink-0 pl-3 text-xs text-white/60">
+            {open?.kind !== "matterport"
+              ? ""
+              : openPlayer?.error
+                ? <span className="text-red-300">SDK ikke forbundet - touren indlæses forfra: {openPlayer.error}</span>
+                : !sdkKey
+                  ? "Uden SDK-nøgle - touren indlæses forfra"
+                  : !viaSdk
+                    ? "Punktet har intet sted - vælg det i touren eller brug et U-link"
+                    : jumpError
+                      ? <span className="text-red-300">{jumpError}</span>
+                      : openPlayer?.readyMs == null
+                        ? "Touren indlæses…"
+                        : jumpMs != null
+                          ? `Hoppet på ${seconds(jumpMs)}`
+                          : ""}
+          </span>
         </div>
         <div className="relative min-h-0 flex-1">
           {modelIds.map((m) => (
             <ModelPlayer key={m} modelId={m} sdkKey={sdkKey!} visible={Boolean(open && viaSdk && openModel === m)} onState={onPlayerState} />
           ))}
           {open && open.kind === "matterport" && !viaSdk && (
-            <iframe key={open.id} src={plainEmbedUrl(open.url)} className="absolute inset-0 h-full w-full border-0" allow="xr-spatial-tracking; fullscreen" allowFullScreen />
+            <iframe key={open.id} src={fallbackEmbedUrl(open.url, openModel)} className="absolute inset-0 h-full w-full border-0" allow="xr-spatial-tracking; fullscreen" allowFullScreen />
           )}
           {open && open.kind === "pano" && (
             <div className="absolute inset-0">

@@ -9,6 +9,8 @@
 
 export type Rotation = { x: number; y: number };
 
+export type SweepInfo = { id?: string; sid?: string; uuid?: string; index?: number };
+
 export type MpSdk = {
   App: {
     Phase: { PLAYING: string };
@@ -19,6 +21,9 @@ export type MpSdk = {
   };
   Sweep: {
     Transition: { FLY: string; INSTANT: string; FADEOUT: string };
+    data: {
+      subscribe(observer: { onCollectionUpdated(collection: Record<string, SweepInfo>): void }): { cancel(): void };
+    };
     moveTo(sweepId: string, options?: { rotation?: Rotation; transition?: string; transitionTime?: number }): Promise<string>;
   };
 };
@@ -91,4 +96,36 @@ export function showcaseUrl(modelId: string, sdkKey: string | null, extra: Recor
     ...extra,
   });
   return `https://my.matterport.com/show/?${params}`;
+}
+
+/**
+ * Where a Matterport "U"-link points: the scan point number (`ss`) and the
+ * view direction (`sr`). Resolved the same way as our MPSkins Script 4 (the
+ * one Halvorsminde and Nymarksminde run on): the sweep whose `index` is the
+ * ss number, and sr as two radians - normally pitch,yaw, swapped when the
+ * first is outside the pitch range.
+ */
+export function uLinkTarget(raw: string): { ss: number; rotation?: Rotation } | null {
+  let params: URLSearchParams;
+  try {
+    params = new URL(raw.trim()).searchParams;
+  } catch {
+    return null;
+  }
+  const ss = Number(params.get("ss"));
+  if (!params.get("ss") || !Number.isFinite(ss)) return null;
+  const sr = (params.get("sr") ?? "").split(",").map(parseFloat);
+  let rotation: Rotation | undefined;
+  if (sr.length >= 2 && !isNaN(sr[0]) && !isNaN(sr[1])) {
+    let [a, b] = sr;
+    if (Math.abs(a) > 1.6) [a, b] = [b, a];
+    rotation = { x: (a * 180) / Math.PI, y: (b * 180) / Math.PI };
+  }
+  return { ss, rotation };
+}
+
+export function sweepIdForIndex(sweeps: Record<string, SweepInfo>, ss: number): string | null {
+  const list = Object.values(sweeps);
+  const hit = list.find((s) => s && s.index === ss) ?? list[ss];
+  return hit ? hit.sid ?? hit.id ?? null : null;
 }
