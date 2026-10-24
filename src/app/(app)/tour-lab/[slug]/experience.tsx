@@ -287,7 +287,12 @@ export function Experience({
       setSelected(p);
       track("drone_point_click", { point_name: p.name, category: T.categories[p.cat].name });
       const v = drone.current;
-      if (v) v.lookAt(Math.max(p.pitch, -70), p.yaw, v.getHfov(), 700);
+      if (v) {
+        // On a computer the panel covers the right side, so the point is centred in what's left of the screen.
+        const panel = window.innerWidth > 760 ? 183 : 0;
+        const yaw = p.yaw + (panel / window.innerWidth) * v.getHfov();
+        v.lookAt(Math.max(p.pitch, -70), yaw, v.getHfov(), 700);
+      }
       if (p.tour) prepare(p.tour);
     },
     [prepare, T]
@@ -1021,6 +1026,9 @@ const CSS = `
 .hv-warn{color:#b81c17;margin:0 0 6px}
 .hv-devbtn{background:#1d2a30;color:#fff;border:0;border-radius:6px;padding:5px 10px;cursor:pointer}
 .hv-devcheck{display:flex;gap:6px;align-items:center;margin:0 0 8px;font-weight:600}
+/* An open point: the welcome box and the filter step aside so they don't cover other points. */
+.hv-punkt .hv-intro,.hv-punkt .hv-filtre{opacity:0;pointer-events:none}
+.hv-intro,.hv-filtre{transition:opacity .25s}
 @media (max-width:760px){
   /* Slim welcome bar instead of the big card, with room for the menu button. */
   .hv-intro{top:10px;left:10px;right:104px;width:auto;display:flex;align-items:center;border-radius:14px}
@@ -1044,8 +1052,6 @@ const CSS = `
   .hv-ikon{width:30px;height:30px;border-width:2px}.hv-ikon svg{width:15px;height:15px}
   /* An open point: the panel takes the bottom, the bars step aside. */
   .hv-panel{top:auto;bottom:0;left:0;right:0;width:auto;max-height:62%;border-radius:18px 18px 0 0;padding-bottom:calc(18px + env(safe-area-inset-bottom,0px))}
-  .hv-punkt .hv-intro,.hv-punkt .hv-filtre{opacity:0;pointer-events:none}
-  .hv-intro,.hv-filtre{transition:opacity .25s}
   .hv-logo{width:56px;top:52px;left:12px}
   .hv-menu{width:100%}
   .hv-room{bottom:76px}
