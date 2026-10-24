@@ -23,6 +23,7 @@
     "date-fns": "^4.4.0",
     "jose": "^6.2.12",
     "next": "16.3.5",
+    "pannellum": "2.5.6",
     "papaparse": "^5.7.0",
     "pdf-lib": "^1.17.1",
     "puppeteer-core": "^25.11.0",

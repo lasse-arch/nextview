@@ -42,7 +42,7 @@ export async function isDineroTestMode(): Promise<boolean> {
 }
 
 /** Settings that hold a text value instead of an on/off switch. */
-export type SettingValueKey = "MATTERPORT_SDK_KEY";
+export type SettingValueKey = "MATTERPORT_SDK_KEY" | "TOUR_PROTOTYPE_GA4_ID";
 
 export async function getSettingValue(key: SettingValueKey): Promise<string | null> {
   const setting = await prisma.integrationSetting.findUnique({ where: { key } });
