@@ -8,6 +8,8 @@
 const TOUR = "https://explore.nextview360.dk/tour/halvorsmindeefterskole";
 const u = (ss: number, sr: string) => `${TOUR}?ss=${ss}&sr=${sr}`;
 
+export type WelcomeGo = { drone: string | null } | { room: string; name: string } | { href: string };
+
 export const halvorsminde = {
   title: "Halvorsminde Efterskole og Halvor Fri Fagskole",
   tourPage: TOUR,
@@ -75,6 +77,30 @@ export const halvorsminde = {
     { id: "volleyball", name: "Volleyball", cat: "sport", icon: "bold", yaw: -10, pitch: -17, tour: null, pano: "volleyball",
       text: "Beachvolley-banen er et af skolens udendørs samlingssteder, når vejret er til det.", chips: ["Beachvolley", "Udendørs", "Sammen"] },
   ] as { id: string; name: string; cat: string; icon: string; yaw: number; pitch: number; tour: string | null; pano?: string; text: string; chips: string[] }[],
+  /**
+   * The welcome (entry popup) as tiles. A choice can open the drone scene
+   * with one category picked out, go straight into a room, or open a link -
+   * and a returning visitor gets "Fortsæt hvor du slap" on top.
+   */
+  welcome: {
+    kicker: "Halvorsminde Efterskole og Fri Fagskole",
+    title: "Velkommen indenfor",
+    lead: "Se skolen fra luften, gå direkte ind i værelserne, eller find dit værksted. Hvor vil du starte?",
+    tiles: [
+      { kicker: "Overblik", title: "Skolen fra luften", go: { drone: null }, style: "dark", recommended: true },
+      { kicker: "Her bor du", title: "Se et værelse", go: { room: u(13, "-3.08,-.19"), name: "2-mandsværelse" }, style: "light" },
+      { kicker: "Linjer og værksteder", title: "Find dit værksted", go: { drone: "vaerk" }, style: "light" },
+      { kicker: "Din hverdag", title: "Spisesalen", go: { room: u(34, "-3.12,1.05"), name: "Spisesalen" }, style: "light" },
+      { kicker: "Næste skridt", title: "Book en rundvisning", go: { href: "https://halvorsminde.dk/aabent-hus/" }, style: "accent" },
+    ],
+    skip: "Jeg kigger selv rundt",
+  } as {
+    kicker: string;
+    title: string;
+    lead: string;
+    tiles: { kicker: string; title: string; go: WelcomeGo; style: "dark" | "light" | "accent"; recommended?: boolean }[];
+    skip: string;
+  },
   /** "free": walk around as in Matterport. "points": only the menu and points move you (e.g. Hals Camping). */
   navigation: "free" as "free" | "points",
   /** Extra scan points to hide (sweep ids) - the ones hidden in MPSkins are picked up automatically. */

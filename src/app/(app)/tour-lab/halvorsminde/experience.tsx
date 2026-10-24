@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { saveTourGa4Id } from "@/lib/actions/tour-lab";
 import { connectSdk, showcaseUrl, uLinkTarget, type MpSdk } from "../matterport";
-import { halvorsminde as H } from "./data";
+import { halvorsminde as H, type WelcomeGo } from "./data";
 import "pannellum/build/pannellum.css";
 
 /* ---------------------------------------------------------------------------
@@ -99,9 +99,29 @@ type Point = (typeof H.points)[number];
 
 /** All tour destinations (menu items and drone points) by their scan point, so a room can be named. */
 const ROOM_NAMES: Record<number, string> = {};
+const ROOM_LINKS: Record<number, string> = {};
 for (const m of H.menu) {
-  if ("items" in m) for (const [name, href] of m.items) { const t = uLinkTarget(href); if (t) ROOM_NAMES[t.ss] ??= name; }
-  else { const t = uLinkTarget(m.href); if (t) ROOM_NAMES[t.ss] ??= m.title; }
+  const entries: [string, string][] = "items" in m ? m.items : [[m.title, m.href]];
+  for (const [name, href] of entries) {
+    const t = uLinkTarget(href);
+    if (t && ROOM_NAMES[t.ss] == null) {
+      ROOM_NAMES[t.ss] = name;
+      ROOM_LINKS[t.ss] = href;
+    }
+  }
+}
+
+/** For smart start links: ?rum=spisesalen / ?punkt=hal. */
+const slug = (s: string) =>
+  s.toLowerCase().replace(/æ/g, "ae").replace(/ø/g, "oe").replace(/å/g, "aa").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+
+const LAST_ROOM_KEY = "hv-last-room";
+function readLastRoom(): { name: string; href: string } | null {
+  try {
+    return JSON.parse(localStorage.getItem(LAST_ROOM_KEY) ?? "null");
+  } catch {
+    return null;
+  }
 }
 
 export function Experience({
@@ -125,6 +145,7 @@ export function Experience({
   /** All scan points of the model, and the one the visitor stands on. */
   const allSweeps = useRef<string[]>([]);
   const currentSweep = useRef<string | null>(null);
+  const roomTimer = useRef<{ name: string | null; at: number } | null>(null);
   /** "Kun punkter": no free walking - only the current scan point is enabled, the menu and points move you. */
   const [pointsOnly, setPointsOnly] = useState(H.navigation === "points");
   const pointsOnlyRef = useRef(pointsOnly);
@@ -141,6 +162,9 @@ export function Experience({
   const [room, setRoom] = useState<string | null>(null);
   const [showLog, setShowLog] = useState(false);
   const [pano, setPano] = useState<Point | null>(null);
+  /** The welcome tiles - skipped when the link already says where to go. */
+  const [welcome, setWelcome] = useState(false);
+  const [lastRoom, setLastRoom] = useState<{ name: string; href: string } | null>(null);
   const [, rerender] = useState(0);
   const mobile = useRef(false);
 
@@ -175,8 +199,18 @@ export function Experience({
         if (first && pointsOnlyRef.current) lockTo(sdk, allSweeps.current, s.sid);
         const ss = ssBySweep[s.sid];
         const name = ss != null ? ROOM_NAMES[ss] ?? null : null;
+        // Time spent where the visitor just was (named rooms only).
+        if (roomTimer.current?.name && roomTimer.current.name !== name) {
+          track("room_time", { room_name: roomTimer.current.name, seconds: Math.round((now() - roomTimer.current.at) / 1000) });
+        }
+        if (roomTimer.current?.name !== name) roomTimer.current = { name, at: now() };
         setRoom(name);
         track("room_view", { sweep_id: s.sid, room_name: name ?? "(uden navn)" });
+        if (name && ss != null) {
+          try {
+            localStorage.setItem(LAST_ROOM_KEY, JSON.stringify({ name, href: ROOM_LINKS[ss] }));
+          } catch {}
+        }
       });
       return sdk;
     });
@@ -346,6 +380,66 @@ export function Experience({
     setTimeout(() => drone.current?.lookAt(start.pitch, start.yaw, start.hfov, 1200), 350);
   }
 
+  /* ----- Start: a link can say where to begin, otherwise the welcome. ----- */
+  const enterRef = useRef(enterTour);
+  useEffect(() => {
+    enterRef.current = enterTour;
+  });
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    const rum = q.get("rum");
+    const punkt = q.get("punkt");
+    const ss = q.get("ss");
+    requestAnimationFrame(() => {
+      if (rum) {
+        const hit = H.menu.flatMap((m) => ("items" in m ? m.items : [[m.title, m.href] as [string, string]])).find(([n]) => slug(n) === rum);
+        if (hit) {
+          track("start_link", { kind: "rum", target: hit[0] });
+          enterRef.current(hit[1], "link", hit[0]);
+          return;
+        }
+      }
+      if (punkt) {
+        const p = H.points.find((x) => x.id === punkt || slug(x.name) === punkt);
+        if (p) {
+          track("start_link", { kind: "punkt", target: p.name });
+          openPoint(p);
+          return;
+        }
+      }
+      if (ss) {
+        track("start_link", { kind: "ss", target: ss });
+        enterRef.current(`${H.tourPage}?${q.toString()}`, "link", ROOM_NAMES[Number(ss)] ?? `ss=${ss}`);
+        return;
+      }
+      setLastRoom(readLastRoom());
+      setWelcome(true);
+      track("welcome_view");
+    });
+  }, [openPoint]);
+
+  function chooseWelcome(go: WelcomeGo | "last" | "skip", label: string) {
+    track("welcome_choice", { choice: label });
+    setWelcome(false);
+    if (go === "skip") return;
+    if (go === "last") {
+      if (lastRoom) enterTour(lastRoom.href, "welcome", lastRoom.name);
+      return;
+    }
+    if ("href" in go) {
+      track("cta_click", { label, link_url: go.href, place: "welcome" });
+      window.open(go.href, "_blank", "noopener");
+      return;
+    }
+    if ("room" in go) {
+      enterTour(go.room, "welcome", go.name);
+      return;
+    }
+    // The drone scene, optionally with only one category's points showing.
+    const only = go.drone;
+    setHidden(only ? Object.fromEntries(Object.keys(H.categories).map((k) => [k, k !== only])) : {});
+  }
+
   async function menuGo(name: string, group: string, href: string) {
     if (href === "#luften") {
       setMenuOpen(false);
@@ -366,7 +460,7 @@ export function Experience({
   const ctaClick = (label: string, href: string, place: string) => track("cta_click", { label, link_url: href, place });
 
   return (
-    <div className={`hv fixed inset-0 z-50 overflow-hidden bg-[#0d1b20] ${selected ? "hv-punkt" : ""} ${zoomed ? "hv-zoom" : ""}`} style={{ fontFamily: `'${H.font}', system-ui, sans-serif` }}>
+    <div className={`hv fixed inset-0 z-50 overflow-hidden bg-[#0d1b20] ${selected ? "hv-punkt" : ""} ${zoomed ? "hv-zoom" : ""} ${welcome ? "hv-welcome" : ""}`} style={{ fontFamily: `'${H.font}', system-ui, sans-serif` }}>
       <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${H.font}:wght@400;600;700;800;900&display=swap`} />
       <style>{CSS}</style>
 
@@ -456,6 +550,41 @@ export function Experience({
           </aside>
         )}
       </div>
+
+      {welcome && (
+        <div className="hv-wel" role="dialog" aria-modal="true" aria-label={H.welcome.title}>
+          <div className="hv-wel-grid">
+            <div className="hv-wel-main">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={H.logo} alt="Halvorsminde" />
+              <div className="hv-wel-kick">{H.welcome.kicker}</div>
+              <h1>{H.welcome.title}</h1>
+              <p>{H.welcome.lead}</p>
+              <button type="button" className="hv-wel-skip" onClick={() => chooseWelcome("skip", H.welcome.skip)}>
+                {H.welcome.skip} →
+              </button>
+            </div>
+            {lastRoom && (
+              <button type="button" className="hv-tile hv-tile-last" onClick={() => chooseWelcome("last", "Fortsæt hvor du slap")}>
+                <span className="hv-tile-plus">↺</span>
+                <small>Fortsæt hvor du slap</small>
+                <b>{lastRoom.name}</b>
+              </button>
+            )}
+            {H.welcome.tiles.map((t) => (
+              <button key={t.title} type="button" className={`hv-tile hv-tile-${t.style}`} onClick={() => chooseWelcome(t.go, t.title)}>
+                {t.recommended && <em>Anbefalet</em>}
+                <span className="hv-tile-plus">+</span>
+                <small>{t.kicker}</small>
+                <b>{t.title}</b>
+              </button>
+            ))}
+          </div>
+          <button type="button" className="hv-wel-x" aria-label="Luk" onClick={() => chooseWelcome("skip", "luk")}>
+            ×
+          </button>
+        </div>
+      )}
 
       {pano?.pano && <PanoView name={pano.name} dir={pano.pano} onClose={() => setPano(null)} />}
 
@@ -722,6 +851,29 @@ const CSS = `
 @keyframes hvFade{from{opacity:0}to{opacity:1}}
 .hv-pano-titel{position:absolute;top:16px;left:16px;z-index:2;background:rgba(21,50,58,.9);color:#fff;font-weight:800;font-size:16px;padding:8px 16px;border-radius:999px}
 .hv-pano-luk{position:absolute;left:16px;bottom:20px;z-index:2;background:${H.colors.petrol};color:#fff;border:0;border-radius:999px;padding:11px 18px;font-weight:800;font-size:14px;font-family:inherit;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.3)}
+.hv-wel{position:absolute;inset:0;z-index:12;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(13,27,32,.38);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);animation:hvFade .45s ease}
+.hv-wel-grid{display:grid;grid-template-columns:1.6fr 1fr 1fr;grid-auto-rows:minmax(150px,auto);gap:16px;width:100%;max-width:1000px}
+.hv-wel-main{grid-row:span 2;background:${H.colors.sand};border-radius:20px;padding:28px 28px 22px;display:flex;flex-direction:column;animation:hvUp .6s cubic-bezier(.2,.7,.2,1)}
+.hv-wel-main img{width:56px;height:56px;background:${H.colors.petrol};border-radius:12px;padding:8px;margin-bottom:18px}
+.hv-wel-kick{font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:#7a8a90}
+.hv-wel-main h1{margin:6px 0 10px;font-size:42px;line-height:1.02;font-weight:900;color:${H.colors.petrol};letter-spacing:-.01em;text-wrap:balance}
+.hv-wel-main p{margin:0;font-size:16px;line-height:1.55;color:#3d4a50}
+.hv-wel-skip{margin-top:auto;padding-top:18px;align-self:flex-start;border:0;background:none;font:800 13px inherit;font-family:inherit;letter-spacing:.1em;text-transform:uppercase;color:${H.colors.petrol};cursor:pointer;opacity:.7}
+.hv-wel-skip:hover{opacity:1}
+.hv-tile{position:relative;border:0;border-radius:20px;padding:18px;text-align:left;cursor:pointer;display:flex;flex-direction:column;justify-content:flex-end;font-family:inherit;min-height:150px;transition:transform .25s,box-shadow .25s;animation:hvUp .6s cubic-bezier(.2,.7,.2,1) both}
+.hv-tile:nth-child(2){animation-delay:.05s}.hv-tile:nth-child(3){animation-delay:.1s}.hv-tile:nth-child(4){animation-delay:.15s}.hv-tile:nth-child(5){animation-delay:.2s}.hv-tile:nth-child(6){animation-delay:.25s}.hv-tile:nth-child(7){animation-delay:.3s}
+@keyframes hvUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+.hv-tile:hover{transform:translateY(-4px);box-shadow:0 18px 40px rgba(0,0,0,.35)}
+.hv-tile small{font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;opacity:.75;margin-bottom:4px}
+.hv-tile b{font-size:24px;line-height:1.05;font-weight:900}
+.hv-tile em{position:absolute;top:14px;left:14px;font-style:normal;font-size:10.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;padding:3px 9px;border-radius:999px;background:${H.colors.orange};color:#fff}
+.hv-tile-plus{position:absolute;top:14px;right:14px;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px}
+.hv-tile-light{background:#fff;color:${H.colors.petrol}}.hv-tile-light .hv-tile-plus{background:${H.colors.petrol};color:#fff}
+.hv-tile-dark{background:${H.colors.petrol};color:#fff}.hv-tile-dark .hv-tile-plus{background:#fff;color:${H.colors.petrol}}
+.hv-tile-accent{background:${H.colors.orange};color:#fff}.hv-tile-accent .hv-tile-plus{background:#fff;color:${H.colors.orange}}
+.hv-tile-last{background:#e7eef0;color:${H.colors.petrol}}.hv-tile-last .hv-tile-plus{background:${H.colors.petrol};color:#fff}
+.hv-wel-x{position:absolute;top:16px;right:16px;width:44px;height:44px;border-radius:12px;border:0;background:rgba(255,255,255,.92);font-size:24px;cursor:pointer;color:${H.colors.petrol}}
+.hv-welcome .hv-intro,.hv-welcome .hv-filtre,.hv-welcome .hv-menuknap{opacity:0;pointer-events:none}
 .hv-dev{position:absolute;right:12px;bottom:12px;z-index:20;font-family:system-ui,sans-serif}
 .hv-dev>button{background:rgba(0,0,0,.65);color:#fff;border:0;border-radius:8px;padding:5px 10px;font-size:11px;cursor:pointer}
 .hv-devpanel{position:absolute;right:0;bottom:30px;width:340px;max-height:60vh;overflow-y:auto;background:#fff;border-radius:10px;padding:12px;font-size:12px;box-shadow:0 10px 30px rgba(0,0,0,.35);color:#1d2a30}
@@ -764,6 +916,17 @@ const CSS = `
   .hv-dev{bottom:calc(64px + env(safe-area-inset-bottom,0px));right:10px}
   .hv-dev>button{font-size:10px;padding:3px 7px}
   .hv-punkt .hv-dev{display:none}
+  .hv-wel{align-items:flex-start;padding:12px;overflow-y:auto}
+  .hv-wel-grid{grid-template-columns:1fr 1fr;gap:10px;grid-auto-rows:auto}
+  .hv-wel-main{grid-column:span 2;grid-row:auto;padding:16px 18px}
+  .hv-wel-main img{width:40px;height:40px;padding:6px;margin-bottom:10px}
+  .hv-wel-kick{display:none}
+  .hv-wel-main h1{font-size:26px;margin-top:0}
+  .hv-wel-main p{font-size:14px}
+  .hv-wel-skip{padding-top:10px;font-size:12px}
+  .hv-tile{min-height:112px;padding:14px;border-radius:16px}
+  .hv-tile b{font-size:18px}
+  .hv-wel-x{top:10px;right:10px;width:38px;height:38px}
   .hv-devpanel{width:calc(100vw - 20px)}
 }
 `;
