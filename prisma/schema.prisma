@@ -574,9 +574,6 @@ model Deal {
   filmingDurationMinutes Int?
   filmingCrewIds         String?
   filmingEventId         String?
-  /// Link to the finished product (e.g. the customer's virtual tour) - put
-  /// into the welcome e-mail they get when the deal is set Live.
-  productUrl        String?
   /// When the "Velkommen til Nextview360" e-mail went out (sent once,
   /// automatically, the first time the deal is set Live).
   welcomeMailSentAt DateTime?

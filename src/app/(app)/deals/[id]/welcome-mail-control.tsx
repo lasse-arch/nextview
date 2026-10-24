@@ -6,7 +6,7 @@ import { previewWelcomeMail, sendWelcomeMailNow } from "@/lib/actions/welcome-ma
 import { useToast } from "@/components/toast";
 
 /**
- * Next to "Link til produkt": shows whether the "Velkommen til Nextview360"
+ * Under Ydelser (whose links go into the mail): shows whether the "Velkommen til Nextview360"
  * mail (sent automatically when the deal is first set Live) has gone out,
  * a preview of it, and a button to send it (again) by hand.
  */
@@ -31,9 +31,9 @@ export function WelcomeMailControl({ dealId, sentAtLabel }: { dealId: string; se
   }
 
   return (
-    <div className="mt-1 text-xs text-slate-500">
+    <div className="mt-3 border-t border-slate-100 pt-3 text-xs text-slate-500">
       <span>
-        {sentAtLabel ? `✓ Velkomstmail sendt ${sentAtLabel}` : "Velkomstmailen sendes automatisk, når kunden sættes Live."}
+        {sentAtLabel ? `✓ Velkomstmail sendt ${sentAtLabel}` : "Velkomstmailen sendes automatisk, når kunden sættes Live - med linkene ovenfor."}
       </span>{" "}
       <button type="button" onClick={togglePreview} className="font-medium text-indigo-600 hover:underline">
         {preview ? "Skjul mail" : "Se mail"}

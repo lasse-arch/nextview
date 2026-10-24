@@ -129,7 +129,6 @@ async function updateDealInner(
   const contactEmail = String(formData.get("contactEmail") || "") || null;
   const contactPhone = String(formData.get("contactPhone") || "") || null;
   const invoiceEmail = String(formData.get("invoiceEmail") || "").trim() || null;
-  const productUrl = formData.has("productUrl") ? String(formData.get("productUrl") || "").trim() || null : undefined;
   const eanNumber = normalizeEanNumber(String(formData.get("eanNumber") ?? ""));
   // Dinero only sends an e-invoice to a contact with a CVR number.
   if (eanNumber && !cvrNumber) throw new Error("Udfyld CVR-nummer - Dinero kræver kundens CVR for at sende EAN-fakturaer.");
@@ -281,7 +280,6 @@ async function updateDealInner(
       contactEmail,
       contactPhone,
       invoiceEmail,
-      productUrl,
       eanNumber,
       // An EAN customer gets e-invoices via NemHandel - never Betalingsservice.
       ...(eanNumber ? { paymentMethod: "INVOICE" as const } : {}),

@@ -214,7 +214,7 @@ const DEFAULT_POSTS: { title: string; body: string; minutesAgo: number; screensh
   {
     minutesAgo: 0,
     title: "Velkomstmail når kunden sættes Live",
-    body: "Når en kunde sættes Live første gang, får de nu automatisk en mail fra lasse@nextview360.dk: \"Velkommen til Nextview360 - vi har nu lavet alt det hårde arbejde, og det hele er klar til at arbejde for jeres virksomhed\", med link til deres færdige produkt og hjemmeside, og at de er velkomne til at skrive eller ringe på 23 27 07 86, hvis de har brug for ændringer eller har spørgsmål.\n\nIndsæt linket til kundens tour i det nye felt \"Link til produkt\" på dealen, inden I sætter den Live - så kommer det med i mailen. Under feltet kan I se mailen (\"Se mail\"), om den er sendt, og sende den (igen) i hånden. Mailen sendes kun én gang automatisk.",
+    body: "Når en kunde sættes Live første gang, får de nu automatisk en mail fra lasse@nextview360.dk: \"Velkommen til Nextview360 - vi har nu lavet alt det hårde arbejde, og det hele er klar til at arbejde for jeres virksomhed\", med links til det, vi har leveret, og deres hjemmeside, og at de er velkomne til at skrive eller ringe på 23 27 07 86, hvis de har brug for ændringer eller har spørgsmål.\n\nLinkene tages fra Ydelser på dealen (tour, hjemmeside osv.) - så sørg for, at de er udfyldt, inden I sætter kunden Live. Nederst under Ydelser kan I se mailen (\"Se mail\"), om den er sendt, og sende den (igen) i hånden. Mailen sendes kun én gang automatisk.",
     screenshotUrl: "/news/velkomstmail.png",
   },
 ];
@@ -231,6 +231,10 @@ export async function ensureDefaultNewsPosts(adminUserId: string): Promise<void>
   if (user.role !== "ADMIN" || user.id !== adminUserId) return;
   // Replaced by "Møder booket denne uge - på forsiden" shortly after it went out.
   await prisma.newsPost.deleteMany({ where: { title: "Møder booket i dag - på forsiden" } });
+  // First version pointed at a separate "Link til produkt" field, since replaced by the Ydelser links.
+  await prisma.newsPost.deleteMany({
+    where: { title: "Velkomstmail når kunden sættes Live", body: { contains: "Link til produkt" } },
+  });
 
   for (const post of DEFAULT_POSTS) {
     const existing = await prisma.newsPost.findFirst({ where: { title: post.title } });

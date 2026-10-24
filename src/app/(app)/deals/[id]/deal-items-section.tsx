@@ -201,7 +201,18 @@ function ItemImage({ dealId, item }: { dealId: string; item: DealItem }) {
   );
 }
 
-export function DealItemsSection({ dealId, items, isAdmin }: { dealId: string; items: DealItem[]; isAdmin: boolean }) {
+export function DealItemsSection({
+  dealId,
+  items,
+  isAdmin,
+  footer,
+}: {
+  dealId: string;
+  items: DealItem[];
+  isAdmin: boolean;
+  /** Shown at the bottom of the section, e.g. the welcome-mail status (it uses these links). */
+  footer?: React.ReactNode;
+}) {
   const [adding, setAdding] = useState(false);
   const [isFree, setIsFree] = useState(false);
   const [productType, setProductType] = useState("");
@@ -363,6 +374,7 @@ export function DealItemsSection({ dealId, items, isAdmin }: { dealId: string; i
           {freeCount > 0 ? ` · ${freeCount} givet gratis` : ""}
         </p>
       )}
+      {footer}
     </section>
   );
 }

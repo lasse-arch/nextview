@@ -308,22 +308,6 @@ export default async function DealDetailPage({
                     className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
                   />
                 </div>
-                <div className="col-span-2">
-                  <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                    Link til produkt (fx tour)
-                  </label>
-                  <input
-                    name="productUrl"
-                    type="url"
-                    placeholder="https://… - kommer med i velkomstmailen, når kunden sættes Live"
-                    defaultValue={deal.productUrl ?? ""}
-                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-                  />
-                  <WelcomeMailControl
-                    dealId={deal.id}
-                    sentAtLabel={deal.welcomeMailSentAt ? formatDate(deal.welcomeMailSentAt) : null}
-                  />
-                </div>
                 <div>
                   <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                     EAN-nummer (offentlige institutioner)
@@ -412,7 +396,17 @@ export default async function DealDetailPage({
             </DealInfoForm>
           </section>
 
-          <DealItemsSection dealId={deal.id} items={deal.items} isAdmin={currentUser?.role === "ADMIN"} />
+          <DealItemsSection
+            dealId={deal.id}
+            items={deal.items}
+            isAdmin={currentUser?.role === "ADMIN"}
+            footer={
+              <WelcomeMailControl
+                dealId={deal.id}
+                sentAtLabel={deal.welcomeMailSentAt ? formatDate(deal.welcomeMailSentAt) : null}
+              />
+            }
+          />
 
           <DealTasksSection
             dealId={deal.id}
