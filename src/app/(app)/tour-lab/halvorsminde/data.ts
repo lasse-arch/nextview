@@ -27,7 +27,8 @@ export const halvorsminde = {
     maxLevel: 4,
     cubeResolution: 4096,
     start: { yaw: 8, pitch: -34, hfov: 102 },
-    startMobile: { yaw: 4, pitch: -32, hfov: 88 },
+    /** Portrait phones see a much wider slice at the same hfov - zoomed in on the school instead. */
+    startMobile: { yaw: 16, pitch: -38, hfov: 74 },
   },
   /** 360° photos at some of the points, same tile format (levels 1-3 for now, 2048 px per cube face). */
   panos: { basePath: "/tours/halvorsminde/panos", maxLevel: 3, cubeResolution: 2048 },
@@ -74,6 +75,8 @@ export const halvorsminde = {
     { id: "volleyball", name: "Volleyball", cat: "sport", icon: "bold", yaw: -10, pitch: -17, tour: null, pano: "volleyball",
       text: "Beachvolley-banen er et af skolens udendørs samlingssteder, når vejret er til det.", chips: ["Beachvolley", "Udendørs", "Sammen"] },
   ] as { id: string; name: string; cat: string; icon: string; yaw: number; pitch: number; tour: string | null; pano?: string; text: string; chips: string[] }[],
+  /** MPSkins "navOpenOnStart", per device. */
+  menuOpenOnStart: { desktop: false, mobile: false },
   /** The MPSkins menu, as it is today. */
   menu: [
     { title: "Velkommen til Halvorsminde", href: u(2, "-3.13,-.15") },
@@ -85,7 +88,7 @@ export const halvorsminde = {
     { title: "Sport og bevægelse", items: [["Hallen", u(202, ".01,-.72")], ["Crossfit", u(207, "-.04,.85")], ["Fitness", u(211, "-.08,1.17")], ["Padel", "https://halvorsminde.dk/linjefag/padel/"], ["Ridning", "https://halvorsminde.dk/linjefag/ridning/"]] },
   ] as ({ title: string; href: string } | { title: string; items: [string, string][] })[],
   /** MPSkins "Codes" as Matterport URL parameters: no help, autostart, no dollhouse/guided tour/highlight reel/floor/floor plan/VR buttons, no Matterport title or branding. */
-  matterportParams: { play: "1", qs: "1", help: "0", dh: "0", gt: "0", hr: "0", f: "0", fp: "0", vr: "0", title: "0", brand: "0", mls: "0" },
+  matterportParams: { play: "1", qs: "1", help: "0", dh: "0", gt: "0", hr: "0", f: "0", fp: "0", vr: "0", title: "0", brand: "0", mls: "0", search: "0" },
   /** MPSkins: Deep Link Transitions FLY, 800 ms. */
   flyMs: 800,
 };

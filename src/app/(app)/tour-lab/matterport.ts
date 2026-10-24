@@ -37,6 +37,7 @@ type ShowcaseWindow = Window & { MP_SDK?: { connect(win: Window): Promise<MpSdk>
 /** Matterport's branding inside the viewer - hidden; our own logo and loading take its place. */
 const HIDE_BRANDING = `
   [class*="logo"], .powered-by, .powered-by-link, .powered-by-label, .co-brand, .co-branded,
+  [class*="search-button"], [class*="search-bar"], [class*="search-panel"], button[aria-label="Search"],
   #loading-gui #loading-header { display: none !important; }
 `;
 

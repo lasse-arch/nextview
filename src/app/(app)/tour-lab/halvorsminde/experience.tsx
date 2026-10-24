@@ -124,6 +124,8 @@ export function Experience({
   const [selected, setSelected] = useState<Point | null>(null);
   const [hidden, setHidden] = useState<Record<string, boolean>>({});
   const [menuOpen, setMenuOpen] = useState(false);
+  /** Zoomed in on the drone picture: room for the point names on a phone. */
+  const [zoomed, setZoomed] = useState(false);
   const [openGroup, setOpenGroup] = useState<string | null>(null);
   const [tourReadyMs, setTourReadyMs] = useState<number | null>(null);
   const [tourError, setTourError] = useState<string | null>(null);
@@ -133,6 +135,11 @@ export function Experience({
   const [pano, setPano] = useState<Point | null>(null);
   const [, rerender] = useState(0);
   const mobile = useRef(false);
+
+  useEffect(() => {
+    const open = window.innerWidth <= 760 ? H.menuOpenOnStart.mobile : H.menuOpenOnStart.desktop;
+    if (open) requestAnimationFrame(() => setMenuOpen(true));
+  }, []);
 
   useEffect(() => {
     const l = () => rerender((n) => n + 1);
@@ -217,6 +224,7 @@ export function Experience({
         yaw: p.yaw,
         cssClass: `hv-hs hv-hs-${p.cat}`,
         createTooltipFunc: (el) => {
+          el.dataset.punkt = p.id;
           el.innerHTML = `<div class="hv-pkt"><span class="hv-ikon" style="background:${H.categories[p.cat].color}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">${ICONS[p.icon] ?? ICONS.skov}</svg></span><span class="hv-navn">${p.name}</span></div>`;
           el.addEventListener("click", (e) => {
             e.stopPropagation();
@@ -248,6 +256,7 @@ export function Experience({
         keyboardZoom: false,
         hotSpots,
       });
+      drone.current.on("zoomchange", (hfov) => setZoomed(Number(hfov) < 56));
       track("drone_view");
     });
     return () => {
@@ -263,6 +272,11 @@ export function Experience({
       document.querySelectorAll<HTMLElement>(`.hv-hs-${cat}`).forEach((el) => el.classList.toggle("hv-skjult", Boolean(hidden[cat])));
     }
   }, [hidden]);
+
+  // The open point stands out (and shows its name on a phone).
+  useEffect(() => {
+    document.querySelectorAll<HTMLElement>(".hv-hs").forEach((el) => el.classList.toggle("hv-aktiv", el.dataset.punkt === selected?.id));
+  }, [selected]);
 
   /* ----- Drone → room: zoom in on the point, the tour is moved to the spot underneath, then cross-fade. ----- */
   async function enterTour(href: string, from: string, pointName: string) {
@@ -319,7 +333,7 @@ export function Experience({
   const ctaClick = (label: string, href: string, place: string) => track("cta_click", { label, link_url: href, place });
 
   return (
-    <div className="hv fixed inset-0 z-50 overflow-hidden bg-[#0d1b20]" style={{ fontFamily: `'${H.font}', system-ui, sans-serif` }}>
+    <div className={`hv fixed inset-0 z-50 overflow-hidden bg-[#0d1b20] ${selected ? "hv-punkt" : ""} ${zoomed ? "hv-zoom" : ""}`} style={{ fontFamily: `'${H.font}', system-ui, sans-serif` }}>
       <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${H.font}:wght@400;600;700;800;900&display=swap`} />
       <style>{CSS}</style>
 
@@ -590,7 +604,8 @@ const CSS = `
 .hv *{box-sizing:border-box}
 .hv .pnlm-load-box{background:rgba(21,50,58,.9)!important;border-radius:12px!important;font-family:inherit!important}
 .hv-hs.hv-skjult{display:none!important}
-.hv-hs:hover{z-index:9}
+.hv-hs:hover,.hv-hs.hv-aktiv{z-index:9}
+.hv-hs.hv-aktiv .hv-ikon{transform:scale(1.18);box-shadow:0 0 0 4px rgba(255,255,255,.55),0 3px 10px rgba(0,0,0,.35)}
 .hv-pkt{display:flex;flex-direction:column;align-items:center;transform:translate(-50%,-100%);cursor:pointer;pointer-events:none}
 .hv-ikon,.hv-navn{pointer-events:auto}
 .hv-ikon{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;border:3px solid #fff;box-shadow:0 3px 10px rgba(0,0,0,.35);transition:transform .15s}
@@ -657,18 +672,36 @@ const CSS = `
 .hv-devt{margin:8px 0 0;font-weight:700}
 .hv-warn{color:#b81c17;margin:0 0 6px}
 @media (max-width:760px){
-  .hv-intro{top:10px;left:10px;right:76px;width:auto}
-  .hv-intro-head img{height:42px}
+  /* Slim welcome bar instead of the big card, with room for the menu button. */
+  .hv-intro{top:10px;left:10px;right:104px;width:auto;display:flex;align-items:center;border-radius:14px}
+  .hv-intro-head{padding:8px 10px;flex:none}
+  .hv-intro-head img{height:30px;margin:0}
+  .hv-intro .hv-sub{display:none}
+  .hv-intro-body{padding:6px 10px;min-width:0;display:flex;flex-direction:column;gap:5px}
+  .hv-intro-body h1{font-size:13.5px;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .hv-intro-body p{display:none}
-  .hv-filtre{left:10px;right:10px;bottom:calc(10px + env(safe-area-inset-bottom,0px));max-width:none;padding:8px 10px}
+  .hv-intro .hv-btn{padding:6px 10px;font-size:12.5px}
+  .hv-menuknap{top:12px;right:10px;padding:10px 16px;font-size:13px}
+  /* Categories: one row you can swipe. */
+  .hv-filtre{left:10px;right:10px;bottom:calc(10px + env(safe-area-inset-bottom,0px));max-width:none;padding:7px 8px}
   .hv-filtre-t{display:none}
-  .hv-chips button{font-size:11.5px;padding:3px 9px 3px 4px}
-  .hv-panel{top:auto;bottom:0;left:0;right:0;width:auto;max-height:64%;border-radius:18px 18px 0 0}
-  .hv-ikon{width:29px;height:29px;border-width:2px}.hv-ikon svg{width:14px;height:14px}
-  .hv-navn{font-size:11px;padding:1px 8px}
+  .hv-chips{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+  .hv-chips::-webkit-scrollbar{display:none}
+  .hv-chips button{flex:none;font-size:12px;padding:4px 10px 4px 5px}
+  /* Only icons until you zoom in - the names crowd each other on a narrow screen. The open point keeps its name. */
+  .hv-navn{display:none;font-size:11px;padding:1px 8px}
+  .hv-zoom .hv-navn,.hv-hs.hv-aktiv .hv-navn{display:block}
+  .hv-ikon{width:30px;height:30px;border-width:2px}.hv-ikon svg{width:15px;height:15px}
+  /* An open point: the panel takes the bottom, the bars step aside. */
+  .hv-panel{top:auto;bottom:0;left:0;right:0;width:auto;max-height:62%;border-radius:18px 18px 0 0;padding-bottom:calc(18px + env(safe-area-inset-bottom,0px))}
+  .hv-punkt .hv-intro,.hv-punkt .hv-filtre{opacity:0;pointer-events:none}
+  .hv-intro,.hv-filtre{transition:opacity .25s}
   .hv-logo{width:56px;top:52px;left:12px}
   .hv-menu{width:100%}
   .hv-room{bottom:76px}
-  .hv-dev{bottom:auto;top:56px}
+  .hv-dev{bottom:calc(64px + env(safe-area-inset-bottom,0px));right:10px}
+  .hv-dev>button{font-size:10px;padding:3px 7px}
+  .hv-punkt .hv-dev{display:none}
+  .hv-devpanel{width:calc(100vw - 20px)}
 }
 `;
