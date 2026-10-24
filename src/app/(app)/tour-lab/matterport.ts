@@ -54,7 +54,7 @@ export async function connectSdk(iframe: HTMLIFrameElement): Promise<MpSdk> {
     return await window.MP_SDK!.connect(iframe);
   } catch (err) {
     const text = String(err);
-    if (text.includes("mismatch") || text.includes("Refused")) {
+    if (/mismatch|refused|invalid key/i.test(text)) {
       throw new Error(
         `SDK-nøglen blev afvist. Tjek i Matterport (Developer Tools → SDK Key Management), at ${window.location.host} er tilføjet som tilladt domæne, og at det ikke er en sandbox-nøgle (de virker kun på localhost).`
       );
