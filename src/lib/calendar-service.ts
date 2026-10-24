@@ -2,7 +2,7 @@ import { prisma } from "@/lib/db";
 import { upsertCalendarEvent } from "@/lib/google-calendar";
 import { dealName } from "@/lib/labels";
 
-const MEETING_TIME_ZONE = "Europe/Copenhagen";
+export const MEETING_TIME_ZONE = "Europe/Copenhagen";
 
 export type CalendarSyncResult = { synced: boolean; reason?: string };
 
@@ -15,7 +15,7 @@ export type CalendarSyncResult = { synced: boolean; reason?: string };
  * timeZone rather than a real UTC instant, or it double-converts and shows
  * the wrong local time (e.g. 22:00 in summer, when DST adds two hours).
  */
-function toWallClockDateTime(date: Date): string {
+export function toWallClockDateTime(date: Date): string {
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}T${pad(
     date.getUTCHours()

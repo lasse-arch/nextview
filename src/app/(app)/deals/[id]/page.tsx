@@ -38,6 +38,8 @@ import { StageFields } from "./stage-fields";
 import { InactiveToggleButton } from "./inactive-toggle-button";
 import { PaymentMethodControl } from "./payment-method-control";
 import { BookMeetingButton } from "./book-meeting-button";
+import { BookFilmingButton } from "./book-filming-button";
+import { WelcomeMailControl } from "./welcome-mail-control";
 import { TerminationSection } from "./termination-section";
 import { DealItemsSection } from "./deal-items-section";
 import { DealDangerActions } from "./danger-actions";
@@ -189,6 +191,15 @@ export default async function DealDetailPage({
             currentMeetingDateIso={deal.meetingDate ? deal.meetingDate.toISOString() : null}
             colleagues={users.filter((u) => u.id !== deal.ownerId).map((u) => ({ id: u.id, name: u.name }))}
           />
+          <BookFilmingButton
+            dealId={deal.id}
+            currentFilmingAtIso={deal.filmingAt ? deal.filmingAt.toISOString() : null}
+            currentHours={deal.filmingDurationMinutes ? deal.filmingDurationMinutes / 60 : null}
+            currentCrewIds={deal.filmingCrewIds ? deal.filmingCrewIds.split(",") : []}
+            contactEmail={deal.contactEmail}
+            crewOptions={users.map((u) => ({ id: u.id, name: u.name }))}
+            defaultCrewIds={users.filter((u) => u.email === "lasse@nextview360.dk").map((u) => u.id)}
+          />
           <InactiveToggleButton dealId={deal.id} isChurned={Boolean(deal.churnedAt)} />
           <DealDangerActions
             dealName={dealName(deal)}
@@ -295,6 +306,22 @@ export default async function DealDetailPage({
                     placeholder="Hvis fakturaer skal et andet sted hen end kontaktpersonen"
                     defaultValue={deal.invoiceEmail ?? ""}
                     className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                    Link til produkt (fx tour)
+                  </label>
+                  <input
+                    name="productUrl"
+                    type="url"
+                    placeholder="https://… - kommer med i velkomstmailen, når kunden sættes Live"
+                    defaultValue={deal.productUrl ?? ""}
+                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  />
+                  <WelcomeMailControl
+                    dealId={deal.id}
+                    sentAtLabel={deal.welcomeMailSentAt ? formatDate(deal.welcomeMailSentAt) : null}
                   />
                 </div>
                 <div>

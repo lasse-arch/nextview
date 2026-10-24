@@ -40,6 +40,8 @@ export type CalendarEventInput = {
   eventId: string | null;
   summary: string;
   description?: string;
+  /** Shown as the event's place, e.g. the customer's address for a filming. */
+  location?: string | null;
   /** Wall-clock date-time with no UTC offset (e.g. "2026-09-26T20:00:00") - interpreted in `timeZone`, not converted from UTC. */
   startIso: string;
   endIso: string;
@@ -85,22 +87,44 @@ export async function upsertCalendarEvent(account: EmailAccount, input: Calendar
     return responseStatus ? { email, responseStatus } : { email };
   });
 
-  const body = {
+  const details = {
     summary: input.summary,
     description: input.description,
+    ...(input.location ? { location: input.location } : {}),
     start: { dateTime: input.startIso, timeZone: input.timeZone },
     end: { dateTime: input.endIso, timeZone: input.timeZone },
-    attendees: attendees.length > 0 ? attendees : undefined,
   };
+  const headers = { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" };
+  const eventsUrl = `${CALENDAR_API_BASE}/calendars/primary/events`;
 
-  const url = input.eventId
-    ? `${CALENDAR_API_BASE}/calendars/primary/events/${input.eventId}?sendUpdates=all`
-    : `${CALENDAR_API_BASE}/calendars/primary/events?sendUpdates=all`;
+  // Never a Google Meet link - our meetings and filmings are in person, and
+  // customers seeing a video link think it's online. Google auto-adds Meet
+  // to new events when the account has "Tilføj automatisk Google Meet" on,
+  // so a new event is first created without guests (no mails go out),
+  // then the guests are added in the same update that strips the Meet -
+  // that way the invitation they receive never carries the link.
+  // conferenceDataVersion=1 is what lets conferenceData: null remove it.
+  let eventId = input.eventId;
+  if (!eventId) {
+    const created = await fetch(`${eventsUrl}?sendUpdates=none&conferenceDataVersion=1`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(details),
+    });
+    if (!created.ok) {
+      throw new Error(`Google Kalender-fejl (${created.status}): ${await created.text()}`);
+    }
+    eventId = ((await created.json()) as { id: string }).id;
+  }
 
-  const res = await fetch(url, {
-    method: input.eventId ? "PATCH" : "POST",
-    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+  const res = await fetch(`${eventsUrl}/${eventId}?sendUpdates=all&conferenceDataVersion=1`, {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify({
+      ...details,
+      conferenceData: null,
+      attendees: attendees.length > 0 ? attendees : undefined,
+    }),
   });
 
   if (!res.ok) {

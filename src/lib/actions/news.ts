@@ -205,6 +205,18 @@ const DEFAULT_POSTS: { title: string; body: string; minutesAgo: number; screensh
     body: "Har I lovet en kunde, at etableringen først faktureres, når produktet er leveret, og de har godkendt det? Fjern krydset i \"Etablering faktureres ved underskrift\", når I laver kontrakten - så står det i kontrakten (godkendt automatisk, hvis kunden ikke har påpeget konkrete mangler inden for 7 dage efter levering), og Arpo fakturerer ikke etableringen af sig selv.\n\nPå dealen står der så \"Etablering afventer kundens godkendelse\". Når kunden har godkendt, sætter I dealen Live - så faktureres etableringen ved næste fakturakørsel. På eksisterende deals kan I gøre det samme med knappen \"Vent til kunden har godkendt\" under Fakturaer, så længe etableringen ikke er faktureret endnu.",
     screenshotUrl: "/news/etablering-afventer.png",
   },
+  {
+    minutesAgo: 0,
+    title: "Book filming - med kalenderinvitation til kunden",
+    body: "Ved siden af \"Book møde\" på dealen er der nu en rød \"🎬 Book filming\"-knap. Vælg starttidspunkt, hvor mange timer optagelsen forventes at tage, og hvem der filmer (Lasse, Victor eller begge). Invitationen sendes fra din egen Google-kalender til kundens e-mail fra kontrakten - og til en ekstra adresse i \"Send også til\", fx pedellen eller forstanderen - med kundens adresse som sted.\n\nI invitationen står der, at vi kommer ud og optager på det aftalte tidspunkt, hvem der kommer, og hvad kunden skal have klar: pænt og ryddet op, døre låst op, lys tændt osv. Den skriver også, at kun starttidspunktet er gældende - sluttiden er kun et estimat, og vi tager selvfølgelig først hjem, når vi er færdige.\n\nSamtidig får hverken mødeinvitationer eller filming-invitationer længere et Google Meet-link på, så ingen tror, at mødet er online.",
+    screenshotUrl: "/news/book-filming.png",
+  },
+  {
+    minutesAgo: 0,
+    title: "Velkomstmail når kunden sættes Live",
+    body: "Når en kunde sættes Live første gang, får de nu automatisk en mail fra lasse@nextview360.dk: \"Velkommen til Nextview360 - vi har nu lavet alt det hårde arbejde, og det hele er klar til at arbejde for jeres virksomhed\", med link til deres færdige produkt og hjemmeside, og at de er velkomne til at skrive eller ringe på 23 27 07 86, hvis de har brug for ændringer eller har spørgsmål.\n\nIndsæt linket til kundens tour i det nye felt \"Link til produkt\" på dealen, inden I sætter den Live - så kommer det med i mailen. Under feltet kan I se mailen (\"Se mail\"), om den er sendt, og sende den (igen) i hånden. Mailen sendes kun én gang automatisk.",
+    screenshotUrl: "/news/velkomstmail.png",
+  },
 ];
 
 /**
