@@ -359,6 +359,12 @@ export function TourLab({ sdkKey }: { sdkKey: string | null }) {
           <p className="text-sm text-slate-500">
             Prototype: overbliksbillede med egne punkter, der hopper ind i Matterport-touren eller et 360°-dronebillede.
           </p>
+          <p className="mt-1 text-sm">
+            Prototype-tours:{" "}
+            <a href="/tour-lab/halvorsminde" className="font-medium text-indigo-600 hover:underline">Halvorsminde (drone først)</a>
+            {" · "}
+            <a href="/tour-lab/fitness-gronlandstorv" className="font-medium text-indigo-600 hover:underline">Fitness United Grønlands Torv (direkte i touren)</a>
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <label className="cursor-pointer rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50">

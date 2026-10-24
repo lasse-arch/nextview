@@ -1,10 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { saveTourGa4Id } from "@/lib/actions/tour-lab";
 import { connectSdk, showcaseUrl, uLinkTarget, type MpSdk } from "../matterport";
-import { halvorsminde as H, type WelcomeGo } from "./data";
+import type { MenuEntry, TourConfig, TourPoint, WelcomeGo } from "../tours/types";
 import "pannellum/build/pannellum.css";
 
 /* ---------------------------------------------------------------------------
@@ -58,7 +58,7 @@ function track(name: string, params: Record<string, string | number> = {}) {
   logListeners.forEach((l) => l());
 }
 
-function useGa4(id: string | null) {
+function useGa4(id: string | null, title: string) {
   useEffect(() => {
     if (!id || window.gtag) return;
     window.dataLayer = window.dataLayer || [];
@@ -68,12 +68,12 @@ function useGa4(id: string | null) {
       window.dataLayer!.push(arguments);
     };
     window.gtag("js", new Date());
-    window.gtag("config", id, { page_title: H.title });
+    window.gtag("config", id, { page_title: title });
     const s = document.createElement("script");
     s.async = true;
     s.src = `https://www.googletagmanager.com/gtag/js?id=${id}`;
     document.head.appendChild(s);
-  }, [id]);
+  }, [id, title]);
 }
 
 /* ---------------------------------------------------------------------------
@@ -95,49 +95,55 @@ const ICONS: Record<string, string> = {
 };
 
 const now = () => performance.now();
-type Point = (typeof H.points)[number];
+type Point = TourPoint;
 
-/** All tour destinations (menu items and drone points) by their scan point, so a room can be named. */
-const ROOM_NAMES: Record<number, string> = {};
-const ROOM_LINKS: Record<number, string> = {};
-for (const m of H.menu) {
-  const entries: [string, string][] = "items" in m ? m.items : [[m.title, m.href]];
-  for (const [name, href] of entries) {
-    const t = uLinkTarget(href);
-    if (t && ROOM_NAMES[t.ss] == null) {
-      ROOM_NAMES[t.ss] = name;
-      ROOM_LINKS[t.ss] = href;
+/** All menu destinations by their scan point, so a room can be named (and returned to). */
+function roomIndex(menu: MenuEntry[]) {
+  const names: Record<number, string> = {};
+  const links: Record<number, string> = {};
+  for (const m of menu) {
+    const entries: [string, string][] = "items" in m ? m.items : [[m.title, m.href]];
+    for (const [name, href] of entries) {
+      const t = uLinkTarget(href);
+      if (t && names[t.ss] == null) {
+        names[t.ss] = name;
+        links[t.ss] = href;
+      }
     }
   }
+  return { names, links };
 }
 
 /** For smart start links: ?rum=spisesalen / ?punkt=hal. */
 const slug = (s: string) =>
   s.toLowerCase().replace(/æ/g, "ae").replace(/ø/g, "oe").replace(/å/g, "aa").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
-const LAST_ROOM_KEY = "hv-last-room";
-function readLastRoom(): { name: string; href: string } | null {
+function readLastRoom(key: string): { name: string; href: string } | null {
   try {
-    return JSON.parse(localStorage.getItem(LAST_ROOM_KEY) ?? "null");
+    return JSON.parse(localStorage.getItem(key) ?? "null");
   } catch {
     return null;
   }
 }
 
 export function Experience({
+  tour: T,
   sdkKey,
   ga4Id,
   modelId,
   sweepBySs,
   hiddenSweeps,
 }: {
+  tour: TourConfig;
   sdkKey: string | null;
   ga4Id: string | null;
   modelId: string | null;
   sweepBySs: Record<number, string>;
   hiddenSweeps: string[];
 }) {
-  useGa4(ga4Id);
+  useGa4(ga4Id, T.title);
+  const { names: ROOM_NAMES, links: ROOM_LINKS } = useMemo(() => roomIndex(T.menu), [T]);
+  const LAST_ROOM_KEY = `${T.slug}-last-room`;
   const droneEl = useRef<HTMLDivElement>(null);
   const drone = useRef<PannellumViewer | null>(null);
   const iframe = useRef<HTMLIFrameElement>(null);
@@ -147,9 +153,9 @@ export function Experience({
   const currentSweep = useRef<string | null>(null);
   const roomTimer = useRef<{ name: string | null; at: number } | null>(null);
   /** "Kun punkter": no free walking - only the current scan point is enabled, the menu and points move you. */
-  const [pointsOnly, setPointsOnly] = useState(H.navigation === "points");
+  const [pointsOnly, setPointsOnly] = useState(T.navigation === "points");
   const pointsOnlyRef = useRef(pointsOnly);
-  const [phase, setPhase] = useState<"drone" | "tour">("drone");
+  const [phase, setPhase] = useState<"drone" | "tour">(T.drone ? "drone" : "tour");
   const [selected, setSelected] = useState<Point | null>(null);
   const [hidden, setHidden] = useState<Record<string, boolean>>({});
   const [menuOpen, setMenuOpen] = useState(false);
@@ -169,9 +175,9 @@ export function Experience({
   const mobile = useRef(false);
 
   useEffect(() => {
-    const open = window.innerWidth <= 760 ? H.menuOpenOnStart.mobile : H.menuOpenOnStart.desktop;
+    const open = window.innerWidth <= 760 ? T.menuOpenOnStart.mobile : T.menuOpenOnStart.desktop;
     if (open) requestAnimationFrame(() => setMenuOpen(true));
-  }, []);
+  }, [T]);
 
   useEffect(() => {
     const l = () => rerender((n) => n + 1);
@@ -216,7 +222,7 @@ export function Experience({
     });
     sdkRef.current.catch((err) => setTourError(err instanceof Error ? err.message : String(err)));
     return () => sub?.cancel();
-  }, [sdkKey, modelId, sweepBySs, hiddenSweeps]);
+  }, [sdkKey, modelId, sweepBySs, hiddenSweeps, ROOM_NAMES, ROOM_LINKS, LAST_ROOM_KEY]);
 
   const setNavigation = useCallback(
     async (only: boolean) => {
@@ -246,12 +252,12 @@ export function Experience({
       await sdk.Sweep.moveTo(sweep, {
         rotation: target?.rotation,
         transition: transition === "fly" ? sdk.Sweep.Transition.FLY : sdk.Sweep.Transition.INSTANT,
-        transitionTime: transition === "fly" ? H.flyMs : undefined,
+        transitionTime: transition === "fly" ? T.flyMs : undefined,
       });
       if (locked && from && from !== sweep) await sdk.Sweep.disable(from).catch(() => {});
       return true;
     },
-    [sweepBySs]
+    [sweepBySs, T]
   );
 
   /* ----- The drone scene. ----- */
@@ -271,28 +277,30 @@ export function Experience({
   const openPoint = useCallback(
     (p: Point) => {
       setSelected(p);
-      track("drone_point_click", { point_name: p.name, category: H.categories[p.cat].name });
+      track("drone_point_click", { point_name: p.name, category: T.categories[p.cat].name });
       const v = drone.current;
       if (v) v.lookAt(Math.max(p.pitch, -70), p.yaw, v.getHfov(), 700);
       if (p.tour) prepare(p.tour);
     },
-    [prepare]
+    [prepare, T]
   );
 
   useEffect(() => {
     mobile.current = window.innerWidth <= 760;
+    const D = T.drone;
+    if (!D) return;
     let cancelled = false;
     loadPannellum().then(() => {
       if (cancelled || !droneEl.current || !window.pannellum) return;
-      const start = mobile.current ? H.drone.startMobile : H.drone.start;
-      const hotSpots: PannellumHotspot[] = H.points.map((p) => ({
+      const start = mobile.current ? D.startMobile : D.start;
+      const hotSpots: PannellumHotspot[] = T.points.map((p) => ({
         id: p.id,
         pitch: p.pitch,
         yaw: p.yaw,
         cssClass: `hv-hs hv-hs-${p.cat}`,
         createTooltipFunc: (el) => {
           el.dataset.punkt = p.id;
-          el.innerHTML = `<div class="hv-pkt"><span class="hv-ikon" style="background:${H.categories[p.cat].color}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">${ICONS[p.icon] ?? ICONS.skov}</svg></span><span class="hv-navn">${p.name}</span></div>`;
+          el.innerHTML = `<div class="hv-pkt"><span class="hv-ikon" style="background:${T.categories[p.cat].color}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">${ICONS[p.icon] ?? ICONS.skov}</svg></span><span class="hv-navn">${p.name}</span></div>`;
           el.addEventListener("click", (e) => {
             e.stopPropagation();
             openPoint(p);
@@ -305,12 +313,12 @@ export function Experience({
         showControls: false,
         compass: false,
         multiRes: {
-          basePath: H.drone.basePath,
+          basePath: D.basePath,
           path: "/%l/%s%y_%x",
           extension: "jpg",
           tileResolution: 512,
-          maxLevel: H.drone.maxLevel,
-          cubeResolution: H.drone.cubeResolution,
+          maxLevel: D.maxLevel,
+          cubeResolution: D.cubeResolution,
         },
         yaw: start.yaw,
         pitch: start.pitch,
@@ -331,14 +339,14 @@ export function Experience({
       drone.current?.destroy();
       drone.current = null;
     };
-  }, [openPoint]);
+  }, [openPoint, T]);
 
   // Category filter: hide/show the points of a category.
   useEffect(() => {
-    for (const cat of Object.keys(H.categories)) {
+    for (const cat of Object.keys(T.categories)) {
       document.querySelectorAll<HTMLElement>(`.hv-hs-${cat}`).forEach((el) => el.classList.toggle("hv-skjult", Boolean(hidden[cat])));
     }
-  }, [hidden]);
+  }, [hidden, T]);
 
   // The open point stands out (and shows its name on a phone).
   useEffect(() => {
@@ -375,8 +383,9 @@ export function Experience({
     prepared.current = null;
     track("back_to_drone", { room_name: room ?? "" });
     setMenuOpen(false);
+    if (!T.drone) return;
     setPhase("drone");
-    const start = mobile.current ? H.drone.startMobile : H.drone.start;
+    const start = mobile.current ? T.drone.startMobile : T.drone.start;
     setTimeout(() => drone.current?.lookAt(start.pitch, start.yaw, start.hfov, 1200), 350);
   }
 
@@ -392,7 +401,7 @@ export function Experience({
     const ss = q.get("ss");
     requestAnimationFrame(() => {
       if (rum) {
-        const hit = H.menu.flatMap((m) => ("items" in m ? m.items : [[m.title, m.href] as [string, string]])).find(([n]) => slug(n) === rum);
+        const hit = T.menu.flatMap((m) => ("items" in m ? m.items : [[m.title, m.href] as [string, string]])).find(([n]) => slug(n) === rum);
         if (hit) {
           track("start_link", { kind: "rum", target: hit[0] });
           enterRef.current(hit[1], "link", hit[0]);
@@ -400,7 +409,7 @@ export function Experience({
         }
       }
       if (punkt) {
-        const p = H.points.find((x) => x.id === punkt || slug(x.name) === punkt);
+        const p = T.points.find((x) => x.id === punkt || slug(x.name) === punkt);
         if (p) {
           track("start_link", { kind: "punkt", target: p.name });
           openPoint(p);
@@ -409,14 +418,15 @@ export function Experience({
       }
       if (ss) {
         track("start_link", { kind: "ss", target: ss });
-        enterRef.current(`${H.tourPage}?${q.toString()}`, "link", ROOM_NAMES[Number(ss)] ?? `ss=${ss}`);
+        enterRef.current(`${T.tourPage}?${q.toString()}`, "link", ROOM_NAMES[Number(ss)] ?? `ss=${ss}`);
         return;
       }
-      setLastRoom(readLastRoom());
+      if (!T.welcome) return;
+      setLastRoom(readLastRoom(LAST_ROOM_KEY));
       setWelcome(true);
       track("welcome_view");
     });
-  }, [openPoint]);
+  }, [openPoint, T, ROOM_NAMES, LAST_ROOM_KEY]);
 
   function chooseWelcome(go: WelcomeGo | "last" | "skip", label: string) {
     track("welcome_choice", { choice: label });
@@ -437,7 +447,7 @@ export function Experience({
     }
     // The drone scene, optionally with only one category's points showing.
     const only = go.drone;
-    setHidden(only ? Object.fromEntries(Object.keys(H.categories).map((k) => [k, k !== only])) : {});
+    setHidden(only ? Object.fromEntries(Object.keys(T.categories).map((k) => [k, k !== only])) : {});
   }
 
   async function menuGo(name: string, group: string, href: string) {
@@ -460,8 +470,16 @@ export function Experience({
   const ctaClick = (label: string, href: string, place: string) => track("cta_click", { label, link_url: href, place });
 
   return (
-    <div className={`hv fixed inset-0 z-50 overflow-hidden bg-[#0d1b20] ${selected ? "hv-punkt" : ""} ${zoomed ? "hv-zoom" : ""} ${welcome ? "hv-welcome" : ""}`} style={{ fontFamily: `'${H.font}', system-ui, sans-serif` }}>
-      <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${H.font}:wght@400;600;700;800;900&display=swap`} />
+    <div className={`hv fixed inset-0 z-50 overflow-hidden bg-[#0d1b20] ${selected ? "hv-punkt" : ""} ${zoomed ? "hv-zoom" : ""} ${welcome ? "hv-welcome" : ""}`} style={
+        {
+          fontFamily: `'${T.font}', system-ui, sans-serif`,
+          "--c-main": T.colors.main,
+          "--c-accent": T.colors.accent,
+          "--c-accent-dark": T.colors.accentDark,
+          "--c-soft": T.colors.soft,
+        } as React.CSSProperties
+      }>
+      <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.font}:wght@400;600;700;800;900&display=swap`} />
       <style>{CSS}</style>
 
       {/* The tour, always mounted so it loads while the visitor is in the drone scene. */}
@@ -469,35 +487,36 @@ export function Experience({
         <iframe
           ref={iframe}
           title="Matterport"
-          src={showcaseUrl(modelId, sdkKey, { ...H.matterportParams, ...startParams(H.start) })}
+          src={showcaseUrl(modelId, sdkKey, { ...T.matterportParams, ...startParams(T.start) })}
           className={`absolute inset-0 h-full w-full border-0 transition-opacity duration-500 ${phase === "tour" ? "opacity-100" : "pointer-events-none opacity-0"}`}
           allow="fullscreen; xr-spatial-tracking; autoplay"
         />
       )}
 
       {/* The drone scene on top; fades away when going into the tour. */}
+      {T.drone && (
       <div className={`absolute inset-0 transition-opacity duration-500 ${phase === "drone" ? "opacity-100" : "pointer-events-none opacity-0"}`}>
         <div ref={droneEl} className="absolute inset-0" />
 
         <div className="hv-intro">
-          <div className="hv-intro-head" style={{ background: H.colors.petrol }}>
+          <div className="hv-intro-head" style={{ background: T.colors.main }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={H.logo} alt="Halvorsminde" />
-            <div className="hv-sub">{H.subtitle}</div>
+            <img src={T.logo} alt={T.brand} />
+            <div className="hv-sub">{T.subtitle}</div>
           </div>
           <div className="hv-intro-body">
-            <h1>Velkommen til Halvorsminde</h1>
-            <p>Se hele skolen fra luften. Tryk på et punkt, og gå direkte ind i rummet.</p>
-            <a className="hv-btn hv-primary" href={H.cta[0].href} target="_blank" rel="noopener" onClick={() => ctaClick(H.cta[0].label, H.cta[0].href, "intro")}>
-              {H.cta[0].label}
+            <h1>{T.drone?.intro.title}</h1>
+            <p>{T.drone?.intro.lead}</p>
+            <a className="hv-btn hv-primary" href={T.cta[0].href} target="_blank" rel="noopener" onClick={() => ctaClick(T.cta[0].label, T.cta[0].href, "intro")}>
+              {T.cta[0].label}
             </a>
           </div>
         </div>
 
         <div className="hv-filtre">
-          <div className="hv-filtre-t">Find rundt på skolen</div>
+          <div className="hv-filtre-t">{T.drone?.filterTitle}</div>
           <div className="hv-chips">
-            {Object.entries(H.categories).map(([k, c]) => (
+            {Object.entries(T.categories).map(([k, c]) => (
               <button
                 key={k}
                 type="button"
@@ -519,8 +538,8 @@ export function Experience({
             <button type="button" className="hv-luk" aria-label="Luk" onClick={() => setSelected(null)}>
               ×
             </button>
-            <div className="hv-kat" style={{ color: H.categories[selected.cat].color }}>
-              {H.categories[selected.cat].name}
+            <div className="hv-kat" style={{ color: T.categories[selected.cat].color }}>
+              {T.categories[selected.cat].name}
             </div>
             <h2>{selected.name}</h2>
             <p>{selected.text}</p>
@@ -550,18 +569,19 @@ export function Experience({
           </aside>
         )}
       </div>
+      )}
 
-      {welcome && (
-        <div className="hv-wel" role="dialog" aria-modal="true" aria-label={H.welcome.title}>
+      {welcome && T.welcome && (
+        <div className="hv-wel" role="dialog" aria-modal="true" aria-label={T.welcome.title}>
           <div className="hv-wel-grid">
             <div className="hv-wel-main">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={H.logo} alt="Halvorsminde" />
-              <div className="hv-wel-kick">{H.welcome.kicker}</div>
-              <h1>{H.welcome.title}</h1>
-              <p>{H.welcome.lead}</p>
-              <button type="button" className="hv-wel-skip" onClick={() => chooseWelcome("skip", H.welcome.skip)}>
-                {H.welcome.skip} →
+              <img src={T.logo} alt={T.brand} />
+              <div className="hv-wel-kick">{T.welcome.kicker}</div>
+              <h1>{T.welcome.title}</h1>
+              <p>{T.welcome.lead}</p>
+              <button type="button" className="hv-wel-skip" onClick={() => chooseWelcome("skip", T.welcome!.skip)}>
+                {T.welcome.skip} →
               </button>
             </div>
             {lastRoom && (
@@ -571,7 +591,7 @@ export function Experience({
                 <b>{lastRoom.name}</b>
               </button>
             )}
-            {H.welcome.tiles.map((t) => (
+            {T.welcome.tiles.map((t) => (
               <button key={t.title} type="button" className={`hv-tile hv-tile-${t.style}`} onClick={() => chooseWelcome(t.go, t.title)}>
                 {t.recommended && <em>Anbefalet</em>}
                 <span className="hv-tile-plus">+</span>
@@ -586,21 +606,23 @@ export function Experience({
         </div>
       )}
 
-      {pano?.pano && <PanoView name={pano.name} dir={pano.pano} onClose={() => setPano(null)} />}
+      {pano?.pano && T.panos && <PanoView name={pano.name} dir={pano.pano} panos={T.panos} onClose={() => setPano(null)} />}
 
       {/* Logo (MPSkins: left, 200px, 13px from the edges). */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={H.logo} alt="" className={`hv-logo ${phase === "tour" ? "" : "hidden"}`} />
+      <img src={T.logo} alt="" className={`hv-logo ${phase === "tour" ? "" : "hidden"}`} />
 
       {/* Inside the tour: back to the air, the room's name, the menu. */}
       {phase === "tour" && (
         <>
+          {T.drone && (
           <button type="button" className="hv-luften" onClick={backToDrone}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M5 5l4 4M19 5l-4 4M5 19l4-4M19 19l-4-4M9 9h6v6H9z" />
             </svg>
-            Skolen fra luften
+            {T.drone.backLabel}
           </button>
+          )}
           {room && <div className="hv-room">{room}</div>}
         </>
       )}
@@ -616,13 +638,13 @@ export function Experience({
         {menuOpen ? "Luk" : "Menu"}
       </button>
       <nav className={`hv-menu ${menuOpen ? "aaben" : ""}`}>
-        <div className="hv-menu-head" style={{ background: H.colors.petrol }}>
+        <div className={`hv-menu-head ${T.logoOnLight ? "hv-light" : ""}`} style={{ background: T.logoOnLight ? "#fff" : T.colors.main }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={H.logo} alt="" />
-          <div className="hv-menu-titel">HALVORSMINDE</div>
-          <div className="hv-sub">{H.subtitle}</div>
+          <img src={T.logo} alt="" />
+          <div className="hv-menu-titel">{T.brand.toUpperCase()}</div>
+          <div className="hv-sub">{T.subtitle}</div>
         </div>
-        {H.menu.map((m) =>
+        {T.menu.map((m) =>
           "items" in m ? (
             <div key={m.title} className="hv-gruppe">
               <button type="button" className="hv-gtitel" onClick={() => setOpenGroup((g) => (g === m.title ? null : m.title))}>
@@ -647,12 +669,41 @@ export function Experience({
           )
         )}
         <div className="hv-menu-cta">
-          {H.cta.map((c) => (
+          {T.cta.map((c) => (
             <a key={c.label} className={`hv-btn ${c.primary ? "hv-primary" : "hv-secondary"}`} href={c.href} target="_blank" rel="noopener" onClick={() => ctaClick(c.label, c.href, "menu")}>
               {c.label}
             </a>
           ))}
         </div>
+        {T.contact && (
+          <div className="hv-contact">
+            <div className="hv-contact-t">Kontakt</div>
+            {T.contact.address && (
+              <a href={T.contact.mapUrl ?? "#"} target="_blank" rel="noopener" onClick={() => track("contact_click", { kind: "map" })}>
+                <span>📍</span>
+                {T.contact.address}
+              </a>
+            )}
+            {T.contact.phone && (
+              <a href={`tel:${T.contact.phone.replace(/\s/g, "")}`} onClick={() => track("contact_click", { kind: "phone" })}>
+                <span>📞</span>
+                {T.contact.phone}
+              </a>
+            )}
+            {T.contact.email && (
+              <a href={`mailto:${T.contact.email}`} onClick={() => track("contact_click", { kind: "email" })}>
+                <span>✉️</span>
+                {T.contact.email}
+              </a>
+            )}
+            {T.contact.instagram && (
+              <a href={T.contact.instagram} target="_blank" rel="noopener" onClick={() => track("contact_click", { kind: "instagram" })}>
+                <span>📷</span>
+                Instagram
+              </a>
+            )}
+          </div>
+        )}
       </nav>
 
       {/* Prototype tools: status and the GA4 event log. */}
@@ -669,7 +720,17 @@ export function Experience({
 }
 
 /** A 360° photo at a point, full screen over the drone scene. */
-function PanoView({ name, dir, onClose }: { name: string; dir: string; onClose: () => void }) {
+function PanoView({
+  name,
+  dir,
+  panos,
+  onClose,
+}: {
+  name: string;
+  dir: string;
+  panos: NonNullable<TourConfig["panos"]>;
+  onClose: () => void;
+}) {
   const el = useRef<HTMLDivElement>(null);
   useEffect(() => {
     let viewer: PannellumViewer | null = null;
@@ -682,12 +743,12 @@ function PanoView({ name, dir, onClose }: { name: string; dir: string; onClose: 
         showControls: false,
         compass: false,
         multiRes: {
-          basePath: `${H.panos.basePath}/${dir}`,
+          basePath: `${panos.basePath}/${dir}`,
           path: "/%l/%s%y_%x",
           extension: "jpg",
           tileResolution: 512,
-          maxLevel: H.panos.maxLevel,
-          cubeResolution: H.panos.cubeResolution,
+          maxLevel: panos.maxLevel,
+          cubeResolution: panos.cubeResolution,
         },
         hfov: window.innerWidth <= 760 ? 90 : 100,
         minHfov: 40,
@@ -699,7 +760,7 @@ function PanoView({ name, dir, onClose }: { name: string; dir: string; onClose: 
       cancelled = true;
       viewer?.destroy();
     };
-  }, [dir]);
+  }, [dir, panos]);
   return (
     <div className="hv-pano">
       <div ref={el} className="absolute inset-0" />
@@ -802,16 +863,16 @@ const CSS = `
 .hv-ikon svg{width:17px;height:17px}
 .hv-navn{margin-top:4px;background:#fff;border-radius:999px;padding:2px 10px;font-size:12.5px;font-weight:800;white-space:nowrap;color:#1d2a30;box-shadow:0 2px 8px rgba(0,0,0,.25)}
 .hv-pkt:hover .hv-ikon{transform:scale(1.12)}
-.hv-intro{position:absolute;top:16px;left:16px;z-index:5;width:320px;background:${H.colors.sand};border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.28)}
+.hv-intro{position:absolute;top:16px;left:16px;z-index:5;width:320px;background:var(--c-soft);border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.28)}
 .hv-intro-head{padding:18px 18px 14px;text-align:center}
 .hv-intro-head img{height:54px;display:block;margin:0 auto 8px}
 .hv-sub{font-size:9.5px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:#9fb3ba}
 .hv-intro-body{padding:14px 18px 16px}
-.hv-intro-body h1{margin:0 0 4px;font-size:19px;font-weight:900;color:${H.colors.petrol}}
+.hv-intro-body h1{margin:0 0 4px;font-size:19px;font-weight:900;color:var(--c-main)}
 .hv-intro-body p{margin:0 0 12px;font-size:14px;line-height:1.45;color:#5c6b72}
 .hv-btn{display:flex;align-items:center;justify-content:center;padding:11px 16px;border-radius:999px;text-decoration:none;font-weight:800;font-size:15px;border:0;cursor:pointer;font-family:inherit}
-.hv-primary{background:${H.colors.orange};color:#fff}.hv-primary:hover{background:${H.colors.orangeDark}}
-.hv-secondary{background:#fff;color:${H.colors.petrol};border:2px solid ${H.colors.petrol}}
+.hv-primary{background:var(--c-accent);color:#fff}.hv-primary:hover{background:var(--c-accent-dark)}
+.hv-secondary{background:#fff;color:var(--c-main);border:2px solid var(--c-main)}
 .hv-wide{width:100%;margin-top:12px}
 .hv-filtre{position:absolute;left:16px;bottom:16px;z-index:5;background:#fff;border-radius:14px;padding:10px 12px;box-shadow:0 8px 24px rgba(0,0,0,.25);max-width:calc(100% - 32px)}
 .hv-filtre-t{font-size:12.5px;font-weight:800;margin:0 2px 8px;color:#5c6b72}
@@ -819,46 +880,54 @@ const CSS = `
 .hv-chips button{display:flex;align-items:center;gap:6px;border:1.5px solid #e3ddd1;background:#fff;border-radius:999px;padding:4px 11px 4px 5px;font-family:inherit;font-size:12.5px;font-weight:700;cursor:pointer;color:#1d2a30}
 .hv-chips button i{width:16px;height:16px;border-radius:50%}
 .hv-chips button.fra{opacity:.42}
-.hv-panel{position:absolute;top:66px;right:16px;z-index:7;width:350px;max-height:calc(100% - 82px);overflow-y:auto;background:${H.colors.sand};border-radius:16px;box-shadow:0 12px 36px rgba(0,0,0,.35);padding:18px 18px 18px;animation:hvIn .25s ease}
+.hv-panel{position:absolute;top:66px;right:16px;z-index:7;width:350px;max-height:calc(100% - 82px);overflow-y:auto;background:var(--c-soft);border-radius:16px;box-shadow:0 12px 36px rgba(0,0,0,.35);padding:18px 18px 18px;animation:hvIn .25s ease}
 @keyframes hvIn{from{opacity:0;transform:translateX(16px)}to{opacity:1;transform:none}}
 .hv-luk{position:absolute;top:10px;right:10px;width:32px;height:32px;border-radius:50%;border:0;background:#fff;font-size:19px;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.2)}
 .hv-kat{font-size:11.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase}
-.hv-panel h2{margin:2px 40px 8px 0;font-size:25px;line-height:1.1;font-weight:900;color:${H.colors.petrol}}
+.hv-panel h2{margin:2px 40px 8px 0;font-size:25px;line-height:1.1;font-weight:900;color:var(--c-main)}
 .hv-panel p{margin:0 0 12px;font-size:15px;line-height:1.5;color:#3d4a50}
 .hv-pchips{display:flex;flex-wrap:wrap;gap:5px}
-.hv-pchips span{background:#e7eef0;color:${H.colors.petrol};font-size:12px;font-weight:700;padding:4px 9px;border-radius:999px}
+.hv-pchips span{background:#e7eef0;color:var(--c-main);font-size:12px;font-weight:700;padding:4px 9px;border-radius:999px}
 .hv-note{font-size:13px!important;color:#7a8a90!important;margin-top:12px!important}
 .hv-logo{position:absolute;top:58px;left:16px;width:84px;z-index:6;filter:drop-shadow(0 2px 6px rgba(0,0,0,.35))}
-.hv-luften{position:absolute;left:16px;bottom:20px;z-index:6;display:flex;align-items:center;gap:8px;background:${H.colors.petrol};color:#fff;border:0;border-radius:999px;padding:11px 18px;font:800 14px inherit;font-family:inherit;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.3)}
+.hv-luften{position:absolute;left:16px;bottom:20px;z-index:6;display:flex;align-items:center;gap:8px;background:var(--c-main);color:#fff;border:0;border-radius:999px;padding:11px 18px;font:800 14px inherit;font-family:inherit;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.3)}
 .hv-luften svg{width:18px;height:18px}
-.hv-room{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);z-index:6;background:rgba(255,255,255,.95);color:${H.colors.petrol};border-radius:999px;padding:8px 16px;font-weight:800;font-size:14px;box-shadow:0 4px 14px rgba(0,0,0,.25)}
-.hv-menuknap{position:absolute;top:14px;right:14px;z-index:9;background:${H.colors.petrol};color:#fff;border:0;border-radius:999px;padding:9px 18px;font-weight:800;font-size:14px;font-family:inherit;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+.hv-room{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);z-index:6;background:rgba(255,255,255,.95);color:var(--c-main);border-radius:999px;padding:8px 16px;font-weight:800;font-size:14px;box-shadow:0 4px 14px rgba(0,0,0,.25)}
+.hv-menuknap{position:absolute;top:14px;right:14px;z-index:9;background:var(--c-main);color:#fff;border:0;border-radius:999px;padding:9px 18px;font-weight:800;font-size:14px;font-family:inherit;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.3)}
 .hv-menu{position:absolute;top:0;right:0;bottom:0;z-index:8;width:320px;max-width:100%;background:rgba(255,255,255,.98);overflow-y:auto;transform:translateX(105%);transition:transform .3s ease;box-shadow:-10px 0 30px rgba(0,0,0,.25)}
 .hv-menu.aaben{transform:none}
 .hv-menu-head{padding:56px 20px 16px;text-align:center;color:#fff}
 .hv-menu-head img{width:58px;height:58px;display:block;margin:0 auto 10px}
 .hv-menu-titel{font-size:20px;font-weight:800;letter-spacing:.08em}
 .hv-gruppe{border-bottom:1px solid #e6eaeb}
-.hv-gtitel{display:flex;justify-content:space-between;align-items:center;width:100%;padding:12px 22px;border:0;background:none;font:600 16px inherit;font-family:inherit;color:${H.colors.petrol};cursor:pointer;text-align:left}
-.hv-gtitel:hover{color:${H.colors.orange}}
+.hv-gtitel{display:flex;justify-content:space-between;align-items:center;width:100%;padding:12px 22px;border:0;background:none;font:600 16px inherit;font-family:inherit;color:var(--c-main);cursor:pointer;text-align:left}
+.hv-gtitel:hover{color:var(--c-accent)}
 .hv-enkel{border-bottom:1px solid #e6eaeb}
 .hv-items{padding:0 0 8px}
 .hv-items button{display:block;width:100%;text-align:left;padding:5px 22px 5px 36px;border:0;background:none;font:400 14.5px inherit;font-family:inherit;color:#4a6168;cursor:pointer}
-.hv-items button:hover{color:${H.colors.orange}}
-.hv-ext{margin-left:6px;font-size:12px;color:${H.colors.orangeDark}}
+.hv-items button:hover{color:var(--c-accent)}
+.hv-ext{margin-left:6px;font-size:12px;color:var(--c-accent-dark)}
+.hv-light{color:var(--c-main)!important;border-bottom:1px solid #e6eaeb}
+.hv-light img{width:auto!important;height:auto!important;max-width:180px;max-height:64px}
+.hv-light .hv-menu-titel{display:none}
+.hv-light .hv-sub{color:#7a8a90}
+.hv-contact{margin:0 22px 26px;padding:14px 16px;border-radius:14px;background:var(--c-soft);display:flex;flex-direction:column;gap:8px}
+.hv-contact-t{font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#7a8a90}
+.hv-contact a{display:flex;gap:8px;align-items:center;overflow-wrap:anywhere;min-width:0;color:var(--c-main);text-decoration:none;font-size:14px;font-weight:600}
+.hv-contact a:hover{color:var(--c-accent-dark)}
 .hv-menu-cta{padding:14px 22px 24px;display:flex;flex-direction:column;gap:8px}
 .hv-pano{position:absolute;inset:0;z-index:15;background:#0d1b20;animation:hvFade .4s ease}
 @keyframes hvFade{from{opacity:0}to{opacity:1}}
 .hv-pano-titel{position:absolute;top:16px;left:16px;z-index:2;background:rgba(21,50,58,.9);color:#fff;font-weight:800;font-size:16px;padding:8px 16px;border-radius:999px}
-.hv-pano-luk{position:absolute;left:16px;bottom:20px;z-index:2;background:${H.colors.petrol};color:#fff;border:0;border-radius:999px;padding:11px 18px;font-weight:800;font-size:14px;font-family:inherit;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.3)}
+.hv-pano-luk{position:absolute;left:16px;bottom:20px;z-index:2;background:var(--c-main);color:#fff;border:0;border-radius:999px;padding:11px 18px;font-weight:800;font-size:14px;font-family:inherit;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.3)}
 .hv-wel{position:absolute;inset:0;z-index:12;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(13,27,32,.38);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);animation:hvFade .45s ease}
 .hv-wel-grid{display:grid;grid-template-columns:1.6fr 1fr 1fr;grid-auto-rows:minmax(150px,auto);gap:16px;width:100%;max-width:1000px}
-.hv-wel-main{grid-row:span 2;background:${H.colors.sand};border-radius:20px;padding:28px 28px 22px;display:flex;flex-direction:column;animation:hvUp .6s cubic-bezier(.2,.7,.2,1)}
-.hv-wel-main img{width:56px;height:56px;background:${H.colors.petrol};border-radius:12px;padding:8px;margin-bottom:18px}
+.hv-wel-main{grid-row:span 2;background:var(--c-soft);border-radius:20px;padding:28px 28px 22px;display:flex;flex-direction:column;animation:hvUp .6s cubic-bezier(.2,.7,.2,1)}
+.hv-wel-main img{width:56px;height:56px;background:var(--c-main);border-radius:12px;padding:8px;margin-bottom:18px}
 .hv-wel-kick{font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:#7a8a90}
-.hv-wel-main h1{margin:6px 0 10px;font-size:42px;line-height:1.02;font-weight:900;color:${H.colors.petrol};letter-spacing:-.01em;text-wrap:balance}
+.hv-wel-main h1{margin:6px 0 10px;font-size:42px;line-height:1.02;font-weight:900;color:var(--c-main);letter-spacing:-.01em;text-wrap:balance}
 .hv-wel-main p{margin:0;font-size:16px;line-height:1.55;color:#3d4a50}
-.hv-wel-skip{margin-top:auto;padding-top:18px;align-self:flex-start;border:0;background:none;font:800 13px inherit;font-family:inherit;letter-spacing:.1em;text-transform:uppercase;color:${H.colors.petrol};cursor:pointer;opacity:.7}
+.hv-wel-skip{margin-top:auto;padding-top:18px;align-self:flex-start;border:0;background:none;font:800 13px inherit;font-family:inherit;letter-spacing:.1em;text-transform:uppercase;color:var(--c-main);cursor:pointer;opacity:.7}
 .hv-wel-skip:hover{opacity:1}
 .hv-tile{position:relative;border:0;border-radius:20px;padding:18px;text-align:left;cursor:pointer;display:flex;flex-direction:column;justify-content:flex-end;font-family:inherit;min-height:150px;transition:transform .25s,box-shadow .25s;animation:hvUp .6s cubic-bezier(.2,.7,.2,1) both}
 .hv-tile:nth-child(2){animation-delay:.05s}.hv-tile:nth-child(3){animation-delay:.1s}.hv-tile:nth-child(4){animation-delay:.15s}.hv-tile:nth-child(5){animation-delay:.2s}.hv-tile:nth-child(6){animation-delay:.25s}.hv-tile:nth-child(7){animation-delay:.3s}
@@ -866,13 +935,13 @@ const CSS = `
 .hv-tile:hover{transform:translateY(-4px);box-shadow:0 18px 40px rgba(0,0,0,.35)}
 .hv-tile small{font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;opacity:.75;margin-bottom:4px}
 .hv-tile b{font-size:24px;line-height:1.05;font-weight:900}
-.hv-tile em{position:absolute;top:14px;left:14px;font-style:normal;font-size:10.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;padding:3px 9px;border-radius:999px;background:${H.colors.orange};color:#fff}
+.hv-tile em{position:absolute;top:14px;left:14px;font-style:normal;font-size:10.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;padding:3px 9px;border-radius:999px;background:var(--c-accent);color:#fff}
 .hv-tile-plus{position:absolute;top:14px;right:14px;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px}
-.hv-tile-light{background:#fff;color:${H.colors.petrol}}.hv-tile-light .hv-tile-plus{background:${H.colors.petrol};color:#fff}
-.hv-tile-dark{background:${H.colors.petrol};color:#fff}.hv-tile-dark .hv-tile-plus{background:#fff;color:${H.colors.petrol}}
-.hv-tile-accent{background:${H.colors.orange};color:#fff}.hv-tile-accent .hv-tile-plus{background:#fff;color:${H.colors.orange}}
-.hv-tile-last{background:#e7eef0;color:${H.colors.petrol}}.hv-tile-last .hv-tile-plus{background:${H.colors.petrol};color:#fff}
-.hv-wel-x{position:absolute;top:16px;right:16px;width:44px;height:44px;border-radius:12px;border:0;background:rgba(255,255,255,.92);font-size:24px;cursor:pointer;color:${H.colors.petrol}}
+.hv-tile-light{background:#fff;color:var(--c-main)}.hv-tile-light .hv-tile-plus{background:var(--c-main);color:#fff}
+.hv-tile-dark{background:var(--c-main);color:#fff}.hv-tile-dark .hv-tile-plus{background:#fff;color:var(--c-main)}
+.hv-tile-accent{background:var(--c-accent);color:#fff}.hv-tile-accent .hv-tile-plus{background:#fff;color:var(--c-accent)}
+.hv-tile-last{background:#e7eef0;color:var(--c-main)}.hv-tile-last .hv-tile-plus{background:var(--c-main);color:#fff}
+.hv-wel-x{position:absolute;top:16px;right:16px;width:44px;height:44px;border-radius:12px;border:0;background:rgba(255,255,255,.92);font-size:24px;cursor:pointer;color:var(--c-main)}
 .hv-welcome .hv-intro,.hv-welcome .hv-filtre,.hv-welcome .hv-menuknap{opacity:0;pointer-events:none}
 .hv-dev{position:absolute;right:12px;bottom:12px;z-index:20;font-family:system-ui,sans-serif}
 .hv-dev>button{background:rgba(0,0,0,.65);color:#fff;border:0;border-radius:8px;padding:5px 10px;font-size:11px;cursor:pointer}

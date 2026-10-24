@@ -20,7 +20,7 @@ export async function saveTourGa4Id(id: string): Promise<{ ok: true } | { ok: fa
   const value = id.trim().toUpperCase();
   if (value && !/^G-[A-Z0-9]{4,}$/.test(value)) return { ok: false, error: "Et GA4-id ser sådan ud: G-XXXXXXXXXX" };
   await setSettingValue("TOUR_PROTOTYPE_GA4_ID", value || null);
-  revalidatePath("/tour-lab/halvorsminde");
+  revalidatePath("/tour-lab/[slug]", "page");
   return { ok: true };
 }
 
