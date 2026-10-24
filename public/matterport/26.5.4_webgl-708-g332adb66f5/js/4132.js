@@ -1,0 +1,2 @@
+/*! For license information please see 4132.js.LICENSE.txt */
+"use strict";(self.webpackChunkmp_webgl=self.webpackChunkmp_webgl||[]).push([[4132],{84132:(e,s,p)=>{e.exports=p.p+"images/apartments-logo-white-r.svg"}}]);

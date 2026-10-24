@@ -1,11 +1,15 @@
 "use client";
 
 /**
- * Thin wrapper around Matterport's Showcase SDK for Embeds. The SDK script is
- * Matterport's own, loaded at runtime from their CDN (the npm package fetches
- * type definitions from Matterport's API on install, which we don't want a
- * deploy to depend on), so only the few calls we use are typed here.
+ * Thin wrapper around Matterport's Showcase SDK Bundle: Matterport's own
+ * viewer, hosted unmodified by Arpo (public/matterport/<version>, from
+ * Matterport's showcase-bundle.zip) - the same approach MPSkins uses. Being
+ * on our own domain is what lets the tour hide Matterport's logo, "Powered
+ * by" and loading screen. Only the few SDK calls we use are typed here.
  */
+
+/** The SDK Bundle version in public/matterport - upgrading = unzip the new one next to it and change this. */
+export const BUNDLE_VERSION = "26.5.4_webgl-708-g332adb66f5";
 
 export type Rotation = { x: number; y: number };
 
@@ -28,40 +32,45 @@ export type MpSdk = {
   };
 };
 
-declare global {
-  interface Window {
-    MP_SDK?: { connect(iframe: HTMLIFrameElement, sdkKey?: string, version?: string): Promise<MpSdk> };
+type ShowcaseWindow = Window & { MP_SDK?: { connect(win: Window): Promise<MpSdk> } };
+
+/** Matterport's branding inside the viewer - hidden; our own logo and loading take its place. */
+const HIDE_BRANDING = `
+  [class*="logo"], .powered-by, .powered-by-link, .powered-by-label, .co-brand, .co-branded,
+  #loading-gui #loading-header { display: none !important; }
+`;
+
+function hideBranding(win: Window) {
+  const doc = win.document;
+  if (doc.getElementById("nv-hide-branding")) return;
+  const style = doc.createElement("style");
+  style.id = "nv-hide-branding";
+  style.textContent = HIDE_BRANDING;
+  (doc.head ?? doc.documentElement).appendChild(style);
+}
+
+/** Waits until the bundle in the iframe has loaded far enough to expose MP_SDK. */
+async function showcaseWindow(iframe: HTMLIFrameElement): Promise<ShowcaseWindow> {
+  const deadline = Date.now() + 60_000;
+  for (;;) {
+    const win = iframe.contentWindow as ShowcaseWindow | null;
+    try {
+      if (win?.document?.head) hideBranding(win);
+      if (win?.MP_SDK) return win;
+    } catch {
+      // Not same-origin yet (about:blank while navigating) - keep waiting.
+    }
+    if (Date.now() > deadline) throw new Error("Matterport-viseren blev ikke indlæst.");
+    await new Promise((r) => setTimeout(r, 100));
   }
 }
 
-const SDK_SCRIPT = "https://static.matterport.com/showcase-sdk/latest.js";
-let scriptPromise: Promise<void> | null = null;
-
-function loadSdkScript(): Promise<void> {
-  if (window.MP_SDK) return Promise.resolve();
-  scriptPromise ??= new Promise((resolve, reject) => {
-    const script = document.createElement("script");
-    script.src = SDK_SCRIPT;
-    script.onload = () => resolve();
-    script.onerror = () => {
-      scriptPromise = null;
-      reject(new Error("Kunne ikke hente Matterports SDK."));
-    };
-    document.head.appendChild(script);
-  });
-  return scriptPromise;
-}
-
-/**
- * Connects to a showcase iframe. The key goes both in the iframe's src
- * (`applicationKey`, what newer SDK versions read) and to connect() itself -
- * the script served as latest.js still checks the key it's handed there, and
- * answers "invalid key" without it.
- */
+/** Connects to a bundle iframe; its src carries `applicationKey`. */
 export async function connectSdk(iframe: HTMLIFrameElement, sdkKey: string): Promise<MpSdk> {
-  await loadSdkScript();
+  void sdkKey; // read by the bundle from the iframe's src
+  const win = await showcaseWindow(iframe);
   try {
-    return await window.MP_SDK!.connect(iframe, sdkKey, "");
+    return await win.MP_SDK!.connect(win);
   } catch (err) {
     const text = String(err);
     if (/mismatch|refused|invalid key/i.test(text)) {
@@ -95,7 +104,8 @@ export function showcaseUrl(modelId: string, sdkKey: string | null, extra: Recor
     ...(sdkKey ? { applicationKey: sdkKey } : {}),
     ...extra,
   });
-  return `https://my.matterport.com/show/?${params}`;
+  // Without a key there's no SDK, so the plain Matterport embed is used.
+  return sdkKey ? `/matterport/${BUNDLE_VERSION}/showcase.html?${params}` : `https://my.matterport.com/show/?${params}`;
 }
 
 /**

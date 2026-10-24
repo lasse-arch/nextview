@@ -28,6 +28,12 @@ const nextConfig: NextConfig = {
           { key: "X-Robots-Tag", value: "noindex, nofollow, noarchive, nosnippet, noimageindex" },
         ],
       },
+      {
+        // Matterport's viewer (the self-hosted SDK Bundle) is shown in an
+        // iframe on our own tour pages - still never on other sites.
+        source: "/matterport/:path*",
+        headers: [{ key: "X-Frame-Options", value: "SAMEORIGIN" }],
+      },
     ];
   },
   experimental: {
