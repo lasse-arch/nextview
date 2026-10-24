@@ -76,7 +76,7 @@ function ModelPlayer({
     ready.catch(() => {});
     onState(modelId, { sdk: null, ready, readyMs: null, error: null });
     let cancelled = false;
-    connectSdk(el)
+    connectSdk(el, sdkKey)
       .then(async (sdk) => {
         await sdk.App.state.waitUntil((s) => s.phase === sdk.App.Phase.PLAYING);
         if (cancelled) return;
@@ -121,7 +121,7 @@ function PlacePicker({
     if (!iframe.current) return;
     let sub: { cancel(): void } | null = null;
     let cancelled = false;
-    connectSdk(iframe.current)
+    connectSdk(iframe.current, sdkKey)
       .then((sdk) => {
         if (cancelled) return;
         setStatus("Gå hen til stedet og drej billedet, som det skal starte - tryk så \"Brug dette sted\".");

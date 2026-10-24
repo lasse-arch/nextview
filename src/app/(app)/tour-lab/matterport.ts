@@ -25,7 +25,7 @@ export type MpSdk = {
 
 declare global {
   interface Window {
-    MP_SDK?: { connect(iframe: HTMLIFrameElement): Promise<MpSdk> };
+    MP_SDK?: { connect(iframe: HTMLIFrameElement, sdkKey?: string, version?: string): Promise<MpSdk> };
   }
 }
 
@@ -47,11 +47,16 @@ function loadSdkScript(): Promise<void> {
   return scriptPromise;
 }
 
-/** Connects to a showcase iframe whose src carries `applicationKey`. */
-export async function connectSdk(iframe: HTMLIFrameElement): Promise<MpSdk> {
+/**
+ * Connects to a showcase iframe. The key goes both in the iframe's src
+ * (`applicationKey`, what newer SDK versions read) and to connect() itself -
+ * the script served as latest.js still checks the key it's handed there, and
+ * answers "invalid key" without it.
+ */
+export async function connectSdk(iframe: HTMLIFrameElement, sdkKey: string): Promise<MpSdk> {
   await loadSdkScript();
   try {
-    return await window.MP_SDK!.connect(iframe);
+    return await window.MP_SDK!.connect(iframe, sdkKey, "");
   } catch (err) {
     const text = String(err);
     if (/mismatch|refused|invalid key/i.test(text)) {
