@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { saveTourGa4Id } from "@/lib/actions/tour-lab";
+import { saveTourGa4Id, saveTourStoryImage } from "@/lib/actions/tour-lab";
 import { connectSdk, showcaseUrl, uLinkTarget, type MpSdk } from "../matterport";
 import type { MenuEntry, TourConfig, TourPoint, WelcomeGo } from "../tours/types";
+import { Stories, STORIES_CSS, storyJpeg, type StoryRoom } from "./stories";
 import "pannellum/build/pannellum.css";
 
 /* ---------------------------------------------------------------------------
@@ -133,6 +134,7 @@ export function Experience({
   modelId,
   sweepBySs,
   hiddenSweeps,
+  storyImages,
 }: {
   tour: TourConfig;
   sdkKey: string | null;
@@ -140,10 +142,21 @@ export function Experience({
   modelId: string | null;
   sweepBySs: Record<number, string>;
   hiddenSweeps: string[];
+  /** Room name -> picture URL for the story cards. */
+  storyImages: Record<string, string>;
 }) {
   useGa4(ga4Id, T.title);
   const { names: ROOM_NAMES, links: ROOM_LINKS } = useMemo(() => roomIndex(T.menu), [T]);
   const LAST_ROOM_KEY = `${T.slug}-last-room`;
+  /** The rooms of "Historier": the ones the setup names, otherwise every room in the menu. */
+  const storyRooms = useMemo<StoryRoom[]>(() => {
+    const all = T.menu
+      .flatMap((m) => ("items" in m ? m.items : [[m.title, m.href] as [string, string]]))
+      .filter(([, href]) => href.includes("explore.nextview360.dk"));
+    const unique = all.filter(([name], i) => all.findIndex(([n]) => n === name) === i);
+    const picked = T.stories?.rooms ? T.stories.rooms.map((r) => unique.find(([n]) => n === r)).filter((x): x is [string, string] => Boolean(x)) : unique;
+    return picked.map(([name, href]) => ({ name, href, image: storyImages[name] }));
+  }, [T, storyImages]);
   const droneEl = useRef<HTMLDivElement>(null);
   const drone = useRef<PannellumViewer | null>(null);
   const iframe = useRef<HTMLIFrameElement>(null);
@@ -384,21 +397,7 @@ export function Experience({
     setTimeout(() => drone.current?.lookAt(start.pitch, start.yaw, start.hfov, 1200), 350);
   }
 
-  /** Opens the tour's menu - the tile menu or the side menu - and closes an open point. */
-  function openMenu(place: string) {
-    setSelected(null);
-    track("menu_open", { style: T.menuStyle, place });
-    if (T.menuStyle === "tiles" && T.welcome) {
-      setLastRoom(readLastRoom(LAST_ROOM_KEY));
-      setWelcome(true);
-    } else setMenuOpen(true);
-  }
-  const openMenuRef = useRef(openMenu);
-  useEffect(() => {
-    openMenuRef.current = openMenu;
-  });
-
-  /* ----- Start: a link can say where to begin, otherwise the menu if it's open on start. ----- */
+  /* ----- Start: a link can say where to begin, otherwise the welcome, or the menu if it's open on start. ----- */
   const enterRef = useRef(enterTour);
   useEffect(() => {
     enterRef.current = enterTour;
@@ -430,8 +429,13 @@ export function Experience({
         enterRef.current(`${T.tourPage}?${q.toString()}`, "link", ROOM_NAMES[Number(ss)] ?? `ss=${ss}`);
         return;
       }
-      const open = window.innerWidth <= 760 ? T.menuOpenOnStart.mobile : T.menuOpenOnStart.desktop;
-      if (open) openMenuRef.current("start");
+      if (T.welcome) {
+        setLastRoom(readLastRoom(LAST_ROOM_KEY));
+        setWelcome(true);
+        track("welcome_view");
+        return;
+      }
+      if (window.innerWidth <= 760 ? T.menuOpenOnStart.mobile : T.menuOpenOnStart.desktop) setMenuOpen(true);
     });
   }, [openPoint, T, ROOM_NAMES, LAST_ROOM_KEY]);
 
@@ -474,10 +478,34 @@ export function Experience({
     await flyTo(href, "fly");
   }
 
+  async function storyGo(r: StoryRoom) {
+    track("menu_click", { item_name: r.name, group: "Historier" });
+    if (phase === "drone") return enterTour(r.href, "story", r.name);
+    await flyTo(r.href, "fly");
+  }
+
+  /** Prototype tool: visits every story room and takes its picture from the tour itself. */
+  const router = useRouter();
+  async function captureStories(progress: (text: string) => void) {
+    if (!sdkRef.current) throw new Error("Touren er ikke klar.");
+    const sdk = await sdkRef.current;
+    setPhase("tour");
+    for (const [i, r] of storyRooms.entries()) {
+      progress(`${i + 1}/${storyRooms.length}: ${r.name}`);
+      if (!(await flyTo(r.href, "instant"))) continue;
+      await new Promise((res) => setTimeout(res, 2500)); // let the room's sharp textures load
+      const shot = await sdk.Renderer.takeScreenShot({ width: 600, height: 800 }, { mattertags: false, sweeps: false, views: false, measurements: false });
+      const saved = await saveTourStoryImage(T.slug, r.name, await storyJpeg(shot));
+      if (!saved.ok) throw new Error(saved.error);
+    }
+    progress(`Færdig - ${storyRooms.length} billeder.`);
+    router.refresh();
+  }
+
   const ctaClick = (label: string, href: string, place: string) => track("cta_click", { label, link_url: href, place });
 
   return (
-    <div className={`hv fixed inset-0 z-50 overflow-hidden bg-[#0d1b20] ${selected ? "hv-punkt" : ""} ${zoomed ? "hv-zoom" : ""} ${welcome ? "hv-welcome" : ""}`} style={
+    <div className={`hv fixed inset-0 z-50 overflow-hidden bg-[#0d1b20] ${selected ? "hv-punkt" : ""} ${zoomed ? "hv-zoom" : ""} ${welcome ? "hv-welcome" : ""} ${phase === "tour" && T.stories?.mobile ? "hv-st-on-m" : ""} ${menuOpen ? "hv-menu-aaben" : ""} ${phase === "tour" && T.stories?.desktop ? "hv-st-on-d" : ""}`} style={
         {
           fontFamily: `'${T.font}', system-ui, sans-serif`,
           "--c-main": T.colors.main,
@@ -487,7 +515,7 @@ export function Experience({
         } as React.CSSProperties
       }>
       <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.font}:wght@400;600;700;800;900&display=swap`} />
-      <style>{CSS}</style>
+      <style>{CSS + STORIES_CSS}</style>
 
       {/* The tour, always mounted so it loads while the visitor is in the drone scene. */}
       {modelId && (
@@ -607,29 +635,6 @@ export function Experience({
               </button>
             ))}
           </div>
-          <div className="hv-wel-all">
-            {T.menu.map((m) => (
-              <div key={m.title} className="hv-wel-group">
-                <h4>{m.title}</h4>
-                <div className="hv-wel-pills">
-                  {("items" in m ? m.items : [[m.title, m.href] as [string, string]]).map(([name, href]) => (
-                    <button
-                      key={name}
-                      type="button"
-                      className={room === name ? "here" : ""}
-                      onClick={() => {
-                        setWelcome(false);
-                        menuGo(name, m.title, href);
-                      }}
-                    >
-                      {name}
-                      {!href.includes("explore.nextview360.dk") && !href.startsWith("#") && " ↗"}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
           <button type="button" className="hv-wel-x" aria-label="Luk" onClick={() => chooseWelcome("skip", "luk")}>
             ×
           </button>
@@ -653,6 +658,16 @@ export function Experience({
             {T.drone.backLabel}
           </button>
           )}
+          {T.stories && storyRooms.length > 0 && (
+            <Stories
+              rooms={storyRooms}
+              current={room}
+              devices={T.stories}
+              leading={T.drone ? { label: T.drone.backLabel, onClick: backToDrone } : undefined}
+              onGo={storyGo}
+              onEvent={track}
+            />
+          )}
           {room && <div className="hv-room">{room}</div>}
         </>
       )}
@@ -661,10 +676,11 @@ export function Experience({
         type="button"
         className="hv-menuknap"
         onClick={() => {
-          if (menuOpen || welcome) {
-            setMenuOpen(false);
-            setWelcome(false);
-          } else openMenu(phase);
+          if (!menuOpen) {
+            track("menu_open", { place: phase });
+            setSelected(null); // an open point and the menu would cover each other
+          }
+          setMenuOpen((o) => !o);
         }}
       >
         {menuOpen ? "Luk" : "Menu"}
@@ -744,7 +760,7 @@ export function Experience({
           {tourError ? "⚠ Tour" : tourReadyMs != null ? `Tour klar ${(tourReadyMs / 1000).toFixed(1).replace(".", ",")} s` : "Tour indlæses…"} · GA4 {ga4Id ? "✓" : "–"}
         </button>
         {showLog && (
-          <DevPanel ga4Id={ga4Id} tourError={tourError} sdkKey={sdkKey} modelId={modelId} pointsOnly={pointsOnly} onPointsOnly={setNavigation} />
+          <DevPanel onCaptureStories={T.stories ? captureStories : undefined} storyCount={storyRooms.length} ga4Id={ga4Id} tourError={tourError} sdkKey={sdkKey} modelId={modelId} pointsOnly={pointsOnly} onPointsOnly={setNavigation} />
         )}
       </div>
     </div>
@@ -823,6 +839,8 @@ function startParams(href: string): Record<string, string> {
 }
 
 function DevPanel({
+  onCaptureStories,
+  storyCount,
   ga4Id,
   tourError,
   sdkKey,
@@ -830,6 +848,8 @@ function DevPanel({
   pointsOnly,
   onPointsOnly,
 }: {
+  onCaptureStories?: (progress: (text: string) => void) => Promise<void>;
+  storyCount: number;
   ga4Id: string | null;
   tourError: string | null;
   sdkKey: string | null;
@@ -839,6 +859,7 @@ function DevPanel({
 }) {
   const [value, setValue] = useState(ga4Id ?? "");
   const [msg, setMsg] = useState<string | null>(null);
+  const [capture, setCapture] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const router = useRouter();
   return (
@@ -850,6 +871,19 @@ function DevPanel({
         <input type="checkbox" checked={pointsOnly} onChange={(e) => onPointsOnly(e.target.checked)} />
         Kun punkter (ingen fri gang - menu og punkter flytter dig)
       </label>
+      {onCaptureStories && (
+        <p>
+          <button
+            type="button"
+            className="hv-devbtn"
+            disabled={capture != null && !/^Færdig|^Fejl/.test(capture)}
+            onClick={() => onCaptureStories(setCapture).catch((err) => setCapture(`Fejl: ${err instanceof Error ? err.message : err}`))}
+          >
+            Tag billeder til Historier ({storyCount} rum)
+          </button>
+          {capture && <span> {capture}</span>}
+        </p>
+      )}
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -974,14 +1008,6 @@ const CSS = `
 .hv-tile-accent{background:var(--c-accent);color:#fff}.hv-tile-accent .hv-tile-plus{background:#fff;color:var(--c-accent)}
 .hv-tile-last{background:#e7eef0;color:var(--c-main)}.hv-tile-last .hv-tile-plus{background:var(--c-main);color:#fff}
 .hv-wel-x{position:absolute;top:16px;right:16px;width:44px;height:44px;border-radius:12px;border:0;background:rgba(255,255,255,.92);font-size:24px;cursor:pointer;color:var(--c-main)}
-.hv-wel{flex-direction:column;justify-content:flex-start;overflow-y:auto}
-.hv-wel>*:first-child{margin-top:auto}
-.hv-wel>*:last-child{margin-bottom:auto}
-.hv-wel-all{width:100%;max-width:1000px;margin-top:22px;display:flex;flex-direction:column;gap:14px;animation:hvUp .6s .2s cubic-bezier(.2,.7,.2,1) both}
-.hv-wel-group h4{margin:0 0 8px;font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.75)}
-.hv-wel-pills{display:flex;flex-wrap:wrap;gap:8px}
-.hv-wel-pills button{border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.12);color:#fff;border-radius:999px;padding:8px 14px;font:700 13.5px inherit;font-family:inherit;cursor:pointer;backdrop-filter:blur(4px)}
-.hv-wel-pills button:hover,.hv-wel-pills button.here{background:var(--c-accent);border-color:var(--c-accent)}
 .hv-welcome .hv-intro,.hv-welcome .hv-filtre,.hv-welcome .hv-menuknap{opacity:0;pointer-events:none}
 .hv-dev{position:absolute;right:12px;bottom:12px;z-index:20;font-family:system-ui,sans-serif}
 .hv-dev>button{background:rgba(0,0,0,.65);color:#fff;border:0;border-radius:8px;padding:5px 10px;font-size:11px;cursor:pointer}
@@ -993,6 +1019,7 @@ const CSS = `
 .hv-devpanel li{margin:2px 0}
 .hv-devt{margin:8px 0 0;font-weight:700}
 .hv-warn{color:#b81c17;margin:0 0 6px}
+.hv-devbtn{background:#1d2a30;color:#fff;border:0;border-radius:6px;padding:5px 10px;cursor:pointer}
 .hv-devcheck{display:flex;gap:6px;align-items:center;margin:0 0 8px;font-weight:600}
 @media (max-width:760px){
   /* Slim welcome bar instead of the big card, with room for the menu button. */

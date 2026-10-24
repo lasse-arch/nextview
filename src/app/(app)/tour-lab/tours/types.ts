@@ -58,12 +58,6 @@ export type TourConfig = {
   panos?: { basePath: string; maxLevel: number; cubeResolution: number };
   categories: Record<string, { name: string; color: string }>;
   points: TourPoint[];
-  /**
-   * The menu's look: "side" = a list sliding in from the side, "tiles" = a
-   * full-screen tile menu (the "welcome" below plus every room as a button).
-   * Shown at start or not by menuOpenOnStart.
-   */
-  menuStyle: "side" | "tiles";
   /** The tiles of the tile menu. */
   welcome?: {
     kicker: string;
@@ -79,6 +73,12 @@ export type TourConfig = {
   /** MPSkins "navOpenOnStart", per device. */
   menuOpenOnStart: { desktop: boolean; mobile: boolean };
   menu: MenuEntry[];
+  /**
+   * "Historier": the rooms as Instagram-style story cards along the bottom,
+   * each with a picture of the room. `rooms` picks and orders them (menu
+   * names); left out = every room in the menu, in menu order.
+   */
+  stories?: { mobile: boolean; desktop: boolean; rooms?: string[] };
   /** MPSkins "Codes" as Matterport URL parameters. */
   matterportParams: Record<string, string>;
   /** MPSkins "Deep Link Transitions" time. */

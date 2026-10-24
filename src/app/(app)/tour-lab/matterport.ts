@@ -23,6 +23,13 @@ export type MpSdk = {
   Camera: {
     pose: { subscribe(cb: (pose: { sweep: string; rotation: Rotation; mode: string }) => void): { cancel(): void } };
   };
+  Renderer: {
+    /** The current view as an image (a data URL), without Matterport's own markers when told so. */
+    takeScreenShot(
+      resolution?: { width: number; height: number },
+      visibility?: { mattertags?: boolean; sweeps?: boolean; views?: boolean; measurements?: boolean }
+    ): Promise<string>;
+  };
   Sweep: {
     Transition: { FLY: string; INSTANT: string; FADEOUT: string };
     data: {

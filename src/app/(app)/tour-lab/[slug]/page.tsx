@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
+import { prisma } from "@/lib/db";
 import { getSettingValue } from "@/lib/integration-settings";
 import { fetchMpskinsCfg, hiddenSweeps, ssOf, sweepForSs } from "@/lib/mpskins";
 import { TOURS } from "../tours";
@@ -21,11 +22,16 @@ export default async function TourPrototypePage({ params }: { params: Promise<{ 
   const tour = TOURS[(await params).slug];
   if (!tour) notFound();
 
-  const [sdkKey, ga4Id, cfg] = await Promise.all([
+  const [sdkKey, ga4Id, cfg, storyImages] = await Promise.all([
     getSettingValue("MATTERPORT_SDK_KEY"),
     getSettingValue("TOUR_PROTOTYPE_GA4_ID"),
     fetchMpskinsCfg(tour.tourPage).catch(() => null),
+    prisma.tourStoryImage.findMany({ where: { tourSlug: tour.slug }, select: { room: true, updatedAt: true } }),
   ]);
+  // The story cards' pictures: room name -> URL (versioned, so a retaken picture shows at once).
+  const storyImageUrls = Object.fromEntries(
+    storyImages.map((s) => [s.room, `/tour-lab/${tour.slug}/historie?rum=${encodeURIComponent(s.room)}&v=${s.updatedAt.getTime()}`])
+  );
 
   const links = [
     tour.start,
@@ -44,6 +50,6 @@ export default async function TourPrototypePage({ params }: { params: Promise<{ 
   const hidden = [...new Set([...(cfg ? hiddenSweeps(cfg) : []), ...tour.hiddenSweeps])];
 
   return (
-    <Experience tour={tour} sdkKey={sdkKey} ga4Id={ga4Id} modelId={cfg?.mpModel ?? null} sweepBySs={sweepBySs} hiddenSweeps={hidden} />
+    <Experience tour={tour} sdkKey={sdkKey} ga4Id={ga4Id} modelId={cfg?.mpModel ?? null} sweepBySs={sweepBySs} hiddenSweeps={hidden} storyImages={storyImageUrls} />
   );
 }

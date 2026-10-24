@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
+import { prisma } from "@/lib/db";
 import { setSettingValue } from "@/lib/integration-settings";
 import { fetchMpskinsCfg, ssOf, sweepForSs } from "@/lib/mpskins";
 
@@ -52,4 +53,23 @@ export async function resolveTourLink(url: string): Promise<ResolvedTourLink> {
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Kunne ikke hente MPSkins-siden." };
   }
+}
+
+/**
+ * Stores a room's picture for the tour's story cards - a JPEG captured from
+ * the tour in the browser (Renderer.takeScreenShot), sent as a data URL.
+ */
+export async function saveTourStoryImage(slug: string, room: string, dataUrl: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const user = await requireUser();
+  if (user.role !== "ADMIN") return { ok: false, error: "Kun admin." };
+  const match = /^data:image\/jpeg;base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl);
+  if (!match) return { ok: false, error: "Billedet skal være en JPEG." };
+  const image = Buffer.from(match[1], "base64");
+  if (image.length > 300_000) return { ok: false, error: "Billedet er for stort." };
+  await prisma.tourStoryImage.upsert({
+    where: { tourSlug_room: { tourSlug: slug, room } },
+    create: { tourSlug: slug, room, image },
+    update: { image },
+  });
+  return { ok: true };
 }

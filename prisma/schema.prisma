@@ -1269,3 +1269,14 @@ model Milestone {
   key       String   @id
   reachedAt DateTime @default(now())
 }
+
+/// A room's picture for a prototype tour's "Historier" (the story cards):
+/// captured from the tour itself with Matterport's Renderer.takeScreenShot.
+model TourStoryImage {
+  tourSlug  String
+  room      String
+  image     Bytes
+  updatedAt DateTime @updatedAt
+
+  @@id([tourSlug, room])
+}

@@ -33,8 +33,8 @@ export const fitnessGronlandstorv: TourConfig = {
   points: [],
   navigation: "free",
   hiddenSweeps: [],
-  menuStyle: "side",
   menuOpenOnStart: { desktop: true, mobile: false },
+  stories: { mobile: true, desktop: true },
   menu: [
     { title: "Indgang og café", items: [["Reception", u(5, "-.03,-1.26")], ["Caféområde", u(13, "-.03,-1.2")], ["Salgsautomater", u(9, "-3.08,.52")]] },
     {
