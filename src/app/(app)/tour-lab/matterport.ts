@@ -28,6 +28,8 @@ export type MpSdk = {
     data: {
       subscribe(observer: { onCollectionUpdated(collection: Record<string, SweepInfo>): void }): { cancel(): void };
     };
+    /** Hides scan points: no puck, can't be walked to. */
+    disable(...sweepIds: string[]): Promise<void>;
     moveTo(sweepId: string, options?: { rotation?: Rotation; transition?: string; transitionTime?: number }): Promise<string>;
   };
 };

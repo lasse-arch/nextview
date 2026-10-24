@@ -3,8 +3,8 @@ import "server-only";
 /** The parts of the `var cfg = {...}` object MPSkins renders into every tour page that we read. */
 export type MpskinsCfg = {
   mpModel?: string;
-  /** Scan points in the order a U-link's ss number counts them (from 1). */
-  sweep?: { uuid?: string }[];
+  /** Scan points in the order a U-link's ss number counts them (from 1); `hide` = turned off under "Scan Points / Floor". */
+  sweep?: { uuid?: string; floor?: number; hide?: boolean }[];
 };
 
 function extractCfg(html: string): MpskinsCfg | null {
@@ -55,4 +55,9 @@ export function ssOf(url: string): number | null {
 
 export function sweepForSs(cfg: MpskinsCfg, ss: number | null): string | null {
   return ss != null ? cfg.sweep?.[ss - 1]?.uuid ?? null : null;
+}
+
+/** The scan points hidden in MPSkins ("Scan Points / Floor"), to be disabled in our tour too. */
+export function hiddenSweeps(cfg: MpskinsCfg): string[] {
+  return (cfg.sweep ?? []).filter((s) => s.hide && s.uuid).map((s) => s.uuid!);
 }

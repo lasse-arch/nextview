@@ -109,11 +109,13 @@ export function Experience({
   ga4Id,
   modelId,
   sweepBySs,
+  hiddenSweeps,
 }: {
   sdkKey: string | null;
   ga4Id: string | null;
   modelId: string | null;
   sweepBySs: Record<number, string>;
+  hiddenSweeps: string[];
 }) {
   useGa4(ga4Id);
   const droneEl = useRef<HTMLDivElement>(null);
@@ -155,6 +157,7 @@ export function Experience({
     const ssBySweep = Object.fromEntries(Object.entries(sweepBySs).map(([ss, id]) => [id, Number(ss)]));
     sdkRef.current = connectSdk(iframe.current, sdkKey).then(async (sdk) => {
       await sdk.App.state.waitUntil((s) => s.phase === sdk.App.Phase.PLAYING);
+      if (hiddenSweeps.length) await sdk.Sweep.disable(...hiddenSweeps).catch((err) => console.warn("Sweep.disable", err));
       setTourReadyMs(now() - started);
       track("tour_ready", { load_ms: Math.round(now() - started) });
       const current = (sdk as unknown as { Sweep: { current: { subscribe(cb: (s: { sid?: string }) => void): { cancel(): void } } } }).Sweep.current;
@@ -169,7 +172,7 @@ export function Experience({
     });
     sdkRef.current.catch((err) => setTourError(err instanceof Error ? err.message : String(err)));
     return () => sub?.cancel();
-  }, [sdkKey, modelId, sweepBySs]);
+  }, [sdkKey, modelId, sweepBySs, hiddenSweeps]);
 
   const flyTo = useCallback(
     async (href: string, transition: "fly" | "instant") => {

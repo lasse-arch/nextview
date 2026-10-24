@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { getSettingValue } from "@/lib/integration-settings";
-import { fetchMpskinsCfg, ssOf, sweepForSs } from "@/lib/mpskins";
+import { fetchMpskinsCfg, hiddenSweeps, ssOf, sweepForSs } from "@/lib/mpskins";
 import { halvorsminde } from "./data";
 import { Experience } from "./experience";
 
@@ -34,5 +34,8 @@ export default async function HalvorsmindePrototypePage() {
     if (ss != null && sweep) sweepBySs[ss] = sweep;
   }
 
-  return <Experience sdkKey={sdkKey} ga4Id={ga4Id} modelId={cfg?.mpModel ?? null} sweepBySs={sweepBySs} />;
+  // Scan points hidden in MPSkins stay hidden here (plus any listed in data.ts).
+  const hidden = [...new Set([...(cfg ? hiddenSweeps(cfg) : []), ...halvorsminde.hiddenSweeps])];
+
+  return <Experience sdkKey={sdkKey} ga4Id={ga4Id} modelId={cfg?.mpModel ?? null} sweepBySs={sweepBySs} hiddenSweeps={hidden} />;
 }
