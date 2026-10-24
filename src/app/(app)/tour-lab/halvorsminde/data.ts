@@ -75,6 +75,8 @@ export const halvorsminde = {
     { id: "volleyball", name: "Volleyball", cat: "sport", icon: "bold", yaw: -10, pitch: -17, tour: null, pano: "volleyball",
       text: "Beachvolley-banen er et af skolens udendørs samlingssteder, når vejret er til det.", chips: ["Beachvolley", "Udendørs", "Sammen"] },
   ] as { id: string; name: string; cat: string; icon: string; yaw: number; pitch: number; tour: string | null; pano?: string; text: string; chips: string[] }[],
+  /** "free": walk around as in Matterport. "points": only the menu and points move you (e.g. Hals Camping). */
+  navigation: "free" as "free" | "points",
   /** Extra scan points to hide (sweep ids) - the ones hidden in MPSkins are picked up automatically. */
   hiddenSweeps: [] as string[],
   /** MPSkins "navOpenOnStart", per device. */

@@ -122,6 +122,12 @@ export function Experience({
   const drone = useRef<PannellumViewer | null>(null);
   const iframe = useRef<HTMLIFrameElement>(null);
   const sdkRef = useRef<Promise<MpSdk> | null>(null);
+  /** All scan points of the model, and the one the visitor stands on. */
+  const allSweeps = useRef<string[]>([]);
+  const currentSweep = useRef<string | null>(null);
+  /** "Kun punkter": no free walking - only the current scan point is enabled, the menu and points move you. */
+  const [pointsOnly, setPointsOnly] = useState(H.navigation === "points");
+  const pointsOnlyRef = useRef(pointsOnly);
   const [phase, setPhase] = useState<"drone" | "tour">("drone");
   const [selected, setSelected] = useState<Point | null>(null);
   const [hidden, setHidden] = useState<Record<string, boolean>>({});
@@ -158,11 +164,15 @@ export function Experience({
     sdkRef.current = connectSdk(iframe.current, sdkKey).then(async (sdk) => {
       await sdk.App.state.waitUntil((s) => s.phase === sdk.App.Phase.PLAYING);
       if (hiddenSweeps.length) await sdk.Sweep.disable(...hiddenSweeps).catch((err) => console.warn("Sweep.disable", err));
+      sdk.Sweep.data.subscribe({ onCollectionUpdated: (c) => (allSweeps.current = Object.keys(c)) });
       setTourReadyMs(now() - started);
       track("tour_ready", { load_ms: Math.round(now() - started) });
       const current = (sdk as unknown as { Sweep: { current: { subscribe(cb: (s: { sid?: string }) => void): { cancel(): void } } } }).Sweep.current;
       sub = current.subscribe((s) => {
         if (!s?.sid) return;
+        const first = currentSweep.current == null;
+        currentSweep.current = s.sid;
+        if (first && pointsOnlyRef.current) lockTo(sdk, allSweeps.current, s.sid);
         const ss = ssBySweep[s.sid];
         const name = ss != null ? ROOM_NAMES[ss] ?? null : null;
         setRoom(name);
@@ -174,17 +184,37 @@ export function Experience({
     return () => sub?.cancel();
   }, [sdkKey, modelId, sweepBySs, hiddenSweeps]);
 
+  const setNavigation = useCallback(
+    async (only: boolean) => {
+      setPointsOnly(only);
+      pointsOnlyRef.current = only;
+      track("navigation_mode", { mode: only ? "points" : "free" });
+      if (!sdkRef.current) return;
+      const sdk = await sdkRef.current;
+      if (only && currentSweep.current) await lockTo(sdk, allSweeps.current, currentSweep.current);
+      if (!only) {
+        const open = allSweeps.current.filter((id) => !hiddenSweeps.includes(id));
+        if (open.length) await sdk.Sweep.enable(...open).catch((err) => console.warn("Sweep.enable", err));
+      }
+    },
+    [hiddenSweeps]
+  );
+
   const flyTo = useCallback(
     async (href: string, transition: "fly" | "instant") => {
       const target = uLinkTarget(href);
       const sweep = target ? sweepBySs[target.ss] : null;
       if (!sdkRef.current || !sweep) return false;
       const sdk = await sdkRef.current;
+      const locked = pointsOnlyRef.current;
+      const from = currentSweep.current;
+      if (locked) await sdk.Sweep.enable(sweep);
       await sdk.Sweep.moveTo(sweep, {
         rotation: target?.rotation,
         transition: transition === "fly" ? sdk.Sweep.Transition.FLY : sdk.Sweep.Transition.INSTANT,
         transitionTime: transition === "fly" ? H.flyMs : undefined,
       });
+      if (locked && from && from !== sweep) await sdk.Sweep.disable(from).catch(() => {});
       return true;
     },
     [sweepBySs]
@@ -501,7 +531,9 @@ export function Experience({
         <button type="button" onClick={() => setShowLog((s) => !s)}>
           {tourError ? "⚠ Tour" : tourReadyMs != null ? `Tour klar ${(tourReadyMs / 1000).toFixed(1).replace(".", ",")} s` : "Tour indlæses…"} · GA4 {ga4Id ? "✓" : "–"}
         </button>
-        {showLog && <DevPanel ga4Id={ga4Id} tourError={tourError} sdkKey={sdkKey} modelId={modelId} />}
+        {showLog && (
+          <DevPanel ga4Id={ga4Id} tourError={tourError} sdkKey={sdkKey} modelId={modelId} pointsOnly={pointsOnly} onPointsOnly={setNavigation} />
+        )}
       </div>
     </div>
   );
@@ -550,6 +582,14 @@ function PanoView({ name, dir, onClose }: { name: string; dir: string; onClose: 
   );
 }
 
+/** Only `keep` stays walkable: every other scan point is disabled (no pucks, no walking). */
+function lockTo(sdk: MpSdk, all: string[], keep: string) {
+  const others = all.filter((id) => id !== keep);
+  return Promise.all([sdk.Sweep.enable(keep), others.length ? sdk.Sweep.disable(...others) : null]).catch((err) =>
+    console.warn("lockTo", err)
+  );
+}
+
 /** The tour's start point (MPSkins "Starting Point") as embed parameters. */
 function startParams(href: string): Record<string, string> {
   try {
@@ -560,7 +600,21 @@ function startParams(href: string): Record<string, string> {
   }
 }
 
-function DevPanel({ ga4Id, tourError, sdkKey, modelId }: { ga4Id: string | null; tourError: string | null; sdkKey: string | null; modelId: string | null }) {
+function DevPanel({
+  ga4Id,
+  tourError,
+  sdkKey,
+  modelId,
+  pointsOnly,
+  onPointsOnly,
+}: {
+  ga4Id: string | null;
+  tourError: string | null;
+  sdkKey: string | null;
+  modelId: string | null;
+  pointsOnly: boolean;
+  onPointsOnly: (only: boolean) => void;
+}) {
   const [value, setValue] = useState(ga4Id ?? "");
   const [msg, setMsg] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -570,6 +624,10 @@ function DevPanel({ ga4Id, tourError, sdkKey, modelId }: { ga4Id: string | null;
       {!sdkKey && <p className="hv-warn">Mangler SDK-nøgle (sæt den på /tour-lab).</p>}
       {!modelId && <p className="hv-warn">Kunne ikke hente touren fra MPSkins.</p>}
       {tourError && <p className="hv-warn">{tourError}</p>}
+      <label className="hv-devcheck">
+        <input type="checkbox" checked={pointsOnly} onChange={(e) => onPointsOnly(e.target.checked)} />
+        Kun punkter (ingen fri gang - menu og punkter flytter dig)
+      </label>
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -674,6 +732,7 @@ const CSS = `
 .hv-devpanel li{margin:2px 0}
 .hv-devt{margin:8px 0 0;font-weight:700}
 .hv-warn{color:#b81c17;margin:0 0 6px}
+.hv-devcheck{display:flex;gap:6px;align-items:center;margin:0 0 8px;font-weight:600}
 @media (max-width:760px){
   /* Slim welcome bar instead of the big card, with room for the menu button. */
   .hv-intro{top:10px;left:10px;right:104px;width:auto;display:flex;align-items:center;border-radius:14px}
