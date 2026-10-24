@@ -40,3 +40,19 @@ export async function isDineroTestMode(): Promise<boolean> {
   const setting = await prisma.integrationSetting.findUnique({ where: { key: "DINERO_TEST_MODE" } });
   return setting?.enabled ?? false;
 }
+
+/** Settings that hold a text value instead of an on/off switch. */
+export type SettingValueKey = "MATTERPORT_SDK_KEY";
+
+export async function getSettingValue(key: SettingValueKey): Promise<string | null> {
+  const setting = await prisma.integrationSetting.findUnique({ where: { key } });
+  return setting?.value ?? null;
+}
+
+export async function setSettingValue(key: SettingValueKey, value: string | null): Promise<void> {
+  await prisma.integrationSetting.upsert({
+    where: { key },
+    create: { key, value },
+    update: { value },
+  });
+}

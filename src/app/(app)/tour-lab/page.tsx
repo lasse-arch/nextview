@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
+import { getSettingValue } from "@/lib/integration-settings";
 import { TourLab } from "./tour-lab";
 
 export const metadata = { title: "Tour-lab" };
@@ -13,5 +14,5 @@ export const metadata = { title: "Tour-lab" };
 export default async function TourLabPage() {
   const user = await getCurrentUser();
   if (user?.role !== "ADMIN") redirect("/");
-  return <TourLab />;
+  return <TourLab sdkKey={await getSettingValue("MATTERPORT_SDK_KEY")} />;
 }

@@ -1,7 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
+import { saveMatterportSdkKey } from "@/lib/actions/tour-lab";
+import { connectSdk, modelIdFrom, showcaseUrl, type MpSdk, type Rotation } from "./matterport";
 
 // The 360° viewer (WebGL) only runs in the browser.
 const Pano = dynamic(() => import("./pano").then((m) => m.Pano), { ssr: false });
@@ -13,37 +16,199 @@ type Point = {
   x: number;
   y: number;
   kind: "matterport" | "pano";
-  /** Matterport link (ideally a "U"-link to the exact spot) or a 360° image URL. */
+  /** Matterport link (tour link or "U"-link) or a 360° image URL. */
   url: string;
+  /** Picked with "Brug dette sted" through the SDK - the exact spot and view direction. */
+  sweepId?: string;
+  rotation?: Rotation;
 };
 
 const STORAGE_KEY = "tour-lab-v1";
 
 /**
- * A Matterport "U"-link (my.matterport.com/show/?m=…&ss=…&sr=…) already
- * carries the start spot (ss) and view direction (sr); play=1 + qs=1 make
- * the embed start straight away at that spot without the intro fly-in.
+ * Without the SDK a point can only open the tour from a "U"-link, which
+ * carries the start spot (ss) and view direction (sr) - a fresh load each time.
  */
-export function matterportEmbedUrl(raw: string): string {
+function plainEmbedUrl(raw: string): string {
   try {
     const url = new URL(raw.trim());
-    url.searchParams.set("play", "1");
-    url.searchParams.set("qs", "1");
-    url.searchParams.set("brand", "0");
-    url.searchParams.set("help", "0");
+    for (const [k, v] of Object.entries({ play: "1", qs: "1", brand: "0", help: "0", title: "0" })) url.searchParams.set(k, v);
     return url.toString();
   } catch {
     return raw;
   }
 }
 
-export function TourLab() {
+/** Wall-clock for the load/jump timings shown in the lab (only called from effects and click handlers). */
+const now = () => performance.now();
+
+function seconds(ms: number): string {
+  return `${(ms / 1000).toFixed(1).replace(".", ",")} s`;
+}
+
+type Player = { sdk: MpSdk | null; ready: Promise<MpSdk>; readyMs: number | null; error: string | null };
+
+/**
+ * One Matterport tour, loaded in the background as soon as the overview is
+ * shown (so it's ready by the time a point is clicked) and kept alive -
+ * every point in the same tour is then a glide to that spot via the SDK,
+ * never a new load.
+ */
+function ModelPlayer({
+  modelId,
+  sdkKey,
+  visible,
+  onState,
+}: {
+  modelId: string;
+  sdkKey: string;
+  visible: boolean;
+  onState: (modelId: string, player: Player) => void;
+}) {
+  const iframe = useRef<HTMLIFrameElement>(null);
+  useEffect(() => {
+    const el = iframe.current;
+    if (!el) return;
+    const started = now();
+    let resolve!: (sdk: MpSdk) => void;
+    let reject!: (err: unknown) => void;
+    const ready = new Promise<MpSdk>((res, rej) => ((resolve = res), (reject = rej)));
+    ready.catch(() => {});
+    onState(modelId, { sdk: null, ready, readyMs: null, error: null });
+    let cancelled = false;
+    connectSdk(el)
+      .then(async (sdk) => {
+        await sdk.App.state.waitUntil((s) => s.phase === sdk.App.Phase.PLAYING);
+        if (cancelled) return;
+        onState(modelId, { sdk, ready, readyMs: now() - started, error: null });
+        resolve(sdk);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        onState(modelId, { sdk: null, ready, readyMs: null, error: err instanceof Error ? err.message : String(err) });
+        reject(err);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [modelId, sdkKey, onState]);
+
+  return (
+    <iframe
+      ref={iframe}
+      src={showcaseUrl(modelId, sdkKey)}
+      className={`absolute inset-0 h-full w-full border-0 transition-opacity duration-300 ${visible ? "opacity-100" : "pointer-events-none opacity-0"}`}
+      allow="fullscreen; xr-spatial-tracking; autoplay"
+    />
+  );
+}
+
+/** Editor: walk to the spot in the tour, turn the view, and take that as the point's target. */
+function PlacePicker({
+  modelId,
+  sdkKey,
+  onPick,
+}: {
+  modelId: string;
+  sdkKey: string;
+  onPick: (sweepId: string, rotation: Rotation) => void;
+}) {
+  const iframe = useRef<HTMLIFrameElement>(null);
+  const pose = useRef<{ sweep: string; rotation: Rotation } | null>(null);
+  const [status, setStatus] = useState("Indlæser touren…");
+
+  useEffect(() => {
+    if (!iframe.current) return;
+    let sub: { cancel(): void } | null = null;
+    let cancelled = false;
+    connectSdk(iframe.current)
+      .then((sdk) => {
+        if (cancelled) return;
+        setStatus("Gå hen til stedet og drej billedet, som det skal starte - tryk så \"Brug dette sted\".");
+        sub = sdk.Camera.pose.subscribe((p) => {
+          if (p.sweep) pose.current = { sweep: p.sweep, rotation: p.rotation };
+        });
+      })
+      .catch((err) => !cancelled && setStatus(err instanceof Error ? err.message : String(err)));
+    return () => {
+      cancelled = true;
+      sub?.cancel();
+    };
+  }, [modelId, sdkKey]);
+
+  return (
+    <div className="space-y-2">
+      <div className="relative aspect-video overflow-hidden rounded-lg bg-black">
+        <iframe ref={iframe} src={showcaseUrl(modelId, sdkKey)} className="absolute inset-0 h-full w-full border-0" allow="fullscreen; xr-spatial-tracking" />
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => pose.current && onPick(pose.current.sweep, pose.current.rotation)}
+          className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+        >
+          Brug dette sted
+        </button>
+        <span className="text-xs text-slate-500">{status}</span>
+      </div>
+    </div>
+  );
+}
+
+function SdkKeyForm({ sdkKey }: { sdkKey: string | null }) {
+  const [value, setValue] = useState(sdkKey ?? "");
+  const [open, setOpen] = useState(!sdkKey);
+  const [pending, startTransition] = useTransition();
+  const router = useRouter();
+  if (!open) {
+    return (
+      <p className="text-xs text-emerald-700">
+        ✓ Matterport SDK-nøgle sat - punkter glider direkte hen til stedet.{" "}
+        <button type="button" onClick={() => setOpen(true)} className="font-medium text-indigo-600 hover:underline">
+          Skift
+        </button>
+      </p>
+    );
+  }
+  return (
+    <form
+      className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm"
+      onSubmit={(e) => {
+        e.preventDefault();
+        startTransition(async () => {
+          await saveMatterportSdkKey(value);
+          setOpen(false);
+          router.refresh();
+        });
+      }}
+    >
+      <label htmlFor="mp-sdk-key" className="font-medium text-amber-900">
+        Matterport SDK-nøgle
+      </label>
+      <input
+        id="mp-sdk-key"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder="Indsæt nøglen fra Developer Tools → SDK Key Management"
+        className="min-w-0 flex-1 rounded-md border border-amber-300 bg-white px-3 py-1.5"
+      />
+      <button type="submit" disabled={pending} className="rounded-md bg-slate-900 px-3 py-1.5 text-white disabled:opacity-50">
+        Gem
+      </button>
+    </form>
+  );
+}
+
+export function TourLab({ sdkKey }: { sdkKey: string | null }) {
   const [overview, setOverview] = useState<string | null>(null);
   const [points, setPoints] = useState<Point[]>([]);
   const [editing, setEditing] = useState(true);
   const [draft, setDraft] = useState<Point | null>(null);
   const [open, setOpen] = useState<Point | null>(null);
-  const panoFiles = useRef(new Map<string, string>());
+  const [players, setPlayers] = useState<Record<string, Player>>({});
+  const [jumpMs, setJumpMs] = useState<number | null>(null);
+  const [picking, setPicking] = useState(false);
+  const lastOpenModel = useRef<string | null>(null);
   const loaded = useRef(false);
 
   useEffect(() => {
@@ -66,6 +231,45 @@ export function TourLab() {
     } catch {}
   }, [overview, points]);
 
+  const onPlayerState = useCallback((modelId: string, player: Player) => {
+    setPlayers((prev) => ({ ...prev, [modelId]: player }));
+  }, []);
+
+  // Tours to keep loaded in the background: every tour a point leads into.
+  const modelIds = sdkKey && !editing
+    ? [...new Set(points.filter((p) => p.kind === "matterport" && p.sweepId).map((p) => modelIdFrom(p.url)).filter((m): m is string => Boolean(m)))]
+    : [];
+  const openModel = open?.kind === "matterport" ? modelIdFrom(open.url) : null;
+  const viaSdk = Boolean(open && open.kind === "matterport" && open.sweepId && openModel && modelIds.includes(openModel));
+
+  async function openPoint(point: Point) {
+    setOpen(point);
+    setJumpMs(null);
+    const modelId = point.kind === "matterport" ? modelIdFrom(point.url) : null;
+    if (!modelId || !point.sweepId || !players[modelId]) return;
+    const started = now();
+    try {
+      const sdk = await players[modelId].ready;
+      // Arriving from the overview: straight to the spot. Moving between
+      // points inside the tour: a short glide, like walking there.
+      const inside = lastOpenModel.current === modelId;
+      await sdk.Sweep.moveTo(point.sweepId, {
+        rotation: point.rotation,
+        transition: inside ? sdk.Sweep.Transition.FLY : sdk.Sweep.Transition.INSTANT,
+        transitionTime: inside ? 1200 : undefined,
+      });
+      lastOpenModel.current = modelId;
+      setJumpMs(now() - started);
+    } catch (err) {
+      console.error("Matterport moveTo failed", err);
+    }
+  }
+
+  function closeViewer() {
+    setOpen(null);
+    lastOpenModel.current = null;
+  }
+
   function pickOverview(file: File) {
     const reader = new FileReader();
     reader.onload = () => setOverview(String(reader.result));
@@ -78,13 +282,18 @@ export function TourLab() {
     const x = ((e.clientX - rect.left) / rect.width) * 100;
     const y = ((e.clientY - rect.top) / rect.height) * 100;
     setDraft({ id: crypto.randomUUID(), name: "", x, y, kind: "matterport", url: "" });
+    setPicking(false);
   }
 
   function saveDraft() {
     if (!draft || !draft.url.trim()) return;
     setPoints((prev) => [...prev.filter((p) => p.id !== draft.id), { ...draft, name: draft.name.trim() || "Punkt" }]);
     setDraft(null);
+    setPicking(false);
   }
+
+  const draftModel = draft?.kind === "matterport" ? modelIdFrom(draft.url) : null;
+  const openPlayer = openModel ? players[openModel] : undefined;
 
   return (
     <div className="space-y-4">
@@ -98,19 +307,10 @@ export function TourLab() {
         <div className="flex flex-wrap items-center gap-2">
           <label className="cursor-pointer rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50">
             {overview ? "Skift overbliksbillede" : "Vælg overbliksbillede"}
-            <input
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => e.target.files?.[0] && pickOverview(e.target.files[0])}
-            />
+            <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && pickOverview(e.target.files[0])} />
           </label>
           <div className="flex rounded-lg border border-slate-300 p-0.5 text-sm">
-            <button
-              type="button"
-              onClick={() => setEditing(true)}
-              className={`rounded-md px-3 py-1.5 ${editing ? "bg-slate-900 text-white" : "text-slate-600"}`}
-            >
+            <button type="button" onClick={() => setEditing(true)} className={`rounded-md px-3 py-1.5 ${editing ? "bg-slate-900 text-white" : "text-slate-600"}`}>
               Rediger
             </button>
             <button
@@ -118,6 +318,7 @@ export function TourLab() {
               onClick={() => {
                 setEditing(false);
                 setDraft(null);
+                setPicking(false);
               }}
               className={`rounded-md px-3 py-1.5 ${!editing ? "bg-slate-900 text-white" : "text-slate-600"}`}
             >
@@ -126,6 +327,28 @@ export function TourLab() {
           </div>
         </div>
       </div>
+
+      <SdkKeyForm sdkKey={sdkKey} />
+
+      {!editing && modelIds.length > 0 && (
+        <p className="text-xs text-slate-500">
+          {modelIds.map((m) => {
+            const p = players[m];
+            return (
+              <span key={m} className="mr-3">
+                Tour {m}:{" "}
+                {p?.error ? (
+                  <span className="text-red-600">{p.error}</span>
+                ) : p?.readyMs != null ? (
+                  <span className="text-emerald-700">klar i baggrunden på {seconds(p.readyMs)}</span>
+                ) : (
+                  "indlæses i baggrunden…"
+                )}
+              </span>
+            );
+          })}
+        </p>
+      )}
 
       {!overview ? (
         <div className="rounded-xl border-2 border-dashed border-slate-300 p-10 text-center text-sm text-slate-500">
@@ -136,14 +359,16 @@ export function TourLab() {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={overview} alt="Overblik" className="block w-full" draggable={false} />
           <div className={`absolute inset-0 ${editing ? "cursor-crosshair" : ""}`} onClick={clickOverview}>
-            {[...points, ...(draft ? [draft] : [])].map((p) => (
+            {[...points.filter((p) => p.id !== draft?.id), ...(draft ? [draft] : [])].map((p) => (
               <button
                 key={p.id}
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  if (editing) setDraft(p);
-                  else setOpen(p);
+                  if (editing) {
+                    setDraft(p);
+                    setPicking(false);
+                  } else openPoint(p);
                 }}
                 className="group absolute -translate-x-1/2 -translate-y-1/2"
                 style={{ left: `${p.x}%`, top: `${p.y}%` }}
@@ -165,13 +390,15 @@ export function TourLab() {
 
       {editing && overview && !draft && (
         <p className="text-sm text-slate-500">
-          Klik på billedet for at sætte et punkt. Tryk <b>U</b> inde i Matterport-touren på det sted, punktet skal hoppe hen til -
-          så kopieres et link til netop det sted og den synsretning.
+          Klik på billedet for at sætte et punkt.{" "}
+          {sdkKey
+            ? "For Matterport indsætter du tourens link og vælger så stedet direkte i touren."
+            : "Tryk U inde i Matterport-touren på det sted, punktet skal hoppe hen til - så kopieres et link til netop det sted."}
         </p>
       )}
 
       {draft && (
-        <div className="max-w-xl space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="max-w-2xl space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="text-sm">
               <span className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Navn</span>
@@ -187,7 +414,7 @@ export function TourLab() {
               <span className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Åbner</span>
               <select
                 value={draft.kind}
-                onChange={(e) => setDraft({ ...draft, kind: e.target.value as Point["kind"], url: "" })}
+                onChange={(e) => setDraft({ ...draft, kind: e.target.value as Point["kind"], url: "", sweepId: undefined, rotation: undefined })}
                 className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2"
               >
                 <option value="matterport">Matterport-tour (sted)</option>
@@ -197,17 +424,42 @@ export function TourLab() {
           </div>
           <label className="block text-sm">
             <span className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-              {draft.kind === "matterport" ? "Matterport-link (tryk U i touren)" : "Link til 360°-billede"}
+              {draft.kind === "matterport" ? (sdkKey ? "Matterport-link (touren)" : "Matterport-link (tryk U i touren)") : "Link til 360°-billede"}
             </span>
             <input
               value={draft.url.startsWith("blob:") ? "(uploadet fil)" : draft.url}
-              onChange={(e) => setDraft({ ...draft, url: e.target.value })}
-              placeholder={
-                draft.kind === "matterport" ? "https://my.matterport.com/show/?m=…&ss=…&sr=…" : "https://…/drone-360.jpg"
-              }
+              onChange={(e) => setDraft({ ...draft, url: e.target.value, sweepId: undefined, rotation: undefined })}
+              placeholder={draft.kind === "matterport" ? "https://my.matterport.com/show/?m=…" : "https://…/drone-360.jpg"}
               className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
             />
           </label>
+
+          {draft.kind === "matterport" && sdkKey && draftModel && (
+            <div className="space-y-2">
+              {draft.sweepId && !picking ? (
+                <p className="text-sm text-emerald-700">
+                  ✓ Sted valgt.{" "}
+                  <button type="button" onClick={() => setPicking(true)} className="font-medium text-indigo-600 hover:underline">
+                    Vælg et andet
+                  </button>
+                </p>
+              ) : picking ? (
+                <PlacePicker
+                  modelId={draftModel}
+                  sdkKey={sdkKey}
+                  onPick={(sweepId, rotation) => {
+                    setDraft({ ...draft, sweepId, rotation });
+                    setPicking(false);
+                  }}
+                />
+              ) : (
+                <button type="button" onClick={() => setPicking(true)} className="rounded-md border border-indigo-300 px-3 py-2 text-sm text-indigo-700 hover:bg-indigo-50">
+                  Vælg sted i touren
+                </button>
+              )}
+            </div>
+          )}
+
           {draft.kind === "pano" && (
             <label className="block text-sm text-slate-600">
               …eller upload et 360°-billede (equirectangular, 2:1):{" "}
@@ -217,25 +469,15 @@ export function TourLab() {
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (!file) return;
-                  const url = URL.createObjectURL(file);
-                  panoFiles.current.set(draft.id, url);
-                  setDraft({ ...draft, url, name: draft.name || file.name.replace(/\.[^.]+$/, "") });
+                  setDraft({ ...draft, url: URL.createObjectURL(file), name: draft.name || file.name.replace(/\.[^.]+$/, "") });
                 }}
               />
               <span className="block text-xs text-slate-400">Uploadede filer huskes kun, indtil siden genindlæses.</span>
             </label>
           )}
           <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={saveDraft}
-              disabled={!draft.url.trim()}
-              className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
-            >
+            <button type="button" onClick={saveDraft} disabled={!draft.url.trim()} className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-40">
               Gem punkt
-            </button>
-            <button type="button" onClick={() => setOpen(draft)} disabled={!draft.url.trim()} className="rounded-md border border-slate-300 px-3 py-2 text-sm disabled:opacity-40">
-              Prøv
             </button>
             {points.some((p) => p.id === draft.id) && (
               <button
@@ -249,50 +491,58 @@ export function TourLab() {
                 Slet punkt
               </button>
             )}
-            <button type="button" onClick={() => setDraft(null)} className="rounded-md px-3 py-2 text-sm text-slate-500">
+            <button
+              type="button"
+              onClick={() => {
+                setDraft(null);
+                setPicking(false);
+              }}
+              className="rounded-md px-3 py-2 text-sm text-slate-500"
+            >
               Annullér
             </button>
           </div>
         </div>
       )}
 
-      {open && (
-        <div className="fixed inset-0 z-50 flex flex-col bg-black">
-          <div className="flex items-center gap-2 overflow-x-auto bg-black/90 px-3 py-2">
+      {/* The viewer. Kept mounted (just invisible) while the overview is shown,
+          so the tours in it load in the background and are ready on click. */}
+      <div className={`fixed inset-0 z-50 flex flex-col bg-black ${open ? "" : "pointer-events-none invisible"}`} aria-hidden={!open}>
+        <div className="flex items-center gap-2 overflow-x-auto bg-black/90 px-3 py-2">
+          <button type="button" onClick={closeViewer} className="shrink-0 rounded-full bg-white px-3 py-1.5 text-sm font-medium text-slate-900">
+            ← Overblik
+          </button>
+          {points.map((p) => (
             <button
+              key={p.id}
               type="button"
-              onClick={() => setOpen(null)}
-              className="shrink-0 rounded-full bg-white px-3 py-1.5 text-sm font-medium text-slate-900"
+              onClick={() => openPoint(p)}
+              className={`shrink-0 rounded-full px-3 py-1.5 text-sm ${p.id === open?.id ? "bg-white/25 text-white" : "text-white/70 hover:text-white"}`}
             >
-              ← Overblik
+              {p.kind === "pano" ? "🚁 " : ""}
+              {p.name}
             </button>
-            {points.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => setOpen(p)}
-                className={`shrink-0 rounded-full px-3 py-1.5 text-sm ${p.id === open.id ? "bg-white/25 text-white" : "text-white/70 hover:text-white"}`}
-              >
-                {p.kind === "pano" ? "🚁 " : ""}
-                {p.name}
-              </button>
-            ))}
-          </div>
-          <div className="relative min-h-0 flex-1">
-            {open.kind === "matterport" ? (
-              <iframe
-                key={open.id}
-                src={matterportEmbedUrl(open.url)}
-                className="h-full w-full border-0"
-                allow="xr-spatial-tracking; fullscreen"
-                allowFullScreen
-              />
-            ) : (
-              <Pano key={open.id} src={open.url} />
-            )}
-          </div>
+          ))}
+          {viaSdk && (
+            <span className="ml-auto shrink-0 pl-3 text-xs text-white/60">
+              {openPlayer?.readyMs == null ? "Touren indlæses…" : jumpMs != null ? `Hoppet på ${seconds(jumpMs)}` : ""}
+            </span>
+          )}
         </div>
-      )}
+        <div className="relative min-h-0 flex-1">
+          {modelIds.map((m) => (
+            <ModelPlayer key={m} modelId={m} sdkKey={sdkKey!} visible={Boolean(open && viaSdk && openModel === m)} onState={onPlayerState} />
+          ))}
+          {open && open.kind === "matterport" && !viaSdk && (
+            <iframe key={open.id} src={plainEmbedUrl(open.url)} className="absolute inset-0 h-full w-full border-0" allow="xr-spatial-tracking; fullscreen" allowFullScreen />
+          )}
+          {open && open.kind === "pano" && (
+            <div className="absolute inset-0">
+              <Pano key={open.id} src={open.url} />
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

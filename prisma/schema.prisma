@@ -861,6 +861,9 @@ model IntegrationSetting {
   id      String  @id @default(cuid())
   key     String  @unique
   enabled Boolean @default(true)
+  /// For settings that hold a value rather than an on/off switch (e.g. the
+  /// Matterport SDK key - a public, domain-restricted browser key).
+  value   String?
 
   updatedAt DateTime @updatedAt
 }
