@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { saveTourGa4Id, saveTourStoryImage } from "@/lib/actions/tour-lab";
 import { connectSdk, showcaseUrl, uLinkTarget, type CameraPose, type MpSdk, type SweepInfo, type Vec3 } from "../matterport";
 import type { MenuEntry, TourConfig, TourPlace, TourPoint, WelcomeGo } from "../tours/types";
-import { CoverWelcome, DESIGNS_CSS, DockMenu } from "./designs";
+import { CoverWelcome, DESIGNS_CSS, DockMenu, PickerMenu } from "./designs";
 import { GUIDE_CSS, GuidePlayer, guideStops } from "./guide";
 import { INFO_CSS, InfoDots, usePlaceInfo } from "./info";
 import { MAP_CSS, MapScene, type MapApi } from "./map";
@@ -341,8 +341,8 @@ export function Experience({
       if (locked) await sdk.Sweep.enable(sweep);
       await sdk.Sweep.moveTo(sweep, {
         rotation: target?.rotation,
-        transition: transition === "fly" ? sdk.Sweep.Transition.FLY : sdk.Sweep.Transition.INSTANT,
-        transitionTime: transition === "fly" ? T.flyMs : undefined,
+        transition: transition === "instant" ? sdk.Sweep.Transition.INSTANT : T.jump === "fade" ? sdk.Sweep.Transition.FADEOUT : sdk.Sweep.Transition.FLY,
+        transitionTime: transition === "instant" ? undefined : T.jump === "fade" ? 700 : T.flyMs,
       });
       if (locked && from && from !== sweep) await sdk.Sweep.disable(from).catch(() => {});
       return true;
@@ -939,7 +939,9 @@ export function Experience({
         </>
       )}
 
-      {T.design?.menu === "dock" ? (
+      {T.design?.menu === "picker" ? (
+        phase === "tour" && !cover && <PickerMenu T={T} onGo={menuGo} onCta={(label, href) => ctaClick(label, href, "picker")} />
+      ) : T.design?.menu === "dock" ? (
         phase === "tour" && !cover && <DockMenu T={T} room={room} onGuide={() => startGuide("dock")} onPlace={(p) => placeGo(p, "dock")} onItem={(label, href) => ctaClick(label, href, "dock")} />
       ) : (
       <>

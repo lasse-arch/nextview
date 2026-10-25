@@ -108,9 +108,17 @@ export type TourConfig = {
   /**
    * The look: which welcome and which menu. Left out = the classic ones
    * (tile welcome, side menu). "cover" = the place's own photo full-screen
-   * with its places to pick; "dock" = a bar at the bottom with what guests came for.
+   * with its places to pick; "dock" = a bar at the bottom with what guests came for;
+   * "picker" = a room picker at the bottom - the menu's groups (e.g. sizes) on one
+   * row, the chosen group's rooms (e.g. empty / furnished) on the next.
    */
-  design?: { welcome: "tiles" | "cover"; menu: "side" | "dock" };
+  design?: { welcome: "tiles" | "cover"; menu: "side" | "dock" | "picker" };
+  /**
+   * How the menu moves you: "fly" through the model (default), or "fade" - a
+   * soft cross-fade, for rooms far apart or tours where only the menu's rooms
+   * are open (navigation "points").
+   */
+  jump?: "fly" | "fade";
   /** Font for big headings (a Google font), if not the body font. */
   fontHeading?: string;
   /** Real spots with a photo - the cover's and the dock's "places". */

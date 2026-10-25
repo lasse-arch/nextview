@@ -162,7 +162,88 @@ export function DockMenu({
   );
 }
 
+/**
+ * The room picker: the menu's groups on one row (e.g. the sizes), the chosen
+ * group's rooms on the next (e.g. empty / with boxes) - for comparing rooms
+ * side by side without walking. Starts on the room the tour starts in.
+ */
+export function PickerMenu({
+  T,
+  onGo,
+  onCta,
+}: {
+  T: TourConfig;
+  onGo: (name: string, group: string, href: string) => void;
+  onCta: (label: string, href: string) => void;
+}) {
+  const groups = T.menu.filter((m): m is { title: string; items: [string, string][] } => "items" in m);
+  const startSs = new URL(T.start).searchParams.get("ss");
+  const ssOf = (href: string) => new URL(href).searchParams.get("ss");
+  const first = groups.flatMap((g) => g.items.map((i) => [g.title, i[0]] as const)).find(([g, n]) => ssOf(groups.find((x) => x.title === g)!.items.find((i) => i[0] === n)![1]) === startSs);
+  const [group, setGroup] = useState(first?.[0] ?? groups[0]?.title);
+  const [item, setItem] = useState<string | null>(first?.[1] ?? null);
+  const current = groups.find((g) => g.title === group);
+  const cta = T.cta.find((c) => c.primary);
+  function pick(g: string, name: string, href: string) {
+    setGroup(g);
+    setItem(name);
+    onGo(name, g, href);
+  }
+  return (
+    <div className="pk">
+      <div className="pk-row pk-groups">
+        {groups.map((g) => (
+          <button
+            key={g.title}
+            type="button"
+            className={g.title === group ? "nu" : ""}
+            onClick={() => {
+              // Same kind of room in the new size if there is one, otherwise its first.
+              const same = g.items.find((i) => i[0] === item) ?? g.items[0];
+              pick(g.title, same[0], same[1]);
+            }}
+          >
+            {g.title.replace(/^[^:]*:\s*/, "")}
+          </button>
+        ))}
+      </div>
+      {current && (
+        <div className="pk-row pk-items">
+          {current.items.map(([name, href]) => (
+            <button key={name} type="button" className={name === item ? "nu" : ""} onClick={() => pick(current.title, name, href)}>
+              {name}
+            </button>
+          ))}
+          {cta && (
+            <TourLink className="pk-cta" href={cta.href} label={cta.label} onClick={() => onCta(cta.label, cta.href)}>
+              {cta.label}
+            </TourLink>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export const DESIGNS_CSS = `
+/* ---- Room picker ---- */
+.pk{position:absolute;left:50%;bottom:18px;translate:-50% 0;z-index:9;display:flex;flex-direction:column;gap:8px;max-width:calc(100% - 24px);padding:10px;border-radius:22px;background:rgba(255,255,255,.94);box-shadow:0 14px 40px rgba(0,0,0,.3);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);animation:hvUp .5s cubic-bezier(.2,.7,.2,1) both}
+.pk-row{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
+.pk-row::-webkit-scrollbar{display:none}
+.pk-row button{flex:none;border:0;border-radius:999px;padding:9px 16px;font:inherit;font-weight:700;font-size:14px;cursor:pointer;background:#eef1f2;color:var(--c-main);transition:background .15s,color .15s}
+.pk-groups button{font-size:16px;font-weight:800;padding:10px 18px}
+.pk-items{flex-wrap:wrap;max-width:720px}
+.pk-row button.nu{background:var(--c-main);color:#fff}
+.pk-items button.nu{background:var(--c-accent);color:#fff}
+.pk-cta{flex:none;margin-left:auto;border-radius:999px;padding:9px 16px;background:var(--c-accent);color:#fff;font-weight:800;font-size:14px;text-decoration:none;white-space:nowrap}
+.hv:has(.pk) .hv-room{bottom:150px}
+@media (max-width:760px){
+  .pk{left:8px;right:8px;translate:none;max-width:none;bottom:calc(8px + env(safe-area-inset-bottom,0px));border-radius:18px;padding:8px}
+  .pk-groups button{font-size:15px;padding:9px 14px}
+  .pk-row button{font-size:13px;padding:8px 13px}
+  .pk-cta{margin-left:0}
+  .hv:has(.pk) .hv-room{bottom:170px}
+}
 .dz-kicker{font-size:11px;font-weight:600;letter-spacing:.22em;text-transform:uppercase;color:var(--c-accent)}
 .hv h1,.dz-cover h1{font-family:var(--font-heading)}
 /* ---- Cover welcome ---- */

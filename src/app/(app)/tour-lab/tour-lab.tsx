@@ -373,6 +373,8 @@ export function TourLab({ sdkKey }: { sdkKey: string | null }) {
             <Link href="/tour-lab/halvorsminde-kort" className="font-medium text-indigo-600 hover:underline">Halvorsminde på kort (camping-model)</Link>
             {" · "}
             <Link href="/tour-lab/boxdepot" className="font-medium text-indigo-600 hover:underline">Boxdepotet (find vej)</Link>
+            {" · "}
+            <Link href="/tour-lab/boxdepot-rum" className="font-medium text-indigo-600 hover:underline">Boxdepotet rumstørrelser (rumvælger)</Link>
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
