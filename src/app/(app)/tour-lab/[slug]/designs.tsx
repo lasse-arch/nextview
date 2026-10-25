@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { TourLink } from "./links";
+import type { AvailableUnit } from "@/lib/availability/boxdepotet";
 import type { DockIcon, TourConfig, TourPlace } from "../tours/types";
 
 /*
@@ -169,10 +170,12 @@ export function DockMenu({
  */
 export function PickerMenu({
   T,
+  units = [],
   onGo,
   onCta,
 }: {
   T: TourConfig;
+  units?: AvailableUnit[];
   onGo: (name: string, group: string, href: string) => void;
   onCta: (label: string, href: string) => void;
 }) {
@@ -184,6 +187,17 @@ export function PickerMenu({
   const [item, setItem] = useState<string | null>(first?.[1] ?? null);
   const current = groups.find((g) => g.title === group);
   const cta = T.cta.find((c) => c.primary);
+  const [showFree, setShowFree] = useState(false);
+  /** The live available rooms that fit a group's size range - available now first, then by price. */
+  const freeIn = (title: string) => {
+    const r = T.availability?.ranges[title];
+    if (!r) return [];
+    return units
+      .filter((u) => u.m3 >= r[0] && u.m3 < r[1])
+      .sort((a, b) => Number(a.from != null) - Number(b.from != null) || a.price - b.price);
+  };
+  const free = group ? freeIn(group) : [];
+  const kr = (n: number) => n.toLocaleString("da-DK");
   function pick(g: string, name: string, href: string) {
     setGroup(g);
     setItem(name);
@@ -191,6 +205,29 @@ export function PickerMenu({
   }
   return (
     <div className="pk">
+      {showFree && free.length > 0 && (
+        <div className="pk-free">
+          {free.map((u) => (
+            <div key={u.no} className="pk-unit">
+              <b>#{u.no}</b>
+              <span>{u.m3.toLocaleString("da-DK")} m³</span>
+              <span className={u.from ? "" : "nu"}>{u.from ? `Ledig fra ${u.from.slice(0, 5).replace("-", "/")}` : "Ledig nu"}</span>
+              <span className="pk-pris">{kr(u.price)} kr./md.</span>
+              <TourLink className="pk-book" href={u.bookUrl} label={`Book depotrum #${u.no}`} onClick={() => onCta(`Book #${u.no}`, u.bookUrl)}>
+                Book
+              </TourLink>
+            </div>
+          ))}
+        </div>
+      )}
+      {T.availability && group && (
+        <button type="button" className={`pk-ledige ${showFree ? "aaben" : ""}`} onClick={() => setShowFree((v) => !v)} disabled={!free.length}>
+          {free.length
+            ? `${free.length} ledige i denne størrelse · fra ${kr(Math.min(...free.map((u) => u.price)))} kr./md.`
+            : "Ingen ledige i denne størrelse lige nu"}
+          {free.length > 0 && <i>{showFree ? "▾" : "▴"}</i>}
+        </button>
+      )}
       <div className="pk-row pk-groups">
         {groups.map((g) => (
           <button
@@ -204,6 +241,7 @@ export function PickerMenu({
             }}
           >
             {g.title.replace(/^[^:]*:\s*/, "")}
+            {T.availability && <span className={`pk-badge ${freeIn(g.title).length ? "" : "tom"}`}>{freeIn(g.title).length}</span>}
           </button>
         ))}
       </div>
@@ -233,6 +271,17 @@ export const DESIGNS_CSS = `
 .pk-row button{flex:none;border:0;border-radius:999px;padding:9px 16px;font:inherit;font-weight:700;font-size:14px;cursor:pointer;background:#eef1f2;color:var(--c-main);transition:background .15s,color .15s}
 .pk-groups button{font-size:16px;font-weight:800;padding:10px 18px}
 .pk-items{flex-wrap:wrap;max-width:720px}
+.pk-badge{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;margin-left:7px;padding:0 6px;border-radius:999px;background:var(--c-accent);color:#fff;font-size:11px;font-weight:800;vertical-align:2px}
+.pk-groups button.nu .pk-badge{background:#fff;color:var(--c-main)}
+.pk-badge.tom{background:#c9cfd2}
+.pk-ledige{display:flex;align-items:center;justify-content:space-between;gap:10px;border:0;border-radius:12px;padding:10px 14px;background:color-mix(in srgb,var(--c-accent) 12%,#fff);color:var(--c-accent-dark);font:inherit;font-weight:800;font-size:14px;cursor:pointer;text-align:left}
+.pk-ledige:disabled{background:#f1f2f3;color:#7b878c;cursor:default}
+.pk-free{display:flex;flex-direction:column;gap:6px;max-height:min(46vh,360px);overflow-y:auto;padding:2px}
+.pk-unit{display:grid;grid-template-columns:auto 1fr auto auto auto;align-items:center;gap:12px;padding:9px 10px 9px 14px;border-radius:12px;background:#f6f7f7;font-size:14px;color:#3d4a50}
+.pk-unit b{color:var(--c-main);font-size:15px}
+.pk-unit .nu{color:var(--c-accent-dark);font-weight:800}
+.pk-pris{font-weight:800;color:var(--c-main);white-space:nowrap}
+.pk-book{border-radius:999px;padding:7px 14px;background:var(--c-accent);color:#fff;font-weight:800;font-size:13px;text-decoration:none}
 .pk-row button.nu{background:var(--c-main);color:#fff}
 .pk-items button.nu{background:var(--c-accent);color:#fff}
 .pk-cta{flex:none;margin-left:auto;border-radius:999px;padding:9px 16px;background:var(--c-accent);color:#fff;font-weight:800;font-size:14px;text-decoration:none;white-space:nowrap}
@@ -242,6 +291,9 @@ export const DESIGNS_CSS = `
   .pk-groups button{font-size:15px;padding:9px 14px}
   .pk-row button{font-size:13px;padding:8px 13px}
   .pk-cta{margin-left:0}
+  .pk-unit{grid-template-columns:auto 1fr auto;gap:4px 10px;font-size:13px}
+  .pk-unit .pk-pris{grid-column:2}
+  .pk-unit .pk-book{grid-column:3;grid-row:1 / span 2}
   .hv:has(.pk) .hv-room{bottom:170px}
 }
 .dz-kicker{font-size:11px;font-weight:600;letter-spacing:.22em;text-transform:uppercase;color:var(--c-accent)}

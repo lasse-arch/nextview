@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from
 import { useRouter } from "next/navigation";
 import { saveTourGa4Id, saveTourStoryImage } from "@/lib/actions/tour-lab";
 import { connectSdk, showcaseUrl, uLinkTarget, type CameraPose, type MpSdk, type SweepInfo, type Vec3 } from "../matterport";
+import type { AvailableUnit } from "@/lib/availability/boxdepotet";
 import type { MenuEntry, TourConfig, TourPlace, TourPoint, WelcomeGo } from "../tours/types";
 import { CoverWelcome, DESIGNS_CSS, DockMenu, PickerMenu } from "./designs";
 import { GUIDE_CSS, GuidePlayer, guideStops } from "./guide";
@@ -166,6 +167,7 @@ export function Experience({
   hiddenSweeps,
   storyImages,
   routeGraph,
+  units,
 }: {
   tour: TourConfig;
   sdkKey: string | null;
@@ -177,6 +179,8 @@ export function Experience({
   storyImages: Record<string, string>;
   /** The model's scan-point network, for "Find vej". */
   routeGraph: RouteGraph | null;
+  /** Rooms available right now (live), for the room picker. */
+  units: AvailableUnit[];
 }) {
   useGa4(ga4Id, T.title);
   const { names: ROOM_NAMES, links: ROOM_LINKS } = useMemo(() => roomIndex([...T.menu, ...(T.places ? [{ title: "", items: T.places.map((p): [string, string] => [p.name, p.href]) }] : [])]), [T]);
@@ -972,7 +976,7 @@ export function Experience({
       )}
 
       {T.design?.menu === "picker" ? (
-        phase === "tour" && !cover && <PickerMenu T={T} onGo={menuGo} onCta={(label, href) => ctaClick(label, href, "picker")} />
+        phase === "tour" && !cover && <PickerMenu T={T} units={units} onGo={menuGo} onCta={(label, href) => ctaClick(label, href, "picker")} />
       ) : T.design?.menu === "dock" ? (
         phase === "tour" && !cover && <DockMenu T={T} room={room} onGuide={() => startGuide("dock")} onPlace={(p) => placeGo(p, "dock")} onItem={(label, href) => ctaClick(label, href, "dock")} />
       ) : (
