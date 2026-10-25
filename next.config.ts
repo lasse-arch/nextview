@@ -34,6 +34,11 @@ const nextConfig: NextConfig = {
         source: "/matterport/:path*",
         headers: [{ key: "X-Frame-Options", value: "SAMEORIGIN" }],
       },
+      {
+        // The tour editor previews the tour in an iframe on its own page.
+        source: "/tour-lab/:slug",
+        headers: [{ key: "X-Frame-Options", value: "SAMEORIGIN" }],
+      },
     ];
   },
   experimental: {

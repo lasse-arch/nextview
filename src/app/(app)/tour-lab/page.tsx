@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { getSettingValue } from "@/lib/integration-settings";
 import { listTours } from "@/lib/tours";
+import { NewTour } from "./new-tour";
 import { TourLab } from "./tour-lab";
 
 export const metadata = { title: "Tour-lab" };
@@ -20,8 +21,13 @@ export default async function TourLabPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-semibold text-slate-900">Tours</h1>
-        <p className="text-sm text-slate-500">Vores egne tours oven på Matterport - én motor, en opsætning pr. tour.</p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-semibold text-slate-900">Tours</h1>
+            <p className="text-sm text-slate-500">Vores egne tours oven på Matterport - én motor, en opsætning pr. tour.</p>
+          </div>
+          <NewTour tours={tours.map((t) => ({ slug: t.slug, name: t.name }))} />
+        </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {tours.map((t) => (
             <div key={t.id} className="flex flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -42,7 +48,10 @@ export default async function TourLabPage() {
                 <span>Ændret {when(t.updatedAt)}</span>
               </div>
               <div className="mt-3 flex gap-2">
-                <Link href={`/tour-lab/${t.slug}`} className="rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-700">
+                <Link href={`/tour-lab/${t.slug}/rediger`} className="rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-700">
+                  Rediger
+                </Link>
+                <Link href={`/tour-lab/${t.slug}`} className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
                   Åbn tour
                 </Link>
               </div>
