@@ -3,8 +3,8 @@ import type { TourConfig } from "./types";
 
 /**
  * Boxdepotet's second tour on the same scanning: only the storage rooms, no
- * walking - you switch between sizes and contents in the room picker, flying
- * straight to the room like the full tour's menu. All other scan points stay
+ * walking - you switch between sizes and contents in the room picker, and the
+ * room just changes, no flight. All other scan points stay
  * hidden (as set in MPSkins).
  */
 const TOUR = "https://explore.nextview360.dk/tour/6pc9z8q6px";
@@ -18,6 +18,7 @@ export const boxdepotRum: TourConfig = {
   start: u(231, "-1.48,1.25"),
   design: { welcome: "tiles", menu: "picker" },
   navigation: "points",
+  jump: "instant",
   // No dollhouse or floor plan - nothing to jump out of the rooms with.
   matterportParams: { ...boxdepot.matterportParams, dh: "0", gt: "0", f: "0", fp: "0" },
   wayfinding: undefined,

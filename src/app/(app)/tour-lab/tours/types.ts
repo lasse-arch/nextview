@@ -114,11 +114,11 @@ export type TourConfig = {
    */
   design?: { welcome: "tiles" | "cover"; menu: "side" | "dock" | "picker" };
   /**
-   * How the menu moves you: "fly" through the model (default), or "fade" - a
-   * soft cross-fade, for rooms far apart or tours where only the menu's rooms
-   * are open (navigation "points").
+   * How the menu moves you: "fly" through the model (default), "instant" - a
+   * straight switch to the room, or "fade" - a cross-fade from a picture of
+   * the old view (a touch slower to start).
    */
-  jump?: "fly" | "fade";
+  jump?: "fly" | "fade" | "instant";
   /** Font for big headings (a Google font), if not the body font. */
   fontHeading?: string;
   /** Real spots with a photo - the cover's and the dock's "places". */

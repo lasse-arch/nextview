@@ -372,8 +372,8 @@ export function Experience({
       } else {
         await sdk.Sweep.moveTo(sweep, {
           rotation: target?.rotation,
-          transition: transition === "instant" ? sdk.Sweep.Transition.INSTANT : sdk.Sweep.Transition.FLY,
-          transitionTime: transition === "instant" ? undefined : T.flyMs,
+          transition: transition === "instant" || T.jump === "instant" ? sdk.Sweep.Transition.INSTANT : sdk.Sweep.Transition.FLY,
+          transitionTime: transition === "instant" || T.jump === "instant" ? undefined : T.flyMs,
         });
       }
       if (locked && from && from !== sweep) await sdk.Sweep.disable(from).catch(() => {});
