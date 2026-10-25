@@ -76,6 +76,22 @@ export type TourConfig = {
     backLabel: string;
     filterTitle: string;
   };
+  /**
+   * A flat start picture instead of the 360° drone scene (an illustrated map, a
+   * site plan, a drone photo): the drone's texts and points, placed on the
+   * picture by `spots` (point id -> x, y in % of the picture). Points without a
+   * spot aren't on the map. Start view: x, y in % and zoom (1 = fill the screen).
+   */
+  map?: {
+    image: string;
+    w: number;
+    h: number;
+    spots: Record<string, [number, number]>;
+    start?: { x: number; y: number; zoom: number };
+    startMobile?: { x: number; y: number; zoom: number };
+    searchPlaceholder?: string;
+    clouds?: boolean;
+  };
   panos?: { basePath: string; maxLevel: number; cubeResolution: number };
   categories: Record<string, { name: string; color: string }>;
   points: TourPoint[];

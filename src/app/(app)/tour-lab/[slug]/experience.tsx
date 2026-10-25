@@ -8,6 +8,7 @@ import type { MenuEntry, TourConfig, TourPlace, TourPoint, WelcomeGo } from "../
 import { CoverWelcome, DESIGNS_CSS, DockMenu } from "./designs";
 import { GUIDE_CSS, GuidePlayer, guideStops } from "./guide";
 import { INFO_CSS, InfoDots, usePlaceInfo } from "./info";
+import { MAP_CSS, MapScene, type MapApi } from "./map";
 import { LINKS_CSS, LinkPopup, LinkProvider, TourLink, openLink, type LinkPopupState } from "./links";
 import { Stories, STORIES_CSS, storyJpeg, type StoryRoom } from "./stories";
 import "pannellum/build/pannellum.css";
@@ -186,6 +187,8 @@ export function Experience({
     return picked.map(([name, href]) => ({ name, href, image: storyImages[name] }));
   }, [T, storyImages]);
   const droneEl = useRef<HTMLDivElement>(null);
+  /** The flat map, when the tour starts on one instead of the 360° drone scene. */
+  const mapApi = useRef<MapApi | null>(null);
   const drone = useRef<PannellumViewer | null>(null);
   const iframe = useRef<HTMLIFrameElement>(null);
   const sdkRef = useRef<Promise<MpSdk> | null>(null);
@@ -212,6 +215,9 @@ export function Experience({
   /** The welcome tiles - skipped when the link already says where to go. */
   const [welcome, setWelcome] = useState(false);
   const [cover, setCover] = useState(false);
+  /** "Træd indenfor" pressed before the tour was ready: the cover stays until it is. */
+  const [coverWaiting, setCoverWaiting] = useState(false);
+  const coverWaitingRef = useRef(false);
   /** The connected viewer, once it's playing (for the parts that follow the camera). */
   const [sdk, setSdk] = useState<MpSdk | null>(null);
   /** The scan point (ss) the visitor stands on. */
@@ -256,6 +262,11 @@ export function Experience({
       sdk.Sweep.data.subscribe({ onCollectionUpdated: (c) => (allSweeps.current = Object.keys(c)) });
       setTourReadyMs(now() - started);
       setSdk(sdk);
+      if (coverWaitingRef.current) {
+        coverWaitingRef.current = false;
+        setCoverWaiting(false);
+        setCover(false);
+      }
       track("tour_ready", { load_ms: Math.round(now() - started) });
       const current = (sdk as unknown as { Sweep: { current: { subscribe(cb: (s: { sid?: string }) => void): { cancel(): void } } } }).Sweep.current;
       sub = current.subscribe((s) => {
@@ -340,6 +351,7 @@ export function Experience({
     (p: Point) => {
       setSelected(p);
       track("drone_point_click", { point_name: p.name, category: T.categories[p.cat].name });
+      if (T.map) mapApi.current?.focus(p.id);
       const v = drone.current;
       if (v) {
         // On a computer the panel covers the right side, so the point is centred in what's left of the screen.
@@ -355,7 +367,7 @@ export function Experience({
   useEffect(() => {
     mobile.current = window.innerWidth <= 760;
     const D = T.drone;
-    if (!D) return;
+    if (!D || T.map) return;
     let cancelled = false;
     let declutter = 0;
     loadPannellum().then(() => {
@@ -434,6 +446,7 @@ export function Experience({
     const p = selected;
     const zoom = new Promise<void>((resolve) => {
       if (v && p && phase === "drone") v.lookAt(Math.max(p.pitch - 6, -80), p.yaw, 34, 650, () => resolve());
+      else if (T.map && p && phase === "drone" && mapApi.current) mapApi.current.focus(p.id, 3.2, 650).then(resolve);
       else resolve();
     });
     const moved = prepare(href);
@@ -458,6 +471,7 @@ export function Experience({
     setPhase("drone");
     const start = mobile.current ? T.drone.startMobile : T.drone.start;
     setTimeout(() => drone.current?.lookAt(start.pitch, start.yaw, start.hfov, 1200), 350);
+    setTimeout(() => mapApi.current?.reset(), 350);
   }
 
   /** What greets the visitor once they're in: the welcome, or the menu if it's open on start. */
@@ -658,7 +672,7 @@ export function Experience({
       }>
       <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.font}:wght@400;600;700;800;900&display=swap`} />
       {T.fontHeading && <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.fontHeading.replace(/ /g, "+")}:wght@500;600&display=swap`} />}
-      <style>{CSS + STORIES_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + INFO_CSS}</style>
+      <style>{CSS + STORIES_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + INFO_CSS + MAP_CSS}</style>
 
       {/* The tour, always mounted so it loads while the visitor is in the drone scene. */}
       {modelId && (
@@ -674,7 +688,19 @@ export function Experience({
       {/* The drone scene on top; fades away when going into the tour. */}
       {T.drone && (
       <div className={`absolute inset-0 transition-opacity duration-500 ${phase === "drone" ? "opacity-100" : "pointer-events-none opacity-0"}`}>
-        <div ref={droneEl} className="absolute inset-0" />
+        {T.map ? (
+          <MapScene
+            T={T}
+            api={mapApi}
+            icons={ICONS}
+            hidden={hidden}
+            selectedId={selected?.id ?? null}
+            onPoint={openPoint}
+            onZoomed={setZoomed}
+          />
+        ) : (
+          <div ref={droneEl} className="absolute inset-0" />
+        )}
 
         <div className="hv-intro">
           <div className="hv-intro-head" style={{ background: T.colors.main }}>
@@ -925,8 +951,15 @@ export function Experience({
       {cover && T.cover && (
         <CoverWelcome
           T={T}
+          waiting={coverWaiting}
           onEnter={() => {
             track("welcome_choice", { choice: "enter" });
+            // Not loaded yet: close the cover when it is, rather than showing Matterport's loading screen.
+            if (!sdk && sdkKey && modelId && !tourError) {
+              coverWaitingRef.current = true;
+              setCoverWaiting(true);
+              return;
+            }
             setCover(false);
           }}
           onPlace={(p) => placeGo(p, "cover")}

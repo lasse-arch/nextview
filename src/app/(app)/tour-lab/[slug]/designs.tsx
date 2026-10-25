@@ -51,8 +51,10 @@ export function CoverWelcome({
   onPlace,
   onGuide,
   onCta,
+  waiting,
 }: {
   T: TourConfig;
+  waiting?: boolean;
   onEnter: () => void;
   onPlace: (p: TourPlace) => void;
   onGuide?: () => void;
@@ -68,8 +70,8 @@ export function CoverWelcome({
         <h1>{C.title}</h1>
         <p>{C.lead}</p>
         <div className="dz-cover-actions">
-          <button type="button" className="dz-btn dz-gold" onClick={onEnter}>
-            {C.enter} <span aria-hidden>→</span>
+          <button type="button" className={`dz-btn dz-gold ${waiting ? "dz-venter" : ""}`} onClick={onEnter} disabled={waiting}>
+            {waiting ? "Åbner…" : C.enter} <span aria-hidden>{waiting ? "" : "→"}</span>
           </button>
           {onGuide && (
             <button type="button" className="dz-btn dz-line" onClick={onGuide}>
@@ -175,6 +177,8 @@ export const DESIGNS_CSS = `
 .dz-btn:hover{transform:translateY(-2px)}
 .dz-gold{border:0;background:var(--c-accent);color:#1a1209;box-shadow:0 10px 30px rgba(0,0,0,.35)}
 .dz-gold:hover{background:var(--c-accent-dark)}
+.dz-venter{cursor:progress;animation:dzVent 1.2s ease-in-out infinite}
+@keyframes dzVent{50%{opacity:.7}}
 .dz-line{border:1px solid rgba(246,239,226,.45);background:rgba(0,0,0,.18);color:#f6efe2;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
 .dz-line:hover{border-color:var(--c-accent);color:var(--c-accent)}
 .dz-cover-places{align-self:flex-end;max-width:100%;display:flex;flex-direction:column;gap:12px}

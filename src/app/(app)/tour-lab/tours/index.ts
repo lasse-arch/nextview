@@ -3,6 +3,7 @@ import { halvorsminde } from "./halvorsminde";
 import { fitnessGronlandstorv } from "./fitness-gronlandstorv";
 import { decoflame } from "./decoflame";
 import { jalsa } from "./jalsa";
+import { halvorsmindeKort } from "./halvorsminde-kort";
 
 /** The prototype tours, by their /tour-lab/<slug> address. */
 export const TOURS: Record<string, TourConfig> = {
@@ -10,4 +11,5 @@ export const TOURS: Record<string, TourConfig> = {
   [fitnessGronlandstorv.slug]: fitnessGronlandstorv,
   [decoflame.slug]: decoflame,
   [jalsa.slug]: jalsa,
+  [halvorsmindeKort.slug]: halvorsmindeKort,
 };

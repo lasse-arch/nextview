@@ -369,6 +369,8 @@ export function TourLab({ sdkKey }: { sdkKey: string | null }) {
             <Link href="/tour-lab/decoflame" className="font-medium text-indigo-600 hover:underline">Decoflame (dronefilm først)</Link>
             {" · "}
             <Link href="/tour-lab/jalsa" className="font-medium text-indigo-600 hover:underline">Jalsa (restaurant)</Link>
+            {" · "}
+            <Link href="/tour-lab/halvorsminde-kort" className="font-medium text-indigo-600 hover:underline">Halvorsminde på kort (camping-model)</Link>
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
