@@ -29,6 +29,8 @@ export const jalsa: TourConfig = {
   ],
   contact: { address: "Ved Stranden 5, 9000 Aalborg", mapUrl: "https://maps.app.goo.gl/FCdXjxKVmkn2SRFy5", phone: "+45 75 75 75 84", email: "info@jalsa.dk" },
   design: { welcome: "cover", menu: "dock" },
+  // Booking and the menu card open over the tour, so the guest never leaves it. (Sites that can't be shown that way open in a new tab by themselves.)
+  linkOpen: { default: "popup" },
   places: [
     { name: "Restauranten", kicker: "Hovedsalen", href: u(2, "3.06,.40"), image: `${P}/restauranten.jpg` },
     { name: "Loungen", kicker: "Sofaer og kunst", href: u(4, ".08,0"), image: `${P}/loungen.jpg` },

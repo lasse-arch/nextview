@@ -6,6 +6,7 @@ import { saveTourGa4Id, saveTourStoryImage } from "@/lib/actions/tour-lab";
 import { connectSdk, showcaseUrl, uLinkTarget, type MpSdk } from "../matterport";
 import type { MenuEntry, TourConfig, TourPlace, TourPoint, WelcomeGo } from "../tours/types";
 import { CoverWelcome, DESIGNS_CSS, DockMenu } from "./designs";
+import { LINKS_CSS, LinkPopup, LinkProvider, TourLink, openLink, type LinkPopupState } from "./links";
 import { Stories, STORIES_CSS, storyJpeg, type StoryRoom } from "./stories";
 import "pannellum/build/pannellum.css";
 
@@ -209,6 +210,11 @@ export function Experience({
   /** The welcome tiles - skipped when the link already says where to go. */
   const [welcome, setWelcome] = useState(false);
   const [cover, setCover] = useState(false);
+  const [linkPopup, setLinkPopup] = useState<LinkPopupState>(null);
+  const popup = (href: string, label: string) => {
+    track("link_popup", { label, link_url: href });
+    setLinkPopup({ href, label });
+  };
   /** The intro film: playing, fading out into the tour, or gone. */
   const [intro, setIntro] = useState<"play" | "fade" | null>(T.intro ? "play" : null);
   const [lastRoom, setLastRoom] = useState<{ name: string; href: string } | null>(null);
@@ -516,7 +522,7 @@ export function Experience({
     }
     if ("href" in go) {
       track("cta_click", { label, link_url: go.href, place: "welcome" });
-      window.open(go.href, "_blank", "noopener");
+      openLink(T, go.href, label, popup);
       return;
     }
     if ("room" in go) {
@@ -536,7 +542,7 @@ export function Experience({
     }
     if (!href.includes("explore.nextview360.dk")) {
       track("cta_click", { label: name, link_url: href, place: "menu" });
-      window.open(href, "_blank", "noopener");
+      openLink(T, href, name, popup);
       return;
     }
     track("menu_click", { item_name: name, group });
@@ -580,6 +586,7 @@ export function Experience({
   const ctaClick = (label: string, href: string, place: string) => track("cta_click", { label, link_url: href, place });
 
   return (
+    <LinkProvider T={T} popup={popup}>
     <div className={`hv fixed inset-0 z-50 overflow-hidden bg-[#0d1b20] ${selected ? "hv-punkt" : ""} ${zoomed ? "hv-zoom" : ""} ${welcome ? "hv-welcome" : ""} ${phase === "tour" && T.stories?.mobile ? "hv-st-on-m" : ""} ${menuOpen ? "hv-menu-aaben" : ""} ${T.design?.menu === "dock" ? "hv-dock" : ""} ${phase === "tour" && T.stories?.desktop ? "hv-st-on-d" : ""}`} style={
         {
           fontFamily: `'${T.font}', system-ui, sans-serif`,
@@ -592,7 +599,7 @@ export function Experience({
       }>
       <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.font}:wght@400;600;700;800;900&display=swap`} />
       {T.fontHeading && <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.fontHeading.replace(/ /g, "+")}:wght@500;600&display=swap`} />}
-      <style>{CSS + STORIES_CSS + DESIGNS_CSS}</style>
+      <style>{CSS + STORIES_CSS + DESIGNS_CSS + LINKS_CSS}</style>
 
       {/* The tour, always mounted so it loads while the visitor is in the drone scene. */}
       {modelId && (
@@ -619,9 +626,9 @@ export function Experience({
           <div className="hv-intro-body">
             <h1>{T.drone?.intro.title}</h1>
             <p>{T.drone?.intro.lead}</p>
-            <a className="hv-btn hv-primary" href={T.cta[0].href} target="_blank" rel="noopener" onClick={() => ctaClick(T.cta[0].label, T.cta[0].href, "intro")}>
+            <TourLink className="hv-btn hv-primary" href={T.cta[0].href} label={T.cta[0].label} onClick={() => ctaClick(T.cta[0].label, T.cta[0].href, "intro")}>
               {T.cta[0].label}
-            </a>
+            </TourLink>
           </div>
         </div>
 
@@ -799,19 +806,19 @@ export function Experience({
         )}
         <div className="hv-menu-cta">
           {T.cta.map((c) => (
-            <a key={c.label} className={`hv-btn ${c.primary ? "hv-primary" : "hv-secondary"}`} href={c.href} target="_blank" rel="noopener" onClick={() => ctaClick(c.label, c.href, "menu")}>
+            <TourLink key={c.label} className={`hv-btn ${c.primary ? "hv-primary" : "hv-secondary"}`} href={c.href} label={c.label} onClick={() => ctaClick(c.label, c.href, "menu")}>
               {c.label}
-            </a>
+            </TourLink>
           ))}
         </div>
         {T.contact && (
           <div className="hv-contact">
             <div className="hv-contact-t">Kontakt</div>
             {T.contact.address && (
-              <a href={T.contact.mapUrl ?? "#"} target="_blank" rel="noopener" onClick={() => track("contact_click", { kind: "map" })}>
+              <TourLink href={T.contact.mapUrl ?? "#"} label={T.contact.address ?? "Kort"} onClick={() => track("contact_click", { kind: "map" })}>
                 <span>📍</span>
                 {T.contact.address}
-              </a>
+              </TourLink>
             )}
             {T.contact.phone && (
               <a href={`tel:${T.contact.phone.replace(/\s/g, "")}`} onClick={() => track("contact_click", { kind: "phone" })}>
@@ -826,10 +833,10 @@ export function Experience({
               </a>
             )}
             {T.contact.instagram && (
-              <a href={T.contact.instagram} target="_blank" rel="noopener" onClick={() => track("contact_click", { kind: "instagram" })}>
+              <TourLink href={T.contact.instagram} label="Instagram" onClick={() => track("contact_click", { kind: "instagram" })}>
                 <span>📷</span>
                 Instagram
-              </a>
+              </TourLink>
             )}
           </div>
         )}
@@ -889,7 +896,9 @@ export function Experience({
           <DevPanel onCaptureStories={T.stories ? captureStories : undefined} storyCount={storyRooms.length} ga4Id={ga4Id} tourError={tourError} sdkKey={sdkKey} modelId={modelId} pointsOnly={pointsOnly} onPointsOnly={setNavigation} />
         )}
       </div>
+      {linkPopup && <LinkPopup open={linkPopup} onClose={() => setLinkPopup(null)} />}
     </div>
+    </LinkProvider>
   );
 }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { TourLink } from "./links";
 import type { DockIcon, TourConfig, TourPlace } from "../tours/types";
 
 /*
@@ -68,9 +69,9 @@ export function CoverWelcome({
             {C.enter} <span aria-hidden>→</span>
           </button>
           {T.cta.map((c) => (
-            <a key={c.label} className="dz-btn dz-line" href={c.href} target="_blank" rel="noopener" onClick={() => onCta(c.label, c.href)}>
+            <TourLink key={c.label} className="dz-btn dz-line" href={c.href} label={c.label} onClick={() => onCta(c.label, c.href)}>
               {c.label}
-            </a>
+            </TourLink>
           ))}
         </div>
       </div>
@@ -120,10 +121,10 @@ export function DockMenu({
         </div>
       )}
       {!sheet && atPlace && primary && primary.go !== "places" && (
-        <a className="dz-here" href={primary.go.href} target="_blank" rel="noopener" onClick={() => onItem(`${primary.label} (${room})`, (primary.go as { href: string }).href)}>
+        <TourLink className="dz-here" href={primary.go.href} label={primary.label} onClick={() => onItem(`${primary.label} (${room})`, (primary.go as { href: string }).href)}>
           <span>{room}</span>
           <b>{primary.label} her →</b>
-        </a>
+        </TourLink>
       )}
       <nav className="dz-dock">
         {T.dock?.map((d) =>
@@ -133,10 +134,10 @@ export function DockMenu({
               <span>{d.label}</span>
             </button>
           ) : (
-            <a key={d.label} className={d.primary ? "dz-primary" : ""} href={d.go.href} target="_blank" rel="noopener" onClick={() => onItem(d.label, (d.go as { href: string }).href)}>
+            <TourLink key={d.label} className={d.primary ? "dz-primary" : ""} href={d.go.href} label={d.label} onClick={() => onItem(d.label, (d.go as { href: string }).href)}>
               <Icon name={d.icon} />
               <span>{d.label}</span>
-            </a>
+            </TourLink>
           )
         )}
       </nav>

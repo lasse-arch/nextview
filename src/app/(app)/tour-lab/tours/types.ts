@@ -9,6 +9,9 @@ export type WelcomeGo = { drone: string | null } | { room: string; name: string 
 /** A real spot in the tour with a photo of it (e.g. one of the model's own Matterport photos). */
 export type TourPlace = { name: string; kicker?: string; href: string; image: string };
 
+/** How a link out of the tour opens: over the tour, in a new tab, or instead of the tour. */
+export type LinkOpen = "popup" | "tab" | "same";
+
 export type DockIcon = "places" | "menu" | "book" | "order" | "map" | "phone";
 
 export type TourPoint = {
@@ -46,6 +49,8 @@ export type TourConfig = {
   colors: { main: string; accent: string; accentDark: string; soft: string };
   font: string;
   cta: { label: string; href: string; primary: boolean }[];
+  /** How links out of the tour open: a default, and single links (by their URL) set differently. Left out = new tab. */
+  linkOpen?: { default: LinkOpen; byUrl?: Record<string, LinkOpen> };
   /** Contact card at the bottom of the menu. */
   contact?: { address?: string; mapUrl?: string; phone?: string; email?: string; instagram?: string };
   /** The drone scene in front of the tour - leave out to start straight in the tour. */
