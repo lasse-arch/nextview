@@ -7,6 +7,8 @@ import type { TourConfig } from "./types";
  */
 const TOUR = "https://explore.nextview360.dk/tour/d1xdm9bgzk";
 const u = (ss: number, sr: string) => `${TOUR}?ss=${ss}&sr=${sr}`;
+/** Just the scan point, facing the way you walked in. */
+const at = (ss: number) => `${TOUR}?ss=${ss}`;
 const BOOK = "https://boxdepotet.dk/priser-booking/horsens-odder/";
 
 export const boxdepot: TourConfig = {
@@ -28,7 +30,11 @@ export const boxdepot: TourConfig = {
   navigation: "free",
   hiddenSweeps: [],
   menuOpenOnStart: { desktop: true, mobile: false },
-  wayfinding: {},
+  wayfinding: {
+    // Box numbers read off the door labels in the tour's own 360° images (a first sample - the
+    // full list comes from running the reading over every scan point).
+    boxes: { "121": at(234), "124": at(234), "125": at(234), "126": at(234), "160": at(231) },
+  },
   menu: [
     { title: "Af- og pålæsning m.m.", items: [["Ankomstområde", u(239, "-3.01,-1.02")], ["Af- og pålæsning", u(4, "-.22,-.98")], ["Elevator", u(174, "-.18,.78")]] },
     { title: "Depotrum: 5 m³", items: [["Tomt", u(231, "-1.48,1.25")], ["Med flyttekasser", u(232, "-1.58,1.27")], ["Med flyttekasser og dæk", u(233, "-1.54,1.13")]] },
