@@ -13,7 +13,6 @@ export const BUNDLE_VERSION = "26.5.4_webgl-708-g332adb66f5";
 
 export type Rotation = { x: number; y: number };
 export type Vec3 = { x: number; y: number; z: number };
-export type MeasurementData = { sid?: string; label?: string; points?: Vec3[]; start?: Vec3; end?: Vec3 };
 export type CameraPose = { position: Vec3; rotation: Rotation; projection: Float32Array | number[]; sweep: string; mode: string };
 
 export type SweepInfo = { id?: string; sid?: string; uuid?: string; index?: number; position?: { x: number; y: number; z: number } };
@@ -27,14 +26,11 @@ export type MpSdk = {
     pose: { subscribe(cb: (pose: CameraPose) => void): { cancel(): void } };
     /** Turns the view by degrees; speed in degrees per second. */
     rotate?(horizontal: number, vertical: number, options?: { speed?: number }): Promise<void>;
+    setRotation?(rotation: Rotation, options?: { speed?: number }): Promise<void>;
+    zoomBy?(delta: number): Promise<number>;
   };
   /** Matterport's own measuring tool (allowed when the model's "measurements" setting is on). */
-  Measurements?: {
-    toggleMode(active: boolean, options?: Record<string, unknown>): Promise<void>;
-    /** The measurements saved on the model, as the viewer has them. */
-    getData?(): Promise<MeasurementData[]>;
-    data?: { subscribe(observer: { onCollectionUpdated(c: Record<string, MeasurementData>): void }): { cancel(): void } };
-  };
+  Measurements?: { toggleMode(active: boolean, options?: Record<string, unknown>): Promise<void> };
   Conversion?: {
     worldToScreen(position: Vec3, pose: CameraPose, size: { w: number; h: number }): Vec3;
   };
@@ -71,7 +67,10 @@ const HIDE_BRANDING = `
 
 /** All of Matterport's own buttons and panels (the 3D view stays) - the tour's own UI replaces them. */
 const HIDE_UI = `
-  #gui, #react-overlay-root, #control-kit-wrapper { display: none !important; }
+  #gui, #react-overlay-root, #control-kit-wrapper { visibility: hidden !important; }
+  /* …except the measurements' labels when the tour shows them (measuring mode, "Vis mål"). */
+  .measurements-overlay, .measurements-overlay * { visibility: visible !important; pointer-events: none !important; }
+  .measurements-gross-area { display: none !important; }
 `;
 
 function hideBranding(win: Window, hideUi: boolean) {

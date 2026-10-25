@@ -120,9 +120,9 @@ export type TourConfig = {
    */
   jump?: "fly" | "fade" | "instant";
   /**
-   * The measurements saved on the model in Matterport, drawn over the tour
-   * with their lengths (visitors can't measure themselves) - with a button to
-   * show/hide them. Needs "Measure and view" on the model in Matterport.
+   * Matterport's measurements shown over the tour (its measuring mode, with all
+   * its buttons hidden and clicks caught, so visitors see the measurements but
+   * can't add their own) - with a "Vis mål / Skjul mål" button.
    */
   measure?: boolean;
   /** Keep Matterport's own buttons (dollhouse, floor plan, settings…). Default: hidden - the tour's own UI is the UI. */

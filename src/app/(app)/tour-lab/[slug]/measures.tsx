@@ -1,63 +1,61 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import type { MeasurementData, MpSdk, Vec3 } from "../matterport";
-import { inFront } from "./info";
-
-/** A saved measurement in the viewer's own coordinates. */
-export type Measurement = { label: string; points: Vec3[] };
-
-/** The viewer's measurements in one shape (newer ones have points, older ones start/end). */
-export function fromViewer(list: MeasurementData[]): Measurement[] {
-  return list
-    .map((m) => ({ label: m.label ?? "", points: m.points?.length ? m.points : m.start && m.end ? [m.start, m.end] : [] }))
-    .filter((m) => m.points.length >= 2);
-}
-
-const length = (m: Measurement) => m.points.slice(1).reduce((sum, p, i) => sum + Math.hypot(p.x - m.points[i].x, p.y - m.points[i].y, p.z - m.points[i].z), 0);
+import type { MpSdk } from "../matterport";
 
 /**
- * The model's saved measurements drawn over the tour - a line with its length -
- * only the ones near the visitor, so walls don't show measurements behind them.
+ * While the measurements are shown, Matterport is in measuring mode - where a
+ * click would start a new measurement. This layer over the view takes the
+ * clicks instead, and turns drags into looking around (and wheel/pinch into
+ * zoom) through the SDK, so visitors see the measurements but can't add any.
  */
-export function MeasureLines({
-  sdk,
-  measurements,
-  frame,
-}: {
-  sdk: MpSdk | null;
-  measurements: Measurement[];
-  frame: React.RefObject<HTMLIFrameElement | null>;
-}) {
-  const svg = useRef<SVGSVGElement>(null);
+export function MeasureShield({ sdk }: { sdk: MpSdk | null }) {
+  const pose = useRef<{ x: number; y: number } | null>(null);
+  const last = useRef(new Map<number, { x: number; y: number }>());
+  const pinch = useRef<number | null>(null);
   useEffect(() => {
-    if (!sdk?.Conversion) return;
-    const conv = sdk.Conversion;
-    const items = measurements.map((m) => ({ pts: m.points, text: m.label || `${length(m).toFixed(2).replace(".", ",")} m` }));
-    const sub = sdk.Camera.pose.subscribe((pose) => {
-      const el = frame.current;
-      const root = svg.current;
-      if (!el || !root) return;
-      const size = { w: el.clientWidth, h: el.clientHeight };
-      let html = "";
-      for (const it of items) {
-        const near = it.pts.some((p) => Math.hypot(p.x - pose.position.x, p.z - pose.position.z) < 5);
-        if (!near || !it.pts.every((p) => inFront(pose, p))) continue;
-        const s = it.pts.map((p) => conv.worldToScreen(p, pose, size));
-        const d = s.map((p, i) => `${i ? "L" : "M"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join("");
-        const mid = { x: (s[0].x + s[s.length - 1].x) / 2, y: (s[0].y + s[s.length - 1].y) / 2 };
-        html += `<path d="${d}" class="ms-shadow"/><path d="${d}" class="ms-line"/>`;
-        html += s.map((p) => `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="4" class="ms-end"/>`).join("");
-        html += `<g transform="translate(${mid.x.toFixed(1)},${mid.y.toFixed(1)})"><rect x="-34" y="-14" width="68" height="28" rx="14" class="ms-pill"/><text class="ms-text" text-anchor="middle" dy="5">${it.text.replace(/[<&]/g, "")}</text></g>`;
-      }
-      root.innerHTML = html;
-    });
+    if (!sdk) return;
+    const sub = sdk.Camera.pose.subscribe((p) => (pose.current = p.rotation));
     return () => sub.cancel();
-  }, [sdk, measurements, frame]);
-  return <svg ref={svg} className="ms" aria-hidden />;
+  }, [sdk]);
+  if (!sdk?.Camera.setRotation) return null;
+  const cam = sdk.Camera;
+  return (
+    <div
+      className="ms-shield"
+      onPointerDown={(e) => {
+        e.currentTarget.setPointerCapture(e.pointerId);
+        last.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      }}
+      onPointerMove={(e) => {
+        const prev = last.current.get(e.pointerId);
+        if (!prev || !pose.current) return;
+        last.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (last.current.size === 2) {
+          const [a, b] = [...last.current.values()];
+          const d = Math.hypot(a.x - b.x, a.y - b.y);
+          if (pinch.current != null) cam.zoomBy?.((d - pinch.current) / 300).catch(() => {});
+          pinch.current = d;
+          return;
+        }
+        const k = 0.18;
+        const next = { x: Math.max(-80, Math.min(80, pose.current.x + (e.clientY - prev.y) * k)), y: pose.current.y + (e.clientX - prev.x) * k };
+        pose.current = next;
+        cam.setRotation!(next, { speed: 1000 }).catch(() => {});
+      }}
+      onPointerUp={(e) => {
+        last.current.delete(e.pointerId);
+        if (last.current.size < 2) pinch.current = null;
+      }}
+      onPointerCancel={(e) => last.current.delete(e.pointerId)}
+      onWheel={(e) => cam.zoomBy?.(-e.deltaY / 800).catch(() => {})}
+    />
+  );
 }
 
 export const MEASURES_CSS = `
+.ms-shield{position:absolute;inset:0;z-index:3;touch-action:none;cursor:grab}
+.ms-shield:active{cursor:grabbing}
 .ms{position:absolute;inset:0;width:100%;height:100%;z-index:4;pointer-events:none;overflow:visible}
 .ms-shadow{fill:none;stroke:rgba(0,0,0,.45);stroke-width:5;stroke-linecap:round}
 .ms-line{fill:none;stroke:#fff;stroke-width:2.5;stroke-linecap:round}

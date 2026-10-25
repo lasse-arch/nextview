@@ -10,7 +10,7 @@ import { CoverWelcome, DESIGNS_CSS, DockMenu, PickerMenu } from "./designs";
 import { GUIDE_CSS, GuidePlayer, guideStops } from "./guide";
 import { INFO_CSS, InfoDots, usePlaceInfo } from "./info";
 import { MAP_CSS, MapScene, type MapApi } from "./map";
-import { MEASURES_CSS, MeasureLines, fromViewer, type Measurement } from "./measures";
+import { MEASURES_CSS, MeasureShield } from "./measures";
 import { ROUTE_CSS, RouteLine, RouteSheet, RouteStatus, flightMs, shortestPath, straighten, type Destination, type RouteGraph } from "./wayfinding";
 import { LINKS_CSS, LinkPopup, LinkProvider, TourLink, openLink, type LinkPopupState } from "./links";
 import { Stories, STORIES_CSS, storyJpeg, type StoryRoom } from "./stories";
@@ -242,8 +242,11 @@ export function Experience({
   const [routeOpen, setRouteOpen] = useState(false);
   /** The saved measurements shown over the tour ("Vis mål"). */
   const [showMeasures, setShowMeasures] = useState(true);
-  /** The model's saved measurements, as the viewer has them. */
-  const [measurements, setMeasurements] = useState<Measurement[]>([]);
+  // The measurements are Matterport's own, shown in its measuring mode (its buttons stay hidden).
+  useEffect(() => {
+    if (!T.measure || !sdk?.Measurements) return;
+    sdk.Measurements.toggleMode(showMeasures && phase === "tour").catch((err) => console.warn("Measurements", err));
+  }, [sdk, showMeasures, phase, T.measure]);
   const [route, setRoute] = useState<{ dest: Destination; step: number; steps: number; arrived: boolean } | null>(null);
   const routeRun = useRef(0);
   /** The route still ahead, drawn on the floor. */
@@ -293,21 +296,6 @@ export function Experience({
       });
       setTourReadyMs(now() - started);
       setSdk(sdk);
-      if (T.measure && sdk.Measurements) {
-        const M = sdk.Measurements;
-        M.data?.subscribe({ onCollectionUpdated: (c) => setMeasurements(fromViewer(Object.values(c))) });
-        (async () => {
-          let list = fromViewer((await M.getData?.().catch(() => [])) ?? []);
-          if (!list.length) {
-            // Some models only load their saved measurements once measuring mode has been on - on and off, unseen.
-            await M.toggleMode(true).catch(() => {});
-            list = fromViewer((await M.getData?.().catch(() => [])) ?? []);
-            await M.toggleMode(false).catch(() => {});
-          }
-          setMeasurements(list);
-          track("measures_loaded", { count: list.length });
-        })();
-      }
       if (coverWaitingRef.current) {
         coverWaitingRef.current = false;
         setCoverWaiting(false);
@@ -1172,9 +1160,9 @@ export function Experience({
           Find vej
         </button>
       )}
-      {T.measure && phase === "tour" && measurements.length > 0 && (
+      {T.measure && phase === "tour" && sdk?.Measurements && (
         <>
-          {showMeasures && <MeasureLines sdk={sdk} measurements={measurements} frame={iframe} />}
+          {showMeasures && <MeasureShield sdk={sdk} />}
           <button
             type="button"
             className={`hv-maal ${showMeasures ? "aktiv" : ""}`}
