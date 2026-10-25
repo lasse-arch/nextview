@@ -13,6 +13,7 @@ export const BUNDLE_VERSION = "26.5.4_webgl-708-g332adb66f5";
 
 export type Rotation = { x: number; y: number };
 export type Vec3 = { x: number; y: number; z: number };
+export type MeasurementData = { sid?: string; label?: string; points?: Vec3[]; start?: Vec3; end?: Vec3 };
 export type CameraPose = { position: Vec3; rotation: Rotation; projection: Float32Array | number[]; sweep: string; mode: string };
 
 export type SweepInfo = { id?: string; sid?: string; uuid?: string; index?: number; position?: { x: number; y: number; z: number } };
@@ -28,7 +29,12 @@ export type MpSdk = {
     rotate?(horizontal: number, vertical: number, options?: { speed?: number }): Promise<void>;
   };
   /** Matterport's own measuring tool (allowed when the model's "measurements" setting is on). */
-  Measurements?: { toggleMode(active: boolean, options?: Record<string, unknown>): Promise<void> };
+  Measurements?: {
+    toggleMode(active: boolean, options?: Record<string, unknown>): Promise<void>;
+    /** The measurements saved on the model, as the viewer has them. */
+    getData?(): Promise<MeasurementData[]>;
+    data?: { subscribe(observer: { onCollectionUpdated(c: Record<string, MeasurementData>): void }): { cancel(): void } };
+  };
   Conversion?: {
     worldToScreen(position: Vec3, pose: CameraPose, size: { w: number; h: number }): Vec3;
   };

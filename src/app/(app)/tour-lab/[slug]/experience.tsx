@@ -10,7 +10,7 @@ import { CoverWelcome, DESIGNS_CSS, DockMenu, PickerMenu } from "./designs";
 import { GUIDE_CSS, GuidePlayer, guideStops } from "./guide";
 import { INFO_CSS, InfoDots, usePlaceInfo } from "./info";
 import { MAP_CSS, MapScene, type MapApi } from "./map";
-import { MEASURES_CSS, MeasureLines, viewerAxes, type Measurement } from "./measures";
+import { MEASURES_CSS, MeasureLines, fromViewer, type Measurement } from "./measures";
 import { ROUTE_CSS, RouteLine, RouteSheet, RouteStatus, flightMs, shortestPath, straighten, type Destination, type RouteGraph } from "./wayfinding";
 import { LINKS_CSS, LinkPopup, LinkProvider, TourLink, openLink, type LinkPopupState } from "./links";
 import { Stories, STORIES_CSS, storyJpeg, type StoryRoom } from "./stories";
@@ -169,7 +169,6 @@ export function Experience({
   storyImages,
   routeGraph,
   units,
-  measurements,
 }: {
   tour: TourConfig;
   sdkKey: string | null;
@@ -183,8 +182,6 @@ export function Experience({
   routeGraph: RouteGraph | null;
   /** Rooms available right now (live), for the room picker. */
   units: AvailableUnit[];
-  /** The model's saved measurements (when "measure" is on). */
-  measurements: Measurement[];
 }) {
   useGa4(ga4Id, T.title);
   const { names: ROOM_NAMES, links: ROOM_LINKS } = useMemo(() => roomIndex([...T.menu, ...(T.places ? [{ title: "", items: T.places.map((p): [string, string] => [p.name, p.href]) }] : [])]), [T]);
@@ -245,7 +242,8 @@ export function Experience({
   const [routeOpen, setRouteOpen] = useState(false);
   /** The saved measurements shown over the tour ("Vis mål"). */
   const [showMeasures, setShowMeasures] = useState(true);
-  const [toViewer, setToViewer] = useState<ReturnType<typeof viewerAxes>>(null);
+  /** The model's saved measurements, as the viewer has them. */
+  const [measurements, setMeasurements] = useState<Measurement[]>([]);
   const [route, setRoute] = useState<{ dest: Destination; step: number; steps: number; arrived: boolean } | null>(null);
   const routeRun = useRef(0);
   /** The route still ahead, drawn on the floor. */
@@ -289,13 +287,27 @@ export function Experience({
           const firstData = allSweeps.current.length === 0;
           allSweeps.current = Object.keys(c);
           sweepData.current = c;
-          if (firstData && routeGraph && T.measure) setToViewer(() => viewerAxes(routeGraph, c));
           // The list can arrive after the visitor's first scan point - lock then, so nothing is left open.
           if (firstData && pointsOnlyRef.current && currentSweep.current) lockTo(sdk, allSweeps.current, currentSweep.current);
         },
       });
       setTourReadyMs(now() - started);
       setSdk(sdk);
+      if (T.measure && sdk.Measurements) {
+        const M = sdk.Measurements;
+        M.data?.subscribe({ onCollectionUpdated: (c) => setMeasurements(fromViewer(Object.values(c))) });
+        (async () => {
+          let list = fromViewer((await M.getData?.().catch(() => [])) ?? []);
+          if (!list.length) {
+            // Some models only load their saved measurements once measuring mode has been on - on and off, unseen.
+            await M.toggleMode(true).catch(() => {});
+            list = fromViewer((await M.getData?.().catch(() => [])) ?? []);
+            await M.toggleMode(false).catch(() => {});
+          }
+          setMeasurements(list);
+          track("measures_loaded", { count: list.length });
+        })();
+      }
       if (coverWaitingRef.current) {
         coverWaitingRef.current = false;
         setCoverWaiting(false);
@@ -1160,9 +1172,9 @@ export function Experience({
           Find vej
         </button>
       )}
-      {T.measure && phase === "tour" && measurements.length > 0 && toViewer && (
+      {T.measure && phase === "tour" && measurements.length > 0 && (
         <>
-          {showMeasures && <MeasureLines sdk={sdk} measurements={measurements} toViewer={toViewer} frame={iframe} />}
+          {showMeasures && <MeasureLines sdk={sdk} measurements={measurements} frame={iframe} />}
           <button
             type="button"
             className={`hv-maal ${showMeasures ? "aktiv" : ""}`}

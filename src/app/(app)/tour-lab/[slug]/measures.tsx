@@ -1,41 +1,20 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import type { MpSdk, SweepInfo, Vec3 } from "../matterport";
+import type { MeasurementData, MpSdk, Vec3 } from "../matterport";
 import { inFront } from "./info";
-import type { RouteGraph } from "./wayfinding";
 
-export type Measurement = { label: string; points: [number, number, number][] };
-type ToViewer = (p: [number, number, number]) => Vec3;
+/** A saved measurement in the viewer's own coordinates. */
+export type Measurement = { label: string; points: Vec3[] };
 
-/**
- * Matterport's model data and the viewer use different axes. Rather than
- * guess, try every way of swapping/flipping them and keep the one that puts
- * the scan points (known in both) where the viewer has them.
- */
-export function viewerAxes(graph: RouteGraph, sweeps: Record<string, SweepInfo>): ToViewer | null {
-  const pairs = Object.entries(graph)
-    .map(([id, g]) => [g.p, sweeps[id]?.position] as const)
-    .filter((x): x is readonly [[number, number, number], { x: number; y: number; z: number }] => Boolean(x[1]))
-    .slice(0, 40);
-  if (pairs.length < 3) return null;
-  let best: { err: number; f: ToViewer } | null = null;
-  for (const [a, b, c] of [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]])
-    for (const sx of [1, -1])
-      for (const sy of [1, -1])
-        for (const sz of [1, -1]) {
-          const f: ToViewer = (p) => ({ x: sx * p[a], y: sy * p[b], z: sz * p[c] });
-          // Compare the floor plan only - the viewer may hold a scan point at camera height.
-          const err = pairs.reduce((e, [g, v]) => {
-            const m = f(g);
-            return e + Math.hypot(m.x - v.x, m.z - v.z);
-          }, 0);
-          if (!best || err < best.err) best = { err, f };
-        }
-  return best && best.err / pairs.length < 0.5 ? best.f : null;
+/** The viewer's measurements in one shape (newer ones have points, older ones start/end). */
+export function fromViewer(list: MeasurementData[]): Measurement[] {
+  return list
+    .map((m) => ({ label: m.label ?? "", points: m.points?.length ? m.points : m.start && m.end ? [m.start, m.end] : [] }))
+    .filter((m) => m.points.length >= 2);
 }
 
-const length = (m: Measurement) => m.points.slice(1).reduce((sum, p, i) => sum + Math.hypot(p[0] - m.points[i][0], p[1] - m.points[i][1], p[2] - m.points[i][2]), 0);
+const length = (m: Measurement) => m.points.slice(1).reduce((sum, p, i) => sum + Math.hypot(p.x - m.points[i].x, p.y - m.points[i].y, p.z - m.points[i].z), 0);
 
 /**
  * The model's saved measurements drawn over the tour - a line with its length -
@@ -44,23 +23,17 @@ const length = (m: Measurement) => m.points.slice(1).reduce((sum, p, i) => sum +
 export function MeasureLines({
   sdk,
   measurements,
-  toViewer,
   frame,
 }: {
   sdk: MpSdk | null;
   measurements: Measurement[];
-  toViewer: ToViewer | null;
   frame: React.RefObject<HTMLIFrameElement | null>;
 }) {
   const svg = useRef<SVGSVGElement>(null);
   useEffect(() => {
-    if (!sdk?.Conversion || !toViewer) return;
+    if (!sdk?.Conversion) return;
     const conv = sdk.Conversion;
-    const items = measurements.map((m) => {
-      const pts = m.points.map(toViewer);
-      const len = length(m);
-      return { pts, text: m.label || `${len.toFixed(2).replace(".", ",")} m` };
-    });
+    const items = measurements.map((m) => ({ pts: m.points, text: m.label || `${length(m).toFixed(2).replace(".", ",")} m` }));
     const sub = sdk.Camera.pose.subscribe((pose) => {
       const el = frame.current;
       const root = svg.current;
@@ -80,7 +53,7 @@ export function MeasureLines({
       root.innerHTML = html;
     });
     return () => sub.cancel();
-  }, [sdk, measurements, toViewer, frame]);
+  }, [sdk, measurements, frame]);
   return <svg ref={svg} className="ms" aria-hidden />;
 }
 
