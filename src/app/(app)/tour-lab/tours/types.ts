@@ -21,6 +21,15 @@ export type TourInfo = {
   ss: number[];
 };
 
+export type PlaceCard = {
+  ss: number[];
+  title: string;
+  text: string;
+  more?: { label: string; text: string };
+  buttons?: ({ label: string; room: string } | { label: string; href: string })[];
+  seconds?: number;
+};
+
 export type DockIcon = "places" | "menu" | "book" | "order" | "map" | "phone" | "play";
 
 export type TourPoint = {
@@ -144,6 +153,17 @@ export type TourConfig = {
    * prototype panel), `ss` the scan points it's shown from.
    */
   info?: TourInfo[];
+  /**
+   * Cards that come up when the visitor arrives at a scan point (MPSkins'
+   * "sweep action" popups): one at a time, bottom-left, gone by themselves
+   * after `seconds` unless the visitor reads on. `more` = a second page
+   * ("Læs mere"); a button flies to a room by its menu name or opens a link.
+   */
+  placeCards?: PlaceCard[];
+  /** A card that comes by itself after a while (e.g. "Din plads venter") - never while the menu or a place card is open. */
+  nudge?: { afterSeconds: number; title: string; text: string; buttons: { label: string; href: string; primary?: boolean }[] };
+  /** Phones: no pinch-zoom in the tour, and a little zoomed out (MPSkins' mobile zoom lock). */
+  mobileZoomLock?: boolean;
   /**
    * "Find vej": the visitor picks a room (from the menu) or a box number, and
    * the tour walks them there from where they stand, scan point by scan point.

@@ -10,6 +10,7 @@ import { CoverWelcome, DESIGNS_CSS, DockMenu, PickerMenu } from "./designs";
 import { GUIDE_CSS, GuidePlayer, guideStops } from "./guide";
 import { INFO_CSS, InfoDots, usePlaceInfo } from "./info";
 import { MAP_CSS, MapScene, type MapApi } from "./map";
+import { CARDS_CSS, NudgeCard, PlaceCard } from "./cards";
 import { MEASURES_CSS, MeasureShield } from "./measures";
 import { ROUTE_CSS, RouteLine, RouteSheet, RouteStatus, flightMs, shortestPath, straighten, type Destination, type RouteGraph } from "./wayfinding";
 import { LINKS_CSS, LinkPopup, LinkProvider, TourLink, openLink, type LinkPopupState } from "./links";
@@ -169,6 +170,7 @@ export function Experience({
   storyImages,
   routeGraph,
   units,
+  phone,
 }: {
   tour: TourConfig;
   sdkKey: string | null;
@@ -182,6 +184,8 @@ export function Experience({
   routeGraph: RouteGraph | null;
   /** Rooms available right now (live), for the room picker. */
   units: AvailableUnit[];
+  /** The visitor is on a phone (from the request) - for the mobile zoom lock. */
+  phone: boolean;
 }) {
   useGa4(ga4Id, T.title);
   const { names: ROOM_NAMES, links: ROOM_LINKS } = useMemo(() => roomIndex([...T.menu, ...(T.places ? [{ title: "", items: T.places.map((p): [string, string] => [p.name, p.href]) }] : [])]), [T]);
@@ -238,6 +242,10 @@ export function Experience({
   const currentSsRef = useRef<number | null>(null);
   /** "Vis mig rundt": the stop it's at, or null when the visitor walks on their own. */
   const [guideAt, setGuideAt] = useState<number | null>(null);
+  /** Place cards closed for good (by index), and the "comes by itself" card. */
+  const [closedCards, setClosedCards] = useState<number[]>([]);
+  const [nudgeOn, setNudgeOn] = useState(false);
+  const [nudgeRound, setNudgeRound] = useState(0);
   /** "Find vej": the picker, and the walk in progress. */
   const [routeOpen, setRouteOpen] = useState(false);
   /** The saved measurements shown over the tour ("Vis mål"). */
@@ -296,6 +304,7 @@ export function Experience({
       });
       setTourReadyMs(now() - started);
       setSdk(sdk);
+      if (T.mobileZoomLock && phone) sdk.Camera.zoomTo?.(0.5).catch(() => {});
       if (coverWaitingRef.current) {
         coverWaitingRef.current = false;
         setCoverWaiting(false);
@@ -329,7 +338,7 @@ export function Experience({
     });
     sdkRef.current.catch((err) => setTourError(err instanceof Error ? err.message : String(err)));
     return () => sub?.cancel();
-  }, [sdkKey, modelId, sweepBySs, hiddenSweeps, ROOM_NAMES, ROOM_LINKS, LAST_ROOM_KEY, T.start, T.matterportUi, T.measure, routeGraph]);
+  }, [sdkKey, modelId, sweepBySs, hiddenSweeps, ROOM_NAMES, ROOM_LINKS, LAST_ROOM_KEY, T.start, T.matterportUi, T.measure, T.mobileZoomLock, phone, routeGraph]);
 
   const setNavigation = useCallback(
     async (only: boolean) => {
@@ -803,6 +812,28 @@ export function Experience({
 
   const place = usePlaceInfo(sdk, iframe, useCallback(() => currentSsRef.current, []));
 
+  /* ----- Place cards and the card that comes by itself ----- */
+  const cardIndex = T.placeCards && currentSs != null ? T.placeCards.findIndex((c, i) => c.ss.includes(currentSs) && !closedCards.includes(i)) : -1;
+  const showCard = phase === "tour" && !cover && cardIndex >= 0 ? cardIndex : null;
+  useEffect(() => {
+    if (showCard != null) track("place_card_view", { title: T.placeCards![showCard].title });
+  }, [showCard, T]);
+  useEffect(() => {
+    if (!T.nudge || phase !== "tour" || cover) return;
+    const t = setTimeout(() => setNudgeOn(true), T.nudge.afterSeconds * 1000);
+    return () => clearTimeout(t);
+  }, [T, phase, cover, nudgeRound]);
+  /** A card's "Se …" button: to the room with that name in the menu, or the drone point with that name. */
+  function goRoom(name: string) {
+    const item = T.menu.flatMap((m) => ("items" in m ? m.items.map((i) => ({ name: i[0], href: i[1], group: m.title })) : [{ name: m.title, href: m.href, group: "" }])).find((i) => i.name === name);
+    if (item) return menuGo(item.name, item.group, item.href);
+    const p = T.points.find((x) => x.name === name);
+    if (p) {
+      backToDrone();
+      setTimeout(() => openPoint(p), 700);
+    }
+  }
+
   const ctaClick = (label: string, href: string, place: string) => track("cta_click", { label, link_url: href, place });
 
   return (
@@ -820,14 +851,14 @@ export function Experience({
       }>
       <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.font}:wght@400;600;700;800;900&display=swap`} />
       {T.fontHeading && <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.fontHeading.replace(/ /g, "+")}:wght@500;600&display=swap`} />}
-      <style>{CSS + STORIES_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + INFO_CSS + MAP_CSS + ROUTE_CSS + MEASURES_CSS}</style>
+      <style>{CSS + STORIES_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + INFO_CSS + MAP_CSS + ROUTE_CSS + MEASURES_CSS + CARDS_CSS}</style>
 
       {/* The tour, always mounted so it loads while the visitor is in the drone scene. */}
       {modelId && (
         <iframe
           ref={iframe}
           title="Matterport"
-          src={showcaseUrl(modelId, sdkKey, { ...T.matterportParams, ...startParams(T.start) })}
+          src={showcaseUrl(modelId, sdkKey, { ...T.matterportParams, ...(T.mobileZoomLock && phone ? { nozoom: "1" } : {}), ...startParams(T.start) })}
           className={`absolute inset-0 h-full w-full border-0 transition-opacity duration-500 ${phase === "tour" ? "opacity-100" : "pointer-events-none opacity-0"}`}
           allow="fullscreen; xr-spatial-tracking; autoplay"
         />
@@ -1209,6 +1240,29 @@ export function Experience({
       )}
       {guideAt != null && GUIDE[guideAt] && (
         <GuidePlayer stops={GUIDE} index={guideAt} seconds={T.guide?.seconds ?? 9} onGo={guideGo} onClose={closeGuide} onEvent={track} />
+      )}
+      {showCard != null && (
+        <PlaceCard
+          key={showCard}
+          card={T.placeCards![showCard]}
+          onClose={(how) => {
+            track("place_card_close", { title: T.placeCards![showCard].title, how });
+            setClosedCards((c) => [...c, showCard]);
+          }}
+          onRoom={goRoom}
+          onLink={(label, href) => ctaClick(label, href, "place_card")}
+        />
+      )}
+      {nudgeOn && showCard == null && !menuOpen && T.nudge && phase === "tour" && (
+        <NudgeCard
+          T={T}
+          onClose={() => {
+            track("nudge_close");
+            setNudgeOn(false);
+            setNudgeRound((r) => r + 1);
+          }}
+          onLink={(label, href) => ctaClick(label, href, "nudge")}
+        />
       )}
       {linkPopup && <LinkPopup open={linkPopup} onClose={() => setLinkPopup(null)} />}
     </div>

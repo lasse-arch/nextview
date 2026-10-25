@@ -1,3 +1,4 @@
+import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
@@ -62,7 +63,7 @@ export default async function TourPrototypePage({ params }: { params: Promise<{ 
   const hidden = [...new Set([...(cfg ? hiddenSweeps(cfg) : []), ...tour.hiddenSweeps])];
 
   return (
-    <Experience units={tour.availability ? await fetchBoxdepotetUnits(tour.availability.url) : []} routeGraph={tour.wayfinding && cfg?.mpModel ? await fetchSweepGraph(cfg.mpModel) : null} tour={tour} sdkKey={sdkKey} ga4Id={ga4Id} modelId={cfg?.mpModel ?? null} sweepBySs={sweepBySs} hiddenSweeps={hidden} storyImages={storyImageUrls} />
+    <Experience phone={/Android|iPhone|iPad|iPod|Mobile/i.test((await headers()).get("user-agent") ?? "")} units={tour.availability ? await fetchBoxdepotetUnits(tour.availability.url) : []} routeGraph={tour.wayfinding && cfg?.mpModel ? await fetchSweepGraph(cfg.mpModel) : null} tour={tour} sdkKey={sdkKey} ga4Id={ga4Id} modelId={cfg?.mpModel ?? null} sweepBySs={sweepBySs} hiddenSweeps={hidden} storyImages={storyImageUrls} />
   );
 }
 

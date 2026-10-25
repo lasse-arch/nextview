@@ -8,13 +8,26 @@ import type { TourConfig } from "@/app/(app)/tour-lab/tours/types";
  * Tours live in the database (Tour + TourVersion). The setups written while
  * prototyping (src/app/(app)/tour-lab/tours) are only starting points: the
  * first time the tour-lab is opened, any of them not yet in the database is
- * added - linked to its customer when exactly one deal matches its name.
+ * added - linked to its customer when exactly one deal matches its name - and
+ * one nobody has edited in Arpo yet is kept in step with its file.
  */
 
 let seeded: Promise<void> | null = null;
 
 async function seed() {
-  const existing = new Set((await prisma.tour.findMany({ select: { slug: true } })).map((t) => t.slug));
+  const rows = await prisma.tour.findMany({ select: { id: true, slug: true, config: true, versions: { select: { id: true, createdByName: true } } } });
+  const existing = new Set(rows.map((t) => t.slug));
+  // A tour nobody has edited in Arpo yet (only the version Arpo created) follows its prototype file.
+  for (const row of rows) {
+    const file = TOURS[row.slug];
+    const untouched = row.versions.length === 1 && row.versions[0].createdByName === "Arpo";
+    if (!file || !untouched || JSON.stringify(row.config) === JSON.stringify(file)) continue;
+    const json = file as unknown as Prisma.InputJsonValue;
+    await prisma.$transaction([
+      prisma.tour.update({ where: { id: row.id }, data: { config: json, name: file.title } }),
+      prisma.tourVersion.update({ where: { id: row.versions[0].id }, data: { config: json } }),
+    ]);
+  }
   for (const config of Object.values(TOURS)) {
     if (existing.has(config.slug)) continue;
     const deals = await prisma.deal.findMany({

@@ -28,6 +28,7 @@ export type MpSdk = {
     rotate?(horizontal: number, vertical: number, options?: { speed?: number }): Promise<void>;
     setRotation?(rotation: Rotation, options?: { speed?: number }): Promise<void>;
     zoomBy?(delta: number): Promise<number>;
+    zoomTo?(zoom: number): Promise<number>;
   };
   /** Matterport's own measuring tool (allowed when the model's "measurements" setting is on). */
   Measurements?: { toggleMode(active: boolean, options?: Record<string, unknown>): Promise<void> };
