@@ -3,12 +3,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { saveTourGa4Id, saveTourStoryImage } from "@/lib/actions/tour-lab";
-import { connectSdk, showcaseUrl, uLinkTarget, type CameraPose, type MpSdk } from "../matterport";
+import { connectSdk, showcaseUrl, uLinkTarget, type CameraPose, type MpSdk, type SweepInfo } from "../matterport";
 import type { MenuEntry, TourConfig, TourPlace, TourPoint, WelcomeGo } from "../tours/types";
 import { CoverWelcome, DESIGNS_CSS, DockMenu } from "./designs";
 import { GUIDE_CSS, GuidePlayer, guideStops } from "./guide";
 import { INFO_CSS, InfoDots, usePlaceInfo } from "./info";
 import { MAP_CSS, MapScene, type MapApi } from "./map";
+import { ROUTE_CSS, RouteSheet, RouteStatus, shortestPath, type Destination, type RouteGraph } from "./wayfinding";
 import { LINKS_CSS, LinkPopup, LinkProvider, TourLink, openLink, type LinkPopupState } from "./links";
 import { Stories, STORIES_CSS, storyJpeg, type StoryRoom } from "./stories";
 import "pannellum/build/pannellum.css";
@@ -164,6 +165,7 @@ export function Experience({
   sweepBySs,
   hiddenSweeps,
   storyImages,
+  routeGraph,
 }: {
   tour: TourConfig;
   sdkKey: string | null;
@@ -173,6 +175,8 @@ export function Experience({
   hiddenSweeps: string[];
   /** Room name -> picture URL for the story cards. */
   storyImages: Record<string, string>;
+  /** The model's scan-point network, for "Find vej". */
+  routeGraph: RouteGraph | null;
 }) {
   useGa4(ga4Id, T.title);
   const { names: ROOM_NAMES, links: ROOM_LINKS } = useMemo(() => roomIndex([...T.menu, ...(T.places ? [{ title: "", items: T.places.map((p): [string, string] => [p.name, p.href]) }] : [])]), [T]);
@@ -194,6 +198,8 @@ export function Experience({
   const sdkRef = useRef<Promise<MpSdk> | null>(null);
   /** All scan points of the model, and the one the visitor stands on. */
   const allSweeps = useRef<string[]>([]);
+  /** Every scan point's place in the viewer (to face the way when walking a route). */
+  const sweepData = useRef<Record<string, SweepInfo>>({});
   const currentSweep = useRef<string | null>(null);
   const roomTimer = useRef<{ name: string | null; at: number } | null>(null);
   /** "Kun punkter": no free walking - only the current scan point is enabled, the menu and points move you. */
@@ -225,6 +231,10 @@ export function Experience({
   const currentSsRef = useRef<number | null>(null);
   /** "Vis mig rundt": the stop it's at, or null when the visitor walks on their own. */
   const [guideAt, setGuideAt] = useState<number | null>(null);
+  /** "Find vej": the picker, and the walk in progress. */
+  const [routeOpen, setRouteOpen] = useState(false);
+  const [route, setRoute] = useState<{ dest: Destination; step: number; steps: number; arrived: boolean } | null>(null);
+  const routeRun = useRef(0);
   const GUIDE = useMemo(() => guideStops(T), [T]);
   const [linkPopup, setLinkPopup] = useState<LinkPopupState>(null);
   const popup = (href: string, label: string) => {
@@ -259,7 +269,12 @@ export function Experience({
         await sdk.Sweep.moveTo(sweepBySs[start.ss], { rotation: start.rotation, transition: sdk.Sweep.Transition.INSTANT }).catch(() => {});
       }
       if (hiddenSweeps.length) await sdk.Sweep.disable(...hiddenSweeps).catch((err) => console.warn("Sweep.disable", err));
-      sdk.Sweep.data.subscribe({ onCollectionUpdated: (c) => (allSweeps.current = Object.keys(c)) });
+      sdk.Sweep.data.subscribe({
+        onCollectionUpdated: (c) => {
+          allSweeps.current = Object.keys(c);
+          sweepData.current = c;
+        },
+      });
       setTourReadyMs(now() - started);
       setSdk(sdk);
       if (coverWaitingRef.current) {
@@ -653,13 +668,71 @@ export function Experience({
     return snippet;
   }
 
+  /* ----- "Find vej" ----- */
+  const DESTINATIONS = useMemo<Destination[]>(
+    () =>
+      T.menu.flatMap((m) =>
+        ("items" in m ? m.items.map(([name, href]) => ({ name, group: m.title, href })) : [{ name: m.title, href: m.href }]).filter((d) =>
+          d.href.includes("explore.nextview360.dk")
+        )
+      ),
+    [T]
+  );
+  /** Which way to face going from one scan point to the next (the viewer looks down -z; yaw turns left). */
+  function heading(a: string, b: string): number | null {
+    const pa = sweepData.current[a]?.position;
+    const pb = sweepData.current[b]?.position;
+    if (!pa || !pb) return null;
+    return (Math.atan2(-(pb.x - pa.x), -(pb.z - pa.z)) * 180) / Math.PI;
+  }
+  async function walkTo(dest: Destination) {
+    setRouteOpen(false);
+    setMenuOpen(false);
+    const run = ++routeRun.current;
+    const target = uLinkTarget(dest.href);
+    const goal = target ? sweepBySs[target.ss] : null;
+    const from = currentSweep.current;
+    const path = sdk && routeGraph && goal && from ? shortestPath(routeGraph, from, goal) : null;
+    track("route_start", { destination: dest.name, group: dest.group ?? "", steps: path ? path.length - 1 : 0 });
+    if (!sdk || !path || path.length < 2) {
+      // No route to walk (already there, or no network): just go there.
+      await flyTo(dest.href, "fly");
+      setRoute({ dest, step: 1, steps: 1, arrived: true });
+      return;
+    }
+    const steps = path.length - 1;
+    setRoute({ dest, step: 0, steps, arrived: false });
+    for (let i = 1; i <= steps; i++) {
+      if (routeRun.current !== run) return;
+      const sid = path[i];
+      const last = i === steps;
+      const yaw = heading(path[i - 1], sid);
+      const closed = pointsOnlyRef.current || hiddenSweeps.includes(sid);
+      if (closed) await sdk.Sweep.enable(sid).catch(() => {});
+      await sdk.Sweep.moveTo(sid, {
+        rotation: last ? target?.rotation : yaw != null ? { x: 0, y: yaw } : undefined,
+        transition: sdk.Sweep.Transition.FLY,
+        transitionTime: last ? 900 : 480,
+      }).catch(() => {});
+      const prev = path[i - 1];
+      if (pointsOnlyRef.current || hiddenSweeps.includes(prev)) await sdk.Sweep.disable(prev).catch(() => {});
+      setRoute({ dest, step: i, steps, arrived: last });
+    }
+    track("route_arrive", { destination: dest.name, steps });
+  }
+  function stopRoute() {
+    if (route && !route.arrived) track("route_stop", { destination: route.dest.name, step: route.step });
+    routeRun.current++;
+    setRoute(null);
+  }
+
   const place = usePlaceInfo(sdk, iframe, useCallback(() => currentSsRef.current, []));
 
   const ctaClick = (label: string, href: string, place: string) => track("cta_click", { label, link_url: href, place });
 
   return (
     <LinkProvider T={T} popup={popup}>
-    <div className={`hv fixed inset-0 z-50 overflow-hidden bg-[#0d1b20] ${selected ? "hv-punkt" : ""} ${zoomed ? "hv-zoom" : ""} ${welcome ? "hv-welcome" : ""} ${phase === "tour" && T.stories?.mobile ? "hv-st-on-m" : ""} ${menuOpen ? "hv-menu-aaben" : ""} ${T.design?.menu === "dock" ? "hv-dock" : ""} ${guideAt != null ? "hv-guiding" : ""} ${phase === "tour" && T.stories?.desktop ? "hv-st-on-d" : ""}`} style={
+    <div className={`hv fixed inset-0 z-50 overflow-hidden bg-[#0d1b20] ${selected ? "hv-punkt" : ""} ${zoomed ? "hv-zoom" : ""} ${welcome ? "hv-welcome" : ""} ${phase === "tour" && T.stories?.mobile ? "hv-st-on-m" : ""} ${menuOpen ? "hv-menu-aaben" : ""} ${T.design?.menu === "dock" ? "hv-dock" : ""} ${guideAt != null ? "hv-guiding" : ""} ${route ? "hv-routing" : ""} ${phase === "tour" && T.stories?.desktop ? "hv-st-on-d" : ""}`} style={
         {
           fontFamily: `'${T.font}', system-ui, sans-serif`,
           "--c-main": T.colors.main,
@@ -672,7 +745,7 @@ export function Experience({
       }>
       <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.font}:wght@400;600;700;800;900&display=swap`} />
       {T.fontHeading && <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.fontHeading.replace(/ /g, "+")}:wght@500;600&display=swap`} />}
-      <style>{CSS + STORIES_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + INFO_CSS + MAP_CSS}</style>
+      <style>{CSS + STORIES_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + INFO_CSS + MAP_CSS + ROUTE_CSS}</style>
 
       {/* The tour, always mounted so it loads while the visitor is in the drone scene. */}
       {modelId && (
@@ -1011,6 +1084,26 @@ export function Experience({
           frame={iframe}
           onOpen={(i) => track("info_open", { title: i.title })}
           onLink={(label, href) => ctaClick(label, href, "info")}
+        />
+      )}
+      {T.wayfinding && phase === "tour" && !route && !routeOpen && !cover && guideAt == null && (
+        <button type="button" className="rt-knap" onClick={() => (track("route_open"), setRouteOpen(true))}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 2l3 7 7 3-7 3-3 7-3-7-7-3 7-3z" />
+          </svg>
+          Find vej
+        </button>
+      )}
+      {routeOpen && <RouteSheet destinations={DESTINATIONS} boxes={T.wayfinding?.boxes} onGo={walkTo} onClose={() => setRouteOpen(false)} />}
+      {route && (
+        <RouteStatus
+          dest={route.dest}
+          step={route.step}
+          steps={route.steps}
+          arrived={route.arrived}
+          cta={T.cta.find((c) => c.primary)}
+          onStop={stopRoute}
+          onCta={() => ctaClick(T.cta.find((c) => c.primary)!.label, T.cta.find((c) => c.primary)!.href, "route")}
         />
       )}
       {guideAt != null && GUIDE[guideAt] && (

@@ -128,6 +128,12 @@ export type TourConfig = {
    * prototype panel), `ss` the scan points it's shown from.
    */
   info?: TourInfo[];
+  /**
+   * "Find vej": the visitor picks a room (from the menu) or a box number, and
+   * the tour walks them there from where they stand, scan point by scan point.
+   * `boxes`: box number -> link to the scan point in front of it.
+   */
+  wayfinding?: { boxes?: Record<string, string> };
   welcome?: {
     kicker: string;
     title: string;

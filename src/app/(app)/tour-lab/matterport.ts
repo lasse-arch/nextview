@@ -15,7 +15,7 @@ export type Rotation = { x: number; y: number };
 export type Vec3 = { x: number; y: number; z: number };
 export type CameraPose = { position: Vec3; rotation: Rotation; projection: Float32Array | number[]; sweep: string; mode: string };
 
-export type SweepInfo = { id?: string; sid?: string; uuid?: string; index?: number };
+export type SweepInfo = { id?: string; sid?: string; uuid?: string; index?: number; position?: { x: number; y: number; z: number } };
 
 export type MpSdk = {
   App: {

@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getSettingValue } from "@/lib/integration-settings";
 import { canEmbed } from "@/lib/link-embed";
+import { fetchSweepGraph } from "@/lib/matterport-graph";
 import { fetchMpskinsCfg, hiddenSweeps, ssOf, sweepForSs } from "@/lib/mpskins";
 import { TOURS } from "../tours";
 import type { TourConfig } from "../tours/types";
@@ -42,6 +43,7 @@ export default async function TourPrototypePage({ params }: { params: Promise<{ 
     ...tour.menu.flatMap((m) => ("items" in m ? m.items.map((i) => i[1]) : [m.href])),
     ...(tour.welcome?.tiles.flatMap((t) => ("room" in t.go ? [t.go.room] : [])) ?? []),
     ...(tour.places?.map((p) => p.href) ?? []),
+    ...Object.values(tour.wayfinding?.boxes ?? {}),
   ];
   const sweepBySs: Record<number, string> = {};
   for (const link of links) {
@@ -59,7 +61,7 @@ export default async function TourPrototypePage({ params }: { params: Promise<{ 
   const hidden = [...new Set([...(cfg ? hiddenSweeps(cfg) : []), ...tour.hiddenSweeps])];
 
   return (
-    <Experience tour={tour} sdkKey={sdkKey} ga4Id={ga4Id} modelId={cfg?.mpModel ?? null} sweepBySs={sweepBySs} hiddenSweeps={hidden} storyImages={storyImageUrls} />
+    <Experience routeGraph={tour.wayfinding && cfg?.mpModel ? await fetchSweepGraph(cfg.mpModel) : null} tour={tour} sdkKey={sdkKey} ga4Id={ga4Id} modelId={cfg?.mpModel ?? null} sweepBySs={sweepBySs} hiddenSweeps={hidden} storyImages={storyImageUrls} />
   );
 }
 
