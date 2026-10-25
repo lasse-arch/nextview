@@ -195,6 +195,8 @@ export function Experience({
   const mapApi = useRef<MapApi | null>(null);
   const drone = useRef<PannellumViewer | null>(null);
   const iframe = useRef<HTMLIFrameElement>(null);
+  /** The picture of the old view that fades away over the new one (jump: "fade"). */
+  const crossfade = useRef<HTMLImageElement>(null);
   const sdkRef = useRef<Promise<MpSdk> | null>(null);
   /** All scan points of the model, and the one the visitor stands on. */
   const allSweeps = useRef<string[]>([]);
@@ -342,11 +344,34 @@ export function Experience({
       const locked = pointsOnlyRef.current;
       const from = currentSweep.current;
       if (locked) await sdk.Sweep.enable(sweep);
-      await sdk.Sweep.moveTo(sweep, {
-        rotation: target?.rotation,
-        transition: transition === "instant" ? sdk.Sweep.Transition.INSTANT : T.jump === "fade" ? sdk.Sweep.Transition.FADEOUT : sdk.Sweep.Transition.FLY,
-        transitionTime: transition === "instant" ? undefined : T.jump === "fade" ? 700 : T.flyMs,
-      });
+      if (transition === "fly" && T.jump === "fade") {
+        // A real cross-fade instead of Matterport's fade to black: a picture of the view on top,
+        // the new room underneath at once, then the picture fades away - like stepping to the next scan.
+        const shot = crossfade.current;
+        const fr = iframe.current;
+        if (shot && fr) {
+          const w = Math.min(fr.clientWidth, 1600);
+          const pic = await sdk.Renderer.takeScreenShot({ width: w, height: Math.round((w * fr.clientHeight) / fr.clientWidth) }, { mattertags: false, sweeps: false }).catch(() => null);
+          if (pic) {
+            shot.style.transition = "none";
+            shot.src = pic;
+            await shot.decode().catch(() => {});
+            shot.style.opacity = "1";
+          }
+        }
+        await sdk.Sweep.moveTo(sweep, { rotation: target?.rotation, transition: sdk.Sweep.Transition.INSTANT });
+        await new Promise((r) => setTimeout(r, 160)); // the new room's first frames
+        if (shot) {
+          shot.style.transition = "opacity .5s ease";
+          shot.style.opacity = "0";
+        }
+      } else {
+        await sdk.Sweep.moveTo(sweep, {
+          rotation: target?.rotation,
+          transition: transition === "instant" ? sdk.Sweep.Transition.INSTANT : sdk.Sweep.Transition.FLY,
+          transitionTime: transition === "instant" ? undefined : T.flyMs,
+        });
+      }
       if (locked && from && from !== sweep) await sdk.Sweep.disable(from).catch(() => {});
       return true;
     },
@@ -779,6 +804,10 @@ export function Experience({
           className={`absolute inset-0 h-full w-full border-0 transition-opacity duration-500 ${phase === "tour" ? "opacity-100" : "pointer-events-none opacity-0"}`}
           allow="fullscreen; xr-spatial-tracking; autoplay"
         />
+      )}
+      {T.jump === "fade" && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img ref={crossfade} alt="" className="pointer-events-none absolute inset-0 h-full w-full object-cover" style={{ opacity: 0 }} />
       )}
 
       {/* The drone scene on top; fades away when going into the tour. */}
