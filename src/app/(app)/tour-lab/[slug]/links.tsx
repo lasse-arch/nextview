@@ -9,10 +9,32 @@ import type { LinkOpen, TourConfig } from "../tours/types";
  * One default per tour, and any single link can be set differently.
  */
 
-const LinkCtx = createContext<{ modeFor: (href: string) => LinkOpen; popup: (href: string, label: string) => void }>({
+const LinkCtx = createContext<{ modeFor: (href: string) => LinkOpen; tag: (href: string) => string; popup: (href: string, label: string) => void }>({
   modeFor: () => "tab",
+  tag: (href) => href,
   popup: () => {},
 });
+
+/**
+ * A link to the customer's own pages (booking, order, contact form) carries
+ * where the visitor came from - utm_source=nextview360 - so the customer's own
+ * analytics and booking system can count the bookings the tour brought.
+ * Maps, social media and our own links are left as they are.
+ */
+export function tagged(T: TourConfig, href: string): string {
+  if (T.utm === false || !/^https?:\/\//i.test(href)) return href;
+  let url: URL;
+  try {
+    url = new URL(href);
+  } catch {
+    return href;
+  }
+  if (/(^|\.)(nextview360\.dk|google\.[a-z.]+|goo\.gl|instagram\.com|facebook\.com|youtube\.com|drive\.google\.com)$/.test(url.hostname) || url.searchParams.has("utm_source")) return href;
+  url.searchParams.set("utm_source", "nextview360");
+  url.searchParams.set("utm_medium", "virtuel-tour");
+  url.searchParams.set("utm_campaign", T.slug);
+  return url.toString();
+}
 
 /** How a link opens: its own setting, otherwise the tour's default (new tab if none). Phone and mail always open normally. */
 export function linkMode(T: TourConfig, href: string): LinkOpen {
@@ -29,7 +51,7 @@ export type LinkPopupState = { href: string; label: string } | null;
 
 /** Gives every TourLink below it the tour's opening rule; `popup` shows a link over the tour. */
 export function LinkProvider({ T, popup, children }: { T: TourConfig; popup: (href: string, label: string) => void; children: React.ReactNode }) {
-  return <LinkCtx.Provider value={{ modeFor: (href) => linkMode(T, href), popup }}>{children}</LinkCtx.Provider>;
+  return <LinkCtx.Provider value={{ modeFor: (href) => linkMode(T, href), tag: (href) => tagged(T, href), popup }}>{children}</LinkCtx.Provider>;
 }
 
 /** The popup: the page over the tour, with a way out to a new tab (some sites refuse to be shown inside others). */
@@ -55,9 +77,10 @@ export function LinkPopup({ open, onClose }: { open: NonNullable<LinkPopupState>
 /** Opens a link from code (a button rather than an <a>) the tour's way. */
 export function openLink(T: TourConfig, href: string, label: string, popup: (href: string, label: string) => void) {
   const mode = linkMode(T, href);
-  if (mode === "popup") popup(href, label);
-  else if (mode === "same") window.location.assign(href);
-  else window.open(href, "_blank", "noopener");
+  const url = tagged(T, href);
+  if (mode === "popup") popup(url, label);
+  else if (mode === "same") window.location.assign(url);
+  else window.open(url, "_blank", "noopener");
 }
 
 /** An <a> that opens the tour's way; onClick is for tracking. */
@@ -74,11 +97,12 @@ export function TourLink({
   className?: string;
   children: React.ReactNode;
 }) {
-  const { modeFor, popup } = useContext(LinkCtx);
+  const { modeFor, tag, popup } = useContext(LinkCtx);
   const mode = modeFor(href);
+  const url = tag(href);
   return (
     <a
-      href={href}
+      href={url}
       className={className}
       target={mode === "tab" ? "_blank" : undefined}
       rel={mode === "tab" ? "noopener" : undefined}
@@ -86,7 +110,7 @@ export function TourLink({
         onClick?.();
         if (mode === "popup") {
           e.preventDefault();
-          popup(href, label);
+          popup(url, label);
         }
       }}
     >

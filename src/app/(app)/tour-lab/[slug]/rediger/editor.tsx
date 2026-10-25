@@ -6,11 +6,14 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { restoreTourVersion, saveTour, searchDeals, setTourDeal } from "@/lib/actions/tours";
 import { askClaudeForTour, saveAnthropicKey, type ChatTurn } from "@/lib/actions/tour-ai";
 import type { LinkOpen, MenuEntry, TourConfig } from "../../tours/types";
+import type { TourStats } from "@/lib/tour-stats";
 import { CardsEditor, GuideEditor, StartEditor } from "./content";
-import { Choice, Field, Group, Icon, input, Toggle, type PreviewApi } from "./ui";
+import { ResultsPanel } from "./results";
+import { Choice, Field, FilesContext, Group, Icon, input, outsideFiles, Toggle, UploadButton, type PreviewApi } from "./ui";
+import { hostTourFiles } from "@/lib/actions/tour-files";
 
 type Version = { id: string; note: string | null; by: string | null; at: string };
-type Tab = "claude" | "start" | "rundvisning" | "kort" | "generelt" | "design" | "menu" | "funktioner" | "links" | "avanceret" | "versioner";
+type Tab = "claude" | "resultater" | "start" | "rundvisning" | "kort" | "generelt" | "design" | "menu" | "funktioner" | "links" | "avanceret" | "versioner";
 
 /** Claude's mark: a small sunburst. */
 const SPARK = '<path d="M12 3v5M12 16v5M3 12h5M16 12h5M5.6 5.6l3.5 3.5M14.9 14.9l3.5 3.5M5.6 18.4l3.5-3.5M14.9 9.1l3.5-3.5"/>';
@@ -18,6 +21,7 @@ const SPARK = '<path d="M12 3v5M12 16v5M3 12h5M16 12h5M5.6 5.6l3.5 3.5M14.9 14.9
 /** The sections, with a small icon each (SF Symbols-like, drawn with strokes), under their headings. */
 const TABS: [Tab, string, string, string?][] = [
   ["claude", "Claude", SPARK],
+  ["resultater", "Resultater", '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'],
   ["start", "Start", '<path d="M5 4v16M5 5h11l-2 4 2 4H5"/>', "Indhold"],
   ["menu", "Menu", '<path d="M4 6h16M4 12h16M4 18h10"/>'],
   ["rundvisning", "Vis mig rundt", '<circle cx="12" cy="12" r="9"/><path d="M10 8.5v7l5.5-3.5z"/>'],
@@ -38,12 +42,17 @@ export function TourEditor({
   deal,
   versions,
   aiReady,
+  stats,
+  blob,
 }: {
   slug: string;
   initial: TourConfig;
   deal: { id: string; name: string } | null;
   versions: Version[];
   aiReady: boolean;
+  stats: TourStats;
+  /** Vercel Blob is set up (uploads of big files, videos). */
+  blob: boolean;
 }) {
   const router = useRouter();
   const [config, setConfig] = useState<TourConfig>(initial);
@@ -138,6 +147,7 @@ export function TourEditor({
   const menuStyle = config.design?.menu ?? "side";
 
   return (
+    <FilesContext.Provider value={{ slug, blob }}>
     <div
       className="-mx-4 -mb-4 flex h-[calc(100vh-6rem)] flex-col overflow-hidden rounded-t-2xl bg-[#f5f5f7] text-[#1d1d1f] sm:-mx-6 sm:-mb-6 lg:-mx-8 lg:-mb-8"
       style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", system-ui, sans-serif' }}
@@ -217,6 +227,7 @@ export function TourEditor({
                   <input className={input} value={config.start} onChange={(e) => edit((d) => void (d.start = e.target.value))} />
                 </Field>
                 </Group>
+                <FilesGroup slug={slug} config={config} onHosted={(c) => edit((d) => Object.assign(d, c))} />
               </>
             )}
 
@@ -263,8 +274,15 @@ export function TourEditor({
                 </div>
                 </Group>
                 <Group title="Logo">
-                <Field title="Logo (adresse)">
-                  <input className={input} value={config.logo} onChange={(e) => edit((d) => void (d.logo = e.target.value))} />
+                <Field title="Logo">
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-10 w-16 flex-none items-center justify-center rounded-lg p-1" style={{ background: config.logoOnLight ? "#f5f5f7" : config.colors.main }}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      {config.logo && <img src={config.logo} alt="" className="max-h-full max-w-full object-contain" />}
+                    </div>
+                    <input className={input} value={config.logo} onChange={(e) => edit((d) => void (d.logo = e.target.value))} />
+                    <UploadButton accept="image/*" onDone={(url) => edit((d) => void (d.logo = url))} />
+                  </div>
                 </Field>
                 <Field title={`Logostørrelse: ${config.logoSize ?? 46} px`}>
                   <input type="range" min={28} max={120} className="w-full accent-[#0071e3]" value={config.logoSize ?? 46} onChange={(e) => edit((d) => void (d.logoSize = Number(e.target.value)))} />
@@ -274,6 +292,7 @@ export function TourEditor({
               </>
             )}
 
+            {tab === "resultater" && <ResultsPanel stats={stats} />}
             {tab === "start" && <StartEditor config={config} edit={edit} slug={slug} preview={preview} />}
             {tab === "rundvisning" && <GuideEditor config={config} edit={edit} preview={preview} />}
             {tab === "kort" && <CardsEditor config={config} edit={edit} preview={preview} />}
@@ -528,6 +547,7 @@ export function TourEditor({
         </div>
       </div>
     </div>
+    </FilesContext.Provider>
   );
 }
 
@@ -700,6 +720,41 @@ function ClaudePanel({
         </div>
       </form>
     </div>
+  );
+}
+
+/** The tour's files: how many still come from other sites, and copying them to us. */
+function FilesGroup({ slug, config, onHosted }: { slug: string; config: TourConfig; onHosted: (c: TourConfig) => void }) {
+  const outside = outsideFiles(config);
+  const [pending, start] = useTransition();
+  const [msg, setMsg] = useState<string | null>(null);
+  return (
+    <Group title="Filer">
+      {outside.length ? (
+        <>
+          <p className="text-[14px] leading-snug">
+            {outside.length === 1 ? "1 fil" : `${outside.length} filer`} hentes stadig fra andre sider (fx kundens hjemmeside) og kan forsvinde, hvis siden ændres.
+          </p>
+          <button
+            type="button"
+            disabled={pending}
+            className="w-full rounded-xl bg-[#0071e3] py-2.5 text-[15px] font-medium text-white hover:bg-[#0077ed] disabled:opacity-50"
+            onClick={() =>
+              start(async () => {
+                const r = await hostTourFiles(slug, config);
+                onHosted(r.config);
+                setMsg(`${r.copied} ${r.copied === 1 ? "fil" : "filer"} gemt hos os - husk at gemme touren.${r.failed.length ? ` Kunne ikke: ${r.failed.join("; ")}` : ""}`);
+              })
+            }
+          >
+            {pending ? "Henter filerne…" : "Gem alle filer hos os"}
+          </button>
+        </>
+      ) : (
+        <p className="text-[14px] leading-snug">✓ Alle tourens billeder, logo og videoer ligger hos os.</p>
+      )}
+      {msg && <p className="text-[12px] leading-snug text-[#6e6e73]">{msg}</p>}
+    </Group>
   );
 }
 

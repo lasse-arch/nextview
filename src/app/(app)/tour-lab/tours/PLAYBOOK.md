@@ -101,6 +101,23 @@ Ikke alle tours skal starte med et valg. Vælg ud fra, hvor folk kommer fra:
 - **Kirkegård/skovbegravelse:** rolig tone; kun "Kontakt os".
 - **Ukendt:** oplevelse → praktisk → "dit sted" → handling.
 
+## Konvertering og måling
+
+Målet er at kunne sige til kunden: "Touren sendte X besøgende videre til
+booking i denne måned". Derfor:
+
+- **Én hovedhandling pr. tour**, og den er altid ét tryk væk (CTA-knappen, i
+  menuen, på stedkort i de vigtigste rum og i "Din plads venter").
+- **Booking i popup over touren**, så folk ikke mister touren, hvis de fortryder.
+- **Handlingen der, hvor lysten opstår**: et stedkort i det smukkeste rum med
+  "Book dette bord" / "Se ledige værelser" slår en knap i en menu.
+- Arpo måler selv hver tour (besøg, hvad folk kigger på, klik på booking og
+  kontakt) - se fanen Resultater. Links til kundens egne sider får
+  utm_source=nextview360, så kunden også kan se bookingerne i sit eget system.
+- Når tallene viser, at folk ikke når handlingen (fx mange besøg, få klik),
+  så flyt handlingen tættere på: et stedkort, en flise på velkomsten, eller
+  "Din plads venter" tidligere.
+
 ## Kunderejsen
 
 En kunde kan have flere tours til forskellige steder i kunderejsen (fx én til

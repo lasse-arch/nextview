@@ -20,6 +20,7 @@
     "@photo-sphere-viewer/markers-plugin": "5.15.1",
     "@prisma/client": "^6.19.3",
     "@sparticuz/chromium": "^153.0.0",
+    "@vercel/blob": "^2.8.2",
     "bcryptjs": "^3.0.3",
     "date-fns": "^4.4.0",
     "jose": "^6.2.12",

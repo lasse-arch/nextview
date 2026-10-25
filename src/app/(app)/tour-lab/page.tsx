@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { getSettingValue } from "@/lib/integration-settings";
+import { leadsByTour } from "@/lib/tour-stats";
 import { listTours } from "@/lib/tours";
 import { NewTour } from "./new-tour";
 import { TourLab } from "./tour-lab";
@@ -27,7 +28,7 @@ function picture(c: TourConfig): { image: string; logo: boolean } {
 export default async function TourLabPage() {
   const user = await getCurrentUser();
   if (user?.role !== "ADMIN") redirect("/");
-  const [tours, sdkKey] = await Promise.all([listTours(), getSettingValue("MATTERPORT_SDK_KEY")]);
+  const [tours, sdkKey, results] = await Promise.all([listTours(), getSettingValue("MATTERPORT_SDK_KEY"), leadsByTour(30)]);
   // One customer can have several tours (one for each step of the customer journey) - shown together.
   const groups = new Map<string, typeof tours>();
   for (const t of tours) {
@@ -76,7 +77,9 @@ export default async function TourLabPage() {
                       </div>
                       <div className="px-4 py-3">
                         <div className="truncate text-[15px] font-medium text-[#1d1d1f]">{t.name}</div>
-                        <div className="text-[12px] text-[#8e8e93]">Ændret {when(t.updatedAt)}</div>
+                        <div className="text-[12px] text-[#8e8e93]">
+                          {results[t.slug] ? `${results[t.slug].leads} til booking/kontakt · ${results[t.slug].visits} besøg (30 dage)` : `Ændret ${when(t.updatedAt)}`}
+                        </div>
                       </div>
                     </Link>
                     <a

@@ -71,6 +71,13 @@ export type TourConfig = {
   cta: { label: string; href: string; primary: boolean }[];
   /** How links out of the tour open: a default, and single links (by their URL) set differently. Left out = new tab. */
   linkOpen?: { default: LinkOpen; byUrl?: Record<string, LinkOpen> };
+  /**
+   * Links to the customer's own pages get utm_source=nextview360 (medium
+   * "virtuel-tour", campaign = the tour's slug), so their analytics/booking
+   * system can count the bookings the tour brings. false = leave links as they are
+   * (only if a booking page breaks with the extra parameters).
+   */
+  utm?: false;
   /** Contact card at the bottom of the menu. */
   contact?: { address?: string; mapUrl?: string; phone?: string; email?: string; instagram?: string };
   /** The drone scene in front of the tour - leave out to start straight in the tour. */

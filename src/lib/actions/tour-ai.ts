@@ -11,6 +11,7 @@ import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getSettingValue, setSettingValue } from "@/lib/integration-settings";
 import { mpskinsMenuDigest, siteDigest } from "@/lib/site-digest";
+import { hostFiles } from "@/lib/tour-files";
 import type { TourConfig } from "@/app/(app)/tour-lab/tours/types";
 
 /*
@@ -132,11 +133,14 @@ async function claudeEdits(key: string, config: TourConfig, history: ChatTurn[],
       .stream({
         model: "claude-opus-5-5",
         max_tokens: maxTokens,
-        system: await systemPrompt(),
+        // The setup docs and the playbook are the same in every call - cached, they cost a tenth on the next ones.
+        system: [{ type: "text", text: await systemPrompt(), cache_control: { type: "ephemeral" } }],
         messages,
         output_config: { effort: "low", format: zodOutputFormat(Edits) },
       })
       .finalMessage();
+    const u = response.usage;
+    console.info(`tour-ai usage: in ${u.input_tokens} + cache write ${u.cache_creation_input_tokens ?? 0} + cache read ${u.cache_read_input_tokens ?? 0}, out ${u.output_tokens}`);
     if (response.stop_reason === "refusal") return { ok: false, error: "Claude ville ikke lave den ændring." };
     if (response.stop_reason === "max_tokens") return { ok: false, error: "Ændringen blev for stor - prøv at dele den op." };
     parsed = response.parsed_output ?? null;
@@ -221,12 +225,15 @@ ${menu || "(Kunne ikke læses)"}
   );
   if (!result.ok) return result;
 
-  const config = { ...result.config, slug } as unknown as Prisma.InputJsonValue;
+  // The logo and pictures from the website are copied to us, so the tour keeps them whatever happens to the site.
+  const hosted = await hostFiles(slug, { ...result.config, slug });
+  const config = hosted.config as unknown as Prisma.InputJsonValue;
   await prisma.tour.create({
-    data: { slug, name: result.config.title || name, config, versions: { create: { config, note: `Bygget af Claude ud fra ${input.website.trim() || "MPSkins-touren"}`, createdByName: user.name } } },
+    data: { slug, name, config, versions: { create: { config, note: `Bygget af Claude ud fra ${input.website.trim() || "MPSkins-touren"}`, createdByName: user.name } } },
   });
   revalidatePath("/tour-lab");
-  return { ok: true, slug, reply: result.reply };
+  const failed = hosted.failed.length ? `\n\nDisse filer kunne ikke hentes til os: ${hosted.failed.join("; ")}` : "";
+  return { ok: true, slug, reply: result.reply + failed };
 }
 
 const slugify = (s: string) =>

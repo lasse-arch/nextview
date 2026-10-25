@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { saveTourStoryImage } from "@/lib/actions/tour-lab";
 import type { PlaceCard, TourConfig, TourPlace, WelcomeGo } from "../../tours/types";
-import { Choice, Field, Group, Icon, input, Toggle, ssOfHref, type PreviewApi } from "./ui";
+import { Choice, Field, Group, Icon, input, Toggle, UploadButton, ssOfHref, type PreviewApi } from "./ui";
 
 /*
  * The editors for a tour's content - the start, its places, "Vis mig rundt"
@@ -186,8 +186,9 @@ function PhotoPicker({ image, onChange, preview, slug, photoKey }: { image: stri
           }}
         >
           <Icon d={CAMERA} className="h-4 w-4" />
-          {busy ? "Tager billede…" : "Tag billede af forhåndsvisningen"}
+          {busy ? "Tager billede…" : "Tag billede"}
         </button>
+        <UploadButton accept="image/*" onDone={onChange} />
       </div>
       {error && <p className="px-1 text-[12px] text-[#ff3b30]">{error}</p>}
       <details className="text-[12px] text-[#8e8e93]">

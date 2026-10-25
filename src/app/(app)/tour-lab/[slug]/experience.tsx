@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { saveTourGa4Id, saveTourStoryImage } from "@/lib/actions/tour-lab";
 import { connectSdk, showcaseUrl, uLinkTarget, type CameraPose, type MpSdk, type Rotation, type SweepInfo, type Vec3 } from "../matterport";
@@ -60,9 +60,30 @@ type TrackedEvent = { name: string; params: Record<string, string | number>; at:
 const eventLog: TrackedEvent[] = [];
 const logListeners = new Set<() => void>();
 
+/** The tour being measured (set when the tour mounts). */
+const tracking = { slug: "", session: "", queue: [] as { name: string; label?: string; url?: string }[], timer: 0 };
+
+/** Sends the waiting events to Arpo's own measurement (/api/tour-events) - also when the page is closed. */
+function flushEvents() {
+  window.clearTimeout(tracking.timer);
+  tracking.timer = 0;
+  if (!tracking.queue.length || !tracking.slug) return;
+  const body = JSON.stringify({ tour: tracking.slug, session: tracking.session, device: matchMedia("(max-width: 760px)").matches ? "mobil" : "computer", events: tracking.queue.splice(0, 50) });
+  if (!navigator.sendBeacon?.("/api/tour-events", new Blob([body], { type: "application/json" }))) {
+    fetch("/api/tour-events", { method: "POST", body, keepalive: true }).catch(() => {});
+  }
+}
+
 function track(name: string, params: Record<string, string | number> = {}) {
-  const full = { tour: "halvorsminde", ...params };
+  const full = { tour: tracking.slug, ...params };
   window.gtag?.("event", name, full);
+  // Arpo's own count - not from the editor's preview (the tour in an iframe there).
+  if (tracking.slug && window.parent === window) {
+    const label = params.label ?? params.item_name ?? params.place_name ?? params.room_name ?? params.kind ?? params.title ?? params.name;
+    tracking.queue.push({ name, label: label != null ? String(label) : undefined, url: params.link_url != null ? String(params.link_url) : undefined });
+    if (name === "cta_click" || name === "contact_click") flushEvents(); // the visitor may be leaving
+    else tracking.timer ||= window.setTimeout(flushEvents, 4000);
+  }
   eventLog.unshift({ name, params: full, at: Date.now() });
   eventLog.length = Math.min(eventLog.length, 30);
   logListeners.forEach((l) => l());
@@ -191,6 +212,24 @@ export function Experience({
   const [draft, setDraft] = useState<TourConfig | null>(null);
   const T = draft ?? savedTour;
   useGa4(ga4Id, T.title);
+  useLayoutEffect(() => {
+    // One visit = one id per browser tab and tour.
+    const key = `tour-session:${savedTour.slug}`;
+    try {
+      tracking.session = sessionStorage.getItem(key) ?? crypto.randomUUID().slice(0, 18);
+      sessionStorage.setItem(key, tracking.session);
+    } catch {
+      tracking.session = Math.random().toString(36).slice(2, 14);
+    }
+    tracking.slug = savedTour.slug;
+    track("tour_open", { label: document.referrer ? new URL(document.referrer).hostname : "direkte" });
+    const leave = () => flushEvents();
+    window.addEventListener("pagehide", leave);
+    return () => {
+      flushEvents();
+      window.removeEventListener("pagehide", leave);
+    };
+  }, [savedTour.slug]);
   const { names: ROOM_NAMES, links: ROOM_LINKS } = useMemo(() => roomIndex([...T.menu, ...(T.places ? [{ title: "", items: T.places.map((p): [string, string] => [p.name, p.href]) }] : [])]), [T]);
   const LAST_ROOM_KEY = `${T.slug}-last-room`;
   /** The rooms of "Historier": the ones the setup names, otherwise every room in the menu. */

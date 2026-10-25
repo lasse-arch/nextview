@@ -1313,3 +1313,38 @@ model TourVersion {
 
   @@index([tourId, createdAt])
 }
+
+/// What happens in a tour (opened, menu clicks, booking clicks …) - Arpo's own
+/// measurement, so we can show each customer what their tour brings them.
+model TourEvent {
+  id        String   @id @default(cuid())
+  tourSlug  String
+  /// One visit (a random id per browser tab).
+  session   String
+  name      String
+  label     String?
+  url       String?
+  /// "mobil" or "computer".
+  device    String?
+  createdAt DateTime @default(now())
+
+  @@index([tourSlug, createdAt])
+}
+
+/// A file a tour uses (logo, photo, svg, video), kept by us so it can't
+/// disappear when a customer changes their website. Small files live here;
+/// with Vercel Blob set up, the file is there and `url` points to it.
+model TourFile {
+  id          String   @id @default(cuid())
+  tourSlug    String
+  name        String
+  contentType String
+  size        Int
+  data        Bytes?
+  url         String?
+  /// Where it was copied from, if anywhere (so the same file isn't copied twice).
+  sourceUrl   String?
+  createdAt   DateTime @default(now())
+
+  @@index([tourSlug])
+}

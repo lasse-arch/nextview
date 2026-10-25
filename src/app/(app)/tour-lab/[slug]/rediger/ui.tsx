@@ -1,5 +1,9 @@
 "use client";
 
+import { createContext, useContext, useState } from "react";
+import { registerTourFile, uploadTourFile } from "@/lib/actions/tour-files";
+import type { TourConfig } from "../../tours/types";
+
 /* The editor's building blocks - Apple-style fields, switches and groups. */
 
 export const input =
@@ -83,3 +87,64 @@ export const ssOfHref = (href: string) => {
   const ss = Number(new URLSearchParams(href.split("?")[1] ?? "").get("ss"));
   return Number.isFinite(ss) && ss > 0 ? ss : null;
 };
+
+/** Where the editor's uploads go: the tour, and whether Vercel Blob is set up (big files, videos). */
+export const FilesContext = createContext<{ slug: string; blob: boolean }>({ slug: "", blob: false });
+
+/** Uploads a file for the tour and returns its address - straight to Vercel Blob when it's there, otherwise via Arpo (max 4 MB). */
+export async function uploadToTour(slug: string, file: File, blob: boolean): Promise<string> {
+  if (blob) {
+    const { upload } = await import("@vercel/blob/client");
+    const result = await upload(`tours/${slug}/${file.name}`, file, { access: "public", handleUploadUrl: "/api/tour-files/upload", contentType: file.type });
+    await registerTourFile(slug, { url: result.url, name: file.name, contentType: file.type, size: file.size });
+    return result.url;
+  }
+  const form = new FormData();
+  form.set("file", file);
+  const r = await uploadTourFile(slug, form);
+  if (!r.ok) throw new Error(r.error);
+  return r.url;
+}
+
+/** A button that picks a file and uploads it. */
+export function UploadButton({ accept, onDone, label = "Upload", className }: { accept: string; onDone: (url: string) => void; label?: string; className?: string }) {
+  const { slug, blob } = useContext(FilesContext);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <span className="inline-flex flex-col">
+      <label className={className ?? "cursor-pointer rounded-xl bg-white px-3 py-2 text-center text-[14px] font-medium text-[#0071e3] ring-1 ring-black/[.06] hover:bg-[#0071e3]/5"}>
+        {busy ? "Uploader…" : label}
+        <input
+          type="file"
+          accept={accept}
+          className="hidden"
+          disabled={busy}
+          onChange={async (e) => {
+            const file = e.target.files?.[0];
+            e.target.value = "";
+            if (!file) return;
+            setBusy(true);
+            setError(null);
+            try {
+              onDone(await uploadToTour(slug, file, blob));
+            } catch (err) {
+              setError(err instanceof Error ? err.message : String(err));
+            }
+            setBusy(false);
+          }}
+        />
+      </label>
+      {error && <span className="mt-1 text-[12px] text-[#ff3b30]">{error}</span>}
+    </span>
+  );
+}
+
+/** The files a setup takes from other sites (that could disappear) - mirrors fileSlots in src/lib/tour-files.ts. */
+export function outsideFiles(c: TourConfig): string[] {
+  const all = [c.logo, c.cover?.image, c.cover?.imageMobile, c.intro?.poster, c.map?.image, ...(c.places ?? []).map((p) => p.image), ...(c.intro?.sources ?? []).map((s) => s.src), ...(c.info ?? []).map((i) => i.image)];
+  return all.filter((src): src is string => {
+    if (!src || !/^https?:\/\//i.test(src)) return false;
+    return !/(^|\.)(arpo\.dk|nextview360\.dk|matterport\.com|blob\.vercel-storage\.com|localhost)$/.test(new URL(src).hostname);
+  });
+}
