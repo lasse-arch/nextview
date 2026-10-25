@@ -285,7 +285,7 @@ export const DESIGNS_CSS = `
 .pk-row button.nu{background:var(--c-main);color:#fff}
 .pk-items button.nu{background:var(--c-accent);color:#fff}
 .pk-cta{flex:none;margin-left:auto;border-radius:999px;padding:9px 16px;background:var(--c-accent);color:#fff;font-weight:800;font-size:14px;text-decoration:none;white-space:nowrap}
-.hv:has(.pk) .hv-room{bottom:150px}
+.hv:has(.pk) .hv-room{display:none} /* the picker already shows where you are */
 @media (max-width:760px){
   .pk{left:8px;right:8px;translate:none;max-width:none;bottom:calc(8px + env(safe-area-inset-bottom,0px));border-radius:18px;padding:8px}
   .pk-groups button{font-size:15px;padding:9px 14px}
@@ -294,7 +294,6 @@ export const DESIGNS_CSS = `
   .pk-unit{grid-template-columns:auto 1fr auto;gap:4px 10px;font-size:13px}
   .pk-unit .pk-pris{grid-column:2}
   .pk-unit .pk-book{grid-column:3;grid-row:1 / span 2}
-  .hv:has(.pk) .hv-room{bottom:170px}
 }
 .dz-kicker{font-size:11px;font-weight:600;letter-spacing:.22em;text-transform:uppercase;color:var(--c-accent)}
 .hv h1,.dz-cover h1{font-family:var(--font-heading)}
