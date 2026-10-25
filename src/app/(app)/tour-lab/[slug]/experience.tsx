@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { saveTourGa4Id, saveTourStoryImage } from "@/lib/actions/tour-lab";
-import { connectSdk, showcaseUrl, uLinkTarget, type CameraPose, type MpSdk, type SweepInfo, type Vec3 } from "../matterport";
+import { connectSdk, showcaseUrl, uLinkTarget, type CameraPose, type MpSdk, type Rotation, type SweepInfo, type Vec3 } from "../matterport";
 import type { AvailableUnit } from "@/lib/availability/boxdepotet";
 import type { MenuEntry, TourConfig, TourPlace, TourPoint, WelcomeGo } from "../tours/types";
 import { CoverWelcome, DESIGNS_CSS, DockMenu, PickerMenu } from "./designs";
@@ -347,15 +347,35 @@ export function Experience({
     [hiddenSweeps]
   );
 
+  /**
+   * Moves to a scan point, opening it first if it's hidden (e.g. the scan
+   * inside a storage room, hidden so nobody walks in) and closing the hidden one
+   * you leave. If Matterport won't fly there, it fades there instead.
+   */
+  const moveSweep = useCallback(
+    async (sdk: MpSdk, sweep: string, opts: { rotation?: Rotation; transition: string; transitionTime?: number }) => {
+      const from = currentSweep.current;
+      const locked = pointsOnlyRef.current;
+      if (locked || hiddenSweeps.includes(sweep)) await sdk.Sweep.enable(sweep).catch(() => {});
+      try {
+        await sdk.Sweep.moveTo(sweep, opts);
+      } catch {
+        track("move_retry", { sweep });
+        await sdk.Sweep.moveTo(sweep, { rotation: opts.rotation, transition: sdk.Sweep.Transition.FADEOUT, transitionTime: 500 }).catch((err) =>
+          track("move_failed", { sweep, error: String(err).slice(0, 80) })
+        );
+      }
+      if (from && from !== sweep && (locked || hiddenSweeps.includes(from))) await sdk.Sweep.disable(from).catch(() => {});
+    },
+    [hiddenSweeps]
+  );
+
   const flyTo = useCallback(
     async (href: string, transition: "fly" | "instant") => {
       const target = uLinkTarget(href);
       const sweep = target ? sweepBySs[target.ss] : null;
       if (!sdkRef.current || !sweep) return false;
       const sdk = await sdkRef.current;
-      const locked = pointsOnlyRef.current;
-      const from = currentSweep.current;
-      if (locked) await sdk.Sweep.enable(sweep);
       if (transition === "fly" && T.jump === "fade") {
         // A real cross-fade instead of Matterport's fade to black: a picture of the view on top,
         // the new room underneath at once, then the picture fades away - like stepping to the next scan.
@@ -371,23 +391,22 @@ export function Experience({
             shot.style.opacity = "1";
           }
         }
-        await sdk.Sweep.moveTo(sweep, { rotation: target?.rotation, transition: sdk.Sweep.Transition.INSTANT });
+        await moveSweep(sdk, sweep, { rotation: target?.rotation, transition: sdk.Sweep.Transition.INSTANT });
         await new Promise((r) => setTimeout(r, 160)); // the new room's first frames
         if (shot) {
           shot.style.transition = "opacity .5s ease";
           shot.style.opacity = "0";
         }
       } else {
-        await sdk.Sweep.moveTo(sweep, {
+        await moveSweep(sdk, sweep, {
           rotation: target?.rotation,
           transition: transition === "instant" || T.jump === "instant" ? sdk.Sweep.Transition.INSTANT : sdk.Sweep.Transition.FLY,
           transitionTime: transition === "instant" || T.jump === "instant" ? undefined : T.flyMs,
         });
       }
-      if (locked && from && from !== sweep) await sdk.Sweep.disable(from).catch(() => {});
       return true;
     },
-    [sweepBySs, T]
+    [sweepBySs, T, moveSweep]
   );
 
   /* ----- The drone scene. ----- */
@@ -765,15 +784,11 @@ export function Experience({
       const last = i === steps;
       // Arrive already facing the next stretch, so the next flight starts straight ahead.
       const yaw = last ? null : heading(sid, flights[i + 1]) ?? heading(flights[i - 1], sid);
-      const closed = pointsOnlyRef.current || hiddenSweeps.includes(sid);
-      if (closed) await sdk.Sweep.enable(sid).catch(() => {});
-      await sdk.Sweep.moveTo(sid, {
+      await moveSweep(sdk, sid, {
         rotation: last ? target?.rotation : yaw != null ? { x: -8, y: yaw } : undefined,
         transition: sdk.Sweep.Transition.FLY,
         transitionTime: flightMs(routeGraph, flights[i - 1], sid),
-      }).catch(() => {});
-      const prev = flights[i - 1];
-      if (pointsOnlyRef.current || hiddenSweeps.includes(prev)) await sdk.Sweep.disable(prev).catch(() => {});
+      });
       setRoute({ dest, step: i, steps, arrived: last });
       setRouteLine(last ? [] : line(i));
     }
