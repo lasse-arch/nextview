@@ -177,7 +177,19 @@ export function MapScene({
           }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={M.image} alt="" draggable={false} />
+          <img
+            src={M.image}
+            alt=""
+            draggable={false}
+            onClick={(e) => {
+              // Setting up: Shift-click copies the spot's position (x, y in %) for the tour's setup.
+              if (!e.shiftKey) return;
+              const r = e.currentTarget.getBoundingClientRect();
+              const spot = `[${(((e.clientX - r.left) / r.width) * 100).toFixed(1)}, ${(((e.clientY - r.top) / r.height) * 100).toFixed(1)}]`;
+              navigator.clipboard?.writeText(spot).catch(() => {});
+              console.info("Kortposition kopieret:", spot);
+            }}
+          />
           {M.clouds !== false && <div className="km-skyer" />}
           {T.points.map((p, i) => {
             const pos = M.spots[p.id];
@@ -241,7 +253,7 @@ export const MAP_CSS = `
 .km{position:absolute;inset:0;overflow:hidden;background:#dfe9e4;cursor:grab;user-select:none}
 .km:active{cursor:grabbing}
 .km-bild{position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform}
-.km-bild>img{display:block;width:100%;height:100%;pointer-events:none}
+.km-bild>img{display:block;width:100%;height:100%}
 /* Cloud shadows drifting slowly over the picture. */
 .km-skyer{position:absolute;inset:-20% -40%;pointer-events:none;mix-blend-mode:multiply;opacity:.16;
   background:radial-gradient(28% 18% at 20% 30%,#1d2a30,transparent 70%),radial-gradient(22% 14% at 62% 62%,#1d2a30,transparent 70%),radial-gradient(30% 16% at 90% 20%,#1d2a30,transparent 70%);
