@@ -5,8 +5,12 @@ import path from "node:path";
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
+import { revalidatePath } from "next/cache";
+import type { Prisma } from "@prisma/client";
 import { requireUser } from "@/lib/auth";
+import { prisma } from "@/lib/db";
 import { getSettingValue, setSettingValue } from "@/lib/integration-settings";
+import { mpskinsMenuDigest, siteDigest } from "@/lib/site-digest";
 import type { TourConfig } from "@/app/(app)/tour-lab/tours/types";
 
 /*
@@ -83,58 +87,63 @@ function apply(root: Record<string, unknown>, op: "set" | "delete", pathText: st
   else (node as Record<string, unknown>)[last] = value;
 }
 
-let typesDoc: Promise<string> | null = null;
-/** The setup's own documented types - the best description of what every field does. */
-function setupDocs() {
-  typesDoc ??= readFile(path.join(process.cwd(), "src/app/(app)/tour-lab/tours/types.ts"), "utf8").catch(() => "");
-  return typesDoc;
+const docs: Record<string, Promise<string>> = {};
+/** A file next to the tour setups: types.ts (what every field does) or PLAYBOOK.md (how we make a good tour). */
+function tourDoc(file: "types.ts" | "PLAYBOOK.md") {
+  docs[file] ??= readFile(path.join(process.cwd(), "src/app/(app)/tour-lab/tours", file), "utf8").catch(() => "");
+  return docs[file];
 }
 
-export async function askClaudeForTour(config: TourConfig, history: ChatTurn[], request: string): Promise<AiEditResult> {
-  await admin();
-  const key = await apiKey();
-  if (!key) return { ok: false, error: "Claude er ikke sat op endnu - indsæt en nøgle." };
-  const docs = await setupDocs();
-
-  const system = `Du hjælper Nextview360 med at sætte virtuelle 360°-tours op i deres CRM, Arpo. En tour er en Matterport-scanning med Nextview360's egen brugerflade ovenpå (velkomst, menu, knapper, kort osv.), styret af en JSON-opsætning (TourConfig).
+async function systemPrompt() {
+  const [types, playbook] = await Promise.all([tourDoc("types.ts"), tourDoc("PLAYBOOK.md")]);
+  return `Du hjælper Nextview360 med at sætte virtuelle 360°-tours op i deres CRM, Arpo. En tour er en Matterport-scanning med Nextview360's egen brugerflade ovenpå (velkomst, menu, knapper, kort osv.), styret af en JSON-opsætning (TourConfig).
 
 Brugeren beskriver en ændring på dansk. Svar med de præcise ændringer til opsætningen (changes) og et kort, venligt svar (reply) på dansk - som en dygtig designer, der lige har lavet ændringen. Ingen teknisk snak om JSON eller stier i svaret.
 
 Regler:
 - Ændr kun det, der bliver bedt om. Bevar alt andet.
-- Links til steder i touren er explore.nextview360.dk-links med ?ss=<scanpunkt> (evt. &rot=pitch,yaw). Opfind aldrig scanpunkter - genbrug dem, der allerede står i opsætningen, eller spørg.
+- Links til steder i touren er explore.nextview360.dk-links med ?ss=<scanpunkt> (evt. &rot=pitch,yaw). Opfind aldrig scanpunkter - genbrug dem, der allerede står i opsætningen eller i MPSkins-menuen, eller spørg.
 - Links ud af touren (booking, hjemmeside) er almindelige https-links.
 - Farver er hex (#rrggbb). Skrifter er navne på Google Fonts.
 - Er ønsket uklart, så stil ét kort spørgsmål i reply og lad changes være tom.
 - En menu (menu) er en liste af enten {title, href} eller grupper {title, items: [[navn, link], ...]}.
+- Følg drejebogen nedenfor - den er Nextview360's erfaring med, hvad der virker.
+
+<drejebog>
+${playbook}
+</drejebog>
 
 Opsætningens typer, med forklaring af hvert felt:
 \`\`\`ts
-${docs}
+${types}
 \`\`\``;
+}
 
+/** Asks Claude for edits to a setup and applies them to a copy. */
+async function claudeEdits(key: string, config: TourConfig, history: ChatTurn[], request: string, maxTokens = 16000): Promise<AiEditResult> {
   const messages: Anthropic.MessageParam[] = [
     ...history.slice(-10).map((t): Anthropic.MessageParam => ({ role: t.role, content: t.text })),
-    { role: "user", content: `Opsætningen lige nu:\n\`\`\`json\n${JSON.stringify(config)}\n\`\`\`\n\nØnske: ${request}` },
+    { role: "user", content: `Opsætningen lige nu:\n\`\`\`json\n${JSON.stringify(config)}\n\`\`\`\n\n${request}` },
   ];
-
   let parsed: z.infer<typeof Edits> | null;
   try {
     const client = new Anthropic({ apiKey: key });
-    const response = await client.messages.parse({
-      model: "claude-opus-5-5",
-      max_tokens: 16000,
-      system,
-      messages,
-      output_config: { effort: "low", format: zodOutputFormat(Edits) },
-    });
+    const response = await client.messages
+      .stream({
+        model: "claude-opus-5-5",
+        max_tokens: maxTokens,
+        system: await systemPrompt(),
+        messages,
+        output_config: { effort: "low", format: zodOutputFormat(Edits) },
+      })
+      .finalMessage();
     if (response.stop_reason === "refusal") return { ok: false, error: "Claude ville ikke lave den ændring." };
     if (response.stop_reason === "max_tokens") return { ok: false, error: "Ændringen blev for stor - prøv at dele den op." };
-    parsed = response.parsed_output;
+    parsed = response.parsed_output ?? null;
   } catch (err) {
     if (err instanceof Anthropic.AuthenticationError) return { ok: false, error: "Claude-nøglen virker ikke længere." };
     if (err instanceof Anthropic.RateLimitError) return { ok: false, error: "Claude har travlt - prøv igen om lidt." };
-    console.error("askClaudeForTour", err);
+    console.error("claudeEdits", err);
     return { ok: false, error: "Kunne ikke få fat i Claude - prøv igen." };
   }
   if (!parsed) return { ok: false, error: "Claude svarede ikke som forventet - prøv igen." };
@@ -146,4 +155,115 @@ ${docs}
     return { ok: false, error: `Claudes ændring kunne ikke bruges (${err instanceof Error ? err.message : err}) - prøv at formulere det anderledes.` };
   }
   return { ok: true, reply: parsed.reply, config: { ...(next as unknown as TourConfig), slug: config.slug }, changed: parsed.changes.length };
+}
+
+export async function askClaudeForTour(config: TourConfig, history: ChatTurn[], request: string): Promise<AiEditResult> {
+  await admin();
+  const key = await apiKey();
+  if (!key) return { ok: false, error: "Claude er ikke sat op endnu - indsæt en nøgle." };
+  return claudeEdits(key, config, history, `Ønske: ${request}`);
+}
+
+/**
+ * A new tour built by Claude from the customer's website and the existing
+ * MPSkins tour: the website gives the look, the words and the actions (the
+ * red thread), the MPSkins tour its rooms and links - on top of an existing
+ * tour's features (its kind of menu, start and functions).
+ */
+export async function createTourFromWebsite(input: { name: string; website: string; tourUrl: string; base: string; notes: string }): Promise<{ ok: true; slug: string; reply: string } | { ok: false; error: string }> {
+  const user = await admin();
+  const key = await apiKey();
+  if (!key) return { ok: false, error: "Claude er ikke sat op endnu - indsæt en nøgle i en tours editor (fanen Claude)." };
+  const name = input.name.trim();
+  if (!name) return { ok: false, error: "Giv touren et navn." };
+  let tourUrl: URL;
+  try {
+    tourUrl = new URL(input.tourUrl.trim());
+  } catch {
+    return { ok: false, error: "Indsæt linket til MPSkins-touren (explore.nextview360.dk/…)." };
+  }
+  if (tourUrl.hostname !== "explore.nextview360.dk") return { ok: false, error: "Tour-linket skal være et explore.nextview360.dk-link." };
+  const source = await prisma.tour.findUnique({ where: { slug: input.base }, select: { config: true } });
+  if (!source) return { ok: false, error: "Touren, der skal bygges videre på, findes ikke." };
+
+  const [site, menu] = await Promise.all([
+    input.website.trim() ? siteDigest(input.website).catch((err: unknown) => `(Hjemmesiden kunne ikke hentes: ${err instanceof Error ? err.message : err})`) : Promise.resolve("(Ingen hjemmeside angivet)"),
+    mpskinsMenuDigest(tourUrl.toString()).catch(() => ""),
+  ]);
+
+  let slug = slugify(name) || "tour";
+  for (let i = 2; await prisma.tour.findUnique({ where: { slug }, select: { id: true } }); i++) slug = `${slugify(name)}-${i}`;
+  const base = neutral(source.config as unknown as TourConfig, { slug, title: name, tourPage: tourUrl.toString() });
+
+  const result = await claudeEdits(
+    key,
+    base,
+    [],
+    `Byg en ny tour til en ny kunde. Opsætningen ovenfor er en skabelon: funktionerne (bevægelse, skift, menutype osv.) er valgt med vilje, men alt kundeindhold er tomt og skal udfyldes.
+
+Udfyld ud fra kundens hjemmeside og den eksisterende MPSkins-tour nedenfor, efter drejebogen:
+- brand, title, subtitle, logo (en logo-kandidat fra hjemmesiden; logoOnLight hvis logoet er mørkt), colors og font/fontHeading så touren ligner hjemmesiden (rød tråd).
+- start: et godt startpunkt fra MPSkins-menuen (typisk "Velkommen"-punktet).
+- menu: byg den fra MPSkins-menuens punkter og links (brug linkene præcis som de står), ordnet efter drejebogen.
+- cta og contact: hjemmesidens vigtigste handling(er) og kontaktoplysninger. linkOpen: popup for booking.
+- velkomst: vælg den start, drejebogen anbefaler til branchen (design.welcome + welcome eller cover). Brug ikke fotos, du ikke har - forsiden får hjemmesidens delingsbillede, hvis der er et.
+- nudge ("Din plads venter") med hovedhandlingen, og evt. et par stedkort/rundvisning ud fra MPSkins-menuens punkter, hvis det giver mening.
+Skriv al tekst på dansk i kundens stemme. Opfind ingen fakta. I reply: fortæl kort, hvad du har valgt og hvorfor, og hvad brugeren selv bør tjekke eller tilføje (fx fotos af stederne).
+${input.notes.trim() ? `\nBemærkninger fra brugeren: ${input.notes.trim()}\n` : ""}
+<hjemmeside>
+${site}
+</hjemmeside>
+
+<mpskins-menu>
+${menu || "(Kunne ikke læses)"}
+</mpskins-menu>`,
+    32000
+  );
+  if (!result.ok) return result;
+
+  const config = { ...result.config, slug } as unknown as Prisma.InputJsonValue;
+  await prisma.tour.create({
+    data: { slug, name: result.config.title || name, config, versions: { create: { config, note: `Bygget af Claude ud fra ${input.website.trim() || "MPSkins-touren"}`, createdByName: user.name } } },
+  });
+  revalidatePath("/tour-lab");
+  return { ok: true, slug, reply: result.reply };
+}
+
+const slugify = (s: string) =>
+  s.toLowerCase().replace(/æ/g, "ae").replace(/ø/g, "oe").replace(/å/g, "aa").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60);
+
+/** An existing tour's setup with everything that belongs to its customer taken out - its features stay. */
+function neutral(c: TourConfig, fields: Pick<TourConfig, "slug" | "title" | "tourPage">): TourConfig {
+  return {
+    ...fields,
+    brand: "",
+    subtitle: undefined,
+    start: "",
+    logo: "",
+    logoOnLight: undefined,
+    logoSize: c.logoSize,
+    colors: c.colors,
+    font: c.font,
+    fontHeading: c.fontHeading,
+    cta: [],
+    contact: undefined,
+    linkOpen: c.linkOpen ? { default: c.linkOpen.default } : undefined,
+    design: c.design,
+    jump: c.jump,
+    measure: c.measure,
+    matterportUi: c.matterportUi,
+    navigation: c.navigation,
+    menuOpenOnStart: c.menuOpenOnStart,
+    stories: c.stories ? { mobile: c.stories.mobile, desktop: c.stories.desktop } : undefined,
+    mobileZoomLock: c.mobileZoomLock,
+    matterportParams: c.matterportParams,
+    flyMs: c.flyMs,
+    wayfinding: c.wayfinding ? {} : undefined,
+    welcome: c.welcome ? { kicker: "", title: "", lead: "", tiles: [], skip: c.welcome.skip } : undefined,
+    cover: c.cover ? { kicker: "", title: "", lead: "", image: "", enter: c.cover.enter, placesTitle: c.cover.placesTitle } : undefined,
+    categories: {},
+    points: [],
+    hiddenSweeps: [],
+    menu: [],
+  };
 }

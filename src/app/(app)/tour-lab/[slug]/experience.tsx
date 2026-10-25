@@ -754,6 +754,17 @@ export function Experience({
       const { sdk, room, menuGo } = bridge.current;
       if (e.data.type === "tour-draft") setDraft(e.data.config as TourConfig);
       if (e.data.type === "tour-go") menuGo(e.data.name ?? "", "editor", e.data.href);
+      if (e.data.type === "tour-shot") {
+        // A photo of what the preview shows - for a place, the cover or a card.
+        if (!sdk) return reply({ type: "tour-shot", id: e.data.id, error: "Touren er ikke klar endnu - vent et øjeblik." });
+        try {
+          const shot = await sdk.Renderer.takeScreenShot({ width: 1600, height: 1000 }, { mattertags: false, sweeps: false, views: false, measurements: false });
+          reply({ type: "tour-shot", id: e.data.id, image: await storyJpeg(shot, 1200, 750) });
+        } catch {
+          reply({ type: "tour-shot", id: e.data.id, error: "Kunne ikke tage billedet." });
+        }
+        return;
+      }
       if (e.data.type === "tour-view") {
         // The view the preview stands in, as a menu link (scan point + exact direction).
         if (!sdk) return reply({ type: "tour-view", id: e.data.id, error: "Touren er ikke klar endnu - vent et øjeblik." });

@@ -7,6 +7,9 @@ import { NewTour } from "./new-tour";
 import { TourLab } from "./tour-lab";
 import type { TourConfig } from "./tours/types";
 
+
+/** Claude may take a minute or two to build or change a tour. */
+export const maxDuration = 300;
 export const metadata = { title: "Tour-lab" };
 
 const when = (d: Date) => d.toLocaleString("da-DK", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Copenhagen" });

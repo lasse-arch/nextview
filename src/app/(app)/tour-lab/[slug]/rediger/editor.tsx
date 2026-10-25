@@ -6,110 +6,31 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { restoreTourVersion, saveTour, searchDeals, setTourDeal } from "@/lib/actions/tours";
 import { askClaudeForTour, saveAnthropicKey, type ChatTurn } from "@/lib/actions/tour-ai";
 import type { LinkOpen, MenuEntry, TourConfig } from "../../tours/types";
+import { CardsEditor, GuideEditor, StartEditor } from "./content";
+import { Choice, Field, Group, Icon, input, Toggle, type PreviewApi } from "./ui";
 
 type Version = { id: string; note: string | null; by: string | null; at: string };
-type Tab = "claude" | "generelt" | "design" | "menu" | "funktioner" | "links" | "avanceret" | "versioner";
+type Tab = "claude" | "start" | "rundvisning" | "kort" | "generelt" | "design" | "menu" | "funktioner" | "links" | "avanceret" | "versioner";
 
 /** Claude's mark: a small sunburst. */
 const SPARK = '<path d="M12 3v5M12 16v5M3 12h5M16 12h5M5.6 5.6l3.5 3.5M14.9 14.9l3.5 3.5M5.6 18.4l3.5-3.5M14.9 9.1l3.5-3.5"/>';
 
-/** The sections, with a small icon each (SF Symbols-like, drawn with strokes). */
-const TABS: [Tab, string, string][] = [
+/** The sections, with a small icon each (SF Symbols-like, drawn with strokes), under their headings. */
+const TABS: [Tab, string, string, string?][] = [
   ["claude", "Claude", SPARK],
-  ["generelt", "Generelt", '<circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/>'],
-  ["design", "Design", '<path d="M12 3a9 9 0 1 0 0 18c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.3-.3-.4-.5-.8-.5-1.3 0-1.1.9-2 2-2h2.3A4.7 4.7 0 0 0 21 9.7C21 5.9 17 3 12 3z"/><circle cx="7.5" cy="11.5" r="1"/><circle cx="10.5" cy="7.5" r="1"/><circle cx="15.5" cy="8" r="1"/>'],
+  ["start", "Start", '<path d="M5 4v16M5 5h11l-2 4 2 4H5"/>', "Indhold"],
   ["menu", "Menu", '<path d="M4 6h16M4 12h16M4 18h10"/>'],
-  ["funktioner", "Funktioner", '<path d="M12 3l2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 15.4 7.2 18l.9-5.4L4.2 8.7l5.4-.8z"/>'],
+  ["rundvisning", "Vis mig rundt", '<circle cx="12" cy="12" r="9"/><path d="M10 8.5v7l5.5-3.5z"/>'],
+  ["kort", "Stedkort", '<rect x="4" y="5" width="16" height="14" rx="2"/><path d="M8 10h8M8 14h5"/>'],
   ["links", "Knapper og links", '<path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/>'],
+  ["design", "Design", '<path d="M12 3a9 9 0 1 0 0 18c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.3-.3-.4-.5-.8-.5-1.3 0-1.1.9-2 2-2h2.3A4.7 4.7 0 0 0 21 9.7C21 5.9 17 3 12 3z"/><circle cx="7.5" cy="11.5" r="1"/><circle cx="10.5" cy="7.5" r="1"/><circle cx="15.5" cy="8" r="1"/>', "Udseende og opsætning"],
+  ["funktioner", "Funktioner", '<path d="M12 3l2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 15.4 7.2 18l.9-5.4L4.2 8.7l5.4-.8z"/>'],
+  ["generelt", "Generelt", '<circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/>'],
+  ["versioner", "Versioner", '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', "Mere"],
   ["avanceret", "Avanceret", '<path d="M8 6l-5 6 5 6M16 6l5 6-5 6"/>'],
-  ["versioner", "Versioner", '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'],
 ];
 
-const input =
-  "w-full rounded-[10px] border-0 bg-[#f2f2f7] px-3 py-2 text-[15px] text-[#1d1d1f] placeholder:text-[#8e8e93] transition focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0071e3]";
-const label = "block text-[13px] font-medium text-[#6e6e73]";
 const when = (iso: string) => new Date(iso).toLocaleString("da-DK", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
-
-function Icon({ d, className = "h-[18px] w-[18px]" }: { d: string; className?: string }) {
-  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className={className} dangerouslySetInnerHTML={{ __html: d }} />;
-}
-
-/** A white, rounded group of settings - like a section in the iPhone's Settings. */
-function Group({ title, children }: { title?: string; children: React.ReactNode }) {
-  return (
-    <section>
-      {title && <h3 className="mb-1.5 px-1 text-[13px] font-medium uppercase tracking-wide text-[#6e6e73]">{title}</h3>}
-      <div className="space-y-4 rounded-2xl bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,.04)] ring-1 ring-black/[.04]">{children}</div>
-    </section>
-  );
-}
-
-function Field({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-1.5">
-      <span className={label}>{title}</span>
-      {children}
-      {hint && <p className="text-[12px] leading-snug text-[#8e8e93]">{hint}</p>}
-    </div>
-  );
-}
-
-/** An iOS-style switch with its label on the left. */
-function Toggle({ on, onChange, title, hint }: { on: boolean; onChange: (on: boolean) => void; title: string; hint?: string }) {
-  return (
-    <div className="flex items-center justify-between gap-4">
-      <span>
-        <span className="block text-[15px] text-[#1d1d1f]">{title}</span>
-        {hint && <span className="block text-[12px] leading-snug text-[#8e8e93]">{hint}</span>}
-      </span>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={on}
-        aria-label={title}
-        onClick={() => onChange(!on)}
-        className={`relative h-[31px] w-[51px] flex-none rounded-full transition-colors duration-200 ${on ? "bg-[#34c759]" : "bg-[#e9e9eb]"}`}
-      >
-        <span className={`absolute top-[2px] h-[27px] w-[27px] rounded-full bg-white shadow-[0_3px_8px_rgba(0,0,0,.15),0_1px_1px_rgba(0,0,0,.16)] transition-all duration-200 ${on ? "left-[22px]" : "left-[2px]"}`} />
-      </button>
-    </div>
-  );
-}
-
-/** A segmented control. */
-function Choice<T extends string>({ value, options, onChange }: { value: T; options: [T, string][]; onChange: (v: T) => void }) {
-  return (
-    <div className="flex rounded-[9px] bg-[#e9e9eb] p-[2px]">
-      {options.map(([v, text]) => (
-        <button
-          key={v}
-          type="button"
-          onClick={() => onChange(v)}
-          className={`flex-1 rounded-[7px] px-3 py-[5px] text-[13px] font-medium transition ${v === value ? "bg-white text-[#1d1d1f] shadow-[0_3px_8px_rgba(0,0,0,.12),0_3px_1px_rgba(0,0,0,.04)]" : "text-[#1d1d1f]/70 hover:text-[#1d1d1f]"}`}
-        >
-          {text}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-/** Starting points when a tour switches to a welcome/menu it has no content for yet. */
-const DEFAULT_WELCOME = (T: TourConfig): NonNullable<TourConfig["welcome"]> => ({
-  kicker: T.brand,
-  title: `Velkommen til ${T.brand}`,
-  lead: "Tag en tur rundt - eller hop direkte derhen, du vil se.",
-  tiles: [],
-  skip: "Jeg kigger selv rundt",
-});
-const DEFAULT_COVER = (T: TourConfig): NonNullable<TourConfig["cover"]> => ({
-  kicker: T.subtitle ?? T.brand,
-  title: `Velkommen til ${T.brand}`,
-  lead: "Kig indenfor før du kommer.",
-  image: T.logo,
-  enter: "Træd indenfor",
-  placesTitle: "Vælg hvor du vil starte",
-});
 
 export function TourEditor({
   slug,
@@ -128,7 +49,20 @@ export function TourEditor({
   const [config, setConfig] = useState<TourConfig>(initial);
   const [dirty, setDirty] = useState(false);
   const [tab, setTab] = useState<Tab>("claude");
-  const [chat, setChat] = useState<ChatMsg[]>([]);
+  // A tour Claude just built (see new-tour.tsx): its account of what it did starts the chat.
+  const [chat, setChat] = useState<ChatMsg[]>(() => {
+    try {
+      const reply = typeof window === "undefined" ? null : sessionStorage.getItem(`tour-claude:${slug}`);
+      return reply ? [{ role: "assistant", text: reply }] : [];
+    } catch {
+      return [];
+    }
+  });
+  useEffect(() => {
+    try {
+      sessionStorage.removeItem(`tour-claude:${slug}`);
+    } catch {}
+  }, [slug]);
   const [note, setNote] = useState("");
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [device, setDevice] = useState<"computer" | "mobil">("computer");
@@ -153,27 +87,29 @@ export function TourEditor({
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
   }, []);
-  const preview = useMemo<PreviewApi>(
-    () => ({
-      view: () =>
-        new Promise((resolve) => {
-          const id = Math.random().toString(36).slice(2);
-          const done = (r: { href?: string; room?: string | null; error?: string }) => {
-            window.removeEventListener("message", onMessage);
-            clearTimeout(timer);
-            resolve(r);
-          };
-          const onMessage = (e: MessageEvent) => {
-            if (e.origin === location.origin && e.data?.type === "tour-view" && e.data.id === id) done(e.data);
-          };
-          const timer = setTimeout(() => done({ error: "Forhåndsvisningen svarede ikke - er touren indlæst?" }), 5000);
-          window.addEventListener("message", onMessage);
-          frame.current?.contentWindow?.postMessage({ type: "tour-view", id }, location.origin);
-        }),
+  const preview = useMemo<PreviewApi>(() => {
+    /** Asks the preview something and waits for its answer (or gives up after a while). */
+    const ask = <T extends object>(type: string, wait = 5000) =>
+      new Promise<T & { error?: string }>((resolve) => {
+        const id = Math.random().toString(36).slice(2);
+        const done = (r: T & { error?: string }) => {
+          window.removeEventListener("message", onMessage);
+          clearTimeout(timer);
+          resolve(r);
+        };
+        const onMessage = (e: MessageEvent) => {
+          if (e.origin === location.origin && e.data?.type === type && e.data.id === id) done(e.data);
+        };
+        const timer = setTimeout(() => done({ error: "Forhåndsvisningen svarede ikke - er touren indlæst?" } as T & { error?: string }), wait);
+        window.addEventListener("message", onMessage);
+        frame.current?.contentWindow?.postMessage({ type, id }, location.origin);
+      });
+    return {
+      view: () => ask<{ href?: string; room?: string | null }>("tour-view"),
+      shot: () => ask<{ image?: string }>("tour-shot", 15000),
       go: (name, href) => frame.current?.contentWindow?.postMessage({ type: "tour-go", name, href }, location.origin),
-    }),
-    []
-  );
+    };
+  }, []);
 
   /** Changes the draft (a copy - the saved tour is untouched until "Gem"). */
   function edit(fn: (draft: TourConfig) => void) {
@@ -199,7 +135,6 @@ export function TourEditor({
     });
   }
 
-  const welcomeStyle = config.design?.welcome === "cover" ? "cover" : config.welcome ? "tiles" : "none";
   const menuStyle = config.design?.menu ?? "side";
 
   return (
@@ -225,9 +160,10 @@ export function TourEditor({
       <div className="flex min-h-0 flex-1">
         {/* Sections */}
         <nav className="flex w-[210px] flex-none flex-col gap-0.5 p-3">
-          {TABS.map(([t, text, icon]) => (
+          {TABS.map(([t, text, icon, heading]) => (
+            <div key={t} className="contents">
+            {heading && <div className="mt-4 px-2.5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-[#8e8e93]">{heading}</div>}
             <button
-              key={t}
               type="button"
               onClick={() => setTab(t)}
               className={`flex items-center gap-2.5 rounded-[9px] px-2.5 py-[7px] text-left text-[14px] transition ${tab === t ? "bg-white font-medium shadow-[0_1px_3px_rgba(0,0,0,.08)]" : "text-[#1d1d1f]/80 hover:bg-black/[.04]"}`}
@@ -237,6 +173,7 @@ export function TourEditor({
               </span>
               {text}
             </button>
+            </div>
           ))}
         </nav>
 
@@ -286,30 +223,6 @@ export function TourEditor({
             {tab === "design" && (
               <>
                 <Group title="Opbygning">
-                <Field title="Velkomst">
-                  <Choice
-                    value={welcomeStyle}
-                    options={[
-                      ["none", "Ingen"],
-                      ["tiles", "Fliser"],
-                      ["cover", "Forside"],
-                    ]}
-                    onChange={(v) =>
-                      edit((d) => {
-                        if (v === "none") {
-                          d.welcome = undefined;
-                          d.design = { welcome: "tiles", menu: menuStyle };
-                        } else if (v === "tiles") {
-                          d.welcome ??= DEFAULT_WELCOME(d);
-                          d.design = { welcome: "tiles", menu: menuStyle };
-                        } else {
-                          d.cover ??= DEFAULT_COVER(d);
-                          d.design = { welcome: "cover", menu: menuStyle };
-                        }
-                      })
-                    }
-                  />
-                </Field>
                 <Field title="Menu">
                   <Choice
                     value={menuStyle}
@@ -361,6 +274,9 @@ export function TourEditor({
               </>
             )}
 
+            {tab === "start" && <StartEditor config={config} edit={edit} slug={slug} preview={preview} />}
+            {tab === "rundvisning" && <GuideEditor config={config} edit={edit} preview={preview} />}
+            {tab === "kort" && <CardsEditor config={config} edit={edit} preview={preview} />}
             {tab === "menu" && <MenuEditor menu={config.menu} preview={preview} onChange={(menu) => edit((d) => void (d.menu = menu))} />}
 
             {tab === "funktioner" && (
@@ -409,7 +325,7 @@ export function TourEditor({
                 <Toggle on={Boolean(config.matterportUi)} onChange={(on) => edit((d) => void (d.matterportUi = on || undefined))} title="Behold Matterports egne knapper" hint="Normalt skjult - tourens egne knapper er brugerfladen." />
                 </Group>
                 <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">
-                  Vis mig rundt ({config.guide?.stops.length ?? 0} stop), infopunkter ({config.info?.length ?? 0}) og steder ({config.places?.length ?? 0}) redigeres under Avanceret indtil videre.
+                  Infopunkter ({config.info?.length ?? 0}) sættes på ting i rummet og rettes indtil videre under Avanceret.
                 </p>
               </>
             )}
@@ -887,8 +803,6 @@ const KIND_ICON: Record<Kind | "group", [string, string]> = {
   group: ["bg-[#ff9500]", '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>'],
 };
 
-/** The preview, as the menu editor uses it: where it stands, and showing a place. */
-export type PreviewApi = { view: () => Promise<{ href?: string; room?: string | null; error?: string }>; go: (name: string, href: string) => void };
 
 /**
  * The menu as one list - like a phone's settings or a web shop's navigation

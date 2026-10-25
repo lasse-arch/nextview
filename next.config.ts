@@ -11,7 +11,7 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     "/*": ["./public/logo.png", "./node_modules/@sparticuz/chromium/bin/**/*"],
     // The tour editor's Claude reads the tour setup's documented types (see tour-ai.ts).
-    "/tour-lab/**": ["./src/app/*/tour-lab/tours/types.ts"],
+    "/tour-lab/**": ["./src/app/*/tour-lab/tours/types.ts", "./src/app/*/tour-lab/tours/PLAYBOOK.md"],
   },
   // Basic hardening on every response: no framing of Arpo by other sites
   // (clickjacking), no MIME sniffing, no full URLs leaked to other sites,

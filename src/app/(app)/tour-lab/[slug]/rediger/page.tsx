@@ -6,6 +6,9 @@ import { ensureToursSeeded } from "@/lib/tours";
 import type { TourConfig } from "../../tours/types";
 import { TourEditor } from "./editor";
 
+
+/** Claude may take a minute or two to build or change a tour. */
+export const maxDuration = 300;
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   return { title: `Rediger tour – ${(await params).slug}` };
 }
