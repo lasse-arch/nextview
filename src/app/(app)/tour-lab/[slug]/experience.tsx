@@ -241,7 +241,7 @@ export function Experience({
   /** "Find vej": the picker, and the walk in progress. */
   const [routeOpen, setRouteOpen] = useState(false);
   /** The saved measurements shown over the tour ("Vis mål"). */
-  const [showMeasures, setShowMeasures] = useState(true);
+  const [showMeasures, setShowMeasures] = useState(false);
   // The measurements are Matterport's own, shown in its measuring mode (its buttons stay hidden).
   useEffect(() => {
     if (!T.measure || !sdk?.Measurements) return;
