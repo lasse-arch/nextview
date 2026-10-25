@@ -3,13 +3,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { saveTourGa4Id, saveTourStoryImage } from "@/lib/actions/tour-lab";
-import { connectSdk, showcaseUrl, uLinkTarget, type CameraPose, type MpSdk, type SweepInfo } from "../matterport";
+import { connectSdk, showcaseUrl, uLinkTarget, type CameraPose, type MpSdk, type SweepInfo, type Vec3 } from "../matterport";
 import type { MenuEntry, TourConfig, TourPlace, TourPoint, WelcomeGo } from "../tours/types";
 import { CoverWelcome, DESIGNS_CSS, DockMenu } from "./designs";
 import { GUIDE_CSS, GuidePlayer, guideStops } from "./guide";
 import { INFO_CSS, InfoDots, usePlaceInfo } from "./info";
 import { MAP_CSS, MapScene, type MapApi } from "./map";
-import { ROUTE_CSS, RouteSheet, RouteStatus, shortestPath, type Destination, type RouteGraph } from "./wayfinding";
+import { ROUTE_CSS, RouteLine, RouteSheet, RouteStatus, flightMs, shortestPath, straighten, type Destination, type RouteGraph } from "./wayfinding";
 import { LINKS_CSS, LinkPopup, LinkProvider, TourLink, openLink, type LinkPopupState } from "./links";
 import { Stories, STORIES_CSS, storyJpeg, type StoryRoom } from "./stories";
 import "pannellum/build/pannellum.css";
@@ -235,6 +235,8 @@ export function Experience({
   const [routeOpen, setRouteOpen] = useState(false);
   const [route, setRoute] = useState<{ dest: Destination; step: number; steps: number; arrived: boolean } | null>(null);
   const routeRun = useRef(0);
+  /** The route still ahead, drawn on the floor. */
+  const [routeLine, setRouteLine] = useState<Vec3[]>([]);
   const GUIDE = useMemo(() => guideStops(T), [T]);
   const [linkPopup, setLinkPopup] = useState<LinkPopupState>(null);
   const popup = (href: string, label: string) => {
@@ -685,6 +687,14 @@ export function Experience({
     if (!pa || !pb) return null;
     return (Math.atan2(-(pb.x - pa.x), -(pb.z - pa.z)) * 180) / Math.PI;
   }
+  /** A scan point's spot on the floor, in the viewer's coordinates (for the route line). */
+  function floorPoint(sid: string): Vec3 | null {
+    const p = sweepData.current[sid]?.position;
+    const g = routeGraph?.[sid]?.p;
+    if (!p) return null;
+    // The network's height is the floor; the viewer's may be the camera's - take the lower.
+    return { x: p.x, y: g ? Math.min(p.y, g[2]) : p.y - 1.5, z: p.z };
+  }
   async function walkTo(dest: Destination) {
     setRouteOpen(false);
     setMenuOpen(false);
@@ -693,37 +703,47 @@ export function Experience({
     const goal = target ? sweepBySs[target.ss] : null;
     const from = currentSweep.current;
     const path = sdk && routeGraph && goal && from ? shortestPath(routeGraph, from, goal) : null;
-    track("route_start", { destination: dest.name, group: dest.group ?? "", steps: path ? path.length - 1 : 0 });
-    if (!sdk || !path || path.length < 2) {
+    const flights = path && routeGraph ? straighten(routeGraph, path) : null;
+    track("route_start", { destination: dest.name, group: dest.group ?? "", flights: flights ? flights.length - 1 : 0 });
+    if (!sdk || !routeGraph || !flights || flights.length < 2) {
       // No route to walk (already there, or no network): just go there.
       await flyTo(dest.href, "fly");
       setRoute({ dest, step: 1, steps: 1, arrived: true });
       return;
     }
-    const steps = path.length - 1;
+    const steps = flights.length - 1;
+    const line = (from: number) => flights.slice(from).map(floorPoint).filter((p): p is Vec3 => p != null);
     setRoute({ dest, step: 0, steps, arrived: false });
+    setRouteLine(line(0));
+    // A moment to see the way before setting off - and look down it.
+    const first = heading(flights[0], flights[1]);
+    if (first != null) await sdk.Sweep.moveTo(flights[0], { rotation: { x: -8, y: first }, transition: sdk.Sweep.Transition.FLY, transitionTime: 700 }).catch(() => {});
+    await new Promise((r) => setTimeout(r, 500));
     for (let i = 1; i <= steps; i++) {
       if (routeRun.current !== run) return;
-      const sid = path[i];
+      const sid = flights[i];
       const last = i === steps;
-      const yaw = heading(path[i - 1], sid);
+      // Arrive already facing the next stretch, so the next flight starts straight ahead.
+      const yaw = last ? null : heading(sid, flights[i + 1]) ?? heading(flights[i - 1], sid);
       const closed = pointsOnlyRef.current || hiddenSweeps.includes(sid);
       if (closed) await sdk.Sweep.enable(sid).catch(() => {});
       await sdk.Sweep.moveTo(sid, {
-        rotation: last ? target?.rotation : yaw != null ? { x: 0, y: yaw } : undefined,
+        rotation: last ? target?.rotation : yaw != null ? { x: -8, y: yaw } : undefined,
         transition: sdk.Sweep.Transition.FLY,
-        transitionTime: last ? 900 : 480,
+        transitionTime: flightMs(routeGraph, flights[i - 1], sid),
       }).catch(() => {});
-      const prev = path[i - 1];
+      const prev = flights[i - 1];
       if (pointsOnlyRef.current || hiddenSweeps.includes(prev)) await sdk.Sweep.disable(prev).catch(() => {});
       setRoute({ dest, step: i, steps, arrived: last });
+      setRouteLine(last ? [] : line(i));
     }
-    track("route_arrive", { destination: dest.name, steps });
+    track("route_arrive", { destination: dest.name, flights: steps });
   }
   function stopRoute() {
     if (route && !route.arrived) track("route_stop", { destination: route.dest.name, step: route.step });
     routeRun.current++;
     setRoute(null);
+    setRouteLine([]);
   }
 
   const place = usePlaceInfo(sdk, iframe, useCallback(() => currentSsRef.current, []));
@@ -1094,6 +1114,7 @@ export function Experience({
           Find vej
         </button>
       )}
+      {routeLine.length > 1 && phase === "tour" && <RouteLine sdk={sdk} points={routeLine} frame={iframe} />}
       {routeOpen && <RouteSheet destinations={DESTINATIONS} boxes={T.wayfinding?.boxes} onGo={walkTo} onClose={() => setRouteOpen(false)} />}
       {route && (
         <RouteStatus

@@ -6,7 +6,7 @@ import type { TourInfo } from "../tours/types";
 import { TourLink } from "./links";
 
 /** Is the point in front of the camera? (Matterport looks down -z; rotation is pitch x / yaw y in degrees.) */
-function inFront(pose: CameraPose, p: Vec3) {
+export function inFront(pose: CameraPose, p: Vec3) {
   const pitch = (pose.rotation.x * Math.PI) / 180;
   const yaw = (pose.rotation.y * Math.PI) / 180;
   const fwd = { x: -Math.sin(yaw) * Math.cos(pitch), y: Math.sin(pitch), z: -Math.cos(yaw) * Math.cos(pitch) };

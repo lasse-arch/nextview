@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { MpSdk, Vec3 } from "../matterport";
+import { inFront } from "./info";
 
 export type RouteGraph = Record<string, { n: string[]; p: [number, number, number] }>;
 export type Destination = { name: string; group?: string; href: string };
@@ -32,6 +34,89 @@ export function shortestPath(graph: RouteGraph, from: string, to: string): strin
   const path = [to];
   while (path[0] !== from) path.unshift(prev[path[0]]);
   return path;
+}
+
+const flat = (graph: RouteGraph, a: string, b: string) => Math.hypot(graph[a].p[0] - graph[b].p[0], graph[a].p[1] - graph[b].p[1]);
+
+/**
+ * Fewer, longer flights: from each stop, fly straight to the furthest later
+ * point on the route that can be seen from it (a neighbour in the network),
+ * as long as the route in between stays close to that straight line - so it
+ * glides down a corridor and only stops at the corners.
+ */
+export function straighten(graph: RouteGraph, path: string[], maxM = 16): string[] {
+  const out = [path[0]];
+  let i = 0;
+  while (i < path.length - 1) {
+    let j = i + 1;
+    for (let k = path.length - 1; k > i + 1; k--) {
+      const a = graph[path[i]].p;
+      const b = graph[path[k]].p;
+      if (!graph[path[i]].n.includes(path[k]) || flat(graph, path[i], path[k]) > maxM || Math.abs(a[2] - b[2]) > 0.5) continue;
+      const len = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+      const off = path.slice(i + 1, k).every((m) => {
+        const c = graph[m].p;
+        return Math.abs((b[0] - a[0]) * (a[1] - c[1]) - (a[0] - c[0]) * (b[1] - a[1])) / len < 1.2;
+      });
+      if (off) {
+        j = k;
+        break;
+      }
+    }
+    out.push(path[j]);
+    i = j;
+  }
+  return out;
+}
+
+/** How long a flight takes: a steady walking-glide pace, never a jerk or a crawl. */
+export function flightMs(graph: RouteGraph, a: string, b: string) {
+  return Math.round(Math.min(2000, Math.max(700, (flat(graph, a, b) / 6) * 1000)));
+}
+
+/**
+ * The route drawn on the floor over the tour: a glowing line from where the
+ * visitor stands to where they're going, following the camera as it moves.
+ */
+export function RouteLine({ sdk, points, frame }: { sdk: MpSdk | null; points: Vec3[]; frame: React.RefObject<HTMLIFrameElement | null> }) {
+  const path = useRef<SVGPathElement>(null);
+  const glow = useRef<SVGPathElement>(null);
+  useEffect(() => {
+    if (!sdk?.Conversion || points.length < 2) return;
+    const conv = sdk.Conversion;
+    // Every leg cut into short pieces, so the parts behind the camera can be left out.
+    const dense: Vec3[] = [];
+    points.forEach((p, i) => {
+      if (i === 0) return dense.push(p);
+      const a = points[i - 1];
+      for (let t = 1; t <= 12; t++) dense.push({ x: a.x + ((p.x - a.x) * t) / 12, y: a.y + ((p.y - a.y) * t) / 12, z: a.z + ((p.z - a.z) * t) / 12 });
+    });
+    const sub = sdk.Camera.pose.subscribe((pose) => {
+      const el = frame.current;
+      if (!el) return;
+      const size = { w: el.clientWidth, h: el.clientHeight };
+      let d = "";
+      let pen = false;
+      for (const p of dense) {
+        if (!inFront(pose, p)) {
+          pen = false;
+          continue;
+        }
+        const s = conv.worldToScreen(p, pose, size);
+        d += `${pen ? "L" : "M"}${s.x.toFixed(1)},${s.y.toFixed(1)}`;
+        pen = true;
+      }
+      path.current?.setAttribute("d", d);
+      glow.current?.setAttribute("d", d);
+    });
+    return () => sub.cancel();
+  }, [sdk, points, frame]);
+  return (
+    <svg className="rt-line" aria-hidden>
+      <path ref={glow} className="rt-line-glow" />
+      <path ref={path} className="rt-line-dash" />
+    </svg>
+  );
 }
 
 /** "Find vej": pick where to go - a room from the menu, or a box number - and the tour walks you there. */
@@ -148,6 +233,11 @@ export const ROUTE_CSS = `
 .rt-cta{background:var(--c-accent);color:#fff;margin-right:auto}
 .rt-status.fremme{border:2px solid var(--c-accent)}
 .hv-routing .hv-room,.hv-routing .hv-stories{display:none}
+.rt-line{position:absolute;inset:0;width:100%;height:100%;z-index:4;pointer-events:none;overflow:visible}
+.rt-line path{fill:none;stroke-linecap:round;stroke-linejoin:round}
+.rt-line-glow{stroke:var(--c-accent);stroke-width:16;opacity:.28;filter:blur(3px)}
+.rt-line-dash{stroke:#fff;stroke-width:5;stroke-dasharray:2 16;animation:rtFlow .9s linear infinite}
+@keyframes rtFlow{to{stroke-dashoffset:-18}}
 @media (max-width:760px){
   .rt-knap{top:auto;bottom:calc(14px + env(safe-area-inset-bottom,0px));left:12px;translate:none;padding:11px 16px}
   .rt-sheet{top:auto;bottom:0;left:0;right:0;width:auto;translate:none;max-height:80%;border-radius:18px 18px 0 0;padding-bottom:calc(10px + env(safe-area-inset-bottom,0px))}
