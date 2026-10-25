@@ -270,11 +270,14 @@ export function Experience({
       if (start?.rotation && T.start.includes("rot=") && sweepBySs[start.ss]) {
         await sdk.Sweep.moveTo(sweepBySs[start.ss], { rotation: start.rotation, transition: sdk.Sweep.Transition.INSTANT }).catch(() => {});
       }
-      if (hiddenSweeps.length) await sdk.Sweep.disable(...hiddenSweeps).catch((err) => console.warn("Sweep.disable", err));
+      if (hiddenSweeps.length) await disableSweeps(sdk, hiddenSweeps);
       sdk.Sweep.data.subscribe({
         onCollectionUpdated: (c) => {
+          const firstData = allSweeps.current.length === 0;
           allSweeps.current = Object.keys(c);
           sweepData.current = c;
+          // The list can arrive after the visitor's first scan point - lock then, so nothing is left open.
+          if (firstData && pointsOnlyRef.current && currentSweep.current) lockTo(sdk, allSweeps.current, currentSweep.current);
         },
       });
       setTourReadyMs(now() - started);
@@ -1192,11 +1195,20 @@ function PanoView({
 }
 
 /** Only `keep` stays walkable: every other scan point is disabled (no pucks, no walking). */
+/**
+ * Turns scan points off in small batches - one bad id must not leave the
+ * rest open (a single call with hundreds of ids fails as a whole).
+ */
+async function disableSweeps(sdk: MpSdk, ids: string[]) {
+  for (let i = 0; i < ids.length; i += 25) {
+    const batch = ids.slice(i, i + 25);
+    await sdk.Sweep.disable(...batch).catch(() => Promise.all(batch.map((id) => sdk.Sweep.disable(id).catch(() => {}))));
+  }
+}
+
+/** "Kun punkter": only the scan point the visitor stands on stays open. */
 function lockTo(sdk: MpSdk, all: string[], keep: string) {
-  const others = all.filter((id) => id !== keep);
-  return Promise.all([sdk.Sweep.enable(keep), others.length ? sdk.Sweep.disable(...others) : null]).catch((err) =>
-    console.warn("lockTo", err)
-  );
+  return Promise.all([sdk.Sweep.enable(keep).catch(() => {}), disableSweeps(sdk, all.filter((id) => id !== keep))]);
 }
 
 /** The tour's start point (MPSkins "Starting Point") as embed parameters. */

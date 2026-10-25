@@ -18,6 +18,8 @@ export const boxdepotRum: TourConfig = {
   design: { welcome: "tiles", menu: "picker" },
   navigation: "points",
   jump: "fade",
+  // No dollhouse or floor plan - nothing to jump out of the rooms with.
+  matterportParams: { ...boxdepot.matterportParams, dh: "0", gt: "0", f: "0", fp: "0" },
   wayfinding: undefined,
   menu: [
     { title: "Depotrum: 5 m³", items: [["Tomt", u(231, "-1.48,1.25")], ["Med flyttekasser", u(232, "-1.58,1.27")], ["Med flyttekasser og dæk", u(233, "-1.54,1.13")]] },
