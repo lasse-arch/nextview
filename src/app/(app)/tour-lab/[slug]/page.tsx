@@ -38,6 +38,7 @@ export default async function TourPrototypePage({ params }: { params: Promise<{ 
     ...tour.points.map((p) => p.tour).filter((t): t is string => Boolean(t)),
     ...tour.menu.flatMap((m) => ("items" in m ? m.items.map((i) => i[1]) : [m.href])),
     ...(tour.welcome?.tiles.flatMap((t) => ("room" in t.go ? [t.go.room] : [])) ?? []),
+    ...(tour.places?.map((p) => p.href) ?? []),
   ];
   const sweepBySs: Record<number, string> = {};
   for (const link of links) {

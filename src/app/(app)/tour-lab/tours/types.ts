@@ -6,6 +6,11 @@
 
 export type WelcomeGo = { drone: string | null } | { room: string; name: string } | { href: string };
 
+/** A real spot in the tour with a photo of it (e.g. one of the model's own Matterport photos). */
+export type TourPlace = { name: string; kicker?: string; href: string; image: string };
+
+export type DockIcon = "places" | "menu" | "book" | "order" | "map" | "phone";
+
 export type TourPoint = {
   id: string;
   name: string;
@@ -68,6 +73,18 @@ export type TourConfig = {
     sources: { src: string; type: "video/webm" | "video/mp4"; media?: string }[];
     poster?: string;
   };
+  /**
+   * The look: which welcome and which menu. Left out = the classic ones
+   * (tile welcome, side menu). "cover" = the place's own photo full-screen
+   * with its places to pick; "dock" = a bar at the bottom with what guests came for.
+   */
+  design?: { welcome: "tiles" | "cover"; menu: "side" | "dock" };
+  /** Font for big headings (a Google font), if not the body font. */
+  fontHeading?: string;
+  /** Real spots with a photo - the cover's and the dock's "places". */
+  places?: TourPlace[];
+  cover?: { kicker: string; title: string; lead: string; image: string; imageMobile?: string; enter: string; placesTitle: string };
+  dock?: { label: string; icon: DockIcon; go: "places" | { href: string }; primary?: boolean }[];
   welcome?: {
     kicker: string;
     title: string;

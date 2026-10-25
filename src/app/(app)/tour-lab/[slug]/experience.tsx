@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from
 import { useRouter } from "next/navigation";
 import { saveTourGa4Id, saveTourStoryImage } from "@/lib/actions/tour-lab";
 import { connectSdk, showcaseUrl, uLinkTarget, type MpSdk } from "../matterport";
-import type { MenuEntry, TourConfig, TourPoint, WelcomeGo } from "../tours/types";
+import type { MenuEntry, TourConfig, TourPlace, TourPoint, WelcomeGo } from "../tours/types";
+import { CoverWelcome, DESIGNS_CSS, DockMenu } from "./designs";
 import { Stories, STORIES_CSS, storyJpeg, type StoryRoom } from "./stories";
 import "pannellum/build/pannellum.css";
 
@@ -170,7 +171,7 @@ export function Experience({
   storyImages: Record<string, string>;
 }) {
   useGa4(ga4Id, T.title);
-  const { names: ROOM_NAMES, links: ROOM_LINKS } = useMemo(() => roomIndex(T.menu), [T]);
+  const { names: ROOM_NAMES, links: ROOM_LINKS } = useMemo(() => roomIndex([...T.menu, ...(T.places ? [{ title: "", items: T.places.map((p): [string, string] => [p.name, p.href]) }] : [])]), [T]);
   const LAST_ROOM_KEY = `${T.slug}-last-room`;
   /** The rooms of "Historier": the ones the setup names, otherwise every room in the menu. */
   const storyRooms = useMemo<StoryRoom[]>(() => {
@@ -207,6 +208,7 @@ export function Experience({
   const [pano, setPano] = useState<Point | null>(null);
   /** The welcome tiles - skipped when the link already says where to go. */
   const [welcome, setWelcome] = useState(false);
+  const [cover, setCover] = useState(false);
   /** The intro film: playing, fading out into the tour, or gone. */
   const [intro, setIntro] = useState<"play" | "fade" | null>(T.intro ? "play" : null);
   const [lastRoom, setLastRoom] = useState<{ name: string; href: string } | null>(null);
@@ -436,6 +438,11 @@ export function Experience({
 
   /** What greets the visitor once they're in: the welcome, or the menu if it's open on start. */
   function afterStart() {
+    if (T.design?.welcome === "cover" && T.cover) {
+      setCover(true);
+      track("welcome_view", { style: "cover" });
+      return;
+    }
     if (T.welcome) {
       setLastRoom(readLastRoom(LAST_ROOM_KEY));
       setWelcome(true);
@@ -562,20 +569,30 @@ export function Experience({
     router.refresh();
   }
 
+  /** A place from the cover or the dock: into the tour, right there. */
+  async function placeGo(p: TourPlace, from: string) {
+    track("place_click", { place_name: p.name, from });
+    setCover(false);
+    if (phase === "drone") return enterTour(p.href, from, p.name);
+    await flyTo(p.href, "fly");
+  }
+
   const ctaClick = (label: string, href: string, place: string) => track("cta_click", { label, link_url: href, place });
 
   return (
-    <div className={`hv fixed inset-0 z-50 overflow-hidden bg-[#0d1b20] ${selected ? "hv-punkt" : ""} ${zoomed ? "hv-zoom" : ""} ${welcome ? "hv-welcome" : ""} ${phase === "tour" && T.stories?.mobile ? "hv-st-on-m" : ""} ${menuOpen ? "hv-menu-aaben" : ""} ${phase === "tour" && T.stories?.desktop ? "hv-st-on-d" : ""}`} style={
+    <div className={`hv fixed inset-0 z-50 overflow-hidden bg-[#0d1b20] ${selected ? "hv-punkt" : ""} ${zoomed ? "hv-zoom" : ""} ${welcome ? "hv-welcome" : ""} ${phase === "tour" && T.stories?.mobile ? "hv-st-on-m" : ""} ${menuOpen ? "hv-menu-aaben" : ""} ${T.design?.menu === "dock" ? "hv-dock" : ""} ${phase === "tour" && T.stories?.desktop ? "hv-st-on-d" : ""}`} style={
         {
           fontFamily: `'${T.font}', system-ui, sans-serif`,
           "--c-main": T.colors.main,
           "--c-accent": T.colors.accent,
           "--c-accent-dark": T.colors.accentDark,
           "--c-soft": T.colors.soft,
+          "--font-heading": `'${T.fontHeading ?? T.font}', serif`,
         } as React.CSSProperties
       }>
       <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.font}:wght@400;600;700;800;900&display=swap`} />
-      <style>{CSS + STORIES_CSS}</style>
+      {T.fontHeading && <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.fontHeading.replace(/ /g, "+")}:wght@500;600&display=swap`} />}
+      <style>{CSS + STORIES_CSS + DESIGNS_CSS}</style>
 
       {/* The tour, always mounted so it loads while the visitor is in the drone scene. */}
       {modelId && (
@@ -732,6 +749,10 @@ export function Experience({
         </>
       )}
 
+      {T.design?.menu === "dock" ? (
+        phase === "tour" && !cover && <DockMenu T={T} room={room} onPlace={(p) => placeGo(p, "dock")} onItem={(label, href) => ctaClick(label, href, "dock")} />
+      ) : (
+      <>
       <button
         type="button"
         className="hv-menuknap"
@@ -818,6 +839,20 @@ export function Experience({
           <img src="/logo.png" alt="nextview360.dk" />
         </a>
       </nav>
+      </>
+      )}
+
+      {cover && T.cover && (
+        <CoverWelcome
+          T={T}
+          onEnter={() => {
+            track("welcome_choice", { choice: "enter" });
+            setCover(false);
+          }}
+          onPlace={(p) => placeGo(p, "cover")}
+          onCta={(label, href) => ctaClick(label, href, "cover")}
+        />
+      )}
 
       {/* The intro film, ending where the tour starts. */}
       {intro && T.intro && (
