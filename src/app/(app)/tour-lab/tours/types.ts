@@ -16,6 +16,10 @@ export type TourInfo = {
   title: string;
   text: string;
   image?: string;
+  /** A YouTube or Vimeo link - played in the tag's card. */
+  video?: string;
+  /** E.g. "Fra 495 kr./md." - shown big on the card. */
+  price?: string;
   link?: { label: string; href: string };
   position: { x: number; y: number; z: number };
   ss: number[];
@@ -149,6 +153,12 @@ export type TourConfig = {
   measure?: boolean;
   /** Keep Matterport's own buttons (dollhouse, floor plan, settings…). Default: hidden - the tour's own UI is the UI. */
   matterportUi?: boolean;
+  /**
+   * A colour filter over the 3D tour (MPSkins' "Color filter") - e.g. a touch
+   * brighter and warmer. brightness/contrast/saturate: 1 = unchanged;
+   * grayscale 0-1; hue in degrees.
+   */
+  filter?: { brightness?: number; contrast?: number; saturate?: number; grayscale?: number; hue?: number };
   /** Font for big headings (a Google font), if not the body font. */
   fontHeading?: string;
   /** Real spots with a photo - the cover's and the dock's "places". */

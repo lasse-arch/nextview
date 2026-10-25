@@ -39,6 +39,7 @@ import { InactiveToggleButton } from "./inactive-toggle-button";
 import { PaymentMethodControl } from "./payment-method-control";
 import { BookMeetingButton } from "./book-meeting-button";
 import { BookFilmingButton } from "./book-filming-button";
+import { FilmingTimeButton } from "./filming-time-button";
 import { WelcomeMailControl } from "./welcome-mail-control";
 import { TerminationSection } from "./termination-section";
 import { DealItemsSection } from "./deal-items-section";
@@ -200,6 +201,9 @@ export default async function DealDetailPage({
             crewOptions={users.map((u) => ({ id: u.id, name: u.name }))}
             defaultCrewIds={users.filter((u) => u.email === "lasse@nextview360.dk").map((u) => u.id)}
           />
+          {["CONTRACT_SIGNED", "FILMED", "LIVE"].includes(deal.stage) || deal.filmingAt ? (
+            <FilmingTimeButton dealId={deal.id} minutes={deal.filmingActualMinutes} plannedMinutes={deal.filmingDurationMinutes} />
+          ) : null}
           <InactiveToggleButton dealId={deal.id} isChurned={Boolean(deal.churnedAt)} />
           <DealDangerActions
             dealName={dealName(deal)}

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { Experience } from "@/app/(app)/tour-lab/[slug]/experience";
 import { loadTour } from "@/app/(app)/tour-lab/[slug]/load";
@@ -25,8 +25,14 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 }
 
 export default async function PublicTourPage({ params }: { params: Promise<{ slug: string }> }) {
-  const setup = await published((await params).slug);
-  if (!setup) notFound();
+  const { slug } = await params;
+  const setup = await published(slug);
+  if (!setup) {
+    // An address the tour had before its pretty-URL was changed.
+    const moved = await prisma.tour.findFirst({ where: { oldSlugs: { has: slug } }, select: { slug: true } });
+    if (moved) redirect(`/t/${moved.slug}`);
+    notFound();
+  }
   const data = await loadTour(setup);
   return <Experience {...data} phone={/Android|iPhone|iPad|iPod|Mobile/i.test((await headers()).get("user-agent") ?? "")} />;
 }

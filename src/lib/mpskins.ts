@@ -5,7 +5,21 @@ export type MpskinsCfg = {
   mpModel?: string;
   /** Scan points in the order a U-link's ss number counts them (from 1); `hide` = turned off under "Scan Points / Floor". */
   sweep?: { uuid?: string; floor?: number; hide?: boolean }[];
+  /** MPSkins' "Color filter", as CSS: "brightness(1.1) contrast(1.06) saturate(1.02) grayscale(0) hue-rotate(0deg)". */
+  modelCssFilter?: string;
 };
+
+/** MPSkins' colour filter as a tour setup's `filter` (null when it changes nothing). */
+export function filterFromCss(css: string | undefined): { brightness?: number; contrast?: number; saturate?: number; grayscale?: number; hue?: number } | null {
+  if (!css) return null;
+  const n = (name: string) => {
+    const m = new RegExp(`${name}\\(([-\\d.]+)`).exec(css);
+    return m ? Number(m[1]) : undefined;
+  };
+  const f = { brightness: n("brightness"), contrast: n("contrast"), saturate: n("saturate"), grayscale: n("grayscale"), hue: n("hue-rotate") };
+  const neutral = (f.brightness ?? 1) === 1 && (f.contrast ?? 1) === 1 && (f.saturate ?? 1) === 1 && !f.grayscale && !f.hue;
+  return neutral ? null : f;
+}
 
 function extractCfg(html: string): MpskinsCfg | null {
   const start = html.indexOf("var cfg = ");

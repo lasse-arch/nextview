@@ -17,3 +17,8 @@ export function placeHref(T: Pick<TourConfig, "tourPage" | "modelId">, ss: numbe
   if (rot) url.searchParams.set("rot", `${rot.x.toFixed(1)},${rot.y.toFixed(1)}`);
   return url.toString();
 }
+
+/** The tour's colour filter as CSS (MPSkins' "Color filter"): 1 = unchanged for brightness/contrast/saturate. */
+export function cssFilter(f: NonNullable<TourConfig["filter"]>): string {
+  return `brightness(${f.brightness ?? 1}) contrast(${f.contrast ?? 1}) saturate(${f.saturate ?? 1}) grayscale(${f.grayscale ?? 0}) hue-rotate(${f.hue ?? 0}deg)`;
+}

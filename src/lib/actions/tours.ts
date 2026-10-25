@@ -6,6 +6,7 @@ import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import type { TourConfig } from "@/app/(app)/tour-lab/tours/types";
 import { tourConfigProblem } from "@/lib/tour-validate";
+import { setSettingValue } from "@/lib/integration-settings";
 
 type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string };
 
@@ -94,4 +95,53 @@ export async function setTourPublished(slug: string, published: boolean): Promis
   await prisma.tour.update({ where: { slug }, data: { published } });
   revalidatePath(`/t/${slug}`);
   return { ok: true };
+}
+
+/** The editor says someone is working on the tour: a minute more on today's time for them (see "Tid og pris"). */
+export async function logTourWork(slug: string, seconds: number): Promise<void> {
+  const user = await admin();
+  const s = Math.max(0, Math.min(120, Math.round(seconds)));
+  if (!s) return;
+  const day = new Date(new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Copenhagen" }));
+  await prisma.tourWork.upsert({
+    where: { tourSlug_userId_day: { tourSlug: slug, userId: user.id, day } },
+    create: { tourSlug: slug, userId: user.id, userName: user.name, day, seconds: s },
+    update: { seconds: { increment: s } },
+  });
+}
+
+/** What an hour of our time costs (for "Tid og pris" - wages and everything else per hour). */
+export async function setTourHourlyCost(kr: number): Promise<Result> {
+  await admin();
+  if (!Number.isFinite(kr) || kr < 0 || kr > 10_000) return { ok: false, error: "Skriv en timepris i kr." };
+  await setSettingValue("TOUR_HOURLY_COST", String(Math.round(kr)));
+  return { ok: true };
+}
+
+/**
+ * Changes a tour's address (MPSkins' "Pretty-URL"): /t/<slug>. The old one
+ * keeps working - it redirects - so iframes already on the customer's site
+ * don't break. Everything kept under the old address moves along.
+ */
+export async function renameTourSlug(slug: string, wanted: string): Promise<Result<{ slug: string }>> {
+  await admin();
+  const next = slugify(wanted);
+  if (next.length < 3) return { ok: false, error: "Adressen skal være mindst 3 tegn (a-z, 0-9 og -)." };
+  if (next === slug) return { ok: true, slug };
+  const taken = await prisma.tour.findFirst({ where: { OR: [{ slug: next }, { oldSlugs: { has: next } }] }, select: { slug: true } });
+  if (taken && taken.slug !== slug) return { ok: false, error: `/t/${next} er allerede i brug.` };
+  const tour = await prisma.tour.findUnique({ where: { slug }, select: { id: true, config: true, oldSlugs: true } });
+  if (!tour) return { ok: false, error: "Touren findes ikke." };
+  // Photos taken in the editor live under the tour's address.
+  const config = JSON.parse(JSON.stringify(tour.config).replaceAll(`/tour-lab/${slug}/`, `/tour-lab/${next}/`)) as Prisma.InputJsonValue;
+  await prisma.$transaction([
+    prisma.tour.update({ where: { id: tour.id }, data: { slug: next, config, oldSlugs: [...new Set([...tour.oldSlugs.filter((s) => s !== next), slug])] } }),
+    prisma.tourEvent.updateMany({ where: { tourSlug: slug }, data: { tourSlug: next } }),
+    prisma.tourFile.updateMany({ where: { tourSlug: slug }, data: { tourSlug: next } }),
+    prisma.tourStoryImage.updateMany({ where: { tourSlug: slug }, data: { tourSlug: next } }),
+    prisma.tourWork.updateMany({ where: { tourSlug: slug }, data: { tourSlug: next } }),
+    prisma.tourAiUsage.updateMany({ where: { tourSlug: slug }, data: { tourSlug: next } }),
+  ]);
+  revalidatePath("/tour-lab");
+  return { ok: true, slug: next };
 }

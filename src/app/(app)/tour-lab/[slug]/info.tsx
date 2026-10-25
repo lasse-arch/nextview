@@ -89,7 +89,9 @@ export function InfoDots({
             // eslint-disable-next-line @next/next/no-img-element
             <img src={card.image} alt="" />
           )}
+          {card.video && videoEmbed(card.video) && <iframe className="ip-video" src={videoEmbed(card.video)!} title={card.title} allow="autoplay; fullscreen; picture-in-picture" allowFullScreen />}
           <h3>{card.title}</h3>
+          {card.price && <div className="ip-price">{card.price}</div>}
           <p>{card.text}</p>
           {card.link && (
             <TourLink className="ip-link" href={card.link.href} label={card.link.label} onClick={() => onLink(card.link!.label, card.link!.href)}>
@@ -100,6 +102,14 @@ export function InfoDots({
       )}
     </>
   );
+}
+
+/** A YouTube/Vimeo link as its embeddable player (null for anything else). */
+export function videoEmbed(url: string): string | null {
+  const yt = /(?:youtube\.com\/(?:watch\?v=|shorts\/|embed\/)|youtu\.be\/)([\w-]{11})/.exec(url);
+  if (yt) return `https://www.youtube-nocookie.com/embed/${yt[1]}?rel=0`;
+  const vimeo = /vimeo\.com\/(?:video\/)?(\d+)/.exec(url);
+  return vimeo ? `https://player.vimeo.com/video/${vimeo[1]}` : null;
 }
 
 /**
@@ -144,6 +154,8 @@ export const INFO_CSS = `
 .ip-dot:hover em,.ip-dot.aaben em{opacity:1;transform:none}
 .ip-card{position:absolute;right:20px;top:50%;translate:0 -50%;z-index:10;width:min(340px,calc(100% - 40px));padding:16px 18px 18px;border-radius:18px;background:#fff;color:#1d2a30;box-shadow:0 16px 44px rgba(0,0,0,.35);animation:hvIn .3s ease both}
 .ip-card img{width:100%;aspect-ratio:16/10;object-fit:cover;border-radius:12px;margin-bottom:12px}
+.ip-video{display:block;width:100%;aspect-ratio:16/9;border:0;border-radius:12px;margin-bottom:12px;background:#000}
+.ip-price{margin:-2px 0 8px;font-size:18px;font-weight:800;color:var(--c-accent-dark,var(--c-main))}
 .ip-card h3{margin:0 30px 6px 0;font-family:var(--font-heading);font-size:22px;font-weight:800;color:var(--c-main)}
 .ip-card p{margin:0 0 14px;font-size:15px;line-height:1.5;color:#3d4a50}
 .ip-luk{position:absolute;top:10px;right:10px;width:32px;height:32px;border:0;border-radius:50%;background:#f1f2f3;font-size:20px;cursor:pointer}

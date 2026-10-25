@@ -1,6 +1,6 @@
 "use client";
 
-import { isPlaceHref, placeHref } from "../tours/places";
+import { cssFilter, isPlaceHref, placeHref } from "../tours/places";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { saveTourGa4Id, saveTourStoryImage } from "@/lib/actions/tour-lab";
@@ -182,19 +182,7 @@ function readLastRoom(key: string): { name: string; href: string } | null {
   }
 }
 
-export function Experience({
-  tour: savedTour,
-  sdkKey,
-  ga4Id,
-  modelId,
-  sweepBySs,
-  hiddenSweeps,
-  storyImages,
-  routeGraph,
-  units,
-  phone,
-  tools = false,
-}: {
+type ExperienceProps = {
   tour: TourConfig;
   sdkKey: string | null;
   ga4Id: string | null;
@@ -211,10 +199,45 @@ export function Experience({
   phone: boolean;
   /** Arpo's own view: the prototype tools (status, event log, copy view …). Never in the public tour. */
   tools?: boolean;
-}) {
-  /** The editor's unsaved draft, when this tour is its live preview (see the editor bridge below). */
+};
+
+/** The parts of a setup the tour only reads when it starts - a change to them starts the preview over. */
+const startSignature = (T: TourConfig) =>
+  JSON.stringify([T.navigation, T.menuOpenOnStart, T.design, Boolean(T.welcome), Boolean(T.cover), T.intro, T.start, T.matterportParams, T.mobileZoomLock, T.matterportUi, T.modelId, T.tourPage]);
+
+/**
+ * The tour. As the editor's live preview it takes the editor's unsaved draft
+ * (see the bridge in TourExperience): most changes show at once, and a change
+ * to how the tour starts restarts it with the draft.
+ */
+export function Experience(props: ExperienceProps) {
   const [draft, setDraft] = useState<TourConfig | null>(null);
-  const T = draft ?? savedTour;
+  useEffect(() => {
+    if (window.parent === window) return;
+    const onMessage = (e: MessageEvent) => {
+      if (e.origin === location.origin && e.source === window.parent && e.data?.type === "tour-draft") setDraft(e.data.config as TourConfig);
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, []);
+  const T = draft ?? props.tour;
+  return <TourExperience key={startSignature(T)} {...props} tour={T} />;
+}
+
+function TourExperience({
+  tour: savedTour,
+  sdkKey,
+  ga4Id,
+  modelId,
+  sweepBySs,
+  hiddenSweeps,
+  storyImages,
+  routeGraph,
+  units,
+  phone,
+  tools = false,
+}: ExperienceProps) {
+  const T = savedTour;
   useGa4(ga4Id, T.title);
   useLayoutEffect(() => {
     // One visit = one id per browser tab and tour.
@@ -785,6 +808,8 @@ export function Experience({
   }
 
   /* ----- Editor bridge: the tour editor shows this page as its live preview ----- */
+  /** A tag the editor is placing (its request id) - see the effect below the bridge. */
+  const [picking, setPicking] = useState<string | null>(null);
   const bridge = useRef({ sdk, room, menuGo });
   useEffect(() => {
     bridge.current = { sdk, room, menuGo };
@@ -795,8 +820,13 @@ export function Experience({
     async function onMessage(e: MessageEvent) {
       if (e.origin !== location.origin || e.source !== window.parent || !e.data?.type) return;
       const { sdk, room, menuGo } = bridge.current;
-      if (e.data.type === "tour-draft") setDraft(e.data.config as TourConfig);
       if (e.data.type === "tour-go") menuGo(e.data.name ?? "", "editor", e.data.href);
+      if (e.data.type === "tour-pick") {
+        // The editor places a tag: the next click in the tour says where.
+        if (!sdk) return reply({ type: "tour-pick", id: e.data.id, error: "Touren er ikke klar endnu - vent et øjeblik." });
+        setPicking(e.data.id);
+        return;
+      }
       if (e.data.type === "tour-shot") {
         // A photo of what the preview shows - for a place, the cover or a card.
         if (!sdk) return reply({ type: "tour-shot", id: e.data.id, error: "Touren er ikke klar endnu - vent et øjeblik." });
@@ -826,6 +856,34 @@ export function Experience({
     reply({ type: "tour-ready" });
     return () => window.removeEventListener("message", onMessage);
   }, [savedTour, sweepBySs]);
+
+  /* A tag being placed from the editor: follow the pointer, the next click is the spot. */
+  useEffect(() => {
+    if (!picking || !sdk) return;
+    let last: Vec3 | null = null;
+    const doc = iframe.current?.contentDocument;
+    const done = (msg: object) => {
+      window.parent.postMessage({ type: "tour-pick", id: picking, ...msg }, location.origin);
+      setPicking(null);
+    };
+    const onClick = (e: Event) => {
+      if (!last) return;
+      e.preventDefault();
+      e.stopPropagation();
+      done({ position: { x: +last.x.toFixed(2), y: +last.y.toFixed(2), z: +last.z.toFixed(2) }, ss: currentSsRef.current, room });
+    };
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && done({ error: "Annulleret." });
+    const sub = sdk.Pointer?.intersection.subscribe((hit) => (last = hit?.position ?? null));
+    doc?.addEventListener("click", onClick, true);
+    window.addEventListener("keydown", onKey);
+    doc?.addEventListener("keydown", onKey);
+    return () => {
+      sub?.cancel();
+      doc?.removeEventListener("click", onClick, true);
+      window.removeEventListener("keydown", onKey);
+      doc?.removeEventListener("keydown", onKey);
+    };
+  }, [picking, sdk, room]);
 
   /* ----- "Find vej" ----- */
   const DESTINATIONS = useMemo<Destination[]>(
@@ -950,6 +1008,7 @@ export function Experience({
           src={showcaseUrl(modelId, sdkKey, { ...T.matterportParams, ...(T.mobileZoomLock && phone ? { nozoom: "1" } : {}), ...startParams(T.start) })}
           className={`absolute inset-0 h-full w-full border-0 transition-opacity duration-500 ${phase === "tour" ? "opacity-100" : "pointer-events-none opacity-0"}`}
           allow="fullscreen; xr-spatial-tracking; autoplay"
+          style={T.filter ? { filter: cssFilter(T.filter) } : undefined}
         />
       )}
       {T.jump === "fade" && (
@@ -1188,7 +1247,7 @@ export function Experience({
           <div className="hv-contact">
             <div className="hv-contact-t">Kontakt</div>
             {T.contact.address && (
-              <TourLink href={T.contact.mapUrl ?? "#"} label={T.contact.address ?? "Kort"} onClick={() => track("contact_click", { kind: "map" })}>
+              <TourLink href={T.contact.mapUrl ?? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(T.contact.address ?? "")}`} label={T.contact.address ?? "Kort"} onClick={() => track("contact_click", { kind: "map" })}>
                 <span>📍</span>
                 {T.contact.address}
               </TourLink>
@@ -1268,6 +1327,7 @@ export function Experience({
         </div>
       )}
 
+      {picking && <div className="hv-pick">Klik der, hvor tagget skal sidde · Esc fortryder</div>}
       {/* Prototype tools: status and the GA4 event log. */}
       {tools && (
       <div className="hv-dev">
@@ -1583,6 +1643,7 @@ const CSS = `
 .hv-pchips{display:flex;flex-wrap:wrap;gap:5px}
 .hv-pchips span{background:#e7eef0;color:var(--c-main);font-size:12px;font-weight:700;padding:4px 9px;border-radius:999px}
 .hv-note{font-size:13px!important;color:#7a8a90!important;margin-top:12px!important}
+.hv-pick{position:absolute;top:16px;left:50%;transform:translateX(-50%);z-index:30;padding:9px 16px;border-radius:999px;background:rgba(0,0,0,.75);color:#fff;font-size:14px;font-weight:700;pointer-events:none;backdrop-filter:blur(8px)}
 .hv-logo{position:absolute;top:14px;left:16px;height:var(--logo-h);width:auto;max-width:min(320px,40vw);object-fit:contain;z-index:6;filter:drop-shadow(0 2px 6px rgba(0,0,0,.35))}
 /* A dark logo gets a light card, so it reads on any wall. */
 .hv-logo-kort{box-sizing:content-box;height:calc(var(--logo-h) - 12px);padding:9px 14px;border-radius:14px;background:rgba(255,255,255,.94);filter:none;box-shadow:0 6px 18px rgba(0,0,0,.18)}

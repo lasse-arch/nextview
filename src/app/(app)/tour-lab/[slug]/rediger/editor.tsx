@@ -5,18 +5,19 @@ import { tourConfigProblem } from "@/lib/tour-validate";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Component, useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { restoreTourVersion, saveTour, searchDeals, setTourDeal } from "@/lib/actions/tours";
+import { logTourWork, renameTourSlug, restoreTourVersion, saveTour, searchDeals, setTourDeal } from "@/lib/actions/tours";
 import { askClaudeForTour, saveAnthropicKey, type ChatTurn } from "@/lib/actions/tour-ai";
 import type { LinkOpen, MenuEntry, TourConfig } from "../../tours/types";
 import type { TourStats } from "@/lib/tour-stats";
-import { CardsEditor, GuideEditor, StartEditor } from "./content";
+import { CardsEditor, GuideEditor, StartEditor, TagsEditor } from "./content";
 import { ResultsPanel } from "./results";
+import { EconomyPanel, type TourEconomy } from "./economy";
 import { DEFAULT_EMBED, SharePanel, SitePreview, type EmbedSize } from "./share";
 import { Choice, Field, FilesContext, Group, Icon, input, outsideFiles, Toggle, UploadButton, type PreviewApi } from "./ui";
 import { hostTourFiles } from "@/lib/actions/tour-files";
 
 type Version = { id: string; note: string | null; by: string | null; at: string };
-type Tab = "claude" | "resultater" | "del" | "start" | "rundvisning" | "kort" | "generelt" | "design" | "menu" | "funktioner" | "links" | "avanceret" | "versioner";
+type Tab = "claude" | "okonomi" | "resultater" | "del" | "tags" | "start" | "rundvisning" | "kort" | "generelt" | "design" | "menu" | "funktioner" | "links" | "avanceret" | "versioner";
 
 /** Claude's mark: a small sunburst. */
 const SPARK = '<path d="M12 3v5M12 16v5M3 12h5M16 12h5M5.6 5.6l3.5 3.5M14.9 14.9l3.5 3.5M5.6 18.4l3.5-3.5M14.9 9.1l3.5-3.5"/>';
@@ -29,12 +30,14 @@ const TABS: [Tab, string, string, string?][] = [
   ["start", "Start", '<path d="M5 4v16M5 5h11l-2 4 2 4H5"/>', "Indhold"],
   ["menu", "Menu", '<path d="M4 6h16M4 12h16M4 18h10"/>'],
   ["rundvisning", "Vis mig rundt", '<circle cx="12" cy="12" r="9"/><path d="M10 8.5v7l5.5-3.5z"/>'],
+  ["tags", "Tags", '<path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z"/><circle cx="8" cy="8" r="1.5"/>'],
   ["kort", "Stedkort", '<rect x="4" y="5" width="16" height="14" rx="2"/><path d="M8 10h8M8 14h5"/>'],
   ["links", "Knapper og links", '<path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/>'],
   ["design", "Design", '<path d="M12 3a9 9 0 1 0 0 18c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.3-.3-.4-.5-.8-.5-1.3 0-1.1.9-2 2-2h2.3A4.7 4.7 0 0 0 21 9.7C21 5.9 17 3 12 3z"/><circle cx="7.5" cy="11.5" r="1"/><circle cx="10.5" cy="7.5" r="1"/><circle cx="15.5" cy="8" r="1"/>', "Udseende og opsætning"],
   ["funktioner", "Funktioner", '<path d="M12 3l2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 15.4 7.2 18l.9-5.4L4.2 8.7l5.4-.8z"/>'],
   ["generelt", "Generelt", '<circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/>'],
-  ["versioner", "Versioner", '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', "Mere"],
+  ["okonomi", "Tid og pris", '<circle cx="12" cy="12" r="9"/><path d="M14.5 9.5a2.5 2 0 0 0-2.5-1.5c-1.4 0-2.5.8-2.5 2s1.1 1.6 2.5 2 2.5.8 2.5 2-1.1 2-2.5 2a2.5 2 0 0 1-2.5-1.5M12 6.5v1.5M12 16v1.5"/>', "Mere"],
+  ["versioner", "Versioner", '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'],
   ["avanceret", "Avanceret", '<path d="M8 6l-5 6 5 6M16 6l5 6-5 6"/>'],
 ];
 
@@ -49,6 +52,7 @@ export function TourEditor({
   stats,
   blob,
   published,
+  economy,
 }: {
   slug: string;
   initial: TourConfig;
@@ -59,6 +63,7 @@ export function TourEditor({
   /** Vercel Blob is set up (uploads of big files, videos). */
   blob: boolean;
   published: boolean;
+  economy: TourEconomy;
 }) {
   const router = useRouter();
   const [config, setConfig] = useState<TourConfig>(initial);
@@ -86,6 +91,22 @@ export function TourEditor({
   const [previewKey, setPreviewKey] = useState(0);
   const [pending, start] = useTransition();
   const [json, setJson] = useState<string | null>(null);
+
+  /* Time spent on the tour: a minute at a time while the page is open and someone is active (typing, clicking, or in the preview). */
+  useEffect(() => {
+    let last = Date.now();
+    const active = () => (last = Date.now());
+    const events = ["keydown", "pointerdown", "wheel", "input"] as const;
+    events.forEach((e) => window.addEventListener(e, active, { passive: true }));
+    const timer = setInterval(() => {
+      const inPreview = document.activeElement instanceof HTMLIFrameElement;
+      if (document.visibilityState === "visible" && (inPreview || Date.now() - last < 120_000)) logTourWork(slug, 60).catch(() => {});
+    }, 60_000);
+    return () => {
+      clearInterval(timer);
+      events.forEach((e) => window.removeEventListener(e, active));
+    };
+  }, [slug]);
 
   /* Live preview: the tour in the iframe shows the draft as it's edited (see the bridge in experience.tsx). */
   const frame = useRef<HTMLIFrameElement>(null);
@@ -126,6 +147,7 @@ export function TourEditor({
     return {
       view: () => ask<{ href?: string; room?: string | null }>("tour-view"),
       shot: () => ask<{ image?: string }>("tour-shot", 15000),
+      pick: () => ask<{ position?: { x: number; y: number; z: number }; ss?: number | null; room?: string | null }>("tour-pick", 120000),
       go: (name, href) => frame.current?.contentWindow?.postMessage({ type: "tour-go", name, href }, location.origin),
     };
   }, []);
@@ -168,13 +190,42 @@ export function TourEditor({
           <Icon d='<path d="M15 5l-7 7 7 7"/>' className="h-4 w-4" />
           Tours
         </Link>
-        <div className="mx-auto text-center">
+        <div className="mx-auto min-w-0 text-center">
           <h1 className="text-[15px] font-semibold tracking-tight">{config.title}</h1>
           <p className="text-[12px] text-[#8e8e93]">{dirty ? "Ændringer ikke gemt" : `Gemt · ${versions[0] ? when(versions[0].at) : ""}`}</p>
         </div>
-        <a href={`/tour-lab/${slug}`} target="_blank" rel="noopener" className="rounded-full bg-[#f2f2f7] px-3.5 py-1.5 text-[13px] font-medium hover:bg-[#e9e9eb]">
-          Åbn tour ↗
-        </a>
+        {/* Saving lives up here - never over the preview (where the tour's own bottom menu is). */}
+        <div className="flex items-center gap-2">
+          {msg && <span className={`text-[13px] ${msg.ok ? "text-[#248a3d]" : "text-[#ff3b30]"}`}>{msg.ok ? "✓ " : ""}{msg.text}</span>}
+          {dirty ? (
+            <>
+              <input
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder="Hvad har du ændret? (valgfrit)"
+                className="w-56 rounded-full border-0 bg-[#f2f2f7] px-3.5 py-1.5 text-[13px] placeholder:text-[#8e8e93] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0071e3]"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  setConfig(initial);
+                  setDirty(false);
+                  setMsg(null);
+                }}
+                className="rounded-full px-3 py-1.5 text-[13px] font-medium text-[#0071e3] hover:bg-[#0071e3]/10"
+              >
+                Fortryd
+              </button>
+              <button type="button" onClick={save} disabled={pending} className="rounded-full bg-[#0071e3] px-5 py-1.5 text-[13px] font-semibold text-white hover:bg-[#0077ed] disabled:opacity-50">
+                {pending ? "Gemmer…" : "Gem"}
+              </button>
+            </>
+          ) : (
+            <a href={`/tour-lab/${slug}`} target="_blank" rel="noopener" className="rounded-full bg-[#f2f2f7] px-3.5 py-1.5 text-[13px] font-medium hover:bg-[#e9e9eb]">
+              Åbn tour ↗
+            </a>
+          )}
+        </div>
       </div>
 
       <SafeArea onUndo={() => { setConfig(initial); setDirty(false); }}>
@@ -222,6 +273,7 @@ export function TourEditor({
                 </Field>
                 <DealPicker slug={slug} initial={deal} />
                 </Group>
+                <SlugField slug={slug} dirty={dirty} />
                 <Group title="I touren">
                 <Field title="Firmanavn i touren">
                   <input className={input} value={config.brand} onChange={(e) => edit((d) => void (d.brand = e.target.value))} />
@@ -284,6 +336,45 @@ export function TourEditor({
                   </Field>
                 </div>
                 </Group>
+                <Group title="Farvefilter på touren">
+                  {(
+                    [
+                      ["brightness", "Lysstyrke", 0.5, 1.5, 0.01, 1],
+                      ["contrast", "Kontrast", 0.5, 1.5, 0.01, 1],
+                      ["saturate", "Mætning", 0, 2, 0.01, 1],
+                      ["grayscale", "Gråtone", 0, 1, 0.01, 0],
+                      ["hue", "Farvetone", -180, 180, 1, 0],
+                    ] as const
+                  ).map(([k, text, min, max, step, neutral]) => {
+                    const value = config.filter?.[k] ?? neutral;
+                    return (
+                      <Field key={k} title={`${text}: ${k === "hue" ? `${value}°` : value.toFixed(2).replace(".", ",")}`}>
+                        <input
+                          type="range"
+                          min={min}
+                          max={max}
+                          step={step}
+                          className="w-full accent-[#0071e3]"
+                          value={value}
+                          onChange={(e) =>
+                            edit((d) => {
+                              const f = { ...d.filter, [k]: Number(e.target.value) };
+                              // Back at neutral everywhere = no filter at all.
+                              const neutralAll = (f.brightness ?? 1) === 1 && (f.contrast ?? 1) === 1 && (f.saturate ?? 1) === 1 && !f.grayscale && !f.hue;
+                              d.filter = neutralAll ? undefined : f;
+                            })
+                          }
+                        />
+                      </Field>
+                    );
+                  })}
+                  {config.filter && (
+                    <button type="button" className="text-[13px] font-medium text-[#0071e3]" onClick={() => edit((d) => void (d.filter = undefined))}>
+                      Nulstil filter
+                    </button>
+                  )}
+                  <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">Lægges over selve 3D-touren - fx lidt lysere og varmere. Se det i forhåndsvisningen.</p>
+                </Group>
                 <Group title="Logo">
                 <Field title="Logo">
                   <div className="flex items-center gap-2">
@@ -304,6 +395,7 @@ export function TourEditor({
             )}
 
             {tab === "resultater" && <ResultsPanel stats={stats} />}
+            {tab === "okonomi" && <EconomyPanel economy={economy} />}
             {tab === "del" && (
               <SharePanel
                 slug={slug}
@@ -318,6 +410,7 @@ export function TourEditor({
             )}
             {tab === "start" && <StartEditor config={config} edit={edit} slug={slug} preview={preview} />}
             {tab === "rundvisning" && <GuideEditor config={config} edit={edit} preview={preview} />}
+            {tab === "tags" && <TagsEditor config={config} edit={edit} slug={slug} preview={preview} />}
             {tab === "kort" && <CardsEditor config={config} edit={edit} preview={preview} />}
             {tab === "menu" && <MenuEditor menu={config.menu} preview={preview} onChange={(menu) => edit((d) => void (d.menu = menu))} />}
 
@@ -367,7 +460,7 @@ export function TourEditor({
                 <Toggle on={Boolean(config.matterportUi)} onChange={(on) => edit((d) => void (d.matterportUi = on || undefined))} title="Behold Matterports egne knapper" hint="Normalt skjult - tourens egne knapper er brugerfladen." />
                 </Group>
                 <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">
-                  Infopunkter ({config.info?.length ?? 0}) sættes på ting i rummet og rettes indtil videre under Avanceret.
+                  Tags på ting i rummet laves under Tags.
                 </p>
               </>
             )}
@@ -391,27 +484,31 @@ export function TourEditor({
                 <CtaEditor cta={config.cta} onChange={(cta) => edit((d) => void (d.cta = cta))} />
                 </Group>
                 <Group title="Kontakt">
-                <Field title="Vises i menuen">
-                  <div className="space-y-2">
-                    {(
-                      [
-                        ["phone", "Telefon"],
-                        ["email", "E-mail"],
-                        ["address", "Adresse"],
-                        ["mapUrl", "Link til kort"],
-                        ["instagram", "Instagram"],
-                      ] as const
-                    ).map(([k, text]) => (
-                      <input
-                        key={k}
-                        className={input}
-                        placeholder={text}
-                        value={config.contact?.[k] ?? ""}
-                        onChange={(e) => edit((d) => void (d.contact = { ...d.contact, [k]: e.target.value || undefined }))}
-                      />
-                    ))}
-                  </div>
-                </Field>
+                <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">Vises nederst i menuen. Udfyld kun det, kunden vil have vist.</p>
+                {(
+                  [
+                    ["phone", "Telefon", "Fx 75 75 75 84", "tel"],
+                    ["email", "E-mail", "Fx info@kunde.dk", "email"],
+                    ["address", "Adresse", "Fx Egelykkevej 2, 9310 Vodskov", "text"],
+                    ["instagram", "Instagram", "Fx instagram.com/kunden", "url"],
+                  ] as const
+                ).map(([k, text, example, type]) => (
+                  <Field key={k} title={text} hint={k === "address" ? "Bliver et link, der åbner adressen i Google Maps." : undefined}>
+                    <input
+                      type={type}
+                      className={input}
+                      placeholder={example}
+                      value={config.contact?.[k] ?? ""}
+                      onChange={(e) => edit((d) => void (d.contact = { ...d.contact, [k]: e.target.value || undefined }))}
+                      onBlur={(e) => k === "instagram" && e.target.value && edit((d) => void (d.contact = { ...d.contact, instagram: withProtocol(e.target.value) }))}
+                    />
+                  </Field>
+                ))}
+                {config.contact?.mapUrl && (
+                  <Field title="Eget kort-link" hint="Bruges i stedet for Google Maps-linket. Tøm feltet for at bruge adressen.">
+                    <input className={input} value={config.contact.mapUrl} onChange={(e) => edit((d) => void (d.contact = { ...d.contact, mapUrl: e.target.value || undefined }))} onBlur={(e) => e.target.value && edit((d) => void (d.contact = { ...d.contact, mapUrl: withProtocol(e.target.value) }))} />
+                  </Field>
+                )}
                 </Group>
               </>
             )}
@@ -548,41 +645,6 @@ export function TourEditor({
             )}
           </div>
 
-          {/* Save bar - only when there's something to save */}
-          {(dirty || msg) && (
-            <div className="pointer-events-none absolute inset-x-0 bottom-7 z-40 flex justify-center">
-              <div className="pointer-events-auto flex items-center gap-3 rounded-full bg-[#1d1d1f]/90 py-2 pl-5 pr-2 text-white shadow-[0_12px_40px_rgba(0,0,0,.3)] backdrop-blur-xl">
-                {msg && !dirty ? (
-                  <span className={`pr-3 text-[14px] ${msg.ok ? "" : "text-[#ff6961]"}`}>{msg.ok ? "✓ " : ""}{msg.text}</span>
-                ) : (
-                  <>
-                    <span className="text-[14px] font-medium">Ikke gemte ændringer</span>
-                    <input
-                      value={note}
-                      onChange={(e) => setNote(e.target.value)}
-                      placeholder="Hvad har du ændret?"
-                      className="w-56 rounded-full border-0 bg-white/10 px-3 py-1.5 text-[13px] text-white placeholder:text-white/50 focus:outline-none focus:ring-2 focus:ring-[#0071e3]"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setConfig(initial);
-                        setDirty(false);
-                        setMsg(null);
-                      }}
-                      className="rounded-full px-3 py-1.5 text-[14px] text-white/80 hover:text-white"
-                    >
-                      Fortryd
-                    </button>
-                    <button type="button" onClick={save} disabled={pending} className="rounded-full bg-[#0071e3] px-5 py-1.5 text-[14px] font-semibold hover:bg-[#0077ed] disabled:opacity-50">
-                      {pending ? "Gemmer…" : "Gem"}
-                    </button>
-                  </>
-                )}
-                {msg && !msg.ok && dirty && <span className="pr-3 text-[13px] text-[#ff6961]">{msg.text}</span>}
-              </div>
-            </div>
-          )}
         </div>
       </div>
       </SafeArea>
@@ -630,7 +692,11 @@ function ClaudePanel({
     const before = config;
     start(async () => {
       const r = await askClaudeForTour(config, history, ask).catch((err: unknown) => ({ ok: false as const, error: `Kunne ikke nå Claude (${err instanceof Error ? err.message : err}) - prøv igen.` }));
-      if (!r.ok) return setChat((c) => [...c, { role: "assistant", text: r.error, error: true }]);
+      if (!r.ok) {
+        // A revoked/changed key: ask for the new one right here.
+        if (r.error.startsWith("Claude-nøglen")) setReady(false);
+        return setChat((c) => [...c, { role: "assistant", text: r.error, error: true }]);
+      }
       if (r.changed) onApply(r.config);
       setChat((c) => [...c, { role: "assistant", text: r.reply, changed: r.changed, before: r.changed ? before : undefined }]);
     });
@@ -642,7 +708,7 @@ function ClaudePanel({
         <span className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#d97757] text-white">
           <Icon d={SPARK} className="h-6 w-6" />
         </span>
-        <h2 className="text-[17px] font-semibold">Sæt Claude op</h2>
+        <h2 className="text-[17px] font-semibold">{initiallyReady ? "Claude-nøglen virker ikke længere" : "Sæt Claude op"}</h2>
         <p className="mt-1 text-[13px] leading-snug text-[#6e6e73]">Indsæt en API-nøgle fra Anthropic. Den gemmes i Arpo, så alle admins kan bruge Claude i editoren.</p>
         <input className={`${input} mt-4 bg-white`} type="password" placeholder="sk-ant-…" value={key} onChange={(e) => setKey(e.target.value)} />
         {keyError && <p className="mt-2 text-[12px] text-[#ff3b30]">{keyError}</p>}
@@ -858,6 +924,46 @@ class SafeArea extends Component<{ onUndo: () => void; children: React.ReactNode
       </div>
     );
   }
+}
+
+/** "maps.google.dk" -> "https://maps.google.dk" - a link without https:// would point inside Arpo. */
+const withProtocol = (url: string) => (/^(https?:|mailto:|tel:|#)/i.test(url.trim()) ? url.trim() : `https://${url.trim()}`);
+
+/** The tour's address - /t/<slug> (MPSkins' "Pretty-URL"). The old address keeps working. */
+function SlugField({ slug, dirty }: { slug: string; dirty: boolean }) {
+  const router = useRouter();
+  const [value, setValue] = useState(slug);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  return (
+    <Group title="Adresse (Pretty-URL)">
+      <Field title="Tourens link" hint="Fx halvorsmindeefterskole. Det gamle link og koden på kundens side virker stadig - de sendes videre.">
+        <div className="flex items-center gap-2">
+          <span className="flex min-w-0 flex-1 items-center rounded-[10px] bg-[#f2f2f7] pl-3 focus-within:bg-white focus-within:ring-2 focus-within:ring-[#0071e3]">
+            <span className="text-[15px] text-[#8e8e93]">/t/</span>
+            <input className="min-w-0 flex-1 border-0 bg-transparent py-2 pr-3 text-[15px] focus:outline-none focus:ring-0" value={value} onChange={(e) => setValue(e.target.value.toLowerCase().replace(/[^a-z0-9æøå-]/g, ""))} />
+          </span>
+          <button
+            type="button"
+            disabled={pending || value === slug || !value || dirty}
+            title={dirty ? "Gem dine ændringer først" : undefined}
+            className="flex-none rounded-xl bg-[#0071e3] px-4 py-2 text-[14px] font-medium text-white disabled:opacity-40"
+            onClick={() =>
+              start(async () => {
+                setError(null);
+                const r = await renameTourSlug(slug, value);
+                if (!r.ok) return setError(r.error);
+                router.replace(`/tour-lab/${r.slug}/rediger`);
+              })
+            }
+          >
+            {pending ? "Skifter…" : "Skift"}
+          </button>
+        </div>
+        {error && <p className="px-1 text-[12px] text-[#ff3b30]">{error}</p>}
+      </Field>
+    </Group>
+  );
 }
 
 function DealPicker({ slug, initial }: { slug: string; initial: { id: string; name: string } | null }) {
@@ -1207,7 +1313,7 @@ function CtaEditor({ cta, onChange }: { cta: TourConfig["cta"]; onChange: (c: To
                 ×
               </button>
             </div>
-            <input className={input} value={c.href} placeholder="https://…" onChange={(e) => onChange(cta.map((x, j) => (j === i ? { ...x, href: e.target.value } : x)))} />
+            <input className={input} value={c.href} placeholder="https://…" onChange={(e) => onChange(cta.map((x, j) => (j === i ? { ...x, href: e.target.value } : x)))} onBlur={(e) => e.target.value && onChange(cta.map((x, j) => (j === i ? { ...x, href: withProtocol(e.target.value) } : x)))} />
             <label className="flex items-center gap-2 text-[13px] text-[#1d1d1f]">
               <input type="checkbox" className="accent-[#0071e3]" checked={c.primary} onChange={(e) => onChange(cta.map((x, j) => (j === i ? { ...x, primary: e.target.checked } : x)))} />
               Hovedknap (fremhævet)

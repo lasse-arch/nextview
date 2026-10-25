@@ -3,7 +3,7 @@
 import { isPlaceHref } from "../../tours/places";
 import { useState } from "react";
 import { saveTourStoryImage } from "@/lib/actions/tour-lab";
-import type { PlaceCard, TourConfig, TourPlace, WelcomeGo } from "../../tours/types";
+import type { PlaceCard, TourConfig, TourInfo, TourPlace, WelcomeGo } from "../../tours/types";
 import { Choice, Field, Group, Icon, input, Toggle, UploadButton, ssOfHref, type PreviewApi } from "./ui";
 
 /*
@@ -51,7 +51,7 @@ function Rows<T>({
   const [drag, setDrag] = useState<number | null>(null);
   const [over, setOver] = useState<number | null>(null);
   return (
-    <div className="-m-4 divide-y divide-black/[.05]">
+    <div className="-mx-4 divide-y divide-black/[.05] border-y border-black/[.05]">
       {items.length === 0 && <p className="px-4 py-5 text-center text-[13px] text-[#8e8e93]">{empty}</p>}
       {items.map((item, i) => (
         <div
@@ -613,6 +613,128 @@ export function CardsEditor({ config, edit, preview }: Omit<Props, "slug">) {
             />
           </>
         )}
+      </Group>
+    </>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+
+/**
+ * Tags: a pulsing dot on a thing in the room with a card - text, photo,
+ * video, price and a button (book, buy, read more). Placed by clicking the
+ * spot in the preview; shown from the scan points it's picked from (and any
+ * added), so it never shows through a wall. Button clicks count as actions in
+ * Resultater.
+ */
+export function TagsEditor({ config, edit, slug, preview }: Props) {
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const tags = config.info ?? [];
+  const setTags = (t: TourInfo[]) => edit((d) => void (d.info = t.length ? t : undefined));
+
+  async function pick(): Promise<{ position: TourInfo["position"]; ss: number | null; room: string | null } | null> {
+    setError(null);
+    const r = await preview.pick();
+    if (r.error || !r.position) {
+      if (r.error !== "Annulleret.") setError(r.error ?? "Intet sted valgt.");
+      return null;
+    }
+    return { position: r.position, ss: r.ss ?? null, room: r.room ?? null };
+  }
+
+  return (
+    <>
+      <Group>
+        <p className="text-[14px] leading-snug">Sæt et tag på en ting i rummet - en sofa, et produkt, en udsigt. Et tryk på prikken åbner et kort med tekst, foto, video, pris og en knap.</p>
+        <button
+          type="button"
+          disabled={busy != null}
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#0071e3] py-2.5 text-[15px] font-medium text-white hover:bg-[#0077ed] disabled:opacity-50"
+          onClick={async () => {
+            setBusy("new");
+            const at = await pick();
+            setBusy(null);
+            if (at) setTags([...tags, { title: "Nyt tag", text: "", position: at.position, ss: at.ss ? [at.ss] : [] }]);
+          }}
+        >
+          <Icon d='<path d="M12 5v14M5 12h14"/>' className="h-4 w-4" />
+          {busy === "new" ? "Klik i forhåndsvisningen…" : "Sæt et tag i forhåndsvisningen"}
+        </button>
+        {busy === "new" && <p className={small}>Klik der i rummet, hvor tagget skal sidde (Esc fortryder).</p>}
+        {error && <p className="px-1 text-[12px] text-[#ff3b30]">{error}</p>}
+      </Group>
+      <Group title="Tags">
+        <Rows<TourInfo>
+          items={tags}
+          onChange={setTags}
+          icon={["bg-[#ff9500]", '<path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z"/><circle cx="8" cy="8" r="1.5"/>']}
+          title={(t) => t.title}
+          subtitle={(t) => [t.price, t.video ? "video" : null, t.link?.label, t.ss.length ? `ses fra punkt ${t.ss.join(", ")}` : "ses ikke nogen steder"].filter(Boolean).join(" · ")}
+          empty="Ingen tags endnu."
+          editor={(t, set) => (
+            <>
+              <Field title="Overskrift">
+                <input className={`${input} bg-white`} value={t.title} onChange={(e) => set({ ...t, title: e.target.value })} />
+              </Field>
+              <Field title="Tekst" hint="Kort - 1-3 sætninger.">
+                <textarea className={`${textarea} bg-white`} value={t.text} onChange={(e) => set({ ...t, text: e.target.value })} />
+              </Field>
+              <Field title="Pris (valgfri)">
+                <input className={`${input} bg-white`} placeholder="Fx Fra 495 kr./md." value={t.price ?? ""} onChange={(e) => set({ ...t, price: e.target.value || undefined })} />
+              </Field>
+              <PhotoPicker image={t.image ?? ""} slug={slug} photoKey={`tag-${t.title}`} preview={preview} onChange={(image) => set({ ...t, image: image || undefined })} />
+              <Field title="Video (valgfri)" hint="Et YouTube- eller Vimeo-link - afspilles i kortet.">
+                <input className={`${input} bg-white`} placeholder="https://youtube.com/…" value={t.video ?? ""} onChange={(e) => set({ ...t, video: e.target.value || undefined })} />
+              </Field>
+              <Field title="Knap (valgfri)">
+                <div className="flex gap-1.5">
+                  <input className={`${input} w-2/5 bg-white`} placeholder="Fx Book" value={t.link?.label ?? ""} onChange={(e) => set({ ...t, link: e.target.value || t.link?.href ? { label: e.target.value, href: t.link?.href ?? "" } : undefined })} />
+                  <input className={`${input} bg-white`} placeholder="https://…" value={t.link?.href ?? ""} onChange={(e) => set({ ...t, link: e.target.value || t.link?.label ? { label: t.link?.label || "Læs mere", href: e.target.value } : undefined })} />
+                </div>
+              </Field>
+              <Field title="Ses fra punkt" hint="Tagget vises kun fra disse scanpunkter, så det aldrig ses gennem en væg.">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {t.ss.map((n) => (
+                    <span key={n} className="flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-[13px] ring-1 ring-black/[.06]">
+                      {n}
+                      <button type="button" className="text-[#c7c7cc] hover:text-[#ff3b30]" onClick={() => set({ ...t, ss: t.ss.filter((x) => x !== n) })} aria-label="Fjern">
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                  <button
+                    type="button"
+                    disabled={busy != null}
+                    className="rounded-full px-2.5 py-1 text-[13px] font-medium text-[#0071e3] hover:bg-[#0071e3]/10"
+                    onClick={async () => {
+                      setBusy("ss");
+                      const r = await preview.view();
+                      setBusy(null);
+                      const ss = r.href ? ssOfHref(r.href) : null;
+                      if (ss && !t.ss.includes(ss)) set({ ...t, ss: [...t.ss, ss] });
+                    }}
+                  >
+                    + Punktet i forhåndsvisningen
+                  </button>
+                </div>
+              </Field>
+              <button
+                type="button"
+                disabled={busy != null}
+                className="text-[13px] font-medium text-[#0071e3]"
+                onClick={async () => {
+                  setBusy("move");
+                  const at = await pick();
+                  setBusy(null);
+                  if (at) set({ ...t, position: at.position, ss: at.ss && !t.ss.includes(at.ss) ? [...t.ss, at.ss] : t.ss });
+                }}
+              >
+                {busy === "move" ? "Klik i forhåndsvisningen…" : "Flyt tagget"}
+              </button>
+            </>
+          )}
+        />
       </Group>
     </>
   );

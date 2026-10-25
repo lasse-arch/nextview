@@ -572,6 +572,9 @@ model Deal {
   /// (user ids, comma-separated) and the Google Calendar invitation.
   filmingAt              DateTime?
   filmingDurationMinutes Int?
+  /// Time actually spent on the filming (incl. setup), in minutes - must be filled in before the deal can go Live,
+  /// so every customer's cost in hours is known (see the tour editor's "Tid og pris").
+  filmingActualMinutes   Int?
   filmingCrewIds         String?
   filmingEventId         String?
   /// When the "Velkommen til Nextview360" e-mail went out (sent once,
@@ -1293,6 +1296,8 @@ model Tour {
   name      String
   /// Shown to anyone at /t/<slug> (and in an iframe on the customer's site) - off until it's ready.
   published Boolean       @default(false)
+  /// Addresses the tour had before its pretty-URL was changed - they redirect to the new one, so iframes already on customers' sites keep working.
+  oldSlugs  String[]      @default([])
   dealId    String?
   deal      Deal?         @relation(fields: [dealId], references: [id], onDelete: SetNull)
   config    Json
@@ -1347,6 +1352,36 @@ model TourFile {
   /// Where it was copied from, if anywhere (so the same file isn't copied twice).
   sourceUrl   String?
   createdAt   DateTime @default(now())
+
+  @@index([tourSlug])
+}
+
+/// Time spent editing a tour in Arpo, per person per day (measured by the
+/// editor while someone is actively working in it).
+model TourWork {
+  id       String   @id @default(cuid())
+  tourSlug String
+  userId   String
+  userName String
+  day      DateTime @db.Date
+  seconds  Int      @default(0)
+
+  @@unique([tourSlug, userId, day])
+  @@index([tourSlug])
+}
+
+/// What Claude cost on a tour: one row per call (building the tour, each change in the editor).
+model TourAiUsage {
+  id               String   @id @default(cuid())
+  tourSlug         String
+  userName         String?
+  kind             String
+  inputTokens      Int
+  outputTokens     Int
+  cacheReadTokens  Int      @default(0)
+  cacheWriteTokens Int      @default(0)
+  costUsd          Float
+  createdAt        DateTime @default(now())
 
   @@index([tourSlug])
 }

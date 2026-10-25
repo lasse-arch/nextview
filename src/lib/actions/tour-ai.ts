@@ -12,6 +12,7 @@ import { prisma } from "@/lib/db";
 import { getSettingValue, setSettingValue } from "@/lib/integration-settings";
 import { mpskinsMenuDigest, siteDigest } from "@/lib/site-digest";
 import { hostFiles } from "@/lib/tour-files";
+import { fetchMpskinsCfg, filterFromCss } from "@/lib/mpskins";
 import { tourConfigProblem } from "@/lib/tour-validate";
 import { fetchModelInfo, modelIdsIn, type ModelInfo } from "@/lib/matterport-graph";
 import type { TourConfig } from "@/app/(app)/tour-lab/tours/types";
@@ -68,6 +69,11 @@ const Edits = z.object({
 export type ChatTurn = { role: "user" | "assistant"; text: string };
 export type AiEditResult = { ok: true; reply: string; config: TourConfig; changed: number } | { ok: false; error: string };
 
+/** Claude Opus 5.5's price per million tokens: input $4, output $20, cache reads $0.20, cache writes (5 min) $5. */
+function claudeCostUsd(u: { input_tokens: number; output_tokens: number; cache_read_input_tokens?: number | null; cache_creation_input_tokens?: number | null }) {
+  return (u.input_tokens * 4 + u.output_tokens * 20 + (u.cache_read_input_tokens ?? 0) * 0.2 + (u.cache_creation_input_tokens ?? 0) * 5) / 1_000_000;
+}
+
 /** Applies one change to a copy-in-progress of the setup. Paths are "/"-separated keys and list indexes. */
 function apply(root: Record<string, unknown>, op: "set" | "delete", pathText: string, value: unknown) {
   const keys = pathText.split("/").filter(Boolean);
@@ -123,7 +129,7 @@ ${types}
 }
 
 /** Asks Claude for edits to a setup and applies them to a copy. */
-async function claudeEdits(key: string, config: TourConfig, history: ChatTurn[], request: string, maxTokens = 16000, retry = true): Promise<AiEditResult> {
+async function claudeEdits(key: string, who: { name: string; kind: string }, config: TourConfig, history: ChatTurn[], request: string, maxTokens = 16000, retry = true): Promise<AiEditResult> {
   const messages: Anthropic.MessageParam[] = [
     ...history.slice(-10).map((t): Anthropic.MessageParam => ({ role: t.role, content: t.text })),
     { role: "user", content: `Opsætningen lige nu:\n\`\`\`json\n${JSON.stringify(config)}\n\`\`\`\n\n${request}` },
@@ -142,7 +148,21 @@ async function claudeEdits(key: string, config: TourConfig, history: ChatTurn[],
       })
       .finalMessage();
     const u = response.usage;
-    console.info(`tour-ai usage: in ${u.input_tokens} + cache write ${u.cache_creation_input_tokens ?? 0} + cache read ${u.cache_read_input_tokens ?? 0}, out ${u.output_tokens}`);
+    // What the call cost, kept on the tour (see "Tid og pris" in the editor).
+    await prisma.tourAiUsage
+      .create({
+        data: {
+          tourSlug: config.slug,
+          userName: who.name,
+          kind: who.kind,
+          inputTokens: u.input_tokens,
+          outputTokens: u.output_tokens,
+          cacheReadTokens: u.cache_read_input_tokens ?? 0,
+          cacheWriteTokens: u.cache_creation_input_tokens ?? 0,
+          costUsd: claudeCostUsd(u),
+        },
+      })
+      .catch((err: unknown) => console.error("tourAiUsage", err));
     if (response.stop_reason === "refusal") return { ok: false, error: "Claude ville ikke lave den ændring." };
     if (response.stop_reason === "max_tokens") return { ok: false, error: "Ændringen blev for stor - prøv at dele den op." };
     parsed = response.parsed_output ?? null;
@@ -164,18 +184,18 @@ async function claudeEdits(key: string, config: TourConfig, history: ChatTurn[],
   }
   if (problem) {
     // Claude gets one go at fixing its own edit, told exactly what was wrong.
-    if (retry) return claudeEdits(key, config, history, `${request}\n\n(Dit forrige forsøg kunne ikke bruges: ${problem}. Lav ændringen igen, så opsætningen har den rigtige form.)`, maxTokens, false);
+    if (retry) return claudeEdits(key, who, config, history, `${request}\n\n(Dit forrige forsøg kunne ikke bruges: ${problem}. Lav ændringen igen, så opsætningen har den rigtige form.)`, maxTokens, false);
     return { ok: false, error: `Claudes ændring kunne ikke bruges (${problem}) - prøv at formulere det anderledes.` };
   }
   return { ok: true, reply: parsed.reply, config: { ...(next as unknown as TourConfig), slug: config.slug }, changed: parsed.changes.length };
 }
 
 export async function askClaudeForTour(config: TourConfig, history: ChatTurn[], request: string): Promise<AiEditResult> {
-  await admin();
+  const user = await admin();
   const key = await apiKey();
   if (!key) return { ok: false, error: "Claude er ikke sat op endnu - indsæt en nøgle." };
   try {
-    return await claudeEdits(key, config, history, `Ønske: ${request}`);
+    return await claudeEdits(key, { name: user.name, kind: "ændring" }, config, history, `Ønske: ${request}`);
   } catch (err) {
     console.error("askClaudeForTour", err);
     return { ok: false, error: `Noget gik galt hos Claude (${err instanceof Error ? err.message : err}) - prøv igen.` };
@@ -231,6 +251,7 @@ export async function createTourFromWebsite(input: {
 
   const result = await claudeEdits(
     key,
+    { name: user.name, kind: "bygget" },
     base,
     [],
     `Byg en ny tour til en ny kunde. Opsætningen ovenfor er en skabelon: funktionerne (bevægelse, skift, menutype osv.) er valgt med vilje, men alt kundeindhold er tomt og skal udfyldes.
@@ -265,6 +286,11 @@ Fotos fra scanningen (brug det første som forsidebillede, hvis der er en forsid
   );
   if (!result.ok) return result;
 
+  // MPSkins' colour filter comes along as it was set there.
+  if (tourUrl) {
+    const filter = filterFromCss((await fetchMpskinsCfg(tourUrl.toString()).catch(() => null))?.modelCssFilter);
+    if (filter) result.config.filter = filter;
+  }
   // The logo and pictures from the website are copied to us, so the tour keeps them whatever happens to the site.
   const hosted = await hostFiles(slug, { ...result.config, slug });
   const config = hosted.config as unknown as Prisma.InputJsonValue;

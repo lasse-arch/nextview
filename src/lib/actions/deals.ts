@@ -35,6 +35,9 @@ function parseMeetingDate(raw: string): Date {
   const value = raw.trim();
   return new Date(/(Z|[+-]\d\d:?\d\d)$/.test(value) ? value : `${value}Z`);
 }
+/** Every customer's cost in hours must be known - the filming time is filled in before a deal goes Live. */
+const FILMING_TIME_REQUIRED = "Udfyld den faktiske filmtid på dealen (knappen \"Filmtid\"), før den kan sættes Live.";
+
 export async function createDealManual(formData: FormData) {
   const user = await requireUser();
 
@@ -154,6 +157,9 @@ async function updateDealInner(
   // saveable for unrelated edits, not crash on every single save forever.
   if (stage === "MEETING_BOOKED" && existing.stage !== "MEETING_BOOKED" && !meetingDate) {
     throw new Error("Angiv en mødedato når stadiet er 'Møde booket'.");
+  }
+  if (stage === "LIVE" && existing.stage !== "LIVE" && existing.filmingActualMinutes == null) {
+    throw new Error(FILMING_TIME_REQUIRED);
   }
 
   // Non-admins can't manually jump into a contract-managed stage from this
@@ -373,6 +379,9 @@ export async function updateDealStage(dealId: string, newStage: DealStage) {
 
   if (newStage === "MEETING_BOOKED" && !existing.meetingDate) {
     throw new Error("Åbn dealen og angiv en mødedato før den kan sættes til 'Møde booket'.");
+  }
+  if (newStage === "LIVE" && existing.stage !== "LIVE" && existing.filmingActualMinutes == null) {
+    throw new Error(FILMING_TIME_REQUIRED);
   }
 
   const stageDateUpdates: Record<string, Date> = {};
@@ -929,4 +938,14 @@ export async function updateCommission(commissionId: string, formData: FormData)
 
   revalidatePath("/commission");
   revalidatePath(`/deals/${commission.dealId}`);
+}
+
+/** The time actually spent filming (incl. setting up), in hours - needed before the deal can go Live. */
+export async function setFilmingActual(dealId: string, hours: number): Promise<{ ok: true } | { ok: false; error: string }> {
+  const user = await requireUser();
+  if (!Number.isFinite(hours) || hours < 0 || hours > 100) return { ok: false, error: "Skriv antal timer, fx 2,5." };
+  await prisma.deal.update({ where: { id: dealId }, data: { filmingActualMinutes: Math.round(hours * 60) } });
+  await logActivity({ type: "DEAL_FILMING_TIME", message: `Filmtid sat til ${String(hours).replace(".", ",")} t`, actorId: user.id, dealId });
+  revalidatePath(`/deals/${dealId}`);
+  return { ok: true };
 }
