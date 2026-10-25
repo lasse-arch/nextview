@@ -89,6 +89,11 @@ export async function siteDigest(address: string): Promise<string> {
   const cssVars = top([...css.matchAll(/(--[\w-]*(?:color|primary|secondary|accent|brand|main)[\w-]*)\s*:\s*(#[0-9a-f]{3,8}|rgba?\([^)]*\))/gi)].map((m) => `${m[1]}: ${m[2]}`), 16);
 
   const imgs = [...html.matchAll(/<img\b[^>]*>/gi)].map((m) => m[0]);
+  const icons = [...html.matchAll(/<link\b[^>]*>/gi)]
+    .map((m) => m[0])
+    .filter((t) => /(^|\s)(icon|apple-touch-icon)(\s|$)/i.test(attr(t, "rel")))
+    .map((t) => abs(attr(t, "href")))
+    .filter((u): u is string => Boolean(u));
   const logos = [
     ...imgs.filter((t) => /logo/i.test(`${attr(t, "src")} ${attr(t, "alt")} ${attr(t, "class")} ${attr(t, "id")}`)).map((t) => {
         const src = [attr(t, "data-src"), attr(t, "src")].find((u) => u && !u.startsWith("data:"));
@@ -113,6 +118,7 @@ export async function siteDigest(address: string): Promise<string> {
     `Sitenavn: ${meta("og:site_name")}`,
     `Delingsbillede (og:image): ${meta("og:image") ? abs(meta("og:image")) : ""}`,
     `theme-color: ${meta("theme-color")}`,
+    `Favicon-kandidater (største først er bedst): ${[...new Set(icons)].slice(0, 4).join(" | ")}`,
     `Logo-kandidater: ${[...new Set(logos)].slice(0, 6).join(" | ")}`,
     `Google Fonts: ${[...new Set(googleFonts)].join(", ")}`,
     `Skrifter i CSS (mest brugt først): ${fontFamilies.join(", ")}`,

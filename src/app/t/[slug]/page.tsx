@@ -21,7 +21,9 @@ async function published(slug: string): Promise<TourConfig | null> {
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const tour = await published((await params).slug);
-  return { title: tour ? `${tour.title} – virtuel tour` : "Tour" };
+  if (!tour) return { title: "Tour" };
+  const icon = tour.favicon || tour.logo;
+  return { title: `${tour.title} – virtuel tour`, icons: icon ? { icon, apple: icon } : undefined };
 }
 
 export default async function PublicTourPage({ params }: { params: Promise<{ slug: string }> }) {

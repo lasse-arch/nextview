@@ -12,9 +12,19 @@ import { prisma } from "@/lib/db";
 import { getSettingValue, setSettingValue } from "@/lib/integration-settings";
 import { mpskinsMenuDigest, siteDigest } from "@/lib/site-digest";
 import { hostFiles } from "@/lib/tour-files";
+import { BRANCHES, DESIGN_PRESETS, type Branch, type DesignPreset } from "@/app/(app)/tour-lab/tours/presets";
+
+/** The prototype tour each ready-made design starts from (for its kind of features). */
+const PRESET_BASE: Record<DesignPreset["id"], string> = {
+  klassisk: "halvorsminde",
+  forside: "jalsa",
+  direkte: "fitness-gronlandstorv",
+  rumvaelger: "boxdepot-rum",
+  guidet: "halvorsminde",
+};
 import { fetchMpskinsCfg, filterFromCss } from "@/lib/mpskins";
 import { tourConfigProblem } from "@/lib/tour-validate";
-import { fetchModelInfo, modelIdsIn, type ModelInfo } from "@/lib/matterport-graph";
+import { fetchModelInfo, modelIdsIn, searchAccountModels, type ModelInfo } from "@/lib/matterport-graph";
 import type { TourConfig } from "@/app/(app)/tour-lab/tours/types";
 
 /*
@@ -117,6 +127,7 @@ Regler:
 - Er ønsket uklart, så stil ét kort spørgsmål i reply og lad changes være tom.
 - En menu (menu) er en liste af enten {title, href} eller grupper {title, items: [[navn, link], ...]}.
 - Følg drejebogen nedenfor - den er Nextview360's erfaring med, hvad der virker.
+- Kan noget ikke laves med felterne (en særlig stil, former, effekter, at flytte eller skjule noget), så skriv CSS i customCss (se typen). Bevar det, der allerede står der, og tilføj til det. Design skal stadig virke på mobil.
 
 <drejebog>
 ${playbook}
@@ -217,7 +228,12 @@ export async function createTourFromWebsite(input: {
   modelId?: string;
   /** The customer (deal) - the tour is linked to it. */
   dealId?: string;
-  base: string;
+  /** An existing tour to take the features from (the copy flow) - or a ready-made design instead. */
+  base?: string;
+  preset?: DesignPreset["id"];
+  branch?: Branch;
+  /** What the tour should drive visitors to. */
+  focus?: string;
   notes: string;
 }): Promise<{ ok: true; slug: string; reply: string } | { ok: false; error: string }> {
   const user = await admin();
@@ -237,8 +253,12 @@ export async function createTourFromWebsite(input: {
   const model = input.modelId ? await fetchModelInfo(input.modelId) : null;
   if (input.modelId && !model) return { ok: false, error: "Matterport-modellen findes ikke eller er ikke offentlig." };
   if (!tourUrl && !model) return { ok: false, error: "Vælg kundens Matterport-tour." };
-  const source = await prisma.tour.findUnique({ where: { slug: input.base }, select: { config: true } });
-  if (!source) return { ok: false, error: "Touren, der skal bygges videre på, findes ikke." };
+  const preset = DESIGN_PRESETS.find((p) => p.id === input.preset);
+  // A ready-made design starts from the prototype tour that has its kind of features.
+  const baseSlug = input.base ?? (preset ? PRESET_BASE[preset.id] : "halvorsminde");
+  const source =
+    (await prisma.tour.findUnique({ where: { slug: baseSlug }, select: { config: true } })) ?? (await prisma.tour.findFirst({ orderBy: { createdAt: "asc" }, select: { config: true } }));
+  if (!source) return { ok: false, error: "Der er ingen tour at bygge videre på." };
 
   const [site, menu] = await Promise.all([
     input.website.trim() ? siteDigest(input.website).catch((err: unknown) => `(Hjemmesiden kunne ikke hentes: ${err instanceof Error ? err.message : err})`) : Promise.resolve("(Ingen hjemmeside angivet)"),
@@ -247,7 +267,9 @@ export async function createTourFromWebsite(input: {
 
   let slug = slugify(name) || "tour";
   for (let i = 2; await prisma.tour.findUnique({ where: { slug }, select: { id: true } }); i++) slug = `${slugify(name)}-${i}`;
-  const base = { ...neutral(source.config as unknown as TourConfig, { slug, title: name, tourPage: tourUrl?.toString() ?? "" }), modelId: model?.id };
+  let base: TourConfig = { ...neutral(source.config as unknown as TourConfig, { slug, title: name, tourPage: tourUrl?.toString() ?? "" }), modelId: model?.id };
+  if (preset) base = { ...base, ...preset.apply(base) };
+  const branch = BRANCHES.find(([b]) => b === input.branch)?.[1];
 
   const result = await claudeEdits(
     key,
@@ -257,13 +279,14 @@ export async function createTourFromWebsite(input: {
     `Byg en ny tour til en ny kunde. Opsætningen ovenfor er en skabelon: funktionerne (bevægelse, skift, menutype osv.) er valgt med vilje, men alt kundeindhold er tomt og skal udfyldes.
 
 Udfyld ud fra kundens hjemmeside og den eksisterende MPSkins-tour nedenfor, efter drejebogen:
-- brand, title, subtitle, logo (en logo-kandidat fra hjemmesiden; logoOnLight hvis logoet er mørkt), colors og font/fontHeading så touren ligner hjemmesiden (rød tråd).
+- brand, title, subtitle, logo (en logo-kandidat fra hjemmesiden; logoOnLight hvis logoet er mørkt), favicon (hjemmesidens favicon, gerne apple-touch-icon), colors og font/fontHeading så touren ligner hjemmesiden (rød tråd).
 - start: et godt startpunkt fra MPSkins-menuen (typisk "Velkommen"-punktet).
 - menu: byg den fra MPSkins-menuens punkter og links (brug linkene præcis som de står), ordnet efter drejebogen.
 - cta og contact: hjemmesidens vigtigste handling(er) og kontaktoplysninger. linkOpen: popup for booking.
-- velkomst: vælg den start, drejebogen anbefaler til branchen (design.welcome + welcome eller cover). Brug ikke fotos, du ikke har - forsiden får hjemmesidens delingsbillede, hvis der er et.
+- velkomst: vælg den start, drejebogen anbefaler til branchen (design.welcome + welcome eller cover). Brug ikke fotos, du ikke har, og aldrig Matterports automatiske billeder (de er for dårlige) - forsiden får hjemmesidens delingsbillede, hvis det er et rigtigt foto af stedet; ellers sig i reply, at brugeren skal tage et forsidebillede i forhåndsvisningen (Start → Forsiden → Tag billede).
 - nudge ("Din plads venter") med hovedhandlingen, og evt. et par stedkort/rundvisning ud fra MPSkins-menuens punkter, hvis det giver mening.
 Skriv al tekst på dansk i kundens stemme. Opfind ingen fakta. I reply: fortæl kort, hvad du har valgt og hvorfor, og hvad brugeren selv bør tjekke eller tilføje (fx fotos af stederne).
+${branch ? `\nBranche: ${branch}.` : ""}${preset ? `\nDesign valgt af brugeren: "${preset.name}" (${preset.what}) - bevar design, menutype, bevægelse og start, som de står i skabelonen; udfyld kun indholdet.` : ""}${input.focus?.trim() ? `\nTouren skal især få besøgende til: ${input.focus.trim()}. Gør det til hovedhandlingen (cta, "Din plads venter", stedkort i de vigtigste rum).` : ""}
 ${input.notes.trim() ? `\nBemærkninger fra brugeren: ${input.notes.trim()}\n` : ""}
 <hjemmeside>
 ${site}
@@ -278,7 +301,6 @@ ${
 <matterport>
 Touren er forbundet direkte til Matterport-modellen ${model.id} ("${model.name}"${model.address ? `, ${model.address}` : ""}).
 Steder i touren skrives som https://my.matterport.com/show/?m=${model.id}&ss=<scanpunkt> - start: brug ss=1, medmindre MPSkins-menuen viser et bedre startpunkt.
-Fotos fra scanningen (brug det første som forsidebillede, hvis der er en forside): ${model.photos.slice(0, 4).join(" ")}
 </matterport>`
     : ""
 }`,
@@ -377,4 +399,30 @@ export async function matterportModels(dealId: string | null, pasted?: string): 
   }
   const models = await Promise.all(modelIdsIn(text).slice(0, 10).map(fetchModelInfo));
   return models.filter((m): m is ModelInfo => m != null);
+}
+
+/* ----- Our Matterport account: pick the space ----- */
+
+export async function matterportConnected(): Promise<boolean> {
+  await admin();
+  return Boolean(process.env.MATTERPORT_API_TOKEN || (await getSettingValue("MATTERPORT_API_TOKEN")));
+}
+
+/** Connects our Matterport account (an API token: id and secret) - checked against Matterport before it's kept. */
+export async function connectMatterport(tokenId: string, secret: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  await admin();
+  const token = `${tokenId.trim()}:${secret.trim()}`;
+  if (token.length < 10) return { ok: false, error: "Indsæt både token-id og secret." };
+  const test = await searchAccountModels(token, "");
+  if (!test.ok) return test;
+  await setSettingValue("MATTERPORT_API_TOKEN", token);
+  return { ok: true };
+}
+
+/** Spaces on our Matterport account, searchable. */
+export async function searchMatterportSpaces(query: string, offset?: string | null) {
+  await admin();
+  const token = process.env.MATTERPORT_API_TOKEN || (await getSettingValue("MATTERPORT_API_TOKEN"));
+  if (!token) return { ok: false as const, error: "Matterport er ikke forbundet." };
+  return searchAccountModels(token, query, offset);
 }

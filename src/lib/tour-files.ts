@@ -22,6 +22,8 @@ const EXT: Record<string, string> = {
   "image/gif": "gif",
   "image/svg+xml": "svg",
   "image/avif": "avif",
+  "image/x-icon": "ico",
+  "image/vnd.microsoft.icon": "ico",
   "video/mp4": "mp4",
   "video/webm": "webm",
   "video/quicktime": "mov",
@@ -79,6 +81,7 @@ type Slot = { get: () => string | undefined; set: (v: string) => void };
 export function fileSlots(c: TourConfig): Slot[] {
   const slots: Slot[] = [
     { get: () => c.logo, set: (v) => (c.logo = v) },
+    { get: () => c.favicon, set: (v) => (c.favicon = v) },
     { get: () => c.cover?.image, set: (v) => (c.cover!.image = v) },
     { get: () => c.cover?.imageMobile, set: (v) => (c.cover!.imageMobile = v) },
     { get: () => c.intro?.poster, set: (v) => (c.intro!.poster = v) },

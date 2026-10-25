@@ -11,6 +11,8 @@ import type { LinkOpen, MenuEntry, TourConfig } from "../../tours/types";
 import type { TourStats } from "@/lib/tour-stats";
 import { CardsEditor, GuideEditor, StartEditor, TagsEditor } from "./content";
 import { ResultsPanel } from "./results";
+import { DesignGallery } from "./design-gallery";
+import { currentPreset } from "../../tours/presets";
 import { EconomyPanel, type TourEconomy } from "./economy";
 import { DEFAULT_EMBED, SharePanel, SitePreview, type EmbedSize } from "./share";
 import { Choice, Field, FilesContext, Group, Icon, input, outsideFiles, Toggle, UploadButton, type PreviewApi } from "./ui";
@@ -296,7 +298,19 @@ export function TourEditor({
 
             {tab === "design" && (
               <>
-                <Group title="Opbygning">
+                <Group title="Design">
+                  <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">Hold musen over et design for at se det i forhåndsvisningen. Et klik vælger det - du kan altid fortryde.</p>
+                  <DesignGallery
+                    colors={config.colors}
+                    selected={currentPreset(config)}
+                    onHover={(p) => {
+                      const shown = p ? { ...structuredClone(config), ...p.apply(config) } : config;
+                      frame.current?.contentWindow?.postMessage({ type: "tour-draft", config: shown }, location.origin);
+                    }}
+                    onPick={(p) => edit((d) => Object.assign(d, p.apply(d)))}
+                  />
+                </Group>
+                <Group title="Finjustering">
                 <Field title="Menu">
                   <Choice
                     value={menuStyle}
@@ -384,6 +398,16 @@ export function TourEditor({
                     </div>
                     <input className={input} value={config.logo} onChange={(e) => edit((d) => void (d.logo = e.target.value))} />
                     <UploadButton accept="image/*" onDone={(url) => edit((d) => void (d.logo = url))} />
+                  </div>
+                </Field>
+                <Field title="Favicon" hint="Det lille ikon i browserfanen. Tomt = logoet.">
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-10 w-10 flex-none items-center justify-center rounded-lg bg-[#f2f2f7] p-1.5">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      {(config.favicon || config.logo) && <img src={config.favicon || config.logo} alt="" className="max-h-full max-w-full object-contain" />}
+                    </div>
+                    <input className={input} placeholder="Samme som logoet" value={config.favicon ?? ""} onChange={(e) => edit((d) => void (d.favicon = e.target.value || undefined))} />
+                    <UploadButton accept="image/png,image/svg+xml,image/x-icon,image/webp" onDone={(url) => edit((d) => void (d.favicon = url))} />
                   </div>
                 </Field>
                 <Field title={`Logostørrelse: ${config.logoSize ?? 46} px`}>
@@ -515,6 +539,16 @@ export function TourEditor({
 
             {tab === "avanceret" && (
               <>
+                <Group title="Eget design (CSS)">
+                  <p className="text-[12px] leading-snug text-[#8e8e93]">Til det, felterne ikke dækker - fx runde former eller en helt bestemt stil. Lettest: bed Claude om det (&quot;gør knapperne runde og giv menuen glas-effekt&quot;), så skrives det her.</p>
+                  <textarea
+                    className="h-40 w-full rounded-xl border-0 bg-[#1d1d1f] p-3 font-mono text-[11.5px] leading-relaxed text-[#f5f5f7] outline-none focus:ring-2 focus:ring-[#0071e3]"
+                    spellCheck={false}
+                    placeholder=".hv-btn { border-radius: 999px; }"
+                    value={config.customCss ?? ""}
+                    onChange={(e) => edit((d) => void (d.customCss = e.target.value || undefined))}
+                  />
+                </Group>
                 <p className="px-1 text-[13px] leading-snug text-[#6e6e73]">Hele opsætningen. Ret direkte her for alt det, der endnu ikke har sine egne felter (velkomstens fliser, punkter, steder, guidet tur, infopunkter…).</p>
                 <textarea
                   className="h-[60vh] w-full rounded-2xl border-0 bg-[#1d1d1f] p-4 font-mono text-[11.5px] leading-relaxed text-[#f5f5f7] shadow-inner outline-none focus:ring-2 focus:ring-[#0071e3]"

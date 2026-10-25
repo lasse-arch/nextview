@@ -77,3 +77,37 @@ export function modelIdsIn(text: string): string[] {
   for (const part of text.split(/[\s,;]+/)) if (/^[a-zA-Z0-9]{11}$/.test(part)) ids.push(part);
   return [...new Set(ids)];
 }
+
+export type AccountModel = { id: string; name: string; created: string | null };
+
+/**
+ * The spaces on our Matterport account (like MPSkins' "Select Matterport
+ * Space"), newest first, searchable - via Matterport's Model API with an API
+ * token ("id:secret", made under Settings → Developer Tools → API Token
+ * Management on my.matterport.com).
+ */
+export async function searchAccountModels(token: string, query: string, offset?: string | null): Promise<{ ok: true; models: AccountModel[]; next: string | null; total: number } | { ok: false; error: string }> {
+  try {
+    const res = await fetch("https://api.matterport.com/api/models/graph", {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Basic ${Buffer.from(token).toString("base64")}` },
+      body: JSON.stringify({
+        query: `query Spaces($q: String, $o: String) { models(query: $q, offset: $o, pageSize: 40) { totalResults nextOffset results { id name created } } }`,
+        variables: { q: query.trim() || null, o: offset || null },
+      }),
+      signal: AbortSignal.timeout(15_000),
+      cache: "no-store",
+    });
+    if (res.status === 401 || res.status === 403) return { ok: false, error: "Matterport afviste nøglen - tjek token-id og secret." };
+    const data = (await res.json().catch(() => null)) as {
+      data?: { models?: { totalResults?: number; nextOffset?: string | null; results?: { id: string; name?: string; created?: string }[] } };
+      errors?: { message: string }[];
+    } | null;
+    if (data?.errors?.length) return { ok: false, error: `Matterport: ${data.errors[0].message}` };
+    const m = data?.data?.models;
+    if (!m) return { ok: false, error: `Matterport svarede ${res.status}.` };
+    return { ok: true, models: (m.results ?? []).map((r) => ({ id: r.id, name: r.name ?? r.id, created: r.created ?? null })), next: m.nextOffset ?? null, total: m.totalResults ?? 0 };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}

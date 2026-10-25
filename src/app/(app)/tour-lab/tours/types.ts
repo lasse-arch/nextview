@@ -71,6 +71,8 @@ export type TourConfig = {
   start: string;
   /** Logo for dark backgrounds - unless logoOnLight. */
   logo: string;
+  /** The little icon in the browser tab (the customer's own favicon) - left out = the logo. */
+  favicon?: string;
   /** The logo is made for light backgrounds (shown on white instead of the main colour). */
   logoOnLight?: boolean;
   /** The logo's height over the tour, in px (computer; a phone shows it a bit smaller). Default 46. */
@@ -159,6 +161,17 @@ export type TourConfig = {
    * grayscale 0-1; hue in degrees.
    */
   filter?: { brightness?: number; contrast?: number; saturate?: number; grayscale?: number; hue?: number };
+  /**
+   * The tour's own design on top of the engine's - CSS for what the fields
+   * don't cover (round shapes, a particular style, hiding or moving
+   * something). Everything sits inside \`.hv\`; the main parts: .hv-logo,
+   * .hv-menuknap (menu button), .hv-panel/.hv-menu (side menu), .hv-btn
+   * (buttons), .dz-dock (bottom bar), .pk (room picker), .hv-wel* (welcome),
+   * .dz-cover (cover), .pc (place cards), .pc-nudge ("Din plads venter"),
+   * .ip-dot/.ip-card (tags), .hv-stories (stories), .gd-card (guide).
+   * Colours: var(--c-main), var(--c-accent), var(--c-accent-dark), var(--c-soft).
+   */
+  customCss?: string;
   /** Font for big headings (a Google font), if not the body font. */
   fontHeading?: string;
   /** Real spots with a photo - the cover's and the dock's "places". */

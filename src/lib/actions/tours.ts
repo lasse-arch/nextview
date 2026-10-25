@@ -6,7 +6,6 @@ import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import type { TourConfig } from "@/app/(app)/tour-lab/tours/types";
 import { tourConfigProblem } from "@/lib/tour-validate";
-import { setSettingValue } from "@/lib/integration-settings";
 
 type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string };
 
@@ -108,14 +107,6 @@ export async function logTourWork(slug: string, seconds: number): Promise<void> 
     create: { tourSlug: slug, userId: user.id, userName: user.name, day, seconds: s },
     update: { seconds: { increment: s } },
   });
-}
-
-/** What an hour of our time costs (for "Tid og pris" - wages and everything else per hour). */
-export async function setTourHourlyCost(kr: number): Promise<Result> {
-  await admin();
-  if (!Number.isFinite(kr) || kr < 0 || kr > 10_000) return { ok: false, error: "Skriv en timepris i kr." };
-  await setSettingValue("TOUR_HOURLY_COST", String(Math.round(kr)));
-  return { ok: true };
 }
 
 /**

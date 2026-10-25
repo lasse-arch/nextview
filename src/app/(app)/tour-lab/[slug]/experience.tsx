@@ -999,6 +999,8 @@ function TourExperience({
       <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.font}:wght@400;600;700;800;900&display=swap`} />
       {T.fontHeading && <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.fontHeading.replace(/ /g, "+")}:wght@500;600&display=swap`} />}
       <style>{CSS + STORIES_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + INFO_CSS + MAP_CSS + ROUTE_CSS + MEASURES_CSS + CARDS_CSS}</style>
+      {/* The tour's own design on top (written by Claude or by hand under Avanceret). */}
+      {T.customCss && <style>{T.customCss.replace(/<\/?style/gi, "")}</style>}
 
       {/* The tour, always mounted so it loads while the visitor is in the drone scene. */}
       {modelId && (
