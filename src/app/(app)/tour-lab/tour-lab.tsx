@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import dynamic from "next/dynamic";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { resolveTourLink, saveMatterportSdkKey } from "@/lib/actions/tour-lab";
 import { connectSdk, modelIdFrom, showcaseUrl, sweepIdForIndex, uLinkTarget, type MpSdk, type Rotation, type SweepInfo } from "./matterport";
@@ -356,25 +355,9 @@ export function TourLab({ sdkKey }: { sdkKey: string | null }) {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Tour-lab</h1>
+          <h2 className="text-lg font-semibold text-slate-900">Testværktøj</h2>
           <p className="text-sm text-slate-500">
-            Prototype: overbliksbillede med egne punkter, der hopper ind i Matterport-touren eller et 360°-dronebillede.
-          </p>
-          <p className="mt-1 text-sm">
-            Prototype-tours:{" "}
-            <Link href="/tour-lab/halvorsminde" className="font-medium text-indigo-600 hover:underline">Halvorsminde (drone først)</Link>
-            {" · "}
-            <Link href="/tour-lab/fitness-gronlandstorv" className="font-medium text-indigo-600 hover:underline">Fitness United Grønlands Torv (direkte i touren)</Link>
-            {" · "}
-            <Link href="/tour-lab/decoflame" className="font-medium text-indigo-600 hover:underline">Decoflame (dronefilm først)</Link>
-            {" · "}
-            <Link href="/tour-lab/jalsa" className="font-medium text-indigo-600 hover:underline">Jalsa (restaurant)</Link>
-            {" · "}
-            <Link href="/tour-lab/halvorsminde-kort" className="font-medium text-indigo-600 hover:underline">Halvorsminde på kort (camping-model)</Link>
-            {" · "}
-            <Link href="/tour-lab/boxdepot" className="font-medium text-indigo-600 hover:underline">Boxdepotet (find vej)</Link>
-            {" · "}
-            <Link href="/tour-lab/boxdepot-rum" className="font-medium text-indigo-600 hover:underline">Boxdepotet rumstørrelser (rumvælger)</Link>
+            Overbliksbillede med egne punkter, der hopper ind i Matterport-touren eller et 360°-dronebillede - og SDK-nøglen.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">

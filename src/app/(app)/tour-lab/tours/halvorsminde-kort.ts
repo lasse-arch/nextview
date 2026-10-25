@@ -11,6 +11,7 @@ import type { TourConfig } from "./types";
 export const halvorsmindeKort: TourConfig = {
   ...halvorsminde,
   slug: "halvorsminde-kort",
+  title: "Halvorsminde - på tegnet kort",
   map: {
     // The illustrated map; the points were placed building by building against the drone photo.
     image: "/tours/halvorsminde/kort/tegning.jpg",

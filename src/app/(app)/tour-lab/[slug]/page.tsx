@@ -6,12 +6,12 @@ import { canEmbed } from "@/lib/link-embed";
 import { fetchSweepGraph } from "@/lib/matterport-graph";
 import { fetchBoxdepotetUnits } from "@/lib/availability/boxdepotet";
 import { fetchMpskinsCfg, hiddenSweeps, ssOf, sweepForSs } from "@/lib/mpskins";
-import { TOURS } from "../tours";
+import { getTourConfig } from "@/lib/tours";
 import type { TourConfig } from "../tours/types";
 import { Experience } from "./experience";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
-  const tour = TOURS[(await params).slug];
+  const tour = await getTourConfig((await params).slug);
   return { title: tour ? `${tour.brand} – prototype` : "Tour-lab" };
 }
 
@@ -23,7 +23,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 export default async function TourPrototypePage({ params }: { params: Promise<{ slug: string }> }) {
   const user = await getCurrentUser();
   if (user?.role !== "ADMIN") redirect("/");
-  const setup = TOURS[(await params).slug];
+  const setup = await getTourConfig((await params).slug);
   if (!setup) notFound();
   const tour = await withPopupFallback(setup);
 

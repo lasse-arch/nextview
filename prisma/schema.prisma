@@ -626,6 +626,7 @@ model Deal {
   reports        CustomerReport[]
   activityEvents ActivityEvent[]
   timeEntries    TimeEntry[]
+  tours          Tour[]
 
   @@index([inLeadInbox, stage])
 }
@@ -1279,4 +1280,36 @@ model TourStoryImage {
   updatedAt DateTime @updatedAt
 
   @@id([tourSlug, room])
+}
+
+/// A tour built in Arpo's tour-lab - one per experience a customer shows
+/// (e.g. "Fuld tur" and "Depotrum" on the same scanning). The whole setup is
+/// one JSON document (the tour engine's TourConfig); every save also keeps a
+/// copy in TourVersion, so a change can always be undone.
+model Tour {
+  id        String        @id @default(cuid())
+  /// The address: /tour-lab/<slug> today, the public tour link later.
+  slug      String        @unique
+  name      String
+  dealId    String?
+  deal      Deal?         @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  config    Json
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  versions  TourVersion[]
+
+  @@index([dealId])
+}
+
+/// One saved state of a tour's setup - who saved it, when, and why.
+model TourVersion {
+  id            String   @id @default(cuid())
+  tourId        String
+  tour          Tour     @relation(fields: [tourId], references: [id], onDelete: Cascade)
+  config        Json
+  note          String?
+  createdByName String?
+  createdAt     DateTime @default(now())
+
+  @@index([tourId, createdAt])
 }
