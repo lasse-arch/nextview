@@ -49,6 +49,11 @@ export default async function TourPrototypePage({ params }: { params: Promise<{ 
     const sweep = cfg ? sweepForSs(cfg, ss) : null;
     if (ss != null && sweep) sweepBySs[ss] = sweep;
   }
+  // Every scan point by its number, so the tour always knows where the visitor stands (info points, the placing tool).
+  cfg?.sweep?.forEach((_, i) => {
+    const sweep = sweepForSs(cfg, i + 1);
+    if (sweep && !sweepBySs[i + 1]) sweepBySs[i + 1] = sweep;
+  });
 
   // Scan points hidden in MPSkins stay hidden here (plus any listed in the tour setup).
   const hidden = [...new Set([...(cfg ? hiddenSweeps(cfg) : []), ...tour.hiddenSweeps])];
@@ -64,7 +69,7 @@ async function withPopupFallback(tour: TourConfig): Promise<TourConfig> {
   if (!L) return tour;
   const hrefs = [
     ...tour.cta.map((c) => c.href),
-    ...(tour.dock ?? []).flatMap((d) => (d.go === "places" ? [] : [d.go.href])),
+    ...(tour.dock ?? []).flatMap((d) => (typeof d.go === "string" ? [] : [d.go.href])),
     ...tour.menu.flatMap((m) => ("items" in m ? m.items.map((i) => i[1]) : [m.href])),
     ...(tour.welcome?.tiles.flatMap((t) => ("href" in t.go ? [t.go.href] : [])) ?? []),
     tour.contact?.mapUrl,

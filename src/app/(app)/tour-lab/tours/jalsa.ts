@@ -31,6 +31,16 @@ export const jalsa: TourConfig = {
   design: { welcome: "cover", menu: "dock" },
   // Booking and the menu card open over the tour, so the guest never leaves it. (Sites that can't be shown that way open in a new tab by themselves.)
   linkOpen: { default: "popup" },
+  guide: {
+    seconds: 8,
+    stops: [
+      { href: u(13, "3.00,-.92"), title: "Velkommen indenfor", text: "Her starter aftenen hos Jalsa - lige inden for døren på Ved Stranden." },
+      { href: u(2, "3.06,.40"), title: "Restauranten", text: "Hovedsalen med de varme lamper. Plads til både to og til hele selskabet." },
+      { href: u(4, ".08,0"), title: "Loungen", text: "Sofaerne og væggen med kunst - til dem, der vil sidde lidt mere afslappet." },
+      { href: u(6, "2.92,1.17"), title: "Baren", text: "Den røde væg og baren. Kig forbi til en drink før maden." },
+      { href: u(15, ".11,.70"), title: "Vinduesbordene", text: "Bordene ved vinduerne ud mod Ved Stranden. Fundet dit bord? Book det med det samme." },
+    ],
+  },
   places: [
     { name: "Restauranten", kicker: "Hovedsalen", href: u(2, "3.06,.40"), image: `${P}/restauranten.jpg` },
     { name: "Loungen", kicker: "Sofaer og kunst", href: u(4, ".08,0"), image: `${P}/loungen.jpg` },

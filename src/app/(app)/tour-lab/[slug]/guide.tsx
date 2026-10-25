@@ -1,0 +1,111 @@
+"use client";
+
+import { useState } from "react";
+import type { TourConfig } from "../tours/types";
+
+export type GuideStop = { href: string; title: string; text: string };
+
+/** The guided tour's stops, with a drone point's name and text filled in where a stop borrows them. */
+export function guideStops(T: TourConfig): GuideStop[] {
+  return (T.guide?.stops ?? []).flatMap((s) => {
+    if (!("point" in s)) return [s];
+    const p = T.points.find((x) => x.id === s.point);
+    return p?.tour ? [{ href: p.tour, title: p.name, text: p.text }] : [];
+  });
+}
+
+/**
+ * "Vis mig rundt": the caption card and progress bars while the tour flies
+ * from stop to stop by itself. Each stop shows for `seconds`, then the next
+ * one comes; the visitor can pause, step or stop whenever they like.
+ */
+export function GuidePlayer({
+  stops,
+  index,
+  seconds,
+  onGo,
+  onClose,
+  onEvent,
+}: {
+  stops: GuideStop[];
+  index: number;
+  seconds: number;
+  onGo: (index: number) => void;
+  onClose: (completed: boolean) => void;
+  onEvent: (name: string, params: Record<string, string | number>) => void;
+}) {
+  const [paused, setPaused] = useState(false);
+  const stop = stops[index];
+
+  function step(to: number, how: string) {
+    if (to >= stops.length) return onClose(true);
+    if (to < 0) return;
+    onEvent("guide_step", { how, stop: to + 1, title: stops[to].title });
+    setPaused(false);
+    onGo(to);
+  }
+
+  return (
+    <div className="gd">
+      <div className="gd-bars">
+        {stops.map((s, i) => (
+          <span key={s.title + i} className={i < index ? "done" : ""}>
+            {i === index && (
+              <i key={index} style={{ animationDuration: `${seconds}s`, animationPlayState: paused ? "paused" : "running" }} onAnimationEnd={() => step(index + 1, "auto")} />
+            )}
+          </span>
+        ))}
+      </div>
+      <div className="gd-card" key={index}>
+        <div className="gd-count">
+          {index + 1} / {stops.length}
+        </div>
+        <h3>{stop.title}</h3>
+        <p>{stop.text}</p>
+        <div className="gd-ctrl">
+          <button type="button" aria-label="Forrige" disabled={index === 0} onClick={() => step(index - 1, "back")}>
+            ‹
+          </button>
+          <button type="button" className="gd-play" onClick={() => setPaused((p) => !p)}>
+            {paused ? "▶ Fortsæt" : "❚❚ Pause"}
+          </button>
+          <button type="button" aria-label="Næste" onClick={() => step(index + 1, "next")}>
+            ›
+          </button>
+          <button type="button" className="gd-stop" onClick={() => onClose(false)}>
+            Gå selv rundt
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export const GUIDE_CSS = `
+.gd{position:absolute;inset:0;z-index:11;pointer-events:none}
+.gd>*{pointer-events:auto}
+.gd-bars{position:absolute;top:10px;left:50%;translate:-50% 0;width:min(560px,calc(100% - 200px));display:flex;gap:4px}
+.gd-bars span{flex:1;height:3px;border-radius:2px;background:rgba(255,255,255,.4);overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.gd-bars span.done{background:#fff}
+.gd-bars i{display:block;height:100%;background:#fff;transform-origin:left;animation:hvStoryGuide linear forwards}
+@keyframes hvStoryGuide{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+.gd-card{position:absolute;left:24px;bottom:24px;width:min(400px,calc(100% - 48px));padding:18px 20px 14px;border-radius:18px;background:rgba(255,255,255,.96);color:#1d2a30;box-shadow:0 16px 44px rgba(0,0,0,.32);animation:hvUp .45s cubic-bezier(.2,.7,.2,1) both}
+.gd-count{font-size:11px;font-weight:800;letter-spacing:.14em;color:var(--c-accent)}
+.gd-card h3{margin:4px 0 6px;font-family:var(--font-heading);font-size:24px;line-height:1.1;font-weight:800;color:var(--c-main)}
+.gd-card p{margin:0 0 14px;font-size:15px;line-height:1.5;color:#3d4a50}
+.gd-ctrl{display:flex;align-items:center;gap:6px}
+.gd-ctrl button{height:36px;min-width:36px;border:0;border-radius:999px;background:#eef1f2;color:var(--c-main);font:inherit;font-weight:800;font-size:15px;cursor:pointer;padding:0 12px}
+.gd-ctrl button:disabled{opacity:.35;cursor:default}
+.gd-ctrl .gd-play{background:var(--c-main);color:#fff;font-size:13px}
+.gd-ctrl .gd-stop{margin-left:auto;background:none;font-size:13px;font-weight:700;color:#56636a;padding:0 4px}
+.hv-guide-knap{display:flex;align-items:center;gap:10px;width:calc(100% - 44px);margin:14px 22px 4px;padding:12px 16px;border:0;border-radius:14px;background:var(--c-accent);color:#fff;font:inherit;font-weight:800;font-size:15px;cursor:pointer;text-align:left}
+.hv-guide-knap small{display:block;font-weight:600;font-size:12px;opacity:.85}
+.hv-wel-guide{display:inline-flex;align-items:center;gap:8px;align-self:flex-start;margin-top:14px;border:0;border-radius:999px;background:var(--c-main);color:#fff;padding:11px 18px;font:inherit;font-weight:800;font-size:14px;cursor:pointer}
+.hv-guiding .hv-room,.hv-guiding .hv-stories,.hv-guiding .hv-luften,.hv-guiding .dz-dock,.hv-guiding .dz-here,.hv-guiding .hv-intro,.hv-guiding .hv-filtre{display:none}
+@media (max-width:760px){
+  .gd-bars{width:calc(100% - 120px);left:12px;translate:none}
+  .gd-card{left:10px;right:10px;width:auto;bottom:calc(10px + env(safe-area-inset-bottom,0px));padding:14px 16px 12px}
+  .gd-card h3{font-size:20px}
+  .gd-card p{font-size:14px;margin-bottom:10px}
+}
+`;

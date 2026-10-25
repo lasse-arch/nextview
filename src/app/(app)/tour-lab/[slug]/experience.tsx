@@ -6,6 +6,8 @@ import { saveTourGa4Id, saveTourStoryImage } from "@/lib/actions/tour-lab";
 import { connectSdk, showcaseUrl, uLinkTarget, type MpSdk } from "../matterport";
 import type { MenuEntry, TourConfig, TourPlace, TourPoint, WelcomeGo } from "../tours/types";
 import { CoverWelcome, DESIGNS_CSS, DockMenu } from "./designs";
+import { GUIDE_CSS, GuidePlayer, guideStops } from "./guide";
+import { INFO_CSS, InfoDots, usePlaceInfo } from "./info";
 import { LINKS_CSS, LinkPopup, LinkProvider, TourLink, openLink, type LinkPopupState } from "./links";
 import { Stories, STORIES_CSS, storyJpeg, type StoryRoom } from "./stories";
 import "pannellum/build/pannellum.css";
@@ -210,6 +212,14 @@ export function Experience({
   /** The welcome tiles - skipped when the link already says where to go. */
   const [welcome, setWelcome] = useState(false);
   const [cover, setCover] = useState(false);
+  /** The connected viewer, once it's playing (for the parts that follow the camera). */
+  const [sdk, setSdk] = useState<MpSdk | null>(null);
+  /** The scan point (ss) the visitor stands on. */
+  const [currentSs, setCurrentSs] = useState<number | null>(null);
+  const currentSsRef = useRef<number | null>(null);
+  /** "Vis mig rundt": the stop it's at, or null when the visitor walks on their own. */
+  const [guideAt, setGuideAt] = useState<number | null>(null);
+  const GUIDE = useMemo(() => guideStops(T), [T]);
   const [linkPopup, setLinkPopup] = useState<LinkPopupState>(null);
   const popup = (href: string, label: string) => {
     track("link_popup", { label, link_url: href });
@@ -240,6 +250,7 @@ export function Experience({
       if (hiddenSweeps.length) await sdk.Sweep.disable(...hiddenSweeps).catch((err) => console.warn("Sweep.disable", err));
       sdk.Sweep.data.subscribe({ onCollectionUpdated: (c) => (allSweeps.current = Object.keys(c)) });
       setTourReadyMs(now() - started);
+      setSdk(sdk);
       track("tour_ready", { load_ms: Math.round(now() - started) });
       const current = (sdk as unknown as { Sweep: { current: { subscribe(cb: (s: { sid?: string }) => void): { cancel(): void } } } }).Sweep.current;
       sub = current.subscribe((s) => {
@@ -248,6 +259,8 @@ export function Experience({
         currentSweep.current = s.sid;
         if (first && pointsOnlyRef.current) lockTo(sdk, allSweeps.current, s.sid);
         const ss = ssBySweep[s.sid];
+        currentSsRef.current = ss ?? null;
+        setCurrentSs(ss ?? null);
         const name = ss != null ? ROOM_NAMES[ss] ?? null : null;
         // Time spent where the visitor just was (named rooms only).
         if (roomTimer.current?.name && roomTimer.current.name !== name) {
@@ -529,6 +542,7 @@ export function Experience({
       enterTour(go.room, "welcome", go.name);
       return;
     }
+    if ("guide" in go) return startGuide("welcome");
     // The drone scene, optionally with only one category's points showing.
     const only = go.drone;
     setHidden(only ? Object.fromEntries(Object.keys(T.categories).map((k) => [k, k !== only])) : {});
@@ -583,11 +597,34 @@ export function Experience({
     await flyTo(p.href, "fly");
   }
 
+  /* ----- "Vis mig rundt" ----- */
+  function guideGo(i: number) {
+    const stop = GUIDE[i];
+    setGuideAt(i);
+    if (phase === "drone") return enterTour(stop.href, "guide", stop.title);
+    flyTo(stop.href, "fly").then(() => sdk?.Camera.rotate?.(18, 0, { speed: 3 }).catch(() => {}));
+  }
+  function startGuide(from: string) {
+    if (!GUIDE.length) return;
+    track("guide_start", { from, stops: GUIDE.length });
+    setMenuOpen(false);
+    setWelcome(false);
+    setCover(false);
+    setSelected(null);
+    guideGo(0);
+  }
+  function closeGuide(completed: boolean) {
+    track(completed ? "guide_complete" : "guide_close", { stop: (guideAt ?? 0) + 1, stops: GUIDE.length });
+    setGuideAt(null);
+  }
+
+  const place = usePlaceInfo(sdk, iframe, useCallback(() => currentSsRef.current, []));
+
   const ctaClick = (label: string, href: string, place: string) => track("cta_click", { label, link_url: href, place });
 
   return (
     <LinkProvider T={T} popup={popup}>
-    <div className={`hv fixed inset-0 z-50 overflow-hidden bg-[#0d1b20] ${selected ? "hv-punkt" : ""} ${zoomed ? "hv-zoom" : ""} ${welcome ? "hv-welcome" : ""} ${phase === "tour" && T.stories?.mobile ? "hv-st-on-m" : ""} ${menuOpen ? "hv-menu-aaben" : ""} ${T.design?.menu === "dock" ? "hv-dock" : ""} ${phase === "tour" && T.stories?.desktop ? "hv-st-on-d" : ""}`} style={
+    <div className={`hv fixed inset-0 z-50 overflow-hidden bg-[#0d1b20] ${selected ? "hv-punkt" : ""} ${zoomed ? "hv-zoom" : ""} ${welcome ? "hv-welcome" : ""} ${phase === "tour" && T.stories?.mobile ? "hv-st-on-m" : ""} ${menuOpen ? "hv-menu-aaben" : ""} ${T.design?.menu === "dock" ? "hv-dock" : ""} ${guideAt != null ? "hv-guiding" : ""} ${phase === "tour" && T.stories?.desktop ? "hv-st-on-d" : ""}`} style={
         {
           fontFamily: `'${T.font}', system-ui, sans-serif`,
           "--c-main": T.colors.main,
@@ -599,7 +636,7 @@ export function Experience({
       }>
       <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.font}:wght@400;600;700;800;900&display=swap`} />
       {T.fontHeading && <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.fontHeading.replace(/ /g, "+")}:wght@500;600&display=swap`} />}
-      <style>{CSS + STORIES_CSS + DESIGNS_CSS + LINKS_CSS}</style>
+      <style>{CSS + STORIES_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + INFO_CSS}</style>
 
       {/* The tour, always mounted so it loads while the visitor is in the drone scene. */}
       {modelId && (
@@ -699,6 +736,11 @@ export function Experience({
               <div className="hv-wel-kick">{T.welcome.kicker}</div>
               <h1>{T.welcome.title}</h1>
               <p>{T.welcome.lead}</p>
+              {GUIDE.length > 0 && (
+                <button type="button" className="hv-wel-guide" onClick={() => chooseWelcome({ guide: true }, "Vis mig rundt")}>
+                  ▶ Vis mig rundt
+                </button>
+              )}
               <button type="button" className="hv-wel-skip" onClick={() => chooseWelcome("skip", T.welcome!.skip)}>
                 {T.welcome.skip} →
               </button>
@@ -757,7 +799,7 @@ export function Experience({
       )}
 
       {T.design?.menu === "dock" ? (
-        phase === "tour" && !cover && <DockMenu T={T} room={room} onPlace={(p) => placeGo(p, "dock")} onItem={(label, href) => ctaClick(label, href, "dock")} />
+        phase === "tour" && !cover && <DockMenu T={T} room={room} onGuide={() => startGuide("dock")} onPlace={(p) => placeGo(p, "dock")} onItem={(label, href) => ctaClick(label, href, "dock")} />
       ) : (
       <>
       <button
@@ -780,6 +822,15 @@ export function Experience({
           <div className="hv-menu-titel">{T.brand.toUpperCase()}</div>
           <div className="hv-sub">{T.subtitle}</div>
         </div>
+        {GUIDE.length > 0 && (
+          <button type="button" className="hv-guide-knap" onClick={() => startGuide("menu")}>
+            ▶
+            <span>
+              Vis mig rundt
+              <small>{GUIDE.length} steder · ca. {Math.ceil((GUIDE.length * (T.guide?.seconds ?? 9)) / 60)} min</small>
+            </span>
+          </button>
+        )}
         {T.menu.map((m) =>
           "items" in m ? (
             <div key={m.title} className="hv-gruppe">
@@ -857,6 +908,7 @@ export function Experience({
             setCover(false);
           }}
           onPlace={(p) => placeGo(p, "cover")}
+          onGuide={GUIDE.length ? () => startGuide("cover") : undefined}
           onCta={(label, href) => ctaClick(label, href, "cover")}
         />
       )}
@@ -893,9 +945,22 @@ export function Experience({
           {tourError ? "⚠ Tour" : tourReadyMs != null ? `Tour klar ${(tourReadyMs / 1000).toFixed(1).replace(".", ",")} s` : "Tour indlæses…"} · GA4 {ga4Id ? "✓" : "–"}
         </button>
         {showLog && (
-          <DevPanel onCaptureStories={T.stories ? captureStories : undefined} storyCount={storyRooms.length} ga4Id={ga4Id} tourError={tourError} sdkKey={sdkKey} modelId={modelId} pointsOnly={pointsOnly} onPointsOnly={setNavigation} />
+          <DevPanel place={T.info ? place : undefined} onCaptureStories={T.stories ? captureStories : undefined} storyCount={storyRooms.length} ga4Id={ga4Id} tourError={tourError} sdkKey={sdkKey} modelId={modelId} pointsOnly={pointsOnly} onPointsOnly={setNavigation} />
         )}
       </div>
+      {phase === "tour" && T.info && T.info.length > 0 && (
+        <InfoDots
+          sdk={sdk}
+          info={T.info}
+          currentSs={currentSs}
+          frame={iframe}
+          onOpen={(i) => track("info_open", { title: i.title })}
+          onLink={(label, href) => ctaClick(label, href, "info")}
+        />
+      )}
+      {guideAt != null && GUIDE[guideAt] && (
+        <GuidePlayer stops={GUIDE} index={guideAt} seconds={T.guide?.seconds ?? 9} onGo={guideGo} onClose={closeGuide} onEvent={track} />
+      )}
       {linkPopup && <LinkPopup open={linkPopup} onClose={() => setLinkPopup(null)} />}
     </div>
     </LinkProvider>
@@ -974,6 +1039,7 @@ function startParams(href: string): Record<string, string> {
 }
 
 function DevPanel({
+  place,
   onCaptureStories,
   storyCount,
   ga4Id,
@@ -983,6 +1049,7 @@ function DevPanel({
   pointsOnly,
   onPointsOnly,
 }: {
+  place?: { placing: boolean; setPlacing: (on: boolean) => void; result: string | null };
   onCaptureStories?: (progress: (text: string) => void) => Promise<void>;
   storyCount: number;
   ga4Id: string | null;
@@ -1002,6 +1069,15 @@ function DevPanel({
       {!sdkKey && <p className="hv-warn">Mangler SDK-nøgle (sæt den på /tour-lab).</p>}
       {!modelId && <p className="hv-warn">Kunne ikke hente touren fra MPSkins.</p>}
       {tourError && <p className="hv-warn">{tourError}</p>}
+      {place && (
+        <p>
+          <button type="button" className="hv-devbtn" onClick={() => place.setPlacing(!place.placing)}>
+            {place.placing ? "Klik nu på stedet i touren… (annullér)" : "Placér infopunkt"}
+          </button>
+          {place.result && <code className="hv-devcode">{place.result}</code>}
+          {place.result?.startsWith("{") && <span> Kopieret - sæt den ind under info i tourens opsætning.</span>}
+        </p>
+      )}
       <label className="hv-devcheck">
         <input type="checkbox" checked={pointsOnly} onChange={(e) => onPointsOnly(e.target.checked)} />
         Kun punkter (ingen fri gang - menu og punkter flytter dig)
@@ -1174,6 +1250,7 @@ const CSS = `
 .hv-devpanel li{margin:2px 0}
 .hv-devt{margin:8px 0 0;font-weight:700}
 .hv-warn{color:#b81c17;margin:0 0 6px}
+.hv-devcode{display:block;margin-top:6px;padding:6px;background:#f1f2f3;border-radius:6px;font-size:11px;word-break:break-all;user-select:all}
 .hv-devbtn{background:#1d2a30;color:#fff;border:0;border-radius:6px;padding:5px 10px;cursor:pointer}
 .hv-devcheck{display:flex;gap:6px;align-items:center;margin:0 0 8px;font-weight:600}
 /* An open point: the welcome box and the filter step aside so they don't cover other points. */

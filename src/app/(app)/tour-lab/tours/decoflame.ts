@@ -54,6 +54,15 @@ export const decoflame: TourConfig = {
   hiddenSweeps: [],
   menuOpenOnStart: { desktop: false, mobile: false },
   stories: { mobile: true, desktop: false },
+  guide: {
+    stops: [
+      { href: u(30, "-.18,.9"), title: "Velkommen i showroomet", text: "Her kan du se pejsene i virkeligheden - i rigtig størrelse og i rigtige rum." },
+      { href: u(37, "-.19,-1.17"), title: "Biopejse til indbygning", text: "Pejse bygget ind i væggen, så flammen bliver en del af rummet." },
+      { href: u(44, "-.16,.83"), title: "Væghængte", text: "Pejse, der hænger direkte på væggen." },
+      { href: u(58, "-2.55,-.96"), title: "Fritstående", text: "Pejse, der står frit - også midt i rummet." },
+      { href: u(8, "-.01,.25"), title: "Produktionen", text: "Bag kulisserne: her bliver pejsene lavet." },
+    ],
+  },
   menu: [
     { title: "Velkommen til Decoflame", href: u(30, "-.18,.9") },
     {

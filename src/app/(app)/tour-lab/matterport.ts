@@ -12,6 +12,8 @@
 export const BUNDLE_VERSION = "26.5.4_webgl-708-g332adb66f5";
 
 export type Rotation = { x: number; y: number };
+export type Vec3 = { x: number; y: number; z: number };
+export type CameraPose = { position: Vec3; rotation: Rotation; projection: Float32Array | number[]; sweep: string; mode: string };
 
 export type SweepInfo = { id?: string; sid?: string; uuid?: string; index?: number };
 
@@ -21,7 +23,15 @@ export type MpSdk = {
     state: { waitUntil(cond: (s: { phase: string }) => boolean): Promise<unknown> };
   };
   Camera: {
-    pose: { subscribe(cb: (pose: { sweep: string; rotation: Rotation; mode: string }) => void): { cancel(): void } };
+    pose: { subscribe(cb: (pose: CameraPose) => void): { cancel(): void } };
+    /** Turns the view by degrees; speed in degrees per second. */
+    rotate?(horizontal: number, vertical: number, options?: { speed?: number }): Promise<void>;
+  };
+  Conversion?: {
+    worldToScreen(position: Vec3, pose: CameraPose, size: { w: number; h: number }): Vec3;
+  };
+  Pointer?: {
+    intersection: { subscribe(cb: (hit: { position: Vec3 } | null) => void): { cancel(): void } };
   };
   Renderer: {
     /** The current view as an image (a data URL), without Matterport's own markers when told so. */

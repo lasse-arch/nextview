@@ -4,7 +4,7 @@
  * prototype; the scalable version keeps it in Arpo, edited in the editor.
  */
 
-export type WelcomeGo = { drone: string | null } | { room: string; name: string } | { href: string };
+export type WelcomeGo = { drone: string | null } | { room: string; name: string } | { href: string } | { guide: true };
 
 /** A real spot in the tour with a photo of it (e.g. one of the model's own Matterport photos). */
 export type TourPlace = { name: string; kicker?: string; href: string; image: string };
@@ -12,7 +12,16 @@ export type TourPlace = { name: string; kicker?: string; href: string; image: st
 /** How a link out of the tour opens: over the tour, in a new tab, or instead of the tour. */
 export type LinkOpen = "popup" | "tab" | "same";
 
-export type DockIcon = "places" | "menu" | "book" | "order" | "map" | "phone";
+export type TourInfo = {
+  title: string;
+  text: string;
+  image?: string;
+  link?: { label: string; href: string };
+  position: { x: number; y: number; z: number };
+  ss: number[];
+};
+
+export type DockIcon = "places" | "menu" | "book" | "order" | "map" | "phone" | "play";
 
 export type TourPoint = {
   id: string;
@@ -89,7 +98,18 @@ export type TourConfig = {
   /** Real spots with a photo - the cover's and the dock's "places". */
   places?: TourPlace[];
   cover?: { kicker: string; title: string; lead: string; image: string; imageMobile?: string; enter: string; placesTitle: string };
-  dock?: { label: string; icon: DockIcon; go: "places" | { href: string }; primary?: boolean }[];
+  dock?: { label: string; icon: DockIcon; go: "places" | "guide" | { href: string }; primary?: boolean }[];
+  /**
+   * "Vis mig rundt": the tour flies from stop to stop by itself with a short
+   * text at each. A stop can borrow a drone point's name and text ({ point: id }).
+   */
+  guide?: { seconds?: number; stops: ({ point: string } | { href: string; title: string; text: string })[] };
+  /**
+   * Info points: small pulsing dots on things in the room; a tap opens a card.
+   * `position` is a spot in the 3D model (placed with "Placér infopunkt" in the
+   * prototype panel), `ss` the scan points it's shown from.
+   */
+  info?: TourInfo[];
   welcome?: {
     kicker: string;
     title: string;

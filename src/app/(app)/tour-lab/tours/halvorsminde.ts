@@ -107,6 +107,7 @@ export const halvorsminde: TourConfig = {
   /** MPSkins "navOpenOnStart", per device. */
   menuOpenOnStart: { desktop: false, mobile: false },
   stories: { mobile: true, desktop: false },
+  guide: { stops: [{ point: "vaerelse2" }, { point: "faellesrum" }, { point: "foredrag" }, { point: "gastro" }, { point: "metal" }, { point: "styling" }, { point: "fitness" }] },
   /** The MPSkins menu, as it is today. */
   menu: [
     { title: "Velkommen til Halvorsminde", href: u(2, "-3.13,-.15") },

@@ -17,6 +17,7 @@ const DOCK_ICONS: Record<DockIcon, string> = {
   book: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18M9 15l2 2 4-4"/>',
   order: '<path d="M6 7h12l-1 13H7zM9 7a3 3 0 0 1 6 0"/>',
   map: '<path d="M12 21s-7-6.3-7-11a7 7 0 0 1 14 0c0 4.7-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/>',
+  play: '<circle cx="12" cy="12" r="9"/><path d="M10 8.5v7l5.5-3.5z"/>',
   phone: '<path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/>',
 };
 
@@ -48,11 +49,13 @@ export function CoverWelcome({
   T,
   onEnter,
   onPlace,
+  onGuide,
   onCta,
 }: {
   T: TourConfig;
   onEnter: () => void;
   onPlace: (p: TourPlace) => void;
+  onGuide?: () => void;
   onCta: (label: string, href: string) => void;
 }) {
   const C = T.cover!;
@@ -68,6 +71,11 @@ export function CoverWelcome({
           <button type="button" className="dz-btn dz-gold" onClick={onEnter}>
             {C.enter} <span aria-hidden>→</span>
           </button>
+          {onGuide && (
+            <button type="button" className="dz-btn dz-line" onClick={onGuide}>
+              ▶ Vis mig rundt
+            </button>
+          )}
           {T.cta.map((c) => (
             <TourLink key={c.label} className="dz-btn dz-line" href={c.href} label={c.label} onClick={() => onCta(c.label, c.href)}>
               {c.label}
@@ -90,15 +98,17 @@ export function DockMenu({
   T,
   room,
   onPlace,
+  onGuide,
   onItem,
 }: {
   T: TourConfig;
   room: string | null;
+  onGuide: () => void;
   onPlace: (p: TourPlace) => void;
   onItem: (label: string, href: string) => void;
 }) {
   const [sheet, setSheet] = useState(false);
-  const primary = T.dock?.find((d) => d.primary && d.go !== "places");
+  const primary = T.dock?.find((d) => d.primary && typeof d.go !== "string");
   const atPlace = room && T.places?.some((p) => p.name === room);
   return (
     <>
@@ -120,7 +130,7 @@ export function DockMenu({
           />
         </div>
       )}
-      {!sheet && atPlace && primary && primary.go !== "places" && (
+      {!sheet && atPlace && primary && typeof primary.go !== "string" && (
         <TourLink className="dz-here" href={primary.go.href} label={primary.label} onClick={() => onItem(`${primary.label} (${room})`, (primary.go as { href: string }).href)}>
           <span>{room}</span>
           <b>{primary.label} her →</b>
@@ -128,7 +138,12 @@ export function DockMenu({
       )}
       <nav className="dz-dock">
         {T.dock?.map((d) =>
-          d.go === "places" ? (
+          d.go === "guide" ? (
+            <button key={d.label} type="button" onClick={onGuide}>
+              <Icon name={d.icon} />
+              <span>{d.label}</span>
+            </button>
+          ) : d.go === "places" ? (
             <button key={d.label} type="button" className={sheet ? "aaben" : ""} onClick={() => setSheet((s) => !s)}>
               <Icon name={d.icon} />
               <span>{d.label}</span>
