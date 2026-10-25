@@ -48,7 +48,7 @@ type ShowcaseWindow = Window & { MP_SDK?: { connect(win: Window): Promise<MpSdk>
 const HIDE_BRANDING = `
   [class*="logo"], .powered-by, .powered-by-link, .powered-by-label, .co-brand, .co-branded,
   [class*="search-button"], [class*="search-bar"], [class*="search-panel"], button[aria-label="Search"],
-  #loading-gui #loading-header { display: none !important; }
+  #loading-gui #loading-header, #loading-powered-by, #powered-by { display: none !important; }
 `;
 
 function hideBranding(win: Window) {

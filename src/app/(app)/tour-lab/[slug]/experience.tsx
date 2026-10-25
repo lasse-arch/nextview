@@ -119,6 +119,30 @@ function roomIndex(menu: MenuEntry[]) {
 const slug = (s: string) =>
   s.toLowerCase().replace(/æ/g, "ae").replace(/ø/g, "oe").replace(/å/g, "aa").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
+type Box = { left: number; right: number; top: number; bottom: number };
+const overlaps = (a: Box, b: Box) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+
+/**
+ * Hides the names that would cover another point's icon or a name already
+ * shown - the open point first, then in setup order - so every point can be
+ * clicked whatever the zoom. A hidden name shows when its icon is hovered.
+ */
+function declutterNames(selected: string | null) {
+  const points = [...document.querySelectorAll<HTMLElement>(".hv-hs[data-punkt]:not(.hv-skjult)")].filter((el) => el.style.visibility !== "hidden");
+  points.sort((a, b) => Number(b.dataset.punkt === selected) - Number(a.dataset.punkt === selected));
+  const icons = points.map((el) => el.querySelector(".hv-ikon")?.getBoundingClientRect());
+  const shown: Box[] = [];
+  points.forEach((el, i) => {
+    const name = el.querySelector<HTMLElement>(".hv-navn");
+    if (!name) return;
+    const box = name.getBoundingClientRect();
+    if (!box.width) return;
+    const hit = icons.some((icon, j) => j !== i && icon && icon.width && overlaps(box, icon)) || shown.some((s) => overlaps(box, s));
+    name.classList.toggle("hv-gemt", hit);
+    if (!hit) shown.push(box);
+  });
+}
+
 function readLastRoom(key: string): { name: string; href: string } | null {
   try {
     return JSON.parse(localStorage.getItem(key) ?? "null");
@@ -186,6 +210,8 @@ export function Experience({
   const [lastRoom, setLastRoom] = useState<{ name: string; href: string } | null>(null);
   const [, rerender] = useState(0);
   const mobile = useRef(false);
+  /** The open point, for the name-declutter loop (which runs outside React). */
+  const selectedId = useRef<string | null>(null);
 
   useEffect(() => {
     const l = () => rerender((n) => n + 1);
@@ -303,6 +329,7 @@ export function Experience({
     const D = T.drone;
     if (!D) return;
     let cancelled = false;
+    let declutter = 0;
     loadPannellum().then(() => {
       if (cancelled || !droneEl.current || !window.pannellum) return;
       const start = mobile.current ? D.startMobile : D.start;
@@ -345,10 +372,12 @@ export function Experience({
         hotSpots,
       });
       drone.current.on("zoomchange", (hfov) => setZoomed(Number(hfov) < 56));
+      declutter = window.setInterval(() => declutterNames(selectedId.current), 120);
       track("drone_view");
     });
     return () => {
       cancelled = true;
+      window.clearInterval(declutter);
       drone.current?.destroy();
       drone.current = null;
     };
@@ -364,6 +393,7 @@ export function Experience({
   // The open point stands out (and shows its name on a phone).
   useEffect(() => {
     document.querySelectorAll<HTMLElement>(".hv-hs").forEach((el) => el.classList.toggle("hv-aktiv", el.dataset.punkt === selected?.id));
+    selectedId.current = selected?.id ?? null;
   }, [selected]);
 
   /* ----- Drone → room: zoom in on the point, the tour is moved to the spot underneath, then cross-fade. ----- */
@@ -650,7 +680,7 @@ export function Experience({
 
       {/* Logo (MPSkins: left, 200px, 13px from the edges). */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={T.logo} alt="" className={`hv-logo ${phase === "tour" ? "" : "hidden"}`} />
+      <img src={T.logo} alt={T.brand} className={`hv-logo ${T.logoOnLight ? "hv-logo-kort" : ""} ${phase === "tour" ? "" : "hidden"}`} />
 
       {/* Inside the tour: back to the air, the room's name, the menu. */}
       {phase === "tour" && (
@@ -757,6 +787,11 @@ export function Experience({
             )}
           </div>
         )}
+        <a className="hv-signatur" href="https://nextview360.dk" target="_blank" rel="noopener" onClick={() => track("nextview_click", { place: "menu" })}>
+          Præsenteret af
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.png" alt="nextview360.dk" />
+        </a>
       </nav>
 
       {/* Prototype tools: status and the GA4 event log. */}
@@ -928,12 +963,16 @@ const CSS = `
 .hv-hs.hv-skjult{display:none!important}
 .hv-hs:hover,.hv-hs.hv-aktiv{z-index:9}
 .hv-hs.hv-aktiv .hv-ikon{transform:scale(1.18);box-shadow:0 0 0 4px rgba(255,255,255,.55),0 3px 10px rgba(0,0,0,.35)}
-.hv-pkt{display:flex;flex-direction:column;align-items:center;transform:translate(-50%,-100%);cursor:pointer;pointer-events:none}
+/* The icon's centre is the place it marks, so it stays put at every zoom; the name hangs below it. */
+.hv-pkt{position:relative;transform:translate(-50%,-50%);cursor:pointer;pointer-events:none}
 .hv-ikon,.hv-navn{pointer-events:auto}
 .hv-ikon{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;border:3px solid #fff;box-shadow:0 3px 10px rgba(0,0,0,.35);transition:transform .15s}
 .hv-ikon svg{width:17px;height:17px}
-.hv-navn{margin-top:4px;background:#fff;border-radius:999px;padding:2px 10px;font-size:12.5px;font-weight:800;white-space:nowrap;color:#1d2a30;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+.hv-navn{position:absolute;top:100%;left:50%;transform:translateX(-50%);margin-top:4px;background:#fff;border-radius:999px;padding:2px 10px;font-size:12.5px;font-weight:800;white-space:nowrap;color:#1d2a30;box-shadow:0 2px 8px rgba(0,0,0,.25)}
 .hv-pkt:hover .hv-ikon{transform:scale(1.12)}
+/* A name that would cover another point steps aside until its icon is hovered. */
+.hv-navn.hv-gemt{visibility:hidden;pointer-events:none}
+.hv-pkt:hover .hv-navn.hv-gemt{visibility:visible}
 .hv-intro{position:absolute;top:16px;left:16px;z-index:5;width:320px;background:var(--c-soft);border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.28)}
 .hv-intro-head{padding:18px 18px 14px;text-align:center}
 .hv-intro-head img{height:54px;display:block;margin:0 auto 8px}
@@ -960,7 +999,12 @@ const CSS = `
 .hv-pchips{display:flex;flex-wrap:wrap;gap:5px}
 .hv-pchips span{background:#e7eef0;color:var(--c-main);font-size:12px;font-weight:700;padding:4px 9px;border-radius:999px}
 .hv-note{font-size:13px!important;color:#7a8a90!important;margin-top:12px!important}
-.hv-logo{position:absolute;top:58px;left:16px;width:84px;z-index:6;filter:drop-shadow(0 2px 6px rgba(0,0,0,.35))}
+.hv-logo{position:absolute;top:14px;left:16px;height:46px;width:auto;max-width:200px;object-fit:contain;z-index:6;filter:drop-shadow(0 2px 6px rgba(0,0,0,.35))}
+/* A dark logo gets a light card, so it reads on any wall. */
+.hv-logo-kort{box-sizing:content-box;height:34px;padding:9px 14px;border-radius:14px;background:rgba(255,255,255,.94);filter:none;box-shadow:0 6px 18px rgba(0,0,0,.18)}
+.hv-signatur{display:flex;align-items:center;justify-content:center;gap:8px;padding:6px 22px 22px;font-size:11px;letter-spacing:.04em;color:#7b878c;text-decoration:none}
+.hv-signatur img{height:14px;width:auto;opacity:.85}
+.hv-signatur:hover{color:#1d2a30}
 .hv-luften{position:absolute;left:16px;bottom:20px;z-index:6;display:flex;align-items:center;gap:8px;background:var(--c-main);color:#fff;border:0;border-radius:999px;padding:11px 18px;font:800 14px inherit;font-family:inherit;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.3)}
 .hv-luften svg{width:18px;height:18px}
 .hv-room{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);z-index:6;background:rgba(255,255,255,.95);color:var(--c-main);border-radius:999px;padding:8px 16px;font-weight:800;font-size:14px;box-shadow:0 4px 14px rgba(0,0,0,.25)}
@@ -1052,7 +1096,8 @@ const CSS = `
   .hv-ikon{width:30px;height:30px;border-width:2px}.hv-ikon svg{width:15px;height:15px}
   /* An open point: the panel takes the bottom, the bars step aside. */
   .hv-panel{top:auto;bottom:0;left:0;right:0;width:auto;max-height:62%;border-radius:18px 18px 0 0;padding-bottom:calc(18px + env(safe-area-inset-bottom,0px))}
-  .hv-logo{width:56px;top:52px;left:12px}
+  .hv-logo{height:34px;max-width:140px;top:12px;left:12px}
+  .hv-logo-kort{height:26px;padding:7px 10px;border-radius:11px}
   .hv-menu{width:100%}
   .hv-room{bottom:76px}
   .hv-dev{bottom:calc(64px + env(safe-area-inset-bottom,0px));right:10px}
