@@ -7,6 +7,8 @@ import { tourStats } from "@/lib/tour-stats";
 import { ensureToursSeeded } from "@/lib/tours";
 import type { TourConfig } from "../../tours/types";
 import { TourEditor } from "./editor";
+import { fetchScanMap } from "@/lib/matterport-graph";
+import { fetchMpskinsCfg, hiddenSweeps } from "@/lib/mpskins";
 import type { TourEconomy } from "./economy";
 
 
@@ -32,9 +34,14 @@ export default async function TourEditPage({ params }: { params: Promise<{ slug:
     },
   });
   if (!tour) notFound();
-  const [work, ai] = await Promise.all([
+  const setup = tour.config as unknown as TourConfig;
+  // The scan points from above (the map in "Scanpunkter") and the ones hidden in MPSkins.
+  const cfg = setup.tourPage ? await fetchMpskinsCfg(setup.tourPage).catch(() => null) : null;
+  const modelId = setup.modelId ?? cfg?.mpModel ?? null;
+  const [work, ai, scanMap] = await Promise.all([
     prisma.tourWork.groupBy({ by: ["userName"], where: { tourSlug: tour.slug }, _sum: { seconds: true } }),
     prisma.tourAiUsage.aggregate({ where: { tourSlug: tour.slug }, _sum: { costUsd: true }, _count: true }),
+    modelId ? fetchScanMap(modelId) : Promise.resolve(null),
   ]);
   const economy: TourEconomy = {
     filmingMinutes: tour.deal?.filmingActualMinutes ?? null,
@@ -51,6 +58,8 @@ export default async function TourEditPage({ params }: { params: Promise<{ slug:
       blob={blobReady()}
       published={tour.published}
       economy={economy}
+      scanMap={scanMap}
+      mpskinsHidden={cfg ? hiddenSweeps(cfg) : []}
       aiReady={Boolean(process.env.ANTHROPIC_API_KEY || (await getSettingValue("ANTHROPIC_API_KEY")))}
       versions={tour.versions.map((v) => ({ id: v.id, note: v.note, by: v.createdByName, at: v.createdAt.toISOString() }))}
     />

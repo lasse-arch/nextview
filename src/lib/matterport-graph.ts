@@ -111,3 +111,32 @@ export async function searchAccountModels(token: string, query: string, offset?:
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
 }
+
+export type ScanPoint = { ss: number; sid: string; x: number; y: number; floor: number };
+export type ScanMap = { floors: string[]; points: ScanPoint[] };
+
+/** Every scan point seen from above (x/y in metres - Matterport's model data is z-up), by floor - for the editor's scan point map. */
+export async function fetchScanMap(modelId: string): Promise<ScanMap | null> {
+  try {
+    const res = await fetch("https://my.matterport.com/api/mp/models/graph", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ query: `{ model(id: ${JSON.stringify(modelId)}) { floors { id label sequence } locations { id index position { x y z } floor { id } } } }` }),
+      signal: AbortSignal.timeout(10_000),
+      next: { revalidate: 3600 },
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as {
+      data?: { model?: { floors?: { id: string; label: string | null; sequence: number }[]; locations?: { id: string; index: number; position: { x: number; y: number }; floor: { id: string } | null }[] } };
+    };
+    const m = data.data?.model;
+    if (!m?.locations?.length) return null;
+    const floors = [...(m.floors ?? [])].sort((a, b) => a.sequence - b.sequence);
+    return {
+      floors: floors.map((f, i) => f.label || `Etage ${i + 1}`),
+      points: m.locations.map((l) => ({ ss: l.index + 1, sid: l.id, x: +l.position.x.toFixed(2), y: +l.position.y.toFixed(2), floor: Math.max(0, floors.findIndex((f) => f.id === l.floor?.id)) })),
+    };
+  } catch {
+    return null;
+  }
+}
