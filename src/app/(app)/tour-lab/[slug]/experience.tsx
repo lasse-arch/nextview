@@ -239,6 +239,14 @@ export function Experience({
   const [guideAt, setGuideAt] = useState<number | null>(null);
   /** "Find vej": the picker, and the walk in progress. */
   const [routeOpen, setRouteOpen] = useState(false);
+  /** Matterport's measuring tool switched on from our "Mål" button. */
+  const [measuring, setMeasuring] = useState(false);
+  async function toggleMeasure(on: boolean) {
+    if (!sdk?.Measurements) return;
+    await sdk.Measurements.toggleMode(on).catch((err) => console.warn("Measurements", err));
+    setMeasuring(on);
+    track(on ? "measure_start" : "measure_stop");
+  }
   const [route, setRoute] = useState<{ dest: Destination; step: number; steps: number; arrived: boolean } | null>(null);
   const routeRun = useRef(0);
   /** The route still ahead, drawn on the floor. */
@@ -1152,6 +1160,18 @@ export function Experience({
           Find vej
         </button>
       )}
+      {T.measure && phase === "tour" && sdk?.Measurements && !cover && (
+        <>
+          <button type="button" className={`hv-maal ${T.design?.menu === "picker" || T.design?.menu === "dock" ? "hv-maal-top" : ""} ${measuring ? "aktiv" : ""}`} onClick={() => toggleMeasure(!measuring)}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 17l14-14 4 4-14 14H3z" />
+              <path d="M7 13l2 2M10 10l2 2M13 7l2 2" />
+            </svg>
+            {measuring ? "Færdig" : "Mål"}
+          </button>
+          {measuring && <div className="hv-maal-tip">Klik ét sted for at starte målingen og igen for at slutte. Mål så mange gange du vil.</div>}
+        </>
+      )}
       {routeLine.length > 1 && phase === "tour" && <RouteLine sdk={sdk} points={routeLine} frame={iframe} />}
       {routeOpen && <RouteSheet destinations={DESTINATIONS} boxes={T.wayfinding?.boxes} onGo={walkTo} onClose={() => setRouteOpen(false)} />}
       {route && (
@@ -1477,6 +1497,12 @@ const CSS = `
 .hv-devt{margin:8px 0 0;font-weight:700}
 .hv-warn{color:#b81c17;margin:0 0 6px}
 .hv-devcode{display:block;margin-top:6px;padding:6px;background:#f1f2f3;border-radius:6px;font-size:11px;word-break:break-all;user-select:all}
+.hv-maal{position:absolute;top:66px;right:14px;z-index:8;display:flex;align-items:center;gap:7px;border:0;border-radius:999px;padding:9px 16px;background:rgba(255,255,255,.95);color:var(--c-main);font:inherit;font-weight:800;font-size:14px;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.25)}
+.hv-maal svg{width:18px;height:18px}
+.hv-maal.hv-maal-top{top:14px}
+.hv-maal.aktiv{background:var(--c-accent);color:#fff}
+.hv-maal-tip{position:absolute;top:66px;left:50%;translate:-50% 0;z-index:8;max-width:calc(100% - 24px);padding:9px 16px;border-radius:12px;background:rgba(0,0,0,.72);color:#fff;font-size:13.5px;text-align:center;animation:hvFade .3s ease}
+@media (max-width:760px){.hv-maal{top:62px;right:10px}.hv-maal.hv-maal-top{top:12px}.hv-maal-tip{top:auto;bottom:calc(240px + env(safe-area-inset-bottom,0px))}}
 .hv-devbtn{background:#1d2a30;color:#fff;border:0;border-radius:6px;padding:5px 10px;cursor:pointer}
 .hv-devcheck{display:flex;gap:6px;align-items:center;margin:0 0 8px;font-weight:600}
 /* An open point: the welcome box and the filter step aside so they don't cover other points. */

@@ -19,6 +19,7 @@ export const boxdepotRum: TourConfig = {
   design: { welcome: "tiles", menu: "picker" },
   navigation: "points",
   jump: "instant",
+  measure: true,
   // No dollhouse or floor plan - nothing to jump out of the rooms with.
   matterportParams: { ...boxdepot.matterportParams, dh: "0", gt: "0", f: "0", fp: "0" },
   wayfinding: undefined,

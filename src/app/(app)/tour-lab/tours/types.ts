@@ -119,6 +119,8 @@ export type TourConfig = {
    * the old view (a touch slower to start).
    */
   jump?: "fly" | "fade" | "instant";
+  /** A "Mål" button that opens Matterport's measuring tool - for when the room's size matters (storage, rentals). */
+  measure?: boolean;
   /** Font for big headings (a Google font), if not the body font. */
   fontHeading?: string;
   /** Real spots with a photo - the cover's and the dock's "places". */

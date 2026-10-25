@@ -27,6 +27,8 @@ export type MpSdk = {
     /** Turns the view by degrees; speed in degrees per second. */
     rotate?(horizontal: number, vertical: number, options?: { speed?: number }): Promise<void>;
   };
+  /** Matterport's own measuring tool (allowed when the model's "measurements" setting is on). */
+  Measurements?: { toggleMode(active: boolean, options?: Record<string, unknown>): Promise<void> };
   Conversion?: {
     worldToScreen(position: Vec3, pose: CameraPose, size: { w: number; h: number }): Vec3;
   };
