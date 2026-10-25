@@ -119,8 +119,14 @@ export type TourConfig = {
    * the old view (a touch slower to start).
    */
   jump?: "fly" | "fade" | "instant";
-  /** A "Mål" button that opens Matterport's measuring tool - for when the room's size matters (storage, rentals). */
+  /**
+   * The measurements saved on the model in Matterport, drawn over the tour
+   * with their lengths (visitors can't measure themselves) - with a button to
+   * show/hide them. Needs "Measure and view" on the model in Matterport.
+   */
   measure?: boolean;
+  /** Keep Matterport's own buttons (dollhouse, floor plan, settings…). Default: hidden - the tour's own UI is the UI. */
+  matterportUi?: boolean;
   /** Font for big headings (a Google font), if not the body font. */
   fontHeading?: string;
   /** Real spots with a photo - the cover's and the dock's "places". */

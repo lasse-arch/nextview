@@ -10,6 +10,7 @@ import { CoverWelcome, DESIGNS_CSS, DockMenu, PickerMenu } from "./designs";
 import { GUIDE_CSS, GuidePlayer, guideStops } from "./guide";
 import { INFO_CSS, InfoDots, usePlaceInfo } from "./info";
 import { MAP_CSS, MapScene, type MapApi } from "./map";
+import { MEASURES_CSS, MeasureLines, viewerAxes, type Measurement } from "./measures";
 import { ROUTE_CSS, RouteLine, RouteSheet, RouteStatus, flightMs, shortestPath, straighten, type Destination, type RouteGraph } from "./wayfinding";
 import { LINKS_CSS, LinkPopup, LinkProvider, TourLink, openLink, type LinkPopupState } from "./links";
 import { Stories, STORIES_CSS, storyJpeg, type StoryRoom } from "./stories";
@@ -168,6 +169,7 @@ export function Experience({
   storyImages,
   routeGraph,
   units,
+  measurements,
 }: {
   tour: TourConfig;
   sdkKey: string | null;
@@ -181,6 +183,8 @@ export function Experience({
   routeGraph: RouteGraph | null;
   /** Rooms available right now (live), for the room picker. */
   units: AvailableUnit[];
+  /** The model's saved measurements (when "measure" is on). */
+  measurements: Measurement[];
 }) {
   useGa4(ga4Id, T.title);
   const { names: ROOM_NAMES, links: ROOM_LINKS } = useMemo(() => roomIndex([...T.menu, ...(T.places ? [{ title: "", items: T.places.map((p): [string, string] => [p.name, p.href]) }] : [])]), [T]);
@@ -239,14 +243,9 @@ export function Experience({
   const [guideAt, setGuideAt] = useState<number | null>(null);
   /** "Find vej": the picker, and the walk in progress. */
   const [routeOpen, setRouteOpen] = useState(false);
-  /** Matterport's measuring tool switched on from our "Mål" button. */
-  const [measuring, setMeasuring] = useState(false);
-  async function toggleMeasure(on: boolean) {
-    if (!sdk?.Measurements) return;
-    await sdk.Measurements.toggleMode(on).catch((err) => console.warn("Measurements", err));
-    setMeasuring(on);
-    track(on ? "measure_start" : "measure_stop");
-  }
+  /** The saved measurements shown over the tour ("Vis mål"). */
+  const [showMeasures, setShowMeasures] = useState(true);
+  const [toViewer, setToViewer] = useState<ReturnType<typeof viewerAxes>>(null);
   const [route, setRoute] = useState<{ dest: Destination; step: number; steps: number; arrived: boolean } | null>(null);
   const routeRun = useRef(0);
   /** The route still ahead, drawn on the floor. */
@@ -277,7 +276,7 @@ export function Experience({
     const started = now();
     let sub: { cancel(): void } | null = null;
     const ssBySweep = Object.fromEntries(Object.entries(sweepBySs).map(([ss, id]) => [id, Number(ss)]));
-    sdkRef.current = connectSdk(iframe.current, sdkKey).then(async (sdk) => {
+    sdkRef.current = connectSdk(iframe.current, sdkKey, { hideUi: !T.matterportUi }).then(async (sdk) => {
       await sdk.App.state.waitUntil((s) => s.phase === sdk.App.Phase.PLAYING);
       // A start with exact angles (rot=) is turned to them as soon as the viewer plays.
       const start = uLinkTarget(T.start);
@@ -290,6 +289,7 @@ export function Experience({
           const firstData = allSweeps.current.length === 0;
           allSweeps.current = Object.keys(c);
           sweepData.current = c;
+          if (firstData && routeGraph && T.measure) setToViewer(() => viewerAxes(routeGraph, c));
           // The list can arrive after the visitor's first scan point - lock then, so nothing is left open.
           if (firstData && pointsOnlyRef.current && currentSweep.current) lockTo(sdk, allSweeps.current, currentSweep.current);
         },
@@ -329,7 +329,7 @@ export function Experience({
     });
     sdkRef.current.catch((err) => setTourError(err instanceof Error ? err.message : String(err)));
     return () => sub?.cancel();
-  }, [sdkKey, modelId, sweepBySs, hiddenSweeps, ROOM_NAMES, ROOM_LINKS, LAST_ROOM_KEY, T.start]);
+  }, [sdkKey, modelId, sweepBySs, hiddenSweeps, ROOM_NAMES, ROOM_LINKS, LAST_ROOM_KEY, T.start, T.matterportUi, T.measure, routeGraph]);
 
   const setNavigation = useCallback(
     async (only: boolean) => {
@@ -805,7 +805,7 @@ export function Experience({
       }>
       <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.font}:wght@400;600;700;800;900&display=swap`} />
       {T.fontHeading && <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.fontHeading.replace(/ /g, "+")}:wght@500;600&display=swap`} />}
-      <style>{CSS + STORIES_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + INFO_CSS + MAP_CSS + ROUTE_CSS}</style>
+      <style>{CSS + STORIES_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + INFO_CSS + MAP_CSS + ROUTE_CSS + MEASURES_CSS}</style>
 
       {/* The tour, always mounted so it loads while the visitor is in the drone scene. */}
       {modelId && (
@@ -1160,16 +1160,23 @@ export function Experience({
           Find vej
         </button>
       )}
-      {T.measure && phase === "tour" && sdk?.Measurements && !cover && (
+      {T.measure && phase === "tour" && measurements.length > 0 && toViewer && (
         <>
-          <button type="button" className={`hv-maal ${T.design?.menu === "picker" || T.design?.menu === "dock" ? "hv-maal-top" : ""} ${measuring ? "aktiv" : ""}`} onClick={() => toggleMeasure(!measuring)}>
+          {showMeasures && <MeasureLines sdk={sdk} measurements={measurements} toViewer={toViewer} frame={iframe} />}
+          <button
+            type="button"
+            className={`hv-maal ${showMeasures ? "aktiv" : ""}`}
+            onClick={() => {
+              track("measures_toggle", { on: showMeasures ? 0 : 1 });
+              setShowMeasures((v) => !v);
+            }}
+          >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M3 17l14-14 4 4-14 14H3z" />
               <path d="M7 13l2 2M10 10l2 2M13 7l2 2" />
             </svg>
-            {measuring ? "Færdig" : "Mål"}
+            {showMeasures ? "Skjul mål" : "Vis mål"}
           </button>
-          {measuring && <div className="hv-maal-tip">Klik ét sted for at starte målingen og igen for at slutte. Mål så mange gange du vil.</div>}
         </>
       )}
       {routeLine.length > 1 && phase === "tour" && <RouteLine sdk={sdk} points={routeLine} frame={iframe} />}
@@ -1497,12 +1504,6 @@ const CSS = `
 .hv-devt{margin:8px 0 0;font-weight:700}
 .hv-warn{color:#b81c17;margin:0 0 6px}
 .hv-devcode{display:block;margin-top:6px;padding:6px;background:#f1f2f3;border-radius:6px;font-size:11px;word-break:break-all;user-select:all}
-.hv-maal{position:absolute;top:66px;right:14px;z-index:8;display:flex;align-items:center;gap:7px;border:0;border-radius:999px;padding:9px 16px;background:rgba(255,255,255,.95);color:var(--c-main);font:inherit;font-weight:800;font-size:14px;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.25)}
-.hv-maal svg{width:18px;height:18px}
-.hv-maal.hv-maal-top{top:14px}
-.hv-maal.aktiv{background:var(--c-accent);color:#fff}
-.hv-maal-tip{position:absolute;top:66px;left:50%;translate:-50% 0;z-index:8;max-width:calc(100% - 24px);padding:9px 16px;border-radius:12px;background:rgba(0,0,0,.72);color:#fff;font-size:13.5px;text-align:center;animation:hvFade .3s ease}
-@media (max-width:760px){.hv-maal{top:62px;right:10px}.hv-maal.hv-maal-top{top:12px}.hv-maal-tip{top:auto;bottom:calc(240px + env(safe-area-inset-bottom,0px))}}
 .hv-devbtn{background:#1d2a30;color:#fff;border:0;border-radius:6px;padding:5px 10px;cursor:pointer}
 .hv-devcheck{display:flex;gap:6px;align-items:center;margin:0 0 8px;font-weight:600}
 /* An open point: the welcome box and the filter step aside so they don't cover other points. */

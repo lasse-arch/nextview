@@ -63,22 +63,27 @@ const HIDE_BRANDING = `
   #loading-gui #loading-header, #loading-powered-by, #powered-by { display: none !important; }
 `;
 
-function hideBranding(win: Window) {
+/** All of Matterport's own buttons and panels (the 3D view stays) - the tour's own UI replaces them. */
+const HIDE_UI = `
+  #gui, #react-overlay-root, #control-kit-wrapper { display: none !important; }
+`;
+
+function hideBranding(win: Window, hideUi: boolean) {
   const doc = win.document;
   if (doc.getElementById("nv-hide-branding")) return;
   const style = doc.createElement("style");
   style.id = "nv-hide-branding";
-  style.textContent = HIDE_BRANDING;
+  style.textContent = HIDE_BRANDING + (hideUi ? HIDE_UI : "");
   (doc.head ?? doc.documentElement).appendChild(style);
 }
 
 /** Waits until the bundle in the iframe has loaded far enough to expose MP_SDK. */
-async function showcaseWindow(iframe: HTMLIFrameElement): Promise<ShowcaseWindow> {
+async function showcaseWindow(iframe: HTMLIFrameElement, hideUi: boolean): Promise<ShowcaseWindow> {
   const deadline = Date.now() + 60_000;
   for (;;) {
     const win = iframe.contentWindow as ShowcaseWindow | null;
     try {
-      if (win?.document?.head) hideBranding(win);
+      if (win?.document?.head) hideBranding(win, hideUi);
       if (win?.MP_SDK) return win;
     } catch {
       // Not same-origin yet (about:blank while navigating) - keep waiting.
@@ -89,9 +94,9 @@ async function showcaseWindow(iframe: HTMLIFrameElement): Promise<ShowcaseWindow
 }
 
 /** Connects to a bundle iframe; its src carries `applicationKey`. */
-export async function connectSdk(iframe: HTMLIFrameElement, sdkKey: string): Promise<MpSdk> {
+export async function connectSdk(iframe: HTMLIFrameElement, sdkKey: string, opts: { hideUi?: boolean } = {}): Promise<MpSdk> {
   void sdkKey; // read by the bundle from the iframe's src
-  const win = await showcaseWindow(iframe);
+  const win = await showcaseWindow(iframe, opts.hideUi ?? false);
   try {
     return await win.MP_SDK!.connect(win);
   } catch (err) {

@@ -188,6 +188,7 @@ export function PickerMenu({
   const current = groups.find((g) => g.title === group);
   const cta = T.cta.find((c) => c.primary);
   const [showFree, setShowFree] = useState(false);
+  const [open, setOpen] = useState(true);
   /** The live available rooms that fit a group's size range - available now first, then by price. */
   const freeIn = (title: string) => {
     const r = T.availability?.ranges[title];
@@ -203,8 +204,20 @@ export function PickerMenu({
     setItem(name);
     onGo(name, g, href);
   }
+  if (!open) {
+    return (
+      <button type="button" className="pk-mini" onClick={() => setOpen(true)}>
+        <span>{group?.replace(/^[^:]*:\s*/, "")}</span>
+        {item && <span className="pk-mini-item">{item}</span>}
+        <b>Skift rum ▴</b>
+      </button>
+    );
+  }
   return (
     <div className="pk">
+      <button type="button" className="pk-luk" aria-label="Skjul rumvælgeren" onClick={() => (setOpen(false), setShowFree(false))}>
+        ▾
+      </button>
       {showFree && free.length > 0 && (
         <div className="pk-free">
           {free.map((u) => (
@@ -271,6 +284,10 @@ export const DESIGNS_CSS = `
 .pk-row button{flex:none;border:0;border-radius:999px;padding:9px 16px;font:inherit;font-weight:700;font-size:14px;cursor:pointer;background:#eef1f2;color:var(--c-main);transition:background .15s,color .15s}
 .pk-groups button{font-size:16px;font-weight:800;padding:10px 18px}
 .pk-items{flex-wrap:wrap;max-width:720px}
+.pk-luk{position:absolute;top:-14px;right:14px;width:30px;height:30px;border:0;border-radius:50%;background:#fff;color:var(--c-main);font-size:14px;font-weight:800;cursor:pointer;box-shadow:0 3px 10px rgba(0,0,0,.25)}
+.pk-mini{position:absolute;left:50%;bottom:18px;translate:-50% 0;z-index:9;display:flex;align-items:center;gap:10px;border:0;border-radius:999px;padding:8px 8px 8px 18px;background:rgba(255,255,255,.95);color:var(--c-main);font:inherit;font-weight:800;font-size:15px;cursor:pointer;box-shadow:0 10px 30px rgba(0,0,0,.3);white-space:nowrap;animation:hvUp .35s ease both}
+.pk-mini-item{font-weight:600;color:#56636a}
+.pk-mini b{padding:8px 14px;border-radius:999px;background:var(--c-accent);color:#fff;font-size:13px}
 .pk-badge{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;margin-left:7px;padding:0 6px;border-radius:999px;background:var(--c-accent);color:#fff;font-size:11px;font-weight:800;vertical-align:2px}
 .pk-groups button.nu .pk-badge{background:#fff;color:var(--c-main)}
 .pk-badge.tom{background:#c9cfd2}
@@ -288,6 +305,7 @@ export const DESIGNS_CSS = `
 .hv:has(.pk) .hv-room{display:none} /* the picker already shows where you are */
 @media (max-width:760px){
   .pk{left:8px;right:8px;translate:none;max-width:none;bottom:calc(8px + env(safe-area-inset-bottom,0px));border-radius:18px;padding:8px}
+  .pk-mini{bottom:calc(10px + env(safe-area-inset-bottom,0px));max-width:calc(100% - 20px)}
   .pk-groups button{font-size:15px;padding:9px 14px}
   .pk-row button{font-size:13px;padding:8px 13px}
   .pk-cta{margin-left:0}
