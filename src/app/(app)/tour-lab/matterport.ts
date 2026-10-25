@@ -153,7 +153,7 @@ export function srToRotation(first: number, second: number): Rotation {
   return { x: (pitch * 180) / Math.PI, y: (yaw * 180) / Math.PI };
 }
 
-/** Where a Matterport "U"-link points: the scan point number (`ss`) and the view direction (`sr`). */
+/** Where a Matterport "U"-link points: the scan point number (`ss`) and the view direction (`sr`, or our own `rot`). */
 export function uLinkTarget(raw: string): { ss: number; rotation?: Rotation } | null {
   let params: URLSearchParams;
   try {
@@ -163,6 +163,9 @@ export function uLinkTarget(raw: string): { ss: number; rotation?: Rotation } | 
   }
   const ss = Number(params.get("ss"));
   if (!params.get("ss") || !Number.isFinite(ss)) return null;
+  // `rot` = the viewer's own angles (pitch,yaw in degrees), as copied with "Kopiér dette udsyn" - exact, no conversion.
+  const rot = (params.get("rot") ?? "").split(",").map(parseFloat);
+  if (rot.length === 2 && !isNaN(rot[0]) && !isNaN(rot[1])) return { ss, rotation: { x: rot[0], y: rot[1] } };
   const sr = (params.get("sr") ?? "").split(",").map(parseFloat);
   const rotation = sr.length >= 2 && !isNaN(sr[0]) && !isNaN(sr[1]) ? srToRotation(sr[0], sr[1]) : undefined;
   return { ss, rotation };

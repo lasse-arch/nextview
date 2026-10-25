@@ -11,7 +11,8 @@ import type { TourConfig } from "./types";
  * image to find the direction it really shows.
  */
 const TOUR = "https://explore.nextview360.dk/tour/jalsaaalborg";
-const u = (ss: number, sr: string) => `${TOUR}?ss=${ss}&sr=${sr}`;
+/** An exact view, copied in the tour with "Kopiér dette udsyn": scan point, pitch and yaw in degrees. */
+const v = (ss: number, pitch: number, yaw: number) => `${TOUR}?ss=${ss}&rot=${pitch},${yaw}`;
 const BOOK = "https://book.easytable.com/book/?id=4cd78&lang=da";
 const ORDER = "https://order.site/jalsa-indisk-restaurant-aalborg/da/dnk";
 const P = "/tours/jalsa";
@@ -21,8 +22,9 @@ export const jalsa: TourConfig = {
   brand: "Jalsa",
   title: "Jalsa Indisk Restaurant Aalborg",
   tourPage: "https://explore.nextview360.dk/da/tour/318freb4af",
-  start: u(2, "0,0"),
+  start: v(2, 0, 0),
   logo: `${P}/logo.png`,
+  logoSize: 72,
   subtitle: "Authentic Indian Restaurant",
   colors: { main: "#120d08", accent: "#e0b96e", accentDark: "#c99c4a", soft: "#f6efe2" },
   font: "Jost",
@@ -38,19 +40,19 @@ export const jalsa: TourConfig = {
   guide: {
     seconds: 8,
     stops: [
-      { href: u(13, "0,-1.88"), title: "Velkommen indenfor", text: "Her starter aftenen hos Jalsa - lige inden for døren på Ved Stranden." },
-      { href: u(2, "0,0"), title: "Restauranten", text: "Hovedsalen med de varme lamper. Plads til både to og til hele selskabet." },
-      { href: u(4, "0,-2.86"), title: "Loungen", text: "Sofaerne og væggen med kunst - til dem, der vil sidde lidt mere afslappet." },
-      { href: u(6, "0,.31"), title: "Baren", text: "Den røde væg og baren. Kig forbi til en drink før maden." },
-      { href: u(15, "0,1.40"), title: "Vinduesbordene", text: "Bordene ved vinduerne ud mod Ved Stranden. Fundet dit bord? Book det med det samme." },
+      { href: v(13, 0, -107.7), title: "Velkommen indenfor", text: "Her starter aftenen hos Jalsa - lige inden for døren på Ved Stranden." },
+      { href: v(2, 0, 0), title: "Restauranten", text: "Hovedsalen med de varme lamper. Plads til både to og til hele selskabet." },
+      { href: v(4, 0, -163.9), title: "Loungen", text: "Sofaerne og væggen med kunst - til dem, der vil sidde lidt mere afslappet." },
+      { href: v(6, 0, 17.8), title: "Baren", text: "Den røde væg og baren. Kig forbi til en drink før maden." },
+      { href: v(15, 0, 80.2), title: "Vinduesbordene", text: "Bordene ved vinduerne ud mod Ved Stranden. Fundet dit bord? Book det med det samme." },
     ],
   },
   places: [
-    { name: "Restauranten", kicker: "Hovedsalen", href: u(2, "0,0"), image: `${P}/restauranten.jpg` },
-    { name: "Loungen", kicker: "Sofaer og kunst", href: u(4, "0,-2.86"), image: `${P}/loungen.jpg` },
-    { name: "Baren", kicker: "Den røde væg", href: u(6, "0,.31"), image: `${P}/baren.jpg` },
-    { name: "Vinduesbordene", kicker: "Ud mod Ved Stranden", href: u(15, "0,1.40"), image: `${P}/vinduesbordene.jpg` },
-    { name: "Indgangen", kicker: "Velkommen", href: u(13, "0,-1.88"), image: `${P}/indgangen.jpg` },
+    { name: "Restauranten", kicker: "Hovedsalen", href: v(2, 0, 0), image: `${P}/restauranten.jpg` },
+    { name: "Loungen", kicker: "Sofaer og kunst", href: v(4, 0, -163.9), image: `${P}/loungen.jpg` },
+    { name: "Baren", kicker: "Den røde væg", href: v(6, 0, 17.8), image: `${P}/baren.jpg` },
+    { name: "Vinduesbordene", kicker: "Ud mod Ved Stranden", href: v(15, 0, 80.2), image: `${P}/vinduesbordene.jpg` },
+    { name: "Indgangen", kicker: "Velkommen", href: v(13, 0, -107.7), image: `${P}/indgangen.jpg` },
   ],
   cover: {
     kicker: "Indisk restaurant · Ved Stranden, Aalborg",

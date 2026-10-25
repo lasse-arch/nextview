@@ -54,6 +54,8 @@ export type TourConfig = {
   logo: string;
   /** The logo is made for light backgrounds (shown on white instead of the main colour). */
   logoOnLight?: boolean;
+  /** The logo's height over the tour, in px (computer; a phone shows it a bit smaller). Default 46. */
+  logoSize?: number;
   subtitle?: string;
   colors: { main: string; accent: string; accentDark: string; soft: string };
   font: string;

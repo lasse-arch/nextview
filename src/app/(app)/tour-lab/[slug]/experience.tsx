@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { saveTourGa4Id, saveTourStoryImage } from "@/lib/actions/tour-lab";
-import { connectSdk, showcaseUrl, uLinkTarget, type MpSdk } from "../matterport";
+import { connectSdk, showcaseUrl, uLinkTarget, type CameraPose, type MpSdk } from "../matterport";
 import type { MenuEntry, TourConfig, TourPlace, TourPoint, WelcomeGo } from "../tours/types";
 import { CoverWelcome, DESIGNS_CSS, DockMenu } from "./designs";
 import { GUIDE_CSS, GuidePlayer, guideStops } from "./guide";
@@ -247,6 +247,11 @@ export function Experience({
     const ssBySweep = Object.fromEntries(Object.entries(sweepBySs).map(([ss, id]) => [id, Number(ss)]));
     sdkRef.current = connectSdk(iframe.current, sdkKey).then(async (sdk) => {
       await sdk.App.state.waitUntil((s) => s.phase === sdk.App.Phase.PLAYING);
+      // A start with exact angles (rot=) is turned to them as soon as the viewer plays.
+      const start = uLinkTarget(T.start);
+      if (start?.rotation && T.start.includes("rot=") && sweepBySs[start.ss]) {
+        await sdk.Sweep.moveTo(sweepBySs[start.ss], { rotation: start.rotation, transition: sdk.Sweep.Transition.INSTANT }).catch(() => {});
+      }
       if (hiddenSweeps.length) await sdk.Sweep.disable(...hiddenSweeps).catch((err) => console.warn("Sweep.disable", err));
       sdk.Sweep.data.subscribe({ onCollectionUpdated: (c) => (allSweeps.current = Object.keys(c)) });
       setTourReadyMs(now() - started);
@@ -279,7 +284,7 @@ export function Experience({
     });
     sdkRef.current.catch((err) => setTourError(err instanceof Error ? err.message : String(err)));
     return () => sub?.cancel();
-  }, [sdkKey, modelId, sweepBySs, hiddenSweeps, ROOM_NAMES, ROOM_LINKS, LAST_ROOM_KEY]);
+  }, [sdkKey, modelId, sweepBySs, hiddenSweeps, ROOM_NAMES, ROOM_LINKS, LAST_ROOM_KEY, T.start]);
 
   const setNavigation = useCallback(
     async (only: boolean) => {
@@ -618,6 +623,22 @@ export function Experience({
     setGuideAt(null);
   }
 
+  /** Prototype tool: the exact view the visitor stands in, as a link for the tour's setup. */
+  async function copyView(): Promise<string> {
+    if (!sdk) return "Touren er ikke klar endnu.";
+    const pose = await new Promise<CameraPose>((resolve) => {
+      const sub = sdk.Camera.pose.subscribe((p) => {
+        resolve(p);
+        setTimeout(() => sub.cancel());
+      });
+    });
+    const ss = Object.entries(sweepBySs).find(([, id]) => id === pose.sweep)?.[0];
+    if (!ss) return "Kunne ikke finde scanpunktet.";
+    const snippet = `v(${ss}, ${pose.rotation.x.toFixed(1)}, ${pose.rotation.y.toFixed(1)})`;
+    navigator.clipboard?.writeText(snippet).catch(() => {});
+    return snippet;
+  }
+
   const place = usePlaceInfo(sdk, iframe, useCallback(() => currentSsRef.current, []));
 
   const ctaClick = (label: string, href: string, place: string) => track("cta_click", { label, link_url: href, place });
@@ -632,6 +653,7 @@ export function Experience({
           "--c-accent-dark": T.colors.accentDark,
           "--c-soft": T.colors.soft,
           "--font-heading": `'${T.fontHeading ?? T.font}', serif`,
+          "--logo-h": `${T.logoSize ?? 46}px`,
         } as React.CSSProperties
       }>
       <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.font}:wght@400;600;700;800;900&display=swap`} />
@@ -945,7 +967,7 @@ export function Experience({
           {tourError ? "⚠ Tour" : tourReadyMs != null ? `Tour klar ${(tourReadyMs / 1000).toFixed(1).replace(".", ",")} s` : "Tour indlæses…"} · GA4 {ga4Id ? "✓" : "–"}
         </button>
         {showLog && (
-          <DevPanel place={T.info ? place : undefined} onCaptureStories={T.stories ? captureStories : undefined} storyCount={storyRooms.length} ga4Id={ga4Id} tourError={tourError} sdkKey={sdkKey} modelId={modelId} pointsOnly={pointsOnly} onPointsOnly={setNavigation} />
+          <DevPanel onCopyView={copyView} place={T.info ? place : undefined} onCaptureStories={T.stories ? captureStories : undefined} storyCount={storyRooms.length} ga4Id={ga4Id} tourError={tourError} sdkKey={sdkKey} modelId={modelId} pointsOnly={pointsOnly} onPointsOnly={setNavigation} />
         )}
       </div>
       {phase === "tour" && T.info && T.info.length > 0 && (
@@ -1032,13 +1054,14 @@ function lockTo(sdk: MpSdk, all: string[], keep: string) {
 function startParams(href: string): Record<string, string> {
   try {
     const p = new URL(href).searchParams;
-    return { ss: p.get("ss") ?? "", sr: p.get("sr") ?? "" };
+    return { ss: p.get("ss") ?? "", sr: p.get("rot") ? "" : p.get("sr") ?? "" };
   } catch {
     return {};
   }
 }
 
 function DevPanel({
+  onCopyView,
   place,
   onCaptureStories,
   storyCount,
@@ -1049,6 +1072,7 @@ function DevPanel({
   pointsOnly,
   onPointsOnly,
 }: {
+  onCopyView: () => Promise<string>;
   place?: { placing: boolean; setPlacing: (on: boolean) => void; result: string | null };
   onCaptureStories?: (progress: (text: string) => void) => Promise<void>;
   storyCount: number;
@@ -1062,6 +1086,7 @@ function DevPanel({
   const [value, setValue] = useState(ga4Id ?? "");
   const [msg, setMsg] = useState<string | null>(null);
   const [capture, setCapture] = useState<string | null>(null);
+  const [view, setView] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const router = useRouter();
   return (
@@ -1069,6 +1094,13 @@ function DevPanel({
       {!sdkKey && <p className="hv-warn">Mangler SDK-nøgle (sæt den på /tour-lab).</p>}
       {!modelId && <p className="hv-warn">Kunne ikke hente touren fra MPSkins.</p>}
       {tourError && <p className="hv-warn">{tourError}</p>}
+      <p>
+        <button type="button" className="hv-devbtn" onClick={() => onCopyView().then(setView)}>
+          Kopiér dette udsyn
+        </button>
+        {view && <code className="hv-devcode">{view}</code>}
+        {view?.startsWith("v(") && <span> Kopieret - brug den som link til et sted, et stop eller starten.</span>}
+      </p>
       {place && (
         <p>
           <button type="button" className="hv-devbtn" onClick={() => place.setPlacing(!place.placing)}>
@@ -1170,9 +1202,9 @@ const CSS = `
 .hv-pchips{display:flex;flex-wrap:wrap;gap:5px}
 .hv-pchips span{background:#e7eef0;color:var(--c-main);font-size:12px;font-weight:700;padding:4px 9px;border-radius:999px}
 .hv-note{font-size:13px!important;color:#7a8a90!important;margin-top:12px!important}
-.hv-logo{position:absolute;top:14px;left:16px;height:46px;width:auto;max-width:200px;object-fit:contain;z-index:6;filter:drop-shadow(0 2px 6px rgba(0,0,0,.35))}
+.hv-logo{position:absolute;top:14px;left:16px;height:var(--logo-h);width:auto;max-width:min(320px,40vw);object-fit:contain;z-index:6;filter:drop-shadow(0 2px 6px rgba(0,0,0,.35))}
 /* A dark logo gets a light card, so it reads on any wall. */
-.hv-logo-kort{box-sizing:content-box;height:34px;padding:9px 14px;border-radius:14px;background:rgba(255,255,255,.94);filter:none;box-shadow:0 6px 18px rgba(0,0,0,.18)}
+.hv-logo-kort{box-sizing:content-box;height:calc(var(--logo-h) - 12px);padding:9px 14px;border-radius:14px;background:rgba(255,255,255,.94);filter:none;box-shadow:0 6px 18px rgba(0,0,0,.18)}
 .hv-signatur{display:flex;align-items:center;justify-content:center;gap:8px;padding:6px 22px 22px;font-size:11px;letter-spacing:.04em;color:#7b878c;text-decoration:none}
 .hv-signatur img{height:14px;width:auto;opacity:.85}
 .hv-signatur:hover{color:#1d2a30}
@@ -1279,8 +1311,8 @@ const CSS = `
   .hv-ikon{width:30px;height:30px;border-width:2px}.hv-ikon svg{width:15px;height:15px}
   /* An open point: the panel takes the bottom, the bars step aside. */
   .hv-panel{top:auto;bottom:0;left:0;right:0;width:auto;max-height:62%;border-radius:18px 18px 0 0;padding-bottom:calc(18px + env(safe-area-inset-bottom,0px))}
-  .hv-logo{height:34px;max-width:140px;top:12px;left:12px}
-  .hv-logo-kort{height:26px;padding:7px 10px;border-radius:11px}
+  .hv-logo{height:calc(var(--logo-h) * .74);max-width:45vw;top:12px;left:12px}
+  .hv-logo-kort{height:calc(var(--logo-h) * .74 - 8px);padding:7px 10px;border-radius:11px}
   .hv-menu{width:100%}
   .hv-room{bottom:76px}
   .hv-dev{bottom:calc(64px + env(safe-area-inset-bottom,0px));right:10px}
