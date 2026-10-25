@@ -207,6 +207,8 @@ export function Experience({
   const [pano, setPano] = useState<Point | null>(null);
   /** The welcome tiles - skipped when the link already says where to go. */
   const [welcome, setWelcome] = useState(false);
+  /** The intro film: playing, fading out into the tour, or gone. */
+  const [intro, setIntro] = useState<"play" | "fade" | null>(T.intro ? "play" : null);
   const [lastRoom, setLastRoom] = useState<{ name: string; href: string } | null>(null);
   const [, rerender] = useState(0);
   const mobile = useRef(false);
@@ -432,6 +434,33 @@ export function Experience({
     setTimeout(() => drone.current?.lookAt(start.pitch, start.yaw, start.hfov, 1200), 350);
   }
 
+  /** What greets the visitor once they're in: the welcome, or the menu if it's open on start. */
+  function afterStart() {
+    if (T.welcome) {
+      setLastRoom(readLastRoom(LAST_ROOM_KEY));
+      setWelcome(true);
+      track("welcome_view");
+      return;
+    }
+    if (window.innerWidth <= 760 ? T.menuOpenOnStart.mobile : T.menuOpenOnStart.desktop) setMenuOpen(true);
+  }
+  const afterStartRef = useRef(afterStart);
+  useEffect(() => {
+    afterStartRef.current = afterStart;
+  });
+
+  /** The intro film is over (or skipped): wait for the tour if it isn't ready yet, then fade into it. */
+  const introEnding = useRef(false);
+  async function endIntro(how: "ended" | "skip" | "blocked", seconds: number) {
+    if (introEnding.current) return;
+    introEnding.current = true;
+    track("intro_end", { how, seconds: Math.round(seconds * 10) / 10 });
+    if (sdkRef.current) await Promise.race([sdkRef.current.catch(() => null), new Promise((r) => setTimeout(r, 6000))]);
+    setIntro("fade");
+    afterStart();
+    setTimeout(() => setIntro(null), 1000);
+  }
+
   /* ----- Start: a link can say where to begin, otherwise the welcome, or the menu if it's open on start. ----- */
   const enterRef = useRef(enterTour);
   useEffect(() => {
@@ -443,6 +472,7 @@ export function Experience({
     const punkt = q.get("punkt");
     const ss = q.get("ss");
     requestAnimationFrame(() => {
+      if (rum || punkt || ss) setIntro(null); // a link to a place goes straight there
       if (rum) {
         const hit = T.menu.flatMap((m) => ("items" in m ? m.items : [[m.title, m.href] as [string, string]])).find(([n]) => slug(n) === rum);
         if (hit) {
@@ -464,13 +494,8 @@ export function Experience({
         enterRef.current(`${T.tourPage}?${q.toString()}`, "link", ROOM_NAMES[Number(ss)] ?? `ss=${ss}`);
         return;
       }
-      if (T.welcome) {
-        setLastRoom(readLastRoom(LAST_ROOM_KEY));
-        setWelcome(true);
-        track("welcome_view");
-        return;
-      }
-      if (window.innerWidth <= 760 ? T.menuOpenOnStart.mobile : T.menuOpenOnStart.desktop) setMenuOpen(true);
+      if (T.intro) return; // the welcome comes when the film ends
+      afterStartRef.current();
     });
   }, [openPoint, T, ROOM_NAMES, LAST_ROOM_KEY]);
 
@@ -644,7 +669,7 @@ export function Experience({
       {welcome && T.welcome && (
         <div className="hv-wel" role="dialog" aria-modal="true" aria-label={T.welcome.title}>
           <div className="hv-wel-grid">
-            <div className="hv-wel-main">
+            <div className={`hv-wel-main ${T.logoOnLight ? "hv-light" : ""}`}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={T.logo} alt={T.brand} />
               <div className="hv-wel-kick">{T.welcome.kicker}</div>
@@ -793,6 +818,32 @@ export function Experience({
           <img src="/logo.png" alt="nextview360.dk" />
         </a>
       </nav>
+
+      {/* The intro film, ending where the tour starts. */}
+      {intro && T.intro && (
+        <div className={`hv-film ${intro === "fade" ? "ude" : ""}`} style={T.intro.poster ? ({ "--poster": `url(${T.intro.poster})` } as React.CSSProperties) : undefined}>
+          <video
+            autoPlay
+            muted
+            playsInline
+            preload="auto"
+            poster={T.intro.poster}
+            onPlay={() => track("intro_start")}
+            onEnded={(e) => endIntro("ended", e.currentTarget.currentTime)}
+            ref={(v) => {
+              v?.play().catch(() => endIntro("blocked", 0));
+            }}
+          >
+            {T.intro.sources.map((v, i) => (
+              // The last source failing means none could play: straight into the tour.
+              <source key={v.src} src={v.src} type={v.type} media={v.media} onError={i === T.intro!.sources.length - 1 ? () => endIntro("blocked", 0) : undefined} />
+            ))}
+          </video>
+          <button type="button" onClick={(e) => endIntro("skip", (e.currentTarget.previousElementSibling as HTMLVideoElement).currentTime)}>
+            Spring over
+          </button>
+        </div>
+      )}
 
       {/* Prototype tools: status and the GA4 event log. */}
       <div className="hv-dev">
@@ -1038,6 +1089,17 @@ const CSS = `
 .hv-wel{position:absolute;inset:0;z-index:12;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(13,27,32,.38);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);animation:hvFade .45s ease}
 .hv-wel-grid{display:grid;grid-template-columns:1.6fr 1fr 1fr;grid-auto-rows:minmax(150px,auto);gap:16px;width:100%;max-width:1000px}
 .hv-wel-main{grid-row:span 2;background:var(--c-soft);border-radius:20px;padding:28px 28px 22px;display:flex;flex-direction:column;animation:hvUp .6s cubic-bezier(.2,.7,.2,1)}
+.hv-film{position:absolute;inset:0;z-index:30;background:#000;transition:opacity .9s ease}
+.hv-film.ude{opacity:0;pointer-events:none}
+.hv-film video{position:relative;width:100%;height:100%;object-fit:cover}
+/* Upright phone: the wide film zoomed just enough to keep its middle (the logo), on a blurred copy of itself. */
+@media (max-aspect-ratio:1/1){
+  .hv-film::before{content:"";position:absolute;inset:-40px;background:var(--poster) center/cover;filter:blur(24px) brightness(.6)}
+  .hv-film video{position:absolute;top:50%;left:50%;width:190%;max-width:none;height:auto;transform:translate(-50%,-50%)}
+  .hv-film video{-webkit-mask-image:linear-gradient(transparent,#000 12%,#000 88%,transparent);mask-image:linear-gradient(transparent,#000 12%,#000 88%,transparent)}
+}
+.hv-film button{position:absolute;right:20px;bottom:24px;border:1px solid rgba(255,255,255,.5);background:rgba(0,0,0,.35);color:#fff;border-radius:999px;padding:9px 18px;font:inherit;font-weight:700;font-size:13px;letter-spacing:.06em;cursor:pointer;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.hv-wel-main.hv-light img{width:auto;height:64px;max-width:200px;object-fit:contain;object-position:left;padding:0;background:none;border-radius:0}
 .hv-wel-main img{width:56px;height:56px;background:var(--c-main);border-radius:12px;padding:8px;margin-bottom:18px}
 .hv-wel-kick{font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:#7a8a90}
 .hv-wel-main h1{margin:6px 0 10px;font-size:42px;line-height:1.02;font-weight:900;color:var(--c-main);letter-spacing:-.01em;text-wrap:balance}

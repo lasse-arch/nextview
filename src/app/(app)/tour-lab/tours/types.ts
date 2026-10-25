@@ -59,6 +59,15 @@ export type TourConfig = {
   categories: Record<string, { name: string; color: string }>;
   points: TourPoint[];
   /** The tiles of the tile menu. */
+  /**
+   * A short film before the tour (e.g. a drone flying down to the entrance).
+   * It ends in the tour at `start`, then the welcome (or the menu) opens.
+   */
+  intro?: {
+    /** The film in each format and size - the browser takes the first it can play (media: e.g. "(max-width: 760px)"). */
+    sources: { src: string; type: "video/webm" | "video/mp4"; media?: string }[];
+    poster?: string;
+  };
   welcome?: {
     kicker: string;
     title: string;
