@@ -1,5 +1,6 @@
 "use client";
 
+import { isPlaceHref } from "../../tours/places";
 import { useState } from "react";
 import { saveTourStoryImage } from "@/lib/actions/tour-lab";
 import type { PlaceCard, TourConfig, TourPlace, WelcomeGo } from "../../tours/types";
@@ -244,7 +245,7 @@ function ButtonsEditor({ buttons, onChange, rooms, allowRoom }: { buttons: CardB
 }
 
 /** Every room in the menu, by name (what card buttons can fly to). */
-const menuRooms = (c: TourConfig) => c.menu.flatMap((m) => ("items" in m ? m.items : [[m.title, m.href] as [string, string]])).filter(([, h]) => h.includes("explore.nextview360.dk")).map(([n]) => n);
+const menuRooms = (c: TourConfig) => c.menu.flatMap((m) => ("items" in m ? m.items : [[m.title, m.href] as [string, string]])).filter(([, h]) => isPlaceHref(h)).map(([n]) => n);
 
 /* ------------------------------------------------------------------ */
 

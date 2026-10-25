@@ -145,6 +145,6 @@ export function outsideFiles(c: TourConfig): string[] {
   const all = [c.logo, c.cover?.image, c.cover?.imageMobile, c.intro?.poster, c.map?.image, ...(c.places ?? []).map((p) => p.image), ...(c.intro?.sources ?? []).map((s) => s.src), ...(c.info ?? []).map((i) => i.image)];
   return all.filter((src): src is string => {
     if (!src || !/^https?:\/\//i.test(src)) return false;
-    return !/(^|\.)(arpo\.dk|nextview360\.dk|matterport\.com|blob\.vercel-storage\.com|localhost)$/.test(new URL(src).hostname);
+    return !/(^|\.)(arpo\.dk|nextview360\.dk|blob\.vercel-storage\.com|localhost)$/.test(new URL(src).hostname);
   });
 }

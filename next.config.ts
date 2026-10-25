@@ -32,9 +32,19 @@ const nextConfig: NextConfig = {
       },
       {
         // Matterport's viewer (the self-hosted SDK Bundle) is shown in an
-        // iframe on our own tour pages - still never on other sites.
+        // iframe in our tours - and those sit in an iframe on customers' sites,
+        // so it may be framed anywhere (a static viewer; frame-ancestors
+        // replaces X-Frame-Options in browsers that know it).
         source: "/matterport/:path*",
-        headers: [{ key: "X-Frame-Options", value: "SAMEORIGIN" }],
+        headers: [
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
+          { key: "Content-Security-Policy", value: "frame-ancestors *" },
+        ],
+      },
+      {
+        // Published tours are made to be embedded on customers' websites.
+        source: "/t/:slug",
+        headers: [{ key: "Content-Security-Policy", value: "frame-ancestors *" }],
       },
       {
         // The tour editor previews the tour in an iframe on its own page.

@@ -67,11 +67,11 @@ export async function copyToTour(slug: string, url: string): Promise<string> {
   return storeTourFile(slug, name, type, bytes, url);
 }
 
-/** Is this address someone else's - a file that could disappear? (Our own files, the repo's and Matterport's are fine.) */
+/** Is this address someone else's - a file that could disappear? (Matterport's photo links expire too.) */
 export function isOutside(src: string | undefined): src is string {
   if (!src || !/^https?:\/\//i.test(src)) return false;
   const host = new URL(src).hostname;
-  return !/(^|\.)(arpo\.dk|nextview360\.dk|matterport\.com|blob\.vercel-storage\.com|localhost)$/.test(host);
+  return !/(^|\.)(arpo\.dk|nextview360\.dk|blob\.vercel-storage\.com|localhost)$/.test(host);
 }
 
 type Slot = { get: () => string | undefined; set: (v: string) => void };

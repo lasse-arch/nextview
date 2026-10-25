@@ -55,8 +55,14 @@ export type TourConfig = {
   /** Short name, e.g. "Halvorsminde". */
   brand: string;
   title: string;
-  /** The current MPSkins tour - scan points and model id are read from it. */
+  /** The current MPSkins tour - scan points and model id are read from it. Empty for a tour connected straight to a Matterport model. */
   tourPage: string;
+  /**
+   * The Matterport model (e.g. "rxaXbNZcETf") when the tour is connected
+   * straight to Matterport instead of an MPSkins tour page - scan points come
+   * from Matterport's own model data then. Left out = the MPSkins tour's model.
+   */
+  modelId?: string;
   /** MPSkins "Starting Point" (a U-link). */
   start: string;
   /** Logo for dark backgrounds - unless logoOnLight. */

@@ -1288,9 +1288,11 @@ model TourStoryImage {
 /// copy in TourVersion, so a change can always be undone.
 model Tour {
   id        String        @id @default(cuid())
-  /// The address: /tour-lab/<slug> today, the public tour link later.
+  /// The address: /tour-lab/<slug> in Arpo, /t/<slug> when published.
   slug      String        @unique
   name      String
+  /// Shown to anyone at /t/<slug> (and in an iframe on the customer's site) - off until it's ready.
+  published Boolean       @default(false)
   dealId    String?
   deal      Deal?         @relation(fields: [dealId], references: [id], onDelete: SetNull)
   config    Json

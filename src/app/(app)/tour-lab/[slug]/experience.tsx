@@ -1,5 +1,6 @@
 "use client";
 
+import { isPlaceHref, placeHref } from "../tours/places";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { saveTourGa4Id, saveTourStoryImage } from "@/lib/actions/tour-lab";
@@ -192,6 +193,7 @@ export function Experience({
   routeGraph,
   units,
   phone,
+  tools = false,
 }: {
   tour: TourConfig;
   sdkKey: string | null;
@@ -207,6 +209,8 @@ export function Experience({
   units: AvailableUnit[];
   /** The visitor is on a phone (from the request) - for the mobile zoom lock. */
   phone: boolean;
+  /** Arpo's own view: the prototype tools (status, event log, copy view …). Never in the public tour. */
+  tools?: boolean;
 }) {
   /** The editor's unsaved draft, when this tour is its live preview (see the editor bridge below). */
   const [draft, setDraft] = useState<TourConfig | null>(null);
@@ -236,7 +240,7 @@ export function Experience({
   const storyRooms = useMemo<StoryRoom[]>(() => {
     const all = T.menu
       .flatMap((m) => ("items" in m ? m.items : [[m.title, m.href] as [string, string]]))
-      .filter(([, href]) => href.includes("explore.nextview360.dk"));
+      .filter(([, href]) => isPlaceHref(href));
     const unique = all.filter(([name], i) => all.findIndex(([n]) => n === name) === i);
     const picked = T.stories?.rooms ? T.stories.rooms.map((r) => unique.find(([n]) => n === r)).filter((x): x is [string, string] => Boolean(x)) : unique;
     return picked.map(([name, href]) => ({ name, href, image: storyImages[name] }));
@@ -700,7 +704,7 @@ export function Experience({
       backToDrone();
       return;
     }
-    if (!href.includes("explore.nextview360.dk")) {
+    if (!isPlaceHref(href)) {
       track("cta_click", { label: name, link_url: href, place: "menu" });
       openLink(T, href, name, popup);
       return;
@@ -815,21 +819,20 @@ export function Experience({
         });
         const ss = Object.entries(sweepBySs).find(([, id]) => id === pose.sweep)?.[0];
         if (!ss) return reply({ type: "tour-view", id: e.data.id, error: "Gå ind i touren først (forbi velkomsten)." });
-        const base = savedTour.tourPage.split("?")[0];
-        reply({ type: "tour-view", id: e.data.id, href: `${base}?ss=${ss}&rot=${pose.rotation.x.toFixed(1)},${pose.rotation.y.toFixed(1)}`, room });
+        reply({ type: "tour-view", id: e.data.id, href: placeHref(savedTour, ss, pose.rotation), room });
       }
     }
     window.addEventListener("message", onMessage);
     reply({ type: "tour-ready" });
     return () => window.removeEventListener("message", onMessage);
-  }, [savedTour.tourPage, sweepBySs]);
+  }, [savedTour, sweepBySs]);
 
   /* ----- "Find vej" ----- */
   const DESTINATIONS = useMemo<Destination[]>(
     () =>
       T.menu.flatMap((m) =>
         ("items" in m ? m.items.map(([name, href]) => ({ name, group: m.title, href })) : [{ name: m.title, href: m.href }]).filter((d) =>
-          d.href.includes("explore.nextview360.dk")
+          isPlaceHref(d.href)
         )
       ),
     [T]
@@ -1162,7 +1165,7 @@ export function Experience({
                   {m.items.map(([name, href]) => (
                     <button key={name} type="button" onClick={() => menuGo(name, m.title, href)}>
                       {name}
-                      {!href.includes("explore.nextview360.dk") && <span className="hv-ext">↗</span>}
+                      {!isPlaceHref(href) && <span className="hv-ext">↗</span>}
                     </button>
                   ))}
                 </div>
@@ -1266,6 +1269,7 @@ export function Experience({
       )}
 
       {/* Prototype tools: status and the GA4 event log. */}
+      {tools && (
       <div className="hv-dev">
         <button type="button" onClick={() => setShowLog((s) => !s)}>
           {tourError ? "⚠ Tour" : tourReadyMs != null ? `Tour klar ${(tourReadyMs / 1000).toFixed(1).replace(".", ",")} s` : "Tour indlæses…"} · GA4 {ga4Id ? "✓" : "–"}
@@ -1274,6 +1278,7 @@ export function Experience({
           <DevPanel onCopyView={copyView} place={T.info ? place : undefined} onCaptureStories={T.stories ? captureStories : undefined} storyCount={storyRooms.length} ga4Id={ga4Id} tourError={tourError} sdkKey={sdkKey} modelId={modelId} pointsOnly={pointsOnly} onPointsOnly={setNavigation} />
         )}
       </div>
+      )}
       {phase === "tour" && T.info && T.info.length > 0 && (
         <InfoDots
           sdk={sdk}

@@ -12,6 +12,8 @@ import { prisma } from "@/lib/db";
 import { getSettingValue, setSettingValue } from "@/lib/integration-settings";
 import { mpskinsMenuDigest, siteDigest } from "@/lib/site-digest";
 import { hostFiles } from "@/lib/tour-files";
+import { tourConfigProblem } from "@/lib/tour-validate";
+import { fetchModelInfo, modelIdsIn, type ModelInfo } from "@/lib/matterport-graph";
 import type { TourConfig } from "@/app/(app)/tour-lab/tours/types";
 
 /*
@@ -121,7 +123,7 @@ ${types}
 }
 
 /** Asks Claude for edits to a setup and applies them to a copy. */
-async function claudeEdits(key: string, config: TourConfig, history: ChatTurn[], request: string, maxTokens = 16000): Promise<AiEditResult> {
+async function claudeEdits(key: string, config: TourConfig, history: ChatTurn[], request: string, maxTokens = 16000, retry = true): Promise<AiEditResult> {
   const messages: Anthropic.MessageParam[] = [
     ...history.slice(-10).map((t): Anthropic.MessageParam => ({ role: t.role, content: t.text })),
     { role: "user", content: `Opsætningen lige nu:\n\`\`\`json\n${JSON.stringify(config)}\n\`\`\`\n\n${request}` },
@@ -153,10 +155,17 @@ async function claudeEdits(key: string, config: TourConfig, history: ChatTurn[],
   if (!parsed) return { ok: false, error: "Claude svarede ikke som forventet - prøv igen." };
 
   const next = structuredClone(config) as unknown as Record<string, unknown>;
+  let problem: string | null;
   try {
     for (const c of parsed.changes) apply(next, c.op, c.path, c.op === "set" ? JSON.parse(c.value_json) : undefined);
+    problem = tourConfigProblem(next);
   } catch (err) {
-    return { ok: false, error: `Claudes ændring kunne ikke bruges (${err instanceof Error ? err.message : err}) - prøv at formulere det anderledes.` };
+    problem = err instanceof Error ? err.message : String(err);
+  }
+  if (problem) {
+    // Claude gets one go at fixing its own edit, told exactly what was wrong.
+    if (retry) return claudeEdits(key, config, history, `${request}\n\n(Dit forrige forsøg kunne ikke bruges: ${problem}. Lav ændringen igen, så opsætningen har den rigtige form.)`, maxTokens, false);
+    return { ok: false, error: `Claudes ændring kunne ikke bruges (${problem}) - prøv at formulere det anderledes.` };
   }
   return { ok: true, reply: parsed.reply, config: { ...(next as unknown as TourConfig), slug: config.slug }, changed: parsed.changes.length };
 }
@@ -165,7 +174,12 @@ export async function askClaudeForTour(config: TourConfig, history: ChatTurn[], 
   await admin();
   const key = await apiKey();
   if (!key) return { ok: false, error: "Claude er ikke sat op endnu - indsæt en nøgle." };
-  return claudeEdits(key, config, history, `Ønske: ${request}`);
+  try {
+    return await claudeEdits(key, config, history, `Ønske: ${request}`);
+  } catch (err) {
+    console.error("askClaudeForTour", err);
+    return { ok: false, error: `Noget gik galt hos Claude (${err instanceof Error ? err.message : err}) - prøv igen.` };
+  }
 }
 
 /**
@@ -174,30 +188,46 @@ export async function askClaudeForTour(config: TourConfig, history: ChatTurn[], 
  * red thread), the MPSkins tour its rooms and links - on top of an existing
  * tour's features (its kind of menu, start and functions).
  */
-export async function createTourFromWebsite(input: { name: string; website: string; tourUrl: string; base: string; notes: string }): Promise<{ ok: true; slug: string; reply: string } | { ok: false; error: string }> {
+export async function createTourFromWebsite(input: {
+  name: string;
+  website: string;
+  /** The MPSkins tour (optional when a Matterport model is given) - its menu is reused. */
+  tourUrl: string;
+  /** The Matterport model the tour is connected to. */
+  modelId?: string;
+  /** The customer (deal) - the tour is linked to it. */
+  dealId?: string;
+  base: string;
+  notes: string;
+}): Promise<{ ok: true; slug: string; reply: string } | { ok: false; error: string }> {
   const user = await admin();
   const key = await apiKey();
   if (!key) return { ok: false, error: "Claude er ikke sat op endnu - indsæt en nøgle i en tours editor (fanen Claude)." };
   const name = input.name.trim();
   if (!name) return { ok: false, error: "Giv touren et navn." };
-  let tourUrl: URL;
-  try {
-    tourUrl = new URL(input.tourUrl.trim());
-  } catch {
-    return { ok: false, error: "Indsæt linket til MPSkins-touren (explore.nextview360.dk/…)." };
+  let tourUrl: URL | null = null;
+  if (input.tourUrl.trim()) {
+    try {
+      tourUrl = new URL(input.tourUrl.trim());
+    } catch {
+      return { ok: false, error: "MPSkins-linket ser ikke rigtigt ud (explore.nextview360.dk/…)." };
+    }
+    if (tourUrl.hostname !== "explore.nextview360.dk") return { ok: false, error: "MPSkins-linket skal være et explore.nextview360.dk-link." };
   }
-  if (tourUrl.hostname !== "explore.nextview360.dk") return { ok: false, error: "Tour-linket skal være et explore.nextview360.dk-link." };
+  const model = input.modelId ? await fetchModelInfo(input.modelId) : null;
+  if (input.modelId && !model) return { ok: false, error: "Matterport-modellen findes ikke eller er ikke offentlig." };
+  if (!tourUrl && !model) return { ok: false, error: "Vælg kundens Matterport-tour." };
   const source = await prisma.tour.findUnique({ where: { slug: input.base }, select: { config: true } });
   if (!source) return { ok: false, error: "Touren, der skal bygges videre på, findes ikke." };
 
   const [site, menu] = await Promise.all([
     input.website.trim() ? siteDigest(input.website).catch((err: unknown) => `(Hjemmesiden kunne ikke hentes: ${err instanceof Error ? err.message : err})`) : Promise.resolve("(Ingen hjemmeside angivet)"),
-    mpskinsMenuDigest(tourUrl.toString()).catch(() => ""),
+    tourUrl ? mpskinsMenuDigest(tourUrl.toString()).catch(() => "") : Promise.resolve(""),
   ]);
 
   let slug = slugify(name) || "tour";
   for (let i = 2; await prisma.tour.findUnique({ where: { slug }, select: { id: true } }); i++) slug = `${slugify(name)}-${i}`;
-  const base = neutral(source.config as unknown as TourConfig, { slug, title: name, tourPage: tourUrl.toString() });
+  const base = { ...neutral(source.config as unknown as TourConfig, { slug, title: name, tourPage: tourUrl?.toString() ?? "" }), modelId: model?.id };
 
   const result = await claudeEdits(
     key,
@@ -219,8 +249,18 @@ ${site}
 </hjemmeside>
 
 <mpskins-menu>
-${menu || "(Kunne ikke læses)"}
-</mpskins-menu>`,
+${menu || (tourUrl ? "(Kunne ikke læses)" : "(Ingen MPSkins-tour - menuens steder vælges bagefter i editoren. Lav menuen med kundens handlinger og evt. tomme grupper, som brugeren fylder.)")}
+</mpskins-menu>
+${
+  model
+    ? `
+<matterport>
+Touren er forbundet direkte til Matterport-modellen ${model.id} ("${model.name}"${model.address ? `, ${model.address}` : ""}).
+Steder i touren skrives som https://my.matterport.com/show/?m=${model.id}&ss=<scanpunkt> - start: brug ss=1, medmindre MPSkins-menuen viser et bedre startpunkt.
+Fotos fra scanningen (brug det første som forsidebillede, hvis der er en forside): ${model.photos.slice(0, 4).join(" ")}
+</matterport>`
+    : ""
+}`,
     32000
   );
   if (!result.ok) return result;
@@ -229,7 +269,7 @@ ${menu || "(Kunne ikke læses)"}
   const hosted = await hostFiles(slug, { ...result.config, slug });
   const config = hosted.config as unknown as Prisma.InputJsonValue;
   await prisma.tour.create({
-    data: { slug, name, config, versions: { create: { config, note: `Bygget af Claude ud fra ${input.website.trim() || "MPSkins-touren"}`, createdByName: user.name } } },
+    data: { slug, name, dealId: input.dealId || null, config, versions: { create: { config, note: `Bygget af Claude ud fra ${input.website.trim() || "MPSkins-touren"}`, createdByName: user.name } } },
   });
   revalidatePath("/tour-lab");
   const failed = hosted.failed.length ? `\n\nDisse filer kunne ikke hentes til os: ${hosted.failed.join("; ")}` : "";
@@ -273,4 +313,42 @@ function neutral(c: TourConfig, fields: Pick<TourConfig, "slug" | "title" | "tou
     hiddenSweeps: [],
     menu: [],
   };
+}
+
+/* ----- "Ny tour": the customer and their Matterport tours ----- */
+
+export type TourCustomer = { id: string; name: string; address: string | null; website: string | null; stage: string; contractSignedAt: string | null; tours: number; hasModel: boolean };
+
+/** Customers to make a tour for - signed/filmed/live first, then by name. */
+export async function searchTourCustomers(query: string): Promise<TourCustomer[]> {
+  await admin();
+  const q = query.trim();
+  const deals = await prisma.deal.findMany({
+    where: q.length >= 2 ? { OR: [{ companyName: { contains: q, mode: "insensitive" } }, { displayName: { contains: q, mode: "insensitive" } }] } : { OR: [{ contractSignedAt: { not: null } }, { mpSkinId: { not: null } }] },
+    orderBy: [{ filmedAt: { sort: "desc", nulls: "last" } }, { contractSignedAt: { sort: "desc", nulls: "last" } }],
+    take: 12,
+    select: { id: true, companyName: true, displayName: true, address: true, websiteUrl: true, stage: true, contractSignedAt: true, mpSkinId: true, _count: { select: { tours: true } }, items: { select: { url: true } } },
+  });
+  return deals.map((d) => ({
+    id: d.id,
+    name: d.displayName ?? d.companyName,
+    address: d.address,
+    website: d.websiteUrl,
+    stage: d.stage,
+    contractSignedAt: d.contractSignedAt?.toISOString() ?? null,
+    tours: d._count.tours,
+    hasModel: modelIdsIn([d.mpSkinId ?? "", ...d.items.map((i) => i.url ?? "")].join(" ")).length > 0,
+  }));
+}
+
+/** The customer's Matterport tours (from the deal's MP-Space ids and product links), with name and photo from Matterport - or one pasted link/id. */
+export async function matterportModels(dealId: string | null, pasted?: string): Promise<ModelInfo[]> {
+  await admin();
+  let text = pasted ?? "";
+  if (dealId && !pasted) {
+    const d = await prisma.deal.findUnique({ where: { id: dealId }, select: { mpSkinId: true, items: { select: { url: true } } } });
+    text = [d?.mpSkinId ?? "", ...(d?.items.map((i) => i.url ?? "") ?? [])].join(" ");
+  }
+  const models = await Promise.all(modelIdsIn(text).slice(0, 10).map(fetchModelInfo));
+  return models.filter((m): m is ModelInfo => m != null);
 }

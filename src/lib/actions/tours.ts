@@ -5,6 +5,7 @@ import type { Prisma } from "@prisma/client";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import type { TourConfig } from "@/app/(app)/tour-lab/tours/types";
+import { tourConfigProblem } from "@/lib/tour-validate";
 
 type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string };
 
@@ -14,24 +15,10 @@ async function admin() {
   return user;
 }
 
-/** The minimum a setup must have for the tour to open - the rest has defaults or is optional. */
-function check(config: unknown): string | null {
-  if (!config || typeof config !== "object" || Array.isArray(config)) return "Opsætningen skal være et objekt.";
-  const c = config as Partial<TourConfig>;
-  for (const key of ["brand", "title", "tourPage", "start", "logo", "font"] as const) {
-    if (typeof c[key] !== "string" || !c[key]) return `Mangler "${key}".`;
-  }
-  if (!c.colors || typeof c.colors !== "object") return 'Mangler "colors".';
-  if (!Array.isArray(c.menu)) return '"menu" skal være en liste.';
-  if (!Array.isArray(c.cta)) return '"cta" skal være en liste.';
-  if (!String(c.tourPage).startsWith("https://explore.nextview360.dk/")) return "Tour-linket skal være et explore.nextview360.dk-link.";
-  return null;
-}
-
 /** Saves a tour's setup as a new version. */
 export async function saveTour(slug: string, config: TourConfig, note: string): Promise<Result<{ versionId: string }>> {
   const user = await admin();
-  const error = check(config);
+  const error = tourConfigProblem(config);
   if (error) return { ok: false, error };
   const tour = await prisma.tour.findUnique({ where: { slug }, select: { id: true } });
   if (!tour) return { ok: false, error: "Touren findes ikke." };
@@ -99,4 +86,12 @@ export async function createTour(name: string, copyOf: string): Promise<Result<{
   });
   revalidatePath("/tour-lab");
   return { ok: true, slug };
+}
+
+/** Publishes a tour at /t/<slug> (for the iframe on the customer's site) - or takes it down again. */
+export async function setTourPublished(slug: string, published: boolean): Promise<Result> {
+  await admin();
+  await prisma.tour.update({ where: { slug }, data: { published } });
+  revalidatePath(`/t/${slug}`);
+  return { ok: true };
 }

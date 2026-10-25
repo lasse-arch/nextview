@@ -25,6 +25,7 @@ export default async function TourEditPage({ params }: { params: Promise<{ slug:
     select: {
       slug: true,
       config: true,
+      published: true,
       deal: { select: { id: true, companyName: true, displayName: true } },
       versions: { orderBy: { createdAt: "desc" }, take: 40, select: { id: true, note: true, createdByName: true, createdAt: true } },
     },
@@ -37,6 +38,7 @@ export default async function TourEditPage({ params }: { params: Promise<{ slug:
       deal={tour.deal ? { id: tour.deal.id, name: tour.deal.displayName ?? tour.deal.companyName } : null}
       stats={await tourStats(tour.slug)}
       blob={blobReady()}
+      published={tour.published}
       aiReady={Boolean(process.env.ANTHROPIC_API_KEY || (await getSettingValue("ANTHROPIC_API_KEY")))}
       versions={tour.versions.map((v) => ({ id: v.id, note: v.note, by: v.createdByName, at: v.createdAt.toISOString() }))}
     />

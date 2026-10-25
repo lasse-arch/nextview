@@ -1,19 +1,22 @@
 "use client";
 
+import { isPlaceHref } from "../../tours/places";
+import { tourConfigProblem } from "@/lib/tour-validate";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { Component, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { restoreTourVersion, saveTour, searchDeals, setTourDeal } from "@/lib/actions/tours";
 import { askClaudeForTour, saveAnthropicKey, type ChatTurn } from "@/lib/actions/tour-ai";
 import type { LinkOpen, MenuEntry, TourConfig } from "../../tours/types";
 import type { TourStats } from "@/lib/tour-stats";
 import { CardsEditor, GuideEditor, StartEditor } from "./content";
 import { ResultsPanel } from "./results";
+import { DEFAULT_EMBED, SharePanel, SitePreview, type EmbedSize } from "./share";
 import { Choice, Field, FilesContext, Group, Icon, input, outsideFiles, Toggle, UploadButton, type PreviewApi } from "./ui";
 import { hostTourFiles } from "@/lib/actions/tour-files";
 
 type Version = { id: string; note: string | null; by: string | null; at: string };
-type Tab = "claude" | "resultater" | "start" | "rundvisning" | "kort" | "generelt" | "design" | "menu" | "funktioner" | "links" | "avanceret" | "versioner";
+type Tab = "claude" | "resultater" | "del" | "start" | "rundvisning" | "kort" | "generelt" | "design" | "menu" | "funktioner" | "links" | "avanceret" | "versioner";
 
 /** Claude's mark: a small sunburst. */
 const SPARK = '<path d="M12 3v5M12 16v5M3 12h5M16 12h5M5.6 5.6l3.5 3.5M14.9 14.9l3.5 3.5M5.6 18.4l3.5-3.5M14.9 9.1l3.5-3.5"/>';
@@ -22,6 +25,7 @@ const SPARK = '<path d="M12 3v5M12 16v5M3 12h5M16 12h5M5.6 5.6l3.5 3.5M14.9 14.9
 const TABS: [Tab, string, string, string?][] = [
   ["claude", "Claude", SPARK],
   ["resultater", "Resultater", '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'],
+  ["del", "Del og udgiv", '<path d="M12 15V3M7 8l5-5 5 5"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/>'],
   ["start", "Start", '<path d="M5 4v16M5 5h11l-2 4 2 4H5"/>', "Indhold"],
   ["menu", "Menu", '<path d="M4 6h16M4 12h16M4 18h10"/>'],
   ["rundvisning", "Vis mig rundt", '<circle cx="12" cy="12" r="9"/><path d="M10 8.5v7l5.5-3.5z"/>'],
@@ -44,6 +48,7 @@ export function TourEditor({
   aiReady,
   stats,
   blob,
+  published,
 }: {
   slug: string;
   initial: TourConfig;
@@ -53,6 +58,7 @@ export function TourEditor({
   stats: TourStats;
   /** Vercel Blob is set up (uploads of big files, videos). */
   blob: boolean;
+  published: boolean;
 }) {
   const router = useRouter();
   const [config, setConfig] = useState<TourConfig>(initial);
@@ -74,7 +80,9 @@ export function TourEditor({
   }, [slug]);
   const [note, setNote] = useState("");
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  const [device, setDevice] = useState<"computer" | "mobil">("computer");
+  const [device, setDevice] = useState<"computer" | "mobil" | "site">("computer");
+  const [siteWidth, setSiteWidth] = useState<"computer" | "mobil">("computer");
+  const [embed, setEmbed] = useState<EmbedSize>(DEFAULT_EMBED);
   const [previewKey, setPreviewKey] = useState(0);
   const [pending, start] = useTransition();
   const [json, setJson] = useState<string | null>(null);
@@ -83,6 +91,8 @@ export function TourEditor({
   const frame = useRef<HTMLIFrameElement>(null);
   const latest = useRef(config);
   useEffect(() => {
+    // Only a whole setup goes to the preview - a half-typed one would break the tour there.
+    if (tourConfigProblem(config)) return;
     latest.current = config;
     const t = setTimeout(() => frame.current?.contentWindow?.postMessage({ type: "tour-draft", config }, location.origin), 250);
     return () => clearTimeout(t);
@@ -167,6 +177,7 @@ export function TourEditor({
         </a>
       </div>
 
+      <SafeArea onUndo={() => { setConfig(initial); setDirty(false); }}>
       <div className="flex min-h-0 flex-1">
         {/* Sections */}
         <nav className="flex w-[210px] flex-none flex-col gap-0.5 p-3">
@@ -293,6 +304,18 @@ export function TourEditor({
             )}
 
             {tab === "resultater" && <ResultsPanel stats={stats} />}
+            {tab === "del" && (
+              <SharePanel
+                slug={slug}
+                title={config.title}
+                published={published}
+                size={embed}
+                setSize={(s) => {
+                  setEmbed(s);
+                  setDevice("site");
+                }}
+              />
+            )}
             {tab === "start" && <StartEditor config={config} edit={edit} slug={slug} preview={preview} />}
             {tab === "rundvisning" && <GuideEditor config={config} edit={edit} preview={preview} />}
             {tab === "kort" && <CardsEditor config={config} edit={edit} preview={preview} />}
@@ -475,37 +498,53 @@ export function TourEditor({
         {/* Preview */}
         <div className="relative flex min-w-0 flex-1 flex-col p-3 pl-4">
           <div className="mb-3 flex items-center gap-3">
-            <div className="w-56">
+            <div className="w-80">
               <Choice
                 value={device}
                 options={[
                   ["computer", "Computer"],
                   ["mobil", "Mobil"],
+                  ["site", "På hjemmeside"],
                 ]}
                 onChange={setDevice}
               />
             </div>
+            {device === "site" && (
+              <div className="w-40">
+                <Choice
+                  value={siteWidth}
+                  options={[
+                    ["computer", "Bred"],
+                    ["mobil", "Mobil"],
+                  ]}
+                  onChange={setSiteWidth}
+                />
+              </div>
+            )}
             <span className="text-[12px] text-[#8e8e93]">{dirty ? "Live · ikke gemt endnu" : "Som den er gemt"}</span>
             <button type="button" onClick={() => setPreviewKey((k) => k + 1)} className="ml-auto rounded-full px-3 py-1 text-[13px] text-[#0071e3] hover:bg-[#0071e3]/10" title="Start touren forfra (fx for at se en ny velkomst)">
               Start forfra
             </button>
           </div>
           <div className="flex min-h-0 flex-1 items-center justify-center">
-            {device === "computer" ? (
+            {device === "site" ? (
+              <SitePreview config={config} size={embed} width={siteWidth}>
+                <iframe ref={frame} key={previewKey} title="Forhåndsvisning" src={`/tour-lab/${slug}`} className="h-full w-full bg-black" allow="fullscreen; xr-spatial-tracking; autoplay; clipboard-write" />
+              </SitePreview>
+            ) : device === "computer" ? (
               <div className="flex h-full w-full flex-col overflow-hidden rounded-xl bg-white shadow-[0_20px_50px_rgba(0,0,0,.15)] ring-1 ring-black/10">
                 <div className="flex items-center gap-1.5 border-b border-black/[.06] bg-[#f6f6f6] px-3 py-2">
                   <i className="h-3 w-3 rounded-full bg-[#ff5f57]" />
                   <i className="h-3 w-3 rounded-full bg-[#febc2e]" />
                   <i className="h-3 w-3 rounded-full bg-[#28c840]" />
-                  <span className="mx-auto rounded-md bg-white px-3 py-0.5 text-[11px] text-[#8e8e93] ring-1 ring-black/[.06]">explore.nextview360.dk/{slug}</span>
+                  <span className="mx-auto rounded-md bg-white px-3 py-0.5 text-[11px] text-[#8e8e93] ring-1 ring-black/[.06]">arpo.dk/t/{slug}</span>
                 </div>
                 <iframe ref={frame} key={previewKey} title="Forhåndsvisning" src={`/tour-lab/${slug}`} className="min-h-0 w-full flex-1 bg-black" allow="fullscreen; xr-spatial-tracking; autoplay; clipboard-write" />
               </div>
             ) : (
-              <div className="relative h-full max-h-[860px] w-[min(410px,100%)] rounded-[54px] bg-[#1d1d1f] p-[12px] shadow-[0_30px_60px_rgba(0,0,0,.3)]">
-                <span className="absolute left-1/2 top-[22px] z-10 h-[28px] w-[100px] -translate-x-1/2 rounded-full bg-black" />
-                <iframe ref={frame} key={previewKey} title="Forhåndsvisning" src={`/tour-lab/${slug}`} className="h-full w-full rounded-[42px] bg-black" allow="fullscreen; xr-spatial-tracking; autoplay; clipboard-write" />
-              </div>
+              <PhoneFrame>
+                <iframe ref={frame} key={previewKey} title="Forhåndsvisning" src={`/tour-lab/${slug}`} className="h-full w-full bg-black" allow="fullscreen; xr-spatial-tracking; autoplay; clipboard-write" />
+              </PhoneFrame>
             )}
           </div>
 
@@ -546,6 +585,7 @@ export function TourEditor({
           )}
         </div>
       </div>
+      </SafeArea>
     </div>
     </FilesContext.Provider>
   );
@@ -589,7 +629,7 @@ function ClaudePanel({
     setText("");
     const before = config;
     start(async () => {
-      const r = await askClaudeForTour(config, history, ask);
+      const r = await askClaudeForTour(config, history, ask).catch((err: unknown) => ({ ok: false as const, error: `Kunne ikke nå Claude (${err instanceof Error ? err.message : err}) - prøv igen.` }));
       if (!r.ok) return setChat((c) => [...c, { role: "assistant", text: r.error, error: true }]);
       if (r.changed) onApply(r.config);
       setChat((c) => [...c, { role: "assistant", text: r.reply, changed: r.changed, before: r.changed ? before : undefined }]);
@@ -758,6 +798,68 @@ function FilesGroup({ slug, config, onHosted }: { slug: string; config: TourConf
   );
 }
 
+/**
+ * An iPhone (15/16: a 393 × 852 screen) with the tour at its real size,
+ * scaled down to fit - so the preview lays out exactly as on a phone.
+ */
+const PHONE = { w: 393, h: 852, bezel: 12 };
+function PhoneFrame({ children }: { children: React.ReactNode }) {
+  const box = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(0.8);
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const fit = () => setScale(Math.min(1, el.clientHeight / (PHONE.h + 2 * PHONE.bezel), el.clientWidth / (PHONE.w + 2 * PHONE.bezel)));
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return (
+    <div ref={box} className="flex h-full w-full items-center justify-center overflow-hidden">
+      <div style={{ width: (PHONE.w + 2 * PHONE.bezel) * scale, height: (PHONE.h + 2 * PHONE.bezel) * scale }}>
+        <div
+          className="relative origin-top-left rounded-[58px] bg-[#1d1d1f] shadow-[0_30px_60px_rgba(0,0,0,.3)]"
+          style={{ width: PHONE.w + 2 * PHONE.bezel, height: PHONE.h + 2 * PHONE.bezel, padding: PHONE.bezel, transform: `scale(${scale})` }}
+        >
+          <span className="absolute left-1/2 top-[23px] z-10 h-[34px] w-[124px] -translate-x-1/2 rounded-full bg-black" />
+          <div className="h-full w-full overflow-hidden rounded-[46px] bg-black">{children}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * If a setup can't be shown (a malformed edit), the editor stays up: a short
+ * message and a way back to the saved version - never a crashed page.
+ */
+class SafeArea extends Component<{ onUndo: () => void; children: React.ReactNode }, { error: string | null }> {
+  state = { error: null as string | null };
+  static getDerivedStateFromError(err: unknown) {
+    return { error: err instanceof Error ? err.message : String(err) };
+  }
+  render() {
+    if (!this.state.error) return this.props.children;
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
+        <p className="text-[17px] font-semibold">Den seneste ændring kan ikke vises</p>
+        <p className="max-w-md text-[13px] text-[#6e6e73]">Noget i opsætningen har en forkert form ({this.state.error}). Intet er gemt - gå tilbage til den gemte version og prøv igen.</p>
+        <button
+          type="button"
+          className="rounded-full bg-[#0071e3] px-5 py-2 text-[15px] font-medium text-white"
+          onClick={() => {
+            this.props.onUndo();
+            this.setState({ error: null });
+          }}
+        >
+          Tilbage til den gemte version
+        </button>
+      </div>
+    );
+  }
+}
+
 function DealPicker({ slug, initial }: { slug: string; initial: { id: string; name: string } | null }) {
   const [deal, setDeal] = useState(initial);
   const [q, setQ] = useState("");
@@ -836,7 +938,7 @@ function moveEntry(menu: MenuEntry[], from: Addr, to: Addr | null): MenuEntry[] 
 }
 
 type Kind = "sted" | "web" | "luft";
-const kindOf = (href: string): Kind => (href === "#luften" ? "luft" : href.includes("explore.nextview360.dk") ? "sted" : "web");
+const kindOf = (href: string): Kind => (href === "#luften" ? "luft" : isPlaceHref(href) ? "sted" : "web");
 function whereText(href: string) {
   const kind = kindOf(href);
   if (!href) return "Mangler et mål";
