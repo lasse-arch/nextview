@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { getSettingValue } from "@/lib/integration-settings";
 import { ensureToursSeeded } from "@/lib/tours";
 import type { TourConfig } from "../../tours/types";
 import { TourEditor } from "./editor";
@@ -29,6 +30,7 @@ export default async function TourEditPage({ params }: { params: Promise<{ slug:
       slug={tour.slug}
       initial={tour.config as unknown as TourConfig}
       deal={tour.deal ? { id: tour.deal.id, name: tour.deal.displayName ?? tour.deal.companyName } : null}
+      aiReady={Boolean(process.env.ANTHROPIC_API_KEY || (await getSettingValue("ANTHROPIC_API_KEY")))}
       versions={tour.versions.map((v) => ({ id: v.id, note: v.note, by: v.createdByName, at: v.createdAt.toISOString() }))}
     />
   );

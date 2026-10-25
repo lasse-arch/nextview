@@ -14,13 +14,13 @@ export function NewTour({ tours }: { tours: { slug: string; name: string }[] }) 
   const [pending, start] = useTransition();
   if (!open)
     return (
-      <button type="button" onClick={() => setOpen(true)} className="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700">
+      <button type="button" onClick={() => setOpen(true)} className="rounded-full bg-[#0071e3] px-4 py-2 text-[14px] font-medium text-white hover:bg-[#0077ed]">
         + Ny tour
       </button>
     );
   return (
     <form
-      className="flex flex-wrap items-end gap-2 rounded-xl border border-slate-200 bg-white p-3"
+      className="flex flex-wrap items-end gap-2 rounded-2xl bg-white p-3 shadow-[0_1px_3px_rgba(0,0,0,.06)] ring-1 ring-black/[.05]"
       onSubmit={(e) => {
         e.preventDefault();
         start(async () => {
@@ -32,11 +32,11 @@ export function NewTour({ tours }: { tours: { slug: string; name: string }[] }) 
     >
       <label className="text-sm">
         <span className="block text-xs font-semibold uppercase text-slate-500">Navn</span>
-        <input autoFocus value={name} onChange={(e) => setName(e.target.value)} className="rounded-lg border border-slate-300 px-3 py-1.5" placeholder="Fx Boxdepotet Vejle" />
+        <input autoFocus value={name} onChange={(e) => setName(e.target.value)} className="rounded-[10px] border-0 bg-[#f2f2f7] px-3 py-1.5" placeholder="Fx Boxdepotet Vejle" />
       </label>
       <label className="text-sm">
         <span className="block text-xs font-semibold uppercase text-slate-500">Start som kopi af</span>
-        <select value={copyOf} onChange={(e) => setCopyOf(e.target.value)} className="rounded-lg border border-slate-300 px-3 py-1.5">
+        <select value={copyOf} onChange={(e) => setCopyOf(e.target.value)} className="rounded-[10px] border-0 bg-[#f2f2f7] px-3 py-1.5">
           {tours.map((t) => (
             <option key={t.slug} value={t.slug}>
               {t.name}
@@ -44,7 +44,7 @@ export function NewTour({ tours }: { tours: { slug: string; name: string }[] }) 
           ))}
         </select>
       </label>
-      <button type="submit" disabled={pending} className="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50">
+      <button type="submit" disabled={pending} className="rounded-full bg-[#0071e3] px-4 py-1.5 text-[14px] font-medium text-white disabled:opacity-50">
         Opret
       </button>
       <button type="button" onClick={() => setOpen(false)} className="px-2 py-1.5 text-sm text-slate-500">

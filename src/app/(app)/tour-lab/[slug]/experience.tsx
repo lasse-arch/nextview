@@ -161,7 +161,7 @@ function readLastRoom(key: string): { name: string; href: string } | null {
 }
 
 export function Experience({
-  tour: T,
+  tour: savedTour,
   sdkKey,
   ga4Id,
   modelId,
@@ -187,6 +187,9 @@ export function Experience({
   /** The visitor is on a phone (from the request) - for the mobile zoom lock. */
   phone: boolean;
 }) {
+  /** The editor's unsaved draft, when this tour is its live preview (see the editor bridge below). */
+  const [draft, setDraft] = useState<TourConfig | null>(null);
+  const T = draft ?? savedTour;
   useGa4(ga4Id, T.title);
   const { names: ROOM_NAMES, links: ROOM_LINKS } = useMemo(() => roomIndex([...T.menu, ...(T.places ? [{ title: "", items: T.places.map((p): [string, string] => [p.name, p.href]) }] : [])]), [T]);
   const LAST_ROOM_KEY = `${T.slug}-last-room`;
@@ -737,6 +740,39 @@ export function Experience({
     navigator.clipboard?.writeText(snippet).catch(() => {});
     return snippet;
   }
+
+  /* ----- Editor bridge: the tour editor shows this page as its live preview ----- */
+  const bridge = useRef({ sdk, room, menuGo });
+  useEffect(() => {
+    bridge.current = { sdk, room, menuGo };
+  });
+  useEffect(() => {
+    if (window.parent === window) return;
+    const reply = (msg: object) => window.parent.postMessage(msg, location.origin);
+    async function onMessage(e: MessageEvent) {
+      if (e.origin !== location.origin || e.source !== window.parent || !e.data?.type) return;
+      const { sdk, room, menuGo } = bridge.current;
+      if (e.data.type === "tour-draft") setDraft(e.data.config as TourConfig);
+      if (e.data.type === "tour-go") menuGo(e.data.name ?? "", "editor", e.data.href);
+      if (e.data.type === "tour-view") {
+        // The view the preview stands in, as a menu link (scan point + exact direction).
+        if (!sdk) return reply({ type: "tour-view", id: e.data.id, error: "Touren er ikke klar endnu - vent et øjeblik." });
+        const pose = await new Promise<CameraPose>((resolve) => {
+          const sub = sdk.Camera.pose.subscribe((p) => {
+            resolve(p);
+            setTimeout(() => sub.cancel());
+          });
+        });
+        const ss = Object.entries(sweepBySs).find(([, id]) => id === pose.sweep)?.[0];
+        if (!ss) return reply({ type: "tour-view", id: e.data.id, error: "Gå ind i touren først (forbi velkomsten)." });
+        const base = savedTour.tourPage.split("?")[0];
+        reply({ type: "tour-view", id: e.data.id, href: `${base}?ss=${ss}&rot=${pose.rotation.x.toFixed(1)},${pose.rotation.y.toFixed(1)}`, room });
+      }
+    }
+    window.addEventListener("message", onMessage);
+    reply({ type: "tour-ready" });
+    return () => window.removeEventListener("message", onMessage);
+  }, [savedTour.tourPage, sweepBySs]);
 
   /* ----- "Find vej" ----- */
   const DESTINATIONS = useMemo<Destination[]>(

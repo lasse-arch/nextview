@@ -2,15 +2,20 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { restoreTourVersion, saveTour, searchDeals, setTourDeal } from "@/lib/actions/tours";
+import { askClaudeForTour, saveAnthropicKey, type ChatTurn } from "@/lib/actions/tour-ai";
 import type { LinkOpen, MenuEntry, TourConfig } from "../../tours/types";
 
 type Version = { id: string; note: string | null; by: string | null; at: string };
-type Tab = "generelt" | "design" | "menu" | "funktioner" | "links" | "avanceret" | "versioner";
+type Tab = "claude" | "generelt" | "design" | "menu" | "funktioner" | "links" | "avanceret" | "versioner";
+
+/** Claude's mark: a small sunburst. */
+const SPARK = '<path d="M12 3v5M12 16v5M3 12h5M16 12h5M5.6 5.6l3.5 3.5M14.9 14.9l3.5 3.5M5.6 18.4l3.5-3.5M14.9 9.1l3.5-3.5"/>';
 
 /** The sections, with a small icon each (SF Symbols-like, drawn with strokes). */
 const TABS: [Tab, string, string][] = [
+  ["claude", "Claude", SPARK],
   ["generelt", "Generelt", '<circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/>'],
   ["design", "Design", '<path d="M12 3a9 9 0 1 0 0 18c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.3-.3-.4-.5-.8-.5-1.3 0-1.1.9-2 2-2h2.3A4.7 4.7 0 0 0 21 9.7C21 5.9 17 3 12 3z"/><circle cx="7.5" cy="11.5" r="1"/><circle cx="10.5" cy="7.5" r="1"/><circle cx="15.5" cy="8" r="1"/>'],
   ["menu", "Menu", '<path d="M4 6h16M4 12h16M4 18h10"/>'],
@@ -106,17 +111,69 @@ const DEFAULT_COVER = (T: TourConfig): NonNullable<TourConfig["cover"]> => ({
   placesTitle: "Vælg hvor du vil starte",
 });
 
-export function TourEditor({ slug, initial, deal, versions }: { slug: string; initial: TourConfig; deal: { id: string; name: string } | null; versions: Version[] }) {
+export function TourEditor({
+  slug,
+  initial,
+  deal,
+  versions,
+  aiReady,
+}: {
+  slug: string;
+  initial: TourConfig;
+  deal: { id: string; name: string } | null;
+  versions: Version[];
+  aiReady: boolean;
+}) {
   const router = useRouter();
   const [config, setConfig] = useState<TourConfig>(initial);
   const [dirty, setDirty] = useState(false);
-  const [tab, setTab] = useState<Tab>("generelt");
+  const [tab, setTab] = useState<Tab>("claude");
+  const [chat, setChat] = useState<ChatMsg[]>([]);
   const [note, setNote] = useState("");
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [device, setDevice] = useState<"computer" | "mobil">("computer");
   const [previewKey, setPreviewKey] = useState(0);
   const [pending, start] = useTransition();
   const [json, setJson] = useState<string | null>(null);
+
+  /* Live preview: the tour in the iframe shows the draft as it's edited (see the bridge in experience.tsx). */
+  const frame = useRef<HTMLIFrameElement>(null);
+  const latest = useRef(config);
+  useEffect(() => {
+    latest.current = config;
+    const t = setTimeout(() => frame.current?.contentWindow?.postMessage({ type: "tour-draft", config }, location.origin), 250);
+    return () => clearTimeout(t);
+  }, [config]);
+  useEffect(() => {
+    function onMessage(e: MessageEvent) {
+      if (e.origin === location.origin && e.source === frame.current?.contentWindow && e.data?.type === "tour-ready") {
+        frame.current?.contentWindow?.postMessage({ type: "tour-draft", config: latest.current }, location.origin);
+      }
+    }
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, []);
+  const preview = useMemo<PreviewApi>(
+    () => ({
+      view: () =>
+        new Promise((resolve) => {
+          const id = Math.random().toString(36).slice(2);
+          const done = (r: { href?: string; room?: string | null; error?: string }) => {
+            window.removeEventListener("message", onMessage);
+            clearTimeout(timer);
+            resolve(r);
+          };
+          const onMessage = (e: MessageEvent) => {
+            if (e.origin === location.origin && e.data?.type === "tour-view" && e.data.id === id) done(e.data);
+          };
+          const timer = setTimeout(() => done({ error: "Forhåndsvisningen svarede ikke - er touren indlæst?" }), 5000);
+          window.addEventListener("message", onMessage);
+          frame.current?.contentWindow?.postMessage({ type: "tour-view", id }, location.origin);
+        }),
+      go: (name, href) => frame.current?.contentWindow?.postMessage({ type: "tour-go", name, href }, location.origin),
+    }),
+    []
+  );
 
   /** Changes the draft (a copy - the saved tour is untouched until "Gem"). */
   function edit(fn: (draft: TourConfig) => void) {
@@ -185,6 +242,19 @@ export function TourEditor({ slug, initial, deal, versions }: { slug: string; in
 
         {/* Settings */}
         <div className="flex w-[400px] flex-none flex-col">
+          {tab === "claude" ? (
+            <ClaudePanel
+              config={config}
+              chat={chat}
+              setChat={setChat}
+              ready={aiReady}
+              onApply={(c) => {
+                setConfig(c);
+                setDirty(true);
+                setMsg(null);
+              }}
+            />
+          ) : (
           <div className="flex-1 space-y-5 overflow-y-auto px-2 pb-28 pt-3">
             {tab === "generelt" && (
               <>
@@ -291,7 +361,7 @@ export function TourEditor({ slug, initial, deal, versions }: { slug: string; in
               </>
             )}
 
-            {tab === "menu" && <MenuEditor menu={config.menu} onChange={(menu) => edit((d) => void (d.menu = menu))} />}
+            {tab === "menu" && <MenuEditor menu={config.menu} preview={preview} onChange={(menu) => edit((d) => void (d.menu = menu))} />}
 
             {tab === "funktioner" && (
               <>
@@ -464,10 +534,11 @@ export function TourEditor({ slug, initial, deal, versions }: { slug: string; in
               </ul>
             )}
           </div>
+          )}
         </div>
 
         {/* Preview */}
-        <div className="flex min-w-0 flex-1 flex-col p-3 pl-4">
+        <div className="relative flex min-w-0 flex-1 flex-col p-3 pl-4">
           <div className="mb-3 flex items-center gap-3">
             <div className="w-56">
               <Choice
@@ -479,7 +550,10 @@ export function TourEditor({ slug, initial, deal, versions }: { slug: string; in
                 onChange={setDevice}
               />
             </div>
-            <span className="text-[12px] text-[#8e8e93]">{dirty ? "Viser den gemte version - gem for at se dine ændringer." : "Viser den gemte version."}</span>
+            <span className="text-[12px] text-[#8e8e93]">{dirty ? "Live · ikke gemt endnu" : "Som den er gemt"}</span>
+            <button type="button" onClick={() => setPreviewKey((k) => k + 1)} className="ml-auto rounded-full px-3 py-1 text-[13px] text-[#0071e3] hover:bg-[#0071e3]/10" title="Start touren forfra (fx for at se en ny velkomst)">
+              Start forfra
+            </button>
           </div>
           <div className="flex min-h-0 flex-1 items-center justify-center">
             {device === "computer" ? (
@@ -490,53 +564,225 @@ export function TourEditor({ slug, initial, deal, versions }: { slug: string; in
                   <i className="h-3 w-3 rounded-full bg-[#28c840]" />
                   <span className="mx-auto rounded-md bg-white px-3 py-0.5 text-[11px] text-[#8e8e93] ring-1 ring-black/[.06]">explore.nextview360.dk/{slug}</span>
                 </div>
-                <iframe key={previewKey} title="Forhåndsvisning" src={`/tour-lab/${slug}`} className="min-h-0 w-full flex-1 bg-black" allow="fullscreen; xr-spatial-tracking; autoplay; clipboard-write" />
+                <iframe ref={frame} key={previewKey} title="Forhåndsvisning" src={`/tour-lab/${slug}`} className="min-h-0 w-full flex-1 bg-black" allow="fullscreen; xr-spatial-tracking; autoplay; clipboard-write" />
               </div>
             ) : (
               <div className="relative h-full max-h-[860px] w-[min(410px,100%)] rounded-[54px] bg-[#1d1d1f] p-[12px] shadow-[0_30px_60px_rgba(0,0,0,.3)]">
                 <span className="absolute left-1/2 top-[22px] z-10 h-[28px] w-[100px] -translate-x-1/2 rounded-full bg-black" />
-                <iframe key={previewKey} title="Forhåndsvisning" src={`/tour-lab/${slug}`} className="h-full w-full rounded-[42px] bg-black" allow="fullscreen; xr-spatial-tracking; autoplay; clipboard-write" />
+                <iframe ref={frame} key={previewKey} title="Forhåndsvisning" src={`/tour-lab/${slug}`} className="h-full w-full rounded-[42px] bg-black" allow="fullscreen; xr-spatial-tracking; autoplay; clipboard-write" />
               </div>
             )}
           </div>
-        </div>
 
-        {/* Save bar - only when there's something to save */}
-        {(dirty || msg) && (
-          <div className="pointer-events-none fixed inset-x-0 bottom-6 z-40 flex justify-center">
-            <div className="pointer-events-auto flex items-center gap-3 rounded-full bg-[#1d1d1f]/90 py-2 pl-5 pr-2 text-white shadow-[0_12px_40px_rgba(0,0,0,.3)] backdrop-blur-xl">
-              {msg && !dirty ? (
-                <span className={`pr-3 text-[14px] ${msg.ok ? "" : "text-[#ff6961]"}`}>{msg.ok ? "✓ " : ""}{msg.text}</span>
-              ) : (
-                <>
-                  <span className="text-[14px] font-medium">Ikke gemte ændringer</span>
-                  <input
-                    value={note}
-                    onChange={(e) => setNote(e.target.value)}
-                    placeholder="Hvad har du ændret?"
-                    className="w-56 rounded-full border-0 bg-white/10 px-3 py-1.5 text-[13px] text-white placeholder:text-white/50 focus:outline-none focus:ring-2 focus:ring-[#0071e3]"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setConfig(initial);
-                      setDirty(false);
-                      setMsg(null);
-                    }}
-                    className="rounded-full px-3 py-1.5 text-[14px] text-white/80 hover:text-white"
-                  >
-                    Fortryd
-                  </button>
-                  <button type="button" onClick={save} disabled={pending} className="rounded-full bg-[#0071e3] px-5 py-1.5 text-[14px] font-semibold hover:bg-[#0077ed] disabled:opacity-50">
-                    {pending ? "Gemmer…" : "Gem"}
-                  </button>
-                </>
-              )}
-              {msg && !msg.ok && dirty && <span className="pr-3 text-[13px] text-[#ff6961]">{msg.text}</span>}
+          {/* Save bar - only when there's something to save */}
+          {(dirty || msg) && (
+            <div className="pointer-events-none absolute inset-x-0 bottom-7 z-40 flex justify-center">
+              <div className="pointer-events-auto flex items-center gap-3 rounded-full bg-[#1d1d1f]/90 py-2 pl-5 pr-2 text-white shadow-[0_12px_40px_rgba(0,0,0,.3)] backdrop-blur-xl">
+                {msg && !dirty ? (
+                  <span className={`pr-3 text-[14px] ${msg.ok ? "" : "text-[#ff6961]"}`}>{msg.ok ? "✓ " : ""}{msg.text}</span>
+                ) : (
+                  <>
+                    <span className="text-[14px] font-medium">Ikke gemte ændringer</span>
+                    <input
+                      value={note}
+                      onChange={(e) => setNote(e.target.value)}
+                      placeholder="Hvad har du ændret?"
+                      className="w-56 rounded-full border-0 bg-white/10 px-3 py-1.5 text-[13px] text-white placeholder:text-white/50 focus:outline-none focus:ring-2 focus:ring-[#0071e3]"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setConfig(initial);
+                        setDirty(false);
+                        setMsg(null);
+                      }}
+                      className="rounded-full px-3 py-1.5 text-[14px] text-white/80 hover:text-white"
+                    >
+                      Fortryd
+                    </button>
+                    <button type="button" onClick={save} disabled={pending} className="rounded-full bg-[#0071e3] px-5 py-1.5 text-[14px] font-semibold hover:bg-[#0077ed] disabled:opacity-50">
+                      {pending ? "Gemmer…" : "Gem"}
+                    </button>
+                  </>
+                )}
+                {msg && !msg.ok && dirty && <span className="pr-3 text-[13px] text-[#ff6961]">{msg.text}</span>}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+type ChatMsg = { role: "user" | "assistant"; text: string; error?: boolean; changed?: number; before?: TourConfig; undone?: boolean };
+
+const SUGGESTIONS = ["Gør logoet lidt større", "Tilføj en knap til booking", "Gør farverne mørkere og mere eksklusive", "Ryd op i menuen, så den er nemmere at overskue"];
+
+/**
+ * Claude in the editor: write what should change, Claude makes the edit, and
+ * the preview shows it at once - nothing is saved until "Gem", and each
+ * answer can be undone on its own.
+ */
+function ClaudePanel({
+  config,
+  chat,
+  setChat,
+  ready: initiallyReady,
+  onApply,
+}: {
+  config: TourConfig;
+  chat: ChatMsg[];
+  setChat: React.Dispatch<React.SetStateAction<ChatMsg[]>>;
+  ready: boolean;
+  onApply: (c: TourConfig) => void;
+}) {
+  const [ready, setReady] = useState(initiallyReady);
+  const [text, setText] = useState("");
+  const [key, setKey] = useState("");
+  const [keyError, setKeyError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  const end = useRef<HTMLDivElement>(null);
+  useEffect(() => end.current?.scrollIntoView({ behavior: "smooth", block: "end" }), [chat.length, pending]);
+
+  function send(request: string) {
+    const ask = request.trim();
+    if (!ask || pending) return;
+    const history: ChatTurn[] = chat.filter((m) => !m.error).map((m) => ({ role: m.role, text: m.text }));
+    setChat((c) => [...c, { role: "user", text: ask }]);
+    setText("");
+    const before = config;
+    start(async () => {
+      const r = await askClaudeForTour(config, history, ask);
+      if (!r.ok) return setChat((c) => [...c, { role: "assistant", text: r.error, error: true }]);
+      if (r.changed) onApply(r.config);
+      setChat((c) => [...c, { role: "assistant", text: r.reply, changed: r.changed, before: r.changed ? before : undefined }]);
+    });
+  }
+
+  if (!ready)
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
+        <span className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#d97757] text-white">
+          <Icon d={SPARK} className="h-6 w-6" />
+        </span>
+        <h2 className="text-[17px] font-semibold">Sæt Claude op</h2>
+        <p className="mt-1 text-[13px] leading-snug text-[#6e6e73]">Indsæt en API-nøgle fra Anthropic. Den gemmes i Arpo, så alle admins kan bruge Claude i editoren.</p>
+        <input className={`${input} mt-4 bg-white`} type="password" placeholder="sk-ant-…" value={key} onChange={(e) => setKey(e.target.value)} />
+        {keyError && <p className="mt-2 text-[12px] text-[#ff3b30]">{keyError}</p>}
+        <button
+          type="button"
+          disabled={pending || !key.trim()}
+          className="mt-3 w-full rounded-xl bg-[#1d1d1f] py-2.5 text-[14px] font-medium text-white disabled:opacity-40"
+          onClick={() =>
+            start(async () => {
+              const r = await saveAnthropicKey(key);
+              if (!r.ok) return setKeyError(r.error);
+              setKey("");
+              setReady(true);
+            })
+          }
+        >
+          {pending ? "Tjekker nøglen…" : "Gem nøgle"}
+        </button>
+      </div>
+    );
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex-1 space-y-4 overflow-y-auto px-3 pb-4 pt-3">
+        {chat.length === 0 && (
+          <div className="px-2 pt-6">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#d97757] text-white">
+              <Icon d={SPARK} className="h-5 w-5" />
+            </span>
+            <h2 className="mt-3 text-[20px] font-semibold tracking-tight">Hvad skal ændres?</h2>
+            <p className="mt-1 text-[14px] leading-snug text-[#6e6e73]">
+              Skriv det, som du ville sige det til en kollega. Ændringen vises med det samme i forhåndsvisningen - intet gemmes, før du trykker Gem.
+            </p>
+            <div className="mt-5 flex flex-col items-start gap-2">
+              {SUGGESTIONS.map((sug) => (
+                <button key={sug} type="button" onClick={() => send(sug)} className="rounded-full bg-white px-3.5 py-1.5 text-left text-[13px] text-[#1d1d1f] ring-1 ring-black/[.08] transition hover:ring-black/20">
+                  {sug}
+                </button>
+              ))}
             </div>
           </div>
         )}
+        {chat.map((m, i) =>
+          m.role === "user" ? (
+            <div key={i} className="flex justify-end">
+              <p className="max-w-[85%] whitespace-pre-wrap rounded-[18px] bg-[#e9e9eb] px-3.5 py-2 text-[14px] leading-snug">{m.text}</p>
+            </div>
+          ) : (
+            <div key={i} className="flex gap-2.5">
+              <span className={`mt-0.5 flex h-6 w-6 flex-none items-center justify-center rounded-full text-white ${m.error ? "bg-[#ff3b30]" : "bg-[#d97757]"}`}>
+                <Icon d={m.error ? '<path d="M12 8v5M12 16h.01"/>' : SPARK} className="h-3.5 w-3.5" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className={`whitespace-pre-wrap text-[14px] leading-relaxed ${m.error ? "text-[#ff3b30]" : ""}`}>{m.text}</p>
+                {m.before && (
+                  <div className="mt-1.5 flex items-center gap-2 text-[12px] text-[#8e8e93]">
+                    {m.undone ? (
+                      <span>Fortrudt</span>
+                    ) : (
+                      <>
+                        <span className="text-[#248a3d]">✓ {m.changed === 1 ? "1 ændring" : `${m.changed} ændringer`} - se forhåndsvisningen</span>
+                        <button
+                          type="button"
+                          className="text-[#0071e3] hover:underline"
+                          onClick={() => {
+                            onApply(m.before!);
+                            setChat((c) => c.map((x, j) => (j >= i && x.before ? { ...x, undone: true } : x)));
+                          }}
+                        >
+                          Fortryd
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )
+        )}
+        {pending && (
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-6 w-6 flex-none animate-spin items-center justify-center rounded-full bg-[#d97757] text-white [animation-duration:2.5s]">
+              <Icon d={SPARK} className="h-3.5 w-3.5" />
+            </span>
+            <span className="text-[14px] text-[#8e8e93]">Arbejder på det…</span>
+          </div>
+        )}
+        <div ref={end} />
       </div>
+      <form
+        className="mx-2 mb-3 rounded-[22px] bg-white p-2 shadow-[0_2px_12px_rgba(0,0,0,.06)] ring-1 ring-black/[.08] focus-within:ring-black/20"
+        onSubmit={(e) => {
+          e.preventDefault();
+          send(text);
+        }}
+      >
+        <textarea
+          value={text}
+          rows={2}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              send(text);
+            }
+          }}
+          placeholder="Beskriv en ændring…"
+          className="block w-full resize-none border-0 bg-transparent px-2 py-1 text-[15px] placeholder:text-[#8e8e93] focus:outline-none focus:ring-0"
+        />
+        <div className="flex items-center justify-between px-1">
+          <span className="text-[11px] text-[#8e8e93]">Claude kan tage fejl - tjek forhåndsvisningen.</span>
+          <button type="submit" disabled={pending || !text.trim()} aria-label="Send" className="flex h-8 w-8 items-center justify-center rounded-full bg-[#d97757] text-white transition hover:bg-[#c96442] disabled:bg-[#e9e9eb] disabled:text-[#8e8e93]">
+            <Icon d='<path d="M12 19V5M5 12l7-7 7 7"/>' className="h-4 w-4" />
+          </button>
+        </div>
+      </form>
     </div>
   );
 }
@@ -593,58 +839,286 @@ function DealPicker({ slug, initial }: { slug: string; initial: { id: string; na
   );
 }
 
-function MenuEditor({ menu, onChange }: { menu: MenuEntry[]; onChange: (m: MenuEntry[]) => void }) {
-  const set = (i: number, m: MenuEntry) => onChange(menu.map((x, j) => (j === i ? m : x)));
-  const move = (i: number, by: number) => {
-    const next = [...menu];
-    const [m] = next.splice(i, 1);
-    next.splice(Math.max(0, Math.min(next.length, i + by)), 0, m);
-    onChange(next);
+type MenuGroup = { title: string; items: [string, string][] };
+/** A row in the menu: a top-level entry (k left out) or a place inside a group. */
+type Addr = { i: number; k?: number };
+const same = (a: Addr | null, b: Addr | null) => Boolean(a && b && a.i === b.i && a.k === b.k);
+
+/** Moves an entry: before another row, into a group (dropped on its header), or last (no target). */
+function moveEntry(menu: MenuEntry[], from: Addr, to: Addr | null): MenuEntry[] {
+  if (same(from, to)) return menu;
+  const m = structuredClone(menu);
+  // Remember the target by identity - indexes shift when the moved entry is taken out.
+  const targetEntry = to ? m[to.i] : null;
+  const targetItem = to?.k != null ? (m[to.i] as MenuGroup).items[to.k] : null;
+  let moving: MenuEntry;
+  if (from.k != null) {
+    const [[title, href]] = (m[from.i] as MenuGroup).items.splice(from.k, 1);
+    moving = { title, href };
+  } else [moving] = m.splice(from.i, 1);
+  if (!targetEntry || targetEntry === moving) return [...m, moving];
+  if ("items" in targetEntry && !("items" in moving)) {
+    const at = targetItem ? targetEntry.items.indexOf(targetItem) : 0;
+    targetEntry.items.splice(at, 0, [moving.title, moving.href]);
+  } else m.splice(m.indexOf(targetEntry), 0, moving);
+  return m;
+}
+
+type Kind = "sted" | "web" | "luft";
+const kindOf = (href: string): Kind => (href === "#luften" ? "luft" : href.includes("explore.nextview360.dk") ? "sted" : "web");
+function whereText(href: string) {
+  const kind = kindOf(href);
+  if (!href) return "Mangler et mål";
+  if (kind === "luft") return "Tilbage til luftfotoet";
+  if (kind === "sted") {
+    const ss = new URLSearchParams(href.split("?")[1] ?? "").get("ss");
+    return `Sted i touren${ss ? ` · punkt ${ss}` : ""}`;
+  }
+  try {
+    return new URL(href).hostname.replace(/^www\./, "");
+  } catch {
+    return href;
+  }
+}
+const KIND_ICON: Record<Kind | "group", [string, string]> = {
+  sted: ["bg-[#34c759]", '<path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>'],
+  web: ["bg-[#0071e3]", '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z"/>'],
+  luft: ["bg-[#5ac8fa]", '<path d="M3 14l4-1 4-7 2 1-2 6 5-1 2-3h2l-1 4 1 4h-2l-2-3-5-1 2 6-2 1-4-7-4-1z"/>'],
+  group: ["bg-[#ff9500]", '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>'],
+};
+
+/** The preview, as the menu editor uses it: where it stands, and showing a place. */
+export type PreviewApi = { view: () => Promise<{ href?: string; room?: string | null; error?: string }>; go: (name: string, href: string) => void };
+
+/**
+ * The menu as one list - like a phone's settings or a web shop's navigation
+ * editor: drag rows to reorder (onto a group's header to put them in it),
+ * click a row to edit it, and add places by walking to them in the preview.
+ */
+function MenuEditor({ menu, onChange, preview }: { menu: MenuEntry[]; onChange: (m: MenuEntry[]) => void; preview: PreviewApi }) {
+  const [open, setOpen] = useState<Addr | null>(null);
+  const [drag, setDrag] = useState<Addr | null>(null);
+  const [over, setOver] = useState<Addr | "end" | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+
+  const get = (a: Addr): { title: string; href?: string; group?: boolean } => {
+    const e = menu[a.i];
+    if (a.k != null) {
+      const [title, href] = (e as MenuGroup).items[a.k];
+      return { title, href };
+    }
+    return "items" in e ? { title: e.title, group: true } : { title: e.title, href: e.href };
   };
-  return (
-    <div className="space-y-3">
-      <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">Links kan være U-links fra Matterport, MPSkins-links eller udsyn kopieret i touren. Links til andre sider åbner som knapper.</p>
-      {menu.map((m, i) => (
-        <div key={i} className="rounded-2xl bg-white p-3.5 shadow-[0_1px_2px_rgba(0,0,0,.04)] ring-1 ring-black/[.04]">
-          <div className="flex items-center gap-2">
-            <input className={input} value={m.title} onChange={(e) => set(i, { ...m, title: e.target.value })} />
-            <button type="button" className="text-[#c7c7cc] hover:text-[#1d1d1f]" onClick={() => move(i, -1)} aria-label="Op">
-              ↑
+  const set = (a: Addr, patch: { title?: string; href?: string }) =>
+    onChange(
+      menu.map((e, i): MenuEntry => {
+        if (i !== a.i) return e;
+        if (a.k != null && "items" in e) return { ...e, items: e.items.map((it, k): [string, string] => (k === a.k ? [patch.title ?? it[0], patch.href ?? it[1]] : it)) };
+        return { ...e, ...patch } as MenuEntry;
+      })
+    );
+  const remove = (a: Addr) => {
+    onChange(a.k != null ? menu.map((e, i) => (i === a.i && "items" in e ? { ...e, items: e.items.filter((_, k) => k !== a.k) } : e)) : menu.filter((_, i) => i !== a.i));
+    setOpen(null);
+  };
+  /** Adds an entry - inside the open group (or the group of the open place), otherwise last. */
+  const add = (title: string, href: string) => {
+    const g = open && "items" in menu[open.i] ? open.i : null;
+    if (g != null) {
+      const items = (menu[g] as MenuGroup).items;
+      onChange(menu.map((e, i) => (i === g ? { ...(e as MenuGroup), items: [...items, [title, href]] } : e)));
+      setOpen({ i: g, k: items.length });
+    } else {
+      onChange([...menu, { title, href }]);
+      setOpen({ i: menu.length });
+    }
+  };
+  async function fromPreview(then: (href: string, room: string | null) => void) {
+    setBusy(true);
+    setNote(null);
+    const r = await preview.view();
+    setBusy(false);
+    if (r.error || !r.href) return setNote(r.error ?? "Forhåndsvisningen svarede ikke.");
+    then(r.href, r.room ?? null);
+  }
+
+  const rowProps = (a: Addr) => ({
+    draggable: true,
+    onDragStart: (e: React.DragEvent) => {
+      e.dataTransfer.effectAllowed = "move";
+      setDrag(a);
+    },
+    onDragEnd: () => {
+      setDrag(null);
+      setOver(null);
+    },
+    onDragOver: (e: React.DragEvent) => {
+      if (!drag) return;
+      e.preventDefault();
+      if (!same(over as Addr, a)) setOver(a);
+    },
+    onDrop: (e: React.DragEvent) => {
+      e.preventDefault();
+      if (drag) onChange(moveEntry(menu, drag, a));
+      setDrag(null);
+      setOver(null);
+      setOpen(null);
+    },
+  });
+
+  function row(a: Addr, depth: number) {
+    const it = get(a);
+    const kind = it.group ? "group" : kindOf(it.href ?? "");
+    const isOpen = same(open, a);
+    const isOver = same(over as Addr, a) && !same(drag, a);
+    const groupDrop = isOver && it.group && drag?.k == null && !("items" in menu[drag!.i]);
+    return (
+      <div key={a.k ?? "top"} {...rowProps(a)} className={`${same(drag, a) ? "opacity-40" : ""}`}>
+        {isOver && !groupDrop && <div className="mx-4 h-0.5 rounded-full bg-[#0071e3]" />}
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => setOpen(isOpen ? null : a)}
+          onKeyDown={(e) => e.key === "Enter" && setOpen(isOpen ? null : a)}
+          className={`group/row flex cursor-pointer items-center gap-3 py-2.5 pr-3 transition ${groupDrop ? "bg-[#0071e3]/10" : isOpen ? "bg-[#f2f2f7]" : "hover:bg-[#f9f9fb]"}`}
+          style={{ paddingLeft: 12 + depth * 28 }}
+        >
+          <span className="cursor-grab text-[#c7c7cc] active:cursor-grabbing" title="Træk for at flytte">
+            <Icon d='<circle cx="9" cy="6" r="1"/><circle cx="15" cy="6" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="9" cy="18" r="1"/><circle cx="15" cy="18" r="1"/>' className="h-4 w-4" />
+          </span>
+          <span className={`flex h-[28px] w-[28px] flex-none items-center justify-center rounded-[7px] text-white ${KIND_ICON[kind][0]}`}>
+            <Icon d={KIND_ICON[kind][1]} className="h-[16px] w-[16px]" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className={`block truncate text-[15px] ${it.group ? "font-semibold" : ""}`}>{it.title || "Uden navn"}</span>
+            <span className={`block truncate text-[12px] ${it.href === "" ? "text-[#ff9500]" : "text-[#8e8e93]"}`}>
+              {it.group ? `Gruppe · ${(menu[a.i] as MenuGroup).items.length} steder` : whereText(it.href ?? "")}
+            </span>
+          </span>
+          {kind === "sted" && (
+            <button
+              type="button"
+              title="Vis i forhåndsvisningen"
+              onClick={(e) => {
+                e.stopPropagation();
+                preview.go(it.title, it.href!);
+              }}
+              className="rounded-full px-2 py-1 text-[12px] font-medium text-[#0071e3] opacity-0 transition hover:bg-[#0071e3]/10 group-hover/row:opacity-100"
+            >
+              Vis
             </button>
-            <button type="button" className="text-[#c7c7cc] hover:text-[#1d1d1f]" onClick={() => move(i, 1)} aria-label="Ned">
-              ↓
-            </button>
-            <button type="button" className="text-[#c7c7cc] hover:text-[#ff3b30]" onClick={() => onChange(menu.filter((_, j) => j !== i))} aria-label="Slet">
-              ×
+          )}
+          <Icon d={isOpen ? '<path d="M6 9l6 6 6-6"/>' : '<path d="M9 6l6 6-6 6"/>'} className="h-4 w-4 flex-none text-[#c7c7cc]" />
+        </div>
+        {isOpen && (
+          <div className="space-y-3 border-t border-black/[.04] bg-[#f9f9fb] px-4 py-3" style={{ paddingLeft: 52 + depth * 28 }}>
+            <Field title="Navn">
+              <input autoFocus className={`${input} bg-white`} value={it.title} onChange={(e) => set(a, { title: e.target.value })} />
+            </Field>
+            {!it.group && (
+              <Field title="Fører til">
+                <Choice
+                  value={kindOf(it.href ?? "") === "web" ? "web" : "sted"}
+                  options={[
+                    ["sted", "Et sted i touren"],
+                    ["web", "En webside"],
+                  ]}
+                  onChange={(v) => set(a, { href: v === "web" ? "https://" : "" })}
+                />
+                {kindOf(it.href ?? "") === "web" ? (
+                  <input className={`${input} mt-2 bg-white`} value={it.href} placeholder="https://…" onChange={(e) => set(a, { href: e.target.value })} />
+                ) : (
+                  <div className="mt-2 space-y-2">
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => fromPreview((href) => set(a, { href }))}
+                      className="flex w-full items-center justify-center gap-2 rounded-[10px] bg-white py-2 text-[14px] font-medium text-[#0071e3] ring-1 ring-black/[.06] hover:bg-[#0071e3]/5 disabled:opacity-50"
+                    >
+                      <Icon d={KIND_ICON.sted[1]} className="h-4 w-4" />
+                      {it.href ? "Brug det udsyn, forhåndsvisningen viser nu" : "Brug det sted, forhåndsvisningen viser"}
+                    </button>
+                    <p className="text-[12px] leading-snug text-[#8e8e93]">Gå hen og drej, så det ser rigtigt ud i forhåndsvisningen til højre - tryk så her. Den retning, du kigger, kommer med.</p>
+                    <details className="text-[12px] text-[#8e8e93]">
+                      <summary className="cursor-pointer select-none">Indsæt link i stedet</summary>
+                      <input className={`${input} mt-1.5 bg-white text-[13px]`} value={it.href} placeholder="U-link fra Matterport eller MPSkins-link" onChange={(e) => set(a, { href: e.target.value })} />
+                    </details>
+                  </div>
+                )}
+              </Field>
+            )}
+            <button type="button" onClick={() => remove(a)} className="text-[13px] text-[#ff3b30] hover:underline">
+              {it.group ? "Slet gruppen og dens steder" : "Slet"}
             </button>
           </div>
-          {"items" in m ? (
-            <div className="mt-2 space-y-1.5 pl-3">
-              {m.items.map(([name, href], k) => (
-                <div key={k} className="flex gap-1.5">
-                  <input className={`${input} w-2/5`} value={name} onChange={(e) => set(i, { ...m, items: m.items.map((it, n) => (n === k ? [e.target.value, it[1]] : it)) })} />
-                  <input className={input} value={href} placeholder="Link" onChange={(e) => set(i, { ...m, items: m.items.map((it, n) => (n === k ? [it[0], e.target.value] : it)) })} />
-                  <button type="button" className="text-[#c7c7cc] hover:text-[#ff3b30]" onClick={() => set(i, { ...m, items: m.items.filter((_, n) => n !== k) })} aria-label="Slet">
-                    ×
-                  </button>
-                </div>
-              ))}
-              <button type="button" className="text-xs font-medium text-[#0071e3]" onClick={() => set(i, { ...m, items: [...m.items, ["Nyt sted", ""]] })}>
-                + Tilføj sted
-              </button>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <Group>
+        <div className="-m-4">
+          {menu.length === 0 && <p className="px-4 py-6 text-center text-[14px] text-[#8e8e93]">Menuen er tom. Gå til et sted i forhåndsvisningen, og tryk &quot;Tilføj det sted, du ser&quot;.</p>}
+          <div className="divide-y divide-black/[.05]">
+            {menu.map((e, i) => (
+              <div key={i}>
+                {row({ i }, 0)}
+                {"items" in e && e.items.map((_, k) => row({ i, k }, 1))}
+              </div>
+            ))}
+          </div>
+          {drag && (
+            <div
+              onDragOver={(e) => {
+                e.preventDefault();
+                setOver("end");
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                onChange(moveEntry(menu, drag, null));
+                setDrag(null);
+                setOver(null);
+              }}
+              className={`m-2 rounded-xl border-2 border-dashed py-2 text-center text-[12px] ${over === "end" ? "border-[#0071e3] text-[#0071e3]" : "border-black/10 text-[#8e8e93]"}`}
+            >
+              Slip her for at lægge nederst
             </div>
-          ) : (
-            <input className={`${input} mt-2`} value={m.href} placeholder="Link" onChange={(e) => set(i, { ...m, href: e.target.value })} />
           )}
         </div>
-      ))}
-      <div className="flex gap-3 text-sm">
-        <button type="button" className="font-medium text-[#0071e3]" onClick={() => onChange([...menu, { title: "Ny gruppe", items: [] }])}>
-          + Gruppe
+      </Group>
+
+      <div className="space-y-2">
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => fromPreview((href, room) => add(room ?? "Nyt sted", href))}
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#0071e3] py-2.5 text-[15px] font-medium text-white shadow-sm hover:bg-[#0077ed] disabled:opacity-50"
+        >
+          <Icon d='<path d="M12 5v14M5 12h14"/>' className="h-4 w-4" />
+          {busy ? "Henter stedet…" : "Tilføj det sted, du ser"}
         </button>
-        <button type="button" className="font-medium text-[#0071e3]" onClick={() => onChange([...menu, { title: "Nyt sted", href: "" }])}>
-          + Enkelt sted
-        </button>
+        {note && <p className="px-1 text-[12px] text-[#ff3b30]">{note}</p>}
+        <div className="grid grid-cols-2 gap-2">
+          <button type="button" onClick={() => add("Ny side", "https://")} className="rounded-xl bg-white py-2 text-[14px] font-medium text-[#0071e3] ring-1 ring-black/[.06] hover:bg-[#0071e3]/5">
+            + Webside
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              onChange([...menu, { title: "Ny gruppe", items: [] }]);
+              setOpen({ i: menu.length });
+            }}
+            className="rounded-xl bg-white py-2 text-[14px] font-medium text-[#0071e3] ring-1 ring-black/[.06] hover:bg-[#0071e3]/5"
+          >
+            + Gruppe
+          </button>
+        </div>
+        <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">
+          Træk i <span className="tracking-tighter">⋮⋮</span> for at flytte. Slip et sted på en gruppe for at lægge det i gruppen. Er en gruppe åben, lægges nye steder i den.
+        </p>
       </div>
     </div>
   );

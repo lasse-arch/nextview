@@ -10,6 +10,8 @@ const nextConfig: NextConfig = {
   // in production, the same issue the old .docx template had.
   outputFileTracingIncludes: {
     "/*": ["./public/logo.png", "./node_modules/@sparticuz/chromium/bin/**/*"],
+    // The tour editor's Claude reads the tour setup's documented types (see tour-ai.ts).
+    "/tour-lab/**": ["./src/app/*/tour-lab/tours/types.ts"],
   },
   // Basic hardening on every response: no framing of Arpo by other sites
   // (clickjacking), no MIME sniffing, no full URLs leaked to other sites,

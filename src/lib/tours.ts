@@ -62,7 +62,7 @@ export async function listTours() {
   await ensureToursSeeded();
   return prisma.tour.findMany({
     orderBy: [{ updatedAt: "desc" }],
-    select: { id: true, slug: true, name: true, updatedAt: true, deal: { select: { id: true, companyName: true, displayName: true } } },
+    select: { id: true, slug: true, name: true, config: true, updatedAt: true, deal: { select: { id: true, companyName: true, displayName: true } } },
   });
 }
 
