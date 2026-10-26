@@ -487,11 +487,15 @@ function TourExperience({
             shot.style.opacity = "1";
           }
         }
-        await moveSweep(sdk, sweep, { rotation: target?.rotation, transition: sdk.Sweep.Transition.INSTANT });
-        await new Promise((r) => setTimeout(r, 160)); // the new room's first frames
-        if (shot) {
-          shot.style.transition = "opacity .5s ease";
-          shot.style.opacity = "0";
+        try {
+          await moveSweep(sdk, sweep, { rotation: target?.rotation, transition: sdk.Sweep.Transition.INSTANT });
+          await new Promise((r) => setTimeout(r, 160)); // the new room's first frames
+        } finally {
+          // Always take the picture away again - a move that fails must never leave a still (or black) picture over the tour.
+          if (shot) {
+            shot.style.transition = "opacity .5s ease";
+            shot.style.opacity = "0";
+          }
         }
       } else {
         await moveSweep(sdk, sweep, {
