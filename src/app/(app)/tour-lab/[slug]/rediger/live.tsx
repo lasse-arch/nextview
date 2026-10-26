@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { previewLiveData, setupLiveData } from "@/lib/actions/tour-ai";
 import type { LiveUnit } from "@/lib/availability/live";
 import type { TourConfig } from "../../tours/types";
-import { Field, Group, Icon, input, type PreviewApi } from "./ui";
+import { Field, Group, Icon, input, Toggle, type PreviewApi } from "./ui";
 
 /*
  * "Live data": free pitches, rooms, storage units … read live off the
@@ -104,6 +104,12 @@ export function LiveDataEditor({ config, edit, slug, preview }: { config: TourCo
             <Field title="Knaptekst ved hver enhed">
               <input className={input} value={live.bookLabel ?? ""} placeholder="Book" onChange={(e) => edit((d) => void (d.live!.bookLabel = e.target.value || undefined))} />
             </Field>
+            <Toggle
+              on={live.showSize !== false}
+              onChange={(on) => edit((d) => void (on ? delete d.live!.showSize : (d.live!.showSize = false)))}
+              title="Vis antal / størrelse"
+              hint={'Fx "12 ledige" eller "100 m²" ved hver - når siden har det. Slå fra, hvis kunden ikke vil vise, hvor mange pladser der er tilbage.'}
+            />
             <details className="text-[12px] text-[#8e8e93]">
               <summary className="cursor-pointer select-none">Opskriften (for de øvede)</summary>
               <textarea className={`${input} mt-1.5 h-24 resize-y bg-white font-mono text-[11px]`} value={live.pattern} onChange={(e) => edit((d) => void (d.live!.pattern = e.target.value))} />

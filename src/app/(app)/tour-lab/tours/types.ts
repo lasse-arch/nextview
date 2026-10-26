@@ -279,6 +279,8 @@ export type TourConfig = {
     flags?: string;
     exclude?: string[];
     bookLabel?: string;
+    /** Show each unit's size / number of free places (when the page has it) - false: leave it out. Default shown. */
+    showSize?: false;
     /** How often the page is read again, in minutes (default 10). */
     refreshMinutes?: number;
     /** Where each unit is in the tour (unit name -> link to the spot) - "Se" flies there, "Find vej" walks there. */
