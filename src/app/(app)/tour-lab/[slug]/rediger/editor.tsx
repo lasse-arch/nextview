@@ -255,7 +255,7 @@ export function TourEditor({
       <SafeArea onUndo={() => { setConfig(initial); setDirty(false); }}>
       <div className="flex min-h-0 flex-1">
         {/* Sections */}
-        <nav className="flex w-[210px] flex-none flex-col gap-0.5 p-3">
+        <nav className="flex min-h-0 w-[210px] flex-none flex-col gap-0.5 overflow-y-auto overscroll-contain p-3">
           {TABS.map(([t, text, icon, heading]) => (
             <div key={t} className="contents">
             {heading && <div className="mt-4 px-2.5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-[#8e8e93]">{heading}</div>}

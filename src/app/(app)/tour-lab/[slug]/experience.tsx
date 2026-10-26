@@ -821,18 +821,28 @@ function TourExperience({
     lockRef.current = T.mobileZoomLock;
   });
   const zoomKey = `${T.zoom?.desktop}|${T.zoom?.mobile}|${T.mobileZoomLock}`;
+  const zoomSet = useRef(false);
   useEffect(() => {
     if (!sdk?.Camera.zoomTo) return;
+    let alive = true;
     const apply = () => {
+      if (!alive) return;
       const small = phone || window.innerWidth <= 760;
-      const z = small ? (zoomRef.current?.mobile ?? (lockRef.current ? 0.5 : 1)) : (zoomRef.current?.desktop ?? 1);
-      sdk.Camera.zoomTo?.(z).catch(() => {});
+      const z = small ? (zoomRef.current?.mobile ?? (lockRef.current ? 0.5 : null)) : (zoomRef.current?.desktop ?? null);
+      // No zoom chosen: leave Matterport alone (and put back the normal view if one was set before).
+      if (z == null && !zoomSet.current) return;
+      zoomSet.current = z != null;
+      try {
+        sdk.Camera.zoomTo?.(z ?? 1).catch(() => {});
+      } catch {}
     };
-    apply();
+    // Only once the tour is really showing - zooming while Matterport is still starting up can leave the view blank.
+    sdk.App.state.waitUntil((st) => st.phase === sdk.App.Phase.PLAYING).then(apply, () => {});
     window.addEventListener("resize", apply);
     const current = (sdk as unknown as { Sweep: { current: { subscribe(cb: () => void): { cancel(): void } } } }).Sweep.current;
-    const sub = current.subscribe(() => setTimeout(apply, 50));
+    const sub = current.subscribe(() => setTimeout(apply, 300));
     return () => {
+      alive = false;
       window.removeEventListener("resize", apply);
       sub.cancel();
     };
@@ -1883,7 +1893,7 @@ const CSS = `
 .hv-live-head b{font-family:var(--font-heading);font-size:20px;color:var(--c-main)}
 .hv-live-head span{font-size:13px;color:#6b7a80}
 .hv-live-head button{margin-left:auto;width:32px;height:32px;border:0;border-radius:50%;background:#f1f2f3;font-size:20px;cursor:pointer}
-.hv-live-sheet ul{margin:0;padding:0 10px 12px;list-style:none;overflow-y:auto}
+.hv-live-sheet ul{min-height:0;margin:0;padding:0 10px 12px;list-style:none;overflow-y:auto;overscroll-behavior:contain}
 .hv-live-sheet li{display:flex;align-items:center;gap:12px;padding:10px 8px;border-top:1px solid #eef0f1}
 .hv-live-sheet li>span{flex:1;min-width:0}
 .hv-live-sheet li b{display:block;font-size:15px}

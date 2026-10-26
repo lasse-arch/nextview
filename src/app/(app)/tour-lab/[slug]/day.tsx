@@ -80,7 +80,7 @@ export const DAY_CSS = `
 .dy-head b{display:block;font-family:var(--font-heading);font-size:22px;color:var(--c-main)}
 .dy-head p{margin:4px 0 0;font-size:14px;line-height:1.45;color:#56636a}
 .dy-head button{margin-left:auto;flex:none;width:34px;height:34px;border:0;border-radius:50%;background:#f1f2f3;font-size:20px;cursor:pointer}
-.dy-sheet ol{margin:0;padding:6px 14px 14px;list-style:none;overflow-y:auto}
+.dy-sheet ol{min-height:0;margin:0;padding:6px 14px 14px;list-style:none;overflow-y:auto;overscroll-behavior:contain}
 .dy-sheet li{position:relative;display:flex;align-items:center;gap:12px;padding:10px 6px;border-radius:14px}
 .dy-sheet li.dy-at{background:var(--c-soft)}
 .dy-sheet time{flex:none;width:46px;font-weight:800;font-size:15px;font-variant-numeric:tabular-nums;color:var(--c-main)}

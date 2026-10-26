@@ -132,7 +132,7 @@ export const SIMPLE_CSS = `
 .sp-menu-top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;border-bottom:1px solid #eef0f1}
 .sp-menu-top img{height:44px;width:auto;max-width:55%;object-fit:contain}
 .sp-luk{height:52px;padding:0 24px;border:0;border-radius:999px;background:#eef1f2;color:var(--c-main);font:inherit;font-weight:800;font-size:18px;cursor:pointer}
-.sp-menu-list{flex:1;overflow-y:auto;width:min(520px,100%);margin:0 auto;padding:18px 16px calc(24px + env(safe-area-inset-bottom,0px))}
+.sp-menu-list{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y;width:min(520px,100%);margin:0 auto;padding:18px 16px calc(24px + env(safe-area-inset-bottom,0px))}
 .sp-group{display:flex;flex-direction:column;gap:10px;margin-top:10px}
 .sp-group-title{margin:4px 4px -2px;font-size:14px;font-weight:800;color:#7a8589}
 .hv:has(.sp-menu) .hv-logo{display:none}
