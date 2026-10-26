@@ -782,7 +782,10 @@ function ClaudePanel({
   const [pending, start] = useTransition();
   const [learned, setLearned] = useState(0);
   const end = useRef<HTMLDivElement>(null);
-  useEffect(() => end.current?.scrollIntoView({ behavior: "smooth", block: "end" }), [chat.length, pending]);
+  // A block body on purpose: newer Chrome returns a promise from scrollIntoView, and an effect must return nothing (or a cleanup).
+  useEffect(() => {
+    end.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [chat.length, pending]);
 
   function send(request: string) {
     const ask = request.trim();
