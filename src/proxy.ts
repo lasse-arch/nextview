@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 
 const SESSION_COOKIE = "nv360_session";
 // "/t" = published tours, shown in an iframe on customers' sites (and their pictures under /tour-lab/<slug>/historie); "/r" = a customer's report on their tour.
-const PUBLIC_PATHS = ["/login", "/robots.txt", "/t", "/r", "/p"];
+const PUBLIC_PATHS = ["/login", "/robots.txt", "/t", "/r", "/p", "/forside"];
 
 /*
  * The short public addresses (see lib/public-urls.ts): on the tour host
@@ -45,7 +45,32 @@ function movedHost(request: NextRequest): NextResponse | null {
   return NextResponse.redirect(url, 308);
 }
 
+/*
+ * The website's own address (NEXT_PUBLIC_SITE_ORIGIN, e.g. https://nextview360.dk,
+ * with or without www): "/" is the front page (/forside), the old site's
+ * pages go to the matching part of it, and nothing else of Arpo is reachable.
+ */
+const SITE_HOST = hostOf(process.env.NEXT_PUBLIC_SITE_ORIGIN)?.replace(/^www\./, "") ?? null;
+const OLD_SITE_PAGES: Record<string, string> = { "/cases": "#cases", "/kontakt": "#kontakt", "/om-os": "#kontakt" };
+
+function siteHost(request: NextRequest): NextResponse | null {
+  const host = request.headers.get("host")?.toLowerCase();
+  if (!SITE_HOST || !host || host.replace(/^www\./, "") !== SITE_HOST) return null;
+  const { pathname } = request.nextUrl;
+  if (pathname === "/") {
+    const url = request.nextUrl.clone();
+    url.pathname = "/forside";
+    return NextResponse.rewrite(url);
+  }
+  // Files (pictures, fonts) are served as they are.
+  if (/\.[a-z0-9]+$/i.test(pathname)) return NextResponse.next();
+  const home = new URL(`/${OLD_SITE_PAGES[pathname.replace(/\/+$/, "").split("/").slice(0, 2).join("/")] ?? ""}`, `https://${host}`);
+  return NextResponse.redirect(home, 307);
+}
+
 export function proxy(request: NextRequest) {
+  const site = siteHost(request);
+  if (site) return site;
   const moved = movedHost(request);
   if (moved) return moved;
   const short = shortHost(request);

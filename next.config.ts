@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const TOUR_HOST = process.env.NEXT_PUBLIC_TOUR_ORIGIN?.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+const SITE_HOST = process.env.NEXT_PUBLIC_SITE_ORIGIN?.replace(/^https?:\/\//, "").replace(/\/.*$/, "").replace(/^www\./, "");
 
 const nextConfig: NextConfig = {
   // ssh2 (Betalingsservice SFTP) loads optional native/crypto modules at
@@ -48,6 +49,14 @@ const nextConfig: NextConfig = {
         source: "/t/:slug",
         headers: [{ key: "Content-Security-Policy", value: "frame-ancestors *" }],
       },
+      // The website (app/forside) may be found on Google - Arpo itself never.
+      ...(SITE_HOST
+        ? [SITE_HOST, `www.${SITE_HOST}`].map((host) => ({
+            source: "/:path*",
+            has: [{ type: "host" as const, value: host }],
+            headers: [{ key: "X-Robots-Tag", value: "index, follow" }],
+          }))
+        : []),
       // The same tours on the short tour address (lib/public-urls.ts).
       ...(TOUR_HOST ? [{ source: "/:slug", has: [{ type: "host" as const, value: TOUR_HOST }], headers: [{ key: "Content-Security-Policy", value: "frame-ancestors *" }] }] : []),
       {
