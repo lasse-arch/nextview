@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 
 const SESSION_COOKIE = "nv360_session";
 // "/t" = published tours, shown in an iframe on customers' sites (and their pictures under /tour-lab/<slug>/historie); "/r" = a customer's report on their tour.
-const PUBLIC_PATHS = ["/login", "/robots.txt", "/t", "/r", "/p", "/site"];
+const PUBLIC_PATHS = ["/login", "/robots.txt", "/t", "/r", "/p", "/site", "/web"];
 
 /*
  * The short public addresses (see lib/public-urls.ts): on the tour host

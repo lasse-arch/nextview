@@ -1485,3 +1485,22 @@ model DeletedDeal {
 
   @@index([createdAt])
 }
+
+/// A message from the contact form on nextview360.dk, exactly as it came
+/// in - and the lead it became in Leadindbakken (dealId). Also what limits
+/// how often one address can send (spam).
+model SiteInquiry {
+  id        String   @id @default(cuid())
+  name      String
+  company   String?
+  email     String
+  phone     String?
+  interest  String?
+  message   String?
+  page      String?
+  ip        String
+  dealId    String?
+  createdAt DateTime @default(now())
+
+  @@index([ip, createdAt])
+}
