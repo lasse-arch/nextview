@@ -22,7 +22,12 @@ lærer begge det nye.
    (·), ingen lange tankestreger (— eller –) og ingen lodrette streger (|) som
    skilletegn. Brug komma, punktum, kolon eller en almindelig bindestreg -
    "Bramming, siden 1897", ikke "Bramming · siden 1897".
-7. **Sandt indhold.** Opfind aldrig priser, antal, åbningstider, navne eller
+7. **Brug det, der findes.** Ligner et ønske en funktion, touren allerede har
+   (stedkort, "Din plads venter", Vis mig rundt, historier, live data, tags …),
+   så brug den - lav ikke en ny, der gør næsten det samme, og efterlign den
+   ikke med CSS. Mangler en funktion, så sig det, så den kan bygges ind i
+   motoren til alle tours.
+8. **Sandt indhold.** Opfind aldrig priser, antal, åbningstider, navne eller
    tilbud. Brug kun det, kunden eller hjemmesiden siger. Mangler noget, så
    spørg eller lad det være ude.
 
