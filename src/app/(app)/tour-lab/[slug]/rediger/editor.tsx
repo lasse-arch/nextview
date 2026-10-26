@@ -449,6 +449,16 @@ export function TourEditor({
                 <Field title={`Logostørrelse: ${config.logoSize ?? 46} px`}>
                   <input type="range" min={28} max={120} className="w-full accent-[#0071e3]" value={config.logoSize ?? 46} onChange={(e) => edit((d) => void (d.logoSize = Number(e.target.value)))} />
                 </Field>
+                <Field title="Logoet sidder til - menuen tager den anden side">
+                  <Choice
+                    value={config.logoSide ?? "left"}
+                    options={[
+                      ["left", "Venstre"],
+                      ["right", "Højre"],
+                    ]}
+                    onChange={(v) => edit((d) => void (d.logoSide = v === "right" ? "right" : undefined))}
+                  />
+                </Field>
                 <Toggle on={Boolean(config.logoOnLight)} onChange={(on) => edit((d) => void (d.logoOnLight = on))} title="Mørkt logo" hint="Et logo lavet til lys baggrund (bruges også i menuens top)." />
                 {config.logoOnLight && (
                   <Toggle

@@ -1,5 +1,7 @@
 import type { NextConfig } from "next";
 
+const TOUR_HOST = process.env.NEXT_PUBLIC_TOUR_ORIGIN?.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+
 const nextConfig: NextConfig = {
   // ssh2 (Betalingsservice SFTP) loads optional native/crypto modules at
   // runtime - kept out of the bundle and required from node_modules instead.
@@ -46,6 +48,8 @@ const nextConfig: NextConfig = {
         source: "/t/:slug",
         headers: [{ key: "Content-Security-Policy", value: "frame-ancestors *" }],
       },
+      // The same tours on the short tour address (lib/public-urls.ts).
+      ...(TOUR_HOST ? [{ source: "/:slug", has: [{ type: "host" as const, value: TOUR_HOST }], headers: [{ key: "Content-Security-Policy", value: "frame-ancestors *" }] }] : []),
       {
         // The tour editor previews the tour in an iframe on its own page.
         source: "/tour-lab/:slug",

@@ -1,5 +1,6 @@
 "use client";
 
+import { reviewUrl } from "@/lib/public-urls";
 import { useEffect, useState, useTransition } from "react";
 import { deleteFeedback, setFeedbackStatus, setTourReview, tourFeedback, type Feedback } from "@/lib/actions/tour-feedback";
 import { Choice, Group, Toggle, type PreviewApi } from "./ui";
@@ -28,7 +29,7 @@ export function FeedbackPanel({ slug, token: initialToken, preview }: { slug: st
     };
   }, [slug]);
 
-  const url = token && typeof window !== "undefined" ? `${location.origin}/p/${token}` : null;
+  const url = token && typeof window !== "undefined" ? reviewUrl(token, location.origin) : null;
   const shown = (items ?? []).filter((f) => filter === "all" || f.status === filter);
   const open = (items ?? []).filter((f) => f.status === "open").length;
   return (

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { tourUrl } from "@/lib/public-urls";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
@@ -38,7 +39,7 @@ export default async function CustomerReportPage({ params }: { params: Promise<{
         <CustomerReport stats={stats} share={share} brand={config.title} />
         {tour.published && (
           <PortalEmbeds
-            url={`${(await headers()).get("x-forwarded-proto") ?? "https"}://${(await headers()).get("host")}/t/${tour.slug}`}
+            url={tourUrl(tour.slug, `${(await headers()).get("x-forwarded-proto") ?? "https"}://${(await headers()).get("host")}`)}
             title={config.title}
             size={config.embeds?.size}
             whole={config.embeds?.pages?._hele ?? null}

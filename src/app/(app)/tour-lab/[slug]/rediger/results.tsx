@@ -1,5 +1,6 @@
 "use client";
 
+import { portalUrl } from "@/lib/public-urls";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { setTourShare, tourShareLink } from "@/lib/actions/tours";
@@ -93,7 +94,7 @@ function ShareSettings({ slug, brand, share: initial, shareStats, token: initial
       {share[key] === "auto" && <p className="text-[11px] text-[#8e8e93]">{shown("auto", shareStats.leads) ? `Vises nu (${shareStats.leads} i perioden).` : "Skjult nu - ingen i perioden."}</p>}
     </div>
   );
-  const url = token && typeof window !== "undefined" ? `${location.origin}/r/${token}` : null;
+  const url = token && typeof window !== "undefined" ? portalUrl(token, location.origin) : null;
   return (
     <>
       <Group title="Kundens rapport - det vi deler">

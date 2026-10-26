@@ -1,5 +1,6 @@
 "use client";
 
+import { tourUrl } from "@/lib/public-urls";
 import { useState, useTransition } from "react";
 import { setTourPublished } from "@/lib/actions/tours";
 import { suggestEmbedPages } from "@/lib/actions/tour-embeds";
@@ -57,7 +58,7 @@ export function SharePanel({
   const [published, setPublished] = useState(initial);
   const [copied, setCopied] = useState<string | null>(null);
   const [pending, start] = useTransition();
-  const url = `${typeof window === "undefined" ? "" : location.origin}/t/${slug}`;
+  const url = tourUrl(slug, typeof window === "undefined" ? "" : location.origin);
   const code = embedCode(url, title, size);
   const copy = (text: string, what: string) => {
     navigator.clipboard?.writeText(text).catch(() => {});

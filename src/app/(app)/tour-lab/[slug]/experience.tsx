@@ -1122,7 +1122,7 @@ function TourExperience({
 
   return (
     <LinkProvider T={T} popup={popup}>
-    <div className={`hv fixed inset-0 z-50 overflow-hidden bg-[#0d1b20] ${selected ? "hv-punkt" : ""} ${zoomed ? "hv-zoom" : ""} ${welcome ? "hv-welcome" : ""} ${phase === "tour" && T.stories?.mobile ? "hv-st-on-m" : ""} ${menuOpen ? "hv-menu-aaben" : ""} ${T.design?.menu === "dock" ? "hv-dock" : ""} ${guideAt != null || (dayAt != null && !dayOpen) ? "hv-guiding" : ""} ${route ? "hv-routing" : ""} ${showMeasures && phase === "tour" ? "hv-maler" : ""} ${phase === "tour" && T.stories?.desktop ? "hv-st-on-d" : ""}`} style={
+    <div className={`hv fixed inset-0 z-50 overflow-hidden bg-[#0d1b20] ${selected ? "hv-punkt" : ""} ${zoomed ? "hv-zoom" : ""} ${welcome ? "hv-welcome" : ""} ${phase === "tour" && T.stories?.mobile ? "hv-st-on-m" : ""} ${menuOpen ? "hv-menu-aaben" : ""} ${T.design?.menu === "dock" ? "hv-dock" : ""} ${T.logoSide === "right" ? "hv-logo-h" : ""} ${guideAt != null || (dayAt != null && !dayOpen) ? "hv-guiding" : ""} ${route ? "hv-routing" : ""} ${showMeasures && phase === "tour" ? "hv-maler" : ""} ${phase === "tour" && T.stories?.desktop ? "hv-st-on-d" : ""}`} style={
         {
           fontFamily: `'${T.font}', system-ui, sans-serif`,
           "--c-main": T.colors.main,
@@ -1135,7 +1135,7 @@ function TourExperience({
       }>
       <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.font.replace(/ /g, "+")}:wght@400;600;700;800;900&display=swap`} />
       {T.fontHeading && <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.fontHeading.replace(/ /g, "+")}:wght@500;600&display=swap`} />}
-      <style>{CSS + STORIES_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + INFO_CSS + MAP_CSS + ROUTE_CSS + MEASURES_CSS + CARDS_CSS + DAY_CSS + SIMPLE_CSS + (review ? FEEDBACK_CSS : "")}</style>
+      <style>{CSS + STORIES_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + INFO_CSS + MAP_CSS + ROUTE_CSS + MEASURES_CSS + CARDS_CSS + DAY_CSS + SIMPLE_CSS + LOGO_RIGHT_CSS + (review ? FEEDBACK_CSS : "")}</style>
       {/* The tour's own design on top (written by Claude or by hand under Avanceret). */}
       {T.customCss && <style>{T.customCss.replace(/<\/?style/gi, "")}</style>}
 
@@ -1288,7 +1288,7 @@ function TourExperience({
 
       {pano?.pano && T.panos && <PanoView name={pano.name} dir={pano.pano} panos={T.panos} onClose={() => setPano(null)} />}
 
-      {/* Logo (MPSkins: left, 200px, 13px from the edges). */}
+      {/* Logo (MPSkins: left, 200px, 13px from the edges - or right, with the menu on the left). */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={T.logo} alt={T.brand} className={`hv-logo ${T.logoOnLight ? (T.logoCard === false ? "hv-logo-lys" : "hv-logo-kort") : ""} ${phase === "tour" ? "" : "hidden"}`} />
 
@@ -2072,5 +2072,22 @@ const CSS = `
   .hv-tile b{font-size:18px}
   .hv-wel-x{top:10px;right:10px;width:38px;height:38px}
   .hv-devpanel{width:calc(100vw - 20px)}
+}
+`;
+
+/* The logo in the right corner: the menu button, its panel and what sits under it change to the left. */
+const LOGO_RIGHT_CSS = `
+.hv-logo-h .hv-logo{left:auto;right:16px}
+.hv-logo-h .hv-menuknap,.hv-logo-h .sp-menuknap,.hv-logo-h .hv-maal{right:auto;left:14px}
+.hv-logo-h .hv-live-chip,.hv-logo-h .hv-panel{right:auto;left:16px}
+.hv-logo-h .hv-menu{right:auto;left:0;transform:translateX(-105%);box-shadow:10px 0 30px rgba(0,0,0,.25)}
+.hv-logo-h .hv-menu.aaben{transform:none}
+.hv-logo-h .sp-menu-top{flex-direction:row-reverse}
+@media (max-width:760px){
+  .hv-logo-h .hv-logo{left:auto;right:12px}
+  .hv-logo-h .hv-menuknap,.hv-logo-h .sp-menuknap{right:auto;left:10px}
+  .hv-logo-h .hv-live-chip{right:auto;left:12px}
+  .hv-logo-h .hv-panel{left:0;right:0}
+  .hv-logo-h .hv-intro{left:104px;right:10px}
 }
 `;
