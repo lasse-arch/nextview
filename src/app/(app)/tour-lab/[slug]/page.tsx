@@ -7,7 +7,8 @@ import { loadTour } from "./load";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const tour = await getTourConfig((await params).slug);
-  return { title: tour ? `${tour.brand} – prototype` : "Tour-lab" };
+  const icon = tour ? tour.favicon || tour.logo : null;
+  return { title: tour ? `${tour.brand} – prototype` : "Tour-lab", icons: icon ? { icon, shortcut: icon, apple: icon } : undefined };
 }
 
 /** A tour in Arpo - the editor's preview and the admins' own view, with the prototype tools. The public one is /t/<slug>. */

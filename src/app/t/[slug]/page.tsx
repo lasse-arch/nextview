@@ -23,7 +23,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const tour = await published((await params).slug);
   if (!tour) return { title: "Tour" };
   const icon = tour.favicon || tour.logo;
-  return { title: `${tour.title} – virtuel tour`, icons: icon ? { icon, apple: icon } : undefined };
+  return { title: `${tour.title} – virtuel tour`, icons: icon ? { icon, shortcut: icon, apple: icon } : undefined };
 }
 
 export default async function PublicTourPage({ params }: { params: Promise<{ slug: string }> }) {

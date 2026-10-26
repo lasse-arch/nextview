@@ -17,6 +17,8 @@ const geistMono = Geist_Mono({
 // X-Robots-Tag header on all responses, see next.config.ts).
 export const metadata: Metadata = {
   title: "Arpo",
+  // Arpo's icon as metadata (not app/icon.png, which would win over everything): a tour page sets its own customer's favicon.
+  icons: { icon: "/icon.png", shortcut: "/favicon.ico", apple: "/icon.png" },
   robots: {
     index: false,
     follow: false,
