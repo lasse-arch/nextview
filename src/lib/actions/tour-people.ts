@@ -74,11 +74,26 @@ const RULES = `Du ser på billeder fra 360°-scanninger (Matterport) af et sted.
 Find rigtige mennesker, der var der, da der blev scannet: en hel person, eller en del af en (arm, ben, hoved, ryg), også i et spejl eller en rude.
 Tæl IKKE med: mennesker på billeder, plakater, skærme eller malerier, dukker, statuer og udstillingsfigurer, og ikke slørede kanter eller stativet nederst.`;
 
-function imageBlocks(scans: ScanImages[], size: "low" | "high"): Anthropic.ContentBlockParam[] {
-  return scans.flatMap((s) => [
-    { type: "text" as const, text: `Scan ${s.ss}:` },
-    ...[1, 2, 3, 4].map((f): Anthropic.ImageBlockParam => ({ type: "image", source: { type: "url", url: (s[size] ?? s.low ?? s.high)!.replace("<face>", String(f)) } })),
-  ]);
+/**
+ * The walls as images in the message itself. Fetched by us and sent along,
+ * not as links: Matterport's image server forbids Claude's own fetcher in its
+ * robots.txt ("This URL is disallowed by the website's robots.txt file").
+ */
+async function imageBlocks(scans: ScanImages[], size: "low" | "high"): Promise<Anthropic.ContentBlockParam[]> {
+  const image = async (url: string): Promise<Anthropic.ImageBlockParam> => {
+    const res = await fetch(url, { signal: AbortSignal.timeout(20_000) });
+    if (!res.ok) throw new Error(`Kunne ikke hente et billede fra Matterport (${res.status}).`);
+    const type = res.headers.get("content-type")?.split(";")[0];
+    const media_type = type === "image/png" || type === "image/webp" || type === "image/gif" ? type : "image/jpeg";
+    return { type: "image", source: { type: "base64", media_type, data: Buffer.from(await res.arrayBuffer()).toString("base64") } };
+  };
+  const per = await Promise.all(
+    scans.map(async (s) => [
+      { type: "text" as const, text: `Scan ${s.ss}:` },
+      ...(await Promise.all([1, 2, 3, 4].map((f) => image((s[size] ?? s.low ?? s.high)!.replace("<face>", String(f)))))),
+    ])
+  );
+  return per.flat();
 }
 
 async function ask<T extends z.ZodTypeAny>(client: Anthropic, slug: string, by: string, schema: T, content: Anthropic.ContentBlockParam[]): Promise<z.infer<T> | null> {
@@ -125,12 +140,12 @@ export async function checkScansForPeople(slug: string, sweepIds: string[]): Pro
   const client = new Anthropic({ apiKey: key });
   try {
     // 1: all of them small - anything that might be a person.
-    const quick = await ask(client, slug, user.name, Quick, [{ type: "text", text: "Svar for hvert scan, om der kan være et menneske. Er du i tvivl, så svar ja." }, ...imageBlocks(scans, "low")]);
+    const quick = await ask(client, slug, user.name, Quick, [{ type: "text", text: "Svar for hvert scan, om der kan være et menneske. Er du i tvivl, så svar ja." }, ...(await imageBlocks(scans, "low"))]);
     const maybe = scans.filter((s) => quick?.scans.find((q) => q.scan === s.ss)?.maybe);
     // 2: the maybes big - sure, and where.
     const sure: z.infer<typeof Sure>["scans"] = [];
     for (let i = 0; i < maybe.length; i += 3) {
-      const r = await ask(client, slug, user.name, Sure, [{ type: "text", text: "Se nøje efter. Svar for hvert scan." }, ...imageBlocks(maybe.slice(i, i + 3), "high")]);
+      const r = await ask(client, slug, user.name, Sure, [{ type: "text", text: "Se nøje efter. Svar for hvert scan." }, ...(await imageBlocks(maybe.slice(i, i + 3), "high"))]);
       sure.push(...(r?.scans ?? []));
     }
     let found = 0;
