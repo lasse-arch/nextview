@@ -6,6 +6,7 @@ import { jalsa } from "./jalsa";
 import { halvorsmindeKort } from "./halvorsminde-kort";
 import { boxdepot } from "./boxdepot";
 import { boxdepotRum } from "./boxdepot-rum";
+import { tolneEfterskole } from "./tolne-efterskole";
 
 /** The prototype tours, by their /tour-lab/<slug> address. */
 export const TOURS: Record<string, TourConfig> = {
@@ -16,4 +17,5 @@ export const TOURS: Record<string, TourConfig> = {
   [halvorsmindeKort.slug]: halvorsmindeKort,
   [boxdepot.slug]: boxdepot,
   [boxdepotRum.slug]: boxdepotRum,
+  [tolneEfterskole.slug]: tolneEfterskole,
 };

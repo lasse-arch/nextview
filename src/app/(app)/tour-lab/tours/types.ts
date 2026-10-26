@@ -179,9 +179,15 @@ export type TourConfig = {
   dock?: { label: string; icon: DockIcon; go: "places" | "guide" | { href: string }; primary?: boolean }[];
   /**
    * "Vis mig rundt": the tour flies from stop to stop by itself with a short
-   * text at each. A stop can borrow a drone point's name and text ({ point: id }).
+   * text at each - and a voice, if the stop has one. A stop can borrow a drone point's name and text ({ point: id }).
    */
-  guide?: { seconds?: number; stops: ({ point: string } | { href: string; title: string; text: string })[] };
+  guide?: {
+    seconds?: number;
+    /** The visitor presses "Næste" themselves (no timer) - calm, e.g. for a voice tour. */
+    manual?: boolean;
+    /** A stop: where (empty href = stay, e.g. a closing card), its text, and optionally a voice (an audio file) that plays there. */
+    stops: ({ point: string } | { href: string; title: string; text: string; audio?: string })[];
+  };
   /**
    * Info points: small pulsing dots on things in the room; a tap opens a card.
    * `position` is a spot in the 3D model (placed with "Placér infopunkt" in the

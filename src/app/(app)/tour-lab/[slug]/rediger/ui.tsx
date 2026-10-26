@@ -144,7 +144,7 @@ export function UploadButton({ accept, onDone, label = "Upload", className }: { 
 
 /** The files a setup takes from other sites (that could disappear) - mirrors fileSlots in src/lib/tour-files.ts. */
 export function outsideFiles(c: TourConfig): string[] {
-  const all = [c.logo, c.favicon, c.cover?.image, c.cover?.imageMobile, c.intro?.poster, c.map?.image, ...(c.places ?? []).map((p) => p.image), ...(c.intro?.sources ?? []).map((s) => s.src), ...(c.info ?? []).map((i) => i.image)];
+  const all = [c.logo, c.favicon, c.cover?.image, c.cover?.imageMobile, c.intro?.poster, c.map?.image, ...(c.places ?? []).map((p) => p.image), ...(c.intro?.sources ?? []).map((s) => s.src), ...(c.info ?? []).map((i) => i.image), ...(c.guide?.stops ?? []).map((s) => ("audio" in s ? s.audio : undefined))];
   return all.filter((src): src is string => {
     if (!src || !/^https?:\/\//i.test(src)) return false;
     return !/(^|\.)(arpo\.dk|nextview360\.dk|blob\.vercel-storage\.com|localhost)$/.test(new URL(src).hostname);

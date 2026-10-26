@@ -704,7 +704,7 @@ function TourExperience({
       }
       if (ss) {
         track("start_link", { kind: "ss", target: ss });
-        enterRef.current(`${T.tourPage}?${q.toString()}`, "link", ROOM_NAMES[Number(ss)] ?? `ss=${ss}`);
+        enterRef.current(T.tourPage ? `${T.tourPage.split("?")[0]}?${q.toString()}` : `https://my.matterport.com/show/?m=${T.modelId}&${q.toString()}`, "link", ROOM_NAMES[Number(ss)] ?? `ss=${ss}`);
         return;
       }
       if (T.intro) return; // the welcome comes when the film ends
@@ -788,6 +788,7 @@ function TourExperience({
   function guideGo(i: number) {
     const stop = GUIDE[i];
     setGuideAt(i);
+    if (!stop.href) return; // a stop that stays where it is (e.g. the closing card)
     if (phase === "drone") return enterTour(stop.href, "guide", stop.title);
     flyTo(stop.href, "fly").then(() => sdk?.Camera.rotate?.(18, 0, { speed: 3 }).catch(() => {}));
   }
@@ -1049,7 +1050,7 @@ function TourExperience({
           "--logo-h": `${T.logoSize ?? 46}px`,
         } as React.CSSProperties
       }>
-      <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.font}:wght@400;600;700;800;900&display=swap`} />
+      <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.font.replace(/ /g, "+")}:wght@400;600;700;800;900&display=swap`} />
       {T.fontHeading && <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.fontHeading.replace(/ /g, "+")}:wght@500;600&display=swap`} />}
       <style>{CSS + STORIES_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + INFO_CSS + MAP_CSS + ROUTE_CSS + MEASURES_CSS + CARDS_CSS}</style>
       {/* The tour's own design on top (written by Claude or by hand under Avanceret). */}
@@ -1501,7 +1502,7 @@ function TourExperience({
         />
       )}
       {guideAt != null && GUIDE[guideAt] && (
-        <GuidePlayer stops={GUIDE} index={guideAt} seconds={T.guide?.seconds ?? 9} onGo={guideGo} onClose={closeGuide} onEvent={track} />
+        <GuidePlayer stops={GUIDE} index={guideAt} seconds={T.guide?.seconds ?? 9} manual={T.guide?.manual} onGo={guideGo} onClose={closeGuide} onEvent={track} />
       )}
       {showCard != null && (
         <PlaceCard
@@ -1837,11 +1838,12 @@ const CSS = `
 .hv-tile:hover{transform:translateY(-4px);box-shadow:0 18px 40px rgba(0,0,0,.35)}
 .hv-tile small{font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;opacity:.75;margin-bottom:4px}
 .hv-tile b{font-size:24px;line-height:1.05;font-weight:900}
-.hv-tile em{position:absolute;top:14px;left:14px;font-style:normal;font-size:10.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;padding:3px 9px;border-radius:999px;background:var(--c-accent);color:#fff}
+.hv-tile em+.hv-tile-plus+small{margin-top:10px}
+.hv-tile em{align-self:flex-start;margin:-4px 0 auto -4px;font-style:normal;font-size:10.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;padding:3px 9px;border-radius:999px;background:var(--c-accent);color:#fff}
 .hv-tile-plus{position:absolute;top:14px;right:14px;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px}
 .hv-tile-light{background:#fff;color:var(--c-main)}.hv-tile-light .hv-tile-plus{background:var(--c-main);color:#fff}
 .hv-tile-dark{background:var(--c-main);color:#fff}.hv-tile-dark .hv-tile-plus{background:#fff;color:var(--c-main)}
-.hv-tile-accent{background:var(--c-accent);color:#fff}.hv-tile-accent .hv-tile-plus{background:#fff;color:var(--c-accent)}
+.hv-tile-accent{background:var(--c-accent);color:#fff}.hv-tile-accent em{background:rgba(255,255,255,.24)}.hv-tile-accent .hv-tile-plus{background:#fff;color:var(--c-accent)}
 .hv-tile-last{background:#e7eef0;color:var(--c-main)}.hv-tile-last .hv-tile-plus{background:var(--c-main);color:#fff}
 .hv-wel-x{position:absolute;top:16px;right:16px;width:44px;height:44px;border-radius:12px;border:0;background:rgba(255,255,255,.92);font-size:24px;cursor:pointer;color:var(--c-main)}
 .hv-welcome .hv-intro,.hv-welcome .hv-filtre,.hv-welcome .hv-menuknap{opacity:0;pointer-events:none}

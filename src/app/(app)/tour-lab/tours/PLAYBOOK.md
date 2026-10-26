@@ -56,6 +56,12 @@ Ikke alle tours skal starte med et valg. Vælg ud fra, hvor folk kommer fra:
 4-7 stop, der fortæller en historie og slutter der, hvor man skal handle.
 1-2 korte sætninger pr. stop. 6-10 sekunder pr. stop.
 
+Med stemme (en lydfil pr. stop, `audio`): godt til skoler og steder, hvor en
+rolig fortæller sælger stemningen (fx Tolne Efterskole). Slå "Man trykker selv
+videre" til (`manual`), så gæsten styrer tempoet; ellers kommer næste stop, når
+stemmen er færdig. Et sidste stop uden sted (tom `href`) er et afslutningskort.
+Gæsten kan altid slå lyden fra. Lydfiler hostes hos os som alle andre filer.
+
 ## Stedkort og "Din plads venter"
 
 - **Stedkort**: når man lander et vigtigt sted, kommer et lille kort med 1-3

@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { TourConfig } from "../tours/types";
 
-export type GuideStop = { href: string; title: string; text: string };
+export type GuideStop = { href: string; title: string; text: string; audio?: string };
 
 /** The guided tour's stops, with a drone point's name and text filled in where a stop borrows them. */
 export function guideStops(T: TourConfig): GuideStop[] {
@@ -23,6 +23,7 @@ export function GuidePlayer({
   stops,
   index,
   seconds,
+  manual = false,
   onGo,
   onClose,
   onEvent,
@@ -30,12 +31,37 @@ export function GuidePlayer({
   stops: GuideStop[];
   index: number;
   seconds: number;
+  /** No timer - the visitor presses Næste (a calm voice tour). */
+  manual?: boolean;
   onGo: (index: number) => void;
   onClose: (completed: boolean) => void;
   onEvent: (name: string, params: Record<string, string | number>) => void;
 }) {
   const [paused, setPaused] = useState(false);
   const stop = stops[index];
+  const hasVoice = stops.some((s) => s.audio);
+  const audio = useRef<HTMLAudioElement | null>(null);
+  const [muted, setMuted] = useState(() => {
+    try {
+      return localStorage.getItem("tour-guide-muted") === "1";
+    } catch {
+      return false;
+    }
+  });
+  // The stop's voice: plays when the stop comes (the visitor started the tour, so sound is allowed).
+  useEffect(() => {
+    audio.current?.pause();
+    if (!stop.audio || muted) return;
+    const a = new Audio(stop.audio);
+    audio.current = a;
+    // Without "Man trykker selv videre", the next stop comes when the voice is done.
+    if (!manual) a.onended = () => step(index + 1, "auto");
+    a.play().catch(() => {});
+    onEvent("guide_audio", { stop: index + 1, title: stop.title });
+    return () => a.pause();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [index, muted]);
+  const timed = !manual && !stop.audio;
 
   function step(to: number, how: string) {
     if (to >= stops.length) return onClose(true);
@@ -50,9 +76,10 @@ export function GuidePlayer({
       <div className="gd-bars">
         {stops.map((s, i) => (
           <span key={s.title + i} className={i < index ? "done" : ""}>
-            {i === index && (
+            {i === index && timed && (
               <i key={index} style={{ animationDuration: `${seconds}s`, animationPlayState: paused ? "paused" : "running" }} onAnimationEnd={() => step(index + 1, "auto")} />
             )}
+            {i === index && !timed && <i key={index} className="gd-here" />}
           </span>
         ))}
       </div>
@@ -66,12 +93,54 @@ export function GuidePlayer({
           <button type="button" aria-label="Forrige" disabled={index === 0} onClick={() => step(index - 1, "back")}>
             ‹
           </button>
-          <button type="button" className="gd-play" onClick={() => setPaused((p) => !p)}>
-            {paused ? "▶ Fortsæt" : "❚❚ Pause"}
-          </button>
-          <button type="button" aria-label="Næste" onClick={() => step(index + 1, "next")}>
-            ›
-          </button>
+          {timed ? (
+            <>
+              <button type="button" className="gd-play" onClick={() => setPaused((p) => !p)}>
+                {paused ? "▶ Fortsæt" : "❚❚ Pause"}
+              </button>
+              <button type="button" aria-label="Næste" onClick={() => step(index + 1, "next")}>
+                ›
+              </button>
+            </>
+          ) : (
+            <>
+              <button type="button" className="gd-play" onClick={() => step(index + 1, "next")}>
+                {index === stops.length - 1 ? "Afslut" : "Næste ›"}
+              </button>
+              {stop.audio && !muted && (
+                <button
+                  type="button"
+                  aria-label="Hør igen"
+                  title="Hør igen"
+                  onClick={() => {
+                    if (!audio.current) return;
+                    audio.current.currentTime = 0;
+                    audio.current.play().catch(() => {});
+                    onEvent("guide_replay", { stop: index + 1 });
+                  }}
+                >
+                  ↺
+                </button>
+              )}
+            </>
+          )}
+          {hasVoice && (
+            <button
+              type="button"
+              className="gd-sound"
+              aria-label={muted ? "Slå lyd til" : "Slå lyd fra"}
+              onClick={() => {
+                const next = !muted;
+                setMuted(next);
+                onEvent("guide_sound", { on: next ? 0 : 1 });
+                try {
+                  localStorage.setItem("tour-guide-muted", next ? "1" : "0");
+                } catch {}
+              }}
+            >
+              {muted ? "🔇" : "🔊"}
+            </button>
+          )}
           <button type="button" className="gd-stop" onClick={() => onClose(false)}>
             Gå selv rundt
           </button>
@@ -82,6 +151,8 @@ export function GuidePlayer({
 }
 
 export const GUIDE_CSS = `
+.gd-bars .gd-here{animation:none!important;width:100%;opacity:.55}
+.gd-sound{width:36px;border:0;border-radius:50%;background:rgba(0,0,0,.06);font-size:16px;cursor:pointer}
 .gd{position:absolute;inset:0;z-index:11;pointer-events:none}
 .gd>*{pointer-events:auto}
 .gd-bars{position:absolute;top:10px;left:50%;translate:-50% 0;width:min(560px,calc(100% - 200px));display:flex;gap:4px}

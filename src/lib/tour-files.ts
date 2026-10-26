@@ -27,13 +27,19 @@ const EXT: Record<string, string> = {
   "video/mp4": "mp4",
   "video/webm": "webm",
   "video/quicktime": "mov",
+  "audio/mpeg": "mp3",
+  "audio/mp3": "mp3",
+  "audio/mp4": "m4a",
+  "audio/x-m4a": "m4a",
+  "audio/wav": "wav",
+  "audio/x-wav": "wav",
 };
 export const ALLOWED_TYPES = Object.keys(EXT);
 
 /** Stores a file for a tour and returns the address the tour uses. */
 export async function storeTourFile(slug: string, name: string, contentType: string, bytes: Buffer, sourceUrl?: string): Promise<string> {
   const type = contentType.split(";")[0].trim().toLowerCase();
-  if (!EXT[type]) throw new Error(`${name}: filtypen ${type || "(ukendt)"} kan ikke bruges (billeder, svg og video).`);
+  if (!EXT[type]) throw new Error(`${name}: filtypen ${type || "(ukendt)"} kan ikke bruges (billeder, svg, video og lyd).`);
   if (blobReady()) {
     if (bytes.length > BLOB_MAX) throw new Error(`${name} er for stor (max 200 MB).`);
     const base = name.replace(/\.[a-z0-9]+$/i, "").replace(/[^a-zA-Z0-9-]+/g, "-").slice(0, 60) || "fil";
@@ -65,7 +71,7 @@ export async function copyToTour(slug: string, url: string): Promise<string> {
   const bytes = Buffer.from(await res.arrayBuffer());
   const name = decodeURIComponent(parsed.pathname.split("/").pop() || parsed.hostname);
   let type = res.headers.get("content-type") ?? "";
-  if (!EXT[type.split(";")[0]] && /\.svg$/i.test(name)) type = "image/svg+xml";
+  if (!EXT[type.split(";")[0]]) type = /\.svg$/i.test(name) ? "image/svg+xml" : /\.mp3$/i.test(name) ? "audio/mpeg" : /\.m4a$/i.test(name) ? "audio/mp4" : type;
   return storeTourFile(slug, name, type, bytes, url);
 }
 
@@ -90,6 +96,7 @@ export function fileSlots(c: TourConfig): Slot[] {
   c.places?.forEach((p) => slots.push({ get: () => p.image, set: (v) => (p.image = v) }));
   c.intro?.sources.forEach((s) => slots.push({ get: () => s.src, set: (v) => (s.src = v) }));
   c.info?.forEach((i) => slots.push({ get: () => i.image, set: (v) => (i.image = v) }));
+  c.guide?.stops.forEach((s) => "audio" in s && slots.push({ get: () => s.audio, set: (v) => (s.audio = v) }));
   return slots;
 }
 

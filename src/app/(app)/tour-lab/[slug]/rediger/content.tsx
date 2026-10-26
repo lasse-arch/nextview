@@ -439,9 +439,17 @@ export function GuideEditor({ config, edit, preview }: Omit<Props, "slug">) {
   return (
     <>
       <Group>
-        <p className="text-[14px] leading-snug text-[#1d1d1f]">&quot;Vis mig rundt&quot; flyver selv fra stop til stop med en kort tekst ved hvert - som en rundvisning med en medarbejder.</p>
+        <p className="text-[14px] leading-snug text-[#1d1d1f]">&quot;Vis mig rundt&quot; flyver fra stop til stop med en kort tekst ved hvert - og en stemme, hvis stoppet har en lydfil. Som en rundvisning med en medarbejder.</p>
         <p className={small}>Hold den kort: 4-7 stop, der fortæller en historie og slutter der, hvor man skal handle (fx book, bliv elev).</p>
         {stops.length > 0 && (
+          <Toggle
+            on={Boolean(config.guide?.manual)}
+            onChange={(on) => edit((d) => void (d.guide = { ...d.guide!, manual: on || undefined }))}
+            title="Man trykker selv videre"
+            hint="Roligt tempo - godt til en stemme-rundvisning. Stop med lyd venter altid på, at stemmen er færdig."
+          />
+        )}
+        {stops.length > 0 && !config.guide?.manual && (
           <Field title={`Sekunder ved hvert stop: ${config.guide?.seconds ?? 8}`}>
             <input type="range" min={4} max={20} className="w-full accent-[#0071e3]" value={config.guide?.seconds ?? 8} onChange={(e) => edit((d) => void (d.guide = { ...d.guide!, seconds: Number(e.target.value) }))} />
           </Field>
@@ -453,7 +461,7 @@ export function GuideEditor({ config, edit, preview }: Omit<Props, "slug">) {
           onChange={setStops}
           icon={["bg-[#ff2d55]", '<path d="M8 5v14l11-7z"/>']}
           title={(s) => ("point" in s ? `Luftfoto-punkt: ${s.point}` : s.title)}
-          subtitle={(s) => ("point" in s ? "Bruger punktets egen tekst" : s.text || "Mangler tekst")}
+          subtitle={(s) => ("point" in s ? "Bruger punktets egen tekst" : [s.audio ? "🔊" : null, s.href ? null : "Bliver stående", s.text || "Mangler tekst"].filter(Boolean).join(" · "))}
           empty='Ingen stop endnu. Gå til det første sted i forhåndsvisningen og tryk "Tilføj det sted, du ser".'
           editor={(s, set) =>
             "point" in s ? (
@@ -466,7 +474,31 @@ export function GuideEditor({ config, edit, preview }: Omit<Props, "slug">) {
                 <Field title="Tekst" hint="1-2 korte sætninger.">
                   <textarea className={`${textarea} bg-white`} value={s.text} onChange={(e) => set({ ...s, text: e.target.value })} />
                 </Field>
-                <PlacePicker href={s.href} name={s.title} preview={preview} onChange={(href) => set({ ...s, href })} />
+                {s.href ? (
+                  <>
+                    <PlacePicker href={s.href} name={s.title} preview={preview} onChange={(href) => set({ ...s, href })} />
+                    <button type="button" className="text-[12px] text-[#8e8e93] hover:text-[#ff3b30]" onClick={() => set({ ...s, href: "" })}>
+                      Bliv stående (intet sted - fx et afslutningskort)
+                    </button>
+                  </>
+                ) : (
+                  <PlacePicker href="" name={s.title} preview={preview} onChange={(href) => set({ ...s, href })} />
+                )}
+                <Field title="Stemme (valgfri)" hint="En lydfil (mp3/m4a), der spilles ved stoppet. Gæsten kan slå lyden fra.">
+                  {s.audio ? (
+                    <div className="space-y-1.5">
+                      <audio controls preload="none" src={s.audio} className="h-9 w-full" />
+                      <div className="flex gap-2">
+                        <UploadButton accept="audio/mpeg,audio/mp4,audio/x-m4a,audio/wav,.mp3,.m4a" label="Skift lyd" onDone={(audio) => set({ ...s, audio })} />
+                        <button type="button" className="text-[13px] text-[#ff3b30] hover:underline" onClick={() => set({ ...s, audio: undefined })}>
+                          Fjern
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <UploadButton accept="audio/mpeg,audio/mp4,audio/x-m4a,audio/wav,.mp3,.m4a" label="Upload lydfil" onDone={(audio) => set({ ...s, audio })} />
+                  )}
+                </Field>
               </>
             )
           }
