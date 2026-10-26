@@ -32,6 +32,7 @@ export default async function TourEditPage({ params }: { params: Promise<{ slug:
       published: true,
       share: true,
       shareToken: true,
+      reviewToken: true,
       deal: { select: { id: true, companyName: true, displayName: true, filmingActualMinutes: true } },
       versions: { orderBy: { createdAt: "desc" }, take: 40, select: { id: true, note: true, createdByName: true, createdAt: true } },
     },
@@ -69,6 +70,8 @@ export default async function TourEditPage({ params }: { params: Promise<{ slug:
       scanMap={scanMap}
       mpskinsHidden={cfg ? hiddenSweeps(cfg) : []}
       scanCount={cfg?.sweep?.length ?? null}
+      reviewToken={tour.reviewToken}
+      feedbackOpen={await prisma.tourFeedback.count({ where: { tourSlug: tour.slug, status: "open" } })}
       aiReady={Boolean(process.env.ANTHROPIC_API_KEY || (await getSettingValue("ANTHROPIC_API_KEY")))}
       versions={tour.versions.map((v) => ({ id: v.id, note: v.note, by: v.createdByName, at: v.createdAt.toISOString() }))}
     />

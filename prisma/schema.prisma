@@ -1302,6 +1302,9 @@ model Tour {
   share      Json?
   /// The customer's own link to their report: /r/<shareToken>.
   shareToken String?       @unique
+  /// "Kundegennemsyn": the secret link /p/<reviewToken> where the customer
+  /// looks around and leaves feedback in the tour. Null = switched off.
+  reviewToken String?      @unique
   dealId    String?
   deal      Deal?         @relation(fields: [dealId], references: [id], onDelete: SetNull)
   config    Json
@@ -1429,4 +1432,27 @@ model TourScanCheck {
 
   @@unique([tourSlug, sweepId])
   @@index([tourSlug, status])
+}
+
+/// Feedback left in a tour through its review link (/p/<token>): a
+/// suggestion or a bug, where in the tour (the view, to go back to), and a
+/// picture of the view with a mark where they pointed.
+model TourFeedback {
+  id        String   @id @default(cuid())
+  tourSlug  String
+  /// "forslag" or "fejl".
+  kind      String
+  text      String
+  author    String?
+  /// The view: a link to the scan point and direction, to fly back to it.
+  href      String?
+  ss        Int?
+  room      String?
+  image     String?
+  device    String?
+  /// "open" or "done".
+  status    String   @default("open")
+  createdAt DateTime @default(now())
+
+  @@index([tourSlug, createdAt])
 }

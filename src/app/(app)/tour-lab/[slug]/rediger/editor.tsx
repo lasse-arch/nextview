@@ -23,12 +23,13 @@ import { Choice, Field, FilesContext, Group, Icon, input, outsideFiles, Toggle, 
 import { fetchSiteFavicon, hostTourFiles } from "@/lib/actions/tour-files";
 import { AiMemoryPanel } from "./memory";
 import { MapEditor } from "./map-editor";
+import { FeedbackPanel } from "./feedback-panel";
 
 /** A zoom level in words, for the Zoom sliders (1 = Matterport's normal view). */
 const zoomLabel = (z: number) => (Math.abs(z - 1) < 0.01 ? "normal" : z < 1 ? `zoomet ud (${Math.round(z * 100)} %)` : `zoomet ind (${Math.round(z * 100)} %)`);
 
 type Version = { id: string; note: string | null; by: string | null; at: string };
-type Tab = "claude" | "live" | "scan" | "okonomi" | "resultater" | "del" | "tags" | "start" | "rundvisning" | "kort" | "kortet" | "generelt" | "design" | "menu" | "funktioner" | "links" | "avanceret" | "versioner";
+type Tab = "claude" | "live" | "scan" | "okonomi" | "resultater" | "del" | "tags" | "start" | "rundvisning" | "kort" | "kortet" | "feedback" | "generelt" | "design" | "menu" | "funktioner" | "links" | "avanceret" | "versioner";
 
 /** Claude's mark: a small sunburst. */
 const SPARK = '<path d="M12 3v5M12 16v5M3 12h5M16 12h5M5.6 5.6l3.5 3.5M14.9 14.9l3.5 3.5M5.6 18.4l3.5-3.5M14.9 9.1l3.5-3.5"/>';
@@ -37,6 +38,7 @@ const SPARK = '<path d="M12 3v5M12 16v5M3 12h5M16 12h5M5.6 5.6l3.5 3.5M14.9 14.9
 const TABS: [Tab, string, string, string?][] = [
   ["claude", "nextviewAI", SPARK],
   ["resultater", "Resultater", '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'],
+  ["feedback", "Feedback", '<path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8M8 12h5"/>'],
   ["del", "Del og udgiv", '<path d="M12 15V3M7 8l5-5 5 5"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/>'],
   ["start", "Start", '<path d="M5 4v16M5 5h11l-2 4 2 4H5"/>', "Indhold"],
   ["menu", "Menu", '<path d="M4 6h16M4 12h16M4 18h10"/>'],
@@ -73,6 +75,8 @@ export function TourEditor({
   scanMap,
   mpskinsHidden,
   scanCount,
+  reviewToken,
+  feedbackOpen,
 }: {
   slug: string;
   initial: TourConfig;
@@ -90,6 +94,9 @@ export function TourEditor({
   scanMap: ScanMap | null;
   mpskinsHidden: string[];
   scanCount: number | null;
+  /** Kundegennemsyn's link token (null = off), and how much feedback is open. */
+  reviewToken: string | null;
+  feedbackOpen: number;
 }) {
   const router = useRouter();
   const [config, setConfig] = useState<TourConfig>(initial);
@@ -270,6 +277,7 @@ export function TourEditor({
                 <Icon d={icon} className="h-4 w-4" />
               </span>
               {text}
+              {t === "feedback" && feedbackOpen > 0 && <span className="ml-auto rounded-full bg-[#ff9500] px-1.5 text-[11px] font-semibold text-white">{feedbackOpen}</span>}
             </button>
             </div>
           ))}
@@ -455,6 +463,7 @@ export function TourEditor({
 
             {tab === "resultater" && <ResultsPanel stats={stats} slug={slug} brand={config.brand} share={share} shareStats={shareStats} token={shareToken} />}
             {tab === "okonomi" && <EconomyPanel economy={economy} />}
+            {tab === "feedback" && <FeedbackPanel slug={slug} token={reviewToken} preview={preview} />}
             {tab === "del" && (
               <SharePanel
                 slug={slug}

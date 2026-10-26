@@ -11,6 +11,7 @@ import type { MenuEntry, TourConfig, TourPlace, TourPoint, WelcomeGo } from "../
 import { CoverWelcome, DESIGNS_CSS, DockMenu, PickerMenu } from "./designs";
 import { GUIDE_CSS, GuidePlayer, guideStops } from "./guide";
 import { DAY_CSS, DayBar, DaySheet } from "./day";
+import { FEEDBACK_CSS, FeedbackLayer } from "./feedback";
 import { ICONS } from "../tours/icons";
 import { SIMPLE_CSS, SimpleMenu, SimpleWelcome } from "./simple";
 import { INFO_CSS, InfoDots, usePlaceInfo } from "./info";
@@ -66,7 +67,7 @@ const eventLog: TrackedEvent[] = [];
 const logListeners = new Set<() => void>();
 
 /** The tour being measured (set when the tour mounts). */
-const tracking = { slug: "", session: "", queue: [] as { name: string; label?: string; url?: string }[], timer: 0 };
+const tracking = { slug: "", session: "", off: false, queue: [] as { name: string; label?: string; url?: string }[], timer: 0 };
 
 /** Sends the waiting events to Arpo's own measurement (/api/tour-events) - also when the page is closed. */
 function flushEvents() {
@@ -83,7 +84,7 @@ function track(name: string, params: Record<string, string | number> = {}) {
   const full = { tour: tracking.slug, ...params };
   window.gtag?.("event", name, full);
   // Arpo's own count - not from the editor's preview (the tour in an iframe there).
-  if (tracking.slug && window.parent === window) {
+  if (tracking.slug && !tracking.off && window.parent === window) {
     const label = params.label ?? params.item_name ?? params.place_name ?? params.room_name ?? params.kind ?? params.title ?? params.name;
     tracking.queue.push({ name, label: label != null ? String(label) : undefined, url: params.link_url != null ? String(params.link_url) : undefined });
     if (name === "cta_click" || name === "contact_click") flushEvents(); // the visitor may be leaving
@@ -190,6 +191,8 @@ type ExperienceProps = {
   phone: boolean;
   /** Arpo's own view: the prototype tools (status, event log, copy view …). Never in the public tour. */
   tools?: boolean;
+  /** Kundegennemsyn: the review link's token - the tour gets "Giv feedback", and isn't counted as visits. */
+  review?: string;
 };
 
 /** The parts of a setup the tour only reads when it starts - a change to them starts the preview over. */
@@ -235,6 +238,7 @@ function TourExperience({
   units,
   phone,
   tools = false,
+  review,
 }: ExperienceProps) {
   const T = savedTour;
   useGa4(ga4Id, T.title);
@@ -248,6 +252,7 @@ function TourExperience({
       tracking.session = Math.random().toString(36).slice(2, 14);
     }
     tracking.slug = savedTour.slug;
+    tracking.off = Boolean(review); // the customer's review isn't a visit
     track("tour_open", { label: document.referrer ? new URL(document.referrer).hostname : "direkte" });
     const leave = () => flushEvents();
     window.addEventListener("pagehide", leave);
@@ -1130,7 +1135,7 @@ function TourExperience({
       }>
       <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.font.replace(/ /g, "+")}:wght@400;600;700;800;900&display=swap`} />
       {T.fontHeading && <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.fontHeading.replace(/ /g, "+")}:wght@500;600&display=swap`} />}
-      <style>{CSS + STORIES_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + INFO_CSS + MAP_CSS + ROUTE_CSS + MEASURES_CSS + CARDS_CSS + DAY_CSS + SIMPLE_CSS}</style>
+      <style>{CSS + STORIES_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + INFO_CSS + MAP_CSS + ROUTE_CSS + MEASURES_CSS + CARDS_CSS + DAY_CSS + SIMPLE_CSS + (review ? FEEDBACK_CSS : "")}</style>
       {/* The tour's own design on top (written by Claude or by hand under Avanceret). */}
       {T.customCss && <style>{T.customCss.replace(/<\/?style/gi, "")}</style>}
 
@@ -1607,6 +1612,29 @@ function TourExperience({
           cta={T.cta.find((c) => c.primary)}
           onStop={stopRoute}
           onCta={() => ctaClick(T.cta.find((c) => c.primary)!.label, T.cta.find((c) => c.primary)!.href, "route")}
+        />
+      )}
+      {review && (
+        <FeedbackLayer
+          token={review}
+          view={async () => {
+            if (!sdk || phase !== "tour") return null;
+            const pose = await new Promise<CameraPose>((resolve) => {
+              const sub = sdk.Camera.pose.subscribe((p) => {
+                resolve(p);
+                setTimeout(() => sub.cancel());
+              });
+            });
+            const ss = Object.entries(sweepBySs).find(([, id]) => id === pose.sweep)?.[0];
+            return ss ? { href: placeHref(savedTour, ss, pose.rotation), ss: Number(ss), room } : null;
+          }}
+          shot={async () => {
+            const fr = iframe.current;
+            if (!sdk || !fr || phase !== "tour") return null;
+            const w = Math.min(fr.clientWidth, 1400);
+            return sdk.Renderer.takeScreenShot({ width: w, height: Math.round((w * fr.clientHeight) / fr.clientWidth) }, { mattertags: false, sweeps: false }).catch(() => null);
+          }}
+          onGo={(href) => menuGo(room ?? "", "feedback", href)}
         />
       )}
       {dayOpen && T.day && <DaySheet day={T.day} at={dayAt} onSee={dayGo} onClose={() => setDayOpen(false)} />}
