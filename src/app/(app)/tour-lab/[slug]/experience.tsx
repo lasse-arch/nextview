@@ -1656,7 +1656,7 @@ function TourExperience({
                   <li key={u.name}>
                     <span>
                       <b>{u.name}</b>
-                      <small>{[u.size, u.from && (/^(ledig|nu)\b/i.test(u.from) ? "ledig nu" : `ledig fra ${u.from}`)].filter(Boolean).join(", ")}</small>
+                      <small>{[u.size && (/^\d+$/.test(u.size.trim()) ? `${u.size.trim()} ledige` : u.size), u.from && (/^(ledig|nu)\b/i.test(u.from) ? "ledig nu" : `ledig fra ${u.from}`)].filter(Boolean).join(", ")}</small>
                     </span>
                     {u.price && <em>{u.price}</em>}
                     {T.live!.places?.[u.name] && (
