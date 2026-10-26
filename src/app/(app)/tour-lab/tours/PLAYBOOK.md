@@ -65,7 +65,10 @@ Gæsten kan altid slå lyden fra. Lydfiler hostes hos os som alle andre filer.
 ## Specialskoler og gæster, der gerne vil vide, hvad der kommer
 
 Fx specialefterskoler (ADHD, autisme, nedsat kognitivt funktionsniveau):
-- **Intet dukker op af sig selv**: ingen "Din plads venter" efter tid, ingen timere.
+- **Designet "Helt enkel"** (`design: { welcome: "simple", menu: "simple" }`):
+  2-3 store knapper under hinanden, og en menu, der er én liste af store knapper.
+  Ingen fliser, ingen undermenuer, ingen paneler ovenpå hinanden.
+- **Intet dukker op af sig selv**: ingen "Din plads venter", ingen stedkort, ingen timere.
   Skriv i velkomsten, at der ikke sker noget, før man selv trykker.
 - **Rolige skift**: `jump: "fade"` i stedet for at flyve gennem bygningen.
 - **Stemme-rundtur, man selv styrer** (`manual`), og guiden viser altid "Næste: …".

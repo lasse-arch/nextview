@@ -65,7 +65,7 @@ export const MEASURES_CSS = `
 .hv-maal{position:absolute;top:14px;right:14px;z-index:8;display:flex;align-items:center;gap:7px;border:0;border-radius:999px;padding:9px 16px;background:rgba(255,255,255,.95);color:var(--c-main);font:inherit;font-weight:800;font-size:14px;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.25)}
 .hv-maal svg{width:18px;height:18px}
 .hv-maal.aktiv{background:var(--c-main);color:#fff}
-.hv:has(.hv-menuknap) .hv-maal{top:66px}
+.hv:has(.hv-menuknap) .hv-maal,.hv:has(.sp-menuknap) .hv-maal{top:76px}
 /*
  * On a touch screen Matterport's measuring mode puts its own "add a point"
  * cross at the bottom of the view - under the tour's buttons, and useless
@@ -73,5 +73,5 @@ export const MEASURES_CSS = `
  * screen while measuring, so that strip is below the edge.
  */
 @media (pointer:coarse){.hv-maler .hv-mp{height:calc(100% + 150px)!important}}
-@media (max-width:760px){.hv-maal{top:12px;right:10px}.hv:has(.hv-menuknap) .hv-maal{top:62px}}
+@media (max-width:760px){.hv-maal{top:12px;right:10px}.hv:has(.hv-menuknap) .hv-maal,.hv:has(.sp-menuknap) .hv-maal{top:72px}}
 `;

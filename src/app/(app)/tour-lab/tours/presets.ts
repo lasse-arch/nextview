@@ -7,10 +7,11 @@ import type { TourConfig } from "./types";
  * live preview before it's chosen.
  */
 
-export type Branch = "efterskole" | "restaurant" | "fitness" | "hotel" | "butik" | "lager" | "camping" | "erhverv" | "andet";
+export type Branch = "efterskole" | "specialskole" | "restaurant" | "fitness" | "hotel" | "butik" | "lager" | "camping" | "erhverv" | "andet";
 
 export const BRANCHES: [Branch, string][] = [
   ["efterskole", "Efterskole / højskole"],
+  ["specialskole", "Specialskole / særlige behov"],
   ["restaurant", "Restaurant / café"],
   ["fitness", "Fitness"],
   ["hotel", "Hotel / konference"],
@@ -24,6 +25,7 @@ export const BRANCHES: [Branch, string][] = [
 /** What the tour should drive visitors to, per branch - suggestions for the focus field. */
 export const FOCUS: Record<Branch, string[]> = {
   efterskole: ["Book en rundvisning", "Ledige pladser", "Se værelserne"],
+  specialskole: ["Book en rundvisning", "Vis hvordan en dag ser ud", "Se værelserne"],
   restaurant: ["Book bord", "Bestil takeaway", "Selskaber og events"],
   fitness: ["Bliv medlem", "Prøv gratis", "Holdplan"],
   hotel: ["Book værelse", "Møder og konferencer", "Restauranten"],
@@ -35,7 +37,7 @@ export const FOCUS: Record<Branch, string[]> = {
 };
 
 export type DesignPreset = {
-  id: "klassisk" | "forside" | "direkte" | "rumvaelger" | "guidet";
+  id: "klassisk" | "forside" | "direkte" | "rumvaelger" | "guidet" | "enkel";
   name: string;
   /** One line on what it is. */
   what: string;
@@ -113,11 +115,30 @@ export const DESIGN_PRESETS: DesignPreset[] = [
       nudge: T.nudge ?? { afterSeconds: 90, title: "Din plads venter", text: "Har du set nok til at tage det næste skridt?", buttons: T.cta.filter((c) => c.primary).map((c) => ({ label: c.label, href: c.href, primary: true })) },
     }),
   },
+  {
+    id: "enkel",
+    name: "Helt enkel",
+    what: "Få store knapper og én menu-knap med én liste. Intet dukker op af sig selv.",
+    when: "Gæster, der skal have det roligt og forudsigeligt - fx specialskoler (autisme, ADHD).",
+    recommendedFor: ["specialskole"],
+    apply: (T) => ({
+      design: { welcome: "simple", menu: "simple" },
+      welcome: T.welcome
+        ? { ...T.welcome, tiles: T.welcome.tiles.slice(0, 3) }
+        : { kicker: T.brand, title: "Hej og velkommen", lead: "Se stedet i dit eget tempo. Der sker ikke noget, før du selv trykker.", tiles: [{ kicker: "", title: "Start rundturen", go: { guide: true }, style: "accent" }], skip: "Kig selv rundt" },
+      navigation: "free",
+      jump: "fade",
+      menuOpenOnStart: { desktop: false, mobile: false },
+      nudge: undefined,
+      guide: T.guide ? { ...T.guide, manual: true } : undefined,
+    }),
+  },
 ];
 
 /** Which preset a tour looks like now (for the Design tab's tick). */
 export function currentPreset(T: TourConfig): DesignPreset["id"] | null {
   const menu = T.design?.menu ?? "side";
+  if (menu === "simple" || T.design?.welcome === "simple") return "enkel";
   if (menu === "picker") return "rumvaelger";
   if (T.design?.welcome === "cover") return "forside";
   if (!T.welcome) return "direkte";

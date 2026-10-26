@@ -32,7 +32,7 @@ export function EconomyPanel({ economy }: { economy: TourEconomy }) {
             <div className="text-[12px] text-[#8e8e93]">filming + redigering</div>
           </div>
           <div>
-            <div className="text-[13px] font-medium text-[#6e6e73]">Claude</div>
+            <div className="text-[13px] font-medium text-[#6e6e73]">nextviewAI</div>
             <div className="text-[36px] font-semibold leading-tight tracking-tight tabular-nums">{Math.round(economy.ai.usd * DKK_PER_USD).toLocaleString("da-DK")} kr.</div>
             <div className="text-[12px] text-[#8e8e93]">
               ${economy.ai.usd.toFixed(2)} · {economy.ai.calls} kald

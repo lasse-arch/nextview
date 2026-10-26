@@ -1389,3 +1389,25 @@ model TourAiUsage {
 
   @@index([tourSlug])
 }
+
+/// What nextviewAI has learned while building and editing tours - kept and
+/// given back to it every time, so it gets better. scope "all" = for every
+/// tour (how Nextview360 likes things done), otherwise a tour's slug (facts
+/// about that customer).
+model TourAiMemory {
+  id        String   @id @default(cuid())
+  scope     String
+  text      String
+  createdBy String?
+  createdAt DateTime @default(now())
+
+  @@index([scope])
+}
+
+/// Pages and PDFs nextviewAI has read on customers' websites, kept for a week
+/// so the same page isn't fetched again and again.
+model SiteCache {
+  url       String   @id
+  text      String
+  fetchedAt DateTime @default(now())
+}

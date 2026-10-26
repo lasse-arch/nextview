@@ -73,7 +73,7 @@ export function LiveDataEditor({ config, edit, slug, preview }: { config: TourCo
           <input className={input} value={what} onChange={(e) => setWhat(e.target.value)} placeholder="Fx ledige campingpladser med nummer, størrelse og pris" />
         </Field>
         <button type="button" disabled={pending || !url.trim()} onClick={read} className="w-full rounded-xl bg-[#0071e3] py-2.5 text-[15px] font-medium text-white disabled:opacity-40">
-          {pending ? "Claude læser siden…" : live ? "Læs siden igen med Claude" : "Læs siden med Claude"}
+          {pending ? "nextviewAI læser siden…" : live ? "Læs siden igen med nextviewAI" : "Læs siden med nextviewAI"}
         </button>
         {error && <p className="px-1 text-[12px] text-[#ff3b30]">{error}</p>}
         {explanation && <p className="px-1 text-[12px] leading-snug text-[#6e6e73]">{explanation}</p>}
@@ -168,7 +168,7 @@ export function LiveDataEditor({ config, edit, slug, preview }: { config: TourCo
                 </ul>
               </>
             )}
-            {units?.length === 0 && <p className="text-[13px] text-[#8e8e93]">Ingen ledige på siden lige nu - eller opskriften passer ikke længere. Prøv &quot;Læs siden igen med Claude&quot;.</p>}
+            {units?.length === 0 && <p className="text-[13px] text-[#8e8e93]">Ingen ledige på siden lige nu - eller opskriften passer ikke længere. Prøv &quot;Læs siden igen med nextviewAI&quot;.</p>}
           </Group>
         </>
       )}

@@ -2,8 +2,9 @@ import type { TourConfig } from "./types";
 
 /**
  * Tolne Efterskole - a special efterskole (ADHD, autism, reduced cognitive
- * functioning are common among the students). Built to be calm and
- * predictable: nothing pops up by itself, places fade in instead of flying,
+ * functioning are common among the students). Built to be calm, plain and
+ * predictable ("Helt enkel"): two big buttons to start, a menu that is one
+ * list, nothing pops up by itself, places fade in instead of flying,
  * the voice tour waits for the visitor and always says what comes next, and
  * "Sådan ser en dag ud" shows the real day (from the school's ugeskema
  * 26/27) with where each part happens. Parents and caseworkers get their own
@@ -46,22 +47,21 @@ export const tolneEfterskole: TourConfig = {
   contact: { address: "Dvergetvedvej 95, Tolne, 9870 Sindal", phone: "98 93 05 11", email: "kontakt@tolneefterskole.dk" },
   // Calm: places fade in instead of flying through the building.
   jump: "fade",
-  design: { welcome: "tiles", menu: "side" },
+  // "Helt enkel": a few big buttons, and a menu that is one plain list - nothing else.
+  design: { welcome: "simple", menu: "simple" },
   welcome: {
     kicker: "Tolne Efterskole",
     title: "Hej og velkommen",
-    lead: "Her kan du se skolen i dit eget tempo, før du kommer. Der sker ikke noget, før du selv trykker. Hvad vil du gerne?",
+    lead: "Her kan du se Tolne Efterskole. Der sker ikke noget, før du selv trykker.",
     tiles: [
-      { kicker: "Med stemme", title: "Tag en rolig rundtur", go: { guide: true }, style: "accent", recommended: true },
-      { kicker: "Her bor du", title: "Se hvor du skal bo", go: { room: ROOM, name: "2-personers værelse" }, style: "light" },
-      { kicker: "7.45 til 22.00", title: "Sådan ser en dag ud", go: { day: true }, style: "light" },
-      { kicker: "Forældre og fagfolk", title: "Book en rundvisning", go: { href: KONTAKT }, style: "dark" },
+      { kicker: "", title: "Start rundturen", go: { guide: true }, style: "accent" },
+      { kicker: "", title: "Se en dag på skolen", go: { day: true }, style: "light" },
     ],
-    skip: "Gå rundt selv",
+    skip: "Kig selv rundt",
   },
   day: {
     title: "Sådan ser en dag ud",
-    lead: "En almindelig skoledag på Tolne Efterskole. Tryk på \"Se stedet\" for at se, hvor det sker.",
+    lead: "Sådan ser en almindelig dag ud. Tryk på \"Se stedet\" for at se, hvor det sker.",
     steps: [
       { time: "7.45", title: "Morgenmad", text: "Vi starter dagen med morgenmad sammen.", href: DINING },
       { time: "8.30", title: "Orientering og morgensang", text: "Her hører du, hvad der skal ske i dag.", href: MORNING },
@@ -90,36 +90,23 @@ export const tolneEfterskole: TourConfig = {
       { href: "", title: "Tak fordi du så med", text: "Gå rundt selv, eller se turen igen.", audio: `${P}/slut.mp3` },
     ],
   },
-  // Short, concrete facts when you arrive at a place (from the school's own site) - no pop-ups after a while, no timers.
-  placeCards: [
-    { ss: [88, 126, 102, 84], title: "Sådan bor du", text: "Det første år bor du på skolen - typisk sammen med én eller to. Toilet og bad deler I med værelset ved siden af." },
-    { ss: [2], title: "Spisesalen", text: "Vi spiser fem måltider om dagen sammen, så krop og hjerne kan holde sig godt i gang." },
-    { ss: [160], title: "Motor & Metal", text: "Har du benzin i blodet? Her svejser du og arbejder med metal og motorer." },
-    { ss: [162], title: "Bygge & Anlæg", text: "Her arbejder du med træ, bygger et skur eller murer en væg." },
-    { ss: [75], title: "Kunst & Kultur", text: "Her tegner, maler og laver du keramik." },
-    { ss: [39], title: "Musik", text: "Her lærer du at synge og spille - pop, rock eller klassisk." },
-    { ss: [50, 53], title: "De voksne", text: "Alle elever har en kontaktlærer, der kender dem godt. Her på kontoret kan du altid få hjælp." },
-  ],
   mobileZoomLock: true,
   categories: {},
   points: [],
   navigation: "free",
   hiddenSweeps: [],
-  menuOpenOnStart: { desktop: true, mobile: false },
+  menuOpenOnStart: { desktop: false, mobile: false },
+  // One plain list: the places a new student wants to see, then the workshops, then what parents need.
   menu: [
-    { title: "Velkommen til Tolne Efterskole", href: u(12, "-.06,-2.20") },
-    { title: "Klyngerne", items: [["2-personers værelse", u(126, "-1.65,-1.29")], ["Toilet og bad", u(125, "-1.5,1.35")]] },
-    { title: "Højre fløj", items: [["2-personers værelse", u(102, "-1.75,-1.46")], ["Toilet og bad", u(104, "-2.19,1.3")]] },
+    { title: "Velkommen", href: u(12, "-.06,-2.20") },
+    { title: "Dit værelse", href: ROOM },
+    { title: "Toilet og bad", href: u(94, "-.43,1.23") },
+    { title: "Spisesalen", href: DINING },
+    { title: "Morgensang", href: MORNING },
+    { title: "Hallen", href: HALL },
+    { title: "Kontoret", href: OFFICE },
     {
-      title: "Venstre fløj",
-      items: [
-        ["3-personers værelse", u(84, "-2.77,1.29")],
-        ["2-personers værelse", u(88, "-2.58,1.02")],
-        ["Toilet og bad", u(94, "-.43,1.23")],
-      ],
-    },
-    {
-      title: "Din skoledag",
+      title: "Værkstederne",
       items: [
         ["Motor & Metal", u(160, "-3.02,-1.02")],
         ["Bygge & Anlæg", u(162, "-2.81,-1.11")],
@@ -129,23 +116,10 @@ export const tolneEfterskole: TourConfig = {
       ],
     },
     {
-      title: "Fælles steder",
-      items: [
-        ["Spisesalen", u(2, "-2.78,1.27")],
-        ["Morgensang", u(35, "-3,.29")],
-        ["Hallen", u(17, "-.18,.5")],
-        ["Fitness", u(25, "-.09,.05")],
-      ],
-    },
-    { title: "De voksne", items: [["Kontoret", u(50, "-2.98,-.23")], ["Forstander og viceforstander", u(53, "-2.94,-.2")]] },
-    {
-      title: "Til forældre og fagfolk",
+      title: "Til forældre",
       items: [
         ["Book en rundvisning", KONTAKT],
         ["Sådan bliver du optaget", OPTAGET],
-        ["Særlig støtte", `${SITE}/saerlig-stoette/`],
-        ["Kørestol", `${SITE}/koerestol/`],
-        ["Forældre-info", `${SITE}/foraeldre-info/`],
       ],
     },
   ],

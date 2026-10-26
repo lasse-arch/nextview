@@ -140,8 +140,11 @@ export type TourConfig = {
    * with its places to pick; "dock" = a bar at the bottom with what guests came for;
    * "picker" = a room picker at the bottom - the menu's groups (e.g. sizes) on one
    * row, the chosen group's rooms (e.g. empty / furnished) on the next.
+   * "simple" (welcome and menu) = "Helt enkel": a few big buttons one below the
+   * other, and a menu that is one list of big buttons - no tiles, sub-menus or
+   * side panels. For visitors who need it calm and plain (special schools).
    */
-  design?: { welcome: "tiles" | "cover"; menu: "side" | "dock" | "picker" };
+  design?: { welcome: "tiles" | "cover" | "simple"; menu: "side" | "dock" | "picker" | "simple" };
   /**
    * How the menu moves you: "fly" through the model (default), "instant" - a
    * straight switch to the room, or "fade" - a cross-fade from a picture of

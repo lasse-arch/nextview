@@ -92,6 +92,14 @@ export function PresetMock({ id, colors }: { id: DesignPreset["id"]; colors: Col
           </div>
         </>
       )}
+      {id === "enkel" && (
+        <div className="absolute inset-x-[22%] top-[12%] bottom-[12%] flex flex-col items-center justify-center gap-1.5 rounded-md bg-white/95 p-2 shadow">
+          {line("45%", colors.main, 4)}
+          <div className="h-3.5 w-full rounded-md" style={{ background: colors.accent }} />
+          <div className="h-3.5 w-full rounded-md ring-1 ring-black/15" />
+          {line("35%", "#bbb", 2)}
+        </div>
+      )}
     </div>
   );
 }

@@ -10,7 +10,7 @@ import type { Prisma } from "@prisma/client";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getSettingValue, setSettingValue } from "@/lib/integration-settings";
-import { siteDigest } from "@/lib/site-digest";
+import { siteResearch } from "@/lib/site-digest";
 import { pageAsText, readUnits, type LiveUnit } from "@/lib/availability/live";
 import { hostFiles } from "@/lib/tour-files";
 import { BRANCHES, DESIGN_PRESETS, type Branch, type DesignPreset } from "@/app/(app)/tour-lab/tours/presets";
@@ -22,6 +22,7 @@ const PRESET_BASE: Record<DesignPreset["id"], string> = {
   direkte: "fitness-gronlandstorv",
   rumvaelger: "boxdepot-rum",
   guidet: "halvorsminde",
+  enkel: "tolne-efterskole",
 };
 import { tourConfigProblem } from "@/lib/tour-validate";
 import { fetchModelInfo, modelIdsIn, searchAccountModels, type ModelInfo } from "@/lib/matterport-graph";
@@ -53,7 +54,7 @@ export async function tourAiReady(): Promise<boolean> {
 export async function saveAnthropicKey(key: string): Promise<{ ok: true } | { ok: false; error: string }> {
   await admin();
   const value = key.trim();
-  if (!value.startsWith("sk-ant-")) return { ok: false, error: "En Claude-nøgle starter med sk-ant-" };
+  if (!value.startsWith("sk-ant-")) return { ok: false, error: "En nøgle fra Anthropic starter med sk-ant-" };
   try {
     await new Anthropic({ apiKey: value }).models.list({ limit: 1 });
   } catch {
@@ -74,10 +75,18 @@ const Edits = z.object({
       })
     )
     .describe("Ændringerne til opsætningen. Tom liste hvis du kun svarer eller spørger."),
+  remember: z
+    .array(
+      z.object({
+        scope: z.enum(["all", "tour"]).describe('"all": gælder alle tours (hvordan Nextview360 vil have tingene). "tour": fakta om netop denne kunde.'),
+        text: z.string().describe("Én kort sætning på dansk."),
+      })
+    )
+    .describe("Det, du har lært og skal huske til næste gang (se Hukommelse). Ofte tom."),
 });
 
 export type ChatTurn = { role: "user" | "assistant"; text: string };
-export type AiEditResult = { ok: true; reply: string; config: TourConfig; changed: number } | { ok: false; error: string };
+export type AiEditResult = { ok: true; reply: string; config: TourConfig; changed: number; remembered: string[] } | { ok: false; error: string };
 
 /** Claude Opus 5.5's price per million tokens: input $4, output $20, cache reads $0.20, cache writes (5 min) $5. */
 function claudeCostUsd(u: { input_tokens: number; output_tokens: number; cache_read_input_tokens?: number | null; cache_creation_input_tokens?: number | null }) {
@@ -129,6 +138,17 @@ Regler:
 - Følg drejebogen nedenfor - den er Nextview360's erfaring med, hvad der virker.
 - Kan noget ikke laves med felterne (en særlig stil, former, effekter, at flytte eller skjule noget), så skriv CSS i customCss (se typen). Bevar det, der allerede står der, og tilføj til det. Design skal stadig virke på mobil.
 
+Sådan arbejder du (du hedder nextviewAI i Arpo):
+- Alt skal være skræddersyet til netop denne kunde - aldrig en skabelon med navnet skiftet ud. Brug kundens egne ord, fakta og handlinger fra hjemmesiden, undersiderne og PDF'erne (fx et ugeskema → "Sådan ser en dag ud" med de rigtige tider).
+- Find først ud af, hvem der besøger touren, og hvad de har brug for. Er det fx en specialskole (autisme, ADHD, særlige behov), så gør alt helt enkelt og forudsigeligt: designet "Helt enkel" (design.welcome og design.menu "simple"), 2-3 store knapper, én flad menu, ingen fliser, intet der dukker op af sig selv (ingen nudge, ingen stedkort), jump "fade", rundtur med stemme hvor man selv trykker videre. Forældre og fagfolk er dem, der handler - giv dem deres egen lille gruppe.
+- Hvem handler, og hvad er næste skridt i virkeligheden (fx "Book en rundvisning", fordi optagelse altid starter der)? Gør det til hovedhandlingen.
+- Mindre er mere: hellere få, tydelige valg end mange.
+
+Hukommelse (remember):
+- Du har en hukommelse, der gives tilbage til dig hver gang (se <hukommelse> nedenfor og i beskeden). Brug den.
+- Gem en kort sætning, når du lærer noget, der skal bruges igen: når brugeren retter dig eller siger, hvordan Nextview360 vil have tingene (scope "all"), eller vigtige fakta om kunden, som ikke står i opsætningen (scope "tour").
+- Gem ikke det, der allerede står i drejebogen eller hukommelsen, og ikke selve ændringen. Oftest er listen tom.
+
 <drejebog>
 ${playbook}
 </drejebog>
@@ -139,11 +159,33 @@ ${types}
 \`\`\``;
 }
 
-/** Asks Claude for edits to a setup and applies them to a copy. */
-async function claudeEdits(key: string, who: { name: string; kind: string }, config: TourConfig, history: ChatTurn[], request: string, maxTokens = 16000, retry = true): Promise<AiEditResult> {
+/** What nextviewAI remembers: for every tour, and about this one. */
+async function memories(slug: string) {
+  const rows = await prisma.tourAiMemory.findMany({ where: { scope: { in: ["all", slug] } }, orderBy: { createdAt: "asc" }, take: 300 });
+  const list = (scope: string) => rows.filter((r) => r.scope === scope).map((r) => `- ${r.text}`).join("\n");
+  return { all: list("all"), tour: list(slug) };
+}
+
+/** Keeps what nextviewAI learned (skipping what it already knew). */
+async function remember(slug: string, by: string, notes: { scope: "all" | "tour"; text: string }[]): Promise<string[]> {
+  const kept: string[] = [];
+  for (const n of notes) {
+    const text = n.text.trim().slice(0, 400);
+    const scope = n.scope === "all" ? "all" : slug;
+    if (!text || (await prisma.tourAiMemory.findFirst({ where: { scope, text }, select: { id: true } }))) continue;
+    await prisma.tourAiMemory.create({ data: { scope, text, createdBy: by } });
+    kept.push(text);
+  }
+  return kept;
+}
+
+/** Asks nextviewAI for edits to a setup and applies them to a copy. `pdfs`: documents (by address) it reads along with the request. */
+async function claudeEdits(key: string, who: { name: string; kind: string }, config: TourConfig, history: ChatTurn[], request: string, maxTokens = 16000, retry = true, pdfs: string[] = []): Promise<AiEditResult> {
+  const mem = await memories(config.slug);
+  const text = `Opsætningen lige nu:\n\`\`\`json\n${JSON.stringify(config)}\n\`\`\`\n\n${mem.tour ? `<hukommelse om denne kunde>\n${mem.tour}\n</hukommelse>\n\n` : ""}${request}`;
   const messages: Anthropic.MessageParam[] = [
     ...history.slice(-10).map((t): Anthropic.MessageParam => ({ role: t.role, content: t.text })),
-    { role: "user", content: `Opsætningen lige nu:\n\`\`\`json\n${JSON.stringify(config)}\n\`\`\`\n\n${request}` },
+    { role: "user", content: [...pdfs.map((url): Anthropic.DocumentBlockParam => ({ type: "document", source: { type: "url", url } })), { type: "text", text }] },
   ];
   let parsed: z.infer<typeof Edits> | null;
   try {
@@ -152,8 +194,11 @@ async function claudeEdits(key: string, who: { name: string; kind: string }, con
       .stream({
         model: "claude-opus-5-5",
         max_tokens: maxTokens,
-        // The setup docs and the playbook are the same in every call - cached, they cost a tenth on the next ones.
-        system: [{ type: "text", text: await systemPrompt(), cache_control: { type: "ephemeral" } }],
+        // The setup docs, the playbook and the shared memory are the same in every call - cached, they cost a tenth on the next ones.
+        system: [
+          { type: "text", text: await systemPrompt(), cache_control: { type: "ephemeral" } },
+          { type: "text", text: `<hukommelse>\nDet, Nextview360 har lært dig (gælder alle tours):\n${mem.all || "(intet endnu)"}\n</hukommelse>`, cache_control: { type: "ephemeral" } },
+        ],
         messages,
         output_config: { effort: "low", format: zodOutputFormat(Edits) },
       })
@@ -174,16 +219,16 @@ async function claudeEdits(key: string, who: { name: string; kind: string }, con
         },
       })
       .catch((err: unknown) => console.error("tourAiUsage", err));
-    if (response.stop_reason === "refusal") return { ok: false, error: "Claude ville ikke lave den ændring." };
+    if (response.stop_reason === "refusal") return { ok: false, error: "nextviewAI ville ikke lave den ændring." };
     if (response.stop_reason === "max_tokens") return { ok: false, error: "Ændringen blev for stor - prøv at dele den op." };
     parsed = response.parsed_output ?? null;
   } catch (err) {
-    if (err instanceof Anthropic.AuthenticationError) return { ok: false, error: "Claude-nøglen virker ikke længere." };
-    if (err instanceof Anthropic.RateLimitError) return { ok: false, error: "Claude har travlt - prøv igen om lidt." };
+    if (err instanceof Anthropic.AuthenticationError) return { ok: false, error: "nextviewAI-nøglen virker ikke længere." };
+    if (err instanceof Anthropic.RateLimitError) return { ok: false, error: "nextviewAI har travlt - prøv igen om lidt." };
     console.error("claudeEdits", err);
-    return { ok: false, error: "Kunne ikke få fat i Claude - prøv igen." };
+    return { ok: false, error: "Kunne ikke få fat i nextviewAI - prøv igen." };
   }
-  if (!parsed) return { ok: false, error: "Claude svarede ikke som forventet - prøv igen." };
+  if (!parsed) return { ok: false, error: "nextviewAI svarede ikke som forventet - prøv igen." };
 
   const next = structuredClone(config) as unknown as Record<string, unknown>;
   let problem: string | null;
@@ -195,21 +240,22 @@ async function claudeEdits(key: string, who: { name: string; kind: string }, con
   }
   if (problem) {
     // Claude gets one go at fixing its own edit, told exactly what was wrong.
-    if (retry) return claudeEdits(key, who, config, history, `${request}\n\n(Dit forrige forsøg kunne ikke bruges: ${problem}. Lav ændringen igen, så opsætningen har den rigtige form.)`, maxTokens, false);
-    return { ok: false, error: `Claudes ændring kunne ikke bruges (${problem}) - prøv at formulere det anderledes.` };
+    if (retry) return claudeEdits(key, who, config, history, `${request}\n\n(Dit forrige forsøg kunne ikke bruges: ${problem}. Lav ændringen igen, så opsætningen har den rigtige form.)`, maxTokens, false, pdfs);
+    return { ok: false, error: `nextviewAIs ændring kunne ikke bruges (${problem}) - prøv at formulere det anderledes.` };
   }
-  return { ok: true, reply: parsed.reply, config: { ...(next as unknown as TourConfig), slug: config.slug }, changed: parsed.changes.length };
+  const remembered = await remember(config.slug, who.name, parsed.remember ?? []).catch((err: unknown) => (console.error("remember", err), []));
+  return { ok: true, reply: parsed.reply, config: { ...(next as unknown as TourConfig), slug: config.slug }, changed: parsed.changes.length, remembered };
 }
 
 export async function askClaudeForTour(config: TourConfig, history: ChatTurn[], request: string): Promise<AiEditResult> {
   const user = await admin();
   const key = await apiKey();
-  if (!key) return { ok: false, error: "Claude er ikke sat op endnu - indsæt en nøgle." };
+  if (!key) return { ok: false, error: "nextviewAI er ikke sat op endnu - indsæt en nøgle." };
   try {
     return await claudeEdits(key, { name: user.name, kind: "ændring" }, config, history, `Ønske: ${request}`);
   } catch (err) {
     console.error("askClaudeForTour", err);
-    return { ok: false, error: `Noget gik galt hos Claude (${err instanceof Error ? err.message : err}) - prøv igen.` };
+    return { ok: false, error: `Noget gik galt hos nextviewAI (${err instanceof Error ? err.message : err}) - prøv igen.` };
   }
 }
 
@@ -236,7 +282,7 @@ export async function createTourFromWebsite(input: {
 }): Promise<{ ok: true; slug: string; reply: string } | { ok: false; error: string }> {
   const user = await admin();
   const key = await apiKey();
-  if (!key) return { ok: false, error: "Claude er ikke sat op endnu - indsæt en nøgle i en tours editor (fanen Claude)." };
+  if (!key) return { ok: false, error: "nextviewAI er ikke sat op endnu - indsæt en nøgle i en tours editor (fanen nextviewAI)." };
   const name = input.name.trim();
   if (!name) return { ok: false, error: "Giv touren et navn." };
   const model = input.modelId ? await fetchModelInfo(input.modelId) : null;
@@ -248,9 +294,11 @@ export async function createTourFromWebsite(input: {
     (await prisma.tour.findUnique({ where: { slug: baseSlug }, select: { config: true } })) ?? (await prisma.tour.findFirst({ orderBy: { createdAt: "asc" }, select: { config: true } }));
   if (!source) return { ok: false, error: "Der er ingen tour at bygge videre på." };
 
-  const [site] = await Promise.all([
-    input.website.trim() ? siteDigest(input.website).catch((err: unknown) => `(Hjemmesiden kunne ikke hentes: ${err instanceof Error ? err.message : err})`) : Promise.resolve("(Ingen hjemmeside angivet)"),
-  ]);
+  // Read like a person would: the front page and the pages and PDFs behind it (cached for a week).
+  const research = input.website.trim()
+    ? await siteResearch(input.website).catch((err: unknown) => ({ text: `(Hjemmesiden kunne ikke hentes: ${err instanceof Error ? err.message : err})`, pdfs: [] as string[] }))
+    : { text: "(Ingen hjemmeside angivet)", pdfs: [] as string[] };
+  const site = research.text;
 
   let slug = slugify(name) || "tour";
   for (let i = 2; await prisma.tour.findUnique({ where: { slug }, select: { id: true } }); i++) slug = `${slugify(name)}-${i}`;
@@ -272,6 +320,8 @@ Udfyld ud fra kundens hjemmeside nedenfor, efter drejebogen:
 - cta og contact: hjemmesidens vigtigste handling(er) og kontaktoplysninger. linkOpen: popup for booking.
 - velkomst: vælg den start, drejebogen anbefaler til branchen (design.welcome + welcome eller cover). Brug ikke fotos, du ikke har, og aldrig Matterports automatiske billeder (de er for dårlige) - forsiden får hjemmesidens delingsbillede, hvis det er et rigtigt foto af stedet; ellers sig i reply, at brugeren skal tage et forsidebillede i forhåndsvisningen (Start → Forsiden → Tag billede).
 - nudge ("Din plads venter") med hovedhandlingen.
+- Læs undersiderne og eventuelle PDF'er (vedhæftet): find ud af, hvem stedet er for, og hvad besøgende har brug for - og byg touren til dem (se "Sådan arbejder du"). Brug rigtige fakta (fx dagsrytme fra et skema → day).
+- Gem det vigtigste, du har lært om kunden, i remember (scope "tour"), så du ved det næste gang.
 Skriv al tekst på dansk i kundens stemme. Opfind ingen fakta. I reply: fortæl kort, hvad du har valgt og hvorfor, og hvad brugeren selv bør tjekke eller tilføje (fx fotos af stederne).
 ${branch ? `\nBranche: ${branch}.` : ""}${preset ? `\nDesign valgt af brugeren: "${preset.name}" (${preset.what}) - bevar design, menutype, bevægelse og start, som de står i skabelonen; udfyld kun indholdet.` : ""}${input.focus?.trim() ? `\nTouren skal især få besøgende til: ${input.focus.trim()}. Gør det til hovedhandlingen (cta, "Din plads venter", stedkort i de vigtigste rum).` : ""}
 ${input.notes.trim() ? `\nBemærkninger fra brugeren: ${input.notes.trim()}\n` : ""}
@@ -283,7 +333,9 @@ ${site}
 Touren er forbundet til Matterport-modellen ${model.id} ("${model.name}"${model.address ? `, ${model.address}` : ""}).
 Steder i touren skrives som https://my.matterport.com/show/?m=${model.id}&ss=<scanpunkt>.
 </matterport>`,
-    32000
+    32000,
+    true,
+    research.pdfs
   );
   if (!result.ok) return result;
 
@@ -291,7 +343,7 @@ Steder i touren skrives som https://my.matterport.com/show/?m=${model.id}&ss=<sc
   const hosted = await hostFiles(slug, { ...result.config, slug });
   const config = hosted.config as unknown as Prisma.InputJsonValue;
   await prisma.tour.create({
-    data: { slug, name, dealId: input.dealId || null, config, versions: { create: { config, note: `Bygget af Claude${input.website.trim() ? ` ud fra ${input.website.trim()}` : ""}`, createdByName: user.name } } },
+    data: { slug, name, dealId: input.dealId || null, config, versions: { create: { config, note: `Bygget af nextviewAI${input.website.trim() ? ` ud fra ${input.website.trim()}` : ""}`, createdByName: user.name } } },
   });
   revalidatePath("/tour-lab");
   const failed = hosted.failed.length ? `\n\nDisse filer kunne ikke hentes til os: ${hosted.failed.join("; ")}` : "";
@@ -421,7 +473,7 @@ type LiveSpec = NonNullable<TourConfig["live"]>;
 export async function setupLiveData(slug: string, url: string, what: string): Promise<{ ok: true; spec: LiveSpec; units: LiveUnit[]; explanation: string } | { ok: false; error: string }> {
   const user = await admin();
   const key = await apiKey();
-  if (!key) return { ok: false, error: "Claude er ikke sat op endnu - indsæt en nøgle under fanen Claude." };
+  if (!key) return { ok: false, error: "nextviewAI er ikke sat op endnu - indsæt en nøgle under fanen nextviewAI." };
   let text: string;
   try {
     text = await pageAsText(url, 0);
@@ -442,15 +494,15 @@ export async function setupLiveData(slug: string, url: string, what: string): Pr
         output_config: { effort: "medium", format: zodOutputFormat(LiveRecipe) },
       });
     } catch (err) {
-      if (err instanceof Anthropic.AuthenticationError) return { ok: false, error: "Claude-nøglen virker ikke længere." };
-      return { ok: false, error: `Kunne ikke få fat i Claude (${err instanceof Error ? err.message : err}).` };
+      if (err instanceof Anthropic.AuthenticationError) return { ok: false, error: "nextviewAI-nøglen virker ikke længere." };
+      return { ok: false, error: `Kunne ikke få fat i nextviewAI (${err instanceof Error ? err.message : err}).` };
     }
     const u = r.usage;
     await prisma.tourAiUsage
       .create({ data: { tourSlug: slug, userName: user.name, kind: "live data", inputTokens: u.input_tokens, outputTokens: u.output_tokens, cacheReadTokens: u.cache_read_input_tokens ?? 0, cacheWriteTokens: u.cache_creation_input_tokens ?? 0, costUsd: claudeCostUsd(u) } })
       .catch(() => {});
     const recipe = r.parsed_output;
-    if (!recipe) return { ok: false, error: "Claude svarede ikke som forventet - prøv igen." };
+    if (!recipe) return { ok: false, error: "nextviewAI svarede ikke som forventet - prøv igen." };
     const spec: LiveSpec = { url, title: recipe.title, pattern: recipe.pattern, flags: recipe.flags.replace(/[^imsu]/g, "") };
     let units: LiveUnit[] = [];
     try {
@@ -462,7 +514,7 @@ export async function setupLiveData(slug: string, url: string, what: string): Pr
     if (units.length || attempt === 1) return { ok: true, spec, units: units.slice(0, 100), explanation: recipe.explanation };
     feedback = `\n(Dit forrige regex /${spec.pattern}/${spec.flags} fandt ingen enheder på siden. Se teksten igen og prøv et andet mønster.)\n`;
   }
-  return { ok: false, error: "Claude kunne ikke finde de ledige enheder på siden." };
+  return { ok: false, error: "nextviewAI kunne ikke finde de ledige enheder på siden." };
 }
 
 /** What a live-data setup finds on the page right now (for the editor's list) - all units, the excluded ones too. */
@@ -473,4 +525,27 @@ export async function previewLiveData(spec: LiveSpec): Promise<{ ok: true; units
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
+}
+
+/* ----- nextviewAI's memory, as the editor shows it ----- */
+
+export type AiMemory = { id: string; scope: "all" | "tour"; text: string; by: string | null; at: string };
+
+export async function tourAiMemories(slug: string): Promise<AiMemory[]> {
+  await admin();
+  const rows = await prisma.tourAiMemory.findMany({ where: { scope: { in: ["all", slug] } }, orderBy: { createdAt: "desc" }, take: 300 });
+  return rows.map((r) => ({ id: r.id, scope: r.scope === "all" ? "all" : "tour", text: r.text, by: r.createdBy, at: r.createdAt.toISOString() }));
+}
+
+/** Teaches nextviewAI something by hand - for every tour, or about this customer. */
+export async function addTourAiMemory(slug: string, scope: "all" | "tour", text: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const user = await admin();
+  if (!text.trim()) return { ok: false, error: "Skriv det, nextviewAI skal huske." };
+  await remember(slug, user.name, [{ scope, text }]);
+  return { ok: true };
+}
+
+export async function forgetTourAiMemory(id: string): Promise<void> {
+  await admin();
+  await prisma.tourAiMemory.delete({ where: { id } }).catch(() => {});
 }

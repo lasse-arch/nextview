@@ -11,6 +11,7 @@ import type { MenuEntry, TourConfig, TourPlace, TourPoint, WelcomeGo } from "../
 import { CoverWelcome, DESIGNS_CSS, DockMenu, PickerMenu } from "./designs";
 import { GUIDE_CSS, GuidePlayer, guideStops } from "./guide";
 import { DAY_CSS, DayBar, DaySheet } from "./day";
+import { SIMPLE_CSS, SimpleMenu, SimpleWelcome } from "./simple";
 import { INFO_CSS, InfoDots, usePlaceInfo } from "./info";
 import { MAP_CSS, MapScene, type MapApi } from "./map";
 import { CARDS_CSS, NudgeCard, PlaceCard } from "./cards";
@@ -1108,7 +1109,7 @@ function TourExperience({
       }>
       <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.font.replace(/ /g, "+")}:wght@400;600;700;800;900&display=swap`} />
       {T.fontHeading && <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.fontHeading.replace(/ /g, "+")}:wght@500;600&display=swap`} />}
-      <style>{CSS + STORIES_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + INFO_CSS + MAP_CSS + ROUTE_CSS + MEASURES_CSS + CARDS_CSS + DAY_CSS}</style>
+      <style>{CSS + STORIES_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + INFO_CSS + MAP_CSS + ROUTE_CSS + MEASURES_CSS + CARDS_CSS + DAY_CSS + SIMPLE_CSS}</style>
       {/* The tour's own design on top (written by Claude or by hand under Avanceret). */}
       {T.customCss && <style>{T.customCss.replace(/<\/?style/gi, "")}</style>}
 
@@ -1218,7 +1219,8 @@ function TourExperience({
       </div>
       )}
 
-      {welcome && T.welcome && (
+      {welcome && T.welcome && T.design?.welcome === "simple" && <SimpleWelcome T={T} onChoose={chooseWelcome} />}
+      {welcome && T.welcome && T.design?.welcome !== "simple" && (
         <div className="hv-wel" role="dialog" aria-modal="true" aria-label={T.welcome.title}>
           <div className="hv-wel-grid">
             <div className={`hv-wel-main ${T.logoOnLight ? "hv-light" : ""}`}>
@@ -1289,7 +1291,25 @@ function TourExperience({
         </>
       )}
 
-      {T.design?.menu === "picker" ? (
+      {T.design?.menu === "simple" ? (
+        phase === "tour" &&
+        !cover &&
+        !welcome && (
+          <SimpleMenu
+            T={T}
+            open={menuOpen}
+            setOpen={(o) => {
+              if (o) track("menu_open", { place: phase });
+              setMenuOpen(o);
+            }}
+            room={room}
+            hasGuide={GUIDE.length > 0}
+            onGuide={() => startGuide("menu")}
+            onDay={() => openDay("menu")}
+            onGo={menuGo}
+          />
+        )
+      ) : T.design?.menu === "picker" ? (
         phase === "tour" && !cover && <PickerMenu T={T} units={units} onGo={menuGo} onCta={(label, href) => ctaClick(label, href, "picker")} />
       ) : T.design?.menu === "dock" ? (
         phase === "tour" && !cover && <DockMenu T={T} room={room} onGuide={() => startGuide("dock")} onPlace={(p) => placeGo(p, "dock")} onItem={(label, href) => ctaClick(label, href, "dock")} />

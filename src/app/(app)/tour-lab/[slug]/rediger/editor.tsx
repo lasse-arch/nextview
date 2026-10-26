@@ -21,6 +21,7 @@ import { EconomyPanel, type TourEconomy } from "./economy";
 import { DEFAULT_EMBED, SharePanel, SitePreview, type EmbedSize } from "./share";
 import { Choice, Field, FilesContext, Group, Icon, input, outsideFiles, Toggle, UploadButton, type PreviewApi } from "./ui";
 import { hostTourFiles } from "@/lib/actions/tour-files";
+import { AiMemoryPanel } from "./memory";
 
 /** A zoom level in words, for the Zoom sliders (1 = Matterport's normal view). */
 const zoomLabel = (z: number) => (Math.abs(z - 1) < 0.01 ? "normal" : z < 1 ? `zoomet ud (${Math.round(z * 100)} %)` : `zoomet ind (${Math.round(z * 100)} %)`);
@@ -33,7 +34,7 @@ const SPARK = '<path d="M12 3v5M12 16v5M3 12h5M16 12h5M5.6 5.6l3.5 3.5M14.9 14.9
 
 /** The sections, with a small icon each (SF Symbols-like, drawn with strokes), under their headings. */
 const TABS: [Tab, string, string, string?][] = [
-  ["claude", "Claude", SPARK],
+  ["claude", "nextviewAI", SPARK],
   ["resultater", "Resultater", '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'],
   ["del", "Del og udgiv", '<path d="M12 15V3M7 8l5-5 5 5"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/>'],
   ["start", "Start", '<path d="M5 4v16M5 5h11l-2 4 2 4H5"/>', "Indhold"],
@@ -340,6 +341,7 @@ export function TourEditor({
                       ["side", "Sidemenu"],
                       ["dock", "Bar i bunden"],
                       ["picker", "Rumvælger"],
+                      ["simple", "Helt enkel"],
                     ]}
                     onChange={(v) => edit((d) => void (d.design = { welcome: d.design?.welcome ?? "tiles", menu: v }))}
                   />
@@ -604,7 +606,7 @@ export function TourEditor({
             {tab === "avanceret" && (
               <>
                 <Group title="Eget design (CSS)">
-                  <p className="text-[12px] leading-snug text-[#8e8e93]">Til det, felterne ikke dækker - fx runde former eller en helt bestemt stil. Lettest: bed Claude om det (&quot;gør knapperne runde og giv menuen glas-effekt&quot;), så skrives det her.</p>
+                  <p className="text-[12px] leading-snug text-[#8e8e93]">Til det, felterne ikke dækker - fx runde former eller en helt bestemt stil. Lettest: bed nextviewAI om det (&quot;gør knapperne runde og giv menuen glas-effekt&quot;), så skrives det her.</p>
                   <textarea
                     className="h-40 w-full rounded-xl border-0 bg-[#1d1d1f] p-3 font-mono text-[11.5px] leading-relaxed text-[#f5f5f7] outline-none focus:ring-2 focus:ring-[#0071e3]"
                     spellCheck={false}
@@ -751,9 +753,9 @@ export function TourEditor({
   );
 }
 
-type ChatMsg = { role: "user" | "assistant"; text: string; error?: boolean; changed?: number; before?: TourConfig; undone?: boolean };
+type ChatMsg = { role: "user" | "assistant"; text: string; error?: boolean; changed?: number; before?: TourConfig; undone?: boolean; remembered?: string[] };
 
-const SUGGESTIONS = ["Gør logoet lidt større", "Tilføj en knap til booking", "Gør farverne mørkere og mere eksklusive", "Ryd op i menuen, så den er nemmere at overskue"];
+const SUGGESTIONS = ["Gør det helt enkelt - få store knapper og én menu", "Tilføj en knap til booking", "Gør farverne mørkere og mere eksklusive", "Ryd op i menuen, så den er nemmere at overskue"];
 
 /**
  * Claude in the editor: write what should change, Claude makes the edit, and
@@ -778,6 +780,7 @@ function ClaudePanel({
   const [key, setKey] = useState("");
   const [keyError, setKeyError] = useState<string | null>(null);
   const [pending, start] = useTransition();
+  const [learned, setLearned] = useState(0);
   const end = useRef<HTMLDivElement>(null);
   useEffect(() => end.current?.scrollIntoView({ behavior: "smooth", block: "end" }), [chat.length, pending]);
 
@@ -789,14 +792,15 @@ function ClaudePanel({
     setText("");
     const before = config;
     start(async () => {
-      const r = await askClaudeForTour(config, history, ask).catch((err: unknown) => ({ ok: false as const, error: `Kunne ikke nå Claude (${err instanceof Error ? err.message : err}) - prøv igen.` }));
+      const r = await askClaudeForTour(config, history, ask).catch((err: unknown) => ({ ok: false as const, error: `Kunne ikke nå nextviewAI (${err instanceof Error ? err.message : err}) - prøv igen.` }));
       if (!r.ok) {
         // A revoked/changed key: ask for the new one right here.
-        if (r.error.startsWith("Claude-nøglen")) setReady(false);
+        if (r.error.startsWith("nextviewAI-nøglen")) setReady(false);
         return setChat((c) => [...c, { role: "assistant", text: r.error, error: true }]);
       }
       if (r.changed) onApply(r.config);
-      setChat((c) => [...c, { role: "assistant", text: r.reply, changed: r.changed, before: r.changed ? before : undefined }]);
+      if (r.remembered.length) setLearned((n) => n + 1);
+      setChat((c) => [...c, { role: "assistant", text: r.reply, changed: r.changed, before: r.changed ? before : undefined, remembered: r.remembered }]);
     });
   }
 
@@ -806,8 +810,8 @@ function ClaudePanel({
         <span className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#d97757] text-white">
           <Icon d={SPARK} className="h-6 w-6" />
         </span>
-        <h2 className="text-[17px] font-semibold">{initiallyReady ? "Claude-nøglen virker ikke længere" : "Sæt Claude op"}</h2>
-        <p className="mt-1 text-[13px] leading-snug text-[#6e6e73]">Indsæt en API-nøgle fra Anthropic. Den gemmes i Arpo, så alle admins kan bruge Claude i editoren.</p>
+        <h2 className="text-[17px] font-semibold">{initiallyReady ? "nextviewAI-nøglen virker ikke længere" : "Sæt nextviewAI op"}</h2>
+        <p className="mt-1 text-[13px] leading-snug text-[#6e6e73]">Indsæt en API-nøgle fra Anthropic. Den gemmes i Arpo, så alle admins kan bruge nextviewAI i editoren.</p>
         <input className={`${input} mt-4 bg-white`} type="password" placeholder="sk-ant-…" value={key} onChange={(e) => setKey(e.target.value)} />
         {keyError && <p className="mt-2 text-[12px] text-[#ff3b30]">{keyError}</p>}
         <button
@@ -861,6 +865,11 @@ function ClaudePanel({
               </span>
               <div className="min-w-0 flex-1">
                 <p className={`whitespace-pre-wrap text-[14px] leading-relaxed ${m.error ? "text-[#ff3b30]" : ""}`}>{m.text}</p>
+                {m.remembered?.map((t) => (
+                  <p key={t} className="mt-1 text-[12px] leading-snug text-[#8e8e93]">
+                    Husker nu: {t}
+                  </p>
+                ))}
                 {m.before && (
                   <div className="mt-1.5 flex items-center gap-2 text-[12px] text-[#8e8e93]">
                     {m.undone ? (
@@ -896,6 +905,7 @@ function ClaudePanel({
         )}
         <div ref={end} />
       </div>
+      <AiMemoryPanel slug={config.slug} refresh={learned} />
       <form
         className="mx-2 mb-3 rounded-[22px] bg-white p-2 shadow-[0_2px_12px_rgba(0,0,0,.06)] ring-1 ring-black/[.08] focus-within:ring-black/20"
         onSubmit={(e) => {
@@ -917,7 +927,7 @@ function ClaudePanel({
           className="block w-full resize-none border-0 bg-transparent px-2 py-1 text-[15px] placeholder:text-[#8e8e93] focus:outline-none focus:ring-0"
         />
         <div className="flex items-center justify-between px-1">
-          <span className="text-[11px] text-[#8e8e93]">Claude kan tage fejl - tjek forhåndsvisningen.</span>
+          <span className="text-[11px] text-[#8e8e93]">nextviewAI kan tage fejl - tjek forhåndsvisningen.</span>
           <button type="submit" disabled={pending || !text.trim()} aria-label="Send" className="flex h-8 w-8 items-center justify-center rounded-full bg-[#d97757] text-white transition hover:bg-[#c96442] disabled:bg-[#e9e9eb] disabled:text-[#8e8e93]">
             <Icon d='<path d="M12 19V5M5 12l7-7 7 7"/>' className="h-4 w-4" />
           </button>

@@ -250,7 +250,7 @@ const menuRooms = (c: TourConfig) => c.menu.flatMap((m) => ("items" in m ? m.ite
 /* ------------------------------------------------------------------ */
 
 export function StartEditor({ config, edit, slug, preview }: Props) {
-  const style = config.design?.welcome === "cover" ? "cover" : config.welcome ? "tiles" : "none";
+  const style = config.design?.welcome === "cover" ? "cover" : config.welcome ? (config.design?.welcome === "simple" ? "simple" : "tiles") : "none";
   const menuStyle = config.design?.menu ?? "side";
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -283,6 +283,7 @@ export function StartEditor({ config, edit, slug, preview }: Props) {
           options={[
             ["none", "Direkte i touren"],
             ["tiles", "Velkomst"],
+            ["simple", "Helt enkel"],
             ["cover", "Forside"],
           ]}
           onChange={(v) =>
@@ -290,9 +291,9 @@ export function StartEditor({ config, edit, slug, preview }: Props) {
               if (v === "none") {
                 d.welcome = undefined;
                 d.design = { welcome: "tiles", menu: menuStyle };
-              } else if (v === "tiles") {
+              } else if (v === "tiles" || v === "simple") {
                 d.welcome ??= { kicker: d.brand, title: `Velkommen til ${d.brand}`, lead: "Tag en tur rundt - eller hop direkte derhen, du vil se.", tiles: [], skip: "Jeg kigger selv rundt" };
-                d.design = { welcome: "tiles", menu: menuStyle };
+                d.design = { welcome: v, menu: menuStyle };
               } else {
                 d.cover ??= { kicker: d.subtitle ?? d.brand, title: `Velkommen til ${d.brand}`, lead: "Kig indenfor før du kommer.", image: d.places?.[0]?.image ?? d.logo, enter: "Træd indenfor", placesTitle: "Vælg hvor du vil starte" };
                 d.design = { welcome: "cover", menu: menuStyle };
@@ -303,6 +304,7 @@ export function StartEditor({ config, edit, slug, preview }: Props) {
         <p className={small}>
           {style === "none" && "Touren starter med det samme - godt når folk kommer fra en knap på hjemmesiden, der allerede har fortalt historien."}
           {style === "tiles" && "En kort velkomst med fliser til de vigtigste steder. Godt når der er få, tydelige valg."}
+          {style === "simple" && "Få store knapper under hinanden - intet andet. Til gæster, der skal have det helt roligt og enkelt (fx specialskoler). Hold det til 2-3 knapper."}
           {style === "cover" && "Et stort foto af stedet med en knap ind og stederne at vælge imellem - premium, og fortsætter hjemmesidens fortælling."}
         </p>
         {config.intro && <Toggle on={Boolean(config.intro)} onChange={(on) => !on && edit((d) => void (d.intro = undefined))} title="Kort film før touren" hint="Fx en drone, der flyver ned til indgangen. Slå fra for at fjerne den." />}
@@ -329,7 +331,7 @@ export function StartEditor({ config, edit, slug, preview }: Props) {
         </Group>
       )}
 
-      {style === "tiles" && welcome && (
+      {(style === "tiles" || style === "simple") && welcome && (
         <>
           <Group title="Velkomsten">
             <Field title="Lille overskrift">

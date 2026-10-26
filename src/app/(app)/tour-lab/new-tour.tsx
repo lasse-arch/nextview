@@ -171,12 +171,12 @@ export function NewTour({ tours }: { tours: { slug: string; name: string }[] }) 
               ) : step === 3 ? (
                 <div className="space-y-3">
                   <h2 className="text-[19px] font-semibold tracking-tight">Vælg design</h2>
-                  <p className="text-[13px] text-[#6e6e73]">De anbefalede passer til branchen. Alt kan ændres bagefter i editoren - også et helt eget design via Claude.</p>
+                  <p className="text-[13px] text-[#6e6e73]">De anbefalede passer til branchen. Alt kan ændres bagefter i editoren - også et helt eget design via nextviewAI.</p>
                   <DesignGallery colors={DEMO_COLORS} selected={preset} branch={branch} onPick={(p) => setPreset(p.id)} />
                 </div>
               ) : (
                 <div className="space-y-3">
-                  <h2 className="text-[19px] font-semibold tracking-tight">Hvad skal Claude bygge?</h2>
+                  <h2 className="text-[19px] font-semibold tracking-tight">Hvad skal nextviewAI bygge?</h2>
                   <div className="space-y-3 rounded-2xl bg-white p-4 ring-1 ring-black/[.04]">
                     <Field title="Navn på touren">
                       <input className={input} value={name} onChange={(e) => setName(e.target.value)} />
@@ -194,11 +194,11 @@ export function NewTour({ tours }: { tours: { slug: string; name: string }[] }) 
                       </div>
                       <input className={input} value={focus} onChange={(e) => setFocus(e.target.value)} placeholder="Fx Book bord" />
                     </Field>
-                    <Field title="Ønsker til Claude (valgfrit)" hint="Alt det særlige: målgruppe, tone, et helt eget design, særlige funktioner …">
+                    <Field title="Ønsker til nextviewAI (valgfrit)" hint="Alt det særlige: målgruppe, tone, et helt eget design, særlige funktioner …">
                       <textarea className={`${input} min-h-[70px] resize-y`} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Fx målgruppen er forældre; brug skolens grønne farve og runde former." />
                     </Field>
                   </div>
-                  {pending && <p className="px-1 text-center text-[13px] text-[#6e6e73]">Claude læser hjemmesiden og bygger touren - det tager typisk et minut…</p>}
+                  {pending && <p className="px-1 text-center text-[13px] text-[#6e6e73]">nextviewAI læser hjemmesiden og bygger touren - det tager typisk et minut…</p>}
                 </div>
               )}
               {error && <p className="mt-3 px-1 text-[13px] text-[#ff3b30]">{error}</p>}
@@ -224,7 +224,7 @@ export function NewTour({ tours }: { tours: { slug: string; name: string }[] }) 
                 </button>
               ) : (
                 <button type="button" disabled={pending || !name.trim()} onClick={build} className="rounded-xl bg-[#0071e3] px-5 py-2.5 text-[15px] font-medium text-white disabled:opacity-40">
-                  {pending ? "Bygger…" : "Byg touren med Claude"}
+                  {pending ? "Bygger…" : "Byg touren med nextviewAI"}
                 </button>
               )}
             </div>
