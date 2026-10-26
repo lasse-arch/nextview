@@ -120,7 +120,8 @@ export function TourEditor({
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [device, setDevice] = useState<"computer" | "mobil" | "site">("computer");
   const [siteWidth, setSiteWidth] = useState<"computer" | "mobil">("computer");
-  const [embed, setEmbed] = useState<EmbedSize>(DEFAULT_EMBED);
+  const embed: EmbedSize = config.embeds?.size ?? DEFAULT_EMBED;
+  const setEmbed = (size: EmbedSize) => edit((d) => void (d.embeds = { ...d.embeds, size }));
   const [previewKey, setPreviewKey] = useState(0);
   const [pending, start] = useTransition();
   const [json, setJson] = useState<string | null>(null);
@@ -466,6 +467,8 @@ export function TourEditor({
             {tab === "feedback" && <FeedbackPanel slug={slug} token={reviewToken} preview={preview} />}
             {tab === "del" && (
               <SharePanel
+                config={config}
+                edit={edit}
                 slug={slug}
                 title={config.title}
                 published={published}

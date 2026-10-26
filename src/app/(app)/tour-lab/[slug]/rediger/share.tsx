@@ -2,6 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { setTourPublished } from "@/lib/actions/tours";
+import { suggestEmbedPages } from "@/lib/actions/tour-embeds";
+import { startPlaces } from "../../tours/places";
 import type { TourConfig } from "../../tours/types";
 import { Choice, Field, Group, input, Toggle } from "./ui";
 
@@ -35,7 +37,23 @@ export function embedCode(url: string, title: string, size: EmbedSize) {
 </div>`;
 }
 
-export function SharePanel({ slug, title, published: initial, size, setSize }: { slug: string; title: string; published: boolean; size: EmbedSize; setSize: (s: EmbedSize) => void }) {
+export function SharePanel({
+  config,
+  edit,
+  slug,
+  title,
+  published: initial,
+  size,
+  setSize,
+}: {
+  config: TourConfig;
+  edit: (fn: (d: TourConfig) => void) => void;
+  slug: string;
+  title: string;
+  published: boolean;
+  size: EmbedSize;
+  setSize: (s: EmbedSize) => void;
+}) {
   const [published, setPublished] = useState(initial);
   const [copied, setCopied] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -102,7 +120,95 @@ export function SharePanel({ slug, title, published: initial, size, setSize }: {
         </button>
         <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">Indsæt koden i en HTML-/kode-blok på siden (WordPress: blokken &quot;Tilpasset HTML&quot;).</p>
       </Group>
+      <PagesGroup config={config} edit={edit} slug={slug} title={title} size={size} published={published} url={url} />
     </>
+  );
+}
+
+/** The site the tour belongs to, guessed from where its main button leads. */
+export function guessSite(T: TourConfig): string {
+  if (T.embeds?.site) return T.embeds.site;
+  const href = [...T.cta.filter((c) => c.primary), ...T.cta].map((c) => c.href).find((h) => /^https?:\/\//.test(h) && !/matterport|nextview360|google\.|instagram|facebook/.test(h));
+  try {
+    return href ? new URL(href).origin : "";
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * "Et sted på hver underside": each place in the tour gets its own code that
+ * starts there (?rum=…), and the page on the customer's site it belongs on -
+ * suggested from their sitemap, confirmed or changed here. The customer sees
+ * the same list with the codes in their portal.
+ */
+function PagesGroup({ config, edit, slug, title, size, published, url }: { config: TourConfig; edit: (fn: (d: TourConfig) => void) => void; slug: string; title: string; size: EmbedSize; published: boolean; url: string }) {
+  const places = startPlaces(config);
+  const pages = config.embeds?.pages ?? {};
+  const [site, setSite] = useState(guessSite(config));
+  const [msg, setMsg] = useState<string | null>(null);
+  const [copied, setCopied] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  const setPage = (key: string, page: string) =>
+    edit((d) => {
+      const next = { ...d.embeds?.pages, [key]: page };
+      if (!page) delete next[key];
+      d.embeds = { ...d.embeds, pages: next };
+    });
+  const copy = (key: string) => {
+    navigator.clipboard?.writeText(embedCode(key ? `${url}?rum=${key}` : url, title, size)).catch(() => {});
+    setCopied(key);
+    setTimeout(() => setCopied(null), 1600);
+  };
+  const row = (key: string, name: string, group: string | null) => (
+    <li key={key || "_hele"} className="space-y-1 py-2">
+      <div className="flex items-center gap-2">
+        <span className="min-w-0 flex-1 truncate text-[14px] font-medium">
+          {name}
+          {group && <span className="font-normal text-[#8e8e93]"> · {group}</span>}
+        </span>
+        <button type="button" disabled={!published} onClick={() => copy(key)} className="flex-none rounded-full bg-[#f2f2f7] px-2.5 py-1 text-[12px] font-medium text-[#0071e3] disabled:opacity-40">
+          {copied === key ? "Kopieret ✓" : "Kopiér kode"}
+        </button>
+      </div>
+      <input className={`${input} py-1.5 text-[12px]`} placeholder="Underside, fx https://kunden.dk/minigolf/" value={pages[key || "_hele"] ?? ""} onChange={(e) => setPage(key || "_hele", e.target.value)} />
+    </li>
+  );
+  return (
+    <Group title="Et sted på hver underside">
+      <p className="text-[12px] leading-snug text-[#8e8e93]">Hvert sted i touren har sin egen kode, der starter dér - fx starter touren i minigolf på siden om minigolf. Find forslag fra kundens hjemmeside, ret til, og gem. Kunden ser koderne i sin kundeportal.</p>
+      <div className="flex gap-2">
+        <input className={`${input} text-[13px]`} value={site} onChange={(e) => setSite(e.target.value)} placeholder="kunden.dk" />
+        <button
+          type="button"
+          disabled={pending || !site.trim()}
+          className="flex-none rounded-xl bg-[#0071e3] px-3 text-[13px] font-medium text-white disabled:opacity-40"
+          onClick={() =>
+            start(async () => {
+              setMsg(null);
+              const r = await suggestEmbedPages(slug, site);
+              if (!r.ok) return setMsg(r.error);
+              const found = Object.entries(r.pages);
+              edit((d) => {
+                const next = { ...d.embeds?.pages };
+                for (const [key, page] of found) if (!next[key]) next[key] = page.url;
+                if (!next._hele) next._hele = new URL(/^https?:/.test(site) ? site : `https://${site}`).origin + "/";
+                d.embeds = { ...d.embeds, site, pages: next };
+              });
+              setMsg(`Læste ${r.checked} sider - fandt en side til ${found.length} af ${places.length} steder. Tjek dem, og tryk Gem.`);
+            })
+          }
+        >
+          {pending ? "Læser siden…" : "Find forslag"}
+        </button>
+      </div>
+      {msg && <p className="px-1 text-[12px] text-[#6e6e73]">{msg}</p>}
+      <ul className="divide-y divide-black/[.05]">
+        {row("", "Hele touren", "starter som normalt")}
+        {places.map((p) => row(p.key, p.name, p.group))}
+      </ul>
+      {!published && <p className="px-1 text-[12px] text-[#ff9500]">Koderne virker, når touren er udgivet.</p>}
+    </Group>
   );
 }
 

@@ -44,7 +44,7 @@ function top<T>(items: T[], n: number): T[] {
 }
 
 /** Something read off the web, kept in the database for a week (SiteCache) so it isn't fetched again and again. */
-async function cached(key: string, read: () => Promise<string>, days = 7): Promise<string> {
+export async function cached(key: string, read: () => Promise<string>, days = 7): Promise<string> {
   const hit = await prisma.siteCache.findUnique({ where: { url: key } }).catch(() => null);
   if (hit && Date.now() - hit.fetchedAt.getTime() < days * 86_400_000) return hit.text;
   const text = await read();

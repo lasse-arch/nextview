@@ -246,6 +246,13 @@ export type TourConfig = {
    * Shown as "<title> · N" in the tour, and as a "Ledig" badge on menu items
    * named like a free unit. \`exclude\`: units never shown (by name).
    */
+  /**
+   * The tour on the customer's own website: the site, the size of the box,
+   * and which of its pages each place goes on (place key, see startPlaces →
+   * the page's address; "" = the whole tour). Shown with the codes in the
+   * customer portal.
+   */
+  embeds?: { site?: string; size?: { kind: "16:9" | "4:3" | "fast" | "skaerm"; height: number }; pages?: Record<string, string> };
   live?: {
     url: string;
     title: string;

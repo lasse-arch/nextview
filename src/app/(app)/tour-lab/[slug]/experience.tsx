@@ -1,6 +1,6 @@
 "use client";
 
-import { cssFilter, isPlaceHref, placeHref } from "../tours/places";
+import { cssFilter, isPlaceHref, placeHref, placeSlug, startPlaces } from "../tours/places";
 import type { LiveUnit } from "@/lib/availability/live";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -139,8 +139,7 @@ function roomIndex(menu: MenuEntry[]) {
 }
 
 /** For smart start links: ?rum=spisesalen / ?punkt=hal. */
-const slug = (s: string) =>
-  s.toLowerCase().replace(/æ/g, "ae").replace(/ø/g, "oe").replace(/å/g, "aa").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+const slug = placeSlug;
 
 type Box = { left: number; right: number; top: number; bottom: number };
 const overlaps = (a: Box, b: Box) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
@@ -704,10 +703,11 @@ function TourExperience({
     requestAnimationFrame(() => {
       if (rum || punkt || ss) setIntro(null); // a link to a place goes straight there
       if (rum) {
-        const hit = T.menu.flatMap((m) => ("items" in m ? m.items : [[m.title, m.href] as [string, string]])).find(([n]) => slug(n) === rum);
+        // "?rum=minigolf" (or "?rum=fløj--toilet-og-bad" when names repeat) - e.g. from the tour's code on the customer's own page about it.
+        const hit = startPlaces(T).find((p) => p.key === rum) ?? startPlaces(T).find((p) => slug(p.name) === rum);
         if (hit) {
-          track("start_link", { kind: "rum", target: hit[0] });
-          enterRef.current(hit[1], "link", hit[0]);
+          track("start_link", { kind: "rum", target: hit.name });
+          enterRef.current(hit.href, "link", hit.name);
           return;
         }
       }

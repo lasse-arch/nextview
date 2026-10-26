@@ -36,6 +36,7 @@ export function tourConfigProblem(config: unknown): string | null {
   if (c.day && (!obj(c.day) || !arr(c.day.steps))) return "Dagen skal have en liste af tidspunkter.";
   if (c.placeCards && (!arr(c.placeCards) || !c.placeCards.every((p) => obj(p) && arr(p.ss) && str(p.title) && str(p.text)))) return "Et stedkort mangler punkt, overskrift eller tekst.";
   if (c.nudge && (!obj(c.nudge) || typeof c.nudge.afterSeconds !== "number" || !arr(c.nudge.buttons))) return '"Din plads venter" har en forkert form.';
-  if (c.design && (!obj(c.design) || !["tiles", "cover"].includes(c.design.welcome) || !["side", "dock", "picker"].includes(c.design.menu))) return '"design" skal have welcome (tiles/cover) og menu (side/dock/picker).';
+  if (c.design && (!obj(c.design) || !["tiles", "cover", "simple"].includes(c.design.welcome) || !["side", "dock", "picker", "simple"].includes(c.design.menu))) return '"design" skal have welcome (tiles/cover/simple) og menu (side/dock/picker/simple).';
+  if (c.embeds && (!obj(c.embeds) || (c.embeds.pages !== undefined && (!obj(c.embeds.pages) || !Object.values(c.embeds.pages).every(str))))) return '"embeds.pages" skal være steder med en adresse.';
   return null;
 }
