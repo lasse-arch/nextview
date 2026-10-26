@@ -1,6 +1,7 @@
 "use client";
 
-import { isPlaceHref } from "../../tours/places";
+import { isPlaceHref, placeHref } from "../../tours/places";
+import { writePlaceCards, type CardDraft } from "@/lib/actions/tour-cards";
 import { useState } from "react";
 import { saveTourStoryImage } from "@/lib/actions/tour-lab";
 import type { PlaceCard, TourConfig, TourInfo, TourPlace, WelcomeGo } from "../../tours/types";
@@ -245,6 +246,8 @@ function ButtonsEditor({ buttons, onChange, rooms, allowRoom }: { buttons: CardB
 }
 
 /** Every room in the menu, by name (what card buttons can fly to). */
+const SPARK_SMALL = '<path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8"/>';
+
 const menuRooms = (c: TourConfig) => c.menu.flatMap((m) => ("items" in m ? m.items : [[m.title, m.href] as [string, string]])).filter(([, h]) => isPlaceHref(h)).map(([n]) => n);
 
 /* ------------------------------------------------------------------ */
@@ -596,7 +599,7 @@ function DayEditor({ config, edit, preview }: Omit<Props, "slug">) {
 /* ------------------------------------------------------------------ */
 
 export function CardsEditor({ config, edit, preview }: Omit<Props, "slug">) {
-  const [busy, setBusy] = useState<number | "new" | null>(null);
+  const [busy, setBusy] = useState<number | "new" | "all" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const cards = config.placeCards ?? [];
   const rooms = menuRooms(config);
@@ -608,6 +611,28 @@ export function CardsEditor({ config, edit, preview }: Omit<Props, "slug">) {
     if (r.error || !ss) setError(r.error ?? "Gå ind i touren først.");
     return ss;
   }
+  /** The menu's places: name and scan point. */
+  const menuPlaces = config.menu
+    .flatMap((m) => ("items" in m ? m.items : [[m.title, m.href] as [string, string]]))
+    .flatMap(([name, href]) => (isPlaceHref(href) && ssOfHref(href) ? [{ name, ss: ssOfHref(href)! }] : []));
+  const nameAt = (ss: number) => menuPlaces.find((p) => p.ss === ss)?.name ?? null;
+  /** nextviewAI writes the card for one place, with a picture of it from the preview (flown there first unless `there`). */
+  async function aiCard(ss: number, there = false): Promise<CardDraft | null> {
+    setError(null);
+    if (!there) {
+      preview.go(nameAt(ss) ?? `Punkt ${ss}`, placeHref(config, ss));
+      await new Promise((r) => setTimeout(r, 3500)); // let the room's sharp pictures load
+    }
+    const shot = await preview.shot().catch(() => ({ image: undefined }));
+    const r = await writePlaceCards(config.slug, config, [{ ss, name: nameAt(ss), image: shot.image }]);
+    if (!r.ok) {
+      setError(r.error);
+      return null;
+    }
+    return r.cards[0];
+  }
+  /** Places in the menu that don't have a card yet. */
+  const withoutCard = menuPlaces.filter((p, i) => menuPlaces.findIndex((x) => x.ss === p.ss) === i && !cards.some((c) => c.ss.includes(p.ss)));
   return (
     <>
       <Group title="Stedkort">
@@ -621,6 +646,20 @@ export function CardsEditor({ config, edit, preview }: Omit<Props, "slug">) {
           empty="Ingen stedkort endnu."
           editor={(c, set) => (
             <>
+              <button
+                type="button"
+                disabled={busy != null || !c.ss.length}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#d97757]/10 py-2 text-[14px] font-medium text-[#b4532f] hover:bg-[#d97757]/15 disabled:opacity-50"
+                onClick={async () => {
+                  setBusy(cards.indexOf(c));
+                  const draft = await aiCard(c.ss[0]);
+                  setBusy(null);
+                  if (draft) set({ ...c, title: draft.title, text: draft.text, more: draft.more ?? c.more, buttons: c.buttons ?? draft.buttons });
+                }}
+              >
+                <Icon d={SPARK_SMALL} className="h-4 w-4" />
+                {busy === cards.indexOf(c) ? "nextviewAI kigger på stedet…" : "Skriv kortet med nextviewAI"}
+              </button>
               <Field title="Overskrift">
                 <input className={`${input} bg-white`} value={c.title} onChange={(e) => set({ ...c, title: e.target.value })} />
               </Field>
@@ -670,13 +709,34 @@ export function CardsEditor({ config, edit, preview }: Omit<Props, "slug">) {
           onClick={async () => {
             setBusy("new");
             const ss = await here();
+            // nextviewAI writes it from what the preview shows right now; without it, an empty card to fill in.
+            const draft = ss ? await aiCard(ss, true) : null;
             setBusy(null);
-            if (ss) edit((d) => void (d.placeCards = [...(d.placeCards ?? []), { ss: [ss], title: "Nyt stedkort", text: "" }]));
+            if (ss) edit((d) => void (d.placeCards = [...(d.placeCards ?? []), draft ?? { ss: [ss], title: "Nyt stedkort", text: "" }]));
           }}
         >
           <Icon d='<path d="M12 5v14M5 12h14"/>' className="h-4 w-4" />
-          {busy === "new" ? "Henter stedet…" : "Nyt kort ved stedet, du ser"}
+          {busy === "new" ? "nextviewAI skriver kortet…" : "Nyt kort ved stedet, du ser"}
         </button>
+        {withoutCard.length > 0 && (
+          <button
+            type="button"
+            disabled={busy != null}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-white py-2.5 text-[14px] font-medium text-[#b4532f] ring-1 ring-black/[.06] hover:bg-[#d97757]/5 disabled:opacity-50"
+            onClick={async () => {
+              setBusy("all");
+              setError(null);
+              const r = await writePlaceCards(config.slug, config, withoutCard.map((p) => ({ ss: p.ss, name: p.name })));
+              setBusy(null);
+              if (!r.ok) return setError(r.error);
+              edit((d) => void (d.placeCards = [...(d.placeCards ?? []), ...r.cards]));
+            }}
+          >
+            <Icon d={SPARK_SMALL} className="h-4 w-4" />
+            {busy === "all" ? `nextviewAI skriver ${withoutCard.length} kort…` : `Lad nextviewAI skrive kort til menuens ${withoutCard.length} steder`}
+          </button>
+        )}
+        <p className={small}>nextviewAI skriver ud fra stedet, menuen og kundens hjemmeside. Ret gerne teksten bagefter - intet gemmes, før du trykker Gem.</p>
         {error && <p className="px-1 text-[12px] text-[#ff3b30]">{error}</p>}
       </Group>
 
