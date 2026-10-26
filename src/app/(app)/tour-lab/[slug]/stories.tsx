@@ -232,7 +232,6 @@ export const STORIES_CSS = `
   .hv-stories.hv-st-d{left:50%;right:auto;transform:translateX(-50%);max-width:min(860px,calc(100vw - 340px));background:none;align-items:center}
   .hv-st-d .hv-st-row{justify-content:safe center}
   .hv-stories.hv-st-d{transition:left .3s ease}
-  .hv-menu-aaben .hv-stories.hv-st-d{left:calc(50% - 160px);max-width:calc(100vw - 360px)}
   .hv-st-d~.hv-room,.hv-st-on-d .hv-luften{display:none}
   .hv-story-play.hv-st-d{left:50%;right:auto;width:min(620px,100vw);transform:translateX(-50%)}
 }

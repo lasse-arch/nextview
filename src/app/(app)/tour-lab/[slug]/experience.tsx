@@ -1354,6 +1354,8 @@ function TourExperience({
       >
         {menuOpen ? "Luk" : "Menu"}
       </button>
+      {/* Behind an open menu: the tour dims a little, and a tap on it closes the menu. */}
+      <button type="button" className="hv-menu-slor" aria-label="Luk menuen" tabIndex={menuOpen ? 0 : -1} onClick={() => setMenuOpen(false)} />
       <nav className={`hv-menu ${menuOpen ? "aaben" : ""}`}>
         <div className={`hv-menu-head ${T.logoOnLight ? "hv-light" : ""}`} style={{ background: T.logoOnLight ? "#fff" : T.colors.main }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1955,6 +1957,12 @@ const CSS = `
 .hv-menuknap{position:absolute;top:14px;right:14px;z-index:9;background:var(--c-main);color:#fff;border:0;border-radius:999px;padding:9px 18px;font-weight:800;font-size:14px;font-family:inherit;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.3)}
 .hv-menu{position:absolute;top:0;right:0;bottom:0;z-index:8;width:320px;max-width:100%;background:rgba(255,255,255,.98);overflow-y:auto;transform:translateX(105%);transition:transform .3s ease;box-shadow:-10px 0 30px rgba(0,0,0,.25)}
 .hv-menu.aaben{transform:none}
+.hv-menu-slor{position:absolute;inset:0;z-index:7;border:0;padding:0;background:rgba(8,14,16,.38);opacity:0;pointer-events:none;transition:opacity .3s ease;cursor:default}
+.hv-menu-aaben .hv-menu-slor{opacity:1;pointer-events:auto}
+/* An open menu has the stage: the bars at the bottom slide away and come back when it closes. */
+.hv-stories,.hv-room,.hv-luften,.hv-filtre{transition:opacity .25s ease,translate .3s ease}
+.hv-menu-aaben :is(.hv-stories,.hv-room,.hv-luften,.hv-filtre){opacity:0;translate:0 24px;pointer-events:none}
+.hv-menu-aaben .hv-stories>*{pointer-events:none}
 .hv-menu-head{padding:56px 20px 16px;text-align:center;color:#fff}
 .hv-menu-head img{width:58px;height:58px;display:block;margin:0 auto 10px}
 .hv-menu-titel{font-size:20px;font-weight:800;letter-spacing:.08em}
@@ -2029,7 +2037,7 @@ const CSS = `
 .hv-devcheck{display:flex;gap:6px;align-items:center;margin:0 0 8px;font-weight:600}
 /* An open point: the welcome box and the filter step aside so they don't cover other points. */
 .hv-punkt .hv-intro,.hv-punkt .hv-filtre{opacity:0;pointer-events:none}
-.hv-intro,.hv-filtre{transition:opacity .25s}
+.hv-intro{transition:opacity .25s}
 @media (max-width:760px){
   /* Slim welcome bar instead of the big card, with room for the menu button. */
   .hv-intro{top:10px;left:10px;right:104px;width:auto;display:flex;align-items:center;border-radius:14px}
