@@ -18,9 +18,11 @@ export type ReportShare = {
   perDay: boolean;
   places: boolean;
   sources: boolean;
+  /** The free units' funnel (live data) - only when the tour has it and someone used it. */
+  live: boolean;
 };
 
-export const DEFAULT_SHARE: ReportShare = { days: 30, visits: true, engaged: true, duration: true, leads: "auto", actions: "auto", perDay: true, places: true, sources: false };
+export const DEFAULT_SHARE: ReportShare = { days: 30, visits: true, engaged: true, duration: true, leads: "auto", actions: "auto", perDay: true, places: true, sources: false, live: true };
 
 export const shareOf = (raw: unknown): ReportShare => ({ ...DEFAULT_SHARE, ...(raw && typeof raw === "object" ? (raw as Partial<ReportShare>) : {}) });
 

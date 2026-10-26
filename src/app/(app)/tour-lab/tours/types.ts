@@ -212,14 +212,25 @@ export type TourConfig = {
   availability?: { source: "boxdepotet"; url: string; ranges: Record<string, [number, number]> };
   /**
    * Live data from the customer's own website - free camping pitches,
-   * storage rooms, rooms… read off \`url\` every 10 minutes with \`pattern\`
+   * storage rooms, rooms… read off \`url\` every \`refreshMinutes\` (default 10) with \`pattern\`
    * (a regular expression over the page as text, links written as
    * [text](href); named groups: name (required), and any of size, price,
    * from, link). Made by Claude in the editor (Live data) and checked there.
    * Shown as "<title> · N" in the tour, and as a "Ledig" badge on menu items
    * named like a free unit. \`exclude\`: units never shown (by name).
    */
-  live?: { url: string; title: string; pattern: string; flags?: string; exclude?: string[]; bookLabel?: string };
+  live?: {
+    url: string;
+    title: string;
+    pattern: string;
+    flags?: string;
+    exclude?: string[];
+    bookLabel?: string;
+    /** How often the page is read again, in minutes (default 10). */
+    refreshMinutes?: number;
+    /** Where each unit is in the tour (unit name -> link to the spot) - "Se" flies there, "Find vej" walks there. */
+    places?: Record<string, string>;
+  };
   welcome?: {
     kicker: string;
     title: string;

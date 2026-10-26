@@ -455,7 +455,7 @@ export function TourEditor({
             {tab === "rundvisning" && <GuideEditor config={config} edit={edit} preview={preview} />}
             {tab === "scan" && <ScanPointsEditor config={config} edit={edit} preview={preview} map={scanMap} mpskinsHidden={mpskinsHidden} expected={scanCount} />}
             {tab === "tags" && <TagsEditor config={config} edit={edit} slug={slug} preview={preview} />}
-            {tab === "live" && <LiveDataEditor config={config} edit={edit} slug={slug} />}
+            {tab === "live" && <LiveDataEditor config={config} edit={edit} slug={slug} preview={preview} />}
             {tab === "kort" && <CardsEditor config={config} edit={edit} preview={preview} />}
             {tab === "menu" && <MenuEditor menu={config.menu} preview={preview} onChange={(menu) => edit((d) => void (d.menu = menu))} />}
 

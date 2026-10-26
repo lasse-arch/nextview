@@ -10,7 +10,7 @@ import { prisma } from "@/lib/db";
  */
 
 /** Events that mean the visitor acted: a link out of the tour (booking, order …) or a call/mail. */
-const ACTION = `(name = 'cta_click' OR (name = 'contact_click' AND label IN ('phone', 'email')))`;
+const ACTION = `(name IN ('cta_click', 'live_book') OR (name = 'contact_click' AND label IN ('phone', 'email')))`;
 
 export type TourStats = {
   days: number;
@@ -23,11 +23,13 @@ export type TourStats = {
   actions: { label: string; count: number }[];
   places: { label: string; count: number }[];
   sources: { label: string; count: number }[];
+  /** Live data (free units): visits that saw them, opened the list, looked at one, and booked one - plus the units booked most. */
+  live: { seen: number; opened: number; viewed: number; booked: number; units: { label: string; count: number }[] };
 };
 
 export async function tourStats(slug: string, days = 30): Promise<TourStats> {
   const since = new Date(Date.now() - days * 86_400_000);
-  const [sessions, perDay, actions, places, sources] = await Promise.all([
+  const [sessions, perDay, actions, places, sources, liveFunnel, liveUnits] = await Promise.all([
     prisma.$queryRawUnsafe<{ visits: bigint; engaged: bigint; leads: bigint; median: number | null; mobile: bigint }[]>(
       `WITH s AS (
          SELECT session,
@@ -51,6 +53,14 @@ export async function tourStats(slug: string, days = 30): Promise<TourStats> {
     top(slug, since, `${ACTION}`),
     top(slug, since, `name IN ('menu_click','place_click')`),
     top(slug, since, `name = 'tour_open'`),
+    prisma.$queryRawUnsafe<{ seen: bigint; opened: bigint; viewed: bigint; booked: bigint }[]>(
+      `SELECT count(DISTINCT session) FILTER (WHERE name = 'live_seen') AS seen, count(DISTINCT session) FILTER (WHERE name = 'live_open') AS opened,
+              count(DISTINCT session) FILTER (WHERE name = 'live_view') AS viewed, count(DISTINCT session) FILTER (WHERE name = 'live_book') AS booked
+       FROM "TourEvent" WHERE "tourSlug" = $1 AND "createdAt" >= $2 AND name LIKE 'live_%'`,
+      slug,
+      since
+    ),
+    top(slug, since, `name = 'live_book'`),
   ]);
   const s = sessions[0];
   const visits = Number(s?.visits ?? 0);
@@ -70,6 +80,13 @@ export async function tourStats(slug: string, days = 30): Promise<TourStats> {
     actions,
     places,
     sources,
+    live: {
+      seen: Number(liveFunnel[0]?.seen ?? 0),
+      opened: Number(liveFunnel[0]?.opened ?? 0),
+      viewed: Number(liveFunnel[0]?.viewed ?? 0),
+      booked: Number(liveFunnel[0]?.booked ?? 0),
+      units: liveUnits,
+    },
   };
 }
 

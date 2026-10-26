@@ -115,6 +115,7 @@ function ShareSettings({ slug, brand, share: initial, shareStats, token: initial
         <Toggle on={share.perDay} onChange={(on) => change({ perDay: on })} title="Besøg pr. dag" />
         <Toggle on={share.places} onChange={(on) => change({ places: on })} title="Mest sete steder" />
         <Toggle on={share.sources} onChange={(on) => change({ sources: on })} title="Hvor besøgene kom fra" />
+        <Toggle on={share.live} onChange={(on) => change({ live: on })} title="Ledige (live data)" />
         {url ? (
           <button
             type="button"
@@ -206,6 +207,18 @@ function OurNumbers({ stats }: { stats: TourStats }) {
         </div>
       </Group>
 
+      {stats.live.seen > 0 && (
+        <Group title="Ledige (live data)">
+          <div className="grid grid-cols-4 gap-2">
+            <Tile value={String(stats.live.seen)} label="så de ledige" />
+            <Tile value={String(stats.live.opened)} label="åbnede listen" />
+            <Tile value={String(stats.live.viewed)} label="så et rum" />
+            <Tile value={String(stats.live.booked)} label="trykkede book" />
+          </div>
+          <p className="text-[11px] text-[#8e8e93]">Besøg pr. trin. {stats.live.seen ? `${pct(stats.live.booked / stats.live.seen)} af dem, der så de ledige, trykkede book.` : ""}</p>
+          {stats.live.units.length > 0 && <Ranked rows={stats.live.units} empty="" />}
+        </Group>
+      )}
       <Group title="Det, folk gik videre til">
         <Ranked rows={stats.actions.map((a) => ({ ...a, label: a.label === "phone" ? "Ringede" : a.label === "email" ? "Skrev en mail" : a.label }))} empty="Ingen klik på booking eller kontakt endnu." />
       </Group>

@@ -41,6 +41,8 @@ export async function pageAsText(address: string, cacheSeconds = 600): Promise<s
 /** The units the pattern finds in the page text (first one per name). */
 export function readUnits(text: string, spec: Pick<LiveSpec, "pattern" | "flags">): LiveUnit[] {
   const re = new RegExp(spec.pattern, `${(spec.flags ?? "").replace(/g/g, "")}g`);
+  // A bounded text keeps even a clumsy pattern quick.
+  text = text.slice(0, 400_000);
   const units: LiveUnit[] = [];
   const seen = new Set<string>();
   for (const m of text.matchAll(re)) {
@@ -55,11 +57,14 @@ export function readUnits(text: string, spec: Pick<LiveSpec, "pattern" | "flags"
   return units;
 }
 
-/** The tour's live units right now (cached 10 minutes) - empty if the page can't be read. */
+/** How often a tour's live page is read again (seconds) - the setting, within sensible bounds. */
+export const refreshSeconds = (spec: Pick<LiveSpec, "refreshMinutes">) => Math.min(24 * 3600, Math.max(120, Math.round((spec.refreshMinutes ?? 10) * 60)));
+
+/** The tour's live units right now (cached for the tour's refresh time) - empty if the page can't be read. */
 export async function fetchLiveUnits(spec: LiveSpec): Promise<LiveUnit[]> {
   try {
     const exclude = new Set(spec.exclude ?? []);
-    return readUnits(await pageAsText(spec.url), spec).filter((u) => !exclude.has(u.name));
+    return readUnits(await pageAsText(spec.url, refreshSeconds(spec)), spec).filter((u) => !exclude.has(u.name));
   } catch {
     return [];
   }

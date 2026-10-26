@@ -4,7 +4,6 @@ import { getSettingValue } from "@/lib/integration-settings";
 import { canEmbed } from "@/lib/link-embed";
 import { fetchSweepGraph, fetchSweepIndex } from "@/lib/matterport-graph";
 import { fetchBoxdepotetUnits } from "@/lib/availability/boxdepotet";
-import { fetchLiveUnits } from "@/lib/availability/live";
 import { fetchMpskinsCfg, hiddenSweeps, ssOf, sweepForSs } from "@/lib/mpskins";
 import { isPlaceHref } from "../tours/places";
 import type { TourConfig } from "../tours/types";
@@ -54,12 +53,11 @@ export async function loadTour(setup: TourConfig) {
 
   // Scan points hidden in MPSkins stay hidden here (plus any listed in the tour setup).
   const hidden = [...new Set([...(cfg ? hiddenSweeps(cfg) : []), ...tour.hiddenSweeps])];
-  const [units, routeGraph, liveUnits] = await Promise.all([
+  const [units, routeGraph] = await Promise.all([
     tour.availability ? fetchBoxdepotetUnits(tour.availability.url) : Promise.resolve([]),
     tour.wayfinding && modelId ? fetchSweepGraph(modelId) : Promise.resolve(null),
-    tour.live ? fetchLiveUnits(tour.live) : Promise.resolve([]),
   ]);
-  return { tour, sdkKey, ga4Id, modelId, sweepBySs, hiddenSweeps: hidden, storyImages: storyImageUrls, units, routeGraph, liveUnits };
+  return { tour, sdkKey, ga4Id, modelId, sweepBySs, hiddenSweeps: hidden, storyImages: storyImageUrls, units, routeGraph };
 }
 
 /** Links set to open in a popup, whose site refuses to be shown inside ours, open in a new tab instead. */

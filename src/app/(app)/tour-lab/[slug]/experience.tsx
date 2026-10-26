@@ -200,8 +200,6 @@ type ExperienceProps = {
   phone: boolean;
   /** Arpo's own view: the prototype tools (status, event log, copy view …). Never in the public tour. */
   tools?: boolean;
-  /** Free units read live off the customer's site (T.live). */
-  liveUnits?: LiveUnit[];
 };
 
 /** The parts of a setup the tour only reads when it starts - a change to them starts the preview over. */
@@ -239,7 +237,6 @@ function TourExperience({
   units,
   phone,
   tools = false,
-  liveUnits = [],
 }: ExperienceProps) {
   const T = savedTour;
   useGa4(ga4Id, T.title);
@@ -827,12 +824,37 @@ function TourExperience({
   /* ----- Editor bridge: the tour editor shows this page as its live preview ----- */
   /* Live units (free pitches, rooms …) from the customer's site. */
   const [liveOpen, setLiveOpen] = useState(false);
+  const [liveUnits, setLiveUnits] = useState<LiveUnit[]>([]);
+  // Fetched after the tour has opened - the tour never waits for the customer's site.
+  useEffect(() => {
+    if (!T.live) return;
+    let off = false;
+    fetch(`/api/tour-live/${savedTour.slug}`)
+      .then((r) => r.json())
+      .then((d: { units?: LiveUnit[] }) => {
+        if (off) return;
+        // A draft in the editor can leave units out without saving first.
+        const exclude = new Set(T.live?.exclude ?? []);
+        setLiveUnits((d.units ?? []).filter((u) => !exclude.has(u.name)));
+      })
+      .catch(() => {});
+    return () => {
+      off = true;
+    };
+  }, [T.live, savedTour.slug]);
   const freeNames = useMemo(() => liveUnits.map((u) => u.name.toLowerCase()), [liveUnits]);
   /** Is a menu item one of the free units? Whole words only - unit "1" isn't "12". */
   const isFree = (name: string) => {
     const n = name.toLowerCase();
     return freeNames.some((f) => n === f || new RegExp(`(^|[^\\p{L}\\d])${f.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}($|[^\\p{L}\\d])`, "u").test(n));
   };
+  // Seen: the free units were shown to this visitor (once per visit).
+  const liveSeen = useRef(false);
+  useEffect(() => {
+    if (!liveUnits.length || liveSeen.current) return;
+    liveSeen.current = true;
+    track("live_seen", { label: String(liveUnits.length) });
+  }, [liveUnits.length]);
   function openLive(from: string) {
     track("live_open", { from, label: String(liveUnits.length) });
     setMenuOpen(false);
@@ -1391,8 +1413,21 @@ function TourExperience({
                       <small>{[u.size, u.from && (/^(ledig|nu)\b/i.test(u.from) ? "ledig nu" : `ledig fra ${u.from}`)].filter(Boolean).join(" · ")}</small>
                     </span>
                     {u.price && <em>{u.price}</em>}
+                    {T.live!.places?.[u.name] && (
+                      <button
+                        type="button"
+                        className="hv-btn hv-secondary"
+                        onClick={() => {
+                          track("live_view", { label: u.name });
+                          setLiveOpen(false);
+                          flyTo(T.live!.places![u.name], "fly");
+                        }}
+                      >
+                        Se
+                      </button>
+                    )}
                     {href && (
-                      <TourLink href={href} label={`${T.live!.bookLabel ?? "Book"} ${u.name}`} className="hv-btn hv-primary" onClick={() => ctaClick(`${T.live!.bookLabel ?? "Book"} ${u.name}`, href, "live")}>
+                      <TourLink href={href} label={`${T.live!.bookLabel ?? "Book"} ${u.name}`} className="hv-btn hv-primary" onClick={() => track("live_book", { label: u.name, link_url: href, ...(u.price ? { price: u.price } : {}) })}>
                         {T.live!.bookLabel ?? "Book"}
                       </TourLink>
                     )}

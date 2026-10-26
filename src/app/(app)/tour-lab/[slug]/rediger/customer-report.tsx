@@ -82,6 +82,24 @@ export function CustomerReport({ stats, share, brand }: { stats: TourStats; shar
           <Ranked rows={stats.actions} />
         </div>
       )}
+      {share.live && stats.live.opened > 0 && (
+        <div className={card}>
+          <div className="mb-2 text-[13px] font-medium text-[#6e6e73]">Ledige i touren</div>
+          <p className="text-[14px] leading-snug">
+            <b>{stats.live.opened}</b> åbnede listen over ledige{stats.live.booked ? (
+              <>
+                , og <b>{stats.live.booked}</b> gik videre til booking af en bestemt
+              </>
+            ) : null}
+            .
+          </p>
+          {stats.live.units.length > 0 && (
+            <div className="mt-3">
+              <Ranked rows={stats.live.units} />
+            </div>
+          )}
+        </div>
+      )}
       {share.places && stats.places.length > 0 && (
         <div className={card}>
           <div className="mb-2 text-[13px] font-medium text-[#6e6e73]">Mest sete steder</div>

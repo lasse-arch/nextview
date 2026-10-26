@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { previewLiveData, setupLiveData } from "@/lib/actions/tour-ai";
 import type { LiveUnit } from "@/lib/availability/live";
 import type { TourConfig } from "../../tours/types";
-import { Field, Group, input } from "./ui";
+import { Field, Group, Icon, input, type PreviewApi } from "./ui";
 
 /*
  * "Live data": free pitches, rooms, storage units … read live off the
@@ -16,7 +16,7 @@ import { Field, Group, input } from "./ui";
 
 type Edit = (fn: (draft: TourConfig) => void) => void;
 
-export function LiveDataEditor({ config, edit, slug }: { config: TourConfig; edit: Edit; slug: string }) {
+export function LiveDataEditor({ config, edit, slug, preview }: { config: TourConfig; edit: Edit; slug: string; preview: PreviewApi }) {
   const live = config.live;
   const [url, setUrl] = useState(live?.url ?? "");
   const [what, setWhat] = useState("");
@@ -85,6 +85,22 @@ export function LiveDataEditor({ config, edit, slug }: { config: TourConfig; edi
             <Field title="Titel">
               <input className={input} value={live.title} onChange={(e) => edit((d) => void (d.live!.title = e.target.value))} />
             </Field>
+            <Field title="Hent nye data" hint="Hvor tit Arpo læser kundens side igen. Touren venter aldrig på det - den viser de seneste data med det samme.">
+              <select className={input} value={live.refreshMinutes ?? 10} onChange={(e) => edit((d) => void (d.live!.refreshMinutes = Number(e.target.value)))}>
+                {[
+                  [5, "Hvert 5. minut"],
+                  [10, "Hvert 10. minut"],
+                  [30, "Hver halve time"],
+                  [60, "Hver time"],
+                  [360, "Hver 6. time"],
+                  [1440, "Én gang i døgnet"],
+                ].map(([v, t]) => (
+                  <option key={v} value={v}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+            </Field>
             <Field title="Knaptekst ved hver enhed">
               <input className={input} value={live.bookLabel ?? ""} placeholder="Book" onChange={(e) => edit((d) => void (d.live!.bookLabel = e.target.value || undefined))} />
             </Field>
@@ -108,7 +124,7 @@ export function LiveDataEditor({ config, edit, slug }: { config: TourConfig; edi
                     Skjul alle
                   </button>
                 </div>
-                <p className="text-[11px] text-[#8e8e93]">Klik for at slå en til/fra - eller hold musen nede og træk hen over flere.</p>
+                <p className="text-[11px] text-[#8e8e93]">Klik for at slå en til/fra - eller hold musen nede og træk hen over flere. 📍: stå ved enheden i forhåndsvisningen og tryk - så får den en &quot;Se&quot;-knap i touren, der viser den.</p>
                 <ul className="-mx-4 max-h-[420px] touch-none select-none divide-y divide-black/[.05] overflow-y-auto border-y border-black/[.05]">
                   {units.map((u) => {
                     const on = !excluded.has(u.name);
@@ -129,8 +145,23 @@ export function LiveDataEditor({ config, edit, slug }: { config: TourConfig; edi
                         <span className={`flex h-5 w-5 flex-none items-center justify-center rounded-md text-[12px] text-white ${on ? "bg-[#34c759]" : "bg-[#d1d1d6]"}`}>{on ? "✓" : ""}</span>
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-[14px] font-medium">{u.name}</span>
-                          <span className="block truncate text-[12px] text-[#8e8e93]">{[u.size, u.price, u.from && (/^(ledig|nu)\b/i.test(u.from) ? "ledig nu" : `ledig fra ${u.from}`)].filter(Boolean).join(" · ") || (u.link ? "med link" : "")}</span>
+                          <span className="block truncate text-[12px] text-[#8e8e93]">{[live.places?.[u.name] ? "📍 sted sat" : null, u.size, u.price, u.from && (/^(ledig|nu)\b/i.test(u.from) ? "ledig nu" : `ledig fra ${u.from}`)].filter(Boolean).join(" · ") || (u.link ? "med link" : "")}</span>
                         </span>
+                        <button
+                          type="button"
+                          title={live.places?.[u.name] ? "Flyt stedet til det, forhåndsvisningen viser (Alt-klik: fjern)" : "Sæt stedet: det, forhåndsvisningen viser nu"}
+                          onPointerDown={(e) => e.stopPropagation()}
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            if (e.altKey) return edit((d) => void (d.live!.places && delete d.live!.places[u.name]));
+                            const r = await preview.view();
+                            if (!r.href) return setError(r.error ?? "Forhåndsvisningen svarede ikke.");
+                            edit((d) => void (d.live!.places = { ...d.live!.places, [u.name]: r.href! }));
+                          }}
+                          className={`flex h-7 w-7 flex-none items-center justify-center rounded-full ${live.places?.[u.name] ? "bg-[#34c759] text-white" : "bg-[#f2f2f7] text-[#8e8e93] hover:text-[#0071e3]"}`}
+                        >
+                          <Icon d='<path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>' className="h-4 w-4" />
+                        </button>
                       </li>
                     );
                   })}
