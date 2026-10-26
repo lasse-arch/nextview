@@ -520,7 +520,8 @@ function TourExperience({
         const shot = crossfade.current;
         const fr = iframe.current;
         if (shot && fr) {
-          const w = Math.min(fr.clientWidth, 1600);
+          // A modest size: it's on screen for half a second, and a big one makes the click feel slow.
+          const w = Math.min(fr.clientWidth, 960);
           const pic = await sdk.Renderer.takeScreenShot({ width: w, height: Math.round((w * fr.clientHeight) / fr.clientWidth) }, { mattertags: false, sweeps: false }).catch(() => null);
           if (pic) {
             shot.style.transition = "none";
@@ -531,11 +532,14 @@ function TourExperience({
         }
         try {
           await moveSweep(sdk, sweep, { rotation: target?.rotation, transition: sdk.Sweep.Transition.INSTANT });
-          await new Promise((r) => setTimeout(r, 160)); // the new room's first frames
+          // Let the new room draw (and its sharp pictures come in) before the old view fades off it -
+          // too soon and it shows blurry or black for a moment.
+          await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+          await new Promise((r) => setTimeout(r, 380));
         } finally {
           // Always take the picture away again - a move that fails must never leave a still (or black) picture over the tour.
           if (shot) {
-            shot.style.transition = "opacity .5s ease";
+            shot.style.transition = "opacity .6s ease";
             shot.style.opacity = "0";
           }
         }
@@ -1254,8 +1258,9 @@ function TourExperience({
         />
       )}
       {T.jump === "fade" && (
+        // The tour's colour filter on the picture too, so the colours don't jump when it fades.
         // eslint-disable-next-line @next/next/no-img-element
-        <img ref={crossfade} alt="" className="pointer-events-none absolute inset-0 h-full w-full object-cover" style={{ opacity: 0 }} />
+        <img ref={crossfade} alt="" className="pointer-events-none absolute inset-0 h-full w-full object-cover" style={{ opacity: 0, filter: T.filter ? cssFilter(T.filter) : undefined }} />
       )}
 
       {/* The drone scene on top; fades away when going into the tour. */}
