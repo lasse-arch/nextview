@@ -48,7 +48,8 @@ export function DuplicateReviewSection({ pairs }: { pairs: DuplicatePair[] }) {
   function resolve(keepId: string, deleteId: string, pairKey: string) {
     startTransition(async () => {
       try {
-        await resolveDuplicate(keepId, deleteId);
+        const r = await resolveDuplicate(keepId, deleteId);
+        if ("error" in r) return showToast(r.error);
         setResolved((prev) => new Set(prev).add(pairKey));
         showToast("Dublet håndteret");
         router.refresh();

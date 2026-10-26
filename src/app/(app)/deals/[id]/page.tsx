@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { hasSigned } from "@/lib/deal-archive";
 import { prisma } from "@/lib/db";
 
 // "Send stats" (see CustomerReportSection) schedules its actual scraping/PDF/
@@ -210,6 +211,7 @@ export default async function DealDetailPage({
             dealId={deal.id}
             stage={deal.stage}
             canDelete={currentUser?.role === "ADMIN" || currentUser?.id === deal.ownerId}
+            signed={hasSigned(deal)}
           />
         </div>
       </div>

@@ -1,6 +1,6 @@
 "use server";
 
-import { deleteDealArchived } from "@/lib/deal-archive";
+import { deleteDealArchived, hasSigned, SIGNED_NO_DELETE } from "@/lib/deal-archive";
 import { releaseEstablishmentOnLive } from "@/lib/establishment-approval";
 import { sendWelcomeMailOnLive } from "@/lib/welcome-mail";
 import { createDuplicateDealRecord } from "@/lib/deal-duplicate";
@@ -553,22 +553,24 @@ export async function setCommissionExcluded(dealId: string, excluded: boolean) {
  * commission, items, renewal history) via cascade - kept whole first, so it
  * can be put back from "Slettede kunder" (lib/deal-archive.ts).
  */
-export async function deleteDeal(dealId: string) {
+export async function deleteDeal(dealId: string): Promise<{ error: string } | void> {
   const user = await requireUser();
   const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId } });
   if (user.role !== "ADMIN" && deal.ownerId !== user.id) {
-    throw new Error("Du kan kun slette dine egne deals.");
+    return { error: "Du kan kun slette dine egne deals." };
   }
+  if (hasSigned(deal)) return { error: SIGNED_NO_DELETE };
   await deleteDealArchived(dealId, user.name);
   revalidatePath("/deals");
   redirect("/deals");
 }
 
 /** Resolves a detected import duplicate by keeping one deal and deleting the other. */
-export async function resolveDuplicate(keepId: string, deleteId: string) {
+export async function resolveDuplicate(keepId: string, deleteId: string): Promise<{ keptId: string } | { error: string }> {
   const user = await requireUser();
-  const deal = await prisma.deal.findUniqueOrThrow({ where: { id: deleteId }, select: { ownerId: true } });
-  if (user.role !== "ADMIN" && deal.ownerId !== user.id) throw new Error("Du kan kun slette dine egne deals.");
+  const deal = await prisma.deal.findUniqueOrThrow({ where: { id: deleteId }, select: { ownerId: true, contractSignedAt: true, contractStatus: true, stage: true } });
+  if (user.role !== "ADMIN" && deal.ownerId !== user.id) return { error: "Du kan kun slette dine egne deals." };
+  if (hasSigned(deal)) return { error: SIGNED_NO_DELETE };
   await deleteDealArchived(deleteId, user.name);
   revalidatePath("/deals");
   return { keptId: keepId };

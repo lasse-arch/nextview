@@ -11,6 +11,19 @@ import { prisma } from "@/lib/db";
  */
 
 type Tx = Prisma.TransactionClient;
+
+/** Stages a customer only reaches by signing. */
+const SIGNED_STAGES = ["CONTRACT_SIGNED", "FILMED", "LIVE"];
+
+/**
+ * A customer who has signed can never be deleted (the database refuses too,
+ * see the deal_signed_no_delete trigger) - lost or inactive instead.
+ */
+export function hasSigned(deal: { contractSignedAt: Date | null; contractStatus: string; stage: string }) {
+  return Boolean(deal.contractSignedAt) || deal.contractStatus === "SIGNED" || SIGNED_STAGES.includes(deal.stage);
+}
+
+export const SIGNED_NO_DELETE = "Kunden har skrevet under og kan ikke slettes. Brug \"Markér som tabt\" eller \"Inaktiv\" i stedet.";
 type Ref = { table: string; column: string; cascade: boolean };
 type Archive = { deal: unknown; rows: Record<string, unknown[]>; links: Record<string, { column: string; ids: string[] }> };
 
@@ -33,6 +46,8 @@ export async function deleteDealArchived(dealId: string, deletedByName: string) 
     async (tx) => {
       const [deal] = await tx.$queryRawUnsafe<{ j: Record<string, unknown> }[]>(`SELECT to_jsonb(d) AS j FROM "Deal" d WHERE id = $1`, dealId);
       if (!deal) throw new Error("Dealen findes ikke.");
+      const signed = deal.j as { contractSignedAt: string | null; contractStatus: string; stage: string };
+      if (hasSigned({ ...signed, contractSignedAt: signed.contractSignedAt ? new Date(signed.contractSignedAt) : null })) throw new Error(SIGNED_NO_DELETE);
       const archive: Archive = { deal: deal.j, rows: {}, links: {} };
       for (const ref of await refsToDeal(tx)) {
         if (ref.cascade) {
