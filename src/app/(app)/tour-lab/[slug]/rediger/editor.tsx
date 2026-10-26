@@ -3,7 +3,7 @@
 import { InsightsPanel } from "./insights";
 import { LanguagesPanel } from "./languages";
 import { tourUrl } from "@/lib/public-urls";
-import { isPlaceHref } from "../../tours/places";
+import { formatPhone, isPlaceHref } from "../../tours/places";
 import { tourConfigProblem } from "@/lib/tour-validate";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -673,6 +673,7 @@ export function TourEditor({
                       placeholder={example}
                       value={config.contact?.[k] ?? ""}
                       onChange={(e) => edit((d) => void (d.contact = { ...d.contact, [k]: e.target.value || undefined }))}
+                      onBlur={(e) => k === "phone" && e.target.value && edit((d) => void (d.contact = { ...d.contact, phone: formatPhone(e.target.value) }))}
                     />
                   </Field>
                 ))}

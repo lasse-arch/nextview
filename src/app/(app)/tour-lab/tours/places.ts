@@ -49,3 +49,16 @@ export function startPlaces(T: Pick<TourConfig, "menu">): StartPlace[] {
     return { ...p, key: twins && p.group ? `${placeSlug(p.group)}--${placeSlug(p.name)}` : placeSlug(p.name) };
   });
 }
+
+/**
+ * A Danish phone number written the usual way: "+45 75 17 38 33" (or
+ * "75 17 38 33" without the country code). Anything that isn't a Danish
+ * 8-digit number is left as it is.
+ */
+export function formatPhone(phone: string): string {
+  const digits = phone.replace(/[^\d+]/g, "");
+  const m = /^(?:(\+45|0045))?(\d{8})$/.exec(digits);
+  if (!m) return phone.trim();
+  const n = m[2].replace(/(\d{2})(?=\d)/g, "$1 ");
+  return m[1] ? `+45 ${n}` : n;
+}

@@ -4,7 +4,7 @@ import { LANG_CSS, LangSwitch } from "./lang-switch";
 import { danishOf, localize, makeT, tourLanguages } from "../tours/i18n";
 import { TourLang } from "../tours/i18n-react";
 import { socialLinks } from "../tours/social";
-import { cssFilter, isInTourHref, isPlaceHref, placeHref, placeSlug, pointOfHref, startPlaces } from "../tours/places";
+import { cssFilter, formatPhone, isInTourHref, isPlaceHref, placeHref, placeSlug, pointOfHref, startPlaces } from "../tours/places";
 import type { LiveUnit } from "@/lib/availability/live";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -1569,7 +1569,7 @@ function TourExperience({
             {T.contact.phone && (
               <a href={`tel:${T.contact.phone.replace(/\s/g, "")}`} onClick={() => track("contact_click", { kind: "phone" })}>
                 <span>📞</span>
-                {T.contact.phone}
+                {formatPhone(T.contact.phone)}
               </a>
             )}
             {T.contact.email && (
