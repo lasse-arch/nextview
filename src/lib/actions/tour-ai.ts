@@ -141,6 +141,7 @@ Sådan arbejder du (du hedder nextviewAI i Arpo):
 - Find først ud af, hvem der besøger touren, og hvad de har brug for. Er det fx en specialskole (autisme, ADHD, særlige behov), så gør alt helt enkelt og forudsigeligt: designet "Helt enkel" (design.welcome og design.menu "simple"), 2-3 store knapper, én flad menu, ingen fliser, intet der dukker op af sig selv (ingen nudge, ingen stedkort), jump "fade", rundtur med stemme hvor man selv trykker videre. Forældre og fagfolk er dem, der handler - giv dem deres egen lille gruppe.
 - Hvem handler, og hvad er næste skridt i virkeligheden (fx "Book en rundvisning", fordi optagelse altid starter der)? Gør det til hovedhandlingen.
 - Mindre er mere: hellere få, tydelige valg end mange.
+- Du får tourens live data-side, som den ser ud lige nu (<live-data>), og sider, brugeren linker til (<side>). Brug dem til at tjekke i stedet for at gætte: virker mønsteret ikke, så ret live.pattern, så det finder enhederne på siden.
 - Skriv som et menneske: aldrig "·", "—", "–" eller "|" mellem ord eller som pynt. Brug komma, punktum, kolon eller en almindelig bindestreg.
 
 Hukommelse (remember):
@@ -255,6 +256,45 @@ function imageBlocks(images: string[]): Anthropic.ImageBlockParam[] {
   });
 }
 
+/**
+ * What nextviewAI sees of the web as it answers: the tour's live-data page read
+ * right now (what the pattern finds there, and the page itself), and any page
+ * the user links to in the request - so it can check instead of guessing.
+ */
+async function webContext(config: TourConfig, request: string): Promise<string> {
+  const parts: string[] = [];
+  if (config.live) {
+    const L = config.live;
+    try {
+      const text = await pageAsText(L.url, 0);
+      let found = "";
+      try {
+        const units = readUnits(text, L).filter((u) => !L.exclude?.includes(u.name));
+        found = units.length
+          ? `Mønsteret finder ${units.length} lige nu: ${units.slice(0, 15).map((u) => [u.name, u.size, u.price, u.from].filter(Boolean).join(" / ")).join("; ")}${units.length > 15 ? " …" : ""}`
+          : "Mønsteret finder INGEN lige nu - så vises live data ingen steder i touren.";
+      } catch (err) {
+        found = `Mønsteret virker ikke: ${err instanceof Error ? err.message : err}`;
+      }
+      parts.push(`<live-data>
+Siden ${L.url} er læst nu (som tekst, links som [tekst](adresse) - kun det, der står i sidens HTML; noget, siden først henter med JavaScript bagefter, kan ikke ses).
+Mønster: /${L.pattern}/${L.flags ?? ""}. ${found}
+Live data vises i touren: som knap øverst i sidemenuen ("${L.title}" med antal) og som chip øverst til højre, når man er inde i touren - ikke på velkomsten, forsiden, dronebilledet eller kortet, og ikke i designs med menuen "simple", "dock" eller "picker". Med 0 fundne vises de ingen steder.
+Sidens tekst (uddrag):
+${text.slice(0, 15_000)}
+</live-data>`);
+    } catch (err) {
+      parts.push(`<live-data>Siden ${L.url} kunne ikke hentes lige nu: ${err instanceof Error ? err.message : err}</live-data>`);
+    }
+  }
+  const links = [...new Set(request.match(/https?:\/\/[^\s<>"')]+/g) ?? [])].slice(0, 2);
+  for (const url of links) {
+    const text = await pageAsText(url, 0).catch((err: unknown) => `(kunne ikke hentes: ${err instanceof Error ? err.message : err})`);
+    parts.push(`<side adresse="${url}">\n${text.slice(0, 15_000)}\n</side>`);
+  }
+  return parts.length ? `\n\n${parts.join("\n\n")}` : "";
+}
+
 /** A change asked for in the editor's chat - `images`: screenshots the user sent along (of the preview, the customer's site …). */
 export async function askClaudeForTour(config: TourConfig, history: ChatTurn[], request: string, images: string[] = []): Promise<AiEditResult> {
   const user = await admin();
@@ -262,7 +302,8 @@ export async function askClaudeForTour(config: TourConfig, history: ChatTurn[], 
   if (!key) return { ok: false, error: "nextviewAI er ikke sat op endnu - indsæt en nøgle." };
   try {
     const seen = images.length ? `\n\n(Brugeren har sendt ${images.length === 1 ? "et billede" : `${images.length} billeder`} med - typisk et skærmbillede af forhåndsvisningen eller kundens hjemmeside. Brug ${images.length === 1 ? "det" : "dem"} til at forstå, hvad de ser og mener.)` : "";
-    return await claudeEdits(key, { name: user.name, kind: "ændring" }, config, history, `Ønske: ${request}${seen}`, 16000, true, [], images);
+    const web = await webContext(config, request).catch(() => "");
+    return await claudeEdits(key, { name: user.name, kind: "ændring" }, config, history, `Ønske: ${request}${seen}${web}`, 16000, true, [], images);
   } catch (err) {
     console.error("askClaudeForTour", err);
     return { ok: false, error: `Noget gik galt hos nextviewAI (${err instanceof Error ? err.message : err}) - prøv igen.` };
