@@ -484,11 +484,18 @@ function TourExperience({
       if (locked || hiddenSweeps.includes(sweep)) await sdk.Sweep.enable(sweep).catch(() => {});
       try {
         await sdk.Sweep.moveTo(sweep, opts);
-      } catch {
-        track("move_retry", { sweep });
-        await sdk.Sweep.moveTo(sweep, { rotation: opts.rotation, transition: sdk.Sweep.Transition.FADEOUT, transitionTime: 500 }).catch((err) =>
-          track("move_failed", { sweep, error: String(err).slice(0, 80) })
-        );
+      } catch (first) {
+        // Most often Matterport is still busy with the last move: wait a moment and try again the same way, so the
+        // chosen kind of move (fly, instant, cross-fade) is kept. Only then its own fade to black, as a last resort.
+        track("move_retry", { sweep, label: String(first).slice(0, 120) }); // the error is kept (as the label), so it can be looked up
+        await new Promise((r) => setTimeout(r, 350));
+        try {
+          await sdk.Sweep.moveTo(sweep, opts);
+        } catch (second) {
+          await sdk.Sweep.moveTo(sweep, { rotation: opts.rotation, transition: sdk.Sweep.Transition.FADEOUT, transitionTime: 500 }).catch((err) =>
+            track("move_failed", { sweep, label: `${String(second).slice(0, 60)} / ${String(err).slice(0, 60)}` })
+          );
+        }
       }
       if (from && from !== sweep && (locked || hiddenSweeps.includes(from))) await sdk.Sweep.disable(from).catch(() => {});
     },
