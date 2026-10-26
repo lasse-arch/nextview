@@ -1262,7 +1262,7 @@ function TourExperience({
 
       {/* Logo (MPSkins: left, 200px, 13px from the edges). */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={T.logo} alt={T.brand} className={`hv-logo ${T.logoOnLight ? "hv-logo-kort" : ""} ${phase === "tour" ? "" : "hidden"}`} />
+      <img src={T.logo} alt={T.brand} className={`hv-logo ${T.logoOnLight ? (T.logoCard === false ? "hv-logo-lys" : "hv-logo-kort") : ""} ${phase === "tour" ? "" : "hidden"}`} />
 
       {/* Inside the tour: back to the air, the room's name, the menu. */}
       {phase === "tour" && (
@@ -1871,6 +1871,8 @@ const CSS = `
 .hv-pick{position:absolute;top:16px;left:50%;transform:translateX(-50%);z-index:30;padding:9px 16px;border-radius:999px;background:rgba(0,0,0,.75);color:#fff;font-size:14px;font-weight:700;pointer-events:none;backdrop-filter:blur(8px)}
 .hv-logo{position:absolute;top:14px;left:16px;height:var(--logo-h);width:auto;max-width:min(320px,40vw);object-fit:contain;z-index:6;filter:drop-shadow(0 2px 6px rgba(0,0,0,.35))}
 /* A dark logo gets a light card, so it reads on any wall. */
+/* A dark logo straight on the tour, no card - a soft light halo keeps it readable on dark walls. */
+.hv-logo-lys{filter:drop-shadow(0 0 1px rgba(255,255,255,.9)) drop-shadow(0 0 8px rgba(255,255,255,.55))}
 .hv-logo-kort{box-sizing:content-box;height:calc(var(--logo-h) - 12px);padding:9px 14px;border-radius:14px;background:rgba(255,255,255,.94);filter:none;box-shadow:0 6px 18px rgba(0,0,0,.18)}
 .hv-signatur{display:flex;align-items:center;justify-content:center;gap:8px;padding:6px 22px 22px;font-size:11px;letter-spacing:.04em;color:#7b878c;text-decoration:none}
 .hv-signatur img{height:14px;width:auto;opacity:.85}

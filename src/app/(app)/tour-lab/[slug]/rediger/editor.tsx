@@ -435,7 +435,15 @@ export function TourEditor({
                 <Field title={`Logostørrelse: ${config.logoSize ?? 46} px`}>
                   <input type="range" min={28} max={120} className="w-full accent-[#0071e3]" value={config.logoSize ?? 46} onChange={(e) => edit((d) => void (d.logoSize = Number(e.target.value)))} />
                 </Field>
-                <Toggle on={Boolean(config.logoOnLight)} onChange={(on) => edit((d) => void (d.logoOnLight = on))} title="Mørkt logo" hint="Logoet får et lyst kort bag sig, så det kan læses på alle vægge." />
+                <Toggle on={Boolean(config.logoOnLight)} onChange={(on) => edit((d) => void (d.logoOnLight = on))} title="Mørkt logo" hint="Et logo lavet til lys baggrund (bruges også i menuens top)." />
+                {config.logoOnLight && (
+                  <Toggle
+                    on={config.logoCard !== false}
+                    onChange={(on) => edit((d) => void (d.logoCard = on ? undefined : false))}
+                    title="Hvidt kort bag logoet"
+                    hint="Fra: logoet ligger gennemsigtigt direkte på touren, som i MPSkins (med en svag lys kant, så det kan læses)."
+                  />
+                )}
                 </Group>
               </>
             )}
