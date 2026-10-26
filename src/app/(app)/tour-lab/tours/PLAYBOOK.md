@@ -62,6 +62,20 @@ videre" til (`manual`), så gæsten styrer tempoet; ellers kommer næste stop, n
 stemmen er færdig. Et sidste stop uden sted (tom `href`) er et afslutningskort.
 Gæsten kan altid slå lyden fra. Lydfiler hostes hos os som alle andre filer.
 
+## Specialskoler og gæster, der gerne vil vide, hvad der kommer
+
+Fx specialefterskoler (ADHD, autisme, nedsat kognitivt funktionsniveau):
+- **Intet dukker op af sig selv**: ingen "Din plads venter" efter tid, ingen timere.
+  Skriv i velkomsten, at der ikke sker noget, før man selv trykker.
+- **Rolige skift**: `jump: "fade"` i stedet for at flyve gennem bygningen.
+- **Stemme-rundtur, man selv styrer** (`manual`), og guiden viser altid "Næste: …".
+- **"Sådan ser en dag ud"** (`day`): skolens rigtige dagsrytme fra ugeskemaet,
+  med "Se stedet" ved hvert tidspunkt. Mens man kigger, viser en bjælke, hvilken
+  del af dagen det er, og hvad der kommer bagefter.
+- **Korte, konkrete sætninger** - én ting pr. sætning.
+- **Forældre og fagfolk** er dem, der handler: giv dem en flise og en menugruppe
+  (book rundvisning, optagelse, særlig støtte).
+
 ## Stedkort og "Din plads venter"
 
 - **Stedkort**: når man lander et vigtigt sted, kommer et lille kort med 1-3

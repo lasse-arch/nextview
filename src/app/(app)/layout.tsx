@@ -11,18 +11,12 @@ import { PresentationModeToggle } from "./presentation-mode-toggle";
 import { isPresentationMode } from "@/lib/presentation-mode";
 import { NewsBell } from "./news-bell";
 import { getUnreadNewsCount } from "@/lib/actions/news";
-import { activeCelebration, SALES_MILESTONE_KR } from "@/lib/milestones";
-import { formatDKK } from "@/lib/labels";
-import { Celebration } from "./celebration";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const [user, presenting] = await Promise.all([getCurrentUser(), isPresentationMode()]);
   if (!user) redirect("/api/auth/session-ended");
 
-  const [unreadNewsCount, celebration] = await Promise.all([
-    getUnreadNewsCount(user.id, user.newsReadAt ?? null),
-    activeCelebration(),
-  ]);
+  const unreadNewsCount = await getUnreadNewsCount(user.id, user.newsReadAt ?? null);
 
   // Company-level pages (commission, visitor stats, growth) grouped under
   // one collapsible "Virksomheden" entry, so the day-to-day sales pages
@@ -120,9 +114,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             userAvatarUrl={user.avatarUrl ?? null}
             logoutAction={logout}
           />
-
-          {/* Not while presenting - customers shouldn't see the sales figure. */}
-          {!presenting && <Celebration active={Boolean(celebration)} amountLabel={formatDKK(SALES_MILESTONE_KR)} />}
 
           <div className="flex items-center justify-end gap-2.5 px-4 pt-4 sm:px-6 md:px-10 md:pt-6">
             <NewsBell unreadCount={unreadNewsCount} />

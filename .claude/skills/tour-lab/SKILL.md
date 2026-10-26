@@ -22,7 +22,7 @@ One engine, one JSON setup per tour, kept in the database and edited in Arpo.
 
 | Part | Where |
 | --- | --- |
-| Engine (the tour visitors see) | `tour-lab/[slug]/experience.tsx` + `designs.tsx` (cover, dock, picker), `cards.tsx` (place cards, nudge), `guide.tsx`, `info.tsx`, `map.tsx`, `wayfinding.tsx` (Find vej), `measures.tsx`, `stories.tsx`, `links.tsx` (popup/tab/same) |
+| Engine (the tour visitors see) | `tour-lab/[slug]/experience.tsx` + `designs.tsx` (cover, dock, picker), `cards.tsx` (place cards, nudge), `guide.tsx` (Vis mig rundt, voice), `day.tsx` (Sådan ser en dag ud), `info.tsx`, `map.tsx`, `wayfinding.tsx` (Find vej), `measures.tsx`, `stories.tsx`, `links.tsx` (popup/tab/same) |
 | Page (server) | `tour-lab/[slug]/page.tsx` (Arpo, with tools) and `src/app/t/[slug]` (published, for iframes) share `load.ts` - maps every ss to a sweep from Matterport's model data (`fetchSweepIndex`), live availability, sweep graph |
 | Matterport glue | `tour-lab/matterport.ts` (SDK types, CSS that hides Matterport's UI, link (`ss`, `sr`, `rot=`) parsing); SDK bundle self-hosted in `public/matterport/` |
 | Setups | DB `Tour` + `TourVersion` (`src/lib/tours.ts`, `src/lib/actions/tours.ts`). The files in `tour-lab/tours/*.ts` are only the prototypes they were seeded from; a tour nobody has edited in Arpo follows its file |

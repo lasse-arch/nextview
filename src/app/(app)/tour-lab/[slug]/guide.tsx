@@ -24,6 +24,7 @@ export function GuidePlayer({
   index,
   seconds,
   manual = false,
+  end,
   onGo,
   onClose,
   onEvent,
@@ -33,6 +34,8 @@ export function GuidePlayer({
   seconds: number;
   /** No timer - the visitor presses Næste (a calm voice tour). */
   manual?: boolean;
+  /** Shown on the last stop - the next step for the visitor (e.g. book a visit). */
+  end?: React.ReactNode;
   onGo: (index: number) => void;
   onClose: (completed: boolean) => void;
   onEvent: (name: string, params: Record<string, string | number>) => void;
@@ -89,6 +92,7 @@ export function GuidePlayer({
         </div>
         <h3>{stop.title}</h3>
         <p>{stop.text}</p>
+        {index < stops.length - 1 ? <div className="gd-next">Næste: {stops[index + 1].title}</div> : end && <div className="gd-end">{end}</div>}
         <div className="gd-ctrl">
           <button type="button" aria-label="Forrige" disabled={index === 0} onClick={() => step(index - 1, "back")}>
             ‹
@@ -164,6 +168,9 @@ export const GUIDE_CSS = `
 .gd-count{font-size:11px;font-weight:800;letter-spacing:.14em;color:var(--c-accent)}
 .gd-card h3{margin:4px 0 6px;font-family:var(--font-heading);font-size:24px;line-height:1.1;font-weight:800;color:var(--c-main)}
 .gd-card p{margin:0 0 14px;font-size:15px;line-height:1.5;color:#3d4a50}
+.gd-next{margin:-6px 0 12px;font-size:12.5px;font-weight:700;color:#7a8589}
+.gd-end{margin:-4px 0 12px}
+.gd-end .hv-btn{display:inline-flex;padding:10px 16px;font-size:14px}
 .gd-ctrl{display:flex;align-items:center;gap:6px}
 .gd-ctrl button{height:36px;min-width:36px;border:0;border-radius:999px;background:#eef1f2;color:var(--c-main);font:inherit;font-weight:800;font-size:15px;cursor:pointer;padding:0 12px}
 .gd-ctrl button:disabled{opacity:.35;cursor:default}

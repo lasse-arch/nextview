@@ -10,6 +10,7 @@ import type { AvailableUnit } from "@/lib/availability/boxdepotet";
 import type { MenuEntry, TourConfig, TourPlace, TourPoint, WelcomeGo } from "../tours/types";
 import { CoverWelcome, DESIGNS_CSS, DockMenu, PickerMenu } from "./designs";
 import { GUIDE_CSS, GuidePlayer, guideStops } from "./guide";
+import { DAY_CSS, DayBar, DaySheet } from "./day";
 import { INFO_CSS, InfoDots, usePlaceInfo } from "./info";
 import { MAP_CSS, MapScene, type MapApi } from "./map";
 import { CARDS_CSS, NudgeCard, PlaceCard } from "./cards";
@@ -312,6 +313,8 @@ function TourExperience({
   const currentSsRef = useRef<number | null>(null);
   /** "Vis mig rundt": the stop it's at, or null when the visitor walks on their own. */
   const [guideAt, setGuideAt] = useState<number | null>(null);
+  const [dayOpen, setDayOpen] = useState(false);
+  const [dayAt, setDayAt] = useState<number | null>(null);
   /** Place cards closed for good (by index), and the "comes by itself" card. */
   const [closedCards, setClosedCards] = useState<number[]>([]);
   const [nudgeOn, setNudgeOn] = useState(false);
@@ -330,6 +333,7 @@ function TourExperience({
   /** The route still ahead, drawn on the floor. */
   const [routeLine, setRouteLine] = useState<Vec3[]>([]);
   const GUIDE = useMemo(() => guideStops(T), [T]);
+  const primaryCta = T.cta.find((c) => c.primary);
   const [linkPopup, setLinkPopup] = useState<LinkPopupState>(null);
   const popup = (href: string, label: string) => {
     track("link_popup", { label, link_url: href });
@@ -730,6 +734,7 @@ function TourExperience({
       return;
     }
     if ("guide" in go) return startGuide("welcome");
+    if ("day" in go) return openDay("welcome");
     // The drone scene, optionally with only one category's points showing.
     const only = go.drone;
     setHidden(only ? Object.fromEntries(Object.keys(T.categories).map((k) => [k, k !== only])) : {});
@@ -795,11 +800,32 @@ function TourExperience({
   function startGuide(from: string) {
     if (!GUIDE.length) return;
     track("guide_start", { from, stops: GUIDE.length });
+    setDayAt(null);
     setMenuOpen(false);
     setWelcome(false);
     setCover(false);
     setSelected(null);
     guideGo(0);
+  }
+  /* ----- "Sådan ser en dag ud" ----- */
+  function openDay(from: string) {
+    if (!T.day) return;
+    track("day_open", { from });
+    setMenuOpen(false);
+    setWelcome(false);
+    setCover(false);
+    setGuideAt(null);
+    setDayOpen(true);
+  }
+  function dayGo(i: number) {
+    const step = T.day?.steps[i];
+    if (!step?.href) return;
+    track("day_view", { label: `${step.time} ${step.title}`, stop: i + 1 });
+    setDayOpen(false);
+    setDayAt(i);
+    setSelected(null);
+    if (phase === "drone") return enterTour(step.href, "day", step.title);
+    flyTo(step.href, "fly");
   }
   function closeGuide(completed: boolean) {
     track(completed ? "guide_complete" : "guide_close", { stop: (guideAt ?? 0) + 1, stops: GUIDE.length });
@@ -1039,7 +1065,7 @@ function TourExperience({
 
   return (
     <LinkProvider T={T} popup={popup}>
-    <div className={`hv fixed inset-0 z-50 overflow-hidden bg-[#0d1b20] ${selected ? "hv-punkt" : ""} ${zoomed ? "hv-zoom" : ""} ${welcome ? "hv-welcome" : ""} ${phase === "tour" && T.stories?.mobile ? "hv-st-on-m" : ""} ${menuOpen ? "hv-menu-aaben" : ""} ${T.design?.menu === "dock" ? "hv-dock" : ""} ${guideAt != null ? "hv-guiding" : ""} ${route ? "hv-routing" : ""} ${phase === "tour" && T.stories?.desktop ? "hv-st-on-d" : ""}`} style={
+    <div className={`hv fixed inset-0 z-50 overflow-hidden bg-[#0d1b20] ${selected ? "hv-punkt" : ""} ${zoomed ? "hv-zoom" : ""} ${welcome ? "hv-welcome" : ""} ${phase === "tour" && T.stories?.mobile ? "hv-st-on-m" : ""} ${menuOpen ? "hv-menu-aaben" : ""} ${T.design?.menu === "dock" ? "hv-dock" : ""} ${guideAt != null || (dayAt != null && !dayOpen) ? "hv-guiding" : ""} ${route ? "hv-routing" : ""} ${phase === "tour" && T.stories?.desktop ? "hv-st-on-d" : ""}`} style={
         {
           fontFamily: `'${T.font}', system-ui, sans-serif`,
           "--c-main": T.colors.main,
@@ -1052,7 +1078,7 @@ function TourExperience({
       }>
       <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.font.replace(/ /g, "+")}:wght@400;600;700;800;900&display=swap`} />
       {T.fontHeading && <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.fontHeading.replace(/ /g, "+")}:wght@500;600&display=swap`} />}
-      <style>{CSS + STORIES_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + INFO_CSS + MAP_CSS + ROUTE_CSS + MEASURES_CSS + CARDS_CSS}</style>
+      <style>{CSS + STORIES_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + INFO_CSS + MAP_CSS + ROUTE_CSS + MEASURES_CSS + CARDS_CSS + DAY_CSS}</style>
       {/* The tour's own design on top (written by Claude or by hand under Avanceret). */}
       {T.customCss && <style>{T.customCss.replace(/<\/?style/gi, "")}</style>}
 
@@ -1171,7 +1197,7 @@ function TourExperience({
               <div className="hv-wel-kick">{T.welcome.kicker}</div>
               <h1>{T.welcome.title}</h1>
               <p>{T.welcome.lead}</p>
-              {GUIDE.length > 0 && (
+              {GUIDE.length > 0 && !T.welcome.tiles.some((t) => "guide" in t.go) && (
                 <button type="button" className="hv-wel-guide" onClick={() => chooseWelcome({ guide: true }, "Vis mig rundt")}>
                   ▶ Vis mig rundt
                 </button>
@@ -1265,6 +1291,17 @@ function TourExperience({
             <span>
               Vis mig rundt
               <small>{GUIDE.length} steder · ca. {Math.ceil((GUIDE.length * (T.guide?.seconds ?? 9)) / 60)} min</small>
+            </span>
+          </button>
+        )}
+        {T.day && (
+          <button type="button" className="hv-day-knap" onClick={() => openDay("menu")}>
+            ◷
+            <span>
+              {T.day.title}
+              <small>
+                {T.day.steps[0]?.time} - {T.day.steps[T.day.steps.length - 1]?.time}
+              </small>
             </span>
           </button>
         )}
@@ -1501,8 +1538,34 @@ function TourExperience({
           onCta={() => ctaClick(T.cta.find((c) => c.primary)!.label, T.cta.find((c) => c.primary)!.href, "route")}
         />
       )}
+      {dayOpen && T.day && <DaySheet day={T.day} at={dayAt} onSee={dayGo} onClose={() => setDayOpen(false)} />}
+      {dayAt != null && T.day?.steps[dayAt] && !dayOpen && guideAt == null && phase === "tour" && (
+        <DayBar
+          day={T.day}
+          at={dayAt}
+          onNext={dayGo}
+          onOpen={() => openDay("bar")}
+          onClose={() => {
+            track("day_close", { stop: dayAt + 1 });
+            setDayAt(null);
+          }}
+        />
+      )}
       {guideAt != null && GUIDE[guideAt] && (
-        <GuidePlayer stops={GUIDE} index={guideAt} seconds={T.guide?.seconds ?? 9} manual={T.guide?.manual} onGo={guideGo} onClose={closeGuide} onEvent={track} />
+        <GuidePlayer
+          stops={GUIDE}
+          index={guideAt}
+          seconds={T.guide?.seconds ?? 9}
+          manual={T.guide?.manual}
+          end={primaryCta && (
+            <TourLink href={primaryCta.href} label={primaryCta.label} className="hv-btn hv-primary" onClick={() => track("cta_click", { label: primaryCta.label, link_url: primaryCta.href, place: "guide_end" })}>
+              {primaryCta.label}
+            </TourLink>
+          )}
+          onGo={guideGo}
+          onClose={closeGuide}
+          onEvent={track}
+        />
       )}
       {showCard != null && (
         <PlaceCard
@@ -1836,7 +1899,7 @@ const CSS = `
 .hv-tile:nth-child(2){animation-delay:.05s}.hv-tile:nth-child(3){animation-delay:.1s}.hv-tile:nth-child(4){animation-delay:.15s}.hv-tile:nth-child(5){animation-delay:.2s}.hv-tile:nth-child(6){animation-delay:.25s}.hv-tile:nth-child(7){animation-delay:.3s}
 @keyframes hvUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
 .hv-tile:hover{transform:translateY(-4px);box-shadow:0 18px 40px rgba(0,0,0,.35)}
-.hv-tile small{font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;opacity:.75;margin-bottom:4px}
+.hv-tile small{padding-right:30px;font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;opacity:.75;margin-bottom:4px}
 .hv-tile b{font-size:24px;line-height:1.05;font-weight:900}
 .hv-tile em+.hv-tile-plus+small{margin-top:10px}
 .hv-tile em{align-self:flex-start;margin:-4px 0 auto -4px;font-style:normal;font-size:10.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;padding:3px 9px;border-radius:999px;background:var(--c-accent);color:#fff}

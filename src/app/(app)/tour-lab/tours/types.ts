@@ -4,7 +4,7 @@
  * prototype; the scalable version keeps it in Arpo, edited in the editor.
  */
 
-export type WelcomeGo = { drone: string | null } | { room: string; name: string } | { href: string } | { guide: true };
+export type WelcomeGo = { drone: string | null } | { room: string; name: string } | { href: string } | { guide: true } | { day: true };
 
 /** A real spot in the tour with a photo of it (e.g. one of the model's own Matterport photos). */
 export type TourPlace = { name: string; kicker?: string; href: string; image: string };
@@ -188,6 +188,12 @@ export type TourConfig = {
     /** A stop: where (empty href = stay, e.g. a closing card), its text, and optionally a voice (an audio file) that plays there. */
     stops: ({ point: string } | { href: string; title: string; text: string; audio?: string })[];
   };
+  /**
+   * "Sådan ser en dag ud": the day as a calm timeline (time, what happens,
+   * and where - "Se stedet" shows it). For visitors who like to know what's
+   * coming, e.g. a special efterskole. A step without href has no place.
+   */
+  day?: { title: string; lead?: string; steps: { time: string; title: string; text?: string; href?: string }[] };
   /**
    * Info points: small pulsing dots on things in the room; a tap opens a card.
    * `position` is a spot in the 3D model (placed with "Placér infopunkt" in the

@@ -375,10 +375,10 @@ export function StartEditor({ config, edit, slug, preview }: Props) {
                   <Toggle on={Boolean(t.recommended)} onChange={(on) => set({ ...t, recommended: on || undefined })} title="Anbefalet" hint='Får et "Anbefalet"-mærke.' />
                   <Field title="Fører til">
                     <Choice
-                      value={"room" in t.go ? "room" : "guide" in t.go ? "guide" : "href" in t.go ? "href" : "drone"}
-                      options={[["room", "Sted"], ["guide", "Rundvisning"], ["href", "Webside"], ...(config.drone || config.map ? ([["drone", "Luftfoto"]] as ["drone", string][]) : [])] as [string, string][]}
+                      value={"room" in t.go ? "room" : "guide" in t.go ? "guide" : "day" in t.go ? "day" : "href" in t.go ? "href" : "drone"}
+                      options={[["room", "Sted"], ["guide", "Rundvisning"], ...(config.day ? ([["day", "Dagen"]] as [string, string][]) : []), ["href", "Webside"], ...(config.drone || config.map ? ([["drone", "Luftfoto"]] as ["drone", string][]) : [])] as [string, string][]}
                       onChange={(v) => {
-                        const go: WelcomeGo = v === "room" ? { room: "", name: t.title } : v === "guide" ? { guide: true } : v === "href" ? { href: "https://" } : { drone: null };
+                        const go: WelcomeGo = v === "room" ? { room: "", name: t.title } : v === "guide" ? { guide: true } : v === "day" ? { day: true } : v === "href" ? { href: "https://" } : { drone: null };
                         set({ ...t, go });
                       }}
                     />
@@ -521,7 +521,73 @@ export function GuideEditor({ config, edit, preview }: Omit<Props, "slug">) {
         </button>
         {error && <p className="px-1 text-[12px] text-[#ff3b30]">{error}</p>}
       </Group>
+      <DayEditor config={config} edit={edit} preview={preview} />
     </>
+  );
+}
+
+type DayStep = NonNullable<TourConfig["day"]>["steps"][number];
+
+/** "Sådan ser en dag ud": a timeline of the day, each step optionally shown in the tour. */
+function DayEditor({ config, edit, preview }: Omit<Props, "slug">) {
+  const day = config.day;
+  if (!day)
+    return (
+      <Group title="Sådan ser en dag ud">
+        <p className={small}>En rolig tidslinje over en almindelig dag - tid, hvad der sker, og hvor. Godt for gæster, der gerne vil vide, hvad der kommer (fx en specialefterskole).</p>
+        <button type="button" className={`${linkButton} w-full`} onClick={() => edit((d) => void (d.day = { title: "Sådan ser en dag ud", steps: [{ time: "8.00", title: "Morgenmad" }] }))}>
+          + Lav en dag
+        </button>
+      </Group>
+    );
+  return (
+    <Group title="Sådan ser en dag ud">
+      <Field title="Overskrift">
+        <input className={input} value={day.title} onChange={(e) => edit((d) => void (d.day!.title = e.target.value))} />
+      </Field>
+      <Field title="Kort intro (valgfri)">
+        <input className={input} value={day.lead ?? ""} onChange={(e) => edit((d) => void (d.day!.lead = e.target.value || undefined))} />
+      </Field>
+      <Rows<DayStep>
+        items={day.steps}
+        onChange={(steps) => edit((d) => void (d.day!.steps = steps))}
+        icon={["bg-[#ff9500]", '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>']}
+        title={(s) => `${s.time}  ${s.title}`}
+        subtitle={(s) => [s.href ? `Punkt ${ssOfHref(s.href) ?? "?"}` : "Intet sted", s.text].filter(Boolean).join(" · ")}
+        empty="Ingen tidspunkter endnu."
+        editor={(s, set) => (
+          <>
+            <div className="flex gap-2">
+              <Field title="Tid">
+                <input className={`${input} w-20 bg-white`} value={s.time} onChange={(e) => set({ ...s, time: e.target.value })} />
+              </Field>
+              <div className="flex-1">
+                <Field title="Hvad sker der">
+                  <input className={`${input} bg-white`} value={s.title} onChange={(e) => set({ ...s, title: e.target.value })} />
+                </Field>
+              </div>
+            </div>
+            <Field title="Tekst (valgfri)" hint="Én kort, konkret sætning.">
+              <input className={`${input} bg-white`} value={s.text ?? ""} onChange={(e) => set({ ...s, text: e.target.value || undefined })} />
+            </Field>
+            <PlacePicker href={s.href ?? ""} name={s.title} preview={preview} onChange={(href) => set({ ...s, href })} />
+            {s.href && (
+              <button type="button" className="text-[12px] text-[#8e8e93] hover:text-[#ff3b30]" onClick={() => set({ ...s, href: undefined })}>
+                Intet sted til dette tidspunkt
+              </button>
+            )}
+          </>
+        )}
+      />
+      <div className="flex gap-2">
+        <button type="button" className={`${linkButton} flex-1`} onClick={() => edit((d) => void d.day!.steps.push({ time: "", title: "Nyt tidspunkt" }))}>
+          + Tidspunkt
+        </button>
+        <button type="button" className="px-2 text-[13px] text-[#ff3b30] hover:underline" onClick={() => edit((d) => void (d.day = undefined))}>
+          Fjern dagen
+        </button>
+      </div>
+    </Group>
   );
 }
 
