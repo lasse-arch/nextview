@@ -11,6 +11,7 @@ import {
   computeSetupTotal,
   PRODUCT_LABELS,
   CONTRACT_SIGNER,
+  tourLocationsProblem,
   type ContractProducts,
 } from "@/lib/contract-template-data";
 import { buildContractHtml } from "@/lib/contract-html-template";
@@ -83,6 +84,8 @@ export async function buildAndSendContract(
       (key) => products[key].selected
     );
     if (selectedKeys.length === 0) throw new Error("Vælg mindst ét produkt.");
+    const locationsProblem = tourLocationsProblem(products);
+    if (locationsProblem) throw new Error(locationsProblem);
     if (!products.bindingMonths || products.bindingMonths <= 0) {
       throw new Error("Angiv en gyldig bindingsperiode.");
     }

@@ -15,6 +15,7 @@ import {
   computeMonthlyTotal,
   computeSetupTotal,
   contractProductsToDealItems,
+  tourLocationsProblem,
   PRODUCT_LABELS,
   CONTRACT_SIGNER,
   type ContractProducts,
@@ -63,6 +64,8 @@ export async function sendStandaloneContract(
       (key) => products[key].selected
     );
     if (selectedKeys.length === 0) throw new Error("Vælg mindst ét produkt.");
+    const locationsProblem = tourLocationsProblem(products);
+    if (locationsProblem) throw new Error(locationsProblem);
     if (!products.bindingMonths || products.bindingMonths <= 0) {
       throw new Error("Angiv en gyldig bindingsperiode.");
     }

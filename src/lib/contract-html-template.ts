@@ -30,7 +30,21 @@ type Labels = {
   section1Body: (count: number) => string;
   section2Title: string;
   products: {
-    nextviewTour: { name: string; sub: string; bullets: string[]; quantityLabel: string; unitPriceLabel: string; totalPriceLabel: string };
+    nextviewTour: {
+      name: string;
+      sub: string;
+      bullets: string[];
+      quantityLabel: string;
+      unitPriceLabel: string;
+      totalPriceLabel: string;
+      /** The table for a customer with several locations - one tour per location. */
+      locationsIntro: string;
+      locationCol: string;
+      addressCol: string;
+      setupCol: string;
+      monthlyCol: string;
+      totalRow: string;
+    };
     hjemmeside: { name: string; bulletsSubscription: string[]; bulletsOneTime: string[]; setupLabel: string; priceLabel: string };
     droneOptagelse: { name: string; bullets: string[]; priceLabel: string };
     visitkort: { name: string; sub: string; bullets: string[]; quantityLabel: string; priceLabel: string };
@@ -86,6 +100,12 @@ const LABELS: Record<ContractLanguage, Labels> = {
         quantityLabel: "Antal lokationer",
         unitPriceLabel: "Etableringspris (eks. moms)",
         totalPriceLabel: "Pris pr. måned (eks. moms)",
+        locationsIntro: "Aftalen omfatter en tour for hver af kundens lokationer herunder. Hver lokation har sin egen etableringspris og månedlige pris.",
+        locationCol: "Lokation",
+        addressCol: "Adresse",
+        setupCol: "Etablering",
+        monthlyCol: "Pr. måned",
+        totalRow: "I alt (eks. moms)",
       },
       hjemmeside: {
         name: "Nextview360 hjemmeside",
@@ -180,6 +200,12 @@ const LABELS: Record<ContractLanguage, Labels> = {
         quantityLabel: "Number of locations",
         unitPriceLabel: "Setup fee (excl. VAT)",
         totalPriceLabel: "Price per month (excl. VAT)",
+        locationsIntro: "This agreement covers a tour for each of the Customer's locations below. Each location has its own setup fee and monthly price.",
+        locationCol: "Location",
+        addressCol: "Address",
+        setupCol: "Setup",
+        monthlyCol: "Per month",
+        totalRow: "Total (excl. VAT)",
       },
       hjemmeside: {
         name: "Nextview360 Website",
@@ -285,14 +311,28 @@ export function buildContractHtml(data: ContractHtmlData, language: ContractLang
 
   if (p.nextviewTour.selected) {
     const pt = t.products.nextviewTour;
+    const locs = p.nextviewTour.locations;
+    const prices = locs.length
+      ? `<p class="loc-intro">${esc(pt.locationsIntro)}</p>
+      <table class="loc-table">
+        <thead><tr><th>${esc(pt.locationCol)}</th><th>${esc(pt.addressCol)}</th><th class="num">${esc(pt.setupCol)}</th><th class="num">${esc(pt.monthlyCol)}</th></tr></thead>
+        <tbody>
+          ${locs.map((l) => `<tr><td><b>${esc(l.name)}</b></td><td>${esc(l.address)}</td><td class="num">${esc(l.setupFee)}</td><td class="num">${esc(l.price)}</td></tr>`).join("\n          ")}
+        </tbody>
+        <tfoot><tr><td colspan="2">${esc(pt.totalRow)}</td><td class="num">${esc(p.nextviewTour.setupFee)}</td><td class="num">${esc(p.nextviewTour.price)}</td></tr></tfoot>
+      </table>
+      <div class="price-rows">
+        ${fieldRow(pt.quantityLabel, String(locs.length))}
+      </div>`
+      : `<div class="price-rows">
+        ${fieldRow(pt.unitPriceLabel, p.nextviewTour.setupFee)}
+        ${fieldRow(pt.totalPriceLabel, p.nextviewTour.price)}
+      </div>`;
     productCards.push(`
     <div class="product-card">
       <p class="product-name">${esc(pt.name)}${subSpan(pt.sub)}</p>
       ${bulletList(pt.bullets.map(esc))}
-      <div class="price-rows">
-        ${fieldRow(pt.unitPriceLabel, p.nextviewTour.setupFee)}
-        ${fieldRow(pt.totalPriceLabel, p.nextviewTour.price)}
-      </div>
+      ${prices}
     </div>`);
   }
 
@@ -383,6 +423,13 @@ export function buildContractHtml(data: ContractHtmlData, language: ContractLang
   .product-list{ margin:0 0 10px; padding-left:20px; }
   .product-list li{ margin-bottom:4px; font-size:13.5px; }
   .price-rows{ border-top:1px solid var(--line); padding-top:8px; }
+  .loc-intro{ font-size:13.5px; margin:0 0 8px; }
+  .loc-table{ width:100%; border-collapse:collapse; font-size:13px; margin:0 0 10px; page-break-inside:auto; }
+  .loc-table th{ text-align:left; font-size:11.5px; font-weight:600; text-transform:uppercase; letter-spacing:.04em; padding:6px 8px; border-bottom:1px solid var(--line); }
+  .loc-table td{ padding:7px 8px; border-bottom:1px solid #ECEFF3; vertical-align:top; }
+  .loc-table tr{ page-break-inside:avoid; break-inside:avoid; }
+  .loc-table .num{ text-align:right; white-space:nowrap; }
+  .loc-table tfoot td{ font-weight:700; border-bottom:none; background:var(--fill); }
   .overview{ background:#F8FAFC; border:1px solid var(--line); border-radius:12px; padding:16px 20px; margin:14px 0; }
   .overview-row{ display:flex; justify-content:space-between; padding:4px 0; font-size:14px; }
   .overview-row:not(:last-child){ border-bottom:1px solid #ECEFF3; }

@@ -18,7 +18,7 @@ export async function createDeliveryTasksForSignedContract(
 
   await prisma.task.createMany({
     data: items.map((item) => ({
-      title: `Aflever ${item.productType}`,
+      title: `Aflever ${item.productType}${item.location ? ` - ${item.location}` : ""}`,
       createdById,
       dealId,
     })),

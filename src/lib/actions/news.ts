@@ -217,6 +217,12 @@ const DEFAULT_POSTS: { title: string; body: string; minutesAgo: number; screensh
     body: "Når en kunde sættes Live første gang, får de nu automatisk en mail fra lasse@nextview360.dk: \"Velkommen til Nextview360 - vi har nu lavet alt det hårde arbejde, og det hele er klar til at arbejde for jeres virksomhed\", med links til det, vi har leveret, og deres hjemmeside, og at de er velkomne til at skrive eller ringe på 23 27 07 86, hvis de har brug for ændringer eller har spørgsmål.\n\nLinkene tages fra Ydelser på dealen (tour, hjemmeside osv.) - så sørg for, at de er udfyldt, inden I sætter kunden Live. Nederst under Ydelser kan I se mailen (\"Se mail\"), om den er sendt, og sende den (igen) i hånden. Mailen sendes kun én gang automatisk.",
     screenshotUrl: "/news/velkomstmail.png",
   },
+  {
+    minutesAgo: 0,
+    title: "Kontrakt til kunder med flere lokationer",
+    body: "Har kunden flere afdelinger, kan du nu lave én kontrakt med en tour til hver. Sæt flueben i \"Kunden har flere lokationer\" under Nextview360 Tour på kontraktsiden, og skriv navn, adresse, etablering og månedspris for hver lokation (\"+ Tilføj lokation\" for flere). Kontrakten viser en tabel med alle lokationerne og totalen, og fakturaerne og ydelserne på dealen får en linje pr. lokation, fx \"Nextview360 Tour - Aarhus\". Virker også på fritstående kontrakter.",
+    screenshotUrl: "/news/flere-lokationer.png",
+  },
 ];
 
 /**

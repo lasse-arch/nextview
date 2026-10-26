@@ -12,6 +12,17 @@ type DealForContract = {
 };
 
 type SetupAndMonthly = { selected: boolean; setupFee: number; price: number };
+
+/** One of the customer's locations with its own tour - its own setup fee and monthly price. */
+export type TourLocation = { name: string; address: string; setupFee: number; price: number };
+
+/**
+ * The tour, for a customer with several locations: one tour per location,
+ * each priced on its own. With `locations` set, the tour's setupFee/price are
+ * the locations' sums (kept in sync by the contract form, and always summed
+ * from the locations here, so the two can't disagree).
+ */
+type TourProduct = SetupAndMonthly & { locations?: TourLocation[] };
 type SetupOnly = { selected: boolean; setupFee: number };
 type SetupAndQuantity = { selected: boolean; setupFee: number; quantity: number };
 
@@ -52,7 +63,7 @@ export const CONTRACT_SIGNER = { name: "Victor Emil Rasmussen", email: "info@nex
  * still sitting in its fields.
  */
 export type ContractProducts = {
-  nextviewTour: SetupAndMonthly;
+  nextviewTour: TourProduct;
   hjemmeside: SetupAndMonthly;
   droneOptagelse: SetupOnly;
   visitkort: SetupAndQuantity;
@@ -76,10 +87,40 @@ function splitZipCity(address: string | null): { street: string; zipCity: string
   return { street: address, zipCity: "" };
 }
 
+/** The tour's locations, when it's a contract for several (at least two named, or one with a name). */
+export function tourLocations(p: ContractProducts): TourLocation[] {
+  return p.nextviewTour.locations?.length ? p.nextviewTour.locations : [];
+}
+
+/** The tour's setup fee and monthly price - summed over its locations, if it has them. */
+export function tourPrices(p: ContractProducts): { setupFee: number; price: number } {
+  const locs = tourLocations(p);
+  if (!locs.length) return { setupFee: p.nextviewTour.setupFee, price: p.nextviewTour.price };
+  return { setupFee: locs.reduce((s, l) => s + l.setupFee, 0), price: locs.reduce((s, l) => s + l.price, 0) };
+}
+
+/** "Nextview360 Tour (3 lokationer)" for a contract with several locations. */
+function tourLabel(p: ContractProducts, label: string, language: ContractLanguage): string {
+  const n = tourLocations(p).length;
+  return n > 1 ? `${label} (${n} ${language === "en" ? "locations" : "lokationer"})` : label;
+}
+
+/** A location's name for an invoice line or a product list: "Nextview360 Tour - Aarhus". */
+const withLocation = (label: string, location: string) => (location.trim() ? `${label} - ${location.trim()}` : label);
+
+/** What's wrong with the tour's locations, if anything - every location needs a name (it's on the contract and the invoices). */
+export function tourLocationsProblem(p: ContractProducts): string | null {
+  if (!p.nextviewTour.selected) return null;
+  const locs = tourLocations(p);
+  if (locs.length === 1) return "Tilføj mindst to lokationer - eller slå flere lokationer fra.";
+  if (locs.some((l) => !l.name.trim())) return "Giv hver lokation et navn.";
+  return null;
+}
+
 /** Sum of the one-off etableringspris across the selected products. */
 export function computeSetupTotal(p: ContractProducts): number {
   return (
-    (p.nextviewTour.selected ? p.nextviewTour.setupFee : 0) +
+    (p.nextviewTour.selected ? tourPrices(p).setupFee : 0) +
     (p.hjemmeside.selected ? p.hjemmeside.setupFee : 0) +
     (p.droneOptagelse.selected ? p.droneOptagelse.setupFee : 0) +
     (p.visitkort.selected ? p.visitkort.setupFee : 0)
@@ -88,7 +129,7 @@ export function computeSetupTotal(p: ContractProducts): number {
 
 /** Sum of the recurring monthly costs across the selected products. */
 export function computeMonthlyTotal(p: ContractProducts): number {
-  return (p.nextviewTour.selected ? p.nextviewTour.price : 0) + (p.hjemmeside.selected ? p.hjemmeside.price : 0);
+  return (p.nextviewTour.selected ? tourPrices(p).price : 0) + (p.hjemmeside.selected ? p.hjemmeside.price : 0);
 }
 
 /**
@@ -99,10 +140,13 @@ export function computeMonthlyTotal(p: ContractProducts): number {
  */
 export function contractProductsToDealItems(
   p: ContractProducts
-): { productType: string; amount: number; isFree: boolean }[] {
-  const items: { productType: string; amount: number; isFree: boolean }[] = [];
+): { productType: string; amount: number; isFree: boolean; location?: string }[] {
+  const items: { productType: string; amount: number; isFree: boolean; location?: string }[] = [];
   if (p.nextviewTour.selected) {
-    items.push({ productType: "Nextview360 Tour", amount: p.nextviewTour.price, isFree: p.nextviewTour.price === 0 });
+    const locs = tourLocations(p);
+    // One tour per location, each with its own line (DealItem.location), so every site shows up on its own.
+    if (locs.length) for (const l of locs) items.push({ productType: "Nextview360 Tour", amount: l.price, isFree: l.price === 0, location: l.name.trim() || undefined });
+    else items.push({ productType: "Nextview360 Tour", amount: p.nextviewTour.price, isFree: p.nextviewTour.price === 0 });
   }
   if (p.hjemmeside.selected) {
     items.push({ productType: "Hjemmeside", amount: p.hjemmeside.price, isFree: p.hjemmeside.price === 0 });
@@ -164,7 +208,11 @@ export function establishmentLineItems(
 ): InvoiceLineItem[] {
   const labels = language === "en" ? PRODUCT_LABELS_EN : PRODUCT_LABELS;
   const entries: { label: string; setupFee: number }[] = [];
-  if (products.nextviewTour.selected) entries.push({ label: labels.nextviewTour, setupFee: products.nextviewTour.setupFee });
+  if (products.nextviewTour.selected) {
+    const locs = tourLocations(products);
+    if (locs.length) for (const l of locs) entries.push({ label: withLocation(labels.nextviewTour, l.name), setupFee: l.setupFee });
+    else entries.push({ label: labels.nextviewTour, setupFee: products.nextviewTour.setupFee });
+  }
   if (products.hjemmeside.selected) entries.push({ label: labels.hjemmeside, setupFee: products.hjemmeside.setupFee });
   if (products.droneOptagelse.selected) entries.push({ label: labels.droneOptagelse, setupFee: products.droneOptagelse.setupFee });
   if (products.visitkort.selected) entries.push({ label: labels.visitkort, setupFee: products.visitkort.setupFee });
@@ -194,7 +242,7 @@ export function establishmentLineItems(
 export function allSelectedProductLabels(products: ContractProducts, language: ContractLanguage = "da"): string[] {
   const productLabels = language === "en" ? PRODUCT_LABELS_EN : PRODUCT_LABELS;
   const labels: string[] = [];
-  if (products.nextviewTour.selected) labels.push(productLabels.nextviewTour);
+  if (products.nextviewTour.selected) labels.push(tourLabel(products, productLabels.nextviewTour, language));
   if (products.hjemmeside.selected) labels.push(productLabels.hjemmeside);
   if (products.droneOptagelse.selected) labels.push(productLabels.droneOptagelse);
   if (products.visitkort.selected) labels.push(productLabels.visitkort);
@@ -212,7 +260,7 @@ export function allSelectedProductLabels(products: ContractProducts, language: C
 export function recurringProductLabels(products: ContractProducts, language: ContractLanguage = "da"): string[] {
   const productLabels = language === "en" ? PRODUCT_LABELS_EN : PRODUCT_LABELS;
   const labels: string[] = [];
-  if (products.nextviewTour.selected) labels.push(productLabels.nextviewTour);
+  if (products.nextviewTour.selected) labels.push(tourLabel(products, productLabels.nextviewTour, language));
   if (products.hjemmeside.selected) labels.push(productLabels.hjemmeside);
   return labels;
 }
@@ -225,7 +273,11 @@ export function recurringLineItems(
 ): InvoiceLineItem[] {
   const productLabels = language === "en" ? PRODUCT_LABELS_EN : PRODUCT_LABELS;
   const entries: { label: string; price: number }[] = [];
-  if (products.nextviewTour.selected) entries.push({ label: productLabels.nextviewTour, price: products.nextviewTour.price });
+  if (products.nextviewTour.selected) {
+    const locs = tourLocations(products);
+    if (locs.length) for (const l of locs) entries.push({ label: withLocation(productLabels.nextviewTour, l.name), price: l.price });
+    else entries.push({ label: productLabels.nextviewTour, price: products.nextviewTour.price });
+  }
   if (products.hjemmeside.selected) entries.push({ label: productLabels.hjemmeside, price: products.hjemmeside.price });
   if (entries.length === 0) return [];
 
@@ -237,7 +289,7 @@ export type ContractHtmlData = {
   client: { company: string; cvr: string; name: string; email: string; phone: string; address: string; zipCity: string };
   seller: { name: string; email: string; phone: string };
   products: {
-    nextviewTour: { selected: boolean; setupFee: string; price: string };
+    nextviewTour: { selected: boolean; setupFee: string; price: string; locations: { name: string; address: string; setupFee: string; price: string }[] };
     hjemmeside: { selected: boolean; setupFee: string; price: string; hasMonthlyPrice: boolean };
     droneOptagelse: { selected: boolean; setupFee: string };
     visitkort: { selected: boolean; quantity: number; setupFee: string };
@@ -292,8 +344,9 @@ export function buildContractHtmlData(deal: DealForContract, products: ContractP
     products: {
       nextviewTour: {
         selected: products.nextviewTour.selected,
-        setupFee: formatDKK(products.nextviewTour.setupFee),
-        price: formatDKK(products.nextviewTour.price),
+        setupFee: formatDKK(tourPrices(products).setupFee),
+        price: formatDKK(tourPrices(products).price),
+        locations: tourLocations(products).map((l) => ({ name: l.name, address: l.address, setupFee: formatDKK(l.setupFee), price: formatDKK(l.price) })),
       },
       hjemmeside: {
         selected: products.hjemmeside.selected,

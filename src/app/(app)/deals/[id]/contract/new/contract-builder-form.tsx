@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { buildAndSendContract } from "@/lib/actions/docuseal";
 import { formatDKK } from "@/lib/labels";
 import { computeSetupTotal, computeMonthlyTotal, type ContractProducts } from "@/lib/contract-template-data";
+import { TourPriceFields } from "./tour-price-fields";
 
 function NumberField({
   label,
@@ -123,16 +124,7 @@ export function ContractBuilderForm({
           selected={products.nextviewTour.selected}
           onToggle={(selected) => setProducts((p) => ({ ...p, nextviewTour: { ...p.nextviewTour, selected } }))}
         >
-          <NumberField
-            label="Etableringspris (engangs, DKK)"
-            value={products.nextviewTour.setupFee}
-            onChange={(setupFee) => setProducts((p) => ({ ...p, nextviewTour: { ...p.nextviewTour, setupFee } }))}
-          />
-          <NumberField
-            label="Pris pr. måned (DKK)"
-            value={products.nextviewTour.price}
-            onChange={(price) => setProducts((p) => ({ ...p, nextviewTour: { ...p.nextviewTour, price } }))}
-          />
+          <TourPriceFields tour={products.nextviewTour} onChange={(nextviewTour) => setProducts((p) => ({ ...p, nextviewTour }))} />
         </ProductCard>
 
         <ProductCard
