@@ -826,6 +826,11 @@ function TourExperience({
     }
     if ("guide" in go) return startGuide("welcome");
     if ("day" in go) return openDay("welcome");
+    // A tour without a drone scene or map: the menu instead, so the tile still leads somewhere.
+    if (!OV) {
+      setMenuOpen(true);
+      return;
+    }
     // The drone scene, optionally with only one category's points showing.
     const only = go.drone;
     setHidden(only ? Object.fromEntries(Object.keys(T.categories).map((k) => [k, k !== only])) : {});
@@ -1508,7 +1513,7 @@ function TourExperience({
             <i /> {T.live.title} <span>{liveUnits.length}</span>
           </button>
         )}
-        {T.menu.map((m) =>
+        {T.menu.filter((m) => !("items" in m) || m.items.length > 0).map((m) => // an empty group (nothing in it yet) isn't shown
           "items" in m ? (
             <div key={m.title} className="hv-gruppe">
               <button

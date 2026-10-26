@@ -98,7 +98,7 @@ export function SimpleMenu({
                 {T.day.title}
               </button>
             )}
-            {T.menu.map((m) =>
+            {T.menu.filter((m) => !("items" in m) || m.items.length > 0).map((m) =>
               "href" in m ? (
                 item(m.title, "", m.href)
               ) : (
