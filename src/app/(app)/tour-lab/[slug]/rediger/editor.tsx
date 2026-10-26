@@ -130,6 +130,14 @@ export function TourEditor({
   const embed: EmbedSize = config.embeds?.size ?? DEFAULT_EMBED;
   const setEmbed = (size: EmbedSize) => edit((d) => void (d.embeds = { ...d.embeds, size }));
   const [previewKey, setPreviewKey] = useState(0);
+  /** The preview popped out over the whole window. */
+  const [big, setBig] = useState(false);
+  useEffect(() => {
+    if (!big) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setBig(false);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [big]);
   const [pending, start] = useTransition();
   const [json, setJson] = useState<string | null>(null);
 
@@ -807,8 +815,23 @@ export function TourEditor({
             <button type="button" onClick={() => setPreviewKey((k) => k + 1)} className="ml-auto rounded-full px-3 py-1 text-[13px] text-[#0071e3] hover:bg-[#0071e3]/10" title="Start touren forfra (fx for at se en ny velkomst)">
               Start forfra
             </button>
+            <button type="button" onClick={() => setBig(true)} className="flex items-center gap-1 rounded-full px-3 py-1 text-[13px] text-[#0071e3] hover:bg-[#0071e3]/10" title="Se forhåndsvisningen i stor skærm">
+              <Icon d='<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>' className="h-3.5 w-3.5" />
+              Stor skærm
+            </button>
           </div>
-          <div className="flex min-h-0 flex-1 items-center justify-center">
+          {big && <div className="fixed inset-0 z-[59] bg-black/60 backdrop-blur-sm" onClick={() => setBig(false)} aria-hidden />}
+          {/* The same element grows to fill the window - the tour isn't reloaded, it stays where it is. */}
+          <div className={big ? "fixed inset-3 z-[60] flex items-center justify-center sm:inset-6" : "flex min-h-0 flex-1 items-center justify-center"}>
+            {big && (
+              <button
+                type="button"
+                onClick={() => setBig(false)}
+                className="absolute left-1/2 top-1 z-10 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-[#1d1d1f] px-3 py-1 text-[12px] font-medium text-white shadow-lg"
+              >
+                Luk stor skærm <span className="text-[#8e8e93]">Esc</span>
+              </button>
+            )}
             {device === "site" ? (
               <SitePreview config={config} size={embed} width={siteWidth}>
                 <iframe ref={frame} key={previewKey} title="Forhåndsvisning" src={`/tour-lab/${slug}`} className="h-full w-full bg-black" allow="fullscreen; xr-spatial-tracking; autoplay; clipboard-write" />
