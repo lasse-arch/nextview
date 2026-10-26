@@ -1,6 +1,7 @@
 "use client";
 
 import { isPlaceHref, placeHref } from "../../tours/places";
+import { AiImageButton } from "./ai-image";
 import { writePlaceCards, type CardDraft } from "@/lib/actions/tour-cards";
 import { useState } from "react";
 import { saveTourStoryImage } from "@/lib/actions/tour-lab";
@@ -192,6 +193,7 @@ function PhotoPicker({ image, onChange, preview, slug, photoKey }: { image: stri
         </button>
         <UploadButton accept="image/*" onDone={onChange} />
       </div>
+      <AiImageButton src={image} onUse={onChange} />
       {error && <p className="px-1 text-[12px] text-[#ff3b30]">{error}</p>}
       <details className="text-[12px] text-[#8e8e93]">
         <summary className="cursor-pointer select-none">Brug et andet billede (adresse)</summary>

@@ -5,6 +5,7 @@ import { ICONS, ICON_NAMES, guessIcon } from "../../tours/icons";
 import { isPlaceHref } from "../../tours/places";
 import type { TourConfig, TourPoint } from "../../tours/types";
 import { Field, Group, Icon, input, Toggle, UploadButton } from "./ui";
+import { AiImageButton } from "./ai-image";
 
 /*
  * "Interaktivt kort": an illustrated map (or site plan, or drone photo) the
@@ -106,6 +107,7 @@ export function MapEditor({ config, edit }: { config: TourConfig; edit: Edit }) 
             Fjern kortet
           </button>
         </div>
+        <AiImageButton src={M.image} onUse={setImage} />
         <p className="text-[12px] text-[#8e8e93]">
           {M.w} × {M.h} px. Punkterne sidder i procent af billedet - et nyt billede i samme udsnit passer stadig.
         </p>
@@ -482,6 +484,8 @@ function PointPanel({
             </div>
           )}
           <UploadButton accept="image/*" label="Tilføj billede" onDone={(url) => setPoint((x) => void (x.images = [...(x.images ?? []), url]))} />
+          {/* The first photo (the one shown first) - e.g. a closed pool made summery. */}
+          <AiImageButton src={p.images?.[0] ?? ""} onUse={(url) => setPoint((x) => void (x.images = [url, ...(x.images ?? []).slice(1)]))} />
         </Field>
         <Field title="Knap" hint='Fx "Book din plads" med linket til bookingen. Tom = ingen knap.'>
           <input
