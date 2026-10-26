@@ -201,7 +201,7 @@ const STATUS: Record<BreakEvenRow["status"], { label: string; cls: string }> = {
 
 /*
  * "Hvornår tjener vi penge?" - per sale, when the customer's payments have
- * covered what the sale cost us (the seller's commission and our hours), and
+ * covered what the sale cost us (the seller's commission), and
  * where it stands now. Admin only: it shows our own costs.
  */
 async function BreakEven({ sellerId }: { sellerId?: string }) {
@@ -230,14 +230,11 @@ async function BreakEven({ sellerId }: { sellerId?: string }) {
         <div>
           <h2 className="text-lg font-semibold text-slate-900">Hvornår tjener vi penge?</h2>
           <p className="mt-1 max-w-2xl text-sm text-slate-500">
-            Et salg koster med det samme: sælgerens provision og vores timer. Det tjenes hjem af etableringen og den månedlige betaling, minus driften pr. kunde. Regnet ud fra kontrakten.
+            Et salg koster med det samme: sælgerens provision. Den tjenes hjem af etableringen og den månedlige betaling, minus driften pr. kunde. Regnet ud fra kontrakten.
           </p>
         </div>
-        <BreakEvenSettingsForm hourlyRate={settings.hourlyRate} monthlyCost={settings.monthlyCost} />
+        <BreakEvenSettingsForm monthlyCost={settings.monthlyCost} />
       </div>
-      {!settings.hourlyRate && (
-        <p className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">Udfyld vores timepris, så timerne på hvert salg kommer med i regnestykket.</p>
-      )}
 
       <div className="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard label="Salg der tjener penge" value={`${inPlus} af ${rows.length}`} />
@@ -312,9 +309,7 @@ async function BreakEven({ sellerId }: { sellerId?: string }) {
                   </td>
                   <td className="px-4 py-2 text-slate-600">
                     <span className="money">{formatDKK(r.upfront)}</span>
-                    <span className="block text-xs text-slate-400">
-                      {formatDKK(r.commission)} provision{r.hours > 0 && ` · ${String(r.hours).replace(".", ",")} t`}
-                    </span>
+                    <span className="block text-xs text-slate-400">provision</span>
                   </td>
                   <td className="px-4 py-2 text-slate-600">
                     {r.breakEvenMonths == null ? "Aldrig" : r.breakEvenMonths === 0 ? "Med det samme" : `Efter ${r.breakEvenMonths} md.`}
@@ -349,7 +344,7 @@ async function BreakEven({ sellerId }: { sellerId?: string }) {
         </table>
       </div>
       <p className="mt-2 text-xs text-slate-400">
-        Timer: det, der er registreret på dealen, plus filmtiden og den målte redigering i tour-editoren, hvor ingen har registreret dem i hånden. Starter fra fakturastart (ellers live-dato).
+        Vores egen tid regnes ikke med. Starter fra fakturastart (ellers live-dato).
       </p>
     </section>
   );

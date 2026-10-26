@@ -4,19 +4,18 @@ import { getSettingValue } from "@/lib/integration-settings";
 
 /*
  * When does a sale start making money? A sale costs at once - the seller's
- * commission (paid shortly after the sale) and our own hours (filming,
- * editing, follow-up) - and pays back over time: the establishment fee when
- * the customer goes live, then the monthly fee. Break-even is the month the
+ * commission (paid shortly after the sale) - and pays back over time: the
+ * establishment fee when the customer goes live, then the monthly fee. Our
+ * own hours are left out. Break-even is the month the
  * customer's payments have covered the costs, the running cost per customer
  * included. An estimate from the contract (not the invoices), so it can be
  * read for a sale that isn't live yet as well.
  */
 
-export type BreakEvenSettings = { hourlyRate: number; monthlyCost: number };
+export type BreakEvenSettings = { monthlyCost: number };
 
 export async function breakEvenSettings(): Promise<BreakEvenSettings> {
-  const [rate, monthly] = await Promise.all([getSettingValue("BREAKEVEN_HOURLY_RATE"), getSettingValue("BREAKEVEN_MONTHLY_COST")]);
-  return { hourlyRate: Number(rate) || 0, monthlyCost: Number(monthly) || 0 };
+  return { monthlyCost: Number(await getSettingValue("BREAKEVEN_MONTHLY_COST")) || 0 };
 }
 
 export type BreakEvenRow = {
@@ -28,8 +27,7 @@ export type BreakEvenRow = {
   establishment: number;
   bindingMonths: number;
   commission: number;
-  hours: number;
-  /** Commission + our hours: what the sale costs before it pays anything. */
+  /** What the sale costs before it pays anything (the commission). */
   upfront: number;
   /** Months from start until the payments have covered the costs (0 = at once; null = never, the monthly fee doesn't cover the running cost). */
   breakEvenMonths: number | null;
@@ -65,16 +63,10 @@ export async function breakEvenRows(sellerId?: string): Promise<{ rows: BreakEve
           billingStartDate: true,
           liveAt: true,
           churnedAt: true,
-          filmingActualMinutes: true,
-          timeEntries: { select: { minutes: true, category: true } },
-          tours: { select: { slug: true } },
         },
       },
     },
   });
-  const slugs = commissions.flatMap((c) => c.deal.tours.map((t) => t.slug));
-  const work = slugs.length ? await prisma.tourWork.groupBy({ by: ["tourSlug"], where: { tourSlug: { in: slugs } }, _sum: { seconds: true } }) : [];
-  const workBySlug = new Map(work.map((w) => [w.tourSlug, w._sum.seconds ?? 0]));
   const now = new Date();
 
   const rows = commissions.map((c): BreakEvenRow => {
@@ -82,14 +74,7 @@ export async function breakEvenRows(sellerId?: string): Promise<{ rows: BreakEve
     const monthly = d.saleAmount ?? 0;
     const establishment = d.establishmentFee ?? 0;
     const bindingMonths = d.bindingMonths ?? 1;
-    // Our hours, each counted once: hours logged on the deal, plus the filming time and the measured editing in the tour editor where nobody logged those by hand.
-    const logged = d.timeEntries.reduce((s, t) => s + t.minutes, 0);
-    const loggedFilming = d.timeEntries.some((t) => t.category === "FILMING");
-    const loggedEditing = d.timeEntries.some((t) => t.category === "TOUR_EDITING");
-    const editingMinutes = loggedEditing ? 0 : d.tours.reduce((s, t) => s + (workBySlug.get(t.slug) ?? 0), 0) / 60;
-    const minutes = logged + (loggedFilming ? 0 : d.filmingActualMinutes ?? 0) + editingMinutes;
-    const hours = Math.round((minutes / 60) * 10) / 10;
-    const upfront = c.amount + Math.round(hours * settings.hourlyRate);
+    const upfront = c.amount;
     const net = monthly - settings.monthlyCost;
     const breakEvenMonths = establishment >= upfront ? 0 : net > 0 ? Math.ceil((upfront - establishment) / net) : null;
     const start = d.billingStartDate ?? d.liveAt ?? null;
@@ -108,7 +93,6 @@ export async function breakEvenRows(sellerId?: string): Promise<{ rows: BreakEve
       establishment,
       bindingMonths,
       commission: c.amount,
-      hours,
       upfront,
       breakEvenMonths,
       start,
