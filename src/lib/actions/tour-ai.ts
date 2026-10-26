@@ -276,6 +276,8 @@ export async function createTourFromWebsite(input: {
   base?: string;
   preset?: DesignPreset["id"];
   branch?: Branch;
+  /** The branch and audience in the user's own words. */
+  about?: string;
   /** What the tour should drive visitors to. */
   focus?: string;
   notes: string;
@@ -323,7 +325,7 @@ Udfyld ud fra kundens hjemmeside nedenfor, efter drejebogen:
 - Læs undersiderne og eventuelle PDF'er (vedhæftet): find ud af, hvem stedet er for, og hvad besøgende har brug for - og byg touren til dem (se "Sådan arbejder du"). Brug rigtige fakta (fx dagsrytme fra et skema → day).
 - Gem det vigtigste, du har lært om kunden, i remember (scope "tour"), så du ved det næste gang.
 Skriv al tekst på dansk i kundens stemme. Opfind ingen fakta. I reply: fortæl kort, hvad du har valgt og hvorfor, og hvad brugeren selv bør tjekke eller tilføje (fx fotos af stederne).
-${branch ? `\nBranche: ${branch}.` : ""}${preset ? `\nDesign valgt af brugeren: "${preset.name}" (${preset.what}) - bevar design, menutype, bevægelse og start, som de står i skabelonen; udfyld kun indholdet.` : ""}${input.focus?.trim() ? `\nTouren skal især få besøgende til: ${input.focus.trim()}. Gør det til hovedhandlingen (cta, "Din plads venter", stedkort i de vigtigste rum).` : ""}
+${branch ? `\nBranche: ${branch}.` : ""}${input.about?.trim() ? `\nOm kunden og målgruppen (brugerens egne ord - følg dem): ${input.about.trim()}` : ""}${preset ? `\nDesign valgt af brugeren: "${preset.name}" (${preset.what}) - bevar design, menutype, bevægelse og start, som de står i skabelonen; udfyld kun indholdet.` : ""}${input.focus?.trim() ? `\nTouren skal især få besøgende til: ${input.focus.trim()}. Gør det til hovedhandlingen (cta, "Din plads venter", stedkort i de vigtigste rum).` : ""}
 ${input.notes.trim() ? `\nBemærkninger fra brugeren: ${input.notes.trim()}\n` : ""}
 <hjemmeside>
 ${site}

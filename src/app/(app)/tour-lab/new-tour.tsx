@@ -40,6 +40,8 @@ export function NewTour({ tours }: { tours: { slug: string; name: string }[] }) 
   const [name, setName] = useState("");
   const [website, setWebsite] = useState("");
   const [focus, setFocus] = useState("");
+  /** The branch and audience in the user's own words - told to nextviewAI as it is. */
+  const [about, setAbout] = useState("");
   const [notes, setNotes] = useState("");
   const [copyOf, setCopyOf] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -71,6 +73,7 @@ export function NewTour({ tours }: { tours: { slug: string; name: string }[] }) 
             dealId: who?.kind === "deal" ? who.deal.id : undefined,
             preset: preset ?? undefined,
             branch: branch ?? undefined,
+            about,
             focus,
             notes,
           }).catch((err: unknown) => ({ ok: false as const, error: `Noget gik galt (${err instanceof Error ? err.message : err}) - prøv igen.` }));
@@ -83,7 +86,7 @@ export function NewTour({ tours }: { tours: { slug: string; name: string }[] }) 
     });
   }
 
-  const canNext = [Boolean(who), Boolean(space), Boolean(branch), Boolean(preset), Boolean(name.trim())][step];
+  const canNext = [Boolean(who), Boolean(space), Boolean(branch) || Boolean(about.trim()), Boolean(preset), Boolean(name.trim())][step];
 
   return (
     <>
@@ -159,7 +162,6 @@ export function NewTour({ tours }: { tours: { slug: string; name: string }[] }) 
                         onClick={() => {
                           setBranch(b);
                           setPreset(DESIGN_PRESETS.find((p) => p.recommendedFor.includes(b))?.id ?? "klassisk");
-                          setStep(3);
                         }}
                         className={`rounded-xl bg-white px-3 py-3 text-left text-[14px] font-medium ring-1 transition hover:shadow-md ${branch === b ? "ring-2 ring-[#0071e3]" : "ring-black/[.06]"}`}
                       >
@@ -167,6 +169,31 @@ export function NewTour({ tours }: { tours: { slug: string; name: string }[] }) 
                       </button>
                     ))}
                   </div>
+                  <Field title="Med dine egne ord (valgfrit)" hint="Hvem er kunden, og hvem skal se touren? nextviewAI får det at vide, som du skriver det.">
+                    <textarea
+                      className={`${input} min-h-[70px] resize-y`}
+                      value={about}
+                      onChange={(e) => {
+                        setAbout(e.target.value);
+                        if (!branch && e.target.value.trim()) setPreset((p) => p ?? "klassisk");
+                      }}
+                      placeholder="Fx Specialefterskole for unge med autisme - forældre og kommuner vælger skolen"
+                    />
+                  </Field>
+                  <Field title="Fokus (valgfrit)" hint="Det, touren især skal få folk til.">
+                    <div className="space-y-1.5">
+                      {branch && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {FOCUS[branch].map((f) => (
+                            <button key={f} type="button" onClick={() => setFocus(f)} className={`rounded-full px-3 py-1 text-[12px] ring-1 ${focus === f ? "bg-[#0071e3] text-white ring-[#0071e3]" : "bg-white ring-black/[.08] hover:ring-black/20"}`}>
+                              {f}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      <input className={input} value={focus} onChange={(e) => setFocus(e.target.value)} placeholder="Fx Book en rundvisning" />
+                    </div>
+                  </Field>
                 </div>
               ) : step === 3 ? (
                 <div className="space-y-3">

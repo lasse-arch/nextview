@@ -17,6 +17,10 @@ export default function AppError({ error, reset }: { error: Error & { digest?: s
       <p className="max-w-md text-sm text-slate-500">
         Noget gik galt og ændringen blev ikke gemt. Prøv igen, eller gå tilbage og prøv en anden handling.
       </p>
+      {/* What actually went wrong, small - so a screenshot of this page tells us. Server errors only show their digest (Next.js hides the message). */}
+      <p className="max-w-lg break-words font-mono text-[11px] text-slate-400">
+        {error.digest ? `Fejlkode ${error.digest}` : error.message?.slice(0, 300)}
+      </p>
       <button
         type="button"
         onClick={reset}
