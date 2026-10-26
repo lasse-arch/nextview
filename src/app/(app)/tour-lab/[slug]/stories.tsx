@@ -228,7 +228,9 @@ export const STORIES_CSS = `
 .hv-story-head button{border:0;background:rgba(0,0,0,.4);color:#fff;width:30px;height:30px;border-radius:50%;font-size:12px;cursor:pointer;flex:none}
 @media (max-width:760px){
   .hv-stories.hv-st-m,.hv-story-play.hv-st-m{display:flex}
-  .hv-st-m~.hv-room,.hv-st-on-m .hv-luften{display:none}
+  .hv-st-m~.hv-room,.hv-st-on-m .hv-room,.hv-st-on-m .hv-luften{display:none}
+  /* A place card stands above the stories, not on them. */
+  .hv-st-on-m .pc{bottom:calc(150px + env(safe-area-inset-bottom,0px))}
   .hv-st-on-m .hv-dev{bottom:calc(150px + env(safe-area-inset-bottom,0px))}
   .hv-st-on-m .hv-logo{transition:opacity .2s}
   .hv-st-on-m:has(.hv-story-play) .hv-logo{opacity:0}
@@ -238,7 +240,8 @@ export const STORIES_CSS = `
   .hv-stories.hv-st-d{left:50%;right:auto;transform:translateX(-50%);max-width:min(860px,calc(100vw - 340px));background:none;align-items:center}
   .hv-st-d .hv-st-row{justify-content:safe center}
   .hv-stories.hv-st-d{transition:left .3s ease}
-  .hv-st-d~.hv-room,.hv-st-on-d .hv-luften{display:none}
+  .hv-st-d~.hv-room,.hv-st-on-d .hv-room,.hv-st-on-d .hv-luften{display:none}
+  .hv-st-on-d .pc{bottom:156px}
   .hv-story-play.hv-st-d{left:50%;right:auto;width:min(620px,100vw);transform:translateX(-50%)}
 }
 `;
