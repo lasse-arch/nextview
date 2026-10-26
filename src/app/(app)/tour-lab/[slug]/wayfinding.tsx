@@ -186,8 +186,8 @@ export function RouteStatus({
 }) {
   return (
     <div className={`rt-status ${arrived ? "fremme" : ""}`}>
-      <div className="rt-kick">{arrived ? "Du er fremme" : `På vej · ${Math.min(step, steps)} af ${steps}`}</div>
-      <b>{dest.group ? `${dest.group} · ${dest.name}` : dest.name}</b>
+      <div className="rt-kick">{arrived ? "Du er fremme" : `På vej: ${Math.min(step, steps)} af ${steps}`}</div>
+      <b>{dest.group ? `${dest.group}: ${dest.name}` : dest.name}</b>
       {!arrived && (
         <div className="rt-bar">
           <i style={{ width: `${(Math.min(step, steps) / Math.max(steps, 1)) * 100}%` }} />

@@ -1466,7 +1466,7 @@ function TourExperience({
             ▶
             <span>
               Vis mig rundt
-              <small>{GUIDE.length} steder · ca. {Math.ceil((GUIDE.length * (T.guide?.seconds ?? 9)) / 60)} min</small>
+              <small>{GUIDE.length} steder, ca. {Math.ceil((GUIDE.length * (T.guide?.seconds ?? 9)) / 60)} min</small>
             </span>
           </button>
         )}
@@ -1624,7 +1624,7 @@ function TourExperience({
                   <li key={u.name}>
                     <span>
                       <b>{u.name}</b>
-                      <small>{[u.size, u.from && (/^(ledig|nu)\b/i.test(u.from) ? "ledig nu" : `ledig fra ${u.from}`)].filter(Boolean).join(" · ")}</small>
+                      <small>{[u.size, u.from && (/^(ledig|nu)\b/i.test(u.from) ? "ledig nu" : `ledig fra ${u.from}`)].filter(Boolean).join(", ")}</small>
                     </span>
                     {u.price && <em>{u.price}</em>}
                     {T.live!.places?.[u.name] && (

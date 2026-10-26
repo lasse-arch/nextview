@@ -65,7 +65,7 @@ export function DayBar({ day, at, onNext, onOpen, onClose }: { day: Day; at: num
       </button>
       {next > 0 && (
         <button type="button" className="dy-bar-next" onClick={() => onNext(next)}>
-          <small>{tr("Bagefter · {tid}", { tid: day.steps[next].time })}</small>
+          <small>{tr("Bagefter: {tid}", { tid: day.steps[next].time })}</small>
           {day.steps[next].title} ›
         </button>
       )}

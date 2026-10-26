@@ -18,7 +18,11 @@ lærer begge det nye.
    Den besøgende skal føle, at de stadig er hos kunden - ikke hos os.
 5. **Kunden er afsender.** Skriv i kundens stemme, til målgruppen (du/din).
    Nextview360 nævnes kun som "Præsenteret af nextview360" i menuen.
-6. **Sandt indhold.** Opfind aldrig priser, antal, åbningstider, navne eller
+6. **Skriv som et menneske.** Ingen pyntetegn mellem ord: ingen midterprik
+   (·), ingen lange tankestreger (— eller –) og ingen lodrette streger (|) som
+   skilletegn. Brug komma, punktum, kolon eller en almindelig bindestreg -
+   "Bramming, siden 1897", ikke "Bramming · siden 1897".
+7. **Sandt indhold.** Opfind aldrig priser, antal, åbningstider, navne eller
    tilbud. Brug kun det, kunden eller hjemmesiden siger. Mangler noget, så
    spørg eller lad det være ude.
 
@@ -106,18 +110,18 @@ Fx specialefterskoler (ADHD, autisme, nedsat kognitivt funktionsniveau):
 
 ## Brancher
 
-- **Efterskole/højskole:** Årshjul · Din hverdag · Skoledagen · Dit hjem på
+- **Efterskole/højskole:** Årshjul, Din hverdag, Skoledagen, Dit hjem på
   [Skole]. Handling: "Ledige pladser"/"Book en rundvisning", CTA "Bliv elev".
   Velkomst med fliser, Vis mig rundt, stedkort i værelser og fællesrum.
-- **Restaurant/café/bar:** Restauranten · Køkkenet · Til dit selskab ·
+- **Restaurant/café/bar:** Restauranten, Køkkenet, Til dit selskab,
   Praktisk. Handling "Book bord" (popup), evt. "Bestil takeaway". Forside med
   foto + bar i bunden. Varm, indbydende tone.
-- **Fitness:** Træning · Hold · Faciliteter. CTA "Bliv medlem".
-- **Hotel/konference:** Dit ophold · Spis og drik · Møder og events ·
+- **Fitness:** Træning, Hold, Faciliteter. CTA "Bliv medlem".
+- **Hotel/konference:** Dit ophold, Spis og drik, Møder og events,
   Faciliteter. CTA "Book nu".
-- **Butik/showroom:** Butikken · Service · Praktisk. CTA "Book fremvisning" /
+- **Butik/showroom:** Butikken, Service, Praktisk. CTA "Book fremvisning" /
   "Find os". Gerne kort film (drone) før touren.
-- **Lager/udlejning (fx Boxdepotet):** Størrelser · Adgang og sikkerhed ·
+- **Lager/udlejning (fx Boxdepotet):** Størrelser, Adgang og sikkerhed,
   Faciliteter. Rumvælger, skift direkte mellem rum, ledige rum live, "Find vej"
   til boksen. CTA "Lej en boks".
 - **Campingplads/stort område:** start på dronebilledet (eller tegnet kort),

@@ -61,7 +61,7 @@ export const UI_STRINGS = [
   "Se stedet",
   "Her nu",
   "Se hele dagen",
-  "Bagefter · {tid}",
+  "Bagefter: {tid}",
   "Du er her",
   "Søg…",
   "Læs mere",
@@ -70,7 +70,7 @@ export const UI_STRINGS = [
   "Ledig nu",
   "Ledig fra {dato}",
   "Book #{nr}",
-  "{antal} ledige i denne størrelse · fra {pris} kr./md.",
+  "{antal} ledige i denne størrelse, fra {pris} kr./md.",
   "Ingen ledige i denne størrelse lige nu",
   "Vis mål",
   "Skjul mål",
@@ -112,6 +112,42 @@ export function translatableTexts(config: TourConfig): string[] {
   walk(config);
   UI_STRINGS.forEach((s) => out.add(s));
   return [...out];
+}
+
+/**
+ * Words as a person writes them: no "·" between words, no long dashes (— –)
+ * and no "|" as separators - "Bramming · siden 1897" becomes "Bramming, siden
+ * 1897". Visitors read those as machine-made text.
+ */
+export function plainWords(s: string): string {
+  return s
+    .replace(/\s+[·•|]\s+/g, ", ")
+    .replace(/^\s*[·•]\s*|\s*[·•]\s*$/g, "")
+    .replace(/\s*[—–]\s*/g, " - ");
+}
+
+/** Every text in a setup (and its translations) through plainWords - links, ids, CSS and the like are left alone. */
+export function plainWordsInConfig(config: TourConfig): TourConfig {
+  const walk = (v: unknown, key?: string): unknown => {
+    if (key === "translations" && v && typeof v === "object") {
+      return Object.fromEntries(
+        Object.entries(v as Record<string, Record<string, string>>).map(([lang, dict]) => [
+          lang,
+          Object.fromEntries(Object.entries(dict).map(([da, x]) => [plainWords(da), plainWords(x)])),
+        ])
+      );
+    }
+    if (key && SKIP.has(key)) return v;
+    if (typeof v === "string") return isText(v) ? plainWords(v) : v;
+    if (Array.isArray(v)) return v.map((x) => walk(x));
+    if (v && typeof v === "object") {
+      const o: Record<string, unknown> = {};
+      for (const [k, x] of Object.entries(v)) o[key === "ranges" && isText(k) ? plainWords(k) : k] = walk(x, k);
+      return o;
+    }
+    return v;
+  };
+  return walk(config) as TourConfig;
 }
 
 /** The languages a setup can be shown in (Danish first). */

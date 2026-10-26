@@ -55,7 +55,7 @@ export const jalsa: TourConfig = {
     { name: "Indgangen", kicker: "Velkommen", href: v(13, 0, -107.7), image: `${P}/indgangen.jpg` },
   ],
   cover: {
-    kicker: "Indisk restaurant · Ved Stranden, Aalborg",
+    kicker: "Indisk restaurant ved Stranden i Aalborg",
     title: "Velkommen til Jalsa",
     lead: "Kig indenfor før du kommer. Find det bord, du helst vil sidde ved - og book det med det samme.",
     image: `${P}/hero.jpg`,

@@ -240,7 +240,7 @@ export function PickerMenu({
       {T.availability && group && (
         <button type="button" className={`pk-ledige ${showFree ? "aaben" : ""}`} onClick={() => setShowFree((v) => !v)} disabled={!free.length}>
           {free.length
-            ? tr("{antal} ledige i denne størrelse · fra {pris} kr./md.", { antal: free.length, pris: kr(Math.min(...free.map((u) => u.price))) })
+            ? tr("{antal} ledige i denne størrelse, fra {pris} kr./md.", { antal: free.length, pris: kr(Math.min(...free.map((u) => u.price))) })
             : tr("Ingen ledige i denne størrelse lige nu")}
           {free.length > 0 && <i>{showFree ? "▾" : "▴"}</i>}
         </button>

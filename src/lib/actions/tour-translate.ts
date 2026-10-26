@@ -7,7 +7,7 @@ import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getSettingValue } from "@/lib/integration-settings";
 import { claudeCostUsd } from "@/lib/claude-cost";
-import { langName, translatableTexts } from "@/app/(app)/tour-lab/tours/i18n";
+import { langName, plainWords, translatableTexts } from "@/app/(app)/tour-lab/tours/i18n";
 import type { TourConfig } from "@/app/(app)/tour-lab/tours/types";
 
 /*
@@ -54,7 +54,7 @@ export async function translateTour(slug: string, config: TourConfig, langs: str
         `Du oversætter en virtuel rundvisning (en 360°-tour af en virksomhed) fra dansk til ${langName(lang)}. ` +
         "Teksterne er overskrifter, menupunkter, knapper, korte fortællinger og faste ord i touren. Skriv dem, som en indfødt tekstforfatter ville skrive dem på en premium hjemmeside: naturligt, varmt og kort - knapper og menupunkter skal være lige så korte som på dansk. " +
         "Navne på virksomheder, steder og produkter (fx Jalsa, Halvorsminde, GastroFabrikken) oversættes ikke. Pladsholdere i krøllede parenteser som {sted} og {pris} skal stå uændret i oversættelsen. Bevar tal, priser, emojis og tegn som ▶ › ▴. " +
-        "Svar med én oversættelse pr. nummer.",
+        "Ingen \"·\", \"—\" eller \"|\" mellem ord - brug komma eller bindestreg. Svar med én oversættelse pr. nummer.",
       messages: [
         {
           role: "user",
@@ -69,7 +69,7 @@ export async function translateTour(slug: string, config: TourConfig, langs: str
       .catch(() => {});
     for (const { i, text } of r.parsed_output?.items ?? []) {
       if (todo[i] && text.trim()) {
-        translations[lang][todo[i]] = text.trim();
+        translations[lang][todo[i]] = plainWords(text.trim());
         count++;
       }
     }

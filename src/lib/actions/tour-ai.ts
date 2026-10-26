@@ -28,6 +28,7 @@ const PRESET_BASE: Record<DesignPreset["id"], string> = {
 import { tourConfigProblem } from "@/lib/tour-validate";
 import { fetchModelInfo, modelIdsIn, searchAccountModels, type ModelInfo } from "@/lib/matterport-graph";
 import type { TourConfig } from "@/app/(app)/tour-lab/tours/types";
+import { plainWordsInConfig } from "@/app/(app)/tour-lab/tours/i18n";
 
 /*
  * "Claude" in the tour editor: describe a change in plain Danish, Claude
@@ -140,6 +141,7 @@ Sådan arbejder du (du hedder nextviewAI i Arpo):
 - Find først ud af, hvem der besøger touren, og hvad de har brug for. Er det fx en specialskole (autisme, ADHD, særlige behov), så gør alt helt enkelt og forudsigeligt: designet "Helt enkel" (design.welcome og design.menu "simple"), 2-3 store knapper, én flad menu, ingen fliser, intet der dukker op af sig selv (ingen nudge, ingen stedkort), jump "fade", rundtur med stemme hvor man selv trykker videre. Forældre og fagfolk er dem, der handler - giv dem deres egen lille gruppe.
 - Hvem handler, og hvad er næste skridt i virkeligheden (fx "Book en rundvisning", fordi optagelse altid starter der)? Gør det til hovedhandlingen.
 - Mindre er mere: hellere få, tydelige valg end mange.
+- Skriv som et menneske: aldrig "·", "—", "–" eller "|" mellem ord eller som pynt. Brug komma, punktum, kolon eller en almindelig bindestreg.
 
 Hukommelse (remember):
 - Du har en hukommelse, der gives tilbage til dig hver gang (se <hukommelse> nedenfor og i beskeden). Brug den.
@@ -241,7 +243,7 @@ async function claudeEdits(key: string, who: { name: string; kind: string }, con
     return { ok: false, error: `nextviewAIs ændring kunne ikke bruges (${problem}) - prøv at formulere det anderledes.` };
   }
   const remembered = await remember(config.slug, who.name, parsed.remember ?? []).catch((err: unknown) => (console.error("remember", err), []));
-  return { ok: true, reply: parsed.reply, config: { ...(next as unknown as TourConfig), slug: config.slug }, changed: parsed.changes.length, remembered };
+  return { ok: true, reply: parsed.reply, config: plainWordsInConfig({ ...(next as unknown as TourConfig), slug: config.slug }), changed: parsed.changes.length, remembered };
 }
 
 export async function askClaudeForTour(config: TourConfig, history: ChatTurn[], request: string): Promise<AiEditResult> {
