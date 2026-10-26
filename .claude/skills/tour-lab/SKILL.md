@@ -30,6 +30,7 @@ One engine, one JSON setup per tour, kept in the database and edited in Arpo.
 | Claude | `src/lib/actions/tour-ai.ts` (edits as structured `changes`, new tour from website), `src/lib/site-digest.ts` (reads a customer's website). Key: `ANTHROPIC_API_KEY` env or Arpo setting |
 | Overview | `tour-lab/page.tsx` (tours grouped by customer), `new-tour.tsx` |
 | Measurement | the engine's `track()` sends events to `/api/tour-events` (TourEvent; not from the editor's preview); `src/lib/tour-stats.ts` turns them into the editor's Resultater tab and the overview's numbers. Links out get utm_source=nextview360 (`links.tsx` `tagged`) |
+| Live data | `src/lib/availability/live.ts` (the customer's page as text, read with the tour's `live.pattern`, cached 10 min - no AI at runtime); Claude writes the pattern once (`setupLiveData` in tour-ai.ts); editor tab Live data; engine shows a chip, a sheet with book buttons and "Ledig" badges in the menu |
 | Files | `src/lib/tour-files.ts` (TourFile; Vercel Blob when `BLOB_READ_WRITE_TOKEN` is set, else the database up to 4 MB, served by `/api/tour-files/<id>`), copied from other sites by "Gem alle filer hos os" and when Claude builds a tour |
 
 ## How things connect

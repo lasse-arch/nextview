@@ -1,6 +1,7 @@
 "use client";
 
 import { cssFilter, isPlaceHref, placeHref } from "../tours/places";
+import type { LiveUnit } from "@/lib/availability/live";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { saveTourGa4Id, saveTourStoryImage } from "@/lib/actions/tour-lab";
@@ -199,6 +200,8 @@ type ExperienceProps = {
   phone: boolean;
   /** Arpo's own view: the prototype tools (status, event log, copy view …). Never in the public tour. */
   tools?: boolean;
+  /** Free units read live off the customer's site (T.live). */
+  liveUnits?: LiveUnit[];
 };
 
 /** The parts of a setup the tour only reads when it starts - a change to them starts the preview over. */
@@ -236,6 +239,7 @@ function TourExperience({
   units,
   phone,
   tools = false,
+  liveUnits = [],
 }: ExperienceProps) {
   const T = savedTour;
   useGa4(ga4Id, T.title);
@@ -821,6 +825,20 @@ function TourExperience({
   }
 
   /* ----- Editor bridge: the tour editor shows this page as its live preview ----- */
+  /* Live units (free pitches, rooms …) from the customer's site. */
+  const [liveOpen, setLiveOpen] = useState(false);
+  const freeNames = useMemo(() => liveUnits.map((u) => u.name.toLowerCase()), [liveUnits]);
+  /** Is a menu item one of the free units? Whole words only - unit "1" isn't "12". */
+  const isFree = (name: string) => {
+    const n = name.toLowerCase();
+    return freeNames.some((f) => n === f || new RegExp(`(^|[^\\p{L}\\d])${f.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}($|[^\\p{L}\\d])`, "u").test(n));
+  };
+  function openLive(from: string) {
+    track("live_open", { from, label: String(liveUnits.length) });
+    setMenuOpen(false);
+    setLiveOpen(true);
+  }
+
   /** A tag the editor is placing (its request id) - see the effect below the bridge. */
   const [picking, setPicking] = useState<string | null>(null);
   const bridge = useRef({ sdk, room, menuGo });
@@ -1227,6 +1245,11 @@ function TourExperience({
             </span>
           </button>
         )}
+        {T.live && liveUnits.length > 0 && (
+          <button type="button" className="hv-gtitel hv-enkel hv-live-knap" onClick={() => openLive("menu")}>
+            <i /> {T.live.title} <span>{liveUnits.length}</span>
+          </button>
+        )}
         {T.menu.map((m) =>
           "items" in m ? (
             <div key={m.title} className="hv-gruppe">
@@ -1239,6 +1262,7 @@ function TourExperience({
                   {m.items.map(([name, href]) => (
                     <button key={name} type="button" onClick={() => menuGo(name, m.title, href)}>
                       {name}
+                      {isFree(name) && <span className="hv-ledig">Ledig</span>}
                       {!isPlaceHref(href) && <span className="hv-ext">↗</span>}
                     </button>
                   ))}
@@ -1342,6 +1366,43 @@ function TourExperience({
         </div>
       )}
 
+      {T.live && liveUnits.length > 0 && phase === "tour" && !cover && !liveOpen && (
+        <button type="button" className="hv-live-chip" onClick={() => openLive("chip")}>
+          <i /> {liveUnits.length} {T.live.title.toLowerCase()}
+        </button>
+      )}
+      {liveOpen && T.live && (
+        <div className="hv-live" onClick={() => setLiveOpen(false)}>
+          <div className="hv-live-sheet" onClick={(e) => e.stopPropagation()}>
+            <div className="hv-live-head">
+              <b>{T.live.title}</b>
+              <span>{liveUnits.length} lige nu</span>
+              <button type="button" aria-label="Luk" onClick={() => setLiveOpen(false)}>
+                ×
+              </button>
+            </div>
+            <ul>
+              {liveUnits.map((u) => {
+                const href = u.link ?? T.cta.find((c) => c.primary)?.href;
+                return (
+                  <li key={u.name}>
+                    <span>
+                      <b>{u.name}</b>
+                      <small>{[u.size, u.from && (/^(ledig|nu)\b/i.test(u.from) ? "ledig nu" : `ledig fra ${u.from}`)].filter(Boolean).join(" · ")}</small>
+                    </span>
+                    {u.price && <em>{u.price}</em>}
+                    {href && (
+                      <TourLink href={href} label={`${T.live!.bookLabel ?? "Book"} ${u.name}`} className="hv-btn hv-primary" onClick={() => ctaClick(`${T.live!.bookLabel ?? "Book"} ${u.name}`, href, "live")}>
+                        {T.live!.bookLabel ?? "Book"}
+                      </TourLink>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        </div>
+      )}
       {picking && <div className="hv-pick">Klik der, hvor tagget skal sidde · Esc fortryder</div>}
       {/* Prototype tools: status and the GA4 event log. */}
       {tools && (
@@ -1658,6 +1719,26 @@ const CSS = `
 .hv-pchips{display:flex;flex-wrap:wrap;gap:5px}
 .hv-pchips span{background:#e7eef0;color:var(--c-main);font-size:12px;font-weight:700;padding:4px 9px;border-radius:999px}
 .hv-note{font-size:13px!important;color:#7a8a90!important;margin-top:12px!important}
+.hv-ledig{margin-left:7px;padding:1px 7px;border-radius:999px;background:#34c75922;color:#1f8a3a;font-size:11px;font-weight:700;vertical-align:1px}
+.hv-live-knap{display:flex;align-items:center;gap:8px}
+.hv-live-knap i,.hv-live-chip i{width:8px;height:8px;border-radius:50%;background:#34c759;box-shadow:0 0 0 3px #34c75944;animation:hvLive 1.6s ease-in-out infinite}
+.hv-live-knap span{margin-left:auto;padding:1px 8px;border-radius:999px;background:var(--c-accent);color:#fff;font-size:12px}
+@keyframes hvLive{50%{box-shadow:0 0 0 6px #34c75911}}
+.hv-live-chip{position:absolute;top:74px;right:16px;z-index:6;display:flex;align-items:center;gap:8px;padding:8px 14px;border:0;border-radius:999px;background:rgba(255,255,255,.95);color:#1d2a30;font:700 13px inherit;font-family:inherit;box-shadow:0 6px 18px rgba(0,0,0,.2);cursor:pointer}
+.hv-live{position:absolute;inset:0;z-index:35;display:flex;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.35);animation:hvFade .2s ease}
+.hv-live-sheet{width:min(520px,100%);max-height:78%;display:flex;flex-direction:column;margin:0 12px 12px;border-radius:20px;background:#fff;color:#1d2a30;box-shadow:0 20px 60px rgba(0,0,0,.4);animation:hvUp .3s cubic-bezier(.2,.7,.2,1) both}
+.hv-live-head{display:flex;align-items:baseline;gap:10px;padding:16px 18px 10px}
+.hv-live-head b{font-family:var(--font-heading);font-size:20px;color:var(--c-main)}
+.hv-live-head span{font-size:13px;color:#6b7a80}
+.hv-live-head button{margin-left:auto;width:32px;height:32px;border:0;border-radius:50%;background:#f1f2f3;font-size:20px;cursor:pointer}
+.hv-live-sheet ul{margin:0;padding:0 10px 12px;list-style:none;overflow-y:auto}
+.hv-live-sheet li{display:flex;align-items:center;gap:12px;padding:10px 8px;border-top:1px solid #eef0f1}
+.hv-live-sheet li>span{flex:1;min-width:0}
+.hv-live-sheet li b{display:block;font-size:15px}
+.hv-live-sheet li small{display:block;font-size:12.5px;color:#6b7a80}
+.hv-live-sheet li em{font-style:normal;font-weight:800;font-size:14px;color:var(--c-main);white-space:nowrap}
+.hv-live-sheet .hv-btn{flex:none;padding:8px 14px;font-size:13px}
+@media (max-width:760px){.hv-live-chip{top:62px;right:12px}.hv-live-sheet{margin:0;border-radius:20px 20px 0 0;max-height:85%}}
 .hv-pick{position:absolute;top:16px;left:50%;transform:translateX(-50%);z-index:30;padding:9px 16px;border-radius:999px;background:rgba(0,0,0,.75);color:#fff;font-size:14px;font-weight:700;pointer-events:none;backdrop-filter:blur(8px)}
 .hv-logo{position:absolute;top:14px;left:16px;height:var(--logo-h);width:auto;max-width:min(320px,40vw);object-fit:contain;z-index:6;filter:drop-shadow(0 2px 6px rgba(0,0,0,.35))}
 /* A dark logo gets a light card, so it reads on any wall. */

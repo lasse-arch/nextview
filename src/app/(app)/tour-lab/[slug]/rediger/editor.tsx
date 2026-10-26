@@ -14,6 +14,7 @@ import { CardsEditor, GuideEditor, StartEditor, TagsEditor } from "./content";
 import { ResultsPanel } from "./results";
 import { DesignGallery } from "./design-gallery";
 import { ScanPointsEditor } from "./scanpoints";
+import { LiveDataEditor } from "./live";
 import type { ScanMap } from "@/lib/matterport-graph";
 import { currentPreset } from "../../tours/presets";
 import { EconomyPanel, type TourEconomy } from "./economy";
@@ -22,7 +23,7 @@ import { Choice, Field, FilesContext, Group, Icon, input, outsideFiles, Toggle, 
 import { hostTourFiles } from "@/lib/actions/tour-files";
 
 type Version = { id: string; note: string | null; by: string | null; at: string };
-type Tab = "claude" | "scan" | "okonomi" | "resultater" | "del" | "tags" | "start" | "rundvisning" | "kort" | "generelt" | "design" | "menu" | "funktioner" | "links" | "avanceret" | "versioner";
+type Tab = "claude" | "live" | "scan" | "okonomi" | "resultater" | "del" | "tags" | "start" | "rundvisning" | "kort" | "generelt" | "design" | "menu" | "funktioner" | "links" | "avanceret" | "versioner";
 
 /** Claude's mark: a small sunburst. */
 const SPARK = '<path d="M12 3v5M12 16v5M3 12h5M16 12h5M5.6 5.6l3.5 3.5M14.9 14.9l3.5 3.5M5.6 18.4l3.5-3.5M14.9 9.1l3.5-3.5"/>';
@@ -37,6 +38,7 @@ const TABS: [Tab, string, string, string?][] = [
   ["rundvisning", "Vis mig rundt", '<circle cx="12" cy="12" r="9"/><path d="M10 8.5v7l5.5-3.5z"/>'],
   ["scan", "Scanpunkter", '<circle cx="6" cy="6" r="2"/><circle cx="18" cy="8" r="2"/><circle cx="9" cy="17" r="2"/><circle cx="17" cy="18" r="2"/><path d="M8 6.5l8 1M7 8l1.5 7M11 17h4"/>'],
   ["tags", "Tags", '<path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z"/><circle cx="8" cy="8" r="1.5"/>'],
+  ["live", "Live data", '<path d="M3 12h4l3-8 4 16 3-8h4"/>'],
   ["kort", "Stedkort", '<rect x="4" y="5" width="16" height="14" rx="2"/><path d="M8 10h8M8 14h5"/>'],
   ["links", "Knapper og links", '<path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/>'],
   ["design", "Design", '<path d="M12 3a9 9 0 1 0 0 18c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.3-.3-.4-.5-.8-.5-1.3 0-1.1.9-2 2-2h2.3A4.7 4.7 0 0 0 21 9.7C21 5.9 17 3 12 3z"/><circle cx="7.5" cy="11.5" r="1"/><circle cx="10.5" cy="7.5" r="1"/><circle cx="15.5" cy="8" r="1"/>', "Udseende og opsætning"],
@@ -453,6 +455,7 @@ export function TourEditor({
             {tab === "rundvisning" && <GuideEditor config={config} edit={edit} preview={preview} />}
             {tab === "scan" && <ScanPointsEditor config={config} edit={edit} preview={preview} map={scanMap} mpskinsHidden={mpskinsHidden} expected={scanCount} />}
             {tab === "tags" && <TagsEditor config={config} edit={edit} slug={slug} preview={preview} />}
+            {tab === "live" && <LiveDataEditor config={config} edit={edit} slug={slug} />}
             {tab === "kort" && <CardsEditor config={config} edit={edit} preview={preview} />}
             {tab === "menu" && <MenuEditor menu={config.menu} preview={preview} onChange={(menu) => edit((d) => void (d.menu = menu))} />}
 

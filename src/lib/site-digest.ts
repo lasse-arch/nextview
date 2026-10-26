@@ -10,7 +10,7 @@ import "server-only";
 const UA = "Mozilla/5.0 (compatible; ArpoTourBuilder/1.0; +https://www.arpo.dk)";
 
 /** Only public web addresses - never our own server or the local network. */
-function publicUrl(raw: string): URL {
+export function publicUrl(raw: string): URL {
   const url = new URL(/^https?:\/\//i.test(raw.trim()) ? raw.trim() : `https://${raw.trim()}`);
   if (!/^https?:$/.test(url.protocol)) throw new Error("Kun http(s)-adresser.");
   const h = url.hostname;

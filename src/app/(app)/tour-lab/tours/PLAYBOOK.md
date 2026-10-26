@@ -118,6 +118,14 @@ booking i denne måned". Derfor:
   så flyt handlingen tættere på: et stedkort, en flise på velkomsten, eller
   "Din plads venter" tidligere.
 
+## Live data
+
+Har kunden en side med ledige pladser, rum eller boliger (campingpladser,
+depotrum, værelser), så vis dem live i touren (Live data): "12 ledige
+pladser" med en book-knap ved hver - og "Ledig" ved de rum i menuen, der er
+ledige. Det er det stærkeste salgsargument, en tour kan have: man ser
+pladsen og kan booke den med det samme.
+
 ## Kunderejsen
 
 En kunde kan have flere tours til forskellige steder i kunderejsen (fx én til

@@ -11,6 +11,7 @@ import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getSettingValue, setSettingValue } from "@/lib/integration-settings";
 import { siteDigest } from "@/lib/site-digest";
+import { pageAsText, readUnits, type LiveUnit } from "@/lib/availability/live";
 import { hostFiles } from "@/lib/tour-files";
 import { BRANCHES, DESIGN_PRESETS, type Branch, type DesignPreset } from "@/app/(app)/tour-lab/tours/presets";
 
@@ -398,4 +399,78 @@ export async function searchMatterportSpaces(query: string, offset?: string | nu
   const token = process.env.MATTERPORT_API_TOKEN || (await getSettingValue("MATTERPORT_API_TOKEN"));
   if (!token) return { ok: false as const, error: "Matterport er ikke forbundet." };
   return searchAccountModels(token, query, offset);
+}
+
+/* ----- Live data: Claude writes the recipe for reading a customer's page ----- */
+
+const LiveRecipe = z.object({
+  title: z.string().describe('Kort titel i touren på dansk, fx "Ledige pladser" eller "Ledige depotrum".'),
+  pattern: z.string().describe("JavaScript-regex (uden skråstreger) med navngivne grupper: name (krævet) og evt. size, price, from, link. Ét match = én ledig enhed."),
+  flags: z.string().describe('Regex-flag uden g, fx "i" eller "is".'),
+  explanation: z.string().describe("Kort forklaring på dansk af, hvad der læses, og evt. hvad der ikke kunne findes."),
+});
+
+type LiveSpec = NonNullable<TourConfig["live"]>;
+
+/**
+ * Reads a customer's page with the free units (pitches, rooms, storage …) and
+ * has Claude write the pattern that picks them out - tested at once on the
+ * page; Claude gets one more go if it finds nothing. After this the tour reads
+ * the page itself, no AI.
+ */
+export async function setupLiveData(slug: string, url: string, what: string): Promise<{ ok: true; spec: LiveSpec; units: LiveUnit[]; explanation: string } | { ok: false; error: string }> {
+  const user = await admin();
+  const key = await apiKey();
+  if (!key) return { ok: false, error: "Claude er ikke sat op endnu - indsæt en nøgle under fanen Claude." };
+  let text: string;
+  try {
+    text = await pageAsText(url, 0);
+  } catch (err) {
+    return { ok: false, error: `Kunne ikke læse siden: ${err instanceof Error ? err.message : err}` };
+  }
+  const client = new Anthropic({ apiKey: key });
+  let feedback = "";
+  for (let attempt = 0; attempt < 2; attempt++) {
+    let r;
+    try {
+      r = await client.messages.parse({
+        model: "claude-opus-5-5",
+        max_tokens: 8000,
+        system:
+          "Du skriver regulære udtryk, der læser ledige enheder (campingpladser, depotrum, værelser, boliger …) ud af en hjemmeside, så en virtuel tour kan vise dem live. Teksten er siden som ren tekst, links skrevet som [tekst](adresse). Skriv ét JavaScript-regex med navngivne grupper: name (enhedens navn/nummer - krævet), og hvis siden har dem: size, price, from (ledig fra), link (adressen til at booke netop den). Ét match skal være én ledig enhed - kun de ledige, ikke de optagne. Brug ikke-grådige mønstre og [\\s\\S] frem for punktum over linjeskift. Regexet skal virke på hele siden og fortsat virke, når der kommer flere eller færre enheder.",
+        messages: [{ role: "user", content: `Hvad skal læses: ${what || "de ledige enheder"}\nSidens adresse: ${url}\n${feedback}\n<side>\n${text.slice(0, 45_000)}\n</side>` }],
+        output_config: { effort: "medium", format: zodOutputFormat(LiveRecipe) },
+      });
+    } catch (err) {
+      if (err instanceof Anthropic.AuthenticationError) return { ok: false, error: "Claude-nøglen virker ikke længere." };
+      return { ok: false, error: `Kunne ikke få fat i Claude (${err instanceof Error ? err.message : err}).` };
+    }
+    const u = r.usage;
+    await prisma.tourAiUsage
+      .create({ data: { tourSlug: slug, userName: user.name, kind: "live data", inputTokens: u.input_tokens, outputTokens: u.output_tokens, cacheReadTokens: u.cache_read_input_tokens ?? 0, cacheWriteTokens: u.cache_creation_input_tokens ?? 0, costUsd: claudeCostUsd(u) } })
+      .catch(() => {});
+    const recipe = r.parsed_output;
+    if (!recipe) return { ok: false, error: "Claude svarede ikke som forventet - prøv igen." };
+    const spec: LiveSpec = { url, title: recipe.title, pattern: recipe.pattern, flags: recipe.flags.replace(/[^imsu]/g, "") };
+    let units: LiveUnit[] = [];
+    try {
+      units = readUnits(text, spec);
+    } catch (err) {
+      feedback = `\n(Dit forrige regex virkede ikke: ${err instanceof Error ? err.message : err}. Prøv igen.)\n`;
+      continue;
+    }
+    if (units.length || attempt === 1) return { ok: true, spec, units: units.slice(0, 100), explanation: recipe.explanation };
+    feedback = `\n(Dit forrige regex /${spec.pattern}/${spec.flags} fandt ingen enheder på siden. Se teksten igen og prøv et andet mønster.)\n`;
+  }
+  return { ok: false, error: "Claude kunne ikke finde de ledige enheder på siden." };
+}
+
+/** What a live-data setup finds on the page right now (for the editor's list) - all units, the excluded ones too. */
+export async function previewLiveData(spec: LiveSpec): Promise<{ ok: true; units: LiveUnit[] } | { ok: false; error: string }> {
+  await admin();
+  try {
+    return { ok: true, units: readUnits(await pageAsText(spec.url, 0), spec).slice(0, 300) };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
 }

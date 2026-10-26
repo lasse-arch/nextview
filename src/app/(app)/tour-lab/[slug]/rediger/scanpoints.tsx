@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { ScanMap } from "@/lib/matterport-graph";
 import { placeHref } from "../../tours/places";
 import type { TourConfig } from "../../tours/types";
@@ -37,6 +37,15 @@ export function ScanPointsEditor({
   const [floor, setFloor] = useState(0);
   const [selected, setSelected] = useState<number | null>(null);
   const [zoom, setZoom] = useState(1);
+  /* Marking many at once: hold the mouse down and drag over the dots - or drag a box on an empty spot. */
+  const [marked, setMarked] = useState<Set<number>>(new Set());
+  const [box, setBox] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
+  const painting = useRef<{ start: number; moved: boolean } | null>(null);
+  const planEl = useRef<HTMLDivElement>(null);
+  const pct = (e: React.PointerEvent) => {
+    const r = planEl.current!.getBoundingClientRect();
+    return { x: ((e.clientX - r.left) / r.width) * 100, y: ((e.clientY - r.top) / r.height) * 100 };
+  };
 
   /** What each scan point is used for in the setup. */
   const uses = useMemo(() => {
@@ -106,7 +115,39 @@ export function ScanPointsEditor({
         <div className="-mx-1 max-h-[480px] overflow-auto rounded-xl bg-[#f5f5f7] ring-1 ring-black/[.04]">
           {plan?.image && plan.aspect ? (
             // Matterport's own top-down photo of the floor, with every scan point where it really is.
-            <div className="relative" style={{ width: `${zoom * 100}%`, aspectRatio: String(plan.aspect) }}>
+            <div
+              ref={planEl}
+              className="relative touch-none select-none"
+              style={{ width: `${zoom * 100}%`, aspectRatio: String(plan.aspect) }}
+              onPointerDown={(e) => {
+                if (e.target !== e.currentTarget && !(e.target instanceof HTMLImageElement)) return;
+                const at = pct(e);
+                setBox({ x0: at.x, y0: at.y, x1: at.x, y1: at.y });
+                if (!e.shiftKey) setMarked(new Set());
+              }}
+              onPointerMove={(e) => {
+                if (box && e.buttons === 1) {
+                  const at = pct(e);
+                  setBox({ ...box, x1: at.x, y1: at.y });
+                }
+              }}
+              onPointerUp={() => {
+                if (box) {
+                  const [l, r, t, b] = [Math.min(box.x0, box.x1), Math.max(box.x0, box.x1), Math.min(box.y0, box.y1), Math.max(box.y0, box.y1)];
+                  if (r - l > 0.5 || b - t > 0.5)
+                    setMarked((m) => new Set([...m, ...points.filter((p) => p.px != null && p.py != null && p.px >= l && p.px <= r && p.py >= t && p.py <= b).map((p) => p.ss)]));
+                  setBox(null);
+                }
+                const paint = painting.current;
+                painting.current = null;
+                // A click (no drag) on a dot: go there.
+                if (paint && !paint.moved) {
+                  setMarked(new Set());
+                  go(paint.start);
+                }
+              }}
+              onPointerLeave={() => setBox(null)}
+            >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={plan.image} alt={plan.name} className="absolute inset-0 h-full w-full select-none object-contain" draggable={false} />
               {points.map((p) =>
@@ -115,8 +156,17 @@ export function ScanPointsEditor({
                     key={p.sid}
                     type="button"
                     title={`Punkt ${p.ss}`}
-                    onClick={() => go(p.ss)}
-                    className={`absolute flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full font-bold tabular-nums shadow-[0_1px_4px_rgba(0,0,0,.35)] transition hover:z-10 hover:scale-125 ${selected === p.ss ? "z-10 scale-125 ring-2 ring-[#1d1d1f]" : ""} ${uses.get(p.ss)?.has("start") ? "outline outline-2 outline-offset-2 outline-[#0071e3]" : ""}`}
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      painting.current = { start: p.ss, moved: false };
+                      setMarked((m) => (e.shiftKey ? new Set([...m, p.ss]) : new Set([p.ss])));
+                    }}
+                    onPointerEnter={(e) => {
+                      if (!painting.current || e.buttons !== 1) return;
+                      painting.current.moved = true;
+                      setMarked((m) => new Set([...m, p.ss]));
+                    }}
+                    className={`absolute flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full font-bold tabular-nums shadow-[0_1px_4px_rgba(0,0,0,.35)] transition hover:z-10 hover:scale-125 ${marked.has(p.ss) && marked.size > 1 ? "z-10 ring-[3px] ring-[#0071e3] ring-offset-1" : ""} ${selected === p.ss ? "z-10 scale-125 ring-2 ring-[#1d1d1f]" : ""} ${uses.get(p.ss)?.has("start") ? "outline outline-2 outline-offset-2 outline-[#0071e3]" : ""}`}
                     style={{
                       left: `${p.px}%`,
                       top: `${p.py}%`,
@@ -132,6 +182,7 @@ export function ScanPointsEditor({
                   </button>
                 )
               )}
+              {box && <div className="pointer-events-none absolute border-2 border-[#0071e3] bg-[#0071e3]/10" style={{ left: `${Math.min(box.x0, box.x1)}%`, top: `${Math.min(box.y0, box.y1)}%`, width: `${Math.abs(box.x1 - box.x0)}%`, height: `${Math.abs(box.y1 - box.y0)}%` }} />}
             </div>
           ) : (
           <svg viewBox={`${minX} ${-maxY} ${w} ${h}`} style={{ width: `${zoom * 100}%`, display: "block" }} className="aspect-auto">
@@ -152,6 +203,36 @@ export function ScanPointsEditor({
           </svg>
           )}
         </div>
+        {marked.size > 1 ? (
+          <div className="flex items-center gap-2 rounded-xl bg-[#0071e3]/10 px-3 py-2">
+            <span className="flex-1 text-[13px] font-medium">{marked.size} punkter markeret</span>
+            {(
+              [
+                ["Skjul", true],
+                ["Vis", false],
+              ] as const
+            ).map(([text, hide]) => (
+              <button
+                key={text}
+                type="button"
+                className="rounded-full bg-white px-3 py-1 text-[13px] font-medium text-[#0071e3] ring-1 ring-black/[.06]"
+                onClick={() =>
+                  edit((d) => {
+                    const sids = map.points.filter((p) => marked.has(p.ss) && !mpskinsHidden.includes(p.sid)).map((p) => p.sid);
+                    d.hiddenSweeps = hide ? [...new Set([...d.hiddenSweeps, ...sids])] : d.hiddenSweeps.filter((s) => !sids.includes(s));
+                  })
+                }
+              >
+                {text}
+              </button>
+            ))}
+            <button type="button" className="px-1 text-[13px] text-[#6e6e73]" onClick={() => setMarked(new Set())}>
+              Fravælg
+            </button>
+          </div>
+        ) : (
+          <p className="text-[11px] text-[#8e8e93]">Klik på et punkt for at gå derhen. Hold musen nede og træk hen over punkter - eller træk en firkant - for at markere mange og skjule/vise dem på én gang (Shift lægger til).</p>
+        )}
         <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-[#6e6e73]">
           {(
             [

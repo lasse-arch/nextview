@@ -210,6 +210,16 @@ export type TourConfig = {
    * per menu group (by its title) the size range (m³) it covers.
    */
   availability?: { source: "boxdepotet"; url: string; ranges: Record<string, [number, number]> };
+  /**
+   * Live data from the customer's own website - free camping pitches,
+   * storage rooms, rooms… read off \`url\` every 10 minutes with \`pattern\`
+   * (a regular expression over the page as text, links written as
+   * [text](href); named groups: name (required), and any of size, price,
+   * from, link). Made by Claude in the editor (Live data) and checked there.
+   * Shown as "<title> · N" in the tour, and as a "Ledig" badge on menu items
+   * named like a free unit. \`exclude\`: units never shown (by name).
+   */
+  live?: { url: string; title: string; pattern: string; flags?: string; exclude?: string[]; bookLabel?: string };
   welcome?: {
     kicker: string;
     title: string;
