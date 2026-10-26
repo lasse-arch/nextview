@@ -267,7 +267,9 @@ function TourExperience({
   const T = useMemo(() => localize(savedTour, lang), [savedTour, lang]);
   const tx = useMemo(() => makeT(savedTour, lang), [savedTour, lang]);
   const da = useMemo(() => danishOf(savedTour, lang), [savedTour, lang]);
-  const startRan = useRef<TourConfig | null>(null);
+  /** What the start ran with: only a change to how the tour starts runs it again (not a new language, nor an edit in the editor - a colour, a text). */
+  const startRan = useRef<string | null>(null);
+  const startKey = JSON.stringify([savedTour.slug, savedTour.start, savedTour.intro, savedTour.design?.welcome, Boolean(savedTour.welcome), Boolean(savedTour.cover), Boolean(savedTour.drone || savedTour.map), savedTour.menuOpenOnStart]);
   useLayoutEffect(() => {
     tracking.da = da;
   }, [da]);
@@ -605,7 +607,17 @@ function TourExperience({
     return id ? (T.points.find((x) => x.id === id) ?? null) : null;
   };
 
+  // The drone scene is rebuilt only when it or its points change - not for every edit in the editor's preview.
+  const droneKey = JSON.stringify([T.drone, Boolean(T.map), T.points, T.categories]);
+  const droneT = useRef(T);
+  const openPointRef = useRef(openPoint);
   useEffect(() => {
+    droneT.current = T;
+    openPointRef.current = openPoint;
+  });
+  useEffect(() => {
+    const T = droneT.current;
+    const openPoint = (p: Point) => openPointRef.current(p);
     mobile.current = window.innerWidth <= 760;
     const D = T.drone;
     if (!D || T.map) return;
@@ -662,7 +674,7 @@ function TourExperience({
       drone.current?.destroy();
       drone.current = null;
     };
-  }, [openPoint, T]);
+  }, [droneKey]);
 
   // Category filter: hide/show the points of a category.
   useEffect(() => {
@@ -755,8 +767,8 @@ function TourExperience({
     enterRef.current = enterTour;
   });
   useEffect(() => {
-    if (startRan.current === savedTour) return; // a new language is the same tour - don't start it over
-    startRan.current = savedTour;
+    if (startRan.current === startKey) return; // the same start (a new language, an edit) - don't start the tour over
+    startRan.current = startKey;
     const q = new URLSearchParams(window.location.search);
     const rum = q.get("rum");
     const punkt = q.get("punkt");
@@ -790,7 +802,7 @@ function TourExperience({
       if (T.intro) return; // the welcome comes when the film ends
       afterStartRef.current();
     });
-  }, [openPoint, T, savedTour, ROOM_NAMES, LAST_ROOM_KEY]);
+  }, [openPoint, T, savedTour, startKey, ROOM_NAMES, LAST_ROOM_KEY]);
 
   function chooseWelcome(go: WelcomeGo | "last" | "skip", label: string) {
     track("welcome_choice", { choice: label });
@@ -1022,9 +1034,17 @@ function TourExperience({
 
   /** A tag the editor is placing (its request id) - see the effect below the bridge. */
   const [picking, setPicking] = useState<string | null>(null);
-  const bridge = useRef({ sdk, room, menuGo });
+  /** The editor wants the 3D tour in view (it's changing something only seen there): out of the welcome, cover and menu, and into the tour. */
+  function peek() {
+    setWelcome(false);
+    setCover(false);
+    setMenuOpen(false);
+    setSelected(null);
+    if (phase === "drone" && !entering) enterTour(T.start, "editor", "Start");
+  }
+  const bridge = useRef({ sdk, room, menuGo, peek });
   useEffect(() => {
-    bridge.current = { sdk, room, menuGo };
+    bridge.current = { sdk, room, menuGo, peek };
   });
   useEffect(() => {
     if (window.parent === window) return;
@@ -1033,6 +1053,7 @@ function TourExperience({
       if (e.origin !== location.origin || e.source !== window.parent || !e.data?.type) return;
       const { sdk, room, menuGo } = bridge.current;
       if (e.data.type === "tour-go") menuGo(e.data.name ?? "", "editor", e.data.href);
+      if (e.data.type === "tour-peek") bridge.current.peek(); // e.g. the colour filter: show the 3D tour itself
       if (e.data.type === "tour-pick") {
         // The editor places a tag: the next click in the tour says where.
         if (!sdk) return reply({ type: "tour-pick", id: e.data.id, error: "Touren er ikke klar endnu - vent et øjeblik." });
@@ -1489,7 +1510,14 @@ function TourExperience({
         {T.menu.map((m) =>
           "items" in m ? (
             <div key={m.title} className="hv-gruppe">
-              <button type="button" className="hv-gtitel" onClick={() => setOpenGroup((g) => (g === m.title ? null : m.title))}>
+              <button
+                type="button"
+                className="hv-gtitel"
+                onClick={() => {
+                  if (openGroup !== m.title) track("menu_group_open", { label: m.title });
+                  setOpenGroup((g) => (g === m.title ? null : m.title));
+                }}
+              >
                 {m.title}
                 <span>{openGroup === m.title ? "−" : "+"}</span>
               </button>

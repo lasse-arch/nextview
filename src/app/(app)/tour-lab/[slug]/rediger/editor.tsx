@@ -412,6 +412,7 @@ export function TourEditor({
                           step={step}
                           className="w-full accent-[#0071e3]"
                           value={value}
+                          onPointerDown={() => frame.current?.contentWindow?.postMessage({ type: "tour-peek" }, location.origin)}
                           onChange={(e) =>
                             edit((d) => {
                               const f = { ...d.filter, [k]: Number(e.target.value) };
@@ -429,7 +430,7 @@ export function TourEditor({
                       Nulstil filter
                     </button>
                   )}
-                  <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">Lægges over selve 3D-touren - fx lidt lysere og varmere. Se det i forhåndsvisningen.</p>
+                  <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">Lægges over selve 3D-touren - fx lidt lysere og varmere. Forhåndsvisningen går ind i touren, så du ser det, mens du trækker.</p>
                 </Group>
                 <Group title="Logo">
                 <Field title="Logo">

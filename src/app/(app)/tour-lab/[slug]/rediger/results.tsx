@@ -226,6 +226,13 @@ function OurNumbers({ stats }: { stats: TourStats }) {
       <Group title="Mest valgte steder">
         <Ranked rows={stats.places} empty="Ingen har valgt steder i menuen endnu." />
       </Group>
+      <Group title="Menuen">
+        <p className="text-[13px] text-[#1d1d1f]">
+          {stats.visits ? `${pct(stats.menu.opened / stats.visits)} af besøgene åbnede menuen (${stats.menu.opened} af ${stats.visits}).` : "Ingen besøg endnu."}
+        </p>
+        <Ranked rows={stats.menu.groups} empty="Ingen har åbnet en gruppe i menuen endnu (måles fra nu af)." />
+        <p className="text-[11px] text-[#8e8e93]">Besøg, der åbnede hver gruppe. En gruppe, få åbner, gemmer sit indhold - ryk det vigtigste ud som et punkt for sig, på velkomsten eller i Vis mig rundt.</p>
+      </Group>
       <Group title="Kom fra">
         <Ranked rows={stats.sources} empty="-" />
       </Group>
