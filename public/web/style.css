@@ -1048,3 +1048,32 @@ a.mq-card:hover .mq-img img { transform: scale(1.04); }
 .software .feat h3 { display: flex; align-items: center; gap: 10px; }
 .software .feat h3 span { display: grid; place-items: center; flex: none; width: 30px; height: 30px; border-radius: 8px; background: var(--navy); color: #fff; font-size: 13px; font-weight: 800; }
 @media (max-width: 900px) { .software .sw-top { grid-template-columns: 1fr; } }
+
+/* Softwaren (software.html): the tour as a sales tool, the customer portal and the data-to-AI loop. */
+.sw-hero { position: relative; padding: 0 0 48px 0; }
+.sw-hero > img:first-child { display: block; width: 100%; aspect-ratio: 16 / 10; object-fit: cover; border-radius: 16px; box-shadow: 0 34px 80px -34px rgba(18,29,59,.55); }
+.sw-hero-phone { position: absolute; right: -10px; bottom: 0; width: 34%; max-width: 230px; border-radius: 26px; border: 7px solid #0f1830; background: #0f1830; box-shadow: 0 30px 60px -20px rgba(18,29,59,.6); }
+.sw-shots { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; }
+.sw-shots figure { margin: 0; background: #fff; border: 1px solid var(--line); border-radius: 16px; overflow: hidden; }
+.sw-shots img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; }
+.sw-shots figcaption { padding: 16px 20px 20px; font-size: 15px; color: var(--ink-2); }
+.sw-shots figcaption b { display: block; color: var(--ink); font-size: 17px; margin-bottom: 4px; }
+.sw-portal { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(28px, 5vw, 72px); align-items: center; }
+.sw-portal-copy .checks { margin-top: 22px; }
+.sw-portal-copy .lead { margin-top: 14px; }
+.sw-note { margin-top: 18px; font-size: 13px; color: var(--ink-2); opacity: .8; }
+.sw-phones { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: start; }
+.sw-phones img { width: 100%; border-radius: 26px; border: 7px solid #0f1830; background: #0f1830; box-shadow: 0 30px 60px -24px rgba(18,29,59,.45); }
+.sw-phones img:last-child { margin-top: 56px; }
+.sw-loop { background: var(--navy); color: rgba(255,255,255,.86); border-radius: 20px; margin: 0 14px; }
+.sw-loop h2 { color: #fff; }
+.sw-loop .lead { color: rgba(255,255,255,.86); }
+.sw-loop .steps li { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.14); }
+.sw-loop .steps li::before { color: #AEB8D3; }
+.sw-loop .steps h3 { color: #fff; }
+.sw-loop .steps p { color: rgba(255,255,255,.78); }
+.sw-example { margin-top: 22px; padding: 22px 26px; border-radius: var(--radius); background: #fff; color: var(--ink-2); max-width: 820px; margin-inline: auto; }
+.sw-example b { color: var(--ink); display: block; margin-bottom: 4px; }
+.sw-example p { margin: 0; }
+@media (max-width: 900px) { .sw-portal { grid-template-columns: 1fr; } .sw-shots { grid-template-columns: 1fr; } }
+@media (max-width: 600px) { .sw-hero-phone { width: 38%; right: 6px; border-width: 5px; border-radius: 18px; } .sw-phones img { border-width: 5px; border-radius: 18px; } .sw-loop { margin: 0 8px; } }
