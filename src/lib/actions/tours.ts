@@ -1,5 +1,6 @@
 "use server";
 
+import { tourChanged } from "@/lib/tour-cache";
 import { revalidatePath } from "next/cache";
 import type { Prisma } from "@prisma/client";
 import { requireUser } from "@/lib/auth";
@@ -32,6 +33,7 @@ export async function saveTour(slug: string, config: TourConfig, note: string): 
   });
   revalidatePath("/tour-lab");
   revalidatePath(`/tour-lab/${slug}`);
+  tourChanged(slug);
   return { ok: true, versionId: version.id };
 }
 
@@ -48,6 +50,7 @@ export async function restoreTourVersion(versionId: string): Promise<Result> {
   ]);
   revalidatePath("/tour-lab");
   revalidatePath(`/tour-lab/${v.tour.slug}`);
+  tourChanged(v.tour.slug);
   return { ok: true };
 }
 
@@ -96,6 +99,7 @@ export async function setTourPublished(slug: string, published: boolean): Promis
   await admin();
   await prisma.tour.update({ where: { slug }, data: { published } });
   revalidatePath(`/t/${slug}`);
+  tourChanged(slug);
   return { ok: true };
 }
 
@@ -137,6 +141,7 @@ export async function renameTourSlug(slug: string, wanted: string): Promise<Resu
     prisma.tourAiUsage.updateMany({ where: { tourSlug: slug }, data: { tourSlug: next } }),
   ]);
   revalidatePath("/tour-lab");
+  tourChanged(slug, next);
   return { ok: true, slug: next };
 }
 
@@ -177,6 +182,7 @@ export async function detachToursFromMpskins(slug?: string): Promise<Result<{ mo
       prisma.tour.update({ where: { id: t.id }, data: { config: json } }),
       prisma.tourVersion.create({ data: { tourId: t.id, config: json, note: `Frakoblet MPSkins (${r.links} links flyttet til Matterport)`, createdByName: user.name } }),
     ]);
+    tourChanged(t.slug);
     moved++;
   }
   revalidatePath("/tour-lab");

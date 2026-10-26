@@ -1,5 +1,6 @@
 "use server";
 
+import { tourChanged } from "@/lib/tour-cache";
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
@@ -192,6 +193,7 @@ export async function decideScan(slug: string, sweepId: string, decision: "hide"
       where: { slug },
       data: { config: next, versions: { create: { config: next, note: `${decision === "hide" ? "Skjulte" : "Viste igen"} scan ${check.ss} (person i billedet)`, createdByName: user.name } } },
     });
+    tourChanged(slug);
   }
   await prisma.tourScanCheck.update({ where: { id: check.id }, data: { status: decision === "hide" ? "hidden" : decision === "keep" ? "kept" : "person", decidedBy: decision === "undo" ? null : user.name } });
   return { ok: true };

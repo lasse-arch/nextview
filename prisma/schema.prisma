@@ -1456,3 +1456,15 @@ model TourFeedback {
 
   @@index([tourSlug, createdAt])
 }
+
+/// A failed password login - to stop password guessing: too many for an
+/// e-mail or from one address within LOGIN_WINDOW and logins pause there.
+model LoginFailure {
+  id        String   @id @default(cuid())
+  email     String
+  ip        String
+  createdAt DateTime @default(now())
+
+  @@index([email, createdAt])
+  @@index([ip, createdAt])
+}

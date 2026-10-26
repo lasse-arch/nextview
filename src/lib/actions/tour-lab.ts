@@ -1,5 +1,6 @@
 "use server";
 
+import { tourChanged } from "@/lib/tour-cache";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
@@ -71,5 +72,6 @@ export async function saveTourStoryImage(slug: string, room: string, dataUrl: st
     create: { tourSlug: slug, room, image },
     update: { image },
   });
+  tourChanged(slug);
   return { ok: true };
 }
