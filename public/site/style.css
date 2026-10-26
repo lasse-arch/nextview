@@ -1028,18 +1028,16 @@ a.mq-card:hover .mq-img img { transform: scale(1.04); }
    and ends on "Book en uforpligtende snak". */
 .film { position: relative; width: 100%; max-width: 1040px; margin-inline: auto; aspect-ratio: 16 / 9; border-radius: 16px; overflow: hidden; background: #0b1226; box-shadow: 0 40px 90px -35px rgba(18,29,59,.55), 0 0 0 1px rgba(18,29,59,.08); }
 .film video { display: block; width: 100%; height: 100%; object-fit: cover; }
-.film .f-play { position: absolute; inset: 0; display: grid; place-items: center; border: 0; padding: 0; background: linear-gradient(180deg, rgba(18,29,59,0) 40%, rgba(18,29,59,.55)); cursor: pointer; color: #fff; font: inherit; }
-.film .f-play > span { display: inline-flex; align-items: center; gap: 14px; padding: 12px 24px 12px 12px; border-radius: 999px; background: #fff; color: var(--navy); box-shadow: 0 18px 40px -12px rgba(0,0,0,.55); transition: transform .2s ease; text-align: left; }
-.film .f-play:hover > span { transform: scale(1.04); }
-.film .f-play i { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 50%; background: var(--navy); color: #fff; font-style: normal; font-size: 18px; padding-left: 3px; }
-.film .f-play b { display: block; font-size: 18px; font-weight: 800; }
-.film .f-play small { display: block; font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.film .f-play { position: absolute; inset: 0; display: grid; place-items: center; border: 0; padding: 0; background: linear-gradient(180deg, rgba(0,0,0,0) 50%, rgba(0,0,0,.28)); cursor: pointer; }
+.film .f-circle { position: relative; width: 84px; height: 84px; border-radius: 50%; background: rgba(255,255,255,.96); box-shadow: 0 12px 34px rgba(0,0,0,.35); transition: transform .2s ease; }
+.film .f-circle::after { content: ""; position: absolute; left: 50%; top: 50%; transform: translate(-36%, -50%); border-style: solid; border-width: 15px 0 15px 24px; border-color: transparent transparent transparent var(--navy); }
+.film .f-play:hover .f-circle { transform: scale(1.07); }
 .film.spiller .f-play { display: none; }
 .film .f-end { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 18px; padding: 24px; background: rgba(18,29,59,.9); color: #fff; text-align: center; }
 .film .f-end[hidden] { display: none; }
 .film .f-end p { color: #fff; font-size: clamp(20px, 2.6vw, 30px); font-weight: 800; letter-spacing: -0.02em; max-width: 560px; margin: 0; }
 .film .f-end .f-again { border: 0; background: none; color: #AEB8D3; font: inherit; font-weight: 700; cursor: pointer; }
-@media (max-width: 760px) { .film { border-radius: 12px; } .film .f-play > span { padding: 8px 16px 8px 8px; gap: 10px; } .film .f-play i { width: 40px; height: 40px; font-size: 14px; } .film .f-play b { font-size: 15px; } .film .f-play small { display: none; } }
+@media (max-width: 760px) { .film { border-radius: 12px; } .film .f-circle { width: 64px; height: 64px; } .film .f-circle::after { border-width: 12px 0 12px 19px; } }
 /* "Vores egen software": the tour as a sales tool, not decoration. */
 .software .sw-top { display: grid; grid-template-columns: minmax(0, .95fr) minmax(0, 1.05fr); gap: clamp(28px, 5vw, 64px); align-items: center; margin-bottom: clamp(28px, 4vw, 44px); }
 .software .sw-top .head { margin-bottom: 0; }
