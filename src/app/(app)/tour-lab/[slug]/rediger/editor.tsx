@@ -9,6 +9,7 @@ import { logTourWork, renameTourSlug, restoreTourVersion, saveTour, searchDeals,
 import { askClaudeForTour, saveAnthropicKey, type ChatTurn } from "@/lib/actions/tour-ai";
 import type { LinkOpen, MenuEntry, TourConfig } from "../../tours/types";
 import type { TourStats } from "@/lib/tour-stats";
+import type { ReportShare } from "@/lib/tour-share";
 import { CardsEditor, GuideEditor, StartEditor, TagsEditor } from "./content";
 import { ResultsPanel } from "./results";
 import { DesignGallery } from "./design-gallery";
@@ -55,11 +56,15 @@ export function TourEditor({
   versions,
   aiReady,
   stats,
+  share,
+  shareStats,
+  shareToken,
   blob,
   published,
   economy,
   scanMap,
   mpskinsHidden,
+  scanCount,
 }: {
   slug: string;
   initial: TourConfig;
@@ -67,12 +72,16 @@ export function TourEditor({
   versions: Version[];
   aiReady: boolean;
   stats: TourStats;
+  share: ReportShare;
+  shareStats: TourStats;
+  shareToken: string | null;
   /** Vercel Blob is set up (uploads of big files, videos). */
   blob: boolean;
   published: boolean;
   economy: TourEconomy;
   scanMap: ScanMap | null;
   mpskinsHidden: string[];
+  scanCount: number | null;
 }) {
   const router = useRouter();
   const [config, setConfig] = useState<TourConfig>(initial);
@@ -425,7 +434,7 @@ export function TourEditor({
               </>
             )}
 
-            {tab === "resultater" && <ResultsPanel stats={stats} />}
+            {tab === "resultater" && <ResultsPanel stats={stats} slug={slug} brand={config.brand} share={share} shareStats={shareStats} token={shareToken} />}
             {tab === "okonomi" && <EconomyPanel economy={economy} />}
             {tab === "del" && (
               <SharePanel
@@ -441,7 +450,7 @@ export function TourEditor({
             )}
             {tab === "start" && <StartEditor config={config} edit={edit} slug={slug} preview={preview} />}
             {tab === "rundvisning" && <GuideEditor config={config} edit={edit} preview={preview} />}
-            {tab === "scan" && <ScanPointsEditor config={config} edit={edit} preview={preview} map={scanMap} mpskinsHidden={mpskinsHidden} />}
+            {tab === "scan" && <ScanPointsEditor config={config} edit={edit} preview={preview} map={scanMap} mpskinsHidden={mpskinsHidden} expected={scanCount} />}
             {tab === "tags" && <TagsEditor config={config} edit={edit} slug={slug} preview={preview} />}
             {tab === "kort" && <CardsEditor config={config} edit={edit} preview={preview} />}
             {tab === "menu" && <MenuEditor menu={config.menu} preview={preview} onChange={(menu) => edit((d) => void (d.menu = menu))} />}

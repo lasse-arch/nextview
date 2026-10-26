@@ -1,8 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useState, useTransition } from "react";
+import { setTourShare, tourShareLink } from "@/lib/actions/tours";
 import type { TourStats } from "@/lib/tour-stats";
-import { Group } from "./ui";
+import { shown, type ReportShare, type ShareWhen } from "@/lib/tour-share";
+import { CustomerReport } from "./customer-report";
+import { Choice, Field, Group, Toggle } from "./ui";
 
 /*
  * "Resultater": what the tour brings the customer - the number to tell them
@@ -44,7 +48,110 @@ function Ranked({ rows, empty }: { rows: { label: string; count: number }[]; emp
   );
 }
 
-export function ResultsPanel({ stats }: { stats: TourStats }) {
+type ShareProps = { slug: string; brand: string; share: ReportShare; shareStats: TourStats; token: string | null };
+
+export function ResultsPanel({ stats, ...shareProps }: { stats: TourStats } & ShareProps) {
+  return (
+    <>
+      <OurNumbers stats={stats} />
+      <ShareSettings {...shareProps} />
+    </>
+  );
+}
+
+/**
+ * Kundens rapport: which numbers the customer gets - each switched on or off,
+ * booking/contact only when there are any (by default) - with exactly what
+ * they'll see, and their own link.
+ */
+function ShareSettings({ slug, brand, share: initial, shareStats, token: initialToken }: ShareProps) {
+  const router = useRouter();
+  const [share, setShare] = useState(initial);
+  const [token, setToken] = useState(initialToken);
+  const [copied, setCopied] = useState(false);
+  const [, start] = useTransition();
+  const change = (patch: Partial<ReportShare>) => {
+    const next = { ...share, ...patch };
+    setShare(next);
+    start(async () => {
+      await setTourShare(slug, next);
+      if (patch.days) router.refresh();
+    });
+  };
+  const when = (key: "leads" | "actions", title: string) => (
+    <div className="space-y-1.5">
+      <div className="text-[15px]">{title}</div>
+      <Choice
+        value={share[key]}
+        options={[
+          ["auto", "Kun når der er nogen"],
+          ["on", "Altid"],
+          ["off", "Aldrig"],
+        ]}
+        onChange={(v: ShareWhen) => change({ [key]: v })}
+      />
+      {share[key] === "auto" && <p className="text-[11px] text-[#8e8e93]">{shown("auto", shareStats.leads) ? `Vises nu (${shareStats.leads} i perioden).` : "Skjult nu - ingen i perioden."}</p>}
+    </div>
+  );
+  const url = token && typeof window !== "undefined" ? `${location.origin}/r/${token}` : null;
+  return (
+    <>
+      <Group title="Kundens rapport - det vi deler">
+        <Field title="Periode">
+          <Choice
+            value={String(share.days) as "30" | "90"}
+            options={[
+              ["30", "30 dage"],
+              ["90", "90 dage"],
+            ]}
+            onChange={(v) => change({ days: Number(v) as 30 | 90 })}
+          />
+        </Field>
+        {when("leads", "Til booking eller kontakt")}
+        {when("actions", "Hvad de gik videre til")}
+        <Toggle on={share.visits} onChange={(on) => change({ visits: on })} title="Besøg" />
+        <Toggle on={share.engaged} onChange={(on) => change({ engaged: on })} title="Gik på opdagelse" />
+        <Toggle on={share.duration} onChange={(on) => change({ duration: on })} title="Typisk besøg (tid)" />
+        <Toggle on={share.perDay} onChange={(on) => change({ perDay: on })} title="Besøg pr. dag" />
+        <Toggle on={share.places} onChange={(on) => change({ places: on })} title="Mest sete steder" />
+        <Toggle on={share.sources} onChange={(on) => change({ sources: on })} title="Hvor besøgene kom fra" />
+        {url ? (
+          <button
+            type="button"
+            className="w-full rounded-xl bg-white py-2 text-[14px] font-medium text-[#0071e3] ring-1 ring-black/[.06]"
+            onClick={() => {
+              navigator.clipboard?.writeText(url).catch(() => {});
+              setCopied(true);
+              setTimeout(() => setCopied(false), 1800);
+            }}
+          >
+            {copied ? "Kopieret ✓" : "Kopiér kundens link"}
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="w-full rounded-xl bg-[#0071e3] py-2 text-[14px] font-medium text-white"
+            onClick={() =>
+              start(async () => {
+                const r = await tourShareLink(slug);
+                if (r.ok) setToken(r.token);
+              })
+            }
+          >
+            Lav et link til kunden
+          </button>
+        )}
+        <p className="text-[11px] leading-snug text-[#8e8e93]">Kunden ser præcis det, der står herunder - intet andet. Linket viser altid de nyeste tal.</p>
+      </Group>
+      <div className="rounded-2xl bg-[#e9e9eb]/60 p-3">
+        <div className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-wide text-[#6e6e73]">Sådan ser kunden det</div>
+        <CustomerReport stats={shareStats} share={share} brand={brand} />
+      </div>
+    </>
+  );
+}
+
+function OurNumbers({ stats }: { stats: TourStats }) {
   const [hover, setHover] = useState<number | null>(null);
   const max = Math.max(1, ...stats.perDay.map((d) => d.visits));
   const conversion = stats.visits ? stats.leads / stats.visits : 0;

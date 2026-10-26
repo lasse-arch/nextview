@@ -1298,6 +1298,10 @@ model Tour {
   published Boolean       @default(false)
   /// Addresses the tour had before its pretty-URL was changed - they redirect to the new one, so iframes already on customers' sites keep working.
   oldSlugs  String[]      @default([])
+  /// Which numbers the customer gets to see (see ReportShare in tour-stats.ts) - null = the defaults.
+  share      Json?
+  /// The customer's own link to their report: /r/<shareToken>.
+  shareToken String?       @unique
   dealId    String?
   deal      Deal?         @relation(fields: [dealId], references: [id], onDelete: SetNull)
   config    Json

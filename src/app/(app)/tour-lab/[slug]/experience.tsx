@@ -448,10 +448,23 @@ function TourExperience({
     [hiddenSweeps]
   );
 
+  /**
+   * The sweep behind a scan point number. Matterport's model data sometimes
+   * leaves scans out (MPSkins sees it too), so a number missing there is
+   * looked up in the viewer's own list of sweeps (index = ss - 1).
+   */
+  const sweepForSs = useCallback(
+    (ss: number) => sweepBySs[ss] ?? (() => {
+      const s = Object.values(sweepData.current).find((x) => x?.index === ss - 1);
+      return s?.sid ?? s?.id ?? null;
+    })(),
+    [sweepBySs]
+  );
+
   const flyTo = useCallback(
     async (href: string, transition: "fly" | "instant") => {
       const target = uLinkTarget(href);
-      const sweep = target ? sweepBySs[target.ss] : null;
+      const sweep = target ? sweepForSs(target.ss) : null;
       if (!sdkRef.current || !sweep) return false;
       const sdk = await sdkRef.current;
       if (transition === "fly" && T.jump === "fade") {
@@ -484,7 +497,7 @@ function TourExperience({
       }
       return true;
     },
-    [sweepBySs, T, moveSweep]
+    [sweepForSs, T, moveSweep]
   );
 
   /* ----- The drone scene. ----- */
@@ -915,7 +928,7 @@ function TourExperience({
     setMenuOpen(false);
     const run = ++routeRun.current;
     const target = uLinkTarget(dest.href);
-    const goal = target ? sweepBySs[target.ss] : null;
+    const goal = target ? sweepForSs(target.ss) : null;
     const from = currentSweep.current;
     const path = sdk && routeGraph && goal && from ? shortestPath(routeGraph, from, goal) : null;
     const flights = path && routeGraph ? straighten(routeGraph, path) : null;

@@ -18,7 +18,22 @@ type Edit = (fn: (draft: TourConfig) => void) => void;
 
 const COLORS = { menu: "#34c759", card: "#5856d6", tag: "#ff9500", plain: "#8e8e93" };
 
-export function ScanPointsEditor({ config, edit, preview, map, mpskinsHidden }: { config: TourConfig; edit: Edit; preview: PreviewApi; map: ScanMap | null; mpskinsHidden: string[] }) {
+export function ScanPointsEditor({
+  config,
+  edit,
+  preview,
+  map,
+  mpskinsHidden,
+  expected,
+}: {
+  config: TourConfig;
+  edit: Edit;
+  preview: PreviewApi;
+  map: ScanMap | null;
+  mpskinsHidden: string[];
+  /** How many scan points MPSkins knows of (when the tour has an MPSkins page). */
+  expected: number | null;
+}) {
   const [floor, setFloor] = useState(0);
   const [selected, setSelected] = useState<number | null>(null);
   const [zoom, setZoom] = useState(1);
@@ -60,6 +75,11 @@ export function ScanPointsEditor({ config, edit, preview, map, mpskinsHidden }: 
 
   return (
     <>
+      {expected != null && expected > map.points.length && (
+        <p className="rounded-xl bg-[#ff9500]/10 px-3 py-2 text-[12px] leading-snug text-[#a05a00]">
+          Matterport sendte kun {map.points.length} af {expected} scanpunkter (det sker af og til - MPSkins kender det også). De manglende virker stadig i touren - de findes, når touren åbner - men vises ikke på kortet.
+        </p>
+      )}
       <Group>
         <div className="flex items-center gap-2">
           {map.floors.length > 1 && (

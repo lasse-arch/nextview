@@ -6,6 +6,8 @@ import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import type { TourConfig } from "@/app/(app)/tour-lab/tours/types";
 import { tourConfigProblem } from "@/lib/tour-validate";
+import type { ReportShare } from "@/lib/tour-share";
+import { randomBytes } from "node:crypto";
 
 type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string };
 
@@ -135,4 +137,22 @@ export async function renameTourSlug(slug: string, wanted: string): Promise<Resu
   ]);
   revalidatePath("/tour-lab");
   return { ok: true, slug: next };
+}
+
+/** Which numbers the customer sees (Resultater → Kundens rapport). */
+export async function setTourShare(slug: string, share: ReportShare): Promise<Result> {
+  await admin();
+  await prisma.tour.update({ where: { slug }, data: { share: share as unknown as Prisma.InputJsonValue } });
+  return { ok: true };
+}
+
+/** The customer's own link to their report - made the first time it's asked for. */
+export async function tourShareLink(slug: string): Promise<Result<{ token: string }>> {
+  await admin();
+  const tour = await prisma.tour.findUnique({ where: { slug }, select: { shareToken: true } });
+  if (!tour) return { ok: false, error: "Touren findes ikke." };
+  if (tour.shareToken) return { ok: true, token: tour.shareToken };
+  const token = randomBytes(18).toString("base64url");
+  await prisma.tour.update({ where: { slug }, data: { shareToken: token } });
+  return { ok: true, token };
 }

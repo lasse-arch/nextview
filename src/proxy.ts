@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 const SESSION_COOKIE = "nv360_session";
-// "/t" = published tours, shown in an iframe on customers' sites (and their pictures under /tour-lab/<slug>/historie).
-const PUBLIC_PATHS = ["/login", "/robots.txt", "/t"];
+// "/t" = published tours, shown in an iframe on customers' sites (and their pictures under /tour-lab/<slug>/historie); "/r" = a customer's report on their tour.
+const PUBLIC_PATHS = ["/login", "/robots.txt", "/t", "/r"];
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;

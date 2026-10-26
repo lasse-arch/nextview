@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { getSettingValue } from "@/lib/integration-settings";
 import { blobReady } from "@/lib/tour-files";
 import { tourStats } from "@/lib/tour-stats";
+import { shareOf } from "@/lib/tour-share";
 import { ensureToursSeeded } from "@/lib/tours";
 import type { TourConfig } from "../../tours/types";
 import { TourEditor } from "./editor";
@@ -29,6 +30,8 @@ export default async function TourEditPage({ params }: { params: Promise<{ slug:
       slug: true,
       config: true,
       published: true,
+      share: true,
+      shareToken: true,
       deal: { select: { id: true, companyName: true, displayName: true, filmingActualMinutes: true } },
       versions: { orderBy: { createdAt: "desc" }, take: 40, select: { id: true, note: true, createdByName: true, createdAt: true } },
     },
@@ -43,6 +46,8 @@ export default async function TourEditPage({ params }: { params: Promise<{ slug:
     prisma.tourAiUsage.aggregate({ where: { tourSlug: tour.slug }, _sum: { costUsd: true }, _count: true }),
     modelId ? fetchScanMap(modelId) : Promise.resolve(null),
   ]);
+  const stats = await tourStats(tour.slug);
+  const share = shareOf(tour.share);
   const economy: TourEconomy = {
     filmingMinutes: tour.deal?.filmingActualMinutes ?? null,
     work: work.map((w) => ({ name: w.userName, seconds: w._sum.seconds ?? 0 })).sort((a, b) => b.seconds - a.seconds),
@@ -54,12 +59,16 @@ export default async function TourEditPage({ params }: { params: Promise<{ slug:
       slug={tour.slug}
       initial={tour.config as unknown as TourConfig}
       deal={tour.deal ? { id: tour.deal.id, name: tour.deal.displayName ?? tour.deal.companyName } : null}
-      stats={await tourStats(tour.slug)}
+      stats={stats}
+      share={share}
+      shareStats={share.days === 30 ? stats : await tourStats(tour.slug, share.days)}
+      shareToken={tour.shareToken}
       blob={blobReady()}
       published={tour.published}
       economy={economy}
       scanMap={scanMap}
       mpskinsHidden={cfg ? hiddenSweeps(cfg) : []}
+      scanCount={cfg?.sweep?.length ?? null}
       aiReady={Boolean(process.env.ANTHROPIC_API_KEY || (await getSettingValue("ANTHROPIC_API_KEY")))}
       versions={tour.versions.map((v) => ({ id: v.id, note: v.note, by: v.createdByName, at: v.createdAt.toISOString() }))}
     />
