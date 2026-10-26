@@ -808,7 +808,32 @@ export function TourEditor({
   );
 }
 
-type ChatMsg = { role: "user" | "assistant"; text: string; error?: boolean; changed?: number; before?: TourConfig; undone?: boolean; remembered?: string[] };
+type ChatMsg = { role: "user" | "assistant"; text: string; images?: string[]; error?: boolean; changed?: number; before?: TourConfig; undone?: boolean; remembered?: string[] };
+
+/** A picture made small enough to send to nextviewAI (longest side 1600 px, JPEG) - as a data URL. */
+function shrinkImage(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const k = Math.min(1, 1600 / Math.max(img.width, img.height));
+      const c = document.createElement("canvas");
+      c.width = Math.round(img.width * k);
+      c.height = Math.round(img.height * k);
+      const g = c.getContext("2d")!;
+      g.fillStyle = "#fff";
+      g.fillRect(0, 0, c.width, c.height);
+      g.drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      resolve(c.toDataURL("image/jpeg", 0.82));
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Billedet kunne ikke læses."));
+    };
+    img.src = url;
+  });
+}
 
 const SUGGESTIONS = ["Gør det helt enkelt - få store knapper og én menu", "Tilføj en knap til booking", "Gør farverne mørkere og mere eksklusive", "Ryd op i menuen, så den er nemmere at overskue"];
 
@@ -835,6 +860,16 @@ function ClaudePanel({
 }) {
   const [ready, setReady] = useState(initiallyReady);
   const [text, setText] = useState("");
+  /** Pictures to send with the next message (pasted, dropped or picked). */
+  const [images, setImages] = useState<string[]>([]);
+  const [dragging, setDragging] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null);
+  async function addImages(files: Iterable<File>) {
+    const pics = [...files].filter((f) => f.type.startsWith("image/"));
+    if (!pics.length) return;
+    const made = await Promise.all(pics.map((f) => shrinkImage(f).catch(() => null)));
+    setImages((now) => [...now, ...made.filter((x): x is string => Boolean(x))].slice(0, 4));
+  }
   const [key, setKey] = useState("");
   const [keyError, setKeyError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -846,14 +881,18 @@ function ClaudePanel({
   }, [chat.length, pending]);
 
   function send(request: string) {
-    const ask = request.trim();
+    const pics = images;
+    const ask = request.trim() || (pics.length ? "Se billedet" : "");
     if (!ask || pending) return;
-    const history: ChatTurn[] = chat.filter((m) => !m.error).map((m) => ({ role: m.role, text: m.text }));
-    setChat((c) => [...c, { role: "user", text: ask }]);
+    const history: ChatTurn[] = chat
+      .filter((m) => !m.error)
+      .map((m) => ({ role: m.role, text: m.images?.length ? `${m.text}\n(${m.images.length === 1 ? "sendte et billede" : `sendte ${m.images.length} billeder`})` : m.text }));
+    setChat((c) => [...c, { role: "user", text: ask, images: pics.length ? pics : undefined }]);
     setText("");
+    setImages([]);
     const before = config;
     start(async () => {
-      const r = await askClaudeForTour(config, history, ask).catch((err: unknown) => ({ ok: false as const, error: `Kunne ikke nå nextviewAI (${err instanceof Error ? err.message : err}) - prøv igen.` }));
+      const r = await askClaudeForTour(config, history, ask, pics).catch((err: unknown) => ({ ok: false as const, error: `Kunne ikke nå nextviewAI (${err instanceof Error ? err.message : err}) - prøv igen.` }));
       if (!r.ok) {
         // A revoked/changed key: ask for the new one right here.
         if (r.error.startsWith("nextviewAI-nøglen")) setReady(false);
@@ -925,7 +964,15 @@ function ClaudePanel({
         )}
         {chat.map((m, i) =>
           m.role === "user" ? (
-            <div key={i} className="flex justify-end">
+            <div key={i} className="flex flex-col items-end gap-1.5">
+              {m.images && (
+                <div className="flex max-w-[85%] flex-wrap justify-end gap-1.5">
+                  {m.images.map((src, j) => (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img key={j} src={src} alt="" className="h-24 rounded-xl object-cover ring-1 ring-black/[.06]" />
+                  ))}
+                </div>
+              )}
               <p className="max-w-[85%] whitespace-pre-wrap rounded-[18px] bg-[#e9e9eb] px-3.5 py-2 text-[14px] leading-snug">{m.text}</p>
             </div>
           ) : (
@@ -977,15 +1024,51 @@ function ClaudePanel({
       </div>
       <AiMemoryPanel slug={config.slug} refresh={learned} />
       <form
-        className="mx-2 mb-3 rounded-[22px] bg-white p-2 shadow-[0_2px_12px_rgba(0,0,0,.06)] ring-1 ring-black/[.08] focus-within:ring-black/20"
+        className={`mx-2 mb-3 rounded-[22px] bg-white p-2 shadow-[0_2px_12px_rgba(0,0,0,.06)] ring-1 focus-within:ring-black/20 ${dragging ? "ring-2 ring-[#0071e3]" : "ring-black/[.08]"}`}
         onSubmit={(e) => {
           e.preventDefault();
           send(text);
         }}
+        onDragOver={(e) => {
+          if (![...e.dataTransfer.items].some((it) => it.type.startsWith("image/"))) return;
+          e.preventDefault();
+          setDragging(true);
+        }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={(e) => {
+          if (!e.dataTransfer.files.length) return;
+          e.preventDefault();
+          setDragging(false);
+          addImages(e.dataTransfer.files);
+        }}
       >
+        {images.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 px-1 pb-1.5 pt-0.5">
+            {images.map((src, i) => (
+              <span key={i} className="relative">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={src} alt="" className="h-14 w-14 rounded-lg object-cover ring-1 ring-black/[.08]" />
+                <button
+                  type="button"
+                  aria-label="Fjern billedet"
+                  onClick={() => setImages((now) => now.filter((_, j) => j !== i))}
+                  className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-[#1d1d1f] text-[12px] leading-none text-white"
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
         <textarea
           value={text}
           rows={2}
+          onPaste={(e) => {
+            const files = [...e.clipboardData.files].filter((f) => f.type.startsWith("image/"));
+            if (!files.length) return;
+            e.preventDefault();
+            addImages(files);
+          }}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
@@ -993,12 +1076,33 @@ function ClaudePanel({
               send(text);
             }
           }}
-          placeholder="Beskriv en ændring…"
+          placeholder="Beskriv en ændring… (indsæt eller træk et billede ind)"
           className="block w-full resize-none border-0 bg-transparent px-2 py-1 text-[15px] placeholder:text-[#8e8e93] focus:outline-none focus:ring-0"
         />
-        <div className="flex items-center justify-between px-1">
-          <span className="text-[11px] text-[#8e8e93]">nextviewAI kan tage fejl - tjek forhåndsvisningen.</span>
-          <button type="submit" disabled={pending || !text.trim()} aria-label="Send" className="flex h-8 w-8 items-center justify-center rounded-full bg-[#d97757] text-white transition hover:bg-[#c96442] disabled:bg-[#e9e9eb] disabled:text-[#8e8e93]">
+        <div className="flex items-center justify-between gap-2 px-1">
+          <button
+            type="button"
+            title="Send et billede med (fx et skærmbillede)"
+            aria-label="Vedhæft billede"
+            disabled={images.length >= 4}
+            onClick={() => fileInput.current?.click()}
+            className="flex h-8 w-8 flex-none items-center justify-center rounded-full text-[#6e6e73] hover:bg-[#f2f2f7] disabled:opacity-40"
+          >
+            <Icon d='<rect x="3" y="5" width="18" height="14" rx="2.5"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16l-5-5-8 8"/>' className="h-[18px] w-[18px]" />
+          </button>
+          <input
+            ref={fileInput}
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            onChange={(e) => {
+              if (e.target.files) addImages(e.target.files);
+              e.target.value = "";
+            }}
+          />
+          <span className="flex-1 text-[11px] text-[#8e8e93]">nextviewAI kan tage fejl - tjek forhåndsvisningen.</span>
+          <button type="submit" disabled={pending || (!text.trim() && !images.length)} aria-label="Send" className="flex h-8 w-8 items-center justify-center rounded-full bg-[#d97757] text-white transition hover:bg-[#c96442] disabled:bg-[#e9e9eb] disabled:text-[#8e8e93]">
             <Icon d='<path d="M12 19V5M5 12l7-7 7 7"/>' className="h-4 w-4" />
           </button>
         </div>

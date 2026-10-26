@@ -179,12 +179,12 @@ async function remember(slug: string, by: string, notes: { scope: "all" | "tour"
 }
 
 /** Asks nextviewAI for edits to a setup and applies them to a copy. `pdfs`: documents (by address) it reads along with the request. */
-async function claudeEdits(key: string, who: { name: string; kind: string }, config: TourConfig, history: ChatTurn[], request: string, maxTokens = 16000, retry = true, pdfs: string[] = []): Promise<AiEditResult> {
+async function claudeEdits(key: string, who: { name: string; kind: string }, config: TourConfig, history: ChatTurn[], request: string, maxTokens = 16000, retry = true, pdfs: string[] = [], images: string[] = []): Promise<AiEditResult> {
   const mem = await memories(config.slug);
   const text = `Opsætningen lige nu:\n\`\`\`json\n${JSON.stringify(config)}\n\`\`\`\n\n${mem.tour ? `<hukommelse om denne kunde>\n${mem.tour}\n</hukommelse>\n\n` : ""}${request}`;
   const messages: Anthropic.MessageParam[] = [
     ...history.slice(-10).map((t): Anthropic.MessageParam => ({ role: t.role, content: t.text })),
-    { role: "user", content: [...pdfs.map((url): Anthropic.DocumentBlockParam => ({ type: "document", source: { type: "url", url } })), { type: "text", text }] },
+    { role: "user", content: [...pdfs.map((url): Anthropic.DocumentBlockParam => ({ type: "document", source: { type: "url", url } })), ...imageBlocks(images), { type: "text", text }] },
   ];
   let parsed: z.infer<typeof Edits> | null;
   try {
@@ -239,19 +239,30 @@ async function claudeEdits(key: string, who: { name: string; kind: string }, con
   }
   if (problem) {
     // Claude gets one go at fixing its own edit, told exactly what was wrong.
-    if (retry) return claudeEdits(key, who, config, history, `${request}\n\n(Dit forrige forsøg kunne ikke bruges: ${problem}. Lav ændringen igen, så opsætningen har den rigtige form.)`, maxTokens, false, pdfs);
+    if (retry) return claudeEdits(key, who, config, history, `${request}\n\n(Dit forrige forsøg kunne ikke bruges: ${problem}. Lav ændringen igen, så opsætningen har den rigtige form.)`, maxTokens, false, pdfs, images);
     return { ok: false, error: `nextviewAIs ændring kunne ikke bruges (${problem}) - prøv at formulere det anderledes.` };
   }
   const remembered = await remember(config.slug, who.name, parsed.remember ?? []).catch((err: unknown) => (console.error("remember", err), []));
   return { ok: true, reply: parsed.reply, config: plainWordsInConfig({ ...(next as unknown as TourConfig), slug: config.slug }), changed: parsed.changes.length, remembered };
 }
 
-export async function askClaudeForTour(config: TourConfig, history: ChatTurn[], request: string): Promise<AiEditResult> {
+/** Screenshots sent with a request (data URLs from the editor, made small there) as image blocks - anything else is dropped. */
+function imageBlocks(images: string[]): Anthropic.ImageBlockParam[] {
+  return images.slice(0, 4).flatMap((url): Anthropic.ImageBlockParam[] => {
+    const m = /^data:(image\/(?:jpeg|png|webp|gif));base64,([A-Za-z0-9+/=]+)$/.exec(url);
+    if (!m || m[2].length > 6_000_000) return [];
+    return [{ type: "image", source: { type: "base64", media_type: m[1] as "image/jpeg" | "image/png" | "image/webp" | "image/gif", data: m[2] } }];
+  });
+}
+
+/** A change asked for in the editor's chat - `images`: screenshots the user sent along (of the preview, the customer's site …). */
+export async function askClaudeForTour(config: TourConfig, history: ChatTurn[], request: string, images: string[] = []): Promise<AiEditResult> {
   const user = await admin();
   const key = await apiKey();
   if (!key) return { ok: false, error: "nextviewAI er ikke sat op endnu - indsæt en nøgle." };
   try {
-    return await claudeEdits(key, { name: user.name, kind: "ændring" }, config, history, `Ønske: ${request}`);
+    const seen = images.length ? `\n\n(Brugeren har sendt ${images.length === 1 ? "et billede" : `${images.length} billeder`} med - typisk et skærmbillede af forhåndsvisningen eller kundens hjemmeside. Brug ${images.length === 1 ? "det" : "dem"} til at forstå, hvad de ser og mener.)` : "";
+    return await claudeEdits(key, { name: user.name, kind: "ændring" }, config, history, `Ønske: ${request}${seen}`, 16000, true, [], images);
   } catch (err) {
     console.error("askClaudeForTour", err);
     return { ok: false, error: `Noget gik galt hos nextviewAI (${err instanceof Error ? err.message : err}) - prøv igen.` };

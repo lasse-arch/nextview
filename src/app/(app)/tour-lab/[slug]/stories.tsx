@@ -41,7 +41,11 @@ export function Stories({
   if (current && !seen.includes(current)) setSeen([...seen, current]);
 
   useEffect(() => {
-    if (current) cards.current[current]?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+    // Only the row scrolls to the room's card - scrollIntoView would also scroll the whole tour sideways
+    // (it's scrollable from code even with overflow hidden), and the hidden menu would peek in from the right.
+    const card = current ? cards.current[current] : null;
+    const row = card?.parentElement;
+    if (card && row) row.scrollTo({ left: card.offsetLeft - row.offsetLeft - (row.clientWidth - card.clientWidth) / 2, behavior: "smooth" });
   }, [current]);
 
   function play(index: number) {
@@ -196,7 +200,7 @@ export const STORIES_CSS = `
 .hv-stories>*{pointer-events:auto}
 .hv-st-toggle{margin:0 0 6px 12px;border:0;border-radius:999px;background:rgba(0,0,0,.45);color:#fff;font-family:inherit;font-weight:800;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;padding:5px 11px;cursor:pointer;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
 .hv-st-lukket{background:none}
-.hv-st-row{display:flex;gap:9px;width:100%;overflow-x:auto;padding:4px 12px 2px;scroll-snap-type:x proximity;scrollbar-width:none}
+.hv-st-row{display:flex;gap:9px;width:100%;overflow-x:auto;touch-action:pan-x;overscroll-behavior-x:contain;padding:4px 12px 2px;scroll-snap-type:x proximity;scrollbar-width:none}
 .hv-st-row::-webkit-scrollbar{display:none}
 .hv-st-card{flex:none;width:74px;display:flex;flex-direction:column;align-items:center;gap:5px;border:0;background:none;padding:0;cursor:pointer;scroll-snap-align:center;font-family:inherit;animation:hvUp .45s cubic-bezier(.2,.7,.2,1) both}
 .hv-st-pic{position:relative;width:74px;height:98px;border-radius:14px;padding:2.5px;background:linear-gradient(160deg,var(--c-accent),var(--c-main));display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:0 6px 16px rgba(0,0,0,.35);transition:transform .2s}

@@ -2044,7 +2044,8 @@ function DevPanel({
 
 const CSS = `
 /* A tour is touched, not read: no text selection or iOS copy menu from a long press (it can't be dismissed over the tour). Fields stay selectable. */
-.hv{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+/* clip, not just hidden: nothing (a scrollIntoView, a focused button) can scroll the tour itself sideways and show the hidden menu. */
+.hv{overflow:clip;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
 .hv input,.hv textarea{-webkit-user-select:text;user-select:text}
 .hv *{box-sizing:border-box}
 .hv .pnlm-load-box{background:rgba(21,50,58,.9)!important;border-radius:12px!important;font-family:inherit!important}
