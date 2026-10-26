@@ -280,6 +280,8 @@ export type TourConfig = {
   hiddenSweeps: string[];
   /** Is the menu open when the tour starts, per device. */
   menuOpenOnStart: { desktop: boolean; mobile: boolean };
+  /** The tour dims behind an open menu, and a tap on it closes the menu - false: no dimming. */
+  menuDim?: false;
   menu: MenuEntry[];
   /**
    * "Historier": the rooms as Instagram-style story cards along the bottom,

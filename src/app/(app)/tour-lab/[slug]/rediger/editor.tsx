@@ -558,6 +558,12 @@ export function TourEditor({
                 <Group title="Menu og historier">
                   <Toggle on={config.menuOpenOnStart.desktop} onChange={(on) => edit((d) => void (d.menuOpenOnStart.desktop = on))} title="Menu åben på computer" />
                   <Toggle on={config.menuOpenOnStart.mobile} onChange={(on) => edit((d) => void (d.menuOpenOnStart.mobile = on))} title="Menu åben på mobil" />
+                  <Toggle
+                    on={config.menuDim !== false}
+                    onChange={(on) => edit((d) => void (d.menuDim = on ? undefined : false))}
+                    title="Dæmp touren bag menuen"
+                    hint="Touren bliver lidt mørkere, når menuen er åben, og et tryk på den lukker menuen. Fra: touren står klar og kan bruges, mens menuen er åben."
+                  />
                 <Toggle
                   on={Boolean(config.stories?.mobile)}
                   onChange={(on) => edit((d) => void (d.stories = { mobile: on, desktop: d.stories?.desktop ?? false, rooms: d.stories?.rooms }))}

@@ -1354,8 +1354,8 @@ function TourExperience({
       >
         {menuOpen ? "Luk" : "Menu"}
       </button>
-      {/* Behind an open menu: the tour dims a little, and a tap on it closes the menu. */}
-      <button type="button" className="hv-menu-slor" aria-label="Luk menuen" tabIndex={menuOpen ? 0 : -1} onClick={() => setMenuOpen(false)} />
+      {/* Behind an open menu: the tour dims a little, and a tap on it closes the menu (unless switched off). */}
+      {T.menuDim !== false && <button type="button" className="hv-menu-slor" aria-label="Luk menuen" tabIndex={menuOpen ? 0 : -1} onClick={() => setMenuOpen(false)} />}
       <nav className={`hv-menu ${menuOpen ? "aaben" : ""}`}>
         <div className={`hv-menu-head ${T.logoOnLight ? "hv-light" : ""}`} style={{ background: T.logoOnLight ? "#fff" : T.colors.main }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
