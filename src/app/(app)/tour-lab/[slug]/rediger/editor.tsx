@@ -132,11 +132,31 @@ export function TourEditor({
   const [previewKey, setPreviewKey] = useState(0);
   /** The preview popped out over the whole window. */
   const [big, setBig] = useState(false);
+  const bigBox = useRef<HTMLDivElement>(null);
+  /** Big = the whole screen (the browser's own full screen where it can), as a visitor sees the tour full screen. */
+  /** The "Luk" hint over the top of the tour, gone after a few seconds so it doesn't cover what's there. */
+  const [bigHint, setBigHint] = useState(false);
+  function openBig() {
+    setBig(true);
+    setBigHint(true);
+    setTimeout(() => setBigHint(false), 3500);
+    bigBox.current?.requestFullscreen?.().catch(() => {});
+  }
+  function closeBig() {
+    setBig(false);
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  }
   useEffect(() => {
     if (!big) return;
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && setBig(false);
+    // Leaving the browser's full screen (Esc, or its own button) closes the big view too.
+    const onFull = () => !document.fullscreenElement && setBig(false);
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    document.addEventListener("fullscreenchange", onFull);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.removeEventListener("fullscreenchange", onFull);
+    };
   }, [big]);
   const [pending, start] = useTransition();
   const [json, setJson] = useState<string | null>(null);
@@ -815,19 +835,19 @@ export function TourEditor({
             <button type="button" onClick={() => setPreviewKey((k) => k + 1)} className="ml-auto rounded-full px-3 py-1 text-[13px] text-[#0071e3] hover:bg-[#0071e3]/10" title="Start touren forfra (fx for at se en ny velkomst)">
               Start forfra
             </button>
-            <button type="button" onClick={() => setBig(true)} className="flex items-center gap-1 rounded-full px-3 py-1 text-[13px] text-[#0071e3] hover:bg-[#0071e3]/10" title="Se forhåndsvisningen i stor skærm">
+            <button type="button" onClick={openBig} className="flex items-center gap-1 rounded-full px-3 py-1 text-[13px] text-[#0071e3] hover:bg-[#0071e3]/10" title="Se forhåndsvisningen i stor skærm">
               <Icon d='<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>' className="h-3.5 w-3.5" />
               Stor skærm
             </button>
           </div>
-          {big && <div className="fixed inset-0 z-[59] bg-black/60 backdrop-blur-sm" onClick={() => setBig(false)} aria-hidden />}
-          {/* The same element grows to fill the window - the tour isn't reloaded, it stays where it is. */}
-          <div className={big ? "fixed inset-3 z-[60] flex items-center justify-center sm:inset-6" : "flex min-h-0 flex-1 items-center justify-center"}>
+          {big && <div className="fixed inset-0 z-[59] bg-black" onClick={closeBig} aria-hidden />}
+          {/* The same element grows to fill the screen - the tour isn't reloaded, it stays where it is. */}
+          <div ref={bigBox} className={big ? "fixed inset-0 z-[60] flex items-center justify-center bg-black" : "flex min-h-0 flex-1 items-center justify-center"}>
             {big && (
               <button
                 type="button"
-                onClick={() => setBig(false)}
-                className="absolute left-1/2 top-1 z-10 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-[#1d1d1f] px-3 py-1 text-[12px] font-medium text-white shadow-lg"
+                onClick={closeBig}
+                className={`absolute left-1/2 top-1 z-10 flex -translate-x-1/2 transition-opacity duration-500 ${bigHint ? "opacity-100" : "pointer-events-none opacity-0"} items-center gap-1.5 rounded-full bg-[#1d1d1f] px-3 py-1 text-[12px] font-medium text-white shadow-lg`}
               >
                 Luk stor skærm <span className="text-[#8e8e93]">Esc</span>
               </button>
@@ -837,8 +857,8 @@ export function TourEditor({
                 <iframe ref={frame} key={previewKey} title="Forhåndsvisning" src={`/tour-lab/${slug}`} className="h-full w-full bg-black" allow="fullscreen; xr-spatial-tracking; autoplay; clipboard-write" />
               </SitePreview>
             ) : device === "computer" ? (
-              <div className="flex h-full w-full flex-col overflow-hidden rounded-xl bg-white shadow-[0_20px_50px_rgba(0,0,0,.15)] ring-1 ring-black/10">
-                <div className="flex items-center gap-1.5 border-b border-black/[.06] bg-[#f6f6f6] px-3 py-2">
+              <div className={`flex h-full w-full flex-col overflow-hidden bg-white ${big ? "" : "rounded-xl shadow-[0_20px_50px_rgba(0,0,0,.15)] ring-1 ring-black/10"}`}>
+                <div className={`${big ? "hidden" : "flex"} items-center gap-1.5 border-b border-black/[.06] bg-[#f6f6f6] px-3 py-2`}>
                   <i className="h-3 w-3 rounded-full bg-[#ff5f57]" />
                   <i className="h-3 w-3 rounded-full bg-[#febc2e]" />
                   <i className="h-3 w-3 rounded-full bg-[#28c840]" />
