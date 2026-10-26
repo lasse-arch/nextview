@@ -140,6 +140,20 @@ booking i denne måned". Derfor:
 - Når tallene viser, at folk ikke når handlingen (fx mange besøg, få klik),
   så flyt handlingen tættere på: et stedkort, en flise på velkomsten, eller
   "Din plads venter" tidligere.
+- **Forslag ud fra tallene** (øverst i Resultater): nextviewAI ser, hvilke steder
+  der fører til booking, hvad folk vælger først, og hvor de stopper. Gør mere
+  af det, der virker: ryk de steder frem, der sender folk videre, og sæt
+  handlingen ind dér. Vent til der er mindst 20 besøg - før er tallene tilfældige.
+
+## Sprog
+
+- Turister, udenlandske forældre, firmakunder: slå de sprog til under Sprog, og
+  lad nextviewAI oversætte det hele (også tourens faste ord). Læs de vigtigste
+  tekster igennem - velkomst, knapper og menu.
+- Navne på steder og virksomheden oversættes ikke, og knapper skal være lige så
+  korte som på dansk.
+- Speak er dansk: på andre sprog kører "Vis mig rundt" med tekst.
+- På kundens engelske side: brug koden med ?sprog=en, så touren starter på engelsk.
 
 ## Live data
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { useT } from "../tours/i18n-react";
 import { isPlaceHref } from "../tours/places";
 import type { TourConfig, WelcomeGo } from "../tours/types";
 
@@ -55,6 +56,7 @@ export function SimpleMenu({
   /** A place in the tour or a link out (the engine's menuGo). */
   onGo: (name: string, group: string, href: string) => void;
 }) {
+  const tr = useT();
   const go = (name: string, group: string, href: string) => {
     setOpen(false);
     onGo(name, group, href);
@@ -64,7 +66,7 @@ export function SimpleMenu({
     return (
       <button key={group + name} type="button" className={`sp-btn ${here ? "sp-here" : ""} ${isPlaceHref(href) ? "" : "sp-out"}`} onClick={() => go(name, group, href)}>
         {name}
-        {here && <small>Du er her</small>}
+        {here && <small>{tr("Du er her")}</small>}
         {!isPlaceHref(href) && <span aria-hidden>↗</span>}
       </button>
     );
@@ -77,7 +79,7 @@ export function SimpleMenu({
         </button>
       )}
       {open && (
-        <div className="sp-menu" role="dialog" aria-modal="true" aria-label="Menu">
+        <div className="sp-menu" role="dialog" aria-modal="true" aria-label={tr("Menu")}>
           <div className="sp-menu-top">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={T.logo} alt={T.brand} />

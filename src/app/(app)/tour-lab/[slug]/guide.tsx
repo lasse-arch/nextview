@@ -1,5 +1,6 @@
 "use client";
 
+import { useT } from "../tours/i18n-react";
 import { useEffect, useRef, useState } from "react";
 import type { TourConfig } from "../tours/types";
 
@@ -40,6 +41,7 @@ export function GuidePlayer({
   onClose: (completed: boolean) => void;
   onEvent: (name: string, params: Record<string, string | number>) => void;
 }) {
+  const tr = useT();
   const [paused, setPaused] = useState(false);
   const stop = stops[index];
   const hasVoice = stops.some((s) => s.audio);
@@ -92,9 +94,9 @@ export function GuidePlayer({
         </div>
         <h3>{stop.title}</h3>
         <p>{stop.text}</p>
-        {index < stops.length - 1 ? <div className="gd-next">Næste: {stops[index + 1].title}</div> : end && <div className="gd-end">{end}</div>}
+        {index < stops.length - 1 ? <div className="gd-next">{tr("Næste: {sted}", { sted: stops[index + 1].title })}</div> : end && <div className="gd-end">{end}</div>}
         <div className="gd-ctrl">
-          <button type="button" aria-label="Forrige" disabled={index === 0} onClick={() => step(index - 1, "back")}>
+          <button type="button" aria-label={tr("Forrige")} disabled={index === 0} onClick={() => step(index - 1, "back")}>
             ‹
           </button>
           {timed ? (
@@ -102,20 +104,20 @@ export function GuidePlayer({
               <button type="button" className="gd-play" onClick={() => setPaused((p) => !p)}>
                 {paused ? "▶ Fortsæt" : "❚❚ Pause"}
               </button>
-              <button type="button" aria-label="Næste" onClick={() => step(index + 1, "next")}>
+              <button type="button" aria-label={tr("Næste")} onClick={() => step(index + 1, "next")}>
                 ›
               </button>
             </>
           ) : (
             <>
               <button type="button" className="gd-play" onClick={() => step(index + 1, "next")}>
-                {index === stops.length - 1 ? "Afslut" : "Næste ›"}
+                {index === stops.length - 1 ? tr("Afslut") : tr("Næste ›")}
               </button>
               {stop.audio && !muted && (
                 <button
                   type="button"
-                  aria-label="Hør igen"
-                  title="Hør igen"
+                  aria-label={tr("Hør igen")}
+                  title={tr("Hør igen")}
                   onClick={() => {
                     if (!audio.current) return;
                     audio.current.currentTime = 0;
@@ -132,7 +134,7 @@ export function GuidePlayer({
             <button
               type="button"
               className="gd-sound"
-              aria-label={muted ? "Slå lyd til" : "Slå lyd fra"}
+              aria-label={muted ? tr("Slå lyd til") : tr("Slå lyd fra")}
               onClick={() => {
                 const next = !muted;
                 setMuted(next);

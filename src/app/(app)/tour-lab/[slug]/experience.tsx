@@ -1,5 +1,8 @@
 "use client";
 
+import { LANG_CSS, LangSwitch } from "./lang-switch";
+import { danishOf, localize, makeT, tourLanguages } from "../tours/i18n";
+import { TourLang } from "../tours/i18n-react";
 import { cssFilter, isPlaceHref, placeHref, placeSlug, startPlaces } from "../tours/places";
 import type { LiveUnit } from "@/lib/availability/live";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
@@ -67,7 +70,7 @@ const eventLog: TrackedEvent[] = [];
 const logListeners = new Set<() => void>();
 
 /** The tour being measured (set when the tour mounts). */
-const tracking = { slug: "", session: "", off: false, queue: [] as { name: string; label?: string; url?: string }[], timer: 0 };
+const tracking = { slug: "", session: "", off: false, queue: [] as { name: string; label?: string; url?: string }[], timer: 0, da: (s: string) => s };
 
 /** Sends the waiting events to Arpo's own measurement (/api/tour-events) - also when the page is closed. */
 function flushEvents() {
@@ -86,7 +89,7 @@ function track(name: string, params: Record<string, string | number> = {}) {
   // Arpo's own count - not from the editor's preview (the tour in an iframe there).
   if (tracking.slug && !tracking.off && window.parent === window) {
     const label = params.label ?? params.item_name ?? params.place_name ?? params.room_name ?? params.kind ?? params.title ?? params.name;
-    tracking.queue.push({ name, label: label != null ? String(label) : undefined, url: params.link_url != null ? String(params.link_url) : undefined });
+    tracking.queue.push({ name, label: label != null ? tracking.da(String(label)) : undefined, url: params.link_url != null ? String(params.link_url) : undefined });
     if (name === "cta_click" || name === "contact_click") flushEvents(); // the visitor may be leaving
     else tracking.timer ||= window.setTimeout(flushEvents, 4000);
   }
@@ -192,6 +195,8 @@ type ExperienceProps = {
   tools?: boolean;
   /** Kundegennemsyn: the review link's token - the tour gets "Giv feedback", and isn't counted as visits. */
   review?: string;
+  /** The language asked for in the link (?sprog=en) - see i18n.ts. */
+  lang?: string;
 };
 
 /** The parts of a setup the tour only reads when it starts - a change to them starts the preview over. */
@@ -222,7 +227,24 @@ export function Experience(props: ExperienceProps) {
     return () => window.removeEventListener("message", onMessage);
   }, [props.tour]);
   const T = draft ?? props.tour;
-  return <TourExperience key={startSignature(T)} {...props} tour={T} />;
+  // The language: the link's (?sprog=), else the visitor's own when the tour has it, else Danish. The editor's preview is told by the editor.
+  const langs = tourLanguages(T);
+  const [lang, setLang] = useState(props.lang && langs.includes(props.lang) ? props.lang : "da");
+  useEffect(() => {
+    const asked = new URLSearchParams(location.search).get("sprog");
+    const own = navigator.languages.map((l) => l.slice(0, 2).replace("no", "nb")).find((l) => langs.includes(l));
+    const pick = asked && langs.includes(asked) ? asked : !asked && window.parent === window ? own : undefined;
+    if (pick) requestAnimationFrame(() => setLang(pick));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [langs.join()]);
+  useEffect(() => {
+    const onMessage = (e: MessageEvent) => {
+      if (e.origin === location.origin && e.source === window.parent && e.data?.type === "tour-lang") setLang(String(e.data.lang));
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, []);
+  return <TourExperience key={startSignature(T)} {...props} tour={T} lang={langs.includes(lang) ? lang : "da"} setLang={setLang} />;
 }
 
 function TourExperience({
@@ -238,8 +260,17 @@ function TourExperience({
   phone,
   tools = false,
   review,
-}: ExperienceProps) {
-  const T = savedTour;
+  lang = "da",
+  setLang,
+}: ExperienceProps & { setLang?: (lang: string) => void }) {
+  // The setup in the visitor's language; names that reach outside it (statistics, ?rum=, pictures) stay Danish.
+  const T = useMemo(() => localize(savedTour, lang), [savedTour, lang]);
+  const tx = useMemo(() => makeT(savedTour, lang), [savedTour, lang]);
+  const da = useMemo(() => danishOf(savedTour, lang), [savedTour, lang]);
+  const startRan = useRef<TourConfig | null>(null);
+  useLayoutEffect(() => {
+    tracking.da = da;
+  }, [da]);
   useGa4(ga4Id, T.title);
   useLayoutEffect(() => {
     // One visit = one id per browser tab and tour.
@@ -260,7 +291,8 @@ function TourExperience({
       window.removeEventListener("pagehide", leave);
     };
   }, [savedTour.slug]);
-  const { names: ROOM_NAMES, links: ROOM_LINKS } = useMemo(() => roomIndex([...T.menu, ...(T.places ? [{ title: "", items: T.places.map((p): [string, string] => [p.name, p.href]) }] : [])]), [T]);
+  // Rooms are known by their Danish names (Matterport and statistics); `roomShown` is the name in the visitor's language.
+  const { names: ROOM_NAMES, links: ROOM_LINKS } = useMemo(() => roomIndex([...savedTour.menu, ...(savedTour.places ? [{ title: "", items: savedTour.places.map((p): [string, string] => [p.name, p.href]) }] : [])]), [savedTour]);
   const LAST_ROOM_KEY = `${T.slug}-last-room`;
   /** The rooms of "Historier": the ones the setup names, otherwise every room in the menu. */
   const storyRooms = useMemo<StoryRoom[]>(() => {
@@ -269,8 +301,8 @@ function TourExperience({
       .filter(([, href]) => isPlaceHref(href));
     const unique = all.filter(([name], i) => all.findIndex(([n]) => n === name) === i);
     const picked = T.stories?.rooms ? T.stories.rooms.map((r) => unique.find(([n]) => n === r)).filter((x): x is [string, string] => Boolean(x)) : unique;
-    return picked.map(([name, href]) => ({ name, href, image: storyImages[name] }));
-  }, [T, storyImages]);
+    return picked.map(([name, href]) => ({ name, href, image: storyImages[da(name)] }));
+  }, [T, storyImages, da]);
   const droneEl = useRef<HTMLDivElement>(null);
   /** The flat map, when the tour starts on one instead of the 360° drone scene. */
   const mapApi = useRef<MapApi | null>(null);
@@ -292,7 +324,7 @@ function TourExperience({
   const OV = T.drone
     ? { intro: T.map?.intro ?? T.drone.intro, backLabel: T.map?.backLabel ?? T.drone.backLabel, filterTitle: T.map?.filterTitle ?? T.drone.filterTitle }
     : T.map
-      ? { intro: T.map.intro ?? { title: T.brand, lead: "Tryk på et sted for at se mere - eller gå direkte ind." }, backLabel: T.map.backLabel ?? "Tilbage til kortet", filterTitle: T.map.filterTitle ?? "Vis" }
+      ? { intro: T.map.intro ?? { title: T.brand, lead: tx("Tryk på et sted for at se mere - eller gå direkte ind.") }, backLabel: T.map.backLabel ?? tx("Tilbage til kortet"), filterTitle: T.map.filterTitle ?? tx("Vis") }
       : null;
   const [phase, setPhase] = useState<"drone" | "tour">(OV ? "drone" : "tour");
   const [selected, setSelected] = useState<Point | null>(null);
@@ -305,6 +337,7 @@ function TourExperience({
   const [tourError, setTourError] = useState<string | null>(null);
   const [entering, setEntering] = useState(false);
   const [room, setRoom] = useState<string | null>(null);
+  const roomShown = room ? tx(room) : null;
   const [showLog, setShowLog] = useState(false);
   const [pano, setPano] = useState<Point | null>(null);
   /** The welcome tiles - skipped when the link already says where to go. */
@@ -696,6 +729,8 @@ function TourExperience({
     enterRef.current = enterTour;
   });
   useEffect(() => {
+    if (startRan.current === savedTour) return; // a new language is the same tour - don't start it over
+    startRan.current = savedTour;
     const q = new URLSearchParams(window.location.search);
     const rum = q.get("rum");
     const punkt = q.get("punkt");
@@ -704,7 +739,9 @@ function TourExperience({
       if (rum || punkt || ss) setIntro(null); // a link to a place goes straight there
       if (rum) {
         // "?rum=minigolf" (or "?rum=fløj--toilet-og-bad" when names repeat) - e.g. from the tour's code on the customer's own page about it.
-        const hit = startPlaces(T).find((p) => p.key === rum) ?? startPlaces(T).find((p) => slug(p.name) === rum);
+        const daPlaces = startPlaces(savedTour);
+        const at = daPlaces.findIndex((p) => p.key === rum) >= 0 ? daPlaces.findIndex((p) => p.key === rum) : daPlaces.findIndex((p) => slug(p.name) === rum);
+        const hit = at >= 0 ? startPlaces(T)[at] : undefined;
         if (hit) {
           track("start_link", { kind: "rum", target: hit.name });
           enterRef.current(hit.href, "link", hit.name);
@@ -727,7 +764,7 @@ function TourExperience({
       if (T.intro) return; // the welcome comes when the film ends
       afterStartRef.current();
     });
-  }, [openPoint, T, ROOM_NAMES, LAST_ROOM_KEY]);
+  }, [openPoint, T, savedTour, ROOM_NAMES, LAST_ROOM_KEY]);
 
   function chooseWelcome(go: WelcomeGo | "last" | "skip", label: string) {
     track("welcome_choice", { choice: label });
@@ -1121,6 +1158,7 @@ function TourExperience({
   const ctaClick = (label: string, href: string, place: string) => track("cta_click", { label, link_url: href, place });
 
   return (
+    <TourLang.Provider value={{ lang, t: tx }}>
     <LinkProvider T={T} popup={popup}>
     <div className={`hv fixed inset-0 z-50 overflow-hidden bg-[#0d1b20] ${selected ? "hv-punkt" : ""} ${zoomed ? "hv-zoom" : ""} ${welcome ? "hv-welcome" : ""} ${phase === "tour" && T.stories?.mobile ? "hv-st-on-m" : ""} ${menuOpen ? "hv-menu-aaben" : ""} ${T.design?.menu === "dock" ? "hv-dock" : ""} ${T.logoSide === "right" ? "hv-logo-h" : ""} ${guideAt != null || (dayAt != null && !dayOpen) ? "hv-guiding" : ""} ${route ? "hv-routing" : ""} ${showMeasures && phase === "tour" ? "hv-maler" : ""} ${phase === "tour" && T.stories?.desktop ? "hv-st-on-d" : ""}`} style={
         {
@@ -1135,7 +1173,7 @@ function TourExperience({
       }>
       <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.font.replace(/ /g, "+")}:wght@400;600;700;800;900&display=swap`} />
       {T.fontHeading && <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.fontHeading.replace(/ /g, "+")}:wght@500;600&display=swap`} />}
-      <style>{CSS + STORIES_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + INFO_CSS + MAP_CSS + ROUTE_CSS + MEASURES_CSS + CARDS_CSS + DAY_CSS + SIMPLE_CSS + LOGO_RIGHT_CSS + (review ? FEEDBACK_CSS : "")}</style>
+      <style>{CSS + STORIES_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + INFO_CSS + MAP_CSS + ROUTE_CSS + MEASURES_CSS + CARDS_CSS + DAY_CSS + SIMPLE_CSS + LOGO_RIGHT_CSS + LANG_CSS + (review ? FEEDBACK_CSS : "")}</style>
       {/* The tour's own design on top (written by Claude or by hand under Avanceret). */}
       {T.customCss && <style>{T.customCss.replace(/<\/?style/gi, "")}</style>}
 
@@ -1209,7 +1247,7 @@ function TourExperience({
 
         {selected && (
           <aside className="hv-panel">
-            <button type="button" className="hv-luk" aria-label="Luk" onClick={() => setSelected(null)}>
+            <button type="button" className="hv-luk" aria-label={tx("Luk")} onClick={() => setSelected(null)}>
               ×
             </button>
             <div className="hv-kat" style={{ color: T.categories[selected.cat].color }}>
@@ -1224,7 +1262,7 @@ function TourExperience({
             </div>
             {selected.tour ? (
               <button type="button" className="hv-btn hv-primary hv-wide" disabled={entering} onClick={() => enterTour(selected.tour!, "drone", selected.name)}>
-                {entering ? "Går ind…" : "Gå ind i rummet"}
+                {entering ? tx("Går ind…") : tx("Gå ind i rummet")}
               </button>
             ) : (
               selected.pano && (
@@ -1257,7 +1295,7 @@ function TourExperience({
               <p>{T.welcome.lead}</p>
               {GUIDE.length > 0 && !T.welcome.tiles.some((t) => "guide" in t.go) && (
                 <button type="button" className="hv-wel-guide" onClick={() => chooseWelcome({ guide: true }, "Vis mig rundt")}>
-                  ▶ Vis mig rundt
+                  ▶ {tx("Vis mig rundt")}
                 </button>
               )}
               <button type="button" className="hv-wel-skip" onClick={() => chooseWelcome("skip", T.welcome!.skip)}>
@@ -1267,20 +1305,20 @@ function TourExperience({
             {lastRoom && (
               <button type="button" className="hv-tile hv-tile-last" onClick={() => chooseWelcome("last", "Fortsæt hvor du slap")}>
                 <span className="hv-tile-plus">↺</span>
-                <small>Fortsæt hvor du slap</small>
-                <b>{lastRoom.name}</b>
+                <small>{tx("Fortsæt hvor du slap")}</small>
+                <b>{tx(lastRoom.name)}</b>
               </button>
             )}
             {T.welcome.tiles.map((t) => (
               <button key={t.title} type="button" className={`hv-tile hv-tile-${t.style}`} onClick={() => chooseWelcome(t.go, t.title)}>
-                {t.recommended && <em>Anbefalet</em>}
+                {t.recommended && <em>{tx("Anbefalet")}</em>}
                 <span className="hv-tile-plus">+</span>
                 <small>{t.kicker}</small>
                 <b>{t.title}</b>
               </button>
             ))}
           </div>
-          <button type="button" className="hv-wel-x" aria-label="Luk" onClick={() => chooseWelcome("skip", "luk")}>
+          <button type="button" className="hv-wel-x" aria-label={tx("Luk")} onClick={() => chooseWelcome("skip", "luk")}>
             ×
           </button>
         </div>
@@ -1306,14 +1344,14 @@ function TourExperience({
           {T.stories && storyRooms.length > 0 && (
             <Stories
               rooms={storyRooms}
-              current={room}
+              current={roomShown}
               devices={T.stories}
               leading={OV ? { label: OV.backLabel, onClick: backToDrone } : undefined}
               onGo={storyGo}
               onEvent={track}
             />
           )}
-          {room && <div className="hv-room">{room}</div>}
+          {roomShown && <div className="hv-room">{roomShown}</div>}
         </>
       )}
 
@@ -1328,7 +1366,7 @@ function TourExperience({
               if (o) track("menu_open", { place: phase });
               setMenuOpen(o);
             }}
-            room={room}
+            room={roomShown}
             hasGuide={GUIDE.length > 0}
             onGuide={() => startGuide("menu")}
             onDay={() => openDay("menu")}
@@ -1338,7 +1376,7 @@ function TourExperience({
       ) : T.design?.menu === "picker" ? (
         phase === "tour" && !cover && <PickerMenu T={T} units={units} onGo={menuGo} onCta={(label, href) => ctaClick(label, href, "picker")} />
       ) : T.design?.menu === "dock" ? (
-        phase === "tour" && !cover && <DockMenu T={T} room={room} onGuide={() => startGuide("dock")} onPlace={(p) => placeGo(p, "dock")} onItem={(label, href) => ctaClick(label, href, "dock")} />
+        phase === "tour" && !cover && <DockMenu T={T} room={roomShown} onGuide={() => startGuide("dock")} onPlace={(p) => placeGo(p, "dock")} onItem={(label, href) => ctaClick(label, href, "dock")} />
       ) : (
       <>
       <button
@@ -1352,10 +1390,10 @@ function TourExperience({
           setMenuOpen((o) => !o);
         }}
       >
-        {menuOpen ? "Luk" : "Menu"}
+        {menuOpen ? tx("Luk") : tx("Menu")}
       </button>
       {/* Behind an open menu: the tour dims a little, and a tap on it closes the menu (unless switched off). */}
-      {T.menuDim !== false && <button type="button" className="hv-menu-slor" aria-label="Luk menuen" tabIndex={menuOpen ? 0 : -1} onClick={() => setMenuOpen(false)} />}
+      {T.menuDim !== false && <button type="button" className="hv-menu-slor" aria-label={tx("Luk menuen")} tabIndex={menuOpen ? 0 : -1} onClick={() => setMenuOpen(false)} />}
       <nav className={`hv-menu ${menuOpen ? "aaben" : ""}`}>
         <div className={`hv-menu-head ${T.logoOnLight ? "hv-light" : ""}`} style={{ background: T.logoOnLight ? "#fff" : T.colors.main }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1400,7 +1438,7 @@ function TourExperience({
                   {m.items.map(([name, href]) => (
                     <button key={name} type="button" onClick={() => menuGo(name, m.title, href)}>
                       {name}
-                      {isFree(name) && <span className="hv-ledig">Ledig</span>}
+                      {isFree(name) && <span className="hv-ledig">{tx("Ledig")}</span>}
                       {!isPlaceHref(href) && <span className="hv-ext">↗</span>}
                     </button>
                   ))}
@@ -1422,9 +1460,9 @@ function TourExperience({
         </div>
         {T.contact && (
           <div className="hv-contact">
-            <div className="hv-contact-t">Kontakt</div>
+            <div className="hv-contact-t">{tx("Kontakt")}</div>
             {T.contact.address && (
-              <TourLink href={T.contact.mapUrl ?? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(T.contact.address ?? "")}`} label={T.contact.address ?? "Kort"} onClick={() => track("contact_click", { kind: "map" })}>
+              <TourLink href={T.contact.mapUrl ?? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(T.contact.address ?? "")}`} label={T.contact.address ?? tx("Kort")} onClick={() => track("contact_click", { kind: "map" })}>
                 <span>📍</span>
                 {T.contact.address}
               </TourLink>
@@ -1543,8 +1581,8 @@ function TourExperience({
                       </button>
                     )}
                     {href && (
-                      <TourLink href={href} label={`${T.live!.bookLabel ?? "Book"} ${u.name}`} className="hv-btn hv-primary" onClick={() => track("live_book", { label: u.name, link_url: href, ...(u.price ? { price: u.price } : {}) })}>
-                        {T.live!.bookLabel ?? "Book"}
+                      <TourLink href={href} label={`${T.live!.bookLabel ?? tx("Book")} ${u.name}`} className="hv-btn hv-primary" onClick={() => track("live_book", { label: u.name, link_url: href, ...(u.price ? { price: u.price } : {}) })}>
+                        {T.live!.bookLabel ?? tx("Book")}
                       </TourLink>
                     )}
                   </li>
@@ -1599,7 +1637,7 @@ function TourExperience({
               <path d="M3 17l14-14 4 4-14 14H3z" />
               <path d="M7 13l2 2M10 10l2 2M13 7l2 2" />
             </svg>
-            {showMeasures ? "Skjul mål" : "Vis mål"}
+            {showMeasures ? tx("Skjul mål") : tx("Vis mål")}
           </button>
         </>
       )}
@@ -1692,8 +1730,10 @@ function TourExperience({
         />
       )}
       {linkPopup && <LinkPopup open={linkPopup} onClose={() => setLinkPopup(null)} />}
+      {setLang && tourLanguages(savedTour).length > 1 && <LangSwitch langs={tourLanguages(savedTour)} lang={lang} onPick={(l) => (track("language", { label: l }), setLang(l))} label={tx("Sprog")} />}
     </div>
     </LinkProvider>
+    </TourLang.Provider>
   );
 }
 

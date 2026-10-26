@@ -1,5 +1,6 @@
 "use client";
 
+import { useT } from "../tours/i18n-react";
 import { useEffect, useRef, useState } from "react";
 
 export type StoryRoom = { name: string; href: string; image?: string };
@@ -29,6 +30,7 @@ export function Stories({
   onGo: (room: StoryRoom) => unknown;
   onEvent: (name: string, params: Record<string, string | number>) => void;
 }) {
+  const tr = useT();
   const [seen, setSeen] = useState<string[]>([]);
   const [playing, setPlaying] = useState<number | null>(null);
   const [paused, setPaused] = useState(false);
@@ -87,15 +89,15 @@ export function Stories({
             <span>
               {playing + 1}/{rooms.length}
             </span>
-            <button type="button" aria-label={paused ? "Fortsæt" : "Pause"} onClick={() => setPaused((p) => !p)}>
+            <button type="button" aria-label={paused ? tr("Fortsæt") : tr("Pause")} onClick={() => setPaused((p) => !p)}>
               {paused ? "▶" : "❚❚"}
             </button>
-            <button type="button" aria-label="Næste" onClick={() => next("tap")}>
+            <button type="button" aria-label={tr("Næste")} onClick={() => next("tap")}>
               ⏭
             </button>
             <button
               type="button"
-              aria-label="Luk"
+              aria-label={tr("Luk")}
               onClick={() => {
                 onEvent("story_close", { room_name: rooms[playing].name, index: playing + 1 });
                 setPlaying(null);
@@ -130,7 +132,7 @@ export function Stories({
               }}
             >
               <span className="hv-st-pic">▶</span>
-              <b>Afspil</b>
+              <b>{tr("Afspil")}</b>
             </button>
             {leading && (
               <button type="button" className="hv-st-card hv-st-extra" onClick={leading.onClick}>

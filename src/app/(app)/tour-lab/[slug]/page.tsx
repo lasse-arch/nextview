@@ -12,11 +12,11 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 }
 
 /** A tour in Arpo - the editor's preview and the admins' own view, with the prototype tools. The public one is /t/<slug>. */
-export default async function TourPrototypePage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function TourPrototypePage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ sprog?: string }> }) {
   const user = await getCurrentUser();
   if (user?.role !== "ADMIN") redirect("/");
   const setup = await getTourConfig((await params).slug);
   if (!setup) notFound();
   const data = await loadTour(setup);
-  return <Experience {...data} tools phone={/Android|iPhone|iPad|iPod|Mobile/i.test((await headers()).get("user-agent") ?? "")} />;
+  return <Experience {...data} lang={(await searchParams).sprog} tools phone={/Android|iPhone|iPad|iPod|Mobile/i.test((await headers()).get("user-agent") ?? "")} />;
 }

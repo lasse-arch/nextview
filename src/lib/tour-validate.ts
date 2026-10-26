@@ -37,6 +37,8 @@ export function tourConfigProblem(config: unknown): string | null {
   if (c.placeCards && (!arr(c.placeCards) || !c.placeCards.every((p) => obj(p) && arr(p.ss) && str(p.title) && str(p.text)))) return "Et stedkort mangler punkt, overskrift eller tekst.";
   if (c.nudge && (!obj(c.nudge) || typeof c.nudge.afterSeconds !== "number" || !arr(c.nudge.buttons))) return '"Din plads venter" har en forkert form.';
   if (c.design && (!obj(c.design) || !["tiles", "cover", "simple"].includes(c.design.welcome) || !["side", "dock", "picker", "simple"].includes(c.design.menu))) return '"design" skal have welcome (tiles/cover/simple) og menu (side/dock/picker/simple).';
+  if (c.languages !== undefined && (!arr(c.languages) || !c.languages.every(str))) return '"languages" skal være en liste af sprogkoder.';
+  if (c.translations !== undefined && (!obj(c.translations) || !Object.values(c.translations).every((m) => obj(m) && Object.values(m as object).every(str)))) return '"translations" skal være sprog med tekst -> oversættelse.';
   if (c.embeds && (!obj(c.embeds) || (c.embeds.pages !== undefined && (!obj(c.embeds.pages) || !Object.values(c.embeds.pages).every(str))))) return '"embeds.pages" skal være steder med en adresse.';
   return null;
 }

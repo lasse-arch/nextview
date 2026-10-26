@@ -22,7 +22,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   return { title: `${tour.title} – virtuel tour`, icons: icon ? { icon, shortcut: icon, apple: icon } : undefined };
 }
 
-export default async function PublicTourPage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function PublicTourPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ sprog?: string }> }) {
   const { slug } = await params;
   const data = await publicTour(slug);
   if (!data) {
@@ -31,5 +31,5 @@ export default async function PublicTourPage({ params }: { params: Promise<{ slu
     if (moved) redirect(`/t/${moved.slug}`);
     notFound();
   }
-  return <Experience {...data} phone={/Android|iPhone|iPad|iPod|Mobile/i.test((await headers()).get("user-agent") ?? "")} />;
+  return <Experience {...data} lang={(await searchParams).sprog} phone={/Android|iPhone|iPad|iPod|Mobile/i.test((await headers()).get("user-agent") ?? "")} />;
 }

@@ -282,6 +282,14 @@ export type TourConfig = {
   menuOpenOnStart: { desktop: boolean; mobile: boolean };
   /** The tour dims behind an open menu, and a tap on it closes the menu - false: no dimming. */
   menuDim?: false;
+  /**
+   * More languages than Danish ("en", "de" … - see LANGUAGES in i18n.ts): the
+   * visitor gets a language button, and a link can pick one with ?sprog=en.
+   * The tour also starts in the visitor's own language when it's one of these.
+   */
+  languages?: string[];
+  /** Per language: Danish text -> the same text in that language (the setup's texts and the engine's words). Made by nextviewAI, editable under Sprog. A text without one shows in Danish. */
+  translations?: Record<string, Record<string, string>>;
   menu: MenuEntry[];
   /**
    * "Historier": the rooms as Instagram-style story cards along the bottom,

@@ -26,10 +26,10 @@ export async function generateMetadata({ params }: { params: Promise<{ token: st
   return { title: `${tour.title} – gennemsyn`, robots: { index: false, follow: false }, icons: icon ? { icon, shortcut: icon, apple: icon } : undefined };
 }
 
-export default async function ReviewTourPage({ params }: { params: Promise<{ token: string }> }) {
+export default async function ReviewTourPage({ params, searchParams }: { params: Promise<{ token: string }>; searchParams: Promise<{ sprog?: string }> }) {
   const { token } = await params;
   const setup = await byToken(token);
   if (!setup) notFound();
   const data = await loadTour(setup);
-  return <Experience {...data} review={token} phone={/Android|iPhone|iPad|iPod|Mobile/i.test((await headers()).get("user-agent") ?? "")} />;
+  return <Experience {...data} lang={(await searchParams).sprog} review={token} phone={/Android|iPhone|iPad|iPod|Mobile/i.test((await headers()).get("user-agent") ?? "")} />;
 }

@@ -1,5 +1,7 @@
 "use client";
 
+import { InsightsPanel } from "./insights";
+import { LanguagesPanel } from "./languages";
 import { tourUrl } from "@/lib/public-urls";
 import { isPlaceHref } from "../../tours/places";
 import { tourConfigProblem } from "@/lib/tour-validate";
@@ -30,7 +32,7 @@ import { FeedbackPanel } from "./feedback-panel";
 const zoomLabel = (z: number) => (Math.abs(z - 1) < 0.01 ? "normal" : z < 1 ? `zoomet ud (${Math.round(z * 100)} %)` : `zoomet ind (${Math.round(z * 100)} %)`);
 
 type Version = { id: string; note: string | null; by: string | null; at: string };
-type Tab = "claude" | "live" | "scan" | "okonomi" | "resultater" | "del" | "tags" | "start" | "rundvisning" | "kort" | "kortet" | "feedback" | "generelt" | "design" | "menu" | "funktioner" | "links" | "avanceret" | "versioner";
+type Tab = "sprog" | "claude" | "live" | "scan" | "okonomi" | "resultater" | "del" | "tags" | "start" | "rundvisning" | "kort" | "kortet" | "feedback" | "generelt" | "design" | "menu" | "funktioner" | "links" | "avanceret" | "versioner";
 
 /** Claude's mark: a small sunburst. */
 const SPARK = '<path d="M12 3v5M12 16v5M3 12h5M16 12h5M5.6 5.6l3.5 3.5M14.9 14.9l3.5 3.5M5.6 18.4l3.5-3.5M14.9 9.1l3.5-3.5"/>';
@@ -51,6 +53,7 @@ const TABS: [Tab, string, string, string?][] = [
   ["kort", "Stedkort", '<rect x="4" y="5" width="16" height="14" rx="2"/><path d="M8 10h8M8 14h5"/>'],
   ["links", "Knapper og links", '<path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/>'],
   ["design", "Design", '<path d="M12 3a9 9 0 1 0 0 18c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.3-.3-.4-.5-.8-.5-1.3 0-1.1.9-2 2-2h2.3A4.7 4.7 0 0 0 21 9.7C21 5.9 17 3 12 3z"/><circle cx="7.5" cy="11.5" r="1"/><circle cx="10.5" cy="7.5" r="1"/><circle cx="15.5" cy="8" r="1"/>', "Udseende og opsætning"],
+  ["sprog", "Sprog", '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>'],
   ["funktioner", "Funktioner", '<path d="M12 3l2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 15.4 7.2 18l.9-5.4L4.2 8.7l5.4-.8z"/>'],
   ["generelt", "Generelt", '<circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/>'],
   ["okonomi", "Tid og pris", '<circle cx="12" cy="12" r="9"/><path d="M14.5 9.5a2.5 2 0 0 0-2.5-1.5c-1.4 0-2.5.8-2.5 2s1.1 1.6 2.5 2 2.5.8 2.5 2-1.1 2-2.5 2a2.5 2 0 0 1-2.5-1.5M12 6.5v1.5M12 16v1.5"/>', "Mere"],
@@ -103,6 +106,8 @@ export function TourEditor({
   const [config, setConfig] = useState<TourConfig>(initial);
   const [dirty, setDirty] = useState(false);
   const [tab, setTab] = useState<Tab>("claude");
+  /** A request for nextviewAI from elsewhere in the editor (a suggestion from Resultater). */
+  const [aiAsk, setAiAsk] = useState<{ request: string; at: number } | null>(null);
   // A tour Claude just built (see new-tour.tsx): its account of what it did starts the chat.
   const [chat, setChat] = useState<ChatMsg[]>(() => {
     try {
@@ -289,6 +294,7 @@ export function TourEditor({
         <div className="flex w-[400px] flex-none flex-col">
           {tab === "claude" ? (
             <ClaudePanel
+              ask={aiAsk}
               config={config}
               chat={chat}
               setChat={setChat}
@@ -473,7 +479,19 @@ export function TourEditor({
               </>
             )}
 
-            {tab === "resultater" && <ResultsPanel stats={stats} slug={slug} brand={config.brand} share={share} shareStats={shareStats} token={shareToken} />}
+            {tab === "resultater" && (
+              <>
+                <InsightsPanel
+                  slug={slug}
+                  config={config}
+                  onAsk={(request) => {
+                    setTab("claude");
+                    setAiAsk({ request, at: Date.now() });
+                  }}
+                />
+                <ResultsPanel stats={stats} slug={slug} brand={config.brand} share={share} shareStats={shareStats} token={shareToken} />
+              </>
+            )}
             {tab === "okonomi" && <EconomyPanel economy={economy} />}
             {tab === "feedback" && <FeedbackPanel slug={slug} token={reviewToken} preview={preview} />}
             {tab === "del" && (
@@ -496,6 +514,9 @@ export function TourEditor({
             {tab === "tags" && <TagsEditor config={config} edit={edit} slug={slug} preview={preview} />}
             {tab === "live" && <LiveDataEditor config={config} edit={edit} slug={slug} preview={preview} />}
             {tab === "kortet" && <MapEditor config={config} edit={edit} />}
+            {tab === "sprog" && (
+              <LanguagesPanel slug={slug} config={config} edit={edit} showIn={(lang) => frame.current?.contentWindow?.postMessage({ type: "tour-lang", lang }, location.origin)} />
+            )}
             {tab === "kort" && <CardsEditor config={config} edit={edit} preview={preview} />}
             {tab === "menu" && <MenuEditor menu={config.menu} preview={preview} onChange={(menu) => edit((d) => void (d.menu = menu))} />}
 
@@ -796,12 +817,15 @@ const SUGGESTIONS = ["Gør det helt enkelt - få store knapper og én menu", "Ti
  * answer can be undone on its own.
  */
 function ClaudePanel({
+  ask,
   config,
   chat,
   setChat,
   ready: initiallyReady,
   onApply,
 }: {
+  /** A request from elsewhere in the editor (a suggestion from Resultater) - sent as if typed. */
+  ask?: { request: string; at: number } | null;
   config: TourConfig;
   chat: ChatMsg[];
   setChat: React.Dispatch<React.SetStateAction<ChatMsg[]>>;
@@ -839,6 +863,15 @@ function ClaudePanel({
       setChat((c) => [...c, { role: "assistant", text: r.reply, changed: r.changed, before: r.changed ? before : undefined, remembered: r.remembered }]);
     });
   }
+
+  // A suggestion from Resultater: sent once, as if typed (after the render, so not from inside the effect itself).
+  const asked = useRef(0);
+  useEffect(() => {
+    if (!ask || asked.current === ask.at) return;
+    asked.current = ask.at;
+    requestAnimationFrame(() => send(ask.request));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ask]);
 
   if (!ready)
     return (

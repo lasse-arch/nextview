@@ -1,5 +1,6 @@
 "use client";
 
+import { useT } from "../tours/i18n-react";
 import { createContext, useContext } from "react";
 import type { LinkOpen, TourConfig } from "../tours/types";
 
@@ -56,15 +57,16 @@ export function LinkProvider({ T, popup, children }: { T: TourConfig; popup: (hr
 
 /** The popup: the page over the tour, with a way out to a new tab (some sites refuse to be shown inside others). */
 export function LinkPopup({ open, onClose }: { open: NonNullable<LinkPopupState>; onClose: () => void }) {
+  const tr = useT();
   return (
     <div className="lk-overlay" onClick={onClose}>
       <div className="lk-popup" onClick={(e) => e.stopPropagation()}>
         <div className="lk-head">
           <b>{open.label}</b>
           <a href={open.href} target="_blank" rel="noopener" onClick={onClose}>
-            Åbn i ny fane ↗
+            {tr("Åbn i ny fane ↗")}
           </a>
-          <button type="button" aria-label="Luk" onClick={onClose}>
+          <button type="button" aria-label={tr("Luk")} onClick={onClose}>
             ×
           </button>
         </div>

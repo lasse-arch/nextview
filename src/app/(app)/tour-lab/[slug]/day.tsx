@@ -1,5 +1,6 @@
 "use client";
 
+import { useT } from "../tours/i18n-react";
 import type { TourConfig } from "../tours/types";
 
 /*
@@ -13,6 +14,7 @@ import type { TourConfig } from "../tours/types";
 type Day = NonNullable<TourConfig["day"]>;
 
 export function DaySheet({ day, at, onSee, onClose }: { day: Day; at: number | null; onSee: (i: number) => void; onClose: () => void }) {
+  const tr = useT();
   return (
     <div className="dy" onClick={onClose}>
       <div className="dy-sheet" role="dialog" aria-label={day.title} onClick={(e) => e.stopPropagation()}>
@@ -21,7 +23,7 @@ export function DaySheet({ day, at, onSee, onClose }: { day: Day; at: number | n
             <b>{day.title}</b>
             {day.lead && <p>{day.lead}</p>}
           </div>
-          <button type="button" aria-label="Luk" onClick={onClose}>
+          <button type="button" aria-label={tr("Luk")} onClick={onClose}>
             ×
           </button>
         </div>
@@ -36,7 +38,7 @@ export function DaySheet({ day, at, onSee, onClose }: { day: Day; at: number | n
               </span>
               {s.href && (
                 <button type="button" className="hv-btn hv-secondary" onClick={() => onSee(i)}>
-                  {i === at ? "Her nu" : "Se stedet"}
+                  {i === at ? tr("Her nu") : tr("Se stedet")}
                 </button>
               )}
             </li>
@@ -49,6 +51,7 @@ export function DaySheet({ day, at, onSee, onClose }: { day: Day; at: number | n
 
 /** While looking at one part of the day: where in the day you are, and what comes next. */
 export function DayBar({ day, at, onNext, onOpen, onClose }: { day: Day; at: number; onNext: (i: number) => void; onOpen: () => void; onClose: () => void }) {
+  const tr = useT();
   const step = day.steps[at];
   const next = day.steps.findIndex((s, i) => i > at && s.href);
   return (
@@ -57,16 +60,16 @@ export function DayBar({ day, at, onNext, onOpen, onClose }: { day: Day; at: num
         <time>{step.time}</time>
         <span>
           <b>{step.title}</b>
-          <small>Se hele dagen</small>
+          <small>{tr("Se hele dagen")}</small>
         </span>
       </button>
       {next > 0 && (
         <button type="button" className="dy-bar-next" onClick={() => onNext(next)}>
-          <small>Bagefter · {day.steps[next].time}</small>
+          <small>{tr("Bagefter · {tid}", { tid: day.steps[next].time })}</small>
           {day.steps[next].title} ›
         </button>
       )}
-      <button type="button" className="dy-bar-x" aria-label="Luk dagen" onClick={onClose}>
+      <button type="button" className="dy-bar-x" aria-label={tr("Luk")} onClick={onClose}>
         ×
       </button>
     </div>

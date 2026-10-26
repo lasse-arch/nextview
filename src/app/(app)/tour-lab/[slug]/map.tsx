@@ -1,5 +1,6 @@
 "use client";
 
+import { useT } from "../tours/i18n-react";
 import { useEffect, useImperativeHandle, useRef, useState } from "react";
 import type { TourConfig, TourPoint } from "../tours/types";
 
@@ -37,6 +38,7 @@ export function MapScene({
   onPoint: (p: TourPoint) => void;
   onZoomed: (zoomed: boolean) => void;
 }) {
+  const tr = useT();
   const M = T.map!;
   const box = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<View | null>(null);
@@ -217,7 +219,7 @@ export function MapScene({
         </div>
       )}
       <div className="km-soeg" onPointerDown={(e) => e.stopPropagation()}>
-        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={M.searchPlaceholder ?? "Søg…"} aria-label="Søg" />
+        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={M.searchPlaceholder ?? tr("Søg…")} aria-label={tr("Søg…")} />
         {hits.length > 0 && (
           <ul>
             {hits.map((p) => (

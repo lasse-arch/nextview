@@ -1,5 +1,6 @@
 "use client";
 
+import { useT } from "../tours/i18n-react";
 import { useState } from "react";
 import type { PlaceCard as Card, TourConfig } from "../tours/types";
 import { TourLink } from "./links";
@@ -20,6 +21,7 @@ export function PlaceCard({
   onRoom: (name: string) => void;
   onLink: (label: string, href: string) => void;
 }) {
+  const tr = useT();
   const [stopped, setStopped] = useState(false);
   const [page, setPage] = useState<1 | 2>(1);
   const [open, setOpen] = useState(false); // phones: the text unfolded
@@ -29,7 +31,7 @@ export function PlaceCard({
       <div className="pc-bar">
         <i style={{ animationDuration: `${seconds}s`, animationPlayState: stopped ? "paused" : "running" }} onAnimationEnd={() => onClose("timer")} />
       </div>
-      <button type="button" className="pc-luk" aria-label="Luk" onClick={() => onClose("close")}>
+      <button type="button" className="pc-luk" aria-label={tr("Luk")} onClick={() => onClose("close")}>
         ×
       </button>
       {page === 1 ? (
@@ -77,10 +79,11 @@ export function PlaceCard({
 
 /** The card that comes by itself after a while, with the tour's next step. */
 export function NudgeCard({ T, onClose, onLink }: { T: TourConfig; onClose: () => void; onLink: (label: string, href: string) => void }) {
+  const tr = useT();
   const n = T.nudge!;
   return (
     <div className="pc pc-nudge">
-      <button type="button" className="pc-luk" aria-label="Luk" onClick={onClose}>
+      <button type="button" className="pc-luk" aria-label={tr("Luk")} onClick={onClose}>
         ×
       </button>
       <h3>{n.title}</h3>

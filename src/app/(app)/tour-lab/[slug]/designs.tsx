@@ -1,5 +1,6 @@
 "use client";
 
+import { useT } from "../tours/i18n-react";
 import { useState } from "react";
 import { TourLink } from "./links";
 import type { AvailableUnit } from "@/lib/availability/boxdepotet";
@@ -61,6 +62,7 @@ export function CoverWelcome({
   onGuide?: () => void;
   onCta: (label: string, href: string) => void;
 }) {
+  const tr = useT();
   const C = T.cover!;
   return (
     <div className="dz-cover" style={{ "--cover": `url(${C.image})`, "--cover-m": `url(${C.imageMobile ?? C.image})` } as React.CSSProperties}>
@@ -76,7 +78,7 @@ export function CoverWelcome({
           </button>
           {onGuide && (
             <button type="button" className="dz-btn dz-line" onClick={onGuide}>
-              ▶ Vis mig rundt
+              ▶ {tr("Vis mig rundt")}
             </button>
           )}
           {T.cta.map((c) => (
@@ -110,6 +112,7 @@ export function DockMenu({
   onPlace: (p: TourPlace) => void;
   onItem: (label: string, href: string) => void;
 }) {
+  const tr = useT();
   const [sheet, setSheet] = useState(false);
   const primary = T.dock?.find((d) => d.primary && typeof d.go !== "string");
   const atPlace = room && T.places?.some((p) => p.name === room);
@@ -118,8 +121,8 @@ export function DockMenu({
       {sheet && T.places && (
         <div className="dz-sheet">
           <div className="dz-sheet-head">
-            <span className="dz-kicker">{T.cover?.placesTitle ?? "Steder"}</span>
-            <button type="button" aria-label="Luk" onClick={() => setSheet(false)}>
+            <span className="dz-kicker">{T.cover?.placesTitle ?? tr("Steder")}</span>
+            <button type="button" aria-label={tr("Luk")} onClick={() => setSheet(false)}>
               ×
             </button>
           </div>
@@ -179,6 +182,7 @@ export function PickerMenu({
   onGo: (name: string, group: string, href: string) => void;
   onCta: (label: string, href: string) => void;
 }) {
+  const tr = useT();
   const groups = T.menu.filter((m): m is { title: string; items: [string, string][] } => "items" in m);
   const startSs = new URL(T.start).searchParams.get("ss");
   const ssOf = (href: string) => new URL(href).searchParams.get("ss");
@@ -209,7 +213,7 @@ export function PickerMenu({
       <button type="button" className="pk-mini" onClick={() => setOpen(true)}>
         <span>{group?.replace(/^[^:]*:\s*/, "")}</span>
         {item && <span className="pk-mini-item">{item}</span>}
-        <b>Skift rum ▴</b>
+        <b>{tr("Skift rum ▴")}</b>
       </button>
     );
   }
@@ -224,9 +228,9 @@ export function PickerMenu({
             <div key={u.no} className="pk-unit">
               <b>#{u.no}</b>
               <span>{u.m3.toLocaleString("da-DK")} m³</span>
-              <span className={u.from ? "" : "nu"}>{u.from ? `Ledig fra ${u.from.slice(0, 5).replace("-", "/")}` : "Ledig nu"}</span>
+              <span className={u.from ? "" : "nu"}>{u.from ? tr("Ledig fra {dato}", { dato: u.from.slice(0, 5).replace("-", "/") }) : tr("Ledig nu")}</span>
               <span className="pk-pris">{kr(u.price)} kr./md.</span>
-              <TourLink className="pk-book" href={u.bookUrl} label={`Book depotrum #${u.no}`} onClick={() => onCta(`Book #${u.no}`, u.bookUrl)}>
+              <TourLink className="pk-book" href={u.bookUrl} label={tr("Book #{nr}", { nr: u.no })} onClick={() => onCta(`Book #${u.no}`, u.bookUrl)}>
                 Book
               </TourLink>
             </div>
@@ -236,8 +240,8 @@ export function PickerMenu({
       {T.availability && group && (
         <button type="button" className={`pk-ledige ${showFree ? "aaben" : ""}`} onClick={() => setShowFree((v) => !v)} disabled={!free.length}>
           {free.length
-            ? `${free.length} ledige i denne størrelse · fra ${kr(Math.min(...free.map((u) => u.price)))} kr./md.`
-            : "Ingen ledige i denne størrelse lige nu"}
+            ? tr("{antal} ledige i denne størrelse · fra {pris} kr./md.", { antal: free.length, pris: kr(Math.min(...free.map((u) => u.price))) })
+            : tr("Ingen ledige i denne størrelse lige nu")}
           {free.length > 0 && <i>{showFree ? "▾" : "▴"}</i>}
         </button>
       )}
