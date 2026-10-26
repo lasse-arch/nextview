@@ -49,7 +49,7 @@ const nextConfig: NextConfig = {
         source: "/t/:slug",
         headers: [{ key: "Content-Security-Policy", value: "frame-ancestors *" }],
       },
-      // The website (app/forside) may be found on Google - Arpo itself never.
+      // The website (public/site) may be found on Google - Arpo itself never.
       ...(SITE_HOST
         ? [SITE_HOST, `www.${SITE_HOST}`].map((host) => ({
             source: "/:path*",

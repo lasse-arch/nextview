@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 
 const SESSION_COOKIE = "nv360_session";
 // "/t" = published tours, shown in an iframe on customers' sites (and their pictures under /tour-lab/<slug>/historie); "/r" = a customer's report on their tour.
-const PUBLIC_PATHS = ["/login", "/robots.txt", "/t", "/r", "/p", "/forside"];
+const PUBLIC_PATHS = ["/login", "/robots.txt", "/t", "/r", "/p", "/site"];
 
 /*
  * The short public addresses (see lib/public-urls.ts): on the tour host
@@ -47,7 +47,7 @@ function movedHost(request: NextRequest): NextResponse | null {
 
 /*
  * The website's own address (NEXT_PUBLIC_SITE_ORIGIN, e.g. https://nextview360.dk,
- * with or without www): "/" is the front page (/forside), the old site's
+ * with or without www): "/" is the front page (public/site/index.html), the old site's
  * pages go to the matching part of it, and nothing else of Arpo is reachable.
  */
 const SITE_HOST = hostOf(process.env.NEXT_PUBLIC_SITE_ORIGIN)?.replace(/^www\./, "") ?? null;
@@ -59,7 +59,7 @@ function siteHost(request: NextRequest): NextResponse | null {
   const { pathname } = request.nextUrl;
   if (pathname === "/") {
     const url = request.nextUrl.clone();
-    url.pathname = "/forside";
+    url.pathname = "/site/index.html";
     return NextResponse.rewrite(url);
   }
   // Files (pictures, fonts) are served as they are.
