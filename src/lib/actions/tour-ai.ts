@@ -10,7 +10,7 @@ import type { Prisma } from "@prisma/client";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getSettingValue, setSettingValue } from "@/lib/integration-settings";
-import { mpskinsMenuDigest, siteDigest } from "@/lib/site-digest";
+import { siteDigest } from "@/lib/site-digest";
 import { hostFiles } from "@/lib/tour-files";
 import { BRANCHES, DESIGN_PRESETS, type Branch, type DesignPreset } from "@/app/(app)/tour-lab/tours/presets";
 
@@ -22,7 +22,6 @@ const PRESET_BASE: Record<DesignPreset["id"], string> = {
   rumvaelger: "boxdepot-rum",
   guidet: "halvorsminde",
 };
-import { fetchMpskinsCfg, filterFromCss } from "@/lib/mpskins";
 import { tourConfigProblem } from "@/lib/tour-validate";
 import { fetchModelInfo, modelIdsIn, searchAccountModels, type ModelInfo } from "@/lib/matterport-graph";
 import type { TourConfig } from "@/app/(app)/tour-lab/tours/types";
@@ -121,7 +120,7 @@ Brugeren beskriver en ændring på dansk. Svar med de præcise ændringer til op
 
 Regler:
 - Ændr kun det, der bliver bedt om. Bevar alt andet.
-- Links til steder i touren er explore.nextview360.dk-links med ?ss=<scanpunkt> (evt. &rot=pitch,yaw). Opfind aldrig scanpunkter - genbrug dem, der allerede står i opsætningen eller i MPSkins-menuen, eller spørg.
+- Links til steder i touren er Matterport-links (https://my.matterport.com/show/?m=<model>&ss=<scanpunkt>, evt. &rot=pitch,yaw). Opfind aldrig scanpunkter - genbrug dem, der allerede står i opsætningen, eller bed brugeren om at vælge stedet i forhåndsvisningen.
 - Links ud af touren (booking, hjemmeside) er almindelige https-links.
 - Farver er hex (#rrggbb). Skrifter er navne på Google Fonts.
 - Er ønsket uklart, så stil ét kort spørgsmål i reply og lad changes være tom.
@@ -215,15 +214,13 @@ export async function askClaudeForTour(config: TourConfig, history: ChatTurn[], 
 
 /**
  * A new tour built by Claude from the customer's website and the existing
- * MPSkins tour: the website gives the look, the words and the actions (the
- * red thread), the MPSkins tour its rooms and links - on top of an existing
+ * Matterport space: the website gives the look, the words and the actions
+ * (the red thread), the Matterport model the scan points - on top of an existing
  * tour's features (its kind of menu, start and functions).
  */
 export async function createTourFromWebsite(input: {
   name: string;
   website: string;
-  /** The MPSkins tour (optional when a Matterport model is given) - its menu is reused. */
-  tourUrl: string;
   /** The Matterport model the tour is connected to. */
   modelId?: string;
   /** The customer (deal) - the tour is linked to it. */
@@ -241,18 +238,8 @@ export async function createTourFromWebsite(input: {
   if (!key) return { ok: false, error: "Claude er ikke sat op endnu - indsæt en nøgle i en tours editor (fanen Claude)." };
   const name = input.name.trim();
   if (!name) return { ok: false, error: "Giv touren et navn." };
-  let tourUrl: URL | null = null;
-  if (input.tourUrl.trim()) {
-    try {
-      tourUrl = new URL(input.tourUrl.trim());
-    } catch {
-      return { ok: false, error: "MPSkins-linket ser ikke rigtigt ud (explore.nextview360.dk/…)." };
-    }
-    if (tourUrl.hostname !== "explore.nextview360.dk") return { ok: false, error: "MPSkins-linket skal være et explore.nextview360.dk-link." };
-  }
   const model = input.modelId ? await fetchModelInfo(input.modelId) : null;
-  if (input.modelId && !model) return { ok: false, error: "Matterport-modellen findes ikke eller er ikke offentlig." };
-  if (!tourUrl && !model) return { ok: false, error: "Vælg kundens Matterport-tour." };
+  if (!model) return { ok: false, error: input.modelId ? "Matterport-modellen findes ikke eller er ikke offentlig." : "Vælg kundens Matterport-tour." };
   const preset = DESIGN_PRESETS.find((p) => p.id === input.preset);
   // A ready-made design starts from the prototype tour that has its kind of features.
   const baseSlug = input.base ?? (preset ? PRESET_BASE[preset.id] : "halvorsminde");
@@ -260,14 +247,13 @@ export async function createTourFromWebsite(input: {
     (await prisma.tour.findUnique({ where: { slug: baseSlug }, select: { config: true } })) ?? (await prisma.tour.findFirst({ orderBy: { createdAt: "asc" }, select: { config: true } }));
   if (!source) return { ok: false, error: "Der er ingen tour at bygge videre på." };
 
-  const [site, menu] = await Promise.all([
+  const [site] = await Promise.all([
     input.website.trim() ? siteDigest(input.website).catch((err: unknown) => `(Hjemmesiden kunne ikke hentes: ${err instanceof Error ? err.message : err})`) : Promise.resolve("(Ingen hjemmeside angivet)"),
-    tourUrl ? mpskinsMenuDigest(tourUrl.toString()).catch(() => "") : Promise.resolve(""),
   ]);
 
   let slug = slugify(name) || "tour";
   for (let i = 2; await prisma.tour.findUnique({ where: { slug }, select: { id: true } }); i++) slug = `${slugify(name)}-${i}`;
-  let base: TourConfig = { ...neutral(source.config as unknown as TourConfig, { slug, title: name, tourPage: tourUrl?.toString() ?? "" }), modelId: model?.id };
+  let base: TourConfig = { ...neutral(source.config as unknown as TourConfig, { slug, title: name, tourPage: "" }), modelId: model.id };
   if (preset) base = { ...base, ...preset.apply(base) };
   const branch = BRANCHES.find(([b]) => b === input.branch)?.[1];
 
@@ -278,13 +264,13 @@ export async function createTourFromWebsite(input: {
     [],
     `Byg en ny tour til en ny kunde. Opsætningen ovenfor er en skabelon: funktionerne (bevægelse, skift, menutype osv.) er valgt med vilje, men alt kundeindhold er tomt og skal udfyldes.
 
-Udfyld ud fra kundens hjemmeside og den eksisterende MPSkins-tour nedenfor, efter drejebogen:
+Udfyld ud fra kundens hjemmeside nedenfor, efter drejebogen:
 - brand, title, subtitle, logo (en logo-kandidat fra hjemmesiden; logoOnLight hvis logoet er mørkt), favicon (hjemmesidens favicon, gerne apple-touch-icon), colors og font/fontHeading så touren ligner hjemmesiden (rød tråd).
-- start: et godt startpunkt fra MPSkins-menuen (typisk "Velkommen"-punktet).
-- menu: byg den fra MPSkins-menuens punkter og links (brug linkene præcis som de står), ordnet efter drejebogen.
+- start: scanpunkt 1, medmindre brugeren har sagt andet (det rettes i editoren under Scanpunkter).
+- menu: kundens handlinger og grupper efter drejebogen. Rummene vælges bagefter i editoren ved at stå i dem - lav tomme grupper med gode navne, som brugeren fylder.
 - cta og contact: hjemmesidens vigtigste handling(er) og kontaktoplysninger. linkOpen: popup for booking.
 - velkomst: vælg den start, drejebogen anbefaler til branchen (design.welcome + welcome eller cover). Brug ikke fotos, du ikke har, og aldrig Matterports automatiske billeder (de er for dårlige) - forsiden får hjemmesidens delingsbillede, hvis det er et rigtigt foto af stedet; ellers sig i reply, at brugeren skal tage et forsidebillede i forhåndsvisningen (Start → Forsiden → Tag billede).
-- nudge ("Din plads venter") med hovedhandlingen, og evt. et par stedkort/rundvisning ud fra MPSkins-menuens punkter, hvis det giver mening.
+- nudge ("Din plads venter") med hovedhandlingen.
 Skriv al tekst på dansk i kundens stemme. Opfind ingen fakta. I reply: fortæl kort, hvad du har valgt og hvorfor, og hvad brugeren selv bør tjekke eller tilføje (fx fotos af stederne).
 ${branch ? `\nBranche: ${branch}.` : ""}${preset ? `\nDesign valgt af brugeren: "${preset.name}" (${preset.what}) - bevar design, menutype, bevægelse og start, som de står i skabelonen; udfyld kun indholdet.` : ""}${input.focus?.trim() ? `\nTouren skal især få besøgende til: ${input.focus.trim()}. Gør det til hovedhandlingen (cta, "Din plads venter", stedkort i de vigtigste rum).` : ""}
 ${input.notes.trim() ? `\nBemærkninger fra brugeren: ${input.notes.trim()}\n` : ""}
@@ -292,32 +278,19 @@ ${input.notes.trim() ? `\nBemærkninger fra brugeren: ${input.notes.trim()}\n` :
 ${site}
 </hjemmeside>
 
-<mpskins-menu>
-${menu || (tourUrl ? "(Kunne ikke læses)" : "(Ingen MPSkins-tour - menuens steder vælges bagefter i editoren. Lav menuen med kundens handlinger og evt. tomme grupper, som brugeren fylder.)")}
-</mpskins-menu>
-${
-  model
-    ? `
 <matterport>
-Touren er forbundet direkte til Matterport-modellen ${model.id} ("${model.name}"${model.address ? `, ${model.address}` : ""}).
-Steder i touren skrives som https://my.matterport.com/show/?m=${model.id}&ss=<scanpunkt> - start: brug ss=1, medmindre MPSkins-menuen viser et bedre startpunkt.
-</matterport>`
-    : ""
-}`,
+Touren er forbundet til Matterport-modellen ${model.id} ("${model.name}"${model.address ? `, ${model.address}` : ""}).
+Steder i touren skrives som https://my.matterport.com/show/?m=${model.id}&ss=<scanpunkt>.
+</matterport>`,
     32000
   );
   if (!result.ok) return result;
 
-  // MPSkins' colour filter comes along as it was set there.
-  if (tourUrl) {
-    const filter = filterFromCss((await fetchMpskinsCfg(tourUrl.toString()).catch(() => null))?.modelCssFilter);
-    if (filter) result.config.filter = filter;
-  }
   // The logo and pictures from the website are copied to us, so the tour keeps them whatever happens to the site.
   const hosted = await hostFiles(slug, { ...result.config, slug });
   const config = hosted.config as unknown as Prisma.InputJsonValue;
   await prisma.tour.create({
-    data: { slug, name, dealId: input.dealId || null, config, versions: { create: { config, note: `Bygget af Claude ud fra ${input.website.trim() || "MPSkins-touren"}`, createdByName: user.name } } },
+    data: { slug, name, dealId: input.dealId || null, config, versions: { create: { config, note: `Bygget af Claude${input.website.trim() ? ` ud fra ${input.website.trim()}` : ""}`, createdByName: user.name } } },
   });
   revalidatePath("/tour-lab");
   const failed = hosted.failed.length ? `\n\nDisse filer kunne ikke hentes til os: ${hosted.failed.join("; ")}` : "";

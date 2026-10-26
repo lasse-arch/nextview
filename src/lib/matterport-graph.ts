@@ -112,29 +112,57 @@ export async function searchAccountModels(token: string, query: string, offset?:
   }
 }
 
-export type ScanPoint = { ss: number; sid: string; x: number; y: number; floor: number };
-export type ScanMap = { floors: string[]; points: ScanPoint[] };
+export type ScanPoint = { ss: number; sid: string; x: number; y: number; floor: number; /** Place on the floor's plan image, in % (when it has one). */ px?: number; py?: number };
+export type ScanFloor = { name: string; /** Matterport's photographic top-down plan of the floor (a signed link - fetched fresh, never stored). */ image: string | null; aspect: number | null };
+export type ScanMap = { floors: ScanFloor[]; points: ScanPoint[] };
 
-/** Every scan point seen from above (x/y in metres - Matterport's model data is z-up), by floor - for the editor's scan point map. */
+type GraphFloorplan = { url: string; resolution: number | null; origin: { x: number; y: number } | null; width: number | null; height: number | null; floor: { id: string } | null };
+
+/**
+ * Every scan point seen from above, by floor, on Matterport's own
+ * photographic floor plan (the "colorplan" - the picture MPSkins shows),
+ * placed by the plan's scale and origin in the model's coordinates (z-up).
+ */
 export async function fetchScanMap(modelId: string): Promise<ScanMap | null> {
   try {
     const res = await fetch("https://my.matterport.com/api/mp/models/graph", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ query: `{ model(id: ${JSON.stringify(modelId)}) { floors { id label sequence } locations { id index position { x y z } floor { id } } } }` }),
+      body: JSON.stringify({
+        query: `{ model(id: ${JSON.stringify(modelId)}) { floors { id label sequence } locations { id index position { x y z } floor { id } } assets { floorplans { url resolution origin { x y } width height floor { id } } } } }`,
+      }),
       signal: AbortSignal.timeout(10_000),
-      next: { revalidate: 3600 },
+      next: { revalidate: 1800 },
     });
     if (!res.ok) return null;
     const data = (await res.json()) as {
-      data?: { model?: { floors?: { id: string; label: string | null; sequence: number }[]; locations?: { id: string; index: number; position: { x: number; y: number }; floor: { id: string } | null }[] } };
+      data?: {
+        model?: {
+          floors?: { id: string; label: string | null; sequence: number }[];
+          locations?: { id: string; index: number; position: { x: number; y: number }; floor: { id: string } | null }[];
+          assets?: { floorplans?: GraphFloorplan[] } | null;
+        };
+      };
     };
     const m = data.data?.model;
     if (!m?.locations?.length) return null;
     const floors = [...(m.floors ?? [])].sort((a, b) => a.sequence - b.sequence);
+    // Per floor the best plan: the photographic one with a transparent background, else the plain photographic one.
+    const plans = floors.map((f) => {
+      const mine = (m.assets?.floorplans ?? []).filter((p) => p.floor?.id === f.id && p.origin && p.resolution && p.width && p.height);
+      const name = (p: GraphFloorplan) => p.url.split("?")[0].split("/").pop() ?? "";
+      return mine.find((p) => name(p).startsWith("colorplan_alpha")) ?? mine.find((p) => name(p).startsWith("colorplan_0")) ?? null;
+    });
     return {
-      floors: floors.map((f, i) => f.label || `Etage ${i + 1}`),
-      points: m.locations.map((l) => ({ ss: l.index + 1, sid: l.id, x: +l.position.x.toFixed(2), y: +l.position.y.toFixed(2), floor: Math.max(0, floors.findIndex((f) => f.id === l.floor?.id)) })),
+      floors: floors.map((f, i) => ({ name: f.label || `Etage ${i + 1}`, image: plans[i]?.url ?? null, aspect: plans[i] ? plans[i]!.width! / plans[i]!.height! : null })),
+      points: m.locations.map((l) => {
+        const floor = Math.max(0, floors.findIndex((f) => f.id === l.floor?.id));
+        const plan = plans[floor];
+        const at = plan
+          ? { px: +((((l.position.x - plan.origin!.x) * plan.resolution!) / plan.width!) * 100).toFixed(2), py: +(((plan.height! - (l.position.y - plan.origin!.y) * plan.resolution!) / plan.height!) * 100).toFixed(2) }
+          : {};
+        return { ss: l.index + 1, sid: l.id, x: +l.position.x.toFixed(2), y: +l.position.y.toFixed(2), floor, ...at };
+      }),
     };
   } catch {
     return null;

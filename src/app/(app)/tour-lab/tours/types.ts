@@ -44,7 +44,7 @@ export type TourPoint = {
   /** Position on the drone picture, degrees. */
   yaw: number;
   pitch: number;
-  /** Where "Gå ind i rummet" lands (a U-link / MPSkins link), if anywhere. */
+  /** Where "Gå ind i rummet" lands (a link to a spot in the tour), if anywhere. */
   tour: string | null;
   /** A 360° photo at the point (folder under panos.basePath). */
   pano?: string;
@@ -59,15 +59,14 @@ export type TourConfig = {
   /** Short name, e.g. "Halvorsminde". */
   brand: string;
   title: string;
-  /** The current MPSkins tour - scan points and model id are read from it. Empty for a tour connected straight to a Matterport model. */
+  /** Legacy: an MPSkins tour page the scan points used to be read from. Empty for every tour connected straight to Matterport (all new ones) - "Frakobl MPSkins" moves the old ones over. */
   tourPage: string;
   /**
-   * The Matterport model (e.g. "rxaXbNZcETf") when the tour is connected
-   * straight to Matterport instead of an MPSkins tour page - scan points come
-   * from Matterport's own model data then. Left out = the MPSkins tour's model.
+   * The Matterport model (e.g. "rxaXbNZcETf") - scan points, floors and floor
+   * plans come straight from Matterport's own model data.
    */
   modelId?: string;
-  /** MPSkins "Starting Point" (a U-link). */
+  /** Where the tour starts: a link to a spot (my.matterport.com/show/?m=…&ss=…, with &rot= for the exact view). */
   start: string;
   /** Logo for dark backgrounds - unless logoOnLight. */
   logo: string;
@@ -156,7 +155,7 @@ export type TourConfig = {
   /** Keep Matterport's own buttons (dollhouse, floor plan, settings…). Default: hidden - the tour's own UI is the UI. */
   matterportUi?: boolean;
   /**
-   * A colour filter over the 3D tour (MPSkins' "Color filter") - e.g. a touch
+   * A colour filter over the 3D tour (like MPSkins' "Color filter" was) - e.g. a touch
    * brighter and warmer. brightness/contrast/saturate: 1 = unchanged;
    * grayscale 0-1; hue in degrees.
    */
@@ -220,9 +219,9 @@ export type TourConfig = {
   };
   /** "free": walk around as in Matterport. "points": only the menu and points move you. */
   navigation: "free" | "points";
-  /** Extra scan points to hide (sweep ids) - the ones hidden in MPSkins are picked up automatically. */
+  /** Scan points to hide (sweep ids) - set under Scanpunkter. */
   hiddenSweeps: string[];
-  /** MPSkins "navOpenOnStart", per device. */
+  /** Is the menu open when the tour starts, per device. */
   menuOpenOnStart: { desktop: boolean; mobile: boolean };
   menu: MenuEntry[];
   /**
@@ -231,8 +230,8 @@ export type TourConfig = {
    * names); left out = every room in the menu, in menu order.
    */
   stories?: { mobile: boolean; desktop: boolean; rooms?: string[] };
-  /** MPSkins "Codes" as Matterport URL parameters. */
+  /** Matterport URL parameters for the viewer. */
   matterportParams: Record<string, string>;
-  /** MPSkins "Deep Link Transitions" time. */
+  /** How long a fly to a spot takes (ms). */
   flyMs: number;
 };

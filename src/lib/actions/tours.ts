@@ -8,6 +8,7 @@ import type { TourConfig } from "@/app/(app)/tour-lab/tours/types";
 import { tourConfigProblem } from "@/lib/tour-validate";
 import type { ReportShare } from "@/lib/tour-share";
 import { randomBytes } from "node:crypto";
+import { detachFromMpskins } from "@/lib/tour-detach";
 
 type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string };
 
@@ -155,4 +156,29 @@ export async function tourShareLink(slug: string): Promise<Result<{ token: strin
   const token = randomBytes(18).toString("base64url");
   await prisma.tour.update({ where: { slug }, data: { shareToken: token } });
   return { ok: true, token };
+}
+
+/** Moves tours off MPSkins (one, or all that still use it) - each gets a new version, so it can be undone. */
+export async function detachToursFromMpskins(slug?: string): Promise<Result<{ moved: number; failed: string[] }>> {
+  const user = await admin();
+  const tours = await prisma.tour.findMany({ where: slug ? { slug } : {}, select: { id: true, slug: true, name: true, config: true } });
+  let moved = 0;
+  const failed: string[] = [];
+  for (const t of tours) {
+    const config = { ...(t.config as unknown as TourConfig), slug: t.slug };
+    if (!config.tourPage) continue;
+    const r = await detachFromMpskins(config);
+    if (!r.ok) {
+      failed.push(`${t.name}: ${r.error}`);
+      continue;
+    }
+    const json = r.config as unknown as Prisma.InputJsonValue;
+    await prisma.$transaction([
+      prisma.tour.update({ where: { id: t.id }, data: { config: json } }),
+      prisma.tourVersion.create({ data: { tourId: t.id, config: json, note: `Frakoblet MPSkins (${r.links} links flyttet til Matterport)`, createdByName: user.name } }),
+    ]);
+    moved++;
+  }
+  revalidatePath("/tour-lab");
+  return { ok: true, moved, failed };
 }

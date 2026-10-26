@@ -61,6 +61,9 @@ export function ScanPointsEditor({
   const w = maxX - minX;
   const h = maxY - minY;
   const hidden = new Set([...config.hiddenSweeps, ...mpskinsHidden]);
+  const plan = map.floors[floor];
+  /** Dots grow a little with zoom, but less than the plan, so crowded spots open up. */
+  const dot = Math.round(20 * Math.sqrt(zoom));
   const sel = map.points.find((p) => p.ss === selected) ?? null;
   const selUses = sel ? uses.get(sel.ss) : undefined;
   const colorOf = (ss: number) => {
@@ -86,7 +89,7 @@ export function ScanPointsEditor({
             <div className="flex rounded-[9px] bg-[#e9e9eb] p-[2px]">
               {map.floors.map((f, i) => (
                 <button key={i} type="button" onClick={() => setFloor(i)} className={`rounded-[7px] px-3 py-[5px] text-[13px] font-medium ${floor === i ? "bg-white shadow" : "text-[#1d1d1f]/70"}`}>
-                  {f}
+                  {f.name}
                 </button>
               ))}
             </div>
@@ -94,13 +97,43 @@ export function ScanPointsEditor({
           <span className="text-[12px] text-[#8e8e93]">{points.length} punkter</span>
           <div className="ml-auto flex gap-1">
             {(["−", "+"] as const).map((t) => (
-              <button key={t} type="button" onClick={() => setZoom((z) => Math.min(4, Math.max(1, z * (t === "+" ? 1.5 : 1 / 1.5))))} className="h-7 w-7 rounded-full bg-[#f2f2f7] text-[15px] font-semibold hover:bg-[#e9e9eb]">
+              <button key={t} type="button" onClick={() => setZoom((z) => Math.min(6, Math.max(1, z * (t === "+" ? 1.5 : 1 / 1.5))))} className="h-7 w-7 rounded-full bg-[#f2f2f7] text-[15px] font-semibold hover:bg-[#e9e9eb]">
                 {t}
               </button>
             ))}
           </div>
         </div>
-        <div className="-mx-1 max-h-[440px] overflow-auto rounded-xl bg-[#f5f5f7] ring-1 ring-black/[.04]">
+        <div className="-mx-1 max-h-[480px] overflow-auto rounded-xl bg-[#f5f5f7] ring-1 ring-black/[.04]">
+          {plan?.image && plan.aspect ? (
+            // Matterport's own top-down photo of the floor, with every scan point where it really is.
+            <div className="relative" style={{ width: `${zoom * 100}%`, aspectRatio: String(plan.aspect) }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={plan.image} alt={plan.name} className="absolute inset-0 h-full w-full select-none object-contain" draggable={false} />
+              {points.map((p) =>
+                p.px == null || p.py == null ? null : (
+                  <button
+                    key={p.sid}
+                    type="button"
+                    title={`Punkt ${p.ss}`}
+                    onClick={() => go(p.ss)}
+                    className={`absolute flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full font-bold tabular-nums shadow-[0_1px_4px_rgba(0,0,0,.35)] transition hover:z-10 hover:scale-125 ${selected === p.ss ? "z-10 scale-125 ring-2 ring-[#1d1d1f]" : ""} ${uses.get(p.ss)?.has("start") ? "outline outline-2 outline-offset-2 outline-[#0071e3]" : ""}`}
+                    style={{
+                      left: `${p.px}%`,
+                      top: `${p.py}%`,
+                      width: dot,
+                      height: dot,
+                      fontSize: dot * 0.45,
+                      background: hidden.has(p.sid) ? "rgba(255,255,255,.85)" : colorOf(p.ss),
+                      color: hidden.has(p.sid) ? "#8e8e93" : "#fff",
+                      border: hidden.has(p.sid) ? "1.5px dashed #8e8e93" : "1.5px solid #fff",
+                    }}
+                  >
+                    {p.ss}
+                  </button>
+                )
+              )}
+            </div>
+          ) : (
           <svg viewBox={`${minX} ${-maxY} ${w} ${h}`} style={{ width: `${zoom * 100}%`, display: "block" }} className="aspect-auto">
             {points.map((p) => {
               const isHidden = hidden.has(p.sid);
@@ -117,6 +150,7 @@ export function ScanPointsEditor({
               );
             })}
           </svg>
+          )}
         </div>
         <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-[#6e6e73]">
           {(

@@ -129,24 +129,3 @@ export async function siteDigest(address: string): Promise<string> {
     `\nTekst:\n${paragraphs.join("\n").slice(0, 5000)}`,
   ].join("\n");
 }
-
-/** The MPSkins tour's own side menu (and contact card) as plain text with its links - what the tour already has. */
-export async function mpskinsMenuDigest(tourUrl: string): Promise<string> {
-  const url = new URL(tourUrl);
-  if (url.hostname !== "explore.nextview360.dk") return "";
-  const html = await fetchText(new URL(url.pathname, url.origin), 2_000_000);
-  const at = html.indexOf('class="nav-box');
-  if (at < 0) return "";
-  return (
-    html
-      .slice(at)
-      .replace(/<(script|style|svg)[\s\S]*?<\/\1>/gi, " ")
-      .replace(/<div class="section cnt[^>]*>/gi, "\n## ")
-      .replace(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi, (_, a: string, text: string) => ` [${strip(text)}](${attr(a, "href")}) `)
-      .replace(/<(br|\/div|\/li|\/p)[^>]*>/gi, "\n")
-      .replace(/<[^>]+>/g, " ")
-      .replace(/[ \t]+/g, " ")
-      .replace(/\n\s*\n+/g, "\n")
-      .slice(0, 15_000)
-  );
-}

@@ -35,7 +35,6 @@ export function NewTour({ tours }: { tours: { slug: string; name: string }[] }) 
   const [step, setStep] = useState(0);
   const [who, setWho] = useState<Who | null>(null);
   const [space, setSpace] = useState<Space | null>(null);
-  const [mpskins, setMpskins] = useState("");
   const [branch, setBranch] = useState<Branch | null>(null);
   const [preset, setPreset] = useState<DesignPreset["id"] | null>(null);
   const [name, setName] = useState("");
@@ -50,7 +49,6 @@ export function NewTour({ tours }: { tours: { slug: string; name: string }[] }) 
     setStep(0);
     setWho(null);
     setSpace(null);
-    setMpskins("");
     setBranch(null);
     setPreset(null);
     setName("");
@@ -69,7 +67,6 @@ export function NewTour({ tours }: { tours: { slug: string; name: string }[] }) 
         : await createTourFromWebsite({
             name: who?.kind === "test" ? `Test – ${name}` : name,
             website,
-            tourUrl: mpskins,
             modelId: space?.id,
             dealId: who?.kind === "deal" ? who.deal.id : undefined,
             preset: preset ?? undefined,
@@ -86,7 +83,7 @@ export function NewTour({ tours }: { tours: { slug: string; name: string }[] }) 
     });
   }
 
-  const canNext = [Boolean(who), Boolean(space || mpskins.trim()), Boolean(branch), Boolean(preset), Boolean(name.trim())][step];
+  const canNext = [Boolean(who), Boolean(space), Boolean(branch), Boolean(preset), Boolean(name.trim())][step];
 
   return (
     <>
@@ -145,8 +142,6 @@ export function NewTour({ tours }: { tours: { slug: string; name: string }[] }) 
                 <SpaceStep
                   dealId={who?.kind === "deal" ? who.deal.id : null}
                   space={space}
-                  mpskins={mpskins}
-                  setMpskins={setMpskins}
                   onPick={(s) => {
                     setSpace(s);
                     if (who?.kind !== "deal") setName(s.name);
@@ -288,7 +283,7 @@ function CustomerStep({ who, onPick, onCopy }: { who: Who | null; onPick: (w: Wh
   );
 }
 
-function SpaceStep({ dealId, space, mpskins, setMpskins, onPick }: { dealId: string | null; space: Space | null; mpskins: string; setMpskins: (s: string) => void; onPick: (s: Space) => void }) {
+function SpaceStep({ dealId, space, onPick }: { dealId: string | null; space: Space | null; onPick: (s: Space) => void }) {
   const [connected, setConnected] = useState<boolean | null>(null);
   const [customerSpaces, setCustomerSpaces] = useState<Space[]>([]);
   const [q, setQ] = useState("");
@@ -391,9 +386,6 @@ function SpaceStep({ dealId, space, mpskins, setMpskins, onPick }: { dealId: str
                 Hent
               </button>
             </div>
-          </Field>
-          <Field title="MPSkins-link (valgfrit)" hint="Har touren en menu i MPSkins, genbruger Claude dens punkter og links.">
-            <input className={input} value={mpskins} onChange={(e) => setMpskins(e.target.value)} placeholder="https://explore.nextview360.dk/…" />
           </Field>
         </div>
       </details>

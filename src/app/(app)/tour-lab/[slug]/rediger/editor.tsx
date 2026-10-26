@@ -5,7 +5,7 @@ import { tourConfigProblem } from "@/lib/tour-validate";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Component, useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { logTourWork, renameTourSlug, restoreTourVersion, saveTour, searchDeals, setTourDeal } from "@/lib/actions/tours";
+import { detachToursFromMpskins, logTourWork, renameTourSlug, restoreTourVersion, saveTour, searchDeals, setTourDeal } from "@/lib/actions/tours";
 import { askClaudeForTour, saveAnthropicKey, type ChatTurn } from "@/lib/actions/tour-ai";
 import type { LinkOpen, MenuEntry, TourConfig } from "../../tours/types";
 import type { TourStats } from "@/lib/tour-stats";
@@ -301,10 +301,11 @@ export function TourEditor({
                 </Field>
                 </Group>
                 <Group title="Matterport">
-                <Field title="Matterport-touren (MPSkins-link)" hint="Touren henter scanpunkter og skjulte punkter herfra.">
-                  <input className={input} value={config.tourPage} onChange={(e) => edit((d) => void (d.tourPage = e.target.value))} />
+                <Field title="Matterport-model" hint="Det ID, der står efter m= i Matterport-linket. Scanpunkterne hentes direkte fra Matterport.">
+                  <input className={input} value={config.modelId ?? ""} placeholder={config.tourPage ? "Hentes fra MPSkins - frakobl herunder" : "Fx rxaXbNZcETf"} onChange={(e) => edit((d) => void (d.modelId = e.target.value.trim() || undefined))} />
                 </Field>
-                <Field title="Start" hint='Et U-link eller et udsyn kopieret med "Kopiér dette udsyn" i touren.'>
+                {config.tourPage && <DetachMpskins slug={slug} dirty={dirty} />}
+                <Field title="Start" hint="Vælg startpunktet under Scanpunkter (Start her) - eller indsæt et link her.">
                   <input className={input} value={config.start} onChange={(e) => edit((d) => void (d.start = e.target.value))} />
                 </Field>
                 </Group>
@@ -1014,6 +1015,34 @@ function SlugField({ slug, dirty }: { slug: string; dirty: boolean }) {
         {error && <p className="px-1 text-[12px] text-[#ff3b30]">{error}</p>}
       </Field>
     </Group>
+  );
+}
+
+/** A tour still running on an MPSkins page: one click moves it onto Matterport alone. */
+function DetachMpskins({ slug, dirty }: { slug: string; dirty: boolean }) {
+  const [pending, start] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <div className="space-y-2 rounded-xl bg-[#ff9500]/10 p-3">
+      <p className="text-[13px] leading-snug text-[#a05a00]">Touren henter stadig sine scanpunkter fra MPSkins. Flyt den over, så den kun bruger Matterport - links, skjulte punkter og farvefilter kommer med.</p>
+      <button
+        type="button"
+        disabled={pending || dirty}
+        title={dirty ? "Gem dine ændringer først" : undefined}
+        className="w-full rounded-xl bg-[#1d1d1f] py-2 text-[14px] font-medium text-white disabled:opacity-40"
+        onClick={() =>
+          start(async () => {
+            const r = await detachToursFromMpskins(slug);
+            if (!r.ok) return setError(r.error);
+            if (r.failed.length) return setError(r.failed.join("; "));
+            window.location.reload();
+          })
+        }
+      >
+        {pending ? "Flytter…" : "Frakobl MPSkins"}
+      </button>
+      {error && <p className="text-[12px] text-[#ff3b30]">{error}</p>}
+    </div>
   );
 }
 

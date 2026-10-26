@@ -6,6 +6,7 @@ import { listTours } from "@/lib/tours";
 import { NewTour } from "./new-tour";
 import { TourLab } from "./tour-lab";
 import { ToursList, type TourRow } from "./tours-list";
+import { DetachAll } from "./detach-all";
 import type { TourConfig } from "./tours/types";
 
 
@@ -28,6 +29,7 @@ export default async function TourLabPage() {
   const user = await getCurrentUser();
   if (user?.role !== "ADMIN") redirect("/");
   const [tours, sdkKey, results] = await Promise.all([listTours(), getSettingValue("MATTERPORT_SDK_KEY"), leadsByTour(30)]);
+  const mpskinsLeft = tours.filter((t) => (t.config as unknown as TourConfig).tourPage).length;
   const rows: TourRow[] = tours.map((t) => {
     const c = t.config as unknown as TourConfig;
     const pic = picture(c);
@@ -54,6 +56,8 @@ export default async function TourLabPage() {
         </div>
         <NewTour tours={tours.map((t) => ({ slug: t.slug, name: t.name }))} />
       </div>
+
+      {mpskinsLeft > 0 && <DetachAll count={mpskinsLeft} />}
 
       <ToursList rows={rows} />
 
