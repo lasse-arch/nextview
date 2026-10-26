@@ -218,11 +218,19 @@ export function Experience(props: ExperienceProps) {
   useEffect(() => {
     if (window.parent === window) return;
     const onMessage = (e: MessageEvent) => {
-      if (e.origin === location.origin && e.source === window.parent && e.data?.type === "tour-draft") setDraft(e.data.config as TourConfig);
+      if (e.origin === location.origin && e.source === window.parent && e.data?.type === "tour-draft") {
+        const next = e.data.config as TourConfig;
+        // Only a real change is a new setup: the same draft again (the editor sends it each time the tour says it's ready)
+        // must not give the tour a new setup object - that would reconnect Matterport and loop forever.
+        setDraft((prev) => {
+          const same = JSON.stringify(next);
+          return same === JSON.stringify(prev ?? props.tour) ? prev : next;
+        });
+      }
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, []);
+  }, [props.tour]);
   const T = draft ?? props.tour;
   return <TourExperience key={startSignature(T)} {...props} tour={T} />;
 }
@@ -978,9 +986,12 @@ function TourExperience({
       }
     }
     window.addEventListener("message", onMessage);
-    reply({ type: "tour-ready" });
     return () => window.removeEventListener("message", onMessage);
   }, [savedTour, sweepBySs]);
+  // Tell the editor once that the preview is listening (it then sends its draft) - not on every setup change.
+  useEffect(() => {
+    if (window.parent !== window) window.parent.postMessage({ type: "tour-ready" }, location.origin);
+  }, []);
 
   /* A tag being placed from the editor: follow the pointer, the next click is the spot. */
   useEffect(() => {
