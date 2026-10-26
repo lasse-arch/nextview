@@ -43,7 +43,7 @@ export function FeedbackPanel({ slug, token: initialToken, preview }: { slug: st
             })
           }
           title="Kunden kan se touren og give feedback"
-          hint="Et hemmeligt link til touren, som den er lige nu (også før den er udgivet), med en knap til forslag og fejl. Slå fra, og linket virker ikke længere."
+          hint="Et hemmeligt link til touren, som den er lige nu (også før den er udgivet), hvor kunden kan skrive feedback. Vi gemmer selv, hvor i touren de stod. Slå fra, og linket virker ikke længere."
         />
         {url && (
           <div className="space-y-1.5">
@@ -91,7 +91,6 @@ export function FeedbackPanel({ slug, token: initialToken, preview }: { slug: st
               )}
               <div className="space-y-1.5 p-3">
                 <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
-                  <span className={`rounded-full px-2 py-0.5 font-semibold ${f.kind === "fejl" ? "bg-[#ffe5e3] text-[#c4271d]" : "bg-[#e8f0fe] text-[#0058b0]"}`}>{f.kind === "fejl" ? "Fejl" : "Forslag"}</span>
                   <span className="text-[#8e8e93]">{[f.author, f.room ?? (f.ss ? `scan ${f.ss}` : null), when(f.at)].filter(Boolean).join(" · ")}</span>
                 </div>
                 <p className="whitespace-pre-wrap text-[14px] leading-snug">{f.text}</p>
