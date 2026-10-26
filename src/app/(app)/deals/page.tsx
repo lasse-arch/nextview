@@ -97,6 +97,11 @@ export default async function DealsPage({
               Leadindbakke ({inboxCount}) →
             </Link>
           )}
+          {currentUser?.role === "ADMIN" && (
+            <Link href="/deals/slettede" className="whitespace-nowrap text-sm text-slate-500 hover:text-slate-900">
+              Slettede
+            </Link>
+          )}
           <div className="flex rounded-md border border-slate-300 text-sm">
             <Link
               href={toggleViewUrl("list")}

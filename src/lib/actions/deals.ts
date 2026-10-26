@@ -1,5 +1,6 @@
 "use server";
 
+import { deleteDealArchived } from "@/lib/deal-archive";
 import { releaseEstablishmentOnLive } from "@/lib/establishment-approval";
 import { sendWelcomeMailOnLive } from "@/lib/welcome-mail";
 import { createDuplicateDealRecord } from "@/lib/deal-duplicate";
@@ -548,9 +549,9 @@ export async function setCommissionExcluded(dealId: string, excluded: boolean) {
 }
 
 /**
- * Permanently deletes a deal and everything tied to it (notes, emails,
- * invoices, commission, items, renewal history) via cascade. Admin-only -
- * this can't be undone.
+ * Deletes a deal and everything tied to it (notes, emails, invoices,
+ * commission, items, renewal history) via cascade - kept whole first, so it
+ * can be put back from "Slettede kunder" (lib/deal-archive.ts).
  */
 export async function deleteDeal(dealId: string) {
   const user = await requireUser();
@@ -558,15 +559,17 @@ export async function deleteDeal(dealId: string) {
   if (user.role !== "ADMIN" && deal.ownerId !== user.id) {
     throw new Error("Du kan kun slette dine egne deals.");
   }
-  await prisma.deal.delete({ where: { id: dealId } });
+  await deleteDealArchived(dealId, user.name);
   revalidatePath("/deals");
   redirect("/deals");
 }
 
 /** Resolves a detected import duplicate by keeping one deal and deleting the other. */
 export async function resolveDuplicate(keepId: string, deleteId: string) {
-  await requireUser();
-  await prisma.deal.delete({ where: { id: deleteId } });
+  const user = await requireUser();
+  const deal = await prisma.deal.findUniqueOrThrow({ where: { id: deleteId }, select: { ownerId: true } });
+  if (user.role !== "ADMIN" && deal.ownerId !== user.id) throw new Error("Du kan kun slette dine egne deals.");
+  await deleteDealArchived(deleteId, user.name);
   revalidatePath("/deals");
   return { keptId: keepId };
 }

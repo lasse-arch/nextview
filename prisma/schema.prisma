@@ -1468,3 +1468,20 @@ model LoginFailure {
   @@index([email, createdAt])
   @@index([ip, createdAt])
 }
+
+/// A deleted deal, kept whole so it can be put back ("Slettede kunder"):
+/// the deal's own row, every row deleted along with it (notes, e-mails,
+/// invoices, commission …) and the ids of rows that only lost their link to
+/// it (tasks, activity, tours, branches), so restoring links them again.
+model DeletedDeal {
+  id            String    @id @default(cuid())
+  dealId        String
+  name          String
+  deletedByName String
+  /// { deal, rows: { [table]: row[] }, links: { [table]: { column, ids } } }
+  data          Json
+  createdAt     DateTime  @default(now())
+  restoredAt    DateTime?
+
+  @@index([createdAt])
+}
