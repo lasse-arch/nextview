@@ -5,37 +5,36 @@ import type { TourConfig } from "./types";
  * Halvorsminde starting on a flat map instead of the 360° drone scene - the
  * prototype for campsites and others that only have a site plan or an
  * illustrated map (until the spring drone flight). Everything else is the
- * same tour. kort.jpg next to it is a flat render of the drone photo, which
- * can be used the same way.
+ * same tour. The points are placed and edited in the editor (Interaktivt kort).
  */
 export const halvorsmindeKort: TourConfig = {
   ...halvorsminde,
   slug: "halvorsminde-kort",
   title: "Halvorsminde - på tegnet kort",
   map: {
-    // The illustrated map; the points were placed building by building against the drone photo.
-    image: "/tours/halvorsminde/kort/tegning.jpg",
-    w: 2587,
-    h: 1579,
+    // The illustrated map (2026), drawn for Nextview360 - the points sit on the buildings they open.
+    image: "/tours/halvorsminde/kort/kort-2026.jpg",
+    w: 4000,
+    h: 1995,
     spots: {
-      hal: [24, 53],
-      fitness: [37, 62],
-      foredrag: [44.5, 58],
-      faellesrum: [52, 54],
-      gastro: [51.5, 61.5],
-      vaerelse4: [42, 48],
-      sauna: [33, 42],
-      vaerelse2: [51, 39],
-      volleyball: [36, 31],
-      styling: [59, 44],
-      vaerelse3: [66, 41],
-      sloejd: [70, 54],
-      metal: [73.5, 48],
-      fodbold: [25.5, 21],
-      skov: [57, 26],
+      hal: [17, 41],
+      fitness: [27, 51],
+      foredrag: [36, 50],
+      faellesrum: [43, 43],
+      gastro: [42, 49],
+      vaerelse4: [30, 37.5],
+      sauna: [21.5, 36],
+      vaerelse2: [41, 29],
+      volleyball: [31.5, 15.5],
+      styling: [49, 29],
+      vaerelse3: [54, 33],
+      sloejd: [57, 42],
+      metal: [63, 41],
+      fodbold: [37.5, 5],
+      skov: [45, 12.5],
     },
-    start: { x: 50, y: 50, zoom: 1 },
-    startMobile: { x: 50, y: 47, zoom: 1.15 },
+    start: { x: 42, y: 40, zoom: 1.1 },
+    startMobile: { x: 38, y: 42, zoom: 1.4 },
     searchPlaceholder: "Søg fx værelse, hal, sløjd…",
   },
 };

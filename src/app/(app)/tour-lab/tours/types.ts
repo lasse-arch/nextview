@@ -50,6 +50,8 @@ export type TourPoint = {
   pano?: string;
   text: string;
   chips: string[];
+  /** How big the point is on the map: 1 = normal (0.6-1.8). */
+  size?: number;
 };
 
 export type MenuEntry = { title: string; href: string } | { title: string; items: [string, string][] };
@@ -120,6 +122,12 @@ export type TourConfig = {
     startMobile?: { x: number; y: number; zoom: number };
     searchPlaceholder?: string;
     clouds?: boolean;
+    /** The words over the map (a tour with a drone scene uses its own). */
+    intro?: { title: string; lead: string };
+    /** The button back to the map from inside the tour. */
+    backLabel?: string;
+    /** The heading over the category filter. */
+    filterTitle?: string;
   };
   panos?: { basePath: string; maxLevel: number; cubeResolution: number };
   categories: Record<string, { name: string; color: string }>;

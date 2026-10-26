@@ -199,7 +199,7 @@ export function MapScene({
                 key={p.id}
                 data-punkt={p.id}
                 className={`hv-hs hv-hs-${p.cat} km-pin ${hidden[p.cat] ? "hv-skjult" : ""} ${selectedId === p.id ? "hv-aktiv" : ""}`}
-                style={{ left: `${pos[0]}%`, top: `${pos[1]}%`, transform: `scale(${1 / view.s})`, animationDelay: `${0.9 + i * 0.06}s` }}
+                style={{ left: `${pos[0]}%`, top: `${pos[1]}%`, transform: `scale(${(p.size ?? 1) / view.s})`, animationDelay: `${0.9 + i * 0.06}s` }}
                 onClick={(e) => {
                   e.stopPropagation();
                   if (!dragged.current) onPoint(p);

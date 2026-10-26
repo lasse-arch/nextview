@@ -11,6 +11,7 @@ import type { MenuEntry, TourConfig, TourPlace, TourPoint, WelcomeGo } from "../
 import { CoverWelcome, DESIGNS_CSS, DockMenu, PickerMenu } from "./designs";
 import { GUIDE_CSS, GuidePlayer, guideStops } from "./guide";
 import { DAY_CSS, DayBar, DaySheet } from "./day";
+import { ICONS } from "../tours/icons";
 import { SIMPLE_CSS, SimpleMenu, SimpleWelcome } from "./simple";
 import { INFO_CSS, InfoDots, usePlaceInfo } from "./info";
 import { MAP_CSS, MapScene, type MapApi } from "./map";
@@ -114,20 +115,7 @@ function useGa4(id: string | null, title: string) {
 /* ---------------------------------------------------------------------------
  * Icons (from the drone page) and small helpers.
  * ------------------------------------------------------------------------- */
-const ICONS: Record<string, string> = {
-  seng: '<path d="M3 18v-5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v5M3 18v2M21 18v2M3 13h18M6 11V9a2 2 0 0 1 2-2h3"/>',
-  mad: '<path d="M7 3v8a2 2 0 0 0 2 2v8M5 3v5M9 3v5M17 3c-2 0-3 2-3 5s1 4 3 4v9"/>',
-  sofa: '<path d="M4 11V8a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3v3M3 11h18v6H3zM6 17v2M18 17v2"/>',
-  mic: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M6 11a6 6 0 0 0 12 0M12 17v4"/>',
-  skrue: '<path d="M14 7l3-3 3 3-3 3M14 7l-8 8-3 3 3-3M14 7l-2 2"/><path d="M9 12l3 3"/>',
-  hammer: '<path d="M14 6l4 4M12 8l-7 7a2 2 0 0 0 3 3l7-7M14 4l6 6-2 2-6-6z"/>',
-  saks: '<circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><path d="M8 7l12 10M8 17L20 7"/>',
-  hal: '<path d="M3 11l9-7 9 7v9H3z"/><path d="M9 20v-5h6v5M3 11h18"/>',
-  loeft: '<path d="M4 10h16M7 7v6M17 7v6M4 10V8M20 10V8M12 4v16"/>',
-  bold: '<circle cx="12" cy="12" r="9"/><path d="M12 7l4 3-1.5 4.5h-5L8 10z"/>',
-  skov: '<path d="M12 3l5 7h-3l4 6H6l4-6H7z"/><path d="M12 16v5"/>',
-  sauna: '<path d="M4 20h16M6 20v-7a6 6 0 0 1 12 0v7M9 8s1-2 0-4M15 8s1-2 0-4"/>',
-};
+
 
 const now = () => performance.now();
 type Point = TourPoint;
@@ -206,7 +194,7 @@ type ExperienceProps = {
 
 /** The parts of a setup the tour only reads when it starts - a change to them starts the preview over. */
 const startSignature = (T: TourConfig) =>
-  JSON.stringify([T.navigation, T.menuOpenOnStart, T.design, Boolean(T.welcome), Boolean(T.cover), T.intro, T.start, T.matterportParams, T.mobileZoomLock, T.matterportUi, T.modelId, T.tourPage]);
+  JSON.stringify([T.navigation, T.menuOpenOnStart, T.design, Boolean(T.welcome), Boolean(T.cover), Boolean(T.map), Boolean(T.drone), T.intro, T.start, T.matterportParams, T.mobileZoomLock, T.matterportUi, T.modelId, T.tourPage]);
 
 /**
  * The tour. As the editor's live preview it takes the editor's unsaved draft
@@ -296,7 +284,13 @@ function TourExperience({
   /** "Kun punkter": no free walking - only the current scan point is enabled, the menu and points move you. */
   const [pointsOnly, setPointsOnly] = useState(T.navigation === "points");
   const pointsOnlyRef = useRef(pointsOnly);
-  const [phase, setPhase] = useState<"drone" | "tour">(T.drone ? "drone" : "tour");
+  /** The overview the tour starts on: the drone scene, or an interactive map on its own (its words fall back to sensible ones). */
+  const OV = T.drone
+    ? { intro: T.map?.intro ?? T.drone.intro, backLabel: T.map?.backLabel ?? T.drone.backLabel, filterTitle: T.map?.filterTitle ?? T.drone.filterTitle }
+    : T.map
+      ? { intro: T.map.intro ?? { title: T.brand, lead: "Tryk på et sted for at se mere - eller gå direkte ind." }, backLabel: T.map.backLabel ?? "Tilbage til kortet", filterTitle: T.map.filterTitle ?? "Vis" }
+      : null;
+  const [phase, setPhase] = useState<"drone" | "tour">(OV ? "drone" : "tour");
   const [selected, setSelected] = useState<Point | null>(null);
   const [hidden, setHidden] = useState<Record<string, boolean>>({});
   const [menuOpen, setMenuOpen] = useState(false);
@@ -651,10 +645,12 @@ function TourExperience({
     prepared.current = null;
     track("back_to_drone", { room_name: room ?? "" });
     setMenuOpen(false);
-    if (!T.drone) return;
+    if (!OV) return;
     setPhase("drone");
-    const start = mobile.current ? T.drone.startMobile : T.drone.start;
-    setTimeout(() => drone.current?.lookAt(start.pitch, start.yaw, start.hfov, 1200), 350);
+    if (T.drone) {
+      const start = mobile.current ? T.drone.startMobile : T.drone.start;
+      setTimeout(() => drone.current?.lookAt(start.pitch, start.yaw, start.hfov, 1200), 350);
+    }
     setTimeout(() => mapApi.current?.reset(), 350);
   }
 
@@ -1155,7 +1151,7 @@ function TourExperience({
       )}
 
       {/* The drone scene on top; fades away when going into the tour. */}
-      {T.drone && (
+      {OV && (
       <div className={`absolute inset-0 transition-opacity duration-500 ${phase === "drone" ? "opacity-100" : "pointer-events-none opacity-0"}`}>
         {T.map ? (
           <MapScene
@@ -1178,8 +1174,8 @@ function TourExperience({
             <div className="hv-sub">{T.subtitle}</div>
           </div>
           <div className="hv-intro-body">
-            <h1>{T.drone?.intro.title}</h1>
-            <p>{T.drone?.intro.lead}</p>
+            <h1>{OV?.intro.title}</h1>
+            <p>{OV?.intro.lead}</p>
             <TourLink className="hv-btn hv-primary" href={T.cta[0].href} label={T.cta[0].label} onClick={() => ctaClick(T.cta[0].label, T.cta[0].href, "intro")}>
               {T.cta[0].label}
             </TourLink>
@@ -1187,7 +1183,7 @@ function TourExperience({
         </div>
 
         <div className="hv-filtre">
-          <div className="hv-filtre-t">{T.drone?.filterTitle}</div>
+          <div className="hv-filtre-t">{OV?.filterTitle}</div>
           <div className="hv-chips">
             {Object.entries(T.categories).map(([k, c]) => (
               <button
@@ -1294,12 +1290,12 @@ function TourExperience({
       {/* Inside the tour: back to the air, the room's name, the menu. */}
       {phase === "tour" && (
         <>
-          {T.drone && (
+          {OV && (
           <button type="button" className="hv-luften" onClick={backToDrone}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M5 5l4 4M19 5l-4 4M5 19l4-4M19 19l-4-4M9 9h6v6H9z" />
             </svg>
-            {T.drone.backLabel}
+            {OV.backLabel}
           </button>
           )}
           {T.stories && storyRooms.length > 0 && (
@@ -1307,7 +1303,7 @@ function TourExperience({
               rooms={storyRooms}
               current={room}
               devices={T.stories}
-              leading={T.drone ? { label: T.drone.backLabel, onClick: backToDrone } : undefined}
+              leading={OV ? { label: OV.backLabel, onClick: backToDrone } : undefined}
               onGo={storyGo}
               onEvent={track}
             />

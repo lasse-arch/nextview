@@ -123,7 +123,7 @@ function Rows<T>({
 }
 
 /** Where something leads in the tour: picked by standing there in the preview. */
-function PlacePicker({ href, onChange, preview, name }: { href: string; onChange: (href: string, room: string | null) => void; preview: PreviewApi; name?: string }) {
+export function PlacePicker({ href, onChange, preview, name }: { href: string; onChange: (href: string, room: string | null) => void; preview: PreviewApi; name?: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const ss = ssOfHref(href);

@@ -153,3 +153,14 @@ pladsen og kan booke den med det samme.
 
 En kunde kan have flere tours til forskellige steder i kunderejsen (fx én til
 hjemmesidens forside og én til en bestemt produktside). Hver tour har ét mål.
+
+## Interaktivt kort
+
+Et tegnet kort, en situationsplan eller et dronefoto, som touren starter på
+(`map`), med punkter man trykker på og går ind fra. Godt til steder med mange
+bygninger eller et stort område (skoler, campingpladser, ferieparker).
+- Sæt punkterne i editoren under "Interaktivt kort": "Sæt menuens rum ind"
+  placerer menuens rum ét klik ad gangen (navn, sted i touren og ikon kommer med).
+- Få kategorier (3-6) med tydelige farver - de bliver til filtret over kortet.
+- De vigtigste steder lidt større (`size`), resten normale.
+- Kortet kan stå alene - det behøver ikke en drone-scene.
