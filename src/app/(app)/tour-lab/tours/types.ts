@@ -74,7 +74,7 @@ export type TourConfig = {
   favicon?: string;
   /** The logo is made for light backgrounds (shown on white instead of the main colour). */
   logoOnLight?: boolean;
-  /** A dark logo sits on a light card in the tour - false: straight on the tour, transparent (as in MPSkins). */
+  /** A dark logo sits on a light card in the tour - false: straight on the tour, transparent, no glow (as in MPSkins). */
   logoCard?: false;
   /** The logo's height over the tour, in px (computer; a phone shows it a bit smaller). Default 46. */
   logoSize?: number;

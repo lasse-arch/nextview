@@ -443,7 +443,7 @@ export function TourEditor({
                     on={config.logoCard !== false}
                     onChange={(on) => edit((d) => void (d.logoCard = on ? undefined : false))}
                     title="Hvidt kort bag logoet"
-                    hint="Fra: logoet ligger gennemsigtigt direkte på touren, som i MPSkins (med en svag lys kant, så det kan læses)."
+                    hint="Fra: logoet ligger gennemsigtigt direkte på touren, præcis som det er - som i MPSkins."
                   />
                 )}
                 </Group>
