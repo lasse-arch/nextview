@@ -72,5 +72,5 @@ One engine, one JSON setup per tour, kept in the database and edited in Arpo.
   login admin@nextview360.dk / admin123) and screenshot `/tour-lab` and
   `/tour-lab/<slug>/rediger` with Playwright.
 - The sandbox can't load Matterport or outside images, so the 3D tour itself
-  (flying, the bridge's `view`/`shot`) can only be tested on www.arpo.dk - say so.
+  (flying, the bridge's `view`/`shot`) can only be tested on the live Arpo (arpo.nextview360.dk) - say so.
 - Tour-lab is admin-only, so no /nyheder post until it is shown to customers.

@@ -9,7 +9,7 @@ import { placeSlug, type StartPlace } from "@/app/(app)/tour-lab/tours/places";
  * sitemap and the links on its front page (cached a week).
  */
 
-const UA = "Mozilla/5.0 (compatible; ArpoTourBuilder/1.0; +https://www.arpo.dk)";
+const UA = "Mozilla/5.0 (compatible; ArpoTourBuilder/1.0; +https://nextview360.dk)";
 type Page = { url: string; title: string };
 
 async function get(url: string): Promise<string> {

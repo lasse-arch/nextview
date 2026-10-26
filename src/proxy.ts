@@ -28,7 +28,26 @@ function shortHost(request: NextRequest): NextResponse | null {
   return NextResponse.rewrite(url);
 }
 
+/*
+ * Arpo moved from arpo.dk to its APP_BASE_URL (arpo.nextview360.dk): the old
+ * address sends every page there, path and all - bookmarks, links in old
+ * e-mails and tour codes on customers' sites keep working. /api isn't
+ * redirected (the matcher leaves it out), so webhooks still pointing at the
+ * old address keep arriving.
+ */
+const OLD_HOSTS = ["arpo.dk", "www.arpo.dk"];
+const APP_HOST = hostOf(process.env.APP_BASE_URL);
+
+function movedHost(request: NextRequest): NextResponse | null {
+  const host = request.headers.get("host")?.toLowerCase();
+  if (!host || !APP_HOST || !OLD_HOSTS.includes(host) || OLD_HOSTS.includes(APP_HOST)) return null;
+  const url = new URL(request.nextUrl.pathname + request.nextUrl.search, process.env.APP_BASE_URL);
+  return NextResponse.redirect(url, 308);
+}
+
 export function proxy(request: NextRequest) {
+  const moved = movedHost(request);
+  if (moved) return moved;
   const short = shortHost(request);
   if (short) return short;
   const { pathname } = request.nextUrl;

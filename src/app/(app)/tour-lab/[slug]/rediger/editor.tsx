@@ -1,5 +1,6 @@
 "use client";
 
+import { tourUrl } from "@/lib/public-urls";
 import { isPlaceHref } from "../../tours/places";
 import { tourConfigProblem } from "@/lib/tour-validate";
 import Link from "next/link";
@@ -766,7 +767,7 @@ export function TourEditor({
                   <i className="h-3 w-3 rounded-full bg-[#ff5f57]" />
                   <i className="h-3 w-3 rounded-full bg-[#febc2e]" />
                   <i className="h-3 w-3 rounded-full bg-[#28c840]" />
-                  <span className="mx-auto rounded-md bg-white px-3 py-0.5 text-[11px] text-[#8e8e93] ring-1 ring-black/[.06]">arpo.dk/t/{slug}</span>
+                  <span className="mx-auto rounded-md bg-white px-3 py-0.5 text-[11px] text-[#8e8e93] ring-1 ring-black/[.06]">{tourUrl(slug, "").replace(/^https?:\/\//, "") || `/t/${slug}`}</span>
                 </div>
                 <iframe ref={frame} key={previewKey} title="Forhåndsvisning" src={`/tour-lab/${slug}`} className="min-h-0 w-full flex-1 bg-black" allow="fullscreen; xr-spatial-tracking; autoplay; clipboard-write" />
               </div>

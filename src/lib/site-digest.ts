@@ -8,7 +8,7 @@ import { prisma } from "@/lib/db";
  * new tour is started from the website (see tour-ai.ts).
  */
 
-const UA = "Mozilla/5.0 (compatible; ArpoTourBuilder/1.0; +https://www.arpo.dk)";
+const UA = "Mozilla/5.0 (compatible; ArpoTourBuilder/1.0; +https://nextview360.dk)";
 
 /** Only public web addresses - never our own server or the local network. */
 export function publicUrl(raw: string): URL {
