@@ -42,6 +42,7 @@ export const halscamping: TourConfig = {
     mapUrl: "https://www.google.com/maps/search/?api=1&query=Hals+Strand+Camping+Lagunen+8+9370+Hals",
     phone: "+45 51 24 35 07",
     email: "info@halsstrandcamping.dk",
+    social: { facebook: "https://www.facebook.com/HalsStrandCamping/" },
   },
   /** The drone 360° over the entrance and the pool (Pannellum multires tiles, moved over from the Lovable map). */
   drone: {

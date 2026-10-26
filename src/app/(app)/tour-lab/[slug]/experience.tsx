@@ -3,6 +3,7 @@
 import { LANG_CSS, LangSwitch } from "./lang-switch";
 import { danishOf, localize, makeT, tourLanguages } from "../tours/i18n";
 import { TourLang } from "../tours/i18n-react";
+import { socialLinks } from "../tours/social";
 import { cssFilter, isInTourHref, isPlaceHref, placeHref, placeSlug, pointOfHref, startPlaces } from "../tours/places";
 import type { LiveUnit } from "@/lib/availability/live";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
@@ -1567,11 +1568,14 @@ function TourExperience({
                 {T.contact.email}
               </a>
             )}
-            {T.contact.instagram && (
-              <TourLink href={T.contact.instagram} label="Instagram" onClick={() => track("contact_click", { kind: "instagram" })}>
-                <span>📷</span>
-                Instagram
-              </TourLink>
+            {socialLinks(T.contact).length > 0 && (
+              <div className="hv-social">
+                {socialLinks(T.contact).map((s) => (
+                  <TourLink key={s.kind} href={s.href} label={s.name} onClick={() => track("contact_click", { kind: s.kind })}>
+                    <svg viewBox="0 0 24 24" fill="currentColor" aria-label={s.name} dangerouslySetInnerHTML={{ __html: s.icon }} />
+                  </TourLink>
+                ))}
+              </div>
             )}
           </div>
         )}
@@ -2155,6 +2159,10 @@ const CSS = `
 .hv-contact-t{font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#7a8a90}
 .hv-contact a{display:flex;gap:8px;align-items:center;overflow-wrap:anywhere;min-width:0;color:var(--c-main);text-decoration:none;font-size:14px;font-weight:600}
 .hv-contact a:hover{color:var(--c-accent-dark)}
+.hv-social{display:flex;flex-wrap:wrap;gap:14px;margin-top:4px}
+.hv-contact .hv-social a{width:34px;height:34px;justify-content:center;border-radius:10px;transition:transform .15s}
+.hv-contact .hv-social a:hover{transform:translateY(-2px)}
+.hv-social svg{width:30px;height:30px}
 .hv-menu-cta{padding:14px 22px 24px;display:flex;flex-direction:column;gap:8px}
 .hv-pano{position:absolute;inset:0;z-index:15;background:#0d1b20;animation:hvFade .4s ease}
 @keyframes hvFade{from{opacity:0}to{opacity:1}}

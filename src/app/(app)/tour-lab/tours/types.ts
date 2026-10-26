@@ -107,7 +107,13 @@ export type TourConfig = {
    */
   utm?: false;
   /** Contact card at the bottom of the menu. */
-  contact?: { address?: string; mapUrl?: string; phone?: string; email?: string; instagram?: string };
+  /**
+   * Contact card at the bottom of the menu. `social`: links to the customer's
+   * social media (facebook, instagram, linkedin, tiktok, youtube, x), shown as
+   * icons - only the ones filled in. `instagram` is the older single field
+   * (still shown, as its icon).
+   */
+  contact?: { address?: string; mapUrl?: string; phone?: string; email?: string; instagram?: string; social?: Partial<Record<import("./social").SocialKind, string>> };
   /** The drone scene in front of the tour - leave out to start straight in the tour. */
   drone?: {
     basePath: string;

@@ -9,6 +9,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Component, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { detachToursFromMpskins, logTourWork, renameTourSlug, restoreTourVersion, saveTour, searchDeals, setTourDeal } from "@/lib/actions/tours";
+import { SOCIALS } from "../../tours/social";
 import { askClaudeForTour, saveAnthropicKey, type ChatTurn } from "@/lib/actions/tour-ai";
 import type { LinkOpen, MenuEntry, TourConfig } from "../../tours/types";
 import type { TourStats } from "@/lib/tour-stats";
@@ -635,7 +636,6 @@ export function TourEditor({
                     ["phone", "Telefon", "Fx 75 75 75 84", "tel"],
                     ["email", "E-mail", "Fx info@kunde.dk", "email"],
                     ["address", "Adresse", "Fx Egelykkevej 2, 9310 Vodskov", "text"],
-                    ["instagram", "Instagram", "Fx instagram.com/kunden", "url"],
                   ] as const
                 ).map(([k, text, example, type]) => (
                   <Field key={k} title={text} hint={k === "address" ? "Bliver et link, der åbner adressen i Google Maps." : undefined}>
@@ -645,10 +645,40 @@ export function TourEditor({
                       placeholder={example}
                       value={config.contact?.[k] ?? ""}
                       onChange={(e) => edit((d) => void (d.contact = { ...d.contact, [k]: e.target.value || undefined }))}
-                      onBlur={(e) => k === "instagram" && e.target.value && edit((d) => void (d.contact = { ...d.contact, instagram: withProtocol(e.target.value) }))}
                     />
                   </Field>
                 ))}
+                <Field title="Sociale medier" hint="Vises som ikoner nederst i menuen. Udfyld linket til dem, kunden vil have vist.">
+                  <div className="space-y-1.5">
+                    {SOCIALS.map((so) => {
+                      // The old single Instagram field shows (and is moved over) here.
+                      const value = config.contact?.social?.[so.kind] ?? (so.kind === "instagram" ? config.contact?.instagram : undefined) ?? "";
+                      const setSocial = (v: string | undefined) =>
+                        edit((d) => {
+                          const social = { ...d.contact?.social, [so.kind]: v };
+                          if (!v) delete social[so.kind];
+                          const next = { ...d.contact, social: Object.keys(social).length ? social : undefined };
+                          if (so.kind === "instagram") delete next.instagram;
+                          d.contact = next;
+                        });
+                      return (
+                        <label key={so.kind} className="flex items-center gap-2">
+                          <span className={`flex h-9 w-9 flex-none items-center justify-center rounded-lg ${value ? "text-[#1d1d1f]" : "text-[#c7c7cc]"}`} title={so.name}>
+                            <svg viewBox="0 0 24 24" fill="currentColor" className="h-6 w-6" dangerouslySetInnerHTML={{ __html: so.icon }} />
+                          </span>
+                          <input
+                            type="url"
+                            className={input}
+                            placeholder={`${so.name} - fx ${so.example}`}
+                            value={value}
+                            onChange={(e) => setSocial(e.target.value || undefined)}
+                            onBlur={(e) => e.target.value && setSocial(withProtocol(e.target.value))}
+                          />
+                        </label>
+                      );
+                    })}
+                  </div>
+                </Field>
                 {config.contact?.mapUrl && (
                   <Field title="Eget kort-link" hint="Bruges i stedet for Google Maps-linket. Tøm feltet for at bruge adressen.">
                     <input className={input} value={config.contact.mapUrl} onChange={(e) => edit((d) => void (d.contact = { ...d.contact, mapUrl: e.target.value || undefined }))} onBlur={(e) => e.target.value && edit((d) => void (d.contact = { ...d.contact, mapUrl: withProtocol(e.target.value) }))} />
