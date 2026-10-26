@@ -13,6 +13,7 @@ import { getSettingValue, setSettingValue } from "@/lib/integration-settings";
 import { siteResearch } from "@/lib/site-digest";
 import { pageAsText, readUnits, type LiveUnit } from "@/lib/availability/live";
 import { hostFiles } from "@/lib/tour-files";
+import { claudeCostUsd } from "@/lib/claude-cost";
 import { BRANCHES, DESIGN_PRESETS, type Branch, type DesignPreset } from "@/app/(app)/tour-lab/tours/presets";
 
 /** The prototype tour each ready-made design starts from (for its kind of features). */
@@ -88,10 +89,6 @@ const Edits = z.object({
 export type ChatTurn = { role: "user" | "assistant"; text: string };
 export type AiEditResult = { ok: true; reply: string; config: TourConfig; changed: number; remembered: string[] } | { ok: false; error: string };
 
-/** Claude Opus 5.5's price per million tokens: input $4, output $20, cache reads $0.20, cache writes (5 min) $5. */
-function claudeCostUsd(u: { input_tokens: number; output_tokens: number; cache_read_input_tokens?: number | null; cache_creation_input_tokens?: number | null }) {
-  return (u.input_tokens * 4 + u.output_tokens * 20 + (u.cache_read_input_tokens ?? 0) * 0.2 + (u.cache_creation_input_tokens ?? 0) * 5) / 1_000_000;
-}
 
 /** Applies one change to a copy-in-progress of the setup. Paths are "/"-separated keys and list indexes. */
 function apply(root: Record<string, unknown>, op: "set" | "delete", pathText: string, value: unknown) {

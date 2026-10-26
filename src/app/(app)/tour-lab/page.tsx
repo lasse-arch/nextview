@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { getSettingValue } from "@/lib/integration-settings";
@@ -54,7 +55,12 @@ export default async function TourLabPage() {
           <h1 className="text-[28px] font-semibold tracking-tight text-[#1d1d1f]">Tours</h1>
           <p className="text-[14px] text-[#6e6e73]">{tours.length} tours · tryk på en for at redigere den.</p>
         </div>
-        <NewTour tours={tours.map((t) => ({ slug: t.slug, name: t.name }))} />
+        <div className="flex items-center gap-2">
+          <Link href="/tour-lab/personer" className="rounded-full bg-white px-4 py-2 text-[14px] font-medium text-[#1d1d1f] ring-1 ring-black/[.08] hover:bg-[#f5f5f7]">
+            Personer i scans
+          </Link>
+          <NewTour tours={tours.map((t) => ({ slug: t.slug, name: t.name }))} />
+        </div>
       </div>
 
       {mpskinsLeft > 0 && <DetachAll count={mpskinsLeft} />}

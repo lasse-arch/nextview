@@ -1411,3 +1411,22 @@ model SiteCache {
   text      String
   fetchedAt DateTime @default(now())
 }
+
+/// One scan point checked for people (nextviewAI looks at the scan's walls).
+/// status: "person" (waits for review), "clear", "hidden" (taken out of the
+/// tour) or "kept" (reviewed, stays).
+model TourScanCheck {
+  id        String   @id @default(cuid())
+  tourSlug  String
+  sweepId   String
+  ss        Int
+  status    String
+  /// The wall (1-4) the person is on, and what nextviewAI saw.
+  face      Int?
+  note      String?
+  checkedAt DateTime @default(now())
+  decidedBy String?
+
+  @@unique([tourSlug, sweepId])
+  @@index([tourSlug, status])
+}

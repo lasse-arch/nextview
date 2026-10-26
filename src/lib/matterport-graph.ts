@@ -168,3 +168,30 @@ export async function fetchScanMap(modelId: string): Promise<ScanMap | null> {
     return null;
   }
 }
+
+export type ScanImages = { sweepId: string; ss: number; low: string | null; high: string | null };
+
+/**
+ * Every scan point's pictures (the cube's faces, from Matterport's public
+ * model graph): `<face>` in the templates is 0 (ceiling), 1-4 (the walls
+ * around) or 5 (floor). The addresses are signed and expire after a while -
+ * fetch them fresh when they're to be shown.
+ */
+export async function fetchScanImages(modelId: string): Promise<ScanImages[]> {
+  const res = await fetch("https://my.matterport.com/api/mp/models/graph", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ query: `{ model(id: ${JSON.stringify(modelId)}) { locations { id index pano { skyboxes { resolution status urlTemplate } } } } }` }),
+    signal: AbortSignal.timeout(20_000),
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(`Matterport svarede ${res.status}.`);
+  const json = (await res.json()) as { data?: { model?: { locations: { id: string; index: number; pano?: { skyboxes: { resolution: string; status: string; urlTemplate: string | null }[] } }[] } } };
+  const locations = json.data?.model?.locations;
+  if (!locations) throw new Error("Matterport-modellen findes ikke eller er ikke offentlig.");
+  const url = (l: (typeof locations)[number], r: string) => l.pano?.skyboxes.find((s) => s.resolution === r && s.urlTemplate)?.urlTemplate ?? null;
+  return locations
+    .map((l) => ({ sweepId: l.id, ss: l.index + 1, low: url(l, "low"), high: url(l, "high") ?? url(l, "2k") }))
+    .filter((l) => l.low || l.high)
+    .sort((a, b) => a.ss - b.ss);
+}
