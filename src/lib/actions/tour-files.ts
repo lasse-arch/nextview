@@ -2,7 +2,7 @@
 
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { DB_MAX, hostFiles, storeTourFile } from "@/lib/tour-files";
+import { copyToTour, DB_MAX, hostFiles, storeTourFile } from "@/lib/tour-files";
 import type { TourConfig } from "@/app/(app)/tour-lab/tours/types";
 
 async function admin() {
@@ -34,4 +34,43 @@ export async function registerTourFile(slug: string, file: { url: string; name: 
   await admin();
   if (!/^https:\/\/[\w.-]+\.blob\.vercel-storage\.com\//.test(file.url)) throw new Error("Ukendt filadresse.");
   await prisma.tourFile.create({ data: { tourSlug: slug, name: file.name.slice(0, 200), contentType: file.contentType, size: file.size, url: file.url } });
+}
+
+/**
+ * The customer's own favicon, fetched from their website and kept by us:
+ * the biggest icon the site names (apple-touch-icon, icon sizes …), or
+ * /favicon.ico when it names none.
+ */
+export async function fetchSiteFavicon(slug: string, site: string): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
+  await admin();
+  try {
+    const base = new URL(/^https?:\/\//i.test(site.trim()) ? site.trim() : `https://${site.trim()}`);
+    if (!/^https?:$/.test(base.protocol) || /^(localhost|\d+\.\d+\.\d+\.\d+)$|\.(local|internal)$/.test(base.hostname)) return { ok: false, error: "Skriv kundens offentlige hjemmeside." };
+    const res = await fetch(base, { headers: { "User-Agent": "Mozilla/5.0 (compatible; ArpoTourBuilder/1.0)" }, signal: AbortSignal.timeout(15_000), redirect: "follow" });
+    if (!res.ok) return { ok: false, error: `${base.hostname} svarede ${res.status}.` };
+    const html = (await res.text()).slice(0, 1_500_000);
+    const icons = [...html.matchAll(/<link\b[^>]*>/gi)]
+      .map((m) => m[0])
+      .filter((tag) => /\brel\s*=\s*["'][^"']*icon[^"']*["']/i.test(tag) && !/mask-icon/i.test(tag))
+      .map((tag) => {
+        const href = /\bhref\s*=\s*["']([^"']+)["']/i.exec(tag)?.[1];
+        const size = Math.max(0, ...[.../\bsizes\s*=\s*["'](\d+)x\d+/i.exec(tag)?.slice(1) ?? []].map(Number));
+        // Bigger is sharper; an apple-touch-icon is a big square made for exactly this.
+        const score = size || (/apple-touch-icon/i.test(tag) ? 180 : /\.svg/i.test(href ?? "") ? 512 : 32);
+        return href ? { url: new URL(href.replace(/&amp;/g, "&"), res.url).toString(), score } : null;
+      })
+      .filter((x): x is { url: string; score: number } => Boolean(x))
+      .sort((a, b) => b.score - a.score);
+    const candidates = [...icons.map((i) => i.url), new URL("/favicon.ico", res.url).toString()];
+    for (const url of candidates) {
+      try {
+        return { ok: true, url: await copyToTour(slug, url) };
+      } catch {
+        // try the next one
+      }
+    }
+    return { ok: false, error: "Fandt intet ikon på hjemmesiden." };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
 }

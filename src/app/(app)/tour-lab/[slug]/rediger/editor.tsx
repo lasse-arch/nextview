@@ -20,7 +20,7 @@ import { currentPreset } from "../../tours/presets";
 import { EconomyPanel, type TourEconomy } from "./economy";
 import { DEFAULT_EMBED, SharePanel, SitePreview, type EmbedSize } from "./share";
 import { Choice, Field, FilesContext, Group, Icon, input, outsideFiles, Toggle, UploadButton, type PreviewApi } from "./ui";
-import { hostTourFiles } from "@/lib/actions/tour-files";
+import { fetchSiteFavicon, hostTourFiles } from "@/lib/actions/tour-files";
 import { AiMemoryPanel } from "./memory";
 
 /** A zoom level in words, for the Zoom sliders (1 = Matterport's normal view). */
@@ -433,6 +433,7 @@ export function TourEditor({
                     <input className={input} placeholder="Samme som logoet" value={config.favicon ?? ""} onChange={(e) => edit((d) => void (d.favicon = e.target.value || undefined))} />
                     <UploadButton accept="image/png,image/svg+xml,image/x-icon,image/webp" onDone={(url) => edit((d) => void (d.favicon = url))} />
                   </div>
+                  <SiteFavicon slug={slug} config={config} onDone={(url) => edit((d) => void (d.favicon = url))} />
                 </Field>
                 <Field title={`Logostørrelse: ${config.logoSize ?? 46} px`}>
                   <input type="range" min={28} max={120} className="w-full accent-[#0071e3]" value={config.logoSize ?? 46} onChange={(e) => edit((d) => void (d.logoSize = Number(e.target.value)))} />
@@ -1039,6 +1040,42 @@ class SafeArea extends Component<{ onUndo: () => void; children: React.ReactNode
 
 /** "maps.google.dk" -> "https://maps.google.dk" - a link without https:// would point inside Arpo. */
 const withProtocol = (url: string) => (/^(https?:|mailto:|tel:|#)/i.test(url.trim()) ? url.trim() : `https://${url.trim()}`);
+
+/** "Hent fra hjemmesiden": the customer's own favicon, from the site the tour's main button leads to (or one typed in). */
+function SiteFavicon({ slug, config, onDone }: { slug: string; config: TourConfig; onDone: (url: string) => void }) {
+  const guess = (() => {
+    const href = [...config.cta.filter((c) => c.primary), ...config.cta].map((c) => c.href).find((h) => /^https?:\/\//.test(h) && !/matterport|nextview360|google\.|instagram|facebook/.test(h));
+    try {
+      return href ? new URL(href).origin : "";
+    } catch {
+      return "";
+    }
+  })();
+  const [site, setSite] = useState(guess);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  return (
+    <div className="mt-1.5 flex flex-wrap items-center gap-2">
+      <input className={`${input} min-w-0 flex-1 text-[13px]`} value={site} onChange={(e) => setSite(e.target.value)} placeholder="kunden.dk" />
+      <button
+        type="button"
+        disabled={pending || !site.trim()}
+        className="flex-none rounded-xl bg-white px-3 py-2 text-[13px] font-medium text-[#0071e3] ring-1 ring-black/[.06] hover:bg-[#0071e3]/5 disabled:opacity-50"
+        onClick={() =>
+          start(async () => {
+            setMsg(null);
+            const r = await fetchSiteFavicon(slug, site);
+            if (r.ok) onDone(r.url);
+            setMsg(r.ok ? "Hentet ✓ - husk Gem" : r.error);
+          })
+        }
+      >
+        {pending ? "Henter…" : "Hent fra hjemmesiden"}
+      </button>
+      {msg && <span className="w-full px-1 text-[12px] text-[#8e8e93]">{msg}</span>}
+    </div>
+  );
+}
 
 /** The tour's address - /t/<slug> (MPSkins' "Pretty-URL"). The old address keeps working. */
 function SlugField({ slug, dirty }: { slug: string; dirty: boolean }) {
