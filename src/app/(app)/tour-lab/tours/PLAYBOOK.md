@@ -120,7 +120,16 @@ Fx specialefterskoler (ADHD, autisme, nedsat kognitivt funktionsniveau):
 - **Lager/udlejning (fx Boxdepotet):** Størrelser · Adgang og sikkerhed ·
   Faciliteter. Rumvælger, skift direkte mellem rum, ledige rum live, "Find vej"
   til boksen. CTA "Lej en boks".
-- **Campingplads/stort område:** start på tegnet kort eller luftfoto.
+- **Campingplads/stort område:** start på dronebilledet (eller tegnet kort),
+  ikke i Matterport - scanningerne ligger langt fra hinanden. Menuen og
+  punkterne flytter folk rundt: "Til hele familien" (badeland, legeplads,
+  minigolf, strand), "Find jeres plads" (én punkt pr. pladstype - komfort,
+  havkig, deluxe, standard, telt, autocamper - med foto og "Book din plads";
+  man filmer aldrig hver plads), "Bo i hytte" og "Faciliteter" (der vi har
+  scannet). Det, der er lukket eller ikke scannet endnu (pool om vinteren),
+  vises med kundens egne sommerbilleder på punktet (`images`) og evt. en
+  360° fra luften - aldrig som "lukket". Pladskortet i menuen (popup).
+  Tysk og engelsk er næsten altid relevant. Se Hals Strand Camping.
 - **Kirkegård/skovbegravelse:** rolig tone; kun "Kontakt os".
 - **Ukendt:** oplevelse → praktisk → "dit sted" → handling.
 
@@ -167,6 +176,15 @@ pladsen og kan booke den med det samme.
 
 En kunde kan have flere tours til forskellige steder i kunderejsen (fx én til
 hjemmesidens forside og én til en bestemt produktside). Hver tour har ét mål.
+
+## Punkter på dronebilledet / kortet
+
+- Et punkt kan have billeder (`images`, man bladrer med et tryk), en knap
+  (`button`, fx booking) og en 360° (`pano`), også når der ikke er et rum at gå ind i.
+- Menupunkter og velkomstfliser kan pege på et punkt med `#punkt:<id>` -
+  så åbner punktets kort på dronebilledet. "Vis mig rundt" viser punkter
+  uden rum på dronebilledet.
+- Velkomstens fliser må gerne have et foto (`image`) - det føles som stedet selv.
 
 ## Interaktivt kort
 

@@ -79,6 +79,7 @@ export const UI_STRINGS = [
   "Vis",
   "Sprog",
   "Åbn i ny fane ↗",
+  "Oplev i 360°",
 ] as const;
 
 /** Keys whose values are never words to translate (links, ids, files, layout, code). */
@@ -92,7 +93,7 @@ const SKIP = new Set([
 
 /** A string that is words for people - not a link, a path, a colour or an id. */
 const isText = (s: string) =>
-  /\p{L}/u.test(s) && !/^(https?:|mailto:|tel:|\/|#[0-9a-f]{3,8}$|data:)/i.test(s.trim()) && !/^[a-z0-9_.:-]+$/.test(s.trim());
+  /\p{L}/u.test(s) && !/^(https?:|mailto:|tel:|\/|#|data:)/i.test(s.trim()) && !/^[a-z0-9_.:-]+$/.test(s.trim());
 
 /** Every text in a setup that a translation should cover, plus the engine's own words. */
 export function translatableTexts(config: TourConfig): string[] {

@@ -43,6 +43,12 @@ export const ICONS: Record<string, string> = {
   kamera: '<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>',
   butik: '<path d="M4 9l1-5h14l1 5M4 9v11h16V9M4 9a3 3 0 0 0 5 0 3 3 0 0 0 6 0 3 3 0 0 0 5 0M10 20v-5h4v5"/>',
   noegle: '<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l2 2M15 8l2 2"/>',
+  golf: '<path d="M12 18V3l6 3-6 3"/><ellipse cx="12" cy="19" rx="6" ry="2"/>',
+  strand: '<path d="M12 3a8 8 0 0 1 8 8H4a8 8 0 0 1 8-8zM12 11l3 10M2 21h20"/>',
+  stik: '<path d="M9 2v6M15 2v6M7 8h10v3a5 5 0 0 1-10 0zM12 16v6"/>',
+  plads: '<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 12h16M12 4v16"/>',
+  autocamper: '<path d="M3 13h12V7H3zM15 10h3l3 3v3h-6zM6 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM17 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/>',
+  koekken: '<path d="M4 11h16v7a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3zM2 11h2M20 11h2M9 7c0-1 1-1.5 1-3M13 7c0-1 1-1.5 1-3"/>',
 };
 
 /** The icons' names in the editor (Danish). */

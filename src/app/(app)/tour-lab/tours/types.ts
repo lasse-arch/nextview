@@ -48,12 +48,23 @@ export type TourPoint = {
   tour: string | null;
   /** A 360° photo at the point (folder under panos.basePath). */
   pano?: string;
+  /** Where the 360° photo opens, in degrees (default: straight ahead, a little down). */
+  panoStart?: { yaw: number; pitch: number };
+  /**
+   * Photos on the point's card, swiped through at the top - e.g. the
+   * customer's own summer photos of a pool that is closed when the drone flew,
+   * or a place that isn't scanned yet.
+   */
+  images?: string[];
+  /** A button on the point's card, e.g. "Book en komfortplads" (opens like any link out of the tour). */
+  button?: { label: string; href: string };
   text: string;
   chips: string[];
   /** How big the point is on the map: 1 = normal (0.6-1.8). */
   size?: number;
 };
 
+/** A menu item: a spot in the tour, "#luften" (back to the drone scene / map), "#punkt:<point id>" (a point on the drone scene / map, its card open), or a page out of the tour. */
 export type MenuEntry = { title: string; href: string } | { title: string; items: [string, string][] };
 
 export type TourConfig = {
@@ -271,7 +282,8 @@ export type TourConfig = {
     kicker: string;
     title: string;
     lead: string;
-    tiles: { kicker: string; title: string; go: WelcomeGo; style: "dark" | "light" | "accent"; recommended?: boolean }[];
+    /** `image`: a photo behind the tile (white text on it) - makes the welcome feel like the place itself. */
+    tiles: { kicker: string; title: string; go: WelcomeGo; style: "dark" | "light" | "accent"; recommended?: boolean; image?: string }[];
     skip: string;
   };
   /** "free": walk around as in Matterport. "points": only the menu and points move you. */

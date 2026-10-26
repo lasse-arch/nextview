@@ -457,6 +457,46 @@ function PointPanel({
             ))}
           </select>
         </Field>
+        <Field title="Billeder" hint="Vises øverst på kortet, man bladrer med et tryk. Fx kundens sommerbilleder af en pool, der er lukket på dronebilledet.">
+          {(p.images ?? []).length > 0 && (
+            <div className="grid grid-cols-3 gap-1.5">
+              {(p.images ?? []).map((src, i) => (
+                <div key={src} className="group relative aspect-[16/10] overflow-hidden rounded-lg bg-white ring-1 ring-black/[.06]">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={src} alt="" className="h-full w-full object-cover" />
+                  <button
+                    type="button"
+                    title="Fjern"
+                    className="absolute right-1 top-1 rounded-full bg-black/60 p-0.5 text-white opacity-0 group-hover:opacity-100"
+                    onClick={() =>
+                      setPoint((x) => {
+                        x.images = (x.images ?? []).filter((_, j) => j !== i);
+                        if (!x.images.length) delete x.images;
+                      })
+                    }
+                  >
+                    <Icon d='<path d="M6 6l12 12M18 6L6 18"/>' className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          <UploadButton accept="image/*" label="Tilføj billede" onDone={(url) => setPoint((x) => void (x.images = [...(x.images ?? []), url]))} />
+        </Field>
+        <Field title="Knap" hint='Fx "Book din plads" med linket til bookingen. Tom = ingen knap.'>
+          <input
+            className={`${input} bg-white`}
+            placeholder="Tekst på knappen"
+            value={p.button?.label ?? ""}
+            onChange={(e) => setPoint((x) => void (x.button = e.target.value || x.button?.href ? { label: e.target.value, href: x.button?.href ?? "" } : undefined))}
+          />
+          <input
+            className={`${input} mt-1.5 bg-white`}
+            placeholder="https://…"
+            value={p.button?.href ?? ""}
+            onChange={(e) => setPoint((x) => void (x.button = e.target.value || x.button?.label ? { label: x.button?.label ?? "", href: e.target.value } : undefined))}
+          />
+        </Field>
       </Group>
     </>
   );

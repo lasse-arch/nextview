@@ -3,7 +3,7 @@
 import { LANG_CSS, LangSwitch } from "./lang-switch";
 import { danishOf, localize, makeT, tourLanguages } from "../tours/i18n";
 import { TourLang } from "../tours/i18n-react";
-import { cssFilter, isPlaceHref, placeHref, placeSlug, startPlaces } from "../tours/places";
+import { cssFilter, isInTourHref, isPlaceHref, placeHref, placeSlug, pointOfHref, startPlaces } from "../tours/places";
 import type { LiveUnit } from "@/lib/availability/live";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -562,22 +562,48 @@ function TourExperience({
     [flyTo]
   );
 
-  const openPoint = useCallback(
-    (p: Point) => {
-      setSelected(p);
-      track("drone_point_click", { point_name: p.name, category: T.categories[p.cat].name });
+  /** Turns the drone scene (or moves the map) to a point - `panel`: leave room for its card on the right. */
+  const lookAtPoint = useCallback(
+    (p: Point, panel: boolean) => {
       if (T.map) mapApi.current?.focus(p.id);
       const v = drone.current;
       if (v) {
         // On a computer the panel covers the right side, so the point is centred in what's left of the screen.
-        const panel = window.innerWidth > 760 ? 183 : 0;
-        const yaw = p.yaw + (panel / window.innerWidth) * v.getHfov();
-        v.lookAt(Math.max(p.pitch, -70), yaw, v.getHfov(), 700);
+        const phone = window.innerWidth <= 760;
+        const shift = panel && !phone ? 183 : 0;
+        // On a phone the card covers the bottom half: zoom in a little and look lower, so the point stands above the card.
+        const hfov = panel && phone ? Math.min(v.getHfov(), 40) : v.getHfov();
+        const yaw = p.yaw + (shift / window.innerWidth) * hfov;
+        const box = droneEl.current;
+        const vfov = box ? (2 * Math.atan(Math.tan((hfov * Math.PI) / 360) * (box.clientHeight / Math.max(1, box.clientWidth))) * 180) / Math.PI : 90;
+        const pitch = panel && phone ? p.pitch - vfov * 0.3 : p.pitch;
+        // No further down than the picture goes (a tall phone screen sees ~110° from top to bottom).
+        v.lookAt(Math.max(pitch, -70, -89 + vfov / 2), yaw, hfov, 700);
       }
+    },
+    [T]
+  );
+  const openPoint = useCallback(
+    (p: Point) => {
+      setSelected(p);
+      track("drone_point_click", { point_name: p.name, category: T.categories[p.cat].name });
+      lookAtPoint(p, true);
       if (p.tour) prepare(p.tour);
     },
-    [prepare, T]
+    [prepare, T, lookAtPoint]
   );
+  /** A point on the drone scene / map, its card open - from wherever the visitor is. */
+  function showPoint(p: Point) {
+    setMenuOpen(false);
+    if (phase === "drone") return openPoint(p);
+    backToDrone();
+    setTimeout(() => openPoint(p), 700);
+  }
+  /** "#punkt:<id>" → that point, if the setup has it. */
+  const pointById = (href: string) => {
+    const id = pointOfHref(href);
+    return id ? (T.points.find((x) => x.id === id) ?? null) : null;
+  };
 
   useEffect(() => {
     mobile.current = window.innerWidth <= 760;
@@ -775,6 +801,8 @@ function TourExperience({
       return;
     }
     if ("href" in go) {
+      const point = pointById(go.href);
+      if (point) return showPoint(point);
       track("cta_click", { label, link_url: go.href, place: "welcome" });
       openLink(T, go.href, label, popup);
       return;
@@ -795,6 +823,11 @@ function TourExperience({
       setMenuOpen(false);
       backToDrone();
       return;
+    }
+    const point = pointById(href);
+    if (point) {
+      track("menu_click", { item_name: name, group });
+      return showPoint(point);
     }
     if (!isPlaceHref(href)) {
       track("cta_click", { label: name, link_url: href, place: "menu" });
@@ -844,6 +877,14 @@ function TourExperience({
     const stop = GUIDE[i];
     setGuideAt(i);
     if (!stop.href) return; // a stop that stays where it is (e.g. the closing card)
+    const point = pointById(stop.href);
+    if (point) {
+      // A point without a room: shown on the drone scene / map, under the guide's card.
+      setSelected(null);
+      if (phase !== "drone") setPhase("drone");
+      setTimeout(() => lookAtPoint(point, false), phase === "drone" ? 0 : 400);
+      return;
+    }
     if (phase === "drone") return enterTour(stop.href, "guide", stop.title);
     flyTo(stop.href, "fly").then(() => sdk?.Camera.rotate?.(18, 0, { speed: 3 }).catch(() => {}));
   }
@@ -1149,10 +1190,7 @@ function TourExperience({
     const item = T.menu.flatMap((m) => ("items" in m ? m.items.map((i) => ({ name: i[0], href: i[1], group: m.title })) : [{ name: m.title, href: m.href, group: "" }])).find((i) => i.name === name);
     if (item) return menuGo(item.name, item.group, item.href);
     const p = T.points.find((x) => x.name === name);
-    if (p) {
-      backToDrone();
-      setTimeout(() => openPoint(p), 700);
-    }
+    if (p) showPoint(p);
   }
 
   const ctaClick = (label: string, href: string, place: string) => track("cta_click", { label, link_url: href, place });
@@ -1250,6 +1288,7 @@ function TourExperience({
             <button type="button" className="hv-luk" aria-label={tx("Luk")} onClick={() => setSelected(null)}>
               ×
             </button>
+            {selected.images?.length ? <PointPhotos key={selected.id} images={selected.images} name={selected.name} /> : null}
             <div className="hv-kat" style={{ color: T.categories[selected.cat].color }}>
               {T.categories[selected.cat].name}
             </div>
@@ -1274,9 +1313,24 @@ function TourExperience({
                     setPano(selected);
                   }}
                 >
-                  Oplev i 360°
+                  {tx("Oplev i 360°")}
                 </button>
               )
+            )}
+            {selected.tour && selected.pano && (
+              <button type="button" className="hv-btn hv-secondary hv-wide" onClick={() => setPano(selected)}>
+                {tx("Oplev i 360°")}
+              </button>
+            )}
+            {selected.button && (
+              <TourLink
+                href={selected.button.href}
+                label={selected.button.label}
+                className={`hv-btn ${selected.tour || selected.pano ? "hv-secondary" : "hv-primary"} hv-wide`}
+                onClick={() => ctaClick(selected.button!.label, selected.button!.href, "point")}
+              >
+                {selected.button.label}
+              </TourLink>
             )}
           </aside>
         )}
@@ -1310,7 +1364,13 @@ function TourExperience({
               </button>
             )}
             {T.welcome.tiles.map((t) => (
-              <button key={t.title} type="button" className={`hv-tile hv-tile-${t.style}`} onClick={() => chooseWelcome(t.go, t.title)}>
+              <button
+                key={t.title}
+                type="button"
+                className={`hv-tile hv-tile-${t.style} ${t.image ? "hv-tile-foto" : ""}`}
+                style={t.image ? { backgroundImage: `linear-gradient(180deg,rgba(0,0,0,0) 35%,rgba(0,0,0,.62)),url(${t.image})` } : undefined}
+                onClick={() => chooseWelcome(t.go, t.title)}
+              >
                 {t.recommended && <em>{tx("Anbefalet")}</em>}
                 <span className="hv-tile-plus">+</span>
                 <small>{t.kicker}</small>
@@ -1324,7 +1384,7 @@ function TourExperience({
         </div>
       )}
 
-      {pano?.pano && T.panos && <PanoView name={pano.name} dir={pano.pano} panos={T.panos} onClose={() => setPano(null)} />}
+      {pano?.pano && T.panos && <PanoView name={pano.name} dir={pano.pano} start={pano.panoStart} panos={T.panos} onClose={() => setPano(null)} />}
 
       {/* Logo (MPSkins: left, 200px, 13px from the edges - or right, with the menu on the left). */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1439,7 +1499,7 @@ function TourExperience({
                     <button key={name} type="button" onClick={() => menuGo(name, m.title, href)}>
                       {name}
                       {isFree(name) && <span className="hv-ledig">{tx("Ledig")}</span>}
-                      {!isPlaceHref(href) && <span className="hv-ext">↗</span>}
+                      {!isInTourHref(href) && <span className="hv-ext">↗</span>}
                     </button>
                   ))}
                 </div>
@@ -1738,14 +1798,50 @@ function TourExperience({
 }
 
 /** A 360° photo at a point, full screen over the drone scene. */
+/** A point's photos at the top of its card - swiped or tapped through, with dots (cross-faded, no scroll box: a scrolling layer over the drone scene can blank it on phones). */
+function PointPhotos({ images, name }: { images: string[]; name: string }) {
+  const [at, setAt] = useState(0);
+  const touch = useRef<number | null>(null);
+  const step = (d: number) => setAt((i) => (i + d + images.length) % images.length);
+  return (
+    <div
+      className="hv-fotos"
+      onClick={() => step(1)}
+      onTouchStart={(e) => (touch.current = e.touches[0].clientX)}
+      onTouchEnd={(e) => {
+        const dx = e.changedTouches[0].clientX - (touch.current ?? e.changedTouches[0].clientX);
+        touch.current = null;
+        if (Math.abs(dx) > 30) {
+          e.preventDefault(); // a swipe, not a tap
+          step(dx < 0 ? 1 : -1);
+        }
+      }}
+    >
+      {images.map((src, i) => (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img key={src} src={src} alt={i === 0 ? name : ""} loading={i === 0 ? "eager" : "lazy"} draggable={false} className={i === at ? "on" : ""} />
+      ))}
+      {images.length > 1 && (
+        <div className="hv-fotos-dots">
+          {images.map((src, i) => (
+            <i key={src} className={i === at ? "on" : ""} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PanoView({
   name,
   dir,
+  start,
   panos,
   onClose,
 }: {
   name: string;
   dir: string;
+  start?: { yaw: number; pitch: number };
   panos: NonNullable<TourConfig["panos"]>;
   onClose: () => void;
 }) {
@@ -1771,14 +1867,15 @@ function PanoView({
         hfov: window.innerWidth <= 760 ? 90 : 100,
         minHfov: 40,
         maxHfov: 120,
-        pitch: -10,
+        yaw: start?.yaw ?? 0,
+        pitch: start?.pitch ?? -10,
       });
     });
     return () => {
       cancelled = true;
       viewer?.destroy();
     };
-  }, [dir, panos]);
+  }, [dir, panos, start]);
   return (
     <div className="hv-pano">
       <div ref={el} className="absolute inset-0" />
@@ -1955,11 +2052,18 @@ const CSS = `
 .hv-chips button.fra{opacity:.42}
 .hv-panel{position:absolute;top:66px;right:16px;z-index:7;width:350px;max-height:calc(100% - 82px);overflow-y:auto;background:var(--c-soft);border-radius:16px;box-shadow:0 12px 36px rgba(0,0,0,.35);padding:18px 18px 18px;animation:hvIn .25s ease}
 @keyframes hvIn{from{opacity:0;transform:translateX(16px)}to{opacity:1;transform:none}}
-.hv-luk{position:absolute;top:10px;right:10px;width:32px;height:32px;border-radius:50%;border:0;background:#fff;font-size:19px;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.2)}
+.hv-luk{position:absolute;z-index:2;top:10px;right:10px;width:32px;height:32px;border-radius:50%;border:0;background:#fff;font-size:19px;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.2)}
 .hv-kat{font-size:11.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase}
 .hv-panel h2{margin:2px 40px 8px 0;font-size:25px;line-height:1.1;font-weight:900;color:var(--c-main)}
 .hv-panel p{margin:0 0 12px;font-size:15px;line-height:1.5;color:#3d4a50}
 .hv-pchips{display:flex;flex-wrap:wrap;gap:5px}
+.hv-fotos{position:relative;margin:-18px -18px 14px;border-radius:16px 16px 0 0;overflow:hidden;background:#dfe5e7;aspect-ratio:16/10;cursor:pointer;user-select:none}
+.hv-fotos img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .35s ease}
+.hv-fotos img.on{opacity:1}
+.hv-fotos-dots{position:absolute;left:0;right:0;bottom:9px;display:flex;justify-content:center;gap:5px;pointer-events:none}
+.hv-fotos-dots i{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.55);box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.hv-fotos-dots i.on{background:#fff;width:16px;border-radius:3px}
+.hv-fotos+.hv-kat{margin-top:0}
 .hv-pchips span{background:#e7eef0;color:var(--c-main);font-size:12px;font-weight:700;padding:4px 9px;border-radius:999px}
 .hv-note{font-size:13px!important;color:#7a8a90!important;margin-top:12px!important}
 .hv-ledig{margin-left:7px;padding:1px 7px;border-radius:999px;background:#34c75922;color:#1f8a3a;font-size:11px;font-weight:700;vertical-align:1px}
@@ -2059,6 +2163,7 @@ const CSS = `
 .hv-tile-light{background:#fff;color:var(--c-main)}.hv-tile-light .hv-tile-plus{background:var(--c-main);color:#fff}
 .hv-tile-dark{background:var(--c-main);color:#fff}.hv-tile-dark .hv-tile-plus{background:#fff;color:var(--c-main)}
 .hv-tile-accent{background:var(--c-accent);color:#fff}.hv-tile-accent em{background:rgba(255,255,255,.24)}.hv-tile-accent .hv-tile-plus{background:#fff;color:var(--c-accent)}
+.hv-tile-foto{background-size:cover;background-position:center;color:#fff;text-shadow:0 1px 8px rgba(0,0,0,.35)}.hv-tile-foto small{opacity:.9}.hv-tile-foto .hv-tile-plus{background:#fff;color:var(--c-main);text-shadow:none}
 .hv-tile-last{background:#e7eef0;color:var(--c-main)}.hv-tile-last .hv-tile-plus{background:var(--c-main);color:#fff}
 .hv-wel-x{position:absolute;top:16px;right:16px;width:44px;height:44px;border-radius:12px;border:0;background:rgba(255,255,255,.92);font-size:24px;cursor:pointer;color:var(--c-main)}
 .hv-welcome .hv-intro,.hv-welcome .hv-filtre,.hv-welcome .hv-menuknap{opacity:0;pointer-events:none}
@@ -2101,6 +2206,7 @@ const CSS = `
   .hv-ikon{width:30px;height:30px;border-width:2px}.hv-ikon svg{width:15px;height:15px}
   /* An open point: the panel takes the bottom, the bars step aside. */
   .hv-panel{top:auto;bottom:0;left:0;right:0;width:auto;max-height:62%;border-radius:18px 18px 0 0;padding-bottom:calc(18px + env(safe-area-inset-bottom,0px))}
+  .hv-fotos{aspect-ratio:auto;height:min(40vw,190px);border-radius:18px 18px 0 0}
   .hv-logo{height:calc(var(--logo-h) * .74);max-width:45vw;top:12px;left:12px}
   .hv-logo-kort{height:calc(var(--logo-h) * .74 - 8px);padding:7px 10px;border-radius:11px}
   .hv-menu{width:100%}

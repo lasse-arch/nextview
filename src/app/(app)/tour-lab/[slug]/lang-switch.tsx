@@ -50,5 +50,9 @@ export const LANG_CSS = `
 .ls-list button{display:flex;align-items:center;gap:10px;width:100%;padding:9px 10px;border:0;border-radius:9px;background:none;color:#1d2a30;font:inherit;font-size:14px;font-weight:600;text-align:left;cursor:pointer}
 .ls-list button:hover,.ls-list button[aria-selected=true]{background:#f1f3f4}
 .hv:has(.fb-bar) .ls{top:64px}
-@media (max-width:760px){.hv-menu-aaben .ls{display:none}.ls{top:12px}.ls-btn{width:38px;height:38px;padding:0;justify-content:center}.ls-btn b{display:none}.ls-btn span{font-size:18px}}
+@media (max-width:760px){.hv-menu-aaben .ls{display:none}.ls{top:12px}.ls-btn{width:38px;height:38px;padding:0;justify-content:center}.ls-btn b{display:none}.ls-btn span{font-size:18px}
+  /* Next to the menu button, clear of the logo and the drone scene's welcome box. */
+  .hv:not(.hv-logo-h) .ls{left:auto;right:100px;translate:none}.hv:not(.hv-logo-h) .ls-list{left:auto;right:-60px;translate:none}
+  /* The welcome fills the top - the button waits at the bottom, its list opening upwards. */
+  .hv.hv-welcome .ls{top:auto;left:auto;right:14px;bottom:calc(14px + env(safe-area-inset-bottom,0px));translate:none}.hv.hv-welcome .ls-list{top:auto;bottom:46px;left:auto;right:0;translate:none}}
 `;

@@ -10,6 +10,12 @@ import type { TourConfig } from "./types";
 
 export const isPlaceHref = (href: string) => /explore\.nextview360\.dk|my\.matterport\.com\/show/.test(href);
 
+/** The point id of a "#punkt:<id>" link (a point on the drone scene or map), else null. */
+export const pointOfHref = (href: string) => (href.startsWith("#punkt:") ? href.slice(7) : null);
+
+/** A link that stays in the tour: a spot, the drone scene/map or one of its points. */
+export const isInTourHref = (href: string) => isPlaceHref(href) || href === "#luften" || pointOfHref(href) != null;
+
 /** The link to a spot in this tour. */
 export function placeHref(T: Pick<TourConfig, "tourPage" | "modelId">, ss: number | string, rot?: { x: number; y: number }): string {
   const url = new URL(T.tourPage ? T.tourPage.split("?")[0] : `https://my.matterport.com/show/?m=${T.modelId}`);

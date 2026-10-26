@@ -11,7 +11,8 @@ export function guideStops(T: TourConfig): GuideStop[] {
   return (T.guide?.stops ?? []).flatMap((s) => {
     if (!("point" in s)) return [s];
     const p = T.points.find((x) => x.id === s.point);
-    return p?.tour ? [{ href: p.tour, title: p.name, text: p.text }] : [];
+    // A point without a room is shown on the drone scene / map itself.
+    return p ? [{ href: p.tour ?? `#punkt:${p.id}`, title: p.name, text: p.text }] : [];
   });
 }
 
