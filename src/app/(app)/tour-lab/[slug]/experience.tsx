@@ -1095,7 +1095,7 @@ function TourExperience({
 
   return (
     <LinkProvider T={T} popup={popup}>
-    <div className={`hv fixed inset-0 z-50 overflow-hidden bg-[#0d1b20] ${selected ? "hv-punkt" : ""} ${zoomed ? "hv-zoom" : ""} ${welcome ? "hv-welcome" : ""} ${phase === "tour" && T.stories?.mobile ? "hv-st-on-m" : ""} ${menuOpen ? "hv-menu-aaben" : ""} ${T.design?.menu === "dock" ? "hv-dock" : ""} ${guideAt != null || (dayAt != null && !dayOpen) ? "hv-guiding" : ""} ${route ? "hv-routing" : ""} ${phase === "tour" && T.stories?.desktop ? "hv-st-on-d" : ""}`} style={
+    <div className={`hv fixed inset-0 z-50 overflow-hidden bg-[#0d1b20] ${selected ? "hv-punkt" : ""} ${zoomed ? "hv-zoom" : ""} ${welcome ? "hv-welcome" : ""} ${phase === "tour" && T.stories?.mobile ? "hv-st-on-m" : ""} ${menuOpen ? "hv-menu-aaben" : ""} ${T.design?.menu === "dock" ? "hv-dock" : ""} ${guideAt != null || (dayAt != null && !dayOpen) ? "hv-guiding" : ""} ${route ? "hv-routing" : ""} ${showMeasures && phase === "tour" ? "hv-maler" : ""} ${phase === "tour" && T.stories?.desktop ? "hv-st-on-d" : ""}`} style={
         {
           fontFamily: `'${T.font}', system-ui, sans-serif`,
           "--c-main": T.colors.main,
@@ -1118,7 +1118,7 @@ function TourExperience({
           ref={iframe}
           title="Matterport"
           src={showcaseUrl(modelId, sdkKey, { ...T.matterportParams, ...(T.mobileZoomLock && phone ? { nozoom: "1" } : {}), ...startParams(T.start) })}
-          className={`absolute inset-0 h-full w-full border-0 transition-opacity duration-500 ${phase === "tour" ? "opacity-100" : "pointer-events-none opacity-0"}`}
+          className={`hv-mp absolute inset-0 h-full w-full border-0 transition-opacity duration-500 ${phase === "tour" ? "opacity-100" : "pointer-events-none opacity-0"}`}
           allow="fullscreen; xr-spatial-tracking; autoplay"
           style={T.filter ? { filter: cssFilter(T.filter) } : undefined}
         />
