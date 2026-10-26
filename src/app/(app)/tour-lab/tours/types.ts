@@ -211,6 +211,8 @@ export type TourConfig = {
   nudge?: { afterSeconds: number; title: string; text: string; buttons: { label: string; href: string; primary?: boolean }[] };
   /** Phones: no pinch-zoom in the tour, and a little zoomed out (MPSkins' mobile zoom lock). */
   mobileZoomLock?: boolean;
+  /** How zoomed the view is, per device: 1 = Matterport's normal, under 1 = zoomed out (more of the room), over 1 = zoomed in. */
+  zoom?: { desktop?: number; mobile?: number };
   /**
    * "Find vej": the visitor picks a room (from the menu) or a box number, and
    * the tour walks them there from where they stand, scan point by scan point.

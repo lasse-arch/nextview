@@ -22,6 +22,9 @@ import { DEFAULT_EMBED, SharePanel, SitePreview, type EmbedSize } from "./share"
 import { Choice, Field, FilesContext, Group, Icon, input, outsideFiles, Toggle, UploadButton, type PreviewApi } from "./ui";
 import { hostTourFiles } from "@/lib/actions/tour-files";
 
+/** A zoom level in words, for the Zoom sliders (1 = Matterport's normal view). */
+const zoomLabel = (z: number) => (Math.abs(z - 1) < 0.01 ? "normal" : z < 1 ? `zoomet ud (${Math.round(z * 100)} %)` : `zoomet ind (${Math.round(z * 100)} %)`);
+
 type Version = { id: string; note: string | null; by: string | null; at: string };
 type Tab = "claude" | "live" | "scan" | "okonomi" | "resultater" | "del" | "tags" | "start" | "rundvisning" | "kort" | "generelt" | "design" | "menu" | "funktioner" | "links" | "avanceret" | "versioner";
 
@@ -483,6 +486,38 @@ export function TourEditor({
                     onChange={(v) => edit((d) => void (d.jump = v))}
                   />
                 </Field>
+                </Group>
+                <Group title="Zoom">
+                  <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">Hvor meget af rummet man ser. Telefonen står på højkant og viser mindre i bredden - zoom lidt ud dér, så man kan se rummet.</p>
+                  {(["desktop", "mobile"] as const).map((k) => {
+                    const v = config.zoom?.[k] ?? (k === "mobile" && config.mobileZoomLock ? 0.5 : 1);
+                    return (
+                      <Field key={k} title={`${k === "desktop" ? "Computer" : "Mobil"}: ${zoomLabel(v)}`}>
+                        <div className="flex items-center gap-2 text-[12px] text-[#8e8e93]">
+                          <span>Ud</span>
+                          <input
+                            type="range"
+                            min={0.5}
+                            max={2}
+                            step={0.05}
+                            className="flex-1 accent-[#0071e3]"
+                            value={v}
+                            onPointerDown={() => setDevice(k === "desktop" ? "computer" : "mobil")}
+                            onFocus={() => setDevice(k === "desktop" ? "computer" : "mobil")}
+                            onChange={(e) =>
+                              edit((d) => {
+                                const n = Number(e.target.value);
+                                d.zoom = { ...d.zoom, [k]: n === 1 ? undefined : n };
+                                if (d.zoom.desktop == null && d.zoom.mobile == null) d.zoom = undefined;
+                              })
+                            }
+                          />
+                          <span>Ind</span>
+                        </div>
+                      </Field>
+                    );
+                  })}
+                  <Toggle on={Boolean(config.mobileZoomLock)} onChange={(on) => edit((d) => void (d.mobileZoomLock = on || undefined))} title="Lås zoom på mobil" hint="Gæsten kan ikke knibe-zoome - så man ikke ved et uheld zoomer helt ind." />
                 </Group>
                 <Group title="Menu og historier">
                   <Toggle on={config.menuOpenOnStart.desktop} onChange={(on) => edit((d) => void (d.menuOpenOnStart.desktop = on))} title="Menu åben på computer" />

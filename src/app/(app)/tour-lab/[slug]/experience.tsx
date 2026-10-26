@@ -378,7 +378,6 @@ function TourExperience({
       });
       setTourReadyMs(now() - started);
       setSdk(sdk);
-      if (T.mobileZoomLock && phone) sdk.Camera.zoomTo?.(0.5).catch(() => {});
       if (coverWaitingRef.current) {
         coverWaitingRef.current = false;
         setCoverWaiting(false);
@@ -412,7 +411,7 @@ function TourExperience({
     });
     sdkRef.current.catch((err) => setTourError(err instanceof Error ? err.message : String(err)));
     return () => sub?.cancel();
-  }, [sdkKey, modelId, sweepBySs, hiddenSweeps, ROOM_NAMES, ROOM_LINKS, LAST_ROOM_KEY, T.start, T.matterportUi, T.measure, T.mobileZoomLock, phone, routeGraph]);
+  }, [sdkKey, modelId, sweepBySs, hiddenSweeps, ROOM_NAMES, ROOM_LINKS, LAST_ROOM_KEY, T.start, T.matterportUi, T.measure, routeGraph]);
 
   const setNavigation = useCallback(
     async (only: boolean) => {
@@ -807,6 +806,37 @@ function TourExperience({
     setSelected(null);
     guideGo(0);
   }
+  /*
+   * How zoomed out the view is, per device (the editor's "Zoom"): set when the
+   * tour is ready, again after every move (Matterport resets it) and when the
+   * window changes between phone and computer width - so the editor's
+   * Mobil/Computer preview shows each one. The setup is read through a ref,
+   * so a change in the editor applies at once without restarting the tour.
+   */
+  const zoomRef = useRef(T.zoom);
+  const lockRef = useRef(T.mobileZoomLock);
+  useEffect(() => {
+    zoomRef.current = T.zoom;
+    lockRef.current = T.mobileZoomLock;
+  });
+  const zoomKey = `${T.zoom?.desktop}|${T.zoom?.mobile}|${T.mobileZoomLock}`;
+  useEffect(() => {
+    if (!sdk?.Camera.zoomTo) return;
+    const apply = () => {
+      const small = phone || window.innerWidth <= 760;
+      const z = small ? (zoomRef.current?.mobile ?? (lockRef.current ? 0.5 : 1)) : (zoomRef.current?.desktop ?? 1);
+      sdk.Camera.zoomTo?.(z).catch(() => {});
+    };
+    apply();
+    window.addEventListener("resize", apply);
+    const current = (sdk as unknown as { Sweep: { current: { subscribe(cb: () => void): { cancel(): void } } } }).Sweep.current;
+    const sub = current.subscribe(() => setTimeout(apply, 50));
+    return () => {
+      window.removeEventListener("resize", apply);
+      sub.cancel();
+    };
+  }, [sdk, phone, zoomKey]);
+
   /* ----- "Sådan ser en dag ud" ----- */
   function openDay(from: string) {
     if (!T.day) return;
