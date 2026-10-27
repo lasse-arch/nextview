@@ -141,7 +141,12 @@ export type TourConfig = {
    * closer) and where it looks (yaw/pitch, degrees).
    */
   imageView?: Record<string, { desktop?: number; mobile?: number; yaw?: number; pitch?: number }>;
-  overviewUi?: { box?: { desktop?: false; mobile?: false }; filter?: { desktop?: false; mobile?: false } };
+  overviewUi?: {
+    box?: { desktop?: false; mobile?: false };
+    filter?: { desktop?: false; mobile?: false };
+    /** The points' names on the drone scene / map: always, only when zoomed in, or never (the open point's card has the name). Default: computer always, phone when zoomed in. */
+    names?: { desktop?: "always" | "zoom" | "never"; mobile?: "always" | "zoom" | "never" };
+  };
   drone?: {
     /** One 360° photo (equirectangular) instead of the tiles below - set by the engine for a 360° map. */
     panorama?: string;

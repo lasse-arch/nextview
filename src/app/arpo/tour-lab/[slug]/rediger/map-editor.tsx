@@ -6,7 +6,7 @@ import { ICONS, ICON_NAMES, guessIcon } from "../../tours/icons";
 import { PANO_HFOV, isPlaceHref, panoHfov, pointOfHref } from "../../tours/places";
 import "pannellum/build/pannellum.css";
 import type { TourConfig, TourPoint } from "../../tours/types";
-import { Field, Group, Icon, input, PanoZoom, Toggle, UploadButton } from "./ui";
+import { Choice, Field, Group, Icon, input, PanoZoom, Toggle, UploadButton } from "./ui";
 import { AiImageButton } from "./ai-image";
 
 /*
@@ -84,12 +84,15 @@ export function MapEditor({ config, edit }: { config: TourConfig; edit: Edit }) 
 
   if (!M)
     return (
+      <>
+      {config.drone && <OverviewUiToggles config={config} edit={edit} />}
       <Group>
         <p className="text-[14px] leading-snug">Start touren på et kort over stedet - en tegning, en situationsplan eller et dronefoto - med punkter man kan trykke på og gå ind fra.</p>
         <p className="text-[12px] leading-snug text-[#8e8e93]">Brug et stort billede (fx 4000 px bredt) - man kan zoome ind på det. JPG eller PNG.</p>
         <UploadButton accept="image/*" label="Upload kortbillede" onDone={setImage} className="block w-full cursor-pointer rounded-xl bg-[#0071e3] py-2.5 text-center text-[15px] font-medium text-white" />
         {error && <p className="text-[12px] text-[#ff3b30]">{error}</p>}
       </Group>
+      </>
     );
 
   const placed = config.points.filter((p) => M.spots[p.id]);
@@ -761,6 +764,25 @@ function OverviewUiToggles({ config, edit }: { config: TourConfig; edit: Edit })
           ))}
         </tbody>
       </table>
+      {(["desktop", "mobile"] as const).map((device) => (
+        <Field key={device} title={`Navne på punkterne - ${device === "desktop" ? "computer" : "mobil"}`} hint={device === "mobile" ? "Aldrig: kun ikonerne - navnet står i kortet, når man trykker. Godt på et travlt luftfoto." : undefined}>
+          <Choice
+            value={ui?.names?.[device] ?? (device === "mobile" ? "zoom" : "always")}
+            options={[
+              ["always", "Altid"],
+              ["zoom", "Når man zoomer ind"],
+              ["never", "Aldrig"],
+            ]}
+            onChange={(v) =>
+              edit((d) => {
+                const names = { ...d.overviewUi?.names, [device]: v === (device === "mobile" ? "zoom" : "always") ? undefined : v };
+                if (!names[device]) delete names[device];
+                d.overviewUi = { ...d.overviewUi, names: Object.keys(names).length ? names : undefined };
+              })
+            }
+          />
+        </Field>
+      ))}
     </Group>
   );
 }

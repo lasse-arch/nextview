@@ -1485,7 +1485,7 @@ function TourExperience({
   return (
     <TourLang.Provider value={{ lang, t: tx }}>
     <LinkProvider T={T} popup={popup}>
-    <div className={`hv fixed inset-0 z-50 overflow-hidden bg-[#0d1b20] ${selected ? "hv-punkt" : ""} ${zoomed ? "hv-zoom" : ""} ${welcome ? "hv-welcome" : ""} ${phase === "tour" && T.stories?.mobile ? "hv-st-on-m" : ""} ${menuOpen ? "hv-menu-aaben" : ""} ${T.overviewUi?.box?.desktop === false ? "hv-boks-ud-d" : ""} ${T.overviewUi?.box?.mobile === false ? "hv-boks-ud-m" : ""} ${T.overviewUi?.filter?.desktop === false ? "hv-filter-ud-d" : ""} ${T.overviewUi?.filter?.mobile === false ? "hv-filter-ud-m" : ""} ${T.design?.menu === "dock" ? "hv-dock" : ""} ${T.logoSide === "right" ? "hv-logo-h" : ""} ${guideAt != null || (dayAt != null && !dayOpen) ? "hv-guiding" : ""} ${route ? "hv-routing" : ""} ${showMeasures && phase === "tour" ? "hv-maler" : ""} ${phase === "tour" && T.stories?.desktop ? "hv-st-on-d" : ""}`} style={
+    <div className={`hv fixed inset-0 z-50 overflow-hidden bg-[#0d1b20] ${selected ? "hv-punkt" : ""} ${zoomed ? "hv-zoom" : ""} ${welcome ? "hv-welcome" : ""} ${phase === "tour" && T.stories?.mobile ? "hv-st-on-m" : ""} ${menuOpen ? "hv-menu-aaben" : ""} ${T.overviewUi?.box?.desktop === false ? "hv-boks-ud-d" : ""} ${T.overviewUi?.box?.mobile === false ? "hv-boks-ud-m" : ""} ${T.overviewUi?.filter?.desktop === false ? "hv-filter-ud-d" : ""} ${T.overviewUi?.filter?.mobile === false ? "hv-filter-ud-m" : ""} ${T.overviewUi?.names?.desktop ? `hv-navne-d-${T.overviewUi.names.desktop}` : ""} ${T.overviewUi?.names?.mobile ? `hv-navne-m-${T.overviewUi.names.mobile}` : ""} ${T.design?.menu === "dock" ? "hv-dock" : ""} ${T.logoSide === "right" ? "hv-logo-h" : ""} ${guideAt != null || (dayAt != null && !dayOpen) ? "hv-guiding" : ""} ${route ? "hv-routing" : ""} ${showMeasures && phase === "tour" ? "hv-maler" : ""} ${phase === "tour" && T.stories?.desktop ? "hv-st-on-d" : ""}`} style={
         {
           fontFamily: `'${T.font}', system-ui, sans-serif`,
           "--c-main": T.colors.main,
@@ -2409,6 +2409,12 @@ const CSS = `
 /* A name that would cover another point steps aside until its icon is hovered. */
 .hv-navn.hv-gemt{visibility:hidden;pointer-events:none}
 .hv-pkt:hover .hv-navn.hv-gemt{visibility:visible}
+@media (min-width:761px){
+  .hv-navne-d-zoom .hv-navn{display:none}
+  .hv-navne-d-zoom.hv-zoom .hv-navn,.hv-navne-d-zoom .hv-hs.hv-aktiv .hv-navn{display:block}
+  .hv-navne-d-never .hv-hs .hv-navn{display:none}
+  .hv-navne-d-zoom .hv-pkt:hover .hv-navn,.hv-navne-d-never .hv-pkt:hover .hv-navn{display:block}
+}
 .hv-intro{position:absolute;top:calc(16px + env(safe-area-inset-top,0px));left:16px;z-index:5;width:320px;background:var(--c-soft);border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.28)}
 .hv-intro-head{padding:18px 18px 14px;text-align:center}
 .hv-intro-head img{height:54px;display:block;margin:0 auto 8px}
@@ -2580,6 +2586,7 @@ const CSS = `
 /* Switched off in the editor (Luftfoto og kort → Over kortet), per device. */
 @media (min-width:761px){.hv-boks-ud-d .hv-intro,.hv-filter-ud-d .hv-filtre{display:none}}
 @media (max-width:760px){.hv-boks-ud-m .hv-intro,.hv-filter-ud-m .hv-filtre{display:none}}
+/* The points' names (Luftfoto og kort → Over kortet), per device - after the defaults further down, so they win. */
 @media (max-width:760px){
   /* Slim welcome bar instead of the big card, with room for the menu button. */
   .hv-intro{top:calc(10px + env(safe-area-inset-top,0px));left:10px;right:104px;width:auto;display:flex;align-items:center;border-radius:14px}
@@ -2600,6 +2607,8 @@ const CSS = `
   /* Only icons until you zoom in - the names crowd each other on a narrow screen. The open point keeps its name. */
   .hv-navn{display:none;font-size:11px;padding:1px 8px}
   .hv-zoom .hv-navn,.hv-hs.hv-aktiv .hv-navn{display:block}
+  .hv-navne-m-always .hv-navn{display:block}
+  .hv-navne-m-never .hv-hs .hv-navn,.hv-navne-m-never.hv-zoom .hv-hs .hv-navn{display:none}
   .hv-ikon{width:30px;height:30px;border-width:2px}.hv-ikon svg{width:15px;height:15px}
   /* An open point: the panel takes the bottom, the bars step aside. */
   .hv-panel{top:auto;bottom:0;left:0;right:0;width:auto;max-height:62%;border-radius:18px 18px 0 0;padding-bottom:calc(18px + env(safe-area-inset-bottom,0px))}
