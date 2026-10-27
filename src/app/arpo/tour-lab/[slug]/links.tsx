@@ -40,8 +40,13 @@ export function tagged(T: TourConfig, href: string): string {
 /** How a link opens: its own setting, otherwise the tour's default (new tab if none). Phone and mail always open normally. */
 export function linkMode(T: TourConfig, href: string): LinkOpen {
   if (/^(tel|mailto):/.test(href)) return "same";
-  return T.linkOpen?.byUrl?.[href] ?? T.linkOpen?.default ?? "tab";
+  const mode = T.linkOpen?.byUrl?.[href] ?? T.linkOpen?.default ?? "tab";
+  // Sites that refuse to be shown inside another site (a popup would just be blank) always get a new tab.
+  return mode === "popup" && NEVER_FRAMED.test(href) ? "tab" : mode;
 }
+
+/** Social media, maps and the like - they forbid being shown in a frame. */
+const NEVER_FRAMED = /^https?:\/\/([a-z0-9-]+\.)*(facebook\.com|fb\.com|fb\.me|instagram\.com|linkedin\.com|tiktok\.com|twitter\.com|x\.com|threads\.net|pinterest\.[a-z.]+|google\.[a-z.]+\/maps|maps\.google\.[a-z.]+|maps\.app\.goo\.gl|goo\.gl|wa\.me|whatsapp\.com|m\.me|messenger\.com)(\/|$)/i;
 
 /** Google Drive's /view pages refuse to be shown inside other sites - its /preview page is made for it. */
 function embeddable(href: string) {

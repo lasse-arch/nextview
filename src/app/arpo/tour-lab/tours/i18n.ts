@@ -53,6 +53,7 @@ export const UI_STRINGS = [
   "Forrige",
   "Næste ›",
   "Næste: {sted}",
+  "På pause - du kigger selv rundt",
   "Afslut",
   "Hør igen",
   "Slå lyd til",

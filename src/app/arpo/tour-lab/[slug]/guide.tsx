@@ -2,12 +2,19 @@
 
 import { useT } from "../tours/i18n-react";
 import { useEffect, useRef, useState } from "react";
-import type { TourConfig } from "../tours/types";
+import type { GuideTurn, TourConfig } from "../tours/types";
+import { startPlaces } from "../tours/places";
 
-export type GuideStop = { href: string; title: string; text: string; audio?: string };
+export type GuideStop = { href: string; title: string; text: string; audio?: string; turn?: GuideTurn };
 
-/** The guided tour's stops, with a drone point's name and text filled in where a stop borrows them. */
+/** The guided tour's stops, with a drone point's name and text filled in where a stop borrows them - or one per menu place when it's made from the menu. */
 export function guideStops(T: TourConfig): GuideStop[] {
+  if (T.guide?.fromMenu) {
+    const pick = T.guide.menuPlaces;
+    return startPlaces(T)
+      .filter((p) => !pick || pick.includes(p.key))
+      .map((p) => ({ href: p.href, title: p.name, text: p.group ?? "", turn: T.guide?.menuTurns?.[p.key] }));
+  }
   return (T.guide?.stops ?? []).flatMap((s) => {
     if (!("point" in s)) return [s];
     const p = T.points.find((x) => x.id === s.point);
@@ -26,6 +33,8 @@ export function GuidePlayer({
   index,
   seconds,
   manual = false,
+  held = false,
+  onResume,
   end,
   onGo,
   onClose,
@@ -36,6 +45,9 @@ export function GuidePlayer({
   seconds: number;
   /** No timer - the visitor presses Næste (a calm voice tour). */
   manual?: boolean;
+  /** The visitor took over (walked on or looked around) - the guide waits until they press Fortsæt or Næste. */
+  held?: boolean;
+  onResume?: () => void;
   /** Shown on the last stop - the next step for the visitor (e.g. book a visit). */
   end?: React.ReactNode;
   onGo: (index: number) => void;
@@ -83,7 +95,7 @@ export function GuidePlayer({
         {stops.map((s, i) => (
           <span key={s.title + i} className={i < index ? "done" : ""}>
             {i === index && timed && (
-              <i key={index} style={{ animationDuration: `${seconds}s`, animationPlayState: paused ? "paused" : "running" }} onAnimationEnd={() => step(index + 1, "auto")} />
+              <i key={index} style={{ animationDuration: `${seconds}s`, animationPlayState: paused || held ? "paused" : "running" }} onAnimationEnd={() => step(index + 1, "auto")} />
             )}
             {i === index && !timed && <i key={index} className="gd-here" />}
           </span>
@@ -94,7 +106,8 @@ export function GuidePlayer({
           {index + 1} / {stops.length}
         </div>
         <h3>{stop.title}</h3>
-        <p>{stop.text}</p>
+        {stop.text && <p>{stop.text}</p>}
+        {held && timed && <div className="gd-next">{tr("På pause - du kigger selv rundt")}</div>}
         {index < stops.length - 1 ? <div className="gd-next">{tr("Næste: {sted}", { sted: stops[index + 1].title })}</div> : end && <div className="gd-end">{end}</div>}
         <div className="gd-ctrl">
           <button type="button" aria-label={tr("Forrige")} disabled={index === 0} onClick={() => step(index - 1, "back")}>
@@ -102,8 +115,15 @@ export function GuidePlayer({
           </button>
           {timed ? (
             <>
-              <button type="button" className="gd-play" onClick={() => setPaused((p) => !p)}>
-                {paused ? "▶ Fortsæt" : "❚❚ Pause"}
+              <button
+                type="button"
+                className="gd-play"
+                onClick={() => {
+                  if (held) return onResume?.();
+                  setPaused((p) => !p);
+                }}
+              >
+                {paused || held ? "▶ Fortsæt" : "❚❚ Pause"}
               </button>
               <button type="button" aria-label={tr("Næste")} onClick={() => step(index + 1, "next")}>
                 ›

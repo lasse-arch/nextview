@@ -4,6 +4,8 @@
  * prototype; the scalable version keeps it in Arpo, edited in the editor.
  */
 
+/** The guide's turn at a stop: "as" = the usual slow turn, "other" = the other way, "none" = no turn. */
+export type GuideTurn = "as" | "other" | "none";
 export type WelcomeGo = { drone: string | null } | { room: string; name: string } | { href: string } | { guide: true } | { day: true };
 
 /** A real spot in the tour with a photo of it (e.g. one of the model's own Matterport photos). */
@@ -237,8 +239,18 @@ export type TourConfig = {
     seconds?: number;
     /** The visitor presses "Næste" themselves (no timer) - calm, e.g. for a voice tour. */
     manual?: boolean;
+    /**
+     * Made from the menu instead of `stops`: one stop per place in the menu,
+     * in the menu's order - `menuPlaces` = the places to include, by their
+     * key (as in ?rum=; all when left out), `menuTurns` = a place's own turn (by key).
+     */
+    fromMenu?: boolean;
+    menuPlaces?: string[];
+    menuTurns?: Record<string, GuideTurn>;
+    /** How the view turns at each stop: left out = a slow turn as always, "other" = the other way, "none" = stands still. A stop can have its own. */
+    turn?: GuideTurn;
     /** A stop: where (empty href = stay, e.g. a closing card), its text, and optionally a voice (an audio file) that plays there. */
-    stops: ({ point: string } | { href: string; title: string; text: string; audio?: string })[];
+    stops: ({ point: string } | { href: string; title: string; text: string; audio?: string; turn?: GuideTurn })[];
   };
   /**
    * "Sådan ser en dag ud": the day as a calm timeline (time, what happens,

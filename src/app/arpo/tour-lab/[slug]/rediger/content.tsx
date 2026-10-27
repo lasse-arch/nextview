@@ -1,11 +1,11 @@
 "use client";
 
-import { isPlaceHref, placeHref } from "../../tours/places";
+import { isPlaceHref, placeHref, startPlaces } from "../../tours/places";
 import { AiImageButton } from "./ai-image";
 import { writePlaceCards, type CardDraft } from "@/lib/actions/tour-cards";
 import { useState } from "react";
 import { saveTourStoryImage } from "@/lib/actions/tour-lab";
-import type { PlaceCard, TourConfig, TourInfo, TourPlace, WelcomeGo } from "../../tours/types";
+import type { GuideTurn, PlaceCard, TourConfig, TourInfo, TourPlace, WelcomeGo } from "../../tours/types";
 import { Choice, Field, Group, Icon, input, Toggle, UploadButton, ssOfHref, type PreviewApi } from "./ui";
 
 /*
@@ -442,13 +442,31 @@ export function GuideEditor({ config, edit, preview }: Omit<Props, "slug">) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const stops = config.guide?.stops ?? [];
-  const setStops = (s: Stop[]) => edit((d) => void (d.guide = s.length ? { ...d.guide, stops: s } : undefined));
+  const fromMenu = Boolean(config.guide?.fromMenu);
+  const places = startPlaces(config);
+  const setStops = (s: Stop[]) => edit((d) => void (d.guide = s.length || d.guide?.fromMenu ? { ...d.guide, stops: s } : undefined));
+  const turnOptions: [string, string][] = [
+    ["as", "Drej som nu"],
+    ["other", "Drej den anden vej"],
+    ["none", "Drej ikke"],
+  ];
   return (
     <>
       <Group>
         <p className="text-[14px] leading-snug text-[#1d1d1f]">&quot;Vis mig rundt&quot; flyver fra stop til stop med en kort tekst ved hvert - og en stemme, hvis stoppet har en lydfil. Som en rundvisning med en medarbejder.</p>
         <p className={small}>Hold den kort: 4-7 stop, der fortæller en historie og slutter der, hvor man skal handle (fx book, bliv elev).</p>
-        {stops.length > 0 && (
+        <Toggle
+          on={fromMenu}
+          onChange={(on) => edit((d) => void (d.guide = on ? { ...d.guide, stops: d.guide?.stops ?? [], fromMenu: true } : d.guide?.stops.length ? { ...d.guide, fromMenu: undefined, menuPlaces: undefined, menuTurns: undefined } : undefined))}
+          title="Lav den ud fra menuen"
+          hint="Ét stop pr. sted i menuen, i menuens rækkefølge. Vælg nedenfor, hvilke der skal med."
+        />
+        {(stops.length > 0 || fromMenu) && (
+          <Field title="Ved hvert stop">
+            <Choice value={config.guide?.turn ?? "as"} options={turnOptions} onChange={(v) => edit((d) => void (d.guide = { ...d.guide!, turn: v === "as" ? undefined : (v as GuideTurn) }))} />
+          </Field>
+        )}
+        {(stops.length > 0 || fromMenu) && (
           <Toggle
             on={Boolean(config.guide?.manual)}
             onChange={(on) => edit((d) => void (d.guide = { ...d.guide!, manual: on || undefined }))}
@@ -462,6 +480,60 @@ export function GuideEditor({ config, edit, preview }: Omit<Props, "slug">) {
           </Field>
         )}
       </Group>
+      {fromMenu ? (
+        <Group title={`Steder fra menuen (${(config.guide?.menuPlaces ?? places.map((p) => p.key)).filter((n) => places.some((p) => p.key === n)).length} af ${places.length})`}>
+          {places.length === 0 && <p className={small}>Menuen har ingen steder i touren endnu.</p>}
+          <ul className="-mx-1 divide-y divide-black/[.05]">
+            {places.map((p) => {
+              const picked = config.guide?.menuPlaces ? config.guide.menuPlaces.includes(p.key) : true;
+              return (
+                <li key={p.key} className="flex items-center gap-2 px-1 py-2">
+                  <input
+                    type="checkbox"
+                    checked={picked}
+                    className="h-4 w-4 accent-[#0071e3]"
+                    onChange={(e) =>
+                      edit((d) => {
+                        const all = places.map((x) => x.key);
+                        const now = new Set(d.guide!.menuPlaces ?? all);
+                        if (e.target.checked) now.add(p.key);
+                        else now.delete(p.key);
+                        d.guide!.menuPlaces = now.size === all.length ? undefined : all.filter((n) => now.has(n));
+                      })
+                    }
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[14px]">{p.name}</span>
+                    {p.group && <span className="block truncate text-[12px] text-[#8e8e93]">{p.group}</span>}
+                  </span>
+                  {picked && (
+                    <select
+                      value={config.guide?.menuTurns?.[p.key] ?? ""}
+                      onChange={(e) =>
+                        edit((d) => {
+                          const turns = { ...d.guide!.menuTurns };
+                          if (e.target.value) turns[p.key] = e.target.value as GuideTurn;
+                          else delete turns[p.key];
+                          d.guide!.menuTurns = Object.keys(turns).length ? turns : undefined;
+                        })
+                      }
+                      className="rounded-lg bg-[#f2f2f7] px-2 py-1 text-[12px]"
+                      title="Drejning ved dette stop"
+                    >
+                      <option value="">Som ovenfor</option>
+                      {turnOptions.map(([v, l]) => (
+                        <option key={v} value={v}>
+                          {l}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </Group>
+      ) : (
       <Group title="Stop">
         <Rows<Stop>
           items={stops}
@@ -490,6 +562,11 @@ export function GuideEditor({ config, edit, preview }: Omit<Props, "slug">) {
                   </>
                 ) : (
                   <PlacePicker href="" name={s.title} preview={preview} onChange={(href) => set({ ...s, href })} />
+                )}
+                {s.href && (
+                  <Field title="Drejning ved stoppet">
+                    <Choice value={s.turn ?? ""} options={[["", "Som de andre"], ...turnOptions]} onChange={(v) => set({ ...s, turn: v ? (v as GuideTurn) : undefined })} />
+                  </Field>
                 )}
                 <Field title="Stemme (valgfri)" hint="En lydfil (mp3/m4a), der spilles ved stoppet. Gæsten kan slå lyden fra.">
                   {s.audio ? (
@@ -528,6 +605,7 @@ export function GuideEditor({ config, edit, preview }: Omit<Props, "slug">) {
         </button>
         {error && <p className="px-1 text-[12px] text-[#ff3b30]">{error}</p>}
       </Group>
+      )}
       <DayEditor config={config} edit={edit} preview={preview} />
     </>
   );

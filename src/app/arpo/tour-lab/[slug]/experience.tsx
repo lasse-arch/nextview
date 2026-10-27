@@ -347,6 +347,10 @@ function TourExperience({
   const currentSsRef = useRef<number | null>(null);
   /** "Vis mig rundt": the stop it's at, or null when the visitor walks on their own. */
   const [guideAt, setGuideAt] = useState<number | null>(null);
+  /** The visitor took over during "Vis mig rundt" (walked on or looked around) - the guide waits for them. */
+  const [guideHeld, setGuideHeld] = useState(false);
+  /** The guide itself is moving the view right now - not the visitor. */
+  const guideMoving = useRef(false);
   const [dayOpen, setDayOpen] = useState(false);
   const [dayAt, setDayAt] = useState<number | null>(null);
   /** Place cards closed for good (by index), and the "comes by itself" card. */
@@ -900,6 +904,7 @@ function TourExperience({
   function guideGo(i: number) {
     const stop = GUIDE[i];
     setGuideAt(i);
+    setGuideHeld(false);
     if (!stop.href) return; // a stop that stays where it is (e.g. the closing card)
     const point = pointById(stop.href);
     if (point) {
@@ -914,8 +919,31 @@ function TourExperience({
     }
     setPano(null);
     if (phase === "drone") return enterTour(stop.href, "guide", stop.title);
-    flyTo(stop.href, "fly").then(() => sdk?.Camera.rotate?.(18, 0, { speed: 3 }).catch(() => {}));
+    // The slow turn at the stop: as always, the other way, or none (the stop's own, else the guide's).
+    const turn = stop.turn ?? T.guide?.turn ?? "as";
+    guideMoving.current = true;
+    flyTo(stop.href, "fly")
+      .then(() => (turn === "none" ? undefined : sdk?.Camera.rotate?.(turn === "other" ? -18 : 18, 0, { speed: 3 }).catch(() => {})))
+      .finally(() => setTimeout(() => (guideMoving.current = false), 700));
   }
+  /*
+   * While the guide runs, the visitor may take over: walk to another scan
+   * point or turn to look at something. Then the guide waits (its timer
+   * stops) until they press Fortsæt or Næste - meanwhile it's just their tour.
+   */
+  useEffect(() => {
+    if (guideAt == null || !sdk || phase !== "tour") return;
+    let base: { sweep: string; x: number; y: number } | null = null;
+    const sub = sdk.Camera.pose.subscribe((p) => {
+      if (guideMoving.current || !base) {
+        base = { sweep: p.sweep, x: p.rotation.x, y: p.rotation.y };
+        return;
+      }
+      if (p.sweep !== base.sweep || Math.abs(p.rotation.y - base.y) > 4 || Math.abs(p.rotation.x - base.x) > 4) setGuideHeld(true);
+    });
+    return () => sub.cancel();
+    // guideHeld too: after Fortsæt, the view the visitor stands in is the new starting point.
+  }, [guideAt, sdk, phase, guideHeld]);
   function startGuide(from: string) {
     if (!GUIDE.length) return;
     track("guide_start", { from, stops: GUIDE.length });
@@ -988,6 +1016,7 @@ function TourExperience({
     flyTo(step.href, "fly");
   }
   function closeGuide(completed: boolean) {
+    setGuideHeld(false);
     track(completed ? "guide_complete" : "guide_close", { stop: (guideAt ?? 0) + 1, stops: GUIDE.length });
     setGuideAt(null);
     setPano(null);
@@ -1823,6 +1852,8 @@ function TourExperience({
           index={guideAt}
           seconds={T.guide?.seconds ?? 9}
           manual={T.guide?.manual}
+          held={guideHeld}
+          onResume={() => setGuideHeld(false)}
           end={primaryCta && (
             <TourLink href={primaryCta.href} label={primaryCta.label} className="hv-btn hv-primary" onClick={() => track("cta_click", { label: primaryCta.label, link_url: primaryCta.href, place: "guide_end" })}>
               {primaryCta.label}
