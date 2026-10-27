@@ -11,7 +11,7 @@ const PUBLIC_PATHS = ["/login", "/robots.txt", "/t", "/r", "/p", "/site", "/web"
  * old addresses - /deals/123, /tour-lab/… - send on to the same page under
  * /arpo, so bookmarks and links in old e-mails keep working.
  */
-const ARPO_SECTIONS = ["commission", "deals", "kalender", "kunder-live", "leadgeneration", "leadindbakke", "nyheder", "opgaver", "profile", "ringeliste", "settings", "stats", "tour-lab", "users", "vaekst"];
+const ARPO_SECTIONS = ["commission", "deals", "kalender", "kunder", "kunder-live", "leadgeneration", "leadindbakke", "nyheder", "opgaver", "profile", "ringeliste", "settings", "stats", "tour-lab", "users", "vaekst"];
 const OLD_ARPO_PATH = new RegExp(`^/(${ARPO_SECTIONS.join("|")})(/|$)`);
 /** A tour's pictures were once under Arpo's /tour-lab - tours saved back then still point there. */
 const OLD_STORY_PICTURE = /^\/tour-lab\/([^/]+)\/historie$/;

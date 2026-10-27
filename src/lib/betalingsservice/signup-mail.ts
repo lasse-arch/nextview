@@ -232,6 +232,7 @@ export async function sendSignupMails(dealId?: string): Promise<{
         fromName: "Nextview360 ApS",
       });
       await prisma.deal.update({ where: { id: deal.id }, data: { bsSignupMailSentAt: new Date() } });
+      await prisma.systemMail.create({ data: { dealId: deal.id, kind: "bs_signup", to: (deal.invoiceEmail || deal.contactEmail)!, subject: mail.subject } }).catch(() => {});
       sent++;
     } catch (err) {
       failed.push({ name: dealName(deal), error: err instanceof Error ? err.message : "Ukendt fejl" });

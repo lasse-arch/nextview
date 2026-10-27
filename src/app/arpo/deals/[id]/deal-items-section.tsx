@@ -15,7 +15,7 @@ type DealItem = {
   imageUrl: string | null;
 };
 
-// Shown full-screen on /kunder-live when presenting to customers, so this
+// Shown full-screen on /arpo/kunder when presenting to customers, so this
 // needs to hold up a lot better than a small thumbnail would.
 const MAX_IMAGE_DIMENSION = 1800;
 const IMAGE_QUALITY = 0.85;

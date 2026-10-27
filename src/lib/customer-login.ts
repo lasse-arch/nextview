@@ -65,16 +65,26 @@ export async function sendLoginMail(account: { id: string; email: string; name: 
 <p>Venlig hilsen<br>Nextview360</p>
 </div>`;
 
+  // Logged for the customer overview in Arpo - which mail, to whom, when (never the link itself).
+  const log = (error: string | null) => prisma.systemMail.create({ data: { accountId: account.id, kind: welcome ? "access" : "login", to: account.email, subject, error } }).catch(() => {});
   const sender = await prisma.emailAccount.findFirst({ where: { provider: "GOOGLE", email: WELCOME_MAIL_SENDER } });
   if (!sender) {
     // On a developer's machine there's no Gmail to send from - the link goes to the server log instead.
     if (process.env.NODE_ENV !== "production") {
       console.log(`[kundelogin] Link til ${account.email}: ${link}`);
+      await log(null);
       return;
     }
+    await log("Ingen forbundet Gmail-konto");
     throw new Error(`Ingen forbundet Gmail-konto for ${WELCOME_MAIL_SENDER}. Forbind den under Indstillinger → E-mail.`);
   }
-  await sendGmailMessage(sender, { to: [account.email], subject, bodyText, bodyHtml, fromName: "Nextview360", fromAddress: LOGIN_MAIL_FROM });
+  try {
+    await sendGmailMessage(sender, { to: [account.email], subject, bodyText, bodyHtml, fromName: "Nextview360", fromAddress: LOGIN_MAIL_FROM });
+  } catch (err) {
+    await log((err instanceof Error ? err.message : String(err)).slice(0, 300));
+    throw err;
+  }
+  await log(null);
 }
 
 /**
@@ -104,6 +114,7 @@ export async function consumeLoginLink(token: string): Promise<string | null> {
   // Marked used in the same step as it's checked - two clicks at once can't both log in.
   const used = await prisma.customerLoginToken.updateMany({ where: { id: row.id, usedAt: null, expiresAt: { gt: new Date() } }, data: { usedAt: new Date() } });
   if (used.count !== 1) return null;
-  await prisma.customerAccount.update({ where: { id: row.accountId }, data: { lastLoginAt: new Date() } });
+  const now = new Date();
+  await prisma.customerAccount.update({ where: { id: row.accountId }, data: { lastLoginAt: now, lastSeenAt: now, logins: { create: { at: now } } } });
   return row.accountId;
 }

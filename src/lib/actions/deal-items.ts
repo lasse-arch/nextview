@@ -64,7 +64,7 @@ export async function updateDealItemImageAction(
   if (!dataUrl) {
     await prisma.dealItem.update({ where: { id: itemId }, data: { imageUrl: null } });
     revalidatePath(`/arpo/deals/${dealId}`);
-    revalidatePath("/arpo/kunder-live");
+    revalidatePath("/arpo/kunder");
     return { ok: true };
   }
 
@@ -77,6 +77,6 @@ export async function updateDealItemImageAction(
 
   await prisma.dealItem.update({ where: { id: itemId }, data: { imageUrl: dataUrl } });
   revalidatePath(`/arpo/deals/${dealId}`);
-  revalidatePath("/arpo/kunder-live");
+  revalidatePath("/arpo/kunder");
   return { ok: true };
 }

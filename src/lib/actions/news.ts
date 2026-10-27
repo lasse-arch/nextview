@@ -62,6 +62,18 @@ export async function getUnreadNewsCount(userId: string, newsReadAt: Date | null
  */
 const DEFAULT_POSTS: { title: string; body: string; minutesAgo: number; screenshotUrl: string }[] = [
   {
+    minutesAgo: 0,
+    title: "Kundeoverblik: alt om en kunde på én side",
+    body: "Klik på en kunde under \"Live kunder\" (eller \"Kundeoverblik\" på dealen), og du får alt samlet: kontaktinfo, aftale og betaling, fakturaer med status (betalt, sendt, forfalden), kundens tours med besøg de sidste 30 dage, hvem der kan logge ind på kundesiden - og hvornår de sidst gjorde det.\n\nNederst er en tidslinje med alle mails og hændelser, nyeste først: velkomstmail, login-links, fakturaer sendt og betalt, Betalingsservice-træk, statistikrapporter (og om de er åbnet), kontrakten og mails fra dealen. Admins kan trykke \"Se kundesiden som kunde\" og se præcis det, kunden ser.",
+    screenshotUrl: "/news/kundeoverblik.png",
+  },
+  {
+    minutesAgo: 1,
+    title: "Gør kunden live direkte fra touren",
+    body: "Øverst under \"Del og udgiv\" i tour-editoren er der nu én knap: \"Udgiv touren endelig og gør kunden live\". Den lægger touren ud på tour.nextview360.dk, giver kontaktpersonen login til kundesiden, sætter dealen Live og sender velkomstmailen - nu med en kort introduktion til kundesiden og en knap til at logge ind. Mangler filmtiden, beder den om den først.",
+    screenshotUrl: "/news/goer-kunden-live.png",
+  },
+  {
     minutesAgo: 15,
     title: "Se om kunden har åbnet din mail",
     body: "Mails du sender fra en deal (via skabelon-knappen) spores nu - under \"E-mail på dealen\" på dealens side kan du se en grøn \"Åbnet\"-badge, så snart kunden har åbnet mailen. Hold musen over badgen for at se hvor mange gange den er åbnet, og hvornår den blev åbnet første gang. Har den ikke en badge endnu, er den bare ikke åbnet af kunden endnu.",

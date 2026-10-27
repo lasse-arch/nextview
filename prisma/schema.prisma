@@ -632,6 +632,7 @@ model Deal {
   tours          Tour[]
   /// Customer logins (nextview360.dk/kunde) that may see this deal.
   customerAccounts CustomerAccountDeal[]
+  systemMails      SystemMail[]
 
   @@index([inLeadInbox, stage])
 }
@@ -1540,10 +1541,46 @@ model CustomerAccount {
   name          String?
   createdAt     DateTime              @default(now())
   lastLoginAt   DateTime?
+  /// Last time they had their customer page open (updated at most every 10 minutes).
+  lastSeenAt    DateTime?
   /// Who gave the access, for the deal page.
   invitedByName String?
   deals         CustomerAccountDeal[]
   tokens        CustomerLoginToken[]
+  logins        CustomerLogin[]
+  mails         SystemMail[]
+}
+
+/// Every time a customer logged in on nextview360.dk/login - for the customer overview in Arpo.
+model CustomerLogin {
+  id        String          @id @default(cuid())
+  accountId String
+  account   CustomerAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  at        DateTime        @default(now())
+
+  @@index([accountId, at])
+}
+
+/// A mail the system sent to a customer by itself (login links, the welcome
+/// mail, the Betalingsservice sign-up) - so the customer overview can show
+/// every mail and when. Mails sent from a deal's own mail box, reports,
+/// invoices and contracts have their own records already.
+model SystemMail {
+  id        String           @id @default(cuid())
+  dealId    String?
+  deal      Deal?            @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  accountId String?
+  account   CustomerAccount? @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  /// "login", "access" (the first login, when access is given), "welcome", "bs_signup".
+  kind      String
+  to        String
+  subject   String
+  /// Why it didn't go out, when it didn't.
+  error     String?
+  sentAt    DateTime         @default(now())
+
+  @@index([dealId, sentAt])
+  @@index([accountId, sentAt])
 }
 
 /// Which deals (and so tours, contract, invoices) a customer login may see.

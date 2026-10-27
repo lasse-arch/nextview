@@ -212,6 +212,11 @@ export default async function DealDetailPage({
           {["CONTRACT_SIGNED", "FILMED", "LIVE"].includes(deal.stage) || deal.filmingAt ? (
             <FilmingTimeButton dealId={deal.id} minutes={deal.filmingActualMinutes} plannedMinutes={deal.filmingDurationMinutes} />
           ) : null}
+          {["CONTRACT_SIGNED", "FILMED", "LIVE"].includes(deal.stage) && (
+            <Link href={`/arpo/kunder/${deal.id}`} className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-[13px] font-semibold text-slate-700 shadow-sm hover:bg-slate-50">
+              Kundeoverblik
+            </Link>
+          )}
           </div>
           <div className="flex flex-wrap items-center gap-2">
           <InactiveToggleButton dealId={deal.id} isChurned={Boolean(deal.churnedAt)} />

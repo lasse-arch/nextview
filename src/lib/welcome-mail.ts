@@ -166,7 +166,13 @@ export async function sendWelcomeMail(dealId: string, actorId: string): Promise<
   if (!to) throw new Error("Kunden har ingen kontakt-e-mail.");
   const account = await prisma.emailAccount.findFirst({ where: { provider: "GOOGLE", email: WELCOME_MAIL_SENDER } });
   if (!account) throw new Error(`Ingen forbundet Gmail-konto for ${WELCOME_MAIL_SENDER}. Forbind den under Indstillinger → E-mail.`);
-  await sendGmailMessage(account, { to: [to], subject, bodyText, bodyHtml, fromName: "Lasse - Nextview360" });
+  try {
+    await sendGmailMessage(account, { to: [to], subject, bodyText, bodyHtml, fromName: "Lasse - Nextview360" });
+  } catch (err) {
+    await prisma.systemMail.create({ data: { dealId, accountId: access?.accountId, kind: "welcome", to, subject, error: (err instanceof Error ? err.message : String(err)).slice(0, 300) } }).catch(() => {});
+    throw err;
+  }
+  await prisma.systemMail.create({ data: { dealId, accountId: access?.accountId, kind: "welcome", to, subject } }).catch(() => {});
   await prisma.deal.update({ where: { id: dealId }, data: { welcomeMailSentAt: new Date() } });
   await prisma.note.create({ data: { dealId, authorId: actorId, kind: "MANUAL", body: `Velkomstmail sendt til ${to}.` } });
   await logActivity({ type: "DEAL_UPDATED", message: `Velkomstmail sendt til ${dealName(deal)}`, actorId, dealId });

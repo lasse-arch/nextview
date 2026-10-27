@@ -36,7 +36,11 @@ const date = (d: Date) => d.toLocaleDateString("da-DK", { day: "numeric", month:
  */
 async function viewer(som: string | undefined): Promise<{ dealIds: string[]; name: string | null; preview: { dealId: string } | null } | null> {
   const account = await getCurrentCustomer();
-  if (account) return { dealIds: account.deals.map((d) => d.dealId), name: account.name, preview: null };
+  if (account) {
+    // "Sidst set" in Arpo's customer overview - at most one write every 10 minutes.
+    if (!account.lastSeenAt || Date.now() - account.lastSeenAt.getTime() > 10 * 60_000) await prisma.customerAccount.update({ where: { id: account.id }, data: { lastSeenAt: new Date() } }).catch(() => {});
+    return { dealIds: account.deals.map((d) => d.dealId), name: account.name, preview: null };
+  }
   const user = await getCurrentUser();
   if (!user) redirect("/api/auth/session-ended");
   if (user.role !== "ADMIN" || !som) redirect("/arpo");

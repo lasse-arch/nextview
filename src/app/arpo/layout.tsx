@@ -32,7 +32,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         { href: "/arpo/opgaver", label: "Opgaver", icon: "tasks" },
       ],
     },
-    { section: "Kunder", items: [{ href: "/arpo/kunder-live", label: "Live kunder", icon: "users" }] },
+    { section: "Kunder", items: [{ href: "/arpo/kunder", label: "Live kunder", icon: "users" }] },
     {
       section: "Tours",
       items: admin
