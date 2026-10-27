@@ -252,9 +252,9 @@ export function PickerMenu({
             type="button"
             className={g.title === group ? "nu" : ""}
             onClick={() => {
-              // Same kind of room in the new size if there is one, otherwise its first.
-              const same = g.items.find((i) => i[0] === item) ?? g.items[0];
-              pick(g.title, same[0], same[1]);
+              // A new size always opens empty ("Tomt") - the size itself is what they're choosing; furnished is one tap further.
+              const empty = g.items.find((i) => /^tom/i.test(i[0])) ?? g.items[0];
+              pick(g.title, empty[0], empty[1]);
             }}
           >
             {g.title.replace(/^[^:]*:\s*/, "")}
