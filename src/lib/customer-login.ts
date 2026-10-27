@@ -22,7 +22,7 @@ const LINK_MINUTES = 15;
  */
 const LOGIN_MAIL_FROM = "info@nextview360.dk";
 /** The first link, when access is given in Arpo: the customer may not open the mail the same day. */
-const WELCOME_DAYS = 7;
+export const WELCOME_DAYS = 7;
 /** Links one customer can ask for in an hour, and requests from one address in 15 minutes. */
 const MAX_PER_ACCOUNT_HOUR = 5;
 const MAX_PER_IP = 20;
@@ -38,6 +38,9 @@ async function newLink(accountId: string, minutes: number): Promise<string> {
   await prisma.customerLoginToken.deleteMany({ where: { expiresAt: { lt: new Date(Date.now() - 24 * 3600_000) } } });
   return `${getAppBaseUrl()}/login/link?t=${token}`;
 }
+
+/** The login button in the welcome mail when the customer goes live: one use, for WELCOME_DAYS. */
+export const welcomeLoginLink = (accountId: string) => newLink(accountId, WELCOME_DAYS * 24 * 60);
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 

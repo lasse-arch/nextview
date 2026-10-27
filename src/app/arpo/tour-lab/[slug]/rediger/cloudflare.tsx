@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { publishNow, publishState, putVersionLive, type PublishState } from "@/lib/actions/tour-publish";
+import { goLive, publishNow, publishState, putVersionLive, type GoLiveState, type PublishState } from "@/lib/actions/tour-publish";
 import { Group, input } from "./ui";
 import { CLOUDFLARE_TOUR_ORIGIN } from "@/lib/public-urls";
 
@@ -11,6 +11,7 @@ import { CLOUDFLARE_TOUR_ORIGIN } from "@/lib/public-urls";
  * published again. Every version is kept; any of them can be put back live.
  */
 
+const day = (iso: string) => new Date(iso).toLocaleDateString("da-DK", { day: "numeric", month: "short", year: "numeric" });
 const when = (iso: string) => new Date(iso).toLocaleString("da-DK", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
 export function CloudflarePublish({ slug }: { slug: string }) {
@@ -36,6 +37,7 @@ export function CloudflarePublish({ slug }: { slug: string }) {
 
   return (
     <Group title="Udgiv på tour.nextview360.dk">
+      {state.deal && <GoLive slug={slug} deal={state.deal} onDone={load} />}
       <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">
         Touren lægges ud som en fast version hos Cloudflare. Den kører, selv hvis Arpo er nede, og ændringer og nye funktioner kommer først med, når du udgiver igen. Alle versioner gemmes, så du kan gå tilbage.
       </p>
@@ -99,5 +101,55 @@ export function CloudflarePublish({ slug }: { slug: string }) {
         </>
       )}
     </Group>
+  );
+}
+
+/**
+ * "Udgiv touren endelig og gør kunden live": the last step, in one press -
+ * the tour out, the customer Live in Arpo with access to their customer page,
+ * and the welcome mail. Asks for the filming time first if it's missing.
+ */
+function GoLive({ slug, deal, onDone }: { slug: string; deal: GoLiveState; onDone: () => void }) {
+  const [hours, setHours] = useState("");
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [pending, start] = useTransition();
+
+  if (deal.liveAt && deal.welcomeMailSentAt)
+    return (
+      <p className="rounded-xl bg-[#34c759]/12 px-3 py-2 text-[13px] text-[#1d7a33]">
+        ✓ {deal.name} er live siden {day(deal.liveAt)}. Velkomstmailen blev sendt {day(deal.welcomeMailSentAt)}
+        {deal.portal ? ", og kunden har adgang til kundesiden." : "."}
+      </p>
+    );
+
+  const go = () => {
+    const h = deal.filmingMissing ? Number(hours.replace(",", ".")) : null;
+    if (deal.filmingMissing && (!hours.trim() || !Number.isFinite(h) || h! <= 0)) return setMsg({ ok: false, text: "Skriv filmtiden i timer, fx 2,5." });
+    if (!confirm(`Udgiv touren og sæt ${deal.name} live?\n\nVelkomstmailen med login til kundesiden sendes til ${deal.contactEmail}.`)) return;
+    start(async () => {
+      setMsg(null);
+      const r = await goLive(slug, h);
+      setMsg(r.ok ? { ok: !!r.value.mail, text: r.value.mail ? `Udgivet, og ${deal.name} er live. Velkomstmailen er sendt til ${r.value.mail}.` : `Udgivet, og ${deal.name} er live - men velkomstmailen blev ikke sendt. Se noten på dealen.` } : { ok: false, text: r.error });
+      onDone();
+    });
+  };
+
+  return (
+    <div className="space-y-2 rounded-xl bg-[#0071e3]/[.06] p-3">
+      <p className="text-[13px] leading-snug text-[#1d1d1f]">
+        <b>Klar til kunden?</b> Touren lægges ud, {deal.name} sættes Live i Arpo, og kunden får velkomstmailen med en kort introduktion til kundesiden og et login{deal.contactEmail ? ` (til ${deal.contactEmail})` : ""}.
+      </p>
+      {!deal.contactEmail && <p className="text-[13px] text-[#c4271d]">Dealen mangler en kontakt-e-mail - tilføj den på dealen først.</p>}
+      {deal.filmingMissing && (
+        <label className="block text-[13px]">
+          <span className="text-[#6e6e73]">Filmtid i timer (med opsætning og transport)</span>
+          <input className={`${input} mt-1 bg-white`} inputMode="decimal" placeholder="Fx 2,5" value={hours} onChange={(e) => setHours(e.target.value)} />
+        </label>
+      )}
+      <button type="button" disabled={pending || !deal.contactEmail} onClick={go} className="w-full rounded-xl bg-[#0071e3] py-2.5 text-[15px] font-semibold text-white disabled:opacity-50">
+        {pending ? "Udgiver og sætter live…" : "Udgiv touren endelig og gør kunden live"}
+      </button>
+      {msg && <p className={`px-1 text-[13px] ${msg.ok ? "text-[#248a3d]" : "text-[#ff3b30]"}`}>{msg.text}</p>}
+    </div>
   );
 }
