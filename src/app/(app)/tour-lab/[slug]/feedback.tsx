@@ -10,7 +10,15 @@ import { useEffect, useState } from "react";
  */
 
 export type ReviewView = { href: string; ss: number; room: string | null };
-type Note = { id: string; kind: string; text: string; author: string | null; href: string | null; room: string | null; status: string };
+type Note = {
+  id: string;
+  kind: string;
+  text: string;
+  author: string | null;
+  href: string | null;
+  room: string | null;
+  status: string;
+};
 
 export function FeedbackLayer({
   token,
@@ -27,10 +35,27 @@ export function FeedbackLayer({
 }) {
   const [step, setStep] = useState<null | "write" | "list">(null);
   const [text, setText] = useState("");
-  const [here, setHere] = useState<{ view: ReviewView | null; image: string | null } | null>(null);
+  const [here, setHere] = useState<{
+    view: ReviewView | null;
+    image: string | null;
+  } | null>(null);
   const [notes, setNotes] = useState<Note[]>([]);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  // Folded into a small tab at the right edge, so it is not in the way of the tour (stories, menus).
+  const [small, setSmall] = useState(() => {
+    try {
+      return typeof window !== "undefined" && sessionStorage.getItem("fb-small") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const fold = (v: boolean) => {
+    setSmall(v);
+    try {
+      sessionStorage.setItem("fb-small", v ? "1" : "0");
+    } catch {}
+  };
 
   const load = () =>
     fetch(`/api/tour-feedback?token=${encodeURIComponent(token)}`)
@@ -55,10 +80,22 @@ export function FeedbackLayer({
     const r = await fetch("/api/tour-feedback", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token, text, href: here?.view?.href, ss: here?.view?.ss, room: here?.view?.room, image: here?.image, device: `${window.innerWidth}×${window.innerHeight} · ${navigator.userAgent.slice(0, 80)}` }),
+      body: JSON.stringify({
+        token,
+        text,
+        href: here?.view?.href,
+        ss: here?.view?.ss,
+        room: here?.view?.room,
+        image: here?.image,
+        device: `${window.innerWidth}×${window.innerHeight} · ${navigator.userAgent.slice(0, 80)}`,
+      }),
     }).catch(() => null);
     setBusy(false);
-    if (!r?.ok) return setMsg((await r?.json().catch(() => null))?.error ?? "Det kunne ikke sendes - prøv igen.");
+    if (!r?.ok)
+      return setMsg(
+        (await r?.json().catch(() => null))?.error ??
+          "Det kunne ikke sendes - prøv igen.",
+      );
     setText("");
     setHere(null);
     setStep(null);
@@ -69,27 +106,60 @@ export function FeedbackLayer({
 
   return (
     <>
-      <div className="fb-bar">
-        <span className="fb-tag">Gennemsyn</span>
-        <button type="button" className="fb-main" onClick={open}>
-          Giv feedback
+      {small ? (
+        <button type="button" className="fb-tab" onClick={() => fold(false)}>
+          Feedback{notes.length ? ` · ${notes.length}` : ""}
         </button>
-        <button type="button" className="fb-list" onClick={() => setStep(step === "list" ? null : "list")}>
-          {notes.length ? `${notes.length} indtil nu` : "Ingen endnu"}
-        </button>
-      </div>
+      ) : (
+        <div className="fb-bar">
+          <span className="fb-tag">Gennemsyn</span>
+          <button type="button" className="fb-main" onClick={open}>
+            Giv feedback
+          </button>
+          <button
+            type="button"
+            className="fb-list"
+            onClick={() => setStep(step === "list" ? null : "list")}
+          >
+            {notes.length ? `${notes.length} indtil nu` : "Ingen endnu"}
+          </button>
+          <button
+            type="button"
+            className="fb-fold"
+            aria-label="Gør mindre"
+            title="Gør mindre"
+            onClick={() => fold(true)}
+          >
+            ›
+          </button>
+        </div>
+      )}
 
       {step === "write" && (
         <div className="fb-sheet" role="dialog" aria-label="Feedback">
           <div className="fb-card">
             <div className="fb-head">
               <b>Din feedback</b>
-              <button type="button" aria-label="Luk" onClick={() => setStep(null)}>
+              <button
+                type="button"
+                aria-label="Luk"
+                onClick={() => setStep(null)}
+              >
                 ×
               </button>
             </div>
-            <textarea autoFocus value={text} onChange={(e) => setText(e.target.value)} placeholder="Skriv det, du gerne vil have ændret - eller noget, der ikke virker." />
-            <button type="button" className="fb-send" disabled={busy || !text.trim()} onClick={send}>
+            <textarea
+              autoFocus
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder="Skriv det, du gerne vil have ændret - eller noget, der ikke virker."
+            />
+            <button
+              type="button"
+              className="fb-send"
+              disabled={busy || !text.trim()}
+              onClick={send}
+            >
               {busy ? "Sender…" : "Send"}
             </button>
           </div>
@@ -100,15 +170,23 @@ export function FeedbackLayer({
         <div className="fb-panel">
           <div className="fb-head">
             <b>Feedback indtil nu</b>
-            <button type="button" aria-label="Luk" onClick={() => setStep(null)}>
+            <button
+              type="button"
+              aria-label="Luk"
+              onClick={() => setStep(null)}
+            >
               ×
             </button>
           </div>
-          {notes.length === 0 && <p className="fb-empty">Ingen har skrevet noget endnu.</p>}
+          {notes.length === 0 && (
+            <p className="fb-empty">Ingen har skrevet noget endnu.</p>
+          )}
           <ul>
             {notes.map((n) => (
               <li key={n.id} className={n.status === "done" ? "done" : ""}>
-                {n.status === "done" && <span className="fb-k fixed">Løst</span>}
+                {n.status === "done" && (
+                  <span className="fb-k fixed">Løst</span>
+                )}
                 <p>{n.text}</p>
                 <small>
                   {n.room}
@@ -138,7 +216,7 @@ export function FeedbackLayer({
 export const FEEDBACK_CSS = `
 .fb-bar{position:absolute;top:14px;left:50%;translate:-50% 0;z-index:40;display:flex;align-items:center;gap:6px;padding:5px;border-radius:999px;background:rgba(20,22,24,.86);color:#fff;box-shadow:0 8px 24px rgba(0,0,0,.3);backdrop-filter:blur(8px)}
 .fb-tag{padding:0 8px 0 10px;font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#ffcc00}
-.fb-bar button{border:0;border-radius:999px;font:inherit;font-weight:700;font-size:13px;cursor:pointer;padding:8px 14px}
+.fb-bar button{white-space:nowrap;border:0;border-radius:999px;font:inherit;font-weight:700;font-size:13px;cursor:pointer;padding:8px 14px}
 .fb-main{background:#ffcc00;color:#1d1d1f}
 .fb-list{background:rgba(255,255,255,.12);color:#fff}
 .fb-sheet{position:absolute;inset:0;z-index:46;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(0,0,0,.4)}
@@ -161,8 +239,14 @@ export const FEEDBACK_CSS = `
 .fb-k.fixed{background:#e3f5e8;color:#248a3d}
 .fb-empty{font-size:14px;color:#6e6e73}
 .fb-toast{position:absolute;left:50%;bottom:24px;translate:-50% 0;z-index:47;padding:10px 16px;border-radius:999px;background:#1d1d1f;color:#fff;font-weight:600;font-size:14px}
+.fb-bar .fb-fold{padding:8px 11px;background:none;color:#fff;opacity:.7;font-size:16px;line-height:1}
+.fb-tab{position:absolute;right:0;top:50%;z-index:40;translate:0 -50%;writing-mode:vertical-rl;rotate:180deg;border:0;border-radius:0 10px 10px 0;padding:12px 7px;background:#ffcc00;color:#1d1d1f;font:inherit;font-weight:800;font-size:12px;letter-spacing:.04em;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.3)}
+/* While a story plays, its progress bars own the top of the screen. */
+.hv:has(.hv-story-play) .fb-bar{display:none}
 @media (max-width:760px){
   .fb-bar{top:auto;bottom:calc(84px + env(safe-area-inset-bottom,0px))}
+  .fb-bar .fb-tag{display:none}
+  .hv:has(.hv-st-m) .fb-bar{bottom:calc(182px + env(safe-area-inset-bottom,0px))}
   .fb-panel{top:auto;bottom:130px;max-height:60%}
 }
 `;

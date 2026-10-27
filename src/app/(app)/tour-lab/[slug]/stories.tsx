@@ -45,7 +45,14 @@ export function Stories({
     // (it's scrollable from code even with overflow hidden), and the hidden menu would peek in from the right.
     const card = current ? cards.current[current] : null;
     const row = card?.parentElement;
-    if (card && row) row.scrollTo({ left: card.offsetLeft - row.offsetLeft - (row.clientWidth - card.clientWidth) / 2, behavior: "smooth" });
+    if (card && row)
+      row.scrollTo({
+        left:
+          card.offsetLeft -
+          row.offsetLeft -
+          (row.clientWidth - card.clientWidth) / 2,
+        behavior: "smooth",
+      });
   }, [current]);
 
   function play(index: number) {
@@ -61,7 +68,11 @@ export function Stories({
       setPlaying(null);
       return;
     }
-    onEvent("story_next", { how, room_name: rooms[playing + 1].name, index: playing + 2 });
+    onEvent("story_next", {
+      how,
+      room_name: rooms[playing + 1].name,
+      index: playing + 2,
+    });
     play(playing + 1);
   }
 
@@ -77,7 +88,10 @@ export function Stories({
                 {i === playing && (
                   <i
                     key={playing}
-                    style={{ animationDuration: `${STORY_MS}ms`, animationPlayState: paused ? "paused" : "running" }}
+                    style={{
+                      animationDuration: `${STORY_MS}ms`,
+                      animationPlayState: paused ? "paused" : "running",
+                    }}
                     onAnimationEnd={() => next("auto")}
                   />
                 )}
@@ -93,17 +107,28 @@ export function Stories({
             <span>
               {playing + 1}/{rooms.length}
             </span>
-            <button type="button" aria-label={paused ? tr("Fortsæt") : tr("Pause")} onClick={() => setPaused((p) => !p)}>
+            <button
+              type="button"
+              aria-label={paused ? tr("Fortsæt") : tr("Pause")}
+              onClick={() => setPaused((p) => !p)}
+            >
               {paused ? "▶" : "❚❚"}
             </button>
-            <button type="button" aria-label={tr("Næste")} onClick={() => next("tap")}>
+            <button
+              type="button"
+              aria-label={tr("Næste")}
+              onClick={() => next("tap")}
+            >
               ⏭
             </button>
             <button
               type="button"
               aria-label={tr("Luk")}
               onClick={() => {
-                onEvent("story_close", { room_name: rooms[playing].name, index: playing + 1 });
+                onEvent("story_close", {
+                  room_name: rooms[playing].name,
+                  index: playing + 1,
+                });
                 setPlaying(null);
               }}
             >
@@ -113,7 +138,9 @@ export function Stories({
         </div>
       )}
 
-      <div className={`hv-stories ${visible} ${collapsed ? "hv-st-lukket" : ""}`}>
+      <div
+        className={`hv-stories ${visible} ${collapsed ? "hv-st-lukket" : ""}`}
+      >
         <button
           type="button"
           className="hv-st-toggle"
@@ -125,12 +152,15 @@ export function Stories({
           Historier {collapsed ? "▴" : "▾"}
         </button>
         {!collapsed && (
-          <div className="hv-st-row">
+          <div className="hv-st-strip">
             <button
               type="button"
               className="hv-st-card hv-st-play"
               onClick={() => {
-                const start = Math.max(0, rooms.findIndex((r) => !seen.includes(r.name)));
+                const start = Math.max(
+                  0,
+                  rooms.findIndex((r) => !seen.includes(r.name)),
+                );
                 onEvent("story_play", { from: rooms[start].name });
                 play(start);
               }}
@@ -138,41 +168,58 @@ export function Stories({
               <span className="hv-st-pic">▶</span>
               <b>{tr("Afspil")}</b>
             </button>
-            {leading && (
-              <button type="button" className="hv-st-card hv-st-extra" onClick={leading.onClick}>
-                <span className="hv-st-pic">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M5 5l4 4M19 5l-4 4M5 19l4-4M19 19l-4-4M9 9h6v6H9z" />
-                  </svg>
-                </span>
-                <b>{leading.label}</b>
-              </button>
-            )}
-            {rooms.map((r, i) => (
-              <button
-                key={r.name}
-                ref={(el) => {
-                  cards.current[r.name] = el;
-                }}
-                type="button"
-                className={`hv-st-card ${r.name === current ? "nu" : seen.includes(r.name) ? "set" : ""}`}
-                onClick={() => {
-                  onEvent("story_tap", { room_name: r.name, index: i + 1, seen: seen.includes(r.name) ? 1 : 0 });
-                  if (playing != null) setPlaying(i);
-                  onGo(r);
-                }}
-              >
-                <span className="hv-st-pic">
-                  {r.image ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={r.image} alt="" loading="lazy" />
-                  ) : (
-                    <em>{r.name.slice(0, 1)}</em>
-                  )}
-                </span>
-                <b>{r.name}</b>
-              </button>
-            ))}
+            <div className="hv-st-row">
+              {leading && (
+                <button
+                  type="button"
+                  className="hv-st-card hv-st-extra"
+                  onClick={leading.onClick}
+                >
+                  <span className="hv-st-pic">
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M5 5l4 4M19 5l-4 4M5 19l4-4M19 19l-4-4M9 9h6v6H9z" />
+                    </svg>
+                  </span>
+                  <b>{leading.label}</b>
+                </button>
+              )}
+              {rooms.map((r, i) => (
+                <button
+                  key={r.name}
+                  ref={(el) => {
+                    cards.current[r.name] = el;
+                  }}
+                  type="button"
+                  className={`hv-st-card ${r.name === current ? "nu" : seen.includes(r.name) ? "set" : ""}`}
+                  onClick={() => {
+                    onEvent("story_tap", {
+                      room_name: r.name,
+                      index: i + 1,
+                      seen: seen.includes(r.name) ? 1 : 0,
+                    });
+                    if (playing != null) setPlaying(i);
+                    onGo(r);
+                  }}
+                >
+                  <span className="hv-st-pic">
+                    {r.image ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={r.image} alt="" loading="lazy" />
+                    ) : (
+                      <em>{r.name.slice(0, 1)}</em>
+                    )}
+                  </span>
+                  <b>{r.name}</b>
+                </button>
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -181,7 +228,11 @@ export function Stories({
 }
 
 /** Turns a screenshot into a small portrait JPEG for a story card (cropped to fill). */
-export async function storyJpeg(src: string, width = 300, height = 400): Promise<string> {
+export async function storyJpeg(
+  src: string,
+  width = 300,
+  height = 400,
+): Promise<string> {
   const img = new Image();
   img.src = src;
   await img.decode();
@@ -191,7 +242,9 @@ export async function storyJpeg(src: string, width = 300, height = 400): Promise
   const scale = Math.max(width / img.naturalWidth, height / img.naturalHeight);
   const w = img.naturalWidth * scale;
   const h = img.naturalHeight * scale;
-  canvas.getContext("2d")!.drawImage(img, (width - w) / 2, (height - h) / 2, w, h);
+  canvas
+    .getContext("2d")!
+    .drawImage(img, (width - w) / 2, (height - h) / 2, w, h);
   return canvas.toDataURL("image/jpeg", 0.78);
 }
 
@@ -213,8 +266,10 @@ export const STORIES_CSS = `
 .hv-st-card:active .hv-st-pic{transform:scale(.95)}
 .hv-st-play .hv-st-pic,.hv-st-extra .hv-st-pic{background:rgba(255,255,255,.16);border:1.5px solid rgba(255,255,255,.6);font-size:26px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
 .hv-st-play .hv-st-pic{background:var(--c-accent);border:0}
-/* "Afspil" stays at the left while the stories scroll behind it - the one button that starts it all. */
-.hv-st-play{position:sticky;left:0;z-index:2;padding-right:4px;margin-right:-4px;background:linear-gradient(90deg,rgba(0,0,0,.35) 70%,rgba(0,0,0,0));border-radius:14px}
+/* "Afspil" stands still beside the row (the one button that starts it all); only the stories scroll, fading in at the row's left edge. */
+.hv-st-strip{display:flex;align-items:flex-start;width:100%;min-width:0;padding-left:12px}
+.hv-st-strip>.hv-st-play{padding-top:4px}
+.hv-st-strip .hv-st-row{flex:1;min-width:0;margin-left:8px;padding-left:14px;-webkit-mask-image:linear-gradient(90deg,transparent,#000 22px);mask-image:linear-gradient(90deg,transparent,#000 22px)}
 .hv-st-extra svg{width:28px;height:28px}
 .hv-story-play{position:absolute;top:0;left:0;right:0;z-index:8;display:none;flex-direction:column;gap:8px;padding:8px 10px 26px;background:linear-gradient(rgba(0,0,0,.5),rgba(0,0,0,0));color:#fff;pointer-events:none}
 .hv-story-play>*{pointer-events:auto}
@@ -241,6 +296,8 @@ export const STORIES_CSS = `
   .hv-stories.hv-st-d,.hv-story-play.hv-st-d{display:flex}
   .hv-stories.hv-st-d{left:50%;right:auto;transform:translateX(-50%);max-width:min(860px,calc(100vw - 340px));background:none;align-items:center}
   .hv-st-d .hv-st-row{justify-content:safe center}
+  .hv-st-d .hv-st-strip{justify-content:center}
+  .hv-st-d .hv-st-strip .hv-st-row{flex:0 1 auto}
   .hv-stories.hv-st-d{transition:left .3s ease}
   .hv-st-d~.hv-room,.hv-st-on-d .hv-room,.hv-st-on-d .hv-luften{display:none}
   .hv-st-on-d .pc{bottom:156px}
