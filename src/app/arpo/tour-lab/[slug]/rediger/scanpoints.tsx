@@ -36,7 +36,7 @@ export function ScanPointsEditor({
 }) {
   const [floor, setFloor] = useState(0);
   /** Matterport's signed link to the plan ran out or failed - points are still shown, on a plain background. */
-  const [planFailed, setPlanFailed] = useState(false);
+  const [failedPlan, setFailedPlan] = useState<string | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
   const [zoom, setZoom] = useState(1);
   /* Marking many at once: hold the mouse down and drag over the dots - or drag a box on an empty spot. */
@@ -154,11 +154,11 @@ export function ScanPointsEditor({
               <img
                 src={plan.image}
                 alt=""
-                onError={() => setPlanFailed(true)}
-                className={`absolute inset-0 h-full w-full select-none object-contain ${planFailed ? "invisible" : ""}`}
+                onError={() => setFailedPlan(plan.image)}
+                className={`absolute inset-0 h-full w-full select-none object-contain ${failedPlan === plan.image ? "invisible" : ""}`}
                 draggable={false}
               />
-              {planFailed && (
+              {failedPlan === plan.image && (
                 <p className="absolute inset-x-0 bottom-2 text-center text-[12px] text-[#8e8e93]">Plantegningen kunne ikke hentes fra Matterport - genindlæs siden.</p>
               )}
               {points.map((p) =>
