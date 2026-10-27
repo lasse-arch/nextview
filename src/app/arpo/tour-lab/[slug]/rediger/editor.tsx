@@ -10,7 +10,7 @@ import { useRouter } from "next/navigation";
 import { Component, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { detachToursFromMpskins, logTourWork, renameTourSlug, restoreTourVersion, saveTour, saveTourDraft, searchDeals, setTourDeal } from "@/lib/actions/tours";
 import { SOCIALS } from "../../tours/social";
-import { askClaudeForTour, saveAnthropicKey, type ChatTurn } from "@/lib/actions/tour-ai";
+import { askClaudeForTour, saveAnthropicKey, suggestTourFilter, type ChatTurn } from "@/lib/actions/tour-ai";
 import type { MenuEntry, TourConfig } from "../../tours/types";
 import type { TourStats } from "@/lib/tour-stats";
 import type { ReportShare } from "@/lib/tour-share";
@@ -276,6 +276,8 @@ export function TourEditor({
   /* Live preview: the tour in the iframe shows the draft as it's edited (see the bridge in experience.tsx). */
   const frame = useRef<HTMLIFrameElement>(null);
   const latest = useRef(config);
+  /** A design hovered in the gallery (shown in the preview until the mouse leaves it). */
+  const hovered = useRef<TourConfig | null>(null);
   useEffect(() => {
     // Only a whole setup goes to the preview - a half-typed one would break the tour there.
     if (tourConfigProblem(config)) return;
@@ -286,7 +288,8 @@ export function TourEditor({
   useEffect(() => {
     function onMessage(e: MessageEvent) {
       if (e.origin === location.origin && e.source === frame.current?.contentWindow && e.data?.type === "tour-ready") {
-        frame.current?.contentWindow?.postMessage({ type: "tour-draft", config: latest.current }, location.origin);
+        // While a design is hovered, the restarted preview gets the design to show - not the saved look back.
+        frame.current?.contentWindow?.postMessage({ type: "tour-draft", config: hovered.current ?? latest.current }, location.origin);
         const to = carry.current;
         carry.current = null;
         if (to) setTimeout(() => frame.current?.contentWindow?.postMessage({ type: "tour-go", name: "", href: to }, location.origin), 300);
@@ -589,9 +592,13 @@ export function TourEditor({
                     selected={currentPreset(config)}
                     onHover={(p) => {
                       const shown = p ? { ...structuredClone(config), ...p.apply(config) } : config;
+                      hovered.current = p ? shown : null;
                       frame.current?.contentWindow?.postMessage({ type: "tour-draft", config: shown }, location.origin);
                     }}
-                    onPick={(p) => edit((d) => Object.assign(d, p.apply(d)))}
+                    onPick={(p) => {
+                      hovered.current = null;
+                      edit((d) => Object.assign(d, p.apply(d)));
+                    }}
                   />
                 </Group>
                 <Group title="Farver og skrift">
@@ -659,6 +666,7 @@ export function TourEditor({
                       Nulstil filter
                     </button>
                   )}
+                  <AiFilterButton slug={slug} config={config} preview={preview} onFilter={(f) => edit((d) => void (d.filter = f))} />
                   <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">Lægges over selve 3D-touren - fx lidt lysere og varmere. Forhåndsvisningen går ind i touren, så du ser det, mens du trækker.</p>
                 </Group>
                 <Group title="Logo">
@@ -2220,5 +2228,37 @@ function ScanJumper({ config, preview, map, count, hiddenSweeps }: { config: Tou
         <span><i className="mr-1 inline-block h-2 w-2 rounded-full border border-dashed border-[#c7c7cc]" />Skjult</span>
       </p>
     </Group>
+  );
+}
+
+/** "nextviewAI: farvefilter": a picture of the preview to nextviewAI, which sets a subtle filter that matches the tour's look. */
+function AiFilterButton({ slug, config, preview, onFilter }: { slug: string; config: TourConfig; preview: PreviewApi; onFilter: (f: NonNullable<TourConfig["filter"]>) => void }) {
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<{ text: string; error?: boolean } | null>(null);
+  return (
+    <div className="space-y-1">
+      <button
+        type="button"
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true);
+          setNote(null);
+          const shot = await preview.shot();
+          if (shot.error || !shot.image) {
+            setBusy(false);
+            return setNote({ text: shot.error ?? "Gå ind i touren i forhåndsvisningen først.", error: true });
+          }
+          const r = await suggestTourFilter(slug, shot.image, { brand: config.brand, colors: config.colors as unknown as Record<string, string> }).catch((err: unknown) => ({ ok: false as const, error: String(err) }));
+          setBusy(false);
+          if (!r.ok) return setNote({ text: r.error, error: true });
+          onFilter(r.filter);
+          setNote({ text: `${r.reason} Juster selv med skyderne - eller Fortryd.` });
+        }}
+        className="w-full rounded-xl bg-gradient-to-r from-[#7c3aed] to-[#0071e3] py-2 text-[14px] font-medium text-white disabled:opacity-60"
+      >
+        {busy ? "nextviewAI kigger på touren…" : "✦ Lad nextviewAI lave et filter, der matcher"}
+      </button>
+      {note && <p className={`px-1 text-[12px] leading-snug ${note.error ? "text-[#ff3b30]" : "text-[#6e6e73]"}`}>{note.text}</p>}
+    </div>
   );
 }

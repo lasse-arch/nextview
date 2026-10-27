@@ -1300,7 +1300,12 @@ function TourExperience({
     async function onMessage(e: MessageEvent) {
       if (e.origin !== location.origin || e.source !== window.parent || !e.data?.type) return;
       const { sdk, room, menuGo } = bridge.current;
-      if (e.data.type === "tour-go") menuGo(e.data.name ?? "", "editor", e.data.href);
+      if (e.data.type === "tour-go") {
+        // The editor shows a place (Vis start, a scan point, a menu item): straight there - the front page / welcome mustn't cover it.
+        setCover(false);
+        setWelcome(false);
+        menuGo(e.data.name ?? "", "editor", e.data.href);
+      }
       if (e.data.type === "tour-peek") bridge.current.peek(); // e.g. the colour filter: show the 3D tour itself
       if (e.data.type === "tour-pick") {
         // The editor places a tag: the next click in the tour says where.

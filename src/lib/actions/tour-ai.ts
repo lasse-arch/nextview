@@ -728,3 +728,63 @@ export async function placeMapSpots(
   for (const s of out.spots) if (keys.has(s.key) && Number.isFinite(s.x) && Number.isFinite(s.y)) spots[s.key] = [clamp(s.x), clamp(s.y)];
   return { ok: true, spots, note: out.note };
 }
+
+/* ----- Design: nextviewAI picks a colour filter for the tour ----- */
+
+const FilterSuggestion = z.object({
+  brightness: z.number().describe("0.5-1.5, 1 = som den er"),
+  contrast: z.number().describe("0.5-1.5, 1 = som den er"),
+  saturate: z.number().describe("0-2, 1 = som den er"),
+  hue: z.number().describe("-180 til 180 grader, 0 = som den er - som regel 0 eller få grader"),
+  reason: z.string().describe("Én kort sætning på dansk: hvad filteret gør, og hvorfor det passer."),
+});
+
+/**
+ * A colour filter for the tour's picture that matches its look (the brand's
+ * colours and mood) - from a picture of the preview. Kept subtle: the place
+ * must still look like itself. Nothing is saved; the editor puts it in its draft.
+ */
+export async function suggestTourFilter(
+  slug: string,
+  image: string,
+  look: { brand: string; colors: Record<string, string> }
+): Promise<{ ok: true; filter: NonNullable<TourConfig["filter"]>; reason: string } | { ok: false; error: string }> {
+  const user = await admin();
+  const key = await apiKey();
+  if (!key) return { ok: false, error: "nextviewAI er ikke sat op endnu - indsæt en nøgle under fanen nextviewAI." };
+  const shot = imageBlocks([image])[0];
+  if (!shot) return { ok: false, error: "Intet billede fra forhåndsvisningen." };
+  let r;
+  try {
+    r = await new Anthropic({ apiKey: key }).messages.parse({
+      model: "claude-opus-5-5",
+      max_tokens: 1500,
+      system:
+        "Du justerer et CSS-farvefilter på en virtuel 360°-tour, så billedet passer til virksomhedens udtryk (farver og stemning) og ser indbydende ud - lysere, hvis det er mørkt eller gråt, lidt varmere eller friskere efter brandet. Hold det diskret og naturligt: stedet skal stadig ligne sig selv, hudfarver og træ må ikke blive unaturlige. Små ændringer (fx lysstyrke 1.05, kontrast 1.05, mætning 1.1). Er billedet allerede godt, så foreslå værdier tæt på 1 og 0.",
+      messages: [
+        {
+          role: "user",
+          content: [shot, { type: "text", text: `Virksomhed: ${look.brand || slug}. Brandets farver: ${Object.entries(look.colors).map(([k, v]) => `${k} ${v}`).join(", ")}. Billedet er et udsnit af touren, som den ser ud nu (uden filter).` }],
+        },
+      ],
+      output_config: { effort: "low", format: zodOutputFormat(FilterSuggestion) },
+    });
+  } catch (err) {
+    if (err instanceof Anthropic.AuthenticationError) return { ok: false, error: "nextviewAI-nøglen virker ikke længere." };
+    return { ok: false, error: `Kunne ikke få fat i nextviewAI (${err instanceof Error ? err.message : err}).` };
+  }
+  const u = r.usage;
+  await prisma.tourAiUsage
+    .create({ data: { tourSlug: slug, userName: user.name, kind: "farvefilter", inputTokens: u.input_tokens, outputTokens: u.output_tokens, cacheReadTokens: u.cache_read_input_tokens ?? 0, cacheWriteTokens: u.cache_creation_input_tokens ?? 0, costUsd: claudeCostUsd(u) } })
+    .catch(() => {});
+  const f = r.parsed_output;
+  if (!f) return { ok: false, error: "nextviewAI svarede ikke som forventet - prøv igen." };
+  const clamp = (v: number, lo: number, hi: number, step: number) => Math.round(Math.min(hi, Math.max(lo, Number.isFinite(v) ? v : (lo + hi) / 2)) / step) * step;
+  const filter = {
+    brightness: +clamp(f.brightness, 0.5, 1.5, 0.01).toFixed(2),
+    contrast: +clamp(f.contrast, 0.5, 1.5, 0.01).toFixed(2),
+    saturate: +clamp(f.saturate, 0, 2, 0.01).toFixed(2),
+    hue: Math.round(clamp(f.hue, -180, 180, 1)),
+  };
+  return { ok: true, filter, reason: f.reason };
+}
