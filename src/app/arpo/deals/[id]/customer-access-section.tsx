@@ -34,7 +34,12 @@ export function CustomerAccessSection({
 
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-      <h2 className="text-sm font-semibold text-slate-900">Kundens login</h2>
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-sm font-semibold text-slate-900">Kundens login</h2>
+        <a href={`/kunde?som=${dealId}`} target="_blank" rel="noopener" className="text-xs font-medium text-[#0071e3] hover:underline">
+          Se som kunde ↗
+        </a>
+      </div>
       <p className="mt-1 text-xs text-slate-500">
         Kunden logger ind på nextview360.dk/login med et link på mail og ser sine tours, tal, koder til hjemmesiden og kontrakten. Fakturaer kan de ikke se der - dem får de tilsendt.
         {branchCount > 0 && ` Adgangen gælder også de ${branchCount} afdelinger.`}

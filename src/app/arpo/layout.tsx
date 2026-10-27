@@ -62,8 +62,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   ];
   if (user.role === "ADMIN") {
     settingsItems.push({ href: "/arpo/users", label: "Brugere" });
-    // Only while a move is set up (NEW_DIRECT_URL in Vercel).
-    if (process.env.NEW_DIRECT_URL) settingsItems.push({ href: "/arpo/settings/flyt-database", label: "Flyt database" });
   }
 
   const initials = user.name

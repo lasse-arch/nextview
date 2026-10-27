@@ -29,12 +29,28 @@ export const metadata: Metadata = { title: "Jeres side - Nextview360", robots: {
 
 const date = (d: Date) => d.toLocaleDateString("da-DK", { day: "numeric", month: "short", year: "numeric" });
 
-export default async function CustomerPage() {
+/**
+ * Who the page is for: the logged-in customer - or, for an admin, "Se som
+ * kunde" from a deal in Arpo (?som=<dealId>): exactly what that customer
+ * sees (the deal and its locations, as access is given), with a bar saying so.
+ */
+async function viewer(som: string | undefined): Promise<{ dealIds: string[]; name: string | null; preview: { dealId: string } | null } | null> {
   const account = await getCurrentCustomer();
-  if (!account) redirect((await getCurrentUser()) ? "/arpo" : "/api/auth/session-ended");
+  if (account) return { dealIds: account.deals.map((d) => d.dealId), name: account.name, preview: null };
+  const user = await getCurrentUser();
+  if (!user) redirect("/api/auth/session-ended");
+  if (user.role !== "ADMIN" || !som) redirect("/arpo");
+  const deal = await prisma.deal.findUnique({ where: { id: som }, select: { id: true, contactName: true, branches: { select: { id: true } }, customerAccounts: { take: 1, orderBy: { createdAt: "asc" }, select: { account: { select: { name: true } } } } } });
+  if (!deal) redirect("/arpo");
+  return { dealIds: [deal.id, ...deal.branches.map((b) => b.id)], name: deal.customerAccounts[0]?.account.name ?? deal.contactName, preview: { dealId: deal.id } };
+}
+
+export default async function CustomerPage({ searchParams }: { searchParams: Promise<{ som?: string }> }) {
+  const who = await viewer((await searchParams).som);
+  if (!who) redirect("/arpo");
 
   const deals = await prisma.deal.findMany({
-    where: { id: { in: account.deals.map((d) => d.dealId) } },
+    where: { id: { in: who.dealIds } },
     orderBy: { companyName: "asc" },
     select: {
       id: true,
@@ -56,14 +72,22 @@ export default async function CustomerPage() {
     )
   );
   const papers = deals.filter((d) => d.contractSignedAt && d.docusealSubmissionId);
-  const first = account.name?.split(" ")[0];
+  const first = who.name?.split(" ")[0];
 
   return (
     <main className="min-h-screen bg-[#f5f5f7] px-4 pb-12 text-[#1d1d1f]" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", system-ui, sans-serif' }}>
+      {who.preview && (
+        <div className="sticky top-0 z-10 -mx-4 flex items-center justify-center gap-3 bg-[#1d1d1f] px-4 py-2.5 text-[13px] text-white">
+          <span>Du ser siden, som kunden ser den.</span>
+          <a href={`/arpo/deals/${who.preview.dealId}`} className="rounded-full bg-white/15 px-3 py-1 font-semibold hover:bg-white/25">
+            Tilbage til Arpo
+          </a>
+        </div>
+      )}
       <header className="mx-auto flex max-w-[720px] items-center justify-between py-5">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/logo.png" alt="Nextview360" className="h-7 w-auto" />
-        <form action={logout}>
+        <form action={logout} className={who.preview ? "invisible" : ""}>
           <button type="submit" className="rounded-full px-3 py-1.5 text-[13px] font-medium text-[#6e6e73] hover:bg-black/5 hover:text-[#1d1d1f]">
             Log ud
           </button>
@@ -124,7 +148,7 @@ export default async function CustomerPage() {
                       <span className="text-[15px]">
                         Kontrakt <span className="text-[13px] text-[#6e6e73]">underskrevet {date(d.contractSignedAt)}</span>
                       </span>
-                      <a href={`/kunde/kontrakt/${d.id}`} className="text-[14px] font-medium text-[#0071e3]">
+                      <a href={`/kunde/kontrakt/${d.id}${who.preview ? `?som=${who.preview.dealId}` : ""}`} className="text-[14px] font-medium text-[#0071e3]">
                         Hent PDF
                       </a>
                     </li>
