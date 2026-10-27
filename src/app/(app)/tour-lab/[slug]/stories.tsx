@@ -213,6 +213,8 @@ export const STORIES_CSS = `
 .hv-st-card:active .hv-st-pic{transform:scale(.95)}
 .hv-st-play .hv-st-pic,.hv-st-extra .hv-st-pic{background:rgba(255,255,255,.16);border:1.5px solid rgba(255,255,255,.6);font-size:26px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
 .hv-st-play .hv-st-pic{background:var(--c-accent);border:0}
+/* "Afspil" stays at the left while the stories scroll behind it - the one button that starts it all. */
+.hv-st-play{position:sticky;left:0;z-index:2;padding-right:4px;margin-right:-4px;background:linear-gradient(90deg,rgba(0,0,0,.35) 70%,rgba(0,0,0,0));border-radius:14px}
 .hv-st-extra svg{width:28px;height:28px}
 .hv-story-play{position:absolute;top:0;left:0;right:0;z-index:8;display:none;flex-direction:column;gap:8px;padding:8px 10px 26px;background:linear-gradient(rgba(0,0,0,.5),rgba(0,0,0,0));color:#fff;pointer-events:none}
 .hv-story-play>*{pointer-events:auto}
