@@ -29,8 +29,15 @@ function tooMany(request: Request): boolean {
 export async function GET(request: Request, { params }: { params: Promise<{ slug: string }> }) {
   if (tooMany(request)) return new NextResponse(null, { status: 429, headers: tourCors(request, { "Retry-After": "60" }) });
   const tour = await prisma.tour.findUnique({ where: { slug: (await params).slug }, select: { config: true, published: true } });
-  const team = tour && !tour.published ? Boolean(await getCurrentUser()) : false;
-  const w = tour && (tour.published || team) ? (tour.config as unknown as TourConfig).weather : undefined;
+  const stored = tour ? (tour.config as unknown as TourConfig).weather : undefined;
+  // The place asked for: the published tour's own - or, for the team's editor preview, the one just chosen (not saved yet).
+  const q = new URL(request.url).searchParams;
+  const asked = { lat: Number(q.get("lat")), lon: Number(q.get("lon")), place: (q.get("place") ?? "").slice(0, 40) };
+  const same = stored && Math.abs(stored.lat - asked.lat) < 1e-6 && Math.abs(stored.lon - asked.lon) < 1e-6;
+  const open = Boolean(tour?.published && (same || !q.has("lat")));
+  const team = !open && Boolean(await getCurrentUser());
+  const inDenmarkish = Math.abs(asked.lat - 56) < 6 && Math.abs(asked.lon - 11) < 10;
+  const w = open ? stored : team ? (q.has("lat") && inDenmarkish ? asked : stored) : undefined;
   if (!w || !Number.isFinite(w.lat) || !Number.isFinite(w.lon)) return NextResponse.json({ now: null, months: null }, { status: 404, headers: tourCors(request) });
   const [now, months] = await Promise.all([weatherNow(w.lat, w.lon), weatherMonths(w.lat, w.lon)]);
   return NextResponse.json(

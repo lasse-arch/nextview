@@ -506,7 +506,94 @@ export function StartEditor({ config, edit, slug, preview }: Props) {
 
 type Stop = NonNullable<TourConfig["guide"]>["stops"][number];
 
-export function GuideEditor({ config, edit, preview }: Omit<Props, "slug">) {
+/**
+ * A guide stop at a point on the aerial photo: what it shows - the point's
+ * 360° photo and its photos - changed right here (upload, remove, AI). The
+ * same pictures as the point's own (one place in the setup); its text and
+ * position are changed at the point under Luftfoto og kort.
+ */
+function PointStop({ config, id, edit, onEdit }: { config: TourConfig; id: string; edit: Props["edit"]; onEdit?: (id: string) => void }) {
+  const p = config.points.find((x) => x.id === id);
+  if (!p) return <p className={small}>Punktet findes ikke længere på luftfotoet.</p>;
+  const proto = !p.panorama && p.pano && config.panos ? `${config.panos.basePath}/${p.pano}-360.jpg` : null;
+  const pano = p.panorama ?? proto;
+  const setPoint = (fn: (x: (typeof config.points)[number]) => void) =>
+    edit((d) => {
+      const x = d.points.find((y) => y.id === id);
+      if (x) fn(x);
+    });
+  /** A new 360° photo for the point - a prototype's tiles are replaced by it, its start direction kept. */
+  const setPano = (url: string) =>
+    edit((d) => {
+      const x = d.points.find((y) => y.id === id);
+      if (!x) return;
+      if (x.panoStart) d.imageView = { ...d.imageView, [url]: { ...d.imageView?.[url], yaw: x.panoStart.yaw, pitch: x.panoStart.pitch } };
+      x.panorama = url;
+      delete x.pano;
+      delete x.panoStart;
+    });
+  const images = p.images ?? [];
+  return (
+    <div className="space-y-3">
+      <Field title="360°-billede" hint="Det, gæsten ser ved stoppet. Et 360°-foto (2:1).">
+        {pano ? (
+          <div className="space-y-1.5">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={pano} alt="" className="aspect-[2/1] w-full rounded-lg object-cover ring-1 ring-black/[.06]" onError={(e) => (e.currentTarget.style.display = "none")} />
+            <div className="flex flex-wrap items-center gap-2">
+              <UploadButton accept="image/*" label="Skift 360°-billede" onDone={setPano} />
+              <AiImageButton src={pano} onUse={setPano} />
+            </div>
+          </div>
+        ) : p.pano ? (
+          <p className={small}>360°-billedet er fra prototypen og kan ikke vises her - upload et nyt for at skifte det.</p>
+        ) : null}
+        {!pano && <UploadButton accept="image/*" label="Upload 360°-billede" onDone={setPano} />}
+      </Field>
+      <Field title="Billeder på punktets kort" hint="Det første vises først. Tryk × for at fjerne et.">
+        {images.length > 0 && (
+          <div className="grid grid-cols-3 gap-1.5">
+            {images.map((src, i) => (
+              <div key={src} className="relative">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={src} alt="" className="aspect-[4/3] w-full rounded-lg object-cover ring-1 ring-black/[.06]" />
+                <button
+                  type="button"
+                  aria-label="Fjern billedet"
+                  className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-[14px] text-white"
+                  onClick={() => setPoint((x) => void (x.images = (x.images ?? []).filter((_, j) => j !== i)))}
+                >
+                  ×
+                </button>
+                {i > 0 && (
+                  <button
+                    type="button"
+                    className="absolute bottom-1 left-1 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-medium text-white"
+                    onClick={() => setPoint((x) => void (x.images = [src, ...(x.images ?? []).filter((y) => y !== src)]))}
+                  >
+                    Vis først
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="flex flex-wrap items-center gap-2">
+          <UploadButton accept="image/*" label="Tilføj billede" onDone={(url) => setPoint((x) => void (x.images = [...(x.images ?? []), url]))} />
+          {images[0] && <AiImageButton src={images[0]} onUse={(url) => setPoint((x) => void (x.images = [url, ...(x.images ?? []).slice(1)]))} />}
+        </div>
+      </Field>
+      <p className={small}>Punktets tekst og placering rettes ved punktet under Luftfoto og kort.</p>
+      {onEdit && config.map && (
+        <button type="button" onClick={() => onEdit(id)} className="w-full rounded-xl bg-[#f2f2f7] py-2 text-[14px] font-medium text-[#0071e3]">
+          Åbn punktet på luftfotoet
+        </button>
+      )}
+    </div>
+  );
+}
+
+export function GuideEditor({ config, edit, preview, onEditPoint }: Omit<Props, "slug"> & { onEditPoint?: (id: string) => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const stops = config.guide?.stops ?? [];
@@ -619,12 +706,12 @@ export function GuideEditor({ config, edit, preview }: Omit<Props, "slug">) {
           items={stops}
           onChange={setStops}
           icon={["bg-[#ff2d55]", '<path d="M8 5v14l11-7z"/>']}
-          title={(s) => ("point" in s ? `Luftfoto-punkt: ${s.point}` : s.title)}
-          subtitle={(s) => ("point" in s ? "Bruger punktets egen tekst" : [s.audio ? "🔊" : null, s.href ? null : "Bliver stående", s.text || "Mangler tekst"].filter(Boolean).join(" · "))}
+          title={(s) => ("point" in s ? (config.points.find((p) => p.id === s.point)?.name ?? `Punkt: ${s.point}`) : s.title)}
+          subtitle={(s) => ("point" in s ? "Punkt på luftfotoet - tekst og billeder fra punktet" : [s.audio ? "🔊" : null, s.href ? null : "Bliver stående", s.text || "Mangler tekst"].filter(Boolean).join(" · "))}
           empty='Ingen stop endnu. Gå til det første sted i forhåndsvisningen og tryk "+ Stop her".'
           editor={(s, set) =>
             "point" in s ? (
-              <p className={small}>Dette stop bruger navn og tekst fra luftfotoets punkt &quot;{s.point}&quot;.</p>
+              <PointStop config={config} id={s.point} edit={edit} onEdit={onEditPoint} />
             ) : (
               <>
                 <Field title="Titel">
@@ -681,7 +768,7 @@ export function GuideEditor({ config, edit, preview }: Omit<Props, "slug">) {
           }}
         >
           <Icon d='<path d="M12 5v14M5 12h14"/>' className="h-4 w-4" />
-          {busy ? "Henter stedet…" : "+ Stop her"}
+          {busy ? "Henter stedet…" : "Stop her"}
         </button>
         {error && <p className="px-1 text-[12px] text-[#ff3b30]">{error}</p>}
       </Group>

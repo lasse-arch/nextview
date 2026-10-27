@@ -84,7 +84,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <ToastProvider>
       <div className="flex min-h-screen" data-presentation={presenting ? "true" : "false"}>
-        <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col overflow-y-auto border-r border-slate-200 bg-slate-50 p-3 md:flex">
+        <aside className="arpo-sidebar sticky top-0 hidden h-screen w-60 shrink-0 flex-col overflow-y-auto border-r border-slate-200 bg-slate-50 p-3 md:flex">
           <Link href="/arpo" className="flex items-center px-2.5 pb-3 pt-3">
             <Image src="/logo.png" alt="Nextview360" width={942} height={219} className="h-6 w-auto" priority />
           </Link>
@@ -123,7 +123,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             logoutAction={logout}
           />
 
-          <div className="flex items-center justify-end gap-2.5 px-4 pt-4 sm:px-6 md:px-10 md:pt-6">
+          <div className="arpo-topbar flex items-center justify-end gap-2.5 px-4 pt-4 sm:px-6 md:px-10 md:pt-6">
             <NewsBell unreadCount={unreadNewsCount} />
             <PresentationModeToggle enabled={presenting} />
             <Link
@@ -133,7 +133,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               + Ny lead
             </Link>
           </div>
-          <main className="flex-1 px-4 pb-10 pt-4 sm:px-6 md:px-10">{children}</main>
+          <main className="arpo-main flex-1 px-4 pb-10 pt-4 sm:px-6 md:px-10">{children}</main>
         </div>
       </div>
     </ToastProvider>

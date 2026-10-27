@@ -7,7 +7,7 @@ import { formatPhone, IMAGE_HREF, imageOfHref, isPlaceHref, pointOfHref } from "
 import { tourConfigProblem } from "@/lib/tour-validate";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Component, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { Component, useEffect, useMemo, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import { detachToursFromMpskins, logTourWork, renameTourSlug, restoreTourVersion, saveTour, saveTourDraft, searchDeals, setTourDeal } from "@/lib/actions/tours";
 import { SOCIALS } from "../../tours/social";
 import { askClaudeForTour, saveAnthropicKey, suggestTourFilter, type ChatTurn } from "@/lib/actions/tour-ai";
@@ -170,6 +170,26 @@ export function TourEditor({
   const [config, setConfig] = useState<TourConfig>(initial);
   /** The search over the sections (above nextviewAI). */
   const [search, setSearch] = useState("");
+  /** Arpo's menu folded away (the default in the editor) - remembered on this computer. */
+  const wide = useSyncExternalStore(
+    (cb) => (window.addEventListener("tour-editor-wide", cb), () => window.removeEventListener("tour-editor-wide", cb)),
+    () => {
+      try {
+        return localStorage.getItem("tour-editor-wide") !== "0";
+      } catch {
+        return true;
+      }
+    },
+    () => true
+  );
+  const setWide = (on: boolean) => {
+    try {
+      localStorage.setItem("tour-editor-wide", on ? "1" : "0");
+    } catch {}
+    window.dispatchEvent(new Event("tour-editor-wide"));
+  };
+  /** A point to open on the map (Luftfoto og kort) - asked from another tab, e.g. a guide stop. */
+  const [pointFocus, setPointFocus] = useState<{ id: string; n: number } | null>(null);
   const found = searchTabs(search, config.menu);
   /*
    * Autosave: every change is kept in the browser at once (survives a lost
@@ -407,12 +427,23 @@ export function TourEditor({
 
   return (
     <FilesContext.Provider value={{ slug, blob }}>
+    {/* Arpo's own menu and top bar folded away, so the editor and its preview get the whole screen. */}
+    {wide && <style>{`.arpo-sidebar,.arpo-topbar{display:none!important}.arpo-main{padding-top:12px!important}`}</style>}
     <div
-      className="-mx-4 -mb-4 flex h-[calc(100vh-6rem)] flex-col overflow-hidden rounded-t-2xl bg-[#f5f5f7] text-[#1d1d1f] sm:-mx-6 sm:-mb-6 lg:-mx-8 lg:-mb-8"
+      className={`-mx-4 -mb-4 flex ${wide ? "h-[calc(100vh-1.5rem)]" : "h-[calc(100vh-6rem)]"} flex-col overflow-hidden rounded-t-2xl bg-[#f5f5f7] text-[#1d1d1f] sm:-mx-6 sm:-mb-6 lg:-mx-8 lg:-mb-8`}
       style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", system-ui, sans-serif' }}
     >
       {/* Header */}
       <div className="flex items-center gap-3 border-b border-black/[.06] bg-white/80 px-5 py-3 backdrop-blur-xl">
+        <button
+          type="button"
+          onClick={() => setWide(!wide)}
+          title={wide ? "Vis Arpo-menuen" : "Skjul Arpo-menuen (større forhåndsvisning)"}
+          aria-label={wide ? "Vis Arpo-menuen" : "Skjul Arpo-menuen"}
+          className="rounded-lg p-1.5 text-[#6e6e73] hover:bg-black/[.05] hover:text-[#1d1d1f]"
+        >
+          <Icon d='<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/>' className="h-[18px] w-[18px]" />
+        </button>
         <Link href="/arpo/tour-lab" className="flex items-center gap-1 text-[15px] text-[#0071e3] hover:opacity-80">
           <Icon d='<path d="M15 5l-7 7 7 7"/>' className="h-4 w-4" />
           Tours
@@ -788,13 +819,23 @@ export function TourEditor({
               />
             )}
             {tab === "start" && <StartEditor config={config} edit={edit} slug={slug} preview={preview} />}
-            {tab === "rundvisning" && <GuideEditor config={config} edit={edit} preview={preview} />}
+            {tab === "rundvisning" && (
+              <GuideEditor
+                config={config}
+                edit={edit}
+                preview={preview}
+                onEditPoint={(id) => {
+                  setPointFocus((f) => ({ id, n: (f?.n ?? 0) + 1 }));
+                  setTab("kortet");
+                }}
+              />
+            )}
             {tab === "scan" && <ScanPointsEditor config={config} edit={edit} preview={preview} map={scanMap} mpskinsHidden={mpskinsHidden} expected={scanCount} />}
             {tab === "tags" && <TagsEditor config={config} edit={edit} slug={slug} preview={preview} />}
             {tab === "live" && <LiveDataEditor config={config} edit={edit} slug={slug} preview={preview} />}
             {tab === "kortet" && (
               <>
-                <MapEditor config={config} edit={edit} />
+                <MapEditor config={config} edit={edit} focus={pointFocus} />
                 {(config.drone || config.map) && <FinderEditor config={config} edit={edit} />}
                 {(config.drone || config.map) && <WeatherEditor config={config} edit={edit} />}
               </>

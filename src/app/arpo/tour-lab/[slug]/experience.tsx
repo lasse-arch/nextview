@@ -1690,6 +1690,7 @@ function TourExperience({
         {T.weather && phase === "drone" && (
           <WeatherChip
             slug={savedTour.slug}
+            at={T.weather}
             onOpen={() => {
               setSelected(null);
               track("weather_open", { label: T.weather!.place });

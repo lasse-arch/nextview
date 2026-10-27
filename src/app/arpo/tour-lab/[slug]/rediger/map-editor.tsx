@@ -62,9 +62,15 @@ function menuRooms(T: TourConfig): [string, string][] {
   return all.filter(([n], i) => all.findIndex(([x]) => x === n) === i);
 }
 
-export function MapEditor({ config, edit }: { config: TourConfig; edit: Edit }) {
+export function MapEditor({ config, edit, focus }: { config: TourConfig; edit: Edit; /** A point to open straight away (from another tab, e.g. a guide stop) - with a counter, so the same point can be asked again. */ focus?: { id: string; n: number } | null }) {
   const M = config.map;
   const [open, setOpen] = useState(false);
+  // Asked for a point from another tab: open the map on it (once per ask).
+  const [focusSeen, setFocusSeen] = useState(0);
+  if (focus && focus.n !== focusSeen) {
+    setFocusSeen(focus.n);
+    if (M) setOpen(true);
+  }
   const [error, setError] = useState<string | null>(null);
 
   async function setImage(url: string) {
@@ -157,7 +163,7 @@ export function MapEditor({ config, edit }: { config: TourConfig; edit: Edit }) 
         />
         {error && <p className="text-[12px] text-[#ff3b30]">{error}</p>}
       </Group>
-      {open && <MapCanvas config={config} edit={edit} onClose={() => setOpen(false)} />}
+      {open && <MapCanvas config={config} edit={edit} onClose={() => setOpen(false)} startWith={focus?.id ?? null} />}
     </>
   );
 }
@@ -165,10 +171,10 @@ export function MapEditor({ config, edit }: { config: TourConfig; edit: Edit }) 
 /* ------------------------------------------------------------------ */
 
 /** The big canvas: the map, the points on it, and the selected point's settings beside it. */
-function MapCanvas({ config, edit, onClose }: { config: TourConfig; edit: Edit; onClose: () => void }) {
+function MapCanvas({ config, edit, onClose, startWith }: { config: TourConfig; edit: Edit; onClose: () => void; startWith: string | null }) {
   const M = config.map as Map;
   const [zoom, setZoom] = useState(1);
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(startWith && config.points.some((p) => p.id === startWith) ? startWith : null);
   /** What the next click on the map does: put down a new point, one of the menu's rooms, or set the start view's centre. */
   const [placing, setPlacing] = useState<null | { kind: "new" } | { kind: "rooms"; queue: [string, string][] } | { kind: "point"; id: string } | { kind: "start"; mobile: boolean }>(null);
   const [drag, setDrag] = useState<{ id: string; x: number; y: number } | null>(null);

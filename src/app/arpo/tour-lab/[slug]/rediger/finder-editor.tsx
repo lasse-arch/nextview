@@ -17,6 +17,34 @@ const CAMPING: Finder = {
     { q: "Hvad er vigtigst?", options: [{ label: "Tæt på stranden", points: [] }, { label: "Tæt på badeland og leg", points: [] }, { label: "Ro og natur", points: [] }] },
   ],
 };
+/** An answer's words → the places whose names fit it (a first guess, ticked when the questions are made - corrected by hand). */
+const GUESS: [RegExp, RegExp][] = [
+  [/familie|børn/i, /aqua|badeland|pool|leg|hytte|deluxe/i],
+  [/os to|par\b/i, /havkig|komfort|ro\b|natur/i],
+  [/gruppe|venner/i, /telt|standard|gruppe/i],
+  [/telt/i, /telt/i],
+  [/campingvogn|autocamper|vogn/i, /deluxe|komfort|standard|havkig|autocamper/i],
+  [/hytte/i, /hytte/i],
+  [/strand/i, /strand|havkig/i],
+  [/badeland|leg\b|leg /i, /aqua|badeland|pool|leg|golf/i],
+  [/ro og natur|natur|\bro\b/i, /natur|komfort|hytte|skov/i],
+];
+/** Places to stay or do things at - not the facilities (kitchens, bathrooms, the reception). */
+const NOT_A_PLACE = /køkken|baderum|toilet|reception|butik/i;
+
+function guessed(f: Finder, points: TourConfig["points"]): Finder {
+  return {
+    ...f,
+    questions: f.questions.map((q) => ({
+      ...q,
+      options: q.options.map((o) => {
+        const fits = GUESS.find(([answer]) => answer.test(o.label))?.[1];
+        return { ...o, points: fits ? points.filter((p) => fits.test(p.name) && !NOT_A_PLACE.test(p.name)).map((p) => p.id) : o.points };
+      }),
+    })),
+  };
+}
+
 const BLANK: Finder = { title: "Find det rette sted", button: "Find det rette sted", questions: [{ q: "Hvad leder I efter?", options: [{ label: "Svar 1", points: [] }, { label: "Svar 2", points: [] }] }] };
 
 /**
@@ -33,14 +61,15 @@ export function FinderEditor({ config, edit }: { config: TourConfig; edit: Edit 
         on={Boolean(F)}
         title="Spørgsmål, der finder det rette sted"
         hint="Gæsten svarer på et par spørgsmål, og touren flyver hen til det sted på billedet, der passer bedst - med kortet og Book-knappen."
-        onChange={(on) => edit((d) => void (d.finder = on ? structuredClone(/camp/i.test(`${d.brand} ${d.title}`) ? CAMPING : BLANK) : undefined))}
+        onChange={(on) => edit((d) => void (d.finder = on ? guessed(structuredClone(/camp/i.test(`${d.brand} ${d.title}`) ? CAMPING : BLANK), d.points) : undefined))}
       />
       {F && (
         <>
           <div className="flex gap-2">
-            <button type="button" className="rounded-lg bg-[#f2f2f7] px-2.5 py-1 text-[12px] font-medium text-[#0071e3]" onClick={() => edit((d) => void (d.finder = structuredClone(CAMPING)))}>
+            <button type="button" className="rounded-lg bg-[#f2f2f7] px-2.5 py-1 text-[12px] font-medium text-[#0071e3]" onClick={() => edit((d) => void (d.finder = guessed(structuredClone(CAMPING), d.points)))}>
               Brug camping-spørgsmål
             </button>
+            <span className="self-center text-[11px] text-[#8e8e93]">Stederne er sat ud fra punkternes navne - ret dem gerne.</span>
           </div>
           <Field title="Overskrift">
             <input className={input} value={F.title} onChange={(e) => set((f) => void (f.title = e.target.value))} />

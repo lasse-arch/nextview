@@ -26,7 +26,7 @@ const MONTHS = ["januar", "februar", "marts", "april", "maj", "juni", "juli", "a
 
 const Icon = ({ d, className }: { d: string; className?: string }) => <svg viewBox="0 0 24 24" aria-hidden className={className} dangerouslySetInnerHTML={{ __html: d }} />;
 
-export function WeatherChip({ slug, onOpen }: { slug: string; onOpen?: () => void }) {
+export function WeatherChip({ slug, at, onOpen }: { slug: string; /** The place as the tour has it now - the editor's preview may not be saved yet. */ at: { lat: number; lon: number; place: string }; onOpen?: () => void }) {
   const tr = useT();
   const [data, setData] = useState<Data | null>(null);
   const [open, setOpen] = useState(false);
@@ -34,14 +34,14 @@ export function WeatherChip({ slug, onOpen }: { slug: string; onOpen?: () => voi
 
   useEffect(() => {
     let alive = true;
-    fetch(apiUrl(`/api/tour-weather/${slug}`))
+    fetch(apiUrl(`/api/tour-weather/${slug}?${new URLSearchParams({ lat: String(at.lat), lon: String(at.lon), place: at.place })}`))
       .then((r) => (r.ok ? r.json() : null))
       .then((d: Data | null) => alive && d && (d.now || d.months) && setData(d))
       .catch(() => {});
     return () => {
       alive = false;
     };
-  }, [slug]);
+  }, [slug, at.lat, at.lon, at.place]);
 
   if (!data) return null;
   const { now, months, place } = data;
