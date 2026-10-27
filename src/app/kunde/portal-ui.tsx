@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { setPortalLanguage } from "@/lib/actions/portal-language";
+import { portalReview } from "@/lib/actions/portal-review";
 
 /*
  * The customer page's moving parts: the location picker (like Wolt's - "all
@@ -121,5 +122,84 @@ export function TourThumb({ src }: { src: string }) {
         <img src={src} alt="" loading="lazy" onError={() => setOk(false)} className="absolute inset-0 h-full w-full object-cover" />
       )}
     </span>
+  );
+}
+
+/** "Rettelser": the tour in review mode in a big window on the page - closing it shows what's been sent. */
+export function ReviewLauncher({ slug, title, words }: { slug: string; title: string; words: { open: string; opening: string; hint: string; close: string } }) {
+  const router = useRouter();
+  const [token, setToken] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const close = () => {
+    setToken(null);
+    router.refresh();
+  };
+  return (
+    <>
+      <button
+        type="button"
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true);
+          setError(null);
+          const r = await portalReview(slug).catch(() => ({ ok: false as const, error: "?" }));
+          setBusy(false);
+          if (r.ok) setToken(r.token);
+          else setError(r.error);
+        }}
+        className="rounded-full bg-[#1d1d1f] px-4 py-2 text-[14px] font-semibold text-white disabled:opacity-50"
+      >
+        {busy ? words.opening : words.open}
+      </button>
+      {error && <span className="text-[13px] text-[#c4271d]">{error}</span>}
+      {token && (
+        <div className="fixed inset-0 z-50 flex flex-col bg-black/70 sm:p-6" role="dialog" aria-modal="true" aria-label={title}>
+          <div className="mx-auto flex h-full w-full max-w-[1500px] flex-col overflow-hidden bg-white sm:rounded-3xl">
+            <div className="flex items-center gap-3 border-b border-black/[.06] px-4 py-2.5">
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[15px] font-semibold">{title}</p>
+                <p className="truncate text-[12px] text-[#6e6e73]">{words.hint}</p>
+              </div>
+              <button type="button" onClick={close} className="rounded-full bg-[#f3f3f5] px-4 py-1.5 text-[14px] font-semibold hover:bg-[#e8e8ed]">
+                {words.close}
+              </button>
+            </div>
+            <iframe src={`/p/${token}`} title={title} className="w-full flex-1 border-0" allow="fullscreen; xr-spatial-tracking; gyroscope; accelerometer; clipboard-write" allowFullScreen />
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+/** "Brug touren": a link straight to each place (and the whole tour), to copy - with a QR code to print. */
+export function PlaceLinks({ links, words }: { links: { key: string; name: string; group: string | null; url: string }[]; words: { copy: string; copied: string; qr: string } }) {
+  const [copied, setCopied] = useState<string | null>(null);
+  return (
+    <ul className="divide-y divide-black/[.06]">
+      {links.map((l) => (
+        <li key={l.key} className="flex flex-wrap items-center gap-2 py-3">
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[15px] font-semibold">{l.name}</p>
+            <p className="truncate text-[12px] text-[#8e8e93]">{l.group ?? l.url.replace(/^https?:\/\//, "")}</p>
+          </div>
+          <a href={`/api/qr?url=${encodeURIComponent(l.url)}`} target="_blank" rel="noopener" className="rounded-full bg-[#f3f3f5] px-3 py-1.5 text-[13px] font-semibold hover:bg-[#e8e8ed]">
+            {words.qr}
+          </a>
+          <button
+            type="button"
+            onClick={() => {
+              navigator.clipboard?.writeText(l.url).catch(() => {});
+              setCopied(l.key);
+              setTimeout(() => setCopied(null), 1600);
+            }}
+            className="rounded-full bg-[#0071e3] px-3.5 py-1.5 text-[13px] font-semibold text-white"
+          >
+            {copied === l.key ? words.copied : words.copy}
+          </button>
+        </li>
+      ))}
+    </ul>
   );
 }

@@ -5,7 +5,7 @@ import { getCurrentCustomer, getCurrentUser } from "@/lib/auth";
 import { logout } from "@/lib/actions/auth";
 import { prisma } from "@/lib/db";
 import { dealName, needsDeliveryLink } from "@/lib/labels";
-import { reviewUrl, tourUrl } from "@/lib/public-urls";
+import { tourUrl } from "@/lib/public-urls";
 import { tourStats, type TourStats } from "@/lib/tour-stats";
 import { shareOf, shown } from "@/lib/tour-share";
 import { mergeShare, mergeStats } from "@/lib/merge-stats";
@@ -15,7 +15,7 @@ import type { TourConfig } from "@/app/arpo/tour-lab/tours/types";
 import { startPlaces } from "@/app/arpo/tour-lab/tours/places";
 import { PortalEmbeds } from "@/app/r/[token]/embeds";
 import { PHONE, WELCOME_MAIL_SENDER } from "@/lib/welcome-mail";
-import { LangToggle, LocationSwitcher, TourThumb } from "./portal-ui";
+import { LangToggle, LocationSwitcher, PlaceLinks, ReviewLauncher, TourThumb } from "./portal-ui";
 import { TEXT, type Lang } from "./text";
 
 /*
@@ -33,7 +33,7 @@ import { TEXT, type Lang } from "./text";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Jeres side - Nextview360", robots: { index: false, follow: false } };
 
-const PAGES = ["hjem", "tal", "hjemmeside", "kontrakt", "hjaelp"] as const;
+const PAGES = ["hjem", "tal", "hjemmeside", "tips", "rettelser", "kontrakt", "hjaelp"] as const;
 type Page = (typeof PAGES)[number];
 
 /**
@@ -117,6 +117,10 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
           .map((i) => ({ id: i.id, name: i.location ? `${dealName(d)} - ${i.location}` : dealName(d), url: /^https?:\/\//i.test(i.url!) ? i.url! : `https://${i.url}` }))
   );
   const needStats = page === "hjem" || page === "tal";
+  const feedback =
+    page === "rettelser" && tours.length
+      ? await prisma.tourFeedback.findMany({ where: { tourSlug: { in: tours.map((x) => x.slug) } }, orderBy: { createdAt: "desc" }, take: 100, select: { id: true, tourSlug: true, kind: true, text: true, room: true, author: true, status: true, createdAt: true } })
+      : [];
   const stats: TourStats[] = needStats ? await Promise.all(tours.map((x) => tourStats(x.slug, x.share.days))) : [];
   const together = needStats ? mergeStats(stats) : null;
   const togetherShare = mergeShare(tours.map((x) => x.share));
@@ -126,6 +130,8 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
     ["hjem", t.nav.hjem, <path key="i" d="M3 10.5 10 4l7 6.5V17a1 1 0 0 1-1 1h-3.5v-4.5h-5V18H4a1 1 0 0 1-1-1v-6.5Z" />],
     ["tal", t.nav.tal, <path key="i" d="M4 17V9m6 8V4m6 13v-6" strokeLinecap="round" />],
     ["hjemmeside", t.nav.hjemmeside, <path key="i" d="M3 5.5A1.5 1.5 0 0 1 4.5 4h11A1.5 1.5 0 0 1 17 5.5v9a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 3 14.5v-9ZM3 8h14M8 11l-2 1.5L8 14m4-3 2 1.5-2 1.5" strokeLinejoin="round" />],
+    ["tips", t.nav.tips, <path key="i" d="M10 2.5v2M4.7 4.7l1.4 1.4M2.5 10h2m11 0h2m-3.2-5.3-1.4 1.4M7.5 14.5h5M8 17.5h4M10 6.5a3.5 3.5 0 0 0-2 6.4v1.6h4v-1.6a3.5 3.5 0 0 0-2-6.4Z" strokeLinecap="round" strokeLinejoin="round" />],
+    ["rettelser", t.nav.rettelser, <path key="i" d="M4 14.5V16h1.5l8.6-8.6-1.5-1.5L4 14.5Zm10.2-10.2 1.5 1.5M4 3.5h6m-6 3h3" strokeLinecap="round" strokeLinejoin="round" />],
     ["kontrakt", t.nav.kontrakt, <path key="i" d="M6 3h6l4 4v10H6V3Zm6 0v4h4M8.5 11h5m-5 3h5" strokeLinejoin="round" />],
     ["hjaelp", t.nav.hjaelp, <path key="i" d="M10 17.5a7.5 7.5 0 1 0 0-15 7.5 7.5 0 0 0 0 15Zm-2.2-9.6a2.3 2.3 0 0 1 4.4 1c0 1.5-2.2 1.9-2.2 3.3m0 2.3h.01" strokeLinecap="round" />],
   ];
@@ -254,11 +260,6 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
                               <p className="truncate text-[15px] font-semibold">{x.config.title || x.name}</p>
                               {x.location && <p className="truncate text-[13px] text-[#6e6e73]">{x.location}</p>}
                             </div>
-                            {x.reviewToken && (
-                              <a href={reviewUrl(x.reviewToken, origin)} target="_blank" rel="noopener" className="hidden rounded-full bg-[#ffcc00] px-3 py-1.5 text-[13px] font-semibold sm:block">
-                                {t.feedback}
-                              </a>
-                            )}
                             <a href={x.url} target="_blank" rel="noopener" className="rounded-full bg-[#1d1d1f] px-3.5 py-1.5 text-[13px] font-semibold text-white">
                               {t.open} ↗
                             </a>
@@ -384,6 +385,119 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
                   <PortalEmbeds url={x.url} title={x.name} places={[]} whole={null} lang={lang} heading={false} />
                 </section>
               ))}
+            </>
+          )}
+
+          {page === "rettelser" && (
+            <>
+              <div className="pt-1">
+                <h1 className="text-[30px] font-bold tracking-tight">{t.fix.title}</h1>
+                <p className="mt-1 max-w-2xl text-[15px] text-[#6e6e73]">{t.fix.lead}</p>
+              </div>
+              <section className={card}>
+                {tours.length + older.length === 0 ? (
+                  <p className="text-[15px]">{t.notLive}</p>
+                ) : (
+                  <ul className="divide-y divide-black/[.06]">
+                    {tours.map((x) => (
+                      <li key={x.slug} className="flex flex-wrap items-center gap-3 py-3">
+                        <TourThumb src={`/api/tour-thumb?tour=${encodeURIComponent(x.slug)}`} />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[15px] font-semibold">{x.config.title || x.name}</p>
+                          {x.location && <p className="truncate text-[13px] text-[#6e6e73]">{x.location}</p>}
+                        </div>
+                        <ReviewLauncher slug={x.slug} title={x.config.title || x.name} words={{ open: t.fix.open, opening: t.fix.opening, hint: t.fix.windowHint, close: t.fix.close }} />
+                      </li>
+                    ))}
+                    {older.map((x) => (
+                      <li key={x.id} className="flex flex-wrap items-center gap-3 py-3">
+                        <TourThumb src={`/api/tour-thumb?item=${x.id}`} />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[15px] font-semibold">{x.name}</p>
+                          <p className="text-[13px] text-[#6e6e73]">{t.fix.older}</p>
+                        </div>
+                        <a href={`mailto:${WELCOME_MAIL_SENDER}?subject=${encodeURIComponent(x.name)}`} className="rounded-full bg-[#f3f3f5] px-4 py-2 text-[14px] font-semibold">
+                          {WELCOME_MAIL_SENDER}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+              {tours.length > 0 && (
+                <section className={card}>
+                  <h2 className="text-[18px] font-bold tracking-tight">{t.fix.sent}</h2>
+                  {feedback.length === 0 ? (
+                    <p className="mt-2 text-[15px] text-[#6e6e73]">{t.fix.none}</p>
+                  ) : (
+                    <ul className="mt-2 divide-y divide-black/[.06]">
+                      {feedback.map((f) => (
+                        <li key={f.id} className="flex gap-3 py-3">
+                          <span className={`mt-0.5 h-fit shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${f.status === "done" ? "bg-[#34c759]/15 text-[#1d7a33]" : "bg-[#f3f3f5] text-[#6e6e73]"}`}>{t.fix.status[f.status] ?? f.status}</span>
+                          <div className="min-w-0 flex-1">
+                            <p className="whitespace-pre-line text-[15px] leading-snug">{f.text}</p>
+                            <p className="mt-0.5 text-[12px] text-[#8e8e93]">
+                              {[t.fix.kinds[f.kind] ?? f.kind, f.room, tours.length > 1 ? (tours.find((x) => x.slug === f.tourSlug)?.config.title ?? null) : null, f.author, fmtDate(f.createdAt, lang)].filter(Boolean).join(" · ")}
+                            </p>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </section>
+              )}
+            </>
+          )}
+
+          {page === "tips" && (
+            <>
+              <div className="pt-1">
+                <h1 className="text-[30px] font-bold tracking-tight">{t.use.title}</h1>
+                <p className="mt-1 max-w-2xl text-[15px] text-[#6e6e73]">{t.use.lead}</p>
+              </div>
+              {tours.length + older.length === 0 ? (
+                <section className={card}>
+                  <p className="text-[15px]">{t.notLive}</p>
+                </section>
+              ) : (
+                <section className={card}>
+                  <h2 className="text-[18px] font-bold tracking-tight">{t.use.links}</h2>
+                  <p className="mt-1 text-[14px] leading-snug text-[#6e6e73]">{t.use.linksLead}</p>
+                  {tours.map((x) => (
+                    <div key={x.slug} className="mt-4">
+                      {tours.length + older.length > 1 && <p className="text-[13px] font-semibold uppercase tracking-wide text-[#8e8e93]">{x.config.title || x.name}</p>}
+                      <PlaceLinks links={[{ key: "_hele", name: t.use.whole, group: null, url: x.url }]} words={{ copy: t.use.copy, copied: t.use.copied, qr: t.use.qr }} />
+                      {startPlaces(x.config).length > 0 && (
+                        <details className="group rounded-2xl bg-[#f7f7f9] px-4">
+                          <summary className="flex cursor-pointer list-none items-center justify-between py-3 text-[14px] font-semibold [&::-webkit-details-marker]:hidden">
+                            {t.use.places(startPlaces(x.config).length)}
+                            <span className="text-[#8e8e93] transition group-open:rotate-90">›</span>
+                          </summary>
+                          <PlaceLinks links={startPlaces(x.config).map((p) => ({ key: p.key, name: p.name, group: p.group, url: `${x.url}?rum=${p.key}` }))} words={{ copy: t.use.copy, copied: t.use.copied, qr: t.use.qr }} />
+                        </details>
+                      )}
+                    </div>
+                  ))}
+                  {older.map((x) => (
+                    <div key={x.id} className="mt-4">
+                      {tours.length + older.length > 1 && <p className="text-[13px] font-semibold uppercase tracking-wide text-[#8e8e93]">{x.name}</p>}
+                      <PlaceLinks links={[{ key: x.id, name: t.use.whole, group: null, url: x.url }]} words={{ copy: t.use.copy, copied: t.use.copied, qr: t.use.qr }} />
+                    </div>
+                  ))}
+                  <p className="mt-3 text-[13px] text-[#8e8e93]">{t.use.qrHint}</p>
+                </section>
+              )}
+              <section className={card}>
+                <h2 className="text-[18px] font-bold tracking-tight">{t.use.ideasTitle}</h2>
+                <div className="mt-3 grid gap-2.5 sm:grid-cols-2">
+                  {t.use.ideas.map(([title, text]) => (
+                    <div key={title} className="rounded-2xl bg-[#f7f7f9] p-4">
+                      <p className="text-[15px] font-semibold">{title}</p>
+                      <p className="mt-0.5 text-[13px] leading-snug text-[#6e6e73]">{text}</p>
+                    </div>
+                  ))}
+                </div>
+              </section>
             </>
           )}
 

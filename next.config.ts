@@ -62,6 +62,11 @@ const nextConfig: NextConfig = {
       // The same tours on the short tour address (lib/public-urls.ts).
       ...(TOUR_HOST ? [{ source: "/:slug", has: [{ type: "host" as const, value: TOUR_HOST }], headers: [{ key: "Content-Security-Policy", value: "frame-ancestors *" }] }] : []),
       {
+        // The review link opens in a window on the customer's own page (/kunde → Rettelser), same address.
+        source: "/p/:token",
+        headers: [{ key: "X-Frame-Options", value: "SAMEORIGIN" }],
+      },
+      {
         // The tour editor previews the tour in an iframe on its own page.
         source: "/arpo/tour-lab/:slug",
         headers: [{ key: "X-Frame-Options", value: "SAMEORIGIN" }],
