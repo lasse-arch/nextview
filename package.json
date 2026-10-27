@@ -9,7 +9,7 @@
     "lint": "eslint",
     "db:seed": "tsx prisma/seed.ts",
     "postinstall": "prisma generate",
-    "vercel-build": "if [ \"$VERCEL_ENV\" = \"production\" ]; then prisma db execute --file prisma/fixes/clear-failed-preview-migration.sql --schema prisma/schema.prisma && DATABASE_URL=${DIRECT_URL:-$DATABASE_URL} prisma migrate deploy; fi && next build"
+    "vercel-build": "if [ \"$VERCEL_ENV\" = \"production\" ]; then prisma db execute --file prisma/fixes/clear-failed-preview-migration.sql --schema prisma/schema.prisma && DATABASE_URL=${DIRECT_URL:-$DATABASE_URL} prisma migrate deploy; fi && node scripts/build-tour-engine.mjs && next build"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -22,6 +22,7 @@
     "@sparticuz/chromium": "^153.0.0",
     "@vercel/blob": "^2.8.2",
     "bcryptjs": "^3.0.3",
+    "blake3-wasm": "2.1.5",
     "date-fns": "^4.4.0",
     "jose": "^6.2.12",
     "next": "16.3.5",
@@ -41,6 +42,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/ssh2-sftp-client": "^9.0.6",
+    "esbuild": "0.28.2",
     "eslint": "^9",
     "eslint-config-next": "16.3.5",
     "playwright": "^1.63.0",

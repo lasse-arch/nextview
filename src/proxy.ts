@@ -3,7 +3,8 @@ import type { NextRequest } from "next/server";
 
 const SESSION_COOKIE = "nv360_session";
 // "/t" = published tours, shown in an iframe on customers' sites (and their pictures, /t/<slug>/historie); "/r" = a customer's report on their tour.
-const PUBLIC_PATHS = ["/login", "/robots.txt", "/t", "/r", "/p", "/site", "/web"];
+// "/tours" and "/tour-engine": the tours' own files (pictures, sound) and the engine for tours published as files - public like the tours.
+const PUBLIC_PATHS = ["/login", "/robots.txt", "/t", "/r", "/p", "/site", "/web", "/tours", "/tour-engine"];
 
 /*
  * Arpo lives under /arpo (the website has "/", customers have /kunde). Its

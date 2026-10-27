@@ -1313,8 +1313,32 @@ model Tour {
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
   versions  TourVersion[]
+  /// Versions published as plain files on Cloudflare (tour.nextview360.dk).
+  publications TourPublication[]
+  /// The publication that is live on Cloudflare now - null = not out there.
+  liveVersion  Int?
 
   @@index([dealId])
+}
+
+/// One version of a tour published as plain files on Cloudflare - frozen: its
+/// page, its data and pictures, and the engine it was published with. Going
+/// back to an older version puts exactly that one live again.
+model TourPublication {
+  id            String   @id @default(cuid())
+  tourId        String
+  tour          Tour     @relation(fields: [tourId], references: [id], onDelete: Cascade)
+  version       Int
+  /// The tour's address on Cloudflare when published (its slug).
+  slug          String
+  /// Every file the version needs: path -> Cloudflare's hash of it (page, pictures, engine, viewer).
+  files         Json
+  engine        String
+  note          String?
+  createdByName String?
+  createdAt     DateTime @default(now())
+
+  @@unique([tourId, version])
 }
 
 /// One saved state of a tour's setup - who saved it, when, and why.

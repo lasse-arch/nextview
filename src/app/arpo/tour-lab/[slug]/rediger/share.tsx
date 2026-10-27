@@ -7,6 +7,7 @@ import { suggestEmbedPages } from "@/lib/actions/tour-embeds";
 import { startPlaces } from "../../tours/places";
 import type { TourConfig } from "../../tours/types";
 import { Choice, Field, Group, input, Toggle } from "./ui";
+import { CloudflarePublish } from "./cloudflare";
 
 /*
  * "Del": the tour goes on the customer's website as an iframe. The size is
@@ -122,6 +123,7 @@ export function SharePanel({
         <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">Indsæt koden i en HTML-/kode-blok på siden (WordPress: blokken &quot;Tilpasset HTML&quot;).</p>
       </Group>
       <PagesGroup config={config} edit={edit} slug={slug} title={title} size={size} published={published} url={url} />
+      <CloudflarePublish slug={slug} />
     </>
   );
 }
