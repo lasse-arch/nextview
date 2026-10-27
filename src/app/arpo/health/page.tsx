@@ -66,7 +66,16 @@ export default async function HealthPage() {
         <p className="mt-2 text-xs text-slate-400">Besøg på alle udgivne tours. Et besøg er én fane i en browser; &quot;lige nu&quot; er de sidste 5 minutter.</p>
 
         {visits.tours.length > 0 && (
-          <ul className="mt-4 space-y-2">
+          // Folded by default - one line per tour gets long with hundreds of customers. Most visited first.
+          <details className="group mt-4">
+            <summary className="flex cursor-pointer list-none items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-[14px] font-medium text-slate-900 hover:bg-slate-50 [&::-webkit-details-marker]:hidden">
+              <span className="text-slate-400 transition-transform group-open:rotate-90">›</span>
+              Hver tour for sig
+              <span className="font-normal text-slate-400">
+                · {visits.tours.length} tours{visits.tours.some((t) => t.now) ? ` · ${visits.tours.filter((t) => t.now).length} med besøgende lige nu` : ""}
+              </span>
+            </summary>
+          <ul className="mt-2 space-y-2">
             {visits.tours.map((t) => (
               <li key={t.slug} className="flex items-center gap-4 overflow-hidden rounded-xl border border-slate-200 bg-white pr-4">
                 <span className={`w-1.5 self-stretch ${t.now ? "bg-[#34c759]" : t.day ? "bg-[#0071e3]" : "bg-slate-200"}`} />
@@ -90,6 +99,7 @@ export default async function HealthPage() {
               </li>
             ))}
           </ul>
+          </details>
         )}
       </section>
 
