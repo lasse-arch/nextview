@@ -1,7 +1,8 @@
 "use client";
 
 import { useT } from "../tours/i18n-react";
-import { createContext, useContext } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
+import { apiUrl } from "../tours/api";
 import type { LinkOpen, PopupSize, TourConfig } from "../tours/types";
 
 /*
@@ -42,7 +43,41 @@ export function linkMode(T: TourConfig, href: string): LinkOpen {
   if (/^(tel|mailto):/.test(href)) return "same";
   const mode = T.linkOpen?.byUrl?.[href] ?? T.linkOpen?.default ?? "tab";
   // Sites that refuse to be shown inside another site (a popup would just be blank) always get a new tab.
-  return mode === "popup" && NEVER_FRAMED.test(href) ? "tab" : mode;
+  return mode === "popup" && (NEVER_FRAMED.test(href) || frameOk.get(untagged(href)) === false) ? "tab" : mode;
+}
+
+/* ----- Can a page be shown in a popup? Asked of Arpo (the browser can't see another site's rules), once per link. ----- */
+
+const frameOk = new Map<string, boolean>();
+const frameAsk = new Map<string, Promise<boolean>>();
+
+/** The link as written in the setup - without the utm_ tags the tour adds (by text, so its spelling stays the same). */
+function untagged(href: string): string {
+  return href
+    .replace(/([?&])utm_[^=&#]*=[^&#]*/g, "$1")
+    .replace(/([?&])&+/g, "$1")
+    .replace(/[?&]+(#|$)/, "$1");
+}
+
+/** Whether the page can be shown in a popup (true when Arpo can't be asked - then the popup's own way out is there). */
+export function checkFrame(slug: string, href: string): Promise<boolean> {
+  const url = untagged(href);
+  if (frameOk.has(url)) return Promise.resolve(frameOk.get(url)!);
+  if (!frameAsk.has(url))
+    frameAsk.set(
+      url,
+      fetch(apiUrl(`/api/link-frame?tour=${encodeURIComponent(slug)}&url=${encodeURIComponent(url)}`))
+        .then((r) => (r.ok ? r.json() : { ok: true }))
+        .then((j: { ok?: boolean }) => j.ok !== false, () => true)
+        .then((ok) => (frameOk.set(url, ok), ok))
+    );
+  return frameAsk.get(url)!;
+}
+
+/** Asks about every link set to open in a popup, ahead of time - so a page that can't be shown opens in a new tab straight away. */
+export function prefetchFrames(T: TourConfig) {
+  const links = new Set(JSON.stringify(T).match(/https?:\/\/[^"\\\s]+/g) ?? []);
+  for (const href of links) if (!NEVER_FRAMED.test(href) && linkMode(T, href) === "popup") void checkFrame(T.slug, href);
 }
 
 /** Social media, maps and the like - they forbid being shown in a frame. */
@@ -76,8 +111,33 @@ export function LinkProvider({ T, popup, children }: { T: TourConfig; popup: (hr
 
 /** The popup: the page over the tour, with a way out to a new tab (some sites refuse to be shown inside others). */
 /** `site`: the site the popup shows, as people write it ("claude.ai") - null leaves it out. */
-export function LinkPopup({ open, onClose, size = "stor", custom, site }: { open: NonNullable<LinkPopupState>; onClose: () => void; size?: PopupSize; custom?: { w: number; h: number }; site: string | null }) {
+export function LinkPopup({
+  open,
+  onClose,
+  size = "stor",
+  custom,
+  site,
+  slug,
+}: {
+  open: NonNullable<LinkPopupState>;
+  onClose: () => void;
+  size?: PopupSize;
+  custom?: { w: number; h: number };
+  site: string | null;
+  /** The tour - to ask whether the page can be shown here at all. */
+  slug: string;
+}) {
   const tr = useT();
+  // Opened before the answer came: if the page refuses to be shown inside ours, a clear way out instead of a blank page.
+  const [blocked, setBlocked] = useState<{ href: string; no: boolean } | null>(null);
+  useEffect(() => {
+    let alive = true;
+    checkFrame(slug, open.href).then((ok) => alive && setBlocked({ href: open.href, no: !ok }));
+    return () => {
+      alive = false;
+    };
+  }, [slug, open.href]);
+  const refused = blocked?.href === open.href && blocked.no;
   return (
     <div className={`lk-overlay lk-${size}`} onClick={onClose}>
       <div className="lk-popup" style={size === "egen" && custom ? ({ "--lk-w": `${custom.w}px`, "--lk-h": `${custom.h}px` } as React.CSSProperties) : undefined} onClick={(e) => e.stopPropagation()}>
@@ -100,7 +160,16 @@ export function LinkPopup({ open, onClose, size = "stor", custom, site }: { open
             ×
           </button>
         </div>
-        <iframe src={embeddable(open.href)} title={open.label} allow="payment; clipboard-write" />
+        {refused ? (
+          <div className="lk-afvist">
+            <p>{tr("Siden kan ikke vises her - den åbner i en ny fane.")}</p>
+            <a href={open.href} target="_blank" rel="noopener" className="lk-afvist-knap" onClick={onClose}>
+              {open.label} ↗
+            </a>
+          </div>
+        ) : (
+          <iframe src={embeddable(open.href)} title={open.label} allow="payment; clipboard-write" />
+        )}
       </div>
     </div>
   );
@@ -162,6 +231,9 @@ export function TourLink({
 }
 
 export const LINKS_CSS = `
+.lk-afvist{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:32px 24px;text-align:center;background:#f6f7f8}
+.lk-afvist p{margin:0;max-width:320px;font-size:15px;color:#5c6b72;line-height:1.5}
+.lk-afvist-knap{display:inline-flex;align-items:center;gap:8px;padding:14px 26px;border-radius:999px;background:var(--c-accent,#e0533d);color:#fff;font-weight:800;font-size:16px;text-decoration:none;box-shadow:0 8px 20px rgba(0,0,0,.18)}
 .lk-overlay{position:absolute;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;padding:28px;background:rgba(0,0,0,.55);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);animation:hvFade .25s ease}
 .lk-popup{width:min(1000px,100%);height:min(860px,100%);display:flex;flex-direction:column;background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.45);animation:hvUp .35s cubic-bezier(.2,.7,.2,1) both}
 .lk-head{display:flex;align-items:center;gap:14px;padding:10px 12px 10px 20px;border-bottom:1px solid #eee;color:#1d2a30}

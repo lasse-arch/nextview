@@ -78,14 +78,8 @@ export async function loadTour(setup: TourConfig) {
 async function withPopupFallback(tour: TourConfig): Promise<TourConfig> {
   const L = tour.linkOpen;
   if (!L) return tour;
-  const hrefs = [
-    ...tour.cta.map((c) => c.href),
-    ...(tour.dock ?? []).flatMap((d) => (typeof d.go === "string" ? [] : [d.go.href])),
-    ...tour.menu.flatMap((m) => ("items" in m ? m.items.map((i) => i[1]) : [m.href])),
-    ...(tour.welcome?.tiles.flatMap((t) => ("href" in t.go ? [t.go.href] : [])) ?? []),
-    tour.contact?.mapUrl,
-    tour.contact?.instagram,
-  ].filter((h): h is string => Boolean(h) && /^https?:/.test(h!) && !isPlaceHref(h!));
+  // Every web link in the setup - buttons, menu, tiles, points, place cards, the nudge.
+  const hrefs = (JSON.stringify(tour).match(/https?:\/\/[^"\\\s]+/g) ?? []).filter((h) => !isPlaceHref(h));
   const popups = [...new Set(hrefs)].filter((h) => (L.byUrl?.[h] ?? L.default) === "popup");
   const blocked = (await Promise.all(popups.map(async (h) => ((await canEmbed(h)) ? null : h)))).filter((h): h is string => h != null);
   if (!blocked.length) return tour;

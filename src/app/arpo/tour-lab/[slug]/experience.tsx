@@ -29,7 +29,7 @@ import { MAP_CSS, MapScene, type MapApi } from "./map";
 import { CARDS_CSS, NudgeCard, PlaceCard } from "./cards";
 import { MEASURES_CSS, MeasureShield } from "./measures";
 import { ROUTE_CSS, RouteLine, RouteSheet, RouteStatus, flightMs, shortestPath, straighten, type Destination, type RouteGraph } from "./wayfinding";
-import { LINKS_CSS, LinkPopup, LinkProvider, TourLink, openLink, popupSize, siteOf, type LinkPopupState } from "./links";
+import { LINKS_CSS, LinkPopup, LinkProvider, TourLink, openLink, popupSize, prefetchFrames, siteOf, type LinkPopupState } from "./links";
 import { Stories, STORIES_CSS, storyJpeg, type StoryRoom } from "./stories";
 import { LIGHTBOX_CSS, Lightbox, type LightboxState } from "./lightbox";
 import "pannellum/build/pannellum.css";
@@ -499,6 +499,8 @@ function TourExperience({
   const GUIDE = useMemo(() => guideStops(T), [T]);
   const primaryCta = T.cta.find((c) => c.primary);
   const [linkPopup, setLinkPopup] = useState<LinkPopupState>(null);
+  // Every link set to open in a popup is checked ahead (can its page be shown here?) - those that can't open in a new tab.
+  useEffect(() => prefetchFrames(T), [T]);
   const popup = (href: string, label: string) => {
     track("link_popup", { label, link_url: href });
     setLinkPopup({ href, label });
@@ -2328,6 +2330,7 @@ function TourExperience({
           size={popupSize(T)}
           custom={T.linkOpen?.custom}
           site={T.linkOpen?.showSite === false ? null : siteOf(linkPopup.href)}
+          slug={savedTour.slug}
         />
       )}
       {setLang && tourLanguages(savedTour).length > 1 && <LangSwitch langs={tourLanguages(savedTour)} lang={lang} onPick={(l) => (track("language", { label: l }), setLang(l))} label={tx("Sprog")} />}
