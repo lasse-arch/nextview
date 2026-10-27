@@ -315,6 +315,8 @@ export type TourConfig = {
    * `boxes`: box number -> link to the scan point in front of it.
    */
   wayfinding?: { boxes?: Record<string, string> };
+  /** "Sådan går du rundt": a short help (drag, walk, the menu) when the visitor first steps inside - once per visitor. */
+  onboarding?: boolean;
   /**
    * Available rooms fetched live (every 10 min) and shown in the room picker:
    * per menu group (by its title) the size range (m³) it covers.

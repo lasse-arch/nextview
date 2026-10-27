@@ -15,6 +15,7 @@ import { apiUrl, isStaticTour } from "../tours/api";
 import type { MenuEntry, TourConfig, TourPlace, TourPoint, WelcomeGo } from "../tours/types";
 import { CoverWelcome, DESIGNS_CSS, DockMenu, PickerMenu } from "./designs";
 import { GUIDE_CSS, GuidePlayer, guideStops } from "./guide";
+import { ONBOARDING_CSS, Onboarding } from "./onboarding";
 import { CONTACT_CSS, CONTACT_HREF, ContactForm } from "./contact-form";
 import { DAY_CSS, DayBar, DaySheet } from "./day";
 import { FEEDBACK_CSS, FeedbackLayer } from "./feedback";
@@ -319,6 +320,22 @@ function TourExperience({
   // Rooms are known by their Danish names (Matterport and statistics); `roomShown` is the name in the visitor's language.
   const { names: ROOM_NAMES, links: ROOM_LINKS } = useMemo(() => roomIndex([...savedTour.menu, ...(savedTour.places ? [{ title: "", items: savedTour.places.map((p): [string, string] => [p.name, p.href]) }] : [])]), [savedTour]);
   const LAST_ROOM_KEY = `${T.slug}-last-room`;
+  /** "Sådan går du rundt" seen (remembered per visitor - not in the editor's preview, where it's shown each time to try it). */
+  const [helpDone, setHelpDone] = useState(() => {
+    if (typeof window === "undefined" || inEditorPreview()) return false;
+    try {
+      return localStorage.getItem(`${T.slug}-hjaelp`) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const doneHelp = useCallback(() => {
+    setHelpDone(true);
+    if (inEditorPreview()) return;
+    try {
+      localStorage.setItem(`${T.slug}-hjaelp`, "1");
+    } catch {}
+  }, [T.slug]);
   /** The rooms of "Historier": the ones the setup names, otherwise every room in the menu. */
   const storyRooms = useMemo<StoryRoom[]>(() => {
     const all = T.menu
@@ -1438,7 +1455,7 @@ function TourExperience({
       }>
       <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.font.replace(/ /g, "+")}:wght@400;600;700;800;900&display=swap`} />
       {T.fontHeading && <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.fontHeading.replace(/ /g, "+")}:wght@500;600&display=swap`} />}
-      <style>{CSS + CONTACT_CSS + STORIES_CSS + LIGHTBOX_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + INFO_CSS + MAP_CSS + ROUTE_CSS + MEASURES_CSS + CARDS_CSS + DAY_CSS + SIMPLE_CSS + LOGO_RIGHT_CSS + LANG_CSS + (review ? FEEDBACK_CSS : "")}</style>
+      <style>{CSS + CONTACT_CSS + STORIES_CSS + LIGHTBOX_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + ONBOARDING_CSS + INFO_CSS + MAP_CSS + ROUTE_CSS + MEASURES_CSS + CARDS_CSS + DAY_CSS + SIMPLE_CSS + LOGO_RIGHT_CSS + LANG_CSS + (review ? FEEDBACK_CSS : "")}</style>
       {/* The tour's own design on top (written by Claude or by hand under Avanceret). */}
       {T.customCss && <style>{T.customCss.replace(/<\/?style/gi, "")}</style>}
 
@@ -2029,6 +2046,16 @@ function TourExperience({
       )}
       {contactOpen && T.contactForm && (
         <ContactForm T={T} preview={inPreview} onClose={() => setContactOpen(false)} onSent={() => track("contact_form", { place: "form" })} />
+      )}
+      {T.onboarding && !helpDone && phase === "tour" && !cover && !welcome && !intro && sdk && guideAt == null && !menuOpen && !contactOpen && (
+        <Onboarding
+          hasMenu={T.menu.length > 0}
+          onGuide={GUIDE.length ? () => startGuide("onboarding") : undefined}
+          onDone={() => {
+            track("onboarding_done", {});
+            doneHelp();
+          }}
+        />
       )}
       {guideAt != null && GUIDE[guideAt] && (
         <GuidePlayer
