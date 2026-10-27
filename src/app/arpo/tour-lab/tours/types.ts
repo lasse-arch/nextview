@@ -366,7 +366,12 @@ export type TourConfig = {
    * each with a picture of the room. `rooms` picks and orders them (menu
    * names); left out = every room in the menu, in menu order.
    */
-  stories?: { mobile: boolean; desktop: boolean; rooms?: string[] };
+  /**
+   * The rooms as story cards along the bottom. `scroll`: the row scrolls
+   * sideways (default on both) - false on a device = every card shown,
+   * wrapped onto more rows.
+   */
+  stories?: { mobile: boolean; desktop: boolean; rooms?: string[]; scroll?: { mobile?: false; desktop?: false } };
   /** Matterport URL parameters for the viewer. */
   matterportParams: Record<string, string>;
   /** How long a fly to a spot takes (ms). */

@@ -760,15 +760,34 @@ export function TourEditor({
                   />
                 <Toggle
                   on={Boolean(config.stories?.mobile)}
-                  onChange={(on) => edit((d) => void (d.stories = { mobile: on, desktop: d.stories?.desktop ?? false, rooms: d.stories?.rooms }))}
+                  onChange={(on) => edit((d) => void (d.stories = { mobile: on, desktop: d.stories?.desktop ?? false, rooms: d.stories?.rooms, scroll: d.stories?.scroll }))}
                   title="Historier på mobil"
                   hint="Rummene som kort nederst, som Instagram-stories."
                 />
                 <Toggle
                   on={Boolean(config.stories?.desktop)}
-                  onChange={(on) => edit((d) => void (d.stories = { mobile: d.stories?.mobile ?? false, desktop: on, rooms: d.stories?.rooms }))}
+                  onChange={(on) => edit((d) => void (d.stories = { mobile: d.stories?.mobile ?? false, desktop: on, rooms: d.stories?.rooms, scroll: d.stories?.scroll }))}
                   title="Historier på computer"
                 />
+                {(config.stories?.mobile || config.stories?.desktop) && (
+                  <Field title="Scroll sidelæns i historierne" hint="Fra: alle historierne vises på én gang, fordelt på flere rækker.">
+                    <Choice
+                      value={config.stories?.scroll?.mobile === false ? (config.stories?.scroll?.desktop === false ? "ingen" : "computer") : config.stories?.scroll?.desktop === false ? "mobil" : "begge"}
+                      options={[
+                        ["begge", "Begge"],
+                        ["mobil", "Kun mobil"],
+                        ["computer", "Kun computer"],
+                        ["ingen", "Ingen"],
+                      ]}
+                      onChange={(v) =>
+                        edit((d) => {
+                          const scroll = { ...(v === "computer" || v === "ingen" ? { mobile: false as const } : {}), ...(v === "mobil" || v === "ingen" ? { desktop: false as const } : {}) };
+                          d.stories = { ...d.stories!, scroll: Object.keys(scroll).length ? scroll : undefined };
+                        })
+                      }
+                    />
+                  </Field>
+                )}
                 </Group>
                 <Group title="Ekstra">
                 <Toggle on={Boolean(config.wayfinding)} onChange={(on) => edit((d) => void (d.wayfinding = on ? d.wayfinding ?? {} : undefined))} title="Find vej" hint="Vælg et rum, og touren går vejen derhen fra der, man står." />

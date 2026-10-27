@@ -24,7 +24,7 @@ export function Stories({
 }: {
   rooms: StoryRoom[];
   current: string | null;
-  devices: { mobile: boolean; desktop: boolean };
+  devices: { mobile: boolean; desktop: boolean; scroll?: { mobile?: false; desktop?: false } };
   /** An extra first card, e.g. "Fra luften" back to the drone scene. */
   leading?: { label: string; onClick: () => void };
   onGo: (room: StoryRoom) => unknown;
@@ -146,7 +146,7 @@ export function Stories({
       )}
 
       <div
-        className={`hv-stories ${visible} ${collapsed ? "hv-st-lukket" : ""}`}
+        className={`hv-stories ${visible} ${collapsed ? "hv-st-lukket" : ""} ${devices.scroll?.mobile === false ? "hv-st-wrap-m" : ""} ${devices.scroll?.desktop === false ? "hv-st-wrap-d" : ""}`}
       >
         <button
           type="button"
@@ -298,6 +298,13 @@ export const STORIES_CSS = `
   .hv-st-on-m .hv-dev{bottom:calc(150px + env(safe-area-inset-bottom,0px))}
   .hv-st-on-m .hv-logo{transition:opacity .2s}
   .hv-st-on-m:has(.hv-story-play) .hv-logo{opacity:0}
+}
+/* No sideways scroll on this device: every story shown, wrapped onto more rows. */
+@media (max-width:760px){
+  .hv-st-wrap-m .hv-st-row{flex-wrap:wrap;overflow:visible;justify-content:center;row-gap:8px;-webkit-mask-image:none;mask-image:none}
+}
+@media (min-width:761px){
+  .hv-st-wrap-d .hv-st-row{flex-wrap:wrap;overflow:visible;justify-content:center;row-gap:8px;-webkit-mask-image:none;mask-image:none}
 }
 @media (min-width:761px){
   .hv-stories.hv-st-d,.hv-story-play.hv-st-d{display:flex}

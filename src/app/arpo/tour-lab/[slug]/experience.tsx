@@ -55,6 +55,16 @@ declare global {
   }
 }
 
+/** The tour is the editor's live preview: in a frame on Arpo's own tour editor (a customer's site is another address, and reading it throws). */
+function inEditorPreview(): boolean {
+  if (window.parent === window) return false;
+  try {
+    return window.parent.location.origin === window.location.origin && /\/tour-lab\/[^/]+\/rediger/.test(window.parent.location.pathname);
+  } catch {
+    return false;
+  }
+}
+
 /**
  * A 360° map (an uploaded equirectangular photo) is shown as the drone scene:
  * the engine gets a `drone` with the photo, and every point placed on the flat
@@ -349,10 +359,10 @@ function TourExperience({
   const [zoomed, setZoomed] = useState(false);
   const [openGroup, setOpenGroup] = useState<string | null>(null);
   const [tourReadyMs, setTourReadyMs] = useState<number | null>(null);
-  /** Shown in the editor's preview (the tour in an iframe there) - false on the server, so the first render matches. */
+  /** Shown in the editor's preview - not just any frame (a customer's site shows the tour in one too). False on the server, so the first render matches. */
   const inPreview = useSyncExternalStore(
     () => () => {},
-    () => window.parent !== window,
+    inEditorPreview,
     () => false
   );
   const [tourError, setTourError] = useState<string | null>(null);
@@ -793,7 +803,8 @@ function TourExperience({
       return;
     }
     if (T.welcome) {
-      setLastRoom(readLastRoom(LAST_ROOM_KEY));
+      // Not in the editor's preview: there it's the editor's own walking about, not a visitor coming back.
+      setLastRoom(inEditorPreview() ? null : readLastRoom(LAST_ROOM_KEY));
       setWelcome(true);
       track("welcome_view");
       return;
