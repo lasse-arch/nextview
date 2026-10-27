@@ -582,6 +582,11 @@ export async function getInvoicePaymentStatus(
   return { paid, paidDate: null, rawStatus: status };
 }
 
+/** Health: can Arpo log in to Dinero right now (one token request, nothing else). */
+export async function pingDinero(): Promise<void> {
+  await getAccessToken();
+}
+
 export type DineroDraftResult = {
   contactGuid: string;
   invoiceGuid: string;

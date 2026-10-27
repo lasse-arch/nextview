@@ -229,6 +229,12 @@ const DEFAULT_POSTS: { title: string; body: string; minutesAgo: number; screensh
     body: "Kunderne kan nu logge ind og se deres egen side: deres tours med de tal, vi deler, koderne til at sætte touren ind på deres hjemmeside, linket til at give feedback, den underskrevne kontrakt som PDF, og hvordan de får fat i os. Fakturaer kan de ikke se der - dem får de tilsendt som altid.\n\nGiv adgang under \"Kundens login\" på dealens side (kun admin): skriv kundens e-mail, og tryk \"Giv adgang og send mail\". Kunden får en mail fra lasse@nextview360.dk med et login-link. Der er ingen adgangskode - næste gang skriver kunden bare sin e-mail på login-siden og får et nyt link, der virker i 15 minutter. Har kunden afdelinger, får de adgang til dem alle. Under \"Kundens login\" kan du også se, hvornår de sidst var logget ind, sende linket igen eller fjerne adgangen.\n\nKunderne kan kun se deres egne ting og kan aldrig komme ind i Arpo. Samtidig er Arpo flyttet til /arpo, så hjemmesiden, login og Arpo kan ligge på samme adresse, nextview360.dk. Gamle links og bogmærker sender selv videre.",
     screenshotUrl: "/news/kundelogin.png",
   },
+  {
+    minutesAgo: 0,
+    title: "Ny menu og en Health-side",
+    body: "Menuen er delt i afsnit - Salg, Kunder, Tours, Virksomheden og Betaling - uden noget, der skal foldes ud, og Tours har fået sit eget afsnit med Tours og Personer i scans. Indstillinger ligger nederst.\n\nUnder Virksomheden → Health (admin) kan I se, om alt kører: databasen, hjemmesiden, tourene på Cloudflare, MPSkins, den natlige backup, Gmail og kalender, Dinero, DocuSeal, Betalingsservice, Matterport og nextviewAI - grøn, gul eller rød, med hvad der er galt. Øverst står, hvor mange der kigger på jeres tours lige nu, og hvor mange der har besøgt dem det sidste døgn, 7 og 30 dage - samlet og for hver tour. Siden opdaterer sig selv hvert 30. sekund.",
+    screenshotUrl: "/news/health.png",
+  },
 ];
 
 /**

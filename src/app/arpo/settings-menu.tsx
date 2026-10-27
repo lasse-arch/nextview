@@ -8,9 +8,12 @@ import { IconGear, IconChevronDown } from "./nav-icons";
 export function SettingsMenu({
   items,
   onNavigate,
+  up = false,
 }: {
   items: { href: string; label: string }[];
   onNavigate?: () => void;
+  /** Opens upwards - for the menu at the bottom of the sidebar. */
+  up?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -39,7 +42,7 @@ export function SettingsMenu({
         <IconChevronDown className={`text-slate-400 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
-        <div className="absolute left-0 top-full z-30 mt-1.5 w-52 rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
+        <div className={`absolute left-0 z-30 w-52 rounded-lg ${up ? "bottom-full mb-1.5" : "top-full mt-1.5"} border border-slate-200 bg-white py-1 shadow-lg`}>
           {items.map((item) => (
             <Link
               key={item.href}

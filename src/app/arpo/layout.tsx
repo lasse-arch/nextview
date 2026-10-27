@@ -5,7 +5,7 @@ import { getCurrentCustomer, getCurrentUser } from "@/lib/auth";
 import { logout } from "@/lib/actions/auth";
 import { ToastProvider } from "@/components/toast";
 import { SettingsMenu } from "./settings-menu";
-import { SidebarNav, type SidebarNavItem, type SidebarNavLink } from "./sidebar-nav";
+import { SidebarNav, type SidebarNavItem } from "./sidebar-nav";
 import { MobileNav } from "./mobile-nav";
 import { PresentationModeToggle } from "./presentation-mode-toggle";
 import { isPresentationMode } from "@/lib/presentation-mode";
@@ -18,32 +18,42 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   const unreadNewsCount = await getUnreadNewsCount(user.id, user.newsReadAt ?? null);
 
-  // Company-level pages (commission, visitor stats, growth) grouped under
-  // one collapsible "Virksomheden" entry, so the day-to-day sales pages
-  // stay at the top of the sidebar.
-  const companyItems: SidebarNavLink[] = [{ href: "/arpo/commission", label: "Provision", icon: "percent" }];
-  if (user.canAccessBilling) {
-    companyItems.push({ href: "/arpo/stats", label: "Stats", icon: "stats" });
-  }
-  if (user.role === "ADMIN") {
-    companyItems.push({ href: "/arpo/vaekst", label: "Vækst", icon: "growth" });
-  }
-
+  // The menu in named parts - what a seller uses every day first, the company's own pages and money last.
+  const admin = user.role === "ADMIN";
   const navItems: SidebarNavItem[] = [
     { href: "/arpo", label: "Oversigt", icon: "home" },
-    { href: "/arpo/deals", label: "Deals", icon: "deals" },
-    { href: "/arpo/leadindbakke", label: "Leadindbakke", icon: "inbox" },
-    { href: "/arpo/leadgeneration", label: "Leadgeneration", icon: "radar" },
-    { href: "/arpo/ringeliste", label: "Ringeliste", icon: "phone" },
-    { href: "/arpo/kunder-live", label: "Live kunder", icon: "users" },
-    { href: "/arpo/kalender", label: "Kalender", icon: "calendar" },
-    { href: "/arpo/opgaver", label: "Opgaver", icon: "tasks" },
-    { label: "Virksomheden", icon: "building", children: companyItems },
-    // Everything about invoicing and getting paid, in one place.
     {
-      label: "Betaling",
-      icon: "wallet",
-      children: user.canAccessBilling
+      section: "Salg",
+      items: [
+        { href: "/arpo/deals", label: "Deals", icon: "deals" },
+        { href: "/arpo/leadindbakke", label: "Leadindbakke", icon: "inbox" },
+        { href: "/arpo/leadgeneration", label: "Leadgeneration", icon: "radar" },
+        { href: "/arpo/ringeliste", label: "Ringeliste", icon: "phone" },
+        { href: "/arpo/kalender", label: "Kalender", icon: "calendar" },
+        { href: "/arpo/opgaver", label: "Opgaver", icon: "tasks" },
+      ],
+    },
+    { section: "Kunder", items: [{ href: "/arpo/kunder-live", label: "Live kunder", icon: "users" }] },
+    {
+      section: "Tours",
+      items: admin
+        ? [
+            { href: "/arpo/tour-lab", label: "Tours", icon: "tour" },
+            { href: "/arpo/tour-lab/personer", label: "Personer i scans", icon: "scanPeople" },
+          ]
+        : [],
+    },
+    {
+      section: "Virksomheden",
+      items: [
+        { href: "/arpo/commission", label: "Provision", icon: "percent" },
+        ...(user.canAccessBilling ? [{ href: "/arpo/stats", label: "Stats", icon: "stats" as const }] : []),
+        ...(admin ? [{ href: "/arpo/vaekst", label: "Vækst", icon: "growth" as const }, { href: "/arpo/health", label: "Health", icon: "pulse" as const }] : []),
+      ],
+    },
+    {
+      section: "Betaling",
+      items: user.canAccessBilling
         ? [
             { href: "/arpo/settings/dinero", label: "Fakturaer", icon: "receipt" },
             { href: "/arpo/settings/betaling", label: "Betalingsstatus", icon: "checkCircle" },
@@ -74,18 +84,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <ToastProvider>
       <div className="flex min-h-screen" data-presentation={presenting ? "true" : "false"}>
-        <aside className="hidden w-60 shrink-0 flex-col border-r border-slate-200 bg-slate-50 p-3 md:flex">
-          <Link href="/arpo" className="flex items-center px-2.5 pb-6 pt-3">
+        <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col overflow-y-auto border-r border-slate-200 bg-slate-50 p-3 md:flex">
+          <Link href="/arpo" className="flex items-center px-2.5 pb-3 pt-3">
             <Image src="/logo.png" alt="Nextview360" width={942} height={219} className="h-6 w-auto" priority />
           </Link>
 
           <SidebarNav items={navItems} />
 
-          <div className="my-2.5 mx-1.5 h-px bg-slate-200" />
-
-          <SettingsMenu items={settingsItems} />
-
           <div className="flex-1" />
+
+          <SettingsMenu items={settingsItems} up />
 
           <div className="flex items-center gap-2.5 border-t border-slate-200 px-2.5 pt-3">
             {user.avatarUrl ? (

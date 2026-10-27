@@ -21,6 +21,9 @@ import {
   IconReceipt,
   IconCheckCircle,
   IconBank,
+  IconTour,
+  IconScanPeople,
+  IconPulse,
 } from "./nav-icons";
 
 /**
@@ -47,6 +50,9 @@ const NAV_ICONS = {
   receipt: IconReceipt,
   checkCircle: IconCheckCircle,
   bank: IconBank,
+  tour: IconTour,
+  scanPeople: IconScanPeople,
+  pulse: IconPulse,
 } as const;
 
 export type NavIconName = keyof typeof NAV_ICONS;
@@ -71,21 +77,29 @@ export type SidebarNavGroup = {
   children: SidebarNavLink[];
 };
 
-export type SidebarNavItem = SidebarNavLink | SidebarNavGroup;
+/** A named part of the menu (Salg, Kunder, Tours …) - always open, its links listed under a small heading. */
+export type SidebarNavSection = {
+  section: string;
+  items: SidebarNavLink[];
+};
+
+export type SidebarNavItem = SidebarNavLink | SidebarNavGroup | SidebarNavSection;
 
 function isActive(pathname: string, href: string): boolean {
   if (href === "/arpo") return pathname === "/arpo";
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-function NavLink({ item, onNavigate, nested }: { item: SidebarNavLink; onNavigate?: () => void; nested?: boolean }) {
+/** The menu's own links, so only the most precise one lights up (Tours → Personer i scans is not also "Tours"). */
+const allHrefs = (items: SidebarNavItem[]) => items.flatMap((i) => ("section" in i ? i.items.map((x) => x.href) : "children" in i ? i.children.map((x) => x.href) : [i.href]));
+function NavLink({ item, onNavigate, nested, hrefs = [] }: { item: SidebarNavLink; onNavigate?: () => void; nested?: boolean; hrefs?: string[] }) {
   const pathname = usePathname();
-  const active = isActive(pathname, item.href);
+  const active = isActive(pathname, item.href) && !hrefs.some((h) => h.length > item.href.length && h.startsWith(item.href) && isActive(pathname, h));
   return (
     <Link
       href={item.href}
       onClick={onNavigate}
-      className={`flex items-center gap-2.5 rounded-lg py-2 text-[13.5px] transition-colors ${nested ? "pl-5 pr-2.5" : "px-2.5"} ${
+      className={`flex items-center gap-2.5 rounded-lg py-1.5 text-[13.5px] transition-colors ${nested ? "pl-5 pr-2.5" : "px-2.5"} ${
         active ? "bg-blue-50 font-semibold text-blue-600" : "font-medium text-slate-700 hover:bg-slate-100"
       }`}
     >
@@ -134,13 +148,23 @@ function NavGroup({ group, onNavigate }: { group: SidebarNavGroup; onNavigate?: 
 }
 
 export function SidebarNav({ items, onNavigate }: { items: SidebarNavItem[]; onNavigate?: () => void }) {
+  const hrefs = allHrefs(items);
   return (
     <div className="flex flex-col gap-0.5">
       {items.map((item) =>
-        "children" in item ? (
+        "section" in item ? (
+          item.items.length > 0 && (
+            <div key={item.section} className="mt-3 flex flex-col gap-0.5">
+              <p className="px-2.5 pb-1 text-[11px] font-semibold uppercase tracking-[.08em] text-slate-400">{item.section}</p>
+              {item.items.map((link) => (
+                <NavLink key={link.href} item={link} onNavigate={onNavigate} hrefs={hrefs} />
+              ))}
+            </div>
+          )
+        ) : "children" in item ? (
           item.children.length > 0 && <NavGroup key={item.label} group={item} onNavigate={onNavigate} />
         ) : (
-          <NavLink key={item.href} item={item} onNavigate={onNavigate} />
+          <NavLink key={item.href} item={item} onNavigate={onNavigate} hrefs={hrefs} />
         )
       )}
     </div>

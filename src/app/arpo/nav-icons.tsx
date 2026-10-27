@@ -188,3 +188,31 @@ export function IconBank({ className }: { className?: string }) {
     </svg>
   );
 }
+
+export function IconTour({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="9" />
+      <ellipse cx="12" cy="12" rx="9" ry="3.6" />
+      <path d="M12 3c2.2 2.4 3.3 5.4 3.3 9s-1.1 6.6-3.3 9" />
+    </svg>
+  );
+}
+
+export function IconScanPeople({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3" />
+      <circle cx="12" cy="10" r="2.4" />
+      <path d="M8 17c.6-2 2.1-3.2 4-3.2s3.4 1.2 4 3.2" />
+    </svg>
+  );
+}
+
+export function IconPulse({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 12h4l2.5-6 4 12 2.5-6H21" />
+    </svg>
+  );
+}

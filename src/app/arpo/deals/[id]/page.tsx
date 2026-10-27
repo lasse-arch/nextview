@@ -173,7 +173,8 @@ export default async function DealDetailPage({
 
   return (
     <div>
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+      {/* The name gets the whole width; the actions sit in one bar under it - the day's steps on the left, the rarer ones on the right. */}
+      <div className="space-y-4">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="break-words text-2xl font-semibold text-slate-900">{dealName(deal)}</h1>
@@ -183,13 +184,17 @@ export default async function DealDetailPage({
               </span>
             )}
           </div>
-          <p className="text-sm text-slate-500">
-            {deal.displayName && <span className="text-slate-400">CVR-navn: {deal.companyName} · </span>}
-            Oprettet {formatDate(deal.createdAt)} · Import: {importTypeLabels[deal.importType]}
-            {deal.importBatch?.fileName ? ` (${deal.importBatch.fileName})` : ""}
+          <p className="mt-1 text-sm text-slate-500">
+            {deal.displayName && <span>CVR-navn: {deal.companyName} · </span>}
+            Oprettet {formatDate(deal.createdAt)}
+            <span className="text-slate-400" title={deal.importBatch?.fileName ?? undefined}>
+              {" "}
+              · {importTypeLabels[deal.importType]}
+            </span>
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2 lg:shrink-0">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-y border-slate-200 py-3">
+          <div className="flex flex-wrap items-center gap-2">
           <BookMeetingButton
             dealId={deal.id}
             currentMeetingDateIso={deal.meetingDate ? deal.meetingDate.toISOString() : null}
@@ -207,6 +212,8 @@ export default async function DealDetailPage({
           {["CONTRACT_SIGNED", "FILMED", "LIVE"].includes(deal.stage) || deal.filmingAt ? (
             <FilmingTimeButton dealId={deal.id} minutes={deal.filmingActualMinutes} plannedMinutes={deal.filmingDurationMinutes} />
           ) : null}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
           <InactiveToggleButton dealId={deal.id} isChurned={Boolean(deal.churnedAt)} />
           <DealDangerActions
             dealName={dealName(deal)}
@@ -215,6 +222,7 @@ export default async function DealDetailPage({
             canDelete={currentUser?.role === "ADMIN" || currentUser?.id === deal.ownerId}
             signed={hasSigned(deal)}
           />
+          </div>
         </div>
       </div>
 

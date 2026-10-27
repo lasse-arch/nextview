@@ -1,0 +1,129 @@
+import "server-only";
+import { prisma } from "@/lib/db";
+import { backups } from "@/lib/backup";
+import { isDineroConfigured, pingDinero } from "@/lib/dinero";
+import { isDocuSealConfigured } from "@/lib/docuseal";
+import { getSettingValue, isDineroTestMode } from "@/lib/integration-settings";
+import { getValidAccessToken } from "@/lib/google-calendar";
+import { WELCOME_MAIL_SENDER } from "@/lib/welcome-mail";
+import { cloudflareReady, PAGES_PROJECT } from "@/lib/tour-publish";
+
+/*
+ * Health (Arpo → Virksomheden → Health): is everything Arpo depends on
+ * working right now - a short, read-only check of each, with a time limit,
+ * so one slow system can't hold the page up. Never shows a key or a
+ * password, only whether it works.
+ */
+
+export type Status = "ok" | "warn" | "down" | "off";
+export type Check = { name: string; status: Status; detail: string; ms?: number };
+export type CheckGroup = { title: string; checks: Check[] };
+
+const LIMIT_MS = 6000;
+
+async function timed(name: string, run: () => Promise<Omit<Check, "name" | "ms">>): Promise<Check> {
+  const started = Date.now();
+  try {
+    const r = await Promise.race([run(), new Promise<never>((_, no) => setTimeout(() => no(new Error("svarede ikke inden for 6 sek.")), LIMIT_MS))]);
+    return { name, ms: Date.now() - started, ...r };
+  } catch (err) {
+    // Only the error's own short text - never anything that could hold a key.
+    return { name, status: "down", detail: (err instanceof Error ? err.message : String(err)).slice(0, 160), ms: Date.now() - started };
+  }
+}
+
+async function reach(url: string): Promise<Omit<Check, "name" | "ms">> {
+  const res = await fetch(url, { method: "GET", redirect: "manual", cache: "no-store", signal: AbortSignal.timeout(LIMIT_MS) });
+  return res.status < 400 ? { status: "ok", detail: `Svarer (${res.status})` } : { status: "down", detail: `Svarer med fejl ${res.status}` };
+}
+
+const ago = (d: Date) => {
+  const h = (Date.now() - d.getTime()) / 3600_000;
+  return h < 1 ? `${Math.max(1, Math.round(h * 60))} min. siden` : h < 48 ? `${Math.round(h)} timer siden` : `${Math.round(h / 24)} dage siden`;
+};
+
+export async function healthChecks(): Promise<CheckGroup[]> {
+  const site = (process.env.APP_BASE_URL || "https://nextview360.dk").replace(/\/+$/, "");
+  const [db, web, tours, explore, gmail, dinero, docuseal, bs, backup, matterport, ai, gemini] = await Promise.all([
+    timed("Database", async () => {
+      const t = Date.now();
+      await prisma.$queryRawUnsafe("SELECT 1");
+      const ms = Date.now() - t;
+      return { status: ms < 100 ? "ok" : "warn", detail: `Svarer på ${ms} ms${process.env.VERCEL_REGION ? ` fra ${process.env.VERCEL_REGION}` : ""}` };
+    }),
+    timed("Hjemmesiden (nextview360.dk)", () => reach(`${site}/`)),
+    timed("Tours på Cloudflare", async () => {
+      if (!cloudflareReady()) return { status: "off", detail: "Ikke sat op endnu" };
+      const live = await prisma.tour.count({ where: { liveVersion: { not: null } } });
+      const r = await reach(`https://${PAGES_PROJECT}.pages.dev/`);
+      return r.status === "ok" ? { status: "ok", detail: `${live} tours udgivet` } : r;
+    }),
+    timed("explore.nextview360.dk (MPSkins)", () => reach("https://explore.nextview360.dk/")),
+    timed(`Gmail og kalender (${WELCOME_MAIL_SENDER})`, async () => {
+      const account = await prisma.emailAccount.findFirst({ where: { provider: "GOOGLE", email: WELCOME_MAIL_SENDER } });
+      if (!account) return { status: "down", detail: "Ikke forbundet - mails til kunder kan ikke sendes" };
+      await getValidAccessToken(account);
+      return { status: "ok", detail: "Forbundet" };
+    }),
+    timed("Dinero (fakturaer)", async () => {
+      if (!(await isDineroConfigured())) return { status: "off", detail: "Slået fra" };
+      await pingDinero();
+      return (await isDineroTestMode()) ? { status: "warn", detail: "Forbundet - men i testtilstand" } : { status: "ok", detail: "Forbundet" };
+    }),
+    timed("DocuSeal (kontrakter)", async () => ((await isDocuSealConfigured()) ? { status: "ok", detail: "Sat op" } : { status: "off", detail: "Slået fra" })),
+    timed("Betalingsservice", async () => {
+      const last = await prisma.bsDelivery.findFirst({ orderBy: { createdAt: "desc" }, select: { createdAt: true, sftpError: true } });
+      if (!last) return { status: "ok", detail: "Ingen leverancer endnu" };
+      return last.sftpError ? { status: "down", detail: `Seneste levering fejlede: ${last.sftpError.slice(0, 100)}` } : { status: "ok", detail: `Seneste levering ${ago(last.createdAt)}` };
+    }),
+    timed("Natlig backup", async () => {
+      const [newest] = await backups();
+      if (!newest) return { status: "down", detail: "Ingen backup fundet" };
+      const hours = (Date.now() - newest.uploadedAt.getTime()) / 3600_000;
+      return { status: hours < 30 ? "ok" : "down", detail: `Seneste ${ago(newest.uploadedAt)} (${Math.round(newest.size / 1024 / 1024)} MB)` };
+    }),
+    timed("Matterport", async () => ((await getSettingValue("MATTERPORT_SDK_KEY")) ? { status: "ok", detail: "SDK-nøgle sat" } : { status: "warn", detail: "Ingen SDK-nøgle - tourene bruger Matterports almindelige visning" })),
+    timed("nextviewAI", async () => ((process.env.ANTHROPIC_API_KEY || (await getSettingValue("ANTHROPIC_API_KEY"))) ? { status: "ok", detail: "Nøgle sat" } : { status: "off", detail: "Ingen nøgle" })),
+    timed("AI-billeder (Gemini)", async () => ((await getSettingValue("GEMINI_API_KEY")) ? { status: "ok", detail: "Nøgle sat" } : { status: "off", detail: "Ingen nøgle" })),
+  ]);
+  return [
+    { title: "Drift", checks: [db, web, tours, explore, backup] },
+    { title: "Integrationer", checks: [gmail, dinero, docuseal, bs, matterport, ai, gemini] },
+  ];
+}
+
+export type TourVisits = { slug: string; name: string; now: number; day: number; week: number; month: number };
+
+/** Visitors on the tours that are out there: right now (last 5 min.), the last day, 7 and 30 days - one visit = one browser tab. */
+export async function tourVisits(): Promise<{ total: Omit<TourVisits, "slug" | "name">; tours: TourVisits[] }> {
+  const tours = await prisma.tour.findMany({ where: { published: true }, select: { slug: true, name: true }, orderBy: { name: "asc" } });
+  const slugs = tours.map((t) => t.slug);
+  if (!slugs.length) return { total: { now: 0, day: 0, week: 0, month: 0 }, tours: [] };
+  const since = (ms: number) => new Date(Date.now() - ms);
+  const rows = await prisma.$queryRaw<{ slug: string; now: bigint; day: bigint; week: bigint; month: bigint }[]>`
+    SELECT "tourSlug" AS slug,
+      count(DISTINCT session) FILTER (WHERE "createdAt" > ${since(5 * 60_000)}) AS now,
+      count(DISTINCT session) FILTER (WHERE "createdAt" > ${since(86400_000)}) AS day,
+      count(DISTINCT session) FILTER (WHERE "createdAt" > ${since(7 * 86400_000)}) AS week,
+      count(DISTINCT session) AS month
+    FROM "TourEvent"
+    WHERE "createdAt" > ${since(30 * 86400_000)} AND "tourSlug" = ANY(${slugs})
+    GROUP BY "tourSlug"`;
+  const [all] = await prisma.$queryRaw<{ now: bigint; day: bigint; week: bigint; month: bigint }[]>`
+    SELECT count(DISTINCT session) FILTER (WHERE "createdAt" > ${since(5 * 60_000)}) AS now,
+      count(DISTINCT session) FILTER (WHERE "createdAt" > ${since(86400_000)}) AS day,
+      count(DISTINCT session) FILTER (WHERE "createdAt" > ${since(7 * 86400_000)}) AS week,
+      count(DISTINCT session) AS month
+    FROM "TourEvent" WHERE "createdAt" > ${since(30 * 86400_000)} AND "tourSlug" = ANY(${slugs})`;
+  const by = new Map(rows.map((r) => [r.slug, r]));
+  const n = (v: bigint | undefined) => Number(v ?? 0);
+  return {
+    total: { now: n(all?.now), day: n(all?.day), week: n(all?.week), month: n(all?.month) },
+    tours: tours
+      .map((t) => {
+        const r = by.get(t.slug);
+        return { slug: t.slug, name: t.name, now: n(r?.now), day: n(r?.day), week: n(r?.week), month: n(r?.month) };
+      })
+      .sort((a, b) => b.now - a.now || b.day - a.day || b.month - a.month),
+  };
+}
