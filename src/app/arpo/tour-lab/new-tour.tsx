@@ -6,6 +6,8 @@ import {
   connectMatterport,
   createTourFromWebsite,
   matterportConnected,
+  planTourFromWebsite,
+  type TourPlanResult,
   matterportModels,
   searchMatterportSpaces,
   searchTourCustomers,
@@ -20,12 +22,13 @@ import { BRANCHES, DESIGN_PRESETS, FOCUS, type Branch, type DesignPreset } from 
 /*
  * "Ny tour", step by step: who it's for (a customer, a test, or nobody yet)
  * → the Matterport space → the branch → a design (recommended for the
- * branch) → the website and what the tour should focus on → Claude builds it.
+ * branch) → the website and what the tour should focus on → nextviewAI tells
+ * its plan (what it builds and why), the user corrects it → it builds it.
  */
 
 type Who = { kind: "deal"; deal: TourCustomer } | { kind: "test" } | { kind: "none" };
 type Space = { id: string; name: string };
-const STEPS = ["Kunde", "Matterport", "Branche", "Design", "Indhold"] as const;
+const STEPS = ["Kunde", "Matterport", "Branche", "Design", "Indhold", "Plan"] as const;
 const DEMO_COLORS = { main: "#1d2a30", accent: "#e0533d", accentDark: "#b8402e", soft: "#f4efe8" };
 const thumb = (id: string) => `https://my.matterport.com/api/v1/player/models/${id}/thumb`;
 
@@ -46,6 +49,9 @@ export function NewTour({ tours }: { tours: { slug: string; name: string }[] }) 
   /** A drone photo the tour starts on - nextviewAI places the points on it. Made smaller in the browser first. */
   const [drone, setDrone] = useState<string | null>(null);
   const [copyOf, setCopyOf] = useState<string | null>(null);
+  /** nextviewAI's plan, before it builds - and the user's corrections to it. */
+  const [plan, setPlan] = useState<TourPlanResult | null>(null);
+  const [corrections, setCorrections] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
@@ -61,7 +67,37 @@ export function NewTour({ tours }: { tours: { slug: string; name: string }[] }) 
     setNotes("");
     setDrone(null);
     setCopyOf(null);
+    setPlan(null);
+    setCorrections("");
     setError(null);
+  }
+
+  const aiInput = () => ({
+    name: who?.kind === "test" ? `Test – ${name}` : name,
+    website,
+    modelId: space?.id,
+    dealId: who?.kind === "deal" ? who.deal.id : undefined,
+    preset: preset ?? undefined,
+    branch: branch ?? undefined,
+    about,
+    focus,
+    notes,
+    droneImage: drone ?? undefined,
+  });
+
+  /** Asks for the plan (again, with the corrections, when there is one). */
+  function makePlan() {
+    setError(null);
+    start(async () => {
+      const r = await planTourFromWebsite(aiInput(), plan ?? undefined, plan ? corrections : undefined).catch((err: unknown) => ({
+        ok: false as const,
+        error: `Noget gik galt (${err instanceof Error ? err.message : err}) - prøv igen.`,
+      }));
+      if (!r.ok) return setError(r.error);
+      setPlan(r.plan);
+      setCorrections("");
+      setStep(5);
+    });
   }
 
   function build() {
@@ -69,18 +105,7 @@ export function NewTour({ tours }: { tours: { slug: string; name: string }[] }) 
     start(async () => {
       const r = copyOf
         ? await createTour(name, copyOf)
-        : await createTourFromWebsite({
-            name: who?.kind === "test" ? `Test – ${name}` : name,
-            website,
-            modelId: space?.id,
-            dealId: who?.kind === "deal" ? who.deal.id : undefined,
-            preset: preset ?? undefined,
-            branch: branch ?? undefined,
-            about,
-            focus,
-            notes,
-            droneImage: drone ?? undefined,
-          }).catch((err: unknown) => ({ ok: false as const, error: `Noget gik galt (${err instanceof Error ? err.message : err}) - prøv igen.` }));
+        : await createTourFromWebsite({ ...aiInput(), plan: plan ?? undefined }).catch((err: unknown) => ({ ok: false as const, error: `Noget gik galt (${err instanceof Error ? err.message : err}) - prøv igen.` }));
       if (!r.ok) return setError(r.error);
       if ("reply" in r)
         try {
@@ -90,7 +115,7 @@ export function NewTour({ tours }: { tours: { slug: string; name: string }[] }) 
     });
   }
 
-  const canNext = [Boolean(who), Boolean(space), Boolean(branch) || Boolean(about.trim()), Boolean(preset), Boolean(name.trim())][step];
+  const canNext = [Boolean(who), Boolean(space), Boolean(branch) || Boolean(about.trim()), Boolean(preset), Boolean(name.trim()), Boolean(plan)][step];
 
   return (
     <>
@@ -205,7 +230,7 @@ export function NewTour({ tours }: { tours: { slug: string; name: string }[] }) 
                   <p className="text-[13px] text-[#6e6e73]">De anbefalede passer til branchen. Alt kan ændres bagefter i editoren - også et helt eget design via nextviewAI.</p>
                   <DesignGallery colors={DEMO_COLORS} selected={preset} branch={branch} onPick={(p) => setPreset(p.id)} />
                 </div>
-              ) : (
+              ) : step === 4 ? (
                 <div className="space-y-3">
                   <h2 className="text-[19px] font-semibold tracking-tight">Hvad skal nextviewAI bygge?</h2>
                   <div className="space-y-3 rounded-2xl bg-white p-4 ring-1 ring-black/[.04]">
@@ -250,8 +275,10 @@ export function NewTour({ tours }: { tours: { slug: string; name: string }[] }) 
                       <textarea className={`${input} min-h-[70px] resize-y`} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Fx målgruppen er forældre; brug skolens grønne farve og runde former." />
                     </Field>
                   </div>
-                  {pending && <p className="px-1 text-center text-[13px] text-[#6e6e73]">nextviewAI læser hjemmesiden og bygger touren - det tager typisk et minut…</p>}
+                  {pending && <p className="px-1 text-center text-[13px] text-[#6e6e73]">nextviewAI læser hjemmesiden og lægger en plan - det tager typisk et halvt minut…</p>}
                 </div>
+              ) : (
+                <PlanStep plan={plan} corrections={corrections} setCorrections={setCorrections} pending={pending} onReplan={makePlan} />
               )}
               {error && <p className="mt-3 px-1 text-[13px] text-[#ff3b30]">{error}</p>}
             </div>
@@ -274,9 +301,13 @@ export function NewTour({ tours }: { tours: { slug: string; name: string }[] }) 
                 <button type="button" disabled={!canNext} onClick={() => setStep(step + 1)} className="rounded-xl bg-[#0071e3] px-5 py-2.5 text-[15px] font-medium text-white disabled:opacity-40">
                   Næste
                 </button>
+              ) : step === 4 ? (
+                <button type="button" disabled={pending || !name.trim()} onClick={plan ? () => setStep(5) : makePlan} className="rounded-xl bg-[#0071e3] px-5 py-2.5 text-[15px] font-medium text-white disabled:opacity-40">
+                  {pending ? "Lægger en plan…" : plan ? "Til planen" : "Se nextviewAIs plan"}
+                </button>
               ) : (
                 <button type="button" disabled={pending || !name.trim()} onClick={build} className="rounded-xl bg-[#0071e3] px-5 py-2.5 text-[15px] font-medium text-white disabled:opacity-40">
-                  {pending ? "Bygger…" : "Byg touren med nextviewAI"}
+                  {pending ? "Bygger…" : "Byg touren efter planen"}
                 </button>
               )}
             </div>
@@ -284,6 +315,68 @@ export function NewTour({ tours }: { tours: { slug: string; name: string }[] }) 
         </div>
       )}
     </>
+  );
+}
+
+/** nextviewAI's plan in its own words - read it, write what should be different, and get a new one (or build). */
+function PlanStep({
+  plan,
+  corrections,
+  setCorrections,
+  pending,
+  onReplan,
+}: {
+  plan: TourPlanResult | null;
+  corrections: string;
+  setCorrections: (s: string) => void;
+  pending: boolean;
+  onReplan: () => void;
+}) {
+  if (!plan) return null;
+  return (
+    <div className="space-y-3">
+      <h2 className="text-[19px] font-semibold tracking-tight">Sådan vil nextviewAI bygge touren</h2>
+      <p className="rounded-2xl bg-white p-4 text-[15px] leading-relaxed ring-1 ring-black/[.04]">{plan.intro}</p>
+      {plan.sections.map((s) => (
+        <section key={s.title} className="rounded-2xl bg-white p-4 ring-1 ring-black/[.04]">
+          <h3 className="text-[13px] font-semibold uppercase tracking-wide text-[#6e6e73]">{s.title}</h3>
+          <p className="mt-1 text-[14px] leading-relaxed">{s.text}</p>
+          {s.items.length > 0 && (
+            <ul className="mt-2 space-y-1">
+              {s.items.map((i) => (
+                <li key={i} className="flex gap-2 text-[14px]">
+                  <span className="mt-[7px] h-1.5 w-1.5 flex-none rounded-full bg-[#0071e3]" />
+                  {i}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      ))}
+      {plan.questions.length > 0 && (
+        <section className="rounded-2xl bg-[#fff8e6] p-4 ring-1 ring-[#f5d27a]/60">
+          <h3 className="text-[13px] font-semibold uppercase tracking-wide text-[#8a6100]">nextviewAI spørger</h3>
+          <ul className="mt-1 list-disc space-y-1 pl-5 text-[14px]">
+            {plan.questions.map((q) => (
+              <li key={q}>{q}</li>
+            ))}
+          </ul>
+        </section>
+      )}
+      <div className="space-y-2 rounded-2xl bg-white p-4 ring-1 ring-black/[.04]">
+        <Field title="Rettelser til planen" hint="Skriv det, der skal være anderledes - eller svar på spørgsmålene. Så laver nextviewAI planen om. Er den god, så tryk Byg touren efter planen.">
+          <textarea
+            className={`${input} min-h-[80px] resize-y`}
+            value={corrections}
+            onChange={(e) => setCorrections(e.target.value)}
+            placeholder="Fx Drop historierne, og læg Priser som eget menupunkt øverst."
+          />
+        </Field>
+        <button type="button" disabled={pending || !corrections.trim()} onClick={onReplan} className="w-full rounded-xl bg-[#f2f2f7] py-2.5 text-[14px] font-medium text-[#0071e3] disabled:opacity-40">
+          {pending ? "nextviewAI retter planen…" : "Lav planen om"}
+        </button>
+      </div>
+    </div>
   );
 }
 

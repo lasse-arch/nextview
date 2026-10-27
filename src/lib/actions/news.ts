@@ -63,6 +63,12 @@ export async function getUnreadNewsCount(userId: string, newsReadAt: Date | null
 const DEFAULT_POSTS: { title: string; body: string; minutesAgo: number; screenshotUrl: string }[] = [
   {
     minutesAgo: 0,
+    title: "Ny tour med nextviewAI: se planen, før den bygger",
+    body: "Når I laver en ny tour med nextviewAI, bygger den ikke længere med det samme. Først fortæller den, hvad den vil bygge og hvorfor: hvem touren er til, hvordan den starter, menupunkterne i rækkefølge, hvilke historier og stedkort den bruger (og fravælger), hvordan touren sælger, og hvad I selv skal gøre bagefter. Er der noget, den er i tvivl om, spørger den.\n\nSkriv rettelser under planen og tryk \"Lav planen om\" - så retter den planen og beholder resten. Når planen er god, trykker I \"Byg touren efter planen\", og den bygger præcis det, I har godkendt.",
+    screenshotUrl: "/news/ai-plan.png",
+  },
+  {
+    minutesAgo: 0,
     title: "Vejret på luftfotoet - lige nu og måned for måned",
     body: "En tour med luftfoto kan nu vise vejret, hvor stedet ligger: en lille knap nederst med graderne lige nu. Trykker man på den, ser man vejret i dag (sol/regn, vind, solopgang og solnedgang) - og kan vælge en måned og se, hvordan den typisk er: temperatur, varmeste dag, soltimer, regn og vind. Godt for fx campingpladser og hoteller, hvor gæsterne planlægger, hvornår de skal komme.\n\nTallene kommer fra DMI (vejret nu, og gennemsnittet af de sidste 10 år for måneden). Slås til i tour-editoren under Luftfoto og kort → Vejret, hvor man skriver byen.",
     screenshotUrl: "/news/vejret.png",

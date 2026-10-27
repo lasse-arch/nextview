@@ -324,13 +324,27 @@ export async function askClaudeForTour(config: TourConfig, history: ChatTurn[], 
   }
 }
 
-/**
- * A new tour built by Claude from the customer's website and the existing
- * Matterport space: the website gives the look, the words and the actions
- * (the red thread), the Matterport model the scan points - on top of an existing
- * tour's features (its kind of menu, start and functions).
- */
-export async function createTourFromWebsite(input: {
+const TourPlan = z.object({
+  intro: z.string().describe("2-4 sætninger i jeg-form: hvad du vil bygge, til hvem, og hvad touren skal få folk til"),
+  sections: z
+    .array(
+      z.object({
+        title: z.string().describe("Fx Start og velkomst, Menuen, Historier og stedkort, Sådan sælger touren, Design, Det skal du selv gøre"),
+        text: z.string().describe("Hvad du vælger og hvorfor, i jeg-form, 1-3 sætninger"),
+        items: z.array(z.string()).describe("Konkrete punkter, fx menupunkterne i rækkefølge med grupper som 'Gruppe: punkt, punkt'. Tom, hvis der ikke er noget at liste."),
+      })
+    )
+    .describe("4-7 afsnit"),
+  questions: z.array(z.string()).describe("Højst 3 korte spørgsmål til brugeren, hvis noget er uklart - ellers tom"),
+});
+export type TourPlanResult = z.infer<typeof TourPlan>;
+
+/** A plan as plain text - what the build is told to follow. */
+function planText(p: TourPlanResult): string {
+  return [p.intro, ...p.sections.map((s) => `${s.title}: ${s.text}${s.items.length ? `\n${s.items.map((i) => `- ${i}`).join("\n")}` : ""}`)].join("\n\n");
+}
+
+type NewTourInput = {
   name: string;
   website: string;
   /** The Matterport model the tour is connected to. */
@@ -348,7 +362,97 @@ export async function createTourFromWebsite(input: {
   notes: string;
   /** A drone photo to start on (a JPEG/PNG/WebP data URL) - nextviewAI places the points on it. */
   droneImage?: string;
-}): Promise<{ ok: true; slug: string; reply: string } | { ok: false; error: string }> {
+};
+
+/**
+ * Before building: nextviewAI tells what it will build and why (the menu,
+ * the stories, how the tour sells, the design) - the user corrects it, and
+ * it plans again, until the build can follow it. `previous` + `corrections`
+ * = a new round on the plan.
+ */
+export async function planTourFromWebsite(
+  input: NewTourInput,
+  previous?: TourPlanResult,
+  corrections?: string
+): Promise<{ ok: true; plan: TourPlanResult } | { ok: false; error: string }> {
+  const user = await admin();
+  const key = await apiKey();
+  if (!key) return { ok: false, error: "nextviewAI er ikke sat op endnu - indsæt en nøgle i en tours editor (fanen nextviewAI)." };
+  const model = input.modelId ? await fetchModelInfo(input.modelId) : null;
+  const preset = DESIGN_PRESETS.find((p) => p.id === input.preset);
+  const branch = BRANCHES.find(([b]) => b === input.branch)?.[1];
+  const research = input.website.trim()
+    ? await siteResearch(input.website).catch((err: unknown) => ({ text: `(Hjemmesiden kunne ikke hentes: ${err instanceof Error ? err.message : err})`, pdfs: [] as string[] }))
+    : { text: "(Ingen hjemmeside angivet)", pdfs: [] as string[] };
+  let drone: string[] = [];
+  if (input.droneImage) {
+    const m = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/.exec(input.droneImage);
+    if (m && m[2].length <= 12_000_000) {
+      const small = await sharp(Buffer.from(m[2], "base64")).resize({ width: 1568, height: 1568, fit: "inside" }).jpeg({ quality: 80 }).toBuffer().catch(() => null);
+      if (small) drone = [`data:image/jpeg;base64,${small.toString("base64")}`];
+    }
+  }
+  const mem = await memories("");
+  const request = `Brugeren vil have en ny tour til en kunde. Du skal IKKE bygge den endnu - fortæl først, hvad du vil bygge, så brugeren kan rette dig.
+
+Skriv planen i jeg-form til brugeren ("Jeg vil bygge …, jeg vælger … fordi …"), konkret for netop denne kunde, efter drejebogen:
+- Hvem touren er til, og hvad den skal få dem til (hovedhandlingen).
+- Start og velkomst: hvilken start (forside, velkomst med fliser, helt enkel, luftfoto) og hvorfor.
+- Menuen: menutypen og de konkrete menupunkter i rækkefølge (med grupper), og hvorfor.
+- Historier, stedkort, "Vis mig rundt", "Sådan ser en dag ud" osv.: hvilke du bruger hvor - og hvilke du fravælger og hvorfor.
+- Sådan sælger touren: knapper, "Din plads venter", hvor booking/kontakt dukker op.
+- Design: farver, skrift og logo fra hjemmesiden.
+- Det skal brugeren selv gøre bagefter (fx vælge rummene i forhåndsvisningen, tage fotos).
+Brug kun fakta fra hjemmesiden, undersiderne og PDF'erne. Opfind intet. Skriv som et menneske, på dansk.
+${branch ? `\nBranche: ${branch}.` : ""}${input.about?.trim() ? `\nOm kunden og målgruppen (brugerens egne ord - følg dem): ${input.about.trim()}` : ""}${preset ? `\nDesign valgt af brugeren: "${preset.name}" (${preset.what}).` : ""}${input.focus?.trim() ? `\nTouren skal især få besøgende til: ${input.focus.trim()}.` : ""}${input.notes.trim() ? `\nBemærkninger fra brugeren: ${input.notes.trim()}` : ""}${drone.length ? "\nBrugeren har givet et dronebillede (vedhæftet), som touren skal starte på - sig, hvilke steder du vil sætte punkter på." : ""}
+${model ? `\nMatterport-modellen: "${model.name}"${model.address ? `, ${model.address}` : ""}.` : ""}${
+    previous
+      ? `\n\n<din forrige plan>\n${planText(previous)}\n</din forrige plan>\n\nBrugerens rettelser (følg dem, og ret planen - behold resten):\n${(corrections ?? "").trim() || "(ingen - lav den bare bedre)"}`
+      : ""
+  }
+
+<hjemmeside>
+${research.text}
+</hjemmeside>`;
+  let r;
+  try {
+    r = await new Anthropic({ apiKey: key }).messages.parse({
+      model: "claude-opus-5-5",
+      max_tokens: 8000,
+      system: [
+        { type: "text", text: await systemPrompt(), cache_control: { type: "ephemeral" } },
+        { type: "text", text: `<hukommelse>\nDet, Nextview360 har lært dig (gælder alle tours):\n${mem.all || "(intet endnu)"}\n</hukommelse>` },
+      ],
+      messages: [
+        {
+          role: "user",
+          content: [...research.pdfs.map((url): Anthropic.DocumentBlockParam => ({ type: "document", source: { type: "url", url } })), ...imageBlocks(drone), { type: "text", text: request }],
+        },
+      ],
+      output_config: { effort: "low", format: zodOutputFormat(TourPlan) },
+    });
+  } catch (err) {
+    if (err instanceof Anthropic.AuthenticationError) return { ok: false, error: "nextviewAI-nøglen virker ikke længere." };
+    if (err instanceof Anthropic.RateLimitError) return { ok: false, error: "nextviewAI har travlt - prøv igen om lidt." };
+    console.error("planTourFromWebsite", err);
+    return { ok: false, error: "Kunne ikke få fat i nextviewAI - prøv igen." };
+  }
+  const u = r.usage;
+  await prisma.tourAiUsage
+    .create({ data: { tourSlug: slugify(input.name) || "ny-tour", userName: user.name, kind: "plan", inputTokens: u.input_tokens, outputTokens: u.output_tokens, cacheReadTokens: u.cache_read_input_tokens ?? 0, cacheWriteTokens: u.cache_creation_input_tokens ?? 0, costUsd: claudeCostUsd(u) } })
+    .catch(() => {});
+  if (r.stop_reason === "refusal") return { ok: false, error: "nextviewAI ville ikke lave den plan." };
+  if (!r.parsed_output) return { ok: false, error: "nextviewAI svarede ikke som forventet - prøv igen." };
+  return { ok: true, plan: r.parsed_output };
+}
+
+/**
+ * A new tour built by Claude from the customer's website and the existing
+ * Matterport space: the website gives the look, the words and the actions
+ * (the red thread), the Matterport model the scan points - on top of an existing
+ * tour's features (its kind of menu, start and functions).
+ */
+export async function createTourFromWebsite(input: NewTourInput & { plan?: TourPlanResult}): Promise<{ ok: true; slug: string; reply: string } | { ok: false; error: string }> {
   const user = await admin();
   const key = await apiKey();
   if (!key) return { ok: false, error: "nextviewAI er ikke sat op endnu - indsæt en nøgle i en tours editor (fanen nextviewAI)." };
@@ -407,7 +511,7 @@ Udfyld ud fra kundens hjemmeside nedenfor, efter drejebogen:
 - nudge ("Din plads venter") med hovedhandlingen.
 - Læs undersiderne og eventuelle PDF'er (vedhæftet): find ud af, hvem stedet er for, og hvad besøgende har brug for - og byg touren til dem (se "Sådan arbejder du"). Brug rigtige fakta (fx dagsrytme fra et skema → day).
 - Gem det vigtigste, du har lært om kunden, i remember (scope "tour"), så du ved det næste gang.
-Skriv al tekst på dansk i kundens stemme. Opfind ingen fakta. I reply: fortæl kort, hvad du har valgt og hvorfor, og hvad brugeren selv bør tjekke eller tilføje (fx fotos af stederne).
+Skriv al tekst på dansk i kundens stemme. Opfind ingen fakta.${input.plan ? `\n\nBrugeren har godkendt denne plan - byg præcis efter den (den går forud for skabelonen og drejebogen, hvor de er uenige):\n<plan>\n${planText(input.plan)}\n</plan>` : ""} I reply: fortæl kort, hvad du har valgt og hvorfor, og hvad brugeren selv bør tjekke eller tilføje (fx fotos af stederne).
 ${branch ? `\nBranche: ${branch}.` : ""}${input.about?.trim() ? `\nOm kunden og målgruppen (brugerens egne ord - følg dem): ${input.about.trim()}` : ""}${preset ? `\nDesign valgt af brugeren: "${preset.name}" (${preset.what}) - bevar design, menutype, bevægelse og start, som de står i skabelonen; udfyld kun indholdet.` : ""}${input.focus?.trim() ? `\nTouren skal især få besøgende til: ${input.focus.trim()}. Gør det til hovedhandlingen (cta, "Din plads venter", stedkort i de vigtigste rum).` : ""}
 ${input.notes.trim() ? `\nBemærkninger fra brugeren: ${input.notes.trim()}\n` : ""}${
       drone
