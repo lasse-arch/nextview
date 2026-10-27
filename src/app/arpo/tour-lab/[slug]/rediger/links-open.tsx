@@ -4,7 +4,7 @@ import type { LinkOpen, PopupSize, TourConfig } from "../../tours/types";
 import { Choice, Field, Toggle } from "./ui";
 
 /*
- * How the tour's links open (Knapper og links → Åbning): the default, a
+ * How the tour's links open (Knapper og kontakt → Åbning): the default, a
  * popup's size, and whether the popup says which site it shows.
  */
 

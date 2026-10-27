@@ -2565,7 +2565,7 @@ const CSS = `
 /* An open point: the welcome box and the filter step aside so they don't cover other points. */
 .hv-punkt .hv-intro,.hv-punkt .hv-filtre{opacity:0;pointer-events:none}
 .hv-intro{transition:opacity .25s}
-/* Switched off in the editor (Interaktivt kort → Over kortet), per device. */
+/* Switched off in the editor (Luftfoto og kort → Over kortet), per device. */
 @media (min-width:761px){.hv-boks-ud-d .hv-intro,.hv-filter-ud-d .hv-filtre{display:none}}
 @media (max-width:760px){.hv-boks-ud-m .hv-intro,.hv-filter-ud-m .hv-filtre{display:none}}
 @media (max-width:760px){

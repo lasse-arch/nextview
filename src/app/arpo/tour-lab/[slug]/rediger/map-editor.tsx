@@ -10,7 +10,7 @@ import { Field, Group, Icon, input, PanoZoom, Toggle, UploadButton } from "./ui"
 import { AiImageButton } from "./ai-image";
 
 /*
- * "Interaktivt kort": an illustrated map (or site plan, or drone photo) the
+ * "Luftfoto og kort": an illustrated map (or site plan, or drone photo) the
  * tour starts on, with points on it. Set up on a big canvas of its own:
  * click to put a point down, drag it to move it, pick its icon, size and
  * category - or let it walk through the menu's rooms, so each one is placed

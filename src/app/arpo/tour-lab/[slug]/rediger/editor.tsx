@@ -39,25 +39,30 @@ type Tab = "sprog" | "claude" | "live" | "scan" | "okonomi" | "resultater" | "de
 /** Claude's mark: a small sunburst. */
 const SPARK = '<path d="M12 3v5M12 16v5M3 12h5M16 12h5M5.6 5.6l3.5 3.5M14.9 14.9l3.5 3.5M5.6 18.4l3.5-3.5M14.9 9.1l3.5-3.5"/>';
 
-/** The sections, with a small icon each (SF Symbols-like, drawn with strokes), under their headings. */
+/**
+ * The sections (each with a small SF Symbols-like icon), in the order a tour is made: the basics (who, how it looks,
+ * the scan points), the tour itself (start, menu, overview, guide), what's in
+ * it, the settings - and at the end, the customer's review, publishing and
+ * the results.
+ */
 const TABS: [Tab, string, string, string?][] = [
   ["claude", "nextviewAI", SPARK],
-  ["resultater", "Resultater", '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'],
-  ["feedback", "Feedback", '<path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8M8 12h5"/>'],
-  ["del", "Del og udgiv", '<path d="M12 15V3M7 8l5-5 5 5"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/>'],
-  ["start", "Start", '<path d="M5 4v16M5 5h11l-2 4 2 4H5"/>', "Indhold"],
-  ["menu", "Menu", '<path d="M4 6h16M4 12h16M4 18h10"/>'],
-  ["rundvisning", "Vis mig rundt", '<circle cx="12" cy="12" r="9"/><path d="M10 8.5v7l5.5-3.5z"/>'],
-  ["kortet", "Interaktivt kort", '<path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/>'],
+  ["generelt", "Generelt", '<circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/>', "1 · Grundlag"],
+  ["design", "Design", '<path d="M12 3a9 9 0 1 0 0 18c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.3-.3-.4-.5-.8-.5-1.3 0-1.1.9-2 2-2h2.3A4.7 4.7 0 0 0 21 9.7C21 5.9 17 3 12 3z"/><circle cx="7.5" cy="11.5" r="1"/><circle cx="10.5" cy="7.5" r="1"/><circle cx="15.5" cy="8" r="1"/>'],
   ["scan", "Scanpunkter", '<circle cx="6" cy="6" r="2"/><circle cx="18" cy="8" r="2"/><circle cx="9" cy="17" r="2"/><circle cx="17" cy="18" r="2"/><path d="M8 6.5l8 1M7 8l1.5 7M11 17h4"/>'],
+  ["start", "Start", '<path d="M5 4v16M5 5h11l-2 4 2 4H5"/>', "2 · Touren"],
+  ["menu", "Menu", '<path d="M4 6h16M4 12h16M4 18h10"/>'],
+  ["kortet", "Luftfoto og kort", '<path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/>'],
+  ["rundvisning", "Vis mig rundt", '<circle cx="12" cy="12" r="9"/><path d="M10 8.5v7l5.5-3.5z"/>'],
+  ["kort", "Stedkort", '<rect x="4" y="5" width="16" height="14" rx="2"/><path d="M8 10h8M8 14h5"/>', "3 · Indhold"],
   ["tags", "Tags", '<path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z"/><circle cx="8" cy="8" r="1.5"/>'],
   ["live", "Live data", '<path d="M3 12h4l3-8 4 16 3-8h4"/>'],
-  ["kort", "Stedkort", '<rect x="4" y="5" width="16" height="14" rx="2"/><path d="M8 10h8M8 14h5"/>'],
-  ["links", "Knapper og links", '<path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/>'],
-  ["design", "Design", '<path d="M12 3a9 9 0 1 0 0 18c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.3-.3-.4-.5-.8-.5-1.3 0-1.1.9-2 2-2h2.3A4.7 4.7 0 0 0 21 9.7C21 5.9 17 3 12 3z"/><circle cx="7.5" cy="11.5" r="1"/><circle cx="10.5" cy="7.5" r="1"/><circle cx="15.5" cy="8" r="1"/>', "Udseende og opsætning"],
+  ["links", "Knapper og kontakt", '<path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/>'],
+  ["funktioner", "Funktioner", '<path d="M12 3l2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 15.4 7.2 18l.9-5.4L4.2 8.7l5.4-.8z"/>', "4 · Indstillinger"],
   ["sprog", "Sprog", '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>'],
-  ["funktioner", "Funktioner", '<path d="M12 3l2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 15.4 7.2 18l.9-5.4L4.2 8.7l5.4-.8z"/>'],
-  ["generelt", "Generelt", '<circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/>'],
+  ["feedback", "Gennemgang", '<path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8M8 12h5"/>', "5 · Aflevering"],
+  ["del", "Del og udgiv", '<path d="M12 15V3M7 8l5-5 5 5"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/>'],
+  ["resultater", "Resultater", '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'],
   ["okonomi", "Tid og pris", '<circle cx="12" cy="12" r="9"/><path d="M14.5 9.5a2.5 2 0 0 0-2.5-1.5c-1.4 0-2.5.8-2.5 2s1.1 1.6 2.5 2 2.5.8 2.5 2-1.1 2-2.5 2a2.5 2 0 0 1-2.5-1.5M12 6.5v1.5M12 16v1.5"/>', "Mere"],
   ["versioner", "Versioner", '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'],
   ["avanceret", "Avanceret", '<path d="M8 6l-5 6 5 6M16 6l5 6-5 6"/>'],
@@ -570,9 +575,6 @@ export function TourEditor({
                   <input className={input} value={config.modelId ?? ""} placeholder={config.tourPage ? "Hentes fra MPSkins - frakobl herunder" : "Fx rxaXbNZcETf"} onChange={(e) => edit((d) => void (d.modelId = e.target.value.trim() || undefined))} />
                 </Field>
                 {config.tourPage && <DetachMpskins slug={slug} dirty={dirty} />}
-                <Field title="Start" hint="Vælg startpunktet under Scanpunkter (Start her) - eller indsæt et link her.">
-                  <input className={input} value={config.start} onChange={(e) => edit((d) => void (d.start = e.target.value))} />
-                </Field>
                 </Group>
                 <FilesGroup slug={slug} config={config} onHosted={(c) => edit((d) => Object.assign(d, c))} />
               </>
@@ -591,36 +593,6 @@ export function TourEditor({
                     }}
                     onPick={(p) => edit((d) => Object.assign(d, p.apply(d)))}
                   />
-                </Group>
-                <Group title="Finjustering">
-                <Field title="Menu">
-                  <Choice
-                    value={menuStyle}
-                    options={[
-                      ["side", "Sidemenu"],
-                      ["dock", "Bar i bunden"],
-                      ["picker", "Rumvælger"],
-                      ["simple", "Helt enkel"],
-                    ]}
-                    onChange={(v) => edit((d) => void (d.design = { ...d.design, welcome: d.design?.welcome ?? "tiles", menu: v }))}
-                  />
-                </Field>
-                {menuStyle === "picker" && (
-                  <Field title="Når man vælger en størrelse, start i" hint="Findes rummet ikke i en størrelse, starter den i størrelsens første">
-                    <select
-                      className={input}
-                      value={config.design?.first ?? ""}
-                      onChange={(e) => edit((d) => void (d.design = { welcome: d.design?.welcome ?? "tiles", menu: d.design?.menu ?? "picker", first: e.target.value || undefined }))}
-                    >
-                      <option value="">Det første i hver størrelse</option>
-                      {[...new Set(config.menu.flatMap((m) => ("items" in m ? m.items.map((i) => i[0]) : [])))].map((n) => (
-                        <option key={n} value={n}>
-                          {n}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                )}
                 </Group>
                 <Group title="Farver og skrift">
                 <div className="grid grid-cols-2 gap-3">
@@ -825,6 +797,44 @@ export function TourEditor({
                       d.imageView = Object.keys(all).length ? all : undefined;
                     })}
                 />
+                <Group title="Menuens udseende">
+                <Field title="Menu">
+                  <Choice
+                    value={menuStyle}
+                    options={[
+                      ["side", "Sidemenu"],
+                      ["dock", "Bar i bunden"],
+                      ["picker", "Rumvælger"],
+                      ["simple", "Helt enkel"],
+                    ]}
+                    onChange={(v) => edit((d) => void (d.design = { ...d.design, welcome: d.design?.welcome ?? "tiles", menu: v }))}
+                  />
+                </Field>
+                {menuStyle === "picker" && (
+                  <Field title="Når man vælger en størrelse, start i" hint="Findes rummet ikke i en størrelse, starter den i størrelsens første">
+                    <select
+                      className={input}
+                      value={config.design?.first ?? ""}
+                      onChange={(e) => edit((d) => void (d.design = { welcome: d.design?.welcome ?? "tiles", menu: d.design?.menu ?? "picker", first: e.target.value || undefined }))}
+                    >
+                      <option value="">Det første i hver størrelse</option>
+                      {[...new Set(config.menu.flatMap((m) => ("items" in m ? m.items.map((i) => i[0]) : [])))].map((n) => (
+                        <option key={n} value={n}>
+                          {n}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                )}
+                  <Toggle on={config.menuOpenOnStart.desktop} onChange={(on) => edit((d) => void (d.menuOpenOnStart.desktop = on))} title="Menu åben på computer" />
+                  <Toggle on={config.menuOpenOnStart.mobile} onChange={(on) => edit((d) => void (d.menuOpenOnStart.mobile = on))} title="Menu åben på mobil" />
+                  <Toggle
+                    on={config.menuDim !== false}
+                    onChange={(on) => edit((d) => void (d.menuDim = on ? undefined : false))}
+                    title="Dæmp touren bag menuen"
+                    hint="Touren bliver lidt mørkere, når menuen er åben, og et tryk på den lukker menuen. Fra: touren står klar og kan bruges, mens menuen er åben."
+                  />
+                </Group>
                 <ScanJumper config={config} preview={preview} map={scanMap} count={scanCount} hiddenSweeps={[...config.hiddenSweeps, ...mpskinsHidden]} />
               </>
             )}
@@ -886,15 +896,7 @@ export function TourEditor({
                   })}
                   <Toggle on={Boolean(config.mobileZoomLock)} onChange={(on) => edit((d) => void (d.mobileZoomLock = on || undefined))} title="Lås zoom på mobil" hint="Gæsten kan ikke knibe-zoome - så man ikke ved et uheld zoomer helt ind." />
                 </Group>
-                <Group title="Menu og historier">
-                  <Toggle on={config.menuOpenOnStart.desktop} onChange={(on) => edit((d) => void (d.menuOpenOnStart.desktop = on))} title="Menu åben på computer" />
-                  <Toggle on={config.menuOpenOnStart.mobile} onChange={(on) => edit((d) => void (d.menuOpenOnStart.mobile = on))} title="Menu åben på mobil" />
-                  <Toggle
-                    on={config.menuDim !== false}
-                    onChange={(on) => edit((d) => void (d.menuDim = on ? undefined : false))}
-                    title="Dæmp touren bag menuen"
-                    hint="Touren bliver lidt mørkere, når menuen er åben, og et tryk på den lukker menuen. Fra: touren står klar og kan bruges, mens menuen er åben."
-                  />
+                <Group title="Historier">
                 <Toggle
                   on={Boolean(config.stories?.mobile)}
                   onChange={(on) => edit((d) => void (d.stories = { mobile: on, desktop: d.stories?.desktop ?? false, rooms: d.stories?.rooms, scroll: d.stories?.scroll }))}

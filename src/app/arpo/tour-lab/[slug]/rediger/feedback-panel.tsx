@@ -101,7 +101,7 @@ export function FeedbackPanel({ slug, token: initialToken, preview }: { slug: st
           {note?.text ?? (status?.to ? `Mailen går til ${status.to} (kontakt-e-mailen på dealen) fra lasse@. Godkender kunden, får I besked på mail.` : status ? "Touren er ikke koblet til en kunde med kontakt-e-mail." : "")}
         </p>
       </Group>
-      <Group title="Kundegennemsyn">
+      <Group title="Linket til gennemsyn">
         <Toggle
           on={Boolean(token)}
           onChange={(on) =>
