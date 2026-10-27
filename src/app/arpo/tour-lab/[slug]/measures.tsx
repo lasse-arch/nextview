@@ -62,7 +62,7 @@ export const MEASURES_CSS = `
 .ms-end{fill:#fff;stroke:rgba(0,0,0,.45);stroke-width:1.5}
 .ms-pill{fill:#fff;filter:drop-shadow(0 2px 4px rgba(0,0,0,.35))}
 .ms-text{font:800 14px system-ui,sans-serif;fill:#1d2a30}
-.hv-maal{position:absolute;top:14px;right:14px;z-index:8;display:flex;align-items:center;gap:7px;border:0;border-radius:999px;padding:9px 16px;background:rgba(255,255,255,.95);color:var(--c-main);font:inherit;font-weight:800;font-size:14px;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.25)}
+.hv-maal{position:absolute;top:calc(14px + env(safe-area-inset-top,0px));right:14px;z-index:8;display:flex;align-items:center;gap:7px;border:0;border-radius:999px;padding:9px 16px;background:rgba(255,255,255,.95);color:var(--c-main);font:inherit;font-weight:800;font-size:14px;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.25)}
 .hv-maal svg{width:18px;height:18px}
 .hv-maal.aktiv{background:var(--c-main);color:#fff}
 .hv:has(.hv-menuknap) .hv-maal,.hv:has(.sp-menuknap) .hv-maal{top:76px}

@@ -129,7 +129,7 @@ export const SIMPLE_CSS = `
 .sp-out span{font-size:15px;opacity:.6}
 .sp-here{border-color:var(--c-main)}
 .sp-here small{position:absolute;right:16px;font-size:12px;font-weight:700;color:#7a8589}
-.sp-menuknap{position:absolute;top:14px;right:14px;z-index:9;min-width:96px;height:52px;padding:0 24px;border:0;border-radius:999px;background:var(--c-main);color:#fff;font:inherit;font-weight:800;font-size:18px;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.3)}
+.sp-menuknap{position:absolute;top:calc(14px + env(safe-area-inset-top,0px));right:14px;z-index:9;min-width:96px;height:52px;padding:0 24px;border:0;border-radius:999px;background:var(--c-main);color:#fff;font:inherit;font-weight:800;font-size:18px;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.3)}
 .sp-menu{position:absolute;inset:0;z-index:30;display:flex;flex-direction:column;background:#fff;color:#1d2a30;animation:hvFade .2s ease}
 .sp-menu-top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;border-bottom:1px solid #eef0f1}
 .sp-menu-top img{height:44px;width:auto;max-width:55%;object-fit:contain}
@@ -139,7 +139,7 @@ export const SIMPLE_CSS = `
 .sp-group-title{margin:4px 4px -2px;font-size:14px;font-weight:800;color:#7a8589}
 .hv:has(.sp-menu) .hv-logo{display:none}
 @media (max-width:760px){
-  .sp-menuknap{top:12px;right:10px}
+  .sp-menuknap{top:calc(12px + env(safe-area-inset-top,0px));right:10px}
   .sp-wel h1{font-size:25px}
   .sp-wel p{font-size:16px}
 }

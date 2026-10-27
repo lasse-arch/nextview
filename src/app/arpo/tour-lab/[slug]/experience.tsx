@@ -1691,7 +1691,7 @@ function TourExperience({
 
       {/* Logo (MPSkins: left, 200px, 13px from the edges - or right, with the menu on the left). */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={T.logo} alt={T.brand} className={`hv-logo ${T.logoOnLight ? (T.logoCard === false ? "hv-logo-lys" : "hv-logo-kort") : ""} ${phase === "tour" ? "" : "hidden"}`} />
+      <img src={T.logo} alt={T.brand} className={`hv-logo ${T.logoOnLight ? (T.logoCard === false ? "hv-logo-lys" : "hv-logo-kort") : ""} ${phase === "tour" && !(cover && T.cover) ? "" : "hidden"}`} />
 
       {/* Inside the tour: back to the air, the room's name, the menu. */}
       {phase === "tour" && (
@@ -2397,7 +2397,7 @@ const CSS = `
 /* A name that would cover another point steps aside until its icon is hovered. */
 .hv-navn.hv-gemt{visibility:hidden;pointer-events:none}
 .hv-pkt:hover .hv-navn.hv-gemt{visibility:visible}
-.hv-intro{position:absolute;top:16px;left:16px;z-index:5;width:320px;background:var(--c-soft);border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.28)}
+.hv-intro{position:absolute;top:calc(16px + env(safe-area-inset-top,0px));left:16px;z-index:5;width:320px;background:var(--c-soft);border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.28)}
 .hv-intro-head{padding:18px 18px 14px;text-align:center}
 .hv-intro-head img{height:54px;display:block;margin:0 auto 8px}
 .hv-sub{font-size:9.5px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:#9fb3ba}
@@ -2414,7 +2414,7 @@ const CSS = `
 .hv-chips button{display:flex;align-items:center;gap:6px;border:1.5px solid #e3ddd1;background:#fff;border-radius:999px;padding:4px 11px 4px 5px;font-family:inherit;font-size:12.5px;font-weight:700;cursor:pointer;color:#1d2a30}
 .hv-chips button i{width:16px;height:16px;border-radius:50%}
 .hv-chips button.fra{opacity:.42}
-.hv-panel{position:absolute;top:66px;right:16px;z-index:7;width:350px;max-height:calc(100% - 82px);overflow-y:auto;background:var(--c-soft);border-radius:16px;box-shadow:0 12px 36px rgba(0,0,0,.35);padding:18px 18px 18px;animation:hvIn .25s ease}
+.hv-panel{position:absolute;top:calc(66px + env(safe-area-inset-top,0px));right:16px;z-index:7;width:350px;max-height:calc(100% - 82px);overflow-y:auto;background:var(--c-soft);border-radius:16px;box-shadow:0 12px 36px rgba(0,0,0,.35);padding:18px 18px 18px;animation:hvIn .25s ease}
 @keyframes hvIn{from{opacity:0;transform:translateX(16px)}to{opacity:1;transform:none}}
 .hv-luk{position:absolute;z-index:2;top:10px;right:10px;width:32px;height:32px;border-radius:50%;border:0;background:#fff;font-size:19px;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.2)}
 .hv-kat{font-size:11.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase}
@@ -2443,7 +2443,7 @@ const CSS = `
 .hv-live-knap i,.hv-live-chip i{width:8px;height:8px;border-radius:50%;background:#34c759;box-shadow:0 0 0 3px #34c75944;animation:hvLive 1.6s ease-in-out infinite}
 .hv-live-knap span{margin-left:auto;padding:1px 8px;border-radius:999px;background:var(--c-accent);color:#fff;font-size:12px}
 @keyframes hvLive{50%{box-shadow:0 0 0 6px #34c75911}}
-.hv-live-chip{position:absolute;top:74px;right:16px;z-index:6;display:flex;align-items:center;gap:8px;padding:8px 14px;border:0;border-radius:999px;background:rgba(255,255,255,.95);color:#1d2a30;font:700 13px inherit;font-family:inherit;box-shadow:0 6px 18px rgba(0,0,0,.2);cursor:pointer}
+.hv-live-chip{position:absolute;top:calc(74px + env(safe-area-inset-top,0px));right:16px;z-index:6;display:flex;align-items:center;gap:8px;padding:8px 14px;border:0;border-radius:999px;background:rgba(255,255,255,.95);color:#1d2a30;font:700 13px inherit;font-family:inherit;box-shadow:0 6px 18px rgba(0,0,0,.2);cursor:pointer}
 .hv-live{position:absolute;inset:0;z-index:35;display:flex;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.35);animation:hvFade .2s ease}
 .hv-live-sheet{width:min(520px,100%);max-height:78%;display:flex;flex-direction:column;margin:0 12px 12px;border-radius:20px;background:#fff;color:#1d2a30;box-shadow:0 20px 60px rgba(0,0,0,.4);animation:hvUp .3s cubic-bezier(.2,.7,.2,1) both}
 .hv-live-head{display:flex;align-items:baseline;gap:10px;padding:16px 18px 10px}
@@ -2458,8 +2458,8 @@ const CSS = `
 .hv-live-sheet li em{font-style:normal;font-weight:800;font-size:14px;color:var(--c-main);white-space:nowrap}
 .hv-live-sheet .hv-btn{flex:none;padding:8px 14px;font-size:13px}
 @media (max-width:760px){.hv-live-chip{top:62px;right:12px}.hv-live-sheet{margin:0;border-radius:20px 20px 0 0;max-height:85%}}
-.hv-pick{position:absolute;top:16px;left:50%;transform:translateX(-50%);z-index:30;padding:9px 16px;border-radius:999px;background:rgba(0,0,0,.75);color:#fff;font-size:14px;font-weight:700;pointer-events:none;backdrop-filter:blur(8px)}
-.hv-logo{position:absolute;top:var(--logo-top,14px);left:var(--logo-side,16px);height:var(--logo-h);width:auto;max-width:min(320px,40vw);object-fit:contain;z-index:6;filter:drop-shadow(0 2px 6px rgba(0,0,0,.35))}
+.hv-pick{position:absolute;top:calc(16px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);z-index:30;padding:9px 16px;border-radius:999px;background:rgba(0,0,0,.75);color:#fff;font-size:14px;font-weight:700;pointer-events:none;backdrop-filter:blur(8px)}
+.hv-logo{position:absolute;top:calc(var(--logo-top,14px) + env(safe-area-inset-top,0px));left:var(--logo-side,16px);height:var(--logo-h);width:auto;max-width:min(320px,40vw);object-fit:contain;z-index:6;filter:drop-shadow(0 2px 6px rgba(0,0,0,.35))}
 /* A dark logo gets a light card, so it reads on any wall. */
 /* A dark logo straight on the tour, no card and no glow - exactly as it is (as in MPSkins). */
 .hv-logo-lys{filter:none}
@@ -2470,7 +2470,7 @@ const CSS = `
 .hv-luften{position:absolute;left:16px;bottom:20px;z-index:6;display:flex;align-items:center;gap:8px;background:var(--c-main);color:#fff;border:0;border-radius:999px;padding:11px 18px;font:800 14px inherit;font-family:inherit;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.3)}
 .hv-luften svg{width:18px;height:18px}
 .hv-room{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);z-index:6;background:rgba(255,255,255,.95);color:var(--c-main);border-radius:999px;padding:8px 16px;font-weight:800;font-size:14px;box-shadow:0 4px 14px rgba(0,0,0,.25)}
-.hv-menuknap{position:absolute;top:14px;right:14px;z-index:9;background:var(--c-main);color:#fff;border:0;border-radius:999px;padding:9px 18px;font-weight:800;font-size:14px;font-family:inherit;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+.hv-menuknap{position:absolute;top:calc(14px + env(safe-area-inset-top,0px));right:14px;z-index:9;background:var(--c-main);color:#fff;border:0;border-radius:999px;padding:9px 18px;font-weight:800;font-size:14px;font-family:inherit;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.3)}
 .hv-menu{position:absolute;top:0;right:0;bottom:0;z-index:8;width:320px;max-width:100%;background:rgba(255,255,255,.98);overflow-y:auto;transform:translateX(105%);transition:transform .3s ease;box-shadow:-10px 0 30px rgba(0,0,0,.25)}
 .hv-menu.aaben{transform:none}
 .hv-menu-slor{position:absolute;inset:0;z-index:7;border:0;padding:0;background:rgba(8,14,16,.38);opacity:0;pointer-events:none;transition:opacity .3s ease;cursor:default}
@@ -2511,7 +2511,7 @@ const CSS = `
 .hv-menu-cta{padding:14px 22px 24px;display:flex;flex-direction:column;gap:8px}
 .hv-pano{position:absolute;inset:0;z-index:15;background:#0d1b20;animation:hvFade .4s ease}
 @keyframes hvFade{from{opacity:0}to{opacity:1}}
-.hv-pano-titel{position:absolute;top:16px;left:16px;z-index:2;background:rgba(21,50,58,.9);color:#fff;font-weight:800;font-size:16px;padding:8px 16px;border-radius:999px}
+.hv-pano-titel{position:absolute;top:calc(16px + env(safe-area-inset-top,0px));left:16px;z-index:2;background:rgba(21,50,58,.9);color:#fff;font-weight:800;font-size:16px;padding:8px 16px;border-radius:999px}
 .hv-pano-luk{position:absolute;left:16px;bottom:20px;z-index:2;background:var(--c-main);color:#fff;border:0;border-radius:999px;padding:11px 18px;font-weight:800;font-size:14px;font-family:inherit;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.3)}
 .hv-wel{position:absolute;inset:0;z-index:12;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(13,27,32,.38);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);animation:hvFade .45s ease}
 .hv-wel-grid{display:grid;grid-template-columns:1.6fr 1fr 1fr;grid-auto-rows:minmax(150px,auto);gap:16px;width:100%;max-width:1000px}
@@ -2547,7 +2547,7 @@ const CSS = `
 .hv-tile-accent{background:var(--c-accent);color:#fff}.hv-tile-accent em{background:rgba(255,255,255,.24)}.hv-tile-accent .hv-tile-plus{background:#fff;color:var(--c-accent)}
 .hv-tile-foto{background-size:cover;background-position:center;color:#fff;text-shadow:0 1px 8px rgba(0,0,0,.35)}.hv-tile-foto small{opacity:.9}.hv-tile-foto .hv-tile-plus{background:#fff;color:var(--c-main);text-shadow:none}
 .hv-tile-last{background:#e7eef0;color:var(--c-main)}.hv-tile-last .hv-tile-plus{background:var(--c-main);color:#fff}
-.hv-wel-x{position:absolute;top:16px;right:16px;width:44px;height:44px;border-radius:12px;border:0;background:rgba(255,255,255,.92);font-size:24px;cursor:pointer;color:var(--c-main)}
+.hv-wel-x{position:absolute;top:calc(16px + env(safe-area-inset-top,0px));right:16px;width:44px;height:44px;border-radius:12px;border:0;background:rgba(255,255,255,.92);font-size:24px;cursor:pointer;color:var(--c-main)}
 .hv-welcome .hv-intro,.hv-welcome .hv-filtre,.hv-welcome .hv-menuknap{opacity:0;pointer-events:none}
 .hv-dev{position:absolute;right:12px;bottom:12px;z-index:20;font-family:system-ui,sans-serif}
 .hv-dev>button{background:rgba(0,0,0,.65);color:#fff;border:0;border-radius:8px;padding:5px 10px;font-size:11px;cursor:pointer}
@@ -2570,7 +2570,7 @@ const CSS = `
 @media (max-width:760px){.hv-boks-ud-m .hv-intro,.hv-filter-ud-m .hv-filtre{display:none}}
 @media (max-width:760px){
   /* Slim welcome bar instead of the big card, with room for the menu button. */
-  .hv-intro{top:10px;left:10px;right:104px;width:auto;display:flex;align-items:center;border-radius:14px}
+  .hv-intro{top:calc(10px + env(safe-area-inset-top,0px));left:10px;right:104px;width:auto;display:flex;align-items:center;border-radius:14px}
   .hv-intro-head{padding:8px 10px;flex:none}
   .hv-intro-head img{height:30px;margin:0}
   .hv-intro .hv-sub{display:none}
@@ -2578,7 +2578,7 @@ const CSS = `
   .hv-intro-body h1{font-size:13.5px;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .hv-intro-body p{display:none}
   .hv-intro .hv-btn{padding:6px 10px;font-size:12.5px}
-  .hv-menuknap{top:12px;right:10px;padding:10px 16px;font-size:13px}
+  .hv-menuknap{top:calc(12px + env(safe-area-inset-top,0px));right:10px;padding:10px 16px;font-size:13px}
   /* Categories: one row you can swipe. */
   .hv-filtre{left:10px;right:10px;bottom:calc(10px + env(safe-area-inset-bottom,0px));max-width:none;padding:7px 8px}
   .hv-filtre-t{display:none}
@@ -2592,7 +2592,7 @@ const CSS = `
   /* An open point: the panel takes the bottom, the bars step aside. */
   .hv-panel{top:auto;bottom:0;left:0;right:0;width:auto;max-height:62%;border-radius:18px 18px 0 0;padding-bottom:calc(18px + env(safe-area-inset-bottom,0px))}
   .hv-fotos{aspect-ratio:auto;height:min(40vw,190px);border-radius:18px 18px 0 0}
-  .hv-logo{height:calc(var(--logo-h) * .74);max-width:45vw;top:var(--logo-top,12px);left:var(--logo-side,12px)}
+  .hv-logo{height:calc(var(--logo-h) * .74);max-width:45vw;top:calc(var(--logo-top,12px) + env(safe-area-inset-top,0px));left:var(--logo-side,12px)}
   .hv-logo-kort{height:calc(var(--logo-h) * .74 - 8px);padding:7px 10px;border-radius:11px}
   .hv-menu{width:100%}
   .hv-room{bottom:76px}
@@ -2609,7 +2609,7 @@ const CSS = `
   .hv-wel-skip{padding-top:10px;font-size:12px}
   .hv-tile{min-height:112px;padding:14px;border-radius:16px}
   .hv-tile b{font-size:18px}
-  .hv-wel-x{top:10px;right:10px;width:38px;height:38px}
+  .hv-wel-x{top:calc(10px + env(safe-area-inset-top,0px));right:10px;width:38px;height:38px}
   .hv-devpanel{width:calc(100vw - 20px)}
 }
 `;

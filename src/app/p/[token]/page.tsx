@@ -5,6 +5,10 @@ import { prisma } from "@/lib/db";
 import { Experience } from "@/app/arpo/tour-lab/[slug]/experience";
 import { loadTour } from "@/app/arpo/tour-lab/[slug]/load";
 import type { TourConfig } from "@/app/arpo/tour-lab/tours/types";
+import type { Viewport } from "next";
+
+/** The tour fills the whole phone screen, also behind the island (its buttons keep clear of it - safe-area insets). */
+export const viewport: Viewport = { viewportFit: "cover", themeColor: "#0d1b20" };
 
 /*
  * Kundegennemsyn: the tour as it is in Arpo right now (published or not) on a

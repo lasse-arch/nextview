@@ -323,7 +323,7 @@ export const DESIGNS_CSS = `
 .dz-kicker{font-size:11px;font-weight:600;letter-spacing:.22em;text-transform:uppercase;color:var(--c-accent)}
 .hv h1,.dz-cover h1{font-family:var(--font-heading)}
 /* ---- Cover welcome ---- */
-.dz-cover{position:absolute;inset:0;z-index:12;display:flex;flex-direction:column;justify-content:space-between;padding:56px 64px 40px;background:linear-gradient(100deg,rgba(12,9,6,.92) 0%,rgba(12,9,6,.72) 38%,rgba(12,9,6,.12) 70%),var(--cover) center/cover;color:#f6efe2;animation:hvFade .6s ease;overflow-y:auto}
+.dz-cover{position:absolute;inset:0;z-index:12;display:flex;flex-direction:column;justify-content:space-between;padding:calc(56px + env(safe-area-inset-top,0px)) 64px 40px;background:linear-gradient(100deg,rgba(12,9,6,.92) 0%,rgba(12,9,6,.72) 38%,rgba(12,9,6,.12) 70%),var(--cover) center/cover;color:#f6efe2;animation:hvFade .6s ease;overflow-y:auto}
 .dz-cover.ude{opacity:0;pointer-events:none;transition:opacity .6s}
 .dz-cover-nu{animation:none}
 .dz-cover-text{max-width:520px;animation:hvUp .8s cubic-bezier(.2,.7,.2,1) both}
@@ -364,9 +364,9 @@ export const DESIGNS_CSS = `
 .dz-here span{font-family:var(--font-heading);font-size:18px;font-weight:600}
 .dz-here b{padding:7px 14px;border-radius:999px;background:var(--c-accent);color:#1a1209;font-size:13px}
 .hv-dock .hv-room{display:none}
-.hv-dock .hv-dev{bottom:auto;top:12px;right:12px}
+.hv-dock .hv-dev{bottom:auto;top:calc(12px + env(safe-area-inset-top,0px));right:12px}
 @media (max-width:760px){
-  .dz-cover{padding:28px 20px calc(18px + env(safe-area-inset-bottom,0px));background:linear-gradient(rgba(12,9,6,.55),rgba(12,9,6,.86) 55%,rgba(12,9,6,.95)),var(--cover-m) center/cover}
+  .dz-cover{padding:calc(28px + env(safe-area-inset-top,0px)) 20px calc(18px + env(safe-area-inset-bottom,0px));background:linear-gradient(rgba(12,9,6,.55),rgba(12,9,6,.86) 55%,rgba(12,9,6,.95)),var(--cover-m) center/cover}
   .dz-cover-logo{width:96px;margin-bottom:14px}
   .dz-cover h1{font-size:42px}
   .dz-cover p{font-size:15px;margin-bottom:18px}

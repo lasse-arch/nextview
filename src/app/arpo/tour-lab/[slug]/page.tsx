@@ -4,6 +4,10 @@ import { getCurrentUser } from "@/lib/auth";
 import { getTourConfig } from "@/lib/tours";
 import { Experience } from "./experience";
 import { loadTour } from "./load";
+import type { Viewport } from "next";
+
+/** The tour fills the whole phone screen, also behind the island (its buttons keep clear of it - safe-area insets). */
+export const viewport: Viewport = { viewportFit: "cover", themeColor: "#0d1b20" };
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const tour = await getTourConfig((await params).slug);

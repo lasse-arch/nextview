@@ -194,7 +194,7 @@ export const GUIDE_CSS = `
 .gd-sound{width:36px;border:0;border-radius:50%;background:rgba(0,0,0,.06);font-size:16px;cursor:pointer}
 .gd{position:absolute;inset:0;z-index:11;pointer-events:none}
 .gd>*{pointer-events:auto}
-.gd-bars{position:absolute;top:10px;left:50%;translate:-50% 0;width:min(560px,calc(100% - 200px));display:flex;gap:4px}
+.gd-bars{position:absolute;top:calc(10px + env(safe-area-inset-top,0px));left:50%;translate:-50% 0;width:min(560px,calc(100% - 200px));display:flex;gap:4px}
 .gd-bars span{flex:1;height:3px;border-radius:2px;background:rgba(255,255,255,.4);overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.3)}
 .gd-bars span.done{background:#fff}
 .gd-bars i{display:block;height:100%;background:#fff;transform-origin:left;animation:hvStoryGuide linear forwards}

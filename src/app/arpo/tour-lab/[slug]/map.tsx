@@ -264,7 +264,7 @@ export const MAP_CSS = `
 .km-pin{position:absolute;width:0;height:0;transform-origin:0 0;animation:kmPop .5s cubic-bezier(.3,1.6,.5,1) both}
 @keyframes kmPop{from{opacity:0;translate:0 -14px}to{opacity:1;translate:0 0}}
 .km-pin .hv-pkt{position:absolute;left:0;top:0}
-.km-soeg{position:absolute;top:14px;left:50%;translate:-50% 0;z-index:6;width:min(320px,calc(100% - 240px))}
+.km-soeg{position:absolute;top:calc(14px + env(safe-area-inset-top,0px));left:50%;translate:-50% 0;z-index:6;width:min(320px,calc(100% - 240px))}
 .km-soeg input{width:100%;border:0;border-radius:999px;padding:11px 18px;font:inherit;font-size:14px;background:rgba(255,255,255,.95);box-shadow:0 6px 20px rgba(0,0,0,.2);outline:none}
 .km-soeg ul{list-style:none;margin:6px 0 0;padding:6px;background:#fff;border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
 .km-soeg li button{display:flex;align-items:center;gap:10px;width:100%;border:0;background:none;padding:9px 10px;border-radius:9px;font:inherit;font-size:14px;font-weight:700;color:#1d2a30;cursor:pointer;text-align:left}

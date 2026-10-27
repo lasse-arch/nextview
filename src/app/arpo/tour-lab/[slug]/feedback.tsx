@@ -262,7 +262,7 @@ export function FeedbackLayer({
 }
 
 export const FEEDBACK_CSS = `
-.fb-bar{position:absolute;top:14px;left:50%;translate:-50% 0;z-index:40;display:flex;align-items:center;gap:6px;padding:5px;border-radius:999px;background:rgba(20,22,24,.86);color:#fff;box-shadow:0 8px 24px rgba(0,0,0,.3);backdrop-filter:blur(8px)}
+.fb-bar{position:absolute;top:calc(14px + env(safe-area-inset-top,0px));left:50%;translate:-50% 0;z-index:40;display:flex;align-items:center;gap:6px;padding:5px;border-radius:999px;background:rgba(20,22,24,.86);color:#fff;box-shadow:0 8px 24px rgba(0,0,0,.3);backdrop-filter:blur(8px)}
 .fb-tag{padding:0 8px 0 10px;font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#ffcc00}
 .fb-bar button{white-space:nowrap;border:0;border-radius:999px;font:inherit;font-weight:700;font-size:13px;cursor:pointer;padding:8px 14px}
 .fb-main{background:#ffcc00;color:#1d1d1f}
@@ -280,7 +280,7 @@ export const FEEDBACK_CSS = `
 .fb-card textarea{min-height:96px;resize:vertical}
 .fb-send{border:0;border-radius:12px;background:#0071e3;color:#fff;font:inherit;font-weight:700;font-size:15px;padding:11px;cursor:pointer}
 .fb-send:disabled{opacity:.4}
-.fb-panel{position:absolute;top:64px;left:50%;translate:-50% 0;z-index:44;max-height:calc(100% - 90px)}
+.fb-panel{position:absolute;top:calc(64px + env(safe-area-inset-top,0px));left:50%;translate:-50% 0;z-index:44;max-height:calc(100% - 90px)}
 .fb-panel ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:8px}
 .fb-panel li{padding:10px 12px;border-radius:12px;background:#f5f5f7}
 .fb-panel li.done{opacity:.55}

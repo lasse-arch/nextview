@@ -4,6 +4,10 @@ import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { publicTour } from "@/lib/tour-cache";
 import { Experience } from "@/app/arpo/tour-lab/[slug]/experience";
+import type { Viewport } from "next";
+
+/** The tour fills the whole phone screen, also behind the island (its buttons keep clear of it - safe-area insets). */
+export const viewport: Viewport = { viewportFit: "cover", themeColor: "#0d1b20" };
 
 /*
  * A published tour, for anyone - made to sit in an iframe on the customer's

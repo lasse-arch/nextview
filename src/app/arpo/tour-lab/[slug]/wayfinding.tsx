@@ -208,9 +208,9 @@ export function RouteStatus({
 }
 
 export const ROUTE_CSS = `
-.rt-knap{position:absolute;top:14px;left:50%;translate:-50% 0;z-index:7;display:flex;align-items:center;gap:8px;border:0;border-radius:999px;padding:10px 18px;background:var(--c-accent);color:#fff;font:inherit;font-weight:800;font-size:14px;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.25)}
+.rt-knap{position:absolute;top:calc(14px + env(safe-area-inset-top,0px));left:50%;translate:-50% 0;z-index:7;display:flex;align-items:center;gap:8px;border:0;border-radius:999px;padding:10px 18px;background:var(--c-accent);color:#fff;font:inherit;font-weight:800;font-size:14px;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.25)}
 .rt-knap svg{width:18px;height:18px}
-.rt-sheet{position:absolute;top:66px;left:50%;translate:-50% 0;z-index:12;width:min(420px,calc(100% - 24px));max-height:calc(100% - 90px);display:flex;flex-direction:column;background:#fff;color:#1d2a30;border-radius:18px;box-shadow:0 16px 44px rgba(0,0,0,.35);padding:16px 16px 10px;animation:hvUp .3s cubic-bezier(.2,.7,.2,1) both}
+.rt-sheet{position:absolute;top:calc(66px + env(safe-area-inset-top,0px));left:50%;translate:-50% 0;z-index:12;width:min(420px,calc(100% - 24px));max-height:calc(100% - 90px);display:flex;flex-direction:column;background:#fff;color:#1d2a30;border-radius:18px;box-shadow:0 16px 44px rgba(0,0,0,.35);padding:16px 16px 10px;animation:hvUp .3s cubic-bezier(.2,.7,.2,1) both}
 .rt-head{display:flex;justify-content:space-between;align-items:center}
 .rt-head b{font-size:20px;font-weight:900;color:var(--c-main)}
 .rt-head button{width:34px;height:34px;border:0;border-radius:50%;background:#f1f2f3;font-size:20px;cursor:pointer}
