@@ -112,7 +112,7 @@ export const DESIGN_PRESETS: DesignPreset[] = [
       navigation: "free",
       jump: "fly",
       menuOpenOnStart: { desktop: false, mobile: false },
-      nudge: T.nudge ?? { afterSeconds: 90, title: "Din plads venter", text: "Har du set nok til at tage det næste skridt?", buttons: T.cta.filter((c) => c.primary).map((c) => ({ label: c.label, href: c.href, primary: true })) },
+      nudge: T.nudge ?? { afterSeconds: 90, title: "Din plads venter", text: "Har du set nok til at tage det næste skridt?", buttons: [] },
     }),
   },
   {

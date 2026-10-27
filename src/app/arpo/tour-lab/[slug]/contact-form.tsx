@@ -28,7 +28,8 @@ export function ContactForm({
   onSent: () => void;
 }) {
   const tr = useT();
-  const F = T.contactForm!;
+  // No address of its own: the tour's contact e-mail (Knapper og kontakt).
+  const F = { ...T.contactForm!, to: T.contactForm!.to || T.contact?.email || "" };
   const [v, setV] = useState({ name: "", email: "", phone: "", message: "" });
   const [state, setState] = useState<"edit" | "send">("edit");
   const [error, setError] = useState<string | null>(null);

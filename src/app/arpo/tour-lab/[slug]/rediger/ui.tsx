@@ -232,7 +232,7 @@ export function PanoZoom({
         e.stopPropagation();
       }}
     >
-      <p className="text-[12px] font-medium text-[#1d1d1f]">360°-visning</p>
+      <p className="text-[12px] font-medium text-[#1d1d1f]" title="Gælder billedet overalt i touren - også hvis det bruges både i menuen og på luftfotoet">360°-visning <span className="font-normal text-[#8e8e93]">· gælder billedet overalt</span></p>
       {preview ? (
         <div className="space-y-1.5">
           <div className="flex gap-2">

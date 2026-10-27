@@ -324,13 +324,13 @@ export function StartEditor({ config, edit, slug, preview }: Props) {
             edit((d) => {
               if (v === "none") {
                 d.welcome = undefined;
-                d.design = { welcome: "tiles", menu: menuStyle };
+                d.design = { ...d.design, welcome: "tiles", menu: menuStyle };
               } else if (v === "tiles" || v === "simple") {
                 d.welcome ??= { kicker: d.brand, title: `Velkommen til ${d.brand}`, lead: "Tag en tur rundt - eller hop direkte derhen, du vil se.", tiles: [], skip: "Jeg kigger selv rundt" };
-                d.design = { welcome: v, menu: menuStyle };
+                d.design = { ...d.design, welcome: v, menu: menuStyle };
               } else {
                 d.cover ??= { kicker: d.subtitle ?? d.brand, title: `Velkommen til ${d.brand}`, lead: "Kig indenfor før du kommer.", image: d.places?.[0]?.image ?? d.logo, enter: "Træd indenfor", placesTitle: "Vælg hvor du vil starte" };
-                d.design = { welcome: "cover", menu: menuStyle };
+                d.design = { ...d.design, welcome: "cover", menu: menuStyle };
               }
             })
           }
@@ -431,8 +431,11 @@ export function StartEditor({ config, edit, slug, preview }: Props) {
         </>
       )}
 
-      <Group title="Steder med foto">
-        <p className={small}>Bruges på forsiden og i bunden af touren (&quot;Steder&quot;). Gå hen til et sted i forhåndsvisningen og tryk på knappen - så kommer både stedet og et foto med.</p>
+      {(style === "cover" || menuStyle === "dock" || (config.places?.length ?? 0) > 0) && (
+      <Group title={style === "cover" ? "Forsidens steder" : "Steder med foto"}>
+        <p className={small}>
+          {style === "cover" ? "Stederne man kan vælge at starte i på forsiden" : "Stederne i barens \"Steder\""} - med foto. Det er ikke menuen (den laves under Menu). Gå hen til et sted i forhåndsvisningen og tryk på knappen - så kommer både stedet og et foto med.
+        </p>
         <Rows<TourPlace>
           items={config.places ?? []}
           onChange={(places) => edit((d) => void (d.places = places.length ? places : undefined))}
@@ -455,10 +458,11 @@ export function StartEditor({ config, edit, slug, preview }: Props) {
         />
         <button type="button" disabled={busy} onClick={addPlace} className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#0071e3] py-2.5 text-[15px] font-medium text-white hover:bg-[#0077ed] disabled:opacity-50">
           <Icon d={CAMERA} className="h-4 w-4" />
-          {busy ? "Henter sted og foto…" : "Tilføj det sted, du ser"}
+          {busy ? "Henter sted og foto…" : "Tilføj stedet, du ser, med foto"}
         </button>
         {error && <p className="px-1 text-[12px] text-[#ff3b30]">{error}</p>}
       </Group>
+      )}
     </>
   );
 }
@@ -570,7 +574,7 @@ export function GuideEditor({ config, edit, preview }: Omit<Props, "slug">) {
           icon={["bg-[#ff2d55]", '<path d="M8 5v14l11-7z"/>']}
           title={(s) => ("point" in s ? `Luftfoto-punkt: ${s.point}` : s.title)}
           subtitle={(s) => ("point" in s ? "Bruger punktets egen tekst" : [s.audio ? "🔊" : null, s.href ? null : "Bliver stående", s.text || "Mangler tekst"].filter(Boolean).join(" · "))}
-          empty='Ingen stop endnu. Gå til det første sted i forhåndsvisningen og tryk "Tilføj det sted, du ser".'
+          empty='Ingen stop endnu. Gå til det første sted i forhåndsvisningen og tryk "+ Stop her".'
           editor={(s, set) =>
             "point" in s ? (
               <p className={small}>Dette stop bruger navn og tekst fra luftfotoets punkt &quot;{s.point}&quot;.</p>
@@ -630,7 +634,7 @@ export function GuideEditor({ config, edit, preview }: Omit<Props, "slug">) {
           }}
         >
           <Icon d='<path d="M12 5v14M5 12h14"/>' className="h-4 w-4" />
-          {busy ? "Henter stedet…" : "Tilføj det sted, du ser"}
+          {busy ? "Henter stedet…" : "+ Stop her"}
         </button>
         {error && <p className="px-1 text-[12px] text-[#ff3b30]">{error}</p>}
       </Group>
@@ -856,7 +860,7 @@ export function CardsEditor({ config, edit, preview }: Omit<Props, "slug">) {
             edit(
               (d) =>
                 void (d.nudge = on
-                  ? { afterSeconds: 90, title: "Din plads venter", text: "Har du set nok til at tage det næste skridt?", buttons: d.cta.filter((c) => c.primary).map((c) => ({ label: c.label, href: c.href, primary: true })) }
+                  ? { afterSeconds: 90, title: "Din plads venter", text: "Har du set nok til at tage det næste skridt?", buttons: [] }
                   : undefined)
             )
           }
@@ -874,12 +878,18 @@ export function CardsEditor({ config, edit, preview }: Omit<Props, "slug">) {
             <Field title="Tekst">
               <textarea className={textarea} value={nudge.text} onChange={(e) => edit((d) => void (d.nudge!.text = e.target.value))} />
             </Field>
-            <ButtonsEditor
+            <Toggle
+              on={nudge.buttons.length === 0}
+              onChange={(on) => edit((d) => void (d.nudge!.buttons = on ? [] : d.cta.filter((c) => c.primary).map((c) => ({ label: c.label, href: c.href, primary: true }))))}
+              title="Brug tourens hovedknapper"
+              hint="Knapperne fra Knapper og kontakt - retter du dem dér, følger kortet med. Fra: kortet får sine egne knapper."
+            />
+            {nudge.buttons.length > 0 && <ButtonsEditor
               buttons={nudge.buttons}
               rooms={rooms}
               allowRoom={false}
               onChange={(b) => edit((d) => void (d.nudge!.buttons = b.filter((x): x is { label: string; href: string; primary?: boolean } => "href" in x)))}
-            />
+            />}
           </>
         )}
       </Group>

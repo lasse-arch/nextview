@@ -3,7 +3,7 @@
 import { InsightsPanel } from "./insights";
 import { LanguagesPanel } from "./languages";
 import { tourUrl } from "@/lib/public-urls";
-import { formatPhone, IMAGE_HREF, imageOfHref, isPlaceHref, placeHref, pointOfHref } from "../../tours/places";
+import { formatPhone, IMAGE_HREF, imageOfHref, isPlaceHref, pointOfHref } from "../../tours/places";
 import { tourConfigProblem } from "@/lib/tour-validate";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -23,7 +23,7 @@ import type { ScanMap } from "@/lib/matterport-graph";
 import { currentPreset } from "../../tours/presets";
 import { EconomyPanel, type TourEconomy } from "./economy";
 import { DEFAULT_EMBED, SharePanel, SitePreview, type EmbedSize } from "./share";
-import { Choice, Field, FilesContext, Group, Icon, input, outsideFiles, PanoZoom, ssOfHref, Toggle, UploadButton, withProtocol, type PreviewApi } from "./ui";
+import { Choice, Field, FilesContext, Group, Icon, input, outsideFiles, PanoZoom, Toggle, UploadButton, withProtocol, type PreviewApi } from "./ui";
 import { fetchSiteFavicon, hostTourFiles } from "@/lib/actions/tour-files";
 import { AiMemoryPanel } from "./memory";
 import { WeatherEditor } from "./weather-editor";
@@ -79,18 +79,18 @@ const FINDS: Partial<Record<Tab, string[]>> = {
   resultater: ["Statistik", "Besøg", "Klik", "Rapport", "Leads"],
   feedback: ["Rettelser", "Kundegennemsyn", "Kommentarer"],
   del: ["Udgiv", "Link", "QR-kode", "Indlejr", "iframe", "Kode til hjemmesiden", "Cloudflare"],
-  start: ["Hvor touren starter|startpunkt|startposition|start-link|start her", "Forsiden", "Velkomsten", "Fliser", "Kort film før touren", "Intro-video", "Steder med foto", "Træd indenfor", "Sådan ser en dag ud"],
-  menu: ["Menupunkter", "Grupper", "Tilføj det sted, du ser", "Billede i menuen", "360°-billede", "Webside", "Luftfotoet", "Scanpunkter i menuen"],
-  rundvisning: ["Vis mig rundt", "Guide", "Guidet tur", "Stop", "Drejning", "Sekunder ved hvert stop", "Stemme", "Lav den ud fra menuen"],
+  start: ["Hvor touren starter|startpunkt|startposition|start-link|start her", "Forsiden", "Velkomsten", "Fliser", "Kort film før touren", "Intro-video", "Steder med foto", "Træd indenfor"],
+  menu: ["Menuens udseende|menu-design|sidemenu|dock|bar i bunden|rumvælger", "Menu åben på computer", "Menu åben på mobil", "Dæmp touren bag menuen", "Menupunkter", "Grupper", "Tilføj det sted, du ser", "Billede i menuen", "360°-billede", "Webside", "Luftfotoet", "Scanpunkter i menuen"],
+  rundvisning: ["Sådan ser en dag ud|dagen|program", "Vis mig rundt", "Guide", "Guidet tur", "Stop", "Drejning", "Sekunder ved hvert stop", "Stemme", "Lav den ud fra menuen"],
   kortet: ["Interaktivt kort", "Luftfoto", "Dronebillede", "360°-kort", "Punkter på kortet", "Kategorier", "Skyer", "Boksen øverst", "Filteret", "Luftfotoets første udsnit|startudsnit", "Ikoner", "Vejret|vejr|temperatur|dmi|sol"],
   scan: ["Scanpunkter", "Skjul scanpunkter", "Personer i scans"],
   tags: ["Tags", "Infotags", "Hotspots", "Pris", "Video"],
   live: ["Live data", "Ledige pladser", "Ledige rum", "Book-knap", "Hent nye data"],
   kort: ["Stedkort", "Kort ved punkt", "Din plads venter", "Kort efter et stykke tid"],
   links: ["Knapper", "Book", "Kontakt", "Telefon", "E-mail", "Adresse", "Sociale medier", "Kontaktformular", "Skriv til os", "Åbning", "Popup", "Ny fane", "Kort-link"],
-  design: ["Farver", "Skrift", "Font", "Logo", "Logostørrelse", "Logoets afstand", "Favicon", "Mørkt logo", "Farvefilter", "Menu-design", "Dock"],
+  design: ["Farver", "Skrift", "Font", "Logo", "Logostørrelse", "Logoets afstand", "Favicon", "Mørkt logo", "Farvefilter", "Skabelon|design|tema|preset"],
   sprog: ["Sprog", "Engelsk", "Tysk", "Oversæt"],
-  funktioner: ["Navigation", "Bevægelse", "Fri bevægelse", "Kun punkter", "Skift mellem steder", "Fade", "Flyv", "Zoom", "Lås zoom på mobil", "Menu åben på computer", "Menu åben på mobil", "Dæmp touren bag menuen", "Historier", "Scroll i historierne", "Find vej", "Vis mål", "Matterports egne knapper", "Sådan går du rundt|hjælp ved start|onboarding"],
+  funktioner: ["Navigation", "Bevægelse", "Fri bevægelse", "Kun punkter", "Skift mellem steder", "Fade", "Flyv", "Zoom", "Lås zoom på mobil", "Historier", "Scroll i historierne", "Find vej", "Vis mål", "Matterports egne knapper", "Sådan går du rundt|hjælp ved start|onboarding"],
   generelt: ["Navn", "Firmanavn", "Undertitel", "Matterport-model"],
   okonomi: ["Tid", "Pris", "Timer", "Økonomi"],
   versioner: ["Versioner", "Fortryd", "Gendan", "Historik"],
@@ -590,8 +590,10 @@ export function TourEditor({
 
             {tab === "design" && (
               <>
-                <Group title="Design">
-                  <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">Hold musen over et design for at se det i forhåndsvisningen. Et klik vælger det - du kan altid fortryde.</p>
+                <Group title="Start fra en skabelon">
+                  <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">
+                    Hold musen over en skabelon for at se den i forhåndsvisningen. Et klik sætter flere ting på én gang: hvordan touren åbner (Start), menuens udseende (Menu), navigation og historier (Funktioner), &quot;Din plads venter&quot; (Stedkort) og Vis mig rundt. Bagefter rettes de enkelte ting i deres egne faner - og du kan altid fortryde.
+                  </p>
                   <DesignGallery
                     colors={config.colors}
                     selected={currentPreset(config)}
@@ -853,7 +855,9 @@ export function TourEditor({
                     hint="Touren bliver lidt mørkere, når menuen er åben, og et tryk på den lukker menuen. Fra: touren står klar og kan bruges, mens menuen er åben."
                   />
                 </Group>
-                <ScanJumper config={config} preview={preview} map={scanMap} count={scanCount} hiddenSweeps={[...config.hiddenSweeps, ...mpskinsHidden]} />
+                <button type="button" onClick={() => setTab("scan")} className="w-full rounded-xl bg-white px-4 py-3 text-left text-[14px] font-medium text-[#0071e3] ring-1 ring-black/[.06] hover:bg-[#0071e3]/5">
+                  Alle scanpunkter - spring rundt, skjul og læg i menuen under Scanpunkter →
+                </button>
               </>
             )}
 
@@ -1037,14 +1041,14 @@ export function TourEditor({
                 <Group title="Kontaktformular i touren">
                   <Toggle
                     on={Boolean(config.contactForm)}
-                    onChange={(on) => edit((d) => void (d.contactForm = on ? { to: d.contact?.email ?? "" } : undefined))}
+                    onChange={(on) => edit((d) => void (d.contactForm = on ? { to: "" } : undefined))}
                     title='"Skriv til os" inde i touren'
                     hint="Gæsten skriver navn, e-mail, telefon og besked i touren. Når de trykker, åbner deres eget mailprogram med mailen færdigskrevet til kunden - de trykker Send, og mailen går direkte fra gæst til kunde. Intet går gennem os. Knappen kommer i kontaktboksen; linket #kontakt kan også bruges i menuen og på knapper."
                   />
                   {config.contactForm && (
                     <>
-                      <Field title="Mailen skrives til" hint="Kundens e-mail - gæsten ser den i sit mailprogram.">
-                        <input type="email" className={input} placeholder="Fx info@kunde.dk" value={config.contactForm.to} onChange={(e) => edit((d) => void (d.contactForm = { ...d.contactForm!, to: e.target.value.trim() }))} />
+                      <Field title="Mailen skrives til" hint={config.contact?.email ? `Tom: kontakt-mailen ovenfor (${config.contact.email}). Skriv kun her, hvis formularen skal til en anden.` : "Kundens e-mail - gæsten ser den i sit mailprogram."}>
+                        <input type="email" className={input} placeholder={config.contact?.email || "Fx info@kunde.dk"} value={config.contactForm.to} onChange={(e) => edit((d) => void (d.contactForm = { ...d.contactForm!, to: e.target.value.trim() }))} />
                       </Field>
                       <Field title="Overskrift">
                         <input className={input} placeholder="Skriv til os" value={config.contactForm.title ?? ""} onChange={(e) => edit((d) => void (d.contactForm = { ...d.contactForm!, title: e.target.value || undefined }))} />
@@ -2180,64 +2184,6 @@ function CtaEditor({ cta, live, form, onChange }: { cta: TourConfig["cta"]; live
         </button>
       </div>
     </Field>
-  );
-}
-
-/**
- * Under the menu: every scan point as a number to click - the preview jumps
- * straight there, also to points you can't walk to (another floor, a closed
- * door). Then "Tilføj det sted, du ser" adds it to the menu.
- */
-function ScanJumper({ config, preview, map, count, hiddenSweeps }: { config: TourConfig; preview: PreviewApi; map: ScanMap | null; count: number | null; hiddenSweeps: string[] }) {
-  const hidden = new Set(hiddenSweeps);
-  const inMenu = new Set(
-    config.menu
-      .flatMap((m) => ("items" in m ? m.items.map((i) => i[1]) : [m.href]))
-      .map(ssOfHref)
-      .filter((n): n is number => n != null)
-  );
-  // The points Matterport told us about, by floor - or just 1..n when it didn't send the map.
-  const floors = map?.points.length
-    ? map.floors
-        .map((f, i) => ({ name: f.name, points: map.points.filter((p) => p.floor === i).sort((a, b) => a.ss - b.ss).map((p) => ({ ss: p.ss, hidden: hidden.has(p.sid) })) }))
-        .filter((f) => f.points.length)
-    : count
-      ? [{ name: "", points: Array.from({ length: count }, (_, i) => ({ ss: i + 1, hidden: false })) }]
-      : [];
-  if (!floors.length) return null;
-  const total = floors.reduce((n, f) => n + f.points.length, 0);
-  return (
-    <Group title={`Alle scanpunkter (${total})`}>
-      <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">Klik på et nummer for at hoppe dertil i forhåndsvisningen - også til punkter, man ikke kan gå hen til. Tryk så &quot;Tilføj det sted, du ser&quot; ovenfor.</p>
-      {floors.map((f) => (
-        <div key={f.name || "alle"} className="space-y-1.5">
-          {floors.length > 1 && <p className="px-1 text-[12px] font-semibold text-[#6e6e73]">{f.name}</p>}
-          <div className="flex flex-wrap gap-1.5">
-            {f.points.map((p) => (
-              <button
-                key={p.ss}
-                type="button"
-                title={p.hidden ? `Punkt ${p.ss} (skjult i touren)` : inMenu.has(p.ss) ? `Punkt ${p.ss} (i menuen)` : `Punkt ${p.ss}`}
-                onClick={() => preview.go(`Punkt ${p.ss}`, placeHref(config, p.ss))}
-                className={`h-8 min-w-8 rounded-full px-2 text-[12px] font-semibold tabular-nums transition ${
-                  p.hidden
-                    ? "border border-dashed border-[#c7c7cc] text-[#8e8e93] hover:border-[#0071e3]"
-                    : inMenu.has(p.ss)
-                      ? "bg-[#34c759] text-white hover:brightness-95"
-                      : "bg-[#f2f2f7] text-[#3a3a3c] hover:bg-[#0071e3] hover:text-white"
-                }`}
-              >
-                {p.ss}
-              </button>
-            ))}
-          </div>
-        </div>
-      ))}
-      <p className="flex gap-3 px-1 text-[11px] text-[#8e8e93]">
-        <span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-[#34c759]" />I menuen</span>
-        <span><i className="mr-1 inline-block h-2 w-2 rounded-full border border-dashed border-[#c7c7cc]" />Skjult</span>
-      </p>
-    </Group>
   );
 }
 

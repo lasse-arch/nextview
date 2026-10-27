@@ -101,7 +101,7 @@ export function NudgeCard({ T, onClose, onLink }: { T: TourConfig; onClose: () =
       <h3>{n.title}</h3>
       <p>{n.text}</p>
       <div className="pc-btns">
-        {n.buttons.map((b) => (
+        {(n.buttons.length ? n.buttons : T.cta.filter((c) => c.primary).map((c) => ({ ...c, primary: true }))).map((b) => (
           <TourLink key={b.label} className={`pc-btn ${b.primary ? "pc-primary" : "pc-fly"}`} href={b.href} label={b.label} onClick={() => onLink(b.label, b.href)}>
             {b.label}
           </TourLink>
