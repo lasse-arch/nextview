@@ -10,7 +10,7 @@ import { prisma } from "@/lib/db";
  */
 
 /** Events that mean the visitor acted: a link out of the tour (booking, order …) or a call/mail. */
-export const ACTION = `(name IN ('cta_click', 'live_book') OR (name = 'contact_click' AND label IN ('phone', 'email')))`;
+export const ACTION = `(name IN ('cta_click', 'live_book', 'contact_form') OR (name = 'contact_click' AND label IN ('phone', 'email')))`;
 
 export type TourStats = {
   days: number;

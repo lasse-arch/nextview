@@ -15,6 +15,7 @@ import { apiUrl, isStaticTour } from "../tours/api";
 import type { MenuEntry, TourConfig, TourPlace, TourPoint, WelcomeGo } from "../tours/types";
 import { CoverWelcome, DESIGNS_CSS, DockMenu, PickerMenu } from "./designs";
 import { GUIDE_CSS, GuidePlayer, guideStops } from "./guide";
+import { CONTACT_CSS, CONTACT_HREF, ContactForm } from "./contact-form";
 import { DAY_CSS, DayBar, DaySheet } from "./day";
 import { FEEDBACK_CSS, FeedbackLayer } from "./feedback";
 import { ICONS } from "../tours/icons";
@@ -360,6 +361,14 @@ function TourExperience({
   const roomShown = room ? tx(room) : null;
   const [showLog, setShowLog] = useState(false);
   const [pano, setPano] = useState<Point | null>(null);
+  /** The tour's contact form ("Skriv til os") is open. */
+  const [contactOpen, setContactOpen] = useState(false);
+  // Any link "#kontakt" (a button, a card, the nudge) opens it.
+  useEffect(() => {
+    const open = () => setContactOpen(true);
+    window.addEventListener("hv-kontakt", open);
+    return () => window.removeEventListener("hv-kontakt", open);
+  }, []);
   /** A point has a 360° photo to open: an uploaded picture, or prepared tiles (with the tour's panos). */
   const hasPano = (p: Point) => Boolean(p.panorama || (p.pano && T.panos));
   /** Pictures full screen: a place's photos, or the site plan (zoomed in on a point). */
@@ -897,6 +906,12 @@ function TourExperience({
       setMenuOpen(false);
       return openPlan();
     }
+    if (href === CONTACT_HREF) {
+      if (!T.contactForm) return;
+      track("contact_click", { kind: "form", place: "menu" });
+      setMenuOpen(false);
+      return setContactOpen(true);
+    }
     if (!isPlaceHref(href)) {
       track("cta_click", { label: name, link_url: href, place: "menu" });
       openLink(T, href, name, popup);
@@ -1328,7 +1343,7 @@ function TourExperience({
       }>
       <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.font.replace(/ /g, "+")}:wght@400;600;700;800;900&display=swap`} />
       {T.fontHeading && <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.fontHeading.replace(/ /g, "+")}:wght@500;600&display=swap`} />}
-      <style>{CSS + STORIES_CSS + LIGHTBOX_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + INFO_CSS + MAP_CSS + ROUTE_CSS + MEASURES_CSS + CARDS_CSS + DAY_CSS + SIMPLE_CSS + LOGO_RIGHT_CSS + LANG_CSS + (review ? FEEDBACK_CSS : "")}</style>
+      <style>{CSS + CONTACT_CSS + STORIES_CSS + LIGHTBOX_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + INFO_CSS + MAP_CSS + ROUTE_CSS + MEASURES_CSS + CARDS_CSS + DAY_CSS + SIMPLE_CSS + LOGO_RIGHT_CSS + LANG_CSS + (review ? FEEDBACK_CSS : "")}</style>
       {/* The tour's own design on top (written by Claude or by hand under Avanceret). */}
       {T.customCss && <style>{T.customCss.replace(/<\/?style/gi, "")}</style>}
 
@@ -1672,6 +1687,18 @@ function TourExperience({
                 {T.contact.email}
               </a>
             )}
+            {T.contactForm && (
+              <button
+                type="button"
+                className="hv-contact-form"
+                onClick={() => {
+                  track("contact_click", { kind: "form", place: "contact" });
+                  setContactOpen(true);
+                }}
+              >
+                ✍️ {T.contactForm.title || tx("Skriv til os")}
+              </button>
+            )}
             {socialLinks(T.contact).length > 0 && (
               <div className="hv-social">
                 {socialLinks(T.contact).map((s) => (
@@ -1885,6 +1912,9 @@ function TourExperience({
             setDayAt(null);
           }}
         />
+      )}
+      {contactOpen && T.contactForm && (
+        <ContactForm T={T} preview={inPreview} onClose={() => setContactOpen(false)} onSent={() => track("contact_form", { place: "form" })} />
       )}
       {guideAt != null && GUIDE[guideAt] && (
         <GuidePlayer

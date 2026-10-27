@@ -284,6 +284,13 @@ export type TourConfig = {
   placeCards?: PlaceCard[];
   /** A card that comes by itself after a while (e.g. "Din plads venter") - never while the menu or a place card is open. */
   nudge?: { afterSeconds: number; title: string; text: string; buttons: { label: string; href: string; primary?: boolean }[] };
+  /**
+   * A contact form inside the tour ("Skriv til os") - no popup to the
+   * customer's own form: the message is mailed to `to` (the customer), with
+   * the visitor's address to answer. Opened from the contact box, and from any
+   * link "#kontakt" (menu, buttons). `phone`: false = no phone field.
+   */
+  contactForm?: { to: string; title?: string; lead?: string; phone?: boolean; thanks?: string };
   /** Phones: no pinch-zoom in the tour, and a little zoomed out (MPSkins' mobile zoom lock). */
   mobileZoomLock?: boolean;
   /** How zoomed the view is, per device: 1 = Matterport's normal, under 1 = zoomed out (more of the room), over 1 = zoomed in. */

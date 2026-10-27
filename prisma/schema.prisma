@@ -1617,3 +1617,22 @@ model CustomerLoginToken {
 
   @@index([accountId, createdAt])
 }
+
+/// A message sent with a tour's contact form ("Skriv til os") - kept here as
+/// well as e-mailed to the customer, so nothing is lost if the mail fails.
+model TourMessage {
+  id        String   @id @default(cuid())
+  tourSlug  String
+  name      String
+  email     String
+  phone     String?
+  message   String
+  /// A hash of the sender's IP - only to limit how many one sender can send, never the address itself.
+  ipHash    String
+  sent      Boolean  @default(false)
+  error     String?
+  createdAt DateTime @default(now())
+
+  @@index([tourSlug, createdAt])
+  @@index([ipHash, createdAt])
+}

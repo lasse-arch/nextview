@@ -108,6 +108,8 @@ export function LinkPopup({ open, onClose, size = "stor", site }: { open: NonNul
 
 /** Opens a link from code (a button rather than an <a>) the tour's way. */
 export function openLink(T: TourConfig, href: string, label: string, popup: (href: string, label: string) => void) {
+  // The tour's own contact form - not a page to open.
+  if (href === "#kontakt") return void window.dispatchEvent(new Event("hv-kontakt"));
   const mode = linkMode(T, href);
   const url = tagged(T, href);
   if (mode === "popup") popup(url, label);
@@ -140,6 +142,12 @@ export function TourLink({
       rel={mode === "tab" ? "noopener" : undefined}
       onClick={(e) => {
         onClick?.();
+        if (href === "#kontakt") {
+          // The tour's own contact form (see contact-form.tsx).
+          e.preventDefault();
+          window.dispatchEvent(new Event("hv-kontakt"));
+          return;
+        }
         if (mode === "popup") {
           e.preventDefault();
           popup(url, label);

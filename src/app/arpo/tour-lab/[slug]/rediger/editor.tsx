@@ -846,6 +846,34 @@ export function TourEditor({
                   </Field>
                 )}
                 </Group>
+                <Group title="Kontaktformular i touren">
+                  <Toggle
+                    on={Boolean(config.contactForm)}
+                    onChange={(on) => edit((d) => void (d.contactForm = on ? { to: d.contact?.email ?? "" } : undefined))}
+                    title='"Skriv til os" inde i touren'
+                    hint="Gæsten skriver navn, e-mail, telefon og besked uden at forlade touren - beskeden sendes til kunden, som kan svare direkte på mailen. Knappen kommer i kontaktboksen; linket #kontakt kan også bruges i menuen og på knapper."
+                  />
+                  {config.contactForm && (
+                    <>
+                      <Field title="Beskeder sendes til" hint="Kundens e-mail. Gæsten ser den ikke.">
+                        <input type="email" className={input} placeholder="Fx info@kunde.dk" value={config.contactForm.to} onChange={(e) => edit((d) => void (d.contactForm = { ...d.contactForm!, to: e.target.value.trim() }))} />
+                      </Field>
+                      <Field title="Overskrift">
+                        <input className={input} placeholder="Skriv til os" value={config.contactForm.title ?? ""} onChange={(e) => edit((d) => void (d.contactForm = { ...d.contactForm!, title: e.target.value || undefined }))} />
+                      </Field>
+                      <Field title="Kort tekst (valgfri)">
+                        <input className={input} placeholder="Fx Vi svarer inden for en dag." value={config.contactForm.lead ?? ""} onChange={(e) => edit((d) => void (d.contactForm = { ...d.contactForm!, lead: e.target.value || undefined }))} />
+                      </Field>
+                      <Toggle on={config.contactForm.phone !== false} onChange={(on) => edit((d) => void (d.contactForm = { ...d.contactForm!, phone: on ? undefined : false }))} title="Felt til telefonnummer" />
+                      {!config.menu.some((m) => ("items" in m ? m.items.some((i) => i[1] === "#kontakt") : m.href === "#kontakt")) && (
+                        <button type="button" onClick={() => edit((d) => void d.menu.push({ title: d.contactForm?.title || "Skriv til os", href: "#kontakt" }))} className="w-full rounded-xl bg-white py-2 text-[14px] font-medium text-[#0071e3] ring-1 ring-black/[.06] hover:bg-[#0071e3]/5">
+                          + Læg &quot;Skriv til os&quot; i menuen
+                        </button>
+                      )}
+                      <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">I forhåndsvisningen kan formularen prøves, men intet sendes.</p>
+                    </>
+                  )}
+                </Group>
               </>
             )}
 

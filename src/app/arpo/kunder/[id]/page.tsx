@@ -88,6 +88,8 @@ export default async function CustomerOverviewPage({ params }: { params: Promise
   ]);
   const picker = forPicker(await customerCards());
   const stats = await Promise.all(tours.map((t) => tourStats(t.slug, 30).catch(() => null)));
+  // Messages visitors wrote with the tours' contact form ("Skriv til os").
+  const messages = tours.length ? await prisma.tourMessage.findMany({ where: { tourSlug: { in: tours.map((t) => t.slug) } }, orderBy: { createdAt: "desc" }, take: 100 }) : [];
 
   // Money: what's been sent, paid, and still out.
   const sent = invoices.filter((i) => i.sentAt || i.status === "SENT_MANUALLY");
@@ -125,6 +127,13 @@ export default async function CustomerOverviewPage({ params }: { params: Promise
     if ((c.status === "REJECTED" || c.status === "CHARGED_BACK") && c.statusAt) events.push({ at: c.statusAt, tone: "warn", title: c.status === "REJECTED" ? "Betalingsservice: afvist" : "Betalingsservice: tilbageført", detail: `${formatDKK(Math.round(c.amountOre / 100))} · faktura ${c.reference}` });
   }
   for (const c of contract) if (CONTRACT[c.type]) events.push({ at: c.occurredAt, tone: "contract", title: CONTRACT[c.type] });
+  for (const m of messages)
+    events.push({
+      at: m.createdAt,
+      tone: m.sent ? "tour" : "warn",
+      title: `Besked fra touren: ${m.name}${m.sent ? "" : " - mailen til kunden gik ikke igennem"}`,
+      detail: `${m.email}${m.phone ? ` · ${m.phone}` : ""} · ${m.message.slice(0, 160)}${m.message.length > 160 ? "…" : ""}`,
+    });
   if (deal.liveAt) events.push({ at: deal.liveAt, tone: "login", title: "Kunden gik live" });
   if (deal.filmedAt) events.push({ at: deal.filmedAt, tone: "tour", title: "Filmet" });
   events.sort((a, b) => b.at.getTime() - a.at.getTime());

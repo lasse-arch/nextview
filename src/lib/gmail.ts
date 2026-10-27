@@ -29,6 +29,8 @@ export async function sendGmailMessage(
      * it otherwise), e.g. sending as the shared info@nextview360.dk through
      * whichever admin's personal Google account has that alias configured. */
     fromAddress?: string;
+    /** Where an answer goes (e.g. the visitor who wrote with a tour's contact form). Must be a plain address. */
+    replyTo?: string;
   }
 ): Promise<{ id: string }> {
   const accessToken = await getValidAccessToken(account);
@@ -41,6 +43,8 @@ export async function sendGmailMessage(
     `From: ${from}`,
     `To: ${params.to.join(", ")}`,
     ...(params.cc && params.cc.length > 0 ? [`Cc: ${params.cc.join(", ")}`] : []),
+    // Only a plain address - never anything that could add a header line.
+    ...(params.replyTo && /^[^\s@<>",;]+@[^\s@<>",;]+\.[^\s@<>",;]+$/.test(params.replyTo) ? [`Reply-To: ${params.replyTo}`] : []),
     `Subject: ${encodeHeaderUtf8(params.subject)}`,
   ];
 
