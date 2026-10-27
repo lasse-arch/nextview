@@ -445,6 +445,18 @@ function TourExperience({
     return () => void logListeners.delete(l);
   }, []);
 
+  /*
+   * The room names and links are read through refs: a new menu item in the
+   * editor changes them, and that must not connect to Matterport again (which
+   * jumps back to the start) - the names just apply from the next step.
+   */
+  const roomNamesRef = useRef(ROOM_NAMES);
+  const roomLinksRef = useRef(ROOM_LINKS);
+  useEffect(() => {
+    roomNamesRef.current = ROOM_NAMES;
+    roomLinksRef.current = ROOM_LINKS;
+  });
+
   /* ----- The tour: loaded in the background from the start, behind the drone scene. ----- */
   useEffect(() => {
     if (!iframe.current || !sdkKey || !modelId) return;
@@ -485,7 +497,7 @@ function TourExperience({
         const ss = ssBySweep[s.sid];
         currentSsRef.current = ss ?? null;
         setCurrentSs(ss ?? null);
-        const name = ss != null ? ROOM_NAMES[ss] ?? null : null;
+        const name = ss != null ? roomNamesRef.current[ss] ?? null : null;
         // Time spent where the visitor just was (named rooms only).
         if (roomTimer.current?.name && roomTimer.current.name !== name) {
           track("room_time", { room_name: roomTimer.current.name, seconds: Math.round((now() - roomTimer.current.at) / 1000) });
@@ -495,7 +507,7 @@ function TourExperience({
         track("room_view", { sweep_id: s.sid, room_name: name ?? "(uden navn)" });
         if (name && ss != null) {
           try {
-            localStorage.setItem(LAST_ROOM_KEY, JSON.stringify({ name, href: ROOM_LINKS[ss] }));
+            localStorage.setItem(LAST_ROOM_KEY, JSON.stringify({ name, href: roomLinksRef.current[ss] }));
           } catch {}
         }
       });
@@ -503,7 +515,8 @@ function TourExperience({
     });
     sdkRef.current.catch((err) => setTourError(err instanceof Error ? err.message : String(err)));
     return () => sub?.cancel();
-  }, [sdkKey, modelId, sweepBySs, hiddenSweeps, ROOM_NAMES, ROOM_LINKS, LAST_ROOM_KEY, T.start, T.matterportUi, T.measure, routeGraph]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- T.start is read once, when the tour first connects
+  }, [sdkKey, modelId, sweepBySs, hiddenSweeps, LAST_ROOM_KEY, T.matterportUi, T.measure, routeGraph]);
 
   const setNavigation = useCallback(
     async (only: boolean) => {
