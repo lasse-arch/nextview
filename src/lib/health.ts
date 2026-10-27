@@ -84,7 +84,15 @@ export async function healthChecks(): Promise<CheckGroup[]> {
     }),
     timed("Matterport", async () => ((await getSettingValue("MATTERPORT_SDK_KEY")) ? { status: "ok", detail: "SDK-nøgle sat" } : { status: "warn", detail: "Ingen SDK-nøgle - tourene bruger Matterports almindelige visning" })),
     timed("nextviewAI", async () => ((process.env.ANTHROPIC_API_KEY || (await getSettingValue("ANTHROPIC_API_KEY"))) ? { status: "ok", detail: "Nøgle sat" } : { status: "off", detail: "Ingen nøgle" })),
-    timed("AI-billeder (Gemini)", async () => ((await getSettingValue("GEMINI_API_KEY")) ? { status: "ok", detail: "Nøgle sat" } : { status: "off", detail: "Ingen nøgle" })),
+    timed("AI-billeder (Gemini)", async () => {
+      // The key in Vercel (GEMINI_API_KEY) first, like "Ret med AI" itself - else one saved in Arpo. And whether Google takes it.
+      const fromEnv = Boolean(process.env.GEMINI_API_KEY);
+      const key = process.env.GEMINI_API_KEY || (await getSettingValue("GEMINI_API_KEY"));
+      if (!key) return { status: "off", detail: "Ingen nøgle" };
+      const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=1", { headers: { "x-goog-api-key": key }, signal: AbortSignal.timeout(8000) }).catch(() => null);
+      if (!res) return { status: "warn", detail: "Kunne ikke nå Google lige nu" };
+      return res.ok ? { status: "ok", detail: fromEnv ? "Nøgle i Vercel virker" : "Nøgle virker" } : { status: "down", detail: `Google afviser nøglen (${res.status})` };
+    }),
   ]);
   return [
     { title: "Drift", checks: [db, web, tours, explore, backup] },
