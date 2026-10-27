@@ -1636,3 +1636,13 @@ model TourMessage {
   @@index([tourSlug, createdAt])
   @@index([ipHash, createdAt])
 }
+
+/// The small pictures on customer cards (from the Matterport model's hero
+/// photo), made once and kept - so a list of customers loads at once instead
+/// of asking Matterport for every card. `data` null: there is no picture
+/// (checked at `createdAt`, asked again after a while).
+model TourThumb {
+  key       String   @id
+  data      Bytes?
+  createdAt DateTime @default(now())
+}
