@@ -25,6 +25,7 @@ import { MEASURES_CSS, MeasureShield } from "./measures";
 import { ROUTE_CSS, RouteLine, RouteSheet, RouteStatus, flightMs, shortestPath, straighten, type Destination, type RouteGraph } from "./wayfinding";
 import { LINKS_CSS, LinkPopup, LinkProvider, TourLink, openLink, type LinkPopupState } from "./links";
 import { Stories, STORIES_CSS, storyJpeg, type StoryRoom } from "./stories";
+import { LIGHTBOX_CSS, Lightbox, type LightboxState } from "./lightbox";
 import "pannellum/build/pannellum.css";
 
 /* ---------------------------------------------------------------------------
@@ -343,6 +344,13 @@ function TourExperience({
   const roomShown = room ? tx(room) : null;
   const [showLog, setShowLog] = useState(false);
   const [pano, setPano] = useState<Point | null>(null);
+  /** Pictures full screen: a place's photos, or the site plan (zoomed in on a point). */
+  const [lightbox, setLightbox] = useState<LightboxState>(null);
+  const openPlan = (p?: Point) => {
+    if (!T.sitePlan) return;
+    track("plan_open", { label: p?.name ?? "menu" });
+    setLightbox({ images: [T.sitePlan.image], at: 0, title: p?.name ?? T.sitePlan.label.replace(/^Se (på )?/i, "").replace(/^./, (c) => c.toUpperCase()), focus: p?.planBox });
+  };
   /** The welcome tiles - skipped when the link already says where to go. */
   const [welcome, setWelcome] = useState(false);
   const [cover, setCover] = useState(false);
@@ -858,6 +866,10 @@ function TourExperience({
       track("menu_click", { item_name: name, group });
       return showPoint(point);
     }
+    if (href === "#plan") {
+      setMenuOpen(false);
+      return openPlan();
+    }
     if (!isPlaceHref(href)) {
       track("cta_click", { label: name, link_url: href, place: "menu" });
       openLink(T, href, name, popup);
@@ -908,12 +920,16 @@ function TourExperience({
     if (!stop.href) return; // a stop that stays where it is (e.g. the closing card)
     const point = pointById(stop.href);
     if (point) {
-      // A point without a room: shown on the drone scene / map, under the guide's card.
       setSelected(null);
       if (phase !== "drone") setPhase("drone");
+      // With its own 360° photo, the guide shows that (turning slowly) - not just a zoom on the big picture.
+      if (point.pano && T.panos) return setPano(point);
+      // Otherwise the point on the drone scene / map, under the guide's card.
+      setPano(null);
       setTimeout(() => lookAtPoint(point, false), phase === "drone" ? 0 : 400);
       return;
     }
+    setPano(null);
     if (phase === "drone") return enterTour(stop.href, "guide", stop.title);
     flyTo(stop.href, "fly").then(() => sdk?.Camera.rotate?.(18, 0, { speed: 3 }).catch(() => {}));
   }
@@ -991,6 +1007,7 @@ function TourExperience({
   function closeGuide(completed: boolean) {
     track(completed ? "guide_complete" : "guide_close", { stop: (guideAt ?? 0) + 1, stops: GUIDE.length });
     setGuideAt(null);
+    setPano(null);
   }
 
   /** Prototype tool: the exact view the visitor stands in, as a link for the tour's setup. */
@@ -1249,7 +1266,7 @@ function TourExperience({
       }>
       <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.font.replace(/ /g, "+")}:wght@400;600;700;800;900&display=swap`} />
       {T.fontHeading && <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.fontHeading.replace(/ /g, "+")}:wght@500;600&display=swap`} />}
-      <style>{CSS + STORIES_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + INFO_CSS + MAP_CSS + ROUTE_CSS + MEASURES_CSS + CARDS_CSS + DAY_CSS + SIMPLE_CSS + LOGO_RIGHT_CSS + LANG_CSS + (review ? FEEDBACK_CSS : "")}</style>
+      <style>{CSS + STORIES_CSS + LIGHTBOX_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + INFO_CSS + MAP_CSS + ROUTE_CSS + MEASURES_CSS + CARDS_CSS + DAY_CSS + SIMPLE_CSS + LOGO_RIGHT_CSS + LANG_CSS + (review ? FEEDBACK_CSS : "")}</style>
       {/* The tour's own design on top (written by Claude or by hand under Avanceret). */}
       {T.customCss && <style>{T.customCss.replace(/<\/?style/gi, "")}</style>}
 
@@ -1327,7 +1344,9 @@ function TourExperience({
             <button type="button" className="hv-luk" aria-label={tx("Luk")} onClick={() => setSelected(null)}>
               ×
             </button>
-            {selected.images?.length ? <PointPhotos key={selected.id} images={selected.images} name={selected.name} /> : null}
+            {selected.images?.length ? (
+              <PointPhotos key={selected.id} images={selected.images} name={selected.name} onOpen={(at) => setLightbox({ images: selected.images!, at, title: selected.name })} />
+            ) : null}
             <div className="hv-kat" style={{ color: T.categories[selected.cat].color }}>
               {T.categories[selected.cat].name}
             </div>
@@ -1359,6 +1378,11 @@ function TourExperience({
             {selected.tour && selected.pano && (
               <button type="button" className="hv-btn hv-secondary hv-wide" onClick={() => setPano(selected)}>
                 {tx("Oplev i 360°")}
+              </button>
+            )}
+            {selected.planBox && T.sitePlan && (
+              <button type="button" className="hv-btn hv-secondary hv-wide" onClick={() => openPlan(selected)}>
+                {T.sitePlan.label}
               </button>
             )}
             {selected.button && (
@@ -1423,7 +1447,8 @@ function TourExperience({
         </div>
       )}
 
-      {pano?.pano && T.panos && <PanoView name={pano.name} dir={pano.pano} start={pano.panoStart} panos={T.panos} onClose={() => setPano(null)} />}
+      {pano?.pano && T.panos && <PanoView name={pano.name} dir={pano.pano} start={pano.panoStart} panos={T.panos} turning={guideAt != null} onClose={() => setPano(null)} />}
+      {lightbox && <Lightbox key={lightbox.title + lightbox.at} state={lightbox} onClose={() => setLightbox(null)} />}
 
       {/* Logo (MPSkins: left, 200px, 13px from the edges - or right, with the menu on the left). */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1848,14 +1873,14 @@ function TourExperience({
 
 /** A 360° photo at a point, full screen over the drone scene. */
 /** A point's photos at the top of its card - swiped or tapped through, with dots (cross-faded, no scroll box: a scrolling layer over the drone scene can blank it on phones). */
-function PointPhotos({ images, name }: { images: string[]; name: string }) {
+function PointPhotos({ images, name, onOpen }: { images: string[]; name: string; onOpen: (at: number) => void }) {
   const [at, setAt] = useState(0);
   const touch = useRef<number | null>(null);
   const step = (d: number) => setAt((i) => (i + d + images.length) % images.length);
   return (
     <div
       className="hv-fotos"
-      onClick={() => step(1)}
+      onClick={() => onOpen(at)}
       onTouchStart={(e) => (touch.current = e.touches[0].clientX)}
       onTouchEnd={(e) => {
         const dx = e.changedTouches[0].clientX - (touch.current ?? e.changedTouches[0].clientX);
@@ -1870,6 +1895,19 @@ function PointPhotos({ images, name }: { images: string[]; name: string }) {
         // eslint-disable-next-line @next/next/no-img-element
         <img key={src} src={src} alt={i === 0 ? name : ""} loading={i === 0 ? "eager" : "lazy"} draggable={false} className={i === at ? "on" : ""} />
       ))}
+      <span className="hv-fotos-stor" aria-hidden>
+        {images.length > 1 ? `${at + 1}/${images.length} ` : ""}⤢
+      </span>
+      {images.length > 1 && (
+        <>
+          <button type="button" className="hv-fotos-pil hv-fotos-forrige" aria-label="Forrige" onClick={(e) => (e.stopPropagation(), step(-1))}>
+            ‹
+          </button>
+          <button type="button" className="hv-fotos-pil hv-fotos-naeste" aria-label="Næste" onClick={(e) => (e.stopPropagation(), step(1))}>
+            ›
+          </button>
+        </>
+      )}
       {images.length > 1 && (
         <div className="hv-fotos-dots">
           {images.map((src, i) => (
@@ -1886,11 +1924,14 @@ function PanoView({
   dir,
   start,
   panos,
+  turning = false,
   onClose,
 }: {
   name: string;
   dir: string;
   start?: { yaw: number; pitch: number };
+  /** Turns slowly by itself (the guide shows it). */
+  turning?: boolean;
   panos: NonNullable<TourConfig["panos"]>;
   onClose: () => void;
 }) {
@@ -1918,13 +1959,14 @@ function PanoView({
         maxHfov: 120,
         yaw: start?.yaw ?? 0,
         pitch: start?.pitch ?? -10,
+        ...(turning ? { autoRotate: -2.5, autoRotateInactivityDelay: 4000 } : {}),
       });
     });
     return () => {
       cancelled = true;
       viewer?.destroy();
     };
-  }, [dir, panos, start]);
+  }, [dir, panos, start, turning]);
   return (
     <div className="hv-pano">
       <div ref={el} className="absolute inset-0" />
@@ -2110,6 +2152,14 @@ const CSS = `
 .hv-fotos{position:relative;margin:-18px -18px 14px;border-radius:16px 16px 0 0;overflow:hidden;background:#dfe5e7;aspect-ratio:16/10;cursor:pointer;user-select:none}
 .hv-fotos img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .35s ease}
 .hv-fotos img.on{opacity:1}
+.hv-fotos-stor{position:absolute;right:10px;bottom:9px;padding:3px 8px;border-radius:999px;background:rgba(0,0,0,.5);color:#fff;font-size:11.5px;font-weight:700;pointer-events:none;backdrop-filter:blur(4px)}
+.hv-fotos-pil{position:absolute;top:50%;translate:0 -50%;width:30px;height:30px;border:0;border-radius:50%;background:rgba(255,255,255,.85);color:#1d2a30;font-size:20px;line-height:1;cursor:pointer;opacity:0;transition:opacity .2s}
+.hv-fotos:hover .hv-fotos-pil{opacity:1}
+.hv-fotos-forrige{left:8px}.hv-fotos-naeste{right:8px}
+@media (hover:none){.hv-fotos-pil{display:none}}
+/* The guide shows a 360° photo under its card. */
+.hv-guiding .hv-pano{z-index:10}
+.hv-guiding .hv-pano-luk,.hv-guiding .hv-pano-titel{display:none}
 .hv-fotos-dots{position:absolute;left:0;right:0;bottom:9px;display:flex;justify-content:center;gap:5px;pointer-events:none}
 .hv-fotos-dots i{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.55);box-shadow:0 1px 3px rgba(0,0,0,.3)}
 .hv-fotos-dots i.on{background:#fff;width:16px;border-radius:3px}

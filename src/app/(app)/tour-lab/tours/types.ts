@@ -58,13 +58,15 @@ export type TourPoint = {
   images?: string[];
   /** A button on the point's card, e.g. "Book en komfortplads" (opens like any link out of the tour). */
   button?: { label: string; href: string };
+  /** Where the point is on the tour's site plan (sitePlan), as fractions of the plan picture (x1, y1, x2, y2) - gives the card a button that shows the plan zoomed in on it. */
+  planBox?: [number, number, number, number];
   text: string;
   chips: string[];
   /** How big the point is on the map: 1 = normal (0.6-1.8). */
   size?: number;
 };
 
-/** A menu item: a spot in the tour, "#luften" (back to the drone scene / map), "#punkt:<point id>" (a point on the drone scene / map, its card open), or a page out of the tour. */
+/** A menu item: a spot in the tour, "#luften" (back to the drone scene / map), "#punkt:<point id>" (a point on the drone scene / map, its card open), "#plan" (the site plan full screen), or a page out of the tour. */
 export type MenuEntry = { title: string; href: string } | { title: string; items: [string, string][] };
 
 export type TourConfig = {
@@ -149,6 +151,12 @@ export type TourConfig = {
     filterTitle?: string;
   };
   panos?: { basePath: string; maxLevel: number; cubeResolution: number };
+  /**
+   * The place's own site plan (e.g. a campsite's pladskort): shown full screen
+   * from the menu ("#plan") and from points with a planBox, zoomed in on them.
+   * `label`: the points' button, e.g. "Se på pladskortet".
+   */
+  sitePlan?: { image: string; label: string };
   categories: Record<string, { name: string; color: string }>;
   points: TourPoint[];
   /** The tiles of the tile menu. */

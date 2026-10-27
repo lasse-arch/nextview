@@ -194,6 +194,11 @@ hjemmesidens forside og én til en bestemt produktside). Hver tour har ét mål.
   så åbner punktets kort på dronebilledet. "Vis mig rundt" viser punkter
   uden rum på dronebilledet.
 - Velkomstens fliser må gerne have et foto (`image`) - det føles som stedet selv.
+- Har stedet et pladskort/situationsplan, så læg det ind som `sitePlan`, og giv
+  hvert punkt dets område på kortet (`planBox`) - "Se på pladskortet" viser det
+  zoomet ind. I menuen: `#plan`.
+- "Vis mig rundt" bruger punktets egen 360° (`pano`), når den findes - det er
+  langt bedre end at zoome rundt på ét stort dronebillede.
 
 ## Interaktivt kort
 

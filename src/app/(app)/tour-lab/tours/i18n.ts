@@ -80,6 +80,8 @@ export const UI_STRINGS = [
   "Sprog",
   "Åbn i ny fane ↗",
   "Oplev i 360°",
+  "Se hele kortet",
+  "Zoom ind",
 ] as const;
 
 /** Keys whose values are never words to translate (links, ids, files, layout, code). */

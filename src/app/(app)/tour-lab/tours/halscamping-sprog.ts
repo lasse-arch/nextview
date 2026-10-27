@@ -164,6 +164,9 @@ export const halscampingTranslations: Record<string, Record<string, string>> = {
     "Sprog": "Language",
     "Åbn i ny fane ↗": "Open in a new tab ↗",
     "Oplev i 360°": "Explore in 360°",
+    "Se hele kortet": "See the whole map",
+    "Zoom ind": "Zoom in",
+    "Se på pladskortet": "See it on the site map",
   },
   de: {
     "Hals Strand Camping": "Hals Strand Camping",
@@ -325,5 +328,8 @@ export const halscampingTranslations: Record<string, Record<string, string>> = {
     "Sprog": "Sprache",
     "Åbn i ny fane ↗": "In neuem Tab öffnen ↗",
     "Oplev i 360°": "In 360° erleben",
+    "Se hele kortet": "Ganze Karte ansehen",
+    "Zoom ind": "Hineinzoomen",
+    "Se på pladskortet": "Auf dem Lageplan ansehen",
   },
 };

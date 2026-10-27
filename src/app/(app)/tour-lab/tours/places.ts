@@ -14,7 +14,7 @@ export const isPlaceHref = (href: string) => /explore\.nextview360\.dk|my\.matte
 export const pointOfHref = (href: string) => (href.startsWith("#punkt:") ? href.slice(7) : null);
 
 /** A link that stays in the tour: a spot, the drone scene/map or one of its points. */
-export const isInTourHref = (href: string) => isPlaceHref(href) || href === "#luften" || pointOfHref(href) != null;
+export const isInTourHref = (href: string) => isPlaceHref(href) || href === "#luften" || href === "#plan" || pointOfHref(href) != null;
 
 /** The link to a spot in this tour. */
 export function placeHref(T: Pick<TourConfig, "tourPage" | "modelId">, ss: number | string, rot?: { x: number; y: number }): string {
