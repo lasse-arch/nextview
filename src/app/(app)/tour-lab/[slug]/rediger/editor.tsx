@@ -390,9 +390,25 @@ export function TourEditor({
                       ["picker", "Rumvælger"],
                       ["simple", "Helt enkel"],
                     ]}
-                    onChange={(v) => edit((d) => void (d.design = { welcome: d.design?.welcome ?? "tiles", menu: v }))}
+                    onChange={(v) => edit((d) => void (d.design = { ...d.design, welcome: d.design?.welcome ?? "tiles", menu: v }))}
                   />
                 </Field>
+                {menuStyle === "picker" && (
+                  <Field title="Når man vælger en størrelse, start i" hint="Findes rummet ikke i en størrelse, starter den i størrelsens første">
+                    <select
+                      className={input}
+                      value={config.design?.first ?? ""}
+                      onChange={(e) => edit((d) => void (d.design = { welcome: d.design?.welcome ?? "tiles", menu: d.design?.menu ?? "picker", first: e.target.value || undefined }))}
+                    >
+                      <option value="">Det første i hver størrelse</option>
+                      {[...new Set(config.menu.flatMap((m) => ("items" in m ? m.items.map((i) => i[0]) : [])))].map((n) => (
+                        <option key={n} value={n}>
+                          {n}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                )}
                 </Group>
                 <Group title="Farver og skrift">
                 <div className="grid grid-cols-2 gap-3">

@@ -179,7 +179,12 @@ export type TourConfig = {
    * other, and a menu that is one list of big buttons - no tiles, sub-menus or
    * side panels. For visitors who need it calm and plain (special schools).
    */
-  design?: { welcome: "tiles" | "cover" | "simple"; menu: "side" | "dock" | "picker" | "simple" };
+  design?: {
+    welcome: "tiles" | "cover" | "simple";
+    menu: "side" | "dock" | "picker" | "simple";
+    /** Room picker: the room a size opens in when it's picked (e.g. "Tomt"). Left out, or not in that size = the size's first. */
+    first?: string;
+  };
   /**
    * How the menu moves you: "fly" through the model (default), "instant" - a
    * straight switch to the room, or "fade" - a cross-fade from a picture of
