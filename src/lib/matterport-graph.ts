@@ -132,7 +132,8 @@ export async function fetchScanMap(modelId: string): Promise<ScanMap | null> {
         query: `{ model(id: ${JSON.stringify(modelId)}) { floors { id label sequence } locations { id index position { x y z } floor { id } } assets { floorplans { url resolution origin { x y } width height floor { id } } } } }`,
       }),
       signal: AbortSignal.timeout(10_000),
-      next: { revalidate: 1800 },
+      // Never kept: the floor plans' links are signed and run out - a kept answer shows a broken picture.
+      cache: "no-store",
     });
     if (!res.ok) return null;
     const data = (await res.json()) as {
