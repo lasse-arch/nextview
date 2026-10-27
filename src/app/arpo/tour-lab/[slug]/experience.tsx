@@ -408,6 +408,8 @@ function TourExperience({
       : null;
   const [phase, setPhase] = useState<"drone" | "tour">(OV ? "drone" : "tour");
   const [selected, setSelected] = useState<Point | null>(null);
+  /** The open point whose whole text is shown (on a phone it's cut short). */
+  const [textOpenFor, setTextOpenFor] = useState<string | null>(null);
   /** "Find din plads": the questions are open - and what they found (the best place and the next best). */
   const [finderOpen, setFinderOpen] = useState(false);
   const [finderPick, setFinderPick] = useState<{ best: string; others: string[] } | null>(null);
@@ -1706,7 +1708,10 @@ function TourExperience({
             </div>
             {finderPick?.best === selected.id && <div className="hv-bedst">★ {tx("Bedst til jer")}</div>}
             <h2>{selected.name}</h2>
-            <p>{selected.text}</p>
+            {/* On a phone the text is cut to a few lines (a tap shows it all), so the card fits without scrolling. */}
+            <p className={`hv-ptekst ${textOpenFor === selected.id ? "aaben" : ""}`} onClick={() => setTextOpenFor((x) => (x === selected.id ? null : selected.id))}>
+              {selected.text}
+            </p>
             {finderPick?.best === selected.id && finderPick.others.some((id) => pointNames[id]) && (
               <p className="hv-andre">
                 {tx("Også godt for jer:")}{" "}
@@ -1742,6 +1747,7 @@ function TourExperience({
                 <span key={c}>{c}</span>
               ))}
             </div>
+            <div className="hv-pknapper">
             {selected.tour ? (
               <button type="button" className="hv-btn hv-primary hv-wide" disabled={entering} onClick={() => enterTour(selected.tour!, "drone", selected.name)}>
                 {entering ? tx("Går ind…") : tx("Gå ind i rummet")}
@@ -1785,6 +1791,7 @@ function TourExperience({
                 {selected.button.label}
               </TourLink>
             )}
+            </div>
           </aside>
         )}
       </div>
@@ -2812,7 +2819,21 @@ const CSS = `
   .hv-ikon{width:30px;height:30px;border-width:2px}.hv-ikon svg{width:15px;height:15px}
   /* An open point: the panel takes the bottom, the bars step aside. */
   .hv-panel{top:auto;bottom:0;left:0;right:0;width:auto;max-height:62%;border-radius:18px 18px 0 0;padding-bottom:calc(18px + env(safe-area-inset-bottom,0px))}
-  .hv-fotos{aspect-ratio:auto;height:min(62vw,260px);border-radius:18px 18px 0 0}
+  .hv-fotos{aspect-ratio:auto;height:min(44vw,200px);border-radius:18px 18px 0 0;margin-bottom:10px}
+  /* A compact card: short text (tap for all), the chips in one row, the buttons always at the bottom. */
+  .hv-panel{padding-top:14px}
+  .hv-panel h2{font-size:21px;margin-bottom:5px}
+  .hv-ptekst{font-size:14px!important;line-height:1.45!important;margin-bottom:8px!important;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden;cursor:pointer}
+  .hv-ptekst.aaben{display:block}
+  .hv-pchips{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:0 -18px;padding:0 18px}
+  .hv-pchips::-webkit-scrollbar{display:none}
+  .hv-pchips span{flex:none}
+  .hv-gaa{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:0 -18px 8px;padding:0 18px}
+  .hv-gaa button{flex:none}
+  .hv-pknapper{position:sticky;bottom:calc(-18px - env(safe-area-inset-bottom,0px));z-index:2;display:flex;gap:8px;margin:10px -18px calc(-18px - env(safe-area-inset-bottom,0px));padding:10px 18px calc(12px + env(safe-area-inset-bottom,0px));background:var(--c-soft);box-shadow:0 -8px 16px -12px rgba(0,0,0,.25)}
+  .hv-pknapper:empty{display:none}
+  .hv-pknapper{flex-wrap:wrap}
+  .hv-pknapper .hv-wide{margin-top:0;flex:1 1 40%;min-width:0;padding-left:10px;padding-right:10px;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .hv-logo{height:calc(var(--logo-h) * .74);max-width:45vw;top:calc(var(--logo-top,12px) + env(safe-area-inset-top,0px));left:var(--logo-side,12px)}
   .hv-logo-kort{height:calc(var(--logo-h) * .74 - 8px);padding:7px 10px;border-radius:11px}
   .hv-menu{width:100%}
