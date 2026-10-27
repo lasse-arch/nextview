@@ -1,7 +1,7 @@
 "use client";
 
 import { LANG_CSS, LangSwitch } from "./lang-switch";
-import { danishOf, localize, makeT, tourLanguages } from "../tours/i18n";
+import { danishOf, LANGUAGES, localize, makeT, tourLanguages } from "../tours/i18n";
 import { TourLang } from "../tours/i18n-react";
 import { socialLinks } from "../tours/social";
 import { cssFilter, formatPhone, imageOfHref, isInTourHref, isPlaceHref, placeHref, panoHfov, placeSlug, pointOfHref, startPlaces } from "../tours/places";
@@ -1539,7 +1539,7 @@ function TourExperience({
           <div ref={droneEl} className="absolute inset-0" />
         )}
 
-        <div className="hv-intro">
+        <div className={`hv-intro ${T.logoOnLight ? "" : "hv-intro-moerk"}`}>
           <div className="hv-intro-head" style={{ background: T.colors.main }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={T.logo} alt={T.brand} />
@@ -1787,6 +1787,19 @@ function TourExperience({
           <div className="hv-menu-titel">{T.brand.toUpperCase()}</div>
           <div className="hv-sub">{T.subtitle}</div>
         </div>
+        {setLang && (T.design?.menu ?? "side") === "side" && tourLanguages(savedTour).length > 1 && (
+          <div className="hv-menu-sprog" role="group" aria-label={tx("Sprog")}>
+            {tourLanguages(savedTour).map((code) => {
+              const l = LANGUAGES.find((x) => x.code === code);
+              return (
+                <button key={code} type="button" aria-pressed={code === lang} onClick={() => (track("language", { label: code }), setLang(code))}>
+                  <span aria-hidden>{l?.flag ?? "🌐"}</span>
+                  {l?.name ?? code}
+                </button>
+              );
+            })}
+          </div>
+        )}
         {GUIDE.length > 0 && (
           <button type="button" className="hv-guide-knap" onClick={() => startGuide("menu")}>
             ▶
@@ -2604,6 +2617,10 @@ const CSS = `
   .hv-intro{top:calc(10px + env(safe-area-inset-top,0px));left:10px;right:104px;width:auto;display:flex;align-items:center;border-radius:14px}
   .hv-intro-head{padding:8px 10px;flex:none}
   .hv-intro-head img{height:30px;margin:0}
+  /* One box on phones: the logo stands straight on it (no box of its own) - on the tour's colour when the logo is light. */
+  .hv-intro-head{background:transparent!important}
+  .hv-intro-moerk{background:var(--c-main)}
+  .hv-intro-moerk .hv-intro-body h1{color:#fff}
   .hv-intro .hv-sub{display:none}
   .hv-intro-body{padding:6px 10px;min-width:0;display:flex;flex-direction:column;gap:5px}
   .hv-intro-body h1{font-size:13.5px;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
