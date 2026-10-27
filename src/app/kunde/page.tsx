@@ -15,7 +15,8 @@ import type { TourConfig } from "@/app/arpo/tour-lab/tours/types";
 import { startPlaces } from "@/app/arpo/tour-lab/tours/places";
 import { PortalEmbeds } from "@/app/r/[token]/embeds";
 import { PHONE, WELCOME_MAIL_SENDER } from "@/lib/welcome-mail";
-import { LangToggle, LocationSwitcher, PlaceLinks, ReviewLauncher, TourThumb } from "./portal-ui";
+import { LangToggle, LocationSwitcher, ReviewLauncher, TourThumb } from "./portal-ui";
+import { TourShare } from "./tour-share";
 import { TEXT, type Lang } from "./text";
 
 /*
@@ -462,29 +463,14 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
               ) : (
                 <section className={card}>
                   <h2 className="text-[18px] font-bold tracking-tight">{t.use.links}</h2>
-                  <p className="mt-1 text-[14px] leading-snug text-[#6e6e73]">{t.use.linksLead}</p>
-                  {tours.map((x) => (
-                    <div key={x.slug} className="mt-4">
-                      {tours.length + older.length > 1 && <p className="text-[13px] font-semibold uppercase tracking-wide text-[#8e8e93]">{x.config.title || x.name}</p>}
-                      <PlaceLinks links={[{ key: "_hele", name: t.use.whole, group: null, url: x.url }]} words={{ copy: t.use.copy, copied: t.use.copied, qr: t.use.qr }} />
-                      {startPlaces(x.config).length > 0 && (
-                        <details className="group rounded-2xl bg-[#f7f7f9] px-4">
-                          <summary className="flex cursor-pointer list-none items-center justify-between py-3 text-[14px] font-semibold [&::-webkit-details-marker]:hidden">
-                            {t.use.places(startPlaces(x.config).length)}
-                            <span className="text-[#8e8e93] transition group-open:rotate-90">›</span>
-                          </summary>
-                          <PlaceLinks links={startPlaces(x.config).map((p) => ({ key: p.key, name: p.name, group: p.group, url: `${x.url}?rum=${p.key}` }))} words={{ copy: t.use.copy, copied: t.use.copied, qr: t.use.qr }} />
-                        </details>
-                      )}
-                    </div>
-                  ))}
-                  {older.map((x) => (
-                    <div key={x.id} className="mt-4">
-                      {tours.length + older.length > 1 && <p className="text-[13px] font-semibold uppercase tracking-wide text-[#8e8e93]">{x.name}</p>}
-                      <PlaceLinks links={[{ key: x.id, name: t.use.whole, group: null, url: x.url }]} words={{ copy: t.use.copy, copied: t.use.copied, qr: t.use.qr }} />
-                    </div>
-                  ))}
-                  <p className="mt-3 text-[13px] text-[#8e8e93]">{t.use.qrHint}</p>
+                  <p className="mb-4 mt-1 text-[14px] leading-snug text-[#6e6e73]">{t.use.linksLead}</p>
+                  <TourShare
+                    tours={[
+                      ...tours.map((x) => ({ key: x.slug, title: x.config.title || x.name, url: x.url, size: x.config.embeds?.size, places: startPlaces(x.config).map((p) => ({ key: p.key, name: p.name, group: p.group })) })),
+                      ...older.map((x) => ({ key: x.id, title: x.name, url: x.url, places: [] })),
+                    ]}
+                    words={t.use.builder}
+                  />
                 </section>
               )}
               <section className={card}>

@@ -172,34 +172,3 @@ export function ReviewLauncher({ slug, title, words }: { slug: string; title: st
     </>
   );
 }
-
-/** "Brug touren": a link straight to each place (and the whole tour), to copy - with a QR code to print. */
-export function PlaceLinks({ links, words }: { links: { key: string; name: string; group: string | null; url: string }[]; words: { copy: string; copied: string; qr: string } }) {
-  const [copied, setCopied] = useState<string | null>(null);
-  return (
-    <ul className="divide-y divide-black/[.06]">
-      {links.map((l) => (
-        <li key={l.key} className="flex flex-wrap items-center gap-2 py-3">
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-[15px] font-semibold">{l.name}</p>
-            <p className="truncate text-[12px] text-[#8e8e93]">{l.group ?? l.url.replace(/^https?:\/\//, "")}</p>
-          </div>
-          <a href={`/api/qr?url=${encodeURIComponent(l.url)}`} target="_blank" rel="noopener" className="rounded-full bg-[#f3f3f5] px-3 py-1.5 text-[13px] font-semibold hover:bg-[#e8e8ed]">
-            {words.qr}
-          </a>
-          <button
-            type="button"
-            onClick={() => {
-              navigator.clipboard?.writeText(l.url).catch(() => {});
-              setCopied(l.key);
-              setTimeout(() => setCopied(null), 1600);
-            }}
-            className="rounded-full bg-[#0071e3] px-3.5 py-1.5 text-[13px] font-semibold text-white"
-          >
-            {copied === l.key ? words.copied : words.copy}
-          </button>
-        </li>
-      ))}
-    </ul>
-  );
-}
