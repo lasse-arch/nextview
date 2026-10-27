@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { healthChecks, tourVisits, type Status } from "@/lib/health";
 import { AutoRefresh } from "./auto-refresh";
+import { BackupNow } from "./backup-now";
 
 /*
  * Health: is everything working, and how many are looking at the tours -
@@ -114,6 +115,7 @@ export default async function HealthPage() {
                   <p className="text-[14px] font-medium text-slate-900">{c.name}</p>
                   <p className="truncate text-xs text-slate-500">{c.detail}</p>
                 </div>
+                {c.name === "Natlig backup" && <BackupNow />}
                 <span className="shrink-0 text-xs text-slate-400">
                   {WORD[c.status]}
                   {c.ms != null && c.status !== "off" ? ` · ${c.ms} ms` : ""}
