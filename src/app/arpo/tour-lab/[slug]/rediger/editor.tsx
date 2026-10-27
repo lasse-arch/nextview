@@ -1475,8 +1475,25 @@ function DeviceFrame({ phone, big, address, children }: { phone: boolean; big: b
               <span className="mx-auto rounded-md bg-white px-3 py-0.5 text-[11px] text-[#8e8e93] ring-1 ring-black/[.06]">{address}</span>
             </div>
           )}
-          <div key="screen" className={phone ? "h-full w-full overflow-hidden rounded-[46px] bg-black" : "min-h-0 w-full flex-1 bg-black"}>
-            {children}
+          {/* One tree for both, so switching device never reloads the tour. On a phone, as in Safari on an iPhone: the page starts below the status bar - nothing hides behind the island. */}
+          <div key="screen" className={phone ? "flex h-full w-full flex-col overflow-hidden rounded-[46px] bg-black" : "flex min-h-0 w-full flex-1 flex-col bg-black"}>
+            <div className={phone ? "flex h-[54px] flex-none items-center justify-between px-9 pt-1 text-[15px] font-semibold text-white" : "hidden"}>
+              <span>9:41</span>
+              <span className="flex items-center gap-1.5">
+                <svg viewBox="0 0 18 12" className="h-3 w-[18px] fill-white" aria-hidden>
+                  <rect x="0" y="8" width="3" height="4" rx="1" />
+                  <rect x="5" y="5.5" width="3" height="6.5" rx="1" />
+                  <rect x="10" y="3" width="3" height="9" rx="1" />
+                  <rect x="15" y="0" width="3" height="12" rx="1" />
+                </svg>
+                <svg viewBox="0 0 27 13" className="h-3 w-[27px]" aria-hidden>
+                  <rect x=".5" y=".5" width="23" height="12" rx="3.5" fill="none" stroke="white" opacity=".5" />
+                  <rect x="2" y="2" width="18" height="9" rx="2" fill="white" />
+                  <rect x="25" y="4.5" width="1.5" height="4" rx=".75" fill="white" opacity=".5" />
+                </svg>
+              </span>
+            </div>
+            <div className="min-h-0 flex-1">{children}</div>
           </div>
         </div>
       </div>
