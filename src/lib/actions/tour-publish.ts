@@ -7,7 +7,6 @@ import { prisma } from "@/lib/db";
 import { normalizeEmail } from "@/lib/customer-login";
 import { setFilmingActual, updateDealStage } from "@/lib/actions/deals";
 import { tourChanged } from "@/lib/tour-cache";
-import { sendWelcomeMail } from "@/lib/welcome-mail";
 import { arpoOrigin, cloudflareReady, PAGES_PROJECT, publishTour, setLiveVersion } from "@/lib/tour-publish";
 
 /* "Udgiv på tour.nextview360.dk" in the tour editor - admins only. */
@@ -92,6 +91,8 @@ export async function goLive(slug: string, filmingHours: number | null): Promise
     });
     const deal = tour?.deal;
     if (!deal) return { ok: false, error: "Touren er ikke koblet til en kunde i Arpo." };
+    // A customer who is already live (e.g. moved over from MPSkins) gets nothing from here: no mail, no new billing - "Udgiv ny version" is for them.
+    if (deal.stage === "LIVE") return { ok: false, error: "Kunden er allerede live - brug \"Udgiv ny version\". Der sendes ingen mail." };
     if (!deal.contactEmail) return { ok: false, error: "Kunden har ingen kontakt-e-mail på dealen - tilføj den først." };
     const email = normalizeEmail(deal.contactEmail);
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, error: `Kontakt-e-mailen på dealen ser forkert ud (${deal.contactEmail}).` };
@@ -115,8 +116,7 @@ export async function goLive(slug: string, filmingHours: number | null): Promise
     }
 
     // 3: Live - which sends the welcome mail the first time (a failure is left as a note on the deal).
-    if (deal.stage !== "LIVE") await updateDealStage(deal.id, "LIVE");
-    else if (!deal.welcomeMailSentAt) await sendWelcomeMail(deal.id, user.id);
+    await updateDealStage(deal.id, "LIVE");
     const after = await prisma.deal.findUnique({ where: { id: deal.id }, select: { welcomeMailSentAt: true } });
     await prisma.note.create({ data: { dealId: deal.id, authorId: user.id, kind: "MANUAL", body: `Touren udgivet endeligt, og kunden sat live. Login til kundesiden givet til ${email}.` } });
     revalidatePath(`/arpo/tour-lab/${slug}/rediger`);

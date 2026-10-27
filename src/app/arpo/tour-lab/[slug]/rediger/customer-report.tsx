@@ -7,11 +7,55 @@ import { shown, type ReportShare } from "@/lib/tour-share";
  * see is what they get.
  */
 
-const pct = (n: number) => `${Math.round(n * 100)} %`;
-const duration = (s: number) => (s < 60 ? `${s} sek` : `${Math.floor(s / 60)} min${s % 60 ? ` ${s % 60} sek` : ""}`);
-const label = (l: string) => (l === "phone" ? "Ringede" : l === "email" ? "Skrev en mail" : l === "direkte" ? "Direkte (link/QR)" : l);
+export type ReportLang = "da" | "en";
 
-function Ranked({ rows }: { rows: { label: string; count: number }[] }) {
+/** The words - Danish, or English for the customer portal in English. */
+const T = {
+  da: {
+    sec: "sek",
+    phone: "Ringede",
+    email: "Skrev en mail",
+    direct: "Direkte (link/QR)",
+    visits: "besøg",
+    engaged: "gik på opdagelse i touren",
+    typical: "typisk besøg",
+    period: (days: number) => `Jeres virtuelle tour · seneste ${days} dage`,
+    leads: "besøgende gik videre til booking eller kontakt fra touren",
+    ofVisits: (p: string) => ` - ${p} af besøgene`,
+    perDay: "Besøg pr. dag",
+    went: "Det, besøgende gik videre til",
+    free: "Ledige i touren",
+    openedFree: "åbnede listen over ledige",
+    bookedFree: "gik videre til booking af en bestemt",
+    and: "og",
+    places: "Mest sete steder",
+    sources: "Hvor besøgene kom fra",
+  },
+  en: {
+    sec: "sec",
+    phone: "Called",
+    email: "Sent an e-mail",
+    direct: "Direct (link/QR)",
+    visits: "visits",
+    engaged: "explored the tour",
+    typical: "typical visit",
+    period: (days: number) => `Your virtual tour · last ${days} days`,
+    leads: "visitors went on to booking or contact from the tour",
+    ofVisits: (p: string) => ` - ${p} of the visits`,
+    perDay: "Visits per day",
+    went: "What visitors went on to",
+    free: "Available in the tour",
+    openedFree: "opened the list of available units",
+    bookedFree: "went on to book a particular one",
+    and: "and",
+    places: "Most viewed places",
+    sources: "Where the visits came from",
+  },
+};
+
+const pct = (n: number) => `${Math.round(n * 100)} %`;
+
+function Ranked({ rows, label }: { rows: { label: string; count: number }[]; label: (l: string) => string }) {
   const max = rows[0]?.count ?? 1;
   return (
     <ul className="space-y-2">
@@ -30,27 +74,31 @@ function Ranked({ rows }: { rows: { label: string; count: number }[] }) {
   );
 }
 
-export function CustomerReport({ stats, share, brand }: { stats: TourStats; share: ReportShare; brand: string }) {
+export function CustomerReport({ stats, share, brand, lang = "da", title }: { stats: TourStats; share: ReportShare; brand: string; lang?: ReportLang; title?: string }) {
+  const t = T[lang];
+  const duration = (s: number) => (s < 60 ? `${s} ${t.sec}` : `${Math.floor(s / 60)} min${s % 60 ? ` ${s % 60} ${t.sec}` : ""}`);
+  const label = (l: string) => (l === "phone" ? t.phone : l === "email" ? t.email : l === "direkte" ? t.direct : l);
   const leads = shown(share.leads, stats.leads);
   const actions = shown(share.actions, stats.leads) && stats.actions.length > 0;
   const max = Math.max(1, ...stats.perDay.map((d) => d.visits));
   const tiles = [
-    share.visits && [String(stats.visits), "besøg"],
-    share.engaged && [pct(stats.visits ? stats.engaged / stats.visits : 0), "gik på opdagelse i touren"],
-    share.duration && stats.medianSeconds >= 5 && [duration(stats.medianSeconds), "typisk besøg"],
+    share.visits && [String(stats.visits), t.visits],
+    share.engaged && [pct(stats.visits ? stats.engaged / stats.visits : 0), t.engaged],
+    share.duration && stats.medianSeconds >= 5 && [duration(stats.medianSeconds), t.typical],
   ].filter(Boolean) as [string, string][];
   const card = "rounded-2xl bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,.04)] ring-1 ring-black/[.05]";
   return (
     <div className="space-y-3">
       <div className="px-1">
-        <div className="text-[13px] text-[#6e6e73]">Jeres virtuelle tour · seneste {stats.days} dage</div>
+        <div className="text-[13px] text-[#6e6e73]">{title ?? t.period(stats.days)}</div>
         <div className="text-[20px] font-semibold tracking-tight">{brand}</div>
       </div>
       {leads && (
         <div className={card}>
           <div className="text-[40px] font-semibold leading-none tracking-tight tabular-nums">{stats.leads}</div>
           <p className="mt-1 text-[14px] leading-snug">
-            besøgende gik videre til booking eller kontakt fra touren{stats.visits ? <span className="text-[#6e6e73]"> - {pct(stats.leads / stats.visits)} af besøgene</span> : null}.
+            {t.leads}
+            {stats.visits ? <span className="text-[#6e6e73]">{t.ofVisits(pct(stats.leads / stats.visits))}</span> : null}.
           </p>
         </div>
       )}
@@ -66,10 +114,10 @@ export function CustomerReport({ stats, share, brand }: { stats: TourStats; shar
       )}
       {share.perDay && (
         <div className={card}>
-          <div className="mb-2 text-[13px] font-medium text-[#6e6e73]">Besøg pr. dag</div>
+          <div className="mb-2 text-[13px] font-medium text-[#6e6e73]">{t.perDay}</div>
           <div className="flex h-20 items-end gap-[2px]">
             {stats.perDay.map((d) => (
-              <div key={d.day} title={`${d.day}: ${d.visits} besøg`} className="flex h-full flex-1 items-end">
+              <div key={d.day} title={`${d.day}: ${d.visits} ${t.visits}`} className="flex h-full flex-1 items-end">
                 <div className="w-full rounded-t-[3px]" style={{ height: d.visits ? `${Math.max(4, (d.visits / max) * 100)}%` : 0, background: "var(--report-accent, #0071e3)" }} />
               </div>
             ))}
@@ -78,38 +126,39 @@ export function CustomerReport({ stats, share, brand }: { stats: TourStats; shar
       )}
       {actions && (
         <div className={card}>
-          <div className="mb-2 text-[13px] font-medium text-[#6e6e73]">Det, besøgende gik videre til</div>
-          <Ranked rows={stats.actions} />
+          <div className="mb-2 text-[13px] font-medium text-[#6e6e73]">{t.went}</div>
+          <Ranked rows={stats.actions} label={label} />
         </div>
       )}
       {share.live && stats.live.opened > 0 && (
         <div className={card}>
-          <div className="mb-2 text-[13px] font-medium text-[#6e6e73]">Ledige i touren</div>
+          <div className="mb-2 text-[13px] font-medium text-[#6e6e73]">{t.free}</div>
           <p className="text-[14px] leading-snug">
-            <b>{stats.live.opened}</b> åbnede listen over ledige{stats.live.booked ? (
+            <b>{stats.live.opened}</b> {t.openedFree}
+            {stats.live.booked ? (
               <>
-                , og <b>{stats.live.booked}</b> gik videre til booking af en bestemt
+                , {t.and} <b>{stats.live.booked}</b> {t.bookedFree}
               </>
             ) : null}
             .
           </p>
           {stats.live.units.length > 0 && (
             <div className="mt-3">
-              <Ranked rows={stats.live.units} />
+              <Ranked rows={stats.live.units} label={label} />
             </div>
           )}
         </div>
       )}
       {share.places && stats.places.length > 0 && (
         <div className={card}>
-          <div className="mb-2 text-[13px] font-medium text-[#6e6e73]">Mest sete steder</div>
-          <Ranked rows={stats.places} />
+          <div className="mb-2 text-[13px] font-medium text-[#6e6e73]">{t.places}</div>
+          <Ranked rows={stats.places} label={label} />
         </div>
       )}
       {share.sources && stats.sources.length > 0 && (
         <div className={card}>
-          <div className="mb-2 text-[13px] font-medium text-[#6e6e73]">Hvor besøgene kom fra</div>
-          <Ranked rows={stats.sources} />
+          <div className="mb-2 text-[13px] font-medium text-[#6e6e73]">{t.sources}</div>
+          <Ranked rows={stats.sources} label={label} />
         </div>
       )}
     </div>

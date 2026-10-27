@@ -44,7 +44,7 @@ export default async function OnlineCustomersPage() {
       industrySet: Boolean(t.deal?.industry),
       city: city(t.deal?.address),
       url: t.liveVersion != null ? `${CLOUDFLARE_TOUR_ORIGIN}/${t.slug}` : `/t/${t.slug}`,
-      thumb: `/api/tour-thumb?tour=${encodeURIComponent(t.slug)}`,
+      thumb: `/api/tour-thumb?tour=${encodeURIComponent(t.slug)}&w=480`,
       ours: true,
       since: t.createdAt.toISOString(),
     });
@@ -64,7 +64,7 @@ export default async function OnlineCustomersPage() {
         industrySet: Boolean(d.industry),
         city: city(d.address),
         url,
-        thumb: `/api/tour-thumb?item=${encodeURIComponent(i.id)}`,
+        thumb: `/api/tour-thumb?item=${encodeURIComponent(i.id)}&w=480`,
         ours: false,
         since: (d.liveAt ?? new Date(0)).toISOString(),
       });

@@ -6,7 +6,7 @@ const SITE_HOST = process.env.NEXT_PUBLIC_SITE_ORIGIN?.replace(/^https?:\/\//, "
 const nextConfig: NextConfig = {
   // ssh2 (Betalingsservice SFTP) loads optional native/crypto modules at
   // runtime - kept out of the bundle and required from node_modules instead.
-  serverExternalPackages: ["ssh2", "ssh2-sftp-client", "blake3-wasm"],
+  serverExternalPackages: ["ssh2", "ssh2-sftp-client", "blake3-wasm", "sharp"],
   // The contract PDF renderer reads public/logo.png via fs at request time
   // (see contract-html-template.ts) - without this it can be left out of
   // the deployed serverless function bundle and contract generation fails

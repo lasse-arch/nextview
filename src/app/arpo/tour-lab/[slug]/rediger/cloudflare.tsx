@@ -114,11 +114,12 @@ function GoLive({ slug, deal, onDone }: { slug: string; deal: GoLiveState; onDon
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [pending, start] = useTransition();
 
-  if (deal.liveAt && deal.welcomeMailSentAt)
+  // Already live (also customers moved over from MPSkins): nothing to do here - publishing a new version below sends no mail and changes no billing.
+  if (deal.liveAt)
     return (
       <p className="rounded-xl bg-[#34c759]/12 px-3 py-2 text-[13px] text-[#1d7a33]">
-        ✓ {deal.name} er live siden {day(deal.liveAt)}. Velkomstmailen blev sendt {day(deal.welcomeMailSentAt)}
-        {deal.portal ? ", og kunden har adgang til kundesiden." : "."}
+        ✓ {deal.name} er live siden {day(deal.liveAt)}
+        {deal.welcomeMailSentAt ? `, velkomstmail sendt ${day(deal.welcomeMailSentAt)}` : ""}. &quot;Udgiv ny version&quot; sender ingen mail til kunden.
       </p>
     );
 
