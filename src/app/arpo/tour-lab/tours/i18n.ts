@@ -46,6 +46,8 @@ export const UI_STRINGS = [
   "Mailen går til",
   "Ret beskeden",
   "Tilbage til touren",
+  "Tilbage",
+  "Tilbage til luften",
   "Menu",
   "Luk",
   "Luk menuen",

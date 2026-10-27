@@ -779,7 +779,7 @@ function PointPanel({
   point: TourPoint;
   rooms: [string, string][];
   setPoint: (fn: (p: TourPoint) => void) => void;
-  setImageZoom: (src: string, zoom: { desktop?: number; mobile?: number } | undefined) => void;
+  setImageZoom: (src: string, view: NonNullable<TourConfig["imageView"]>[string] | undefined) => void;
   onMove: () => void;
   onRemove: () => void;
   onDone: () => void;

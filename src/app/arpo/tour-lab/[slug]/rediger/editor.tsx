@@ -1759,7 +1759,7 @@ function MenuEditor({
   overview?: boolean;
   /** How zoomed each 360° picture opens (by its address). */
   imageView?: TourConfig["imageView"];
-  onImageView: (src: string, zoom: { desktop?: number; mobile?: number } | undefined) => void;
+  onImageView: (src: string, view: NonNullable<TourConfig["imageView"]>[string] | undefined) => void;
 }) {
   const [open, setOpen] = useState<Addr | null>(null);
   const [drag, setDrag] = useState<Addr | null>(null);

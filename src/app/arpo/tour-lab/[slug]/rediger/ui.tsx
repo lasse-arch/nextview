@@ -1,6 +1,7 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
+import "pannellum/build/pannellum.css";
 import { registerTourFile, uploadTourFile } from "@/lib/actions/tour-files";
 import type { TourConfig } from "../../tours/types";
 
@@ -154,41 +155,113 @@ export function outsideFiles(c: TourConfig): string[] {
 /** A typed address with https:// in front when it has no scheme (links, # and mailto/tel are kept). */
 export const withProtocol = (url: string) => (/^(https?:|mailto:|tel:|#)/i.test(url.trim()) ? url.trim() : `https://${url.trim()}`);
 
+type PanoViewSetting = { desktop?: number; mobile?: number; yaw?: number; pitch?: number };
+
 /**
- * How zoomed a 360° picture opens, on a computer and on a phone (shown only
- * for a 2:1 picture). Unset = the normal: a computer a little zoomed out, a
- * phone a little zoomed in.
+ * How a 360° picture opens (shown only for a 2:1 picture): where it looks -
+ * picked by turning a small 360° view - and how zoomed, on a computer and on
+ * a phone. Unset = the normal: straight ahead, a computer a little zoomed out,
+ * a phone a little zoomed in.
  */
-export function PanoZoom({ src, value, onChange }: { src: string; value?: { desktop?: number; mobile?: number }; onChange: (v: { desktop?: number; mobile?: number } | undefined) => void }) {
+export function PanoZoom({ src, value, onChange }: { src: string; value?: PanoViewSetting; onChange: (v: PanoViewSetting | undefined) => void }) {
   const [is360, setIs360] = useState<boolean | null>(null);
+  const [picking, setPicking] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  const viewer = useRef<{ getYaw(): number; getPitch(): number; destroy(): void } | null>(null);
   useEffect(() => {
     const img = new Image();
     img.onload = () => setIs360(Math.abs(img.naturalWidth / img.naturalHeight - 2) < 0.05);
     img.onerror = () => setIs360(false);
     img.src = src;
   }, [src]);
+  // The small 360° view to turn to where it should start.
+  useEffect(() => {
+    if (!picking) return;
+    let dead = false;
+    (async () => {
+      if (!window.pannellum) await import("pannellum/build/pannellum.js");
+      if (dead || !box.current || !window.pannellum) return;
+      viewer.current = window.pannellum.viewer(box.current, {
+        type: "equirectangular",
+        panorama: src,
+        autoLoad: true,
+        showFullscreenCtrl: false,
+        hfov: 100,
+        yaw: value?.yaw ?? 0,
+        pitch: value?.pitch ?? -10,
+      }) as unknown as { getYaw(): number; getPitch(): number; destroy(): void };
+    })();
+    return () => {
+      dead = true;
+      viewer.current?.destroy();
+      viewer.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- opened once per picking; the saved view is only where it opens
+  }, [picking, src]);
   if (!is360) return null;
-  const set = (k: "desktop" | "mobile", z: number | undefined) => {
-    const next = { ...value, [k]: z };
-    if (next[k] == null) delete next[k];
-    onChange(next.desktop == null && next.mobile == null ? undefined : next);
+  const put = (patch: Partial<PanoViewSetting>) => {
+    const next: PanoViewSetting = { ...value, ...patch };
+    (Object.keys(next) as (keyof PanoViewSetting)[]).forEach((k) => next[k] == null && delete next[k]);
+    onChange(Object.keys(next).length ? next : undefined);
   };
   return (
-    <div className="space-y-1.5 rounded-xl bg-white p-2.5 ring-1 ring-black/[.06]">
-      <p className="text-[12px] font-medium text-[#1d1d1f]">Zoom i 360°</p>
+    // Inside a menu row you can drag to reorder: dragging here turns the picture instead, never moves the row.
+    <div
+      className="space-y-2 rounded-xl bg-white p-2.5 ring-1 ring-black/[.06]"
+      onDragStart={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      }}
+    >
+      <p className="text-[12px] font-medium text-[#1d1d1f]">360°-visning</p>
+      {picking ? (
+        <div className="space-y-1.5">
+          <div className="relative h-44 w-full overflow-hidden rounded-lg bg-black">
+            <div ref={box} className="absolute inset-0" />
+          </div>
+          <p className="text-[11px] text-[#8e8e93]">Træk til det, man skal se først.</p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              className="flex-1 rounded-lg bg-[#0071e3] py-1.5 text-[12px] font-medium text-white"
+              onClick={() => {
+                const v = viewer.current;
+                if (v) put({ yaw: Math.round(v.getYaw()), pitch: Math.round(v.getPitch()) });
+                setPicking(false);
+              }}
+            >
+              Start her
+            </button>
+            <button type="button" className="rounded-lg bg-[#f2f2f7] px-3 py-1.5 text-[12px] font-medium" onClick={() => setPicking(false)}>
+              Fortryd
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 text-[12px]">
+          <button type="button" className="rounded-lg bg-[#f2f2f7] px-3 py-1.5 font-medium text-[#0071e3]" onClick={() => setPicking(true)}>
+            {value?.yaw != null ? "Skift hvor det starter" : "Vælg hvor det starter"}
+          </button>
+          {value?.yaw != null && (
+            <button type="button" className="text-[#8e8e93] hover:text-[#0071e3]" onClick={() => put({ yaw: undefined, pitch: undefined })}>
+              Lige frem
+            </button>
+          )}
+        </div>
+      )}
       {(["desktop", "mobile"] as const).map((k) => (
         <div key={k} className="flex items-center gap-2 text-[12px] text-[#6e6e73]">
           <span className="w-16 flex-none">{k === "desktop" ? "Computer" : "Mobil"}</span>
-          <input type="range" min={0.7} max={2.5} step={0.05} className="w-full accent-[#0071e3]" value={value?.[k] ?? 1} onChange={(e) => set(k, Number(e.target.value))} />
+          <input type="range" min={0.7} max={2.5} step={0.05} className="w-full accent-[#0071e3]" value={value?.[k] ?? 1} onChange={(e) => put({ [k]: Number(e.target.value) })} />
           <span className="w-16 flex-none text-right tabular-nums">{value?.[k] != null ? `${value[k]!.toFixed(2)}×` : "Standard"}</span>
           {value?.[k] != null && (
-            <button type="button" title="Tilbage til standard" className="text-[#0071e3]" onClick={() => set(k, undefined)}>
+            <button type="button" title="Tilbage til standard" className="text-[#0071e3]" onClick={() => put({ [k]: undefined })}>
               ↺
             </button>
           )}
         </div>
       ))}
-      <p className="text-[11px] leading-snug text-[#8e8e93]">Standard er lidt zoomet ud på computer og lidt ind på mobil. Over 1× er tættere på.</p>
+      <p className="text-[11px] leading-snug text-[#8e8e93]">Zoom: standard er lidt zoomet ud på computer og lidt ind på mobil. Over 1× er tættere på.</p>
     </div>
   );
 }

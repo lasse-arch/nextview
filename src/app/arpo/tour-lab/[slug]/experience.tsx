@@ -552,17 +552,26 @@ function TourExperience({
       try {
         await sdk.Sweep.moveTo(sweep, opts);
       } catch (first) {
-        // Most often Matterport is still busy with the last move: wait a moment and try again the same way, so the
-        // chosen kind of move (fly, instant, cross-fade) is kept. Only then its own fade to black, as a last resort.
+        // Most often Matterport is still busy with the last move (the visitor's own step, or a turn): wait and try
+        // again the same way, so the chosen kind of move (fly, instant, cross-fade) is kept - for up to ~4 s, as a
+        // step can take a while. Only then its own fade to black, as a last resort.
         track("move_retry", { sweep, label: String(first).slice(0, 120) }); // the error is kept (as the label), so it can be looked up
-        await new Promise((r) => setTimeout(r, 350));
-        try {
-          await sdk.Sweep.moveTo(sweep, opts);
-        } catch (second) {
-          await sdk.Sweep.moveTo(sweep, { rotation: opts.rotation, transition: sdk.Sweep.Transition.FADEOUT, transitionTime: 500 }).catch((err) =>
-            track("move_failed", { sweep, label: `${String(second).slice(0, 60)} / ${String(err).slice(0, 60)}` })
-          );
+        let last: unknown = first;
+        let done = false;
+        for (const wait of [250, 350, 450, 600, 800, 1000]) {
+          await new Promise((r) => setTimeout(r, wait));
+          try {
+            await sdk.Sweep.moveTo(sweep, opts);
+            done = true;
+            break;
+          } catch (err) {
+            last = err;
+          }
         }
+        if (!done)
+          await sdk.Sweep.moveTo(sweep, { rotation: opts.rotation, transition: sdk.Sweep.Transition.FADEOUT, transitionTime: 500 }).catch((err) =>
+            track("move_failed", { sweep, label: `${String(last).slice(0, 60)} / ${String(err).slice(0, 60)}` })
+          );
       }
       if (from && from !== sweep && (locked || hiddenSweeps.includes(from))) await sdk.Sweep.disable(from).catch(() => {});
     },
@@ -1604,7 +1613,24 @@ function TourExperience({
         </div>
       )}
 
-      {pano && hasPano(pano) && <PanoView name={pano.name} dir={pano.pano} image={pano.panorama} start={pano.panoStart} panos={T.panos} turning={guideAt != null} zoom={pano.panorama ? T.imageView?.[pano.panorama] : undefined} onClose={() => setPano(null)} />}
+      {pano && hasPano(pano) && (
+        <PanoView
+          name={pano.name}
+          dir={pano.pano}
+          image={pano.panorama}
+          start={pano.panoStart ?? (pano.panorama && T.imageView?.[pano.panorama]?.yaw != null ? { yaw: T.imageView[pano.panorama].yaw!, pitch: T.imageView[pano.panorama].pitch ?? 0 } : undefined)}
+          panos={T.panos}
+          turning={guideAt != null}
+          zoom={pano.panorama ? T.imageView?.[pano.panorama] : undefined}
+          // A picture opened from the menu goes back to the menu - "Tilbage til luften" only when you came from the drone scene / map.
+          backLabel={pano.id.startsWith("billede-") ? tx("Tilbage") : tx("Tilbage til luften")}
+          onClose={() => {
+            const fromMenu = pano.id.startsWith("billede-");
+            setPano(null);
+            if (fromMenu) setMenuOpen(true);
+          }}
+        />
+      )}
       {lightbox && <Lightbox key={lightbox.title + lightbox.at} state={lightbox} onClose={() => setLightbox(null)} />}
 
       {/* Logo (MPSkins: left, 200px, 13px from the edges - or right, with the menu on the left). */}
@@ -2111,9 +2137,11 @@ function PanoView({
   panos,
   turning = false,
   zoom,
+  backLabel,
   onClose,
 }: {
   name: string;
+  backLabel: string;
   /** How zoomed it opens, per device (1 = normal: a computer a little out, a phone a little in). */
   zoom?: { desktop?: number; mobile?: number };
   /** A folder of prepared tiles (under `panos`) - or `image`, one uploaded 360° photo. */
@@ -2167,7 +2195,7 @@ function PanoView({
       <div ref={el} className="absolute inset-0" />
       <div className="hv-pano-titel">{name}</div>
       <button type="button" className="hv-pano-luk" onClick={onClose}>
-        ← Tilbage til luften
+        ← {backLabel}
       </button>
     </div>
   );

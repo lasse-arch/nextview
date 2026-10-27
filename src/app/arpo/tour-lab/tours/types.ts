@@ -135,8 +135,12 @@ export type TourConfig = {
    * box at the top (logo, title, text and the first button) and the
    * category filter ("Vis").
    */
-  /** How zoomed a 360° picture opens (menu pictures, a point's 360° photo), by the picture's address: 1 = the device's normal, over 1 closer. */
-  imageView?: Record<string, { desktop?: number; mobile?: number }>;
+  /**
+   * How a 360° picture opens (menu pictures, a point's 360° photo), by the
+   * picture's address: zoom per device (1 = the device's normal, over 1
+   * closer) and where it looks (yaw/pitch, degrees).
+   */
+  imageView?: Record<string, { desktop?: number; mobile?: number; yaw?: number; pitch?: number }>;
   overviewUi?: { box?: { desktop?: false; mobile?: false }; filter?: { desktop?: false; mobile?: false } };
   drone?: {
     /** One 360° photo (equirectangular) instead of the tiles below - set by the engine for a 360° map. */
