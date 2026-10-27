@@ -6,9 +6,9 @@ import { TourLang } from "../tours/i18n-react";
 import { socialLinks } from "../tours/social";
 import { cssFilter, formatPhone, isInTourHref, isPlaceHref, placeHref, placeSlug, pointOfHref, startPlaces } from "../tours/places";
 import type { LiveUnit } from "@/lib/availability/live";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
-import { saveTourGa4Id, saveTourStoryImage } from "@/lib/actions/tour-lab";
+import { saveTourStoryImage } from "@/lib/actions/tour-lab";
 import { connectSdk, showcaseUrl, uLinkTarget, type CameraPose, type MpSdk, type Rotation, type SweepInfo, type Vec3 } from "../matterport";
 import type { AvailableUnit } from "@/lib/availability/boxdepotet";
 import { apiUrl, isStaticTour } from "../tours/api";
@@ -51,8 +51,6 @@ type PannellumHotspot = {
 declare global {
   interface Window {
     pannellum?: { viewer(el: HTMLElement | string, cfg: Record<string, unknown>): PannellumViewer };
-    dataLayer?: unknown[];
-    gtag?: (...args: unknown[]) => void;
   }
 }
 
@@ -64,9 +62,8 @@ async function loadPannellum(): Promise<void> {
 }
 
 /* ---------------------------------------------------------------------------
- * GA4: every interaction in the tour becomes an event. Without a measurement
- * id the events are still shown in the event log, so the tracking plan can
- * be checked before it's connected.
+ * Measurement: every interaction in the tour becomes an event, counted by
+ * Arpo itself (/api/tour-events) and shown in the editor preview's event log.
  * ------------------------------------------------------------------------- */
 type TrackedEvent = { name: string; params: Record<string, string | number>; at: number };
 const eventLog: TrackedEvent[] = [];
@@ -89,7 +86,6 @@ function flushEvents() {
 
 function track(name: string, params: Record<string, string | number> = {}) {
   const full = { tour: tracking.slug, ...params };
-  window.gtag?.("event", name, full);
   // Arpo's own count - not from the editor's preview (the tour in an iframe there).
   if (tracking.slug && !tracking.off && window.parent === window) {
     const label = params.label ?? params.item_name ?? params.place_name ?? params.room_name ?? params.kind ?? params.title ?? params.name;
@@ -100,24 +96,6 @@ function track(name: string, params: Record<string, string | number> = {}) {
   eventLog.unshift({ name, params: full, at: Date.now() });
   eventLog.length = Math.min(eventLog.length, 30);
   logListeners.forEach((l) => l());
-}
-
-function useGa4(id: string | null, title: string) {
-  useEffect(() => {
-    if (!id || window.gtag) return;
-    window.dataLayer = window.dataLayer || [];
-    window.gtag = function gtag() {
-      // gtag.js expects the arguments object itself, not an array.
-      // eslint-disable-next-line prefer-rest-params
-      window.dataLayer!.push(arguments);
-    };
-    window.gtag("js", new Date());
-    window.gtag("config", id, { page_title: title });
-    const s = document.createElement("script");
-    s.async = true;
-    s.src = `https://www.googletagmanager.com/gtag/js?id=${id}`;
-    document.head.appendChild(s);
-  }, [id, title]);
 }
 
 /* ---------------------------------------------------------------------------
@@ -183,7 +161,6 @@ function readLastRoom(key: string): { name: string; href: string } | null {
 type ExperienceProps = {
   tour: TourConfig;
   sdkKey: string | null;
-  ga4Id: string | null;
   modelId: string | null;
   sweepBySs: Record<number, string>;
   hiddenSweeps: string[];
@@ -254,7 +231,6 @@ export function Experience(props: ExperienceProps) {
 function TourExperience({
   tour: savedTour,
   sdkKey,
-  ga4Id,
   modelId,
   sweepBySs,
   hiddenSweeps,
@@ -277,7 +253,6 @@ function TourExperience({
   useLayoutEffect(() => {
     tracking.da = da;
   }, [da]);
-  useGa4(ga4Id, T.title);
   useLayoutEffect(() => {
     // One visit = one id per browser tab and tour.
     const key = `tour-session:${savedTour.slug}`;
@@ -340,6 +315,12 @@ function TourExperience({
   const [zoomed, setZoomed] = useState(false);
   const [openGroup, setOpenGroup] = useState<string | null>(null);
   const [tourReadyMs, setTourReadyMs] = useState<number | null>(null);
+  /** Shown in the editor's preview (the tour in an iframe there) - false on the server, so the first render matches. */
+  const inPreview = useSyncExternalStore(
+    () => () => {},
+    () => window.parent !== window,
+    () => false
+  );
   const [tourError, setTourError] = useState<string | null>(null);
   const [entering, setEntering] = useState(false);
   const [room, setRoom] = useState<string | null>(null);
@@ -1739,14 +1720,14 @@ function TourExperience({
         </div>
       )}
       {picking && <div className="hv-pick">Klik der, hvor tagget skal sidde · Esc fortryder</div>}
-      {/* Prototype tools: status and the GA4 event log. */}
-      {tools && (
+      {/* Prototype tools (status, event log, copy view …) - only in the editor's preview, never where the tour is opened on its own. */}
+      {tools && inPreview && (
       <div className="hv-dev">
         <button type="button" onClick={() => setShowLog((s) => !s)}>
-          {tourError ? "⚠ Tour" : tourReadyMs != null ? `Tour klar ${(tourReadyMs / 1000).toFixed(1).replace(".", ",")} s` : "Tour indlæses…"} · GA4 {ga4Id ? "✓" : "–"}
+          {tourError ? "⚠ Tour" : tourReadyMs != null ? `Tour klar ${(tourReadyMs / 1000).toFixed(1).replace(".", ",")} s` : "Tour indlæses…"}
         </button>
         {showLog && (
-          <DevPanel onCopyView={copyView} place={T.info ? place : undefined} onCaptureStories={T.stories ? captureStories : undefined} storyCount={storyRooms.length} ga4Id={ga4Id} tourError={tourError} sdkKey={sdkKey} modelId={modelId} pointsOnly={pointsOnly} onPointsOnly={setNavigation} />
+          <DevPanel onCopyView={copyView} place={T.info ? place : undefined} onCaptureStories={T.stories ? captureStories : undefined} storyCount={storyRooms.length} tourError={tourError} sdkKey={sdkKey} modelId={modelId} pointsOnly={pointsOnly} onPointsOnly={setNavigation} />
         )}
       </div>
       )}
@@ -2022,7 +2003,6 @@ function DevPanel({
   place,
   onCaptureStories,
   storyCount,
-  ga4Id,
   tourError,
   sdkKey,
   modelId,
@@ -2033,19 +2013,14 @@ function DevPanel({
   place?: { placing: boolean; setPlacing: (on: boolean) => void; result: string | null };
   onCaptureStories?: (progress: (text: string) => void) => Promise<void>;
   storyCount: number;
-  ga4Id: string | null;
   tourError: string | null;
   sdkKey: string | null;
   modelId: string | null;
   pointsOnly: boolean;
   onPointsOnly: (only: boolean) => void;
 }) {
-  const [value, setValue] = useState(ga4Id ?? "");
-  const [msg, setMsg] = useState<string | null>(null);
   const [capture, setCapture] = useState<string | null>(null);
   const [view, setView] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
-  const router = useRouter();
   return (
     <div className="hv-devpanel">
       {!sdkKey && <p className="hv-warn">Mangler SDK-nøgle (sæt den på /tour-lab).</p>}
@@ -2084,24 +2059,7 @@ function DevPanel({
           {capture && <span> {capture}</span>}
         </p>
       )}
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          startTransition(async () => {
-            const r = await saveTourGa4Id(value);
-            setMsg(r.ok ? "Gemt - genindlæs siden." : r.error);
-            if (r.ok) router.refresh();
-          });
-        }}
-      >
-        <label htmlFor="ga4">GA4-måle-id</label>
-        <input id="ga4" value={value} onChange={(e) => setValue(e.target.value)} placeholder="G-XXXXXXXXXX" />
-        <button type="submit" disabled={pending}>
-          Gem
-        </button>
-      </form>
-      {msg && <p>{msg}</p>}
-      <p className="hv-devt">Hændelser{ga4Id ? " (sendes til GA4)" : " (ikke sendt - intet GA4-id)"}:</p>
+      <p className="hv-devt">Hændelser:</p>
       <ul>
         {eventLog.slice(0, 12).map((e, i) => (
           <li key={i}>

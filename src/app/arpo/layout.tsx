@@ -21,7 +21,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // The menu in named parts - what a seller uses every day first, the company's own pages and money last.
   const admin = user.role === "ADMIN";
   const navItems: SidebarNavItem[] = [
-    { href: "/arpo", label: "Oversigt", icon: "home" },
     {
       section: "Salg",
       items: [

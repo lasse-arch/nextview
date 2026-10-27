@@ -41,7 +41,7 @@ export const boxdepot: TourConfig = {
     { title: "Depotrum: 14 m³", items: [["Tomt", u(235, "-.83,-1.08")], ["Med flyttekasser", u(237, "-.85,-1.04")], ["Med flyttekasser, dæk og møbler", u(238, "-1.06,-.99")]] },
     { title: "Depotrum: 17 m³", items: [["Tomt", u(208, "-1.71,1.14")], ["Med flyttekasser, dæk og møbler", u(193, "-1.88,1.19")]] },
     { title: "Depotrum: 29 m³", items: [["Tomt", u(230, "-.58,.77")], ["Med flyttekasser", u(229, "-.48,.65")], ["Med flyttekasser, dæk og møbler", u(228, "-.38,.68")]] },
-    { title: "Depotrum: 33 m³", items: [["Tomt", u(204, "-.17,.26")], ["Med flyttekasser", u(205, "-.19,.34")]] },
+    { title: "Depotrum: 33 m³", items: [["Tomt", u(204, "-.17,.26")], ["Med flyttekasser", u(205, "-.19,.34")], ["Med flyttekasser, dæk og møbler", u(207, "-.27,.4")]] },
   ],
   matterportParams: { play: "1", qs: "1", help: "0", title: "0", brand: "0", mls: "0", search: "0", vr: "0" },
   flyMs: 800,

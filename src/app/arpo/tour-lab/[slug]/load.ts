@@ -17,9 +17,8 @@ import type { TourConfig } from "../tours/types";
  */
 export async function loadTour(setup: TourConfig) {
   const tour = await withPopupFallback(setup);
-  const [sdkKey, ga4Id, cfg, storyImages] = await Promise.all([
+  const [sdkKey, cfg, storyImages] = await Promise.all([
     getSettingValue("MATTERPORT_SDK_KEY"),
-    getSettingValue("TOUR_PROTOTYPE_GA4_ID"),
     tour.tourPage ? fetchMpskinsCfg(tour.tourPage).catch(() => null) : Promise.resolve(null),
     prisma.tourStoryImage.findMany({ where: { tourSlug: tour.slug, NOT: { room: { startsWith: "foto:" } } }, select: { room: true, updatedAt: true } }),
   ]);
@@ -51,13 +50,28 @@ export async function loadTour(setup: TourConfig) {
     });
   } else if (modelId) Object.assign(sweepBySs, await fetchSweepIndex(modelId));
 
-  // Scan points hidden in MPSkins stay hidden here (plus any listed in the tour setup).
-  const hidden = [...new Set([...(cfg ? hiddenSweeps(cfg) : []), ...tour.hiddenSweeps])];
+  // Scan points hidden in MPSkins (or in the tour's own setup) stay hidden - except the ones the tour's own
+  // menu, points or places link to: a room you can pick must be one you can get to.
+  const linked = new Set(
+    [
+      tour.start,
+      ...tour.points.map((p) => p.tour).filter((t): t is string => Boolean(t)),
+      ...tour.menu.flatMap((m) => ("items" in m ? m.items.map((i) => i[1]) : [m.href])),
+      ...(tour.welcome?.tiles.flatMap((t) => ("room" in t.go ? [t.go.room] : [])) ?? []),
+      ...(tour.places?.map((p) => p.href) ?? []),
+    ]
+      .map((link) => {
+        const ss = ssOf(link);
+        return ss != null ? sweepBySs[ss] : undefined;
+      })
+      .filter((s): s is string => Boolean(s))
+  );
+  const hidden = [...new Set([...(cfg ? hiddenSweeps(cfg) : []), ...tour.hiddenSweeps])].filter((s) => !linked.has(s));
   const [units, routeGraph] = await Promise.all([
     tour.availability ? fetchBoxdepotetUnits(tour.availability.url) : Promise.resolve([]),
     tour.wayfinding && modelId ? fetchSweepGraph(modelId) : Promise.resolve(null),
   ]);
-  return { tour, sdkKey, ga4Id, modelId, sweepBySs, hiddenSweeps: hidden, storyImages: storyImageUrls, units, routeGraph };
+  return { tour, sdkKey, modelId, sweepBySs, hiddenSweeps: hidden, storyImages: storyImageUrls, units, routeGraph };
 }
 
 /** Links set to open in a popup, whose site refuses to be shown inside ours, open in a new tab instead. */

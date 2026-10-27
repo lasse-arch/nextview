@@ -5,7 +5,6 @@
  * code - and nothing that could reach the database - ends up in a public file.
  */
 const off = async () => ({ ok: false as const, error: "Ikke i en udgivet tour." });
-export const saveTourGa4Id = off;
 export const saveTourStoryImage = off;
 export function useRouter() {
   return { refresh() {}, push() {}, replace() {}, back() {}, prefetch() {} };

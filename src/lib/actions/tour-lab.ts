@@ -16,16 +16,6 @@ export async function saveMatterportSdkKey(key: string): Promise<void> {
 }
 
 /** GA4 measurement id (G-…) the tour prototype sends its events to. */
-export async function saveTourGa4Id(id: string): Promise<{ ok: true } | { ok: false; error: string }> {
-  const user = await requireUser();
-  if (user.role !== "ADMIN") return { ok: false, error: "Kun admin." };
-  const value = id.trim().toUpperCase();
-  if (value && !/^G-[A-Z0-9]{4,}$/.test(value)) return { ok: false, error: "Et GA4-id ser sådan ud: G-XXXXXXXXXX" };
-  await setSettingValue("TOUR_PROTOTYPE_GA4_ID", value || null);
-  revalidatePath("/arpo/tour-lab/[slug]", "page");
-  return { ok: true };
-}
-
 export type ResolvedTourLink = { modelId: string; sweepId: string | null; ss: number | null } | { error: string };
 
 /**
