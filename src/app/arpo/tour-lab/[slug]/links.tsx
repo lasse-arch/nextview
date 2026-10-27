@@ -107,7 +107,7 @@ export function LinkPopup({ open, onClose, size = "stor", custom, site }: { open
 }
 
 /** Links that open something inside the tour rather than a page: the contact form and the live data list. */
-const IN_TOUR: Record<string, string> = { "#kontakt": "hv-kontakt", "#live": "hv-live" };
+const IN_TOUR: Record<string, string> = { "#kontakt": "hv-kontakt", "#live": "hv-live", "#find": "hv-find" };
 
 /** Opens a link from code (a button rather than an <a>) the tour's way. */
 export function openLink(T: TourConfig, href: string, label: string, popup: (href: string, label: string) => void) {

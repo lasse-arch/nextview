@@ -12,6 +12,7 @@ import { saveTourStoryImage } from "@/lib/actions/tour-lab";
 import { connectSdk, showcaseUrl, uLinkTarget, type CameraPose, type MpSdk, type Rotation, type SweepInfo, type Vec3 } from "../matterport";
 import type { AvailableUnit } from "@/lib/availability/boxdepotet";
 import { WeatherChip, WEATHER_CSS } from "./weather";
+import { FinderSheet, FINDER_CSS, WalkLines } from "./finder";
 import { apiUrl, isStaticTour } from "../tours/api";
 import type { MenuEntry, TourConfig, TourPlace, TourPoint, WelcomeGo } from "../tours/types";
 import { CoverWelcome, DESIGNS_CSS, DockMenu, PickerMenu } from "./designs";
@@ -176,12 +177,20 @@ const slug = placeSlug;
 type Box = { left: number; right: number; top: number; bottom: number };
 const overlaps = (a: Box, b: Box) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
 
+/** Where a name can stand by its icon: under it (normal), over it, to the right, to the left. */
+const NAME_SPOTS = ["", "hv-navn-op", "hv-navn-h", "hv-navn-v"] as const;
+
 /**
- * Hides the names that would cover another point's icon or a name already
- * shown - the open point first, then in setup order - so every point can be
- * clicked whatever the zoom. A hidden name shows when its icon is hovered.
+ * Keeps the names from covering another point's icon or a name already
+ * shown - the open point first, then in setup order: a name that's in the way
+ * moves over, right or left of its icon; only if no spot is free is it hidden
+ * (it shows when its icon is hovered). With names set to "Altid" nothing is
+ * hidden - it keeps the best spot it has.
  */
 function declutterNames(selected: string | null) {
+  const root = document.querySelector(".hv");
+  const phone = window.innerWidth <= 760;
+  const always = phone ? Boolean(root?.classList.contains("hv-navne-m-always")) : !root?.classList.contains("hv-navne-d-zoom") && !root?.classList.contains("hv-navne-d-never");
   const points = [...document.querySelectorAll<HTMLElement>(".hv-hs[data-punkt]:not(.hv-skjult)")].filter((el) => el.style.visibility !== "hidden");
   points.sort((a, b) => Number(b.dataset.punkt === selected) - Number(a.dataset.punkt === selected));
   const icons = points.map((el) => el.querySelector(".hv-ikon")?.getBoundingClientRect());
@@ -189,11 +198,27 @@ function declutterNames(selected: string | null) {
   points.forEach((el, i) => {
     const name = el.querySelector<HTMLElement>(".hv-navn");
     if (!name) return;
-    const box = name.getBoundingClientRect();
-    if (!box.width) return;
-    const hit = icons.some((icon, j) => j !== i && icon && icon.width && overlaps(box, icon)) || shown.some((s) => overlaps(box, s));
-    name.classList.toggle("hv-gemt", hit);
-    if (!hit) shown.push(box);
+    const free = (box: DOMRect) => !icons.some((icon, j) => j !== i && icon && icon.width && overlaps(box, icon)) && !shown.some((s) => overlaps(box, s));
+    let spot: string | null = null;
+    let first: DOMRect | null = null;
+    for (const c of NAME_SPOTS) {
+      name.classList.remove(...NAME_SPOTS.filter(Boolean));
+      if (c) name.classList.add(c);
+      const box = name.getBoundingClientRect();
+      if (!box.width) return;
+      first ??= box;
+      if (free(box)) {
+        spot = c;
+        shown.push(box);
+        break;
+      }
+    }
+    if (spot == null) {
+      // No free spot: back under the icon - shown anyway with "Altid", else hidden.
+      name.classList.remove(...NAME_SPOTS.filter(Boolean));
+      if (always && first) shown.push(first);
+    }
+    name.classList.toggle("hv-gemt", spot == null && !always);
   });
 }
 
@@ -383,6 +408,9 @@ function TourExperience({
       : null;
   const [phase, setPhase] = useState<"drone" | "tour">(OV ? "drone" : "tour");
   const [selected, setSelected] = useState<Point | null>(null);
+  /** "Find din plads": the questions are open - and what they found (the best place and the next best). */
+  const [finderOpen, setFinderOpen] = useState(false);
+  const [finderPick, setFinderPick] = useState<{ best: string; others: string[] } | null>(null);
   const [hidden, setHidden] = useState<Record<string, boolean>>({});
   const [menuOpen, setMenuOpen] = useState(false);
   /** Zoomed in on the drone picture: room for the point names on a phone. */
@@ -408,6 +436,13 @@ function TourExperience({
     const open = () => setContactOpen(true);
     window.addEventListener("hv-kontakt", open);
     return () => window.removeEventListener("hv-kontakt", open);
+  }, []);
+  // Any link "#find" opens "Find din plads" - on the drone scene / map, where the places are.
+  const openFinderRef = useRef<() => void>(() => {});
+  useEffect(() => {
+    const open = () => openFinderRef.current();
+    window.addEventListener("hv-find", open);
+    return () => window.removeEventListener("hv-find", open);
   }, []);
   /** A point has a 360° photo to open: an uploaded picture, or prepared tiles (with the tour's panos). */
   const hasPano = (p: Point) => Boolean(p.panorama || (p.pano && T.panos));
@@ -719,6 +754,25 @@ function TourExperience({
     backToDrone();
     setTimeout(() => openPoint(p), 700);
   }
+  /** The points shown on the scene, by id → their name (walking times and the finder only name these). */
+  const pointNames = useMemo(() => Object.fromEntries(T.points.map((p) => [p.id, p.name])), [T]);
+  /** The places "Find din plads" can land on: points some answer points at. */
+  const finderPoints = useMemo(() => {
+    const ids = new Set(T.finder?.questions.flatMap((q) => q.options.flatMap((o) => o.points)) ?? []);
+    return T.points.filter((p) => ids.has(p.id));
+  }, [T]);
+  function openFinder(from: string) {
+    if (!T.finder || !finderPoints.length) return;
+    track("finder_open", { label: from });
+    setMenuOpen(false);
+    setSelected(null);
+    if (phase === "drone") return setFinderOpen(true);
+    backToDrone();
+    setTimeout(() => setFinderOpen(true), 700);
+  }
+  useEffect(() => {
+    openFinderRef.current = () => openFinder("link");
+  });
   /** "#punkt:<id>" → that point, if the setup has it. */
   const pointById = (href: string) => {
     const id = pointOfHref(href);
@@ -1205,6 +1259,8 @@ function TourExperience({
     track(completed ? "guide_complete" : "guide_close", { stop: (guideAt ?? 0) + 1, stops: GUIDE.length });
     setGuideAt(null);
     setPano(null);
+    // A tour you can't walk around in: back to the drone scene / map, not left standing inside.
+    if (T.guide?.exit === "overview" && OV && phase === "tour") backToDrone();
   }
 
   /** Prototype tool: the exact view the visitor stands in, as a link for the tour's setup. */
@@ -1486,7 +1542,7 @@ function TourExperience({
   return (
     <TourLang.Provider value={{ lang, t: tx }}>
     <LinkProvider T={T} popup={popup}>
-    <div className={`hv fixed inset-0 z-50 overflow-hidden bg-[#0d1b20] ${selected ? "hv-punkt" : ""} ${zoomed ? "hv-zoom" : ""} ${welcome ? "hv-welcome" : ""} ${phase === "tour" && T.stories?.mobile ? "hv-st-on-m" : ""} ${menuOpen ? "hv-menu-aaben" : ""} ${T.overviewUi?.box?.desktop === false ? "hv-boks-ud-d" : ""} ${T.overviewUi?.box?.mobile === false ? "hv-boks-ud-m" : ""} ${T.overviewUi?.filter?.desktop === false ? "hv-filter-ud-d" : ""} ${T.overviewUi?.filter?.mobile === false ? "hv-filter-ud-m" : ""} ${T.overviewUi?.names?.desktop ? `hv-navne-d-${T.overviewUi.names.desktop}` : ""} ${T.overviewUi?.names?.mobile ? `hv-navne-m-${T.overviewUi.names.mobile}` : ""} ${T.design?.menu === "dock" ? "hv-dock" : ""} ${T.logoSide === "right" ? "hv-logo-h" : ""} ${guideAt != null || (dayAt != null && !dayOpen) ? "hv-guiding" : ""} ${route ? "hv-routing" : ""} ${showMeasures && phase === "tour" ? "hv-maler" : ""} ${phase === "tour" && T.stories?.desktop ? "hv-st-on-d" : ""}`} style={
+    <div className={`hv fixed inset-0 z-50 overflow-hidden bg-[#0d1b20] ${selected ? "hv-punkt" : ""} ${zoomed ? "hv-zoom" : ""} ${welcome ? "hv-welcome" : ""} ${phase === "tour" && T.stories?.mobile ? "hv-st-on-m" : ""} ${menuOpen ? "hv-menu-aaben" : ""} ${T.overviewUi?.box?.desktop === false ? "hv-boks-ud-d" : ""} ${T.overviewUi?.box?.mobile === false ? "hv-boks-ud-m" : ""} ${T.overviewUi?.filter?.desktop === false ? "hv-filter-ud-d" : ""} ${T.overviewUi?.filter?.mobile === false ? "hv-filter-ud-m" : ""} ${T.overviewUi?.names?.desktop ? `hv-navne-d-${T.overviewUi.names.desktop}` : ""} ${T.overviewUi?.names?.mobile ? `hv-navne-m-${T.overviewUi.names.mobile}` : ""} ${T.overviewUi?.filterColumns ? `hv-filter-kol hv-filter-kol-${T.overviewUi.filterColumns}` : ""} ${T.design?.menu === "dock" ? "hv-dock" : ""} ${T.logoSide === "right" ? "hv-logo-h" : ""} ${guideAt != null || (dayAt != null && !dayOpen) ? "hv-guiding" : ""} ${route ? "hv-routing" : ""} ${showMeasures && phase === "tour" ? "hv-maler" : ""} ${phase === "tour" && T.stories?.desktop ? "hv-st-on-d" : ""}`} style={
         {
           fontFamily: `'${T.font}', system-ui, sans-serif`,
           "--c-main": T.colors.main,
@@ -1501,7 +1557,7 @@ function TourExperience({
       }>
       <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.font.replace(/ /g, "+")}:wght@400;600;700;800;900&display=swap`} />
       {T.fontHeading && <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.fontHeading.replace(/ /g, "+")}:wght@500;600&display=swap`} />}
-      <style>{CSS + CONTACT_CSS + STORIES_CSS + LIGHTBOX_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + ONBOARDING_CSS + INFO_CSS + MAP_CSS + ROUTE_CSS + MEASURES_CSS + CARDS_CSS + DAY_CSS + SIMPLE_CSS + LOGO_RIGHT_CSS + LANG_CSS + WEATHER_CSS + (review ? FEEDBACK_CSS : "")}</style>
+      <style>{CSS + CONTACT_CSS + STORIES_CSS + LIGHTBOX_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + ONBOARDING_CSS + INFO_CSS + MAP_CSS + ROUTE_CSS + MEASURES_CSS + CARDS_CSS + DAY_CSS + SIMPLE_CSS + LOGO_RIGHT_CSS + LANG_CSS + WEATHER_CSS + FINDER_CSS + (review ? FEEDBACK_CSS : "")}</style>
       {/* The tour's own design on top (written by Claude or by hand under Avanceret). */}
       {T.customCss && <style>{T.customCss.replace(/<\/?style/gi, "")}</style>}
 
@@ -1551,8 +1607,36 @@ function TourExperience({
             <TourLink className="hv-btn hv-primary" href={T.cta[0].href} label={T.cta[0].label} onClick={() => ctaClick(T.cta[0].label, T.cta[0].href, "intro")}>
               {T.cta[0].label}
             </TourLink>
+            {T.finder && finderPoints.length > 0 && (
+              <button type="button" className="hv-btn hv-secondary hv-find" onClick={() => openFinder("intro")}>
+                {tx(T.finder.button)}
+              </button>
+            )}
           </div>
         </div>
+        {T.finder && finderPoints.length > 0 && (
+          <button type="button" className="hv-find-m" onClick={() => openFinder("intro")}>
+            <svg viewBox="0 0 24 24" aria-hidden>
+              <circle cx="11" cy="11" r="6.5" />
+              <path d="m20 20-4.2-4.2" />
+            </svg>
+            {tx(T.finder.button)}
+          </button>
+        )}
+        {finderOpen && T.finder && (
+          <FinderSheet
+            finder={T.finder}
+            points={finderPoints}
+            onClose={() => setFinderOpen(false)}
+            onDone={(best, others) => {
+              setFinderOpen(false);
+              setFinderPick({ best: best.id, others: others.map((o) => o.id) });
+              track("finder_result", { label: best.name });
+              openPoint(best);
+            }}
+          />
+        )}
+        {selected?.walks?.length ? <WalkLines from={selected.id} walks={selected.walks} names={pointNames} /> : null}
 
         <div className="hv-filtre">
           <div className="hv-filtre-t">{OV?.filterTitle}</div>
@@ -1568,7 +1652,7 @@ function TourExperience({
                 }}
               >
                 <i style={{ background: c.color }} />
-                {c.name}
+                <span>{c.name}</span>
               </button>
             ))}
           </div>
@@ -1595,8 +1679,39 @@ function TourExperience({
             <div className="hv-kat" style={{ color: T.categories[selected.cat].color }}>
               {T.categories[selected.cat].name}
             </div>
+            {finderPick?.best === selected.id && <div className="hv-bedst">★ {tx("Bedst til jer")}</div>}
             <h2>{selected.name}</h2>
             <p>{selected.text}</p>
+            {finderPick?.best === selected.id && finderPick.others.some((id) => pointNames[id]) && (
+              <p className="hv-andre">
+                {tx("Også godt for jer:")}{" "}
+                {finderPick.others
+                  .filter((id) => pointNames[id])
+                  .map((id, i) => (
+                    <span key={id}>
+                      {i > 0 && ", "}
+                      <button type="button" onClick={() => openPoint(T.points.find((x) => x.id === id)!)}>
+                        {pointNames[id]}
+                      </button>
+                    </span>
+                  ))}
+              </p>
+            )}
+            {selected.walks?.some((w) => pointNames[w.to]) && (
+              <div className="hv-gaa">
+                {selected.walks
+                  .filter((w) => pointNames[w.to])
+                  .map((w) => (
+                    <button key={w.to} type="button" onClick={() => openPoint(T.points.find((x) => x.id === w.to)!)}>
+                      <svg viewBox="0 0 24 24" aria-hidden>
+                        <circle cx="13" cy="4" r="2" />
+                        <path d="m9 21 2-6 3 3v3M7 12l3-4 4 1 3 3M10 8l1.5 5" />
+                      </svg>
+                      {w.minutes} min {tx("til")} {pointNames[w.to]}
+                    </button>
+                  ))}
+              </div>
+            )}
             <div className="hv-pchips">
               {selected.chips.map((c) => (
                 <span key={c}>{c}</span>
@@ -1629,6 +1744,11 @@ function TourExperience({
               <button type="button" className="hv-btn hv-secondary hv-wide" onClick={() => openPlan(selected)}>
                 {T.sitePlan.label}
               </button>
+            )}
+            {finderPick?.best === selected.id && !selected.button && T.cta[0] && (
+              <TourLink href={T.cta[0].href} label={T.cta[0].label} className={`hv-btn ${selected.tour || hasPano(selected) ? "hv-secondary" : "hv-primary"} hv-wide`} onClick={() => ctaClick(T.cta[0].label, T.cta[0].href, "finder")}>
+                {T.cta[0].label}
+              </TourLink>
             )}
             {selected.button && (
               <TourLink
@@ -2143,6 +2263,7 @@ function TourExperience({
           onGo={guideGo}
           onClose={closeGuide}
           onEvent={track}
+          stopLabel={T.guide?.exit === "overview" && OV ? tx("Tilbage til luften") : undefined}
         />
       )}
       {showCard != null && (
@@ -2206,7 +2327,11 @@ function PointPhotos({ images, name, onOpen }: { images: string[]; name: string;
     >
       {images.map((src, i) => (
         // eslint-disable-next-line @next/next/no-img-element
-        <img key={src} src={src} alt={i === 0 ? name : ""} loading={i === 0 ? "eager" : "lazy"} draggable={false} className={i === at ? "on" : ""} />
+        <span key={src} className={`hv-foto ${i === at ? "on" : ""}`}>
+          {/* The whole photo, on a soft, blurred copy of itself - nothing cut off. */}
+          <img src={src} alt="" aria-hidden className="hv-foto-bag" loading={i === 0 ? "eager" : "lazy"} draggable={false} />
+          <img src={src} alt={i === 0 ? name : ""} loading={i === 0 ? "eager" : "lazy"} draggable={false} />
+        </span>
       ))}
       <span className="hv-fotos-stor" aria-hidden>
         {images.length > 1 ? `${at + 1}/${images.length} ` : ""}⤢
@@ -2432,6 +2557,9 @@ const CSS = `
 .hv-navn{position:absolute;top:100%;left:50%;transform:translateX(-50%);margin-top:4px;background:#fff;border-radius:999px;padding:2px 10px;font-size:12.5px;font-weight:800;white-space:nowrap;color:#1d2a30;box-shadow:0 2px 8px rgba(0,0,0,.25)}
 .hv-pkt:hover .hv-ikon{transform:scale(1.12)}
 /* A name that would cover another point steps aside until its icon is hovered. */
+.hv-navn.hv-navn-op{top:auto;bottom:100%;margin:0 0 4px}
+.hv-navn.hv-navn-h{top:50%;left:100%;transform:translateY(-50%);margin:0 0 0 5px}
+.hv-navn.hv-navn-v{top:50%;left:auto;right:100%;transform:translateY(-50%);margin:0 5px 0 0}
 .hv-navn.hv-gemt{visibility:hidden;pointer-events:none}
 .hv-pkt:hover .hv-navn.hv-gemt{visibility:visible}
 @media (min-width:761px){
@@ -2465,8 +2593,10 @@ const CSS = `
 .hv-panel p{margin:0 0 12px;font-size:15px;line-height:1.5;color:#3d4a50}
 .hv-pchips{display:flex;flex-wrap:wrap;gap:5px}
 .hv-fotos{position:relative;margin:-18px -18px 14px;border-radius:16px 16px 0 0;overflow:hidden;background:#dfe5e7;aspect-ratio:16/10;cursor:pointer;user-select:none}
-.hv-fotos img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .35s ease}
-.hv-fotos img.on{opacity:1}
+.hv-foto{position:absolute;inset:0;opacity:0;transition:opacity .35s ease}
+.hv-foto.on{opacity:1}
+.hv-foto img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
+.hv-foto img.hv-foto-bag{object-fit:cover;filter:blur(18px) brightness(.85);transform:scale(1.15)}
 .hv-fotos-stor{position:absolute;right:10px;bottom:9px;padding:3px 8px;border-radius:999px;background:rgba(0,0,0,.5);color:#fff;font-size:11.5px;font-weight:700;pointer-events:none;backdrop-filter:blur(4px)}
 .hv-fotos-pil{position:absolute;top:50%;translate:0 -50%;width:30px;height:30px;border:0;border-radius:50%;background:rgba(255,255,255,.85);color:#1d2a30;font-size:20px;line-height:1;cursor:pointer;opacity:0;transition:opacity .2s}
 .hv-fotos:hover .hv-fotos-pil{opacity:1}
@@ -2623,7 +2753,7 @@ const CSS = `
   .hv-intro-moerk .hv-intro-body h1{color:#fff}
   .hv-intro .hv-sub{display:none}
   .hv-intro-body{padding:6px 10px;min-width:0;display:flex;flex-direction:column;gap:5px}
-  .hv-intro-body h1{font-size:13.5px;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .hv-intro-body h1{font-size:13.5px;line-height:1.2;margin:0;overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;text-wrap:balance}
   .hv-intro-body p{display:none}
   .hv-intro .hv-btn{padding:6px 10px;font-size:12.5px}
   .hv-menuknap{top:calc(12px + env(safe-area-inset-top,0px));right:10px;padding:10px 16px;font-size:13px}
@@ -2633,6 +2763,15 @@ const CSS = `
   .hv-chips{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
   .hv-chips::-webkit-scrollbar{display:none}
   .hv-chips button{flex:none;font-size:12px;padding:4px 10px 4px 5px}
+  /* Rows of 2-4 (set under Luftfoto og kort): every category seen at once, long names cut short. */
+  .hv-filter-kol .hv-chips{display:grid;overflow:visible;gap:5px}
+  .hv-filter-kol-2 .hv-chips{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .hv-filter-kol-3 .hv-chips{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .hv-filter-kol-4 .hv-chips{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .hv-filter-kol .hv-chips button{min-width:0;padding:4px 8px 4px 4px}
+  .hv-filter-kol-4 .hv-chips button{font-size:11px;gap:4px}
+  .hv-filter-kol .hv-chips button i{flex:none}
+  .hv-filter-kol .hv-chips button span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   /* Only icons until you zoom in - the names crowd each other on a narrow screen. The open point keeps its name. */
   .hv-navn{display:none;font-size:11px;padding:1px 8px}
   .hv-zoom .hv-navn,.hv-hs.hv-aktiv .hv-navn{display:block}
@@ -2641,7 +2780,7 @@ const CSS = `
   .hv-ikon{width:30px;height:30px;border-width:2px}.hv-ikon svg{width:15px;height:15px}
   /* An open point: the panel takes the bottom, the bars step aside. */
   .hv-panel{top:auto;bottom:0;left:0;right:0;width:auto;max-height:62%;border-radius:18px 18px 0 0;padding-bottom:calc(18px + env(safe-area-inset-bottom,0px))}
-  .hv-fotos{aspect-ratio:auto;height:min(40vw,190px);border-radius:18px 18px 0 0}
+  .hv-fotos{aspect-ratio:auto;height:min(62vw,260px);border-radius:18px 18px 0 0}
   .hv-logo{height:calc(var(--logo-h) * .74);max-width:45vw;top:calc(var(--logo-top,12px) + env(safe-area-inset-top,0px));left:var(--logo-side,12px)}
   .hv-logo-kort{height:calc(var(--logo-h) * .74 - 8px);padding:7px 10px;border-radius:11px}
   .hv-menu{width:100%}

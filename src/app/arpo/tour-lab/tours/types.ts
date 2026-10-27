@@ -70,6 +70,8 @@ export type TourPoint = {
   chips: string[];
   /** How big the point is on the map: 1 = normal (0.6-1.8). */
   size?: number;
+  /** Walking times to other points (by id): "2 min til Stranden" on the card, and lines on the picture while it's open. */
+  walks?: { to: string; minutes: number }[];
 };
 
 /** A menu item: a spot in the tour, "#luften" (back to the drone scene / map), "#punkt:<point id>" (a point on the drone scene / map, its card open), "#plan" (the site plan full screen), or a page out of the tour. */
@@ -147,6 +149,8 @@ export type TourConfig = {
     filter?: { desktop?: false; mobile?: false };
     /** The points' names on the drone scene / map: always, only when zoomed in, or never (the open point's card has the name). Default: computer always, phone when zoomed in. */
     names?: { desktop?: "always" | "zoom" | "never"; mobile?: "always" | "zoom" | "never" };
+    /** Phones: the filter's categories side by side in rows of 2-4, so all are seen at once. Default: one row to scroll sideways. */
+    filterColumns?: 2 | 3 | 4;
   };
   drone?: {
     /** One 360° photo (equirectangular) instead of the tiles below - set by the engine for a 360° map. */
@@ -270,6 +274,8 @@ export type TourConfig = {
     seconds?: number;
     /** The visitor presses "Næste" themselves (no timer) - calm, e.g. for a voice tour. */
     manual?: boolean;
+    /** The guide's stop button: "self" = "Gå selv rundt" (stay where you are), "overview" = back to the drone scene / map - for tours you can't walk around in. Default "self". */
+    exit?: "self" | "overview";
     /**
      * Made from the menu instead of `stops`: one stop per place in the menu,
      * in the menu's order - `menuPlaces` = the places to include, by their
@@ -321,6 +327,20 @@ export type TourConfig = {
    * `boxes`: box number -> link to the scan point in front of it.
    */
   wayfinding?: { boxes?: Record<string, string> };
+  /**
+   * "Find din plads": a few questions on the drone scene/map (who are you,
+   * what do you sleep in, what matters most); each answer points at the
+   * points that fit it, and the point with most answers wins - the scene
+   * flies there and opens its card, with the next best as alternatives.
+   * Opened from a button in the box at the top, and from any link "#find".
+   */
+  finder?: {
+    title: string;
+    lead?: string;
+    /** The button's text, e.g. "Find jeres plads". */
+    button: string;
+    questions: { q: string; options: { label: string; points: string[] }[] }[];
+  };
   /**
    * "Vejret" on the drone scene: the weather right now where the place is
    * (DMI), and what each month is typically like - for visitors planning a

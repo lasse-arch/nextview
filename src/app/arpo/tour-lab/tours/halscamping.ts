@@ -168,6 +168,7 @@ export const halscamping: TourConfig = {
   },
   mobileZoomLock: true,
   guide: {
+    exit: "overview",
     stops: [
       { point: "pool" },
       { point: "legeplads" },

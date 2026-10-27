@@ -86,6 +86,7 @@ export function MapEditor({ config, edit }: { config: TourConfig; edit: Edit }) 
     return (
       <>
       {config.drone && <OverviewUiToggles config={config} edit={edit} />}
+      {config.drone && <DroneToMap config={config} edit={edit} />}
       <Group>
         <p className="text-[14px] leading-snug">Start touren på et kort over stedet - en tegning, en situationsplan eller et dronefoto - med punkter man kan trykke på og gå ind fra.</p>
         <p className="text-[12px] leading-snug text-[#8e8e93]">Brug et stort billede (fx 4000 px bredt) - man kan zoome ind på det. JPG eller PNG.</p>
@@ -257,6 +258,9 @@ function MapCanvas({ config, edit, onClose }: { config: TourConfig; edit: Edit; 
     edit((d) => {
       d.points = d.points.filter((p) => p.id !== id);
       delete d.map!.spots[id];
+      // Nothing left pointing at it: walking times to it, and the finder's answers.
+      for (const p of d.points) if (p.walks?.some((w) => w.to === id)) p.walks = p.walks.filter((w) => w.to !== id);
+      d.finder?.questions.forEach((q) => q.options.forEach((o) => (o.points = o.points.filter((x) => x !== id))));
     });
     setSelected(null);
   }
@@ -461,7 +465,21 @@ function MapCanvas({ config, edit, onClose }: { config: TourConfig; edit: Edit; 
                       if (z) all[src] = z;
                       else delete all[src];
                       d.imageView = Object.keys(all).length ? all : undefined;
-                    })} onMove={() => setPlacing({ kind: "point", id: point.id })} onRemove={() => removePoint(point.id)} onDone={() => setSelected(null)} />
+                    })} onMove={() => setPlacing({ kind: "point", id: point.id })} onRemove={() => removePoint(point.id)} onDone={() => setSelected(null)}
+              edit={edit}
+              setWalk={(to, minutes) =>
+                // Both ways: the walk from A to B is the walk from B to A.
+                edit((d) => {
+                  const put = (from: string, other: string) => {
+                    const p = d.points.find((x) => x.id === from);
+                    if (!p) return;
+                    const rest = (p.walks ?? []).filter((w) => w.to !== other);
+                    p.walks = minutes == null ? (rest.length ? rest : undefined) : [...rest, { to: other, minutes }];
+                  };
+                  put(point.id, to);
+                  put(to, point.id);
+                })
+              } />
           ) : (
             <>
               <Group title="Luftfotoets første udsnit">
@@ -731,7 +749,9 @@ function OverviewUiToggles({ config, edit }: { config: TourConfig; edit: Edit })
       const clean = (o: object) => (Object.keys(o).length ? o : undefined);
       const box = clean(next.box) as typeof next.box | undefined;
       const filter = clean(next.filter) as typeof next.filter | undefined;
-      d.overviewUi = box || filter ? { box, filter } : undefined;
+      // The other settings over the map stay as they are.
+      const rest = { ...d.overviewUi, box, filter };
+      d.overviewUi = Object.values(rest).some((v) => v !== undefined) ? rest : undefined;
     });
   return (
     <Group title="Over kortet">
@@ -764,6 +784,18 @@ function OverviewUiToggles({ config, edit }: { config: TourConfig; edit: Edit })
           ))}
         </tbody>
       </table>
+      <Field title="Filteret på mobil" hint="Hvor mange kategorier der ses på én gang. Rul: én række, man skubber sidelæns. 2-4: i rækker under hinanden, så alle ses.">
+        <Choice
+          value={String(ui?.filterColumns ?? "rul")}
+          options={[
+            ["rul", "Rul"],
+            ["2", "2 pr. række"],
+            ["3", "3 pr. række"],
+            ["4", "4 pr. række"],
+          ]}
+          onChange={(v) => edit((d) => void (d.overviewUi = { ...d.overviewUi, filterColumns: v === "rul" ? undefined : (Number(v) as 2 | 3 | 4) }))}
+        />
+      </Field>
       {(["desktop", "mobile"] as const).map((device) => (
         <Field key={device} title={`Navne på punkterne - ${device === "desktop" ? "computer" : "mobil"}`} hint={device === "mobile" ? "Aldrig: kun ikonerne - navnet står i kortet, når man trykker. Godt på et travlt luftfoto." : undefined}>
           <Choice
@@ -796,9 +828,13 @@ function PointPanel({
   onMove,
   onRemove,
   onDone,
+  setWalk,
+  edit,
 }: {
+  edit: Edit;
   config: TourConfig;
   point: TourPoint;
+  setWalk: (to: string, minutes: number | null) => void;
   rooms: [string, string][];
   setPoint: (fn: (p: TourPoint) => void) => void;
   setImageZoom: (src: string, view: NonNullable<TourConfig["imageView"]>[string] | undefined) => void;
@@ -926,6 +962,8 @@ function PointPanel({
               </button>
             </div>
           ) : null}
+          {p.panorama && <AiImageButton src={p.panorama} onUse={(url) => setPoint((x) => void (x.panorama = url))} />}
+          {!p.panorama && protoPano(config, p) && <PrototypePano config={config} point={p} edit={edit} />}
           {p.panorama ? (
             <PanoZoom src={p.panorama} value={config.imageView?.[p.panorama]} onChange={(z) => setImageZoom(p.panorama!, z)} />
           ) : (
@@ -947,7 +985,172 @@ function PointPanel({
           />
         </Field>
       </Group>
+      <Group title="Gåafstande">
+        <p className="text-[12px] leading-snug text-[#8e8e93]">
+          Hvor mange minutter man går herfra til andre steder. Vises på kortet (&quot;2 min til stranden&quot;) og som streger på billedet, når punktet er åbent. Gælder begge veje.
+        </p>
+        {(p.walks ?? []).map((w) => {
+          const other = config.points.find((x) => x.id === w.to);
+          if (!other) return null;
+          return (
+            <div key={w.to} className="flex items-center gap-2">
+              <span className="min-w-0 flex-1 truncate text-[14px]">{other.name}</span>
+              <input
+                type="number"
+                min={1}
+                max={120}
+                className={`${input} w-[70px] bg-white py-1.5 text-right`}
+                value={w.minutes}
+                onChange={(e) => {
+                  const n = Math.round(Number(e.target.value));
+                  if (n >= 1 && n <= 120) setWalk(w.to, n);
+                }}
+                aria-label={`Minutter til ${other.name}`}
+              />
+              <span className="text-[13px] text-[#8e8e93]">min</span>
+              <button type="button" className="text-[#c7c7cc] hover:text-[#ff3b30]" title="Fjern" onClick={() => setWalk(w.to, null)}>
+                <Icon d='<path d="M6 6l12 12M18 6L6 18"/>' className="h-4 w-4" />
+              </button>
+            </div>
+          );
+        })}
+        {config.points.some((x) => x.id !== p.id && !p.walks?.some((w) => w.to === x.id)) && (
+          <select className={`${input} bg-white`} value="" onChange={(e) => e.target.value && setWalk(e.target.value, 2)}>
+            <option value="">+ Gåafstand til …</option>
+            {config.points
+              .filter((x) => x.id !== p.id && !p.walks?.some((w) => w.to === x.id))
+              .map((x) => (
+                <option key={x.id} value={x.id}>
+                  {x.name}
+                </option>
+              ))}
+          </select>
+        )}
+      </Group>
     </>
+  );
+}
+
+/** A prototype's 360° photo (tiles under `panos`) as one picture: the tiles' folder + "-360.jpg" (made from them). */
+const protoPano = (T: TourConfig, p: TourPoint) => (p.pano && T.panos ? `${T.panos.basePath}/${p.pano}-360.jpg` : null);
+
+/** Makes a point's prototype 360° photo its own picture - its start direction kept with the picture. */
+function adoptPanoPicture(d: TourConfig, id: string, url: string) {
+  const p = d.points.find((x) => x.id === id);
+  if (!p) return;
+  if (p.panoStart) d.imageView = { ...d.imageView, [url]: { ...d.imageView?.[url], yaw: p.panoStart.yaw, pitch: p.panoStart.pitch } };
+  p.panorama = url;
+  delete p.pano;
+  delete p.panoStart;
+}
+
+/**
+ * A drone scene from the early prototypes is cut into tiles in the code, so
+ * the editor can't show it. When the whole 360° picture is there too (the
+ * tiles' folder + "-360.jpg", or the scene's own picture), one click makes it
+ * the tour's 360° map: the same picture, points, start and words - editable
+ * here like any other.
+ */
+function DroneToMap({ config, edit }: { config: TourConfig; edit: Edit }) {
+  const D = config.drone!;
+  const image = D.panorama || `${D.basePath}-360.jpg`;
+  const [found, setFound] = useState<{ w: number; h: number } | null | undefined>(undefined);
+  /** The points' prototype 360° photos that exist as one picture (point id → picture). */
+  const [panos, setPanos] = useState<Record<string, string>>({});
+  useEffect(() => {
+    let alive = true;
+    const all = config.points.map((p) => [p.id, protoPano(config, p)] as const).filter((x): x is readonly [string, string] => Boolean(x[1]));
+    Promise.all(all.map(([id, url]) => imageSize(url).then(() => [id, url] as const, () => null))).then((r) => alive && setPanos(Object.fromEntries(r.filter((x) => x != null))));
+    return () => {
+      alive = false;
+    };
+  }, [config]);
+  useEffect(() => {
+    let alive = true;
+    imageSize(image).then(
+      (s) => alive && setFound(Math.abs(s.w / s.h - 2) < 0.05 ? s : null),
+      () => alive && setFound(null)
+    );
+    return () => {
+      alive = false;
+    };
+  }, [image]);
+  const at = (v: { yaw: number; pitch: number; hfov: number }, phone: boolean) => ({
+    x: Math.round(((v.yaw + 180) / 360) * 1000) / 10,
+    y: Math.round(((90 - v.pitch) / 180) * 1000) / 10,
+    zoom: Math.round(((phone ? PANO_HFOV.mobile : PANO_HFOV.desktop) / v.hfov) * 100) / 100,
+  });
+  return (
+    <Group title="Luftfotoet">
+      {found === undefined ? (
+        <p className="text-[13px] text-[#8e8e93]">Henter luftfotoet…</p>
+      ) : found ? (
+        <>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={image} alt="Luftfotoet" className="aspect-[2/1] w-full rounded-xl object-cover ring-1 ring-black/[.06]" />
+          <p className="text-[12px] leading-snug text-[#8e8e93]">
+            Luftfotoet er fra prototypen og ligger som fliser i koden, så det kan ikke rettes her endnu. Gør det til et almindeligt 360°-billede: samme billede, punkter, start og tekster - og så kan du flytte punkterne, sætte gåafstande, bruge &quot;Find din plads&quot; og skifte billedet.
+          </p>
+          <button
+            type="button"
+            className="w-full rounded-xl bg-[#0071e3] py-2.5 text-[15px] font-medium text-white"
+            onClick={() =>
+              edit((d) => {
+                const drone = d.drone!;
+                d.map = {
+                  image,
+                  w: found.w,
+                  h: found.h,
+                  panorama: true,
+                  spots: Object.fromEntries(d.points.map((p) => [p.id, [Math.round(((p.yaw + 180) / 360) * 10000) / 100, Math.round(((90 - p.pitch) / 180) * 10000) / 100]])),
+                  start: at(drone.start, false),
+                  startMobile: at(drone.startMobile, true),
+                  intro: drone.intro,
+                  backLabel: drone.backLabel,
+                  filterTitle: drone.filterTitle,
+                };
+                d.drone = undefined;
+                // The guide's and points' 360° photos too, so they can be seen and changed here.
+                for (const [id, url] of Object.entries(panos)) adoptPanoPicture(d, id, url);
+              })
+            }
+          >
+            Gør luftfotoet redigerbart
+          </button>
+        </>
+      ) : (
+        <p className="text-[12px] leading-snug text-[#8e8e93]">
+          Luftfotoet er fra prototypen og ligger som fliser i koden ({D.basePath}). Det kan ikke rettes her - upload det hele 360°-billede nedenfor for at lave det om til et redigerbart kort.
+        </p>
+      )}
+    </Group>
+  );
+}
+
+/** A point's 360° photo from the prototype (tiles in the code): shown, and made the point's own picture with one click. */
+function PrototypePano({ config, point, edit }: { config: TourConfig; point: TourPoint; edit: Edit }) {
+  const url = protoPano(config, point)!;
+  const [ok, setOk] = useState<boolean | null>(null);
+  useEffect(() => {
+    let alive = true;
+    imageSize(url).then(
+      () => alive && setOk(true),
+      () => alive && setOk(false)
+    );
+    return () => {
+      alive = false;
+    };
+  }, [url]);
+  if (!ok) return ok === false ? <p className="text-[12px] text-[#8e8e93]">Punktet har et 360°-billede fra prototypen (fliser i koden), som ikke kan vises her.</p> : null;
+  return (
+    <div className="space-y-1.5 rounded-xl bg-white p-2.5 ring-1 ring-black/[.06]">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={url} alt="" className="aspect-[2/1] w-full rounded-lg object-cover" />
+      <p className="text-[11px] leading-snug text-[#8e8e93]">360°-billedet er fra prototypen. Gør det til punktets eget billede, så du kan sætte zoom, rette det med AI eller skifte det.</p>
+      <button type="button" className="w-full rounded-lg bg-[#0071e3] py-1.5 text-[13px] font-medium text-white" onClick={() => edit((d) => adoptPanoPicture(d, point.id, url))}>
+        Gør 360°-billedet redigerbart
+      </button>
+    </div>
   );
 }
 

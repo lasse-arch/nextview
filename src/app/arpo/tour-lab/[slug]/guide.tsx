@@ -40,7 +40,10 @@ export function GuidePlayer({
   onGo,
   onClose,
   onEvent,
+  stopLabel,
 }: {
+  /** The stop button's words (default "Gå selv rundt"). */
+  stopLabel?: string;
   stops: GuideStop[];
   index: number;
   seconds: number;
@@ -181,7 +184,7 @@ export function GuidePlayer({
             </button>
           )}
           <button type="button" className="gd-stop" onClick={() => onClose(false)}>
-            Gå selv rundt
+            {stopLabel ?? tr("Gå selv rundt")}
           </button>
         </div>
       </div>

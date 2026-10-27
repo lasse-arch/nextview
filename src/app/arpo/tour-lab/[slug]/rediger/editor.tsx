@@ -27,6 +27,7 @@ import { Choice, Field, FilesContext, Group, Icon, input, outsideFiles, PanoZoom
 import { fetchSiteFavicon, hostTourFiles } from "@/lib/actions/tour-files";
 import { AiMemoryPanel } from "./memory";
 import { WeatherEditor } from "./weather-editor";
+import { FinderEditor } from "./finder-editor";
 import { MapEditor } from "./map-editor";
 import { FeedbackPanel } from "./feedback-panel";
 import { LinksOpenEditor } from "./links-open";
@@ -82,7 +83,7 @@ const FINDS: Partial<Record<Tab, string[]>> = {
   start: ["Hvor touren starter|startpunkt|startposition|start-link|start her", "Forsiden", "Velkomsten", "Fliser", "Kort film før touren", "Intro-video", "Steder med foto", "Træd indenfor"],
   menu: ["Menuens udseende|menu-design|sidemenu|dock|bar i bunden|rumvælger", "Menu åben på computer", "Menu åben på mobil", "Dæmp touren bag menuen", "Menupunkter", "Grupper", "Tilføj det sted, du ser", "Billede i menuen", "360°-billede", "Webside", "Luftfotoet", "Scanpunkter i menuen"],
   rundvisning: ["Sådan ser en dag ud|dagen|program", "Vis mig rundt", "Guide", "Guidet tur", "Stop", "Drejning", "Sekunder ved hvert stop", "Stemme", "Lav den ud fra menuen"],
-  kortet: ["Interaktivt kort", "Luftfoto", "Dronebillede", "360°-kort", "Punkter på kortet", "Kategorier", "Skyer", "Boksen øverst", "Filteret", "Luftfotoets første udsnit|startudsnit", "Ikoner", "Vejret|vejr|temperatur|dmi|sol"],
+  kortet: ["Interaktivt kort", "Luftfoto", "Dronebillede", "360°-kort", "Punkter på kortet", "Kategorier", "Skyer", "Boksen øverst", "Filteret", "Luftfotoets første udsnit|startudsnit", "Ikoner", "Vejret|vejr|temperatur|dmi|sol", "Find din plads|finder|spørgsmål|guide til plads", "Gåafstande|gåafstand|minutter|afstand"],
   scan: ["Scanpunkter", "Skjul scanpunkter", "Personer i scans"],
   tags: ["Tags", "Infotags", "Hotspots", "Pris", "Video"],
   live: ["Live data", "Ledige pladser", "Ledige rum", "Book-knap", "Hent nye data"],
@@ -794,6 +795,7 @@ export function TourEditor({
             {tab === "kortet" && (
               <>
                 <MapEditor config={config} edit={edit} />
+                {(config.drone || config.map) && <FinderEditor config={config} edit={edit} />}
                 {(config.drone || config.map) && <WeatherEditor config={config} edit={edit} />}
               </>
             )}

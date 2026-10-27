@@ -507,6 +507,18 @@ export function GuideEditor({ config, edit, preview }: Omit<Props, "slug">) {
             hint="Roligt tempo - godt til en stemme-rundvisning. Stop med lyd venter altid på, at stemmen er færdig."
           />
         )}
+        {(stops.length > 0 || fromMenu) && (config.drone || config.map) && (
+          <Field title="Knappen, der stopper guiden" hint="Tilbage til luften: til tours, hvor man ikke kan gå rundt selv (fx kun 360°-billeder på luftfotoet).">
+            <Choice
+              value={config.guide?.exit ?? "self"}
+              options={[
+                ["self", "Gå selv rundt"],
+                ["overview", "Tilbage til luften"],
+              ]}
+              onChange={(v) => edit((d) => void (d.guide = { ...d.guide!, exit: v === "overview" ? "overview" : undefined }))}
+            />
+          </Field>
+        )}
         {stops.length > 0 && !config.guide?.manual && (
           <Field title={`Sekunder ved hvert stop: ${config.guide?.seconds ?? 8}`}>
             <input type="range" min={4} max={20} className="w-full accent-[#0071e3]" value={config.guide?.seconds ?? 8} onChange={(e) => edit((d) => void (d.guide = { ...d.guide!, seconds: Number(e.target.value) }))} />

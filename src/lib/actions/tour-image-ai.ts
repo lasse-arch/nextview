@@ -8,6 +8,7 @@ import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getSettingValue, setSettingValue } from "@/lib/integration-settings";
 import { storeTourFile } from "@/lib/tour-files";
+import { keepSharpWhereUnchanged } from "@/lib/image-merge";
 
 /*
  * "Ret med AI": a tour's picture (the map, a drone photo, a cover, a point's
@@ -114,8 +115,11 @@ export async function editTourImage(slug: string, src: string, request: string):
       const said = json?.candidates?.[0]?.content?.parts?.find((p) => p.text)?.text;
       return { ok: false, error: said ? `Billed-AI'en lavede intet billede: ${said.slice(0, 200)}` : "Billed-AI'en lavede intet billede - prøv at formulere det anderledes." };
     }
-    // Back to the original's exact size, so points placed in % of it still sit right.
-    const out = await sharp(Buffer.from(part.inlineData.data, "base64")).resize(w, h, { fit: "fill" }).webp({ quality: 86 }).toBuffer();
+    // The original's exact size (points placed in % of it still sit right) - and its own sharpness wherever nothing changed.
+    const merged = await keepSharpWhereUnchanged(original, Buffer.from(part.inlineData.data, "base64"));
+    const out = await sharp(merged.data, { raw: { width: merged.w, height: merged.h, channels: 3 } })
+      .webp({ quality: 86 })
+      .toBuffer();
     const name = `ai-${path.basename(src.split("?")[0]).replace(/\.[a-z0-9]+$/i, "") || "billede"}`;
     const url = await storeTourFile(slug, name, "image/webp", out, src);
     await prisma.tourAiUsage
