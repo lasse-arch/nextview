@@ -1036,11 +1036,19 @@ function TourExperience({
       .then(async () => {
         if (ticket !== guideTicket.current) return;
         await flyTo(stop.href, "fly");
-        // The slow turn isn't waited for - the next move may start while it turns.
-        if (ticket === guideTicket.current && turn !== "none") sdk?.Camera.rotate?.(turn === "other" ? -18 : 18, 0, { speed: 3 }).catch(() => {});
+        if (ticket !== guideTicket.current || turn === "none") return;
+        // The slow turn isn't waited for by the queue (the next move may start while it turns) - but it is
+        // still the guide moving, not the visitor: guideMoving stays on until the turn is done.
+        const turning = sdk?.Camera.rotate?.(turn === "other" ? -18 : 18, 0, { speed: 3 }).catch(() => {});
+        turning?.finally(() => {
+          if (ticket === guideTicket.current) setTimeout(() => ticket === guideTicket.current && (guideMoving.current = false), 700);
+        });
+        return "turning";
       })
-      .finally(() => {
-        if (ticket === guideTicket.current) setTimeout(() => ticket === guideTicket.current && (guideMoving.current = false), 700);
+      .then((r) => {
+        if (r !== "turning" && ticket === guideTicket.current) setTimeout(() => ticket === guideTicket.current && (guideMoving.current = false), 700);
+      }, () => {
+        if (ticket === guideTicket.current) guideMoving.current = false;
       });
   }
   /*
