@@ -950,6 +950,10 @@ function TourExperience({
       setMenuOpen(false);
       return setContactOpen(true);
     }
+    if (href === "#live") {
+      if (T.live) openLive("menu");
+      return;
+    }
     if (!isPlaceHref(href)) {
       track("cta_click", { label: name, link_url: href, place: "menu" });
       openLink(T, href, name, popup);
@@ -1180,6 +1184,14 @@ function TourExperience({
     setMenuOpen(false);
     setLiveOpen(true);
   }
+  // A link "#live" (a button, a menu item) opens the live list.
+  const openLiveRef = useRef(openLive);
+  useEffect(() => void (openLiveRef.current = openLive));
+  useEffect(() => {
+    const open = () => openLiveRef.current("button");
+    window.addEventListener("hv-live", open);
+    return () => window.removeEventListener("hv-live", open);
+  }, []);
 
   /** A tag the editor is placing (its request id) - see the effect below the bridge. */
   const [picking, setPicking] = useState<string | null>(null);
@@ -1709,19 +1721,19 @@ function TourExperience({
             <div className="hv-contact-t">{tx("Kontakt")}</div>
             {T.contact.address && (
               <TourLink href={T.contact.mapUrl ?? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(T.contact.address ?? "")}`} label={T.contact.address ?? tx("Kort")} onClick={() => track("contact_click", { kind: "map" })}>
-                <span>📍</span>
+                <ContactIcon kind="pin" />
                 {T.contact.address}
               </TourLink>
             )}
             {T.contact.phone && (
               <a href={`tel:${T.contact.phone.replace(/\s/g, "")}`} onClick={() => track("contact_click", { kind: "phone" })}>
-                <span>📞</span>
+                <ContactIcon kind="phone" />
                 {formatPhone(T.contact.phone)}
               </a>
             )}
             {T.contact.email && (
               <a href={`mailto:${T.contact.email}`} onClick={() => track("contact_click", { kind: "email" })}>
-                <span>✉️</span>
+                <ContactIcon kind="mail" />
                 {T.contact.email}
               </a>
             )}
@@ -1734,7 +1746,8 @@ function TourExperience({
                   setContactOpen(true);
                 }}
               >
-                ✍️ {T.contactForm.title || tx("Skriv til os")}
+                <ContactIcon kind="write" />
+                {T.contactForm.title || tx("Skriv til os")}
               </button>
             )}
             {socialLinks(T.contact).length > 0 && (
@@ -1820,7 +1833,7 @@ function TourExperience({
             </div>
             <ul>
               {liveUnits.map((u) => {
-                const href = u.link ?? T.cta.find((c) => c.primary)?.href;
+                const href = T.live!.bookHref || u.link || T.cta.find((c) => c.primary && !c.href.startsWith("#"))?.href;
                 return (
                   <li key={u.name}>
                     <span>
@@ -2350,6 +2363,8 @@ const CSS = `
 .hv-contact-t{font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#7a8a90}
 .hv-contact a{display:flex;gap:8px;align-items:center;overflow-wrap:anywhere;min-width:0;color:var(--c-main);text-decoration:none;font-size:14px;font-weight:600}
 .hv-contact a:hover{color:var(--c-accent-dark)}
+.hv-ci{flex:none;width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;opacity:.65}
+.hv-contact-form .hv-ci{opacity:.9}
 .hv-social{display:flex;flex-wrap:wrap;gap:14px;margin-top:4px}
 .hv-contact .hv-social a{width:34px;height:34px;justify-content:center;border-radius:10px;transition:transform .15s}
 .hv-contact .hv-social a:hover{transform:translateY(-2px)}
@@ -2473,3 +2488,15 @@ const LOGO_RIGHT_CSS = `
   .hv-logo-h .hv-intro{left:104px;right:10px}
 }
 `;
+
+/** The contact box's icons - thin lines in the tour's own colour (not emoji). */
+const CONTACT_ICONS = {
+  pin: '<path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/>',
+  phone: '<path d="M6.6 3.5h2.6l1.4 4-1.9 1.3a12 12 0 0 0 6.5 6.5l1.3-1.9 4 1.4v2.6a2 2 0 0 1-2.2 2A16.5 16.5 0 0 1 4.6 5.7a2 2 0 0 1 2-2.2z"/>',
+  mail: '<rect x="3.5" y="5.5" width="17" height="13" rx="2"/><path d="m4 7 8 6 8-6"/>',
+  write: '<path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-4-4L4 16v4z"/><path d="m13.5 6.5 4 4"/>',
+};
+
+function ContactIcon({ kind }: { kind: keyof typeof CONTACT_ICONS }) {
+  return <svg className="hv-ci" viewBox="0 0 24 24" aria-hidden dangerouslySetInnerHTML={{ __html: CONTACT_ICONS[kind] }} />;
+}

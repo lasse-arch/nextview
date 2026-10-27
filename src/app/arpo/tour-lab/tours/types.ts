@@ -329,6 +329,8 @@ export type TourConfig = {
     flags?: string;
     exclude?: string[];
     bookLabel?: string;
+    /** Where every unit's button goes - a web page of the customer's. Empty: the unit's own link from the list, else the tour's primary button. */
+    bookHref?: string;
     /** Show each unit's size / number of free places (when the page has it) - false: leave it out. Default shown. */
     showSize?: false;
     /** How often the page is read again, in minutes (default 10). */

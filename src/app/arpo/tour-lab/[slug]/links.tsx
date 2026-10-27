@@ -106,10 +106,12 @@ export function LinkPopup({ open, onClose, size = "stor", site }: { open: NonNul
   );
 }
 
+/** Links that open something inside the tour rather than a page: the contact form and the live data list. */
+const IN_TOUR: Record<string, string> = { "#kontakt": "hv-kontakt", "#live": "hv-live" };
+
 /** Opens a link from code (a button rather than an <a>) the tour's way. */
 export function openLink(T: TourConfig, href: string, label: string, popup: (href: string, label: string) => void) {
-  // The tour's own contact form - not a page to open.
-  if (href === "#kontakt") return void window.dispatchEvent(new Event("hv-kontakt"));
+  if (IN_TOUR[href]) return void window.dispatchEvent(new Event(IN_TOUR[href]));
   const mode = linkMode(T, href);
   const url = tagged(T, href);
   if (mode === "popup") popup(url, label);
@@ -142,10 +144,10 @@ export function TourLink({
       rel={mode === "tab" ? "noopener" : undefined}
       onClick={(e) => {
         onClick?.();
-        if (href === "#kontakt") {
-          // The tour's own contact form (see contact-form.tsx).
+        if (IN_TOUR[href]) {
+          // Opens inside the tour (the contact form, the live data list).
           e.preventDefault();
-          window.dispatchEvent(new Event("hv-kontakt"));
+          window.dispatchEvent(new Event(IN_TOUR[href]));
           return;
         }
         if (mode === "popup") {

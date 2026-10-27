@@ -150,3 +150,6 @@ export function outsideFiles(c: TourConfig): string[] {
     return !/(^|\.)(arpo\.dk|nextview360\.dk|blob\.vercel-storage\.com|localhost)$/.test(new URL(src).hostname);
   });
 }
+
+/** A typed address with https:// in front when it has no scheme (links, # and mailto/tel are kept). */
+export const withProtocol = (url: string) => (/^(https?:|mailto:|tel:|#)/i.test(url.trim()) ? url.trim() : `https://${url.trim()}`);

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { previewLiveData, setupLiveData } from "@/lib/actions/tour-ai";
 import type { LiveUnit } from "@/lib/availability/live";
 import type { TourConfig } from "../../tours/types";
-import { Field, Group, Icon, input, Toggle, type PreviewApi } from "./ui";
+import { Field, Group, Icon, input, Toggle, withProtocol, type PreviewApi } from "./ui";
 
 /*
  * "Live data": free pitches, rooms, storage units … read live off the
@@ -49,7 +49,7 @@ export function LiveDataEditor({ config, edit, slug, preview }: { config: TourCo
       if (!r.ok) return setError(r.error);
       setUnits(r.units);
       setExplanation(r.explanation);
-      edit((d) => void (d.live = { ...r.spec, exclude: d.live?.exclude, bookLabel: d.live?.bookLabel }));
+      edit((d) => void (d.live = { ...r.spec, exclude: d.live?.exclude, bookLabel: d.live?.bookLabel, bookHref: d.live?.bookHref }));
     });
   }
 
@@ -103,6 +103,15 @@ export function LiveDataEditor({ config, edit, slug, preview }: { config: TourCo
             </Field>
             <Field title="Knaptekst ved hver enhed">
               <input className={input} value={live.bookLabel ?? ""} placeholder="Book" onChange={(e) => edit((d) => void (d.live!.bookLabel = e.target.value || undefined))} />
+            </Field>
+            <Field title="Knappen åbner" hint={live.bookHref ? "Alle knapper åbner denne side." : "Tom: hver enheds egen side fra kundens liste - ellers tourens hovedknap."}>
+              <input
+                className={input}
+                value={live.bookHref ?? ""}
+                placeholder="https://kunden.dk/book"
+                onChange={(e) => edit((d) => void (d.live!.bookHref = e.target.value.trim() || undefined))}
+                onBlur={(e) => e.target.value && edit((d) => void (d.live!.bookHref = withProtocol(e.target.value)))}
+              />
             </Field>
             <Toggle
               on={live.showSize !== false}

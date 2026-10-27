@@ -23,7 +23,7 @@ import type { ScanMap } from "@/lib/matterport-graph";
 import { currentPreset } from "../../tours/presets";
 import { EconomyPanel, type TourEconomy } from "./economy";
 import { DEFAULT_EMBED, SharePanel, SitePreview, type EmbedSize } from "./share";
-import { Choice, Field, FilesContext, Group, Icon, input, outsideFiles, ssOfHref, Toggle, UploadButton, type PreviewApi } from "./ui";
+import { Choice, Field, FilesContext, Group, Icon, input, outsideFiles, ssOfHref, Toggle, UploadButton, withProtocol, type PreviewApi } from "./ui";
 import { fetchSiteFavicon, hostTourFiles } from "@/lib/actions/tour-files";
 import { AiMemoryPanel } from "./memory";
 import { MapEditor } from "./map-editor";
@@ -806,7 +806,7 @@ export function TourEditor({
                   <LinksOpenEditor config={config} edit={edit} />
                 </Group>
                 <Group title="Knapper">
-                <CtaEditor cta={config.cta} onChange={(cta) => edit((d) => void (d.cta = cta))} />
+                <CtaEditor cta={config.cta} live={Boolean(config.live)} form={Boolean(config.contactForm)} onChange={(cta) => edit((d) => void (d.cta = cta))} />
                 </Group>
                 <Group title="Kontakt">
                 <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">Vises nederst i menuen. Udfyld kun det, kunden vil have vist.</p>
@@ -1470,7 +1470,6 @@ class SafeArea extends Component<{ onUndo: () => void; children: React.ReactNode
 }
 
 /** "maps.google.dk" -> "https://maps.google.dk" - a link without https:// would point inside Arpo. */
-const withProtocol = (url: string) => (/^(https?:|mailto:|tel:|#)/i.test(url.trim()) ? url.trim() : `https://${url.trim()}`);
 
 /** "Hent fra hjemmesiden": the customer's own favicon, from the site the tour's main button leads to (or one typed in). */
 function SiteFavicon({ slug, config, onDone }: { slug: string; config: TourConfig; onDone: (url: string) => void }) {
@@ -1927,25 +1926,39 @@ function MenuEditor({ menu, onChange, preview, overview = false }: { menu: MenuE
   );
 }
 
-function CtaEditor({ cta, onChange }: { cta: TourConfig["cta"]; onChange: (c: TourConfig["cta"]) => void }) {
+function CtaEditor({ cta, live, form, onChange }: { cta: TourConfig["cta"]; live: boolean; form: boolean; onChange: (c: TourConfig["cta"]) => void }) {
+  const set = (i: number, patch: Partial<TourConfig["cta"][number]>) => onChange(cta.map((x, j) => (j === i ? { ...x, ...patch } : x)));
+  type To = "web" | "live" | "form";
+  const toOf = (href: string): To => (href === "#live" ? "live" : href === "#kontakt" ? "form" : "web");
+  const options: [To, string][] = [["web", "Webside"], ...(live ? [["live", "Live data"] as [To, string]] : []), ...(form ? [["form", "Kontaktformular"] as [To, string]] : [])];
   return (
     <Field title="Knapper (fx Book, Kontakt)">
       <div className="space-y-2">
-        {cta.map((c, i) => (
-          <div key={i} className="space-y-1.5 rounded-xl bg-[#f2f2f7]/60 p-2.5">
-            <div className="flex gap-1.5">
-              <input className={input} value={c.label} placeholder="Tekst" onChange={(e) => onChange(cta.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)))} />
-              <button type="button" className="text-[#c7c7cc] hover:text-[#ff3b30]" onClick={() => onChange(cta.filter((_, j) => j !== i))} aria-label="Slet">
-                ×
-              </button>
+        {cta.map((c, i) => {
+          const to = toOf(c.href);
+          return (
+            <div key={i} className="space-y-1.5 rounded-xl bg-[#f2f2f7]/60 p-2.5">
+              <div className="flex gap-1.5">
+                <input className={input} value={c.label} placeholder="Tekst" onChange={(e) => set(i, { label: e.target.value })} />
+                <button type="button" className="text-[#c7c7cc] hover:text-[#ff3b30]" onClick={() => onChange(cta.filter((_, j) => j !== i))} aria-label="Slet">
+                  ×
+                </button>
+              </div>
+              {(options.length > 1 || to !== "web") && (
+                <Choice<To> value={to} options={options.some(([v]) => v === to) ? options : [...options, [to, to === "live" ? "Live data" : "Kontaktformular"]]} onChange={(v) => set(i, { href: v === "live" ? "#live" : v === "form" ? "#kontakt" : "" })} />
+              )}
+              {to === "web" ? (
+                <input className={input} value={c.href} placeholder="https://…" onChange={(e) => set(i, { href: e.target.value })} onBlur={(e) => e.target.value && set(i, { href: withProtocol(e.target.value) })} />
+              ) : (
+                <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">{to === "live" ? "Åbner listen med de ledige (Live data) inde i touren." : "Åbner kontaktformularen inde i touren."}</p>
+              )}
+              <label className="flex items-center gap-2 text-[13px] text-[#1d1d1f]">
+                <input type="checkbox" className="accent-[#0071e3]" checked={c.primary} onChange={(e) => set(i, { primary: e.target.checked })} />
+                Hovedknap (fremhævet)
+              </label>
             </div>
-            <input className={input} value={c.href} placeholder="https://…" onChange={(e) => onChange(cta.map((x, j) => (j === i ? { ...x, href: e.target.value } : x)))} onBlur={(e) => e.target.value && onChange(cta.map((x, j) => (j === i ? { ...x, href: withProtocol(e.target.value) } : x)))} />
-            <label className="flex items-center gap-2 text-[13px] text-[#1d1d1f]">
-              <input type="checkbox" className="accent-[#0071e3]" checked={c.primary} onChange={(e) => onChange(cta.map((x, j) => (j === i ? { ...x, primary: e.target.checked } : x)))} />
-              Hovedknap (fremhævet)
-            </label>
-          </div>
-        ))}
+          );
+        })}
         <button type="button" className="text-sm font-medium text-[#0071e3]" onClick={() => onChange([...cta, { label: "Ny knap", href: "", primary: cta.length === 0 }])}>
           + Knap
         </button>
