@@ -131,7 +131,7 @@ export function ScanPointsEditor({
   const cw = Math.max(5, crop.r - crop.l);
   const ch = Math.max(5, crop.b - crop.t);
   /** Dots grow a little with zoom, but less than the plan, so crowded spots open up. */
-  const dot = Math.round((big ? 20 : 18) * Math.pow(zoom, 0.35));
+  const dot = Math.round((big ? 24 : 21) * Math.pow(zoom, 0.35));
   const sel = map.points.find((p) => p.ss === selected) ?? null;
   const selUses = sel ? uses.get(sel.ss) : undefined;
   const colorOf = (ss: number) => {
@@ -216,16 +216,17 @@ export function ScanPointsEditor({
                       painting.current.moved = true;
                       setMarked((m) => new Set([...m, p.ss]));
                     }}
-                    className={`absolute flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full font-semibold tabular-nums shadow-[0_1px_3px_rgba(0,0,0,.3)] transition hover:z-10 hover:scale-125 ${marked.has(p.ss) && marked.size > 1 ? "z-10 ring-[3px] ring-[#0071e3] ring-offset-1" : ""} ${selected === p.ss ? "z-10 scale-125 ring-2 ring-[#1d1d1f]" : ""} ${uses.get(p.ss)?.has("start") ? "outline outline-2 outline-offset-2 outline-[#0071e3]" : ""}`}
+                    className={`absolute flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full font-bold leading-none tracking-tight tabular-nums shadow-[0_1px_4px_rgba(0,0,0,.45)] transition hover:z-10 hover:scale-125 ${marked.has(p.ss) && marked.size > 1 ? "z-10 ring-[3px] ring-[#0071e3] ring-offset-1" : ""} ${selected === p.ss ? "z-10 scale-125 ring-2 ring-[#1d1d1f]" : ""} ${uses.get(p.ss)?.has("start") ? "outline outline-2 outline-offset-2 outline-[#0071e3]" : ""}`}
                     style={{
                       left: `${p.px}%`,
                       top: `${p.py}%`,
                       width: dot,
                       height: dot,
-                      fontSize: dot * 0.45,
+                      fontSize: Math.max(11, dot * 0.5),
                       // As in MPSkins: a light dot with a coloured ring and a dark number - the plan stays readable around it.
-                      background: hidden.has(p.sid) ? "rgba(255,255,255,.7)" : "rgba(255,255,255,.92)",
-                      color: hidden.has(p.sid) ? "#ff3b30" : "#1d1d1f",
+                      // Solid white with black digits - readable on any plan, whatever its colours.
+                      background: "#fff",
+                      color: hidden.has(p.sid) ? "#d70015" : "#000",
                       border: hidden.has(p.sid) ? "2px dashed #ff3b30" : `2px solid ${colorOf(p.ss)}`,
                     }}
                   >
