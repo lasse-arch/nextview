@@ -928,6 +928,12 @@ export function TourEditor({
                 </Group>
                 <Group title="Ekstra">
                 <Toggle
+                  on={config.autoplay !== false}
+                  onChange={(on) => edit((d) => void (on ? delete d.autoplay : (d.autoplay = false)))}
+                  title="Start af sig selv på hjemmesider"
+                  hint="Slået fra: på en hjemmeside viser touren et billede med en stor afspil-knap (som MPSkins). Intet hentes, før man trykker - og så åbner touren i fuld skærm (på en telefon i sin egen fane). Åbnes touren via sit eget link, starter den altid med det samme."
+                />
+                <Toggle
                   on={Boolean(config.onboarding)}
                   onChange={(on) => edit((d) => void (d.onboarding = on || undefined))}
                   title="Hjælp, når man går ind"

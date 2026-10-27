@@ -318,6 +318,12 @@ export type TourConfig = {
   /** "Sådan går du rundt": a short help (drag, walk, the menu) when the visitor first steps inside - once per visitor. */
   onboarding?: boolean;
   /**
+   * false: on a website the tour starts with a play button (a picture, its
+   * name and "Gå ind i touren") - nothing loads until it's pressed, and then
+   * it opens in full screen. Default: it starts by itself.
+   */
+  autoplay?: false;
+  /**
    * Available rooms fetched live (every 10 min) and shown in the room picker:
    * per menu group (by its title) the size range (m³) it covers.
    */

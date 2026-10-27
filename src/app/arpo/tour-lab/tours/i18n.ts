@@ -51,6 +51,7 @@ export const UI_STRINGS = [
   "Tryk på de hvide cirkler for at gå hen til dem",
   "Åbn menuen for at hoppe direkte til et sted",
   "Forstået",
+  "Gå ind i touren",
   "Tilbage",
   "Tilbage til luften",
   "Menu",

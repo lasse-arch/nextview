@@ -16,6 +16,7 @@ import type { MenuEntry, TourConfig, TourPlace, TourPoint, WelcomeGo } from "../
 import { CoverWelcome, DESIGNS_CSS, DockMenu, PickerMenu } from "./designs";
 import { GUIDE_CSS, GuidePlayer, guideStops } from "./guide";
 import { ONBOARDING_CSS, Onboarding } from "./onboarding";
+import { PlayGate } from "./play-gate";
 import { CONTACT_CSS, CONTACT_HREF, ContactForm } from "./contact-form";
 import { DAY_CSS, DayBar, DaySheet } from "./day";
 import { FEEDBACK_CSS, FeedbackLayer } from "./feedback";
@@ -270,8 +271,18 @@ export function Experience(props: ExperienceProps) {
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
   }, []);
-  return <TourExperience key={startSignature(T)} {...props} tour={T} lang={langs.includes(lang) ? lang : "da"} setLang={setLang} />;
+  // The play button (autoplay off): only where the tour sits in someone's page (or the editor's preview) - opened on its own, it just starts.
+  const embedded = useSyncExternalStore(
+    noop,
+    () => window.parent !== window && !new URLSearchParams(location.search).has("afspil"),
+    () => true
+  );
+  const [played, setPlayed] = useState(false);
+  if (T.autoplay === false && embedded && !played) return <PlayGate T={T} isPreview={inEditorPreview} onPlay={() => setPlayed(true)} />;
+  return <TourExperience key={startSignature(T)} {...props} tour={T} lang={langs.includes(lang) ? lang : "da"} setLang={setLang} played={played} />;
 }
+
+const noop = () => () => {};
 
 function TourExperience({
   tour: savedTour,
@@ -287,7 +298,8 @@ function TourExperience({
   review,
   lang = "da",
   setLang,
-}: ExperienceProps & { setLang?: (lang: string) => void }) {
+  played = false,
+}: ExperienceProps & { setLang?: (lang: string) => void; /** Started from the play button - that was the front page, so the cover isn't shown again. */ played?: boolean }) {
   // The setup in the visitor's language; names that reach outside it (statistics, ?rum=, pictures) stay Danish.
   const T = useMemo(() => asScene(localize(savedTour, lang)), [savedTour, lang]);
   const tx = useMemo(() => makeT(savedTour, lang), [savedTour, lang]);
@@ -408,7 +420,7 @@ function TourExperience({
   /** The welcome tiles - skipped when the link already says where to go. */
   const [welcome, setWelcome] = useState(false);
   /** The tour opens on the cover welcome: it's there from the very first picture (no flash of the drone scene before it). */
-  const startsCovered = T.design?.welcome === "cover" && Boolean(T.cover) && !T.intro;
+  const startsCovered = T.design?.welcome === "cover" && Boolean(T.cover) && !T.intro && !played;
   const [cover, setCover] = useState(startsCovered);
   /** "Træd indenfor" pressed before the tour was ready: the cover stays until it is. */
   const [coverWaiting, setCoverWaiting] = useState(false);
@@ -841,7 +853,7 @@ function TourExperience({
 
   /** What greets the visitor once they're in: the welcome, or the menu if it's open on start. */
   function afterStart() {
-    if (T.design?.welcome === "cover" && T.cover) {
+    if (T.design?.welcome === "cover" && T.cover && !played) {
       setCover(true);
       track("welcome_view", { style: "cover" });
       return;
@@ -1033,6 +1045,20 @@ function TourExperience({
   }
 
   /* ----- "Vis mig rundt" ----- */
+  /** Does the view stand on the scan point of a link right now (asked of Matterport, not of what we last told it)? */
+  async function standsAt(href: string): Promise<boolean> {
+    const target = uLinkTarget(href);
+    const want = target ? sweepForSs(target.ss) : null;
+    if (!want || !sdkRef.current) return true; // nothing to check - don't loop
+    const mp = await sdkRef.current;
+    const now = await new Promise<string>((resolve) => {
+      const sub = mp.Camera.pose.subscribe((p) => {
+        resolve(p.sweep);
+        setTimeout(() => sub.cancel());
+      });
+    });
+    return now === want;
+  }
   function guideGo(i: number) {
     const stop = GUIDE[i];
     setGuideAt(i);
@@ -1061,7 +1087,14 @@ function TourExperience({
       .catch(() => {})
       .then(async () => {
         if (ticket !== guideTicket.current) return;
-        await flyTo(stop.href, "fly");
+        // Matterport can answer "done" to a move asked for while it's still flying the last one - without moving.
+        // So check that the view really is at the stop, and fly again if not (a few times).
+        for (let attempt = 0; attempt < 4; attempt++) {
+          await flyTo(stop.href, "fly");
+          if (ticket !== guideTicket.current) return;
+          if (await standsAt(stop.href)) break;
+          await new Promise((r) => setTimeout(r, 450));
+        }
         if (ticket !== guideTicket.current || turn === "none") return;
         // The slow turn isn't waited for by the queue (the next move may start while it turns) - but it is
         // still the guide moving, not the visitor: guideMoving stays on until the turn is done.
