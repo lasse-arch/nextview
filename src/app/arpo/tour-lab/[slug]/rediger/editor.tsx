@@ -3,7 +3,7 @@
 import { InsightsPanel } from "./insights";
 import { LanguagesPanel } from "./languages";
 import { tourUrl } from "@/lib/public-urls";
-import { formatPhone, isPlaceHref } from "../../tours/places";
+import { formatPhone, isPlaceHref, placeHref } from "../../tours/places";
 import { tourConfigProblem } from "@/lib/tour-validate";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -23,7 +23,7 @@ import type { ScanMap } from "@/lib/matterport-graph";
 import { currentPreset } from "../../tours/presets";
 import { EconomyPanel, type TourEconomy } from "./economy";
 import { DEFAULT_EMBED, SharePanel, SitePreview, type EmbedSize } from "./share";
-import { Choice, Field, FilesContext, Group, Icon, input, outsideFiles, Toggle, UploadButton, type PreviewApi } from "./ui";
+import { Choice, Field, FilesContext, Group, Icon, input, outsideFiles, ssOfHref, Toggle, UploadButton, type PreviewApi } from "./ui";
 import { fetchSiteFavicon, hostTourFiles } from "@/lib/actions/tour-files";
 import { AiMemoryPanel } from "./memory";
 import { MapEditor } from "./map-editor";
@@ -590,7 +590,12 @@ export function TourEditor({
               <LanguagesPanel slug={slug} config={config} edit={edit} showIn={(lang) => frame.current?.contentWindow?.postMessage({ type: "tour-lang", lang }, location.origin)} />
             )}
             {tab === "kort" && <CardsEditor config={config} edit={edit} preview={preview} />}
-            {tab === "menu" && <MenuEditor menu={config.menu} preview={preview} onChange={(menu) => edit((d) => void (d.menu = menu))} />}
+            {tab === "menu" && (
+              <>
+                <MenuEditor menu={config.menu} preview={preview} onChange={(menu) => edit((d) => void (d.menu = menu))} />
+                <ScanJumper config={config} preview={preview} map={scanMap} count={scanCount} hiddenSweeps={[...config.hiddenSweeps, ...mpskinsHidden]} />
+              </>
+            )}
 
             {tab === "funktioner" && (
               <>
@@ -1786,5 +1791,63 @@ function CtaEditor({ cta, onChange }: { cta: TourConfig["cta"]; onChange: (c: To
         </button>
       </div>
     </Field>
+  );
+}
+
+/**
+ * Under the menu: every scan point as a number to click - the preview jumps
+ * straight there, also to points you can't walk to (another floor, a closed
+ * door). Then "Tilføj det sted, du ser" adds it to the menu.
+ */
+function ScanJumper({ config, preview, map, count, hiddenSweeps }: { config: TourConfig; preview: PreviewApi; map: ScanMap | null; count: number | null; hiddenSweeps: string[] }) {
+  const hidden = new Set(hiddenSweeps);
+  const inMenu = new Set(
+    config.menu
+      .flatMap((m) => ("items" in m ? m.items.map((i) => i[1]) : [m.href]))
+      .map(ssOfHref)
+      .filter((n): n is number => n != null)
+  );
+  // The points Matterport told us about, by floor - or just 1..n when it didn't send the map.
+  const floors = map?.points.length
+    ? map.floors
+        .map((f, i) => ({ name: f.name, points: map.points.filter((p) => p.floor === i).sort((a, b) => a.ss - b.ss).map((p) => ({ ss: p.ss, hidden: hidden.has(p.sid) })) }))
+        .filter((f) => f.points.length)
+    : count
+      ? [{ name: "", points: Array.from({ length: count }, (_, i) => ({ ss: i + 1, hidden: false })) }]
+      : [];
+  if (!floors.length) return null;
+  const total = floors.reduce((n, f) => n + f.points.length, 0);
+  return (
+    <Group title={`Alle scanpunkter (${total})`}>
+      <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">Klik på et nummer for at hoppe dertil i forhåndsvisningen - også til punkter, man ikke kan gå hen til. Tryk så &quot;Tilføj det sted, du ser&quot; ovenfor.</p>
+      {floors.map((f) => (
+        <div key={f.name || "alle"} className="space-y-1.5">
+          {floors.length > 1 && <p className="px-1 text-[12px] font-semibold text-[#6e6e73]">{f.name}</p>}
+          <div className="flex flex-wrap gap-1.5">
+            {f.points.map((p) => (
+              <button
+                key={p.ss}
+                type="button"
+                title={p.hidden ? `Punkt ${p.ss} (skjult i touren)` : inMenu.has(p.ss) ? `Punkt ${p.ss} (i menuen)` : `Punkt ${p.ss}`}
+                onClick={() => preview.go(`Punkt ${p.ss}`, placeHref(config, p.ss))}
+                className={`h-8 min-w-8 rounded-full px-2 text-[12px] font-semibold tabular-nums transition ${
+                  p.hidden
+                    ? "border border-dashed border-[#c7c7cc] text-[#8e8e93] hover:border-[#0071e3]"
+                    : inMenu.has(p.ss)
+                      ? "bg-[#34c759] text-white hover:brightness-95"
+                      : "bg-[#f2f2f7] text-[#3a3a3c] hover:bg-[#0071e3] hover:text-white"
+                }`}
+              >
+                {p.ss}
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+      <p className="flex gap-3 px-1 text-[11px] text-[#8e8e93]">
+        <span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-[#34c759]" />I menuen</span>
+        <span><i className="mr-1 inline-block h-2 w-2 rounded-full border border-dashed border-[#c7c7cc]" />Skjult</span>
+      </p>
+    </Group>
   );
 }
