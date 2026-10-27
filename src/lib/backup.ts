@@ -64,16 +64,27 @@ export async function backupFile() {
   return { file: encrypt(gzipSync(Buffer.from(text))), tables, rows };
 }
 
+/**
+ * Where backups go: a private Blob store of their own when it's connected
+ * (BACKUP_BLOB_READ_WRITE_TOKEN - nothing in it can be opened by a link),
+ * else the shared one the tours' pictures are in. Encrypted either way.
+ */
+const store = () => {
+  const own = process.env.BACKUP_BLOB_READ_WRITE_TOKEN;
+  return own ? { token: own, access: "private" as const } : { token: process.env.BLOB_READ_WRITE_TOKEN, access: "public" as const };
+};
+
 /** Takes a backup now and removes the ones beyond the newest KEEP. */
 export async function createBackup(): Promise<BackupResult> {
-  if (!process.env.BLOB_READ_WRITE_TOKEN) return { ok: false, error: "Vercel Blob er ikke sat op (BLOB_READ_WRITE_TOKEN mangler)." };
+  const { token, access } = store();
+  if (!token) return { ok: false, error: "Vercel Blob er ikke sat op (BLOB_READ_WRITE_TOKEN mangler)." };
   const started = Date.now();
   try {
     const { file, tables, rows } = await backupFile();
     const stamp = new Date().toISOString().slice(0, 16).replace(":", "");
-    const blob = await put(`backups/arpo-${stamp}.bak`, file, { access: "public", contentType: "application/octet-stream", addRandomSuffix: true });
+    const blob = await put(`backups/arpo-${stamp}.bak`, file, { access, token, contentType: "application/octet-stream", addRandomSuffix: true });
     const all = await backups();
-    if (all.length > KEEP) await del(all.slice(KEEP).map((b) => b.url));
+    if (all.length > KEEP) await del(all.slice(KEEP).map((b) => b.url), { token });
     return { ok: true, url: blob.url, size: file.length, tables, rows, ms: Date.now() - started };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
@@ -85,7 +96,7 @@ export async function backups() {
   const found: { url: string; pathname: string; size: number; uploadedAt: Date }[] = [];
   let cursor: string | undefined;
   do {
-    const page = await list({ prefix: "backups/", cursor });
+    const page = await list({ prefix: "backups/", cursor, token: store().token });
     found.push(...page.blobs);
     cursor = page.hasMore ? page.cursor : undefined;
   } while (cursor);
