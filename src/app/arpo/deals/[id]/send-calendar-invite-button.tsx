@@ -51,11 +51,11 @@ export function SendCalendarInviteButton({
   const [activeSuggestion, setActiveSuggestion] = useState(0);
   const searchSeq = useRef(0);
 
+  // No mention being typed: nothing to suggest (stale results are just not shown).
+  const shownSuggestions = mention === null ? [] : suggestions;
+
   useEffect(() => {
-    if (mention === null) {
-      setSuggestions([]);
-      return;
-    }
+    if (mention === null) return;
     const seq = ++searchSeq.current;
     const timer = setTimeout(() => {
       searchMentionableCustomers(mention.query).then((results) => {
@@ -94,16 +94,16 @@ export function SendCalendarInviteButton({
   }
 
   function handleBodyKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (mention === null || suggestions.length === 0) return;
+    if (mention === null || shownSuggestions.length === 0) return;
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setActiveSuggestion((i) => (i + 1) % suggestions.length);
+      setActiveSuggestion((i) => (i + 1) % shownSuggestions.length);
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      setActiveSuggestion((i) => (i - 1 + suggestions.length) % suggestions.length);
+      setActiveSuggestion((i) => (i - 1 + shownSuggestions.length) % shownSuggestions.length);
     } else if (e.key === "Enter" || e.key === "Tab") {
       e.preventDefault();
-      insertMention(suggestions[activeSuggestion]);
+      insertMention(shownSuggestions[activeSuggestion]);
     } else if (e.key === "Escape") {
       setMention(null);
     }
@@ -180,9 +180,9 @@ export function SendCalendarInviteButton({
               rows={3}
               className="mt-1.5 w-full rounded-md border border-slate-300 px-2 py-1.5 text-xs"
             />
-            {mention !== null && suggestions.length > 0 && (
+            {mention !== null && shownSuggestions.length > 0 && (
               <div className="absolute left-0 top-full z-20 mt-1 w-full rounded-md border border-slate-200 bg-white py-1 text-xs shadow-lg">
-                {suggestions.map((s, i) => (
+                {shownSuggestions.map((s, i) => (
                   <button
                     key={s.token}
                     type="button"
