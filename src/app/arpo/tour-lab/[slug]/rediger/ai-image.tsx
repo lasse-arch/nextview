@@ -1,12 +1,36 @@
 "use client";
 
-import { useContext, useState, useTransition } from "react";
+import { useContext, useState, useSyncExternalStore, useTransition } from "react";
+import { createPortal } from "react-dom";
 import { editTourImage, imageAiReady, saveGeminiKey } from "@/lib/actions/tour-image-ai";
 import { FilesContext, Icon, input } from "./ui";
 
 const SPARK = '<path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8"/>';
 
 const IDEAS = ["Gør græsset sommergrønt og himlen blå", "Fyld poolen med vand, og læg solsenge rundt om", "Gør lyset varmere, som en sommeraften", "Fjern bilerne på parkeringspladsen"];
+
+/*
+ * The AI's last suggestion for a picture is kept on this computer (the new
+ * file is already stored with the tour), so it isn't lost - nor paid for
+ * again - when the panel closes, another row opens or the page reloads. It
+ * goes when it's used or thrown away.
+ */
+const kept = (slug: string, src: string) => `ai-forslag:${slug}:${src}`;
+const keptEvent = "ai-forslag";
+function readKept(slug: string, src: string): string | null {
+  try {
+    return localStorage.getItem(kept(slug, src));
+  } catch {
+    return null;
+  }
+}
+function writeKept(slug: string, src: string, url: string | null) {
+  try {
+    if (url) localStorage.setItem(kept(slug, src), url);
+    else localStorage.removeItem(kept(slug, src));
+  } catch {}
+  window.dispatchEvent(new Event(keptEvent));
+}
 
 /**
  * "Ret med AI" next to a picture: describe the change, see the new picture
@@ -19,7 +43,12 @@ export function AiImageButton({ src, onUse }: { src: string; onUse: (url: string
   const [ready, setReady] = useState<boolean | null>(null);
   const [key, setKey] = useState("");
   const [ask, setAsk] = useState("");
-  const [result, setResult] = useState<string | null>(null);
+  const result = useSyncExternalStore(
+    (cb) => (window.addEventListener(keptEvent, cb), () => window.removeEventListener(keptEvent, cb)),
+    () => (src ? readKept(slug, src) : null),
+    () => null
+  );
+  const setResult = (url: string | null) => writeKept(slug, src, url);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   /** Before and after, big - side by side, or one over the other with a slider. */
@@ -37,7 +66,7 @@ export function AiImageButton({ src, onUse }: { src: string; onUse: (url: string
         className="inline-flex items-center gap-1.5 rounded-xl bg-[#d97757]/10 px-3 py-2 text-[14px] font-medium text-[#b4532f] hover:bg-[#d97757]/15"
       >
         <Icon d={SPARK} className="h-4 w-4" />
-        Ret med AI
+        {result ? "Ret med AI · et forslag venter" : "Ret med AI"}
       </button>
     );
 
@@ -163,8 +192,9 @@ export function AiImageButton({ src, onUse }: { src: string; onUse: (url: string
 function Compare({ before, after, onClose }: { before: string; after: string; onClose: () => void }) {
   const [mode, setMode] = useState<"side" | "slider">("side");
   const [at, setAt] = useState(50);
-  return (
-    <div className="fixed inset-0 z-[90] flex flex-col bg-[#111]/95 p-4 text-white" role="dialog" aria-label="Før og efter" onKeyDown={(e) => e.key === "Escape" && onClose()}>
+  // Over the whole page (the editor's panels would otherwise clip and show through it).
+  return createPortal(
+    <div className="fixed inset-0 z-[1000] flex flex-col bg-[#111] p-4 text-white" role="dialog" aria-label="Før og efter" onKeyDown={(e) => e.key === "Escape" && onClose()}>
       <div className="mb-3 flex items-center gap-3">
         <div className="flex rounded-full bg-white/10 p-0.5 text-[13px]">
           {(
@@ -217,6 +247,7 @@ function Compare({ before, after, onClose }: { before: string; after: string; on
           />
         </div>
       )}
-    </div>
+    </div>,
+    document.body
   );
 }
