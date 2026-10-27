@@ -2,10 +2,12 @@
 
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import sharp from "sharp";
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
+import { storeTourFile } from "@/lib/tour-files";
 import type { Prisma } from "@prisma/client";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
@@ -344,6 +346,8 @@ export async function createTourFromWebsite(input: {
   /** What the tour should drive visitors to. */
   focus?: string;
   notes: string;
+  /** A drone photo to start on (a JPEG/PNG/WebP data URL) - nextviewAI places the points on it. */
+  droneImage?: string;
 }): Promise<{ ok: true; slug: string; reply: string } | { ok: false; error: string }> {
   const user = await admin();
   const key = await apiKey();
@@ -371,6 +375,22 @@ export async function createTourFromWebsite(input: {
   if (preset) base = { ...base, ...preset.apply(base) };
   const branch = BRANCHES.find(([b]) => b === input.branch)?.[1];
 
+  // The drone photo: kept with the tour's files, and shown to nextviewAI so it can place the points on it.
+  let drone: { url: string; w: number; h: number; data: string } | null = null;
+  if (input.droneImage) {
+    const m = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/.exec(input.droneImage);
+    if (!m || m[2].length > 12_000_000) return { ok: false, error: "Dronebilledet skal være et JPEG-, PNG- eller WebP-billede på højst ca. 9 MB." };
+    const bytes = Buffer.from(m[2], "base64");
+    const meta = await sharp(bytes).metadata().catch(() => null);
+    if (!meta?.width || !meta.height) return { ok: false, error: "Dronebilledet kunne ikke læses." };
+    const url = await storeTourFile(slug, "drone-start", m[1], bytes).catch((err: unknown) => {
+      throw new Error(`Dronebilledet kunne ikke gemmes: ${err instanceof Error ? err.message : err}`);
+    });
+    // What nextviewAI looks at: the same picture, small enough for it (the tour keeps the big one).
+    const small = await sharp(bytes).resize({ width: 1568, height: 1568, fit: "inside" }).jpeg({ quality: 80 }).toBuffer();
+    drone = { url, w: meta.width, h: meta.height, data: `data:image/jpeg;base64,${small.toString("base64")}` };
+  }
+
   const result = await claudeEdits(
     key,
     { name: user.name, kind: "bygget" },
@@ -389,7 +409,19 @@ Udfyld ud fra kundens hjemmeside nedenfor, efter drejebogen:
 - Gem det vigtigste, du har lært om kunden, i remember (scope "tour"), så du ved det næste gang.
 Skriv al tekst på dansk i kundens stemme. Opfind ingen fakta. I reply: fortæl kort, hvad du har valgt og hvorfor, og hvad brugeren selv bør tjekke eller tilføje (fx fotos af stederne).
 ${branch ? `\nBranche: ${branch}.` : ""}${input.about?.trim() ? `\nOm kunden og målgruppen (brugerens egne ord - følg dem): ${input.about.trim()}` : ""}${preset ? `\nDesign valgt af brugeren: "${preset.name}" (${preset.what}) - bevar design, menutype, bevægelse og start, som de står i skabelonen; udfyld kun indholdet.` : ""}${input.focus?.trim() ? `\nTouren skal især få besøgende til: ${input.focus.trim()}. Gør det til hovedhandlingen (cta, "Din plads venter", stedkort i de vigtigste rum).` : ""}
-${input.notes.trim() ? `\nBemærkninger fra brugeren: ${input.notes.trim()}\n` : ""}
+${input.notes.trim() ? `\nBemærkninger fra brugeren: ${input.notes.trim()}\n` : ""}${
+      drone
+        ? `
+<dronebillede>
+Brugeren har givet et dronebillede (vedhæftet), som touren skal starte på. Det ligger på ${drone.url} og er ${drone.w} × ${drone.h} px.
+- Sæt map = { image: "${drone.url}", w: ${drone.w}, h: ${drone.h}, spots: {...} } - touren starter på billedet med punkterne på.
+- Lav points for de steder, bygninger og områder, du kan se på billedet, og som hjemmesiden fortæller om (navn som kunden selv bruger, kategori, ikon, kort tekst og chips efter drejebogen; yaw og pitch 0; tour null - rummene vælges bagefter i editoren).
+- spots[punktets id] = [x, y] i procent af billedets bredde og højde (0-100), præcis der hvor stedet er på billedet - midt på bygningen/området, ikke en kant. Sæt kun et punkt, du faktisk kan se; er du i tvivl, så nævn det i reply i stedet.
+- map.intro med en kort titel og tekst til start, og categories til punkterne.
+</dronebillede>
+`
+        : ""
+    }
 <hjemmeside>
 ${site}
 </hjemmeside>
@@ -400,7 +432,8 @@ Steder i touren skrives som https://my.matterport.com/show/?m=${model.id}&ss=<sc
 </matterport>`,
     32000,
     true,
-    research.pdfs
+    research.pdfs,
+    drone ? [drone.data] : []
   );
   if (!result.ok) return result;
 

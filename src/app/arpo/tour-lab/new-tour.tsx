@@ -43,6 +43,8 @@ export function NewTour({ tours }: { tours: { slug: string; name: string }[] }) 
   /** The branch and audience in the user's own words - told to nextviewAI as it is. */
   const [about, setAbout] = useState("");
   const [notes, setNotes] = useState("");
+  /** A drone photo the tour starts on - nextviewAI places the points on it. Made smaller in the browser first. */
+  const [drone, setDrone] = useState<string | null>(null);
   const [copyOf, setCopyOf] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -57,6 +59,7 @@ export function NewTour({ tours }: { tours: { slug: string; name: string }[] }) 
     setWebsite("");
     setFocus("");
     setNotes("");
+    setDrone(null);
     setCopyOf(null);
     setError(null);
   }
@@ -76,6 +79,7 @@ export function NewTour({ tours }: { tours: { slug: string; name: string }[] }) 
             about,
             focus,
             notes,
+            droneImage: drone ?? undefined,
           }).catch((err: unknown) => ({ ok: false as const, error: `Noget gik galt (${err instanceof Error ? err.message : err}) - prøv igen.` }));
       if (!r.ok) return setError(r.error);
       if ("reply" in r)
@@ -220,6 +224,27 @@ export function NewTour({ tours }: { tours: { slug: string; name: string }[] }) 
                         ))}
                       </div>
                       <input className={input} value={focus} onChange={(e) => setFocus(e.target.value)} placeholder="Fx Book bord" />
+                    </Field>
+                    <Field title="Dronebillede til start (valgfrit)" hint="Touren starter på billedet, og nextviewAI sætter punkterne på stederne, den kan se - du kan flytte dem bagefter under Interaktivt kort.">
+                      {drone ? (
+                        <div className="flex items-center gap-3">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={drone} alt="" className="h-16 w-28 rounded-lg object-cover ring-1 ring-black/[.06]" />
+                          <button type="button" onClick={() => setDrone(null)} className="text-[13px] text-[#ff3b30] hover:underline">
+                            Fjern
+                          </button>
+                        </div>
+                      ) : (
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          onChange={async (e) => {
+                            const f = e.target.files?.[0];
+                            if (f) setDrone(await shrinkImage(f, 2400).catch(() => null));
+                          }}
+                          className="block w-full text-[13px] file:mr-3 file:rounded-full file:border-0 file:bg-[#0071e3]/10 file:px-3 file:py-1.5 file:text-[13px] file:font-medium file:text-[#0071e3]"
+                        />
+                      )}
                     </Field>
                     <Field title="Ønsker til nextviewAI (valgfrit)" hint="Alt det særlige: målgruppe, tone, et helt eget design, særlige funktioner …">
                       <textarea className={`${input} min-h-[70px] resize-y`} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Fx målgruppen er forældre; brug skolens grønne farve og runde former." />
@@ -441,4 +466,26 @@ function CopyStep({ tours, copyOf, setCopyOf, name, setName }: { tours: { slug: 
       </div>
     </div>
   );
+}
+
+/** A picture made at most `max` px wide/high, as a JPEG data URL - small enough to send, sharp enough for the tour. */
+function shrinkImage(file: File, max: number): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, max / Math.max(img.width, img.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL("image/jpeg", 0.86));
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Billedet kunne ikke læses."));
+    };
+    img.src = url;
+  });
 }

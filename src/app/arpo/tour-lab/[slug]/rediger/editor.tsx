@@ -1475,7 +1475,8 @@ function moveEntry(menu: MenuEntry[], from: Addr, to: Addr | null): MenuEntry[] 
 }
 
 type Kind = "sted" | "web" | "luft";
-const kindOf = (href: string): Kind => (href === "#luften" ? "luft" : isPlaceHref(href) ? "sted" : "web");
+// No target yet (e.g. a menu item nextviewAI made, or just switched to "Et sted i touren") counts as a place waiting to be picked - not a web page.
+const kindOf = (href: string): Kind => (href === "#luften" ? "luft" : !href || isPlaceHref(href) ? "sted" : "web");
 function whereText(href: string) {
   const kind = kindOf(href);
   if (!href) return "Mangler et mål";
