@@ -25,6 +25,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       section: "Salg",
       items: [
         { href: "/arpo/deals", label: "Deals", icon: "deals" },
+        { href: "/arpo/online-kunder", label: "Online kunder", icon: "tour" },
         { href: "/arpo/leadindbakke", label: "Leadindbakke", icon: "inbox" },
         { href: "/arpo/leadgeneration", label: "Leadgeneration", icon: "radar" },
         { href: "/arpo/ringeliste", label: "Ringeliste", icon: "phone" },

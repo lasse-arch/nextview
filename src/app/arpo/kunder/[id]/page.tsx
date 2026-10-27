@@ -6,6 +6,8 @@ import { dealName, formatDKK, invoiceQuarterShortLabel } from "@/lib/labels";
 import { tourStats } from "@/lib/tour-stats";
 import { CLOUDFLARE_TOUR_ORIGIN } from "@/lib/public-urls";
 import { CustomerAccessSection } from "../../deals/[id]/customer-access-section";
+import { customerCards, forPicker } from "@/lib/customer-cards";
+import { CustomerPicker, Thumb } from "../customer-picker";
 
 export const metadata = { title: "Kunde" };
 
@@ -54,6 +56,8 @@ export default async function CustomerOverviewPage({ params }: { params: Promise
   const user = await getCurrentUser();
   if (!user) redirect("/api/auth/session-ended?next=/arpo");
   const isAdmin = user.role === "ADMIN";
+  // Amounts, invoices and payments only for those with access to billing (as Stats and Fakturaer).
+  const billing = user.canAccessBilling;
   const { id } = await params;
 
   const deal = await prisma.deal.findUnique({
@@ -82,6 +86,7 @@ export default async function CustomerOverviewPage({ params }: { params: Promise
     prisma.systemMail.findMany({ where: { OR: [{ dealId: { in: dealIds } }, ...(accountIds.length ? [{ accountId: { in: accountIds } }] : [])] }, orderBy: { sentAt: "desc" }, take: 100 }),
     prisma.tour.findMany({ where: { dealId: { in: dealIds } }, orderBy: { name: "asc" }, select: { slug: true, name: true, published: true, liveVersion: true } }),
   ]);
+  const picker = forPicker(await customerCards());
   const stats = await Promise.all(tours.map((t) => tourStats(t.slug, 30).catch(() => null)));
 
   // Money: what's been sent, paid, and still out.
@@ -110,12 +115,12 @@ export default async function CustomerOverviewPage({ params }: { params: Promise
     events.push({ at: r.sentAt, tone: r.status === "FAILED" ? "warn" : "tour", title: r.status === "FAILED" ? "Statistikrapport - blev ikke sendt" : `Statistikrapport sendt${r.method === "AUTOMATIC" ? " (automatisk)" : ""}`, detail: r.errorMessage ?? undefined });
     if (r.openedAt) events.push({ at: r.openedAt, tone: "tour", title: "Kunden åbnede statistikrapporten", detail: r.openCount > 1 ? `${r.openCount} gange i alt` : undefined });
   }
-  for (const i of invoices) {
+  for (const i of billing ? invoices : []) {
     const what = `${i.dineroInvoiceNumber ? `Faktura ${i.dineroInvoiceNumber}` : "Faktura"} · ${i.quarterIndex === 0 ? "Etablering" : invoiceQuarterShortLabel(i.scheduledDate)} · ${formatDKK(i.amount)}`;
     if (i.sentAt) events.push({ at: i.sentAt, tone: "money", title: "Faktura sendt", detail: what });
     if (i.paidAt) events.push({ at: i.paidAt, tone: "money", title: "Faktura betalt", detail: what });
   }
-  for (const c of collections) {
+  for (const c of billing ? collections : []) {
     if (c.status === "PAID" && c.paymentDate) events.push({ at: c.paymentDate, tone: "money", title: "Betalingsservice: beløbet er trukket", detail: `${formatDKK(Math.round((c.paidAmountOre ?? c.amountOre) / 100))} · faktura ${c.reference}` });
     if ((c.status === "REJECTED" || c.status === "CHARGED_BACK") && c.statusAt) events.push({ at: c.statusAt, tone: "warn", title: c.status === "REJECTED" ? "Betalingsservice: afvist" : "Betalingsservice: tilbageført", detail: `${formatDKK(Math.round(c.amountOre / 100))} · faktura ${c.reference}` });
   }
@@ -132,12 +137,19 @@ export default async function CustomerOverviewPage({ params }: { params: Promise
   return (
     <div className="space-y-6">
       <div>
-        <Link href="/arpo/kunder" className="text-sm text-[#0071e3]">
-          ‹ Kunder
-        </Link>
-        <div className="mt-1 flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h1 className="text-2xl font-semibold text-slate-900">{name}</h1>
+        {/* Like Wolt's venue picker: Kunder / <this one ⌄> - jump straight to another. */}
+        <nav className="flex items-center gap-1 text-sm text-slate-400">
+          <Link href="/arpo/kunder" className="rounded-lg px-2 py-1 font-medium text-slate-600 hover:bg-slate-100">
+            Kunder
+          </Link>
+          <span>/</span>
+          <CustomerPicker customers={picker} current={picker.find((c) => c.id === deal.id) ?? null} />
+        </nav>
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-4">
+          <div className="flex min-w-0 items-center gap-4">
+            <Thumb src={picker.find((c) => c.id === deal.id)?.thumb ?? null} name={name} size="lg" />
+            <div className="min-w-0">
+            <h1 className="text-[26px] font-semibold tracking-tight text-slate-900">{name}</h1>
             <p className="mt-1 text-sm text-slate-500">
               {deal.stage === "LIVE" ? `Live siden ${d(deal.liveAt)}` : deal.churnedAt ? `Stoppet ${d(deal.churnedAt)}` : "Ikke live endnu"}
               {deal.cvrNumber ? ` · CVR ${deal.cvrNumber}` : ""}
@@ -150,6 +162,7 @@ export default async function CustomerOverviewPage({ params }: { params: Promise
                 </>
               ) : null}
             </p>
+            </div>
           </div>
           <div className="flex flex-wrap gap-2">
             {isAdmin && (
@@ -166,8 +179,12 @@ export default async function CustomerOverviewPage({ params }: { params: Promise
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Tile label="Besøg på tours, 30 dage" value={num(visits30)} sub={leads30 ? `${num(leads30)} handlede (booking, opkald …)` : tours.length ? "" : "Ingen tours"} />
-        <Tile label="Udestående" value={formatDKK(sum(open))} sub={overdue.length ? `${overdue.length} forfalden${overdue.length > 1 ? "e" : ""}` : open.length ? "Ikke forfaldent" : "Alt er betalt"} tone={overdue.length ? "warn" : undefined} money />
-        <Tile label="Betalt i alt" value={formatDKK(sum(paid))} sub={next ? `Næste faktura ${d(next.scheduledDate)}` : ""} money />
+        {billing && (
+          <>
+            <Tile label="Udestående" value={formatDKK(sum(open))} sub={overdue.length ? `${overdue.length} forfalden${overdue.length > 1 ? "e" : ""}` : open.length ? "Ikke forfaldent" : "Alt er betalt"} tone={overdue.length ? "warn" : undefined} money />
+            <Tile label="Betalt i alt" value={formatDKK(sum(paid))} sub={next ? `Næste faktura ${d(next.scheduledDate)}` : ""} money />
+          </>
+        )}
         <Tile label="Kundesiden" value={deal.customerAccounts.length ? `${deal.customerAccounts.length} login${deal.customerAccounts.length > 1 ? "s" : ""}` : "Ingen adgang"} sub={lastLogin ? `Sidst logget ind ${d(lastLogin)}` : deal.customerAccounts.length ? "Har ikke logget ind endnu" : ""} />
       </div>
 
@@ -192,14 +209,15 @@ export default async function CustomerOverviewPage({ params }: { params: Promise
             <Rows
               rows={[
                 ["Produkt", deal.soldProduct],
-                ["Månedspris", deal.saleAmount != null ? <span className="money">{formatDKK(deal.saleAmount)}</span> : null],
-                ["Etablering", deal.establishmentFee != null ? <span className="money">{formatDKK(deal.establishmentFee)}</span> : null],
+                ["Månedspris", billing && deal.saleAmount != null ? <span className="money">{formatDKK(deal.saleAmount)}</span> : null],
+                ["Etablering", billing && deal.establishmentFee != null ? <span className="money">{formatDKK(deal.establishmentFee)}</span> : null],
                 ["Binding", deal.bindingMonths ? `${deal.bindingMonths} måneder` : null],
                 ["Underskrevet", deal.contractSignedAt ? d(deal.contractSignedAt) : null],
                 ["Fakturering fra", deal.billingStartDate ? d(deal.billingStartDate) : null],
                 ["Ophører", deal.contractEndDate ? d(deal.contractEndDate) : null],
                 ["Betaling", deal.paymentMethod === "BETALINGSSERVICE" ? `Betalingsservice${deal.bsMandateStatus === "ACTIVE" ? " · tilmeldt" : deal.bsMandateStatus === "CANCELLED" ? " · afmeldt" : " · ikke tilmeldt endnu"}` : "Faktura"],
-                ["Kontrakt", deal.contractSignedAt ? <a href={`/kunde/kontrakt/${deal.id}`} target="_blank" rel="noopener" className="text-[#0071e3]">Hent PDF ↗</a> : null],
+                // Only contracts signed through DocuSeal can be fetched - older ones came from the previous system and aren't in Arpo.
+                ["Kontrakt", deal.contractSignedAt ? (deal.docusealSubmissionId && isAdmin ? <a href={`/kunde/kontrakt/${deal.id}`} target="_blank" rel="noopener" className="text-[#0071e3]">Hent PDF ↗</a> : deal.docusealSubmissionId ? "Underskrevet i DocuSeal" : <span className="text-slate-500">Fra det gamle system - ikke i Arpo</span>) : null],
               ]}
             />
           </Card>
@@ -283,6 +301,7 @@ export default async function CustomerOverviewPage({ params }: { params: Promise
             )}
           </Card>
 
+          {billing && (
           <Card title="Fakturaer">
             {invoices.length === 0 ? (
               <p className="text-sm text-slate-400">Ingen fakturaer endnu.</p>
@@ -330,6 +349,7 @@ export default async function CustomerOverviewPage({ params }: { params: Promise
               </div>
             )}
           </Card>
+          )}
 
           <Card title="Mails og hændelser">
             {events.length === 0 ? (

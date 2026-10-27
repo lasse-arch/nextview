@@ -444,6 +444,8 @@ model Deal {
   /// The lead's own website/source link - captured automatically when added
   /// via Ringeliste from a pasted URL, and editable there too.
   websiteUrl   String?
+  /// The customer's industry (see src/lib/industries.ts) - for "Online kunder", where sellers find a tour to show. Null = guessed from the name.
+  industry     String?
 
   owner   User   @relation("DealOwner", fields: [ownerId], references: [id])
   ownerId String
