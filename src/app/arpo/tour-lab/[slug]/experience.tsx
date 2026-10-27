@@ -1269,6 +1269,12 @@ function TourExperience({
         }
         return;
       }
+      if (e.data.type === "tour-pano-view") {
+        // The 360° picture open in the preview: where it looks and how zoomed (on this device's width).
+        const v = openPanoView?.();
+        if (!v) return reply({ type: "tour-pano-view", id: e.data.id, error: "Åbn billedet i forhåndsvisningen først." });
+        return reply({ type: "tour-pano-view", id: e.data.id, ...v, phone: window.innerWidth <= 760 });
+      }
       if (e.data.type === "tour-view") {
         // The view the preview stands in, as a menu link (scan point + exact direction).
         if (!sdk) return reply({ type: "tour-view", id: e.data.id, error: "Touren er ikke klar endnu - vent et øjeblik." });
@@ -2129,6 +2135,9 @@ function PointPhotos({ images, name, onOpen }: { images: string[]; name: string;
   );
 }
 
+/** The 360° picture open right now (PanoView) - the editor asks for its view to save where it starts and how zoomed. */
+let openPanoView: (() => { yaw: number; pitch: number; hfov: number; image?: string }) | null = null;
+
 function PanoView({
   name,
   dir,
@@ -2184,9 +2193,12 @@ function PanoView({
         pitch: start?.pitch ?? -10,
         ...(turning ? { autoRotate: -2.5, autoRotateInactivityDelay: 4000 } : {}),
       });
+      const v = viewer;
+      openPanoView = () => ({ yaw: v.getYaw(), pitch: v.getPitch(), hfov: v.getHfov(), image });
     });
     return () => {
       cancelled = true;
+      openPanoView = null;
       viewer?.destroy();
     };
   }, [dir, image, panos, start, turning, zoom]);

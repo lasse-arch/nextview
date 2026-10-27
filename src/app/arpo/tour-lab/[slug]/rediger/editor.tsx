@@ -164,6 +164,11 @@ export function TourEditor({
   /** Where the preview stood before it was reloaded in another frame - flown back to once it's ready. */
   const carry = useRef<string | null>(null);
   const [siteWidth, setSiteWidth] = useState<"computer" | "mobil">("computer");
+  /** Which device the preview shows - read by the preview's helpers (bound once). */
+  const deviceRef = useRef<"computer" | "mobil">("computer");
+  useEffect(() => {
+    deviceRef.current = device === "site" ? siteWidth : device;
+  });
   const embed: EmbedSize = config.embeds?.size ?? DEFAULT_EMBED;
   const setEmbed = (size: EmbedSize) => edit((d) => void (d.embeds = { ...d.embeds, size }));
   const [previewKey, setPreviewKey] = useState(0);
@@ -285,6 +290,8 @@ export function TourEditor({
       shot: () => ask<{ image?: string }>("tour-shot", 15000),
       pick: () => ask<{ position?: { x: number; y: number; z: number }; ss?: number | null; room?: string | null }>("tour-pick", 120000),
       go: (name, href) => frame.current?.contentWindow?.postMessage({ type: "tour-go", name, href }, location.origin),
+      device: () => deviceRef.current,
+      panoView: () => ask<{ yaw?: number; pitch?: number; hfov?: number; phone?: boolean; image?: string }>("tour-pano-view"),
     };
   }, []);
 
@@ -1764,6 +1771,14 @@ function MenuEditor({
   const [open, setOpen] = useState<Addr | null>(null);
   const [drag, setDrag] = useState<Addr | null>(null);
   const [over, setOver] = useState<Addr | "end" | null>(null);
+  /** The row whose handle is held - only it can be dragged. */
+  const [armed, setArmed] = useState<Addr | null>(null);
+  useEffect(() => {
+    if (!armed) return;
+    const off = () => setArmed(null);
+    window.addEventListener("pointerup", off);
+    return () => window.removeEventListener("pointerup", off);
+  }, [armed]);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
 
@@ -1808,8 +1823,9 @@ function MenuEditor({
     then(r.href, r.room ?? null);
   }
 
+  // A row moves only when picked up by its handle (⋮⋮) - dragging a slider or a 360° picture inside it never moves the menu.
   const rowProps = (a: Addr) => ({
-    draggable: true,
+    draggable: same(armed, a),
     onDragStart: (e: React.DragEvent) => {
       e.dataTransfer.effectAllowed = "move";
       setDrag(a);
@@ -1817,6 +1833,7 @@ function MenuEditor({
     onDragEnd: () => {
       setDrag(null);
       setOver(null);
+      setArmed(null);
     },
     onDragOver: (e: React.DragEvent) => {
       if (!drag) return;
@@ -1849,7 +1866,7 @@ function MenuEditor({
           className={`group/row flex cursor-pointer items-center gap-3 py-2.5 pr-3 transition ${groupDrop ? "bg-[#0071e3]/10" : isOpen ? "bg-[#f2f2f7]" : "hover:bg-[#f9f9fb]"}`}
           style={{ paddingLeft: 12 + depth * 28 }}
         >
-          <span className="cursor-grab text-[#c7c7cc] active:cursor-grabbing" title="Træk for at flytte">
+          <span className="cursor-grab text-[#c7c7cc] active:cursor-grabbing" title="Træk for at flytte" onPointerDown={() => setArmed(a)} onClick={(e) => e.stopPropagation()}>
             <Icon d='<circle cx="9" cy="6" r="1"/><circle cx="15" cy="6" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="9" cy="18" r="1"/><circle cx="15" cy="18" r="1"/>' className="h-4 w-4" />
           </span>
           <span className={`flex h-[28px] w-[28px] flex-none items-center justify-center rounded-[7px] text-white ${KIND_ICON[kind][0]}`}>
@@ -1903,7 +1920,9 @@ function MenuEditor({
                     )}
                     <UploadButton accept="image/*" label={imageOfHref(it.href ?? "") ? "Skift billede" : "Upload billede"} onDone={(url) => set(a, { href: IMAGE_HREF + url })} />
                     <p className="text-[12px] leading-snug text-[#8e8e93]">Vises i fuld skærm i touren - fx et dronefoto, et situationskort eller en plantegning. Et 360°-billede (2:1) åbner som 360°.</p>
-                    {imageOfHref(it.href ?? "") && <PanoZoom src={imageOfHref(it.href ?? "")!} value={imageView?.[imageOfHref(it.href ?? "")!]} onChange={(z) => onImageView(imageOfHref(it.href ?? "")!, z)} />}
+                    {imageOfHref(it.href ?? "") && (
+                      <PanoZoom src={imageOfHref(it.href ?? "")!} name={it.title} preview={preview} value={imageView?.[imageOfHref(it.href ?? "")!]} onChange={(z) => onImageView(imageOfHref(it.href ?? "")!, z)} />
+                    )}
                   </div>
                 ) : kindOf(it.href ?? "") === "web" ? (
                   <input className={`${input} mt-2 bg-white`} value={it.href} placeholder="https://…" onChange={(e) => set(a, { href: e.target.value })} />

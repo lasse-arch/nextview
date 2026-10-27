@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import "pannellum/build/pannellum.css";
 import { registerTourFile, uploadTourFile } from "@/lib/actions/tour-files";
+import { IMAGE_HREF, PANO_HFOV } from "../../tours/places";
 import type { TourConfig } from "../../tours/types";
 
 /* The editor's building blocks - Apple-style fields, switches and groups. */
@@ -83,6 +84,10 @@ export type PreviewApi = {
   /** Waits for a click in the preview: the spot in the room (for a tag), the scan point and the room. */
   pick: () => Promise<{ position?: { x: number; y: number; z: number }; ss?: number | null; room?: string | null; error?: string }>;
   go: (name: string, href: string) => void;
+  /** The 360° picture open in the preview: its direction, zoom (view width) and whether the preview is a phone. */
+  /** The device the preview is set to (Computer / Mobil over it). */
+  device: () => "computer" | "mobil";
+  panoView: () => Promise<{ yaw?: number; pitch?: number; hfov?: number; phone?: boolean; image?: string; error?: string }>;
 };
 
 /** The scan point number (ss) of a link to a place in the tour. */
@@ -163,8 +168,22 @@ type PanoViewSetting = { desktop?: number; mobile?: number; yaw?: number; pitch?
  * a phone. Unset = the normal: straight ahead, a computer a little zoomed out,
  * a phone a little zoomed in.
  */
-export function PanoZoom({ src, value, onChange }: { src: string; value?: PanoViewSetting; onChange: (v: PanoViewSetting | undefined) => void }) {
+export function PanoZoom({
+  src,
+  value,
+  onChange,
+  preview,
+  name = "",
+}: {
+  src: string;
+  value?: PanoViewSetting;
+  onChange: (v: PanoViewSetting | undefined) => void;
+  /** With the editor's preview: open the picture there and save what it shows (direction, and zoom for the device it shows). */
+  preview?: PreviewApi;
+  name?: string;
+}) {
   const [is360, setIs360] = useState<boolean | null>(null);
+  const [note, setNote] = useState<{ text: string; error?: boolean } | null>(null);
   const [picking, setPicking] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   const viewer = useRef<{ getYaw(): number; getPitch(): number; destroy(): void } | null>(null);
@@ -214,7 +233,39 @@ export function PanoZoom({ src, value, onChange }: { src: string; value?: PanoVi
       }}
     >
       <p className="text-[12px] font-medium text-[#1d1d1f]">360°-visning</p>
-      {picking ? (
+      {preview ? (
+        <div className="space-y-1.5">
+          <div className="flex gap-2">
+            <button type="button" className="flex-1 rounded-lg bg-[#f2f2f7] py-1.5 text-[12px] font-medium text-[#0071e3]" onClick={() => (setNote(null), preview.go(name, IMAGE_HREF + src))}>
+              Vis i forhåndsvisningen
+            </button>
+            <button
+              type="button"
+              className="flex-1 rounded-lg bg-[#0071e3] py-1.5 text-[12px] font-medium text-white"
+              onClick={async () => {
+                setNote(null);
+                const v = await preview.panoView();
+                if (v.error || v.yaw == null || v.hfov == null) return setNote({ text: v.error ?? "Forhåndsvisningen svarede ikke.", error: true });
+                if (v.image !== src) return setNote({ text: "Forhåndsvisningen viser et andet billede - tryk Vis i forhåndsvisningen først.", error: true });
+                const phone = preview.device() === "mobil";
+                // The tour picks its zoom by its width: a narrow Computer preview shows the phone view, so its zoom can't be read as a computer's.
+                if (!phone && v.phone) return setNote({ text: "Forhåndsvisningen er så smal, at touren viser mobilvisningen. Tryk Stor skærm over forhåndsvisningen, og gem igen.", error: true });
+                put({ yaw: Math.round(v.yaw), pitch: Math.round(v.pitch ?? 0), [phone ? "mobile" : "desktop"]: Math.round(((v.phone ? PANO_HFOV.mobile : PANO_HFOV.desktop) / v.hfov) * 100) / 100 });
+                setNote({ text: `Gemt: hvor det starter, og zoom på ${phone ? "mobil" : "computer"}. Skift til ${phone ? "Computer" : "Mobil"} over forhåndsvisningen og gem igen for at sætte zoom dér.` });
+              }}
+            >
+              Gem det, du ser
+            </button>
+          </div>
+          <p className="text-[11px] leading-snug text-[#8e8e93]">Drej og zoom billedet i forhåndsvisningen, og tryk Gem det, du ser. Zoomen gemmes for den enhed, forhåndsvisningen viser.</p>
+          {note && <p className={`text-[11px] leading-snug ${note.error ? "text-[#ff3b30]" : "text-[#34c759]"}`}>{note.text}</p>}
+          {value?.yaw != null && (
+            <button type="button" className="text-[12px] text-[#8e8e93] hover:text-[#0071e3]" onClick={() => put({ yaw: undefined, pitch: undefined })}>
+              Start lige frem igen
+            </button>
+          )}
+        </div>
+      ) : picking ? (
         <div className="space-y-1.5">
           <div className="relative h-44 w-full overflow-hidden rounded-lg bg-black">
             <div ref={box} className="absolute inset-0" />
