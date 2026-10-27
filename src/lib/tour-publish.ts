@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import "server-only";
 import { hash as blake3 } from "blake3-wasm";
 import { prisma } from "@/lib/db";
@@ -42,6 +43,17 @@ export function cloudflareReady(): boolean {
 
 type ManifestFile = { path: string; hash: string; type: string };
 type EngineManifest = { version: string; engine: ManifestFile[]; shared: ManifestFile[]; tours: ManifestFile[] };
+
+/** A fingerprint of a tour's setup - the same setup gives the same one. */
+export function configHash(config: unknown): string {
+  return createHash("sha256").update(JSON.stringify(config ?? null)).digest("hex").slice(0, 32);
+}
+
+/** The tour engine Arpo would publish with right now. */
+export async function currentEngine(origin: string): Promise<string | null> {
+  const res = await own(origin, "/tour-engine/manifest.json").catch(() => null);
+  return res?.ok ? (((await res.json()) as EngineManifest).version ?? null) : null;
+}
 
 async function own(origin: string, path: string): Promise<Response> {
   // Only ever Arpo's own address and a path starting with "/" - never an address from the tour's setup.
@@ -218,12 +230,12 @@ export function arpoOrigin(requestOrigin: string): string {
 }
 
 export async function publishTour(slug: string, who: string, note: string | null, origin: string) {
-  const tour = await prisma.tour.findUnique({ where: { slug }, select: { id: true, published: true } });
+  const tour = await prisma.tour.findUnique({ where: { slug }, select: { id: true, published: true, config: true } });
   if (!tour) throw new Error("Touren findes ikke.");
   const built = await buildVersion(slug, origin);
   const last = await prisma.tourPublication.findFirst({ where: { tourId: tour.id }, orderBy: { version: "desc" }, select: { version: true } });
   const version = (last?.version ?? 0) + 1;
-  await prisma.tourPublication.create({ data: { tourId: tour.id, version, slug, files: built.files, engine: built.engine, note, createdByName: who } });
+  await prisma.tourPublication.create({ data: { tourId: tour.id, version, slug, files: built.files, engine: built.engine, configHash: configHash(tour.config), note, createdByName: who } });
   const before = await prisma.tour.findUnique({ where: { slug }, select: { liveVersion: true } });
   await prisma.tour.update({ where: { slug }, data: { liveVersion: version, published: true } });
   try {

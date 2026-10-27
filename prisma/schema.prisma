@@ -1339,6 +1339,8 @@ model TourPublication {
   /// Every file the version needs: path -> Cloudflare's hash of it (page, pictures, engine, viewer).
   files         Json
   engine        String
+  /// The tour's setup when it was published (a hash) - with the engine, what tells "nothing new to publish".
+  configHash    String?
   note          String?
   createdByName String?
   createdAt     DateTime @default(now())

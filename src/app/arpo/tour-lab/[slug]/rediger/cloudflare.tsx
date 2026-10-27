@@ -17,6 +17,7 @@ const when = (iso: string) => new Date(iso).toLocaleString("da-DK", { day: "nume
 export function CloudflarePublish({ slug }: { slug: string }) {
   const [state, setState] = useState<PublishState | null>(null);
   const [note, setNote] = useState("");
+  const [anyway, setAnyway] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [pending, start] = useTransition();
   const load = () => publishState(slug).then(setState).catch(() => {});
@@ -57,6 +58,16 @@ export function CloudflarePublish({ slug }: { slug: string }) {
               <span className="text-[#6e6e73]">Ikke udgivet på Cloudflare endnu.</span>
             )}
           </p>
+          {state.upToDate && !anyway ? (
+            // Nothing changed since the live version - a new one would be the same.
+            <div className="rounded-xl bg-[#f2f2f7] px-3 py-2.5 text-center text-[14px] text-[#6e6e73]">
+              ✓ Allerede udgivet - ingen ændringer siden version {state.live}
+              <button type="button" onClick={() => setAnyway(true)} className="mt-1 block w-full text-[12px] text-[#8e8e93] underline-offset-2 hover:underline">
+                Udgiv alligevel
+              </button>
+            </div>
+          ) : (
+          <>
           <input className={`${input} bg-[#f2f2f7]`} placeholder="Hvad er ændret? (valgfrit)" value={note} maxLength={200} onChange={(e) => setNote(e.target.value)} />
           <button
             type="button"
@@ -64,8 +75,11 @@ export function CloudflarePublish({ slug }: { slug: string }) {
             className="w-full rounded-xl bg-[#1d1d1f] py-2.5 text-[15px] font-medium text-white disabled:opacity-50"
             onClick={() =>
               run(async () => {
-                const r = await publishNow(slug, note);
-                if (r.ok) setNote("");
+                const r = await publishNow(slug, note, anyway);
+                if (r.ok) {
+                  setNote("");
+                  setAnyway(false);
+                }
                 if (r.ok && r.value.missing.length) return { ok: false as const, error: `Version ${r.value.version} er live, men ${r.value.missing.length} billeder kunne ikke hentes og vises fra Arpo: ${r.value.missing.slice(0, 3).join(", ")}` };
                 return r;
               }, "Udgivet. Det tager op til et minut, før den nye version vises alle steder.")
@@ -73,6 +87,8 @@ export function CloudflarePublish({ slug }: { slug: string }) {
           >
             {pending ? "Arbejder… (op til et par minutter første gang)" : "Udgiv ny version"}
           </button>
+          </>
+          )}
           {msg && <p className={`px-1 text-[13px] ${msg.ok ? "text-[#248a3d]" : "text-[#ff3b30]"}`}>{msg.text}</p>}
           {state.versions.length > 0 && (
             <ul className="divide-y divide-black/[.06] rounded-xl bg-[#f2f2f7]">

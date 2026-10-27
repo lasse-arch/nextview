@@ -7,13 +7,15 @@ import { prisma } from "@/lib/db";
 import { normalizeEmail } from "@/lib/customer-login";
 import { setFilmingActual, updateDealStage } from "@/lib/actions/deals";
 import { tourChanged } from "@/lib/tour-cache";
+import { configHash, currentEngine } from "@/lib/tour-publish";
 import { arpoOrigin, cloudflareReady, PAGES_PROJECT, publishTour, setLiveVersion } from "@/lib/tour-publish";
 
 /* "Udgiv på tour.nextview360.dk" in the tour editor - admins only. */
 
 export type Publication = { version: number; note: string | null; by: string | null; at: string; engine: string };
 export type GoLiveState = { name: string; contactEmail: string | null; filmingMissing: boolean; liveAt: string | null; welcomeMailSentAt: string | null; portal: boolean };
-export type PublishState = { ready: boolean; project: string; live: number | null; versions: Publication[]; deal: GoLiveState | null };
+/** upToDate: the live version already has the tour's current setup and engine - nothing new to publish. */
+export type PublishState = { ready: boolean; project: string; live: number | null; upToDate: boolean; versions: Publication[]; deal: GoLiveState | null };
 type Result<T> = { ok: true; value: T } | { ok: false; error: string };
 
 async function admin() {
@@ -32,13 +34,17 @@ export async function publishState(slug: string): Promise<PublishState> {
     where: { slug },
     select: {
       liveVersion: true,
+      config: true,
       deal: { select: { id: true, companyName: true, displayName: true, contactEmail: true, filmingActualMinutes: true, stage: true, liveAt: true, welcomeMailSentAt: true, customerAccounts: { select: { accountId: true } } } },
-      publications: { orderBy: { version: "desc" }, take: 30, select: { version: true, note: true, createdByName: true, createdAt: true, engine: true } } },
+      publications: { orderBy: { version: "desc" }, take: 30, select: { version: true, note: true, createdByName: true, createdAt: true, engine: true, configHash: true } } },
   });
+  const live = tour?.publications.find((p) => p.version === tour.liveVersion);
+  const upToDate = Boolean(tour && live?.configHash && live.configHash === configHash(tour.config) && live.engine === (await currentEngine(await origin())));
   return {
     ready: cloudflareReady(),
     project: PAGES_PROJECT,
     live: tour?.liveVersion ?? null,
+    upToDate,
     versions: (tour?.publications ?? []).map((p) => ({ version: p.version, note: p.note, by: p.createdByName, at: p.createdAt.toISOString(), engine: p.engine })),
     deal: tour?.deal
       ? {
@@ -53,9 +59,11 @@ export async function publishState(slug: string): Promise<PublishState> {
   };
 }
 
-export async function publishNow(slug: string, note: string): Promise<Result<{ version: number; missing: string[] }>> {
+export async function publishNow(slug: string, note: string, anyway = false): Promise<Result<{ version: number; missing: string[] }>> {
   try {
     const user = await admin();
+    // Nothing new since the live version: no new version unless asked for on purpose ("Udgiv alligevel").
+    if (!anyway && (await publishState(slug)).upToDate) return { ok: false, error: "Den live version har allerede touren, som den er nu - intet nyt at udgive." };
     const r = await publishTour(slug, user.name, note.trim().slice(0, 200) || null, await origin());
     revalidatePath(`/arpo/tour-lab/${slug}/rediger`);
     return { ok: true, value: r };
