@@ -9,8 +9,9 @@ import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { claudeCostUsd } from "@/lib/claude-cost";
 import { getSettingValue } from "@/lib/integration-settings";
-import { fetchScanImages, type ScanImages } from "@/lib/matterport-graph";
-import { fetchMpskinsCfg } from "@/lib/mpskins";
+import { fetchScanImages, fetchSweepGraph, type ScanImages, type SweepGraph } from "@/lib/matterport-graph";
+import { fetchMpskinsCfg, hiddenSweeps, ssOf } from "@/lib/mpskins";
+import { strandedBy } from "@/lib/sweep-reach";
 import type { TourConfig } from "@/app/arpo/tour-lab/tours/types";
 
 /*
@@ -166,7 +167,47 @@ export async function checkScansForPeople(slug: string, sweepIds: string[]): Pro
   }
 }
 
-export type ScanFinding = { slug: string; tour: string; sweepId: string; ss: number; status: string; face: number | null; note: string | null; images: string[] };
+export type ScanFinding = {
+  slug: string;
+  tour: string;
+  sweepId: string;
+  ss: number;
+  status: string;
+  face: number | null;
+  note: string | null;
+  images: string[];
+  /** Scan points you can no longer walk to if this one is hidden (null: the walkways couldn't be fetched). */
+  stranded: number | null;
+  /** ...of them, ones the tour's menu, start, points or places send you to. */
+  strandedLinked: number;
+  /** The tour's own menu, start, points or places go here - so it's never hidden in the tour, whatever is chosen. */
+  linked: boolean;
+};
+
+type Walk = { graph: SweepGraph | null; hidden: Set<string>; linked: Set<string>; start: string | null };
+
+/** What's needed to tell whether hiding a scan cuts the tour off: the walkways, what's hidden already, and where the tour sends people. Mirrors load.ts. */
+async function walkOf(slug: string, modelId: string, config: TourConfig, scans: ScanImages[]): Promise<Walk> {
+  const [graph, cfg] = await Promise.all([fetchSweepGraph(modelId), config.tourPage ? fetchMpskinsCfg(config.tourPage).catch(() => null) : null]);
+  const bySs = new Map(scans.map((s) => [s.ss, s.sweepId]));
+  const sweepOf = (link: string | undefined) => {
+    const ss = link ? ssOf(link) : null;
+    return ss != null ? bySs.get(ss) : undefined;
+  };
+  const linked = new Set(
+    [
+      config.start,
+      ...(config.points ?? []).map((p) => p.tour),
+      ...(config.menu ?? []).flatMap((m) => ("items" in m ? m.items.map((i) => i[1]) : [m.href])),
+      ...(config.welcome?.tiles.flatMap((t) => ("room" in t.go ? [t.go.room] : [])) ?? []),
+      ...(config.places?.map((p) => p.href) ?? []),
+    ]
+      .map((l) => sweepOf(l ?? undefined))
+      .filter((s): s is string => Boolean(s))
+  );
+  const hidden = new Set([...(cfg ? hiddenSweeps(cfg) : []), ...(config.hiddenSweeps ?? [])].filter((s) => !linked.has(s)));
+  return { graph, hidden, linked, start: sweepOf(config.start) ?? null };
+}
 
 /** The scans with people waiting for review (or all decided ones too), with fresh pictures of their walls. */
 export async function peopleFindings(includeDecided = false): Promise<ScanFinding[]> {
@@ -175,10 +216,12 @@ export async function peopleFindings(includeDecided = false): Promise<ScanFindin
   const slugs = [...new Set(rows.map((r) => r.tourSlug))];
   const tours = await prisma.tour.findMany({ where: { slug: { in: slugs } }, select: { slug: true, name: true } });
   const images: Record<string, ScanImages[]> = {};
+  const walks: Record<string, Walk | null> = {};
   await Promise.all(
     slugs.map(async (slug) => {
       const m = await modelOf(slug).catch(() => null);
       images[slug] = m ? await fetchScanImages(m.modelId).catch(() => []) : [];
+      walks[slug] = m ? await walkOf(slug, m.modelId, m.config, images[slug]).catch(() => null) : null;
     })
   );
   return rows.map((r) => {
@@ -186,7 +229,21 @@ export async function peopleFindings(includeDecided = false): Promise<ScanFindin
     const t = img?.high ?? img?.low;
     // The wall with the person first.
     const order = r.face ? [r.face, ...[1, 2, 3, 4].filter((f) => f !== r.face)] : [1, 2, 3, 4];
-    return { slug: r.tourSlug, tour: tours.find((x) => x.slug === r.tourSlug)?.name ?? r.tourSlug, sweepId: r.sweepId, ss: r.ss, status: r.status, face: r.face, note: r.note, images: t ? order.map((f) => t.replace("<face>", String(f))) : [] };
+    const walk = walks[r.tourSlug];
+    const stranded = walk?.graph ? strandedBy(walk.graph, r.sweepId, walk.hidden, walk.start) : null;
+    return {
+      slug: r.tourSlug,
+      tour: tours.find((x) => x.slug === r.tourSlug)?.name ?? r.tourSlug,
+      sweepId: r.sweepId,
+      ss: r.ss,
+      status: r.status,
+      face: r.face,
+      note: r.note,
+      images: t ? order.map((f) => t.replace("<face>", String(f))) : [],
+      stranded: stranded?.length ?? null,
+      strandedLinked: stranded?.filter((s) => walk!.linked.has(s)).length ?? 0,
+      linked: walk?.linked.has(r.sweepId) ?? false,
+    };
   });
 }
 

@@ -154,6 +154,7 @@ function Finding({ f, onDone }: { f: ScanFinding; onDone: () => void }) {
           {f.status === "hidden" ? " · skjult" : f.status === "kept" ? " · beholdt" : ""}
         </div>
         <p className="text-[14px] leading-snug">{f.note || "En person i scannet."}</p>
+        <Walkway f={f} />
         <div className="flex flex-wrap gap-2">
           {f.status === "person" ? (
             <>
@@ -175,5 +176,25 @@ function Finding({ f, onDone }: { f: ScanFinding; onDone: () => void }) {
         </div>
       </div>
     </div>
+  );
+}
+
+/** Would hiding this scan cut the tour off? A hidden scan can't be walked through - so the (!) when it's the only way on. */
+function Walkway({ f }: { f: ScanFinding }) {
+  if (f.linked)
+    return (
+      <p className="rounded-lg bg-[#f2f2f7] px-2.5 py-1.5 text-[12px] leading-snug text-[#6e6e73]">
+        Menuen eller starten sender folk hertil, så scannet bliver ikke skjult i touren, selv om du vælger &quot;Skjul&quot;.
+      </p>
+    );
+  if (f.stranded == null || f.stranded === 0) return null;
+  return (
+    <p className="flex gap-2 rounded-lg bg-[#ff9500]/12 px-2.5 py-1.5 text-[12px] leading-snug text-[#9a5b00]">
+      <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[#ff9500] text-[11px] font-bold text-white">!</span>
+      <span>
+        {f.status === "hidden" ? "Skjult afskærer det" : "Skjules det, afskæres"} {f.stranded === 1 ? "1 scan" : `${f.stranded} scans`} - man kan ikke gå videre forbi det
+        {f.strandedLinked ? `, og ${f.strandedLinked === 1 ? "et rum" : `${f.strandedLinked} rum`} fra menuen kan ikke nås ved at gå` : ""}.
+      </span>
+    </p>
   );
 }
