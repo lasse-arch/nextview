@@ -1364,16 +1364,23 @@ function TourExperience({
     };
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && done({ error: "Annulleret." });
     const sub = sdk.Pointer?.intersection.subscribe((hit) => (last = hit?.position ?? null));
+    // The click that places the tag mustn't also walk to the nearest scan point: the other points are off meanwhile.
+    if (currentSweep.current) lockTo(sdk, allSweeps.current, currentSweep.current);
     doc?.addEventListener("click", onClick, true);
     window.addEventListener("keydown", onKey);
     doc?.addEventListener("keydown", onKey);
     return () => {
       sub?.cancel();
+      // Walking again as before (still only by the points, when the tour is set to that).
+      if (!pointsOnlyRef.current) {
+        const open = allSweeps.current.filter((id) => !hiddenSweeps.includes(id));
+        if (open.length) sdk.Sweep.enable(...open).catch(() => {});
+      }
       doc?.removeEventListener("click", onClick, true);
       window.removeEventListener("keydown", onKey);
       doc?.removeEventListener("keydown", onKey);
     };
-  }, [picking, sdk, room]);
+  }, [picking, sdk, room, hiddenSweeps]);
 
   /* ----- "Find vej" ----- */
   const DESTINATIONS = useMemo<Destination[]>(
