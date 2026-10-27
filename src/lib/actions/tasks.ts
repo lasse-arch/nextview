@@ -9,8 +9,8 @@ import { parseDueDateFromText } from "@/lib/task-date-parser";
 export type TaskResult = { ok: true; id: string } | { ok: false; error: string };
 
 function revalidateTaskPaths(dealId: string | null) {
-  revalidatePath("/opgaver");
-  if (dealId) revalidatePath(`/deals/${dealId}`);
+  revalidatePath("/arpo/opgaver");
+  if (dealId) revalidatePath(`/arpo/deals/${dealId}`);
 }
 
 function parseRecurringWeekday(formData: FormData): number | null {
@@ -195,8 +195,8 @@ export async function bulkReassignTasks(taskIds: string[], assigneeId: string | 
   const tasks = await prisma.task.findMany({ where: { id: { in: taskIds } }, select: { dealId: true } });
   await prisma.task.updateMany({ where: { id: { in: taskIds } }, data: { assigneeId } });
   const dealIds = new Set(tasks.map((t) => t.dealId).filter((id): id is string => Boolean(id)));
-  revalidatePath("/opgaver");
-  for (const dealId of dealIds) revalidatePath(`/deals/${dealId}`);
+  revalidatePath("/arpo/opgaver");
+  for (const dealId of dealIds) revalidatePath(`/arpo/deals/${dealId}`);
 }
 
 export async function deleteTask(taskId: string): Promise<void> {

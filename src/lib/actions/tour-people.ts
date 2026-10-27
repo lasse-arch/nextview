@@ -11,7 +11,7 @@ import { claudeCostUsd } from "@/lib/claude-cost";
 import { getSettingValue } from "@/lib/integration-settings";
 import { fetchScanImages, type ScanImages } from "@/lib/matterport-graph";
 import { fetchMpskinsCfg } from "@/lib/mpskins";
-import type { TourConfig } from "@/app/(app)/tour-lab/tours/types";
+import type { TourConfig } from "@/app/arpo/tour-lab/tours/types";
 
 /*
  * People in the scans: we film without people, but on 250 scan points

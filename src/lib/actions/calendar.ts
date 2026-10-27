@@ -18,7 +18,7 @@ export type CalendarWeekClientData = {
 };
 
 /** Lets the Kalender page's week grid switch weeks purely client-side (via
- * useTransition), instead of navigating to `/kalender?week=N` and re-running
+ * useTransition), instead of navigating to `/arpo/kalender?week=N` and re-running
  * the whole page's data fetching (stats tiles, monthly chart, per-seller
  * cards included) just to change which week is shown. */
 export async function getCalendarWeekAction(weekOffset: number): Promise<CalendarWeekClientData> {

@@ -60,7 +60,7 @@ export async function createLeadFilter(
     data: { ...fields, createdById: user.id },
   });
 
-  revalidatePath("/leadgeneration");
+  revalidatePath("/arpo/leadgeneration");
   return { ok: true, id: filter.id };
 }
 
@@ -74,7 +74,7 @@ export async function updateLeadFilter(
   if (error) return { ok: false, error };
 
   await prisma.leadFilter.update({ where: { id: filterId }, data: fields });
-  revalidatePath("/leadgeneration");
+  revalidatePath("/arpo/leadgeneration");
   return { ok: true };
 }
 
@@ -90,26 +90,26 @@ export async function renameLeadFilter(
   const trimmed = name.trim();
   if (!trimmed) return { ok: false, error: "Giv listen et navn." };
   await prisma.leadFilter.update({ where: { id: filterId }, data: { name: trimmed } });
-  revalidatePath("/leadgeneration");
+  revalidatePath("/arpo/leadgeneration");
   return { ok: true };
 }
 
 export async function setLeadFilterEnabled(filterId: string, enabled: boolean): Promise<void> {
   await requireUser();
   await prisma.leadFilter.update({ where: { id: filterId }, data: { enabled } });
-  revalidatePath("/leadgeneration");
+  revalidatePath("/arpo/leadgeneration");
 }
 
 export async function deleteLeadFilter(filterId: string): Promise<void> {
   await requireUser();
   await prisma.leadFilter.delete({ where: { id: filterId } });
-  revalidatePath("/leadgeneration");
+  revalidatePath("/arpo/leadgeneration");
 }
 
 export async function runLeadFilterNowAction(filterId: string): Promise<RunLeadFilterResult> {
   await requireUser();
   const result = await runLeadFilter(filterId);
-  revalidatePath("/leadgeneration");
+  revalidatePath("/arpo/leadgeneration");
   return result;
 }
 
@@ -171,9 +171,9 @@ export async function moveLeadDealsToCallList(
   }
   await markMatchesHandled(filterId, candidateIds);
 
-  revalidatePath("/leadgeneration");
-  revalidatePath("/ringeliste");
-  revalidatePath("/deals");
+  revalidatePath("/arpo/leadgeneration");
+  revalidatePath("/arpo/ringeliste");
+  revalidatePath("/arpo/deals");
   return { ok: true, moved };
 }
 
@@ -184,7 +184,7 @@ export async function moveLeadDealsToCallList(
 export async function hideLeadMatch(filterId: string, candidateId: string): Promise<void> {
   await requireUser();
   await markMatchesHandled(filterId, [candidateId]);
-  revalidatePath("/leadgeneration");
+  revalidatePath("/arpo/leadgeneration");
 }
 
 /**
@@ -223,8 +223,8 @@ export async function addLeadCandidateAsDeal(
     });
   }
 
-  revalidatePath("/leadgeneration");
-  revalidatePath("/deals");
+  revalidatePath("/arpo/leadgeneration");
+  revalidatePath("/arpo/deals");
   // A name-similarity "possible duplicate" hint only makes sense for a
   // genuinely new deal - when the CVR number already matched an existing
   // one (alreadyExisted), that IS the same company, not just a similarly-
@@ -268,9 +268,9 @@ export async function addLeadCandidateToCallList(
     });
   }
 
-  revalidatePath("/leadgeneration");
-  revalidatePath("/ringeliste");
-  revalidatePath("/deals");
+  revalidatePath("/arpo/leadgeneration");
+  revalidatePath("/arpo/ringeliste");
+  revalidatePath("/arpo/deals");
   return { ok: true, dealId: result.dealId, alreadyExisted: !result.created, existingStage: result.existingStage };
 }
 
@@ -316,9 +316,9 @@ export async function addLeadCandidatesToCallList(
   }
   await markMatchesHandled(filterId, candidateIds);
 
-  revalidatePath("/leadgeneration");
-  revalidatePath("/ringeliste");
-  revalidatePath("/deals");
+  revalidatePath("/arpo/leadgeneration");
+  revalidatePath("/arpo/ringeliste");
+  revalidatePath("/arpo/deals");
   return { ok: true, added, alreadyExisted, skipped };
 }
 
@@ -326,7 +326,7 @@ export async function dismissLeadCandidate(candidateId: string, filterId?: strin
   await requireUser();
   await prisma.leadCandidate.updateMany({ where: { id: candidateId, status: "NEW" }, data: { status: "DISMISSED" } });
   await markMatchesHandled(filterId, [candidateId]);
-  revalidatePath("/leadgeneration");
+  revalidatePath("/arpo/leadgeneration");
 }
 
 /**
@@ -353,6 +353,6 @@ export async function deleteLeadCandidates(
     data: { status: "DISMISSED" },
   });
   await markMatchesHandled(filterId, candidateIds);
-  revalidatePath("/leadgeneration");
+  revalidatePath("/arpo/leadgeneration");
   return { deleted: result.count };
 }

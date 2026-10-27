@@ -22,7 +22,7 @@ export async function createCallList(name?: string): Promise<{ id: string; name:
   const list = await prisma.callList.create({
     data: { name: name?.trim() || defaultListName(), createdById: user.id },
   });
-  revalidatePath("/ringeliste");
+  revalidatePath("/arpo/ringeliste");
   return { id: list.id, name: list.name };
 }
 
@@ -35,8 +35,8 @@ export async function renameCallList(callListId: string, name: string): Promise<
   const trimmed = name.trim();
   if (!trimmed) return { ok: false, error: "Navnet må ikke være tomt." };
   await prisma.callList.update({ where: { id: callListId }, data: { name: trimmed } });
-  revalidatePath("/ringeliste");
-  revalidatePath("/leadgeneration");
+  revalidatePath("/arpo/ringeliste");
+  revalidatePath("/arpo/leadgeneration");
   return { ok: true };
 }
 
@@ -209,8 +209,8 @@ export async function addLeadsToCallList(
     created++;
   }
 
-  revalidatePath("/ringeliste");
-  revalidatePath("/deals");
+  revalidatePath("/arpo/ringeliste");
+  revalidatePath("/arpo/deals");
   return { ok: true, created, moved, skipped, alreadyExisting };
 }
 
@@ -218,7 +218,7 @@ export async function deleteCallList(callListId: string): Promise<void> {
   await requireUser();
   // Deals stay - they just lose their list tag (onDelete: SetNull on the relation).
   await prisma.callList.delete({ where: { id: callListId } });
-  revalidatePath("/ringeliste");
+  revalidatePath("/arpo/ringeliste");
 }
 
 /**
@@ -237,7 +237,7 @@ export async function markVoicemail(dealId: string): Promise<{ at: string }> {
     actorId: user.id,
     dealId,
   });
-  revalidatePath("/ringeliste");
+  revalidatePath("/arpo/ringeliste");
   return { at: at.toISOString() };
 }
 
@@ -288,8 +288,8 @@ export async function scheduleCallBack(
     dealId,
   });
 
-  revalidatePath("/ringeliste");
-  revalidatePath("/opgaver");
-  revalidatePath(`/deals/${dealId}`);
+  revalidatePath("/arpo/ringeliste");
+  revalidatePath("/arpo/opgaver");
+  revalidatePath(`/arpo/deals/${dealId}`);
   return { ok: true };
 }

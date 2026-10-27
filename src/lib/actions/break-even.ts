@@ -11,6 +11,6 @@ export async function saveBreakEvenSettings(monthlyCost: string): Promise<{ erro
   const monthly = Math.round(Number(monthlyCost.replace(",", ".")) || 0);
   if (monthly < 0) return { error: "Driften kan ikke være negativ." };
   await setSettingValue("BREAKEVEN_MONTHLY_COST", String(monthly));
-  revalidatePath("/commission");
+  revalidatePath("/arpo/commission");
   return {};
 }

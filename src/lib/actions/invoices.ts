@@ -28,8 +28,8 @@ export async function runInvoiceGenerationNow(): Promise<InvoiceRunSummary> {
   const summary = await runQuarterlyInvoiceGeneration();
   const { churned } = await runAutoChurn();
   const payments = await checkAllPendingPayments();
-  revalidatePath("/settings/dinero");
-  revalidatePath("/deals");
+  revalidatePath("/arpo/settings/dinero");
+  revalidatePath("/arpo/deals");
   return { ...summary, churned, paymentsChecked: payments.checked, paymentsNewlyPaid: payments.paid };
 }
 
@@ -49,8 +49,8 @@ export async function createInvoiceForDeal(dealId: string): Promise<InvoiceRunSu
   if (user.role !== "ADMIN") throw new Error("Kun admin kan oprette faktura-kladder");
 
   const summary = await generateInvoiceForDeal(dealId);
-  revalidatePath(`/deals/${dealId}`);
-  revalidatePath("/settings/dinero");
+  revalidatePath(`/arpo/deals/${dealId}`);
+  revalidatePath("/arpo/settings/dinero");
   return summary;
 }
 
@@ -59,8 +59,8 @@ export async function markEstablishmentSentManuallyAction(dealId: string): Promi
   if (user.role !== "ADMIN") throw new Error("Kun admin kan markere fakturaer som sendt manuelt");
 
   const result = await markEstablishmentSentManually(dealId);
-  revalidatePath(`/deals/${dealId}`);
-  revalidatePath("/settings/dinero");
+  revalidatePath(`/arpo/deals/${dealId}`);
+  revalidatePath("/arpo/settings/dinero");
   return result;
 }
 
@@ -82,8 +82,8 @@ export async function markPeriodSentManuallyAction(
   if (user.role !== "ADMIN") throw new Error("Kun admin kan markere fakturaer som sendt manuelt");
 
   const result = await markPeriodSentManually(dealId, quarterIndex);
-  revalidatePath(`/deals/${dealId}`);
-  revalidatePath("/settings/dinero");
+  revalidatePath(`/arpo/deals/${dealId}`);
+  revalidatePath("/arpo/settings/dinero");
   return result;
 }
 
@@ -94,8 +94,8 @@ export async function checkInvoicePaymentAction(
   if (user.role !== "ADMIN") throw new Error("Kun admin kan tjekke betalingsstatus");
 
   const result = await checkInvoicePayment(invoiceId);
-  revalidatePath(`/deals/${result.dealId}`);
-  revalidatePath("/settings/dinero");
+  revalidatePath(`/arpo/deals/${result.dealId}`);
+  revalidatePath("/arpo/settings/dinero");
   return result;
 }
 
@@ -107,8 +107,8 @@ export async function markInvoicePaidManuallyAction(
   if (user.role !== "ADMIN") throw new Error("Kun admin kan markere fakturaer som betalt");
 
   const result = await markInvoicePaidManually(invoiceId, paid);
-  if (result.ok) revalidatePath(`/deals/${result.dealId}`);
-  revalidatePath("/settings/dinero");
+  if (result.ok) revalidatePath(`/arpo/deals/${result.dealId}`);
+  revalidatePath("/arpo/settings/dinero");
   return result;
 }
 
@@ -117,7 +117,7 @@ export async function retryInvoiceDraft(invoiceId: string): Promise<{ success: b
   if (user.role !== "ADMIN") throw new Error("Kun admin kan genforsøge fakturaer");
 
   const result = await retrySingleInvoice(invoiceId);
-  revalidatePath("/settings/dinero");
+  revalidatePath("/arpo/settings/dinero");
   return result;
 }
 
@@ -153,8 +153,8 @@ export async function deleteInvoiceDraft(invoiceId: string): Promise<ActionResul
     if (user.role !== "ADMIN") throw new Error("Kun admin kan fjerne fakturaer");
 
     const invoice = await prisma.invoice.delete({ where: { id: invoiceId } });
-    revalidatePath(`/deals/${invoice.dealId}`);
-    revalidatePath("/settings/dinero");
+    revalidatePath(`/arpo/deals/${invoice.dealId}`);
+    revalidatePath("/arpo/settings/dinero");
     return undefined;
   });
 }
@@ -173,8 +173,8 @@ export async function clearAllInvoices(confirmation: string): Promise<{ deleted:
   if (confirmation.trim().toLowerCase() !== "sletslet") throw new Error('Ikke slettet - du skal skrive "sletslet".');
 
   const { count } = await prisma.invoice.deleteMany({});
-  revalidatePath("/settings/dinero");
-  revalidatePath("/deals");
+  revalidatePath("/arpo/settings/dinero");
+  revalidatePath("/arpo/deals");
   return { deleted: count };
 }
 
@@ -203,7 +203,7 @@ export async function clearTestInvoices(): Promise<{ deleted: number; deletedInD
   }
 
   const { count } = await prisma.invoice.deleteMany({ where: { dineroInvoiceGuid: { startsWith: TEST_DRAFT_PREFIX } } });
-  revalidatePath("/settings/dinero");
-  revalidatePath("/deals");
+  revalidatePath("/arpo/settings/dinero");
+  revalidatePath("/arpo/deals");
   return { deleted: count, deletedInDinero, keptBooked };
 }

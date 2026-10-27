@@ -21,7 +21,7 @@ export async function setTourReview(slug: string, on: boolean): Promise<{ token:
   await admin();
   const token = on ? randomBytes(12).toString("base64url") : null;
   await prisma.tour.update({ where: { slug }, data: { reviewToken: token } });
-  revalidatePath(`/tour-lab/${slug}/rediger`);
+  revalidatePath(`/arpo/tour-lab/${slug}/rediger`);
   return { token };
 }
 

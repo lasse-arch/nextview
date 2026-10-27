@@ -17,6 +17,6 @@ export async function sendWelcomeMailNow(dealId: string): Promise<{ ok: true } |
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Velkomstmailen kunne ikke sendes." };
   }
-  revalidatePath(`/deals/${dealId}`);
+  revalidatePath(`/arpo/deals/${dealId}`);
   return { ok: true };
 }

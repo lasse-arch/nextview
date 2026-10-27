@@ -12,9 +12,9 @@ export async function toggleIntegration(key: IntegrationKey, enabled: boolean) {
 
   await setIntegrationEnabled(key, enabled);
 
-  revalidatePath("/settings/dinero");
-  revalidatePath("/settings/docuseal");
-  revalidatePath("/settings/email");
+  revalidatePath("/arpo/settings/dinero");
+  revalidatePath("/arpo/settings/docuseal");
+  revalidatePath("/arpo/settings/email");
 }
 
 /**
@@ -33,6 +33,6 @@ export async function setRequireGoogleLogin(enabled: boolean): Promise<{ ok: tru
     create: { key: REQUIRE_GOOGLE_LOGIN_KEY, enabled },
     update: { enabled },
   });
-  revalidatePath("/users");
+  revalidatePath("/arpo/users");
   return { ok: true };
 }

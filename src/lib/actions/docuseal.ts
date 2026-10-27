@@ -158,8 +158,8 @@ export async function buildAndSendContract(
       dealId,
     });
 
-    revalidatePath(`/deals/${dealId}`);
-    revalidatePath("/opgaver");
+    revalidatePath(`/arpo/deals/${dealId}`);
+    revalidatePath("/arpo/opgaver");
     return { ok: true };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Der opstod en fejl ved afsendelse af kontrakten." };
@@ -208,7 +208,7 @@ export async function archiveSignedContract(
 
     await prisma.contractEvent.create({ data: { dealId, type: "SIGNED_CONTRACT_ARCHIVED", occurredAt: new Date() } });
 
-    revalidatePath(`/deals/${dealId}`);
+    revalidatePath(`/arpo/deals/${dealId}`);
     return { ok: true };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Der opstod en fejl ved arkivering af kontrakten." };
@@ -253,7 +253,7 @@ export async function archiveSentContract(
     await prisma.contractEvent.create({ data: { dealId, type: "SENT_CONTRACT_ARCHIVED", occurredAt: new Date() } });
     await completeContractFollowUpTasks(dealId);
 
-    revalidatePath(`/deals/${dealId}`);
+    revalidatePath(`/arpo/deals/${dealId}`);
     return { ok: true };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Der opstod en fejl ved sletning af kontrakten." };

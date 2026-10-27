@@ -14,7 +14,7 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     "/*": ["./public/logo.png", "./node_modules/@sparticuz/chromium/bin/**/*"],
     // The tour editor's Claude reads the tour setup's documented types (see tour-ai.ts).
-    "/tour-lab/**": ["./src/app/*/tour-lab/tours/types.ts", "./src/app/*/tour-lab/tours/PLAYBOOK.md"],
+    "/arpo/tour-lab/**": ["./src/app/arpo/tour-lab/tours/types.ts", "./src/app/arpo/tour-lab/tours/PLAYBOOK.md"],
   },
   // Basic hardening on every response: no framing of Arpo by other sites
   // (clickjacking), no MIME sniffing, no full URLs leaked to other sites,
@@ -49,19 +49,21 @@ const nextConfig: NextConfig = {
         source: "/t/:slug",
         headers: [{ key: "Content-Security-Policy", value: "frame-ancestors *" }],
       },
-      // The website (public/site) may be found on Google - Arpo itself never.
+      // The website's pages (public/site, public/web) may be found on Google - login, Arpo (/arpo) and the customers' pages (/kunde) on the same address never.
       ...(SITE_HOST
-        ? [SITE_HOST, `www.${SITE_HOST}`].map((host) => ({
-            source: "/:path*",
-            has: [{ type: "host" as const, value: host }],
-            headers: [{ key: "X-Robots-Tag", value: "index, follow" }],
-          }))
+        ? [SITE_HOST, `www.${SITE_HOST}`].flatMap((host) =>
+            ["/", "/site/:path*", "/web/:path*", "/:page([a-z0-9-]+\\.html)"].map((source) => ({
+              source,
+              has: [{ type: "host" as const, value: host }],
+              headers: [{ key: "X-Robots-Tag", value: "index, follow" }],
+            }))
+          )
         : []),
       // The same tours on the short tour address (lib/public-urls.ts).
       ...(TOUR_HOST ? [{ source: "/:slug", has: [{ type: "host" as const, value: TOUR_HOST }], headers: [{ key: "Content-Security-Policy", value: "frame-ancestors *" }] }] : []),
       {
         // The tour editor previews the tour in an iframe on its own page.
-        source: "/tour-lab/:slug",
+        source: "/arpo/tour-lab/:slug",
         headers: [{ key: "X-Frame-Options", value: "SAMEORIGIN" }],
       },
     ];

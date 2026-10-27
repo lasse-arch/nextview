@@ -87,16 +87,16 @@ export async function createDealManual(formData: FormData) {
     dealId: deal.id,
   });
 
-  revalidatePath("/deals");
-  redirect(duplicates.length > 0 ? `/deals/${deal.id}?dup=1` : `/deals/${deal.id}`);
+  revalidatePath("/arpo/deals");
+  redirect(duplicates.length > 0 ? `/arpo/deals/${deal.id}?dup=1` : `/arpo/deals/${deal.id}`);
 }
 
 export async function duplicateDeal(dealId: string) {
   await requireUser();
   const deal = await createDuplicateDealRecord(dealId);
 
-  revalidatePath("/deals");
-  redirect(`/deals/${deal.id}`);
+  revalidatePath("/arpo/deals");
+  redirect(`/arpo/deals/${deal.id}`);
 }
 
 export type UpdateDealResult =
@@ -338,9 +338,9 @@ async function updateDealInner(
     await sendContractSignedNotification(dealId);
   }
 
-  revalidatePath("/deals");
-  revalidatePath("/commission");
-  revalidatePath(`/deals/${dealId}`);
+  revalidatePath("/arpo/deals");
+  revalidatePath("/arpo/commission");
+  revalidatePath(`/arpo/deals/${dealId}`);
 
   return {
     ok: true,
@@ -423,9 +423,9 @@ export async function updateDealStage(dealId: string, newStage: DealStage) {
   await releaseEstablishmentOnLive(dealId, existing.stage, newStage, user.id);
   await sendWelcomeMailOnLive(dealId, existing.stage, newStage, user.id);
 
-  revalidatePath("/deals");
-  revalidatePath(`/deals/${dealId}`);
-  revalidatePath("/commission");
+  revalidatePath("/arpo/deals");
+  revalidatePath(`/arpo/deals/${dealId}`);
+  revalidatePath("/arpo/commission");
 }
 
 /**
@@ -460,8 +460,8 @@ export async function setMeetingDateAndStage(dealId: string, meetingDateIso: str
     });
   }
 
-  revalidatePath("/deals");
-  revalidatePath(`/deals/${dealId}`);
+  revalidatePath("/arpo/deals");
+  revalidatePath(`/arpo/deals/${dealId}`);
 }
 
 /** "Send kalender invitation" button on the deal page - calendar invites are
@@ -520,7 +520,7 @@ export async function sendCalendarInvite(
     durationMinutes,
     fromCurrentUser ? user.id : undefined
   );
-  revalidatePath(`/deals/${dealId}`);
+  revalidatePath(`/arpo/deals/${dealId}`);
   return result;
 }
 
@@ -532,7 +532,7 @@ export async function markDealLost(dealId: string, reason: string) {
   if (!trimmed) throw new Error("Skriv en årsag til, at dealen er tabt.");
   await updateDealStage(dealId, "LOST");
   await prisma.note.create({ data: { dealId, authorId: user.id, body: `Tabt: ${trimmed}`, kind: "MANUAL" } });
-  revalidatePath(`/deals/${dealId}`);
+  revalidatePath(`/arpo/deals/${dealId}`);
 }
 
 /**
@@ -544,8 +544,8 @@ export async function setCommissionExcluded(dealId: string, excluded: boolean) {
   await requireUser();
   await prisma.deal.update({ where: { id: dealId }, data: { commissionExcluded: excluded } });
   await recalcCommission(dealId);
-  revalidatePath(`/deals/${dealId}`);
-  revalidatePath("/commission");
+  revalidatePath(`/arpo/deals/${dealId}`);
+  revalidatePath("/arpo/commission");
 }
 
 /**
@@ -561,8 +561,8 @@ export async function deleteDeal(dealId: string): Promise<{ error: string } | vo
   }
   if (hasSigned(deal)) return { error: SIGNED_NO_DELETE };
   await deleteDealArchived(dealId, user.name);
-  revalidatePath("/deals");
-  redirect("/deals");
+  revalidatePath("/arpo/deals");
+  redirect("/arpo/deals");
 }
 
 /** Resolves a detected import duplicate by keeping one deal and deleting the other. */
@@ -572,7 +572,7 @@ export async function resolveDuplicate(keepId: string, deleteId: string): Promis
   if (user.role !== "ADMIN" && deal.ownerId !== user.id) return { error: "Du kan kun slette dine egne deals." };
   if (hasSigned(deal)) return { error: SIGNED_NO_DELETE };
   await deleteDealArchived(deleteId, user.name);
-  revalidatePath("/deals");
+  revalidatePath("/arpo/deals");
   return { keptId: keepId };
 }
 
@@ -597,8 +597,8 @@ export async function linkDealToParent(
   }
 
   await prisma.deal.update({ where: { id: dealId }, data: { parentDealId } });
-  revalidatePath(`/deals/${dealId}`);
-  revalidatePath(`/deals/${parentDealId}`);
+  revalidatePath(`/arpo/deals/${dealId}`);
+  revalidatePath(`/arpo/deals/${parentDealId}`);
   return { ok: true };
 }
 
@@ -629,8 +629,8 @@ export async function linkBranchesToDeal(
   }
 
   await prisma.deal.updateMany({ where: { id: { in: branchDealIds } }, data: { parentDealId } });
-  revalidatePath(`/deals/${parentDealId}`);
-  for (const id of branchDealIds) revalidatePath(`/deals/${id}`);
+  revalidatePath(`/arpo/deals/${parentDealId}`);
+  for (const id of branchDealIds) revalidatePath(`/arpo/deals/${id}`);
   return { ok: true };
 }
 
@@ -638,8 +638,8 @@ export async function unlinkDealFromParent(dealId: string) {
   await requireUser();
   const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId } });
   await prisma.deal.update({ where: { id: dealId }, data: { parentDealId: null } });
-  revalidatePath(`/deals/${dealId}`);
-  if (deal.parentDealId) revalidatePath(`/deals/${deal.parentDealId}`);
+  revalidatePath(`/arpo/deals/${dealId}`);
+  if (deal.parentDealId) revalidatePath(`/arpo/deals/${deal.parentDealId}`);
 }
 
 /**
@@ -654,7 +654,7 @@ export async function unlinkDealFromParent(dealId: string) {
 export async function setCombinedInvoicing(dealId: string, enabled: boolean): Promise<void> {
   await requireUser();
   await prisma.deal.update({ where: { id: dealId }, data: { combinedInvoicing: enabled } });
-  revalidatePath(`/deals/${dealId}`);
+  revalidatePath(`/arpo/deals/${dealId}`);
 }
 
 export async function addNote(
@@ -685,7 +685,7 @@ export async function addNote(
     data: { dealId, authorId: user.id, body, kind },
   });
 
-  revalidatePath(`/deals/${dealId}`);
+  revalidatePath(`/arpo/deals/${dealId}`);
   return { ok: true };
 }
 
@@ -699,7 +699,7 @@ export async function deleteNote(noteId: string): Promise<{ ok: true } | { ok: f
   }
 
   await prisma.note.delete({ where: { id: noteId } });
-  revalidatePath(`/deals/${note.dealId}`);
+  revalidatePath(`/arpo/deals/${note.dealId}`);
   return { ok: true };
 }
 
@@ -712,9 +712,9 @@ export async function renameDeal(dealId: string, name: string) {
   if (!trimmed) throw new Error("Navnet må ikke være tomt.");
 
   await prisma.deal.update({ where: { id: dealId }, data: { displayName: trimmed } });
-  revalidatePath("/deals");
-  revalidatePath("/ringeliste");
-  revalidatePath(`/deals/${dealId}`);
+  revalidatePath("/arpo/deals");
+  revalidatePath("/arpo/ringeliste");
+  revalidatePath(`/arpo/deals/${dealId}`);
 }
 
 /** Quick inline phone-number add/edit from the Ringeliste queue, where a
@@ -725,9 +725,9 @@ export async function updateDealPhone(dealId: string, phone: string) {
   if (!trimmed) throw new Error("Telefonnummeret må ikke være tomt.");
 
   await prisma.deal.update({ where: { id: dealId }, data: { contactPhone: trimmed } });
-  revalidatePath("/deals");
-  revalidatePath("/ringeliste");
-  revalidatePath(`/deals/${dealId}`);
+  revalidatePath("/arpo/deals");
+  revalidatePath("/arpo/ringeliste");
+  revalidatePath(`/arpo/deals/${dealId}`);
 }
 
 /** Quick inline website-link add/edit from the Ringeliste queue - a pasted
@@ -745,9 +745,9 @@ export async function updateDealWebsite(dealId: string, url: string) {
   }
 
   await prisma.deal.update({ where: { id: dealId }, data: { websiteUrl: withScheme } });
-  revalidatePath("/deals");
-  revalidatePath("/ringeliste");
-  revalidatePath(`/deals/${dealId}`);
+  revalidatePath("/arpo/deals");
+  revalidatePath("/arpo/ringeliste");
+  revalidatePath(`/arpo/deals/${dealId}`);
 }
 
 /** Used by the board view's Quick-note popup - adds a note without navigating away. */
@@ -760,14 +760,14 @@ export async function addQuickNote(dealId: string, body: string) {
     data: { dealId, authorId: user.id, body: trimmed, kind: "MANUAL" },
   });
 
-  revalidatePath(`/deals/${dealId}`);
+  revalidatePath(`/arpo/deals/${dealId}`);
 }
 
 export async function markDealInactive(dealId: string) {
   await requireUser();
   await prisma.deal.update({ where: { id: dealId }, data: { churnedAt: new Date() } });
-  revalidatePath(`/deals/${dealId}`);
-  revalidatePath("/deals");
+  revalidatePath(`/arpo/deals/${dealId}`);
+  revalidatePath("/arpo/deals");
 }
 
 export async function reactivateDeal(dealId: string) {
@@ -778,8 +778,8 @@ export async function reactivateDeal(dealId: string) {
     where: { id: dealId },
     data: { churnedAt: null, terminationNoticeAt: null, contractEndDate: null },
   });
-  revalidatePath(`/deals/${dealId}`);
-  revalidatePath("/deals");
+  revalidatePath(`/arpo/deals/${dealId}`);
+  revalidatePath("/arpo/deals");
 }
 
 /**
@@ -842,8 +842,8 @@ export async function terminateContract(
     data: { terminationNoticeAt: noticeDate, noticePeriodMonths, contractEndDate, contractEndDateManual: false },
   });
 
-  revalidatePath(`/deals/${dealId}`);
-  revalidatePath("/deals");
+  revalidatePath(`/arpo/deals/${dealId}`);
+  revalidatePath("/arpo/deals");
   return { ok: true };
 }
 
@@ -855,8 +855,8 @@ export async function withdrawTermination(dealId: string) {
     where: { id: dealId },
     data: { terminationNoticeAt: null, contractEndDate: null, contractEndDateManual: false },
   });
-  revalidatePath(`/deals/${dealId}`);
-  revalidatePath("/deals");
+  revalidatePath(`/arpo/deals/${dealId}`);
+  revalidatePath("/arpo/deals");
 }
 
 /**
@@ -883,8 +883,8 @@ export async function setManualContractEndDate(
     data: { contractEndDate, contractEndDateManual: true },
   });
 
-  revalidatePath(`/deals/${dealId}`);
-  revalidatePath("/deals");
+  revalidatePath(`/arpo/deals/${dealId}`);
+  revalidatePath("/arpo/deals");
   return { ok: true };
 }
 
@@ -895,8 +895,8 @@ export async function markCommissionPaid(commissionId: string) {
     where: { id: commissionId },
     data: { status: "PAID", paidAt: new Date() },
   });
-  revalidatePath("/commission");
-  revalidatePath(`/deals/${commission.dealId}`);
+  revalidatePath("/arpo/commission");
+  revalidatePath(`/arpo/deals/${commission.dealId}`);
 }
 
 /** Lets admin manually correct any field on a commission - rate, amounts, payout, due date and status/paid date. */
@@ -941,8 +941,8 @@ export async function updateCommission(commissionId: string, formData: FormData)
     },
   });
 
-  revalidatePath("/commission");
-  revalidatePath(`/deals/${commission.dealId}`);
+  revalidatePath("/arpo/commission");
+  revalidatePath(`/arpo/deals/${commission.dealId}`);
 }
 
 /** The time actually spent filming (incl. setting up), in hours - needed before the deal can go Live. */
@@ -951,6 +951,6 @@ export async function setFilmingActual(dealId: string, hours: number): Promise<{
   if (!Number.isFinite(hours) || hours < 0 || hours > 100) return { ok: false, error: "Skriv antal timer, fx 2,5." };
   await prisma.deal.update({ where: { id: dealId }, data: { filmingActualMinutes: Math.round(hours * 60) } });
   await logActivity({ type: "DEAL_FILMING_TIME", message: `Filmtid sat til ${String(hours).replace(".", ",")} t`, actorId: user.id, dealId });
-  revalidatePath(`/deals/${dealId}`);
+  revalidatePath(`/arpo/deals/${dealId}`);
   return { ok: true };
 }

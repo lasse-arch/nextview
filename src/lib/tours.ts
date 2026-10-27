@@ -1,12 +1,12 @@
 import "server-only";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { TOURS } from "@/app/(app)/tour-lab/tours";
-import type { TourConfig } from "@/app/(app)/tour-lab/tours/types";
+import { TOURS } from "@/app/arpo/tour-lab/tours";
+import type { TourConfig } from "@/app/arpo/tour-lab/tours/types";
 
 /*
  * Tours live in the database (Tour + TourVersion). The setups written while
- * prototyping (src/app/(app)/tour-lab/tours) are only starting points: the
+ * prototyping (src/app/arpo/tour-lab/tours) are only starting points: the
  * first time the tour-lab is opened, any of them not yet in the database is
  * added - linked to its customer when exactly one deal matches its name - and
  * one nobody has edited in Arpo yet is kept in step with its file.

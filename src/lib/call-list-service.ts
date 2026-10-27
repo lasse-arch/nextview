@@ -26,7 +26,7 @@ export async function findOrCreateTodayCallList(createdById: string): Promise<{ 
   const existing = await prisma.callList.findFirst({ where: { name, createdById } });
   if (existing) return existing;
   const list = await prisma.callList.create({ data: { name, createdById } });
-  revalidatePath("/ringeliste");
+  revalidatePath("/arpo/ringeliste");
   return list;
 }
 

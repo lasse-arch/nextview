@@ -29,7 +29,7 @@ export async function holdEstablishmentForApproval(dealId: string): Promise<{ ok
       kind: "MANUAL",
     },
   });
-  revalidatePath(`/deals/${dealId}`);
+  revalidatePath(`/arpo/deals/${dealId}`);
   return { ok: true };
 }
 
@@ -40,6 +40,6 @@ export async function releaseEstablishmentHold(dealId: string): Promise<{ ok: tr
   await prisma.note.create({
     data: { dealId, authorId: user.id, body: "Etableringen faktureres alligevel som normalt (efter underskrift).", kind: "MANUAL" },
   });
-  revalidatePath(`/deals/${dealId}`);
+  revalidatePath(`/arpo/deals/${dealId}`);
   return { ok: true };
 }

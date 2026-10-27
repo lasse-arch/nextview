@@ -28,17 +28,17 @@ export async function addDealItem(
   // add one here too instead of leaving the delivery untracked.
   if (productType.toLowerCase() === "visitkort") {
     await prisma.task.create({ data: { title: "Aflever Visitkort", createdById: user.id, dealId } });
-    revalidatePath("/opgaver");
+    revalidatePath("/arpo/opgaver");
   }
 
-  revalidatePath(`/deals/${dealId}`);
+  revalidatePath(`/arpo/deals/${dealId}`);
   return { ok: true };
 }
 
 export async function removeDealItem(dealId: string, itemId: string) {
   await requireUser();
   await prisma.dealItem.delete({ where: { id: itemId } });
-  revalidatePath(`/deals/${dealId}`);
+  revalidatePath(`/arpo/deals/${dealId}`);
 }
 
 /** Anyone can add a missing link; changing or removing one that's set is admin only. */
@@ -49,7 +49,7 @@ export async function updateDealItemUrl(dealId: string, itemId: string, url: str
   if (next && !/^https?:\/\//i.test(next)) throw new Error("Linket skal starte med https://");
   if (item.url && next !== item.url && user.role !== "ADMIN") throw new Error("Kun administratorer kan rette et link.");
   await prisma.dealItem.update({ where: { id: itemId }, data: { url: next } });
-  revalidatePath(`/deals/${dealId}`);
+  revalidatePath(`/arpo/deals/${dealId}`);
 }
 
 const MAX_IMAGE_DATA_URL_LENGTH = 3_500_000; // ~2.6MB of actual image data once base64-decoded
@@ -63,8 +63,8 @@ export async function updateDealItemImageAction(
 
   if (!dataUrl) {
     await prisma.dealItem.update({ where: { id: itemId }, data: { imageUrl: null } });
-    revalidatePath(`/deals/${dealId}`);
-    revalidatePath("/kunder-live");
+    revalidatePath(`/arpo/deals/${dealId}`);
+    revalidatePath("/arpo/kunder-live");
     return { ok: true };
   }
 
@@ -76,7 +76,7 @@ export async function updateDealItemImageAction(
   }
 
   await prisma.dealItem.update({ where: { id: itemId }, data: { imageUrl: dataUrl } });
-  revalidatePath(`/deals/${dealId}`);
-  revalidatePath("/kunder-live");
+  revalidatePath(`/arpo/deals/${dealId}`);
+  revalidatePath("/arpo/kunder-live");
   return { ok: true };
 }

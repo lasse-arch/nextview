@@ -121,7 +121,7 @@ export async function importLeadCsv(
     skipDuplicates: true,
   });
 
-  revalidatePath("/leadgeneration");
+  revalidatePath("/arpo/leadgeneration");
   return { ok: true, imported: fresh.length, alreadyKnown, skipped };
 }
 
@@ -133,6 +133,6 @@ export async function renameLeadImportList(
   const trimmed = name.trim();
   if (!trimmed) return { ok: false, error: "Giv listen et navn." };
   await prisma.leadImportList.update({ where: { id: listId }, data: { name: trimmed } });
-  revalidatePath("/leadgeneration");
+  revalidatePath("/arpo/leadgeneration");
   return { ok: true };
 }

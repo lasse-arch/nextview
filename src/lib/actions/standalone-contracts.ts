@@ -127,7 +127,7 @@ export async function sendStandaloneContract(
       },
     });
 
-    revalidatePath("/settings/docuseal/standalone-contracts");
+    revalidatePath("/arpo/settings/docuseal/standalone-contracts");
     return { ok: true, id: created.id };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Der opstod en fejl ved afsendelse af kontrakten." };
@@ -138,7 +138,7 @@ export async function deleteStandaloneContract(id: string): Promise<{ ok: true }
   try {
     await requireUser();
     await prisma.standaloneContract.delete({ where: { id } });
-    revalidatePath("/settings/docuseal/standalone-contracts");
+    revalidatePath("/arpo/settings/docuseal/standalone-contracts");
     return { ok: true };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Kunne ikke slette kontrakten." };
@@ -221,9 +221,9 @@ export async function linkStandaloneContractToDeal(
 
     await prisma.standaloneContract.delete({ where: { id: contractId } });
 
-    revalidatePath("/settings/docuseal/standalone-contracts");
-    revalidatePath(`/deals/${dealId}`);
-    revalidatePath("/deals");
+    revalidatePath("/arpo/settings/docuseal/standalone-contracts");
+    revalidatePath(`/arpo/deals/${dealId}`);
+    revalidatePath("/arpo/deals");
     return { ok: true };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Kunne ikke kæde kontrakten sammen med dealen." };

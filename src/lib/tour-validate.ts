@@ -1,4 +1,4 @@
-import type { TourConfig } from "@/app/(app)/tour-lab/tours/types";
+import type { TourConfig } from "@/app/arpo/tour-lab/tours/types";
 
 /*
  * Is a tour setup whole - every part the editor and the tour read has the

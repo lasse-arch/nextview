@@ -153,11 +153,11 @@ export async function importExistingCustomers(formData: FormData) {
     created++;
   }
 
-  revalidatePath("/deals");
-  revalidatePath("/commission");
+  revalidatePath("/arpo/deals");
+  revalidatePath("/arpo/commission");
 
   const params = new URLSearchParams({ importBatchId: batch.id });
   if (duplicateNames.length > 0) params.set("duplicates", duplicateNames.join(","));
   if (skippedRows.length > 0) params.set("skipped", skippedRows.join(","));
-  redirect(`/deals?${params.toString()}`);
+  redirect(`/arpo/deals?${params.toString()}`);
 }

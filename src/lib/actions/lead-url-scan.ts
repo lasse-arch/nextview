@@ -50,7 +50,7 @@ export async function scanUrlNowAction(
     });
   }
 
-  revalidatePath("/leadgeneration");
+  revalidatePath("/arpo/leadgeneration");
   return {
     ok: true,
     added: fresh.length,
@@ -75,7 +75,7 @@ export async function createWatchedUrl(
   }
 
   const watched = await prisma.watchedUrl.create({ data: { url, label, createdById: user.id } });
-  revalidatePath("/leadgeneration");
+  revalidatePath("/arpo/leadgeneration");
   return { ok: true, id: watched.id };
 }
 
@@ -90,20 +90,20 @@ export async function renameWatchedUrl(
   await requireUser();
   const result = await prisma.watchedUrl.updateMany({ where: { url }, data: { label: label.trim() || null } });
   if (result.count === 0) return { ok: false, error: "Siden overvåges ikke længere og kan ikke omdøbes." };
-  revalidatePath("/leadgeneration");
+  revalidatePath("/arpo/leadgeneration");
   return { ok: true };
 }
 
 export async function setWatchedUrlEnabled(id: string, enabled: boolean): Promise<void> {
   await requireUser();
   await prisma.watchedUrl.update({ where: { id }, data: { enabled } });
-  revalidatePath("/leadgeneration");
+  revalidatePath("/arpo/leadgeneration");
 }
 
 export async function deleteWatchedUrl(id: string): Promise<void> {
   await requireUser();
   await prisma.watchedUrl.delete({ where: { id } });
-  revalidatePath("/leadgeneration");
+  revalidatePath("/arpo/leadgeneration");
 }
 
 export async function runWatchedUrlNowAction(
@@ -111,6 +111,6 @@ export async function runWatchedUrlNowAction(
 ): Promise<{ ok: true; added: number; unchanged: boolean } | { ok: false; error: string }> {
   await requireUser();
   const result = await runWatchedUrl(id);
-  revalidatePath("/leadgeneration");
+  revalidatePath("/arpo/leadgeneration");
   return result;
 }

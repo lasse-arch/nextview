@@ -10,8 +10,8 @@ import { prisma } from "@/lib/db";
 import { getSettingValue } from "@/lib/integration-settings";
 import { siteResearch } from "@/lib/site-digest";
 import { claudeCostUsd } from "@/lib/claude-cost";
-import { plainWords } from "@/app/(app)/tour-lab/tours/i18n";
-import type { PlaceCard, TourConfig } from "@/app/(app)/tour-lab/tours/types";
+import { plainWords } from "@/app/arpo/tour-lab/tours/i18n";
+import type { PlaceCard, TourConfig } from "@/app/arpo/tour-lab/tours/types";
 
 /*
  * Stedkort written by nextviewAI: for the place the preview stands in (with a
@@ -53,7 +53,7 @@ export async function writePlaceCards(slug: string, config: TourConfig, places: 
 
   const site = await websiteOf(slug, config);
   const research = site ? await siteResearch(site).catch(() => null) : null;
-  const playbook = await readFile(path.join(process.cwd(), "src/app/(app)/tour-lab/tours/PLAYBOOK.md"), "utf8").catch(() => "");
+  const playbook = await readFile(path.join(process.cwd(), "src/app/arpo/tour-lab/tours/PLAYBOOK.md"), "utf8").catch(() => "");
   const memory = await prisma.tourAiMemory.findMany({ where: { scope: { in: ["all", slug] } }, orderBy: { createdAt: "asc" }, take: 200, select: { text: true } });
   const primary = config.cta.find((c) => c.primary) ?? config.cta[0];
 

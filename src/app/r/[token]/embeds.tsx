@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { DEFAULT_EMBED, embedCode, type EmbedSize } from "@/app/(app)/tour-lab/[slug]/rediger/share";
+import { DEFAULT_EMBED, embedCode, type EmbedSize } from "@/app/arpo/tour-lab/[slug]/rediger/share";
 
 /*
  * The customer portal's "Touren på jeres hjemmeside": a code for the whole

@@ -1,6 +1,6 @@
 ---
 name: tour-lab
-description: How Nextview360's own tour engine in Arpo (tour-lab) is built and how to extend it - the engine, the tour setups, the editor, Claude in the editor and the tour drejebog. Use whenever working on anything under src/app/(app)/tour-lab, src/lib/tours.ts, src/lib/actions/tours.ts or tour-ai.ts, or when the user asks for a new tour feature, a new customer tour, menus, welcome/cover, place cards, "Vis mig rundt", Find vej, the room picker or the tour editor.
+description: How Nextview360's own tour engine in Arpo (tour-lab) is built and how to extend it - the engine, the tour setups, the editor, Claude in the editor and the tour drejebog. Use whenever working on anything under src/app/arpo/tour-lab, src/lib/tours.ts, src/lib/actions/tours.ts or tour-ai.ts, or when the user asks for a new tour feature, a new customer tour, menus, welcome/cover, place cards, "Vis mig rundt", Find vej, the room picker or the tour editor.
 ---
 
 # Tour-lab: Nextview360's tour engine in Arpo
@@ -10,11 +10,11 @@ One engine, one JSON setup per tour, kept in the database and edited in Arpo.
 
 ## Read first
 
-- `src/app/(app)/tour-lab/tours/PLAYBOOK.md` - **how we make a good tour**
+- `src/app/arpo/tour-lab/tours/PLAYBOOK.md` - **how we make a good tour**
   (mobile first, never confusing, converts, red thread from the customer's
   website, branch templates). Claude in the Arpo editor reads this file too:
   when the user teaches you something about good tours, write it there.
-- `src/app/(app)/tour-lab/tours/types.ts` - `TourConfig`, every field with a doc
+- `src/app/arpo/tour-lab/tours/types.ts` - `TourConfig`, every field with a doc
   comment. Claude in the editor reads these comments to know what a field does,
   so every new field needs a clear one (Danish UI, English comments).
 
@@ -72,7 +72,7 @@ One engine, one JSON setup per tour, kept in the database and edited in Arpo.
 ## Checking your work
 
 - `npx tsc --noEmit -p .` (lines from `.next/` are transient) and
-  `npx eslint "src/app/(app)/tour-lab"`. Don't run prettier.
+  `npx eslint "src/app/arpo/tour-lab"`. Don't run prettier.
 - Run the app (Postgres: `service postgresql start`; dev server on port 3100;
   login admin@nextview360.dk / admin123) and screenshot `/tour-lab` and
   `/tour-lab/<slug>/rediger` with Playwright.

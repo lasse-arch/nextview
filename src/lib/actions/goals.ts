@@ -42,7 +42,7 @@ export async function upsertGoal(targetUserId: string | null, metric: GoalMetric
     });
   }
 
-  revalidatePath("/");
+  revalidatePath("/arpo");
 }
 
 /**
@@ -56,7 +56,7 @@ export async function reorderGoals(goalIds: string[]) {
   await prisma.$transaction(
     goalIds.map((id, index) => prisma.goal.update({ where: { id }, data: { sortOrder: index + 1 } }))
   );
-  revalidatePath("/");
+  revalidatePath("/arpo");
 }
 
 export async function deleteGoal(goalId: string) {
@@ -66,5 +66,5 @@ export async function deleteGoal(goalId: string) {
     throw new Error("Du kan kun slette dit eget mål.");
   }
   await prisma.goal.delete({ where: { id: goalId } });
-  revalidatePath("/");
+  revalidatePath("/arpo");
 }

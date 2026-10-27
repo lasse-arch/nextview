@@ -14,7 +14,7 @@ import { siteResearch } from "@/lib/site-digest";
 import { pageAsText, readUnits, type LiveUnit } from "@/lib/availability/live";
 import { hostFiles } from "@/lib/tour-files";
 import { claudeCostUsd } from "@/lib/claude-cost";
-import { BRANCHES, DESIGN_PRESETS, type Branch, type DesignPreset } from "@/app/(app)/tour-lab/tours/presets";
+import { BRANCHES, DESIGN_PRESETS, type Branch, type DesignPreset } from "@/app/arpo/tour-lab/tours/presets";
 
 /** The prototype tour each ready-made design starts from (for its kind of features). */
 const PRESET_BASE: Record<DesignPreset["id"], string> = {
@@ -27,8 +27,8 @@ const PRESET_BASE: Record<DesignPreset["id"], string> = {
 };
 import { tourConfigProblem } from "@/lib/tour-validate";
 import { fetchModelInfo, modelIdsIn, searchAccountModels, type ModelInfo } from "@/lib/matterport-graph";
-import type { TourConfig } from "@/app/(app)/tour-lab/tours/types";
-import { plainWordsInConfig } from "@/app/(app)/tour-lab/tours/i18n";
+import type { TourConfig } from "@/app/arpo/tour-lab/tours/types";
+import { plainWordsInConfig } from "@/app/arpo/tour-lab/tours/i18n";
 
 /*
  * "Claude" in the tour editor: describe a change in plain Danish, Claude
@@ -116,7 +116,7 @@ function apply(root: Record<string, unknown>, op: "set" | "delete", pathText: st
 const docs: Record<string, Promise<string>> = {};
 /** A file next to the tour setups: types.ts (what every field does) or PLAYBOOK.md (how we make a good tour). */
 function tourDoc(file: "types.ts" | "PLAYBOOK.md") {
-  docs[file] ??= readFile(path.join(process.cwd(), "src/app/(app)/tour-lab/tours", file), "utf8").catch(() => "");
+  docs[file] ??= readFile(path.join(process.cwd(), "src/app/arpo/tour-lab/tours", file), "utf8").catch(() => "");
   return docs[file];
 }
 
@@ -410,7 +410,7 @@ Steder i touren skrives som https://my.matterport.com/show/?m=${model.id}&ss=<sc
   await prisma.tour.create({
     data: { slug, name, dealId: input.dealId || null, config, versions: { create: { config, note: `Bygget af nextviewAI${input.website.trim() ? ` ud fra ${input.website.trim()}` : ""}`, createdByName: user.name } } },
   });
-  revalidatePath("/tour-lab");
+  revalidatePath("/arpo/tour-lab");
   const failed = hosted.failed.length ? `\n\nDisse filer kunne ikke hentes til os: ${hosted.failed.join("; ")}` : "";
   return { ok: true, slug, reply: result.reply + failed };
 }

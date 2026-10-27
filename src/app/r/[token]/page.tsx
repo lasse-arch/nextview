@@ -5,9 +5,9 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { tourStats } from "@/lib/tour-stats";
 import { shareOf } from "@/lib/tour-share";
-import { CustomerReport } from "@/app/(app)/tour-lab/[slug]/rediger/customer-report";
-import type { TourConfig } from "@/app/(app)/tour-lab/tours/types";
-import { startPlaces } from "@/app/(app)/tour-lab/tours/places";
+import { CustomerReport } from "@/app/arpo/tour-lab/[slug]/rediger/customer-report";
+import type { TourConfig } from "@/app/arpo/tour-lab/tours/types";
+import { startPlaces } from "@/app/arpo/tour-lab/tours/places";
 import { PortalEmbeds } from "./embeds";
 
 /*

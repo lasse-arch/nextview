@@ -1,6 +1,6 @@
 import "server-only";
 import { cached, publicUrl } from "@/lib/site-digest";
-import { placeSlug, type StartPlace } from "@/app/(app)/tour-lab/tours/places";
+import { placeSlug, type StartPlace } from "@/app/arpo/tour-lab/tours/places";
 
 /*
  * Which page on the customer's website each place in the tour belongs on -

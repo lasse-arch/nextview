@@ -33,6 +33,6 @@ export async function POST(request: NextRequest) {
     after(() => kickCustomerReportQueue());
   }
 
-  revalidatePath("/stats");
+  revalidatePath("/arpo/stats");
   return NextResponse.json(result);
 }

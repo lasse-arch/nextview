@@ -146,7 +146,7 @@ function buildImportRedirectUrl(batchId: string, duplicateNames: string[]): stri
   if (duplicateNames.length > 0) {
     params.set("duplicates", duplicateNames.join(","));
   }
-  return `/deals?${params.toString()}`;
+  return `/arpo/deals?${params.toString()}`;
 }
 
 export async function importFromCsvFile(formData: FormData) {
@@ -163,7 +163,7 @@ export async function importFromCsvFile(formData: FormData) {
 
   const { batchId, duplicateNames } = await createDealsFromRows(rows, "CSV", { fileName: file.name }, user.id);
 
-  revalidatePath("/deals");
+  revalidatePath("/arpo/deals");
   redirect(buildImportRedirectUrl(batchId, duplicateNames));
 }
 
@@ -196,7 +196,7 @@ export async function importFromGoogleDocs(formData: FormData) {
     user.id
   );
 
-  revalidatePath("/deals");
+  revalidatePath("/arpo/deals");
   redirect(buildImportRedirectUrl(batchId, duplicateNames));
 }
 
@@ -208,5 +208,5 @@ export async function deleteEmptyImportBatch(batchId: string) {
     throw new Error("Denne import har importeret deals og kan ikke slettes herfra.");
   }
   await prisma.importBatch.delete({ where: { id: batchId } });
-  revalidatePath("/deals");
+  revalidatePath("/arpo/deals");
 }

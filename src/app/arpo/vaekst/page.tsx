@@ -1,0 +1,212 @@
+import { redirect } from "next/navigation";
+import Link from "next/link";
+import { getCurrentUser } from "@/lib/auth";
+import { getGrowthDashboardData } from "@/lib/growth-dashboard-data";
+import { formatDKK, formatDate, stageLabels } from "@/lib/labels";
+import { NewCustomersChart } from "./new-customers-chart";
+import { CustomerStatTile } from "./customer-stat-tile";
+
+function StatTile({ label, value, sub, money }: { label: string; value: string; sub?: string; money?: boolean }) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</div>
+      <div className={`mt-1 text-xl font-semibold text-slate-900 ${money ? "money" : ""}`}>{value}</div>
+      {sub && <div className="mt-0.5 text-xs text-slate-400">{sub}</div>}
+    </div>
+  );
+}
+
+function Row({ label, value, strong, money }: { label: string; value: string; strong?: boolean; money?: boolean }) {
+  return (
+    <div className="flex justify-between py-1 text-sm">
+      <span className="text-slate-500">{label}</span>
+      <span className={`${strong ? "font-semibold text-slate-900" : "text-slate-800"} ${money ? "money" : ""}`}>
+        {value}
+      </span>
+    </div>
+  );
+}
+
+export default async function GrowthDashboardPage() {
+  const user = await getCurrentUser();
+  if (!user) redirect("/api/auth/session-ended");
+  if (user.role !== "ADMIN") redirect("/arpo");
+
+  const d = await getGrowthDashboardData();
+  const riskLabelFor = (days: number) => (days === 30 ? "< 30 dage" : days === 60 ? "< 60 dage" : "< 90 dage");
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-semibold text-slate-900">Vækst</h1>
+        <p className="mt-1 text-sm text-slate-500">Måned-for-måned overblik over MRR, fastholdelse og kontraktværdi</p>
+      </div>
+
+      <div>
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Kunder</h2>
+        <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <CustomerStatTile label="Aktive kunder" value={String(d.activeCount)} customers={d.activeCustomers} />
+          <CustomerStatTile label="Pipeline (afventer start)" value={String(d.pipelineCount)} customers={d.pipelineCustomers} />
+          <CustomerStatTile
+            label="Kunder i alt"
+            value={String(d.totalCount)}
+            sub="Aktive + pipeline + opsagt"
+            customers={d.allCustomers}
+          />
+          <CustomerStatTile label="Opsagt" value={String(d.expiredCount)} customers={d.expiredCustomers} />
+        </div>
+      </div>
+
+      <div>
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400">MRR</h2>
+        <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          <StatTile label="Aktiv MRR" value={formatDKK(d.activeMRR)} money />
+          <StatTile label="Inaktiv MRR (pipeline)" value={formatDKK(d.pipelineMRR)} money />
+          <StatTile label="MRR i alt (potentiel)" value={formatDKK(d.totalMRR)} money />
+          <StatTile label="ARR (aktiv × 12)" value={formatDKK(d.arr)} money />
+          <StatTile label="Kvartalsvis fakturering" value={formatDKK(d.quarterlyBilling)} money />
+          <StatTile label="Gns. MRR pr. aktiv kunde" value={formatDKK(d.avgMRRPerActive)} money />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <h2 className="text-sm font-semibold text-slate-900">Fastholdelse · MRR i risiko</h2>
+          <p className="mt-1 text-xs text-slate-500">Aktive kunder med en registreret opsigelse, der ophører snart.</p>
+          <div className="mt-3 divide-y divide-slate-100">
+            {d.risk.map((r) => (
+              <Row
+                key={r.days}
+                label={`Kunder der udløber ${riskLabelFor(r.days)}`}
+                value={`${r.count} stk`}
+              />
+            ))}
+            {d.risk.map((r) => (
+              <Row key={`mrr-${r.days}`} label={`MRR i risiko ${riskLabelFor(r.days)}`} value={formatDKK(r.mrr)} strong money />
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <h2 className="text-sm font-semibold text-slate-900">Kontraktværdi</h2>
+          <div className="mt-3 divide-y divide-slate-100">
+            <Row label="Aktiv kontraktværdi (fuld binding)" value={formatDKK(d.activeContractValue)} money />
+            <Row label="Realiseret til dato (aktive, mod fuld binding)" value={formatDKK(d.realizedToDate)} money />
+            <Row label="Resterende kontraktværdi (aktiv)" value={formatDKK(d.remainingContractValue)} money />
+            <Row label="Pipeline kontraktværdi (fuld binding)" value={formatDKK(d.pipelineContractValue)} money />
+            <Row label="Opstart i alt" value={formatDKK(d.establishmentTotal)} money />
+            <Row
+              label="Kontraktværdi i alt (alle solgte, inkl. genfornyede perioder)"
+              value={formatDKK(d.contractedContractTotal)}
+              money
+            />
+            <Row label="Samlet booket værdi" value={formatDKK(d.totalBookedValue)} strong money />
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Betaling</h2>
+        <div className="mt-2 grid grid-cols-1 gap-4 lg:grid-cols-4">
+          <CustomerStatTile
+            label="Udestående betaling"
+            value={formatDKK(d.paymentStatus.outstandingTotal)}
+            sub={`${d.paymentStatus.outstandingCount} faktura${d.paymentStatus.outstandingCount === 1 ? "" : "er"} ikke meldt betalt`}
+            customers={d.paymentStatus.outstanding}
+            noteHeader="Faktura"
+            money
+          />
+          <CustomerStatTile
+            label="Etablering vi mangler at modtage"
+            value={formatDKK(d.paymentStatus.missingEstablishmentTotal)}
+            sub={`${d.paymentStatus.missingEstablishmentCount} kunde${d.paymentStatus.missingEstablishmentCount === 1 ? "" : "r"} ikke faktureret/betalt endnu`}
+            customers={d.paymentStatus.missingEstablishment}
+            noteHeader="Status"
+            money
+          />
+
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-1">
+            <h3 className="text-sm font-semibold text-slate-900">Solgt, men ikke gået live</h3>
+            <p className="mt-1 text-xs text-slate-500">Fakturering starter først fra Live-datoen.</p>
+            <div className="mt-3 max-h-56 divide-y divide-slate-100 overflow-y-auto">
+              {d.paymentStatus.notLiveYet.map((deal) => (
+                <div key={deal.id} className="flex items-center justify-between gap-2 py-1.5 text-sm">
+                  <Link href={`/arpo/deals/${deal.id}`} className="truncate font-medium text-slate-900 hover:underline">
+                    {deal.name}
+                  </Link>
+                  <span className="shrink-0 text-xs text-slate-400">{stageLabels[deal.stage] ?? deal.stage}</span>
+                </div>
+              ))}
+              {d.paymentStatus.notLiveYet.length === 0 && (
+                <p className="py-2 text-sm text-slate-400">Ingen - alle solgte kunder er gået live.</p>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-1">
+            <h3 className="text-sm font-semibold text-slate-900">Live, men mangler faktura</h3>
+            <p className="mt-1 text-xs text-slate-500">Gået live, men har aldrig fået en etablerings- eller løbende faktura.</p>
+            <div className="mt-3 max-h-56 divide-y divide-slate-100 overflow-y-auto">
+              {d.paymentStatus.liveWithoutInvoice.map((deal) => (
+                <div key={deal.id} className="flex items-center justify-between gap-2 py-1.5 text-sm">
+                  <Link href={`/arpo/deals/${deal.id}`} className="truncate font-medium text-slate-900 hover:underline">
+                    {deal.name}
+                  </Link>
+                  <span className="shrink-0 text-xs text-slate-400">{deal.liveAt ? `Live ${formatDate(deal.liveAt)}` : "–"}</span>
+                </div>
+              ))}
+              {d.paymentStatus.liveWithoutInvoice.length === 0 && (
+                <p className="py-2 text-sm text-slate-400">Ingen - alle live kunder har mindst én faktura.</p>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Nøgletal</h2>
+        <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+          <StatTile label="Gns. bindingsperiode" value={`${d.avgBindingMonths.toFixed(1)} mdr`} />
+          <StatTile label="Gns. kontraktværdi" value={formatDKK(d.avgContractValue)} money />
+          <StatTile label="Gns. kundelevetidsværdi (LTV)" value={formatDKK(d.ltv)} money />
+          <StatTile label="Højeste månedspris" value={formatDKK(d.maxMonthlyPrice)} sub="Enkeltkunde" money />
+          <StatTile label="Kundekoncentration" value={`${d.concentration.toFixed(1)}%`} sub="Største ÷ aktiv MRR" />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <NewCustomersChart bySignedDate={d.monthlyNewBySignedDate} byLiveDate={d.monthlyNewByLiveDate} />
+
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <h2 className="text-sm font-semibold text-slate-900">Service mix</h2>
+          <p className="mt-1 text-xs text-slate-500">Ydelser på tværs af aktive/ikke-opsagte kunder (ekskl. gratis).</p>
+          <table className="mt-3 w-full text-sm">
+            <thead className="text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+              <tr>
+                <th className="py-1 font-medium">Service</th>
+                <th className="py-1 text-right font-medium">Antal</th>
+                <th className="py-1 text-right font-medium">Beløb i alt</th>
+              </tr>
+            </thead>
+            <tbody>
+              {d.serviceMix.map((s) => (
+                <tr key={s.productType} className="border-t border-slate-100">
+                  <td className="py-1.5 text-slate-800">{s.productType}</td>
+                  <td className="py-1.5 text-right text-slate-600">{s.count}</td>
+                  <td className="money py-1.5 text-right text-slate-600">{formatDKK(s.total)}</td>
+                </tr>
+              ))}
+              {d.serviceMix.length === 0 && (
+                <tr>
+                  <td colSpan={3} className="py-4 text-center text-slate-400">
+                    Ingen tilføjelser registreret endnu.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}

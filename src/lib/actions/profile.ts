@@ -26,7 +26,7 @@ export async function updateOwnAvatar(dataUrl: string, targetUserId?: string) {
 
   await prisma.user.update({ where: { id: target }, data: { avatarUrl: dataUrl } });
   revalidatePath("/", "layout");
-  revalidatePath("/users");
+  revalidatePath("/arpo/users");
 }
 
 export async function removeOwnAvatar(targetUserId?: string) {
@@ -36,7 +36,7 @@ export async function removeOwnAvatar(targetUserId?: string) {
 
   await prisma.user.update({ where: { id: target }, data: { avatarUrl: null } });
   revalidatePath("/", "layout");
-  revalidatePath("/users");
+  revalidatePath("/arpo/users");
 }
 
 export async function updateOwnContactInfo(formData: FormData) {
@@ -46,7 +46,7 @@ export async function updateOwnContactInfo(formData: FormData) {
   const lastName = String(formData.get("lastName") || "").trim() || null;
   if (!name) throw new Error("Fornavn kan ikke være tomt.");
   await prisma.user.update({ where: { id: user.id }, data: { name, phone, lastName } });
-  revalidatePath("/profile");
+  revalidatePath("/arpo/profile");
   revalidatePath("/", "layout");
-  revalidatePath("/users");
+  revalidatePath("/arpo/users");
 }

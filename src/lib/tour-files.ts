@@ -1,7 +1,7 @@
 import "server-only";
 import { put } from "@vercel/blob";
 import { prisma } from "@/lib/db";
-import type { TourConfig } from "@/app/(app)/tour-lab/tours/types";
+import type { TourConfig } from "@/app/arpo/tour-lab/tours/types";
 
 /*
  * A tour's files (logo, photos, svg, videos) kept by us, so a tour never

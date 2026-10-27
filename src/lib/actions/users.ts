@@ -34,8 +34,8 @@ export async function createUser(formData: FormData) {
     data: { name, email, passwordHash, role, isCommissionBased, canAccessBilling, commissionRate, payoutFrequency },
   });
 
-  revalidatePath("/users");
-  redirect("/users?saved=Bruger%20oprettet");
+  revalidatePath("/arpo/users");
+  redirect("/arpo/users?saved=Bruger%20oprettet");
 }
 
 export async function updateUser(userId: string, formData: FormData) {
@@ -69,8 +69,8 @@ export async function updateUser(userId: string, formData: FormData) {
     }
   }
 
-  revalidatePath("/users");
-  revalidatePath("/deals");
-  revalidatePath("/commission");
-  redirect("/users?saved=1");
+  revalidatePath("/arpo/users");
+  revalidatePath("/arpo/deals");
+  revalidatePath("/arpo/commission");
+  redirect("/arpo/users?saved=1");
 }

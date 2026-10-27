@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { Experience } from "@/app/(app)/tour-lab/[slug]/experience";
-import { loadTour } from "@/app/(app)/tour-lab/[slug]/load";
-import type { TourConfig } from "@/app/(app)/tour-lab/tours/types";
+import { Experience } from "@/app/arpo/tour-lab/[slug]/experience";
+import { loadTour } from "@/app/arpo/tour-lab/[slug]/load";
+import type { TourConfig } from "@/app/arpo/tour-lab/tours/types";
 
 /*
  * Kundegennemsyn: the tour as it is in Arpo right now (published or not) on a

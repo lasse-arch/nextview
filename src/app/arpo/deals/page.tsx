@@ -1,0 +1,215 @@
+import Link from "next/link";
+import { prisma } from "@/lib/db";
+import { getCurrentUser } from "@/lib/auth";
+import { findDuplicatePairsForBatch } from "@/lib/duplicates";
+import { stageLabels, importTypeLabels, formatDKK, formatDate, dealName } from "@/lib/labels";
+import { DealsBoard, type BoardDeal } from "./board-view";
+import { DealsListTable } from "./deals-list-table";
+import { DuplicateReviewSection } from "./duplicate-review";
+import { DeleteEmptyImportBatchButton } from "./delete-empty-import-batch-button";
+import type { Prisma, DealStage, ImportType } from "@prisma/client";
+
+type SearchParams = {
+  owner?: string;
+  stage?: string;
+  importType?: string;
+  importBatchId?: string;
+  sort?: string;
+  duplicates?: string;
+  skipped?: string;
+  view?: string;
+};
+
+export default async function DealsPage({
+  searchParams,
+}: {
+  searchParams: Promise<SearchParams>;
+}) {
+  const params = await searchParams;
+  const isBoard = params.view !== "list";
+
+  // Leads still being called off a ringeliste live in Leadindbakken, not here
+  // (see Deal.inLeadInbox) - the board is for deals actually being worked.
+  const where: Prisma.DealWhereInput = { inLeadInbox: false };
+  if (params.owner) where.ownerId = params.owner;
+  if (!isBoard && params.stage) where.stage = params.stage as DealStage;
+  if (params.importType) where.importType = params.importType as ImportType;
+  if (params.importBatchId) where.importBatchId = params.importBatchId;
+
+  const orderBy: Prisma.DealOrderByWithRelationInput =
+    params.sort === "oldest"
+      ? { createdAt: "asc" }
+      : params.sort === "company"
+      ? { companyName: "asc" }
+      : { createdAt: "desc" };
+
+  const [deals, users, importBatches, currentUser, duplicatePairs, inboxCount] = await Promise.all([
+    prisma.deal.findMany({
+      where,
+      orderBy,
+      include: { owner: true, importBatch: true },
+    }),
+    prisma.user.findMany({ orderBy: { name: "asc" } }),
+    prisma.importBatch.findMany({ orderBy: { createdAt: "desc" } }),
+    getCurrentUser(),
+    params.importBatchId ? findDuplicatePairsForBatch(params.importBatchId) : Promise.resolve([]),
+    prisma.deal.count({ where: { inLeadInbox: true, stage: { in: ["LEAD", "CONTACTED"] } } }),
+  ]);
+
+  function toggleViewUrl(view: "list" | "board") {
+    const sp = new URLSearchParams();
+    if (params.owner) sp.set("owner", params.owner);
+    if (view === "list" && params.stage) sp.set("stage", params.stage);
+    if (params.importType) sp.set("importType", params.importType);
+    if (params.importBatchId) sp.set("importBatchId", params.importBatchId);
+    if (params.sort) sp.set("sort", params.sort);
+    if (view === "list") sp.set("view", "list");
+    const qs = sp.toString();
+    return qs ? `/arpo/deals?${qs}` : "/arpo/deals";
+  }
+
+  const boardDeals: BoardDeal[] = deals.map((d) => ({
+    id: d.id,
+    companyName: d.companyName,
+    displayName: d.displayName,
+    contactName: d.contactName,
+    ownerName: d.owner.name,
+    ownerAvatarUrl: d.owner.avatarUrl,
+    saleAmount: d.saleAmount,
+    bindingMonths: d.bindingMonths,
+    establishmentFee: d.establishmentFee,
+    stage: d.stage,
+    isChurned: Boolean(d.churnedAt),
+    hasMeetingDate: Boolean(d.meetingDate),
+  }));
+
+  return (
+    <div>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold text-slate-900">Deals</h1>
+        <div className="flex items-center gap-3">
+          {inboxCount > 0 && (
+            <Link
+              href="/arpo/leadindbakke"
+              title="Leads fra ringelisterne, der ikke har fået et møde endnu"
+              className="whitespace-nowrap text-sm text-slate-500 hover:text-slate-900"
+            >
+              Leadindbakke ({inboxCount}) →
+            </Link>
+          )}
+          {currentUser?.role === "ADMIN" && (
+            <Link href="/arpo/deals/slettede" className="whitespace-nowrap text-sm text-slate-500 hover:text-slate-900">
+              Slettede
+            </Link>
+          )}
+          <div className="flex rounded-md border border-slate-300 text-sm">
+            <Link
+              href={toggleViewUrl("list")}
+              className={`rounded-l-md px-3 py-1.5 ${!isBoard ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-50"}`}
+            >
+              Liste
+            </Link>
+            <Link
+              href={toggleViewUrl("board")}
+              className={`rounded-r-md px-3 py-1.5 ${isBoard ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-50"}`}
+            >
+              Tavle
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      {duplicatePairs.length > 0 ? (
+        <DuplicateReviewSection pairs={duplicatePairs} />
+      ) : (
+        params.duplicates && (
+          <div className="mt-4 rounded-md bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            Bemærk: {params.duplicates.split(",").length} af de importerede firmanavne fandtes allerede i systemet:{" "}
+            <span className="font-medium">{params.duplicates.split(",").join(", ")}</span>. De er importeret
+            alligevel — tjek for evt. dubletter.
+          </div>
+        )
+      )}
+
+      {params.skipped && (
+        <div className="mt-4 rounded-md bg-red-50 px-4 py-3 text-sm text-red-800">
+          {params.skipped.split(",").length} række(r) blev sprunget over pga. manglende salgsbeløb, binding eller
+          startdato: <span className="font-medium">{params.skipped.split(",").join(", ")}</span>
+        </div>
+      )}
+
+      {params.importBatchId && deals.length === 0 && (
+        <div className="mt-4 flex items-center justify-between gap-3 rounded-md bg-slate-100 px-4 py-3 text-sm text-slate-600">
+          <span>Denne import har ikke importeret nogen deals.</span>
+          <DeleteEmptyImportBatchButton batchId={params.importBatchId} />
+        </div>
+      )}
+
+      <form method="get" className="mt-4 flex flex-wrap gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        {!isBoard && <input type="hidden" name="view" value="list" />}
+        <select name="owner" defaultValue={params.owner ?? ""} className="rounded-md border border-slate-300 px-2 py-1.5 text-sm">
+          <option value="">Alle ejere</option>
+          {users.map((u) => (
+            <option key={u.id} value={u.id}>
+              {u.name}
+            </option>
+          ))}
+        </select>
+
+        {!isBoard && (
+          <select name="stage" defaultValue={params.stage ?? ""} className="rounded-md border border-slate-300 px-2 py-1.5 text-sm">
+            <option value="">Alle stadier</option>
+            {Object.entries(stageLabels).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        )}
+
+        <select name="importType" defaultValue={params.importType ?? ""} className="rounded-md border border-slate-300 px-2 py-1.5 text-sm">
+          <option value="">Alle importtyper</option>
+          {Object.entries(importTypeLabels).map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+
+        {importBatches.length > 0 && (
+          <select name="importBatchId" defaultValue={params.importBatchId ?? ""} className="rounded-md border border-slate-300 px-2 py-1.5 text-sm">
+            <option value="">Alle import-batches</option>
+            {importBatches.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.fileName ?? b.sourceUrl ?? b.id} ({formatDate(b.createdAt)})
+              </option>
+            ))}
+          </select>
+        )}
+
+        {!isBoard && (
+          <select name="sort" defaultValue={params.sort ?? "newest"} className="rounded-md border border-slate-300 px-2 py-1.5 text-sm">
+            <option value="newest">Nyeste først</option>
+            <option value="oldest">Ældste først</option>
+            <option value="company">Firmanavn A-Å</option>
+          </select>
+        )}
+
+        <button type="submit" className="rounded-md border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-50">
+          Filtrér
+        </button>
+        <Link href={isBoard ? "/arpo/deals" : "/arpo/deals?view=list"} className="rounded-md px-3 py-1.5 text-sm text-slate-500 hover:text-slate-900">
+          Nulstil
+        </Link>
+      </form>
+
+      {isBoard ? (
+        <div className="mt-4">
+          <DealsBoard initialDeals={boardDeals} isAdmin={currentUser?.role === "ADMIN"} />
+        </div>
+      ) : (
+        <DealsListTable deals={deals} users={users} />
+      )}
+    </div>
+  );
+}

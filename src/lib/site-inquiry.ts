@@ -65,7 +65,7 @@ async function notifyAdmins(dealId: string, input: Inquiry) {
     input.interest && `Interesseret i: ${input.interest}`,
     input.message && `\n${input.message}`,
     "",
-    `Se leadet i Arpo: ${getAppBaseUrl()}/deals/${dealId}`,
+    `Se leadet i Arpo: ${getAppBaseUrl()}/arpo/deals/${dealId}`,
   ].filter((l): l is string => typeof l === "string");
   for (const account of accounts) {
     try {

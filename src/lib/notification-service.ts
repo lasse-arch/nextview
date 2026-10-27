@@ -33,7 +33,7 @@ export async function sendContractSignedNotification(dealId: string): Promise<No
   }
 
   const recipients = Array.from(new Set([deal.owner.email, ...admins.map((a) => a.email)]));
-  const dealUrl = `${getAppBaseUrl()}/deals/${deal.id}`;
+  const dealUrl = `${getAppBaseUrl()}/arpo/deals/${deal.id}`;
 
   let lastError = "Ukendt fejl ved afsendelse.";
   for (const account of adminAccounts) {

@@ -11,7 +11,7 @@ export async function GET() {
 
   if (!isGoogleConfigured()) {
     return NextResponse.redirect(
-      new URL("/settings/email?error=google_not_configured", getAppBaseUrl())
+      new URL("/arpo/settings/email?error=google_not_configured", getAppBaseUrl())
     );
   }
 

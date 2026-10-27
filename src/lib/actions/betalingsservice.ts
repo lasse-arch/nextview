@@ -26,7 +26,7 @@ import {
   testSftpConnection,
 } from "@/lib/betalingsservice/sftp";
 
-const PAGE = "/settings/betalingsservice";
+const PAGE = "/arpo/settings/betalingsservice";
 
 async function requireBillingUser() {
   const user = await requireUser();
@@ -82,7 +82,7 @@ export async function setDealPaymentMethod(dealId: string, method: PaymentMethod
     await ensureBsCustomerNumber(dealId);
   }
   await prisma.deal.update({ where: { id: dealId }, data: { paymentMethod: method } });
-  revalidatePath(`/deals/${dealId}`);
+  revalidatePath(`/arpo/deals/${dealId}`);
   revalidatePath(PAGE);
 }
 
@@ -121,7 +121,7 @@ export async function importBsReturnFileAction(formData: FormData) {
   if (file.size > 20 * 1024 * 1024) return { ok: false as const, error: "Filen er for stor." };
   const result = await importBsReturnFile(file.name, Buffer.from(await file.arrayBuffer()), user.id);
   revalidatePath(PAGE);
-  revalidatePath("/settings/betaling");
+  revalidatePath("/arpo/settings/betaling");
   return result;
 }
 

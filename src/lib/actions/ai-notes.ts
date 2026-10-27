@@ -60,6 +60,6 @@ export async function saveEmailNoteSuggestion(
     data: { dealId, authorId: user.id, body: trimmed, kind: "AI_EMAIL" },
   });
 
-  revalidatePath(`/deals/${dealId}`);
+  revalidatePath(`/arpo/deals/${dealId}`);
   return { ok: true };
 }

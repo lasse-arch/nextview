@@ -54,7 +54,7 @@ export async function addManualTimeEntry(
     })),
   });
 
-  revalidatePath(`/deals/${dealId}`);
+  revalidatePath(`/arpo/deals/${dealId}`);
   return { ok: true };
 }
 
@@ -69,7 +69,7 @@ export async function deleteTimeEntry(entryId: string): Promise<{ ok: true } | {
   }
 
   await prisma.timeEntry.delete({ where: { id: entryId } });
-  revalidatePath(`/deals/${entry.dealId}`);
+  revalidatePath(`/arpo/deals/${entry.dealId}`);
   return { ok: true };
 }
 

@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
   const errorParam = request.nextUrl.searchParams.get("error");
 
   if (errorParam || !code) {
-    return NextResponse.redirect(new URL("/settings/email?error=google_denied", getAppBaseUrl()));
+    return NextResponse.redirect(new URL("/arpo/settings/email?error=google_denied", getAppBaseUrl()));
   }
 
   try {
@@ -64,9 +64,9 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    return NextResponse.redirect(new URL("/settings/email?connected=google", getAppBaseUrl()));
+    return NextResponse.redirect(new URL("/arpo/settings/email?connected=google", getAppBaseUrl()));
   } catch (err) {
     console.error("Google OAuth callback error", err);
-    return NextResponse.redirect(new URL("/settings/email?error=google_failed", getAppBaseUrl()));
+    return NextResponse.redirect(new URL("/arpo/settings/email?error=google_failed", getAppBaseUrl()));
   }
 }

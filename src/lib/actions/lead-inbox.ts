@@ -28,8 +28,8 @@ export async function moveLeadsToDeals(dealIds: string[]): Promise<{ moved: numb
       dealId: deal.id,
     });
   }
-  revalidatePath("/leadindbakke");
-  revalidatePath("/deals");
+  revalidatePath("/arpo/leadindbakke");
+  revalidatePath("/arpo/deals");
   return { moved: deals.length };
 }
 
@@ -44,6 +44,6 @@ export async function reopenInboxLead(dealId: string): Promise<void> {
     actorId: user.id,
     dealId,
   });
-  revalidatePath("/leadindbakke");
-  revalidatePath(`/deals/${dealId}`);
+  revalidatePath("/arpo/leadindbakke");
+  revalidatePath(`/arpo/deals/${dealId}`);
 }

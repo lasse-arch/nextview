@@ -18,8 +18,8 @@ export async function bulkUpdateSaleAmount(dealIds: string[], amountRaw: string)
     await recalcCommission(dealId);
   }
 
-  revalidatePath("/deals");
-  revalidatePath("/commission");
+  revalidatePath("/arpo/deals");
+  revalidatePath("/arpo/commission");
   return { updated: dealIds.length };
 }
 
@@ -35,8 +35,8 @@ export async function bulkUpdateBindingMonths(dealIds: string[], monthsRaw: stri
     await recalcCommission(dealId);
   }
 
-  revalidatePath("/deals");
-  revalidatePath("/commission");
+  revalidatePath("/arpo/deals");
+  revalidatePath("/arpo/commission");
   return { updated: dealIds.length };
 }
 
@@ -48,7 +48,7 @@ export async function bulkDuplicateDeals(dealIds: string[]) {
     await createDuplicateDealRecord(dealId);
   }
 
-  revalidatePath("/deals");
+  revalidatePath("/arpo/deals");
   return { duplicated: dealIds.length };
 }
 
@@ -59,7 +59,7 @@ export async function bulkSetOwner(dealIds: string[], ownerId: string) {
 
   await prisma.deal.updateMany({ where: { id: { in: dealIds } }, data: { ownerId } });
 
-  revalidatePath("/deals");
+  revalidatePath("/arpo/deals");
   return { updated: dealIds.length };
 }
 
@@ -72,9 +72,9 @@ export async function bulkSetSoldProduct(dealIds: string[], products: string[]) 
     data: { soldProduct: products.length > 0 ? products.join(", ") : null },
   });
 
-  revalidatePath("/deals");
+  revalidatePath("/arpo/deals");
   for (const dealId of dealIds) {
-    revalidatePath(`/deals/${dealId}`);
+    revalidatePath(`/arpo/deals/${dealId}`);
   }
   return { updated: dealIds.length };
 }
@@ -98,7 +98,7 @@ export async function bulkStripUrlFromField(dealIds: string[], field: Strippable
     data: { [field]: null },
   });
 
-  revalidatePath("/deals");
+  revalidatePath("/arpo/deals");
   return { updated: result.count };
 }
 
@@ -118,9 +118,9 @@ export async function bulkAddProduct(
     data: dealIds.map((dealId) => ({ dealId, productType, amount, isFree })),
   });
 
-  revalidatePath("/deals");
+  revalidatePath("/arpo/deals");
   for (const dealId of dealIds) {
-    revalidatePath(`/deals/${dealId}`);
+    revalidatePath(`/arpo/deals/${dealId}`);
   }
   return { updated: dealIds.length };
 }

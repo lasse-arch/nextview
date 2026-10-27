@@ -124,6 +124,6 @@ export async function bookFilming(
     dealId,
   });
 
-  revalidatePath(`/deals/${dealId}`);
+  revalidatePath(`/arpo/deals/${dealId}`);
   return { ok: true, sentTo };
 }

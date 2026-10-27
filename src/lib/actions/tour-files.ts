@@ -3,7 +3,7 @@
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { copyToTour, DB_MAX, hostFiles, storeTourFile } from "@/lib/tour-files";
-import type { TourConfig } from "@/app/(app)/tour-lab/tours/types";
+import type { TourConfig } from "@/app/arpo/tour-lab/tours/types";
 
 async function admin() {
   const user = await requireUser();

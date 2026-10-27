@@ -12,7 +12,7 @@ export async function saveMatterportSdkKey(key: string): Promise<void> {
   const user = await requireUser();
   if (user.role !== "ADMIN") throw new Error("Kun admin kan ændre SDK-nøglen.");
   await setSettingValue("MATTERPORT_SDK_KEY", key.trim() || null);
-  revalidatePath("/tour-lab");
+  revalidatePath("/arpo/tour-lab");
 }
 
 /** GA4 measurement id (G-…) the tour prototype sends its events to. */
@@ -22,7 +22,7 @@ export async function saveTourGa4Id(id: string): Promise<{ ok: true } | { ok: fa
   const value = id.trim().toUpperCase();
   if (value && !/^G-[A-Z0-9]{4,}$/.test(value)) return { ok: false, error: "Et GA4-id ser sådan ud: G-XXXXXXXXXX" };
   await setSettingValue("TOUR_PROTOTYPE_GA4_ID", value || null);
-  revalidatePath("/tour-lab/[slug]", "page");
+  revalidatePath("/arpo/tour-lab/[slug]", "page");
   return { ok: true };
 }
 

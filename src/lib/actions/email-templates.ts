@@ -14,7 +14,7 @@ export async function createEmailTemplate(
   if (!name || !subject || !bodyHtml) return { ok: false, error: "Udfyld navn, emne og indhold." };
 
   const template = await prisma.emailTemplate.create({ data: { name, subject, bodyHtml, createdById: user.id } });
-  revalidatePath("/settings/email-templates");
+  revalidatePath("/arpo/settings/email-templates");
   return { ok: true, id: template.id };
 }
 
@@ -34,7 +34,7 @@ export async function updateEmailTemplate(
   if (!name || !subject || !bodyHtml) return { ok: false, error: "Udfyld navn, emne og indhold." };
 
   await prisma.emailTemplate.update({ where: { id: templateId }, data: { name, subject, bodyHtml } });
-  revalidatePath("/settings/email-templates");
+  revalidatePath("/arpo/settings/email-templates");
   return { ok: true };
 }
 
@@ -45,5 +45,5 @@ export async function deleteEmailTemplate(templateId: string): Promise<void> {
     throw new Error("Du kan kun slette dine egne skabeloner.");
   }
   await prisma.emailTemplate.delete({ where: { id: templateId } });
-  revalidatePath("/settings/email-templates");
+  revalidatePath("/arpo/settings/email-templates");
 }

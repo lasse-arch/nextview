@@ -8,7 +8,7 @@ import { prisma } from "@/lib/db";
 import { getSettingValue } from "@/lib/integration-settings";
 import { claudeCostUsd } from "@/lib/claude-cost";
 import { ACTION, tourStats } from "@/lib/tour-stats";
-import type { TourConfig } from "@/app/(app)/tour-lab/tours/types";
+import type { TourConfig } from "@/app/arpo/tour-lab/tours/types";
 
 /*
  * "Forslag ud fra tallene" in Resultater: nextviewAI reads what visitors do

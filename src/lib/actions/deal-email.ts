@@ -197,7 +197,7 @@ export async function sendTemplatedEmailAction(
     dealId,
   });
 
-  revalidatePath(`/deals/${dealId}`);
-  revalidatePath("/opgaver");
+  revalidatePath(`/arpo/deals/${dealId}`);
+  revalidatePath("/arpo/opgaver");
   return { ok: true };
 }

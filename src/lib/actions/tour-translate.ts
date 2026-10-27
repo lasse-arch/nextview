@@ -7,8 +7,8 @@ import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getSettingValue } from "@/lib/integration-settings";
 import { claudeCostUsd } from "@/lib/claude-cost";
-import { langName, plainWords, translatableTexts } from "@/app/(app)/tour-lab/tours/i18n";
-import type { TourConfig } from "@/app/(app)/tour-lab/tours/types";
+import { langName, plainWords, translatableTexts } from "@/app/arpo/tour-lab/tours/i18n";
+import type { TourConfig } from "@/app/arpo/tour-lab/tours/types";
 
 /*
  * "Oversæt med nextviewAI" under Sprog: every text of the tour (and the

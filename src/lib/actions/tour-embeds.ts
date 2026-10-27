@@ -3,8 +3,8 @@
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { matchPages, sitePages } from "@/lib/site-pages";
-import { startPlaces } from "@/app/(app)/tour-lab/tours/places";
-import type { TourConfig } from "@/app/(app)/tour-lab/tours/types";
+import { startPlaces } from "@/app/arpo/tour-lab/tours/places";
+import type { TourConfig } from "@/app/arpo/tour-lab/tours/types";
 
 /** Suggests which of the customer's pages each place in the tour goes on (the editor shows them to confirm). */
 export async function suggestEmbedPages(slug: string, site: string): Promise<{ ok: true; pages: Record<string, { url: string; title: string }>; checked: number } | { ok: false; error: string }> {

@@ -23,8 +23,8 @@ export async function updateMpSkinIdAction(
     .filter(Boolean);
 
   await prisma.deal.update({ where: { id: dealId }, data: { mpSkinId: ids.join(", ") || null } });
-  revalidatePath("/stats");
-  revalidatePath(`/deals/${dealId}`);
+  revalidatePath("/arpo/stats");
+  revalidatePath(`/arpo/deals/${dealId}`);
   return { ok: true };
 }
 
@@ -45,8 +45,8 @@ export async function updateReportCcEmailsAction(
   if (invalid) return { ok: false, error: `"${invalid}" ser ikke ud som en gyldig e-mail.` };
 
   await prisma.deal.update({ where: { id: dealId }, data: { reportCcEmails: addresses.join(", ") || null } });
-  revalidatePath("/stats");
-  revalidatePath(`/deals/${dealId}`);
+  revalidatePath("/arpo/stats");
+  revalidatePath(`/arpo/deals/${dealId}`);
   return { ok: true };
 }
 
@@ -58,8 +58,8 @@ export async function updateReportLanguageAction(
   if (user.role !== "ADMIN") throw new Error("Kun admin kan ændre rapportsprog");
 
   await prisma.deal.update({ where: { id: dealId }, data: { reportLanguage: language } });
-  revalidatePath("/stats");
-  revalidatePath(`/deals/${dealId}`);
+  revalidatePath("/arpo/stats");
+  revalidatePath(`/arpo/deals/${dealId}`);
   return { ok: true };
 }
 
@@ -73,8 +73,8 @@ export async function updateReportCombineBranchesAction(
   if (user.role !== "ADMIN") throw new Error("Kun admin kan ændre rapport-indstillinger");
 
   await prisma.deal.update({ where: { id: dealId }, data: { reportCombineBranches: combine } });
-  revalidatePath("/stats");
-  revalidatePath(`/deals/${dealId}`);
+  revalidatePath("/arpo/stats");
+  revalidatePath(`/arpo/deals/${dealId}`);
   return { ok: true };
 }
 
@@ -93,8 +93,8 @@ export async function updateReportIntervalAction(
     interval === null ? null : deal.reportInterval === interval ? deal.nextReportDueAt : addMonths(new Date(), REPORT_INTERVAL_MONTHS[interval]);
 
   await prisma.deal.update({ where: { id: dealId }, data: { reportInterval: interval, nextReportDueAt } });
-  revalidatePath("/stats");
-  revalidatePath(`/deals/${dealId}`);
+  revalidatePath("/arpo/stats");
+  revalidatePath(`/arpo/deals/${dealId}`);
   return { ok: true };
 }
 
@@ -121,8 +121,8 @@ export async function sendCustomerReportNowAction(
   await prisma.customerReport.create({ data: { dealId, method: "MANUAL", status: "PENDING" } });
   after(() => kickCustomerReportQueue());
 
-  revalidatePath(`/deals/${dealId}`);
-  revalidatePath("/stats");
+  revalidatePath(`/arpo/deals/${dealId}`);
+  revalidatePath("/arpo/stats");
   return { ok: true, queued: true };
 }
 
@@ -178,8 +178,8 @@ export async function sendCombinedCustomerReportAction(
   });
   after(() => kickCustomerReportQueue());
 
-  revalidatePath(`/deals/${parentDealId}`);
-  revalidatePath("/stats");
+  revalidatePath(`/arpo/deals/${parentDealId}`);
+  revalidatePath("/arpo/stats");
   return { ok: true, queued: true, branchCount: parent.branches.length };
 }
 
@@ -201,6 +201,6 @@ export async function sendCustomerReportsNowAction(
   });
   after(() => kickCustomerReportQueue());
 
-  revalidatePath("/stats");
+  revalidatePath("/arpo/stats");
   return { ok: true, queued: sendable.length, skipped };
 }

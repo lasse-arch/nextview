@@ -3,7 +3,7 @@ import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { publicTour } from "@/lib/tour-cache";
-import { Experience } from "@/app/(app)/tour-lab/[slug]/experience";
+import { Experience } from "@/app/arpo/tour-lab/[slug]/experience";
 
 /*
  * A published tour, for anyone - made to sit in an iframe on the customer's

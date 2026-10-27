@@ -9,13 +9,13 @@ import type { EmailProvider } from "@prisma/client";
 export async function disconnectEmailAccount(provider: EmailProvider) {
   const user = await requireUser();
   await prisma.emailAccount.deleteMany({ where: { userId: user.id, provider } });
-  revalidatePath("/settings/email");
+  revalidatePath("/arpo/settings/email");
 }
 
 export async function syncInboundEmailsNow(): Promise<EmailSyncSummary> {
   await requireUser();
   const summary = await syncDealEmails();
-  revalidatePath("/settings/email");
-  revalidatePath("/deals");
+  revalidatePath("/arpo/settings/email");
+  revalidatePath("/arpo/deals");
   return summary;
 }

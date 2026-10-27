@@ -10,8 +10,8 @@ export async function restoreDeal(id: string) {
   if (user.role !== "ADMIN") return { ok: false as const, error: "Kun admin kan sætte kunder tilbage." };
   const result = await restoreDeletedDeal(id);
   if (result.ok) {
-    revalidatePath("/deals");
-    revalidatePath("/deals/slettede");
+    revalidatePath("/arpo/deals");
+    revalidatePath("/arpo/deals/slettede");
   }
   return result;
 }

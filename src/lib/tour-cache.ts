@@ -1,8 +1,8 @@
 import "server-only";
 import { revalidateTag, unstable_cache } from "next/cache";
 import { prisma } from "@/lib/db";
-import { loadTour } from "@/app/(app)/tour-lab/[slug]/load";
-import type { TourConfig } from "@/app/(app)/tour-lab/tours/types";
+import { loadTour } from "@/app/arpo/tour-lab/[slug]/load";
+import type { TourConfig } from "@/app/arpo/tour-lab/tours/types";
 
 /*
  * Published tours on customers' sites are read from a cache, not the database

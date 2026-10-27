@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import type { Prisma } from "@prisma/client";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import type { TourConfig } from "@/app/(app)/tour-lab/tours/types";
+import type { TourConfig } from "@/app/arpo/tour-lab/tours/types";
 import { tourConfigProblem } from "@/lib/tour-validate";
 import type { ReportShare } from "@/lib/tour-share";
 import { randomBytes } from "node:crypto";
@@ -31,8 +31,8 @@ export async function saveTour(slug: string, config: TourConfig, note: string): 
     await tx.tour.update({ where: { id: tour.id }, data: { config: json, name: config.title } });
     return tx.tourVersion.create({ data: { tourId: tour.id, config: json, note: note.trim() || null, createdByName: user.name }, select: { id: true } });
   });
-  revalidatePath("/tour-lab");
-  revalidatePath(`/tour-lab/${slug}`);
+  revalidatePath("/arpo/tour-lab");
+  revalidatePath(`/arpo/tour-lab/${slug}`);
   tourChanged(slug);
   return { ok: true, versionId: version.id };
 }
@@ -48,8 +48,8 @@ export async function restoreTourVersion(versionId: string): Promise<Result> {
     prisma.tour.update({ where: { id: v.tour.id }, data: { config: v.config as Prisma.InputJsonValue, name: config.title } }),
     prisma.tourVersion.create({ data: { tourId: v.tour.id, config: v.config as Prisma.InputJsonValue, note: `Gendannet fra ${stamp}`, createdByName: user.name } }),
   ]);
-  revalidatePath("/tour-lab");
-  revalidatePath(`/tour-lab/${v.tour.slug}`);
+  revalidatePath("/arpo/tour-lab");
+  revalidatePath(`/arpo/tour-lab/${v.tour.slug}`);
   tourChanged(v.tour.slug);
   return { ok: true };
 }
@@ -58,7 +58,7 @@ export async function restoreTourVersion(versionId: string): Promise<Result> {
 export async function setTourDeal(slug: string, dealId: string | null): Promise<Result> {
   await admin();
   await prisma.tour.update({ where: { slug }, data: { dealId } });
-  revalidatePath("/tour-lab");
+  revalidatePath("/arpo/tour-lab");
   return { ok: true };
 }
 
@@ -90,7 +90,7 @@ export async function createTour(name: string, copyOf: string): Promise<Result<{
   await prisma.tour.create({
     data: { slug, name: title, config, versions: { create: { config, note: `Kopieret fra ${copyOf}`, createdByName: user.name } } },
   });
-  revalidatePath("/tour-lab");
+  revalidatePath("/arpo/tour-lab");
   return { ok: true, slug };
 }
 
@@ -131,7 +131,9 @@ export async function renameTourSlug(slug: string, wanted: string): Promise<Resu
   const tour = await prisma.tour.findUnique({ where: { slug }, select: { id: true, config: true, oldSlugs: true } });
   if (!tour) return { ok: false, error: "Touren findes ikke." };
   // Photos taken in the editor live under the tour's address.
-  const config = JSON.parse(JSON.stringify(tour.config).replaceAll(`/tour-lab/${slug}/`, `/tour-lab/${next}/`)) as Prisma.InputJsonValue;
+  const config = JSON.parse(
+    JSON.stringify(tour.config).replaceAll(`/tour-lab/${slug}/historie`, `/t/${next}/historie`).replaceAll(`/t/${slug}/historie`, `/t/${next}/historie`)
+  ) as Prisma.InputJsonValue;
   await prisma.$transaction([
     prisma.tour.update({ where: { id: tour.id }, data: { slug: next, config, oldSlugs: [...new Set([...tour.oldSlugs.filter((s) => s !== next), slug])] } }),
     prisma.tourEvent.updateMany({ where: { tourSlug: slug }, data: { tourSlug: next } }),
@@ -140,7 +142,7 @@ export async function renameTourSlug(slug: string, wanted: string): Promise<Resu
     prisma.tourWork.updateMany({ where: { tourSlug: slug }, data: { tourSlug: next } }),
     prisma.tourAiUsage.updateMany({ where: { tourSlug: slug }, data: { tourSlug: next } }),
   ]);
-  revalidatePath("/tour-lab");
+  revalidatePath("/arpo/tour-lab");
   tourChanged(slug, next);
   return { ok: true, slug: next };
 }
@@ -185,6 +187,6 @@ export async function detachToursFromMpskins(slug?: string): Promise<Result<{ mo
     tourChanged(t.slug);
     moved++;
   }
-  revalidatePath("/tour-lab");
+  revalidatePath("/arpo/tour-lab");
   return { ok: true, moved, failed };
 }

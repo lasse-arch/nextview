@@ -139,7 +139,7 @@ async function fetchMergedMeetings(rangeStart: Date, rangeEnd: Date): Promise<Ca
     hour: d.meetingDate!.getUTCHours(),
     minute: d.meetingDate!.getUTCMinutes(),
     label: dealName(d),
-    href: `/deals/${d.id}`,
+    href: `/arpo/deals/${d.id}`,
     ownerName: [d.owner.name, d.owner.lastName].filter(Boolean).join(" "),
     ownerUserId: d.ownerId,
     durationMinutes: d.meetingDurationMinutes,

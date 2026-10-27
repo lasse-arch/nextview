@@ -23,7 +23,7 @@ export async function createNewsPost(input: {
   // The poster shouldn't see their own post as "unread" the moment they land back on the page.
   await prisma.user.update({ where: { id: user.id }, data: { newsReadAt: new Date() } });
 
-  revalidatePath("/nyheder");
+  revalidatePath("/arpo/nyheder");
   return { ok: true };
 }
 
@@ -31,7 +31,7 @@ export async function deleteNewsPost(postId: string): Promise<void> {
   const user = await requireUser();
   if (user.role !== "ADMIN") throw new Error("Kun admin kan slette nyheder.");
   await prisma.newsPost.delete({ where: { id: postId } });
-  revalidatePath("/nyheder");
+  revalidatePath("/arpo/nyheder");
 }
 
 /** Called when /nyheder is opened, so the header badge clears. Deliberately

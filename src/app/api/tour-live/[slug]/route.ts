@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { fetchLiveUnits, refreshSeconds } from "@/lib/availability/live";
-import type { TourConfig } from "@/app/(app)/tour-lab/tours/types";
+import type { TourConfig } from "@/app/arpo/tour-lab/tours/types";
 
 /*
  * A tour's live units (free pitches, rooms …), fetched by the tour after it
