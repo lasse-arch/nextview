@@ -2149,6 +2149,7 @@ function TourExperience({
           open={linkPopup}
           onClose={() => setLinkPopup(null)}
           size={popupSize(T)}
+          custom={T.linkOpen?.custom}
           site={T.linkOpen?.showSite === false ? null : siteOf(linkPopup.href)}
         />
       )}

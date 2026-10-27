@@ -14,7 +14,7 @@ export type TourPlace = { name: string; kicker?: string; href: string; image: st
 /** How a link out of the tour opens: over the tour, in a new tab, or instead of the tour. */
 export type LinkOpen = "popup" | "tab" | "same";
 /** How big a popup over the tour is (see links.tsx). */
-export type PopupSize = "lille" | "mellem" | "stor" | "fuld";
+export type PopupSize = "lille" | "mellem" | "stor" | "egen" | "fuld";
 
 export type TourInfo = {
   title: string;
@@ -113,7 +113,8 @@ export type TourConfig = {
    * "stor"). A popup says which site it shows ("Fra claude.ai"), so visitors
    * know they're not on the tour's own page - `showSite: false` leaves it out.
    */
-  linkOpen?: { default: LinkOpen; byUrl?: Record<string, LinkOpen>; size?: PopupSize; showSite?: false };
+  /** `custom`: the popup's own size in px (size "egen") - never bigger than the screen. */
+  linkOpen?: { default: LinkOpen; byUrl?: Record<string, LinkOpen>; size?: PopupSize; custom?: { w: number; h: number }; showSite?: false };
   /**
    * Links to the customer's own pages get utm_source=nextview360 (medium
    * "virtuel-tour", campaign = the tour's slug), so their analytics/booking

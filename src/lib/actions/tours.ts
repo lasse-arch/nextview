@@ -79,13 +79,19 @@ export async function setTourDeal(slug: string, dealId: string | null): Promise<
   return { ok: true };
 }
 
-/** Customers to pick from, by name. */
+/** Customers to pick from, by name - only those who have signed (a lead can't have a tour). */
 export async function searchDeals(query: string) {
   await admin();
   const q = query.trim();
   if (q.length < 2) return [];
   return prisma.deal.findMany({
-    where: { OR: [{ companyName: { contains: q, mode: "insensitive" } }, { displayName: { contains: q, mode: "insensitive" } }] },
+    where: {
+      AND: [
+        { OR: [{ companyName: { contains: q, mode: "insensitive" } }, { displayName: { contains: q, mode: "insensitive" } }] },
+        // Signed: a contract date, or a stage after signing (customers moved over from before Arpo may have no date).
+        { OR: [{ contractSignedAt: { not: null }, stage: { not: "LOST" } }, { stage: { in: ["CONTRACT_SIGNED", "FILMED", "LIVE"] } }] },
+      ],
+    },
     select: { id: true, companyName: true, displayName: true },
     take: 8,
   });

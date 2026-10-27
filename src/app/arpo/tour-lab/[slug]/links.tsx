@@ -76,11 +76,11 @@ export function LinkProvider({ T, popup, children }: { T: TourConfig; popup: (hr
 
 /** The popup: the page over the tour, with a way out to a new tab (some sites refuse to be shown inside others). */
 /** `site`: the site the popup shows, as people write it ("claude.ai") - null leaves it out. */
-export function LinkPopup({ open, onClose, size = "stor", site }: { open: NonNullable<LinkPopupState>; onClose: () => void; size?: PopupSize; site: string | null }) {
+export function LinkPopup({ open, onClose, size = "stor", custom, site }: { open: NonNullable<LinkPopupState>; onClose: () => void; size?: PopupSize; custom?: { w: number; h: number }; site: string | null }) {
   const tr = useT();
   return (
     <div className={`lk-overlay lk-${size}`} onClick={onClose}>
-      <div className="lk-popup" onClick={(e) => e.stopPropagation()}>
+      <div className="lk-popup" style={size === "egen" && custom ? ({ "--lk-w": `${custom.w}px`, "--lk-h": `${custom.h}px` } as React.CSSProperties) : undefined} onClick={(e) => e.stopPropagation()}>
         <div className="lk-head">
           <div className="lk-title">
             <b>{open.label}</b>
@@ -171,6 +171,7 @@ export const LINKS_CSS = `
 .lk-site img{width:14px;height:14px;border-radius:3px;flex:none}
 .lk-lille .lk-popup{width:min(560px,100%);height:min(640px,100%)}
 .lk-mellem .lk-popup{width:min(820px,100%);height:min(760px,100%)}
+.lk-egen .lk-popup{width:min(var(--lk-w,1200px),100%);height:min(var(--lk-h,900px),100%)}
 .lk-fuld{padding:12px}
 .lk-fuld .lk-popup{width:100%;height:100%}
 .lk-head a{font-size:13px;color:#56636a;text-decoration:none;white-space:nowrap}
@@ -179,6 +180,6 @@ export const LINKS_CSS = `
 .lk-popup iframe{flex:1;width:100%;border:0;background:#fafafa}
 @media (max-width:760px){
   .lk-overlay{padding:0;align-items:flex-end}
-  .lk-popup{height:94%;border-radius:18px 18px 0 0}
+  .lk-popup,.lk-egen .lk-popup{width:100%;height:94%;border-radius:18px 18px 0 0}
 }
 `;
