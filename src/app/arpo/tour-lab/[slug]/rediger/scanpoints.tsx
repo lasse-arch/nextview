@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ScanMap } from "@/lib/matterport-graph";
 import { placeHref } from "../../tours/places";
 import type { TourConfig } from "../../tours/types";
@@ -46,6 +46,46 @@ export function ScanPointsEditor({
   const [box, setBox] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
   const painting = useRef<{ start: number; moved: boolean } | null>(null);
   const planEl = useRef<HTMLDivElement>(null);
+  /*
+   * Zoom with the mouse wheel (or a trackpad pinch), around the spot under the
+   * cursor - the box scrolls so that spot stays put. A non-passive listener,
+   * so the page itself doesn't scroll meanwhile.
+   */
+  const scroller = useRef<HTMLDivElement>(null);
+  /** Where the box should scroll once the plan is drawn at the new zoom (so the spot under the cursor stays put). */
+  const anchor = useRef<{ left: number; top: number } | null>(null);
+  useLayoutEffect(() => {
+    const el = scroller.current;
+    if (!el || !anchor.current) return;
+    el.scrollLeft = anchor.current.left;
+    el.scrollTop = anchor.current.top;
+    anchor.current = null;
+  }, [zoom]);
+  const zoomNow = useRef(zoom);
+  useEffect(() => {
+    zoomNow.current = zoom;
+  });
+  useEffect(() => {
+    const el = scroller.current;
+    if (!el) return;
+    const wheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const old = zoomNow.current;
+      const next = Math.min(8, Math.max(1, old * Math.exp(-e.deltaY * 0.0015)));
+      if (next === old) return;
+      const r = el.getBoundingClientRect();
+      const x = e.clientX - r.left;
+      const y = e.clientY - r.top;
+      // Several wheel steps can come before the plan is drawn again: go on from where the last one will put it.
+      const left = anchor.current?.left ?? el.scrollLeft;
+      const top = anchor.current?.top ?? el.scrollTop;
+      anchor.current = { left: ((left + x) / old) * next - x, top: ((top + y) / old) * next - y };
+      zoomNow.current = next;
+      setZoom(next);
+    };
+    el.addEventListener("wheel", wheel, { passive: false });
+    return () => el.removeEventListener("wheel", wheel);
+  }, [big, map, floor]);
   const pct = (e: React.PointerEvent) => {
     const r = planEl.current!.getBoundingClientRect();
     return { x: ((e.clientX - r.left) / r.width) * 100, y: ((e.clientY - r.top) / r.height) * 100 };
@@ -77,18 +117,21 @@ export function ScanPointsEditor({
   const plan = map.floors[floor];
   // Only the part of the plan where the scan points are (a plan can cover a whole site, the scans a corner of it) - with a margin.
   const placed = points.filter((p) => p.px != null && p.py != null);
-  const crop = placed.length
+  // Big (full screen): the whole plan, as in MPSkins - there's room for it.
+  const crop = big
+    ? { l: 0, r: 100, t: 0, b: 100 }
+    : placed.length
     ? {
-        l: Math.max(0, Math.min(...placed.map((p) => p.px!)) - 5),
-        r: Math.min(100, Math.max(...placed.map((p) => p.px!)) + 5),
-        t: Math.max(0, Math.min(...placed.map((p) => p.py!)) - 5),
-        b: Math.min(100, Math.max(...placed.map((p) => p.py!)) + 5),
+        l: Math.max(0, Math.min(...placed.map((p) => p.px!)) - 9),
+        r: Math.min(100, Math.max(...placed.map((p) => p.px!)) + 9),
+        t: Math.max(0, Math.min(...placed.map((p) => p.py!)) - 9),
+        b: Math.min(100, Math.max(...placed.map((p) => p.py!)) + 9),
       }
     : { l: 0, r: 100, t: 0, b: 100 };
   const cw = Math.max(5, crop.r - crop.l);
   const ch = Math.max(5, crop.b - crop.t);
   /** Dots grow a little with zoom, but less than the plan, so crowded spots open up. */
-  const dot = Math.round((big ? 24 : 20) * Math.sqrt(zoom));
+  const dot = Math.round((big ? 20 : 18) * Math.pow(zoom, 0.35));
   const sel = map.points.find((p) => p.ss === selected) ?? null;
   const selUses = sel ? uses.get(sel.ss) : undefined;
   const colorOf = (ss: number) => {
@@ -103,7 +146,7 @@ export function ScanPointsEditor({
 
   /** The plan with its points - shown in the panel, or big (full screen); only one of them at a time. */
   const planView = (
-        <div className={big ? "min-h-0 flex-1 overflow-auto bg-[#ececee]" : "-mx-1 max-h-[560px] overflow-auto rounded-xl bg-[#f5f5f7] ring-1 ring-black/[.04]"}>
+        <div ref={scroller} className={big ? "min-h-0 flex-1 overflow-auto bg-[#ececee]" : "-mx-1 max-h-[560px] overflow-auto rounded-xl bg-[#f5f5f7] ring-1 ring-black/[.04]"}>
           {plan?.image && plan.aspect ? (
             // Matterport's own top-down photo of the floor, with every scan point where it really is - cut to where the points are.
             <div
@@ -173,16 +216,17 @@ export function ScanPointsEditor({
                       painting.current.moved = true;
                       setMarked((m) => new Set([...m, p.ss]));
                     }}
-                    className={`absolute flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full font-bold tabular-nums shadow-[0_1px_4px_rgba(0,0,0,.35)] transition hover:z-10 hover:scale-125 ${marked.has(p.ss) && marked.size > 1 ? "z-10 ring-[3px] ring-[#0071e3] ring-offset-1" : ""} ${selected === p.ss ? "z-10 scale-125 ring-2 ring-[#1d1d1f]" : ""} ${uses.get(p.ss)?.has("start") ? "outline outline-2 outline-offset-2 outline-[#0071e3]" : ""}`}
+                    className={`absolute flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full font-semibold tabular-nums shadow-[0_1px_3px_rgba(0,0,0,.3)] transition hover:z-10 hover:scale-125 ${marked.has(p.ss) && marked.size > 1 ? "z-10 ring-[3px] ring-[#0071e3] ring-offset-1" : ""} ${selected === p.ss ? "z-10 scale-125 ring-2 ring-[#1d1d1f]" : ""} ${uses.get(p.ss)?.has("start") ? "outline outline-2 outline-offset-2 outline-[#0071e3]" : ""}`}
                     style={{
                       left: `${p.px}%`,
                       top: `${p.py}%`,
                       width: dot,
                       height: dot,
                       fontSize: dot * 0.45,
-                      background: hidden.has(p.sid) ? "rgba(255,255,255,.85)" : colorOf(p.ss),
-                      color: hidden.has(p.sid) ? "#8e8e93" : "#fff",
-                      border: hidden.has(p.sid) ? "1.5px dashed #8e8e93" : "1.5px solid #fff",
+                      // As in MPSkins: a light dot with a coloured ring and a dark number - the plan stays readable around it.
+                      background: hidden.has(p.sid) ? "rgba(255,255,255,.7)" : "rgba(255,255,255,.92)",
+                      color: hidden.has(p.sid) ? "#ff3b30" : "#1d1d1f",
+                      border: hidden.has(p.sid) ? "2px dashed #ff3b30" : `2px solid ${colorOf(p.ss)}`,
                     }}
                   >
                     {p.ss}
@@ -267,11 +311,12 @@ export function ScanPointsEditor({
                     )}
                     <button
                       type="button"
-                      disabled={selUses?.has("start")}
-                      className="rounded-lg bg-white py-1.5 text-[13px] font-medium text-[#0071e3] ring-1 ring-black/[.06] disabled:opacity-40"
-                      onClick={async () => {
-                        const r = await preview.view();
-                        edit((d) => void (d.start = r.href && ssOfHref(r.href) === sel.ss ? r.href : placeHref(d, sel.ss)));
+                      className="rounded-lg bg-white py-1.5 text-[13px] font-medium text-[#0071e3] ring-1 ring-black/[.06]"
+                      title="Touren starter her - drej så i forhåndsvisningen og gem retningen"
+                      onClick={() => {
+                        if (!selUses?.has("start")) edit((d) => void (d.start = placeHref(d, sel.ss)));
+                        // The direction is chosen in the preview, which the big view covers: back to it.
+                        setBig(false);
                       }}
                     >
                       Start her
@@ -438,14 +483,13 @@ export function ScanPointsEditor({
             </button>
             <button
               type="button"
-              disabled={selUses?.has("start")}
-              className="rounded-xl bg-white py-2 text-[14px] font-medium text-[#0071e3] ring-1 ring-black/[.06] hover:bg-[#0071e3]/5 disabled:opacity-40"
+              className={`rounded-xl py-2 text-[14px] font-medium ring-1 ring-black/[.06] ${selUses?.has("start") ? "bg-[#0071e3] text-white" : "bg-white text-[#0071e3] hover:bg-[#0071e3]/5"}`}
               onClick={async () => {
                 const r = await preview.view();
                 edit((d) => void (d.start = r.href && ssOfHref(r.href) === sel.ss ? r.href : placeHref(d, sel.ss)));
               }}
             >
-              Start her
+              {selUses?.has("start") ? "Gem retningen, du ser" : "Start her"}
             </button>
             <button
               type="button"
@@ -458,7 +502,12 @@ export function ScanPointsEditor({
               + Til menuen
             </button>
           </div>
-          <p className="text-[11px] leading-snug text-[#8e8e93]">&quot;Start her&quot; og &quot;Til menuen&quot; bruger den retning, forhåndsvisningen kigger - drej først, så det ser rigtigt ud. Stedkortets tekst skrives under Stedkort.</p>
+          <p className="text-[11px] leading-snug text-[#8e8e93]">
+            {selUses?.has("start")
+              ? "Touren starter her. Drej i forhåndsvisningen til det, man skal se først, og tryk Gem retningen, du ser."
+              : "\"Start her\" og \"Til menuen\" bruger den retning, forhåndsvisningen kigger - drej først, så det ser rigtigt ud."}{" "}
+            Stedkortets tekst skrives under Stedkort.
+          </p>
         </Group>
       ) : (
         <p className="px-1 text-[12px] text-[#8e8e93]">Klik på et punkt for at gå derhen i forhåndsvisningen.</p>
