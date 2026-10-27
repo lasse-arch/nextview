@@ -785,6 +785,9 @@ function TourExperience({
 
   // The drone scene is rebuilt only when it or its points change - not for every edit in the editor's preview.
   const droneKey = JSON.stringify([T.drone, Boolean(T.map), T.points, T.categories]);
+  /** The drone picture that has finished loading - until then its points and boxes wait, so nothing floats on black. */
+  const [droneLoaded, setDroneLoaded] = useState<string | null>(null);
+  const droneWaiting = Boolean(T.drone && !T.map) && droneLoaded !== droneKey;
   const droneT = useRef(T);
   const openPointRef = useRef(openPoint);
   useEffect(() => {
@@ -799,6 +802,8 @@ function TourExperience({
     if (!D || T.map) return;
     let cancelled = false;
     let declutter = 0;
+    let shownTimer = 0;
+    const key = droneKey;
     loadPannellum().then(() => {
       if (cancelled || !droneEl.current || !window.pannellum) return;
       const start = mobile.current ? D.startMobile : D.start;
@@ -846,12 +851,22 @@ function TourExperience({
         hotSpots,
       });
       drone.current.on("zoomchange", (hfov) => setZoomed(Number(hfov) < 56));
+      // Shown when the picture can be drawn: the one 360° photo, or the tiles' small first level (the sharp ones come after) - or after a while, whatever happens.
+      const shown = () => setDroneLoaded(key);
+      drone.current.on("load", shown);
+      drone.current.on("error", shown);
+      const first = D.panorama ? [D.panorama] : ["f", "b", "u", "d", "l", "r"].map((f) => `${D.basePath}/1/${f}0_0.jpg`);
+      Promise.all(first.map((src) => new Promise((done) => Object.assign(new Image(), { onload: done, onerror: done, src })))).then(() => {
+        if (!cancelled) shownTimer = window.setTimeout(shown, 350);
+      });
+      window.setTimeout(shown, 8_000);
       declutter = window.setInterval(() => declutterNames(selectedId.current), 120);
       track("drone_view");
     });
     return () => {
       cancelled = true;
       window.clearInterval(declutter);
+      window.clearTimeout(shownTimer);
       drone.current?.destroy();
       drone.current = null;
     };
@@ -1584,7 +1599,13 @@ function TourExperience({
 
       {/* The drone scene on top; fades away when going into the tour. */}
       {OV && (
-      <div className={`absolute inset-0 transition-opacity duration-500 ${phase === "drone" ? "opacity-100" : "pointer-events-none opacity-0"} ${cover && T.cover ? "invisible" : ""}`}>
+      <div className={`absolute inset-0 transition-opacity duration-500 ${phase === "drone" ? "opacity-100" : "pointer-events-none opacity-0"} ${cover && T.cover ? "invisible" : ""} ${droneWaiting ? "hv-laster" : ""}`}>
+        {droneWaiting && (
+          <div className="hv-laster-tegn" aria-hidden>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={T.logo} alt="" />
+          </div>
+        )}
         {T.map ? (
           <MapScene
             T={T}
@@ -2330,10 +2351,11 @@ function PointPhotos({ images, name, onOpen }: { images: string[]; name: string;
       }}
     >
       {images.map((src, i) => (
-        // eslint-disable-next-line @next/next/no-img-element
         <span key={src} className={`hv-foto ${i === at ? "on" : ""}`}>
           {/* The whole photo, on a soft, blurred copy of itself - nothing cut off. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={src} alt="" aria-hidden className="hv-foto-bag" loading={i === 0 ? "eager" : "lazy"} draggable={false} />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={src} alt={i === 0 ? name : ""} loading={i === 0 ? "eager" : "lazy"} draggable={false} />
         </span>
       ))}
@@ -2561,6 +2583,12 @@ const CSS = `
 .hv-navn{position:absolute;top:100%;left:50%;transform:translateX(-50%);margin-top:4px;background:#fff;border-radius:999px;padding:2px 10px;font-size:12.5px;font-weight:800;white-space:nowrap;color:#1d2a30;box-shadow:0 2px 8px rgba(0,0,0,.25)}
 .hv-pkt:hover .hv-ikon{transform:scale(1.12)}
 /* A name that would cover another point steps aside until its icon is hovered. */
+/* While the drone picture loads: its points and boxes wait (nothing floats on black), the logo breathes in the middle - then all fade in together. */
+.hv-intro,.hv-filtre,.pnlm-hotspot-base,.vj-chip,.hv-find-m{transition:opacity .5s ease}
+.hv-laster .hv-intro,.hv-laster .hv-filtre,.hv-laster .pnlm-hotspot-base,.hv-laster .vj-chip,.hv-laster .hv-find-m{opacity:0!important;pointer-events:none}
+.hv-laster-tegn{position:absolute;inset:0;z-index:3;display:flex;align-items:center;justify-content:center;pointer-events:none}
+.hv-laster-tegn img{max-width:180px;max-height:70px;opacity:.85;animation:hvAande 1.8s ease-in-out infinite}
+@keyframes hvAande{0%,100%{opacity:.35;transform:scale(.97)}50%{opacity:.9;transform:scale(1)}}
 .hv-navn.hv-navn-op{top:auto;bottom:100%;margin:0 0 4px}
 .hv-navn.hv-navn-h{top:50%;left:100%;transform:translateY(-50%);margin:0 0 0 5px}
 .hv-navn.hv-navn-v{top:50%;left:auto;right:100%;transform:translateY(-50%);margin:0 5px 0 0}

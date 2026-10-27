@@ -290,6 +290,8 @@ export function StartEditor({ config, edit, slug, preview }: Props) {
     setStartNote({ text: `Touren starter nu her${view.room ? ` (${view.room})` : ""} - også retningen, du kigger i.` });
   }
   const startSs = new URLSearchParams(config.start.split("?")[1] ?? "").get("ss");
+  /** Tours with an aerial photo: is there a start inside at all (switched on, or already chosen)? */
+  const [startOn, setStartOn] = useState(Boolean(config.start));
 
   return (
     <>
@@ -297,11 +299,18 @@ export function StartEditor({ config, edit, slug, preview }: Props) {
         {config.drone || config.map ? (
           <>
             <p className="text-[14px] leading-snug">Touren starter på luftfotoet.</p>
-            <p className={small}>Hvad man ser først på luftfotoet, sættes under Luftfoto og kort. Man går ind fra punkterne på billedet, så der er ikke noget startpunkt indenfor at vælge.</p>
-            <details className="text-[13px]">
-              <summary className="cursor-pointer select-none text-[#0071e3]">Sted indenfor, når man går ind uden et punkt (sjældent brugt)</summary>
-              <div className="mt-2 space-y-2">
-                <p className={small}>Bruges kun, hvis noget fører ind uden at vælge et sted, fx forsidens &quot;Træd indenfor&quot;. Touren gør det også klar i baggrunden.</p>
+            <p className={small}>Hvad man ser først på luftfotoet, sættes under Luftfoto og kort.</p>
+            <Toggle
+              on={startOn}
+              onChange={(on) => {
+                setStartOn(on);
+                if (!on) edit((d) => void (d.start = ""));
+              }}
+              title="Startpunkt indenfor"
+              hint="Til, når touren har en hel Matterport-scanning: der, hvor man lander, når man går ind uden at vælge et punkt (fx forsidens Træd indenfor), og det touren gør klar i baggrunden. Fra, når man kun går ind fra punkterne (fx Hals)."
+            />
+            {startOn && (
+              <div className="space-y-2">
                 <div className="flex gap-2">
                   <button type="button" onClick={startHere} className="flex-1 rounded-xl bg-[#0071e3] py-2 text-[14px] font-medium text-white">
                     Vælg startpunkt her
@@ -316,7 +325,7 @@ export function StartEditor({ config, edit, slug, preview }: Props) {
                   {startNote?.text ?? (startSs ? `Starter nu i scanpunkt ${startSs}.` : config.start ? "Starter et valgt sted." : "Intet startpunkt endnu - touren starter, hvor Matterport starter.")}
                 </p>
               </div>
-            </details>
+            )}
           </>
         ) : (
           <>
