@@ -345,6 +345,9 @@ function MapCanvas({ config, edit, onClose }: { config: TourConfig; edit: Edit; 
               Færdig
             </button>
           </div>
+          {/* The picture keeps its place: the lines about what's going on lie over it, so it never jumps when they come and go. */}
+          <div className="relative flex min-h-0 flex-1 flex-col">
+          <div className="absolute inset-x-0 top-0 z-20 shadow-sm">
           {banner && (
             <div className="flex items-center gap-3 bg-[#0071e3] px-4 py-2 text-[13px] text-white">
               <span className="font-medium">{banner}</span>
@@ -366,6 +369,7 @@ function MapCanvas({ config, edit, onClose }: { config: TourConfig; edit: Edit; 
               </button>
             </div>
           )}
+          </div>
           {in360 && M.panorama ? (
             <Pano360 config={config} selected={selected} picking={Boolean(placing)} onApi={(a) => (pano.current = a)} onPick={placeAt} onSelect={setSelected} />
           ) : (
@@ -421,6 +425,7 @@ function MapCanvas({ config, edit, onClose }: { config: TourConfig; edit: Edit; 
             </div>
           </div>
           )}
+          </div>
         </div>
 
         {/* Beside the map: the point, or the map's points and categories */}
@@ -509,6 +514,7 @@ type PanoViewer = {
   getPitch(): number;
   getYaw(): number;
   getHfov(): number;
+  resize(): void;
 };
 
 /**
@@ -536,6 +542,7 @@ function Pano360({
   const el = useRef<HTMLDivElement>(null);
   const viewer = useRef<PanoViewer | null>(null);
   const shown = useRef<string[]>([]);
+  const stopResize = useRef<(() => void) | null>(null);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Read through refs: the viewer's own events are bound once.
@@ -578,6 +585,12 @@ function Pano360({
         pick.current(toXY(pitch, yaw));
       });
       viewer.current = v;
+      // The box changes size (the blue "click where…" line comes and goes): the viewer must follow at once,
+      // or a click is read against the old size and the point lands beside where you clicked.
+      const box = el.current;
+      const ro = new ResizeObserver(() => v.resize());
+      ro.observe(box);
+      stopResize.current = () => ro.disconnect();
       giveApi.current({
         view: () => {
           const [x, y] = toXY(v.getPitch(), v.getYaw());
@@ -588,6 +601,7 @@ function Pano360({
     })();
     return () => {
       dead = true;
+      stopResize.current?.();
       viewer.current?.destroy();
       viewer.current = null;
       giveApi.current(null);
