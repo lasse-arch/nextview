@@ -4,7 +4,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { verifyPassword } from "@/lib/password";
-import { createSession, destroySession, safeNextPath } from "@/lib/auth";
+import { createSession, destroySession, getCurrentUser, safeNextPath } from "@/lib/auth";
 import { isGoogleLoginRequired } from "@/lib/google-login";
 
 export type LoginState = { error?: string } | undefined;
@@ -53,6 +53,8 @@ export async function login(_prevState: LoginState, formData: FormData): Promise
 }
 
 export async function logout() {
+  // The team lands on their own login again; customers on theirs.
+  const staff = await getCurrentUser();
   await destroySession();
-  redirect("/login");
+  redirect(staff ? "/login?next=/arpo" : "/login");
 }

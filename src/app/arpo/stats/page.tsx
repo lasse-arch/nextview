@@ -21,7 +21,7 @@ export const maxDuration = 300;
  */
 export default async function StatsPage() {
   const currentUser = await getCurrentUser();
-  if (!currentUser) redirect("/api/auth/session-ended");
+  if (!currentUser) redirect("/api/auth/session-ended?next=/arpo");
   if (!currentUser.canAccessBilling) redirect("/arpo");
 
   const [autoRunEnabled, queueProgress] = await Promise.all([

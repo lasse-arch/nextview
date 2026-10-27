@@ -18,7 +18,8 @@ import { PHONE, WELCOME_MAIL_SENDER } from "@/lib/welcome-mail";
  * The customer's own page, nextview360.dk/kunde - after logging in with the
  * link from their e-mail. Only the deals the login was given access to in
  * Arpo: their tours (the numbers we share, the codes for their website,
- * the review link), the signed contract, the invoices, and how to reach us.
+ * the review link), the signed contract, and how to reach us. Invoices are
+ * not here on purpose - they're e-mailed to the customer.
  * Everything is looked up from the login's own deals - never from anything
  * in the address - so one customer can never see another's.
  */
@@ -26,7 +27,6 @@ import { PHONE, WELCOME_MAIL_SENDER } from "@/lib/welcome-mail";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Jeres side - Nextview360", robots: { index: false, follow: false } };
 
-const kr = (n: number) => `${n.toLocaleString("da-DK")} kr.`;
 const date = (d: Date) => d.toLocaleDateString("da-DK", { day: "numeric", month: "short", year: "numeric" });
 
 export default async function CustomerPage() {
@@ -43,11 +43,6 @@ export default async function CustomerPage() {
       contractSignedAt: true,
       docusealSubmissionId: true,
       tours: { where: { published: true }, orderBy: { createdAt: "asc" }, select: { slug: true, name: true, config: true, share: true, reviewToken: true } },
-      invoices: {
-        where: { sentAt: { not: null } },
-        orderBy: { sentAt: "desc" },
-        select: { id: true, amount: true, sentAt: true, dueDate: true, paidAt: true, dineroInvoiceNumber: true, dineroInvoiceGuid: true },
-      },
     },
   });
   const h = await headers();
@@ -60,7 +55,7 @@ export default async function CustomerPage() {
       })
     )
   );
-  const papers = deals.filter((d) => (d.contractSignedAt && d.docusealSubmissionId) || d.invoices.length);
+  const papers = deals.filter((d) => d.contractSignedAt && d.docusealSubmissionId);
   const first = account.name?.split(" ")[0];
 
   return (
@@ -119,12 +114,12 @@ export default async function CustomerPage() {
 
         {papers.length > 0 && (
           <section className="rounded-2xl bg-white ring-1 ring-black/[.06]">
-            <h2 className="px-5 pt-5 text-[17px] font-semibold">Kontrakt og fakturaer</h2>
+            <h2 className="px-5 pt-5 text-[17px] font-semibold">Kontrakt</h2>
             {papers.map((d) => (
               <div key={d.id} className="px-5 pb-4 pt-3">
                 {papers.length > 1 && <p className="mb-1 text-[13px] font-semibold text-[#6e6e73]">{dealName(d)}</p>}
                 <ul className="divide-y divide-black/[.06]">
-                  {d.contractSignedAt && d.docusealSubmissionId && (
+                  {d.contractSignedAt && (
                     <li className="flex items-center justify-between gap-3 py-2.5">
                       <span className="text-[15px]">
                         Kontrakt <span className="text-[13px] text-[#6e6e73]">underskrevet {date(d.contractSignedAt)}</span>
@@ -134,23 +129,6 @@ export default async function CustomerPage() {
                       </a>
                     </li>
                   )}
-                  {d.invoices.map((i) => (
-                    <li key={i.id} className="flex items-center justify-between gap-3 py-2.5">
-                      <span className="min-w-0 text-[15px]">
-                        Faktura {i.dineroInvoiceNumber ?? ""} <span className="text-[13px] text-[#6e6e73]">{date(i.sentAt!)} · {kr(i.amount)}</span>{" "}
-                        {i.paidAt ? (
-                          <span className="ml-1 rounded-full bg-[#e3f5e8] px-2 py-0.5 text-[11px] font-semibold text-[#248a3d]">Betalt</span>
-                        ) : i.dueDate ? (
-                          <span className="ml-1 text-[12px] text-[#6e6e73]">forfalder {date(i.dueDate)}</span>
-                        ) : null}
-                      </span>
-                      {i.dineroInvoiceGuid && (
-                        <a href={`/kunde/faktura/${i.id}`} className="flex-none text-[14px] font-medium text-[#0071e3]">
-                          Hent PDF
-                        </a>
-                      )}
-                    </li>
-                  ))}
                 </ul>
               </div>
             ))}

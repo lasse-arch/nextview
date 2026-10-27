@@ -8,7 +8,7 @@ import { RestoreButton } from "./restore-button";
 /** Slettede kunder: every deleted deal, kept whole, with "Gendan". Admins only. */
 export default async function DeletedDealsPage() {
   const user = await getCurrentUser();
-  if (!user) redirect("/api/auth/session-ended");
+  if (!user) redirect("/api/auth/session-ended?next=/arpo");
   if (user.role !== "ADMIN") redirect("/arpo/deals");
   const deleted = await prisma.deletedDeal.findMany({ orderBy: { createdAt: "desc" }, take: 200 });
   const counts = (data: unknown) => {

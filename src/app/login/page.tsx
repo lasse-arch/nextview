@@ -25,6 +25,9 @@ export default async function LoginPage({
 }) {
   const { next, error } = await searchParams;
   const nextPath = safeNextPath(next);
+  // Customers only ever see their own login. The team's (Google) shows when they come from Arpo
+  // (nextview360.dk/arpo sends here with next=/arpo…) or back from Google.
+  const team = nextPath.startsWith("/arpo") || Boolean(error?.startsWith("google_"));
   const [googleRequired, googleAvailable] = [await isGoogleLoginRequired(), isGoogleConfigured()];
 
   const google = googleAvailable && (
@@ -42,32 +45,31 @@ export default async function LoginPage({
     </a>
   );
 
-  // One login for everyone: customers get a link by e-mail, the team uses Google (or a password, while that's allowed).
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#f5f5f7] px-4 py-10">
       <div className="w-full max-w-sm rounded-2xl bg-white p-8 shadow-sm ring-1 ring-black/[.06]">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/logo.png" alt="Nextview360" className="h-8 w-auto" />
-        <p className="mt-6 text-2xl font-semibold tracking-tight text-slate-900">Log ind</p>
+        <p className="mt-6 text-2xl font-semibold tracking-tight text-slate-900">{team ? "Log ind i Arpo" : "Log ind"}</p>
         {error && ERRORS[error] && <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{ERRORS[error]}</p>}
 
-        <p className="mt-5 text-sm font-semibold text-slate-900">Kunde hos Nextview360</p>
-        <p className="mt-0.5 text-sm text-slate-500">Skriv din e-mail, så sender vi et link. Ingen adgangskode.</p>
-        <LinkForm />
-
-        <div className="mt-8 flex items-center gap-3 text-xs text-slate-400">
-          <span className="h-px flex-1 bg-slate-200" />
-          Medarbejder
-          <span className="h-px flex-1 bg-slate-200" />
-        </div>
-        {google}
-        {googleRequired ? (
-          <p className="mt-3 text-xs text-slate-500">Log ind med jeres Google-arbejdskonto.</p>
+        {team ? (
+          <>
+            {google}
+            {googleRequired ? (
+              <p className="mt-3 text-xs text-slate-500">Log ind med jeres Google-arbejdskonto.</p>
+            ) : (
+              <details className="mt-3 text-sm" open={!googleAvailable}>
+                <summary className="cursor-pointer text-xs text-slate-500">Med adgangskode</summary>
+                <LoginForm next={nextPath} />
+              </details>
+            )}
+          </>
         ) : (
-          <details className="mt-3 text-sm" open={!googleAvailable}>
-            <summary className="cursor-pointer text-xs text-slate-500">Med adgangskode</summary>
-            <LoginForm next={nextPath} />
-          </details>
+          <>
+            <p className="mt-2 text-sm text-slate-500">Skriv din e-mail, så sender vi dig et link til jeres side. Ingen adgangskode.</p>
+            <LinkForm />
+          </>
         )}
       </div>
     </div>

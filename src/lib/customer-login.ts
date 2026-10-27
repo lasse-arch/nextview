@@ -38,7 +38,7 @@ export async function sendLoginMail(account: { id: string; email: string; name: 
   const hi = account.name ? `Hej ${account.name.split(" ")[0]}` : "Hej";
   const subject = welcome ? "Jeres egen side hos Nextview360" : "Dit login til Nextview360";
   const lead = welcome
-    ? "I har nu jeres egen side hos Nextview360. Her kan I se, hvordan jeres virtuelle tour klarer sig, hente koderne til jeres hjemmeside og finde kontrakt og fakturaer."
+    ? "I har nu jeres egen side hos Nextview360. Her kan I se, hvordan jeres virtuelle tour klarer sig, hente koderne til jeres hjemmeside og finde jeres kontrakt."
     : "Her er dit link til at logge ind hos Nextview360.";
   const after = `Linket virker én gang og i ${LINK_MINUTES} minutter. Næste gang skriver du bare din e-mail på nextview360.dk/login, så får du et nyt.`;
   const bodyText = `${hi}\n\n${lead}\n\nLog ind her:\n${link}\n\n${after}\n\nHar du ikke bedt om det, kan du se bort fra mailen.\n\nVenlig hilsen\nNextview360`;

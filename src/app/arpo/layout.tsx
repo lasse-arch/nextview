@@ -14,7 +14,7 @@ import { getUnreadNewsCount } from "@/lib/actions/news";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const [user, presenting] = await Promise.all([getCurrentUser(), isPresentationMode()]);
-  if (!user) redirect((await getCurrentCustomer()) ? "/kunde" : "/api/auth/session-ended");
+  if (!user) redirect((await getCurrentCustomer()) ? "/kunde" : "/api/auth/session-ended?next=/arpo");
 
   const unreadNewsCount = await getUnreadNewsCount(user.id, user.newsReadAt ?? null);
 

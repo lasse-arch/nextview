@@ -10,7 +10,7 @@ const when = (d: Date | null) => (d ? `Sidst logget ind ${new Date(d).toLocaleDa
 
 /**
  * "Kundens login": who at the customer can log in on nextview360.dk/login and
- * see their tours, numbers, contract and invoices - and the button that gives
+ * see their tours, numbers and contract - and the button that gives
  * a new person access (a mail with a login link goes out at once).
  */
 export function CustomerAccessSection({
@@ -36,7 +36,7 @@ export function CustomerAccessSection({
     <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
       <h2 className="text-sm font-semibold text-slate-900">Kundens login</h2>
       <p className="mt-1 text-xs text-slate-500">
-        Kunden logger ind på nextview360.dk/login med et link på mail og ser sine tours, tal, koder til hjemmesiden, kontrakt og fakturaer.
+        Kunden logger ind på nextview360.dk/login med et link på mail og ser sine tours, tal, koder til hjemmesiden og kontrakten. Fakturaer kan de ikke se der - dem får de tilsendt.
         {branchCount > 0 && ` Adgangen gælder også de ${branchCount} afdelinger.`}
       </p>
 

@@ -11,7 +11,7 @@ import { formatDate } from "@/lib/labels";
 
 export default async function UsersPage() {
   const currentUser = await getCurrentUser();
-  if (!currentUser) redirect("/api/auth/session-ended");
+  if (!currentUser) redirect("/api/auth/session-ended?next=/arpo");
   if (currentUser.role !== "ADMIN") redirect("/arpo");
 
   const users = await prisma.user.findMany({ orderBy: { name: "asc" } });

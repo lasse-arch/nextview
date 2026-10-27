@@ -5,7 +5,7 @@ import { AvatarUploader } from "../avatar-uploader";
 
 export default async function ProfilePage() {
   const user = await getCurrentUser();
-  if (!user) redirect("/api/auth/session-ended");
+  if (!user) redirect("/api/auth/session-ended?next=/arpo");
 
   return (
     <div className="mx-auto max-w-lg space-y-6">

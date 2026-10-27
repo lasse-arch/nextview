@@ -29,7 +29,7 @@ function Row({ label, value, strong, money }: { label: string; value: string; st
 
 export default async function GrowthDashboardPage() {
   const user = await getCurrentUser();
-  if (!user) redirect("/api/auth/session-ended");
+  if (!user) redirect("/api/auth/session-ended?next=/arpo");
   if (user.role !== "ADMIN") redirect("/arpo");
 
   const d = await getGrowthDashboardData();
