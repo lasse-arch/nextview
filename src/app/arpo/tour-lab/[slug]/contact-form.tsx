@@ -2,16 +2,18 @@
 
 import { useState } from "react";
 import { useT } from "../tours/i18n-react";
-import { apiUrl } from "../tours/api";
 import type { TourConfig } from "../tours/types";
 
 /** The link that opens the tour's contact form - in the menu, on a button, anywhere a link goes. */
 export const CONTACT_HREF = "#kontakt";
 
+const EMAIL = /^[^\s@<>",;?&]+@[^\s@<>",;?&]+\.[^\s@<>",;?&]+$/;
+
 /**
  * "Skriv til os": the customer's contact form inside the tour - name, e-mail,
- * phone and message, sent to the customer (/api/tour-contact) without leaving
- * the tour. In the editor's preview nothing is sent.
+ * phone and message. Nothing goes through us: sending opens the visitor's own
+ * mail app with the message written to the customer (a mailto link), and the
+ * visitor presses Send there. In the editor's preview nothing is opened.
  */
 export function ContactForm({
   T,
@@ -27,12 +29,12 @@ export function ContactForm({
 }) {
   const tr = useT();
   const F = T.contactForm!;
-  const [v, setV] = useState({ name: "", email: "", phone: "", message: "", website: "" });
-  const [state, setState] = useState<"edit" | "sending" | "sent">("edit");
+  const [v, setV] = useState({ name: "", email: "", phone: "", message: "" });
+  const [state, setState] = useState<"edit" | "sent">("edit");
   const [error, setError] = useState<string | null>(null);
   const set = (k: keyof typeof v) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setV((x) => ({ ...x, [k]: e.target.value }));
 
-  async function send(e: React.FormEvent) {
+  function send(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     if (!v.name.trim() || !v.email.trim() || !v.message.trim()) return setError(tr("Udfyld navn, e-mail og besked."));
@@ -40,18 +42,13 @@ export function ContactForm({
       setState("sent");
       return;
     }
-    setState("sending");
-    try {
-      // Plain text, so the browser sends it straight (no extra check first) - also from the tour's own address.
-      const res = await fetch(apiUrl("/api/tour-contact"), { method: "POST", headers: { "content-type": "text/plain" }, body: JSON.stringify({ tour: T.slug, ...v }) });
-      const r = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
-      if (!res.ok || !r.ok) throw new Error(r.error || tr("Beskeden kunne ikke sendes - prøv igen."));
-      setState("sent");
-      onSent();
-    } catch (err) {
-      setState("edit");
-      setError(err instanceof Error ? err.message : String(err));
-    }
+    if (!EMAIL.test(F.to)) return setError(tr("Formularen virker ikke lige nu."));
+    const title = T.title || T.slug;
+    const phone = v.phone.trim() ? [`${tr("Telefon")}: ${v.phone.trim()}`] : [];
+    const body = [v.message.trim(), "", `${tr("Navn")}: ${v.name.trim()}`, `${tr("E-mail")}: ${v.email.trim()}`, ...phone, "", tr("Sendt fra den virtuelle tour")].join("\r\n");
+    window.location.href = `mailto:${F.to}?subject=${encodeURIComponent(`${F.title || tr("Skriv til os")} - ${title}`)}&body=${encodeURIComponent(body)}`;
+    setState("sent");
+    onSent();
   }
 
   return (
@@ -63,8 +60,16 @@ export function ContactForm({
         {state === "sent" ? (
           <div className="cf-tak">
             <div className="cf-ok">✓</div>
-            <h3>{F.thanks || tr("Tak for din besked!")}</h3>
-            <p>{preview ? "Forhåndsvisning - beskeden blev ikke sendt." : tr("Vi vender tilbage hurtigst muligt.")}</p>
+            <h3>{F.thanks || tr("Næsten færdig!")}</h3>
+            <p>
+              {preview ? "Forhåndsvisning - her åbner gæstens mailprogram med beskeden, klar til at trykke Send." : tr("Din mail er klar i dit mailprogram - tryk Send der.")}
+              {!preview && (
+                <>
+                  <br />
+                  {tr("Åbnede den ikke? Skriv til")} <a href={`mailto:${F.to}`}>{F.to}</a>
+                </>
+              )}
+            </p>
             <button type="button" className="hv-btn hv-primary" onClick={onClose}>
               {tr("Tilbage til touren")}
             </button>
@@ -91,11 +96,9 @@ export function ContactForm({
               <span>{tr("Besked")}</span>
               <textarea value={v.message} onChange={set("message")} rows={4} maxLength={4000} required />
             </label>
-            {/* Hidden from people - a bot fills it in, and its message is dropped. */}
-            <input className="cf-hp" tabIndex={-1} autoComplete="off" aria-hidden value={v.website} onChange={set("website")} name="website" />
             {error && <p className="cf-fejl">{error}</p>}
-            <button type="submit" className="hv-btn hv-primary cf-send" disabled={state === "sending"}>
-              {state === "sending" ? tr("Sender…") : tr("Send")}
+            <button type="submit" className="hv-btn hv-primary cf-send">
+              {tr("Skriv mailen")}
             </button>
           </>
         )}
@@ -113,7 +116,7 @@ export const CONTACT_CSS = `
 .cf label span{display:block;margin-bottom:4px;font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#7a8589}
 .cf input,.cf textarea{width:100%;box-sizing:border-box;border:0;border-bottom:2px solid #dfe4e6;background:#f6f8f8;border-radius:10px 10px 4px 4px;padding:10px 12px;font:inherit;font-size:16px;color:#1d2a30;outline:none;resize:vertical}
 .cf input:focus,.cf textarea:focus{border-bottom-color:var(--c-accent);background:#fff}
-.cf-hp{position:absolute!important;left:-9999px!important;width:1px!important;height:1px!important;opacity:0}
+.cf-tak a{color:var(--c-main);font-weight:700}
 .cf-fejl{margin:10px 0 0;font-size:13px;color:#c4271d}
 .cf-send{width:100%;justify-content:center;margin-top:16px}
 .cf-luk{position:absolute;top:12px;right:12px;width:32px;height:32px;border:0;border-radius:50%;background:#eef1f2;font-size:20px;line-height:1;cursor:pointer;color:#1d2a30}

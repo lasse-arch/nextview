@@ -870,11 +870,11 @@ export function TourEditor({
                     on={Boolean(config.contactForm)}
                     onChange={(on) => edit((d) => void (d.contactForm = on ? { to: d.contact?.email ?? "" } : undefined))}
                     title='"Skriv til os" inde i touren'
-                    hint="Gæsten skriver navn, e-mail, telefon og besked uden at forlade touren - beskeden sendes til kunden, som kan svare direkte på mailen. Knappen kommer i kontaktboksen; linket #kontakt kan også bruges i menuen og på knapper."
+                    hint="Gæsten skriver navn, e-mail, telefon og besked i touren. Når de trykker, åbner deres eget mailprogram med mailen færdigskrevet til kunden - de trykker Send, og mailen går direkte fra gæst til kunde. Intet går gennem os. Knappen kommer i kontaktboksen; linket #kontakt kan også bruges i menuen og på knapper."
                   />
                   {config.contactForm && (
                     <>
-                      <Field title="Beskeder sendes til" hint="Kundens e-mail. Gæsten ser den ikke.">
+                      <Field title="Mailen skrives til" hint="Kundens e-mail - gæsten ser den i sit mailprogram.">
                         <input type="email" className={input} placeholder="Fx info@kunde.dk" value={config.contactForm.to} onChange={(e) => edit((d) => void (d.contactForm = { ...d.contactForm!, to: e.target.value.trim() }))} />
                       </Field>
                       <Field title="Overskrift">
@@ -889,7 +889,7 @@ export function TourEditor({
                           + Læg &quot;Skriv til os&quot; i menuen
                         </button>
                       )}
-                      <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">I forhåndsvisningen kan formularen prøves, men intet sendes.</p>
+                      <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">I forhåndsvisningen kan formularen prøves, men mailprogrammet åbnes ikke.</p>
                     </>
                   )}
                 </Group>
