@@ -582,6 +582,17 @@ export async function getInvoicePaymentStatus(
   return { paid, paidDate: null, rawStatus: status };
 }
 
+/** A booked invoice as the PDF the customer got (for their own page, /kunde). */
+export async function downloadInvoicePdf(invoiceGuid: string): Promise<ArrayBuffer> {
+  const accessToken = await getAccessToken();
+  const orgId = process.env.DINERO_ORGANIZATION_ID!;
+  const res = await dineroFetch(`${DINERO_API_BASE}/${orgId}/invoices/${invoiceGuid}`, {
+    headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/pdf" },
+  });
+  if (!res.ok || !res.headers.get("content-type")?.includes("pdf")) throw new Error(`Dinero: kunne ikke hente fakturaen som PDF (${res.status})`);
+  return res.arrayBuffer();
+}
+
 export type DineroDraftResult = {
   contactGuid: string;
   invoiceGuid: string;

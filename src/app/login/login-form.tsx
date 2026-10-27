@@ -18,7 +18,6 @@ export function LoginForm({ next }: { next: string }) {
           name="email"
           type="email"
           required
-          autoFocus
           className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
         />
       </div>

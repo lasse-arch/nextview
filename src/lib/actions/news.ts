@@ -223,6 +223,12 @@ const DEFAULT_POSTS: { title: string; body: string; minutesAgo: number; screensh
     body: "Har kunden flere afdelinger, kan du nu lave én kontrakt med en tour til hver. Sæt flueben i \"Kunden har flere lokationer\" under Nextview360 Tour på kontraktsiden, og skriv navn, adresse, etablering og månedspris for hver lokation (\"+ Tilføj lokation\" for flere). Kontrakten viser en tabel med alle lokationerne og totalen, og fakturaerne og ydelserne på dealen får en linje pr. lokation, fx \"Nextview360 Tour - Aarhus\". Virker også på fritstående kontrakter.",
     screenshotUrl: "/news/flere-lokationer.png",
   },
+  {
+    minutesAgo: 0,
+    title: "Kunderne får deres egen side med login",
+    body: "Kunderne kan nu logge ind og se deres egen side: deres tours med de tal, vi deler, koderne til at sætte touren ind på deres hjemmeside, linket til at give feedback, den underskrevne kontrakt og fakturaerne som PDF, og hvordan de får fat i os.\n\nGiv adgang under \"Kundens login\" på dealens side (kun admin): skriv kundens e-mail, og tryk \"Giv adgang og send mail\". Kunden får en mail fra lasse@nextview360.dk med et login-link. Der er ingen adgangskode - næste gang skriver kunden bare sin e-mail på login-siden og får et nyt link, der virker i 15 minutter. Har kunden afdelinger, får de adgang til dem alle. Under \"Kundens login\" kan du også se, hvornår de sidst var logget ind, sende linket igen eller fjerne adgangen.\n\nKunderne kan kun se deres egne ting og kan aldrig komme ind i Arpo. Samtidig er Arpo flyttet til /arpo, så hjemmesiden, login og Arpo kan ligge på samme adresse, nextview360.dk. Gamle links og bogmærker sender selv videre.",
+    screenshotUrl: "/news/kundelogin.png",
+  },
 ];
 
 /**

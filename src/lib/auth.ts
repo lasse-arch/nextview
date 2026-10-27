@@ -33,14 +33,20 @@ function getSecret() {
  * sessions stop working (see getCurrentUser). */
 export type LoginMethod = "password" | "google";
 
-export async function createSession(userId: string, method: LoginMethod) {
-  const token = await new SignJWT({ userId, method })
+/** The team (Arpo) or a customer (their own page, /kunde) - never both: a
+ * customer's session doesn't open Arpo, and the team's doesn't open /kunde. */
+type Session = { kind: "staff"; userId: string; method: LoginMethod } | { kind: "customer"; customerId: string };
+
+async function setSessionCookie(payload: Record<string, string>) {
+  const token = await new SignJWT(payload)
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime(`${SESSION_TTL_SECONDS}s`)
     .sign(getSecret());
 
   const cookieStore = await cookies();
+  // No "domain": the cookie belongs to this exact address only - it's never
+  // sent to tour.nextview360.dk, explore.nextview360.dk or any other subdomain.
   cookieStore.set(SESSION_COOKIE, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
@@ -50,34 +56,52 @@ export async function createSession(userId: string, method: LoginMethod) {
   });
 }
 
+export async function createSession(userId: string, method: LoginMethod) {
+  await setSessionCookie({ userId, method });
+}
+
+/** A customer logged in with the link from their e-mail. */
+export async function createCustomerSession(customerId: string) {
+  await setSessionCookie({ customerId, method: "link" });
+}
+
 export async function destroySession() {
   const cookieStore = await cookies();
   cookieStore.delete(SESSION_COOKIE);
 }
 
-async function getSessionFromCookie(): Promise<{ userId: string; method: LoginMethod } | null> {
+async function getSessionFromCookie(): Promise<Session | null> {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE)?.value;
   if (!token) return null;
   try {
     const { payload } = await jwtVerify(token, getSecret());
+    if (typeof payload.customerId === "string") return { kind: "customer", customerId: payload.customerId };
     if (typeof payload.userId !== "string") return null;
     // Sessions from before login methods were recorded were all password ones.
-    return { userId: payload.userId, method: payload.method === "google" ? "google" : "password" };
+    return { kind: "staff", userId: payload.userId, method: payload.method === "google" ? "google" : "password" };
   } catch {
     return null;
   }
 }
 
+/** The logged-in team member (admin or seller) - null for customers, who only ever get getCurrentCustomer. */
 export async function getCurrentUser(): Promise<User | null> {
   const session = await getSessionFromCookie();
-  if (!session) return null;
+  if (session?.kind !== "staff") return null;
   // With "Kræv Google-login" on, a password session (even one started
   // before it was turned on) no longer counts - log in again with Google.
   if (session.method === "password" && (await isGoogleLoginRequired())) return null;
   const user = await prisma.user.findUnique({ where: { id: session.userId } });
   if (user) touchLastActive(user);
   return user;
+}
+
+/** The logged-in customer, with the deals they may see - null for everyone else. */
+export async function getCurrentCustomer() {
+  const session = await getSessionFromCookie();
+  if (session?.kind !== "customer") return null;
+  return prisma.customerAccount.findUnique({ where: { id: session.customerId }, include: { deals: { select: { dealId: true } } } });
 }
 
 export async function requireUser(): Promise<User> {

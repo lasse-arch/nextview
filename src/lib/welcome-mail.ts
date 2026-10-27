@@ -7,7 +7,7 @@ import { logActivity } from "@/lib/activity";
 
 /** The welcome mail goes from Lasse's mailbox, so replies land with him. */
 export const WELCOME_MAIL_SENDER = "lasse@nextview360.dk";
-const PHONE = "23 27 07 86";
+export const PHONE = "23 27 07 86";
 const NEXTVIEW_URL = "https://www.nextview360.dk";
 
 function esc(s: string): string {

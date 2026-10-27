@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentCustomer, getCurrentUser } from "@/lib/auth";
 import { logout } from "@/lib/actions/auth";
 import { ToastProvider } from "@/components/toast";
 import { SettingsMenu } from "./settings-menu";
@@ -14,7 +14,7 @@ import { getUnreadNewsCount } from "@/lib/actions/news";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const [user, presenting] = await Promise.all([getCurrentUser(), isPresentationMode()]);
-  if (!user) redirect("/api/auth/session-ended");
+  if (!user) redirect((await getCurrentCustomer()) ? "/kunde" : "/api/auth/session-ended");
 
   const unreadNewsCount = await getUnreadNewsCount(user.id, user.newsReadAt ?? null);
 

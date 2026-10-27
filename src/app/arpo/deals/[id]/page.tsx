@@ -46,6 +46,7 @@ import { TerminationSection } from "./termination-section";
 import { DealItemsSection } from "./deal-items-section";
 import { DealDangerActions } from "./danger-actions";
 import { CustomerLinkSection } from "./customer-link-section";
+import { CustomerAccessSection } from "./customer-access-section";
 import { AddressAutocomplete } from "../../address-autocomplete";
 import { CvrLookupField } from "./cvr-lookup-field";
 import { DisplayNameInput } from "../../display-name-input";
@@ -134,6 +135,7 @@ export default async function DealDetailPage({
         tasks: { orderBy: { createdAt: "asc" } },
         reports: { orderBy: { sentAt: "desc" }, take: 1 },
         timeEntries: { include: { user: true }, orderBy: { date: "desc" } },
+        customerAccounts: { orderBy: { createdAt: "asc" }, include: { account: { select: { id: true, email: true, name: true, lastLoginAt: true } } } },
       },
     }),
     prisma.user.findMany({ orderBy: { name: "asc" } }),
@@ -742,6 +744,16 @@ export default async function DealDetailPage({
               contractEndDateManual={deal.contractEndDateManual}
               isChurned={Boolean(deal.churnedAt)}
               isAdmin
+            />
+          )}
+
+          {currentUser?.role === "ADMIN" && (
+            <CustomerAccessSection
+              dealId={deal.id}
+              accounts={deal.customerAccounts.map((c) => c.account)}
+              defaultEmail={deal.contactEmail}
+              defaultName={deal.contactName}
+              branchCount={deal.branches.length}
             />
           )}
 

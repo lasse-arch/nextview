@@ -630,6 +630,8 @@ model Deal {
   activityEvents ActivityEvent[]
   timeEntries    TimeEntry[]
   tours          Tour[]
+  /// Customer logins (nextview360.dk/kunde) that may see this deal.
+  customerAccounts CustomerAccountDeal[]
 
   @@index([inLeadInbox, stage])
 }
@@ -1503,4 +1505,44 @@ model SiteInquiry {
   createdAt DateTime @default(now())
 
   @@index([ip, createdAt])
+}
+
+/// A customer's login to their own page, nextview360.dk/kunde - no password,
+/// a link on e-mail. Kept apart from User on purpose: customers never turn up
+/// among Arpo's users, sellers or commission, and can't open anything in Arpo.
+model CustomerAccount {
+  id            String                @id @default(cuid())
+  email         String                @unique
+  name          String?
+  createdAt     DateTime              @default(now())
+  lastLoginAt   DateTime?
+  /// Who gave the access, for the deal page.
+  invitedByName String?
+  deals         CustomerAccountDeal[]
+  tokens        CustomerLoginToken[]
+}
+
+/// Which deals (and so tours, contract, invoices) a customer login may see.
+model CustomerAccountDeal {
+  accountId String
+  account   CustomerAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  dealId    String
+  deal      Deal            @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  createdAt DateTime        @default(now())
+
+  @@id([accountId, dealId])
+  @@index([dealId])
+}
+
+/// A one-time login link: only its hash is kept, it works once, for 15 minutes.
+model CustomerLoginToken {
+  id        String          @id @default(cuid())
+  tokenHash String          @unique
+  accountId String
+  account   CustomerAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime        @default(now())
+
+  @@index([accountId, createdAt])
 }

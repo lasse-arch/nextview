@@ -1,8 +1,9 @@
 import { redirect } from "next/navigation";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentCustomer, getCurrentUser } from "@/lib/auth";
 
-/** "/" outside the website's own address: Arpo for the team. (On nextview360.dk, "/" is the website - see proxy.ts.) */
+/** "/" outside the website's own address (on nextview360.dk, "/" is the website - see proxy.ts): Arpo for the team, their own page for customers. */
 export default async function Home() {
   if (await getCurrentUser()) redirect("/arpo");
+  if (await getCurrentCustomer()) redirect("/kunde");
   redirect("/api/auth/session-ended");
 }
