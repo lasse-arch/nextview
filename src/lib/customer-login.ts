@@ -14,6 +14,13 @@ import { WELCOME_MAIL_SENDER } from "@/lib/welcome-mail";
  */
 
 const LINK_MINUTES = 15;
+/**
+ * Login mails go out as info@nextview360.dk, through lasse@'s connected Gmail,
+ * where it is a "Send mail as" address - so a customer who answers reaches
+ * the shared inbox, not one person. (Gmail sends as lasse@ instead if the
+ * alias is ever removed there.)
+ */
+const LOGIN_MAIL_FROM = "info@nextview360.dk";
 /** The first link, when access is given in Arpo: the customer may not open the mail the same day. */
 const WELCOME_DAYS = 7;
 /** Links one customer can ask for in an hour, and requests from one address in 15 minutes. */
@@ -47,6 +54,7 @@ export async function sendLoginMail(account: { id: string; email: string; name: 
     : `Linket virker én gang og i ${LINK_MINUTES} minutter. Har du ikke bedt om det, kan du se bort fra mailen.`;
   const bodyText = `${hi}\n\n${lead}\n\nLog ind her:\n${link}\n\n${after}\n\nVenlig hilsen\nNextview360`;
   const bodyHtml = `<div style="font-family:-apple-system,Segoe UI,Arial,sans-serif;font-size:15px;line-height:1.5;color:#1d1d1f;max-width:520px">
+<p style="margin:0 0 24px"><img src="${esc(getAppBaseUrl())}/logo.png" alt="Nextview360" width="138" height="32" style="display:block;border:0;height:32px;width:auto"></p>
 <p>${esc(hi)}</p>
 <p>${esc(lead)}</p>
 <p><a href="${esc(link)}" style="display:inline-block;background:#0071e3;color:#fff;text-decoration:none;font-weight:600;padding:12px 22px;border-radius:12px">Log ind</a></p>
@@ -63,7 +71,7 @@ export async function sendLoginMail(account: { id: string; email: string; name: 
     }
     throw new Error(`Ingen forbundet Gmail-konto for ${WELCOME_MAIL_SENDER}. Forbind den under Indstillinger → E-mail.`);
   }
-  await sendGmailMessage(sender, { to: [account.email], subject, bodyText, bodyHtml, fromName: "Nextview360" });
+  await sendGmailMessage(sender, { to: [account.email], subject, bodyText, bodyHtml, fromName: "Nextview360", fromAddress: LOGIN_MAIL_FROM });
 }
 
 /**
