@@ -1316,6 +1316,13 @@ model Tour {
   /// "Kundegennemsyn": the secret link /p/<reviewToken> where the customer
   /// looks around and leaves feedback in the tour. Null = switched off.
   reviewToken String?      @unique
+  /// "Send til gennemgang": when the customer was sent the review mail, the last reminder and how many,
+  /// and when the tour was approved - by the customer (in the tour or their page) or by us.
+  reviewSentAt     DateTime?
+  reviewRemindedAt DateTime?
+  reviewReminders  Int       @default(0)
+  reviewApprovedAt DateTime?
+  reviewApprovedBy String?
   dealId    String?
   deal      Deal?         @relation(fields: [dealId], references: [id], onDelete: SetNull)
   config    Json

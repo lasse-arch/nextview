@@ -2,13 +2,15 @@
 
 import { reviewUrl } from "@/lib/public-urls";
 import { useEffect, useState, useTransition } from "react";
-import { deleteFeedback, setFeedbackStatus, setTourReview, tourFeedback, type Feedback } from "@/lib/actions/tour-feedback";
+import { deleteFeedback, reviewStatus, sendForReview, setFeedbackStatus, setTourApproved, setTourReview, tourFeedback, type Feedback, type ReviewStatus } from "@/lib/actions/tour-feedback";
 import { Choice, Group, Toggle, type PreviewApi } from "./ui";
 
 /*
  * "Feedback": Kundegennemsyn switched on and off (the secret link the customer
  * gets), and what customers have said in the tour - each with a picture of
- * the spot and "Vis stedet", which flies the preview there.
+ * the spot and "Vis stedet", which flies the preview there. On top: "Send til
+ * gennemgang" - the mail to the customer, reminders, and the approval (theirs,
+ * or ours when they don't answer).
  */
 
 const when = (iso: string) => new Date(iso).toLocaleString("da-DK", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
@@ -20,9 +22,13 @@ export function FeedbackPanel({ slug, token: initialToken, preview }: { slug: st
   const [copied, setCopied] = useState(false);
   const [big, setBig] = useState<string | null>(null);
   const [pending, start] = useTransition();
+  const [status, setStatus] = useState<ReviewStatus | null>(null);
+  const [note, setNote] = useState<{ text: string; error?: boolean } | null>(null);
   const reload = () => tourFeedback(slug).then(setItems);
+  const reloadStatus = () => reviewStatus(slug).then(setStatus);
   useEffect(() => {
     let off = false;
+    reviewStatus(slug).then((r) => !off && setStatus(r));
     tourFeedback(slug).then((f) => !off && setItems(f));
     return () => {
       off = true;
@@ -32,8 +38,69 @@ export function FeedbackPanel({ slug, token: initialToken, preview }: { slug: st
   const url = token && typeof window !== "undefined" ? reviewUrl(token, location.origin) : null;
   const shown = (items ?? []).filter((f) => filter === "all" || f.status === filter);
   const open = (items ?? []).filter((f) => f.status === "open").length;
+  function send(reminder: boolean) {
+    setNote(null);
+    start(async () => {
+      const r = await sendForReview(slug, reminder);
+      if (!r.ok) return setNote({ text: r.error, error: true });
+      setNote({ text: `${reminder ? "Påmindelsen" : "Mailen"} er sendt til ${r.to}.` });
+      reloadStatus();
+      setToken(r.token); // the link in the mail (switched on by sending, if it was off)
+    });
+  }
+
   return (
     <>
+      <Group title="Gennemgang hos kunden">
+        {status?.approvedAt ? (
+          <div className="rounded-xl bg-[#34c759]/10 px-3 py-2.5">
+            <p className="text-[14px] font-semibold text-[#1f7a35]">✓ Godkendt {when(status.approvedAt)}</p>
+            <p className="text-[12px] text-[#3a6b45]">af {status.approvedBy}{status.open ? ` · ${status.open} rettelse${status.open === 1 ? "" : "r"} stadig åben${status.open === 1 ? "" : "e"}` : ""}</p>
+          </div>
+        ) : status?.sentAt ? (
+          <div className="rounded-xl bg-[#ff9500]/10 px-3 py-2.5">
+            <p className="text-[14px] font-semibold text-[#a05a00]">Venter på kunden</p>
+            <p className="text-[12px] text-[#7a5a2a]">
+              Sendt {when(status.sentAt)}
+              {status.reminders ? ` · ${status.reminders} påmindelse${status.reminders === 1 ? "" : "r"} (sidst ${when(status.remindedAt!)})` : ""}
+              {status.open ? ` · ${status.open} rettelse${status.open === 1 ? "" : "r"} fra kunden` : ""}
+            </p>
+          </div>
+        ) : (
+          <p className="text-[13px] leading-snug text-[#6e6e73]">
+            Send touren til kunden: de får en mail med touren, hvor de kan gå rundt, skrive rettelser der, hvor de står, og trykke Godkend. Har de adgang til kundesiden, kommer den med i mailen.
+          </p>
+        )}
+        <div className="flex flex-wrap gap-2">
+          {!status?.sentAt || status.approvedAt ? (
+            <button type="button" disabled={pending || !status?.to} onClick={() => send(false)} className="flex-1 rounded-xl bg-[#0071e3] py-2 text-[14px] font-medium text-white disabled:opacity-40">
+              {status?.approvedAt ? "Send til ny gennemgang" : "Send til gennemgang"}
+            </button>
+          ) : (
+            <button type="button" disabled={pending} onClick={() => send(true)} className="flex-1 rounded-xl bg-[#0071e3] py-2 text-[14px] font-medium text-white disabled:opacity-40">
+              Send påmindelse
+            </button>
+          )}
+          {status?.sentAt && !status.approvedAt && (
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => confirm("Godkend touren selv? Kunden får ikke besked.") && start(async () => (await setTourApproved(slug, true), reloadStatus()))}
+              className="rounded-xl bg-white px-3 py-2 text-[14px] font-medium text-[#1f7a35] ring-1 ring-black/[.06]"
+            >
+              Godkend selv
+            </button>
+          )}
+          {status?.approvedAt && (
+            <button type="button" disabled={pending} onClick={() => start(async () => (await setTourApproved(slug, false), reloadStatus()))} className="rounded-xl bg-white px-3 py-2 text-[14px] font-medium text-[#0071e3] ring-1 ring-black/[.06]">
+              Genåbn
+            </button>
+          )}
+        </div>
+        <p className={`text-[12px] leading-snug ${note?.error ? "text-[#ff3b30]" : note ? "text-[#34c759]" : "text-[#8e8e93]"}`}>
+          {note?.text ?? (status?.to ? `Mailen går til ${status.to} (kontakt-e-mailen på dealen) fra lasse@. Godkender kunden, får I besked på mail.` : status ? "Touren er ikke koblet til en kunde med kontakt-e-mail." : "")}
+        </p>
+      </Group>
       <Group title="Kundegennemsyn">
         <Toggle
           on={Boolean(token)}

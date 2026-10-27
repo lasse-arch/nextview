@@ -34,7 +34,10 @@ export function FeedbackLayer({
   shot: () => Promise<string | null>;
   onGo: (href: string) => void;
 }) {
-  const [step, setStep] = useState<null | "write" | "list">(null);
+  const [step, setStep] = useState<null | "write" | "list" | "approve">(null);
+  /** "Godkend touren": done already (by them or us), and the name they sign with. */
+  const [approved, setApproved] = useState<string | null>(null);
+  const [name, setName] = useState("");
   const [text, setText] = useState("");
   const [here, setHere] = useState<{
     view: ReviewView | null;
@@ -65,8 +68,23 @@ export function FeedbackLayer({
       .catch(() => {});
   useEffect(() => {
     load();
+    fetch(apiUrl(`/api/tour-review?token=${encodeURIComponent(token)}`))
+      .then((r) => (r.ok ? r.json() : null))
+      .then((r: { approvedAt: string | null } | null) => r?.approvedAt && setApproved(r.approvedAt))
+      .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
+
+  async function approve() {
+    setBusy(true);
+    const r = await fetch(apiUrl("/api/tour-review"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token, name }) }).catch(() => null);
+    setBusy(false);
+    if (!r?.ok) return setMsg((await r?.json().catch(() => null))?.error ?? "Det kunne ikke sendes - prøv igen.");
+    setApproved(new Date().toISOString());
+    setStep(null);
+    setMsg("Tak! Touren er godkendt - vi har fået besked.");
+    setTimeout(() => setMsg(null), 4000);
+  }
 
   /** Straight to writing - where they stand and what they see is kept by itself. */
   async function open() {
@@ -118,6 +136,13 @@ export function FeedbackLayer({
           <button type="button" className="fb-main" onClick={open}>
             Giv feedback
           </button>
+          {approved ? (
+            <span className="fb-ok">Godkendt ✓</span>
+          ) : (
+            <button type="button" className="fb-godkend" onClick={() => setStep("approve")}>
+              Godkend
+            </button>
+          )}
           <button
             type="button"
             className="fb-list"
@@ -163,6 +188,27 @@ export function FeedbackLayer({
               onClick={send}
             >
               {busy ? "Sender…" : "Send"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {step === "approve" && (
+        <div className="fb-sheet" role="dialog" aria-label="Godkend touren">
+          <div className="fb-card">
+            <div className="fb-head">
+              <b>Godkend touren</b>
+              <button type="button" aria-label="Luk" onClick={() => setStep(null)}>
+                ×
+              </button>
+            </div>
+            <p className="fb-tekst">
+              Er I tilfredse med touren? Så godkender I den her, og vi får besked.
+              {notes.some((n) => n.status !== "done") ? " Jeres rettelser, der ikke er løst endnu, retter vi stadig." : ""}
+            </p>
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Jeres navn (valgfrit)" maxLength={80} />
+            <button type="button" className="fb-send fb-send-ok" disabled={busy} onClick={approve}>
+              {busy ? "Sender…" : "Ja, godkend touren"}
             </button>
           </div>
         </div>
@@ -221,6 +267,10 @@ export const FEEDBACK_CSS = `
 .fb-bar button{white-space:nowrap;border:0;border-radius:999px;font:inherit;font-weight:700;font-size:13px;cursor:pointer;padding:8px 14px}
 .fb-main{background:#ffcc00;color:#1d1d1f}
 .fb-list{background:rgba(255,255,255,.12);color:#fff}
+.fb-godkend{background:#34c759;color:#fff}
+.fb-ok{padding:8px 12px;font-size:13px;font-weight:700;color:#7ee29a;white-space:nowrap}
+.fb-tekst{margin:0;font-size:14px;line-height:1.45;color:#3a3a3c}
+.fb-send.fb-send-ok{background:#34c759}
 .fb-sheet{position:absolute;inset:0;z-index:46;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(0,0,0,.4)}
 .fb-card,.fb-panel{width:min(440px,100%);max-height:100%;overflow-y:auto;border-radius:20px;background:#fff;color:#1d1d1f;padding:16px;box-shadow:0 20px 60px rgba(0,0,0,.4);display:flex;flex-direction:column;gap:10px}
 .fb-head{display:flex;align-items:center;justify-content:space-between}

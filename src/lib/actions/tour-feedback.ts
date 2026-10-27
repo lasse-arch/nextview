@@ -4,6 +4,7 @@ import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { approveTour, sendReviewMail } from "@/lib/tour-review";
 
 /*
  * "Kundegennemsyn": a secret link (/p/<token>) we switch on for a tour, where
@@ -41,4 +42,54 @@ export async function setFeedbackStatus(id: string, status: "open" | "done"): Pr
 export async function deleteFeedback(id: string): Promise<void> {
   await admin();
   await prisma.tourFeedback.delete({ where: { id } }).catch(() => {});
+}
+
+/* ----- "Send til gennemgang": the mail, reminders and approval ----- */
+
+export type ReviewStatus = {
+  to: string | null;
+  sentAt: string | null;
+  remindedAt: string | null;
+  reminders: number;
+  approvedAt: string | null;
+  approvedBy: string | null;
+  open: number;
+};
+
+export async function reviewStatus(slug: string): Promise<ReviewStatus> {
+  await admin();
+  const t = await prisma.tour.findUnique({
+    where: { slug },
+    select: { reviewSentAt: true, reviewRemindedAt: true, reviewReminders: true, reviewApprovedAt: true, reviewApprovedBy: true, deal: { select: { contactEmail: true } } },
+  });
+  const open = await prisma.tourFeedback.count({ where: { tourSlug: slug, status: "open" } });
+  return {
+    to: t?.deal?.contactEmail ?? null,
+    sentAt: t?.reviewSentAt?.toISOString() ?? null,
+    remindedAt: t?.reviewRemindedAt?.toISOString() ?? null,
+    reminders: t?.reviewReminders ?? 0,
+    approvedAt: t?.reviewApprovedAt?.toISOString() ?? null,
+    approvedBy: t?.reviewApprovedBy ?? null,
+    open,
+  };
+}
+
+/** Sends the review mail to the customer - or a reminder. */
+export async function sendForReview(slug: string, reminder: boolean): Promise<{ ok: true; to: string; token: string } | { ok: false; error: string }> {
+  const user = await admin();
+  try {
+    const r = await sendReviewMail(slug, { id: user.id, name: user.name }, reminder);
+    revalidatePath(`/arpo/tour-lab/${slug}/rediger`);
+    return { ok: true, to: r.to, token: r.token };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/** We approve it ourselves (no answer from the customer) - or open the review again. */
+export async function setTourApproved(slug: string, approved: boolean): Promise<void> {
+  const user = await admin();
+  if (approved) await approveTour(slug, { name: user.name, customer: false, actorId: user.id });
+  else await prisma.tour.update({ where: { slug }, data: { reviewApprovedAt: null, reviewApprovedBy: null } });
+  revalidatePath(`/arpo/tour-lab/${slug}/rediger`);
 }

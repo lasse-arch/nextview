@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { setPortalLanguage } from "@/lib/actions/portal-language";
-import { portalReview } from "@/lib/actions/portal-review";
+import { portalApprove, portalReview } from "@/lib/actions/portal-review";
 
 /*
  * The customer page's moving parts: the location picker (like Wolt's - "all
@@ -121,6 +121,41 @@ export function TourThumb({ src }: { src: string }) {
         // eslint-disable-next-line @next/next/no-img-element
         <img src={src} alt="" loading="lazy" onError={() => setOk(false)} className="absolute inset-0 h-full w-full object-cover" />
       )}
+    </span>
+  );
+}
+
+/** "Godkend touren" on the customer's page - approving tells us; an admin looking as the customer can't do it in their name. */
+export function ApproveTour({ slug, approved, preview, words }: { slug: string; approved: string | null; preview: boolean; words: { approve: string; confirm: string; approved: string; previewOnly: string } }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  if (approved)
+    return (
+      <span className="rounded-full bg-[#34c759]/15 px-3 py-1.5 text-[13px] font-semibold text-[#1d7a33]">
+        {words.approved} {approved}
+      </span>
+    );
+  return (
+    <span className="flex flex-col items-end gap-1">
+      <button
+        type="button"
+        disabled={busy || preview}
+        title={preview ? words.previewOnly : undefined}
+        onClick={async () => {
+          if (!confirm(words.confirm)) return;
+          setBusy(true);
+          setError(null);
+          const r = await portalApprove(slug);
+          setBusy(false);
+          if (!r.ok) return setError(r.error);
+          router.refresh();
+        }}
+        className="rounded-full bg-[#34c759] px-4 py-2 text-[14px] font-semibold text-white disabled:opacity-50"
+      >
+        {words.approve}
+      </button>
+      {error && <span className="text-[12px] text-[#c4271d]">{error}</span>}
     </span>
   );
 }

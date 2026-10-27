@@ -63,6 +63,12 @@ export async function getUnreadNewsCount(userId: string, newsReadAt: Date | null
 const DEFAULT_POSTS: { title: string; body: string; minutesAgo: number; screenshotUrl: string }[] = [
   {
     minutesAgo: 0,
+    title: "Send touren til gennemgang hos kunden",
+    body: "I tour-editoren under Feedback er der nu \"Send til gennemgang\": kunden får en mail fra lasse@ med et link til touren, hvor de går rundt, trykker \"Giv feedback\" der, hvor noget skal rettes, og \"Godkend\", når de er tilfredse. Har kunden adgang til kundesiden, kommer den med i mailen - og under Rettelser kan de også se touren, skrive rettelser og godkende. Touren kan sendes, før den er udgivet.\n\nI editoren står der, hvornår den er sendt, om kunden har godkendt, og hvor mange rettelser der er åbne. Hører I ikke noget, kan I sende en påmindelse - eller trykke \"Godkend selv\". Godkender kunden, får I en mail. Efter en godkendelse kan I sende touren til en ny gennemgang. Udgiv virker som før og venter ikke på kunden.",
+    screenshotUrl: "/news/gennemgang.png",
+  },
+  {
+    minutesAgo: 0,
     title: "Kundeoverblik: alt om en kunde på én side",
     body: "Klik på en kunde under \"Live kunder\" (eller \"Kundeoverblik\" på dealen), og du får alt samlet: kontaktinfo, aftale og betaling, fakturaer med status (betalt, sendt, forfalden), kundens tours med besøg de sidste 30 dage, hvem der kan logge ind på kundesiden - og hvornår de sidst gjorde det.\n\nNederst er en tidslinje med alle mails og hændelser, nyeste først: velkomstmail, login-links, fakturaer sendt og betalt, Betalingsservice-træk, statistikrapporter (og om de er åbnet), kontrakten og mails fra dealen. Admins kan trykke \"Se kundesiden som kunde\" og se præcis det, kunden ser.",
     screenshotUrl: "/news/kundeoverblik.png",

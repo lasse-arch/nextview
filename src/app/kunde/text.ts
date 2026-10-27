@@ -68,6 +68,11 @@ export const TEXT = {
       kinds: { forslag: "Forslag", fejl: "Fejl" } as Record<string, string>,
       status: { open: "Modtaget", done: "Rettet ✓" } as Record<string, string>,
       older: "Rettelser til denne tour: skriv til os, så klarer vi det.",
+      approve: "Godkend touren",
+      approveConfirm: "Er I tilfredse med touren? Så godkender I den, og vi får besked. Rettelser, der ikke er løst endnu, retter vi stadig.",
+      approved: "Godkendt ✓",
+      waiting: "Venter på jeres gennemsyn",
+      previewOnly: "Kun kunden selv kan godkende her.",
     },
     use: {
       title: "Få mere ud af touren",
@@ -171,6 +176,11 @@ export const TEXT = {
       kinds: { forslag: "Suggestion", fejl: "Error" } as Record<string, string>,
       status: { open: "Received", done: "Fixed ✓" } as Record<string, string>,
       older: "Changes to this tour: write to us, and we'll take care of it.",
+      approve: "Approve the tour",
+      approveConfirm: "Happy with the tour? Then approve it, and we'll be told. Changes not fixed yet, we'll still fix.",
+      approved: "Approved ✓",
+      waiting: "Waiting for your review",
+      previewOnly: "Only the customer can approve here.",
     },
     use: {
       title: "Get more from your tour",

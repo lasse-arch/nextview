@@ -15,7 +15,7 @@ import type { TourConfig } from "@/app/arpo/tour-lab/tours/types";
 import { startPlaces } from "@/app/arpo/tour-lab/tours/places";
 import { PortalEmbeds } from "@/app/r/[token]/embeds";
 import { PHONE, WELCOME_MAIL_SENDER } from "@/lib/welcome-mail";
-import { LangToggle, LocationSwitcher, ReviewLauncher, TourThumb } from "./portal-ui";
+import { LangToggle, LocationSwitcher, ReviewLauncher, TourThumb, ApproveTour } from "./portal-ui";
 import { TourShare } from "./tour-share";
 import { TEXT, type Lang } from "./text";
 
@@ -77,7 +77,12 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
       docusealSubmissionId: true,
       contractProducts: true,
       items: { where: { url: { not: null } }, orderBy: { createdAt: "asc" }, select: { id: true, productType: true, location: true, url: true } },
-      tours: { where: { published: true }, orderBy: { createdAt: "asc" }, select: { slug: true, name: true, config: true, share: true, reviewToken: true, liveVersion: true } },
+      // Published tours - and one sent to them for review before it's published (only on Rettelser).
+      tours: {
+        where: { OR: [{ published: true }, { reviewSentAt: { not: null } }] },
+        orderBy: { createdAt: "asc" },
+        select: { slug: true, name: true, config: true, share: true, reviewToken: true, liveVersion: true, published: true, reviewSentAt: true, reviewApprovedAt: true },
+      },
     },
   });
 
@@ -107,9 +112,10 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
   const h = await headers();
   const origin = `${h.get("x-forwarded-proto") ?? "https"}://${h.get("host")}`;
   // Their tours: ours (with numbers), and older ones still on explore (a link only).
-  const tours = scope.flatMap((d) =>
+  const reviewTours = scope.flatMap((d) =>
     d.tours.map((x) => ({ ...x, dealId: d.id, location: many ? dealName(d) : null, config: x.config as unknown as TourConfig, share: shareOf(x.share), url: tourUrl(x.slug, origin, x.liveVersion != null) }))
   );
+  const tours = reviewTours.filter((x) => x.published);
   const older = scope.flatMap((d) =>
     d.tours.length
       ? []
@@ -119,8 +125,8 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
   );
   const needStats = page === "hjem" || page === "tal";
   const feedback =
-    page === "rettelser" && tours.length
-      ? await prisma.tourFeedback.findMany({ where: { tourSlug: { in: tours.map((x) => x.slug) } }, orderBy: { createdAt: "desc" }, take: 100, select: { id: true, tourSlug: true, kind: true, text: true, room: true, author: true, status: true, createdAt: true } })
+    page === "rettelser" && reviewTours.length
+      ? await prisma.tourFeedback.findMany({ where: { tourSlug: { in: reviewTours.map((x) => x.slug) } }, orderBy: { createdAt: "desc" }, take: 100, select: { id: true, tourSlug: true, kind: true, text: true, room: true, author: true, status: true, createdAt: true } })
       : [];
   const stats: TourStats[] = needStats ? await Promise.all(tours.map((x) => tourStats(x.slug, x.share.days))) : [];
   const together = needStats ? mergeStats(stats) : null;
@@ -396,18 +402,27 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
                 <p className="mt-1 max-w-2xl text-[15px] text-[#6e6e73]">{t.fix.lead}</p>
               </div>
               <section className={card}>
-                {tours.length + older.length === 0 ? (
+                {reviewTours.length + older.length === 0 ? (
                   <p className="text-[15px]">{t.notLive}</p>
                 ) : (
                   <ul className="divide-y divide-black/[.06]">
-                    {tours.map((x) => (
+                    {reviewTours.map((x) => (
                       <li key={x.slug} className="flex flex-wrap items-center gap-3 py-3">
                         <TourThumb src={`/api/tour-thumb?tour=${encodeURIComponent(x.slug)}`} />
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-[15px] font-semibold">{x.config.title || x.name}</p>
                           {x.location && <p className="truncate text-[13px] text-[#6e6e73]">{x.location}</p>}
+                          {x.reviewSentAt && !x.reviewApprovedAt && <p className="text-[13px] font-medium text-[#a05a00]">{t.fix.waiting}</p>}
                         </div>
                         <ReviewLauncher slug={x.slug} title={x.config.title || x.name} words={{ open: t.fix.open, opening: t.fix.opening, hint: t.fix.windowHint, close: t.fix.close }} />
+                        {(x.reviewSentAt || x.reviewApprovedAt) && (
+                          <ApproveTour
+                            slug={x.slug}
+                            approved={x.reviewApprovedAt ? fmtDate(x.reviewApprovedAt, lang) : null}
+                            preview={Boolean(who.preview)}
+                            words={{ approve: t.fix.approve, confirm: t.fix.approveConfirm, approved: t.fix.approved, previewOnly: t.fix.previewOnly }}
+                          />
+                        )}
                       </li>
                     ))}
                     {older.map((x) => (
@@ -425,7 +440,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
                   </ul>
                 )}
               </section>
-              {tours.length > 0 && (
+              {reviewTours.length > 0 && (
                 <section className={card}>
                   <h2 className="text-[18px] font-bold tracking-tight">{t.fix.sent}</h2>
                   {feedback.length === 0 ? (
@@ -438,7 +453,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
                           <div className="min-w-0 flex-1">
                             <p className="whitespace-pre-line text-[15px] leading-snug">{f.text}</p>
                             <p className="mt-0.5 text-[12px] text-[#8e8e93]">
-                              {[t.fix.kinds[f.kind] ?? f.kind, f.room, tours.length > 1 ? (tours.find((x) => x.slug === f.tourSlug)?.config.title ?? null) : null, f.author, fmtDate(f.createdAt, lang)].filter(Boolean).join(" · ")}
+                              {[t.fix.kinds[f.kind] ?? f.kind, f.room, reviewTours.length > 1 ? (reviewTours.find((x) => x.slug === f.tourSlug)?.config.title ?? null) : null, f.author, fmtDate(f.createdAt, lang)].filter(Boolean).join(" · ")}
                             </p>
                           </div>
                         </li>

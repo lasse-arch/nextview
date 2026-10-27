@@ -52,3 +52,25 @@ export async function sendContractSignedNotification(dealId: string): Promise<No
   }
   return { sent: false, reason: lastError };
 }
+
+/**
+ * A short message to the team (all admins, and the deal's owner) - sent as
+ * info@ through the first admin's Gmail that can, as above. Never throws.
+ */
+export async function notifyTeam(params: { dealId?: string | null; subject: string; text: string }): Promise<NotificationResult> {
+  const admins = await prisma.user.findMany({ where: { role: "ADMIN" } });
+  const owner = params.dealId ? (await prisma.deal.findUnique({ where: { id: params.dealId }, select: { owner: { select: { email: true } } } }))?.owner.email : null;
+  const accounts = await prisma.emailAccount.findMany({ where: { userId: { in: admins.map((a) => a.id) }, provider: "GOOGLE" } });
+  if (!accounts.length) return { sent: false, reason: "Ingen admin har forbundet Google under Indstillinger → E-mail." };
+  const to = Array.from(new Set([...(owner ? [owner] : []), ...admins.map((a) => a.email)]));
+  let lastError = "Ukendt fejl ved afsendelse.";
+  for (const account of accounts) {
+    try {
+      await sendGmailMessage(account, { to, subject: params.subject, bodyText: params.text, fromName: "Nextview360", fromAddress: CONTRACT_SIGNER.email });
+      return { sent: true };
+    } catch (err) {
+      lastError = err instanceof Error ? err.message : lastError;
+    }
+  }
+  return { sent: false, reason: lastError };
+}
