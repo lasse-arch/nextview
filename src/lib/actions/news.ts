@@ -63,6 +63,12 @@ export async function getUnreadNewsCount(userId: string, newsReadAt: Date | null
 const DEFAULT_POSTS: { title: string; body: string; minutesAgo: number; screenshotUrl: string }[] = [
   {
     minutesAgo: 0,
+    title: "Vejret på luftfotoet - lige nu og måned for måned",
+    body: "En tour med luftfoto kan nu vise vejret, hvor stedet ligger: en lille knap nederst med graderne lige nu. Trykker man på den, ser man vejret i dag (sol/regn, vind, solopgang og solnedgang) - og kan vælge en måned og se, hvordan den typisk er: temperatur, varmeste dag, soltimer, regn og vind. Godt for fx campingpladser og hoteller, hvor gæsterne planlægger, hvornår de skal komme.\n\nTallene kommer fra DMI (vejret nu, og gennemsnittet af de sidste 10 år for måneden). Slås til i tour-editoren under Luftfoto og kort → Vejret, hvor man skriver byen.",
+    screenshotUrl: "/news/vejret.png",
+  },
+  {
+    minutesAgo: 0,
     title: "Send touren til gennemgang hos kunden",
     body: "I tour-editoren under Feedback er der nu \"Send til gennemgang\": kunden får en mail fra lasse@ med et link til touren, hvor de går rundt, trykker \"Giv feedback\" der, hvor noget skal rettes, og \"Godkend\", når de er tilfredse. Har kunden adgang til kundesiden, kommer den med i mailen - og under Rettelser kan de også se touren, skrive rettelser og godkende. Touren kan sendes, før den er udgivet.\n\nI editoren står der, hvornår den er sendt, om kunden har godkendt, og hvor mange rettelser der er åbne. Hører I ikke noget, kan I sende en påmindelse - eller trykke \"Godkend selv\". Godkender kunden, får I en mail. Efter en godkendelse kan I sende touren til en ny gennemgang. Udgiv virker som før og venter ikke på kunden.",
     screenshotUrl: "/news/gennemgang.png",

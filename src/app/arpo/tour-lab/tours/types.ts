@@ -321,6 +321,12 @@ export type TourConfig = {
    * `boxes`: box number -> link to the scan point in front of it.
    */
   wayfinding?: { boxes?: Record<string, string> };
+  /**
+   * "Vejret" on the drone scene: the weather right now where the place is
+   * (DMI), and what each month is typically like - for visitors planning a
+   * stay. `place` is the name shown ("Vejret i Hals").
+   */
+  weather?: { lat: number; lon: number; place: string };
   /** "Sådan går du rundt": a short help (drag, walk, the menu) when the visitor first steps inside - once per visitor. */
   onboarding?: boolean;
   /**

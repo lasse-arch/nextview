@@ -23,6 +23,7 @@ const img = (name: string) => `/tours/halscamping/img/${name}.webp`;
 export const halscamping: TourConfig = {
   slug: "halscamping",
   brand: "Hals Strand Camping",
+  weather: { lat: 57.039, lon: 10.363, place: "Hals" },
   title: "Hals Strand Camping",
   tourPage: "",
   modelId: MODEL,

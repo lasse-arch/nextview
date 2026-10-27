@@ -26,6 +26,7 @@ import { DEFAULT_EMBED, SharePanel, SitePreview, type EmbedSize } from "./share"
 import { Choice, Field, FilesContext, Group, Icon, input, outsideFiles, PanoZoom, ssOfHref, Toggle, UploadButton, withProtocol, type PreviewApi } from "./ui";
 import { fetchSiteFavicon, hostTourFiles } from "@/lib/actions/tour-files";
 import { AiMemoryPanel } from "./memory";
+import { WeatherEditor } from "./weather-editor";
 import { MapEditor } from "./map-editor";
 import { FeedbackPanel } from "./feedback-panel";
 import { LinksOpenEditor } from "./links-open";
@@ -81,7 +82,7 @@ const FINDS: Partial<Record<Tab, string[]>> = {
   start: ["Hvor touren starter|startpunkt|startposition|start-link|start her", "Forsiden", "Velkomsten", "Fliser", "Kort film før touren", "Intro-video", "Steder med foto", "Træd indenfor", "Sådan ser en dag ud"],
   menu: ["Menupunkter", "Grupper", "Tilføj det sted, du ser", "Billede i menuen", "360°-billede", "Webside", "Luftfotoet", "Scanpunkter i menuen"],
   rundvisning: ["Vis mig rundt", "Guide", "Guidet tur", "Stop", "Drejning", "Sekunder ved hvert stop", "Stemme", "Lav den ud fra menuen"],
-  kortet: ["Interaktivt kort", "Luftfoto", "Dronebillede", "360°-kort", "Punkter på kortet", "Kategorier", "Skyer", "Boksen øverst", "Filteret", "Luftfotoets første udsnit|startudsnit", "Ikoner"],
+  kortet: ["Interaktivt kort", "Luftfoto", "Dronebillede", "360°-kort", "Punkter på kortet", "Kategorier", "Skyer", "Boksen øverst", "Filteret", "Luftfotoets første udsnit|startudsnit", "Ikoner", "Vejret|vejr|temperatur|dmi|sol"],
   scan: ["Scanpunkter", "Skjul scanpunkter", "Personer i scans"],
   tags: ["Tags", "Infotags", "Hotspots", "Pris", "Video"],
   live: ["Live data", "Ledige pladser", "Ledige rum", "Book-knap", "Hent nye data"],
@@ -788,7 +789,12 @@ export function TourEditor({
             {tab === "scan" && <ScanPointsEditor config={config} edit={edit} preview={preview} map={scanMap} mpskinsHidden={mpskinsHidden} expected={scanCount} />}
             {tab === "tags" && <TagsEditor config={config} edit={edit} slug={slug} preview={preview} />}
             {tab === "live" && <LiveDataEditor config={config} edit={edit} slug={slug} preview={preview} />}
-            {tab === "kortet" && <MapEditor config={config} edit={edit} />}
+            {tab === "kortet" && (
+              <>
+                <MapEditor config={config} edit={edit} />
+                {(config.drone || config.map) && <WeatherEditor config={config} edit={edit} />}
+              </>
+            )}
             {tab === "sprog" && (
               <LanguagesPanel slug={slug} config={config} edit={edit} showIn={(lang) => frame.current?.contentWindow?.postMessage({ type: "tour-lang", lang }, location.origin)} />
             )}
