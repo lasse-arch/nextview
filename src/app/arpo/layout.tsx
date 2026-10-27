@@ -25,12 +25,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       section: "Salg",
       items: [
         { href: "/arpo/deals", label: "Deals", icon: "deals" },
-        { href: "/arpo/online-kunder", label: "Online kunder", icon: "tour" },
         { href: "/arpo/leadindbakke", label: "Leadindbakke", icon: "inbox" },
         { href: "/arpo/leadgeneration", label: "Leadgeneration", icon: "radar" },
         { href: "/arpo/ringeliste", label: "Ringeliste", icon: "phone" },
         { href: "/arpo/kalender", label: "Kalender", icon: "calendar" },
         { href: "/arpo/opgaver", label: "Opgaver", icon: "tasks" },
+        { href: "/arpo/online-kunder", label: "Online kunder", icon: "tour" },
       ],
     },
     { section: "Kunder", items: [{ href: "/arpo/kunder", label: "Live kunder", icon: "users" }] },
