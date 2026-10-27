@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { fetchLiveUnits, refreshSeconds } from "@/lib/availability/live";
+import { tourCors } from "@/lib/tour-cors";
 import type { TourConfig } from "@/app/arpo/tour-lab/tours/types";
 
 /*
@@ -10,10 +11,10 @@ import type { TourConfig } from "@/app/arpo/tour-lab/tours/types";
  * from cache in between; public, as the units are on the customer's own
  * public page anyway.
  */
-export async function GET(_request: Request, { params }: { params: Promise<{ slug: string }> }) {
+export async function GET(request: Request, { params }: { params: Promise<{ slug: string }> }) {
   const tour = await prisma.tour.findUnique({ where: { slug: (await params).slug }, select: { config: true } });
   const live = (tour?.config as unknown as TourConfig | undefined)?.live;
-  if (!live) return NextResponse.json({ units: [] });
+  if (!live) return NextResponse.json({ units: [] }, { headers: tourCors(request) });
   const ttl = refreshSeconds(live);
-  return NextResponse.json({ units: await fetchLiveUnits(live) }, { headers: { "Cache-Control": `public, s-maxage=${ttl}, stale-while-revalidate=${ttl}` } });
+  return NextResponse.json({ units: await fetchLiveUnits(live) }, { headers: tourCors(request, { "Cache-Control": `public, s-maxage=${ttl}, stale-while-revalidate=${ttl}` }) });
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { apiUrl } from "../tours/api";
 
 /*
  * Kundegennemsyn: on the review link (/p/<token>) the tour gets a "Giv
@@ -58,7 +59,7 @@ export function FeedbackLayer({
   };
 
   const load = () =>
-    fetch(`/api/tour-feedback?token=${encodeURIComponent(token)}`)
+    fetch(apiUrl(`/api/tour-feedback?token=${encodeURIComponent(token)}`))
       .then((r) => (r.ok ? r.json() : []))
       .then(setNotes)
       .catch(() => {});
@@ -78,7 +79,7 @@ export function FeedbackLayer({
   async function send() {
     if (!text.trim()) return;
     setBusy(true);
-    const r = await fetch("/api/tour-feedback", {
+    const r = await fetch(apiUrl("/api/tour-feedback"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

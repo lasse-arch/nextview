@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation";
 import { saveTourGa4Id, saveTourStoryImage } from "@/lib/actions/tour-lab";
 import { connectSdk, showcaseUrl, uLinkTarget, type CameraPose, type MpSdk, type Rotation, type SweepInfo, type Vec3 } from "../matterport";
 import type { AvailableUnit } from "@/lib/availability/boxdepotet";
+import { apiUrl, isStaticTour } from "../tours/api";
 import type { MenuEntry, TourConfig, TourPlace, TourPoint, WelcomeGo } from "../tours/types";
 import { CoverWelcome, DESIGNS_CSS, DockMenu, PickerMenu } from "./designs";
 import { GUIDE_CSS, GuidePlayer, guideStops } from "./guide";
@@ -80,8 +81,9 @@ function flushEvents() {
   tracking.timer = 0;
   if (!tracking.queue.length || !tracking.slug) return;
   const body = JSON.stringify({ tour: tracking.slug, session: tracking.session, device: matchMedia("(max-width: 760px)").matches ? "mobil" : "computer", events: tracking.queue.splice(0, 50) });
-  if (!navigator.sendBeacon?.("/api/tour-events", new Blob([body], { type: "application/json" }))) {
-    fetch("/api/tour-events", { method: "POST", body, keepalive: true }).catch(() => {});
+  // As plain text: from a published tour on another address that's a "simple" request a browser sends without asking first.
+  if (!navigator.sendBeacon?.(apiUrl("/api/tour-events"), new Blob([body], { type: "text/plain" }))) {
+    fetch(apiUrl("/api/tour-events"), { method: "POST", body, keepalive: true }).catch(() => {});
   }
 }
 
@@ -258,7 +260,7 @@ function TourExperience({
   hiddenSweeps,
   storyImages,
   routeGraph,
-  units,
+  units: givenUnits,
   phone,
   tools = false,
   review,
@@ -1027,6 +1029,16 @@ function TourExperience({
   }
 
   /* ----- Editor bridge: the tour editor shows this page as its live preview ----- */
+  /* A tour published as plain files has the free rooms from when it was published - fresh ones are fetched once it's open. */
+  const [units, setUnits] = useState(givenUnits);
+  useEffect(() => {
+    if (!isStaticTour() || !savedTour.availability) return;
+    fetch(apiUrl(`/api/tour-units/${savedTour.slug}`))
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { units?: AvailableUnit[] } | null) => d?.units && setUnits(d.units))
+      .catch(() => {});
+  }, [savedTour.slug, savedTour.availability]);
+
   /* Live units (free pitches, rooms …) from the customer's site. */
   const [liveOpen, setLiveOpen] = useState(false);
   const [liveUnits, setLiveUnits] = useState<LiveUnit[]>([]);
@@ -1034,7 +1046,7 @@ function TourExperience({
   useEffect(() => {
     if (!T.live) return;
     let off = false;
-    fetch(`/api/tour-live/${savedTour.slug}`)
+    fetch(apiUrl(`/api/tour-live/${savedTour.slug}`))
       .then((r) => r.json())
       .then((d: { units?: LiveUnit[] }) => {
         if (off) return;
