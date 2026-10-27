@@ -403,7 +403,7 @@ function MapCanvas({ config, edit, onClose }: { config: TourConfig; edit: Edit; 
               <img src={M.image} alt="" draggable={false} className="block h-full w-full rounded-lg" />
               {(["start", "startMobile"] as const).map((k) =>
                 M[k] ? (
-                  <span key={k} title={k === "start" ? "Startudsnit (computer)" : "Startudsnit (mobil)"} className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 text-[18px] text-white drop-shadow" style={{ left: `${M[k]!.x}%`, top: `${M[k]!.y}%` }}>
+                  <span key={k} title={k === "start" ? "Første udsnit (computer)" : "Første udsnit (mobil)"} className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 text-[18px] text-white drop-shadow" style={{ left: `${M[k]!.x}%`, top: `${M[k]!.y}%` }}>
                     {k === "start" ? "⌖" : "▯"}
                   </span>
                 ) : null
@@ -464,7 +464,7 @@ function MapCanvas({ config, edit, onClose }: { config: TourConfig; edit: Edit; 
                     })} onMove={() => setPlacing({ kind: "point", id: point.id })} onRemove={() => removePoint(point.id)} onDone={() => setSelected(null)} />
           ) : (
             <>
-              <Group title="Startudsnit">
+              <Group title="Luftfotoets første udsnit">
                 <p className="text-[12px] leading-snug text-[#8e8e93]">{in360 && M.panorama ? `Hvad man ser først på ${phone ? "mobil" : "computer"}. Drej og zoom 360°-billedet til det, man skal se, og tryk. Skift mellem Computer og Mobil øverst.` : "Hvad man ser først. Klik på knappen og så på kortet."}</p>
                 {(["start", "startMobile"] as const).filter((k) => !(in360 && M.panorama) || (k === "startMobile") === phone).map((k) => (
                   <div key={k} className="space-y-1.5">
@@ -477,7 +477,7 @@ function MapCanvas({ config, edit, onClose }: { config: TourConfig; edit: Edit; 
                           if (v) edit((d) => void (d.map![k] = v));
                         }}
                       >
-                        {k === "start" ? "Start her - computer" : "Start her - mobil"}
+                        {k === "start" ? "Vis dette først - computer" : "Vis dette først - mobil"}
                       </button>
                     ) : (
                       <button type="button" className="w-full rounded-xl bg-white py-2 text-[13px] font-medium text-[#0071e3] ring-1 ring-black/[.06]" onClick={() => setPlacing({ kind: "start", mobile: k === "startMobile" })}>

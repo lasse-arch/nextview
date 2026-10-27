@@ -70,26 +70,27 @@ const TABS: [Tab, string, string, string?][] = [
 
 /**
  * What the search over the sections finds: the settings in each section, by
- * the words on them (and a few words people use for them).
+ * the words on them. "Label|other|words" = one hit, found by any of the words
+ * (so one setting is never listed twice under different names).
  */
 const FINDS: Partial<Record<Tab, string[]>> = {
   claude: ["AI", "Spørg", "Lav om", "Hukommelse"],
   resultater: ["Statistik", "Besøg", "Klik", "Rapport", "Leads"],
   feedback: ["Rettelser", "Kundegennemsyn", "Kommentarer"],
   del: ["Udgiv", "Link", "QR-kode", "Indlejr", "iframe", "Kode til hjemmesiden", "Cloudflare"],
-  start: ["Startpunkt", "Hvor touren starter", "Startposition", "Forsiden", "Velkomsten", "Fliser", "Kort film før touren", "Intro-video", "Steder med foto", "Træd indenfor", "Sådan ser en dag ud"],
+  start: ["Hvor touren starter|startpunkt|startposition|start-link|start her", "Forsiden", "Velkomsten", "Fliser", "Kort film før touren", "Intro-video", "Steder med foto", "Træd indenfor", "Sådan ser en dag ud"],
   menu: ["Menupunkter", "Grupper", "Tilføj det sted, du ser", "Billede i menuen", "360°-billede", "Webside", "Luftfotoet", "Scanpunkter i menuen"],
   rundvisning: ["Vis mig rundt", "Guide", "Guidet tur", "Stop", "Drejning", "Sekunder ved hvert stop", "Stemme", "Lav den ud fra menuen"],
-  kortet: ["Interaktivt kort", "Luftfoto", "Dronebillede", "360°-kort", "Punkter på kortet", "Kategorier", "Skyer", "Boksen øverst", "Filteret", "Startudsnit", "Ikoner"],
-  scan: ["Scanpunkter", "Skjul scanpunkter", "Startpunkt", "Personer i scans"],
+  kortet: ["Interaktivt kort", "Luftfoto", "Dronebillede", "360°-kort", "Punkter på kortet", "Kategorier", "Skyer", "Boksen øverst", "Filteret", "Luftfotoets første udsnit|startudsnit", "Ikoner"],
+  scan: ["Scanpunkter", "Skjul scanpunkter", "Personer i scans"],
   tags: ["Tags", "Infotags", "Hotspots", "Pris", "Video"],
   live: ["Live data", "Ledige pladser", "Ledige rum", "Book-knap", "Hent nye data"],
   kort: ["Stedkort", "Kort ved punkt", "Din plads venter", "Kort efter et stykke tid"],
   links: ["Knapper", "Book", "Kontakt", "Telefon", "E-mail", "Adresse", "Sociale medier", "Kontaktformular", "Skriv til os", "Åbning", "Popup", "Ny fane", "Kort-link"],
   design: ["Farver", "Skrift", "Font", "Logo", "Logostørrelse", "Logoets afstand", "Favicon", "Mørkt logo", "Farvefilter", "Menu-design", "Dock"],
   sprog: ["Sprog", "Engelsk", "Tysk", "Oversæt"],
-  funktioner: ["Navigation", "Bevægelse", "Fri bevægelse", "Kun punkter", "Skift mellem steder", "Fade", "Flyv", "Zoom", "Lås zoom på mobil", "Menu åben på computer", "Menu åben på mobil", "Dæmp touren bag menuen", "Historier", "Scroll i historierne", "Find vej", "Vis mål", "Matterports egne knapper", "Hjælp ved start"],
-  generelt: ["Navn", "Firmanavn", "Undertitel", "Matterport-model", "Start-link"],
+  funktioner: ["Navigation", "Bevægelse", "Fri bevægelse", "Kun punkter", "Skift mellem steder", "Fade", "Flyv", "Zoom", "Lås zoom på mobil", "Menu åben på computer", "Menu åben på mobil", "Dæmp touren bag menuen", "Historier", "Scroll i historierne", "Find vej", "Vis mål", "Matterports egne knapper", "Sådan går du rundt|hjælp ved start|onboarding"],
+  generelt: ["Navn", "Firmanavn", "Undertitel", "Matterport-model"],
   okonomi: ["Tid", "Pris", "Timer", "Økonomi"],
   versioner: ["Versioner", "Fortryd", "Gendan", "Historik"],
   avanceret: ["Eget design", "CSS", "JSON", "Opsætningen"],
@@ -104,7 +105,10 @@ function searchTabs(q: string, menu: MenuEntry[]): { tab: Tab; label: string; se
   const out: { tab: Tab; label: string; section: string }[] = [];
   for (const [t, title] of TABS) {
     if (hit(title)) out.push({ tab: t, label: title, section: "" });
-    for (const f of FINDS[t] ?? []) if (hit(f) && f !== title) out.push({ tab: t, label: f, section: title });
+    for (const f of FINDS[t] ?? []) {
+      const [label, ...also] = f.split("|");
+      if (label !== title && [label, ...also].some(hit)) out.push({ tab: t, label, section: title });
+    }
   }
   for (const m of menu) {
     if (hit(m.title)) out.push({ tab: "menu", label: m.title, section: "Menu - menupunkt" });

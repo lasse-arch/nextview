@@ -310,18 +310,6 @@ export function ScanPointsEditor({
                         {config.hiddenSweeps.includes(sel.sid) ? "Vis punktet" : "Skjul punktet"}
                       </button>
                     )}
-                    <button
-                      type="button"
-                      className="rounded-lg bg-white py-1.5 text-[13px] font-medium text-[#0071e3] ring-1 ring-black/[.06]"
-                      title="Touren starter her - drej så i forhåndsvisningen og gem retningen"
-                      onClick={() => {
-                        if (!selUses?.has("start")) edit((d) => void (d.start = placeHref(d, sel.ss)));
-                        // The direction is chosen in the preview, which the big view covers: back to it.
-                        setBig(false);
-                      }}
-                    >
-                      Start her
-                    </button>
                   </div>
                 </div>
               )}
@@ -484,16 +472,6 @@ export function ScanPointsEditor({
             </button>
             <button
               type="button"
-              className={`rounded-xl py-2 text-[14px] font-medium ring-1 ring-black/[.06] ${selUses?.has("start") ? "bg-[#0071e3] text-white" : "bg-white text-[#0071e3] hover:bg-[#0071e3]/5"}`}
-              onClick={async () => {
-                const r = await preview.view();
-                edit((d) => void (d.start = r.href && ssOfHref(r.href) === sel.ss ? r.href : placeHref(d, sel.ss)));
-              }}
-            >
-              {selUses?.has("start") ? "Gem retningen, du ser" : "Start her"}
-            </button>
-            <button
-              type="button"
               className="rounded-xl bg-white py-2 text-[14px] font-medium text-[#0071e3] ring-1 ring-black/[.06] hover:bg-[#0071e3]/5"
               onClick={async () => {
                 const r = await preview.view();
@@ -504,10 +482,7 @@ export function ScanPointsEditor({
             </button>
           </div>
           <p className="text-[11px] leading-snug text-[#8e8e93]">
-            {selUses?.has("start")
-              ? "Touren starter her. Drej i forhåndsvisningen til det, man skal se først, og tryk Gem retningen, du ser."
-              : "\"Start her\" og \"Til menuen\" bruger den retning, forhåndsvisningen kigger - drej først, så det ser rigtigt ud."}{" "}
-            Stedkortets tekst skrives under Stedkort.
+            &quot;Til menuen&quot; bruger den retning, forhåndsvisningen kigger - drej først. Hvor touren starter, vælges under Start. Stedkortets tekst skrives under Stedkort.
           </p>
         </Group>
       ) : (
