@@ -2,7 +2,7 @@
 
 import { tourChanged } from "@/lib/tour-cache";
 import { revalidatePath } from "next/cache";
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import type { TourConfig } from "@/app/arpo/tour-lab/tours/types";
@@ -28,13 +28,30 @@ export async function saveTour(slug: string, config: TourConfig, note: string): 
   if (!tour) return { ok: false, error: "Touren findes ikke." };
   const json = { ...config, slug } as unknown as Prisma.InputJsonValue;
   const version = await prisma.$transaction(async (tx) => {
-    await tx.tour.update({ where: { id: tour.id }, data: { config: json, name: config.title } });
+    await tx.tour.update({ where: { id: tour.id }, data: { config: json, name: config.title, draft: Prisma.DbNull, draftAt: null, draftByName: null } });
     return tx.tourVersion.create({ data: { tourId: tour.id, config: json, note: note.trim() || null, createdByName: user.name }, select: { id: true } });
   });
   revalidatePath("/arpo/tour-lab");
   revalidatePath(`/arpo/tour-lab/${slug}`);
   tourChanged(slug);
   return { ok: true, versionId: version.id };
+}
+
+/**
+ * The editor's autosave: the changes not saved yet, kept as a draft on the
+ * tour - the tour itself (and /t/<slug>) is untouched until "Gem". Offered
+ * back when the editor is opened again (after a lost connection, a closed
+ * browser …). `null` throws the draft away.
+ */
+export async function saveTourDraft(slug: string, config: TourConfig | null): Promise<Result<{ at: string }>> {
+  const user = await admin();
+  const at = new Date();
+  if (config && JSON.stringify(config).length > 3_000_000) return { ok: false, error: "Udkastet er for stort til at autogemme." };
+  await prisma.tour.update({
+    where: { slug },
+    data: config ? { draft: { ...config, slug } as unknown as Prisma.InputJsonValue, draftAt: at, draftByName: user.name } : { draft: Prisma.DbNull, draftAt: null, draftByName: null },
+  });
+  return { ok: true, at: at.toISOString() };
 }
 
 /** Puts an earlier version back (as a new version, so nothing is lost). */

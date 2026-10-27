@@ -1304,6 +1304,10 @@ model Tour {
   /// Shown to anyone at /t/<slug> (and in an iframe on the customer's site) - off until it's ready.
   published Boolean       @default(false)
   /// Addresses the tour had before its pretty-URL was changed - they redirect to the new one, so iframes already on customers' sites keep working.
+  /// The editor's autosaved, not yet saved changes - never shown in the tour, only offered back in the editor.
+  draft       Json?
+  draftAt     DateTime?
+  draftByName String?
   oldSlugs  String[]      @default([])
   /// Which numbers the customer gets to see (see ReportShare in tour-stats.ts) - null = the defaults.
   share      Json?

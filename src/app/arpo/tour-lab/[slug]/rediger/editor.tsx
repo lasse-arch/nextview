@@ -8,7 +8,7 @@ import { tourConfigProblem } from "@/lib/tour-validate";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Component, useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { detachToursFromMpskins, logTourWork, renameTourSlug, restoreTourVersion, saveTour, searchDeals, setTourDeal } from "@/lib/actions/tours";
+import { detachToursFromMpskins, logTourWork, renameTourSlug, restoreTourVersion, saveTour, saveTourDraft, searchDeals, setTourDeal } from "@/lib/actions/tours";
 import { SOCIALS } from "../../tours/social";
 import { askClaudeForTour, saveAnthropicKey, type ChatTurn } from "@/lib/actions/tour-ai";
 import type { MenuEntry, TourConfig } from "../../tours/types";
@@ -68,6 +68,7 @@ const when = (iso: string) => new Date(iso).toLocaleString("da-DK", { day: "nume
 export function TourEditor({
   slug,
   initial,
+  serverDraft,
   deal,
   versions,
   aiReady,
@@ -87,6 +88,8 @@ export function TourEditor({
 }: {
   slug: string;
   initial: TourConfig;
+  /** Changes autosaved on the server but never saved - offered back when the editor opens. */
+  serverDraft: { config: TourConfig; at: string; by: string | null } | null;
   deal: { id: string; name: string } | null;
   versions: Version[];
   aiReady: boolean;
@@ -109,6 +112,34 @@ export function TourEditor({
 }) {
   const router = useRouter();
   const [config, setConfig] = useState<TourConfig>(initial);
+  /*
+   * Autosave: every change is kept in the browser at once (survives a lost
+   * connection or a closed browser) and as a draft on the server every 15
+   * seconds - never in the tour itself until "Gem". Opening the editor again
+   * offers the newest one back.
+   */
+  const localKey = `tour-draft:${slug}`;
+  const [autosavedAt, setAutosavedAt] = useState<string | null>(null);
+  const [offer, setOffer] = useState<{ config: TourConfig; at: string; by: string | null } | null>(null);
+  useEffect(() => {
+    let local: { config: TourConfig; at: string } | null = null;
+    try {
+      local = JSON.parse(localStorage.getItem(localKey) ?? "null");
+    } catch {}
+    const same = (c: TourConfig) => JSON.stringify(c) === JSON.stringify(initial);
+    const options = [local && { ...local, by: null }, serverDraft].filter((x): x is { config: TourConfig; at: string; by: string | null } => Boolean(x && !same(x.config)));
+    const newest = options.sort((a, b) => b.at.localeCompare(a.at))[0];
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- read once from the browser's storage after loading
+    if (newest) setOffer(newest);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  function forgetDraft() {
+    try {
+      localStorage.removeItem(localKey);
+    } catch {}
+    saveTourDraft(slug, null).catch(() => {});
+    setAutosavedAt(null);
+  }
   const [dirty, setDirty] = useState(false);
   const [tab, setTab] = useState<Tab>("claude");
   /** A request for nextviewAI from elsewhere in the editor (a suggestion from Resultater). */
@@ -205,6 +236,33 @@ export function TourEditor({
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
   }, []);
+  // Autosave while there are changes: the browser at once, the server every 15 seconds.
+  useEffect(() => {
+    if (!dirty) return;
+    const local = setTimeout(() => {
+      try {
+        localStorage.setItem(localKey, JSON.stringify({ config, at: new Date().toISOString() }));
+      } catch {}
+    }, 800);
+    return () => clearTimeout(local);
+  }, [config, dirty, localKey]);
+  useEffect(() => {
+    if (!dirty) return;
+    const remote = setTimeout(() => {
+      if (!navigator.onLine) return;
+      saveTourDraft(slug, config)
+        .then((r) => r.ok && setAutosavedAt(r.at))
+        .catch(() => {});
+    }, 15_000);
+    return () => clearTimeout(remote);
+  }, [config, dirty, slug]);
+  // Leaving with unsaved changes: the browser asks first (they're autosaved either way).
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
   const preview = useMemo<PreviewApi>(() => {
     /** Asks the preview something and waits for its answer (or gives up after a while). */
     const ask = <T extends object>(type: string, wait = 5000) =>
@@ -263,6 +321,11 @@ export function TourEditor({
       if (!r.ok) return setMsg({ ok: false, text: r.error });
       setDirty(false);
       setNote("");
+      // Saved for real - the draft is in the tour now (the server cleared its copy).
+      try {
+        localStorage.removeItem(localKey);
+      } catch {}
+      setAutosavedAt(null);
       setMsg({ ok: true, text: "Gemt" });
       setTimeout(() => setMsg(null), 2500);
       setPreviewKey((k) => k + 1);
@@ -286,7 +349,9 @@ export function TourEditor({
         </Link>
         <div className="mx-auto min-w-0 text-center">
           <h1 className="text-[15px] font-semibold tracking-tight">{config.title}</h1>
-          <p className="text-[12px] text-[#8e8e93]">{dirty ? "Ændringer ikke gemt" : `Gemt · ${versions[0] ? when(versions[0].at) : ""}`}</p>
+          <p className="text-[12px] text-[#8e8e93]">
+            {dirty ? `Ændringer ikke gemt${autosavedAt ? ` · autogemt ${new Date(autosavedAt).toLocaleTimeString("da-DK", { hour: "2-digit", minute: "2-digit" })}` : ""}` : `Gemt · ${versions[0] ? when(versions[0].at) : ""}`}
+          </p>
         </div>
         {/* Saving lives up here - never over the preview (where the tour's own bottom menu is). */}
         <div className="flex items-center gap-2">
@@ -305,6 +370,7 @@ export function TourEditor({
                   setConfig(initial);
                   setDirty(false);
                   setMsg(null);
+                  forgetDraft();
                 }}
                 className="rounded-full px-3 py-1.5 text-[13px] font-medium text-[#0071e3] hover:bg-[#0071e3]/10"
               >
@@ -322,6 +388,35 @@ export function TourEditor({
         </div>
       </div>
 
+      {offer && (
+        <div className="flex flex-wrap items-center justify-center gap-3 border-b border-[#ff9500]/30 bg-[#fff6e5] px-4 py-2 text-[13px] text-[#8a5300]">
+          <span>
+            Der er ændringer, der ikke blev gemt (autogemt {new Date(offer.at).toLocaleString("da-DK", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+            {offer.by ? ` af ${offer.by}` : ""}).
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              setConfig(offer.config);
+              setDirty(true);
+              setOffer(null);
+            }}
+            className="rounded-full bg-[#ff9500] px-3 py-1 font-semibold text-white"
+          >
+            Fortsæt med dem
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setOffer(null);
+              forgetDraft();
+            }}
+            className="rounded-full px-3 py-1 font-medium hover:bg-black/5"
+          >
+            Kassér
+          </button>
+        </div>
+      )}
       <SafeArea onUndo={() => { setConfig(initial); setDirty(false); }}>
       <div className="flex min-h-0 flex-1">
         {/* Sections */}

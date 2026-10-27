@@ -31,6 +31,9 @@ export default async function TourEditPage({ params }: { params: Promise<{ slug:
       config: true,
       published: true,
       liveVersion: true,
+      draft: true,
+      draftAt: true,
+      draftByName: true,
       share: true,
       shareToken: true,
       reviewToken: true,
@@ -60,6 +63,7 @@ export default async function TourEditPage({ params }: { params: Promise<{ slug:
     <TourEditor
       slug={tour.slug}
       initial={tour.config as unknown as TourConfig}
+      serverDraft={tour.draft && tour.draftAt ? { config: tour.draft as unknown as TourConfig, at: tour.draftAt.toISOString(), by: tour.draftByName } : null}
       deal={tour.deal ? { id: tour.deal.id, name: tour.deal.displayName ?? tour.deal.companyName } : null}
       stats={stats}
       share={share}
