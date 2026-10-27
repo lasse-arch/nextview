@@ -8,6 +8,9 @@ import type { TourConfig } from "./types";
  * Anything else is a page out of the tour.
  */
 
+/** A menu item (or any link) that shows a picture in the tour: "#billede:" + its address - a 2:1 picture opens as 360°. */
+export const IMAGE_HREF = "#billede:";
+export const imageOfHref = (href: string) => (href.startsWith(IMAGE_HREF) ? href.slice(IMAGE_HREF.length) || null : null);
 export const isPlaceHref = (href: string) => /explore\.nextview360\.dk|my\.matterport\.com\/show/.test(href);
 
 /** The point id of a "#punkt:<id>" link (a point on the drone scene or map), else null. */

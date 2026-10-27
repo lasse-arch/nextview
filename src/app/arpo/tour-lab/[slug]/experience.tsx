@@ -4,7 +4,7 @@ import { LANG_CSS, LangSwitch } from "./lang-switch";
 import { danishOf, localize, makeT, tourLanguages } from "../tours/i18n";
 import { TourLang } from "../tours/i18n-react";
 import { socialLinks } from "../tours/social";
-import { cssFilter, formatPhone, isInTourHref, isPlaceHref, placeHref, placeSlug, pointOfHref, startPlaces } from "../tours/places";
+import { cssFilter, formatPhone, imageOfHref, isInTourHref, isPlaceHref, placeHref, placeSlug, pointOfHref, startPlaces } from "../tours/places";
 import type { LiveUnit } from "@/lib/availability/live";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
@@ -919,6 +919,20 @@ function TourExperience({
     if (href === "#luften") {
       setMenuOpen(false);
       backToDrone();
+      return;
+    }
+    // A picture from the menu: full screen - or as 360°, when it's a 2:1 panorama.
+    const image = imageOfHref(href);
+    if (image) {
+      track("menu_click", { item_name: name, group });
+      setMenuOpen(false);
+      const img = new Image();
+      img.onload = () => {
+        if (Math.abs(img.naturalWidth / img.naturalHeight - 2) < 0.05) setPano({ id: `billede-${name}`, name, panorama: image } as Point);
+        else setLightbox({ images: [image], at: 0, title: name });
+      };
+      img.onerror = () => setLightbox({ images: [image], at: 0, title: name });
+      img.src = image;
       return;
     }
     const point = pointById(href);

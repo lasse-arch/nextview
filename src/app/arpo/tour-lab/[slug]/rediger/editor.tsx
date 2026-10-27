@@ -3,7 +3,7 @@
 import { InsightsPanel } from "./insights";
 import { LanguagesPanel } from "./languages";
 import { tourUrl } from "@/lib/public-urls";
-import { formatPhone, isPlaceHref, placeHref } from "../../tours/places";
+import { formatPhone, IMAGE_HREF, imageOfHref, isPlaceHref, placeHref } from "../../tours/places";
 import { tourConfigProblem } from "@/lib/tour-validate";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -687,7 +687,7 @@ export function TourEditor({
             {tab === "kort" && <CardsEditor config={config} edit={edit} preview={preview} />}
             {tab === "menu" && (
               <>
-                <MenuEditor menu={config.menu} preview={preview} onChange={(menu) => edit((d) => void (d.menu = menu))} />
+                <MenuEditor menu={config.menu} preview={preview} overview={Boolean(config.drone || config.map)} onChange={(menu) => edit((d) => void (d.menu = menu))} />
                 <ScanJumper config={config} preview={preview} map={scanMap} count={scanCount} hiddenSweeps={[...config.hiddenSweeps, ...mpskinsHidden]} />
               </>
             )}
@@ -1650,13 +1650,14 @@ function moveEntry(menu: MenuEntry[], from: Addr, to: Addr | null): MenuEntry[] 
   return m;
 }
 
-type Kind = "sted" | "web" | "luft";
+type Kind = "sted" | "web" | "luft" | "billede";
 // No target yet (e.g. a menu item nextviewAI made, or just switched to "Et sted i touren") counts as a place waiting to be picked - not a web page.
-const kindOf = (href: string): Kind => (href === "#luften" ? "luft" : !href || isPlaceHref(href) ? "sted" : "web");
+const kindOf = (href: string): Kind => (href === "#luften" ? "luft" : href.startsWith(IMAGE_HREF) ? "billede" : !href || isPlaceHref(href) ? "sted" : "web");
 function whereText(href: string) {
   const kind = kindOf(href);
   if (!href) return "Mangler et mål";
   if (kind === "luft") return "Tilbage til luftfotoet";
+  if (kind === "billede") return imageOfHref(href) ? "Viser et billede" : "Mangler et billede";
   if (kind === "sted") {
     const ss = new URLSearchParams(href.split("?")[1] ?? "").get("ss");
     return `Sted i touren${ss ? ` · punkt ${ss}` : ""}`;
@@ -1670,6 +1671,7 @@ function whereText(href: string) {
 const KIND_ICON: Record<Kind | "group", [string, string]> = {
   sted: ["bg-[#34c759]", '<path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>'],
   web: ["bg-[#0071e3]", '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z"/>'],
+  billede: ["bg-[#af52de]", '<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10" r="1.5"/><path d="M21 16l-5-5-8 8"/>'],
   luft: ["bg-[#5ac8fa]", '<path d="M3 14l4-1 4-7 2 1-2 6 5-1 2-3h2l-1 4 1 4h-2l-2-3-5-1 2 6-2 1-4-7-4-1z"/>'],
   group: ["bg-[#ff9500]", '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>'],
 };
@@ -1680,7 +1682,7 @@ const KIND_ICON: Record<Kind | "group", [string, string]> = {
  * editor: drag rows to reorder (onto a group's header to put them in it),
  * click a row to edit it, and add places by walking to them in the preview.
  */
-function MenuEditor({ menu, onChange, preview }: { menu: MenuEntry[]; onChange: (m: MenuEntry[]) => void; preview: PreviewApi }) {
+function MenuEditor({ menu, onChange, preview, overview = false }: { menu: MenuEntry[]; onChange: (m: MenuEntry[]) => void; preview: PreviewApi; /** The tour starts on a drone picture / map - a menu item can lead back to it. */ overview?: boolean }) {
   const [open, setOpen] = useState<Addr | null>(null);
   const [drag, setDrag] = useState<Addr | null>(null);
   const [over, setOver] = useState<Addr | "end" | null>(null);
@@ -1804,14 +1806,27 @@ function MenuEditor({ menu, onChange, preview }: { menu: MenuEntry[]; onChange: 
             {!it.group && (
               <Field title="Fører til">
                 <Choice
-                  value={kindOf(it.href ?? "") === "web" ? "web" : "sted"}
+                  value={kindOf(it.href ?? "")}
                   options={[
-                    ["sted", "Et sted i touren"],
-                    ["web", "En webside"],
+                    ["sted", "Sted i touren"],
+                    ["billede", "Billede"],
+                    ...(overview || kindOf(it.href ?? "") === "luft" ? ([["luft", "Luftfotoet"]] as [string, string][]) : []),
+                    ["web", "Webside"],
                   ]}
-                  onChange={(v) => set(a, { href: v === "web" ? "https://" : "" })}
+                  onChange={(v) => set(a, { href: v === "web" ? "https://" : v === "billede" ? IMAGE_HREF : v === "luft" ? "#luften" : "" })}
                 />
-                {kindOf(it.href ?? "") === "web" ? (
+                {kindOf(it.href ?? "") === "luft" ? (
+                  <p className="mt-2 text-[12px] leading-snug text-[#8e8e93]">Fører tilbage til luftfotoet / kortet, touren starter på.</p>
+                ) : kindOf(it.href ?? "") === "billede" ? (
+                  <div className="mt-2 space-y-2">
+                    {imageOfHref(it.href ?? "") && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={imageOfHref(it.href ?? "")!} alt="" className="max-h-32 w-full rounded-lg object-cover ring-1 ring-black/[.06]" />
+                    )}
+                    <UploadButton accept="image/*" label={imageOfHref(it.href ?? "") ? "Skift billede" : "Upload billede"} onDone={(url) => set(a, { href: IMAGE_HREF + url })} />
+                    <p className="text-[12px] leading-snug text-[#8e8e93]">Vises i fuld skærm i touren - fx et dronefoto, et situationskort eller en plantegning. Et 360°-billede (2:1) åbner som 360°.</p>
+                  </div>
+                ) : kindOf(it.href ?? "") === "web" ? (
                   <input className={`${input} mt-2 bg-white`} value={it.href} placeholder="https://…" onChange={(e) => set(a, { href: e.target.value })} />
                 ) : (
                   <div className="mt-2 space-y-2">
@@ -1886,9 +1901,12 @@ function MenuEditor({ menu, onChange, preview }: { menu: MenuEntry[]; onChange: 
           {busy ? "Henter stedet…" : "Tilføj det sted, du ser"}
         </button>
         {note && <p className="px-1 text-[12px] text-[#ff3b30]">{note}</p>}
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-3 gap-2">
           <button type="button" onClick={() => add("Ny side", "https://")} className="rounded-xl bg-white py-2 text-[14px] font-medium text-[#0071e3] ring-1 ring-black/[.06] hover:bg-[#0071e3]/5">
             + Webside
+          </button>
+          <button type="button" onClick={() => add("Nyt billede", IMAGE_HREF)} className="rounded-xl bg-white py-2 text-[14px] font-medium text-[#0071e3] ring-1 ring-black/[.06] hover:bg-[#0071e3]/5">
+            + Billede
           </button>
           <button
             type="button"
