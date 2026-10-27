@@ -45,6 +45,7 @@ export function SharePanel({
   slug,
   title,
   published: initial,
+  onCloudflare,
   size,
   setSize,
 }: {
@@ -53,13 +54,14 @@ export function SharePanel({
   slug: string;
   title: string;
   published: boolean;
+  onCloudflare: boolean;
   size: EmbedSize;
   setSize: (s: EmbedSize) => void;
 }) {
   const [published, setPublished] = useState(initial);
   const [copied, setCopied] = useState<string | null>(null);
   const [pending, start] = useTransition();
-  const url = tourUrl(slug, typeof window === "undefined" ? "" : location.origin);
+  const url = tourUrl(slug, typeof window === "undefined" ? "" : location.origin, onCloudflare);
   const code = embedCode(url, title, size);
   const copy = (text: string, what: string) => {
     navigator.clipboard?.writeText(text).catch(() => {});

@@ -21,7 +21,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Kundeportal - jeres virtuelle tour" };
 
 export default async function CustomerReportPage({ params }: { params: Promise<{ token: string }> }) {
-  const tour = await prisma.tour.findUnique({ where: { shareToken: (await params).token }, select: { slug: true, config: true, share: true, published: true } });
+  const tour = await prisma.tour.findUnique({ where: { shareToken: (await params).token }, select: { slug: true, config: true, share: true, published: true, liveVersion: true } });
   if (!tour) notFound();
   const config = tour.config as unknown as TourConfig;
   const share = shareOf(tour.share);
@@ -39,7 +39,7 @@ export default async function CustomerReportPage({ params }: { params: Promise<{
         <CustomerReport stats={stats} share={share} brand={config.title} />
         {tour.published && (
           <PortalEmbeds
-            url={tourUrl(tour.slug, `${(await headers()).get("x-forwarded-proto") ?? "https"}://${(await headers()).get("host")}`)}
+            url={tourUrl(tour.slug, `${(await headers()).get("x-forwarded-proto") ?? "https"}://${(await headers()).get("host")}`, tour.liveVersion != null)}
             title={config.title}
             size={config.embeds?.size}
             whole={config.embeds?.pages?._hele ?? null}

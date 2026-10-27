@@ -30,6 +30,7 @@ export default async function TourEditPage({ params }: { params: Promise<{ slug:
       slug: true,
       config: true,
       published: true,
+      liveVersion: true,
       share: true,
       shareToken: true,
       reviewToken: true,
@@ -66,6 +67,7 @@ export default async function TourEditPage({ params }: { params: Promise<{ slug:
       shareToken={tour.shareToken}
       blob={blobReady()}
       published={tour.published}
+      onCloudflare={tour.liveVersion != null}
       economy={economy}
       scanMap={scanMap}
       mpskinsHidden={cfg ? hiddenSweeps(cfg) : []}

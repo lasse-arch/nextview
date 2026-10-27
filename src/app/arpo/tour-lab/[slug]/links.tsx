@@ -2,7 +2,7 @@
 
 import { useT } from "../tours/i18n-react";
 import { createContext, useContext } from "react";
-import type { LinkOpen, TourConfig } from "../tours/types";
+import type { LinkOpen, PopupSize, TourConfig } from "../tours/types";
 
 /*
  * Every link out of a tour (book, menu card, webshop…) opens the way the tour
@@ -50,19 +50,44 @@ function embeddable(href: string) {
 
 export type LinkPopupState = { href: string; label: string } | null;
 
+/** A popup's size: the tour's own, else "stor". */
+export function popupSize(T: TourConfig): PopupSize {
+  return T.linkOpen?.size ?? "stor";
+}
+
+/** The site a link goes to, as people write it: "boxdepotet.dk". */
+export function siteOf(href: string): string | null {
+  try {
+    return new URL(href).hostname.replace(/^www\./, "");
+  } catch {
+    return null;
+  }
+}
+
 /** Gives every TourLink below it the tour's opening rule; `popup` shows a link over the tour. */
 export function LinkProvider({ T, popup, children }: { T: TourConfig; popup: (href: string, label: string) => void; children: React.ReactNode }) {
   return <LinkCtx.Provider value={{ modeFor: (href) => linkMode(T, href), tag: (href) => tagged(T, href), popup }}>{children}</LinkCtx.Provider>;
 }
 
 /** The popup: the page over the tour, with a way out to a new tab (some sites refuse to be shown inside others). */
-export function LinkPopup({ open, onClose }: { open: NonNullable<LinkPopupState>; onClose: () => void }) {
+/** `site`: the site the popup shows, as people write it ("claude.ai") - null leaves it out. */
+export function LinkPopup({ open, onClose, size = "stor", site }: { open: NonNullable<LinkPopupState>; onClose: () => void; size?: PopupSize; site: string | null }) {
   const tr = useT();
   return (
-    <div className="lk-overlay" onClick={onClose}>
+    <div className={`lk-overlay lk-${size}`} onClick={onClose}>
       <div className="lk-popup" onClick={(e) => e.stopPropagation()}>
         <div className="lk-head">
-          <b>{open.label}</b>
+          <div className="lk-title">
+            <b>{open.label}</b>
+            {/* So visitors know the page is the customer's own site, not ours - shown over the tour. */}
+            {site && (
+              <span className="lk-site">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                {/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(site) && <img src={`https://${site}/favicon.ico`} alt="" width={14} height={14} onError={(e) => (e.currentTarget.style.display = "none")} />}
+                {tr("Fra {side}", { side: site })}
+              </span>
+            )}
+          </div>
           <a href={open.href} target="_blank" rel="noopener" onClick={onClose}>
             {tr("Åbn i ny fane ↗")}
           </a>
@@ -125,7 +150,14 @@ export const LINKS_CSS = `
 .lk-overlay{position:absolute;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;padding:28px;background:rgba(0,0,0,.55);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);animation:hvFade .25s ease}
 .lk-popup{width:min(1000px,100%);height:min(860px,100%);display:flex;flex-direction:column;background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.45);animation:hvUp .35s cubic-bezier(.2,.7,.2,1) both}
 .lk-head{display:flex;align-items:center;gap:14px;padding:10px 12px 10px 20px;border-bottom:1px solid #eee;color:#1d2a30}
-.lk-head b{flex:1;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lk-title{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.lk-head b{font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lk-site{display:flex;align-items:center;gap:5px;font-size:12px;color:#6b777d;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lk-site img{width:14px;height:14px;border-radius:3px;flex:none}
+.lk-lille .lk-popup{width:min(560px,100%);height:min(640px,100%)}
+.lk-mellem .lk-popup{width:min(820px,100%);height:min(760px,100%)}
+.lk-fuld{padding:12px}
+.lk-fuld .lk-popup{width:100%;height:100%}
 .lk-head a{font-size:13px;color:#56636a;text-decoration:none;white-space:nowrap}
 .lk-head a:hover{color:#1d2a30}
 .lk-head button{width:36px;height:36px;border:0;border-radius:10px;background:#f1f2f3;font-size:22px;cursor:pointer;color:#1d2a30}

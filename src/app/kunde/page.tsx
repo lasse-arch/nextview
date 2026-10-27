@@ -58,7 +58,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
       displayName: true,
       contractSignedAt: true,
       docusealSubmissionId: true,
-      tours: { where: { published: true }, orderBy: { createdAt: "asc" }, select: { slug: true, name: true, config: true, share: true, reviewToken: true } },
+      tours: { where: { published: true }, orderBy: { createdAt: "asc" }, select: { slug: true, name: true, config: true, share: true, reviewToken: true, liveVersion: true } },
     },
   });
   const h = await headers();
@@ -115,7 +115,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
               </div>
               <div className="min-w-0 flex-1">
                 <h2 className="truncate text-[17px] font-semibold">{t.config.title || t.name}</h2>
-                <a href={tourUrl(t.slug, origin)} target="_blank" rel="noopener" className="text-[13px] text-[#0071e3]">
+                <a href={tourUrl(t.slug, origin, t.liveVersion != null)} target="_blank" rel="noopener" className="text-[13px] text-[#0071e3]">
                   Åbn touren ↗
                 </a>
               </div>
@@ -127,7 +127,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
             </div>
             <CustomerReport stats={t.stats} share={t.share} brand={t.config.title} />
             <PortalEmbeds
-              url={tourUrl(t.slug, origin)}
+              url={tourUrl(t.slug, origin, t.liveVersion != null)}
               title={t.config.title}
               size={t.config.embeds?.size}
               whole={t.config.embeds?.pages?._hele ?? null}

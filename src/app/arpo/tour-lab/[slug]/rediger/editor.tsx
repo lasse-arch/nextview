@@ -11,7 +11,7 @@ import { Component, useEffect, useMemo, useRef, useState, useTransition } from "
 import { detachToursFromMpskins, logTourWork, renameTourSlug, restoreTourVersion, saveTour, searchDeals, setTourDeal } from "@/lib/actions/tours";
 import { SOCIALS } from "../../tours/social";
 import { askClaudeForTour, saveAnthropicKey, type ChatTurn } from "@/lib/actions/tour-ai";
-import type { LinkOpen, MenuEntry, TourConfig } from "../../tours/types";
+import type { MenuEntry, TourConfig } from "../../tours/types";
 import type { TourStats } from "@/lib/tour-stats";
 import type { ReportShare } from "@/lib/tour-share";
 import { CardsEditor, GuideEditor, StartEditor, TagsEditor } from "./content";
@@ -28,6 +28,7 @@ import { fetchSiteFavicon, hostTourFiles } from "@/lib/actions/tour-files";
 import { AiMemoryPanel } from "./memory";
 import { MapEditor } from "./map-editor";
 import { FeedbackPanel } from "./feedback-panel";
+import { LinksOpenEditor } from "./links-open";
 
 /** A zoom level in words, for the Zoom sliders (1 = Matterport's normal view). */
 const zoomLabel = (z: number) => (Math.abs(z - 1) < 0.01 ? "normal" : z < 1 ? `zoomet ud (${Math.round(z * 100)} %)` : `zoomet ind (${Math.round(z * 100)} %)`);
@@ -76,6 +77,7 @@ export function TourEditor({
   shareToken,
   blob,
   published,
+  onCloudflare,
   economy,
   scanMap,
   mpskinsHidden,
@@ -95,6 +97,8 @@ export function TourEditor({
   /** Vercel Blob is set up (uploads of big files, videos). */
   blob: boolean;
   published: boolean;
+  /** The tour has a live version on Cloudflare - its embed code points there. */
+  onCloudflare: boolean;
   economy: TourEconomy;
   scanMap: ScanMap | null;
   mpskinsHidden: string[];
@@ -547,6 +551,7 @@ export function TourEditor({
                 slug={slug}
                 title={config.title}
                 published={published}
+                onCloudflare={onCloudflare}
                 size={embed}
                 setSize={(s) => {
                   setEmbed(s);
@@ -658,17 +663,7 @@ export function TourEditor({
             {tab === "links" && (
               <>
                 <Group title="Åbning">
-                <Field title="Links åbner som standard">
-                  <Choice
-                    value={config.linkOpen?.default ?? "tab"}
-                    options={[
-                      ["popup", "Popup over touren"],
-                      ["tab", "Ny fane"],
-                      ["same", "Samme fane"],
-                    ]}
-                    onChange={(v: LinkOpen) => edit((d) => void (d.linkOpen = { default: v, byUrl: d.linkOpen?.byUrl }))}
-                  />
-                </Field>
+                  <LinksOpenEditor config={config} edit={edit} />
                 </Group>
                 <Group title="Knapper">
                 <CtaEditor cta={config.cta} onChange={(cta) => edit((d) => void (d.cta = cta))} />

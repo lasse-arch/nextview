@@ -79,6 +79,7 @@ export const UI_STRINGS = [
   "Vis",
   "Sprog",
   "Åbn i ny fane ↗",
+  "Fra {side}",
   "Oplev i 360°",
   "Se hele kortet",
   "Zoom ind",

@@ -24,7 +24,7 @@ import { MAP_CSS, MapScene, type MapApi } from "./map";
 import { CARDS_CSS, NudgeCard, PlaceCard } from "./cards";
 import { MEASURES_CSS, MeasureShield } from "./measures";
 import { ROUTE_CSS, RouteLine, RouteSheet, RouteStatus, flightMs, shortestPath, straighten, type Destination, type RouteGraph } from "./wayfinding";
-import { LINKS_CSS, LinkPopup, LinkProvider, TourLink, openLink, type LinkPopupState } from "./links";
+import { LINKS_CSS, LinkPopup, LinkProvider, TourLink, openLink, popupSize, siteOf, type LinkPopupState } from "./links";
 import { Stories, STORIES_CSS, storyJpeg, type StoryRoom } from "./stories";
 import { LIGHTBOX_CSS, Lightbox, type LightboxState } from "./lightbox";
 import "pannellum/build/pannellum.css";
@@ -1856,7 +1856,14 @@ function TourExperience({
           onLink={(label, href) => ctaClick(label, href, "nudge")}
         />
       )}
-      {linkPopup && <LinkPopup open={linkPopup} onClose={() => setLinkPopup(null)} />}
+      {linkPopup && (
+        <LinkPopup
+          open={linkPopup}
+          onClose={() => setLinkPopup(null)}
+          size={popupSize(T)}
+          site={T.linkOpen?.showSite === false ? null : siteOf(linkPopup.href)}
+        />
+      )}
       {setLang && tourLanguages(savedTour).length > 1 && <LangSwitch langs={tourLanguages(savedTour)} lang={lang} onPick={(l) => (track("language", { label: l }), setLang(l))} label={tx("Sprog")} />}
     </div>
     </LinkProvider>

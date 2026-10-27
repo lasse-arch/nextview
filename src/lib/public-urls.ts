@@ -11,9 +11,17 @@ const trim = (o: string | undefined) => o?.replace(/\/+$/, "") || null;
 export const TOUR_ORIGIN = trim(process.env.NEXT_PUBLIC_TOUR_ORIGIN);
 export const PORTAL_ORIGIN = trim(process.env.NEXT_PUBLIC_PORTAL_ORIGIN);
 
-/** The published tour - `origin` is Arpo's own (used when no tour address is set). */
-export const tourUrl = (slug: string, origin: string) => (TOUR_ORIGIN ? `${TOUR_ORIGIN}/${slug}` : `${origin}/t/${slug}`);
-/** Kundegennemsyn (the review link) - a tour, so it lives with the tours. */
-export const reviewUrl = (token: string, origin: string) => `${TOUR_ORIGIN ?? origin}/p/${token}`;
+/** Where tours published as files on Cloudflare live (see lib/tour-publish.ts). */
+export const CLOUDFLARE_TOUR_ORIGIN = trim(process.env.NEXT_PUBLIC_CLOUDFLARE_TOUR_ORIGIN) ?? "https://tour.nextview360.dk";
+
+/**
+ * The published tour - `origin` is Arpo's own. A tour that's out on Cloudflare
+ * (`onCloudflare`: it has a live version there) gets its address there,
+ * tour.nextview360.dk/<slug>; any other stays on Arpo's /t/<slug>.
+ */
+export const tourUrl = (slug: string, origin: string, onCloudflare = false) =>
+  onCloudflare ? `${CLOUDFLARE_TOUR_ORIGIN}/${slug}` : TOUR_ORIGIN ? `${TOUR_ORIGIN}/${slug}` : `${origin}/t/${slug}`;
+/** Kundegennemsyn (the review link) - always on Arpo itself: it saves the customer's notes there. */
+export const reviewUrl = (token: string, origin: string) => `${origin}/p/${token}`;
 /** The customer portal. */
 export const portalUrl = (token: string, origin: string) => (PORTAL_ORIGIN ? `${PORTAL_ORIGIN}/${token}` : `${origin}/r/${token}`);

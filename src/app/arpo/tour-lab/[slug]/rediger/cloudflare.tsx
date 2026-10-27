@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { publishNow, publishState, putVersionLive, type PublishState } from "@/lib/actions/tour-publish";
 import { Group, input } from "./ui";
+import { CLOUDFLARE_TOUR_ORIGIN } from "@/lib/public-urls";
 
 /*
  * "Udgiv på tour.nextview360.dk": the tour as a frozen version on Cloudflare
@@ -24,7 +25,7 @@ export function CloudflarePublish({ slug }: { slug: string }) {
   }, [slug]);
 
   if (!state) return null;
-  const preview = `https://${state.project}.pages.dev/${slug}`;
+  const preview = `${CLOUDFLARE_TOUR_ORIGIN}/${slug}`;
   const run = (fn: () => Promise<{ ok: true; value: unknown } | { ok: false; error: string }>, done: string) =>
     start(async () => {
       setMsg(null);
