@@ -34,6 +34,7 @@ export function GuidePlayer({
   seconds,
   manual = false,
   held = false,
+  walkHint = false,
   onResume,
   end,
   onGo,
@@ -47,6 +48,8 @@ export function GuidePlayer({
   manual?: boolean;
   /** The visitor took over (walked on or looked around) - the guide waits until they press Fortsæt or Næste. */
   held?: boolean;
+  /** In the 3D tour: tell the visitor (on the first stops) that they may look around and walk themselves. */
+  walkHint?: boolean;
   onResume?: () => void;
   /** Shown on the last stop - the next step for the visitor (e.g. book a visit). */
   end?: React.ReactNode;
@@ -108,6 +111,15 @@ export function GuidePlayer({
         <h3>{stop.title}</h3>
         {stop.text && <p>{stop.text}</p>}
         {held && timed && <div className="gd-next">{tr("På pause - du kigger selv rundt")}</div>}
+        {walkHint && !held && index < 2 && (
+          <div className="gd-selv">
+            <svg viewBox="0 0 24 24" aria-hidden>
+              <path d="M9 11V5.5a1.5 1.5 0 0 1 3 0V11m0-1.5a1.5 1.5 0 0 1 3 0V11m0-.5a1.5 1.5 0 0 1 3 0v4a6 6 0 0 1-6 6h-.6a6 6 0 0 1-4.6-2.2L4.6 15a1.5 1.5 0 0 1 2.3-1.9L9 15" />
+              <path d="M3 5h3M3 5l1.5-1.5M3 5l1.5 1.5M21 5h-3m3 0-1.5-1.5M21 5l-1.5 1.5" />
+            </svg>
+            {tr("Træk i billedet for at se dig omkring, og tryk for at gå - guiden venter på dig.")}
+          </div>
+        )}
         {index < stops.length - 1 ? <div className="gd-next">{tr("Næste: {sted}", { sted: stops[index + 1].title })}</div> : end && <div className="gd-end">{end}</div>}
         <div className="gd-ctrl">
           <button type="button" aria-label={tr("Forrige")} disabled={index === 0} onClick={() => step(index - 1, "back")}>
@@ -193,6 +205,9 @@ export const GUIDE_CSS = `
 .gd-card p{margin:0 0 14px;font-size:15px;line-height:1.5;color:#3d4a50}
 .gd-next{margin:-6px 0 12px;font-size:12.5px;font-weight:700;color:#7a8589}
 .gd-end{margin:-4px 0 12px}
+.gd-selv{display:flex;align-items:center;gap:8px;margin:-4px 0 12px;font-size:12.5px;line-height:1.35;font-weight:600;color:#56636a}
+.gd-selv svg{flex:none;width:22px;height:22px;fill:none;stroke:var(--c-accent);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;animation:gdSelv 2.4s ease-in-out infinite}
+@keyframes gdSelv{0%,100%{transform:translateX(-3px)}50%{transform:translateX(3px)}}
 .gd-end .hv-btn{display:inline-flex;padding:10px 16px;font-size:14px}
 .gd-ctrl{display:flex;align-items:center;gap:6px}
 .gd-ctrl button{height:36px;min-width:36px;border:0;border-radius:999px;background:#eef1f2;color:var(--c-main);font:inherit;font-weight:800;font-size:15px;cursor:pointer;padding:0 12px}
@@ -204,6 +219,7 @@ export const GUIDE_CSS = `
 .hv-wel-guide{display:inline-flex;align-items:center;gap:8px;align-self:flex-start;margin-top:14px;border:0;border-radius:999px;background:var(--c-main);color:#fff;padding:11px 18px;font:inherit;font-weight:800;font-size:14px;cursor:pointer}
 .hv-guiding .hv-room,.hv-guiding .hv-stories,.hv-guiding .hv-luften,.hv-guiding .dz-dock,.hv-guiding .dz-here,.hv-guiding .hv-intro,.hv-guiding .hv-filtre{display:none}
 @media (max-width:760px){
+  .hv-guiding .hv-logo{display:none}
   .gd-bars{width:calc(100% - 120px);left:12px;translate:none}
   .gd-card{left:10px;right:10px;width:auto;bottom:calc(10px + env(safe-area-inset-bottom,0px));padding:14px 16px 12px}
   .gd-card h3{font-size:20px}

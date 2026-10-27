@@ -407,6 +407,9 @@ function TourExperience({
   const [guideHeld, setGuideHeld] = useState(false);
   /** The guide itself is moving the view right now - not the visitor. */
   const guideMoving = useRef(false);
+  /** The guide's moves, one after the other - and the newest asked for (only that one is flown to). */
+  const guideQueue = useRef<Promise<unknown>>(Promise.resolve());
+  const guideTicket = useRef(0);
   const [dayOpen, setDayOpen] = useState(false);
   const [dayAt, setDayAt] = useState<number | null>(null);
   /** Place cards closed for good (by index), and the "comes by itself" card. */
@@ -1025,9 +1028,20 @@ function TourExperience({
     // The slow turn at the stop: as always, the other way, or none (the stop's own, else the guide's).
     const turn = stop.turn ?? T.guide?.turn ?? "as";
     guideMoving.current = true;
-    flyTo(stop.href, "fly")
-      .then(() => (turn === "none" ? undefined : sdk?.Camera.rotate?.(turn === "other" ? -18 : 18, 0, { speed: 3 }).catch(() => {})))
-      .finally(() => setTimeout(() => (guideMoving.current = false), 700));
+    // One move at a time: Matterport refuses a move while the last one is still flying, so a quick
+    // Næste waits for it - and only the newest stop is flown to (the ones skipped meanwhile are dropped).
+    const ticket = ++guideTicket.current;
+    guideQueue.current = guideQueue.current
+      .catch(() => {})
+      .then(async () => {
+        if (ticket !== guideTicket.current) return;
+        await flyTo(stop.href, "fly");
+        // The slow turn isn't waited for - the next move may start while it turns.
+        if (ticket === guideTicket.current && turn !== "none") sdk?.Camera.rotate?.(turn === "other" ? -18 : 18, 0, { speed: 3 }).catch(() => {});
+      })
+      .finally(() => {
+        if (ticket === guideTicket.current) setTimeout(() => ticket === guideTicket.current && (guideMoving.current = false), 700);
+      });
   }
   /*
    * While the guide runs, the visitor may take over: walk to another scan
@@ -1981,6 +1995,7 @@ function TourExperience({
           seconds={T.guide?.seconds ?? 9}
           manual={T.guide?.manual}
           held={guideHeld}
+          walkHint={phase === "tour"}
           onResume={() => setGuideHeld(false)}
           end={primaryCta && (
             <TourLink href={primaryCta.href} label={primaryCta.label} className="hv-btn hv-primary" onClick={() => track("cta_click", { label: primaryCta.label, link_url: primaryCta.href, place: "guide_end" })}>
@@ -2347,6 +2362,10 @@ const CSS = `
 .hv-menu.aaben{transform:none}
 .hv-menu-slor{position:absolute;inset:0;z-index:7;border:0;padding:0;background:rgba(8,14,16,.38);opacity:0;pointer-events:none;transition:opacity .3s ease;cursor:default}
 .hv-menu-aaben .hv-menu-slor{opacity:1;pointer-events:auto}
+/* An open menu lies over everything on the drone scene / map (a chosen point, its card) - not under it. */
+.hv-menu-aaben .hv-menu-slor{z-index:12}
+.hv-menu-aaben .hv-menu{z-index:13}
+.hv-menu-aaben .hv-menuknap{z-index:14}
 /* An open menu has the stage: the bars at the bottom slide away and come back when it closes. */
 .hv-stories,.hv-room,.hv-luften,.hv-filtre{transition:opacity .25s ease,translate .3s ease}
 .hv-menu-aaben :is(.hv-stories,.hv-room,.hv-luften,.hv-filtre){opacity:0;translate:0 24px;pointer-events:none}

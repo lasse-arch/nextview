@@ -71,6 +71,7 @@ export const UI_STRINGS = [
   "Næste ›",
   "Næste: {sted}",
   "På pause - du kigger selv rundt",
+  "Træk i billedet for at se dig omkring, og tryk for at gå - guiden venter på dig.",
   "Afslut",
   "Hør igen",
   "Slå lyd til",
