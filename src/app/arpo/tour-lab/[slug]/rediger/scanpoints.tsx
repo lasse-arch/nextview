@@ -73,6 +73,18 @@ export function ScanPointsEditor({
   const h = maxY - minY;
   const hidden = new Set([...config.hiddenSweeps, ...mpskinsHidden]);
   const plan = map.floors[floor];
+  // Only the part of the plan where the scan points are (a plan can cover a whole site, the scans a corner of it) - with a margin.
+  const placed = points.filter((p) => p.px != null && p.py != null);
+  const crop = placed.length
+    ? {
+        l: Math.max(0, Math.min(...placed.map((p) => p.px!)) - 5),
+        r: Math.min(100, Math.max(...placed.map((p) => p.px!)) + 5),
+        t: Math.max(0, Math.min(...placed.map((p) => p.py!)) - 5),
+        b: Math.min(100, Math.max(...placed.map((p) => p.py!)) + 5),
+      }
+    : { l: 0, r: 100, t: 0, b: 100 };
+  const cw = Math.max(5, crop.r - crop.l);
+  const ch = Math.max(5, crop.b - crop.t);
   /** Dots grow a little with zoom, but less than the plan, so crowded spots open up. */
   const dot = Math.round(20 * Math.sqrt(zoom));
   const sel = map.points.find((p) => p.ss === selected) ?? null;
@@ -114,13 +126,14 @@ export function ScanPointsEditor({
             ))}
           </div>
         </div>
-        <div className="-mx-1 max-h-[480px] overflow-auto rounded-xl bg-[#f5f5f7] ring-1 ring-black/[.04]">
+        <div className="-mx-1 max-h-[560px] overflow-auto rounded-xl bg-[#f5f5f7] ring-1 ring-black/[.04]">
           {plan?.image && plan.aspect ? (
-            // Matterport's own top-down photo of the floor, with every scan point where it really is.
+            // Matterport's own top-down photo of the floor, with every scan point where it really is - cut to where the points are.
+            <div className="relative overflow-hidden" style={{ width: `${zoom * 100}%`, aspectRatio: String((cw / ch) * plan.aspect) }}>
             <div
               ref={planEl}
-              className="relative touch-none select-none"
-              style={{ width: `${zoom * 100}%`, aspectRatio: String(plan.aspect) }}
+              className="absolute touch-none select-none"
+              style={{ width: `${10000 / cw}%`, height: `${10000 / ch}%`, left: `${(-crop.l * 100) / cw}%`, top: `${(-crop.t * 100) / ch}%` }}
               onPointerDown={(e) => {
                 if (e.target !== e.currentTarget && !(e.target instanceof HTMLImageElement)) return;
                 const at = pct(e);
@@ -194,6 +207,7 @@ export function ScanPointsEditor({
                 )
               )}
               {box && <div className="pointer-events-none absolute border-2 border-[#0071e3] bg-[#0071e3]/10" style={{ left: `${Math.min(box.x0, box.x1)}%`, top: `${Math.min(box.y0, box.y1)}%`, width: `${Math.abs(box.x1 - box.x0)}%`, height: `${Math.abs(box.y1 - box.y0)}%` }} />}
+            </div>
             </div>
           ) : (
           <svg viewBox={`${minX} ${-maxY} ${w} ${h}`} style={{ width: `${zoom * 100}%`, display: "block" }} className="aspect-auto">
