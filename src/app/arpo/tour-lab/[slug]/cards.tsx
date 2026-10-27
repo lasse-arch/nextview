@@ -1,7 +1,7 @@
 "use client";
 
 import { useT } from "../tours/i18n-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { PlaceCard as Card, TourConfig } from "../tours/types";
 import { TourLink } from "./links";
 
@@ -25,6 +25,16 @@ export function PlaceCard({
   const [stopped, setStopped] = useState(false);
   const [page, setPage] = useState<1 | 2>(1);
   const [open, setOpen] = useState(false); // phones: the text unfolded
+  // "Læs mere" only when the text is actually cut off (a short text has nothing more to read).
+  const textEl = useRef<HTMLParagraphElement>(null);
+  const [clipped, setClipped] = useState(false);
+  useEffect(() => {
+    const el = textEl.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setClipped(el.scrollHeight > el.clientHeight + 1));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [card.text, page]);
   const seconds = card.seconds ?? 15;
   return (
     <div className="pc" onPointerDown={() => setStopped(true)}>
@@ -37,8 +47,10 @@ export function PlaceCard({
       {page === 1 ? (
         <>
           <h3>{card.title}</h3>
-          <p className={open ? "" : "pc-klip"}>{card.text}</p>
-          {!open && (
+          <p ref={textEl} className={open ? "" : "pc-klip"}>
+            {card.text}
+          </p>
+          {!open && clipped && (
             <button type="button" className="pc-mere-mobil" onClick={() => setOpen(true)}>
               Læs mere
             </button>
