@@ -15,6 +15,8 @@ export type OnlineTour = {
   industrySet: boolean;
   city: string | null;
   url: string;
+  /** The customer's tours of the same place (a full tour, a room picker …) - more than one: a choice in the card and the window. */
+  variants: { key: string; label: string; url: string }[];
   thumb: string;
   /** Built in Arpo (else an older tour on explore). */
   ours: boolean;
@@ -25,7 +27,7 @@ export type OnlineTour = {
 export function OnlineTours({ tours, isAdmin }: { tours: OnlineTour[]; isAdmin: boolean }) {
   const [industry, setIndustry] = useState<string | null>(null);
   const [q, setQ] = useState("");
-  const [open, setOpen] = useState<OnlineTour | null>(null);
+  const [open, setOpen] = useState<{ t: OnlineTour; variant: number } | null>(null);
 
   const counts = useMemo(() => {
     const c = new Map<string, number>();
@@ -56,12 +58,12 @@ export function OnlineTours({ tours, isAdmin }: { tours: OnlineTour[]; isAdmin: 
       ) : (
         <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
           {shown.map((t) => (
-            <Card key={t.key} t={t} isAdmin={isAdmin} onOpen={() => setOpen(t)} />
+            <Card key={t.key} t={t} isAdmin={isAdmin} onOpen={(variant = 0) => setOpen({ t, variant })} />
           ))}
         </div>
       )}
 
-      {open && <Viewer t={open} onClose={() => setOpen(null)} />}
+      {open && <Viewer t={open.t} first={open.variant} onClose={() => setOpen(null)} />}
     </div>
   );
 }
@@ -78,12 +80,13 @@ function Chip({ active, onClick, label, count }: { active: boolean; onClick: () 
   );
 }
 
-function Card({ t, isAdmin, onOpen }: { t: OnlineTour; isAdmin: boolean; onOpen: () => void }) {
+function Card({ t, isAdmin, onOpen }: { t: OnlineTour; isAdmin: boolean; onOpen: (variant?: number) => void }) {
   const [img, setImg] = useState(true);
+  const [editing, setEditing] = useState(false);
   const [pending, start] = useTransition();
   return (
     <article className="flex flex-col overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/80 transition hover:shadow-md">
-      <button type="button" onClick={onOpen} className="group relative aspect-[16/10] overflow-hidden bg-gradient-to-br from-[#1d2a4d] to-[#2c4a8a]" aria-label={`Fremvis ${t.name}`}>
+      <button type="button" onClick={() => onOpen()} className="group relative aspect-[16/10] overflow-hidden bg-gradient-to-br from-[#1d2a4d] to-[#2c4a8a]" aria-label={`Fremvis ${t.name}`}>
         {img && (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={t.thumb} alt="" loading="lazy" onError={() => setImg(false)} className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]" />
@@ -100,8 +103,17 @@ function Card({ t, isAdmin, onOpen }: { t: OnlineTour; isAdmin: boolean; onOpen:
         </div>
         <h3 className="text-[17px] font-semibold leading-snug text-slate-900">{t.name}</h3>
         {t.city && <p className="text-sm text-slate-500">{t.city}</p>}
+        {t.variants.length > 1 && (
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {t.variants.map((v, i) => (
+              <button key={v.key} type="button" onClick={() => onOpen(i)} className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-200">
+                {v.label}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="mt-auto flex flex-wrap items-center gap-2 pt-3">
-          <button type="button" onClick={onOpen} className="rounded-full bg-[#1d2a4d] px-4 py-2 text-sm font-semibold text-white hover:bg-[#26365f]">
+          <button type="button" onClick={() => onOpen()} className="rounded-full bg-[#1d2a4d] px-4 py-2 text-sm font-semibold text-white hover:bg-[#26365f]">
             Fremvis
           </button>
           <a href={t.url} target="_blank" rel="noopener" className="rounded-full px-3 py-2 text-sm font-medium text-[#0071e3] hover:bg-[#0071e3]/10">
@@ -113,31 +125,42 @@ function Card({ t, isAdmin, onOpen }: { t: OnlineTour; isAdmin: boolean; onOpen:
             </Link>
           )}
         </div>
-        {isAdmin && t.dealId && (
+        {/* Only admins can set the industry (the action checks it too). */}
+        {isAdmin && t.dealId && (editing ? (
           <select
+            autoFocus
             disabled={pending}
             value={t.industrySet ? t.industry : ""}
-            onChange={(e) => start(async () => void (await setDealIndustry(t.dealId!, e.target.value)))}
+            onBlur={() => setEditing(false)}
+            onChange={(e) => start(async () => {
+              await setDealIndustry(t.dealId!, e.target.value);
+              setEditing(false);
+            })}
             className="mt-2 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-xs text-slate-600"
-            title="Branche (kun admin)"
           >
-            <option value="">Branche: gættet ({t.industry})</option>
+            <option value="">Gæt ud fra navnet ({t.industry})</option>
             {INDUSTRIES.map((i) => (
               <option key={i} value={i}>
                 {i}
               </option>
             ))}
           </select>
-        )}
+        ) : (
+          <button type="button" onClick={() => setEditing(true)} className="mt-1 self-start text-[11px] text-slate-400 hover:text-slate-600">
+            Ret branche
+          </button>
+        ))}
       </div>
     </article>
   );
 }
 
 /** The tour big, over the page - like the tour windows on nextview360.dk. Esc closes it. */
-function Viewer({ t, onClose }: { t: OnlineTour; onClose: () => void }) {
+function Viewer({ t, first, onClose }: { t: OnlineTour; first: number; onClose: () => void }) {
   const [copied, setCopied] = useState(false);
-  const full = t.url.startsWith("/") ? `${window.location.origin}${t.url}` : t.url;
+  const [at, setAt] = useState(first);
+  const url = t.variants[at]?.url ?? t.url;
+  const full = url.startsWith("/") ? `${window.location.origin}${url}` : url;
   useEffect(() => {
     const key = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", key);
@@ -159,6 +182,15 @@ function Viewer({ t, onClose }: { t: OnlineTour; onClose: () => void }) {
               {t.city ? ` · ${t.city}` : ""}
             </p>
           </div>
+          {t.variants.length > 1 && (
+            <div className="hidden rounded-full bg-slate-100 p-0.5 sm:flex">
+              {t.variants.map((v, i) => (
+                <button key={v.key} type="button" onClick={() => setAt(i)} className={`rounded-full px-3 py-1 text-[13px] font-medium ${i === at ? "bg-white shadow-sm" : "text-slate-600"}`}>
+                  {v.label}
+                </button>
+              ))}
+            </div>
+          )}
           <button
             type="button"
             onClick={() => navigator.clipboard?.writeText(full).then(() => (setCopied(true), setTimeout(() => setCopied(false), 1500)))}
@@ -173,7 +205,7 @@ function Viewer({ t, onClose }: { t: OnlineTour; onClose: () => void }) {
             ×
           </button>
         </div>
-        <iframe src={t.url} title={t.name} className="h-full w-full flex-1 border-0" allow="fullscreen; xr-spatial-tracking; gyroscope; accelerometer; autoplay" allowFullScreen />
+        <iframe key={url} src={url} title={t.name} className="h-full w-full flex-1 border-0" allow="fullscreen; xr-spatial-tracking; gyroscope; accelerometer; autoplay" allowFullScreen />
       </div>
     </div>
   );

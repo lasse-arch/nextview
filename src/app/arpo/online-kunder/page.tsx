@@ -32,18 +32,31 @@ export default async function OnlineCustomersPage() {
   const city = (address: string | null | undefined) => address?.split(",").pop()?.replace(/\d{4}/, "").trim() || null;
   const list: OnlineTour[] = [];
   const withArpoTour = new Set<string>();
-  for (const t of tours) {
+  // One customer's tours (e.g. a full tour and a room picker of the same place) are one card, with a choice between them.
+  const variant = (tourName: string, customer: string) => {
+    const rest = tourName.replace(customer, "").replace(/^[\s\-–·:]+/, "").trim();
+    return rest ? rest[0].toUpperCase() + rest.slice(1) : "Fuld tour";
+  };
+  const shortest = [...tours].sort((a, b) => a.name.length - b.name.length);
+  for (const t of shortest) {
+    const url = t.liveVersion != null ? `${CLOUDFLARE_TOUR_ORIGIN}/${t.slug}` : `/t/${t.slug}`;
+    const same = t.deal && list.find((x) => x.ours && x.dealId === t.deal!.id);
+    if (same) {
+      same.variants.push({ key: t.slug, label: variant(t.name, same.name), url });
+      continue;
+    }
     if (t.deal) withArpoTour.add(t.deal.id);
     const name = t.deal ? dealName(t.deal) : t.name;
     list.push({
       key: `t:${t.slug}`,
+      variants: [{ key: t.slug, label: "Fuld tour", url }],
       name: t.name,
       customer: name,
       dealId: t.deal?.id ?? null,
       industry: industryOf(`${name} ${t.name}`, t.deal?.industry),
       industrySet: Boolean(t.deal?.industry),
       city: city(t.deal?.address),
-      url: t.liveVersion != null ? `${CLOUDFLARE_TOUR_ORIGIN}/${t.slug}` : `/t/${t.slug}`,
+      url,
       thumb: `/api/tour-thumb?tour=${encodeURIComponent(t.slug)}&w=480`,
       ours: true,
       since: t.createdAt.toISOString(),
@@ -53,22 +66,24 @@ export default async function OnlineCustomersPage() {
     // A customer with a tour in Arpo is shown by that one - not again by its old explore link.
     if (withArpoTour.has(d.id)) continue;
     const items = d.items.filter((i) => needsDeliveryLink(i.productType) && !/hjemmeside/i.test(i.productType));
-    for (const i of items) {
-      const url = /^https?:\/\//i.test(i.url!) ? i.url! : `https://${i.url}`;
-      list.push({
-        key: `i:${i.id}`,
-        name: items.length > 1 && i.location ? `${dealName(d)} - ${i.location}` : dealName(d),
-        customer: dealName(d),
-        dealId: d.id,
-        industry: industryOf(dealName(d), d.industry),
-        industrySet: Boolean(d.industry),
-        city: city(d.address),
-        url,
-        thumb: `/api/tour-thumb?item=${encodeURIComponent(i.id)}&w=480`,
-        ours: false,
-        since: (d.liveAt ?? new Date(0)).toISOString(),
-      });
-    }
+    if (!items.length) continue;
+    const link = (u: string) => (/^https?:\/\//i.test(u) ? u : `https://${u}`);
+    // All of one customer's tour links in one card - "Fuld tour", and the others by their location (e.g. "Rum").
+    const label = (i: (typeof items)[number], n: number) => (i.location ? variant(i.location, dealName(d)) : n === 0 ? "Fuld tour" : `Tour ${n + 1}`);
+    list.push({
+      key: `i:${items[0].id}`,
+      variants: items.length > 1 ? items.map((i, n) => ({ key: i.id, label: label(i, n), url: link(i.url!) })) : [],
+      name: dealName(d),
+      customer: dealName(d),
+      dealId: d.id,
+      industry: industryOf(dealName(d), d.industry),
+      industrySet: Boolean(d.industry),
+      city: city(d.address),
+      url: link(items[0].url!),
+      thumb: `/api/tour-thumb?item=${encodeURIComponent(items[0].id)}&w=480`,
+      ours: false,
+      since: (d.liveAt ?? new Date(0)).toISOString(),
+    });
   }
   list.sort((a, b) => a.name.localeCompare(b.name, "da"));
 
