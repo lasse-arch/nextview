@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/db";
 import type { EmailAccount } from "@prisma/client";
 
@@ -54,6 +55,8 @@ export type CalendarEventInput = {
   /** Attendees to mark as already accepted - the seller sending the invite
    * (their CRM login email, which can differ from the Google account's). */
   acceptedEmails?: (string | null | undefined)[];
+  /** An online meeting: the invitation gets a Google Meet link. Left out = in person, never a Meet link. */
+  online?: boolean;
 };
 
 export async function upsertCalendarEvent(account: EmailAccount, input: CalendarEventInput): Promise<string> {
@@ -64,12 +67,14 @@ export async function upsertCalendarEvent(account: EmailAccount, input: Calendar
   // reset everyone's existing RSVP back to "awaiting" - carry each guest's
   // current answer over from the event as it stands.
   const existingResponses = new Map<string, string>();
+  let hasMeet = false;
   if (input.eventId) {
     const current = await fetch(`${CALENDAR_API_BASE}/calendars/primary/events/${input.eventId}`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
     if (current.ok) {
-      const data = (await current.json()) as { attendees?: { email?: string; responseStatus?: string }[] };
+      const data = (await current.json()) as { attendees?: { email?: string; responseStatus?: string }[]; hangoutLink?: string };
+      hasMeet = Boolean(data.hangoutLink);
       for (const a of data.attendees ?? []) {
         if (a.email && a.responseStatus) existingResponses.set(a.email.toLowerCase(), a.responseStatus);
       }
@@ -97,8 +102,8 @@ export async function upsertCalendarEvent(account: EmailAccount, input: Calendar
   const headers = { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" };
   const eventsUrl = `${CALENDAR_API_BASE}/calendars/primary/events`;
 
-  // Never a Google Meet link - our meetings and filmings are in person, and
-  // customers seeing a video link think it's online. Google auto-adds Meet
+  // No Google Meet link unless the meeting is online - our meetings and
+  // filmings are in person, and customers seeing a video link think it's online. Google auto-adds Meet
   // to new events when the account has "Tilføj automatisk Google Meet" on,
   // so a new event is first created without guests (no mails go out),
   // then the guests are added in the same update that strips the Meet -
@@ -114,15 +119,23 @@ export async function upsertCalendarEvent(account: EmailAccount, input: Calendar
     if (!created.ok) {
       throw new Error(`Google Kalender-fejl (${created.status}): ${await created.text()}`);
     }
-    eventId = ((await created.json()) as { id: string }).id;
+    const made = (await created.json()) as { id: string; hangoutLink?: string };
+    eventId = made.id;
+    hasMeet = Boolean(made.hangoutLink);
   }
+  // Online: keep the Meet link the event has, or ask Google for one.
+  const conferenceData = !input.online
+    ? null
+    : hasMeet
+      ? undefined
+      : { createRequest: { requestId: randomUUID(), conferenceSolutionKey: { type: "hangoutsMeet" } } };
 
   const res = await fetch(`${eventsUrl}/${eventId}?sendUpdates=all&conferenceDataVersion=1`, {
     method: "PATCH",
     headers,
     body: JSON.stringify({
       ...details,
-      conferenceData: null,
+      ...(conferenceData === undefined ? {} : { conferenceData }),
       attendees: attendees.length > 0 ? attendees : undefined,
     }),
   });

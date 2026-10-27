@@ -33,6 +33,7 @@ export function BookMeetingButton({
   const [dateInput, setDateInput] = useState(currentMeetingDateIso ? currentMeetingDateIso.slice(0, 16) : "");
   const [duration, setDuration] = useState(30);
   const [sendInvite, setSendInvite] = useState(true);
+  const [online, setOnline] = useState(false);
   const [selectedColleagues, setSelectedColleagues] = useState<string[]>([]);
   const [pending, startTransition] = useTransition();
   const router = useRouter();
@@ -53,7 +54,7 @@ export function BookMeetingButton({
         await setMeetingDateAndStage(dealId, iso);
 
         if (sendInvite) {
-          const result = await sendCalendarInvite(dealId, selectedColleagues, iso, undefined, duration);
+          const result = await sendCalendarInvite(dealId, selectedColleagues, iso, undefined, duration, undefined, false, online);
           showToast(result.synced ? "Møde booket og kalenderinvitation sendt." : `Møde booket. ${result.reason ?? "Kalenderinvitation kunne ikke sendes."}`);
         } else {
           showToast("Møde booket");
@@ -110,6 +111,12 @@ export function BookMeetingButton({
             />
             Send kalenderinvitation med det samme
           </label>
+          {sendInvite && (
+            <label className="mt-2 flex items-center gap-2 pl-6 text-sm text-slate-700">
+            <input type="checkbox" checked={online} onChange={(e) => setOnline(e.target.checked)} className="h-4 w-4" />
+            Online møde (Google Meet)
+          </label>
+          )}
           {sendInvite && colleagues.length > 0 && (
             <div className="mt-2 pl-6">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Inviter også</p>

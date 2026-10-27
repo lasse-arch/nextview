@@ -379,6 +379,7 @@ export default async function DealDetailPage({
                         dealId={deal.id}
                         colleagues={users.filter((u) => u.id !== deal.ownerId).map((u) => ({ id: u.id, name: u.name }))}
                         defaultDurationMinutes={deal.meetingDurationMinutes}
+                        defaultOnline={deal.meetingOnline}
                       />
                     </div>
                   </div>

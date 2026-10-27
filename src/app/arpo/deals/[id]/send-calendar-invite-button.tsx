@@ -28,15 +28,19 @@ export function SendCalendarInviteButton({
   dealId,
   colleagues,
   defaultDurationMinutes = 30,
+  defaultOnline = false,
 }: {
   dealId: string;
   colleagues: { id: string; name: string }[];
   defaultDurationMinutes?: number;
+  /** The deal's meeting is online (Google Meet) - off by default. */
+  defaultOnline?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
   const [customBody, setCustomBody] = useState("");
   const [duration, setDuration] = useState(defaultDurationMinutes);
+  const [online, setOnline] = useState(defaultOnline);
   const [pending, startTransition] = useTransition();
   const showToast = useToast();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -113,7 +117,7 @@ export function SendCalendarInviteButton({
     const dateInput = rootRef.current?.closest("form")?.querySelector<HTMLInputElement>('input[name="meetingDate"]');
     startTransition(async () => {
       try {
-        const result = await sendCalendarInvite(dealId, selected, dateInput?.value || undefined, customBody, duration);
+        const result = await sendCalendarInvite(dealId, selected, dateInput?.value || undefined, customBody, duration, undefined, false, online);
         showToast(result.synced ? "Kalenderinvitation sendt." : result.reason ?? "Kunne ikke sende invitationen.");
         if (result.synced) setOpen(false);
       } catch (err) {
@@ -157,6 +161,10 @@ export function SendCalendarInviteButton({
             <option value={45}>45 minutter</option>
             <option value={60}>60 minutter</option>
           </select>
+          <label className="mt-3 flex items-center gap-2 text-xs text-slate-700">
+            <input type="checkbox" checked={online} onChange={(e) => setOnline(e.target.checked)} className="h-4 w-4" />
+            Online møde (Google Meet)
+          </label>
 
           <p className="mt-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
             Ekstra besked (valgfri)

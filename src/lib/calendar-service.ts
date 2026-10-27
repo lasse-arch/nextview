@@ -44,7 +44,9 @@ export async function syncDealMeetingToCalendar(
   /** Who sends the invite (from their own Google calendar, signed with
    * their name) - the deal's owner unless given, e.g. whoever booked the
    * meeting from the ringeliste. */
-  organizerUserId?: string
+  organizerUserId?: string,
+  /** Online (a Google Meet link) - saved on the deal; left out = what the deal already says (in person by default). */
+  online?: boolean
 ): Promise<CalendarSyncResult> {
   const deal = await prisma.deal.findUnique({ where: { id: dealId }, include: { owner: true } });
   if (!deal || !deal.meetingDate) {
@@ -71,6 +73,8 @@ export async function syncDealMeetingToCalendar(
   if (durationMinutes && durationMinutes !== deal.meetingDurationMinutes) {
     await prisma.deal.update({ where: { id: deal.id }, data: { meetingDurationMinutes: durationMinutes } });
   }
+  const isOnline = online ?? deal.meetingOnline;
+  if (isOnline !== deal.meetingOnline) await prisma.deal.update({ where: { id: deal.id }, data: { meetingOnline: isOnline } });
 
   const start = deal.meetingDate;
   const end = new Date(start.getTime() + (durationMinutes ?? deal.meetingDurationMinutes) * 60_000);
@@ -82,6 +86,7 @@ export async function syncDealMeetingToCalendar(
     "Tak for at du har sat tid af til at mødes med os.",
     "",
     "Vi glæder os til at snakke med dig og fortælle mere om, hvad vi kan hjælpe med.",
+    ...(isOnline ? ["", "Mødet foregår online - linket til Google Meet står i invitationen."] : []),
     ...(customBody?.trim() ? ["", customBody.trim()] : []),
     "",
     "Har du lyst til at kigge lidt nærmere på os inden mødet, er du velkommen til at besøge www.nextview360.dk",
@@ -104,6 +109,7 @@ export async function syncDealMeetingToCalendar(
       timeZone: MEETING_TIME_ZONE,
       attendeeEmails: [organizer.email, deal.contactEmail, ...extraAttendeeEmails],
       acceptedEmails: [organizer.email],
+      online: isOnline,
     });
 
     if (eventId !== deal.googleCalendarEventId) {

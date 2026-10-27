@@ -484,7 +484,9 @@ export async function sendCalendarInvite(
   contactEmail?: string,
   /** Send it from the logged-in user's calendar instead of the deal owner's
    * - the ringeliste, where whoever books the meeting is the one inviting. */
-  fromCurrentUser = false
+  fromCurrentUser = false,
+  /** An online meeting (Google Meet in the invitation) - in person by default. */
+  online?: boolean
 ): Promise<CalendarSyncResult> {
   const user = await requireUser();
   const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId } });
@@ -518,7 +520,8 @@ export async function sendCalendarInvite(
     extraUsers.map((u) => u.email),
     resolvedCustomBody,
     durationMinutes,
-    fromCurrentUser ? user.id : undefined
+    fromCurrentUser ? user.id : undefined,
+    online
   );
   revalidatePath(`/arpo/deals/${dealId}`);
   return result;

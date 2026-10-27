@@ -304,6 +304,7 @@ function QueueCard({ deal, users, currentUserId }: { deal: QueueDeal; users: Col
   const [duration, setDuration] = useState(30);
   const [inviteEmail, setInviteEmail] = useState(deal.contactEmail ?? "");
   const [sendInvite, setSendInvite] = useState(true);
+  const [online, setOnline] = useState(false);
   const [selectedColleagues, setSelectedColleagues] = useState<string[]>([]);
   // You send the invite yourself (from your own calendar), so the rest are the colleagues to add.
   const colleagues = users.filter((u) => u.id !== currentUserId);
@@ -446,7 +447,8 @@ function QueueCard({ deal, users, currentUserId }: { deal: QueueDeal; users: Col
             undefined,
             duration,
             inviteEmail,
-            true
+            true,
+            online
           );
           showToast(
             result.synced
@@ -790,6 +792,11 @@ function QueueCard({ deal, users, currentUserId }: { deal: QueueDeal; users: Col
 
           {sendInvite && (
             <>
+              <label className="flex items-center gap-2 text-sm text-slate-700">
+            <input type="checkbox" checked={online} onChange={(e) => setOnline(e.target.checked)} className="h-4 w-4" />
+            Online møde (Google Meet)
+          </label>
+
               <label className="block">
                 <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                   Kundens e-mail (gemmes på dealen)
