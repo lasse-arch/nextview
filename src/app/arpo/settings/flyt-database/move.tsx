@@ -24,7 +24,7 @@ export function MoveDatabase({ host }: { host: string }) {
       setTables(list);
       setStatus("Gør den nye database klar…");
       unwrap(await movePrepare());
-      for (const t of list) {
+      for (const t of list.filter((x) => !x.skipped)) {
         let offset = 0;
         for (;;) {
           setStatus(`Kopierer ${t.table}: ${offset.toLocaleString("da-DK")} af ${t.old.toLocaleString("da-DK")}`);
@@ -37,7 +37,7 @@ export function MoveDatabase({ host }: { host: string }) {
       setStatus("Sætter forbindelserne mellem tabellerne på igen og tæller efter…");
       const after = unwrap(await moveFinish());
       setTables(after);
-      const off = after.filter((t) => t.old !== t.new);
+      const off = after.filter((t) => !t.skipped && t.old !== t.new);
       setStatus(off.length ? `${off.length} tabeller har ikke samme antal rækker - se herunder. Kør igen.` : "Færdig: alle tabeller har samme antal rækker i begge databaser.");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -53,7 +53,7 @@ export function MoveDatabase({ host }: { host: string }) {
     else setError(r.error);
   };
 
-  const off = tables?.filter((t) => t.old !== t.new).length ?? 0;
+  const off = tables?.filter((t) => !t.skipped && t.old !== t.new).length ?? 0;
   return (
     <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
       <p className="text-sm text-slate-600">
@@ -81,11 +81,14 @@ export function MoveDatabase({ host }: { host: string }) {
           </thead>
           <tbody className="divide-y divide-slate-100">
             {tables.map((t) => (
-              <tr key={t.table} className={t.old === t.new ? "" : "text-red-700"}>
-                <td className="py-1">{t.table}</td>
+              <tr key={t.table} className={t.skipped ? "text-slate-400" : t.old === t.new ? "" : "text-red-700"}>
+                <td className="py-1">
+                  {t.table}
+                  {t.skipped && <span className="ml-2 text-xs">springes over - bruges ikke af Arpo</span>}
+                </td>
                 <td className="py-1 text-right tabular-nums">{t.old.toLocaleString("da-DK")}</td>
                 <td className="py-1 text-right tabular-nums">
-                  {t.new.toLocaleString("da-DK")} {t.old === t.new ? "✓" : ""}
+                  {t.skipped ? "-" : `${t.new.toLocaleString("da-DK")} ${t.old === t.new ? "✓" : ""}`}
                 </td>
               </tr>
             ))}

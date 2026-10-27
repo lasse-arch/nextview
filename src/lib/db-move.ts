@@ -1,5 +1,5 @@
 import "server-only";
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 import { prisma } from "@/lib/db";
 
 /*
@@ -62,15 +62,33 @@ async function foreignKeys(db: PrismaClient): Promise<ForeignKey[]> {
   );
 }
 
-export type TableState = { table: string; old: number; new: number };
+export type TableState = { table: string; old: number; new: number; skipped?: boolean };
 
-/** Every table with its row count in the old and the new database. */
-export async function compare(): Promise<TableState[]> {
-  const db = newDb();
+/** The tables Arpo itself uses (its Prisma models). */
+const arpoTables = () => new Set(Prisma.dmmf.datamodel.models.map((m) => m.dbName ?? m.name));
+
+/**
+ * The tables to copy: the old database's, minus leftovers Arpo no longer uses
+ * (a table from a feature that was tried and taken out again) - those aren't
+ * created in the new database and stay behind. A table Arpo does use but the
+ * new database lacks stops the move.
+ */
+async function plan(db: PrismaClient): Promise<{ copy: string[]; leftovers: string[] }> {
   const [oldTables, newTables] = await Promise.all([tablesOf(prisma), tablesOf(db)]);
   const missing = oldTables.filter((t) => !newTables.includes(t));
-  if (missing.length) throw new Error(`Den nye database mangler tabeller (${missing.slice(0, 5).join(", ")}…) - lav et nyt deploy, så de bliver oprettet.`);
-  return Promise.all(oldTables.map(async (table) => ({ table, old: await countOf(prisma, table), new: await countOf(db, table) })));
+  const used = arpoTables();
+  const needed = missing.filter((t) => used.has(t));
+  if (needed.length) throw new Error(`Den nye database mangler tabeller (${needed.slice(0, 5).join(", ")}) - lav et nyt deploy, så de bliver oprettet.`);
+  return { copy: oldTables.filter((t) => newTables.includes(t)), leftovers: missing };
+}
+
+/** Every table with its row count in the old and the new database (leftovers marked as skipped). */
+export async function compare(): Promise<TableState[]> {
+  const db = newDb();
+  const { copy, leftovers } = await plan(db);
+  const rows = await Promise.all(copy.map(async (table) => ({ table, old: await countOf(prisma, table), new: await countOf(db, table) })));
+  const left = await Promise.all(leftovers.map(async (table) => ({ table, old: await countOf(prisma, table), new: 0, skipped: true })));
+  return [...rows, ...left];
 }
 
 /** Before copying: the new database's links between tables come off, so tables can be filled in any order. */
@@ -82,7 +100,7 @@ export async function prepare(): Promise<void> {
 /** Copies one batch of a table, from row `offset`; the first batch empties the table in the new database first. */
 export async function copyBatch(table: string, offset: number): Promise<{ copied: number; done: boolean }> {
   const db = newDb();
-  if (!(await tablesOf(prisma)).includes(table)) throw new Error(`Ukendt tabel: ${table}`);
+  if (!(await plan(db)).copy.includes(table)) throw new Error(`Ukendt tabel: ${table}`);
   if (offset === 0) await db.$executeRawUnsafe(`TRUNCATE ${q(table)}`);
   const [files] = await prisma.$queryRawUnsafe<{ n: bigint }[]>(
     `SELECT count(*) AS n FROM information_schema.columns WHERE table_schema = 'public' AND table_name = $1 AND data_type = 'bytea'`,
@@ -101,8 +119,10 @@ export async function copyBatch(table: string, offset: number): Promise<{ copied
 /** After copying: the links between tables go back on, exactly as in the old database (checked against the data as they're added). */
 export async function finish(): Promise<void> {
   const db = newDb();
+  const { copy } = await plan(db);
   const have = new Set((await foreignKeys(db)).map((fk) => `${fk.tbl}.${fk.name}`));
   for (const fk of await foreignKeys(prisma)) {
-    if (!have.has(`${fk.tbl}.${fk.name}`)) await db.$executeRawUnsafe(`ALTER TABLE ${q(fk.tbl)} ADD CONSTRAINT ${q(fk.name)} ${fk.def}`);
+    // Links of a left-behind table stay behind with it.
+    if (copy.includes(fk.tbl) && !have.has(`${fk.tbl}.${fk.name}`)) await db.$executeRawUnsafe(`ALTER TABLE ${q(fk.tbl)} ADD CONSTRAINT ${q(fk.name)} ${fk.def}`);
   }
 }
