@@ -414,6 +414,13 @@ export type TourConfig = {
    * The tour also starts in the visitor's own language when it's one of these.
    */
   languages?: string[];
+  /**
+   * Where the visitor picks the language, per device: "top" = a button at the
+   * top in the middle, "corner" = next to the menu button, "menu" = in the
+   * menu (the side menu; others fall back to the button), "hidden" = not at all
+   * (only a link with ?sprog=). Default: computer "top", phone "menu".
+   */
+  langSwitch?: { desktop?: "top" | "corner" | "menu" | "hidden"; mobile?: "top" | "corner" | "menu" | "hidden" };
   /** Per language: Danish text -> the same text in that language (the setup's texts and the engine's words). Made by nextviewAI, editable under Sprog. A text without one shows in Danish. */
   translations?: Record<string, Record<string, string>>;
   menu: MenuEntry[];

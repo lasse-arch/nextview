@@ -87,6 +87,33 @@ export function LanguagesPanel({ slug, config, edit, showIn }: { slug: string; c
       </Group>
 
       {langs.length > 0 && (
+        <Group title="Hvor man skifter sprog">
+          {(["desktop", "mobile"] as const).map((device) => (
+            <div key={device} className="space-y-1.5">
+              <span className="block text-[13px] font-medium text-[#6e6e73]">{device === "desktop" ? "Computer" : "Mobil"}</span>
+              <Choice
+                value={config.langSwitch?.[device] ?? (device === "desktop" ? "top" : "menu")}
+                options={[
+                  ["top", "Øverst"],
+                  ["corner", "Ved menuknappen"],
+                  ["menu", "I menuen"],
+                  ["hidden", "Skjult"],
+                ]}
+                onChange={(v) =>
+                  edit((d) => {
+                    const next = { ...d.langSwitch, [device]: v === (device === "desktop" ? "top" : "menu") ? undefined : v };
+                    if (!next[device]) delete next[device];
+                    d.langSwitch = Object.keys(next).length ? (next as TourConfig["langSwitch"]) : undefined;
+                  })
+                }
+              />
+            </div>
+          ))}
+          <p className="text-[12px] leading-snug text-[#8e8e93]">I menuen: øverst i sidemenuen (andre menuer får knappen ved menuknappen). Skjult: kun med et link, fx ?sprog=en. Under velkomsten vises knappen altid, så man kan skifte før man går ind.</p>
+        </Group>
+      )}
+
+      {langs.length > 0 && (
         <Group title="Se touren på">
           <Choice
             value={preview}

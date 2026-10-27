@@ -63,6 +63,12 @@ export async function getUnreadNewsCount(userId: string, newsReadAt: Date | null
 const DEFAULT_POSTS: { title: string; body: string; minutesAgo: number; screenshotUrl: string }[] = [
   {
     minutesAgo: 0,
+    title: "\"Find din plads\" og gåafstande på luftfotoet",
+    body: "Tours med luftfoto kan nu have \"Find din plads\": gæsten svarer på et par spørgsmål (fx hvem kommer, hvad bor I i, hvad er vigtigst), og touren flyver hen til det sted, der passer bedst, med \"Bedst til jer\", andre gode bud og Book-knappen. Spørgsmålene og hvilke steder der passer til hvert svar sættes under Luftfoto og kort → Find din plads. Der er også færdige camping-spørgsmål.\n\nPunkterne kan også have gåafstande (\"2 min til stranden\"). De står på kortet, og når et punkt er åbent, tegnes stregerne til stederne på billedet.\n\nOgså nyt: luftfotos og 360°-billeder fra de første prototyper (fx Hals) kan gøres redigerbare med ét klik, \"Ret med AI\" beholder nu fuld skarphed alle steder, hvor intet blev ændret, og punkternes billeder vises hele.",
+    screenshotUrl: "/news/find-din-plads.png",
+  },
+  {
+    minutesAgo: 0,
     title: "Ny tour med nextviewAI: se planen, før den bygger",
     body: "Når I laver en ny tour med nextviewAI, bygger den ikke længere med det samme. Først fortæller den, hvad den vil bygge og hvorfor: hvem touren er til, hvordan den starter, menupunkterne i rækkefølge, hvilke historier og stedkort den bruger (og fravælger), hvordan touren sælger, og hvad I selv skal gøre bagefter. Er der noget, den er i tvivl om, spørger den.\n\nSkriv rettelser under planen og tryk \"Lav planen om\" - så retter den planen og beholder resten. Når planen er god, trykker I \"Byg touren efter planen\", og den bygger præcis det, I har godkendt.",
     screenshotUrl: "/news/ai-plan.png",
