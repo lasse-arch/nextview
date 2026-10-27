@@ -70,6 +70,7 @@ export function FeedbackLayer({
   /** Straight to writing - where they stand and what they see is kept by itself. */
   async function open() {
     setStep("write");
+    window.dispatchEvent(new Event("hv-pause")); // a playing story stops where it is, so the note is about what they see now
     const [v, pic] = await Promise.all([view(), shot()]);
     setHere({ view: v, image: pic });
   }
@@ -241,11 +242,12 @@ export const FEEDBACK_CSS = `
 .fb-toast{position:absolute;left:50%;bottom:24px;translate:-50% 0;z-index:47;padding:10px 16px;border-radius:999px;background:#1d1d1f;color:#fff;font-weight:600;font-size:14px}
 .fb-bar .fb-fold{padding:8px 11px;background:none;color:#fff;opacity:.7;font-size:16px;line-height:1}
 .fb-tab{position:absolute;right:0;top:50%;z-index:40;translate:0 -50%;writing-mode:vertical-rl;rotate:180deg;border:0;border-radius:0 10px 10px 0;padding:12px 7px;background:#ffcc00;color:#1d1d1f;font:inherit;font-weight:800;font-size:12px;letter-spacing:.04em;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.3)}
-/* While a story plays, its progress bars own the top of the screen. */
-.hv:has(.hv-story-play) .fb-bar{display:none}
+/* While a story plays, its progress bars own the top of the screen - the bar steps down below them. */
+.hv:has(.hv-story-play) .fb-bar{top:86px}
 @media (max-width:760px){
   .fb-bar{top:auto;bottom:calc(84px + env(safe-area-inset-bottom,0px))}
   .fb-bar .fb-tag{display:none}
+  .hv:has(.hv-story-play) .fb-bar{top:auto}
   .hv:has(.hv-st-m) .fb-bar{bottom:calc(182px + env(safe-area-inset-bottom,0px))}
   .fb-panel{top:auto;bottom:130px;max-height:60%}
 }

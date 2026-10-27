@@ -55,6 +55,13 @@ export function Stories({
       });
   }, [current]);
 
+  // Something else wants the visitor's attention (e.g. writing feedback): the story waits.
+  useEffect(() => {
+    const pause = () => setPaused(true);
+    window.addEventListener("hv-pause", pause);
+    return () => window.removeEventListener("hv-pause", pause);
+  }, []);
+
   function play(index: number) {
     setPlaying(index);
     setPaused(false);
