@@ -17,7 +17,7 @@ export function BackupNow() {
           start(async () => {
             setMsg(null);
             const r = await backupNow();
-            setMsg(r.ok ? `Taget (${Math.max(1, Math.round(r.size / 1024 / 1024))} MB)` : r.error.slice(0, 80));
+            setMsg(r.ok ? `Taget: ${(r.size / 1024 / 1024).toLocaleString("da-DK", { maximumFractionDigits: 1 })} MB, ${r.tables} tabeller, ${r.rows.toLocaleString("da-DK")} rækker` : r.error.slice(0, 80));
           })
         }
         className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-200 disabled:opacity-50"
