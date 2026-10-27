@@ -129,7 +129,9 @@ export function TourEditor({
   }, [slug]);
   const [note, setNote] = useState("");
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  const [device, setDevice] = useState<"computer" | "mobil" | "site">("computer");
+  const [device, setDeviceNow] = useState<"computer" | "mobil" | "site">("computer");
+  /** Where the preview stood before it was reloaded in another frame - flown back to once it's ready. */
+  const carry = useRef<string | null>(null);
   const [siteWidth, setSiteWidth] = useState<"computer" | "mobil">("computer");
   const embed: EmbedSize = config.embeds?.size ?? DEFAULT_EMBED;
   const setEmbed = (size: EmbedSize) => edit((d) => void (d.embeds = { ...d.embeds, size }));
@@ -195,6 +197,9 @@ export function TourEditor({
     function onMessage(e: MessageEvent) {
       if (e.origin === location.origin && e.source === frame.current?.contentWindow && e.data?.type === "tour-ready") {
         frame.current?.contentWindow?.postMessage({ type: "tour-draft", config: latest.current }, location.origin);
+        const to = carry.current;
+        carry.current = null;
+        if (to) setTimeout(() => frame.current?.contentWindow?.postMessage({ type: "tour-go", name: "", href: to }, location.origin), 300);
       }
     }
     window.addEventListener("message", onMessage);
@@ -224,6 +229,22 @@ export function TourEditor({
       go: (name, href) => frame.current?.contentWindow?.postMessage({ type: "tour-go", name, href }, location.origin),
     };
   }, []);
+
+  /**
+   * Switches Computer / Mobil / På hjemmeside. Computer and Mobil share one
+   * frame (nothing reloads); to or from "På hjemmeside" the tour loads again,
+   * so the spot it stood in is taken along and flown back to.
+   */
+  function setDevice(next: "computer" | "mobil" | "site") {
+    if (next === device) return;
+    if ((next === "site") === (device === "site")) return setDeviceNow(next);
+    preview
+      .view()
+      .then((r) => {
+        carry.current = r.href ?? null;
+      })
+      .finally(() => setDeviceNow(next));
+  }
 
   /** Changes the draft (a copy - the saved tour is untouched until "Gem"). */
   function edit(fn: (draft: TourConfig) => void) {
@@ -868,20 +889,12 @@ export function TourEditor({
               <SitePreview config={config} size={embed} width={siteWidth}>
                 <iframe ref={frame} key={previewKey} title="Forhåndsvisning" src={`/arpo/tour-lab/${slug}`} className="h-full w-full bg-black" allow="fullscreen; xr-spatial-tracking; autoplay; clipboard-write" />
               </SitePreview>
-            ) : device === "computer" ? (
-              <div className={`flex h-full w-full flex-col overflow-hidden bg-white ${big ? "" : "rounded-xl shadow-[0_20px_50px_rgba(0,0,0,.15)] ring-1 ring-black/10"}`}>
-                <div className={`${big ? "hidden" : "flex"} items-center gap-1.5 border-b border-black/[.06] bg-[#f6f6f6] px-3 py-2`}>
-                  <i className="h-3 w-3 rounded-full bg-[#ff5f57]" />
-                  <i className="h-3 w-3 rounded-full bg-[#febc2e]" />
-                  <i className="h-3 w-3 rounded-full bg-[#28c840]" />
-                  <span className="mx-auto rounded-md bg-white px-3 py-0.5 text-[11px] text-[#8e8e93] ring-1 ring-black/[.06]">{tourUrl(slug, "").replace(/^https?:\/\//, "") || `/t/${slug}`}</span>
-                </div>
-                <iframe ref={frame} key={previewKey} title="Forhåndsvisning" src={`/arpo/tour-lab/${slug}`} className="min-h-0 w-full flex-1 bg-black" allow="fullscreen; xr-spatial-tracking; autoplay; clipboard-write" />
-              </div>
             ) : (
-              <PhoneFrame>
+              // Computer and phone share one frame, so switching between them (or grabbing a zoom slider) only changes the
+              // frame around the tour - the tour itself isn't reloaded and stays where it is.
+              <DeviceFrame phone={device === "mobil"} big={big} address={tourUrl(slug, "").replace(/^https?:\/\//, "") || `/t/${slug}`}>
                 <iframe ref={frame} key={previewKey} title="Forhåndsvisning" src={`/arpo/tour-lab/${slug}`} className="h-full w-full bg-black" allow="fullscreen; xr-spatial-tracking; autoplay; clipboard-write" />
-              </PhoneFrame>
+              </DeviceFrame>
             )}
           </div>
 
@@ -1236,7 +1249,8 @@ function FilesGroup({ slug, config, onHosted }: { slug: string; config: TourConf
  * scaled down to fit - so the preview lays out exactly as on a phone.
  */
 const PHONE = { w: 393, h: 852, bezel: 12 };
-function PhoneFrame({ children }: { children: React.ReactNode }) {
+/** The browser window (computer) or the phone around the preview - the same elements either way, so the tour inside stays loaded. */
+function DeviceFrame({ phone, big, address, children }: { phone: boolean; big: boolean; address: string; children: React.ReactNode }) {
   const box = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(0.8);
   useEffect(() => {
@@ -1250,13 +1264,28 @@ function PhoneFrame({ children }: { children: React.ReactNode }) {
   }, []);
   return (
     <div ref={box} className="flex h-full w-full items-center justify-center overflow-hidden">
-      <div style={{ width: (PHONE.w + 2 * PHONE.bezel) * scale, height: (PHONE.h + 2 * PHONE.bezel) * scale }}>
+      <div style={phone ? { width: (PHONE.w + 2 * PHONE.bezel) * scale, height: (PHONE.h + 2 * PHONE.bezel) * scale } : { width: "100%", height: "100%" }}>
         <div
-          className="relative origin-top-left rounded-[58px] bg-[#1d1d1f] shadow-[0_30px_60px_rgba(0,0,0,.3)]"
-          style={{ width: PHONE.w + 2 * PHONE.bezel, height: PHONE.h + 2 * PHONE.bezel, padding: PHONE.bezel, transform: `scale(${scale})` }}
+          className={
+            phone
+              ? "relative origin-top-left rounded-[58px] bg-[#1d1d1f] shadow-[0_30px_60px_rgba(0,0,0,.3)]"
+              : `flex h-full w-full flex-col overflow-hidden bg-white ${big ? "" : "rounded-xl shadow-[0_20px_50px_rgba(0,0,0,.15)] ring-1 ring-black/10"}`
+          }
+          style={phone ? { width: PHONE.w + 2 * PHONE.bezel, height: PHONE.h + 2 * PHONE.bezel, padding: PHONE.bezel, transform: `scale(${scale})` } : undefined}
         >
-          <span className="absolute left-1/2 top-[23px] z-10 h-[34px] w-[124px] -translate-x-1/2 rounded-full bg-black" />
-          <div className="h-full w-full overflow-hidden rounded-[46px] bg-black">{children}</div>
+          {phone ? (
+            <span key="notch" className="absolute left-1/2 top-[23px] z-10 h-[34px] w-[124px] -translate-x-1/2 rounded-full bg-black" />
+          ) : (
+            <div key="bar" className={`${big ? "hidden" : "flex"} items-center gap-1.5 border-b border-black/[.06] bg-[#f6f6f6] px-3 py-2`}>
+              <i className="h-3 w-3 rounded-full bg-[#ff5f57]" />
+              <i className="h-3 w-3 rounded-full bg-[#febc2e]" />
+              <i className="h-3 w-3 rounded-full bg-[#28c840]" />
+              <span className="mx-auto rounded-md bg-white px-3 py-0.5 text-[11px] text-[#8e8e93] ring-1 ring-black/[.06]">{address}</span>
+            </div>
+          )}
+          <div key="screen" className={phone ? "h-full w-full overflow-hidden rounded-[46px] bg-black" : "min-h-0 w-full flex-1 bg-black"}>
+            {children}
+          </div>
         </div>
       </div>
     </div>
