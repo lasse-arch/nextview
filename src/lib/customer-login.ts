@@ -14,6 +14,8 @@ import { WELCOME_MAIL_SENDER } from "@/lib/welcome-mail";
  */
 
 const LINK_MINUTES = 15;
+/** The first link, when access is given in Arpo: the customer may not open the mail the same day. */
+const WELCOME_DAYS = 7;
 /** Links one customer can ask for in an hour, and requests from one address in 15 minutes. */
 const MAX_PER_ACCOUNT_HOUR = 5;
 const MAX_PER_IP = 20;
@@ -22,9 +24,9 @@ const hash = (token: string) => createHash("sha256").update(token).digest("hex")
 export const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
 /** A fresh one-time link for the account - the token itself only ever exists in the e-mail. */
-async function newLink(accountId: string): Promise<string> {
+async function newLink(accountId: string, minutes: number): Promise<string> {
   const token = randomBytes(32).toString("base64url");
-  await prisma.customerLoginToken.create({ data: { tokenHash: hash(token), accountId, expiresAt: new Date(Date.now() + LINK_MINUTES * 60_000) } });
+  await prisma.customerLoginToken.create({ data: { tokenHash: hash(token), accountId, expiresAt: new Date(Date.now() + minutes * 60_000) } });
   // Used and expired links are no use - cleared as we go, so the table stays small.
   await prisma.customerLoginToken.deleteMany({ where: { expiresAt: { lt: new Date(Date.now() - 24 * 3600_000) } } });
   return `${getAppBaseUrl()}/login/link?t=${token}`;
@@ -34,19 +36,21 @@ const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replac
 
 /** Sends the login mail from lasse@nextview360.dk. `welcome` = the first one, when access is given in Arpo. */
 export async function sendLoginMail(account: { id: string; email: string; name: string | null }, welcome = false): Promise<void> {
-  const link = await newLink(account.id);
+  const link = await newLink(account.id, welcome ? WELCOME_DAYS * 24 * 60 : LINK_MINUTES);
   const hi = account.name ? `Hej ${account.name.split(" ")[0]}` : "Hej";
   const subject = welcome ? "Jeres egen side hos Nextview360" : "Dit login til Nextview360";
   const lead = welcome
     ? "I har nu jeres egen side hos Nextview360. Her kan I se, hvordan jeres virtuelle tour klarer sig, hente koderne til jeres hjemmeside og finde jeres kontrakt."
     : "Her er dit link til at logge ind hos Nextview360.";
-  const after = `Linket virker én gang og i ${LINK_MINUTES} minutter. Næste gang skriver du bare din e-mail på nextview360.dk/login, så får du et nyt.`;
-  const bodyText = `${hi}\n\n${lead}\n\nLog ind her:\n${link}\n\n${after}\n\nHar du ikke bedt om det, kan du se bort fra mailen.\n\nVenlig hilsen\nNextview360`;
+  const after = welcome
+    ? `Linket virker én gang i de næste ${WELCOME_DAYS} dage. Næste gang skriver I bare jeres e-mail på nextview360.dk/login, så får I et nyt link.`
+    : `Linket virker én gang og i ${LINK_MINUTES} minutter. Har du ikke bedt om det, kan du se bort fra mailen.`;
+  const bodyText = `${hi}\n\n${lead}\n\nLog ind her:\n${link}\n\n${after}\n\nVenlig hilsen\nNextview360`;
   const bodyHtml = `<div style="font-family:-apple-system,Segoe UI,Arial,sans-serif;font-size:15px;line-height:1.5;color:#1d1d1f;max-width:520px">
 <p>${esc(hi)}</p>
 <p>${esc(lead)}</p>
 <p><a href="${esc(link)}" style="display:inline-block;background:#0071e3;color:#fff;text-decoration:none;font-weight:600;padding:12px 22px;border-radius:12px">Log ind</a></p>
-<p style="color:#6e6e73;font-size:13px">${esc(after)} Har du ikke bedt om det, kan du se bort fra mailen.</p>
+<p style="color:#6e6e73;font-size:13px">${esc(after)}</p>
 <p>Venlig hilsen<br>Nextview360</p>
 </div>`;
 
