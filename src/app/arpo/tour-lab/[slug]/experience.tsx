@@ -4,7 +4,7 @@ import { LANG_CSS, LangSwitch } from "./lang-switch";
 import { danishOf, localize, makeT, tourLanguages } from "../tours/i18n";
 import { TourLang } from "../tours/i18n-react";
 import { socialLinks } from "../tours/social";
-import { cssFilter, formatPhone, imageOfHref, isInTourHref, isPlaceHref, placeHref, placeSlug, pointOfHref, startPlaces } from "../tours/places";
+import { cssFilter, formatPhone, imageOfHref, isInTourHref, isPlaceHref, placeHref, panoHfov, placeSlug, pointOfHref, startPlaces } from "../tours/places";
 import type { LiveUnit } from "@/lib/availability/live";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
@@ -77,7 +77,7 @@ function asScene(T: TourConfig): TourConfig {
   const dir = (x: number, y: number) => ({ yaw: (x / 100) * 360 - 180, pitch: 90 - (y / 100) * 180 });
   const view = (s: { x: number; y: number; zoom: number } | undefined, phone: boolean) => {
     const d = dir(s?.x ?? 50, s?.y ?? 50);
-    return { ...d, hfov: Math.max(40, Math.min(115, (phone ? 100 : 105) / (s?.zoom || 1))) };
+    return { ...d, hfov: panoHfov(phone, s?.zoom) };
   };
   return {
     ...T,
@@ -1408,7 +1408,7 @@ function TourExperience({
   return (
     <TourLang.Provider value={{ lang, t: tx }}>
     <LinkProvider T={T} popup={popup}>
-    <div className={`hv fixed inset-0 z-50 overflow-hidden bg-[#0d1b20] ${selected ? "hv-punkt" : ""} ${zoomed ? "hv-zoom" : ""} ${welcome ? "hv-welcome" : ""} ${phase === "tour" && T.stories?.mobile ? "hv-st-on-m" : ""} ${menuOpen ? "hv-menu-aaben" : ""} ${T.design?.menu === "dock" ? "hv-dock" : ""} ${T.logoSide === "right" ? "hv-logo-h" : ""} ${guideAt != null || (dayAt != null && !dayOpen) ? "hv-guiding" : ""} ${route ? "hv-routing" : ""} ${showMeasures && phase === "tour" ? "hv-maler" : ""} ${phase === "tour" && T.stories?.desktop ? "hv-st-on-d" : ""}`} style={
+    <div className={`hv fixed inset-0 z-50 overflow-hidden bg-[#0d1b20] ${selected ? "hv-punkt" : ""} ${zoomed ? "hv-zoom" : ""} ${welcome ? "hv-welcome" : ""} ${phase === "tour" && T.stories?.mobile ? "hv-st-on-m" : ""} ${menuOpen ? "hv-menu-aaben" : ""} ${T.overviewUi?.box?.desktop === false ? "hv-boks-ud-d" : ""} ${T.overviewUi?.box?.mobile === false ? "hv-boks-ud-m" : ""} ${T.overviewUi?.filter?.desktop === false ? "hv-filter-ud-d" : ""} ${T.overviewUi?.filter?.mobile === false ? "hv-filter-ud-m" : ""} ${T.design?.menu === "dock" ? "hv-dock" : ""} ${T.logoSide === "right" ? "hv-logo-h" : ""} ${guideAt != null || (dayAt != null && !dayOpen) ? "hv-guiding" : ""} ${route ? "hv-routing" : ""} ${showMeasures && phase === "tour" ? "hv-maler" : ""} ${phase === "tour" && T.stories?.desktop ? "hv-st-on-d" : ""}`} style={
         {
           fontFamily: `'${T.font}', system-ui, sans-serif`,
           "--c-main": T.colors.main,
@@ -1604,7 +1604,7 @@ function TourExperience({
         </div>
       )}
 
-      {pano && hasPano(pano) && <PanoView name={pano.name} dir={pano.pano} image={pano.panorama} start={pano.panoStart} panos={T.panos} turning={guideAt != null} onClose={() => setPano(null)} />}
+      {pano && hasPano(pano) && <PanoView name={pano.name} dir={pano.pano} image={pano.panorama} start={pano.panoStart} panos={T.panos} turning={guideAt != null} zoom={pano.panorama ? T.imageView?.[pano.panorama] : undefined} onClose={() => setPano(null)} />}
       {lightbox && <Lightbox key={lightbox.title + lightbox.at} state={lightbox} onClose={() => setLightbox(null)} />}
 
       {/* Logo (MPSkins: left, 200px, 13px from the edges - or right, with the menu on the left). */}
@@ -2110,9 +2110,12 @@ function PanoView({
   start,
   panos,
   turning = false,
+  zoom,
   onClose,
 }: {
   name: string;
+  /** How zoomed it opens, per device (1 = normal: a computer a little out, a phone a little in). */
+  zoom?: { desktop?: number; mobile?: number };
   /** A folder of prepared tiles (under `panos`) - or `image`, one uploaded 360° photo. */
   dir?: string;
   image?: string;
@@ -2146,8 +2149,8 @@ function PanoView({
         autoLoad: true,
         showControls: false,
         compass: false,
-        hfov: window.innerWidth <= 760 ? 90 : 100,
-        minHfov: 40,
+        hfov: window.innerWidth <= 760 ? panoHfov(true, zoom?.mobile) : panoHfov(false, zoom?.desktop),
+        minHfov: 30,
         maxHfov: 120,
         yaw: start?.yaw ?? 0,
         pitch: start?.pitch ?? -10,
@@ -2158,7 +2161,7 @@ function PanoView({
       cancelled = true;
       viewer?.destroy();
     };
-  }, [dir, image, panos, start, turning]);
+  }, [dir, image, panos, start, turning, zoom]);
   return (
     <div className="hv-pano">
       <div ref={el} className="absolute inset-0" />
@@ -2462,6 +2465,9 @@ const CSS = `
 /* An open point: the welcome box and the filter step aside so they don't cover other points. */
 .hv-punkt .hv-intro,.hv-punkt .hv-filtre{opacity:0;pointer-events:none}
 .hv-intro{transition:opacity .25s}
+/* Switched off in the editor (Interaktivt kort → Over kortet), per device. */
+@media (min-width:761px){.hv-boks-ud-d .hv-intro,.hv-filter-ud-d .hv-filtre{display:none}}
+@media (max-width:760px){.hv-boks-ud-m .hv-intro,.hv-filter-ud-m .hv-filtre{display:none}}
 @media (max-width:760px){
   /* Slim welcome bar instead of the big card, with room for the menu button. */
   .hv-intro{top:10px;left:10px;right:104px;width:auto;display:flex;align-items:center;border-radius:14px}

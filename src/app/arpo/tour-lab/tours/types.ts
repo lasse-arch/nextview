@@ -130,6 +130,14 @@ export type TourConfig = {
    */
   contact?: { address?: string; mapUrl?: string; phone?: string; email?: string; instagram?: string; social?: Partial<Record<import("./social").SocialKind, string>> };
   /** The drone scene in front of the tour - leave out to start straight in the tour. */
+  /**
+   * What lies over the drone scene / map, per device - false hides it: the
+   * box at the top (logo, title, text and the first button) and the
+   * category filter ("Vis").
+   */
+  /** How zoomed a 360° picture opens (menu pictures, a point's 360° photo), by the picture's address: 1 = the device's normal, over 1 closer. */
+  imageView?: Record<string, { desktop?: number; mobile?: number }>;
+  overviewUi?: { box?: { desktop?: false; mobile?: false }; filter?: { desktop?: false; mobile?: false } };
   drone?: {
     /** One 360° photo (equirectangular) instead of the tiles below - set by the engine for a 360° map. */
     panorama?: string;

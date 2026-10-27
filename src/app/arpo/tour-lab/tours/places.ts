@@ -65,3 +65,8 @@ export function formatPhone(phone: string): string {
   const n = m[2].replace(/(\d{2})(?=\d)/g, "$1 ");
   return m[1] ? `+45 ${n}` : n;
 }
+
+/** A 360° picture's view width (degrees) per device at zoom 1: a computer a little zoomed out, a phone a little zoomed in. */
+export const PANO_HFOV = { desktop: 110, mobile: 80 } as const;
+/** The view width for a zoom (1 = the device's normal; over 1 is closer). */
+export const panoHfov = (phone: boolean, zoom = 1) => Math.max(30, Math.min(120, (phone ? PANO_HFOV.mobile : PANO_HFOV.desktop) / (zoom || 1)));

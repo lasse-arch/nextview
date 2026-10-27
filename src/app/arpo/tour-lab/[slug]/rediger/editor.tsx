@@ -23,7 +23,7 @@ import type { ScanMap } from "@/lib/matterport-graph";
 import { currentPreset } from "../../tours/presets";
 import { EconomyPanel, type TourEconomy } from "./economy";
 import { DEFAULT_EMBED, SharePanel, SitePreview, type EmbedSize } from "./share";
-import { Choice, Field, FilesContext, Group, Icon, input, outsideFiles, ssOfHref, Toggle, UploadButton, withProtocol, type PreviewApi } from "./ui";
+import { Choice, Field, FilesContext, Group, Icon, input, outsideFiles, PanoZoom, ssOfHref, Toggle, UploadButton, withProtocol, type PreviewApi } from "./ui";
 import { fetchSiteFavicon, hostTourFiles } from "@/lib/actions/tour-files";
 import { AiMemoryPanel } from "./memory";
 import { MapEditor } from "./map-editor";
@@ -719,7 +719,20 @@ export function TourEditor({
             {tab === "kort" && <CardsEditor config={config} edit={edit} preview={preview} />}
             {tab === "menu" && (
               <>
-                <MenuEditor menu={config.menu} preview={preview} overview={Boolean(config.drone || config.map)} onChange={(menu) => edit((d) => void (d.menu = menu))} />
+                <MenuEditor
+                  menu={config.menu}
+                  preview={preview}
+                  overview={Boolean(config.drone || config.map)}
+                  onChange={(menu) => edit((d) => void (d.menu = menu))}
+                  imageView={config.imageView}
+                  onImageView={(src, z) =>
+                    edit((d) => {
+                      const all = { ...d.imageView };
+                      if (z) all[src] = z;
+                      else delete all[src];
+                      d.imageView = Object.keys(all).length ? all : undefined;
+                    })}
+                />
                 <ScanJumper config={config} preview={preview} map={scanMap} count={scanCount} hiddenSweeps={[...config.hiddenSweeps, ...mpskinsHidden]} />
               </>
             )}
@@ -1714,7 +1727,23 @@ const KIND_ICON: Record<Kind | "group", [string, string]> = {
  * editor: drag rows to reorder (onto a group's header to put them in it),
  * click a row to edit it, and add places by walking to them in the preview.
  */
-function MenuEditor({ menu, onChange, preview, overview = false }: { menu: MenuEntry[]; onChange: (m: MenuEntry[]) => void; preview: PreviewApi; /** The tour starts on a drone picture / map - a menu item can lead back to it. */ overview?: boolean }) {
+function MenuEditor({
+  menu,
+  onChange,
+  preview,
+  overview = false,
+  imageView,
+  onImageView,
+}: {
+  menu: MenuEntry[];
+  onChange: (m: MenuEntry[]) => void;
+  preview: PreviewApi;
+  /** The tour starts on a drone picture / map - a menu item can lead back to it. */
+  overview?: boolean;
+  /** How zoomed each 360° picture opens (by its address). */
+  imageView?: TourConfig["imageView"];
+  onImageView: (src: string, zoom: { desktop?: number; mobile?: number } | undefined) => void;
+}) {
   const [open, setOpen] = useState<Addr | null>(null);
   const [drag, setDrag] = useState<Addr | null>(null);
   const [over, setOver] = useState<Addr | "end" | null>(null);
@@ -1857,6 +1886,7 @@ function MenuEditor({ menu, onChange, preview, overview = false }: { menu: MenuE
                     )}
                     <UploadButton accept="image/*" label={imageOfHref(it.href ?? "") ? "Skift billede" : "Upload billede"} onDone={(url) => set(a, { href: IMAGE_HREF + url })} />
                     <p className="text-[12px] leading-snug text-[#8e8e93]">Vises i fuld skærm i touren - fx et dronefoto, et situationskort eller en plantegning. Et 360°-billede (2:1) åbner som 360°.</p>
+                    {imageOfHref(it.href ?? "") && <PanoZoom src={imageOfHref(it.href ?? "")!} value={imageView?.[imageOfHref(it.href ?? "")!]} onChange={(z) => onImageView(imageOfHref(it.href ?? "")!, z)} />}
                   </div>
                 ) : kindOf(it.href ?? "") === "web" ? (
                   <input className={`${input} mt-2 bg-white`} value={it.href} placeholder="https://…" onChange={(e) => set(a, { href: e.target.value })} />

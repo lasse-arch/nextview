@@ -3,10 +3,10 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { placeMapSpots } from "@/lib/actions/tour-ai";
 import { ICONS, ICON_NAMES, guessIcon } from "../../tours/icons";
-import { isPlaceHref, pointOfHref } from "../../tours/places";
+import { PANO_HFOV, isPlaceHref, panoHfov, pointOfHref } from "../../tours/places";
 import "pannellum/build/pannellum.css";
 import type { TourConfig, TourPoint } from "../../tours/types";
-import { Field, Group, Icon, input, Toggle, UploadButton } from "./ui";
+import { Field, Group, Icon, input, PanoZoom, Toggle, UploadButton } from "./ui";
 import { AiImageButton } from "./ai-image";
 
 /*
@@ -133,6 +133,7 @@ export function MapEditor({ config, edit }: { config: TourConfig; edit: Edit }) 
           />
         )}
       </Group>
+      <OverviewUiToggles config={config} edit={edit} />
       <Group title="Billede">
         <div className="flex gap-2">
           <UploadButton accept="image/*" label="Skift kortbillede" onDone={setImage} />
@@ -178,6 +179,8 @@ function MapCanvas({ config, edit, onClose }: { config: TourConfig; edit: Edit; 
   const notInMenu = config.points.filter((p) => M.spots[p.id] && !inMenu(config, p));
   /** A 360° picture is set up in 360° (it can be shown flat too). */
   const [in360, setIn360] = useState(Boolean(M.panorama));
+  /** The 360° picture as a computer or a phone shows it (the start view and zoom are set per device). */
+  const [phone, setPhone] = useState(false);
   const pano = useRef<{ view: () => { x: number; y: number; zoom: number } } | null>(null);
   const [aiBusy, startAi] = useTransition();
   const [aiNote, setAiNote] = useState<{ text: string; error?: boolean } | null>(null);
@@ -323,6 +326,15 @@ function MapCanvas({ config, edit, onClose }: { config: TourConfig; edit: Edit; 
                 Læg i menuen ({notInMenu.length})
               </button>
             )}
+            {M.panorama && in360 && (
+              <span className="flex rounded-full bg-[#f2f2f7] p-0.5 text-[12px] font-medium">
+                {([false, true] as const).map((v) => (
+                  <button key={String(v)} type="button" onClick={() => setPhone(v)} className={`rounded-full px-2.5 py-1 ${phone === v ? "bg-white shadow" : "text-[#6e6e73]"}`}>
+                    {v ? "Mobil" : "Computer"}
+                  </button>
+                ))}
+              </span>
+            )}
             {M.panorama && (
               <span className="flex rounded-full bg-[#f2f2f7] p-0.5 text-[12px] font-medium">
                 {([true, false] as const).map((v) => (
@@ -371,7 +383,16 @@ function MapCanvas({ config, edit, onClose }: { config: TourConfig; edit: Edit; 
           )}
           </div>
           {in360 && M.panorama ? (
-            <Pano360 config={config} selected={selected} picking={Boolean(placing)} onApi={(a) => (pano.current = a)} onPick={placeAt} onSelect={setSelected} />
+            phone ? (
+              <div className="flex min-h-0 flex-1 items-center justify-center bg-[#e9e9ee] px-4 pb-4 pt-14">
+                <div className="relative flex h-full max-h-[844px] flex-col overflow-hidden rounded-[36px] border-[10px] border-[#1d1d1f] bg-black shadow-2xl" style={{ aspectRatio: "390 / 844" }}>
+                  <Pano360 key="mobil" config={config} phone selected={selected} picking={Boolean(placing)} onApi={(a) => (pano.current = a)} onPick={placeAt} onSelect={setSelected} />
+                  <PhoneChrome config={config} />
+                </div>
+              </div>
+            ) : (
+              <Pano360 key="computer" config={config} selected={selected} picking={Boolean(placing)} onApi={(a) => (pano.current = a)} onPick={placeAt} onSelect={setSelected} />
+            )
           ) : (
           <div ref={scroller} className="min-h-0 flex-1 overflow-auto p-4">
             <div ref={wrap} className={`relative mx-auto select-none ${placing ? "cursor-crosshair" : ""}`} style={{ width: `${zoom * 100}%`, aspectRatio: `${M.w} / ${M.h}` }} onClick={clickMap}>
@@ -431,12 +452,18 @@ function MapCanvas({ config, edit, onClose }: { config: TourConfig; edit: Edit; 
         {/* Beside the map: the point, or the map's points and categories */}
         <aside className="w-[340px] flex-none space-y-4 overflow-y-auto border-l border-black/[.06] p-4">
           {point ? (
-            <PointPanel config={config} point={point} rooms={rooms} setPoint={setPoint} onMove={() => setPlacing({ kind: "point", id: point.id })} onRemove={() => removePoint(point.id)} onDone={() => setSelected(null)} />
+            <PointPanel config={config} point={point} rooms={rooms} setPoint={setPoint} setImageZoom={(src, z) =>
+                    edit((d) => {
+                      const all = { ...d.imageView };
+                      if (z) all[src] = z;
+                      else delete all[src];
+                      d.imageView = Object.keys(all).length ? all : undefined;
+                    })} onMove={() => setPlacing({ kind: "point", id: point.id })} onRemove={() => removePoint(point.id)} onDone={() => setSelected(null)} />
           ) : (
             <>
               <Group title="Startudsnit">
-                <p className="text-[12px] leading-snug text-[#8e8e93]">{in360 && M.panorama ? "Hvad man ser først. Drej og zoom 360°-billedet til det, man skal se, og tryk." : "Hvad man ser først. Klik på knappen og så på kortet."}</p>
-                {(["start", "startMobile"] as const).map((k) => (
+                <p className="text-[12px] leading-snug text-[#8e8e93]">{in360 && M.panorama ? `Hvad man ser først på ${phone ? "mobil" : "computer"}. Drej og zoom 360°-billedet til det, man skal se, og tryk. Skift mellem Computer og Mobil øverst.` : "Hvad man ser først. Klik på knappen og så på kortet."}</p>
+                {(["start", "startMobile"] as const).filter((k) => !(in360 && M.panorama) || (k === "startMobile") === phone).map((k) => (
                   <div key={k} className="space-y-1.5">
                     {in360 && M.panorama ? (
                       <button
@@ -456,7 +483,7 @@ function MapCanvas({ config, edit, onClose }: { config: TourConfig; edit: Edit; 
                     )}
                     {M[k] && (
                       <Field title={`Zoom ${k === "start" ? "computer" : "mobil"}: ${M[k]!.zoom.toFixed(2)}×`}>
-                        <input type="range" min={1} max={3} step={0.05} className="w-full accent-[#0071e3]" value={M[k]!.zoom} onChange={(e) => edit((d) => void (d.map![k] = { ...d.map![k]!, zoom: Number(e.target.value) }))} />
+                        <input type="range" min={0.7} max={3} step={0.05} className="w-full accent-[#0071e3]" value={M[k]!.zoom} onChange={(e) => edit((d) => void (d.map![k] = { ...d.map![k]!, zoom: Number(e.target.value) }))} />
                       </Field>
                     )}
                   </div>
@@ -526,6 +553,7 @@ function Pano360({
   config,
   selected,
   picking,
+  phone = false,
   onApi,
   onPick,
   onSelect,
@@ -533,6 +561,8 @@ function Pano360({
   config: TourConfig;
   selected: string | null;
   picking: boolean;
+  /** As a phone shows it: its own start view and zoom. */
+  phone?: boolean;
   /** What the start buttons need: the view shown right now (null when the viewer is gone). */
   onApi: (api: { view: () => { x: number; y: number; zoom: number } } | null) => void;
   onPick: (pos: [number, number]) => void;
@@ -560,14 +590,14 @@ function Pano360({
     (async () => {
       if (!window.pannellum) await import("pannellum/build/pannellum.js");
       if (dead || !el.current || !window.pannellum) return;
-      const s = M.start ?? { x: 50, y: 50, zoom: 1 };
+      const s = (phone ? (M.startMobile ?? M.start) : M.start) ?? { x: 50, y: 50, zoom: 1 };
       const v = window.pannellum.viewer(el.current, {
         type: "equirectangular",
         panorama: M.image,
         autoLoad: true,
         showFullscreenCtrl: false,
         ...toDir(s.x, s.y),
-        hfov: Math.max(40, Math.min(115, 105 / (s.zoom || 1))),
+        hfov: panoHfov(phone, s.zoom),
         minHfov: 25,
         maxHfov: 120,
         hotSpots: [], // addHotSpot needs the list to be there
@@ -594,7 +624,7 @@ function Pano360({
       giveApi.current({
         view: () => {
           const [x, y] = toXY(v.getPitch(), v.getYaw());
-          return { x, y, zoom: Math.round((105 / v.getHfov()) * 100) / 100 };
+          return { x, y, zoom: Math.round(((phone ? PANO_HFOV.mobile : PANO_HFOV.desktop) / v.getHfov()) * 100) / 100 };
         },
       });
       setReady(true);
@@ -609,7 +639,7 @@ function Pano360({
       setReady(false);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- the viewer is made once per picture; the start view is only where it opens
-  }, [M.image]);
+  }, [M.image, phone]);
 
   // The points, as hotspots - put up again when they (or the chosen one) change.
   useEffect(() => {
@@ -645,7 +675,7 @@ function Pano360({
     <div className={`relative min-h-0 flex-1 ${picking ? "mk-picking" : ""}`}>
       <div ref={el} className="absolute inset-0" />
       {error && <p className="absolute left-4 top-4 rounded-lg bg-white px-3 py-2 text-[13px] text-[#ff3b30] shadow">{error}</p>}
-      <p className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-black/55 px-3 py-1 text-[12px] text-white">Træk for at dreje · rul for at zoome · klik på et punkt for at vælge det</p>
+      {!phone && <p className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-black/55 px-3 py-1 text-[12px] text-white">Træk for at dreje · rul for at zoome · klik på et punkt for at vælge det</p>}
       <style>{`
 .mk-hs{width:0;height:0;overflow:visible;cursor:pointer;z-index:2}
 .mk-hs .mk-dot{position:absolute;left:-16px;top:-16px;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.35);outline:2px solid #fff}
@@ -659,11 +689,88 @@ function Pano360({
   );
 }
 
+/** On the phone preview: what lies over the picture in the tour (the box at the top, the menu button, the filter) - roughly as the tour draws it. */
+function PhoneChrome({ config }: { config: TourConfig }) {
+  const M = config.map as Map;
+  const box = config.overviewUi?.box?.mobile !== false;
+  const filter = config.overviewUi?.filter?.mobile !== false && Object.keys(config.categories).length > 0;
+  return (
+    <div className="pointer-events-none absolute inset-0 z-10 text-[12px]">
+      {box && (
+        <div className="absolute left-2.5 right-[88px] top-2.5 flex items-center overflow-hidden rounded-[14px] shadow-lg" style={{ background: config.colors.soft }}>
+          <div className="flex-none px-2.5 py-2" style={{ background: config.colors.main }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            {config.logo && <img src={config.logo} alt="" className="h-[30px]" />}
+          </div>
+          <div className="min-w-0 px-2.5 py-1.5">
+            <div className="truncate font-extrabold" style={{ color: config.colors.main }}>
+              {M.intro?.title ?? config.drone?.intro.title ?? config.brand}
+            </div>
+          </div>
+        </div>
+      )}
+      <div className="absolute right-2.5 top-2.5 rounded-full px-3.5 py-2 font-extrabold tracking-wider text-white shadow-lg" style={{ background: config.colors.main }}>
+        MENU
+      </div>
+      {filter && <div className="absolute bottom-2.5 left-2.5 right-2.5 rounded-xl bg-white/95 px-3 py-2 font-semibold text-[#1d1d1f] shadow">{M.filterTitle ?? "Vis"} · {Object.values(config.categories).map((c) => c.name).join(" · ")}</div>}
+    </div>
+  );
+}
+
+/** What lies over the map, per device: the box at the top and the filter - each can be switched off. */
+function OverviewUiToggles({ config, edit }: { config: TourConfig; edit: Edit }) {
+  const ui = config.overviewUi;
+  const set = (what: "box" | "filter", device: "desktop" | "mobile", on: boolean) =>
+    edit((d) => {
+      const next = { box: { ...d.overviewUi?.box }, filter: { ...d.overviewUi?.filter } };
+      if (on) delete next[what][device];
+      else next[what][device] = false;
+      const clean = (o: object) => (Object.keys(o).length ? o : undefined);
+      const box = clean(next.box) as typeof next.box | undefined;
+      const filter = clean(next.filter) as typeof next.filter | undefined;
+      d.overviewUi = box || filter ? { box, filter } : undefined;
+    });
+  return (
+    <Group title="Over kortet">
+      <table className="w-full text-[13px]">
+        <thead>
+          <tr className="text-[11px] text-[#8e8e93]">
+            <th className="pb-1 text-left font-medium" />
+            <th className="pb-1 font-medium">Computer</th>
+            <th className="pb-1 font-medium">Mobil</th>
+          </tr>
+        </thead>
+        <tbody>
+          {(
+            [
+              ["box", "Boksen øverst", "Logo, overskrift, tekst og den første knap (fx Kontakt os)"],
+              ["filter", "Filteret", 'Boksen nederst ("Vis" med kategorierne)'],
+            ] as const
+          ).map(([what, title, hint]) => (
+            <tr key={what}>
+              <td className="py-1 pr-2">
+                <div className="font-medium text-[#1d1d1f]">{title}</div>
+                <div className="text-[11px] leading-snug text-[#8e8e93]">{hint}</div>
+              </td>
+              {(["desktop", "mobile"] as const).map((device) => (
+                <td key={device} className="text-center">
+                  <input type="checkbox" className="h-4 w-4 accent-[#0071e3]" checked={ui?.[what]?.[device] !== false} onChange={(e) => set(what, device, e.target.checked)} />
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </Group>
+  );
+}
+
 function PointPanel({
   config,
   point: p,
   rooms,
   setPoint,
+  setImageZoom,
   onMove,
   onRemove,
   onDone,
@@ -672,6 +779,7 @@ function PointPanel({
   point: TourPoint;
   rooms: [string, string][];
   setPoint: (fn: (p: TourPoint) => void) => void;
+  setImageZoom: (src: string, zoom: { desktop?: number; mobile?: number } | undefined) => void;
   onMove: () => void;
   onRemove: () => void;
   onDone: () => void;
@@ -795,6 +903,9 @@ function PointPanel({
                 Fjern
               </button>
             </div>
+          ) : null}
+          {p.panorama ? (
+            <PanoZoom src={p.panorama} value={config.imageView?.[p.panorama]} onChange={(z) => setImageZoom(p.panorama!, z)} />
           ) : (
             <UploadButton accept="image/*" label="Upload 360°-billede" onDone={(url) => setPoint((x) => void (x.panorama = url))} />
           )}

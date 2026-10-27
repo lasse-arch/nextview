@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { registerTourFile, uploadTourFile } from "@/lib/actions/tour-files";
 import type { TourConfig } from "../../tours/types";
 
@@ -153,3 +153,42 @@ export function outsideFiles(c: TourConfig): string[] {
 
 /** A typed address with https:// in front when it has no scheme (links, # and mailto/tel are kept). */
 export const withProtocol = (url: string) => (/^(https?:|mailto:|tel:|#)/i.test(url.trim()) ? url.trim() : `https://${url.trim()}`);
+
+/**
+ * How zoomed a 360° picture opens, on a computer and on a phone (shown only
+ * for a 2:1 picture). Unset = the normal: a computer a little zoomed out, a
+ * phone a little zoomed in.
+ */
+export function PanoZoom({ src, value, onChange }: { src: string; value?: { desktop?: number; mobile?: number }; onChange: (v: { desktop?: number; mobile?: number } | undefined) => void }) {
+  const [is360, setIs360] = useState<boolean | null>(null);
+  useEffect(() => {
+    const img = new Image();
+    img.onload = () => setIs360(Math.abs(img.naturalWidth / img.naturalHeight - 2) < 0.05);
+    img.onerror = () => setIs360(false);
+    img.src = src;
+  }, [src]);
+  if (!is360) return null;
+  const set = (k: "desktop" | "mobile", z: number | undefined) => {
+    const next = { ...value, [k]: z };
+    if (next[k] == null) delete next[k];
+    onChange(next.desktop == null && next.mobile == null ? undefined : next);
+  };
+  return (
+    <div className="space-y-1.5 rounded-xl bg-white p-2.5 ring-1 ring-black/[.06]">
+      <p className="text-[12px] font-medium text-[#1d1d1f]">Zoom i 360°</p>
+      {(["desktop", "mobile"] as const).map((k) => (
+        <div key={k} className="flex items-center gap-2 text-[12px] text-[#6e6e73]">
+          <span className="w-16 flex-none">{k === "desktop" ? "Computer" : "Mobil"}</span>
+          <input type="range" min={0.7} max={2.5} step={0.05} className="w-full accent-[#0071e3]" value={value?.[k] ?? 1} onChange={(e) => set(k, Number(e.target.value))} />
+          <span className="w-16 flex-none text-right tabular-nums">{value?.[k] != null ? `${value[k]!.toFixed(2)}×` : "Standard"}</span>
+          {value?.[k] != null && (
+            <button type="button" title="Tilbage til standard" className="text-[#0071e3]" onClick={() => set(k, undefined)}>
+              ↺
+            </button>
+          )}
+        </div>
+      ))}
+      <p className="text-[11px] leading-snug text-[#8e8e93]">Standard er lidt zoomet ud på computer og lidt ind på mobil. Over 1× er tættere på.</p>
+    </div>
+  );
+}
