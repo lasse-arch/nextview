@@ -54,9 +54,12 @@ export function CoverWelcome({
   onGuide,
   onCta,
   waiting,
+  instant,
 }: {
   T: TourConfig;
   waiting?: boolean;
+  /** Shown from the first picture - no fade in over what's behind. */
+  instant?: boolean;
   onEnter: () => void;
   onPlace: (p: TourPlace) => void;
   onGuide?: () => void;
@@ -65,7 +68,7 @@ export function CoverWelcome({
   const tr = useT();
   const C = T.cover!;
   return (
-    <div className="dz-cover" style={{ "--cover": `url(${C.image})`, "--cover-m": `url(${C.imageMobile ?? C.image})` } as React.CSSProperties}>
+    <div className={`dz-cover ${instant ? "dz-cover-nu" : ""}`} style={{ "--cover": `url(${C.image})`, "--cover-m": `url(${C.imageMobile ?? C.image})` } as React.CSSProperties}>
       <div className="dz-cover-text">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={T.logo} alt={T.brand} className="dz-cover-logo" />
@@ -322,6 +325,7 @@ export const DESIGNS_CSS = `
 /* ---- Cover welcome ---- */
 .dz-cover{position:absolute;inset:0;z-index:12;display:flex;flex-direction:column;justify-content:space-between;padding:56px 64px 40px;background:linear-gradient(100deg,rgba(12,9,6,.92) 0%,rgba(12,9,6,.72) 38%,rgba(12,9,6,.12) 70%),var(--cover) center/cover;color:#f6efe2;animation:hvFade .6s ease;overflow-y:auto}
 .dz-cover.ude{opacity:0;pointer-events:none;transition:opacity .6s}
+.dz-cover-nu{animation:none}
 .dz-cover-text{max-width:520px;animation:hvUp .8s cubic-bezier(.2,.7,.2,1) both}
 .dz-cover-logo{width:150px;height:auto;margin-bottom:28px;filter:drop-shadow(0 4px 16px rgba(0,0,0,.5))}
 .dz-cover h1{margin:12px 0 14px;font-size:68px;line-height:.98;font-weight:500;letter-spacing:-.01em;color:#fff}

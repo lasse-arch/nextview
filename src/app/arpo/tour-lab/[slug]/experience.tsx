@@ -390,7 +390,9 @@ function TourExperience({
   };
   /** The welcome tiles - skipped when the link already says where to go. */
   const [welcome, setWelcome] = useState(false);
-  const [cover, setCover] = useState(false);
+  /** The tour opens on the cover welcome: it's there from the very first picture (no flash of the drone scene before it). */
+  const startsCovered = T.design?.welcome === "cover" && Boolean(T.cover) && !T.intro;
+  const [cover, setCover] = useState(startsCovered);
   /** "Træd indenfor" pressed before the tour was ready: the cover stays until it is. */
   const [coverWaiting, setCoverWaiting] = useState(false);
   const coverWaitingRef = useRef(false);
@@ -854,7 +856,11 @@ function TourExperience({
     const punkt = q.get("punkt");
     const ss = q.get("ss");
     requestAnimationFrame(() => {
-      if (rum || punkt || ss) setIntro(null); // a link to a place goes straight there
+      if (rum || punkt || ss) {
+        // a link to a place goes straight there
+        setIntro(null);
+        setCover(false);
+      }
       if (rum) {
         // "?rum=minigolf" (or "?rum=fløj--toilet-og-bad" when names repeat) - e.g. from the tour's code on the customer's own page about it.
         const daPlaces = startPlaces(savedTour);
@@ -1416,7 +1422,7 @@ function TourExperience({
 
       {/* The drone scene on top; fades away when going into the tour. */}
       {OV && (
-      <div className={`absolute inset-0 transition-opacity duration-500 ${phase === "drone" ? "opacity-100" : "pointer-events-none opacity-0"}`}>
+      <div className={`absolute inset-0 transition-opacity duration-500 ${phase === "drone" ? "opacity-100" : "pointer-events-none opacity-0"} ${cover && T.cover ? "invisible" : ""}`}>
         {T.map ? (
           <MapScene
             T={T}
@@ -1773,6 +1779,7 @@ function TourExperience({
       {cover && T.cover && (
         <CoverWelcome
           T={T}
+          instant={startsCovered}
           waiting={coverWaiting}
           onEnter={() => {
             track("welcome_choice", { choice: "enter" });
