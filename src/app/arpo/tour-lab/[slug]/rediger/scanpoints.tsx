@@ -39,6 +39,8 @@ export function ScanPointsEditor({
   const [failedPlan, setFailedPlan] = useState<string | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
   const [zoom, setZoom] = useState(1);
+  /** The plan full screen (as in MPSkins): big, with every point as a number beside it. */
+  const [big, setBig] = useState(false);
   /* Marking many at once: hold the mouse down and drag over the dots - or drag a box on an empty spot. */
   const [marked, setMarked] = useState<Set<number>>(new Set());
   const [box, setBox] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
@@ -86,7 +88,7 @@ export function ScanPointsEditor({
   const cw = Math.max(5, crop.r - crop.l);
   const ch = Math.max(5, crop.b - crop.t);
   /** Dots grow a little with zoom, but less than the plan, so crowded spots open up. */
-  const dot = Math.round(20 * Math.sqrt(zoom));
+  const dot = Math.round((big ? 24 : 20) * Math.sqrt(zoom));
   const sel = map.points.find((p) => p.ss === selected) ?? null;
   const selUses = sel ? uses.get(sel.ss) : undefined;
   const colorOf = (ss: number) => {
@@ -99,37 +101,18 @@ export function ScanPointsEditor({
     preview.go(`Punkt ${ss}`, placeHref(config, ss));
   }
 
-  return (
-    <>
-      {expected != null && expected > map.points.length && (
-        <p className="rounded-xl bg-[#ff9500]/10 px-3 py-2 text-[12px] leading-snug text-[#a05a00]">
-          Matterport sendte kun {map.points.length} af {expected} scanpunkter (det sker af og til - MPSkins kender det også). De manglende virker stadig i touren - de findes, når touren åbner - men vises ikke på kortet.
-        </p>
-      )}
-      <Group>
-        <div className="flex items-center gap-2">
-          {map.floors.length > 1 && (
-            <div className="flex rounded-[9px] bg-[#e9e9eb] p-[2px]">
-              {map.floors.map((f, i) => (
-                <button key={i} type="button" onClick={() => setFloor(i)} className={`rounded-[7px] px-3 py-[5px] text-[13px] font-medium ${floor === i ? "bg-white shadow" : "text-[#1d1d1f]/70"}`}>
-                  {f.name}
-                </button>
-              ))}
-            </div>
-          )}
-          <span className="text-[12px] text-[#8e8e93]">{points.length} punkter</span>
-          <div className="ml-auto flex gap-1">
-            {(["−", "+"] as const).map((t) => (
-              <button key={t} type="button" onClick={() => setZoom((z) => Math.min(6, Math.max(1, z * (t === "+" ? 1.5 : 1 / 1.5))))} className="h-7 w-7 rounded-full bg-[#f2f2f7] text-[15px] font-semibold hover:bg-[#e9e9eb]">
-                {t}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="-mx-1 max-h-[560px] overflow-auto rounded-xl bg-[#f5f5f7] ring-1 ring-black/[.04]">
+  /** The plan with its points - shown in the panel, or big (full screen); only one of them at a time. */
+  const planView = (
+        <div className={big ? "min-h-0 flex-1 overflow-auto bg-[#ececee]" : "-mx-1 max-h-[560px] overflow-auto rounded-xl bg-[#f5f5f7] ring-1 ring-black/[.04]"}>
           {plan?.image && plan.aspect ? (
             // Matterport's own top-down photo of the floor, with every scan point where it really is - cut to where the points are.
-            <div className="relative overflow-hidden" style={{ width: `${zoom * 100}%`, aspectRatio: String((cw / ch) * plan.aspect) }}>
+            <div
+              className={`relative overflow-hidden ${big ? "mx-auto" : ""}`}
+              style={{
+                width: big ? `min(${zoom * 100}%, calc(${zoom} * (100vh - 140px) * ${(cw / ch) * plan.aspect}))` : `${zoom * 100}%`,
+                aspectRatio: String((cw / ch) * plan.aspect),
+              }}
+            >
             <div
               ref={planEl}
               className="absolute touch-none select-none"
@@ -228,6 +211,149 @@ export function ScanPointsEditor({
           </svg>
           )}
         </div>
+  );
+
+  return (
+    <>
+      {big && (
+        <div className="fixed inset-0 z-[80] flex bg-[#1d1d1f]/60 p-4 backdrop-blur-sm" role="dialog" aria-label="Scanpunkter" onKeyDown={(e) => e.key === "Escape" && setBig(false)}>
+          <div className="flex min-h-0 flex-1 overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="flex min-w-0 flex-1 flex-col">
+              <div className="flex items-center gap-2 border-b border-black/[.06] px-4 py-2.5">
+                {map.floors.length > 1 && (
+                  <div className="flex rounded-[9px] bg-[#e9e9eb] p-[2px]">
+                    {map.floors.map((f, i) => (
+                      <button key={i} type="button" onClick={() => setFloor(i)} className={`rounded-[7px] px-3 py-[5px] text-[13px] font-medium ${floor === i ? "bg-white shadow" : "text-[#1d1d1f]/70"}`}>
+                        {f.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <span className="text-[13px] text-[#6e6e73]">Klik på et punkt for at vælge det · træk hen over punkter eller en firkant for at markere mange</span>
+                <span className="ml-auto flex gap-1">
+                  <button type="button" title="Zoom ind" onClick={() => setZoom((z) => Math.min(8, z * 1.5))} className="h-9 w-9 rounded-lg bg-[#f2f2f7] text-[17px] font-semibold hover:bg-[#e9e9eb]">
+                    +
+                  </button>
+                  <button type="button" title="Zoom ud" onClick={() => setZoom((z) => Math.max(1, z / 1.5))} className="h-9 w-9 rounded-lg bg-[#f2f2f7] text-[17px] font-semibold hover:bg-[#e9e9eb]">
+                    −
+                  </button>
+                  <button type="button" title="Hele kortet" onClick={() => setZoom(1)} className="h-9 w-9 rounded-lg bg-[#f2f2f7] text-[15px] hover:bg-[#e9e9eb]">
+                    ↺
+                  </button>
+                  <button type="button" onClick={() => setBig(false)} className="ml-2 rounded-full bg-[#1d1d1f] px-4 text-[13px] font-medium text-white">
+                    Færdig
+                  </button>
+                </span>
+              </div>
+              {planView}
+            </div>
+            <aside className="flex w-[300px] flex-none flex-col border-l border-black/[.06] bg-[#f5f5f7]">
+              <div className="border-b border-black/[.06] p-4">
+                <p className="text-[15px] font-semibold">{points.length} scanpunkter</p>
+                <p className="text-[12px] text-[#6e6e73]">{points.filter((p) => hidden.has(p.sid)).length} skjult · klik et nummer for at gå derhen</p>
+              </div>
+              {sel && (
+                <div className="space-y-2 border-b border-black/[.06] p-4">
+                  <p className="text-[14px] font-semibold">Punkt {sel.ss}</p>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {!mpskinsHidden.includes(sel.sid) && (
+                      <button
+                        type="button"
+                        className="rounded-lg bg-white py-1.5 text-[13px] font-medium text-[#0071e3] ring-1 ring-black/[.06]"
+                        onClick={() => edit((d) => void (d.hiddenSweeps = d.hiddenSweeps.includes(sel.sid) ? d.hiddenSweeps.filter((x) => x !== sel.sid) : [...d.hiddenSweeps, sel.sid]))}
+                      >
+                        {config.hiddenSweeps.includes(sel.sid) ? "Vis punktet" : "Skjul punktet"}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      disabled={selUses?.has("start")}
+                      className="rounded-lg bg-white py-1.5 text-[13px] font-medium text-[#0071e3] ring-1 ring-black/[.06] disabled:opacity-40"
+                      onClick={async () => {
+                        const r = await preview.view();
+                        edit((d) => void (d.start = r.href && ssOfHref(r.href) === sel.ss ? r.href : placeHref(d, sel.ss)));
+                      }}
+                    >
+                      Start her
+                    </button>
+                  </div>
+                </div>
+              )}
+              {marked.size > 1 && (
+                <div className="flex items-center gap-1.5 border-b border-black/[.06] p-3">
+                  <span className="flex-1 text-[13px] font-medium">{marked.size} markeret</span>
+                  {(
+                    [
+                      ["Skjul", true],
+                      ["Vis", false],
+                    ] as const
+                  ).map(([text, hide]) => (
+                    <button
+                      key={text}
+                      type="button"
+                      className="rounded-full bg-white px-3 py-1 text-[13px] font-medium text-[#0071e3] ring-1 ring-black/[.06]"
+                      onClick={() =>
+                        edit((d) => {
+                          const sids = map.points.filter((p) => marked.has(p.ss) && !mpskinsHidden.includes(p.sid)).map((p) => p.sid);
+                          d.hiddenSweeps = hide ? [...new Set([...d.hiddenSweeps, ...sids])] : d.hiddenSweeps.filter((x) => !sids.includes(x));
+                        })
+                      }
+                    >
+                      {text}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div className="grid min-h-0 flex-1 grid-cols-4 content-start gap-1.5 overflow-y-auto p-4">
+                {[...points].sort((a, b) => a.ss - b.ss).map((p) => (
+                  <button
+                    key={p.sid}
+                    type="button"
+                    onClick={() => go(p.ss)}
+                    className={`h-9 rounded-lg border-2 text-[14px] font-semibold tabular-nums ${selected === p.ss ? "border-[#1d1d1f] bg-white" : hidden.has(p.sid) ? "border-dashed border-[#ff3b30] bg-white text-[#ff3b30]" : "bg-white text-[#1d1d1f]"}`}
+                    style={selected === p.ss || hidden.has(p.sid) ? undefined : { borderColor: colorOf(p.ss) }}
+                  >
+                    {p.ss}
+                  </button>
+                ))}
+              </div>
+            </aside>
+          </div>
+        </div>
+      )}
+      {expected != null && expected > map.points.length && (
+        <p className="rounded-xl bg-[#ff9500]/10 px-3 py-2 text-[12px] leading-snug text-[#a05a00]">
+          Matterport sendte kun {map.points.length} af {expected} scanpunkter (det sker af og til - MPSkins kender det også). De manglende virker stadig i touren - de findes, når touren åbner - men vises ikke på kortet.
+        </p>
+      )}
+      <Group>
+        <div className="flex items-center gap-2">
+          {map.floors.length > 1 && (
+            <div className="flex rounded-[9px] bg-[#e9e9eb] p-[2px]">
+              {map.floors.map((f, i) => (
+                <button key={i} type="button" onClick={() => setFloor(i)} className={`rounded-[7px] px-3 py-[5px] text-[13px] font-medium ${floor === i ? "bg-white shadow" : "text-[#1d1d1f]/70"}`}>
+                  {f.name}
+                </button>
+              ))}
+            </div>
+          )}
+          <span className="text-[12px] text-[#8e8e93]">{points.length} punkter</span>
+          <div className="ml-auto flex gap-1">
+            <button type="button" onClick={() => (setBig(true), setZoom(1))} className="rounded-full bg-[#0071e3] px-3 text-[12px] font-medium text-white">
+              Stor visning
+            </button>
+            {(["−", "+"] as const).map((t) => (
+              <button key={t} type="button" onClick={() => setZoom((z) => Math.min(6, Math.max(1, z * (t === "+" ? 1.5 : 1 / 1.5))))} className="h-7 w-7 rounded-full bg-[#f2f2f7] text-[15px] font-semibold hover:bg-[#e9e9eb]">
+                {t}
+              </button>
+            ))}
+          </div>
+        </div>
+        {big ? (
+          <p className="rounded-xl bg-[#f5f5f7] px-3 py-6 text-center text-[13px] text-[#8e8e93]">Kortet er åbent i stor visning.</p>
+        ) : (
+          planView
+        )}
         {marked.size > 1 ? (
           <div className="flex items-center gap-2 rounded-xl bg-[#0071e3]/10 px-3 py-2">
             <span className="flex-1 text-[13px] font-medium">{marked.size} punkter markeret</span>
