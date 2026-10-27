@@ -647,3 +647,84 @@ export async function forgetTourAiMemory(id: string): Promise<void> {
   await admin();
   await prisma.tourAiMemory.delete({ where: { id } }).catch(() => {});
 }
+
+/* ----- "Redigér kortet": nextviewAI finds the places on the map picture ----- */
+
+const MapSpots = z.object({
+  spots: z
+    .array(z.object({ key: z.string().describe("Stedets nøgle, præcis som givet."), x: z.number().describe("Vandret position i % af billedets bredde (0-100)."), y: z.number().describe("Lodret position i % af billedets højde (0-100).") }))
+    .describe("Kun de steder, du faktisk kan se på billedet."),
+  note: z.string().describe("Kort besked til brugeren på dansk: hvad du har sat, og hvilke steder du ikke kunne finde (og hvorfor)."),
+});
+
+/** One of our own stored tour files (never an address from outside - so this can't be used to fetch anything else). */
+async function ourTourImage(src: string): Promise<Buffer | null> {
+  const id = /^\/api\/tour-files\/([\w-]+)$/.exec(src)?.[1];
+  const row = await prisma.tourFile.findFirst({ where: id ? { id } : { url: src }, select: { data: true, url: true, contentType: true } });
+  if (!row || !row.contentType.startsWith("image/")) return null;
+  if (row.data) return Buffer.from(row.data);
+  if (!row.url) return null;
+  const res = await fetch(row.url, { signal: AbortSignal.timeout(60_000) });
+  return res.ok ? Buffer.from(await res.arrayBuffer()) : null;
+}
+
+/**
+ * Where the given places are on the tour's map picture (a drawing, a drone
+ * photo or a 360° photo) - as % of the flat picture. Nothing is saved: the
+ * editor places the points in its draft, to be checked and moved by hand.
+ */
+export async function placeMapSpots(
+  slug: string,
+  image: string,
+  places: { key: string; name: string; text?: string }[],
+  panorama: boolean
+): Promise<{ ok: true; spots: Record<string, [number, number]>; note: string } | { ok: false; error: string }> {
+  const user = await admin();
+  const key = await apiKey();
+  if (!key) return { ok: false, error: "nextviewAI er ikke sat op endnu - indsæt en nøgle under fanen nextviewAI." };
+  if (!places.length) return { ok: false, error: "Der er ingen steder at sætte ind." };
+  const bytes = await ourTourImage(image).catch(() => null);
+  if (!bytes) return { ok: false, error: "Kortbilledet kunne ikke læses - upload det igen under Billede." };
+  const small = await sharp(bytes).resize({ width: 1568, height: 1568, fit: "inside" }).jpeg({ quality: 82 }).toBuffer();
+  const tour = await prisma.tour.findUnique({ where: { slug }, select: { name: true } });
+  const list = places
+    .slice(0, 60)
+    .map((p) => `- ${p.key}: ${p.name.slice(0, 80)}${p.text ? ` (${p.text.slice(0, 160)})` : ""}`)
+    .join("\n");
+  let r;
+  try {
+    r = await new Anthropic({ apiKey: key }).messages.parse({
+      model: "claude-opus-5-5",
+      max_tokens: 6000,
+      system:
+        "Du placerer steder på et billede til en virtuel tour: et kort, en situationsplan eller et dronefoto af stedet. For hvert sted, du kan se på billedet, giver du positionen i procent af billedets bredde og højde (0-100) - midt på bygningen, rummet eller området, ikke en kant. Brug skilte, tekst, bygningernes form og hvad stederne hedder og bruges til. Gæt ikke: et sted, du ikke kan finde, udelader du og nævner i note.",
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "image", source: { type: "base64", media_type: "image/jpeg", data: small.toString("base64") } },
+            {
+              type: "text",
+              text: `Touren: ${tour?.name ?? slug}.${panorama ? " Billedet er et 360°-foto (equirectangular, 2:1): venstre og højre kant mødes bag beskueren, midten af højden er horisonten, og ting nær top og bund er strakt ud i bredden." : ""}\n\nFind disse steder på billedet:\n${list}`,
+            },
+          ],
+        },
+      ],
+      output_config: { effort: "medium", format: zodOutputFormat(MapSpots) },
+    });
+  } catch (err) {
+    if (err instanceof Anthropic.AuthenticationError) return { ok: false, error: "nextviewAI-nøglen virker ikke længere." };
+    return { ok: false, error: `Kunne ikke få fat i nextviewAI (${err instanceof Error ? err.message : err}).` };
+  }
+  const u = r.usage;
+  await prisma.tourAiUsage
+    .create({ data: { tourSlug: slug, userName: user.name, kind: "kortpunkter", inputTokens: u.input_tokens, outputTokens: u.output_tokens, cacheReadTokens: u.cache_read_input_tokens ?? 0, cacheWriteTokens: u.cache_creation_input_tokens ?? 0, costUsd: claudeCostUsd(u) } })
+    .catch(() => {});
+  const out = r.parsed_output;
+  if (!out) return { ok: false, error: "nextviewAI svarede ikke som forventet - prøv igen." };
+  const keys = new Set(places.map((p) => p.key));
+  const clamp = (v: number) => Math.round(Math.min(100, Math.max(0, v)) * 10) / 10;
+  const spots: Record<string, [number, number]> = {};
+  for (const s of out.spots) if (keys.has(s.key) && Number.isFinite(s.x) && Number.isFinite(s.y)) spots[s.key] = [clamp(s.x), clamp(s.y)];
+  return { ok: true, spots, note: out.note };
+}

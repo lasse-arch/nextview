@@ -3,7 +3,7 @@
 import { InsightsPanel } from "./insights";
 import { LanguagesPanel } from "./languages";
 import { tourUrl } from "@/lib/public-urls";
-import { formatPhone, IMAGE_HREF, imageOfHref, isPlaceHref, placeHref } from "../../tours/places";
+import { formatPhone, IMAGE_HREF, imageOfHref, isPlaceHref, placeHref, pointOfHref } from "../../tours/places";
 import { tourConfigProblem } from "@/lib/tour-validate";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -1683,11 +1683,12 @@ function moveEntry(menu: MenuEntry[], from: Addr, to: Addr | null): MenuEntry[] 
 
 type Kind = "sted" | "web" | "luft" | "billede";
 // No target yet (e.g. a menu item nextviewAI made, or just switched to "Et sted i touren") counts as a place waiting to be picked - not a web page.
-const kindOf = (href: string): Kind => (href === "#luften" ? "luft" : href.startsWith(IMAGE_HREF) ? "billede" : !href || isPlaceHref(href) ? "sted" : "web");
+// A point on the drone scene / map ("#punkt:<id>") counts as the overview too: it opens the point there.
+const kindOf = (href: string): Kind => (href === "#luften" || pointOfHref(href) ? "luft" : href.startsWith(IMAGE_HREF) ? "billede" : !href || isPlaceHref(href) ? "sted" : "web");
 function whereText(href: string) {
   const kind = kindOf(href);
   if (!href) return "Mangler et mål";
-  if (kind === "luft") return "Tilbage til luftfotoet";
+  if (kind === "luft") return pointOfHref(href) ? "Et punkt på kortet / luftfotoet" : "Tilbage til luftfotoet";
   if (kind === "billede") return imageOfHref(href) ? "Viser et billede" : "Mangler et billede";
   if (kind === "sted") {
     const ss = new URLSearchParams(href.split("?")[1] ?? "").get("ss");
