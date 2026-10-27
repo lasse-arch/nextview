@@ -47,8 +47,10 @@ export function MapEditor({ config, edit }: { config: TourConfig; edit: Edit }) 
     setError(null);
     try {
       const { w, h } = await imageSize(url);
+      // A 2:1 picture is a 360° photo (equirectangular) - shown as one you look around in.
+      const panorama = Math.abs(w / h - 2) < 0.05 ? true : undefined;
       edit((d) => {
-        d.map = d.map ? { ...d.map, image: url, w, h } : { image: url, w, h, spots: {}, start: { x: 50, y: 50, zoom: 1 } };
+        d.map = d.map ? { ...d.map, image: url, w, h, panorama } : { image: url, w, h, spots: {}, start: { x: 50, y: 50, zoom: 1 }, panorama };
         if (!Object.keys(d.categories).length) d.categories = { steder: { name: "Steder", color: d.colors.accent } };
       });
     } catch (err) {
@@ -111,6 +113,12 @@ export function MapEditor({ config, edit }: { config: TourConfig; edit: Edit }) 
         <p className="text-[12px] text-[#8e8e93]">
           {M.w} × {M.h} px. Punkterne sidder i procent af billedet - et nyt billede i samme udsnit passer stadig.
         </p>
+        <Toggle
+          on={Boolean(M.panorama)}
+          onChange={(on) => edit((d) => void (d.map!.panorama = on || undefined))}
+          title="Det er et 360°-billede"
+          hint="Touren viser det som 360°, man kan kigge rundt i, med punkterne på. Du sætter punkterne på det flade billede her - de sidder samme sted i 360°. Slås til af sig selv, når billedet er 2:1."
+        />
         {error && <p className="text-[12px] text-[#ff3b30]">{error}</p>}
       </Group>
       {open && <MapCanvas config={config} edit={edit} onClose={() => setOpen(false)} />}
@@ -486,6 +494,20 @@ function PointPanel({
           <UploadButton accept="image/*" label="Tilføj billede" onDone={(url) => setPoint((x) => void (x.images = [...(x.images ?? []), url]))} />
           {/* The first photo (the one shown first) - e.g. a closed pool made summery. */}
           <AiImageButton src={p.images?.[0] ?? ""} onUse={(url) => setPoint((x) => void (x.images = [url, ...(x.images ?? []).slice(1)]))} />
+        </Field>
+        <Field title="360°-billede (valgfrit)" hint='Et 360°-foto taget lige her (2:1). Kortet får knappen "Oplev i 360°", og billedet åbner, så man kan kigge rundt.'>
+          {p.panorama ? (
+            <div className="flex items-center gap-2">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={p.panorama} alt="" className="h-12 w-24 rounded-lg object-cover ring-1 ring-black/[.06]" />
+              <UploadButton accept="image/*" label="Skift" onDone={(url) => setPoint((x) => void (x.panorama = url))} />
+              <button type="button" className="text-[13px] text-[#ff3b30] hover:underline" onClick={() => setPoint((x) => void delete x.panorama)}>
+                Fjern
+              </button>
+            </div>
+          ) : (
+            <UploadButton accept="image/*" label="Upload 360°-billede" onDone={(url) => setPoint((x) => void (x.panorama = url))} />
+          )}
         </Field>
         <Field title="Knap" hint='Fx "Book din plads" med linket til bookingen. Tom = ingen knap.'>
           <input

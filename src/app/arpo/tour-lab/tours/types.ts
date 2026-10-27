@@ -54,6 +54,8 @@ export type TourPoint = {
   pano?: string;
   /** Where the 360° photo opens, in degrees (default: straight ahead, a little down). */
   panoStart?: { yaw: number; pitch: number };
+  /** An uploaded 360° photo (one equirectangular picture, 2:1) at the point - opens with "Oplev i 360°", like `pano`. */
+  panorama?: string;
   /**
    * Photos on the point's card, swiped through at the top - e.g. the
    * customer's own summer photos of a pool that is closed when the drone flew,
@@ -127,6 +129,8 @@ export type TourConfig = {
   contact?: { address?: string; mapUrl?: string; phone?: string; email?: string; instagram?: string; social?: Partial<Record<import("./social").SocialKind, string>> };
   /** The drone scene in front of the tour - leave out to start straight in the tour. */
   drone?: {
+    /** One 360° photo (equirectangular) instead of the tiles below - set by the engine for a 360° map. */
+    panorama?: string;
     basePath: string;
     maxLevel: number;
     cubeResolution: number;
@@ -158,6 +162,13 @@ export type TourConfig = {
     backLabel?: string;
     /** The heading over the category filter. */
     filterTitle?: string;
+    /**
+     * The picture is a 360° photo (equirectangular, 2:1): the tour shows it as
+     * a 360° scene to look around in, with the points on it - `spots` are
+     * still % of the flat picture (x = around, y = up/down), and `start` the
+     * view it opens on (zoom 1 = a normal view).
+     */
+    panorama?: boolean;
   };
   panos?: { basePath: string; maxLevel: number; cubeResolution: number };
   /**

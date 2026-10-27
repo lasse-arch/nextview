@@ -54,6 +54,39 @@ declare global {
   }
 }
 
+/**
+ * A 360° map (an uploaded equirectangular photo) is shown as the drone scene:
+ * the engine gets a `drone` with the photo, and every point placed on the flat
+ * picture gets its direction (x % → around, y % → up/down). The setup itself
+ * keeps the map, so the editor still places points on the flat picture.
+ */
+function asScene(T: TourConfig): TourConfig {
+  const M = T.map;
+  if (!M?.panorama || !M.image) return T;
+  const dir = (x: number, y: number) => ({ yaw: (x / 100) * 360 - 180, pitch: 90 - (y / 100) * 180 });
+  const view = (s: { x: number; y: number; zoom: number } | undefined, phone: boolean) => {
+    const d = dir(s?.x ?? 50, s?.y ?? 50);
+    return { ...d, hfov: Math.max(40, Math.min(115, (phone ? 100 : 105) / (s?.zoom || 1))) };
+  };
+  return {
+    ...T,
+    map: undefined,
+    drone: {
+      panorama: M.image,
+      basePath: "",
+      maxLevel: 0,
+      cubeResolution: 0,
+      start: view(M.start, false),
+      startMobile: view(M.startMobile ?? M.start, true),
+      intro: M.intro ?? { title: T.brand || T.title, lead: "Tryk på et sted for at se mere - eller gå direkte ind." },
+      backLabel: M.backLabel ?? "Tilbage til 360°-billedet",
+      filterTitle: M.filterTitle ?? "Vis",
+    },
+    // Only the points placed on the picture are on it.
+    points: T.points.filter((p) => M.spots[p.id]).map((p) => ({ ...p, ...dir(M.spots[p.id][0], M.spots[p.id][1]) })),
+  };
+}
+
 /** Bundled with Arpo (npm "pannellum"), not fetched from a CDN - the tour shouldn't depend on one. */
 async function loadPannellum(): Promise<void> {
   if (window.pannellum) return;
@@ -244,7 +277,7 @@ function TourExperience({
   setLang,
 }: ExperienceProps & { setLang?: (lang: string) => void }) {
   // The setup in the visitor's language; names that reach outside it (statistics, ?rum=, pictures) stay Danish.
-  const T = useMemo(() => localize(savedTour, lang), [savedTour, lang]);
+  const T = useMemo(() => asScene(localize(savedTour, lang)), [savedTour, lang]);
   const tx = useMemo(() => makeT(savedTour, lang), [savedTour, lang]);
   const da = useMemo(() => danishOf(savedTour, lang), [savedTour, lang]);
   /** What the start ran with: only a change to how the tour starts runs it again (not a new language, nor an edit in the editor - a colour, a text). */
@@ -327,6 +360,8 @@ function TourExperience({
   const roomShown = room ? tx(room) : null;
   const [showLog, setShowLog] = useState(false);
   const [pano, setPano] = useState<Point | null>(null);
+  /** A point has a 360° photo to open: an uploaded picture, or prepared tiles (with the tour's panos). */
+  const hasPano = (p: Point) => Boolean(p.panorama || (p.pano && T.panos));
   /** Pictures full screen: a place's photos, or the site plan (zoomed in on a point). */
   const [lightbox, setLightbox] = useState<LightboxState>(null);
   const openPlan = (p?: Point) => {
@@ -648,25 +683,30 @@ function TourExperience({
         },
       }));
       drone.current = window.pannellum.viewer(droneEl.current, {
-        type: "multires",
+        // One uploaded 360° photo, or the drone's prepared tiles.
+        ...(D.panorama
+          ? { type: "equirectangular", panorama: D.panorama }
+          : {
+              type: "multires",
+              multiRes: {
+                basePath: D.basePath,
+                path: "/%l/%s%y_%x",
+                extension: "jpg",
+                tileResolution: 512,
+                maxLevel: D.maxLevel,
+                cubeResolution: D.cubeResolution,
+              },
+            }),
         autoLoad: true,
         showControls: false,
         compass: false,
-        multiRes: {
-          basePath: D.basePath,
-          path: "/%l/%s%y_%x",
-          extension: "jpg",
-          tileResolution: 512,
-          maxLevel: D.maxLevel,
-          cubeResolution: D.cubeResolution,
-        },
         yaw: start.yaw,
         pitch: start.pitch,
         hfov: start.hfov,
         minHfov: mobile.current ? 40 : 50,
         maxHfov: mobile.current ? 110 : 115,
         minPitch: -90,
-        maxPitch: 25,
+        maxPitch: D.panorama ? 90 : 25,
         mouseZoom: true,
         keyboardZoom: false,
         hotSpots,
@@ -911,7 +951,7 @@ function TourExperience({
       setSelected(null);
       if (phase !== "drone") setPhase("drone");
       // With its own 360° photo, the guide shows that (turning slowly) - not just a zoom on the big picture.
-      if (point.pano && T.panos) return setPano(point);
+      if (hasPano(point)) return setPano(point);
       // Otherwise the point on the drone scene / map, under the guide's card.
       setPano(null);
       setTimeout(() => lookAtPoint(point, false), phase === "drone" ? 0 : 400);
@@ -1384,7 +1424,7 @@ function TourExperience({
                 {entering ? tx("Går ind…") : tx("Gå ind i rummet")}
               </button>
             ) : (
-              selected.pano && (
+              hasPano(selected) && (
                 <button
                   type="button"
                   className="hv-btn hv-primary hv-wide"
@@ -1397,7 +1437,7 @@ function TourExperience({
                 </button>
               )
             )}
-            {selected.tour && selected.pano && (
+            {selected.tour && hasPano(selected) && (
               <button type="button" className="hv-btn hv-secondary hv-wide" onClick={() => setPano(selected)}>
                 {tx("Oplev i 360°")}
               </button>
@@ -1411,7 +1451,7 @@ function TourExperience({
               <TourLink
                 href={selected.button.href}
                 label={selected.button.label}
-                className={`hv-btn ${selected.tour || selected.pano ? "hv-secondary" : "hv-primary"} hv-wide`}
+                className={`hv-btn ${selected.tour || hasPano(selected) ? "hv-secondary" : "hv-primary"} hv-wide`}
                 onClick={() => ctaClick(selected.button!.label, selected.button!.href, "point")}
               >
                 {selected.button.label}
@@ -1469,7 +1509,7 @@ function TourExperience({
         </div>
       )}
 
-      {pano?.pano && T.panos && <PanoView name={pano.name} dir={pano.pano} start={pano.panoStart} panos={T.panos} turning={guideAt != null} onClose={() => setPano(null)} />}
+      {pano && hasPano(pano) && <PanoView name={pano.name} dir={pano.pano} image={pano.panorama} start={pano.panoStart} panos={T.panos} turning={guideAt != null} onClose={() => setPano(null)} />}
       {lightbox && <Lightbox key={lightbox.title + lightbox.at} state={lightbox} onClose={() => setLightbox(null)} />}
 
       {/* Logo (MPSkins: left, 200px, 13px from the edges - or right, with the menu on the left). */}
@@ -1953,17 +1993,20 @@ function PointPhotos({ images, name, onOpen }: { images: string[]; name: string;
 function PanoView({
   name,
   dir,
+  image,
   start,
   panos,
   turning = false,
   onClose,
 }: {
   name: string;
-  dir: string;
+  /** A folder of prepared tiles (under `panos`) - or `image`, one uploaded 360° photo. */
+  dir?: string;
+  image?: string;
   start?: { yaw: number; pitch: number };
   /** Turns slowly by itself (the guide shows it). */
   turning?: boolean;
-  panos: NonNullable<TourConfig["panos"]>;
+  panos?: TourConfig["panos"];
   onClose: () => void;
 }) {
   const el = useRef<HTMLDivElement>(null);
@@ -1972,19 +2015,24 @@ function PanoView({
     let cancelled = false;
     loadPannellum().then(() => {
       if (cancelled || !el.current || !window.pannellum) return;
+      if (!image && !(dir && panos)) return;
       viewer = window.pannellum.viewer(el.current, {
-        type: "multires",
+        ...(image
+          ? { type: "equirectangular", panorama: image }
+          : {
+              type: "multires",
+              multiRes: {
+                basePath: `${panos!.basePath}/${dir}`,
+                path: "/%l/%s%y_%x",
+                extension: "jpg",
+                tileResolution: 512,
+                maxLevel: panos!.maxLevel,
+                cubeResolution: panos!.cubeResolution,
+              },
+            }),
         autoLoad: true,
         showControls: false,
         compass: false,
-        multiRes: {
-          basePath: `${panos.basePath}/${dir}`,
-          path: "/%l/%s%y_%x",
-          extension: "jpg",
-          tileResolution: 512,
-          maxLevel: panos.maxLevel,
-          cubeResolution: panos.cubeResolution,
-        },
         hfov: window.innerWidth <= 760 ? 90 : 100,
         minHfov: 40,
         maxHfov: 120,
@@ -1997,7 +2045,7 @@ function PanoView({
       cancelled = true;
       viewer?.destroy();
     };
-  }, [dir, panos, start, turning]);
+  }, [dir, image, panos, start, turning]);
   return (
     <div className="hv-pano">
       <div ref={el} className="absolute inset-0" />
