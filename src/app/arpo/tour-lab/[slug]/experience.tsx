@@ -250,6 +250,16 @@ type ExperienceProps = {
   review?: string;
   /** The language asked for in the link (?sprog=en) - see i18n.ts. */
   lang?: string;
+  /** The visitor's country (from the request, e.g. "DE") - a guess at their language when the browser's isn't in the tour. */
+  country?: string;
+};
+
+/** A country's language, for the languages a tour can have. */
+const COUNTRY_LANG: Record<string, string> = {
+  DK: "da", GL: "da", FO: "da",
+  DE: "de", AT: "de", CH: "de", LI: "de",
+  SE: "sv", NO: "nb", NL: "nl", BE: "nl", FR: "fr", LU: "fr", MC: "fr", ES: "es", IT: "it", SM: "it", PL: "pl",
+  GB: "en", IE: "en", US: "en", CA: "en", AU: "en", NZ: "en",
 };
 
 /** The parts of a setup the tour only reads when it starts - a change to them starts the preview over. */
@@ -283,13 +293,31 @@ export function Experience(props: ExperienceProps) {
   // The language: the link's (?sprog=), else the visitor's own when the tour has it, else Danish. The editor's preview is told by the editor.
   const langs = tourLanguages(T);
   const [lang, setLang] = useState(props.lang && langs.includes(props.lang) ? props.lang : "da");
+  // The language by itself, also where the tour sits in a customer's page (not in the editor's preview, which the editor steers):
+  // the link's ?sprog=, else the one the visitor picked before, else their browser's (a Dane in Germany keeps Danish),
+  // else their country's (from where they are), else English, else Danish.
   useEffect(() => {
+    if (inEditorPreview()) return;
     const asked = new URLSearchParams(location.search).get("sprog");
-    const own = navigator.languages.map((l) => l.slice(0, 2).replace("no", "nb")).find((l) => langs.includes(l));
-    const pick = asked && langs.includes(asked) ? asked : !asked && window.parent === window ? own : undefined;
-    if (pick) requestAnimationFrame(() => setLang(pick));
+    let picked: string | null = null;
+    try {
+      picked = localStorage.getItem("tour-lang");
+    } catch {}
+    const browser = navigator.languages.map((l) => l.slice(0, 2).toLowerCase().replace(/^(no|nn)$/, "nb")).find((l) => langs.includes(l));
+    const country = props.country ? COUNTRY_LANG[props.country.toUpperCase()] : undefined;
+    // Many set their browser to English whatever they speak: then the country counts first.
+    const order = browser === "en" ? [asked, picked, country, browser] : [asked, picked, browser, country, "en"];
+    const pick = order.find((l): l is string => Boolean(l) && langs.includes(l!)) ?? "da";
+    if (pick !== lang) requestAnimationFrame(() => setLang(pick));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [langs.join()]);
+  /** The visitor picks a language: used, and remembered for the next tour they open. */
+  const pickLang = (l: string) => {
+    try {
+      localStorage.setItem("tour-lang", l);
+    } catch {}
+    setLang(l);
+  };
   useEffect(() => {
     const onMessage = (e: MessageEvent) => {
       if (e.origin === location.origin && e.source === window.parent && e.data?.type === "tour-lang") setLang(String(e.data.lang));
@@ -305,7 +333,7 @@ export function Experience(props: ExperienceProps) {
   );
   const [played, setPlayed] = useState(false);
   if (T.autoplay === false && embedded && !played) return <PlayGate T={T} isPreview={inEditorPreview} onPlay={() => setPlayed(true)} />;
-  return <TourExperience key={startSignature(T)} {...props} tour={T} lang={langs.includes(lang) ? lang : "da"} setLang={setLang} played={played} />;
+  return <TourExperience key={startSignature(T)} {...props} tour={T} lang={langs.includes(lang) ? lang : "da"} setLang={pickLang} played={played} />;
 }
 
 const noop = () => () => {};

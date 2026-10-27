@@ -35,5 +35,5 @@ export default async function PublicTourPage({ params, searchParams }: { params:
     if (moved) redirect(`/t/${moved.slug}`);
     notFound();
   }
-  return <Experience {...data} lang={(await searchParams).sprog} phone={/Android|iPhone|iPad|iPod|Mobile/i.test((await headers()).get("user-agent") ?? "")} />;
+  return <Experience {...data} lang={(await searchParams).sprog} country={(await headers()).get("x-vercel-ip-country") ?? undefined} phone={/Android|iPhone|iPad|iPod|Mobile/i.test((await headers()).get("user-agent") ?? "")} />;
 }

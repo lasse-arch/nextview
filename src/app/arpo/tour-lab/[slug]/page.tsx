@@ -22,5 +22,5 @@ export default async function TourPrototypePage({ params, searchParams }: { para
   const setup = await getTourConfig((await params).slug);
   if (!setup) notFound();
   const data = await loadTour(setup);
-  return <Experience {...data} lang={(await searchParams).sprog} tools phone={/Android|iPhone|iPad|iPod|Mobile/i.test((await headers()).get("user-agent") ?? "")} />;
+  return <Experience {...data} lang={(await searchParams).sprog} country={(await headers()).get("x-vercel-ip-country") ?? undefined} tools phone={/Android|iPhone|iPad|iPod|Mobile/i.test((await headers()).get("user-agent") ?? "")} />;
 }
