@@ -22,6 +22,8 @@ export function AiImageButton({ src, onUse }: { src: string; onUse: (url: string
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
+  /** Before and after, big - side by side, or one over the other with a slider. */
+  const [big, setBig] = useState(false);
 
   if (!src) return null;
   if (!open)
@@ -108,19 +110,22 @@ export function AiImageButton({ src, onUse }: { src: string; onUse: (url: string
           >
             {pending ? "AI'en retter billedet… (10-30 sek.)" : result ? "Ret det nye videre" : "Ret billedet"}
           </button>
+          {result && big && <Compare before={src} after={result} onClose={() => setBig(false)} />}
           {result && (
             <>
               <div className="grid grid-cols-2 gap-1.5">
                 <figure>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={src} alt="" className="aspect-[4/3] w-full rounded-lg object-cover ring-1 ring-black/[.06]" />
+                  <button type="button" className="block w-full" onClick={() => setBig(true)}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={src} alt="" className="aspect-[4/3] w-full rounded-lg object-cover ring-1 ring-black/[.06]" />
+                  </button>
                   <figcaption className="mt-0.5 text-center text-[11px] text-[#8e8e93]">Nu</figcaption>
                 </figure>
                 <figure>
-                  <a href={result} target="_blank" rel="noopener">
+                  <button type="button" className="block w-full" onClick={() => setBig(true)}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={result} alt="" className="aspect-[4/3] w-full rounded-lg object-cover ring-2 ring-[#d97757]" />
-                  </a>
+                  </button>
                   <figcaption className="mt-0.5 text-center text-[11px] text-[#8e8e93]">Rettet af AI (tryk for stort)</figcaption>
                 </figure>
               </div>
@@ -147,6 +152,71 @@ export function AiImageButton({ src, onUse }: { src: string; onUse: (url: string
         </>
       )}
       {error && <p className="text-[12px] text-[#ff3b30]">{error}</p>}
+    </div>
+  );
+}
+
+/**
+ * Before and after over the whole screen: side by side, or the same view with
+ * a line to drag across (the AI's change shows where the two differ).
+ */
+function Compare({ before, after, onClose }: { before: string; after: string; onClose: () => void }) {
+  const [mode, setMode] = useState<"side" | "slider">("side");
+  const [at, setAt] = useState(50);
+  return (
+    <div className="fixed inset-0 z-[90] flex flex-col bg-[#111]/95 p-4 text-white" role="dialog" aria-label="Før og efter" onKeyDown={(e) => e.key === "Escape" && onClose()}>
+      <div className="mb-3 flex items-center gap-3">
+        <div className="flex rounded-full bg-white/10 p-0.5 text-[13px]">
+          {(
+            [
+              ["side", "Side om side"],
+              ["slider", "Før/efter-skyder"],
+            ] as const
+          ).map(([m, label]) => (
+            <button key={m} type="button" onClick={() => setMode(m)} className={`rounded-full px-3 py-1.5 font-medium ${mode === m ? "bg-white text-[#1d1d1f]" : "text-white/80"}`}>
+              {label}
+            </button>
+          ))}
+        </div>
+        <button type="button" onClick={onClose} autoFocus className="ml-auto rounded-full bg-white/10 px-4 py-1.5 text-[13px] font-medium hover:bg-white/20">
+          Luk
+        </button>
+      </div>
+      {mode === "side" ? (
+        <div className="grid min-h-0 flex-1 gap-3 md:grid-cols-2">
+          {(
+            [
+              [before, "Nu"],
+              [after, "Rettet af AI"],
+            ] as const
+          ).map(([url, label]) => (
+            <figure key={label} className="flex min-h-0 flex-col">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={url} alt={label} className="min-h-0 w-full flex-1 rounded-lg object-contain" />
+              <figcaption className="mt-1 text-center text-[12px] text-white/70">{label}</figcaption>
+            </figure>
+          ))}
+        </div>
+      ) : (
+        <div className="relative min-h-0 flex-1 select-none">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={before} alt="Nu" className="absolute inset-0 h-full w-full object-contain" />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={after} alt="Rettet af AI" className="absolute inset-0 h-full w-full object-contain" style={{ clipPath: `inset(0 0 0 ${at}%)` }} />
+          <div className="pointer-events-none absolute inset-y-0 w-0.5 bg-white shadow-[0_0_8px_rgba(0,0,0,.6)]" style={{ left: `${at}%` }} />
+          <span className="absolute left-3 top-3 rounded-full bg-black/60 px-2.5 py-1 text-[12px]">Nu</span>
+          <span className="absolute right-3 top-3 rounded-full bg-[#d97757] px-2.5 py-1 text-[12px]">Rettet af AI</span>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            value={at}
+            onChange={(e) => setAt(Number(e.target.value))}
+            aria-label="Før og efter"
+            className="absolute bottom-3 left-1/2 w-[min(420px,80%)] -translate-x-1/2 accent-[#d97757]"
+          />
+        </div>
+      )}
     </div>
   );
 }
