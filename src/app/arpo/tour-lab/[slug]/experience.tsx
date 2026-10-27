@@ -817,6 +817,16 @@ function TourExperience({
 
   // The drone scene is rebuilt only when it or its points change - not for every edit in the editor's preview.
   const droneKey = JSON.stringify([T.drone, Boolean(T.map), T.points, T.categories]);
+  /** The filter at the bottom: its height is given to what stands just above it (weather, Find din plads), which moves up with it. */
+  const filterEl = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = filterEl.current;
+    const root = el?.closest<HTMLElement>(".hv");
+    if (!el || !root) return;
+    const ro = new ResizeObserver(() => root.style.setProperty("--filtre-h", `${el.offsetHeight}px`));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   /** The drone picture that has finished loading - until then its points and boxes wait, so nothing floats on black. */
   const [droneLoaded, setDroneLoaded] = useState<string | null>(null);
   const droneWaiting = Boolean(T.drone && !T.map) && droneLoaded !== droneKey;
@@ -1593,7 +1603,7 @@ function TourExperience({
   return (
     <TourLang.Provider value={{ lang, t: tx }}>
     <LinkProvider T={T} popup={popup}>
-    <div className={`hv fixed inset-0 z-50 overflow-hidden bg-[#0d1b20] ${selected ? "hv-punkt" : ""} ${zoomed ? "hv-zoom" : ""} ${welcome ? "hv-welcome" : ""} ${phase === "tour" && T.stories?.mobile ? "hv-st-on-m" : ""} ${menuOpen ? "hv-menu-aaben" : ""} ${T.overviewUi?.box?.desktop === false ? "hv-boks-ud-d" : ""} ${T.overviewUi?.box?.mobile === false ? "hv-boks-ud-m" : ""} ${T.overviewUi?.filter?.desktop === false ? "hv-filter-ud-d" : ""} ${T.overviewUi?.filter?.mobile === false ? "hv-filter-ud-m" : ""} ${T.overviewUi?.names?.desktop ? `hv-navne-d-${T.overviewUi.names.desktop}` : ""} ${T.overviewUi?.names?.mobile ? `hv-navne-m-${T.overviewUi.names.mobile}` : ""} ${T.overviewUi?.filterColumns ? `hv-filter-kol hv-filter-kol-${T.overviewUi.filterColumns}` : ""} ${langClasses} ${T.design?.menu === "dock" ? "hv-dock" : ""} ${T.logoSide === "right" ? "hv-logo-h" : ""} ${guideAt != null || (dayAt != null && !dayOpen) ? "hv-guiding" : ""} ${route ? "hv-routing" : ""} ${showMeasures && phase === "tour" ? "hv-maler" : ""} ${phase === "tour" && T.stories?.desktop ? "hv-st-on-d" : ""}`} style={
+    <div className={`hv fixed inset-0 z-50 overflow-hidden bg-[#0d1b20] ${selected ? "hv-punkt" : ""} ${zoomed ? "hv-zoom" : ""} ${welcome ? "hv-welcome" : ""} ${phase === "tour" && T.stories?.mobile ? "hv-st-on-m" : ""} ${menuOpen ? "hv-menu-aaben" : ""} ${T.overviewUi?.box?.desktop === false ? "hv-boks-ud-d" : ""} ${T.overviewUi?.box?.mobile === false ? "hv-boks-ud-m" : ""} ${T.overviewUi?.filter?.desktop === false ? "hv-filter-ud-d" : ""} ${T.overviewUi?.filter?.mobile === false ? "hv-filter-ud-m" : ""} ${T.overviewUi?.names?.desktop ? `hv-navne-d-${T.overviewUi.names.desktop}` : ""} ${T.overviewUi?.names?.mobile ? `hv-navne-m-${T.overviewUi.names.mobile}` : ""} ${T.overviewUi?.filterColumns ? `hv-filter-kol hv-filter-kol-${T.overviewUi.filterColumns}` : T.overviewUi?.filterScroll ? "hv-filter-rul" : ""} ${langClasses} ${T.design?.menu === "dock" ? "hv-dock" : ""} ${T.logoSide === "right" ? "hv-logo-h" : ""} ${guideAt != null || (dayAt != null && !dayOpen) ? "hv-guiding" : ""} ${route ? "hv-routing" : ""} ${showMeasures && phase === "tour" ? "hv-maler" : ""} ${phase === "tour" && T.stories?.desktop ? "hv-st-on-d" : ""}`} style={
         {
           fontFamily: `'${T.font}', system-ui, sans-serif`,
           "--c-main": T.colors.main,
@@ -1695,7 +1705,7 @@ function TourExperience({
         )}
         {selected?.walks?.length ? <WalkLines from={selected.id} walks={selected.walks} names={pointNames} /> : null}
 
-        <div className="hv-filtre">
+        <div className="hv-filtre" ref={filterEl}>
           <div className="hv-filtre-t">{OV?.filterTitle}</div>
           <div className="hv-chips">
             {Object.entries(T.categories).map(([k, c]) => (
@@ -2831,9 +2841,13 @@ const CSS = `
   /* Categories: one row you can swipe. */
   .hv-filtre{left:10px;right:10px;bottom:calc(10px + env(safe-area-inset-bottom,0px));max-width:none;padding:7px 8px}
   .hv-filtre-t{display:none}
-  .hv-chips{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
-  .hv-chips::-webkit-scrollbar{display:none}
-  .hv-chips button{flex:none;font-size:12px;padding:4px 10px 4px 5px}
+  /* All categories in rows (as many as fit), a size a thumb hits - or one row to scroll (filterScroll), or rows of 2-4 (filterColumns). */
+  .hv-chips{gap:6px}
+  .hv-chips button{font-size:13.5px;padding:6px 12px 6px 6px}
+  .hv-chips button i{width:18px;height:18px}
+  .hv-filter-rul .hv-chips{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+  .hv-filter-rul .hv-chips::-webkit-scrollbar{display:none}
+  .hv-filter-rul .hv-chips button{flex:none}
   /* Rows of 2-4 (set under Luftfoto og kort): every category seen at once, long names cut short. */
   .hv-filter-kol .hv-chips{display:grid;overflow:visible;gap:5px}
   .hv-filter-kol-2 .hv-chips{grid-template-columns:repeat(2,minmax(0,1fr))}

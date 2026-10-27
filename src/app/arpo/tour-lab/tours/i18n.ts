@@ -235,3 +235,15 @@ export function makeT(config: TourConfig, lang: string) {
 }
 
 export type TourT = ReturnType<typeof makeT>;
+
+/**
+ * "i" or "på" before a place in Danish: på for places you're on - a camp
+ * site, a school, a farm, a beach, an island (Fanø, Bornholm …) - else i (i Hals,
+ * i København). "Vejret på Hals Strand Camping", "Vejret i Hals".
+ */
+export function iEllerPaa(place: string): "i" | "på" {
+  const p = place.trim().toLowerCase();
+  if (/(camping|campingplads|skole|efterskole|højskole|gård|gaard|strand|havn|hotel|kro|slot|museum|marina|ferieby|feriecenter|centret|centeret)\b/.test(p)) return "på";
+  if (/^(bornholm|fanø|rømø|læsø|samsø|ærø|langeland|mors|fyn|als|lolland|falster|møn|anholt|sjælland|amager|tåsinge|ærø|endelave|livø|venø|fur|thurø|omø|agersø|askø|femø|fejø|mandø|egholm|hjarnø|tunø|sejerø|nekselø|orø|strynø|drejø|avernakø|lyø|bjørnø|hjortø|skarø|fænø)$/.test(p)) return "på";
+  return "i";
+}

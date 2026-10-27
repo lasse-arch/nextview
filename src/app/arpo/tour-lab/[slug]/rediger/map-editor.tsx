@@ -781,25 +781,45 @@ function OverviewUiToggles({ config, edit }: { config: TourConfig; edit: Edit })
                 <div className="font-medium text-[#1d1d1f]">{title}</div>
                 <div className="text-[11px] leading-snug text-[#8e8e93]">{hint}</div>
               </td>
-              {(["desktop", "mobile"] as const).map((device) => (
-                <td key={device} className="text-center">
-                  <input type="checkbox" className="h-4 w-4 accent-[#0071e3]" checked={ui?.[what]?.[device] !== false} onChange={(e) => set(what, device, e.target.checked)} />
-                </td>
-              ))}
+              {(["desktop", "mobile"] as const).map((device) =>
+                // The filter on a phone is set just below (show all, rows, scroll or hide).
+                what === "filter" && device === "mobile" ? (
+                  <td key={device} className="text-center text-[11px] text-[#8e8e93]" title="Se Filteret på mobil nedenfor">
+                    ↓
+                  </td>
+                ) : (
+                  <td key={device} className="text-center">
+                    <input type="checkbox" className="h-4 w-4 accent-[#0071e3]" checked={ui?.[what]?.[device] !== false} onChange={(e) => set(what, device, e.target.checked)} />
+                  </td>
+                )
+              )}
             </tr>
           ))}
         </tbody>
       </table>
-      <Field title="Filteret på mobil" hint="Hvor mange kategorier der ses på én gang. Rul: én række, man skubber sidelæns. 2-4: i rækker under hinanden, så alle ses.">
+      <Field title="Filteret på mobil" hint="Vis alle: alle kategorier i rækker, så man ser dem. Rul: én række, man skubber sidelæns. Skjul: intet filter.">
         <Choice
-          value={String(ui?.filterColumns ?? "rul")}
+          value={ui?.filter?.mobile === false ? "skjul" : ui?.filterColumns ? String(ui.filterColumns) : ui?.filterScroll ? "rul" : "alle"}
           options={[
-            ["rul", "Rul"],
+            ["alle", "Vis alle"],
             ["2", "2 pr. række"],
             ["3", "3 pr. række"],
-            ["4", "4 pr. række"],
+            ["rul", "Rul"],
+            ["skjul", "Skjul"],
           ]}
-          onChange={(v) => edit((d) => void (d.overviewUi = { ...d.overviewUi, filterColumns: v === "rul" ? undefined : (Number(v) as 2 | 3 | 4) }))}
+          onChange={(v) =>
+            edit((d) => {
+              const filter = { ...d.overviewUi?.filter };
+              if (v === "skjul") filter.mobile = false;
+              else delete filter.mobile;
+              d.overviewUi = {
+                ...d.overviewUi,
+                filter: Object.keys(filter).length ? filter : undefined,
+                filterColumns: v === "2" || v === "3" ? (Number(v) as 2 | 3) : undefined,
+                filterScroll: v === "rul" ? true : undefined,
+              };
+            })
+          }
         />
       </Field>
       {(["desktop", "mobile"] as const).map((device) => (

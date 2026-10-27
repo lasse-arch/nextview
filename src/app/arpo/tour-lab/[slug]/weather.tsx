@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useT } from "../tours/i18n-react";
+import { useLang, useT } from "../tours/i18n-react";
+import { iEllerPaa } from "../tours/i18n";
 import { apiUrl } from "../tours/api";
 
 /*
@@ -28,6 +29,7 @@ const Icon = ({ d, className }: { d: string; className?: string }) => <svg viewB
 
 export function WeatherChip({ slug, at, onOpen }: { slug: string; /** The place as the tour has it now - the editor's preview may not be saved yet. */ at: { lat: number; lon: number; place: string }; onOpen?: () => void }) {
   const tr = useT();
+  const lang = useLang();
   const [data, setData] = useState<Data | null>(null);
   const [open, setOpen] = useState(false);
   const [month, setMonth] = useState(() => new Date().getMonth());
@@ -45,6 +47,8 @@ export function WeatherChip({ slug, at, onOpen }: { slug: string; /** The place 
 
   if (!data) return null;
   const { now, months, place } = data;
+  // "Vejret i Hals", "Vejret på Hals Strand Camping" - the engine picks the word in Danish; other languages say it their way.
+  const weatherIn = lang === "da" ? `Vejret ${iEllerPaa(place)} ${place}` : `${tr("Vejret i")} ${place}`;
   const m = months?.[month];
   const top = months ? Math.max(...months.map((x) => x.temp), 1) : 1;
   const low = months ? Math.min(...months.map((x) => x.temp), 0) : 0;
@@ -69,17 +73,17 @@ export function WeatherChip({ slug, at, onOpen }: { slug: string; /** The place 
         ) : (
           <>
             <Icon d={SKY["let-skyet"].icon} />
-            <span>{tr("Vejret i")} {place}</span>
+            <span>{weatherIn}</span>
           </>
         )}
       </button>
 
       {open && (
-        <div className="vj-kort" role="dialog" aria-label={`${tr("Vejret i")} ${place}`}>
+        <div className="vj-kort" role="dialog" aria-label={weatherIn}>
           <button type="button" className="vj-luk" aria-label={tr("Luk")} onClick={() => setOpen(false)}>
             ×
           </button>
-          <div className="vj-t">{tr("Vejret i")} {place}</div>
+          <div className="vj-t">{weatherIn}</div>
 
           {now && (
             <div className="vj-nu">
@@ -170,7 +174,7 @@ export const WEATHER_CSS = `
 .vj-kilde{font-size:10.5px;color:#8a979d;margin:8px 2px 0}
 .hv-punkt .vj-chip,.hv-punkt .vj-kort,.hv-welcome .vj-chip,.hv-menu-aaben .vj-chip,.hv-menu-aaben .vj-kort{opacity:0;pointer-events:none}
 @media (max-width:760px){
-  .vj-chip{right:10px;bottom:calc(64px + env(safe-area-inset-bottom,0px));height:36px;font-size:13px}
+  .vj-chip{right:10px;bottom:calc(var(--filtre-h, 50px) + 18px + env(safe-area-inset-bottom,0px));height:36px;font-size:13px}
   .hv-filter-ud-m .vj-chip{bottom:calc(10px + env(safe-area-inset-bottom,0px))}
   .vj-kort{left:0;right:0;bottom:0;width:auto;max-height:82%;border-radius:20px 20px 0 0;padding-bottom:calc(14px + env(safe-area-inset-bottom,0px));z-index:30}
 }

@@ -149,8 +149,10 @@ export type TourConfig = {
     filter?: { desktop?: false; mobile?: false };
     /** The points' names on the drone scene / map: always, only when zoomed in, or never (the open point's card has the name). Default: computer always, phone when zoomed in. */
     names?: { desktop?: "always" | "zoom" | "never"; mobile?: "always" | "zoom" | "never" };
-    /** Phones: the filter's categories side by side in rows of 2-4, so all are seen at once. Default: one row to scroll sideways. */
+    /** Phones: the filter's categories in rows of 2-4 of the same width. Default: all shown, as many to a row as fit. */
     filterColumns?: 2 | 3 | 4;
+    /** Phones: the categories in one row to scroll sideways instead (fewer lines over the picture). */
+    filterScroll?: true;
   };
   drone?: {
     /** One 360° photo (equirectangular) instead of the tiles below - set by the engine for a 360° map. */
