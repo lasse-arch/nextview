@@ -280,8 +280,37 @@ export function StartEditor({ config, edit, slug, preview }: Props) {
     setBusy(false);
   }
 
+  /** The tour's start: where the preview stands right now (scan point and the exact direction). */
+  const [startNote, setStartNote] = useState<{ text: string; error?: boolean } | null>(null);
+  async function startHere() {
+    setStartNote(null);
+    const view = await preview.view();
+    if (view.error || !view.href) return setStartNote({ text: view.error ?? "Forhåndsvisningen svarede ikke.", error: true });
+    edit((d) => void (d.start = view.href!));
+    setStartNote({ text: `Touren starter nu her${view.room ? ` (${view.room})` : ""} - også retningen, du kigger i.` });
+  }
+  const startSs = new URLSearchParams(config.start.split("?")[1] ?? "").get("ss");
+
   return (
     <>
+      <Group title="Hvor touren starter">
+        <p className="text-[12px] leading-snug text-[#8e8e93]">
+          Gå hen, hvor touren skal starte, i forhåndsvisningen, og drej, så man ser det rigtige. Tryk så Vælg startpunkt her.{config.drone || config.map ? " (Med luftfoto/kort er det her, Træd indenfor fører hen.)" : ""}
+        </p>
+        <div className="flex gap-2">
+          <button type="button" onClick={startHere} className="flex-1 rounded-xl bg-[#0071e3] py-2 text-[14px] font-medium text-white">
+            Vælg startpunkt her
+          </button>
+          {config.start && (
+            <button type="button" onClick={() => preview.go("Start", config.start)} className="rounded-xl bg-[#f2f2f7] px-3 py-2 text-[14px] font-medium text-[#0071e3]">
+              Vis start
+            </button>
+          )}
+        </div>
+        <p className={`px-1 text-[12px] ${startNote?.error ? "text-[#ff3b30]" : startNote ? "text-[#34c759]" : "text-[#8e8e93]"}`}>
+          {startNote?.text ?? (startSs ? `Starter nu i scanpunkt ${startSs}.` : config.start ? "Starter et valgt sted." : "Intet startpunkt endnu - touren starter, hvor Matterport starter.")}
+        </p>
+      </Group>
       <Group title="Når touren åbner">
         <Choice
           value={style}

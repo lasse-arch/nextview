@@ -63,6 +63,51 @@ const TABS: [Tab, string, string, string?][] = [
   ["avanceret", "Avanceret", '<path d="M8 6l-5 6 5 6M16 6l5 6-5 6"/>'],
 ];
 
+/**
+ * What the search over the sections finds: the settings in each section, by
+ * the words on them (and a few words people use for them).
+ */
+const FINDS: Partial<Record<Tab, string[]>> = {
+  claude: ["AI", "Spørg", "Lav om", "Hukommelse"],
+  resultater: ["Statistik", "Besøg", "Klik", "Rapport", "Leads"],
+  feedback: ["Rettelser", "Kundegennemsyn", "Kommentarer"],
+  del: ["Udgiv", "Link", "QR-kode", "Indlejr", "iframe", "Kode til hjemmesiden", "Cloudflare"],
+  start: ["Startpunkt", "Hvor touren starter", "Startposition", "Forsiden", "Velkomsten", "Fliser", "Kort film før touren", "Intro-video", "Steder med foto", "Træd indenfor", "Sådan ser en dag ud"],
+  menu: ["Menupunkter", "Grupper", "Tilføj det sted, du ser", "Billede i menuen", "360°-billede", "Webside", "Luftfotoet", "Scanpunkter i menuen"],
+  rundvisning: ["Vis mig rundt", "Guide", "Guidet tur", "Stop", "Drejning", "Sekunder ved hvert stop", "Stemme", "Lav den ud fra menuen"],
+  kortet: ["Interaktivt kort", "Luftfoto", "Dronebillede", "360°-kort", "Punkter på kortet", "Kategorier", "Skyer", "Boksen øverst", "Filteret", "Startudsnit", "Ikoner"],
+  scan: ["Scanpunkter", "Skjul scanpunkter", "Startpunkt", "Personer i scans"],
+  tags: ["Tags", "Infotags", "Hotspots", "Pris", "Video"],
+  live: ["Live data", "Ledige pladser", "Ledige rum", "Book-knap", "Hent nye data"],
+  kort: ["Stedkort", "Kort ved punkt", "Din plads venter", "Kort efter et stykke tid"],
+  links: ["Knapper", "Book", "Kontakt", "Telefon", "E-mail", "Adresse", "Sociale medier", "Kontaktformular", "Skriv til os", "Åbning", "Popup", "Ny fane", "Kort-link"],
+  design: ["Farver", "Skrift", "Font", "Logo", "Logostørrelse", "Logoets afstand", "Favicon", "Mørkt logo", "Farvefilter", "Menu-design", "Dock"],
+  sprog: ["Sprog", "Engelsk", "Tysk", "Oversæt"],
+  funktioner: ["Navigation", "Bevægelse", "Fri bevægelse", "Kun punkter", "Skift mellem steder", "Fade", "Flyv", "Zoom", "Lås zoom på mobil", "Menu åben på computer", "Menu åben på mobil", "Dæmp touren bag menuen", "Historier", "Scroll i historierne", "Find vej", "Vis mål", "Matterports egne knapper", "Hjælp ved start"],
+  generelt: ["Navn", "Firmanavn", "Undertitel", "Matterport-model", "Start-link"],
+  okonomi: ["Tid", "Pris", "Timer", "Økonomi"],
+  versioner: ["Versioner", "Fortryd", "Gendan", "Historik"],
+  avanceret: ["Eget design", "CSS", "JSON", "Opsætningen"],
+};
+
+/** The sections and settings matching a search (and the tour's own menu items, which are under Menu). */
+function searchTabs(q: string, menu: MenuEntry[]): { tab: Tab; label: string; section: string }[] {
+  const norm = (x: string) => x.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
+  const words = norm(q).split(/\s+/).filter(Boolean);
+  if (!words.length) return [];
+  const hit = (x: string) => words.every((w) => norm(x).includes(w));
+  const out: { tab: Tab; label: string; section: string }[] = [];
+  for (const [t, title] of TABS) {
+    if (hit(title)) out.push({ tab: t, label: title, section: "" });
+    for (const f of FINDS[t] ?? []) if (hit(f) && f !== title) out.push({ tab: t, label: f, section: title });
+  }
+  for (const m of menu) {
+    if (hit(m.title)) out.push({ tab: "menu", label: m.title, section: "Menu - menupunkt" });
+    if ("items" in m) for (const [name] of m.items) if (hit(name)) out.push({ tab: "menu", label: name, section: `Menu - i ${m.title}` });
+  }
+  return out.slice(0, 30);
+}
+
 const when = (iso: string) => new Date(iso).toLocaleString("da-DK", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
 export function TourEditor({
@@ -112,6 +157,9 @@ export function TourEditor({
 }) {
   const router = useRouter();
   const [config, setConfig] = useState<TourConfig>(initial);
+  /** The search over the sections (above nextviewAI). */
+  const [search, setSearch] = useState("");
+  const found = searchTabs(search, config.menu);
   /*
    * Autosave: every change is kept in the browser at once (survives a lost
    * connection or a closed browser) and as a draft on the server every 15
@@ -142,6 +190,7 @@ export function TourEditor({
   }
   const [dirty, setDirty] = useState(false);
   const [tab, setTab] = useState<Tab>("claude");
+
   /** A request for nextviewAI from elsewhere in the editor (a suggestion from Resultater). */
   const [aiAsk, setAiAsk] = useState<{ request: string; at: number } | null>(null);
   // A tour Claude just built (see new-tour.tsx): its account of what it did starts the chat.
@@ -428,7 +477,43 @@ export function TourEditor({
       <div className="flex min-h-0 flex-1">
         {/* Sections */}
         <nav className="flex min-h-0 w-[210px] flex-none flex-col gap-0.5 overflow-y-auto overscroll-contain p-3">
-          {TABS.map(([t, text, icon, heading]) => (
+          <div className="relative mb-1.5">
+            <Icon d='<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>' className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8e8e93]" />
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") setSearch("");
+                if (e.key === "Enter" && found[0]) {
+                  setTab(found[0].tab);
+                  setSearch("");
+                }
+              }}
+              placeholder="Søg i funktioner og menu"
+              className="w-full rounded-[9px] bg-black/[.05] py-[7px] pl-8 pr-2 text-[13px] outline-none placeholder:text-[#8e8e93] focus:bg-white focus:ring-2 focus:ring-[#0071e3]/40"
+            />
+          </div>
+          {search.trim() &&
+            (found.length ? (
+              found.map((f, i) => (
+                <button
+                  key={`${f.tab}-${f.label}-${i}`}
+                  type="button"
+                  onClick={() => {
+                    setTab(f.tab);
+                    setSearch("");
+                  }}
+                  className="rounded-[9px] px-2.5 py-[6px] text-left hover:bg-black/[.04]"
+                >
+                  <span className="block text-[14px] text-[#1d1d1f]">{f.label}</span>
+                  {f.section && <span className="block text-[11px] text-[#8e8e93]">{f.section}</span>}
+                </button>
+              ))
+            ) : (
+              <p className="px-2.5 py-2 text-[12px] text-[#8e8e93]">Intet fundet - prøv et andet ord, eller spørg nextviewAI.</p>
+            ))}
+          {!search.trim() && TABS.map(([t, text, icon, heading]) => (
             <div key={t} className="contents">
             {heading && <div className="mt-4 px-2.5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-[#8e8e93]">{heading}</div>}
             <button
