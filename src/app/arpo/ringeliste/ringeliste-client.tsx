@@ -124,7 +124,7 @@ function QuickAdd({ selectedListId }: { selectedListId: string | null }) {
         value={text}
         onChange={(e) => setText(e.target.value)}
         rows={5}
-        placeholder={"Indsæt links - ét pr. linje\nhttps://datacvr.virk.dk/enhed/virksomhed/12345678\nhttps://www.facebook.com/eksempelvirksomhed\nhttps://eksempel.dk\nhttps://www.dk-camp.dk/campingpladser/ (henter alle campingpladserne)"}
+        placeholder={"Indsæt links eller navne - ét pr. linje\nhttps://datacvr.virk.dk/enhed/virksomhed/12345678\nhttps://www.facebook.com/eksempelvirksomhed\nhttps://eksempel.dk\nFirma ApS, Aalborg: 98 15 10 10\nhttps://www.dk-camp.dk/campingpladser/ (henter alle campingpladserne)"}
         className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
       />
       <div className="mt-2 flex flex-wrap items-center gap-2">

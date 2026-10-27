@@ -132,6 +132,11 @@ export async function addLeadsToCallList(
       companyName = scraped.name || guessNameFromUrl(line.url);
       contactPhone = scraped.phone;
       contactName = scraped.ownerName;
+    } else if (line.name) {
+      // "Navn, By: telefon" - the town goes in the address until the lead is looked up properly.
+      companyName = line.name.slice(0, 120);
+      contactPhone = line.phone ?? null;
+      address = line.city ?? null;
     } else {
       companyName = line.raw.slice(0, 120);
     }
