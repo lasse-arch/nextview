@@ -4,7 +4,7 @@ import { LANG_CSS, LangSwitch } from "./lang-switch";
 import { danishOf, LANGUAGES, localize, makeT, tourLanguages } from "../tours/i18n";
 import { TourLang } from "../tours/i18n-react";
 import { socialLinks } from "../tours/social";
-import { cssFilter, formatPhone, imageOfHref, isInTourHref, isPlaceHref, placeHref, panoHfov, placeSlug, pointOfHref, startPlaces } from "../tours/places";
+import { cssFilter, formatPhone, guideExit, imageOfHref, isInTourHref, isPlaceHref, placeHref, panoHfov, placeSlug, pointOfHref, startPlaces } from "../tours/places";
 import type { LiveUnit } from "@/lib/availability/live";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
@@ -1321,7 +1321,7 @@ function TourExperience({
     setGuideAt(null);
     setPano(null);
     // A tour you can't walk around in: back to the drone scene / map, not left standing inside.
-    if (T.guide?.exit === "overview" && OV && phase === "tour") backToDrone();
+    if (guideExit(T) === "overview" && OV && phase === "tour") backToDrone();
   }
 
   /** Prototype tool: the exact view the visitor stands in, as a link for the tour's setup. */
@@ -2336,7 +2336,7 @@ function TourExperience({
           onGo={guideGo}
           onClose={closeGuide}
           onEvent={track}
-          stopLabel={T.guide?.exit === "overview" && OV ? tx("Tilbage til luften") : undefined}
+          stopLabel={guideExit(T) === "overview" && OV ? tx(OV.backLabel || "Tilbage til luften") : undefined}
         />
       )}
       {showCard != null && (

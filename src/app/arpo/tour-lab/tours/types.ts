@@ -276,7 +276,7 @@ export type TourConfig = {
     seconds?: number;
     /** The visitor presses "Næste" themselves (no timer) - calm, e.g. for a voice tour. */
     manual?: boolean;
-    /** The guide's stop button: "self" = "Gå selv rundt" (stay where you are), "overview" = back to the drone scene / map - for tours you can't walk around in. Default "self". */
+    /** The guide's stop button: "self" = "Gå selv rundt" (stay where you are), "overview" = back to the drone scene / map. Not set: back to it when the guide only shows its points (see guideExit). */
     exit?: "self" | "overview";
     /**
      * Made from the menu instead of `stops`: one stop per place in the menu,

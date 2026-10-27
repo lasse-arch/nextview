@@ -70,3 +70,15 @@ export function formatPhone(phone: string): string {
 export const PANO_HFOV = { desktop: 110, mobile: 80 } as const;
 /** The view width for a zoom (1 = the device's normal; over 1 is closer). */
 export const panoHfov = (phone: boolean, zoom = 1) => Math.max(30, Math.min(120, (phone ? PANO_HFOV.mobile : PANO_HFOV.desktop) / (zoom || 1)));
+
+/**
+ * What the guide's stop button does: its own setting - else back to the
+ * aerial photo when the guide only shows points on it (nothing to walk around
+ * in), else "Gå selv rundt".
+ */
+export function guideExit(T: TourConfig): "self" | "overview" {
+  if (T.guide?.exit) return T.guide.exit;
+  const stops = T.guide?.stops ?? [];
+  const onlyPoints = !T.guide?.fromMenu && stops.length > 0 && stops.every((s) => "point" in s || !s.href);
+  return onlyPoints && (T.drone || T.map) ? "overview" : "self";
+}

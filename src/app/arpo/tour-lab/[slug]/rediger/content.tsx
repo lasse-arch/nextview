@@ -1,6 +1,6 @@
 "use client";
 
-import { isPlaceHref, placeHref, startPlaces } from "../../tours/places";
+import { guideExit, isPlaceHref, placeHref, startPlaces } from "../../tours/places";
 import { AiImageButton } from "./ai-image";
 import { writePlaceCards, type CardDraft } from "@/lib/actions/tour-cards";
 import { useState } from "react";
@@ -632,12 +632,12 @@ export function GuideEditor({ config, edit, preview, onEditPoint }: Omit<Props, 
         {(stops.length > 0 || fromMenu) && (config.drone || config.map) && (
           <Field title="Knappen, der stopper guiden" hint="Tilbage til luften: til tours, hvor man ikke kan gå rundt selv (fx kun 360°-billeder på luftfotoet).">
             <Choice
-              value={config.guide?.exit ?? "self"}
+              value={guideExit(config)}
               options={[
                 ["self", "Gå selv rundt"],
                 ["overview", "Tilbage til luften"],
               ]}
-              onChange={(v) => edit((d) => void (d.guide = { ...d.guide!, exit: v === "overview" ? "overview" : undefined }))}
+              onChange={(v) => edit((d) => void (d.guide = { ...d.guide!, exit: v === "overview" ? "overview" : "self" }))}
             />
           </Field>
         )}
