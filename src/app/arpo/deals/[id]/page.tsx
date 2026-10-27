@@ -157,6 +157,9 @@ export default async function DealDetailPage({
   ).sort((a, b) => dealName(a).localeCompare(dealName(b), "da"));
 
   if (!deal) notFound();
+  // Filming time: registered as "Filming" in the time registration first, else the hand-typed one (see lib/filming-time).
+  const filmingRegistered = deal.timeEntries.filter((e) => e.category === "FILMING").reduce((n, e) => n + e.minutes, 0);
+  const filming = filmingRegistered > 0 ? { minutes: filmingRegistered, registered: true } : { minutes: deal.filmingActualMinutes, registered: false };
   // Can this EAN actually receive e-invoices? A warning on the deal, never a block.
   const eanRecipient = deal.eanNumber ? await lookupEanRecipient(deal.eanNumber) : null;
   // A branch billed together with its parent pays through the parent's
@@ -210,7 +213,7 @@ export default async function DealDetailPage({
             defaultCrewIds={users.filter((u) => u.email === "lasse@nextview360.dk").map((u) => u.id)}
           />
           {["CONTRACT_SIGNED", "FILMED", "LIVE"].includes(deal.stage) || deal.filmingAt ? (
-            <FilmingTimeButton dealId={deal.id} minutes={deal.filmingActualMinutes} plannedMinutes={deal.filmingDurationMinutes} />
+            <FilmingTimeButton dealId={deal.id} minutes={filming.minutes} registered={filming.registered} plannedMinutes={deal.filmingDurationMinutes} />
           ) : null}
           {["CONTRACT_SIGNED", "FILMED", "LIVE"].includes(deal.stage) && (
             <Link href={`/arpo/kunder/${deal.id}`} className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-[13px] font-semibold text-slate-700 shadow-sm hover:bg-slate-50">

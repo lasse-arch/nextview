@@ -9,6 +9,7 @@ import { setFilmingActual, updateDealStage } from "@/lib/actions/deals";
 import { tourChanged } from "@/lib/tour-cache";
 import { configHash, currentEngine } from "@/lib/tour-publish";
 import { arpoOrigin, cloudflareReady, PAGES_PROJECT, publishTour, setLiveVersion } from "@/lib/tour-publish";
+import { filmingTime } from "@/lib/filming-time";
 
 /* "Udgiv på tour.nextview360.dk" in the tour editor - admins only. */
 
@@ -50,7 +51,7 @@ export async function publishState(slug: string): Promise<PublishState> {
       ? {
           name: tour.deal.displayName ?? tour.deal.companyName,
           contactEmail: tour.deal.contactEmail,
-          filmingMissing: tour.deal.filmingActualMinutes == null,
+          filmingMissing: (await filmingTime(tour.deal)).minutes == null,
           liveAt: tour.deal.stage === "LIVE" ? (tour.deal.liveAt ?? new Date()).toISOString() : null,
           welcomeMailSentAt: tour.deal.welcomeMailSentAt?.toISOString() ?? null,
           portal: tour.deal.customerAccounts.length > 0,
@@ -104,8 +105,8 @@ export async function goLive(slug: string, filmingHours: number | null): Promise
     if (!deal.contactEmail) return { ok: false, error: "Kunden har ingen kontakt-e-mail på dealen - tilføj den først." };
     const email = normalizeEmail(deal.contactEmail);
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, error: `Kontakt-e-mailen på dealen ser forkert ud (${deal.contactEmail}).` };
-    if (deal.filmingActualMinutes == null) {
-      if (filmingHours == null) return { ok: false, error: "Udfyld filmtiden først." };
+    if ((await filmingTime(deal)).minutes == null) {
+      if (filmingHours == null) return { ok: false, error: "Registrér filmtiden i timeregistreringen (Filming) - eller udfyld den her." };
       const r = await setFilmingActual(deal.id, filmingHours);
       if (!r.ok) return r;
     }

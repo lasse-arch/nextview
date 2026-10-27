@@ -11,6 +11,7 @@ import { TourEditor } from "./editor";
 import { fetchScanMap } from "@/lib/matterport-graph";
 import { fetchMpskinsCfg, hiddenSweeps } from "@/lib/mpskins";
 import type { TourEconomy } from "./economy";
+import { filmingTime } from "@/lib/filming-time";
 
 
 /** Claude may take a minute or two to build or change a tour. */
@@ -54,7 +55,7 @@ export default async function TourEditPage({ params }: { params: Promise<{ slug:
   const stats = await tourStats(tour.slug);
   const share = shareOf(tour.share);
   const economy: TourEconomy = {
-    filmingMinutes: tour.deal?.filmingActualMinutes ?? null,
+    filmingMinutes: tour.deal ? (await filmingTime(tour.deal)).minutes : null,
     work: work.map((w) => ({ name: w.userName, seconds: w._sum.seconds ?? 0 })).sort((a, b) => b.seconds - a.seconds),
     ai: { calls: ai._count, usd: ai._sum.costUsd ?? 0 },
     dealId: tour.deal?.id ?? null,

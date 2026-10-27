@@ -20,6 +20,7 @@ import { sendContractSignedNotification } from "@/lib/notification-service";
 import { logActivity } from "@/lib/activity";
 import { dealName } from "@/lib/labels";
 import { isPocketShareUrl, fetchPocketTranscript } from "@/lib/pocket-transcript";
+import { filmingTime } from "@/lib/filming-time";
 import type { DealStage, CommissionFrequency, CommissionStatus } from "@prisma/client";
 
 const CONTRACT_MANAGED_STAGES: DealStage[] = ["CONTRACT_SENT", "CONTRACT_SIGNED"];
@@ -37,7 +38,7 @@ function parseMeetingDate(raw: string): Date {
   return new Date(/(Z|[+-]\d\d:?\d\d)$/.test(value) ? value : `${value}Z`);
 }
 /** Every customer's cost in hours must be known - the filming time is filled in before a deal goes Live. */
-const FILMING_TIME_REQUIRED = "Udfyld den faktiske filmtid på dealen (knappen \"Filmtid\"), før den kan sættes Live.";
+const FILMING_TIME_REQUIRED = "Registrér filmtiden i timeregistreringen (kategori Filming) - eller udfyld knappen \"Filmtid\" - før dealen kan sættes Live.";
 
 export async function createDealManual(formData: FormData) {
   const user = await requireUser();
@@ -159,7 +160,7 @@ async function updateDealInner(
   if (stage === "MEETING_BOOKED" && existing.stage !== "MEETING_BOOKED" && !meetingDate) {
     throw new Error("Angiv en mødedato når stadiet er 'Møde booket'.");
   }
-  if (stage === "LIVE" && existing.stage !== "LIVE" && existing.filmingActualMinutes == null) {
+  if (stage === "LIVE" && existing.stage !== "LIVE" && (await filmingTime(existing)).minutes == null) {
     throw new Error(FILMING_TIME_REQUIRED);
   }
 
@@ -381,7 +382,7 @@ export async function updateDealStage(dealId: string, newStage: DealStage) {
   if (newStage === "MEETING_BOOKED" && !existing.meetingDate) {
     throw new Error("Åbn dealen og angiv en mødedato før den kan sættes til 'Møde booket'.");
   }
-  if (newStage === "LIVE" && existing.stage !== "LIVE" && existing.filmingActualMinutes == null) {
+  if (newStage === "LIVE" && existing.stage !== "LIVE" && (await filmingTime(existing)).minutes == null) {
     throw new Error(FILMING_TIME_REQUIRED);
   }
 

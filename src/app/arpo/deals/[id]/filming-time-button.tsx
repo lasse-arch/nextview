@@ -5,15 +5,23 @@ import { setFilmingActual } from "@/lib/actions/deals";
 
 /**
  * "Filmtid": the time actually spent filming (incl. setting up). Must be
- * filled in before the deal can go Live - it's the customer's cost in hours
- * next to the tour's editing time (see the tour editor's "Tid og pris").
+ * known before the deal can go Live - it's the customer's cost in hours next
+ * to the tour's editing time (see the tour editor's "Tid og pris"). Taken
+ * from the time registration ("Filming") when there is some; only then is
+ * there nothing to type in here.
  */
-export function FilmingTimeButton({ dealId, minutes, plannedMinutes }: { dealId: string; minutes: number | null; plannedMinutes: number | null }) {
+export function FilmingTimeButton({ dealId, minutes, registered = false, plannedMinutes }: { dealId: string; minutes: number | null; registered?: boolean; plannedMinutes: number | null }) {
   const [open, setOpen] = useState(false);
   const [hours, setHours] = useState(minutes != null ? String(minutes / 60).replace(".", ",") : plannedMinutes ? String(plannedMinutes / 60).replace(".", ",") : "");
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const label = minutes != null ? `Filmtid: ${String(Math.round((minutes / 60) * 10) / 10).replace(".", ",")} t` : "Filmtid mangler";
+  if (registered)
+    return (
+      <span className="shrink-0 rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 text-[13px] font-semibold text-slate-700" title="Fra timeregistreringen (Filming) - ret den dér">
+        {label} <span className="font-normal text-slate-500">· timeregistrering</span>
+      </span>
+    );
   return (
     <div className="relative inline-block shrink-0">
       <button
