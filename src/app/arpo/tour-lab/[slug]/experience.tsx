@@ -1409,6 +1409,8 @@ function TourExperience({
           "--c-soft": T.colors.soft,
           "--font-heading": `'${T.fontHeading ?? T.font}', serif`,
           "--logo-h": `${T.logoSize ?? 46}px`,
+          ...(T.logoOffset?.top != null && { "--logo-top": `${T.logoOffset.top}px` }),
+          ...(T.logoOffset?.side != null && { "--logo-side": `${T.logoOffset.side}px` }),
         } as React.CSSProperties
       }>
       <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.font.replace(/ /g, "+")}:wght@400;600;700;800;900&display=swap`} />
@@ -2346,7 +2348,7 @@ const CSS = `
 .hv-live-sheet .hv-btn{flex:none;padding:8px 14px;font-size:13px}
 @media (max-width:760px){.hv-live-chip{top:62px;right:12px}.hv-live-sheet{margin:0;border-radius:20px 20px 0 0;max-height:85%}}
 .hv-pick{position:absolute;top:16px;left:50%;transform:translateX(-50%);z-index:30;padding:9px 16px;border-radius:999px;background:rgba(0,0,0,.75);color:#fff;font-size:14px;font-weight:700;pointer-events:none;backdrop-filter:blur(8px)}
-.hv-logo{position:absolute;top:14px;left:16px;height:var(--logo-h);width:auto;max-width:min(320px,40vw);object-fit:contain;z-index:6;filter:drop-shadow(0 2px 6px rgba(0,0,0,.35))}
+.hv-logo{position:absolute;top:var(--logo-top,14px);left:var(--logo-side,16px);height:var(--logo-h);width:auto;max-width:min(320px,40vw);object-fit:contain;z-index:6;filter:drop-shadow(0 2px 6px rgba(0,0,0,.35))}
 /* A dark logo gets a light card, so it reads on any wall. */
 /* A dark logo straight on the tour, no card and no glow - exactly as it is (as in MPSkins). */
 .hv-logo-lys{filter:none}
@@ -2476,7 +2478,7 @@ const CSS = `
   /* An open point: the panel takes the bottom, the bars step aside. */
   .hv-panel{top:auto;bottom:0;left:0;right:0;width:auto;max-height:62%;border-radius:18px 18px 0 0;padding-bottom:calc(18px + env(safe-area-inset-bottom,0px))}
   .hv-fotos{aspect-ratio:auto;height:min(40vw,190px);border-radius:18px 18px 0 0}
-  .hv-logo{height:calc(var(--logo-h) * .74);max-width:45vw;top:12px;left:12px}
+  .hv-logo{height:calc(var(--logo-h) * .74);max-width:45vw;top:var(--logo-top,12px);left:var(--logo-side,12px)}
   .hv-logo-kort{height:calc(var(--logo-h) * .74 - 8px);padding:7px 10px;border-radius:11px}
   .hv-menu{width:100%}
   .hv-room{bottom:76px}
@@ -2500,14 +2502,14 @@ const CSS = `
 
 /* The logo in the right corner: the menu button, its panel and what sits under it change to the left. */
 const LOGO_RIGHT_CSS = `
-.hv-logo-h .hv-logo{left:auto;right:16px}
+.hv-logo-h .hv-logo{left:auto;right:var(--logo-side,16px)}
 .hv-logo-h .hv-menuknap,.hv-logo-h .sp-menuknap,.hv-logo-h .hv-maal{right:auto;left:14px}
 .hv-logo-h .hv-live-chip,.hv-logo-h .hv-panel{right:auto;left:16px}
 .hv-logo-h .hv-menu{right:auto;left:0;transform:translateX(-105%);box-shadow:10px 0 30px rgba(0,0,0,.25)}
 .hv-logo-h .hv-menu.aaben{transform:none}
 .hv-logo-h .sp-menu-top{flex-direction:row-reverse}
 @media (max-width:760px){
-  .hv-logo-h .hv-logo{left:auto;right:12px}
+  .hv-logo-h .hv-logo{left:auto;right:var(--logo-side,12px)}
   .hv-logo-h .hv-menuknap,.hv-logo-h .sp-menuknap{right:auto;left:10px}
   .hv-logo-h .hv-live-chip{right:auto;left:12px}
   .hv-logo-h .hv-panel{left:0;right:0}

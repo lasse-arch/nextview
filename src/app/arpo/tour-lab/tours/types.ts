@@ -101,6 +101,8 @@ export type TourConfig = {
   logoSide?: "left" | "right";
   /** The logo's height over the tour, in px (computer; a phone shows it a bit smaller). Default 46. */
   logoSize?: number;
+  /** The logo's distance (px) from the top and from its side of the screen - both devices. Unset: 14/16 on a computer, 12/12 on a phone. */
+  logoOffset?: { top?: number; side?: number };
   subtitle?: string;
   colors: { main: string; accent: string; accentDark: string; soft: string };
   font: string;

@@ -622,6 +622,38 @@ export function TourEditor({
                 <Field title={`Logostørrelse: ${config.logoSize ?? 46} px`}>
                   <input type="range" min={28} max={120} className="w-full accent-[#0071e3]" value={config.logoSize ?? 46} onChange={(e) => edit((d) => void (d.logoSize = Number(e.target.value)))} />
                 </Field>
+                {(["top", "side"] as const).map((k) => {
+                  const v = config.logoOffset?.[k];
+                  return (
+                    <Field key={k} title={`Afstand fra ${k === "top" ? "toppen" : "siden"}: ${v != null ? `${v} px` : "standard"}`}>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="range"
+                          min={0}
+                          max={80}
+                          className="w-full accent-[#0071e3]"
+                          value={v ?? (k === "top" ? 14 : 16)}
+                          onChange={(e) => edit((d) => void (d.logoOffset = { ...d.logoOffset, [k]: Number(e.target.value) }))}
+                        />
+                        {v != null && (
+                          <button
+                            type="button"
+                            className="shrink-0 text-[12px] font-medium text-[#0071e3]"
+                            onClick={() =>
+                              edit((d) => {
+                                const o = { ...d.logoOffset };
+                                delete o[k];
+                                d.logoOffset = o.top == null && o.side == null ? undefined : o;
+                              })
+                            }
+                          >
+                            Standard
+                          </button>
+                        )}
+                      </div>
+                    </Field>
+                  );
+                })}
                 <Field title="Logoet sidder til - menuen tager den anden side">
                   <Choice
                     value={config.logoSide ?? "left"}
