@@ -6,7 +6,10 @@
 
 /** The guide's turn at a stop: "as" = the usual slow turn, "other" = the other way, "none" = no turn. */
 export type GuideTurn = "as" | "other" | "none";
-export type WelcomeGo = { drone: string | null } | { room: string; name: string } | { href: string } | { guide: true } | { day: true };
+/** Where the drone picture looks (set from the editor's preview). */
+export type DroneView = { yaw: number; pitch: number; hfov: number };
+/** `view`: a tile to the drone picture can turn it to its own spot, per device - else the start view. */
+export type WelcomeGo = { drone: string | null; view?: { desktop?: DroneView; mobile?: DroneView } } | { room: string; name: string } | { href: string } | { guide: true } | { day: true };
 
 /** A real spot in the tour with a photo of it (e.g. one of the model's own Matterport photos). */
 export type TourPlace = { name: string; kicker?: string; href: string; image: string };
@@ -205,7 +208,8 @@ export type TourConfig = {
    * `label`: the points' button, e.g. "Se på pladskortet".
    */
   sitePlan?: { image: string; label: string };
-  categories: Record<string, { name: string; color: string }>;
+  /** `walks: false`: its points' cards don't show walking times (e.g. Faciliteter - the pitches show the way to them instead). */
+  categories: Record<string, { name: string; color: string; walks?: false }>;
   points: TourPoint[];
   /** The tiles of the tile menu. */
   /**
@@ -291,7 +295,7 @@ export type TourConfig = {
     /** How the view turns at each stop: left out = a slow turn as always, "other" = the other way, "none" = stands still. A stop can have its own. */
     turn?: GuideTurn;
     /** A stop: where (empty href = stay, e.g. a closing card), its text, and optionally a voice (an audio file) that plays there. */
-    stops: ({ point: string } | { href: string; title: string; text: string; audio?: string; turn?: GuideTurn })[];
+    stops: ({ point: string; turn?: GuideTurn } | { href: string; title: string; text: string; audio?: string; turn?: GuideTurn })[];
   };
   /**
    * "Sådan ser en dag ud": the day as a calm timeline (time, what happens,

@@ -3,7 +3,7 @@
 import { InsightsPanel } from "./insights";
 import { LanguagesPanel } from "./languages";
 import { tourUrl } from "@/lib/public-urls";
-import { formatPhone, IMAGE_HREF, imageOfHref, isPlaceHref, pointOfHref } from "../../tours/places";
+import { droneHref, droneViewsOfHref, formatPhone, IMAGE_HREF, imageOfHref, isDroneHref, isPlaceHref, pointOfHref } from "../../tours/places";
 import { tourConfigProblem } from "@/lib/tour-validate";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -14,7 +14,7 @@ import { askClaudeForTour, saveAnthropicKey, suggestTourFilter, type ChatTurn } 
 import type { MenuEntry, TourConfig } from "../../tours/types";
 import type { TourStats } from "@/lib/tour-stats";
 import type { ReportShare } from "@/lib/tour-share";
-import { CardsEditor, GuideEditor, StartEditor, TagsEditor } from "./content";
+import { CardsEditor, DroneViewPicker, GuideEditor, StartEditor, TagsEditor } from "./content";
 import { ResultsPanel } from "./results";
 import { DesignGallery } from "./design-gallery";
 import { ScanPointsEditor } from "./scanpoints";
@@ -376,6 +376,7 @@ export function TourEditor({
       go: (name, href) => frame.current?.contentWindow?.postMessage({ type: "tour-go", name, href }, location.origin),
       device: () => deviceRef.current,
       panoView: () => ask<{ yaw?: number; pitch?: number; hfov?: number; phone?: boolean; image?: string }>("tour-pano-view"),
+      droneView: () => ask<{ yaw?: number; pitch?: number; hfov?: number; phone?: boolean }>("tour-drone-view"),
     };
   }, []);
 
@@ -844,7 +845,7 @@ export function TourEditor({
             {tab === "sprog" && (
               <LanguagesPanel slug={slug} config={config} edit={edit} showIn={(lang) => frame.current?.contentWindow?.postMessage({ type: "tour-lang", lang }, location.origin)} />
             )}
-            {tab === "kort" && <CardsEditor config={config} edit={edit} preview={preview} />}
+            {tab === "kort" && <CardsEditor config={config} edit={edit} preview={preview} scanMap={scanMap} mpskinsHidden={mpskinsHidden} />}
             {tab === "menu" && (
               <>
                 <MenuEditor
@@ -1887,7 +1888,7 @@ function moveEntry(menu: MenuEntry[], from: Addr, to: Addr | null): MenuEntry[] 
 type Kind = "sted" | "web" | "luft" | "billede";
 // No target yet (e.g. a menu item nextviewAI made, or just switched to "Et sted i touren") counts as a place waiting to be picked - not a web page.
 // A point on the drone scene / map ("#punkt:<id>") counts as the overview too: it opens the point there.
-const kindOf = (href: string): Kind => (href === "#luften" || pointOfHref(href) ? "luft" : href.startsWith(IMAGE_HREF) ? "billede" : !href || isPlaceHref(href) ? "sted" : "web");
+const kindOf = (href: string): Kind => (isDroneHref(href) || pointOfHref(href) ? "luft" : href.startsWith(IMAGE_HREF) ? "billede" : !href || isPlaceHref(href) ? "sted" : "web");
 function whereText(href: string) {
   const kind = kindOf(href);
   if (!href) return "Mangler et mål";
@@ -2077,7 +2078,12 @@ function MenuEditor({
                   onChange={(v) => set(a, { href: v === "web" ? "https://" : v === "billede" ? IMAGE_HREF : v === "luft" ? "#luften" : "" })}
                 />
                 {kindOf(it.href ?? "") === "luft" ? (
-                  <p className="mt-2 text-[12px] leading-snug text-[#8e8e93]">Fører tilbage til luftfotoet / kortet, touren starter på.</p>
+                  <div className="mt-2 space-y-2">
+                    <p className="text-[12px] leading-snug text-[#8e8e93]">Fører tilbage til luftfotoet / kortet, touren starter på.</p>
+                    {isDroneHref(it.href ?? "") && overview && (
+                      <DroneViewPicker what="menupunktet" views={droneViewsOfHref(it.href ?? "")} preview={preview} onChange={(v) => set(a, { href: droneHref(v ?? {}) })} />
+                    )}
+                  </div>
                 ) : kindOf(it.href ?? "") === "billede" ? (
                   <div className="mt-2 space-y-2">
                     {imageOfHref(it.href ?? "") && (

@@ -88,6 +88,8 @@ export type PreviewApi = {
   /** The device the preview is set to (Computer / Mobil over it). */
   device: () => "computer" | "mobil";
   panoView: () => Promise<{ yaw?: number; pitch?: number; hfov?: number; phone?: boolean; image?: string; error?: string }>;
+  /** Where the drone picture in the preview looks, and whether the preview is a phone. */
+  droneView: () => Promise<{ yaw?: number; pitch?: number; hfov?: number; phone?: boolean; error?: string }>;
 };
 
 /** The scan point number (ss) of a link to a place in the tour. */

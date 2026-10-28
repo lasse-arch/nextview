@@ -1,4 +1,4 @@
-import type { TourConfig } from "./types";
+import type { DroneView, TourConfig } from "./types";
 
 /*
  * A spot in the tour is a link with the scan point (ss) and, if picked in
@@ -16,8 +16,29 @@ export const isPlaceHref = (href: string) => /explore\.nextview360\.dk|my\.matte
 /** The point id of a "#punkt:<id>" link (a point on the drone scene or map), else null. */
 export const pointOfHref = (href: string) => (href.startsWith("#punkt:") ? href.slice(7) : null);
 
+/**
+ * "#luften": back to the drone scene / map - turned to a spot of its own, if
+ * one was picked in the editor, per device: "#luften?d=yaw,pitch,hfov&m=…".
+ */
+export type DroneViews = { desktop?: DroneView; mobile?: DroneView };
+export const isDroneHref = (href: string) => href === "#luften" || href.startsWith("#luften?");
+export function droneViewsOfHref(href: string): DroneViews {
+  if (!href.startsWith("#luften?")) return {};
+  const q = new URLSearchParams(href.slice(8));
+  const read = (s: string | null): DroneView | undefined => {
+    const [yaw, pitch, hfov] = (s ?? "").split(",").map(Number);
+    return [yaw, pitch, hfov].every(Number.isFinite) && hfov > 0 ? { yaw, pitch, hfov } : undefined;
+  };
+  return { desktop: read(q.get("d")), mobile: read(q.get("m")) };
+}
+export function droneHref(v: DroneViews): string {
+  const put = (x: DroneView) => [x.yaw, x.pitch, x.hfov].map((n) => Math.round(n * 10) / 10).join(",");
+  const q = [v.desktop && `d=${put(v.desktop)}`, v.mobile && `m=${put(v.mobile)}`].filter(Boolean).join("&");
+  return q ? `#luften?${q}` : "#luften";
+}
+
 /** A link that stays in the tour: a spot, the drone scene/map or one of its points. */
-export const isInTourHref = (href: string) => isPlaceHref(href) || href === "#luften" || href === "#plan" || pointOfHref(href) != null;
+export const isInTourHref = (href: string) => isPlaceHref(href) || isDroneHref(href) || href === "#plan" || pointOfHref(href) != null;
 
 /** The link to a spot in this tour. */
 export function placeHref(T: Pick<TourConfig, "tourPage" | "modelId">, ss: number | string, rot?: { x: number; y: number }): string {

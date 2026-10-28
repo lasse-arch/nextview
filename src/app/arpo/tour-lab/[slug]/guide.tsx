@@ -19,7 +19,7 @@ export function guideStops(T: TourConfig): GuideStop[] {
     if (!("point" in s)) return [s];
     const p = T.points.find((x) => x.id === s.point);
     // A point without a room is shown on the drone scene / map itself.
-    return p ? [{ href: p.tour ?? `#punkt:${p.id}`, title: p.name, text: p.text }] : [];
+    return p ? [{ href: p.tour ?? `#punkt:${p.id}`, title: p.name, text: p.text, turn: s.turn }] : [];
   });
 }
 

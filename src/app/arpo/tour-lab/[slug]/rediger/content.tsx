@@ -5,7 +5,10 @@ import { AiImageButton } from "./ai-image";
 import { writePlaceCards, type CardDraft } from "@/lib/actions/tour-cards";
 import { useEffect, useState } from "react";
 import { saveTourStoryImage } from "@/lib/actions/tour-lab";
-import type { GuideTurn, PlaceCard, TourConfig, TourInfo, TourPlace, WelcomeGo } from "../../tours/types";
+import type { DroneView, GuideTurn, PlaceCard, TourConfig, TourInfo, TourPlace, WelcomeGo } from "../../tours/types";
+import type { DroneViews } from "../../tours/places";
+import type { ScanMap } from "@/lib/matterport-graph";
+import { ScanPointPicker } from "./scanpoints";
 import { Choice, Field, Group, Icon, input, PanoZoom, Toggle, UploadButton, ssOfHref, type PreviewApi } from "./ui";
 
 /*
@@ -464,6 +467,7 @@ export function StartEditor({ config, edit, slug, preview }: Props) {
                   </Field>
                   {"room" in t.go && <PlacePicker href={t.go.room} name={t.title} preview={preview} onChange={(href) => set({ ...t, go: { room: href, name: t.title } })} />}
                   {"href" in t.go && <input className={`${input} bg-white`} value={t.go.href} placeholder="https://…" onChange={(e) => set({ ...t, go: { href: e.target.value } })} />}
+                  {"drone" in t.go && <DroneViewPicker views={t.go.view} preview={preview} onChange={(view) => set({ ...t, go: { drone: (t.go as { drone: string | null }).drone, view } })} />}
                 </>
               )}
             />
@@ -520,6 +524,57 @@ type Stop = NonNullable<TourConfig["guide"]>["stops"][number];
  * same pictures as the point's own (one place in the setup); its text and
  * position are changed at the point under Luftfoto og kort.
  */
+/**
+ * Where a tile to the drone picture turns it: look there in the preview (on
+ * Computer or Mobil over it) and press - kept per device, else the start view.
+ */
+export function DroneViewPicker({ views, preview, onChange, what = "flisen" }: { views: DroneViews | undefined; preview: PreviewApi; onChange: (views: DroneViews | undefined) => void; what?: string }) {
+  const [msg, setMsg] = useState<string | null>(null);
+  const device = preview.device() === "mobil" ? "mobile" : "desktop";
+  const go = { view: views };
+  const set = (key: "desktop" | "mobile", v: DroneView | undefined) => {
+    const view = { ...views, [key]: v };
+    if (!v) delete view[key];
+    onChange(view.desktop || view.mobile ? view : undefined);
+  };
+  return (
+    <Field title="Udsnit af luftfotoet" hint={`Drej og zoom luftfotoet i forhåndsvisningen til det, ${what} skal vise, og tryk. Computer og mobil hver for sig - skift øverst over forhåndsvisningen. Uden udsnit vises luftfotoets første udsnit.`}>
+      <div className="space-y-1.5">
+        <div className="flex gap-1.5">
+          <button type="button" className={`${linkButton} flex-1`} onClick={() => preview.go("", "#luften")}>
+            Vis luftfotoet
+          </button>
+          <button
+            type="button"
+            className={`${linkButton} flex-1`}
+            onClick={async () => {
+              setMsg(null);
+              const v = await preview.droneView();
+              if (v.error || v.yaw == null || v.pitch == null || v.hfov == null) return setMsg(v.error ?? "Kunne ikke læse udsnittet.");
+              set(v.phone ? "mobile" : "desktop", { yaw: v.yaw, pitch: v.pitch, hfov: v.hfov });
+              setMsg(`Gemt for ${v.phone ? "mobil" : "computer"}.`);
+            }}
+          >
+            Brug dette udsnit
+          </button>
+        </div>
+        {(["desktop", "mobile"] as const).map((k) => (
+          <div key={k} className="flex items-center gap-2 px-1 text-[12px] text-[#8e8e93]">
+            <span className={k === device ? "font-semibold text-[#1d1d1f]" : ""}>{k === "desktop" ? "Computer" : "Mobil"}:</span>
+            <span className="flex-1">{go.view?.[k] ? "eget udsnit" : "første udsnit"}</span>
+            {go.view?.[k] && (
+              <button type="button" className="text-[#ff3b30]" onClick={() => set(k, undefined)}>
+                Nulstil
+              </button>
+            )}
+          </div>
+        ))}
+        {msg && <p className={small}>{msg}</p>}
+      </div>
+    </Field>
+  );
+}
+
 function PointStop({ config, id, edit, onEdit, preview }: { config: TourConfig; id: string; edit: Props["edit"]; onEdit?: (id: string) => void; preview: PreviewApi }) {
   const p = config.points.find((x) => x.id === id);
   if (!p) return <p className={small}>Punktet findes ikke længere på luftfotoet.</p>;
@@ -753,7 +808,12 @@ export function GuideEditor({ config, edit, preview, onEditPoint }: Omit<Props, 
           empty='Ingen stop endnu. Gå til det første sted i forhåndsvisningen og tryk "+ Stop her".'
           editor={(s, set) =>
             "point" in s ? (
-              <PointStop config={config} id={s.point} edit={edit} onEdit={onEditPoint} preview={preview} />
+              <>
+                <PointStop config={config} id={s.point} edit={edit} onEdit={onEditPoint} preview={preview} />
+                <Field title="Drejning ved stoppet" hint="Om billedet drejer langsomt rundt, mens stoppet vises.">
+                  <Choice value={s.turn ?? ""} options={[["", "Som de andre"], ...turnOptions]} onChange={(v) => set({ ...s, turn: v ? (v as GuideTurn) : undefined })} />
+                </Field>
+              </>
             ) : (
               <>
                 <Field title="Titel">
@@ -887,8 +947,10 @@ function DayEditor({ config, edit, preview }: Omit<Props, "slug">) {
 
 /* ------------------------------------------------------------------ */
 
-export function CardsEditor({ config, edit, preview }: Omit<Props, "slug">) {
+export function CardsEditor({ config, edit, preview, scanMap, mpskinsHidden }: Omit<Props, "slug"> & { scanMap: ScanMap | null; mpskinsHidden: string[] }) {
   const [busy, setBusy] = useState<number | "new" | "all" | null>(null);
+  /** "Vælg på kortet": the big scan point plan, picking the points a card shows at. */
+  const [picking, setPicking] = useState<{ title: string; value: number[]; apply: (ss: number[]) => void } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const cards = config.placeCards ?? [];
   const rooms = menuRooms(config);
@@ -924,6 +986,20 @@ export function CardsEditor({ config, edit, preview }: Omit<Props, "slug">) {
   const withoutCard = menuPlaces.filter((p, i) => menuPlaces.findIndex((x) => x.ss === p.ss) === i && !cards.some((c) => c.ss.includes(p.ss)));
   return (
     <>
+      {picking && scanMap && (
+        <ScanPointPicker
+          map={scanMap}
+          config={config}
+          mpskinsHidden={mpskinsHidden}
+          title={picking.title}
+          value={picking.value}
+          onClose={() => setPicking(null)}
+          onDone={(ss) => {
+            picking.apply(ss);
+            setPicking(null);
+          }}
+        />
+      )}
       <Group title="Stedkort">
         <p className={small}>Et lille kort, der kommer frem, når man lander et bestemt sted - med en tekst om stedet og evt. knapper. Det forsvinder selv igen.</p>
         <Rows<PlaceCard>
@@ -978,6 +1054,15 @@ export function CardsEditor({ config, edit, preview }: Omit<Props, "slug">) {
                   >
                     + Punktet i forhåndsvisningen
                   </button>
+                  {scanMap && (
+                    <button
+                      type="button"
+                      className="rounded-full px-2.5 py-1 text-[13px] font-medium text-[#0071e3] hover:bg-[#0071e3]/10"
+                      onClick={() => setPicking({ title: c.title || "Stedkort", value: c.ss, apply: (ss) => set({ ...c, ss }) })}
+                    >
+                      Vælg på kortet
+                    </button>
+                  )}
                 </div>
               </Field>
               <details className="text-[13px]">

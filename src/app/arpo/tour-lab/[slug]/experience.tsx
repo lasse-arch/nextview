@@ -4,7 +4,7 @@ import { LANG_CSS, LangSwitch } from "./lang-switch";
 import { danishOf, LANGUAGES, localize, makeT, tourLanguages } from "../tours/i18n";
 import { TourLang } from "../tours/i18n-react";
 import { socialLinks } from "../tours/social";
-import { cssFilter, formatPhone, guideExit, imageOfHref, isInTourHref, isPlaceHref, placeHref, panoHfov, placeSlug, pointOfHref, startPlaces } from "../tours/places";
+import { cssFilter, droneViewsOfHref, formatPhone, isDroneHref, guideExit, imageOfHref, isInTourHref, isPlaceHref, placeHref, panoHfov, placeSlug, pointOfHref, startPlaces } from "../tours/places";
 import type { LiveUnit } from "@/lib/availability/live";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
@@ -14,7 +14,7 @@ import type { AvailableUnit } from "@/lib/availability/boxdepotet";
 import { WeatherChip, WEATHER_CSS } from "./weather";
 import { FinderSheet, FINDER_CSS, WalkLines } from "./finder";
 import { apiUrl, isStaticTour } from "../tours/api";
-import type { MenuEntry, TourConfig, TourPlace, TourPoint, WelcomeGo } from "../tours/types";
+import type { DroneView, GuideTurn, MenuEntry, TourConfig, TourPlace, TourPoint, WelcomeGo } from "../tours/types";
 import { CoverWelcome, DESIGNS_CSS, DockMenu, PickerMenu } from "./designs";
 import { GUIDE_CSS, GuidePlayer, guideStops } from "./guide";
 import { ONBOARDING_CSS, Onboarding } from "./onboarding";
@@ -794,6 +794,22 @@ function TourExperience({
   const langClasses = `hv-sprog-d-${langPlace(T.langSwitch?.desktop ?? "top")} hv-sprog-m-${langPlace(T.langSwitch?.mobile ?? "menu")}`;
   /** The points shown on the scene, by id → their name (walking times and the finder only name these). */
   const pointNames = useMemo(() => Object.fromEntries(T.points.map((p) => [p.id, p.name])), [T]);
+  /**
+   * The open point's walking times: a walk goes both ways (also one set from
+   * the other end), so a pitch shows the way to the facilities - nearest
+   * first. None on a category set not to show them.
+   */
+  const selectedWalks = useMemo(() => {
+    if (!selected || T.categories[selected.cat]?.walks === false) return [];
+    const by = new Map<string, number>();
+    for (const w of selected.walks ?? []) by.set(w.to, w.minutes);
+    for (const p of T.points) for (const w of p.walks ?? []) if (w.to === selected.id && !by.has(p.id)) by.set(p.id, w.minutes);
+    by.delete(selected.id);
+    return [...by]
+      .filter(([to]) => pointNames[to])
+      .map(([to, minutes]) => ({ to, minutes }))
+      .sort((a, b) => a.minutes - b.minutes);
+  }, [selected, T, pointNames]);
   /** The places "Find din plads" can land on: points some answer points at. */
   const finderPoints = useMemo(() => {
     const ids = new Set(T.finder?.questions.flatMap((q) => q.options.flatMap((o) => o.points)) ?? []);
@@ -907,7 +923,9 @@ function TourExperience({
         pitch: start.pitch,
         hfov: start.hfov,
         minHfov: mobile.current ? 40 : 50,
-        maxHfov: mobile.current ? 110 : 115,
+        // On a tall phone screen, zooming out past the start makes the view taller than the picture lets it look down,
+        // so pannellum tilts it up - and everything, points too, slides up and down. Out to the start, no further.
+        maxHfov: mobile.current ? Math.min(110, Math.max(start.hfov, 60)) : 115,
         minPitch: -90,
         maxPitch: D.panorama ? 90 : 25,
         mouseZoom: true,
@@ -976,14 +994,15 @@ function TourExperience({
     setEntering(false);
   }
 
-  function backToDrone() {
+  /** Back to the drone scene / map - at its start, or turned to `view` (a menu item's own spot). */
+  function backToDrone(view?: DroneView) {
     prepared.current = null;
     track("back_to_drone", { room_name: room ?? "" });
     setMenuOpen(false);
     if (!OV) return;
     setPhase("drone");
     if (T.drone) {
-      const start = mobile.current ? T.drone.startMobile : T.drone.start;
+      const start = view ?? (mobile.current ? T.drone.startMobile : T.drone.start);
       setTimeout(() => drone.current?.lookAt(start.pitch, start.yaw, start.hfov, 1200), 350);
     }
     setTimeout(() => mapApi.current?.reset(), 350);
@@ -1098,12 +1117,17 @@ function TourExperience({
     // The drone scene, optionally with only one category's points showing.
     const only = go.drone;
     setHidden(only ? Object.fromEntries(Object.keys(T.categories).map((k) => [k, k !== only])) : {});
+    // Turned to the tile's own spot, if it has one for this device.
+    const view = window.innerWidth <= 760 ? go.view?.mobile : go.view?.desktop;
+    if (view) drone.current?.lookAt(view.pitch, view.yaw, view.hfov, 1000);
   }
 
   async function menuGo(name: string, group: string, href: string) {
-    if (href === "#luften") {
+    if (isDroneHref(href)) {
       setMenuOpen(false);
-      backToDrone();
+      // Turned to the item's own spot, if it has one for this device.
+      const views = droneViewsOfHref(href);
+      backToDrone(mobile.current ? views.mobile : views.desktop);
       return;
     }
     // A picture from the menu: full screen - or as 360°, when it's a 2:1 panorama.
@@ -1436,9 +1460,9 @@ function TourExperience({
     setSelected(null);
     if (phase === "drone" && !entering) enterTour(T.start, "editor", "Start");
   }
-  const bridge = useRef({ sdk, room, menuGo, peek });
+  const bridge = useRef({ sdk, room, menuGo, peek, phase });
   useEffect(() => {
-    bridge.current = { sdk, room, menuGo, peek };
+    bridge.current = { sdk, room, menuGo, peek, phase };
   });
   useEffect(() => {
     if (window.parent === window) return;
@@ -1475,6 +1499,13 @@ function TourExperience({
         const v = openPanoView?.();
         if (!v) return reply({ type: "tour-pano-view", id: e.data.id, error: "Åbn billedet i forhåndsvisningen først." });
         return reply({ type: "tour-pano-view", id: e.data.id, ...v, phone: window.innerWidth <= 760 });
+      }
+      if (e.data.type === "tour-drone-view") {
+        // Where the drone picture looks - for a tile that leads to the drone picture.
+        const v = drone.current;
+        if (!v || bridge.current.phase !== "drone") return reply({ type: "tour-drone-view", id: e.data.id, error: "Gå til luftfotoet i forhåndsvisningen først." });
+        const r = (n: number) => Math.round(n * 10) / 10;
+        return reply({ type: "tour-drone-view", id: e.data.id, yaw: r(v.getYaw()), pitch: r(v.getPitch()), hfov: r(v.getHfov()), phone: window.innerWidth <= 760 });
       }
       if (e.data.type === "tour-view") {
         // The view the preview stands in, as a menu link (scan point + exact direction).
@@ -1733,7 +1764,7 @@ function TourExperience({
             }}
           />
         )}
-        {selected?.walks?.length ? <WalkLines from={selected.id} walks={selected.walks} names={pointNames} /> : null}
+        {selectedWalks.length ? <WalkLines from={selected!.id} walks={selectedWalks} names={pointNames} /> : null}
 
         <div className="hv-filtre" ref={filterEl}>
           <div className="hv-filtre-t">{OV?.filterTitle}</div>
@@ -1798,19 +1829,17 @@ function TourExperience({
                   ))}
               </p>
             )}
-            {selected.walks?.some((w) => pointNames[w.to]) && (
+            {selectedWalks.length > 0 && (
               <div className="hv-gaa">
-                {selected.walks
-                  .filter((w) => pointNames[w.to])
-                  .map((w) => (
-                    <button key={w.to} type="button" onClick={() => openPoint(T.points.find((x) => x.id === w.to)!)}>
-                      <svg viewBox="0 0 24 24" aria-hidden>
-                        <circle cx="13" cy="4" r="2" />
-                        <path d="m9 21 2-6 3 3v3M7 12l3-4 4 1 3 3M10 8l1.5 5" />
-                      </svg>
-                      {w.minutes} min {tx("til")} {pointNames[w.to]}
-                    </button>
-                  ))}
+                {selectedWalks.map((w) => (
+                  <button key={w.to} type="button" onClick={() => openPoint(T.points.find((x) => x.id === w.to)!)}>
+                    <svg viewBox="0 0 24 24" aria-hidden>
+                      <circle cx="13" cy="4" r="2" />
+                      <path d="m9 21 2-6 3 3v3M7 12l3-4 4 1 3 3M10 8l1.5 5" />
+                    </svg>
+                    {w.minutes} min {tx("til")} {pointNames[w.to]}
+                  </button>
+                ))}
               </div>
             )}
             <div className="hv-pchips">
@@ -1922,7 +1951,7 @@ function TourExperience({
           image={pano.panorama}
           start={pano.panoStart ?? (pano.panorama && T.imageView?.[pano.panorama]?.yaw != null ? { yaw: T.imageView[pano.panorama].yaw!, pitch: T.imageView[pano.panorama].pitch ?? 0 } : undefined)}
           panos={T.panos}
-          turning={guideAt != null}
+          turn={guideAt != null ? (GUIDE[guideAt]?.turn ?? T.guide?.turn ?? "as") : null}
           zoom={pano.panorama ? T.imageView?.[pano.panorama] : undefined}
           // A picture opened from the menu goes back to the menu - "Tilbage til luften" only when you came from the drone scene / map.
           backLabel={pano.id.startsWith("billede-") ? tx("Tilbage") : tx("Tilbage til luften")}
@@ -1943,7 +1972,7 @@ function TourExperience({
       {phase === "tour" && (
         <>
           {OV && (
-          <button type="button" className="hv-luften" onClick={backToDrone}>
+          <button type="button" className="hv-luften" onClick={() => backToDrone()}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M5 5l4 4M19 5l-4 4M5 19l4-4M19 19l-4-4M9 9h6v6H9z" />
             </svg>
@@ -1955,7 +1984,7 @@ function TourExperience({
               rooms={storyRooms}
               current={roomShown}
               devices={T.stories}
-              leading={OV ? { label: OV.backLabel, onClick: backToDrone } : undefined}
+              leading={OV ? { label: OV.backLabel, onClick: () => backToDrone() } : undefined}
               onGo={storyGo}
               onEvent={track}
             />
@@ -2486,7 +2515,7 @@ function PanoView({
   image,
   start,
   panos,
-  turning = false,
+  turn = null,
   zoom,
   backLabel,
   onClose,
@@ -2499,8 +2528,8 @@ function PanoView({
   dir?: string;
   image?: string;
   start?: { yaw: number; pitch: number };
-  /** Turns slowly by itself (the guide shows it). */
-  turning?: boolean;
+  /** Turns slowly by itself while the guide shows it: as always, the other way, or not ("none"/null). */
+  turn?: GuideTurn | null;
   panos?: TourConfig["panos"];
   onClose: () => void;
 }) {
@@ -2533,7 +2562,7 @@ function PanoView({
         maxHfov: 120,
         yaw: start?.yaw ?? 0,
         pitch: start?.pitch ?? -10,
-        ...(turning ? { autoRotate: -2.5, autoRotateInactivityDelay: 4000 } : {}),
+        ...(turn && turn !== "none" ? { autoRotate: turn === "other" ? 2.5 : -2.5, autoRotateInactivityDelay: 4000 } : {}),
       });
       const v = viewer;
       openPanoView = () => ({ yaw: v.getYaw(), pitch: v.getPitch(), hfov: v.getHfov(), image });
@@ -2543,7 +2572,7 @@ function PanoView({
       openPanoView = null;
       viewer?.destroy();
     };
-  }, [dir, image, panos, start, turning, zoom]);
+  }, [dir, image, panos, start, turn, zoom]);
   return (
     <div className="hv-pano">
       <div ref={el} className="absolute inset-0" />

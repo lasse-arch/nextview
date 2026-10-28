@@ -1046,7 +1046,7 @@ function PointPanel({
       </Group>
       <Group title="Gåafstande">
         <p className="text-[12px] leading-snug text-[#8e8e93]">
-          Hvor mange minutter man går herfra til andre steder. Vises på kortet (&quot;2 min til stranden&quot;) og som streger på billedet, når punktet er åbent. Gælder begge veje.
+          Hvor mange minutter man går herfra til andre steder. Vises på kortet (&quot;2 min til stranden&quot;) og som streger på billedet, når punktet er åbent. Gælder begge veje - en kategori kan slås fra under Kategorier (den gående mand).
         </p>
         {(p.walks ?? []).map((w) => {
           const other = config.points.find((x) => x.id === w.to);
@@ -1058,7 +1058,8 @@ function PointPanel({
                 type="number"
                 min={1}
                 max={120}
-                className={`${input} w-[70px] bg-white py-1.5 text-right`}
+                className={`${input} bg-white py-1.5 text-right`}
+                style={{ width: 70, flex: "none" }}
                 value={w.minutes}
                 onChange={(e) => {
                   const n = Math.round(Number(e.target.value));
@@ -1217,7 +1218,7 @@ function CategoriesPanel({ config, edit }: { config: TourConfig; edit: Edit }) {
   const cats = Object.entries(config.categories);
   return (
     <Group title="Kategorier">
-      <p className="text-[12px] leading-snug text-[#8e8e93]">Farven på punkterne - og filtret over kortet (fx Her bor du, Værksteder, Udenfor).</p>
+      <p className="text-[12px] leading-snug text-[#8e8e93]">Farven på punkterne - og filtret over kortet (fx Her bor du, Værksteder, Udenfor). Den lille gående mand: om kortene i kategorien viser gåafstande - slå den fra for fx Faciliteter, så er det pladserne, der viser vejen til dem.</p>
       <ul className="space-y-1.5">
         {cats.map(([id, c]) => {
           const used = config.points.filter((p) => p.cat === id).length;
@@ -1226,6 +1227,20 @@ function CategoriesPanel({ config, edit }: { config: TourConfig; edit: Edit }) {
               <input type="color" value={c.color} onChange={(e) => edit((d) => void (d.categories[id].color = e.target.value))} className="h-7 w-7 flex-none cursor-pointer rounded-full border-0 bg-transparent p-0" />
               <input className={`${input} bg-white py-1.5 text-[13px]`} value={c.name} onChange={(e) => edit((d) => void (d.categories[id].name = e.target.value))} />
               <span className="w-6 text-right text-[11px] text-[#8e8e93]">{used}</span>
+              <button
+                type="button"
+                title={c.walks === false ? "Gåafstande vises ikke på kortene her - tryk for at vise dem" : "Gåafstande vises på kortene her - tryk for at skjule dem (fx Faciliteter)"}
+                aria-pressed={c.walks !== false}
+                className={c.walks === false ? "text-[#c7c7cc]" : "text-[#0071e3]"}
+                onClick={() =>
+                  edit((d) => {
+                    if (d.categories[id].walks === false) delete d.categories[id].walks;
+                    else d.categories[id].walks = false;
+                  })
+                }
+              >
+                <Icon d='<circle cx="13" cy="4" r="2"/><path d="m9 21 2-6 3 3v3M7 12l3-4 4 1 3 3M10 8l1.5 5"/>' className="h-4 w-4" />
+              </button>
               <button type="button" disabled={used > 0} title={used ? "Bruges af punkter" : "Fjern"} className="text-[#c7c7cc] hover:text-[#ff3b30] disabled:opacity-30" onClick={() => edit((d) => void delete d.categories[id])}>
                 <Icon d='<path d="M6 6l12 12M18 6L6 18"/>' className="h-4 w-4" />
               </button>
