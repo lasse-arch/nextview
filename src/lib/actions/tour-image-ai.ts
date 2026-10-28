@@ -163,3 +163,85 @@ export async function editTourImage(slug: string, src: string, request: string, 
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
 }
+
+/*
+ * "Ret selv i en anden AI": the part of the picture to change - for a 360°
+ * photo the view turned to, else the whole picture - downloaded, changed in
+ * whichever AI or program the user likes, and uploaded again. It goes back
+ * exactly where it came from, and only where it was changed (the rest of the
+ * picture keeps its full sharpness) - the same as "Ret med AI" does.
+ */
+
+/** A view's size in pixels: as sharp as the 360° photo has it there, 3:2 like the window. */
+function viewSize(width: number, hfov: number) {
+  const vw = Math.round(Math.min(2560, Math.max(1200, ((width * hfov) / 360) * 1.15)) / 2) * 2;
+  return { vw, vh: Math.round((vw * 2) / 3) };
+}
+const cleanView = (view: PanoView): PanoView => ({ yaw: Number(view.yaw) || 0, pitch: Math.max(-89, Math.min(89, Number(view.pitch) || 0)), hfov: Math.max(25, Math.min(110, Number(view.hfov) || 70)) });
+
+/** The view of a 360° photo as a JPEG (base64), ready to download. */
+export async function cutTourView(src: string, view: PanoView): Promise<{ ok: true; jpeg: string; width: number; height: number } | { ok: false; error: string }> {
+  await admin();
+  try {
+    const original = await load(src);
+    const { data, info } = await sharp(original, { limitInputPixels: 300_000_000 }).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+    if (Math.abs(info.width / info.height - 2) > 0.05) return { ok: false, error: "Billedet er ikke et 360°-billede." };
+    const v = cleanView(view);
+    const { vw, vh } = viewSize(info.width, v.hfov);
+    const cut = renderView(data, info.width, info.height, v, vw, vh);
+    const jpeg = await sharp(cut, { raw: { width: vw, height: vh, channels: 3 } }).jpeg({ quality: 93, mozjpeg: true }).toBuffer();
+    return { ok: true, jpeg: jpeg.toString("base64"), width: vw, height: vh };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/**
+ * The changed picture back: `view` set = a view of the 360° photo `src`
+ * (laid back in its place), else the whole picture (merged so it keeps the
+ * original's size and sharpness). Stored as a new file - nothing in the tour
+ * changes until the user picks it.
+ */
+export async function pasteTourEdit(slug: string, src: string, view: PanoView | null, form: FormData): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
+  const user = await admin();
+  const file = form.get("file");
+  if (!(file instanceof File) || !file.type.startsWith("image/")) return { ok: false, error: "Vælg et billede." };
+  if (file.size > 25_000_000) return { ok: false, error: "Billedet er for stort (max 25 MB)." };
+  try {
+    const edited = Buffer.from(await file.arrayBuffer());
+    const em = await sharp(edited, { limitInputPixels: 100_000_000 }).metadata();
+    if (!em.width || !em.height) return { ok: false, error: "Billedet kunne ikke læses." };
+    const original = await load(src);
+    let out: Buffer;
+    let type: string;
+    if (view) {
+      const { data, info } = await sharp(original, { limitInputPixels: 300_000_000 }).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+      if (Math.abs(info.width / info.height - 2) > 0.05) return { ok: false, error: "Billedet er ikke et 360°-billede." };
+      // The same shape as the view that was downloaded - else it can't go back in the right place.
+      if (Math.abs(Math.log(em.width / em.height / 1.5)) > 0.06) return { ok: false, error: `Det rettede billede har en anden form (${em.width}×${em.height}) end udsnittet (3:2). Bed AI'en beholde formatet og beskæringen.` };
+      const v = cleanView(view);
+      const { vw, vh } = viewSize(info.width, v.hfov);
+      const before = renderView(data, info.width, info.height, v, vw, vh);
+      const after = await sharp(edited).rotate().resize(vw, vh, { fit: "fill" }).removeAlpha().raw().toBuffer();
+      pasteView(data, info.width, info.height, after, await changeMask(before, after, vw, vh), v, vw, vh);
+      out = await sharp(data, { raw: { width: info.width, height: info.height, channels: 3 } }).jpeg({ quality: 88, mozjpeg: true }).toBuffer();
+      type = "image/jpeg";
+    } else {
+      const om = await sharp(original).rotate().metadata();
+      const ow = om.autoOrient?.width ?? om.width ?? 1;
+      const oh = om.autoOrient?.height ?? om.height ?? 1;
+      if (Math.abs(Math.log(em.width / em.height / (ow / oh))) > 0.06) return { ok: false, error: `Det rettede billede har en anden form (${em.width}×${em.height}) end originalen (${ow}×${oh}). Bed AI'en beholde formatet og beskæringen.` };
+      const merged = await keepSharpWhereUnchanged(original, edited);
+      out = await sharp(merged.data, { raw: { width: merged.w, height: merged.h, channels: 3 } }).webp({ quality: 86 }).toBuffer();
+      type = "image/webp";
+    }
+    const name = `rettet-${path.basename(src.split("?")[0]).replace(/\.[a-z0-9]+$/i, "") || "billede"}`;
+    const url = await storeTourFile(slug, name, type, out, src);
+    await prisma.tourAiUsage
+      .create({ data: { tourSlug: slug, userName: user.name, kind: "billede (rettet selv)", inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, costUsd: 0 } })
+      .catch(() => {});
+    return { ok: true, url };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}

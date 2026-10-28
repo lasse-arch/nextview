@@ -2,7 +2,7 @@
 
 import { useContext, useEffect, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import { createPortal } from "react-dom";
-import { editTourImage, imageAiReady, saveGeminiKey } from "@/lib/actions/tour-image-ai";
+import { cutTourView, editTourImage, imageAiReady, pasteTourEdit, saveGeminiKey } from "@/lib/actions/tour-image-ai";
 import { FilesContext, Icon, input } from "./ui";
 
 const SPARK = '<path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8"/>';
@@ -92,6 +92,28 @@ export function AiImageButton({ src, onUse }: { src: string; onUse: (url: string
         </button>
       </div>
 
+      {is360 && (
+        <>
+          <PanoWindow key={result && showAfter ? result : src} src={result && showAfter ? result : src} view={view} />
+          {result ? (
+            <div className="flex rounded-lg bg-[#f2f2f7] p-0.5 text-[12px] font-medium">
+              {(
+                [
+                  [false, "Før"],
+                  [true, "Efter (rettet af AI)"],
+                ] as const
+              ).map(([after, label]) => (
+                <button key={label} type="button" onClick={() => setShowAfter(after)} className={`flex-1 rounded-md py-1 ${showAfter === after ? "bg-white shadow-sm" : "text-[#6e6e73]"}`}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="text-[11px] leading-snug text-[#8e8e93]">Drej og zoom hen til det, der skal rettes - kun det, du ser i rammen, bliver rettet. Resten af 360°-billedet røres ikke.</p>
+          )}
+        </>
+      )}
+      <ManualEdit slug={slug} base={result ?? src} is360={is360} view={view} onResult={(url) => (setResult(url), setShowAfter(true))} onError={setError} />
       {ready === false ? (
         <>
           <p className="text-[12px] leading-snug text-[#6e6e73]">
@@ -117,27 +139,6 @@ export function AiImageButton({ src, onUse }: { src: string; onUse: (url: string
         </>
       ) : (
         <>
-          {is360 && (
-            <>
-              <PanoWindow key={result && showAfter ? result : src} src={result && showAfter ? result : src} view={view} />
-              {result ? (
-                <div className="flex rounded-lg bg-[#f2f2f7] p-0.5 text-[12px] font-medium">
-                  {(
-                    [
-                      [false, "Før"],
-                      [true, "Efter (rettet af AI)"],
-                    ] as const
-                  ).map(([after, label]) => (
-                    <button key={label} type="button" onClick={() => setShowAfter(after)} className={`flex-1 rounded-md py-1 ${showAfter === after ? "bg-white shadow-sm" : "text-[#6e6e73]"}`}>
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-[11px] leading-snug text-[#8e8e93]">Drej og zoom hen til det, der skal rettes - kun det, du ser i rammen, bliver rettet. Resten af 360°-billedet røres ikke.</p>
-              )}
-            </>
-          )}
           <textarea
             className={`${input} min-h-[64px] resize-y bg-[#f2f2f7]`}
             placeholder="Hvad skal ændres? Fx: gør græsset sommergrønt og fyld poolen"
@@ -172,47 +173,47 @@ export function AiImageButton({ src, onUse }: { src: string; onUse: (url: string
           >
             {pending ? "AI'en retter billedet… (10-30 sek.)" : result ? "Ret det nye videre" : "Ret billedet"}
           </button>
-          {result && big && <Compare before={src} after={result} onClose={() => setBig(false)} />}
-          {result && (
-            <>
-              <div className={`grid grid-cols-2 gap-1.5 ${is360 ? "hidden" : ""}`}>
-                <figure>
-                  <button type="button" className="block w-full" onClick={() => setBig(true)}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={src} alt="" className="aspect-[4/3] w-full rounded-lg object-cover ring-1 ring-black/[.06]" />
-                  </button>
-                  <figcaption className="mt-0.5 text-center text-[11px] text-[#8e8e93]">Nu</figcaption>
-                </figure>
-                <figure>
-                  <button type="button" className="block w-full" onClick={() => setBig(true)}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={result} alt="" className="aspect-[4/3] w-full rounded-lg object-cover ring-2 ring-[#d97757]" />
-                  </button>
-                  <figcaption className="mt-0.5 text-center text-[11px] text-[#8e8e93]">Rettet af AI (tryk for stort)</figcaption>
-                </figure>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  className="flex-1 rounded-xl bg-[#0071e3] py-2 text-[14px] font-medium text-white"
-                  onClick={() => {
-                    onUse(result);
-                    setResult(null);
-                    setAsk("");
-                    setOpen(false);
-                  }}
-                >
-                  Brug det nye
-                </button>
-                <button type="button" className="flex-1 rounded-xl bg-[#f2f2f7] py-2 text-[14px] font-medium text-[#1d1d1f]" onClick={() => setResult(null)}>
-                  Forkast
-                </button>
-              </div>
-            </>
-          )}
-          <p className="text-[11px] leading-snug text-[#8e8e93]">Det gamle billede bliver liggende. Touren ændres først, når du trykker &quot;Brug det nye&quot; og Gem.</p>
         </>
       )}
+      {result && big && <Compare before={src} after={result} onClose={() => setBig(false)} />}
+      {result && (
+        <>
+          <div className={`grid grid-cols-2 gap-1.5 ${is360 ? "hidden" : ""}`}>
+            <figure>
+              <button type="button" className="block w-full" onClick={() => setBig(true)}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={src} alt="" className="aspect-[4/3] w-full rounded-lg object-cover ring-1 ring-black/[.06]" />
+              </button>
+              <figcaption className="mt-0.5 text-center text-[11px] text-[#8e8e93]">Nu</figcaption>
+            </figure>
+            <figure>
+              <button type="button" className="block w-full" onClick={() => setBig(true)}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={result} alt="" className="aspect-[4/3] w-full rounded-lg object-cover ring-2 ring-[#d97757]" />
+              </button>
+              <figcaption className="mt-0.5 text-center text-[11px] text-[#8e8e93]">Rettet af AI (tryk for stort)</figcaption>
+            </figure>
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              className="flex-1 rounded-xl bg-[#0071e3] py-2 text-[14px] font-medium text-white"
+              onClick={() => {
+                onUse(result);
+                setResult(null);
+                setAsk("");
+                setOpen(false);
+              }}
+            >
+              Brug det nye
+            </button>
+            <button type="button" className="flex-1 rounded-xl bg-[#f2f2f7] py-2 text-[14px] font-medium text-[#1d1d1f]" onClick={() => setResult(null)}>
+              Forkast
+            </button>
+          </div>
+        </>
+      )}
+      <p className="text-[11px] leading-snug text-[#8e8e93]">Det gamle billede bliver liggende. Touren ændres først, når du trykker &quot;Brug det nye&quot; og Gem.</p>
       {error && <p className="text-[12px] text-[#ff3b30]">{error}</p>}
     </div>
   );
@@ -329,4 +330,141 @@ function Compare({ before, after, onClose }: { before: string; after: string; on
     </div>,
     document.body
   );
+}
+
+/** Where a downloaded 360° view was cut, so the changed one goes back in the same place - kept on this computer. */
+const cutKey = (slug: string, base: string) => `ai-udsnit:${slug}:${base}`;
+
+/**
+ * "Ret selv i en anden AI": download the view (or the whole picture), change
+ * it in ChatGPT, Gemini, Photoshop … and upload it again - it goes back where
+ * it came from, and only where it changed.
+ */
+function ManualEdit({
+  slug,
+  base,
+  is360,
+  view,
+  onResult,
+  onError,
+}: {
+  slug: string;
+  /** The picture it's cut from - the AI's suggestion, when there is one. */
+  base: string;
+  is360: boolean;
+  view: React.MutableRefObject<{ yaw: number; pitch: number; hfov: number }>;
+  onResult: (url: string) => void;
+  onError: (e: string | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [pending, start] = useTransition();
+  const [saved, setSaved] = useState(false);
+  const file = useRef<HTMLInputElement>(null);
+
+  function save(blob: Blob, name: string) {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
+  }
+
+  function download() {
+    onError(null);
+    start(async () => {
+      if (is360) {
+        const v = { ...view.current };
+        const r = await cutTourView(base, v);
+        if (!r.ok) return onError(r.error);
+        try {
+          localStorage.setItem(cutKey(slug, base), JSON.stringify(v));
+        } catch {}
+        setSaved(true);
+        save(new Blob([Uint8Array.from(atob(r.jpeg), (c) => c.charCodeAt(0))], { type: "image/jpeg" }), `udsnit-${slug}-${r.width}x${r.height}.jpg`);
+      } else {
+        const res = await fetch(base).catch(() => null);
+        if (!res?.ok) return void window.open(base, "_blank");
+        const blob = await res.blob();
+        save(blob, `billede-${slug}.${(blob.type.split("/")[1] || "jpg").replace("jpeg", "jpg")}`);
+      }
+    });
+  }
+
+  async function upload(f: File) {
+    onError(null);
+    let v: { yaw: number; pitch: number; hfov: number } | null = null;
+    if (is360) {
+      try {
+        v = JSON.parse(localStorage.getItem(cutKey(slug, base)) ?? "null");
+      } catch {}
+      if (!v) return onError("Hent udsnittet her først - så ved Arpo, hvor det rettede skal sidde.");
+    }
+    // Made a JPEG of at most 3072 px here, so even a big PNG from the AI goes through quickly.
+    const bmp = await createImageBitmap(f).catch(() => null);
+    if (!bmp) return onError("Billedet kunne ikke læses.");
+    const k = Math.min(1, 3072 / Math.max(bmp.width, bmp.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(bmp.width * k);
+    canvas.height = Math.round(bmp.height * k);
+    canvas.getContext("2d")!.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+    const jpeg = await new Promise<Blob | null>((r) => canvas.toBlob(r, "image/jpeg", 0.93));
+    if (!jpeg) return onError("Billedet kunne ikke læses.");
+    const form = new FormData();
+    form.append("file", new File([jpeg], "rettet.jpg", { type: "image/jpeg" }));
+    start(async () => {
+      const r = await pasteTourEdit(slug, base, v, form);
+      if (!r.ok) return onError(r.error);
+      onResult(r.url);
+    });
+  }
+
+  if (!open)
+    return (
+      <button type="button" onClick={() => setOpen(true)} className="w-full rounded-xl bg-[#f2f2f7] py-2 text-[13px] font-medium text-[#1d1d1f] hover:bg-[#e9e9eb]">
+        Ret selv i en anden AI (ChatGPT, Gemini, Photoshop …)
+      </button>
+    );
+  return (
+    <div className="space-y-2 rounded-xl bg-[#f7f7f9] p-3">
+      <div className="flex items-center justify-between">
+        <span className="text-[13px] font-semibold">Ret selv i en anden AI</span>
+        <button type="button" className="text-[12px] text-[#8e8e93] hover:text-[#1d1d1f]" onClick={() => setOpen(false)}>
+          Skjul
+        </button>
+      </div>
+      <ol className="list-decimal space-y-1 pl-4 text-[12px] leading-snug text-[#6e6e73]">
+        <li>{is360 ? "Drej og zoom hen til det, der skal rettes, og hent udsnittet." : "Hent billedet."}</li>
+        <li>Ret det i fx ChatGPT, Gemini, FLUX eller Photoshop. Bed AI&apos;en beholde formatet og beskæringen præcis.</li>
+        <li>Upload det rettede - det sættes ind præcis dér, det kom fra, og resten af billedet beholder sin fulde skarphed.</li>
+      </ol>
+      <div className="flex gap-2">
+        <button type="button" disabled={pending} onClick={download} className="flex-1 rounded-lg bg-white py-2 text-[13px] font-medium ring-1 ring-black/[.08] hover:bg-[#fafafa] disabled:opacity-40">
+          {pending ? "…" : is360 ? "Hent udsnit" : "Hent billedet"}
+        </button>
+        <button type="button" disabled={pending || (is360 && !saved && !hasCut(slug, base))} onClick={() => file.current?.click()} className="flex-1 rounded-lg bg-[#1d1d1f] py-2 text-[13px] font-medium text-white disabled:opacity-40">
+          {pending ? "Sætter ind…" : "Upload det rettede"}
+        </button>
+        <input
+          ref={file}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            e.target.value = "";
+            if (f) upload(f);
+          }}
+        />
+      </div>
+      {is360 && (saved || hasCut(slug, base)) && <p className="text-[11px] text-[#8e8e93]">Udsnittet er husket - du må gerne dreje rundt, det rettede sættes ind dér, hvor du hentede det.</p>}
+    </div>
+  );
+}
+
+function hasCut(slug: string, base: string): boolean {
+  try {
+    return Boolean(localStorage.getItem(cutKey(slug, base)));
+  } catch {
+    return false;
+  }
 }
