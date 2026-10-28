@@ -1681,3 +1681,21 @@ model SalesMail {
   @@index([userId, finalAt])
   @@index([finalAt])
 }
+
+/// A tour moved to the papirkurv ("Slet tour"): everything needed to bring it
+/// back - the tour, its versions and its Cloudflare publications - for 30
+/// days. While it's here, the tour's prototype file (if any) isn't made into
+/// a tour again either.
+model DeletedTour {
+  id            String    @id @default(cuid())
+  slug          String
+  name          String
+  deletedByName String
+  /// { tour, versions, publications } as they were
+  data          Json
+  createdAt     DateTime  @default(now())
+  restoredAt    DateTime?
+
+  @@index([slug])
+  @@index([createdAt])
+}

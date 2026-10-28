@@ -18,6 +18,7 @@ import { CardsEditor, GuideEditor, StartEditor, TagsEditor } from "./content";
 import { ResultsPanel } from "./results";
 import { DesignGallery } from "./design-gallery";
 import { ScanPointsEditor } from "./scanpoints";
+import { DeleteTour } from "./delete-tour";
 import { LiveDataEditor } from "./live";
 import type { ScanMap } from "@/lib/matterport-graph";
 import { currentPreset } from "../../tours/presets";
@@ -1156,6 +1157,7 @@ export function TourEditor({
                     </button>
                   )}
                 </div>
+                <DeleteTour slug={slug} name={config.title} published={published} />
               </>
             )}
 

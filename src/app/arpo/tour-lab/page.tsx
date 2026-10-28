@@ -8,6 +8,8 @@ import { NewTour } from "./new-tour";
 import { TourLab } from "./tour-lab";
 import { ToursList, type TourRow } from "./tours-list";
 import { DetachAll } from "./detach-all";
+import { Papirkurv } from "./papirkurv";
+import { deletedTours } from "@/lib/actions/tours";
 import type { TourConfig } from "./tours/types";
 
 
@@ -29,7 +31,8 @@ function picture(c: TourConfig): { image: string; logo: boolean } {
 export default async function TourLabPage() {
   const user = await getCurrentUser();
   if (user?.role !== "ADMIN") redirect("/arpo");
-  const [tours, sdkKey, results] = await Promise.all([listTours(), getSettingValue("MATTERPORT_SDK_KEY"), leadsByTour(30)]);
+  const [tours, sdkKey, results, deleted] = await Promise.all([listTours(), getSettingValue("MATTERPORT_SDK_KEY"), leadsByTour(30), deletedTours()]);
+  const now = new Date().getTime();
   const mpskinsLeft = tours.filter((t) => (t.config as unknown as TourConfig).tourPage).length;
   const rows: TourRow[] = tours.map((t) => {
     const c = t.config as unknown as TourConfig;
@@ -66,6 +69,8 @@ export default async function TourLabPage() {
       {mpskinsLeft > 0 && <DetachAll count={mpskinsLeft} />}
 
       <ToursList rows={rows} />
+
+      <Papirkurv rows={deleted.map((d) => ({ ...d, createdAt: d.createdAt.toISOString(), daysLeft: Math.max(0, 30 - Math.floor((now - d.createdAt.getTime()) / 86_400_000)) }))} />
 
       <details className="rounded-2xl bg-white/60 px-4 py-3 ring-1 ring-black/[.05]">
         <summary className="cursor-pointer select-none text-[14px] text-[#6e6e73]">Udviklerværktøjer (Matterport SDK-nøgle og testværktøj)</summary>

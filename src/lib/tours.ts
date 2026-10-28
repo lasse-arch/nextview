@@ -14,9 +14,15 @@ import type { TourConfig } from "@/app/arpo/tour-lab/tours/types";
 
 let seeded: Promise<void> | null = null;
 
+/** Tours in the papirkurv - their prototype files aren't made into tours again, nor shown. */
+async function deletedSlugs(): Promise<Set<string>> {
+  const rows = await prisma.deletedTour.findMany({ where: { restoredAt: null }, select: { slug: true } }).catch(() => []);
+  return new Set(rows.map((r) => r.slug));
+}
+
 async function seed() {
   const rows = await prisma.tour.findMany({ select: { id: true, slug: true, config: true, versions: { select: { id: true, createdByName: true } } } });
-  const existing = new Set(rows.map((t) => t.slug));
+  const existing = new Set([...rows.map((t) => t.slug), ...(await deletedSlugs())]);
   // A tour nobody has edited in Arpo yet (only the version Arpo created) follows its prototype file.
   for (const row of rows) {
     const file = TOURS[row.slug];
@@ -71,5 +77,6 @@ export async function getTourConfig(slug: string): Promise<TourConfig | null> {
   await ensureToursSeeded().catch(() => {});
   const row = await prisma.tour.findUnique({ where: { slug }, select: { slug: true, config: true } }).catch(() => null);
   if (row) return { ...(row.config as unknown as TourConfig), slug: row.slug };
-  return TOURS[slug] ?? null;
+  if (!TOURS[slug] || (await deletedSlugs()).has(slug)) return null;
+  return TOURS[slug];
 }

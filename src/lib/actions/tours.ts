@@ -213,3 +213,55 @@ export async function detachToursFromMpskins(slug?: string): Promise<Result<{ mo
   revalidatePath("/arpo/tour-lab");
   return { ok: true, moved, failed };
 }
+
+/** How long a deleted tour stays in the papirkurv. */
+const KEEP_DELETED_DAYS = 30;
+
+/**
+ * "Slet tour": the tour moves to the papirkurv - with its versions and
+ * Cloudflare publications - and can be restored for 30 days. Only a tour
+ * that's off the net: never one a customer's website may be showing.
+ */
+export async function deleteTour(slug: string, typedName: string): Promise<Result> {
+  const user = await admin();
+  const tour = await prisma.tour.findUnique({ where: { slug }, include: { versions: true, publications: true } });
+  if (!tour) return { ok: false, error: "Touren findes ikke." };
+  const names = [tour.name, (tour.config as unknown as TourConfig).title].filter(Boolean).map((n) => n.trim().toLowerCase());
+  if (!names.includes(typedName.trim().toLowerCase())) return { ok: false, error: "Skriv tourens navn præcis for at slette den." };
+  if (tour.published || tour.liveVersion != null) return { ok: false, error: "Touren er udgivet. Tag den af nettet under Del og udgiv først - så forsvinder den ikke fra en kundes hjemmeside uden varsel." };
+  const { versions, publications, ...row } = tour;
+  await prisma.$transaction([
+    prisma.deletedTour.create({ data: { slug, name: tour.name, deletedByName: user.name, data: JSON.parse(JSON.stringify({ tour: row, versions, publications })) as Prisma.InputJsonValue } }),
+    prisma.tour.delete({ where: { id: tour.id } }),
+  ]);
+  revalidatePath("/arpo/tour-lab");
+  return { ok: true };
+}
+
+/** Back from the papirkurv - as it was, versions and publications included. */
+export async function restoreTour(deletedId: string): Promise<Result<{ slug: string }>> {
+  await admin();
+  const d = await prisma.deletedTour.findUnique({ where: { id: deletedId } });
+  if (!d || d.restoredAt) return { ok: false, error: "Touren er ikke i papirkurven." };
+  if (await prisma.tour.findUnique({ where: { slug: d.slug }, select: { id: true } })) return { ok: false, error: `Der findes allerede en tour med adressen "${d.slug}".` };
+  const data = d.data as unknown as { tour: Prisma.TourUncheckedCreateInput; versions: Prisma.TourVersionUncheckedCreateInput[]; publications: Prisma.TourPublicationUncheckedCreateInput[] };
+  // The customer may have been removed meanwhile - then the tour comes back without one.
+  const dealId = data.tour.dealId && (await prisma.deal.findUnique({ where: { id: data.tour.dealId }, select: { id: true } })) ? data.tour.dealId : null;
+  await prisma.$transaction([
+    // An empty JSON field (no draft, default sharing) is left out - Prisma takes no plain null there.
+    prisma.tour.create({ data: { ...data.tour, draft: data.tour.draft ?? undefined, share: data.tour.share ?? undefined, dealId, published: false, liveVersion: null } }),
+    ...(data.versions.length ? [prisma.tourVersion.createMany({ data: data.versions })] : []),
+    ...(data.publications.length ? [prisma.tourPublication.createMany({ data: data.publications })] : []),
+    prisma.deletedTour.update({ where: { id: d.id }, data: { restoredAt: new Date() } }),
+  ]);
+  revalidatePath("/arpo/tour-lab");
+  return { ok: true, slug: d.slug };
+}
+
+/** The papirkurv: tours deleted within the last 30 days (older ones are let go here). */
+export async function deletedTours() {
+  await admin();
+  const cutoff = new Date(Date.now() - KEEP_DELETED_DAYS * 86_400_000);
+  await prisma.deletedTour.deleteMany({ where: { OR: [{ createdAt: { lt: cutoff } }, { restoredAt: { not: null } }] } }).catch(() => {});
+  return prisma.deletedTour.findMany({ orderBy: { createdAt: "desc" }, select: { id: true, slug: true, name: true, deletedByName: true, createdAt: true } });
+}
