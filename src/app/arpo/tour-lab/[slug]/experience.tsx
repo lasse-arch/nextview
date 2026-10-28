@@ -1186,6 +1186,9 @@ function TourExperience({
     if (point) {
       setSelected(null);
       if (phase !== "drone") setPhase("drone");
+      // The next stop inside the tour is got ready behind this one (the room loaded, standing there), so going in is quick.
+      const next = GUIDE[i + 1]?.href;
+      if (next && !pointById(next)) setTimeout(() => prepare(next), 1200);
       // With its own 360° photo, the guide shows that (turning slowly) - not just a zoom on the big picture.
       if (hasPano(point)) return setPano(point);
       // Otherwise the point on the drone scene / map, under the guide's card.
