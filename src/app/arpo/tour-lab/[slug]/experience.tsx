@@ -118,7 +118,7 @@ const eventLog: TrackedEvent[] = [];
 const logListeners = new Set<() => void>();
 
 /** The tour being measured (set when the tour mounts). */
-const tracking = { slug: "", session: "", off: false, queue: [] as { name: string; label?: string; url?: string }[], timer: 0, da: (s: string) => s };
+const tracking = { slug: "", session: "", off: false, queue: [] as { name: string; label?: string; url?: string; value?: number }[], timer: 0, da: (s: string) => s };
 
 /** Sends the waiting events to Arpo's own measurement (/api/tour-events) - also when the page is closed. */
 function flushEvents() {
@@ -136,8 +136,10 @@ function track(name: string, params: Record<string, string | number> = {}) {
   const full = { tour: tracking.slug, ...params };
   // Arpo's own count - not from the editor's preview (the tour in an iframe there).
   if (tracking.slug && !tracking.off && window.parent === window) {
-    const label = params.label ?? params.item_name ?? params.place_name ?? params.room_name ?? params.kind ?? params.title ?? params.name;
-    tracking.queue.push({ name, label: label != null ? tracking.da(String(label)) : undefined, url: params.link_url != null ? String(params.link_url) : undefined });
+    const label = params.label ?? params.item_name ?? params.place_name ?? params.point_name ?? params.room_name ?? params.kind ?? params.title ?? params.name;
+    // A number that matters, kept with the event: the seconds spent in a room.
+    const value = typeof params.seconds === "number" ? Math.round(params.seconds) : undefined;
+    tracking.queue.push({ name, label: label != null ? tracking.da(String(label)) : undefined, url: params.link_url != null ? String(params.link_url) : undefined, value });
     if (name === "cta_click" || name === "contact_click") flushEvents(); // the visitor may be leaving
     else tracking.timer ||= window.setTimeout(flushEvents, 4000);
   }

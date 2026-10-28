@@ -43,6 +43,16 @@ export function mergeStats(all: TourStats[]): TourStats | null {
       units: sumRows(all.map((s) => s.live.units)).slice(0, 10),
     },
     menu: { opened: all.reduce((n, s) => n + s.menu.opened, 0), groups: sumRows(all.map((s) => s.menu.groups)) },
+    rooms: sumRows(all.map((s) => s.rooms)).slice(0, 10),
+    // Rooms with the same name in several tours: the typical time weighted by how many visits it's from.
+    roomTime: [...all.flatMap((s) => s.roomTime).reduce((m, r) => {
+      const x = m.get(r.label) ?? { secs: 0, count: 0 };
+      return m.set(r.label, { secs: x.secs + r.seconds * r.count, count: x.count + r.count });
+    }, new Map<string, { secs: number; count: number }>())]
+      .map(([label, x]) => ({ label, seconds: Math.round(x.secs / x.count), count: x.count }))
+      .sort((a, b) => b.seconds - a.seconds)
+      .slice(0, 8),
+    opened: sumRows(all.map((s) => s.opened)).slice(0, 10),
   };
 }
 
@@ -50,7 +60,7 @@ export function mergeStats(all: TourStats[]): TourStats | null {
 export function mergeShare(all: ReportShare[]): ReportShare | null {
   if (!all.length) return null;
   const when = (k: "leads" | "actions"): ShareWhen => (all.some((s) => s[k] === "off") ? "off" : all.every((s) => s[k] === "on") ? "on" : "auto");
-  const every = (k: "visits" | "engaged" | "duration" | "perDay" | "places" | "sources" | "live") => all.every((s) => s[k]);
+  const every = (k: "visits" | "engaged" | "duration" | "perDay" | "places" | "sources" | "live" | "rooms" | "roomTime" | "opened") => all.every((s) => s[k]);
   return {
     days: all.every((s) => s.days === 90) ? 90 : 30,
     visits: every("visits"),
@@ -62,5 +72,8 @@ export function mergeShare(all: ReportShare[]): ReportShare | null {
     places: every("places"),
     sources: every("sources"),
     live: every("live"),
+    rooms: every("rooms"),
+    roomTime: every("roomTime"),
+    opened: every("opened"),
   };
 }

@@ -27,11 +27,17 @@ export type TourStats = {
   live: { seen: number; opened: number; viewed: number; booked: number; units: { label: string; count: number }[] };
   /** The menu: visits that opened it, and how many opened each of its groups (does anyone look inside them?). */
   menu: { opened: number; groups: { label: string; count: number }[] };
+  /** Where visitors went around inside: the rooms they came to (however they got there). */
+  rooms: { label: string; count: number }[];
+  /** Where they stayed longest: the typical (median) seconds in each room, and in how many visits. */
+  roomTime: { label: string; seconds: number; count: number }[];
+  /** What they opened along the way: points on the aerial photo, info points, place cards, 360° photos. */
+  opened: { label: string; count: number }[];
 };
 
 export async function tourStats(slug: string, days = 30): Promise<TourStats> {
   const since = new Date(Date.now() - days * 86_400_000);
-  const [sessions, perDay, actions, places, sources, liveFunnel, liveUnits, menuOpened, menuGroups] = await Promise.all([
+  const [sessions, perDay, actions, places, sources, liveFunnel, liveUnits, menuOpened, menuGroups, rooms, roomTime, opened] = await Promise.all([
     prisma.$queryRawUnsafe<{ visits: bigint; engaged: bigint; leads: bigint; median: number | null; mobile: bigint }[]>(
       `WITH s AS (
          SELECT session,
@@ -65,6 +71,15 @@ export async function tourStats(slug: string, days = 30): Promise<TourStats> {
     top(slug, since, `name = 'live_book'`),
     prisma.$queryRawUnsafe<{ n: bigint }[]>(`SELECT count(DISTINCT session) AS n FROM "TourEvent" WHERE "tourSlug" = $1 AND "createdAt" >= $2 AND name = 'menu_open'`, slug, since),
     top(slug, since, `name = 'menu_group_open'`),
+    top(slug, since, `name = 'room_view' AND label IS NOT NULL AND label <> '(uden navn)'`),
+    prisma.$queryRawUnsafe<{ label: string; seconds: number; count: bigint }[]>(
+      `SELECT label, percentile_cont(0.5) WITHIN GROUP (ORDER BY value) AS seconds, count(DISTINCT session) AS count FROM "TourEvent"
+       WHERE "tourSlug" = $1 AND "createdAt" >= $2 AND name = 'room_time' AND value IS NOT NULL AND value >= 2 AND label IS NOT NULL
+       GROUP BY label HAVING count(DISTINCT session) >= 3 ORDER BY seconds DESC LIMIT 8`,
+      slug,
+      since
+    ),
+    top(slug, since, `name IN ('drone_point_click','info_open','place_card_view','pano_open') AND label IS NOT NULL`),
   ]);
   const s = sessions[0];
   const visits = Number(s?.visits ?? 0);
@@ -92,6 +107,9 @@ export async function tourStats(slug: string, days = 30): Promise<TourStats> {
       units: liveUnits,
     },
     menu: { opened: Number(menuOpened[0]?.n ?? 0), groups: menuGroups },
+    rooms,
+    roomTime: roomTime.map((r) => ({ label: r.label, seconds: Math.round(r.seconds), count: Number(r.count) })),
+    opened,
   };
 }
 

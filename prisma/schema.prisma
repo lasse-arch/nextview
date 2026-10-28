@@ -1384,6 +1384,8 @@ model TourEvent {
   url       String?
   /// "mobil" or "computer".
   device    String?
+  /// A number with the event - e.g. room_time's seconds spent in the room.
+  value     Int?
   createdAt DateTime @default(now())
 
   @@index([tourSlug, createdAt])

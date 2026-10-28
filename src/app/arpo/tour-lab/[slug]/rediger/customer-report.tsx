@@ -28,8 +28,13 @@ const T = {
     openedFree: "åbnede listen over ledige",
     bookedFree: "gik videre til booking af en bestemt",
     and: "og",
-    places: "Mest sete steder",
+    places: "Det, de valgte i menuen",
     sources: "Hvor besøgene kom fra",
+    rooms: "Hvor de gik rundt",
+    roomsHint: "Rum, de besøgende kom ind i - uanset om de gik derhen selv eller via menuen",
+    roomTime: "Hvor de blev længst",
+    roomTimeHint: "Typisk tid i rummet",
+    opened: "Det, de åbnede i touren",
   },
   en: {
     sec: "sec",
@@ -48,14 +53,19 @@ const T = {
     openedFree: "opened the list of available units",
     bookedFree: "went on to book a particular one",
     and: "and",
-    places: "Most viewed places",
+    places: "What they picked in the menu",
     sources: "Where the visits came from",
+    rooms: "Where they went",
+    roomsHint: "Rooms visitors came to - whether they walked there or used the menu",
+    roomTime: "Where they stayed longest",
+    roomTimeHint: "Typical time in the room",
+    opened: "What they opened in the tour",
   },
 };
 
 const pct = (n: number) => `${Math.round(n * 100)} %`;
 
-function Ranked({ rows, label }: { rows: { label: string; count: number }[]; label: (l: string) => string }) {
+function Ranked({ rows, label, show = String }: { rows: { label: string; count: number }[]; label: (l: string) => string; /** How the number reads (e.g. as a time). */ show?: (n: number) => string }) {
   const max = rows[0]?.count ?? 1;
   return (
     <ul className="space-y-2">
@@ -63,7 +73,7 @@ function Ranked({ rows, label }: { rows: { label: string; count: number }[]; lab
         <li key={r.label}>
           <div className="flex justify-between gap-3 text-[13px]">
             <span className="truncate">{label(r.label)}</span>
-            <span className="tabular-nums text-[#6e6e73]">{r.count}</span>
+            <span className="tabular-nums text-[#6e6e73]">{show(r.count)}</span>
           </div>
           <div className="mt-1 h-1.5 rounded-full bg-[#f2f2f7]">
             <div className="h-full rounded-full" style={{ width: `${(r.count / max) * 100}%`, background: "var(--report-accent, #0071e3)" }} />
@@ -153,6 +163,26 @@ export function CustomerReport({ stats, share, brand, lang = "da", title }: { st
         <div className={card}>
           <div className="mb-2 text-[13px] font-medium text-[#6e6e73]">{t.places}</div>
           <Ranked rows={stats.places} label={label} />
+        </div>
+      )}
+      {share.rooms && stats.rooms.length > 0 && (
+        <div className={card}>
+          <div className="text-[13px] font-medium text-[#6e6e73]">{t.rooms}</div>
+          <p className="mb-2 text-[11.5px] text-[#8e8e93]">{t.roomsHint}</p>
+          <Ranked rows={stats.rooms} label={label} />
+        </div>
+      )}
+      {share.roomTime && stats.roomTime.length > 0 && (
+        <div className={card}>
+          <div className="text-[13px] font-medium text-[#6e6e73]">{t.roomTime}</div>
+          <p className="mb-2 text-[11.5px] text-[#8e8e93]">{t.roomTimeHint}</p>
+          <Ranked rows={stats.roomTime.map((r) => ({ label: r.label, count: r.seconds }))} label={label} show={duration} />
+        </div>
+      )}
+      {share.opened && stats.opened.length > 0 && (
+        <div className={card}>
+          <div className="mb-2 text-[13px] font-medium text-[#6e6e73]">{t.opened}</div>
+          <Ranked rows={stats.opened} label={label} />
         </div>
       )}
       {share.sources && stats.sources.length > 0 && (

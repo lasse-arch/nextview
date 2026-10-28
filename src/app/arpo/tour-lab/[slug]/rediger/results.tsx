@@ -29,7 +29,7 @@ function Tile({ value, label, hint }: { value: string; label: string; hint?: str
 }
 
 /** A ranked list with a thin bar for each row's share of the top one. */
-function Ranked({ rows, empty }: { rows: { label: string; count: number }[]; empty: string }) {
+function Ranked({ rows, empty, show = String }: { rows: { label: string; count: number }[]; empty: string; /** How the number reads (e.g. as a time). */ show?: (n: number) => string }) {
   if (!rows.length) return <p className="text-[13px] text-[#8e8e93]">{empty}</p>;
   const max = rows[0].count;
   return (
@@ -38,7 +38,7 @@ function Ranked({ rows, empty }: { rows: { label: string; count: number }[]; emp
         <li key={r.label}>
           <div className="flex justify-between gap-3 text-[13px]">
             <span className="truncate">{r.label}</span>
-            <span className="tabular-nums text-[#6e6e73]">{r.count}</span>
+            <span className="tabular-nums text-[#6e6e73]">{show(r.count)}</span>
           </div>
           <div className="mt-1 h-1.5 rounded-full bg-[#f2f2f7]">
             <div className="h-full rounded-full bg-[#0071e3]" style={{ width: `${(r.count / max) * 100}%` }} />
@@ -114,7 +114,10 @@ function ShareSettings({ slug, brand, share: initial, shareStats, token: initial
         <Toggle on={share.engaged} onChange={(on) => change({ engaged: on })} title="Gik på opdagelse" />
         <Toggle on={share.duration} onChange={(on) => change({ duration: on })} title="Typisk besøg (tid)" />
         <Toggle on={share.perDay} onChange={(on) => change({ perDay: on })} title="Besøg pr. dag" />
-        <Toggle on={share.places} onChange={(on) => change({ places: on })} title="Mest sete steder" />
+        <Toggle on={share.places} onChange={(on) => change({ places: on })} title="Det, de valgte i menuen" />
+        <Toggle on={share.rooms} onChange={(on) => change({ rooms: on })} title="Hvor de gik rundt (rum)" />
+        <Toggle on={share.roomTime} onChange={(on) => change({ roomTime: on })} title="Hvor de blev længst (tid i rum)" />
+        <Toggle on={share.opened} onChange={(on) => change({ opened: on })} title="Det, de åbnede (punkter, infopunkter, stedkort, 360°)" />
         <Toggle on={share.sources} onChange={(on) => change({ sources: on })} title="Hvor besøgene kom fra" />
         <Toggle on={share.live} onChange={(on) => change({ live: on })} title="Ledige (live data)" />
         {url ? (
@@ -225,6 +228,21 @@ function OurNumbers({ stats }: { stats: TourStats }) {
       </Group>
       <Group title="Mest valgte steder">
         <Ranked rows={stats.places} empty="Ingen har valgt steder i menuen endnu." />
+      </Group>
+      <Group title="Hvor de gik rundt">
+        <Ranked rows={stats.rooms} empty="Ingen rumbesøg endnu." />
+        <p className="text-[11px] text-[#8e8e93]">Besøg, der kom ind i hvert rum - også når de gik derhen selv.</p>
+      </Group>
+      <Group title="Hvor de blev længst">
+        <Ranked
+          rows={stats.roomTime.map((r) => ({ label: r.label, count: r.seconds }))}
+          show={(s) => (s < 60 ? `${s} sek` : `${Math.floor(s / 60)} min ${s % 60 ? `${s % 60} sek` : ""}`.trim())}
+          empty="Ingen tal endnu - tiden i hvert rum måles fra nu af (mindst 3 besøg pr. rum)."
+        />
+        <p className="text-[11px] text-[#8e8e93]">Typisk tid i rummet, hos rum med mindst 3 besøg.</p>
+      </Group>
+      <Group title="Det, de åbnede i touren">
+        <Ranked rows={stats.opened} empty="Ingen har åbnet punkter, infopunkter, stedkort eller 360°-billeder endnu." />
       </Group>
       <Group title="Menuen">
         <p className="text-[13px] text-[#1d1d1f]">

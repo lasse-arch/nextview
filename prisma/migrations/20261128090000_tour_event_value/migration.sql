@@ -1,0 +1,1 @@
+ALTER TABLE "TourEvent" ADD COLUMN "value" INTEGER;

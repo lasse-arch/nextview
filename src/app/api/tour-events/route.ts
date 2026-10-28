@@ -34,8 +34,14 @@ export async function POST(request: NextRequest) {
   const device = body.device === "mobil" ? "mobil" : "computer";
   const events = body.events
     .slice(0, 50)
-    .map((e: { name?: unknown; label?: unknown; url?: unknown }) => ({ name: text(e?.name, 40), label: text(e?.label, 120), url: text(e?.url, 500) }))
-    .filter((e): e is { name: string; label: string | null; url: string | null } => Boolean(e.name && /^[a-z_]+$/.test(e.name)));
+    .map((e: { name?: unknown; label?: unknown; url?: unknown; value?: unknown }) => ({
+      name: text(e?.name, 40),
+      label: text(e?.label, 120),
+      url: text(e?.url, 500),
+      // A whole number of at most an hour (seconds in a room) - anything else is dropped.
+      value: typeof e?.value === "number" && Number.isInteger(e.value) && e.value >= 0 && e.value <= 3600 ? e.value : null,
+    }))
+    .filter((e): e is { name: string; label: string | null; url: string | null; value: number | null } => Boolean(e.name && /^[a-z_]+$/.test(e.name)));
   if (events.length) await prisma.tourEvent.createMany({ data: events.map((e) => ({ ...e, tourSlug: tour, session, device })) });
   return new NextResponse(null, { status: 204 });
 }
