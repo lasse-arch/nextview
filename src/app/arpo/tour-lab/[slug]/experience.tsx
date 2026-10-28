@@ -1619,6 +1619,8 @@ function TourExperience({
           "--c-soft": T.colors.soft,
           "--font-heading": `'${T.fontHeading ?? T.font}', serif`,
           "--logo-h": `${T.logoSize ?? 46}px`,
+          "--pkt-d": T.overviewUi?.pointSize?.desktop ?? 1,
+          "--pkt-m": T.overviewUi?.pointSize?.mobile ?? 0.85,
           ...(T.logoOffset?.top != null && { "--logo-top": `${T.logoOffset.top}px` }),
           ...(T.logoOffset?.side != null && { "--logo-side": `${T.logoOffset.side}px` }),
         } as React.CSSProperties
@@ -2636,7 +2638,7 @@ const CSS = `
 .hv-hs:hover,.hv-hs.hv-aktiv{z-index:9}
 .hv-hs.hv-aktiv .hv-ikon{transform:scale(1.18);box-shadow:0 0 0 4px rgba(255,255,255,.55),0 3px 10px rgba(0,0,0,.35)}
 /* The icon's centre is the place it marks, so it stays put at every zoom; the name hangs below it. */
-.hv-pkt{position:relative;transform:translate(-50%,-50%);cursor:pointer;pointer-events:none}
+.hv-pkt{position:relative;transform:translate(-50%,-50%) scale(var(--pkt-d,1));cursor:pointer;pointer-events:none}
 .hv-ikon,.hv-navn{pointer-events:auto}
 .hv-ikon{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;border:3px solid #fff;box-shadow:0 3px 10px rgba(0,0,0,.35);transition:transform .15s}
 .hv-ikon svg{width:17px;height:17px}
@@ -2874,6 +2876,8 @@ const CSS = `
   .hv-navne-m-always .hv-navn{display:block}
   .hv-navne-m-never .hv-hs .hv-navn,.hv-navne-m-never.hv-zoom .hv-hs .hv-navn{display:none}
   .hv-ikon{width:30px;height:30px;border-width:2px}.hv-ikon svg{width:15px;height:15px}
+  /* Smaller on a phone (set under Luftfoto og kort) - the icon's centre stays on its place. */
+  .hv-pkt{transform:translate(-50%,-50%) scale(var(--pkt-m,.85))}
   /* An open point: the panel takes the bottom, the bars step aside. */
   .hv-panel{top:auto;bottom:0;left:0;right:0;width:auto;max-height:62%;border-radius:18px 18px 0 0;padding-bottom:calc(18px + env(safe-area-inset-bottom,0px))}
   .hv-fotos{aspect-ratio:auto;height:min(44vw,200px);border-radius:18px 18px 0 0;margin-bottom:10px}

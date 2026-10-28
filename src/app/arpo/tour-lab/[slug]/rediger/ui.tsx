@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import "pannellum/build/pannellum.css";
 import { registerTourFile, uploadTourFile } from "@/lib/actions/tour-files";
-import { IMAGE_HREF, PANO_HFOV } from "../../tours/places";
+import { IMAGE_HREF, PANO_HFOV, panoHfov } from "../../tours/places";
 import type { TourConfig } from "../../tours/types";
 
 /* The editor's building blocks - Apple-style fields, switches and groups. */
@@ -185,6 +185,10 @@ export function PanoZoom({
   const [is360, setIs360] = useState<boolean | null>(null);
   const [note, setNote] = useState<{ text: string; error?: boolean } | null>(null);
   const [picking, setPicking] = useState(false);
+  /** The device whose zoom is being set - its view shown in a small window while the slider moves. */
+  const [look, setLook] = useState<"desktop" | "mobile" | null>(null);
+  /** The big preview is opened on this picture once, the first time a slider is moved. */
+  const shownInPreview = useRef(false);
   const box = useRef<HTMLDivElement>(null);
   const viewer = useRef<{ getYaw(): number; getPitch(): number; destroy(): void } | null>(null);
   useEffect(() => {
@@ -303,7 +307,25 @@ export function PanoZoom({
       {(["desktop", "mobile"] as const).map((k) => (
         <div key={k} className="flex items-center gap-2 text-[12px] text-[#6e6e73]">
           <span className="w-16 flex-none">{k === "desktop" ? "Computer" : "Mobil"}</span>
-          <input type="range" min={0.7} max={2.5} step={0.05} className="w-full accent-[#0071e3]" value={value?.[k] ?? 1} onChange={(e) => put({ [k]: Number(e.target.value) })} />
+          <input
+            type="range"
+            min={0.7}
+            max={2.5}
+            step={0.05}
+            className="w-full accent-[#0071e3]"
+            value={value?.[k] ?? 1}
+            onPointerDown={() => setLook(k)}
+            onFocus={() => setLook(k)}
+            onChange={(e) => {
+              setLook(k);
+              // The big preview shows the picture too (it follows the setting live) - opened once, not on every step.
+              if (preview && !shownInPreview.current) {
+                shownInPreview.current = true;
+                preview.go(name, IMAGE_HREF + src);
+              }
+              put({ [k]: Number(e.target.value) });
+            }}
+          />
           <span className="w-16 flex-none text-right tabular-nums">{value?.[k] != null ? `${value[k]!.toFixed(2)}×` : "Standard"}</span>
           {value?.[k] != null && (
             <button type="button" title="Tilbage til standard" className="text-[#0071e3]" onClick={() => put({ [k]: undefined })}>
@@ -312,7 +334,60 @@ export function PanoZoom({
           )}
         </div>
       ))}
+      {look && !picking && (
+        <div className="space-y-1">
+          <div className="flex items-center justify-between text-[11px] text-[#8e8e93]">
+            <span>Sådan ser det ud på {look === "desktop" ? "en computer" : "en mobil"}</span>
+            <button type="button" className="hover:text-[#1d1d1f]" onClick={() => setLook(null)}>
+              Skjul
+            </button>
+          </div>
+          <ZoomPeek src={src} yaw={value?.yaw ?? 0} pitch={value?.pitch ?? -10} hfov={panoHfov(look === "mobile", value?.[look] ?? 1)} phone={look === "mobile"} />
+        </div>
+      )}
       <p className="text-[11px] leading-snug text-[#8e8e93]">Zoom: standard er lidt zoomet ud på computer og lidt ind på mobil. Over 1× er tættere på.</p>
+    </div>
+  );
+}
+
+/** A small window with the picture as a device opens it - framed like its screen, zoomed as set, following the slider. */
+function ZoomPeek({ src, yaw, pitch, hfov, phone }: { src: string; yaw: number; pitch: number; hfov: number; phone: boolean }) {
+  const box = useRef<HTMLDivElement>(null);
+  const viewer = useRef<{ setHfov(h: number, animated?: boolean): void; lookAt(p: number, y: number, h: number, animated?: boolean): void; destroy(): void } | null>(null);
+  const latest = useRef({ yaw, pitch, hfov });
+  useEffect(() => {
+    latest.current = { yaw, pitch, hfov };
+    viewer.current?.lookAt(pitch, yaw, hfov, false);
+  }, [yaw, pitch, hfov]);
+  useEffect(() => {
+    let dead = false;
+    (async () => {
+      if (!window.pannellum) await import("pannellum/build/pannellum.js");
+      if (dead || !box.current || !window.pannellum) return;
+      const v = latest.current;
+      viewer.current = window.pannellum.viewer(box.current, {
+        type: "equirectangular",
+        panorama: src,
+        autoLoad: true,
+        showControls: false,
+        mouseZoom: false,
+        draggable: false,
+        minHfov: 20,
+        maxHfov: 130,
+        hfov: v.hfov,
+        yaw: v.yaw,
+        pitch: v.pitch,
+      }) as unknown as NonNullable<typeof viewer.current>;
+    })();
+    return () => {
+      dead = true;
+      viewer.current?.destroy();
+      viewer.current = null;
+    };
+  }, [src, phone]);
+  return (
+    <div className={`relative mx-auto overflow-hidden rounded-lg bg-black ring-1 ring-black/[.06] ${phone ? "aspect-[9/19.5] w-[45%]" : "aspect-[16/10] w-full"}`}>
+      <div ref={box} className="absolute inset-0" />
     </div>
   );
 }

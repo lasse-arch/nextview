@@ -6,7 +6,7 @@ import { ICONS, ICON_NAMES, guessIcon } from "../../tours/icons";
 import { PANO_HFOV, isPlaceHref, panoHfov, pointOfHref } from "../../tours/places";
 import "pannellum/build/pannellum.css";
 import type { TourConfig, TourPoint } from "../../tours/types";
-import { Choice, Field, Group, Icon, input, PanoZoom, Toggle, UploadButton } from "./ui";
+import { Choice, Field, Group, Icon, input, PanoZoom, Toggle, UploadButton, type PreviewApi } from "./ui";
 import { AiImageButton } from "./ai-image";
 
 /*
@@ -62,7 +62,7 @@ function menuRooms(T: TourConfig): [string, string][] {
   return all.filter(([n], i) => all.findIndex(([x]) => x === n) === i);
 }
 
-export function MapEditor({ config, edit, focus }: { config: TourConfig; edit: Edit; /** A point to open straight away (from another tab, e.g. a guide stop) - with a counter, so the same point can be asked again. */ focus?: { id: string; n: number } | null }) {
+export function MapEditor({ config, edit, focus, preview }: { config: TourConfig; edit: Edit; preview?: PreviewApi; /** A point to open straight away (from another tab, e.g. a guide stop) - with a counter, so the same point can be asked again. */ focus?: { id: string; n: number } | null }) {
   const M = config.map;
   const [open, setOpen] = useState(false);
   // Asked for a point from another tab: open the map on it (once per ask).
@@ -91,7 +91,7 @@ export function MapEditor({ config, edit, focus }: { config: TourConfig; edit: E
   if (!M)
     return (
       <>
-      {config.drone && <OverviewUiToggles config={config} edit={edit} />}
+      {config.drone && <OverviewUiToggles config={config} edit={edit} preview={preview} />}
       {config.drone && <DroneToMap config={config} edit={edit} />}
       <Group>
         <p className="text-[14px] leading-snug">Start touren på et kort over stedet - en tegning, en situationsplan eller et dronefoto - med punkter man kan trykke på og gå ind fra.</p>
@@ -143,7 +143,7 @@ export function MapEditor({ config, edit, focus }: { config: TourConfig; edit: E
           />
         )}
       </Group>
-      <OverviewUiToggles config={config} edit={edit} />
+      <OverviewUiToggles config={config} edit={edit} preview={preview} />
       <Group title="Billede">
         <div className="flex gap-2">
           <UploadButton accept="image/*" label="Skift kortbillede" onDone={setImage} />
@@ -745,7 +745,9 @@ function PhoneChrome({ config }: { config: TourConfig }) {
 }
 
 /** What lies over the map, per device: the box at the top and the filter - each can be switched off. */
-function OverviewUiToggles({ config, edit }: { config: TourConfig; edit: Edit }) {
+function OverviewUiToggles({ config, edit, preview }: { config: TourConfig; edit: Edit; preview?: PreviewApi }) {
+  /** The preview goes to the aerial photo the first time a size is changed, so the points can be seen growing and shrinking. */
+  const toOverview = useRef(false);
   const ui = config.overviewUi;
   const set = (what: "box" | "filter", device: "desktop" | "mobile", on: boolean) =>
     edit((d) => {
@@ -841,6 +843,37 @@ function OverviewUiToggles({ config, edit }: { config: TourConfig; edit: Edit })
           />
         </Field>
       ))}
+      {(["desktop", "mobile"] as const).map((device) => {
+        const def = device === "mobile" ? 0.85 : 1;
+        const v = ui?.pointSize?.[device] ?? def;
+        return (
+          <Field key={`size-${device}`} title={`Størrelse på punkterne - ${device === "desktop" ? "computer" : "mobil"}`} hint={device === "mobile" ? "Ikon og navn. Mindre giver plads til flere punkter på en lille skærm." : undefined}>
+            <div className="flex items-center gap-2 text-[12px] text-[#6e6e73]">
+              <input
+                type="range"
+                min={0.6}
+                max={1.3}
+                step={0.05}
+                className="w-full accent-[#0071e3]"
+                value={v}
+                onChange={(e) => {
+                  if (preview && !toOverview.current) {
+                    toOverview.current = true;
+                    preview.go("", "#luften");
+                  }
+                  edit((d) => {
+                    const n = Number(e.target.value);
+                    const size = { ...d.overviewUi?.pointSize, [device]: Math.abs(n - def) < 0.001 ? undefined : n };
+                    if (size[device] == null) delete size[device];
+                    d.overviewUi = { ...d.overviewUi, pointSize: Object.keys(size).length ? size : undefined };
+                  });
+                }}
+              />
+              <span className="w-12 flex-none text-right tabular-nums">{Math.round(v * 100)} %</span>
+            </div>
+          </Field>
+        );
+      })}
     </Group>
   );
 }

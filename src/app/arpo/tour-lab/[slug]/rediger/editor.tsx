@@ -836,7 +836,7 @@ export function TourEditor({
             {tab === "live" && <LiveDataEditor config={config} edit={edit} slug={slug} preview={preview} />}
             {tab === "kortet" && (
               <>
-                <MapEditor config={config} edit={edit} focus={pointFocus} />
+                <MapEditor config={config} edit={edit} focus={pointFocus} preview={preview} />
                 {(config.drone || config.map) && <FinderEditor config={config} edit={edit} />}
                 {(config.drone || config.map) && <WeatherEditor config={config} edit={edit} />}
               </>
