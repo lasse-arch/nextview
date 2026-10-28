@@ -572,6 +572,18 @@ function PointStop({ config, id, edit, onEdit, preview }: { config: TourConfig; 
         ) : null}
         {!pano && <UploadButton accept="image/*" label="Upload 360°-billede" onDone={setPano} />}
       </Field>
+      {/* Where "Gå ind" goes in the tour from this point - and where the guide goes in, when it does. */}
+      <div className="space-y-1">
+        <PlacePicker href={p.tour ?? ""} name={p.name} preview={preview} onChange={(href) => setPoint((x) => void (x.tour = href))} />
+        <p className={small}>
+          {p.tour ? 'Her starter touren, når man trykker "Gå ind" ved punktet.' : 'Punktet har intet sted i touren endnu - så er der ingen "Gå ind".'}{" "}
+          {p.tour && (
+            <button type="button" className="text-[#0071e3] hover:underline" onClick={() => setPoint((x) => void (x.tour = null))}>
+              Fjern stedet
+            </button>
+          )}
+        </p>
+      </div>
       <Field title="Billeder på punktets kort" hint="Det første vises først. Tryk × for at fjerne et.">
         {images.length > 0 && (
           <div className="grid grid-cols-3 gap-1.5">
