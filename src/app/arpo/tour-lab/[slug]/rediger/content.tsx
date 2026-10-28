@@ -3,7 +3,7 @@
 import { guideExit, isPlaceHref, placeHref, startPlaces } from "../../tours/places";
 import { AiImageButton } from "./ai-image";
 import { writePlaceCards, type CardDraft } from "@/lib/actions/tour-cards";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { saveTourStoryImage } from "@/lib/actions/tour-lab";
 import type { GuideTurn, PlaceCard, TourConfig, TourInfo, TourPlace, WelcomeGo } from "../../tours/types";
 import { Choice, Field, Group, Icon, input, PanoZoom, Toggle, UploadButton, ssOfHref, type PreviewApi } from "./ui";
@@ -52,17 +52,25 @@ function Rows<T>({
   const [open, setOpen] = useState<number | null>(null);
   const [drag, setDrag] = useState<number | null>(null);
   const [over, setOver] = useState<number | null>(null);
+  /** A row moves only when picked up by its handle (⋮⋮) - dragging a slider or a 360° picture inside it never moves the row. */
+  const [armed, setArmed] = useState<number | null>(null);
+  useEffect(() => {
+    const up = () => setArmed(null);
+    window.addEventListener("pointerup", up);
+    return () => window.removeEventListener("pointerup", up);
+  }, []);
   return (
     <div className="-mx-4 divide-y divide-black/[.05] border-y border-black/[.05]">
       {items.length === 0 && <p className="px-4 py-5 text-center text-[13px] text-[#8e8e93]">{empty}</p>}
       {items.map((item, i) => (
         <div
           key={i}
-          draggable
+          draggable={armed === i}
           onDragStart={() => setDrag(i)}
           onDragEnd={() => {
             setDrag(null);
             setOver(null);
+            setArmed(null);
           }}
           onDragOver={(e) => {
             if (drag == null) return;
@@ -91,7 +99,7 @@ function Rows<T>({
             onKeyDown={(e) => e.key === "Enter" && setOpen(open === i ? null : i)}
             className={`flex cursor-pointer items-center gap-3 py-2.5 pl-3 pr-3 transition ${open === i ? "bg-[#f2f2f7]" : "hover:bg-[#f9f9fb]"}`}
           >
-            <span className="cursor-grab text-[#c7c7cc]" title="Træk for at flytte">
+            <span className="cursor-grab text-[#c7c7cc]" title="Træk for at flytte" onPointerDown={() => setArmed(i)} onClick={(e) => e.stopPropagation()}>
               <Icon d='<circle cx="9" cy="6" r="1"/><circle cx="15" cy="6" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="9" cy="18" r="1"/><circle cx="15" cy="18" r="1"/>' className="h-4 w-4" />
             </span>
             <span className={`flex h-[28px] w-[28px] flex-none items-center justify-center rounded-[7px] text-white ${icon[0]}`}>

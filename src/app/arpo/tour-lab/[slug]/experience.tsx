@@ -817,6 +817,26 @@ function TourExperience({
     return id ? (T.points.find((x) => x.id === id) ?? null) : null;
   };
 
+  /** The 360° photos of the guide's stops from `from` on (the next two) - fetched ahead, so a stop opens at once instead of loading. */
+  const prefetchGuidePanos = (from: number) => {
+    for (const stop of GUIDE.slice(from, from + 2)) {
+      const p = stop.href ? pointById(stop.href) : null;
+      if (p?.panorama) prefetchPano(p.panorama);
+      // Prepared tiles: the two coarse levels (all six faces) - enough to open sharp-ish at once, the finer ones follow.
+      else if (p?.pano && T.panos)
+        for (const level of [1, 2])
+          for (const face of ["f", "b", "u", "d", "l", "r"])
+            for (let y = 0; y < 2 ** (level - 1); y++) for (let x = 0; x < 2 ** (level - 1); x++) prefetchPano(`${T.panos.basePath}/${p.pano}/${level}/${face}${y}_${x}.jpg`);
+    }
+  };
+  // On the drone scene: the first stops' photos come in quietly, before "Vis mig rundt" is even pressed.
+  useEffect(() => {
+    if (phase !== "drone" || !GUIDE.length) return;
+    const t = setTimeout(() => prefetchGuidePanos(0), 2500);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per arrival on the drone scene
+  }, [phase, GUIDE]);
+
   // The drone scene is rebuilt only when it or its points change - not for every edit in the editor's preview.
   const droneKey = JSON.stringify([T.drone, Boolean(T.map), T.points, T.categories]);
   /** The filter at the bottom: its height is given to what stands just above it (weather, Find din plads), which moves up with it. */
@@ -1181,6 +1201,7 @@ function TourExperience({
     const stop = GUIDE[i];
     setGuideAt(i);
     setGuideHeld(false);
+    prefetchGuidePanos(i + 1);
     if (!stop.href) return; // a stop that stays where it is (e.g. the closing card)
     const point = pointById(stop.href);
     if (point) {
@@ -2445,6 +2466,17 @@ function PointPhotos({ images, name, onOpen }: { images: string[]; name: string;
   );
 }
 
+/** 360° photos already asked for (each fetched once) - the browser keeps them, so the viewer gets them from its cache. */
+const prefetchedPanos = new Set<string>();
+function prefetchPano(url: string) {
+  if (prefetchedPanos.has(url) || typeof window === "undefined") return;
+  prefetchedPanos.add(url);
+  // Fetched as the viewer fetches it (same address, CORS), so it is the same cached file. Low priority: never ahead of what's on screen.
+  fetch(url, { mode: "cors", priority: "low" } as RequestInit)
+    .then((r) => r.blob())
+    .catch(() => prefetchedPanos.delete(url));
+}
+
 /** The 360° picture open right now (PanoView) - the editor asks for its view to save where it starts and how zoomed. */
 let openPanoView: (() => { yaw: number; pitch: number; hfov: number; image?: string }) | null = null;
 
@@ -2634,6 +2666,13 @@ const CSS = `
 .hv input,.hv textarea{-webkit-user-select:text;user-select:text}
 .hv *{box-sizing:border-box}
 .hv .pnlm-load-box{background:rgba(21,50,58,.9)!important;border-radius:12px!important;font-family:inherit!important}
+/* A 360° photo still loading: dark and calm (not pannellum's grey grid and "Loading..." box) - a thin bar shows it coming. */
+.hv-pano .pnlm-container{background:#0d1b20!important}
+.hv-pano .pnlm-load-box{background:transparent!important;width:180px!important;height:auto!important;margin:0!important;transform:translate(-50%,-50%);top:50%!important;left:50%!important;padding:0!important}
+.hv-pano .pnlm-load-box p{display:none}
+.hv-pano .pnlm-lbar{width:180px!important;height:3px!important;border:0!important;background:rgba(255,255,255,.15)!important;border-radius:2px;margin:0!important}
+.hv-pano .pnlm-lbar-fill{background:#fff!important;border-radius:2px}
+.hv-pano .pnlm-lmsg{display:none}
 .hv-hs.hv-skjult{display:none!important}
 .hv-hs:hover,.hv-hs.hv-aktiv{z-index:9}
 .hv-hs.hv-aktiv .hv-ikon{transform:scale(1.18);box-shadow:0 0 0 4px rgba(255,255,255,.55),0 3px 10px rgba(0,0,0,.35)}
