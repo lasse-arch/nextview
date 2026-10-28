@@ -1,6 +1,6 @@
 "use client";
 
-import { guideExit, isPlaceHref, placeHref, startPlaces } from "../../tours/places";
+import { guideExit, isPlaceHref, PANO_HFOV, placeHref, startPlaces } from "../../tours/places";
 import { AiImageButton } from "./ai-image";
 import { writePlaceCards, type CardDraft } from "@/lib/actions/tour-cards";
 import { useEffect, useState } from "react";
@@ -519,27 +519,39 @@ export function StartEditor({ config, edit, slug, preview }: Props) {
 type Stop = NonNullable<TourConfig["guide"]>["stops"][number];
 
 /**
- * A guide stop at a point on the aerial photo: what it shows - the point's
- * 360° photo and its photos - changed right here (upload, remove, AI). The
- * same pictures as the point's own (one place in the setup); its text and
- * position are changed at the point under Luftfoto og kort.
- */
-/**
- * Where a tile to the drone picture turns it: look there in the preview (on
- * Computer or Mobil over it) and press - kept per device, else the start view.
+ * Where something leading to the drone picture turns it. By default one view
+ * for both devices (the other device's zoom made to fit its screen); "Kun
+ * computer/mobil" sets just the device the preview is on.
  */
 export function DroneViewPicker({ views, preview, onChange, what = "flisen" }: { views: DroneViews | undefined; preview: PreviewApi; onChange: (views: DroneViews | undefined) => void; what?: string }) {
   const [msg, setMsg] = useState<string | null>(null);
+  const [only, setOnly] = useState(false);
   const device = preview.device() === "mobil" ? "mobile" : "desktop";
-  const go = { view: views };
+  const name = (k: "desktop" | "mobile") => (k === "desktop" ? "computer" : "mobil");
   const set = (key: "desktop" | "mobile", v: DroneView | undefined) => {
     const view = { ...views, [key]: v };
     if (!v) delete view[key];
     onChange(view.desktop || view.mobile ? view : undefined);
   };
+  /** The same spot on the other device: a phone is narrow, so it sees it with less width (as 360° photos open). */
+  const other = (v: DroneView, to: "desktop" | "mobile"): DroneView => {
+    const f = to === "mobile" ? PANO_HFOV.mobile / PANO_HFOV.desktop : PANO_HFOV.desktop / PANO_HFOV.mobile;
+    return { ...v, hfov: Math.round(Math.max(30, Math.min(120, v.hfov * f)) * 10) / 10 };
+  };
+  const both = !only;
   return (
-    <Field title="Udsnit af luftfotoet" hint={`Drej og zoom luftfotoet i forhåndsvisningen til det, ${what} skal vise, og tryk. Computer og mobil hver for sig - skift øverst over forhåndsvisningen. Uden udsnit vises luftfotoets første udsnit.`}>
+    <Field title="Udsnit af luftfotoet" hint={`Drej og zoom luftfotoet i forhåndsvisningen til det, ${what} skal vise, og tryk. Det gælder både computer og mobil - vælg "Kun ${name(device)}" for at rette den ene for sig (skift enhed øverst over forhåndsvisningen). Uden udsnit vises luftfotoets første udsnit.`}>
       <div className="space-y-1.5">
+        <div className="flex rounded-[9px] bg-[#e9e9eb] p-[2px] text-[12px] font-medium">
+          {([
+            [false, "Begge"],
+            [true, `Kun ${name(device)}`],
+          ] as const).map(([v, label]) => (
+            <button key={label} type="button" onClick={() => setOnly(v)} className={`flex-1 rounded-[7px] py-1 ${only === v ? "bg-white shadow" : "text-[#1d1d1f]/70"}`}>
+              {label}
+            </button>
+          ))}
+        </div>
         <div className="flex gap-1.5">
           <button type="button" className={`${linkButton} flex-1`} onClick={() => preview.go("", "#luften")}>
             Vis luftfotoet
@@ -551,30 +563,45 @@ export function DroneViewPicker({ views, preview, onChange, what = "flisen" }: {
               setMsg(null);
               const v = await preview.droneView();
               if (v.error || v.yaw == null || v.pitch == null || v.hfov == null) return setMsg(v.error ?? "Kunne ikke læse udsnittet.");
-              set(v.phone ? "mobile" : "desktop", { yaw: v.yaw, pitch: v.pitch, hfov: v.hfov });
-              setMsg(`Gemt for ${v.phone ? "mobil" : "computer"}.`);
+              const here: "desktop" | "mobile" = v.phone ? "mobile" : "desktop";
+              const view = { yaw: v.yaw, pitch: v.pitch, hfov: v.hfov };
+              if (both) {
+                const there = here === "mobile" ? "desktop" : "mobile";
+                onChange({ [here]: view, [there]: other(view, there) });
+                setMsg("Gemt for computer og mobil.");
+              } else {
+                set(here, view);
+                setMsg(`Gemt kun for ${name(here)}.`);
+              }
             }}
           >
             Brug dette udsnit
           </button>
         </div>
-        {(["desktop", "mobile"] as const).map((k) => (
-          <div key={k} className="flex items-center gap-2 px-1 text-[12px] text-[#8e8e93]">
-            <span className={k === device ? "font-semibold text-[#1d1d1f]" : ""}>{k === "desktop" ? "Computer" : "Mobil"}:</span>
-            <span className="flex-1">{go.view?.[k] ? "eget udsnit" : "første udsnit"}</span>
-            {go.view?.[k] && (
-              <button type="button" className="text-[#ff3b30]" onClick={() => set(k, undefined)}>
-                Nulstil
-              </button>
-            )}
-          </div>
-        ))}
+        <div className="flex items-center gap-2 px-1 text-[12px] text-[#8e8e93]">
+          <span className="flex-1">
+            {!views?.desktop && !views?.mobile
+              ? "Første udsnit (intet eget)"
+              : (["desktop", "mobile"] as const).map((k) => `${name(k)[0].toUpperCase()}${name(k).slice(1)}: ${views?.[k] ? "eget" : "første"}`).join(" · ")}
+          </span>
+          {(views?.desktop || views?.mobile) && (
+            <button type="button" className="text-[#ff3b30]" onClick={() => (only ? set(device, undefined) : onChange(undefined))}>
+              {only ? `Nulstil ${name(device)}` : "Nulstil"}
+            </button>
+          )}
+        </div>
         {msg && <p className={small}>{msg}</p>}
       </div>
     </Field>
   );
 }
 
+/**
+ * A guide stop at a point on the aerial photo: what it shows - the point's
+ * 360° photo and its photos - changed right here (upload, remove, AI). The
+ * same pictures as the point's own (one place in the setup); its text and
+ * position are changed at the point under Luftfoto og kort.
+ */
 function PointStop({ config, id, edit, onEdit, preview }: { config: TourConfig; id: string; edit: Props["edit"]; onEdit?: (id: string) => void; preview: PreviewApi }) {
   const p = config.points.find((x) => x.id === id);
   if (!p) return <p className={small}>Punktet findes ikke længere på luftfotoet.</p>;
