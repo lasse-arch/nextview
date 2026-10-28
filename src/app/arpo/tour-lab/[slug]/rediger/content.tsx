@@ -6,7 +6,7 @@ import { writePlaceCards, type CardDraft } from "@/lib/actions/tour-cards";
 import { useState } from "react";
 import { saveTourStoryImage } from "@/lib/actions/tour-lab";
 import type { GuideTurn, PlaceCard, TourConfig, TourInfo, TourPlace, WelcomeGo } from "../../tours/types";
-import { Choice, Field, Group, Icon, input, Toggle, UploadButton, ssOfHref, type PreviewApi } from "./ui";
+import { Choice, Field, Group, Icon, input, PanoZoom, Toggle, UploadButton, ssOfHref, type PreviewApi } from "./ui";
 
 /*
  * The editors for a tour's content - the start, its places, "Vis mig rundt"
@@ -512,7 +512,7 @@ type Stop = NonNullable<TourConfig["guide"]>["stops"][number];
  * same pictures as the point's own (one place in the setup); its text and
  * position are changed at the point under Luftfoto og kort.
  */
-function PointStop({ config, id, edit, onEdit }: { config: TourConfig; id: string; edit: Props["edit"]; onEdit?: (id: string) => void }) {
+function PointStop({ config, id, edit, onEdit, preview }: { config: TourConfig; id: string; edit: Props["edit"]; onEdit?: (id: string) => void; preview: PreviewApi }) {
   const p = config.points.find((x) => x.id === id);
   if (!p) return <p className={small}>Punktet findes ikke længere på luftfotoet.</p>;
   const proto = !p.panorama && p.pano && config.panos ? `${config.panos.basePath}/${p.pano}-360.jpg` : null;
@@ -544,6 +544,28 @@ function PointStop({ config, id, edit, onEdit }: { config: TourConfig; id: strin
               <UploadButton accept="image/*" label="Skift 360°-billede" onDone={setPano} />
               <AiImageButton src={pano} onUse={setPano} />
             </div>
+            {/* Where it looks and how close when the stop opens - per picture, as everywhere in the tour. */}
+            <PanoZoom
+              src={pano}
+              name={p.name}
+              preview={preview}
+              value={config.imageView?.[pano] ?? (p.panoStart ? { yaw: p.panoStart.yaw, pitch: p.panoStart.pitch } : undefined)}
+              onChange={(z) =>
+                edit((d) => {
+                  const x = d.points.find((y) => y.id === id);
+                  // A prototype's tiles become a plain 360° photo here, so the view can be kept with it.
+                  if (x && !x.panorama && proto) {
+                    x.panorama = proto;
+                    delete x.pano;
+                    delete x.panoStart;
+                  }
+                  const all = { ...d.imageView };
+                  if (z) all[pano] = z;
+                  else delete all[pano];
+                  d.imageView = Object.keys(all).length ? all : undefined;
+                })
+              }
+            />
           </div>
         ) : p.pano ? (
           <p className={small}>360°-billedet er fra prototypen og kan ikke vises her - upload et nyt for at skifte det.</p>
@@ -711,7 +733,7 @@ export function GuideEditor({ config, edit, preview, onEditPoint }: Omit<Props, 
           empty='Ingen stop endnu. Gå til det første sted i forhåndsvisningen og tryk "+ Stop her".'
           editor={(s, set) =>
             "point" in s ? (
-              <PointStop config={config} id={s.point} edit={edit} onEdit={onEditPoint} />
+              <PointStop config={config} id={s.point} edit={edit} onEdit={onEditPoint} preview={preview} />
             ) : (
               <>
                 <Field title="Titel">
