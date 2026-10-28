@@ -1,6 +1,6 @@
 "use client";
 
-import { useContext, useState, useSyncExternalStore, useTransition } from "react";
+import { useContext, useEffect, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { editTourImage, imageAiReady, saveGeminiKey } from "@/lib/actions/tour-image-ai";
 import { FilesContext, Icon, input } from "./ui";
@@ -53,6 +53,17 @@ export function AiImageButton({ src, onUse }: { src: string; onUse: (url: string
   const [pending, start] = useTransition();
   /** Before and after, big - side by side, or one over the other with a slider. */
   const [big, setBig] = useState(false);
+  /** A 360° photo (2:1): only the view turned to in the small 360° window is changed. */
+  const [is360, setIs360] = useState(false);
+  useEffect(() => {
+    if (!src || !open) return;
+    const img = new Image();
+    img.onload = () => setIs360(Math.abs(img.naturalWidth / img.naturalHeight - 2) < 0.05);
+    img.src = src;
+  }, [src, open]);
+  const view = useRef<{ yaw: number; pitch: number; hfov: number }>({ yaw: 0, pitch: -20, hfov: 75 });
+  /** Which one the 360° window shows once there's a suggestion. */
+  const [showAfter, setShowAfter] = useState(true);
 
   if (!src) return null;
   if (!open)
@@ -106,6 +117,27 @@ export function AiImageButton({ src, onUse }: { src: string; onUse: (url: string
         </>
       ) : (
         <>
+          {is360 && (
+            <>
+              <PanoWindow key={result && showAfter ? result : src} src={result && showAfter ? result : src} view={view} />
+              {result ? (
+                <div className="flex rounded-lg bg-[#f2f2f7] p-0.5 text-[12px] font-medium">
+                  {(
+                    [
+                      [false, "Før"],
+                      [true, "Efter (rettet af AI)"],
+                    ] as const
+                  ).map(([after, label]) => (
+                    <button key={label} type="button" onClick={() => setShowAfter(after)} className={`flex-1 rounded-md py-1 ${showAfter === after ? "bg-white shadow-sm" : "text-[#6e6e73]"}`}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-[11px] leading-snug text-[#8e8e93]">Drej og zoom hen til det, der skal rettes - kun det, du ser i rammen, bliver rettet. Resten af 360°-billedet røres ikke.</p>
+              )}
+            </>
+          )}
           <textarea
             className={`${input} min-h-[64px] resize-y bg-[#f2f2f7]`}
             placeholder="Hvad skal ændres? Fx: gør græsset sommergrønt og fyld poolen"
@@ -128,12 +160,13 @@ export function AiImageButton({ src, onUse }: { src: string; onUse: (url: string
             onClick={() =>
               start(async () => {
                 setError(null);
-                const r = await editTourImage(slug, result ?? src, ask);
+                const r = await editTourImage(slug, result ?? src, ask, is360 ? { ...view.current } : undefined);
                 if (!r.ok) {
                   if (r.error.startsWith("Gemini-nøglen")) setReady(false);
                   return setError(r.error);
                 }
                 setResult(r.url);
+                setShowAfter(true);
               })
             }
           >
@@ -142,7 +175,7 @@ export function AiImageButton({ src, onUse }: { src: string; onUse: (url: string
           {result && big && <Compare before={src} after={result} onClose={() => setBig(false)} />}
           {result && (
             <>
-              <div className="grid grid-cols-2 gap-1.5">
+              <div className={`grid grid-cols-2 gap-1.5 ${is360 ? "hidden" : ""}`}>
                 <figure>
                   <button type="button" className="block w-full" onClick={() => setBig(true)}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -181,6 +214,52 @@ export function AiImageButton({ src, onUse }: { src: string; onUse: (url: string
         </>
       )}
       {error && <p className="text-[12px] text-[#ff3b30]">{error}</p>}
+    </div>
+  );
+}
+
+type PanoViewer = { getYaw(): number; getPitch(): number; getHfov(): number; on(e: string, f: () => void): void; destroy(): void };
+
+/**
+ * A small 360° window to turn to the part to change - framed 3:2 like the
+ * picture the AI gets. Where it looks is kept in `view` (also when it shows
+ * the AI's version, so before and after are seen from the same place).
+ */
+function PanoWindow({ src, view }: { src: string; view: React.MutableRefObject<{ yaw: number; pitch: number; hfov: number }> }) {
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    let dead = false;
+    let viewer: PanoViewer | null = null;
+    let timer = 0;
+    (async () => {
+      if (!window.pannellum) await import("pannellum/build/pannellum.js");
+      if (dead || !box.current || !window.pannellum) return;
+      viewer = window.pannellum.viewer(box.current, {
+        type: "equirectangular",
+        panorama: src,
+        autoLoad: true,
+        showFullscreenCtrl: false,
+        showZoomCtrl: true,
+        hfov: view.current.hfov,
+        minHfov: 25,
+        maxHfov: 110,
+        yaw: view.current.yaw,
+        pitch: view.current.pitch,
+      }) as unknown as PanoViewer;
+      // Where it looks, kept as it moves.
+      timer = window.setInterval(() => {
+        if (viewer) view.current = { yaw: viewer.getYaw(), pitch: viewer.getPitch(), hfov: viewer.getHfov() };
+      }, 250);
+    })();
+    return () => {
+      dead = true;
+      window.clearInterval(timer);
+      viewer?.destroy();
+    };
+  }, [src, view]);
+  return (
+    <div className="relative aspect-[3/2] w-full overflow-hidden rounded-lg bg-black ring-1 ring-black/[.06]">
+      <div ref={box} className="absolute inset-0" />
     </div>
   );
 }

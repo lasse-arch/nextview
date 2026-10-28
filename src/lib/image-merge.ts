@@ -41,3 +41,16 @@ export async function keepSharpWhereUnchanged(original: Buffer, edited: Buffer):
   }
   return { data: out, w, h };
 }
+
+/** Where two pictures of the same size (raw RGB) differ, as a soft mask (one byte per pixel, 0-255) - compared small and soft like above. */
+export async function changeMask(a: Buffer, b: Buffer, w: number, h: number): Promise<Buffer> {
+  const ch = Math.max(1, Math.round((COMPARE_W * h) / w));
+  const small = (x: Buffer) => sharp(x, { raw: { width: w, height: h, channels: 3 } }).resize(COMPARE_W, ch, { fit: "fill" }).blur(1.5).raw().toBuffer();
+  const [sa, sb] = await Promise.all([small(a), small(b)]);
+  const mask = Buffer.alloc(COMPARE_W * ch);
+  for (let i = 0, p = 0; p < mask.length; p++, i += 3) {
+    const d = Math.abs(sa[i] - sb[i]) + Math.abs(sa[i + 1] - sb[i + 1]) + Math.abs(sa[i + 2] - sb[i + 2]);
+    mask[p] = d <= LOW ? 0 : d >= HIGH ? 255 : Math.round(((d - LOW) / (HIGH - LOW)) * 255);
+  }
+  return sharp(mask, { raw: { width: COMPARE_W, height: ch, channels: 1 } }).dilate(2).blur(3).resize(w, h, { fit: "fill" }).extractChannel(0).raw().toBuffer();
+}
