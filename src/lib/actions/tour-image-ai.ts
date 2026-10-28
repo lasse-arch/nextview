@@ -202,7 +202,14 @@ export async function cutTourView(src: string, view: PanoView): Promise<{ ok: tr
  * original's size and sharpness). Stored as a new file - nothing in the tour
  * changes until the user picks it.
  */
-export async function pasteTourEdit(slug: string, src: string, view: PanoView | null, form: FormData): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
+export async function pasteTourEdit(
+  slug: string,
+  src: string,
+  view: PanoView | null,
+  form: FormData,
+  /** "hele": the whole changed picture is used (cleaning, colours, light - changes too fine to detect); "aendret": only where it differs, the rest keeps the original's sharpness. */
+  mode: "hele" | "aendret" = "hele"
+): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
   const user = await admin();
   const file = form.get("file");
   if (!(file instanceof File) || !file.type.startsWith("image/")) return { ok: false, error: "Vælg et billede." };
@@ -223,7 +230,8 @@ export async function pasteTourEdit(slug: string, src: string, view: PanoView | 
       const { vw, vh } = viewSize(info.width, v.hfov);
       const before = renderView(data, info.width, info.height, v, vw, vh);
       const after = await sharp(edited).rotate().resize(vw, vh, { fit: "fill" }).removeAlpha().raw().toBuffer();
-      pasteView(data, info.width, info.height, after, await changeMask(before, after, vw, vh), v, vw, vh);
+      const mask = mode === "hele" ? Buffer.alloc(vw * vh, 255) : await changeMask(before, after, vw, vh);
+      pasteView(data, info.width, info.height, after, mask, v, vw, vh);
       out = await sharp(data, { raw: { width: info.width, height: info.height, channels: 3 } }).jpeg({ quality: 88, mozjpeg: true }).toBuffer();
       type = "image/jpeg";
     } else {
@@ -231,8 +239,13 @@ export async function pasteTourEdit(slug: string, src: string, view: PanoView | 
       const ow = om.autoOrient?.width ?? om.width ?? 1;
       const oh = om.autoOrient?.height ?? om.height ?? 1;
       if (Math.abs(Math.log(em.width / em.height / (ow / oh))) > 0.06) return { ok: false, error: `Det rettede billede har en anden form (${em.width}×${em.height}) end originalen (${ow}×${oh}). Bed AI'en beholde formatet og beskæringen.` };
-      const merged = await keepSharpWhereUnchanged(original, edited);
-      out = await sharp(merged.data, { raw: { width: merged.w, height: merged.h, channels: 3 } }).webp({ quality: 86 }).toBuffer();
+      if (mode === "hele") {
+        // The changed picture as it is - at the original's exact size, so points placed on it still sit right.
+        out = await sharp(edited).rotate().resize(ow, oh, { fit: "fill" }).webp({ quality: 88 }).toBuffer();
+      } else {
+        const merged = await keepSharpWhereUnchanged(original, edited);
+        out = await sharp(merged.data, { raw: { width: merged.w, height: merged.h, channels: 3 } }).webp({ quality: 86 }).toBuffer();
+      }
       type = "image/webp";
     }
     const name = `rettet-${path.basename(src.split("?")[0]).replace(/\.[a-z0-9]+$/i, "") || "billede"}`;

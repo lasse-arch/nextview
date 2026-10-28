@@ -359,6 +359,10 @@ function ManualEdit({
   const [open, setOpen] = useState(false);
   const [pending, start] = useTransition();
   const [saved, setSaved] = useState(false);
+  /** Use the whole changed view (default) - or only where it differs, so the rest stays as sharp as the original. */
+  const [mode, setMode] = useState<"hele" | "aendret">("hele");
+  /** The last uploaded picture - to put it in again the other way without uploading it again. */
+  const [last, setLast] = useState<File | null>(null);
   const file = useRef<HTMLInputElement>(null);
 
   function save(blob: Blob, name: string) {
@@ -390,8 +394,9 @@ function ManualEdit({
     });
   }
 
-  async function upload(f: File) {
+  async function upload(f: File, how = mode) {
     onError(null);
+    setLast(f);
     let v: { yaw: number; pitch: number; hfov: number } | null = null;
     if (is360) {
       try {
@@ -412,8 +417,13 @@ function ManualEdit({
     const form = new FormData();
     form.append("file", new File([jpeg], "rettet.jpg", { type: "image/jpeg" }));
     start(async () => {
-      const r = await pasteTourEdit(slug, base, v, form);
+      const r = await pasteTourEdit(slug, base, v, form, how);
       if (!r.ok) return onError(r.error);
+      // The new picture has the same geometry - so its view is remembered too, and a picture can be uploaded again straight away.
+      if (v)
+        try {
+          localStorage.setItem(cutKey(slug, r.url), JSON.stringify(v));
+        } catch {}
       onResult(r.url);
     });
   }
@@ -437,6 +447,31 @@ function ManualEdit({
         <li>Ret det i fx ChatGPT, Gemini, FLUX eller Photoshop. Bed AI&apos;en beholde formatet og beskæringen præcis.</li>
         <li>Upload det rettede - det sættes ind præcis dér, det kom fra, og resten af billedet beholder sin fulde skarphed.</li>
       </ol>
+      <div className="space-y-1">
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-[#8e8e93]">Sæt det rettede ind</span>
+        <div className="flex rounded-lg bg-white p-0.5 text-[12px] font-medium ring-1 ring-black/[.06]">
+          {(
+            [
+              ["hele", "Hele udsnittet"],
+              ["aendret", "Kun det ændrede"],
+            ] as const
+          ).map(([m, label]) => (
+            <button key={m} type="button" onClick={() => setMode(m)} className={`flex-1 rounded-md py-1 ${mode === m ? "bg-[#1d1d1f] text-white" : "text-[#6e6e73]"}`}>
+              {label}
+            </button>
+          ))}
+        </div>
+        <p className="text-[11px] leading-snug text-[#8e8e93]">
+          {mode === "hele"
+            ? "Bruger hele det rettede billede - til rengøring, farver og lys. Kanterne tones blødt over i resten af billedet."
+            : "Bruger kun de steder, hvor noget tydeligt er ændret (fx noget tilføjet eller fjernet) - resten forbliver lige så skarpt som originalen."}
+        </p>
+        {last && !pending && (
+          <button type="button" className="text-[12px] font-medium text-[#0071e3] hover:underline" onClick={() => upload(last, mode)}>
+            Sæt det sidst uploadede ind igen som &quot;{mode === "hele" ? "Hele udsnittet" : "Kun det ændrede"}&quot;
+          </button>
+        )}
+      </div>
       <div className="flex gap-2">
         <button type="button" disabled={pending} onClick={download} className="flex-1 rounded-lg bg-white py-2 text-[13px] font-medium ring-1 ring-black/[.08] hover:bg-[#fafafa] disabled:opacity-40">
           {pending ? "…" : is360 ? "Hent udsnit" : "Hent billedet"}
