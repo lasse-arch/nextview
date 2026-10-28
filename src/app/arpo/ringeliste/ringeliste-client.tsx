@@ -1,5 +1,7 @@
 "use client";
 
+import type { LeadPlace } from "@/lib/lead-place";
+import { OFFICE } from "@/lib/office";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -29,6 +31,8 @@ type QueueDeal = {
   stage: DealStage;
   lastVoicemailAt: Date | string | null;
   ownerId: string;
+  /** Where the lead is - from the postcode in its address (null when there's none). */
+  place: LeadPlace | null;
 };
 
 type Colleague = { id: string; name: string };
@@ -510,6 +514,11 @@ function QueueCard({ deal, users, currentUserId }: { deal: QueueDeal; users: Col
           )}
           <p className="mt-0.5 text-xs text-slate-500">
             {[deal.cvrNumber ? `CVR ${deal.cvrNumber}` : null, deal.address].filter(Boolean).join(" · ") || "Ingen adresse"}
+            {deal.place && (
+              <span className="ml-1.5 inline-flex items-center rounded-full bg-slate-100 px-1.5 py-px text-[11px] font-medium text-slate-600" title={`I luftlinje fra kontoret (${OFFICE.address}) · ${deal.place.kommune} Kommune, Region ${deal.place.region}`}>
+                {deal.place.km} km · {deal.place.kommune}
+              </span>
+            )}
           </p>
           <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-slate-500">
             {[deal.contactName, deal.contactEmail].filter(Boolean).length > 0 && (
@@ -871,11 +880,23 @@ export function RingelisteClient({
   currentUserId: string;
 }) {
   const [search, setSearch] = useState("");
+  /** Order and area: as the list (who's next), nearest the office first, or furthest - and one region/kommune. */
+  const [order, setOrder] = useState<"liste" | "naer" | "fjern">("liste");
+  const [area, setArea] = useState("");
+  const regions = [...new Set(deals.map((d) => d.place?.region).filter((r): r is string => Boolean(r)))].sort();
+  const kommuner = [...new Set(deals.map((d) => d.place?.kommune).filter((k): k is string => Boolean(k)))].sort((a, b) => a.localeCompare(b, "da"));
+  const count = (pick: (d: QueueDeal) => boolean) => deals.filter(pick).length;
   // Searches the whole list, not just what's on screen - name (and kaldenavn),
   // phone (ignoring spaces), e-mail, address, CVR and website.
   const query = search.trim().toLowerCase();
+  const inArea = area ? deals.filter((d) => (area.startsWith("r:") ? d.place?.region === area.slice(2) : area === "ingen" ? !d.place : d.place?.kommune === area.slice(2))) : deals;
+  const ordered =
+    order === "liste"
+      ? inArea
+      : // Leads without a known place last, whichever way.
+        [...inArea].sort((a, b) => (a.place ? (b.place ? (order === "naer" ? a.place.km - b.place.km : b.place.km - a.place.km) : -1) : b.place ? 1 : 0));
   const visibleDeals = query
-    ? deals.filter((d) => {
+    ? ordered.filter((d) => {
         const haystack = [d.companyName, d.displayName, d.contactName, d.contactEmail, d.address, d.cvrNumber, d.websiteUrl]
           .filter(Boolean)
           .join(" ")
@@ -884,7 +905,7 @@ export function RingelisteClient({
         const phone = (d.contactPhone ?? "").replace(/[\s+-]/g, "");
         return haystack.includes(query) || (phoneQuery.length >= 3 && /^\d+$/.test(phoneQuery) && phone.includes(phoneQuery));
       })
-    : deals;
+    : ordered;
 
   return (
     <div className="space-y-6">
@@ -896,7 +917,7 @@ export function RingelisteClient({
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-sm font-semibold text-slate-900">
             {selectedListId
-              ? `Tilbage at ringe (${query ? `${visibleDeals.length} af ${deals.length}` : deals.length})`
+              ? `Tilbage at ringe (${query || area ? `${visibleDeals.length} af ${deals.length}` : deals.length})`
               : "Vælg eller opret en liste ovenfor"}
           </h2>
           {selectedListId && deals.length > 0 && (
@@ -909,6 +930,34 @@ export function RingelisteClient({
             />
           )}
         </div>
+        {selectedListId && deals.some((d) => d.place) && (
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+            <select value={order} onChange={(e) => setOrder(e.target.value as typeof order)} className="rounded-md border border-slate-300 px-2 py-1.5" aria-label="Rækkefølge">
+              <option value="liste">Rækkefølge: som listen</option>
+              <option value="naer">Nærmest kontoret først</option>
+              <option value="fjern">Længst fra kontoret først</option>
+            </select>
+            <select value={area} onChange={(e) => setArea(e.target.value)} className="rounded-md border border-slate-300 px-2 py-1.5" aria-label="Område">
+              <option value="">Hele landet ({deals.length})</option>
+              <optgroup label="Region">
+                {regions.map((r) => (
+                  <option key={r} value={`r:${r}`}>
+                    {r} ({count((d) => d.place?.region === r)})
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="Kommune">
+                {kommuner.map((k) => (
+                  <option key={k} value={`k:${k}`}>
+                    {k} ({count((d) => d.place?.kommune === k)})
+                  </option>
+                ))}
+              </optgroup>
+              {deals.some((d) => !d.place) && <option value="ingen">Uden kendt adresse ({count((d) => !d.place)})</option>}
+            </select>
+            <span className="text-xs text-slate-400">Afstand i luftlinje fra {OFFICE.address}</span>
+          </div>
+        )}
         <ul className="mt-3 space-y-2.5">
           {visibleDeals.map((deal) => (
             <QueueCard key={deal.id} deal={deal} users={users} currentUserId={currentUserId} />

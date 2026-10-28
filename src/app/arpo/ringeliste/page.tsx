@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { RingelisteClient } from "./ringeliste-client";
+import { placeOf } from "@/lib/lead-place";
 
 // Only leads not yet worked: once a deal moves on (Kontaktet, Opfølgning,
 // Møde booket, ...) from here or anywhere else, it drops off the list.
@@ -65,7 +66,8 @@ export default async function RingelistePage({
       <RingelisteClient
         lists={lists.map((l) => ({ id: l.id, name: l.name, openCount: l._count.deals }))}
         selectedListId={selectedListId}
-        deals={deals}
+        // Each lead with where it is (distance from the office, region, kommune) - from the postcode in its address.
+        deals={deals.map((d) => ({ ...d, place: placeOf(d.address) }))}
         users={users}
         currentUserId={currentUser.id}
       />
