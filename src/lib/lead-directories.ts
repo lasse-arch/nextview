@@ -9,6 +9,9 @@ import "server-only";
  * reader), currently:
  *  - dk-camp.dk/campingpladser/ - every DK-CAMP campsite (name, address,
  *    phone, e-mail, website). A single campsite's page adds just that one.
+ *  - friskolerne.dk/om-os/friskolekort - every friskole on Friskolernes map
+ *    (the school's address, phone, e-mail and website, the head teacher as
+ *    the contact, and its size as a note).
  */
 
 export type DirectoryLead = {
@@ -19,6 +22,10 @@ export type DirectoryLead = {
   websiteUrl: string | null;
   /** The business's own page on the directory - kept as the lead's "Kilde". */
   sourceUrl: string;
+  /** The person to ask for (e.g. a school's head teacher) - then contactPhone/contactEmail are theirs. */
+  contactName?: string | null;
+  /** More from the directory, kept as a note on the lead (the school's own number, its size …). */
+  note?: string | null;
 };
 
 const USER_AGENT = "Mozilla/5.0 (compatible; Arpo)";
@@ -37,7 +44,76 @@ export async function expandDirectoryLink(url: string): Promise<DirectoryLead[] 
     const slug = parsed.pathname.replace(/^\/campingpladser\/?/, "").replace(/\/$/, "");
     return dkCampLeads(slug || null);
   }
+  if (host === "friskolerne.dk" && /^\/om-os\/friskolekort\/?$/.test(parsed.pathname)) return friskoleLeads();
   return null;
+}
+
+const FRISKOLERNE = "https://www.friskolerne.dk";
+
+/**
+ * Friskolernes map: the schools are written into a script the page loads
+ * (title + an info box of HTML per school) - read from there.
+ */
+async function friskoleLeads(): Promise<DirectoryLead[]> {
+  const page = await fetch(`${FRISKOLERNE}/om-os/friskolekort`, { headers: { "User-Agent": USER_AGENT } });
+  if (!page.ok) throw new Error(`friskolerne.dk svarede ${page.status} - kunne ikke hente friskolekortet.`);
+  const html = await page.text();
+  // The map's data is in one of the page's own scripts (its name changes) - the one that has the schools in it.
+  const scripts = [...html.matchAll(/<script[^>]+src="(\/typo3temp\/[^"]+\.js[^"]*)"/g)].map((m) => new URL(decodeEntities(m[1]), FRISKOLERNE).toString());
+  let source = html;
+  for (const src of scripts) {
+    const res = await fetch(src, { headers: { "User-Agent": USER_AGENT } });
+    const js = res.ok ? await res.text() : "";
+    if (js.includes("maps-info-content")) {
+      source = js;
+      break;
+    }
+  }
+  const seen = new Set<string>();
+  const leads: DirectoryLead[] = [];
+  for (const m of source.matchAll(/title:\s*'((?:\\'|[^'])*)'[\s\S]*?html:\s*'((?:\\'|[^'])*)'/g)) {
+    const name = decodeEntities(m[1].replace(/\\'/g, "'")).trim();
+    if (!name || seen.has(name)) continue;
+    seen.add(name);
+    const box = m[2].replace(/\\'/g, "'");
+    // A block of the info box (the school's contact details, the head teacher, …) and a line in it.
+    const block = (kind: string) => new RegExp(`maps-info-content__block--${kind}"([\\s\\S]*?)(?=maps-info-content__block--|$)`).exec(box)?.[1] ?? "";
+    const line = (b: string, kind: string) => {
+      const v = new RegExp(`maps-info-content__line--${kind}"><p>([\\s\\S]*?)</p>`).exec(b)?.[1];
+      return v ? decodeEntities(v.replace(/<[^>]+>/g, "")).trim() || null : null;
+    };
+    const school = block("address");
+    const leader = block("leader");
+    const facts = block("school");
+    const phone = (v: string | null) => (v && /\d{8}/.test(v.replace(/\s/g, "")) ? v.replace(/\s/g, "").replace(/(\d{2})(?=\d)/g, "$1 ") : null);
+    const web = line(school, "web");
+    const leaderName = line(leader, "name");
+    const schoolPhone = phone(line(school, "phone"));
+    const schoolEmail = line(school, "email");
+    const leaderPhone = phone(line(leader, "phone"));
+    const leaderEmail = line(leader, "email");
+    const factLines = [...facts.matchAll(/<p>([\s\S]*?)<\/p>/g)].map((x) => decodeEntities(x[1].replace(/<[^>]+>/g, "")).trim()).filter((x) => /:/.test(x));
+    const note = [
+      leaderName ? `Skoleleder: ${leaderName}${leaderPhone ? `, ${leaderPhone}` : ""}${leaderEmail ? `, ${leaderEmail}` : ""}` : null,
+      schoolPhone || schoolEmail ? `Skolen: ${[schoolPhone, schoolEmail].filter(Boolean).join(", ")}` : null,
+      ...factLines,
+    ]
+      .filter(Boolean)
+      .join("\n");
+    leads.push({
+      companyName: name,
+      address: [line(school, "address"), line(school, "zip-city")].filter(Boolean).join(", ") || null,
+      // The head teacher is the one to call - the school's own number and mail when there's none.
+      contactName: leaderName,
+      contactPhone: leaderPhone ?? schoolPhone,
+      contactEmail: leaderEmail ?? schoolEmail,
+      websiteUrl: web ? (/^https?:/i.test(web) ? web : `https://${web}`) : null,
+      sourceUrl: `${FRISKOLERNE}/om-os/friskolekort#${encodeURIComponent(name)}`,
+      note: note || null,
+    });
+  }
+  if (!leads.length) throw new Error("Kunne ikke læse skolerne på friskolekortet - siden er måske lavet om.");
+  return leads;
 }
 
 type DkCampItem = { url: string; title: string; address: string | null };

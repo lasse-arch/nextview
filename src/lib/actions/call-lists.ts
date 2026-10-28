@@ -105,6 +105,7 @@ export async function addLeadsToCallList(
       address = directory.address;
       contactEmail = directory.contactEmail;
       contactPhone = directory.contactPhone;
+      contactName = directory.contactName ?? null;
     } else if (line.cvrNumber) {
       const lookup = await lookupCvrNumber(line.cvrNumber);
       if (lookup.ok) {
@@ -201,7 +202,7 @@ export async function addLeadsToCallList(
     });
     await prisma.deal.update({ where: { id: deal.id }, data: { dealEmailAddress: buildDealEmailAddress(deal.id) } });
     await prisma.note.create({
-      data: { dealId: deal.id, authorId: user.id, body: `Kilde: ${line.raw}`, kind: "MANUAL" },
+      data: { dealId: deal.id, authorId: user.id, body: `Kilde: ${line.raw}${directory?.note ? `\n\n${directory.note}` : ""}`, kind: "MANUAL" },
     });
 
     await logActivity({
