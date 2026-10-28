@@ -163,7 +163,7 @@ const LABELS: Record<ContractLanguage, Labels> = {
     section4Body: [
       "Fakturering sker kvartalsvist forud (netto 8 dage), medmindre andet er angivet under Yderligere betingelser.",
       "Betaling sker via faktura eller efter aftale om automatisk betaling. Forsinket betaling påløber rente efter renteloven.",
-      "Betales en faktura ikke senest 14 dage efter forfald, og er der sendt en skriftlig rykker, kan leverandøren lukke touren, indtil der er betalt. Ved væsentlig misligholdelse, herunder gentagen manglende betaling, kan leverandøren hæve aftalen, og det resterende beløb for den løbende periode forfalder da straks til betaling. Rykkergebyr og inkassoomkostninger opkræves efter gældende regler.",
+      "Betales en faktura ikke senest 14 dage efter forfald, og er der sendt en skriftlig rykker, kan leverandøren lukke for de løbende ydelser – fx touren eller hjemmesiden – indtil der er betalt. Ved væsentlig misligholdelse, herunder gentagen manglende betaling, kan leverandøren hæve aftalen, og det resterende beløb for den løbende periode forfalder da straks til betaling. Rykkergebyr og inkassoomkostninger opkræves efter gældende regler.",
     ],
     section5Title: "5) Fortrolighed",
     section5Body:
@@ -267,7 +267,7 @@ const LABELS: Record<ContractLanguage, Labels> = {
     section4Body: [
       "Invoicing is quarterly in advance (net 8 days), unless otherwise stated under Additional Terms.",
       "Payment is made by invoice or by agreement on automatic payment. Late payment accrues interest under the Danish Interest Act.",
-      "If an invoice is not paid within 14 days after the due date and a written reminder has been sent, the Supplier may close the tour until payment has been made. In case of material breach, including repeated non-payment, the Supplier may terminate the agreement, and the remaining amount for the current period then falls due immediately. Reminder fees and collection costs are charged in accordance with applicable rules.",
+      "If an invoice is not paid within 14 days after the due date and a written reminder has been sent, the Supplier may suspend the ongoing services – e.g. the tour or the website – until payment has been made. In case of material breach, including repeated non-payment, the Supplier may terminate the agreement, and the remaining amount for the current period then falls due immediately. Reminder fees and collection costs are charged in accordance with applicable rules.",
     ],
     section5Title: "5) Confidentiality",
     section5Body:
