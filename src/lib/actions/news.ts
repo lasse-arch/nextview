@@ -63,6 +63,12 @@ export async function getUnreadNewsCount(userId: string, newsReadAt: Date | null
 const DEFAULT_POSTS: { title: string; body: string; minutesAgo: number; screenshotUrl: string }[] = [
   {
     minutesAgo: 0,
+    title: "Mailgenerator under Salg",
+    body: "Under Salg → Mailgenerator skriver nextviewAI et mailforslag ud fra et par linjer: hvem den er til, hvad I talte om, og om det er efter et møde, en første henvendelse, et tilbud eller en opfølgning. En deal er valgfri - vælger du en, udfyldes navn, firma og e-mail.\n\nSkriv prisen ind (etablering, månedlig pris, afdelinger, binding og betingelser), så kommer den med - præcis som du har skrevet den, for prisen sættes ind af Arpo og ikke af AI'en. Du kan også vælge op til 3 tours, som kunden kan se, og linkene kommer med.\n\nRet i forslaget, tryk \"Kortere\", \"Mere personlig\" osv., eller skriv selv, hvad der skal laves om. Send den fra din egen Gmail (med en deal ligger den på dealen) eller kopiér den. Den skriver som en sælger, ikke som en reklame - og den lærer: de mails, I sender herfra, bruges som eksempler næste gang, også dét I har rettet.",
+    screenshotUrl: "/news/mailgenerator.png",
+  },
+  {
+    minutesAgo: 0,
     title: "Salg pr. måned på Provision",
     body: "Øverst på Provision kan sælgerne nu se, hvad de har solgt måned for måned: antal salg, etablering solgt, MRR solgt og provision - med den valgte måned som kort øverst (og hvor meget det er op eller ned i forhold til måneden før) og de seneste 12 måneder i en tabel med totaler. Klik på en måned for at se den.\n\nSom sælger ser du kun dine egne salg. Som admin kan du se alle samlet, hvem der solgte hvad i måneden, eller vælge én sælger. Tallene tælles som i målene: salgsdatoen, dealens sælger, MRR = den månedlige pris.",
     screenshotUrl: "/news/salg-pr-maaned.png",

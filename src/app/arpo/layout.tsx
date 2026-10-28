@@ -31,6 +31,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         { href: "/arpo/kalender", label: "Kalender", icon: "calendar" },
         { href: "/arpo/opgaver", label: "Opgaver", icon: "tasks" },
         { href: "/arpo/online-kunder", label: "Online kunder", icon: "tour" },
+        { href: "/arpo/mailgenerator", label: "Mailgenerator", icon: "mail" },
       ],
     },
     { section: "Kunder", items: [{ href: "/arpo/kunder", label: "Live kunder", icon: "users" }] },

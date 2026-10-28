@@ -4,24 +4,9 @@ import Link from "next/link";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { INDUSTRIES } from "@/lib/industries";
 import { setDealIndustry } from "@/lib/actions/industry";
+import type { OnlineTour } from "@/lib/online-tours";
 
-export type OnlineTour = {
-  key: string;
-  name: string;
-  customer: string;
-  dealId: string | null;
-  industry: string;
-  /** Set on the deal (else guessed from the name). */
-  industrySet: boolean;
-  city: string | null;
-  url: string;
-  /** The customer's tours of the same place (a full tour, a room picker …) - more than one: a choice in the card and the window. */
-  variants: { key: string; label: string; url: string }[];
-  thumb: string;
-  /** Built in Arpo (else an older tour on explore). */
-  ours: boolean;
-  since: string;
-};
+export type { OnlineTour };
 
 /** The tours as cards like on nextview360.dk, filtered by industry and name - "Fremvis" opens one big, right here. */
 export function OnlineTours({ tours, isAdmin }: { tours: OnlineTour[]; isAdmin: boolean }) {

@@ -175,26 +175,26 @@ enum DownloadJobStatus {
 /// here as bytes until downloaded - short-lived by nature, not meant to
 /// accumulate indefinitely.
 model ReportDownloadJob {
-  id           String            @id @default(cuid())
+  id            String            @id @default(cuid())
   /// Comma-separated deal ids (one for a single download, several for a
   /// merged "download all"/bulk-selection download).
-  dealIds      String
+  dealIds       String
   /// Mirrors "Send samlet" for a download - one combined PDF (one stats
   /// page per branch) for a deal and its linked branches, instead of each
   /// deal's own separate report. Only meaningful with exactly one dealId.
-  combined     Boolean           @default(false)
-  status       DownloadJobStatus @default(PENDING)
-  pdfData      Bytes?
-  fileName     String?
-  errorMessage String?
+  combined      Boolean           @default(false)
+  status        DownloadJobStatus @default(PENDING)
+  pdfData       Bytes?
+  fileName      String?
+  errorMessage  String?
   /// Set while a queue step works on the job - a big download is split
   /// over several steps (each its own request, under the route's time
   /// limit), with what's done so far kept in collectedData: a combined
   /// report's gathered stats, or the deals already merged into pdfData.
   claimedAt     DateTime?
   collectedData Json?
-  createdById  String
-  createdAt    DateTime          @default(now())
+  createdById   String
+  createdAt     DateTime          @default(now())
 }
 
 model Invoice {
@@ -565,7 +565,7 @@ model Deal {
 
   /// Excludes this deal from provision entirely, e.g. so the owner can stay
   /// on the deal for pipeline tracking without it generating commission.
-  commissionExcluded Boolean @default(false)
+  commissionExcluded     Boolean @default(false)
   /// A provision rate (%) an admin set for this deal by hand - used instead
   /// of the owner's own rate, also when the commission is recalculated
   /// later (a new price, a signed contract). Null = the owner's rate.
@@ -583,7 +583,7 @@ model Deal {
   filmingEventId         String?
   /// When the "Velkommen til Nextview360" e-mail went out (sent once,
   /// automatically, the first time the deal is set Live).
-  welcomeMailSentAt DateTime?
+  welcomeMailSentAt      DateTime?
 
   /// The setup fee waits until the customer has approved the product
   /// (agreed when selling - "Etablering faktureres ved underskrift" unticked
@@ -623,17 +623,17 @@ model Deal {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  notes          Note[]
-  emails         EmailMessage[]
-  commission     Commission?
-  invoices       Invoice[]
-  items          DealItem[]
-  contractEvents ContractEvent[]
-  tasks          Task[]
-  reports        CustomerReport[]
-  activityEvents ActivityEvent[]
-  timeEntries    TimeEntry[]
-  tours          Tour[]
+  notes            Note[]
+  emails           EmailMessage[]
+  commission       Commission?
+  invoices         Invoice[]
+  items            DealItem[]
+  contractEvents   ContractEvent[]
+  tasks            Task[]
+  reports          CustomerReport[]
+  activityEvents   ActivityEvent[]
+  timeEntries      TimeEntry[]
+  tours            Tour[]
   /// Customer logins (nextview360.dk/kunde) that may see this deal.
   customerAccounts CustomerAccountDeal[]
   systemMails      SystemMail[]
@@ -1131,9 +1131,9 @@ model WatchedUrl {
 
 /// Betalingsservice agreement values + running counters. A single row (id "default").
 model BsSettings {
-  id                      String  @id @default("default")
+  id                      String    @id @default("default")
   dataSupplierNumber      String?
-  subsystem               String  @default("BS1")
+  subsystem               String    @default("BS1")
   pbsNumber               String?
   debtorGroupNumber       String?
   /// Dinero account the BS payments are registered against (the
@@ -1147,8 +1147,8 @@ model BsSettings {
   /// one without the bank payment details, so the invoice doesn't invite a
   /// bank transfer. Null: Dinero's default template.
   dineroInvoiceTemplateId String?
-  nextDeliverySequence    Int     @default(1)
-  nextCustomerNumber      Int     @default(1)
+  nextDeliverySequence    Int       @default(1)
+  nextCustomerNumber      Int       @default(1)
   /// The BS Tilmeldingslink made in Mastercard Connect (BS Customer Portal) -
   /// sign-up with MitID. Put in the sign-up e-mail and on invoices.
   signupLink              String?
@@ -1159,16 +1159,16 @@ model BsSettings {
   /// SFTP to Mastercard's My File Transfer (see src/lib/betalingsservice/sftp.ts).
   /// The private key is stored encrypted (AES-GCM keyed from AUTH_SECRET) and
   /// itself passphrase-protected; only the public half ever leaves Arpo.
-  sftpHost           String?
-  sftpPort           Int       @default(10022)
+  sftpHost                 String?
+  sftpPort                 Int       @default(10022)
   /// The mailbox UserID in My File Transfer.
-  sftpUser           String?
-  sftpPrivateKeyEnc  String?
-  sftpPassphraseEnc  String?
-  sftpPublicKey      String?
-  sftpKeyCreatedAt   DateTime?
-  sftpLastRunAt      DateTime?
-  sftpLastError      String?
+  sftpUser                 String?
+  sftpPrivateKeyEnc        String?
+  sftpPassphraseEnc        String?
+  sftpPublicKey            String?
+  sftpKeyCreatedAt         DateTime?
+  sftpLastRunAt            DateTime?
+  sftpLastError            String?
   /// Relay server with a fixed IP (e.g. Hetzner) doing the SFTP exchange on
   /// Arpo's behalf - Mastercard only accepts SFTP from a whitelisted IP, and
   /// Vercel has none. It polls Arpo with this token (only its hash is kept);
@@ -1180,8 +1180,8 @@ model BsSettings {
   /// "Send/hent nu" while on the relay: picked up at its next poll.
   relayExchangeRequestedAt DateTime?
   /// Make and send the BS 0601 file by itself (once a day when invoices are ready).
-  autoSend           Boolean   @default(false)
-  lastAutoDeliveryAt DateTime?
+  autoSend                 Boolean   @default(false)
+  lastAutoDeliveryAt       DateTime?
 
   updatedAt DateTime @updatedAt
 }
@@ -1297,42 +1297,42 @@ model TourStoryImage {
 /// one JSON document (the tour engine's TourConfig); every save also keeps a
 /// copy in TourVersion, so a change can always be undone.
 model Tour {
-  id        String        @id @default(cuid())
+  id               String            @id @default(cuid())
   /// The address: /tour-lab/<slug> in Arpo, /t/<slug> when published.
-  slug      String        @unique
-  name      String
+  slug             String            @unique
+  name             String
   /// Shown to anyone at /t/<slug> (and in an iframe on the customer's site) - off until it's ready.
-  published Boolean       @default(false)
+  published        Boolean           @default(false)
   /// Addresses the tour had before its pretty-URL was changed - they redirect to the new one, so iframes already on customers' sites keep working.
   /// The editor's autosaved, not yet saved changes - never shown in the tour, only offered back in the editor.
-  draft       Json?
-  draftAt     DateTime?
-  draftByName String?
-  oldSlugs  String[]      @default([])
+  draft            Json?
+  draftAt          DateTime?
+  draftByName      String?
+  oldSlugs         String[]          @default([])
   /// Which numbers the customer gets to see (see ReportShare in tour-stats.ts) - null = the defaults.
-  share      Json?
+  share            Json?
   /// The customer's own link to their report: /r/<shareToken>.
-  shareToken String?       @unique
+  shareToken       String?           @unique
   /// "Kundegennemsyn": the secret link /p/<reviewToken> where the customer
   /// looks around and leaves feedback in the tour. Null = switched off.
-  reviewToken String?      @unique
+  reviewToken      String?           @unique
   /// "Send til gennemgang": when the customer was sent the review mail, the last reminder and how many,
   /// and when the tour was approved - by the customer (in the tour or their page) or by us.
   reviewSentAt     DateTime?
   reviewRemindedAt DateTime?
-  reviewReminders  Int       @default(0)
+  reviewReminders  Int               @default(0)
   reviewApprovedAt DateTime?
   reviewApprovedBy String?
-  dealId    String?
-  deal      Deal?         @relation(fields: [dealId], references: [id], onDelete: SetNull)
-  config    Json
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
-  versions  TourVersion[]
+  dealId           String?
+  deal             Deal?             @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  config           Json
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  versions         TourVersion[]
   /// Versions published as plain files on Cloudflare (tour.nextview360.dk).
-  publications TourPublication[]
+  publications     TourPublication[]
   /// The publication that is live on Cloudflare now - null = not out there.
-  liveVersion  Int?
+  liveVersion      Int?
 
   @@index([dealId])
 }
@@ -1654,4 +1654,30 @@ model TourThumb {
   key       String   @id
   data      Bytes?
   createdAt DateTime @default(now())
+}
+
+/// A mail from the mail generator (Salg → Mailgenerator): what the seller
+/// asked for, nextviewAI's draft and - once sent or copied - the mail as the
+/// seller actually sent it. The sent ones are the generator's examples next
+/// time, so it learns how the team writes (and what they correct).
+model SalesMail {
+  id           String    @id @default(cuid())
+  userId       String
+  userName     String
+  dealId       String?
+  kind         String
+  industry     String?
+  /// What the seller filled in (recipient, notes, price, tours).
+  input        Json
+  subject      String
+  draft        String
+  finalSubject String?
+  finalBody    String?
+  /// "sendt" or "kopieret" - null while it's only a draft.
+  finalHow     String?
+  finalAt      DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@index([userId, finalAt])
+  @@index([finalAt])
 }
