@@ -92,7 +92,7 @@ const LABELS: Record<ContractLanguage, Labels> = {
         sub: "— 360° virtuel rundvisning",
         bullets: [
           "Fuldt optimeret virtuel rundvisning med produkt- og infohotspots",
-          "Udgivelse på både Google Street View og egen hjemmeside",
+          "Udgivelse på egen hjemmeside – med koder til hele touren og til hvert sted i den",
           "Support samt 1 årlig genoptagelse pr. lokation",
           "Billeder i høj kvalitet til fri afbenyttelse",
           "Kvartalsvis performance-rapportering (engagement, visninger, henvendelser)",
@@ -192,7 +192,7 @@ const LABELS: Record<ContractLanguage, Labels> = {
         sub: "— 360° virtual tour",
         bullets: [
           "Fully optimized virtual tour with product and info hotspots",
-          "Published on both Google Street View and the customer's own website",
+          "Published on the customer's own website – with codes for the whole tour and for each place in it",
           "Support plus 1 annual re-shoot per location",
           "High-quality images for the customer's free use",
           "Quarterly performance reporting (engagement, views, inquiries)",
