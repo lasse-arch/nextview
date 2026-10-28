@@ -12,6 +12,10 @@ import { breakEvenRows, type BreakEvenRow } from "@/lib/break-even";
 import { BreakEvenSettingsForm } from "./break-even-settings";
 
 const MONTHS_BACK = 6;
+/** How many months "Salg pr. måned" goes back. */
+const SALES_MONTHS = 12;
+
+type SalesMonth = { key: string; label: string; count: number; establishment: number; mrr: number; commission: number };
 const WEEKS_BACK = 6;
 
 export default async function CommissionPage({
@@ -66,6 +70,7 @@ export default async function CommissionPage({
   for (const c of sellerFiltered) {
     if (c.saleDate) monthOptionValues.add(format(c.saleDate, "yyyy-MM"));
   }
+  for (let i = 0; i < SALES_MONTHS; i++) monthOptionValues.add(format(subMonths(startOfMonth(new Date()), i), "yyyy-MM"));
   const monthOptions = Array.from(monthOptionValues)
     .sort((a, b) => b.localeCompare(a))
     .map((value) => ({ value, label: format(new Date(`${value}-01`), "MMMM yyyy", { locale: da }) }));
@@ -92,6 +97,39 @@ export default async function CommissionPage({
     weeklyBars.push({ label: format(w, "'uge' I", { locale: da }), value });
   }
 
+  // "Salg pr. måned": what the seller sold each month - the same counting as
+  // the goals (soldAt, the deal's owner, MRR = monthly price, etablering = the fee).
+  const salesStart = subMonths(startOfMonth(now), SALES_MONTHS - 1);
+  const salesDeals = await prisma.deal.findMany({
+    where: { soldAt: { gte: salesStart }, ...(selectedSellerId === "all" ? {} : { ownerId: selectedSellerId }) },
+    select: { soldAt: true, saleAmount: true, establishmentFee: true, ownerId: true, owner: { select: { name: true } } },
+  });
+  const salesMonths: SalesMonth[] = [];
+  for (let i = 0; i < SALES_MONTHS; i++) {
+    const m = subMonths(startOfMonth(now), i);
+    const key = format(m, "yyyy-MM");
+    const inMonth = salesDeals.filter((d) => format(d.soldAt!, "yyyy-MM") === key);
+    salesMonths.push({
+      key,
+      label: format(m, "MMMM yyyy", { locale: da }),
+      count: inMonth.length,
+      establishment: inMonth.reduce((n, d) => n + (d.establishmentFee ?? 0), 0),
+      mrr: inMonth.reduce((n, d) => n + (d.saleAmount ?? 0), 0),
+      commission: sellerFiltered.filter((c) => c.saleDate && format(c.saleDate, "yyyy-MM") === key).reduce((n, c) => n + c.amount, 0),
+    });
+  }
+  // The month in focus: the one picked in the filter, else this month.
+  const focusKey = selectedMonth !== "all" && salesMonths.some((m) => m.key === selectedMonth) ? selectedMonth : salesMonths[0].key;
+  const focus = salesMonths.find((m) => m.key === focusKey)!;
+  const before = salesMonths[salesMonths.findIndex((m) => m.key === focusKey) + 1] ?? null;
+  const bySeller =
+    isAdmin && selectedSellerId === "all"
+      ? [...salesDeals.filter((d) => format(d.soldAt!, "yyyy-MM") === focusKey).reduce((m, d) => {
+          const x = m.get(d.ownerId) ?? { name: d.owner.name, count: 0, establishment: 0, mrr: 0 };
+          return m.set(d.ownerId, { ...x, count: x.count + 1, establishment: x.establishment + (d.establishmentFee ?? 0), mrr: x.mrr + (d.saleAmount ?? 0) });
+        }, new Map<string, { name: string; count: number; establishment: number; mrr: number }>()).values()].sort((a, b) => b.mrr - a.mrr)
+      : [];
+
   return (
     <div>
       <h1 className="text-2xl font-semibold text-slate-900">
@@ -106,7 +144,10 @@ export default async function CommissionPage({
         isAdmin={isAdmin}
       />
 
-      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <SalesOverview months={salesMonths} focus={focus} before={before} bySeller={bySeller} seller={isAdmin && selectedSellerId !== "all" ? selectedSellerId : null} />
+
+      <h2 className="mt-10 text-lg font-semibold text-slate-900">Provision</h2>
+      <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard label="Afventer udbetaling" value={formatDKK(sumPending)} />
         <StatCard label="Forfaldne" value={formatDKK(sumOverdue)} highlight={sumOverdue > 0} />
         <StatCard label="Udbetalt i alt" value={formatDKK(sumPaid)} />
@@ -356,5 +397,111 @@ function StatCard({ label, value, highlight }: { label: string; value: string; h
       <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</p>
       <p className={`money mt-1 text-xl font-semibold ${highlight ? "text-red-600" : "text-slate-900"}`}>{value}</p>
     </div>
+  );
+}
+
+/** "Salg pr. måned": the month in focus as cards (with the change from the month before), each month in a table, and - for all sellers - who sold what that month. */
+function SalesOverview({
+  months,
+  focus,
+  before,
+  bySeller,
+  seller,
+}: {
+  /** The seller picked in the filter - kept when a month is clicked. */
+  seller: string | null;
+  months: SalesMonth[];
+  focus: SalesMonth;
+  before: SalesMonth | null;
+  bySeller: { name: string; count: number; establishment: number; mrr: number }[];
+}) {
+  const diff = (now: number, then: number | undefined, money: boolean) => {
+    if (then === undefined || now === then) return null;
+    const d = now - then;
+    return <span className={d > 0 ? "text-emerald-700" : "text-slate-500"}>{`${d > 0 ? "+" : "−"}${money ? formatDKK(Math.abs(d)) : Math.abs(d)} ift. måneden før`}</span>;
+  };
+  const totals = months.reduce((t, m) => ({ count: t.count + m.count, establishment: t.establishment + m.establishment, mrr: t.mrr + m.mrr, commission: t.commission + m.commission }), { count: 0, establishment: 0, mrr: 0, commission: 0 });
+  const cards: [string, string, React.ReactNode][] = [
+    ["Salg", String(focus.count), diff(focus.count, before?.count, false)],
+    ["Etablering solgt", formatDKK(focus.establishment), diff(focus.establishment, before?.establishment, true)],
+    ["MRR solgt", formatDKK(focus.mrr), diff(focus.mrr, before?.mrr, true)],
+    ["Provision", formatDKK(focus.commission), diff(focus.commission, before?.commission, true)],
+  ];
+  return (
+    <section className="mt-6">
+      <h2 className="text-lg font-semibold text-slate-900">
+        Salg i <span className="capitalize">{focus.label}</span>
+      </h2>
+      <div className="mt-3 grid grid-cols-2 gap-4 lg:grid-cols-4">
+        {cards.map(([label, value, sub]) => (
+          <div key={label} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+            <p className="money mt-1 text-xl font-semibold text-slate-900">{value}</p>
+            <p className="mt-0.5 min-h-4 text-xs">{sub}</p>
+          </div>
+        ))}
+      </div>
+
+      {bySeller.length > 0 && (
+        <div className="mt-4 overflow-x-auto rounded-lg border border-slate-200 bg-white">
+          <table className="w-full min-w-[480px] text-sm">
+            <thead className="bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+              <tr>
+                <th className="px-4 py-2 font-medium">Sælger</th>
+                <th className="px-4 py-2 text-right font-medium">Salg</th>
+                <th className="px-4 py-2 text-right font-medium">Etablering</th>
+                <th className="px-4 py-2 text-right font-medium">MRR</th>
+              </tr>
+            </thead>
+            <tbody>
+              {bySeller.map((r) => (
+                <tr key={r.name} className="border-t border-slate-100">
+                  <td className="px-4 py-2 font-medium text-slate-900">{r.name}</td>
+                  <td className="px-4 py-2 text-right tabular-nums">{r.count}</td>
+                  <td className="money px-4 py-2 text-right">{formatDKK(r.establishment)}</td>
+                  <td className="money px-4 py-2 text-right">{formatDKK(r.mrr)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <div className="mt-4 overflow-x-auto rounded-lg border border-slate-200 bg-white">
+        <table className="w-full min-w-[560px] text-sm">
+          <thead className="bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+            <tr>
+              <th className="px-4 py-2 font-medium">Måned</th>
+              <th className="px-4 py-2 text-right font-medium">Salg</th>
+              <th className="px-4 py-2 text-right font-medium">Etablering solgt</th>
+              <th className="px-4 py-2 text-right font-medium">MRR solgt</th>
+              <th className="px-4 py-2 text-right font-medium">Provision</th>
+            </tr>
+          </thead>
+          <tbody>
+            {months.map((m) => (
+              <tr key={m.key} className={`border-t border-slate-100 ${m.key === focus.key ? "bg-blue-50/50" : ""} ${m.count === 0 && m.commission === 0 ? "text-slate-400" : ""}`}>
+                <td className="px-4 py-2 font-medium capitalize">
+                  <Link href={`?${new URLSearchParams({ ...(seller ? { seller } : {}), month: m.key })}`} className="hover:underline">
+                    {m.label}
+                  </Link>
+                </td>
+                <td className="px-4 py-2 text-right tabular-nums">{m.count}</td>
+                <td className="money px-4 py-2 text-right">{formatDKK(m.establishment)}</td>
+                <td className="money px-4 py-2 text-right">{formatDKK(m.mrr)}</td>
+                <td className="money px-4 py-2 text-right">{formatDKK(m.commission)}</td>
+              </tr>
+            ))}
+            <tr className="border-t border-slate-200 bg-slate-50 font-semibold text-slate-900">
+              <td className="px-4 py-2">Seneste {months.length} måneder</td>
+              <td className="px-4 py-2 text-right tabular-nums">{totals.count}</td>
+              <td className="money px-4 py-2 text-right">{formatDKK(totals.establishment)}</td>
+              <td className="money px-4 py-2 text-right">{formatDKK(totals.mrr)}</td>
+              <td className="money px-4 py-2 text-right">{formatDKK(totals.commission)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }

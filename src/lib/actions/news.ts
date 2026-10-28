@@ -63,6 +63,12 @@ export async function getUnreadNewsCount(userId: string, newsReadAt: Date | null
 const DEFAULT_POSTS: { title: string; body: string; minutesAgo: number; screenshotUrl: string }[] = [
   {
     minutesAgo: 0,
+    title: "Salg pr. måned på Provision",
+    body: "Øverst på Provision kan sælgerne nu se, hvad de har solgt måned for måned: antal salg, etablering solgt, MRR solgt og provision - med den valgte måned som kort øverst (og hvor meget det er op eller ned i forhold til måneden før) og de seneste 12 måneder i en tabel med totaler. Klik på en måned for at se den.\n\nSom sælger ser du kun dine egne salg. Som admin kan du se alle samlet, hvem der solgte hvad i måneden, eller vælge én sælger. Tallene tælles som i målene: salgsdatoen, dealens sælger, MRR = den månedlige pris.",
+    screenshotUrl: "/news/salg-pr-maaned.png",
+  },
+  {
+    minutesAgo: 0,
     title: "Ny besøgsrapport - og kunden vælger selv, hvor tit",
     body: "Besøgsrapporten er lavet helt om. For kunder med tours i Arpo bygges den nu af vores egne tal - de samme som på kundens side - og den viser tydeligt, hvad touren gør for dem: antal besøg (og hvordan det går ift. perioden før), hvor mange timer de besøgende tilsammen har brugt i touren, hvor mange der gik videre til booking eller kontakt, det mest besøgte sted, hvor de blev længst, hvad de valgte i menuen og åbnede, og flere tours side om side. Kun det, touren er sat til at dele med kunden, kommer med.\n\nMailen viser nu de vigtigste tal direkte i selve mailen med en knap til kundens side, så værdien ses uden at åbne PDF'en. Rapporten dækker den periode, den sendes for (1, 2 eller 3 måneder).\n\nKunden kan selv vælge på sin side under Statistik → \"Statistik på mail\": hver måned, hver 2. måned, hver 3. måned eller ikke på mail. I kan stadig ændre det på dealen. Kunder, hvis tours stadig kun ligger på explore, får den gamle rapport.",
     screenshotUrl: "/news/besoegsrapport.png",
