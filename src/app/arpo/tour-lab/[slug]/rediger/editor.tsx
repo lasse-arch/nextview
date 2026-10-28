@@ -1812,14 +1812,37 @@ function DealPicker({ slug, initial }: { slug: string; initial: { id: string; na
   const [deal, setDeal] = useState(initial);
   const [q, setQ] = useState("");
   const [hits, setHits] = useState<{ id: string; companyName: string; displayName: string | null }[]>([]);
-  const [, start] = useTransition();
-  const pick = (d: { id: string; name: string } | null) =>
-    start(async () => {
-      await setTourDeal(slug, d?.id ?? null);
-      setDeal(d);
-      setQ("");
-      setHits([]);
-    });
+  const [error, setError] = useState<string | null>(null);
+  /*
+   * Server actions run one at a time, so a search per keystroke queued up in
+   * front of the pick: it searches once typing pauses, only the newest answer
+   * counts, and a pick shows at once (saved meanwhile, put back if it fails).
+   */
+  const timer = useRef(0);
+  const asked = useRef("");
+  const search = (query: string) => {
+    window.clearTimeout(timer.current);
+    asked.current = query;
+    if (query.trim().length < 2) return setHits([]);
+    timer.current = window.setTimeout(async () => {
+      const found = await searchDeals(query);
+      if (asked.current === query) setHits(found);
+    }, 250);
+  };
+  const pick = async (d: { id: string; name: string } | null) => {
+    const before = deal;
+    window.clearTimeout(timer.current);
+    asked.current = "";
+    setDeal(d);
+    setQ("");
+    setHits([]);
+    setError(null);
+    const r = await setTourDeal(slug, d?.id ?? null).catch(() => ({ ok: false as const, error: "Kunne ikke gemme kunden." }));
+    if (!r.ok) {
+      setDeal(before);
+      setError("error" in r && r.error ? r.error : "Kunne ikke gemme kunden.");
+    }
+  };
   return (
     <Field title="Kunde">
       {deal ? (
@@ -1839,8 +1862,7 @@ function DealPicker({ slug, initial }: { slug: string; initial: { id: string; na
             value={q}
             onChange={(e) => {
               setQ(e.target.value);
-              const query = e.target.value;
-              start(async () => setHits(await searchDeals(query)));
+              search(e.target.value);
             }}
           />
           {hits.length > 0 && (
@@ -1856,6 +1878,7 @@ function DealPicker({ slug, initial }: { slug: string; initial: { id: string; na
           )}
         </div>
       )}
+      {error && <p className="mt-1 text-[12px] text-[#ff3b30]">{error}</p>}
     </Field>
   );
 }
