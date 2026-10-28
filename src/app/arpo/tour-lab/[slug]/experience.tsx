@@ -1373,7 +1373,9 @@ function TourExperience({
       off = true;
     };
   }, [T.live, savedTour.slug]);
-  const freeNames = useMemo(() => liveUnits.map((u) => u.name.toLowerCase()), [liveUnits]);
+  /** Prices and memberships, not free units: no counts, no "ledig", no badges in the menu. */
+  const livePrices = T.live?.kind === "priser";
+  const freeNames = useMemo(() => (livePrices ? [] : liveUnits.map((u) => u.name.toLowerCase())), [liveUnits, livePrices]);
   /** Is a menu item one of the free units? Whole words only - unit "1" isn't "12". */
   const isFree = (name: string) => {
     const n = name.toLowerCase();
@@ -2017,7 +2019,7 @@ function TourExperience({
         )}
         {T.live && liveUnits.length > 0 && (
           <button type="button" className="hv-gtitel hv-enkel hv-live-knap" onClick={() => openLive("menu")}>
-            <i /> {T.live.title} <span>{liveUnits.length}</span>
+            <i /> {T.live.title} {!livePrices && <span>{liveUnits.length}</span>}
           </button>
         )}
         {T.menu.filter((m) => !("items" in m) || m.items.length > 0).map((m) => // an empty group (nothing in it yet) isn't shown
@@ -2162,7 +2164,7 @@ function TourExperience({
 
       {T.live && liveUnits.length > 0 && phase === "tour" && !cover && !liveOpen && (
         <button type="button" className="hv-live-chip" onClick={() => openLive("chip")}>
-          <i /> {liveUnits.length} {T.live.title.toLowerCase()}
+          <i /> {livePrices ? T.live.title : `${liveUnits.length} ${T.live.title.toLowerCase()}`}
         </button>
       )}
       {liveOpen && T.live && (
@@ -2170,7 +2172,7 @@ function TourExperience({
           <div className="hv-live-sheet" onClick={(e) => e.stopPropagation()}>
             <div className="hv-live-head">
               <b>{T.live.title}</b>
-              <span>{liveUnits.length} lige nu</span>
+              {!livePrices && <span>{liveUnits.length} lige nu</span>}
               <button type="button" aria-label="Luk" onClick={() => setLiveOpen(false)}>
                 ×
               </button>
@@ -2182,7 +2184,11 @@ function TourExperience({
                   <li key={u.name}>
                     <span>
                       <b>{u.name}</b>
-                      <small>{[T.live!.showSize !== false && u.size && (/^\d+$/.test(u.size.trim()) ? `${u.size.trim()} ledige` : u.size), u.from && (/^(ledig|nu)\b/i.test(u.from) ? "ledig nu" : `ledig fra ${u.from}`)].filter(Boolean).join(", ")}</small>
+                      <small>
+                        {livePrices
+                          ? [T.live!.showSize !== false && u.size, u.from].filter(Boolean).join(" · ")
+                          : [T.live!.showSize !== false && u.size && (/^\d+$/.test(u.size.trim()) ? `${u.size.trim()} ledige` : u.size), u.from && (/^(ledig|nu)\b/i.test(u.from) ? "ledig nu" : `ledig fra ${u.from}`)].filter(Boolean).join(", ")}
+                      </small>
                     </span>
                     {u.price && <em>{u.price}</em>}
                     {T.live!.places?.[u.name] && (

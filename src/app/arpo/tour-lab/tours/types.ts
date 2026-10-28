@@ -381,6 +381,8 @@ export type TourConfig = {
   live?: {
     url: string;
     title: string;
+    /** "priser": prices and memberships (a gym's memberships, a menu …) - shown without counts, "ledig" or badges. Default: free units. */
+    kind?: "priser";
     pattern: string;
     flags?: string;
     exclude?: string[];

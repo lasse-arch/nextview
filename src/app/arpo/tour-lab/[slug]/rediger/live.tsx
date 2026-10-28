@@ -65,7 +65,7 @@ export function LiveDataEditor({ config, edit, slug, preview }: { config: TourCo
   return (
     <>
       <Group>
-        <p className="text-[14px] leading-snug">Vis ledige pladser, rum eller boliger direkte fra kundens egen side - fx ledige campingpladser eller depotrum. Touren viser dem live og opdaterer selv hvert 10. minut.</p>
+        <p className="text-[14px] leading-snug">Vis ledige pladser, rum eller boliger - eller priser og medlemskaber - direkte fra kundens egen side, fx ledige campingpladser, depotrum eller et fitnesscenters medlemskaber. Touren viser dem live og opdaterer selv.</p>
         <Field title="Siden med de ledige" hint="Den side på kundens hjemmeside, hvor listen står.">
           <input className={input} value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://kunden.dk/ledige-pladser" />
         </Field>
@@ -82,6 +82,20 @@ export function LiveDataEditor({ config, edit, slug, preview }: { config: TourCo
       {live && (
         <>
           <Group title="I touren">
+            <Field title="Det er" hint={live.kind === "priser" ? "Vises som en liste med pris og knap - uden antal og uden \"ledig\"." : "Vises som ledige med antal - og \"Ledig\" ved menupunkter med samme navn."}>
+              <div className="flex rounded-lg bg-[#f2f2f7] p-0.5 text-[13px] font-medium">
+                {(
+                  [
+                    [undefined, "Ledige (pladser, rum …)"],
+                    ["priser", "Priser og medlemskaber"],
+                  ] as const
+                ).map(([k, label]) => (
+                  <button key={label} type="button" onClick={() => edit((d) => void (k ? (d.live!.kind = k) : delete d.live!.kind))} className={`flex-1 rounded-md py-1.5 ${live.kind === k ? "bg-white shadow-sm" : "text-[#6e6e73]"}`}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </Field>
             <Field title="Titel">
               <input className={input} value={live.title} onChange={(e) => edit((d) => void (d.live!.title = e.target.value))} />
             </Field>

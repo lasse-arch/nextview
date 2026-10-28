@@ -21,8 +21,19 @@ export const fitnessGronlandstorv: TourConfig = {
   colors: { main: "#1b2526", accent: "#68c4c6", accentDark: "#3e9fa1", soft: "#eeeeea" },
   font: "Barlow",
   cta: [
-    { label: "Bliv medlem - første måned halv pris", href: "https://fitnessunited.dk/bliv-medlem/aalborg", primary: true },
+    // Opens the memberships (Live data) inside the tour - each with its own "Vælg" to sign up.
+    { label: "Bliv medlem - første måned halv pris", href: "#live", primary: true },
   ],
+  /** The memberships and their prices, read off Fitness United's own sign-up page once a day. */
+  live: {
+    url: "https://fitnessunited.dk/bliv-medlem/aalborg-gronlands-torv",
+    title: "Medlemskaber",
+    kind: "priser",
+    pattern: String.raw`\n[ \t]*(?<name>[^\n\[\]]{2,40}?)[ \t]*\nMEDLEMSKAB[ \t]*\n(?:[ \t]*(?<size>[^\n]*(?:pris|gratis|rabat)[^\n]*?)[ \t]*\n)?[\s\S]{0,300}?Normalpris\s+(?<price>[^\n]*?pr\. ?md\.)[\s\S]{0,1500}?\[Vælg\]\((?<link>[^)\s]+)\)`,
+    flags: "i",
+    bookLabel: "Vælg",
+    refreshMinutes: 1440,
+  },
   contact: {
     address: "Grønlands Torv, Aalborg",
     mapUrl: "https://www.google.com/maps/search/?api=1&query=Fitness+United+Aalborg+Gr%C3%B8nlands+Torv",
