@@ -93,9 +93,12 @@ const LABELS: Record<ContractLanguage, Labels> = {
         bullets: [
           "Fuldt optimeret virtuel rundvisning med produkt- og infohotspots",
           "Udgivelse på egen hjemmeside – med koder til hele touren og til hvert sted i den",
-          "Support samt 1 årlig genoptagelse pr. lokation – yderligere genoptagelser aftales til en pris pr. optagelse",
-          "Billeder i høj kvalitet til fri afbenyttelse",
-          "Kvartalsvis performance-rapportering (engagement, visninger, henvendelser)",
+          "Touren på flere sprog efter behov – inkluderet",
+          "Adgang til egen kundeportal med statistik, der opdateres løbende: antal besøg, hvor de besøgende går hen og bliver længst, hvad de klikker på, og hvor mange der går videre til booking eller kontakt. Her findes også koderne til hjemmesiden, rettelser til touren og kontrakten",
+          "Besøgsrapport på mail hver måned, hver 2. eller hver 3. måned – kunden vælger selv",
+          "Løbende opdatering og udvikling af touren og platformen samt support",
+          "1 årlig genoptagelse pr. lokation – yderligere genoptagelser aftales til en pris pr. optagelse",
+          "Billeder i høj kvalitet, taget i forbindelse med den virtuelle tour, som kunden frit kan bruge – fx på hjemmeside, sociale medier og i markedsføring",
         ],
         quantityLabel: "Antal lokationer",
         unitPriceLabel: "Etableringspris (eks. moms)",
@@ -152,7 +155,7 @@ const LABELS: Record<ContractLanguage, Labels> = {
     additionalTermsTitle: "Yderligere betingelser",
     section3Title: "3) Løbetid og opsigelse",
     section3Body:
-      "Aftalen træder i kraft ved underskrift af begge parter. Bindingsperioden starter dog først, når det/de valgte produkt(er) er afleveret/leveret af leverandøren til kunden.",
+      "Aftalen træder i kraft ved underskrift af begge parter. Bindingsperioden starter, når det/de valgte produkt(er) er leveret til kunden. Aftalen forlænges automatisk med en periode af samme længde som bindingsperioden, medmindre den opsiges skriftligt med det opsigelsesvarsel, der står herunder, til udgangen af den løbende periode.",
     bindingLabel: "Bindingsperiode",
     noticeLabel: "Opsigelsesvarsel",
     monthsSuffix: "måneder",
@@ -160,6 +163,7 @@ const LABELS: Record<ContractLanguage, Labels> = {
     section4Body: [
       "Fakturering sker kvartalsvist forud (netto 8 dage), medmindre andet er angivet under Yderligere betingelser.",
       "Betaling sker via faktura eller efter aftale om automatisk betaling. Forsinket betaling påløber rente efter renteloven.",
+      "Betales en faktura ikke senest 14 dage efter forfald, og er der sendt en skriftlig rykker, kan leverandøren lukke touren, indtil der er betalt. Ved væsentlig misligholdelse, herunder gentagen manglende betaling, kan leverandøren hæve aftalen, og det resterende beløb for den løbende periode forfalder da straks til betaling. Rykkergebyr og inkassoomkostninger opkræves efter gældende regler.",
     ],
     section5Title: "5) Fortrolighed",
     section5Body:
@@ -193,9 +197,12 @@ const LABELS: Record<ContractLanguage, Labels> = {
         bullets: [
           "Fully optimized virtual tour with product and info hotspots",
           "Published on the customer's own website – with codes for the whole tour and for each place in it",
-          "Support plus 1 annual re-shoot per location – further re-shoots are agreed at a price per shoot",
-          "High-quality images for the customer's free use",
-          "Quarterly performance reporting (engagement, views, inquiries)",
+          "The tour in several languages as needed – included",
+          "Access to the customer's own portal with continuously updated statistics: number of visits, where visitors go and stay longest, what they click on, and how many go on to booking or contact. The portal also holds the website codes, tour change requests and the contract",
+          "Visitor report by e-mail every month, every 2 or every 3 months – the customer chooses",
+          "Ongoing updates and development of the tour and the platform, plus support",
+          "1 annual re-shoot per location – further re-shoots are agreed at a price per shoot",
+          "High-quality images, taken in connection with the virtual tour, which the customer may use freely – e.g. on their website, social media and in marketing",
         ],
         quantityLabel: "Number of locations",
         unitPriceLabel: "Setup fee (excl. VAT)",
@@ -252,7 +259,7 @@ const LABELS: Record<ContractLanguage, Labels> = {
     additionalTermsTitle: "Additional Terms",
     section3Title: "3) Term and Termination",
     section3Body:
-      "This agreement takes effect once signed by both parties. The binding period, however, only begins once the selected product(s) have been delivered by the Supplier to the Customer.",
+      "This agreement takes effect once signed by both parties. The binding period begins once the selected product(s) have been delivered to the Customer. The agreement is automatically renewed for a period of the same length as the binding period, unless it is terminated in writing with the notice period stated below, effective at the end of the current period.",
     bindingLabel: "Binding period",
     noticeLabel: "Notice period",
     monthsSuffix: "months",
@@ -260,6 +267,7 @@ const LABELS: Record<ContractLanguage, Labels> = {
     section4Body: [
       "Invoicing is quarterly in advance (net 8 days), unless otherwise stated under Additional Terms.",
       "Payment is made by invoice or by agreement on automatic payment. Late payment accrues interest under the Danish Interest Act.",
+      "If an invoice is not paid within 14 days after the due date and a written reminder has been sent, the Supplier may close the tour until payment has been made. In case of material breach, including repeated non-payment, the Supplier may terminate the agreement, and the remaining amount for the current period then falls due immediately. Reminder fees and collection costs are charged in accordance with applicable rules.",
     ],
     section5Title: "5) Confidentiality",
     section5Body:
