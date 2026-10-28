@@ -21,7 +21,7 @@ import type { ReportInterval, ReportLanguage, ReportSendStatus } from "@prisma/c
 const INTERVAL_LABELS: Record<ReportInterval, string> = {
   MONTHLY: "Hver måned",
   BIMONTHLY: "Hver 2. måned",
-  QUARTERLY: "Hvert kvartal",
+  QUARTERLY: "Hver 3. måned",
 };
 
 export type StatsCustomerRowData = {

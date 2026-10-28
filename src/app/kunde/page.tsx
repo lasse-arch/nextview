@@ -15,7 +15,7 @@ import type { TourConfig } from "@/app/arpo/tour-lab/tours/types";
 import { startPlaces } from "@/app/arpo/tour-lab/tours/places";
 import { PortalEmbeds } from "@/app/r/[token]/embeds";
 import { PHONE, WELCOME_MAIL_SENDER } from "@/lib/welcome-mail";
-import { LangToggle, LocationSwitcher, ReviewLauncher, TourThumb, ApproveTour } from "./portal-ui";
+import { LangToggle, LocationSwitcher, ReviewLauncher, TourThumb, ApproveTour, ReportMailChoice } from "./portal-ui";
 import { TourShare } from "./tour-share";
 import { TEXT, type Lang } from "./text";
 
@@ -76,6 +76,10 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
       contractSignedAt: true,
       docusealSubmissionId: true,
       contractProducts: true,
+      reportInterval: true,
+      nextReportDueAt: true,
+      invoiceEmail: true,
+      contactEmail: true,
       items: { where: { url: { not: null } }, orderBy: { createdAt: "asc" }, select: { id: true, productType: true, location: true, url: true } },
       // Published tours - and one sent to them for review before it's published (only on Rettelser).
       tours: {
@@ -326,6 +330,21 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
                 <h1 className="text-[30px] font-bold tracking-tight">{t.statsTitle}</h1>
                 <p className="mt-1 text-[15px] text-[#6e6e73]">{t.statsLead}</p>
               </div>
+              {root && (tours.length > 0 || older.length > 0) && (
+                <section className={card}>
+                  <h2 className="text-[18px] font-bold tracking-tight">{t.reportMail.title}</h2>
+                  <p className="mb-3 mt-0.5 text-[14px] text-[#6e6e73]">{who.preview ? t.reportMail.preview : t.reportMail.lead}</p>
+                  <ReportMailChoice current={root.reportInterval ?? "OFF"} disabled={Boolean(who.preview)} words={{ options: t.reportMail.options, saved: t.reportMail.saved }} />
+                  <p className="text-[13px] text-[#6e6e73]">
+                    {[
+                      root.reportInterval && (root.invoiceEmail || root.contactEmail) && t.reportMail.to(root.invoiceEmail || root.contactEmail!),
+                      root.reportInterval && root.nextReportDueAt && t.reportMail.next(fmtDate(root.nextReportDueAt, lang)),
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
+                </section>
+              )}
               {!together || !togetherShare ? (
                 <section className={card}>
                   <p className="text-[15px] text-[#3a3a3c]">{tours.length || older.length ? t.noStatsYet : t.notLive}</p>

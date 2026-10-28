@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { setPortalLanguage } from "@/lib/actions/portal-language";
 import { portalApprove, portalReview } from "@/lib/actions/portal-review";
+import { setMyReportInterval, type PortalReportChoice } from "@/lib/actions/portal-report";
 
 /*
  * The customer page's moving parts: the location picker (like Wolt's - "all
@@ -205,5 +206,57 @@ export function ReviewLauncher({ slug, title, words }: { slug: string; title: st
         </div>
       )}
     </>
+  );
+}
+
+/** "Statistik på mail": how often the report comes - the customer's own choice (the team can change it in Arpo too). */
+export function ReportMailChoice({
+  current,
+  disabled,
+  words,
+}: {
+  current: PortalReportChoice;
+  /** The team's "Se som kunde" - shown, not changed (that's done on the deal). */
+  disabled?: boolean;
+  words: { options: Record<PortalReportChoice, string>; saved: string };
+}) {
+  const router = useRouter();
+  const [chosen, setChosen] = useState(current);
+  const [state, setState] = useState<"idle" | "saving" | "saved" | string>("idle");
+  async function pick(c: PortalReportChoice) {
+    if (disabled || c === chosen) return;
+    const before = chosen;
+    setChosen(c);
+    setState("saving");
+    const r = await setMyReportInterval(c).catch(() => ({ ok: false as const, error: "Der skete en fejl - prøv igen." }));
+    if (r.ok) {
+      setState("saved");
+      router.refresh();
+    } else {
+      setChosen(before);
+      setState(r.error);
+    }
+  }
+  return (
+    <div>
+      <div role="radiogroup" className="flex flex-wrap gap-2">
+        {(Object.keys(words.options) as PortalReportChoice[]).map((c) => (
+          <button
+            key={c}
+            type="button"
+            role="radio"
+            aria-checked={chosen === c}
+            disabled={disabled}
+            onClick={() => pick(c)}
+            className={`rounded-full px-4 py-2 text-[14px] font-semibold transition ${chosen === c ? "bg-[#1d1d1f] text-white" : "bg-[#f3f3f5] text-[#1d1d1f] hover:bg-[#e8e8ed]"} disabled:cursor-not-allowed ${disabled && chosen !== c ? "opacity-50" : ""}`}
+          >
+            {words.options[c]}
+          </button>
+        ))}
+      </div>
+      <p aria-live="polite" className={`mt-2 h-4 text-[12.5px] ${state === "saved" ? "text-[#1a7f37]" : state === "idle" || state === "saving" ? "text-[#6e6e73]" : "text-[#d70015]"}`}>
+        {state === "saved" ? `✓ ${words.saved}` : state === "idle" || state === "saving" ? "" : state}
+      </p>
+    </div>
   );
 }

@@ -12,6 +12,7 @@ import {
   type CombinedCustomerReportBranch,
 } from "@/lib/customer-report-template";
 import { renderCustomerReportPdf } from "@/lib/customer-report-pdf";
+import { buildArpoReport } from "@/lib/arpo-report";
 import { sendGmailMessage } from "@/lib/gmail";
 import { findOrCreateCustomerStatsFolder, uploadPdfToDrive } from "@/lib/google-drive";
 import { getAppBaseUrl } from "@/lib/email-oauth";
@@ -62,6 +63,22 @@ function parseMpSkinIds(raw: string | null): string[] {
 /** The report email's body, matching the signature/wording Lasse uses when sending manually. */
 /** Describes the period the report covers to match how often it's actually sent -
  * a quarterly customer shouldn't be told their report is "for the latest month". */
+/**
+ * The deals whose report is built from Arpo's own numbers: when they have
+ * published tours in Arpo and none of them is still only on explore (an
+ * MP-Skin nummer and no Arpo tour) - otherwise its numbers would be missing.
+ * Null = the old report from explore.nextview360.dk.
+ */
+async function arpoReportDealIds(deals: { id?: string; mpSkinId: string | null }[]): Promise<string[] | null> {
+  const ids = deals.map((d) => d.id).filter((id): id is string => Boolean(id));
+  if (ids.length !== deals.length || !ids.length) return null;
+  const withTours = new Set(
+    (await prisma.tour.findMany({ where: { dealId: { in: ids }, published: true }, select: { dealId: true } })).map((t) => t.dealId)
+  );
+  if (!withTours.size) return null;
+  return deals.every((d) => withTours.has(d.id!) || parseMpSkinIds(d.mpSkinId).length === 0) ? ids : null;
+}
+
 function periodPhrase(interval: ReportInterval | null, language: ReportLanguage): string {
   if (language === "EN") {
     switch (interval) {
@@ -85,6 +102,30 @@ function periodPhrase(interval: ReportInterval | null, language: ReportLanguage)
     default:
       return "for den seneste periode";
   }
+}
+
+/** "The numbers are always up to date on your page" - for customers whose report is from Arpo's numbers (the same as on their page). */
+function portalLine(language: ReportLanguage): { text: string; html: string } {
+  const url = `${getAppBaseUrl()}/kunde`;
+  const shown = url.replace(/^https?:\/\/(www\.)?/, "");
+  return language === "EN"
+    ? {
+        text: `The numbers are always up to date on your own page, ${url} - where you can also choose how often you get this report.\n\n`,
+        html: `<p>The numbers are always up to date on your own page, <a href="${url}">${shown}</a> - where you can also choose how often you get this report.</p>\n`,
+      }
+    : {
+        text: `Tallene opdateres hele tiden på jeres egen side, ${url} - dér kan I også selv vælge, hvor tit I får rapporten.\n\n`,
+        html: `<p>Tallene opdateres hele tiden på jeres egen side, <a href="${url}">${shown}</a> - dér kan I også selv vælge, hvor tit I får rapporten.</p>\n`,
+      };
+}
+
+/** The headline numbers (a card) after the opening line, and the portal line after "see the attached PDF". */
+function withArpoSummary(mail: { subject: string; bodyText: string; bodyHtml: string }, language: ReportLanguage, card: { html: string; text: string }) {
+  const line = portalLine(language);
+  mail = { ...mail, bodyText: mail.bodyText.replace(/^([^\n]*\n\n[^\n]*\n\n)/, `$1${card.text}`), bodyHtml: mail.bodyHtml.replace(/(<p>[^<]*<\/p>\n<p>[^<]*<\/p>\n)/, `$1${card.html}\n`) };
+  const after = language === "EN" ? /(Please see the attached PDF[^\n]*\n\n)/ : /(Se vedhæftede PDF[^\n]*\n\n)/;
+  const afterHtml = language === "EN" ? /(<p>Please see the attached PDF[^<]*<\/p>\n)/ : /(<p>Se vedhæftede PDF[^<]*<\/p>\n)/;
+  return { ...mail, bodyText: mail.bodyText.replace(after, `$1${line.text}`), bodyHtml: mail.bodyHtml.replace(afterHtml, `$1${line.html}`) };
 }
 
 function buildReportEmailText(
@@ -210,10 +251,14 @@ export function computeNextReportDueAt(
 }
 
 export type ReportPdfDeal = {
+  /** With the id, a deal whose tours are in Arpo gets the report from Arpo's own numbers. */
+  id?: string;
   companyName: string;
   displayName: string | null;
   mpSkinId: string | null;
   reportLanguage: ReportLanguage;
+  /** The period the Arpo report covers (a month when not set). */
+  reportInterval?: ReportInterval | null;
 };
 
 /**
@@ -224,11 +269,16 @@ export type ReportPdfDeal = {
  * "send" in any sense that should touch nextReportDueAt or the send history.
  */
 export async function generateCustomerReportPdfBuffer(deal: ReportPdfDeal): Promise<Buffer> {
-  const mpSkinIds = parseMpSkinIds(deal.mpSkinId);
-  if (mpSkinIds.length === 0) throw new Error("Dealen har intet MP-Skin nummer udfyldt.");
-
   const customerName = deal.displayName || deal.companyName;
   const language = deal.reportLanguage;
+  const arpo = await arpoReportDealIds([deal]);
+  if (arpo) {
+    const built = await buildArpoReport({ customerName, language, interval: deal.reportInterval ?? null, dealIds: arpo });
+    if (built) return built.pdf;
+  }
+
+  const mpSkinIds = parseMpSkinIds(deal.mpSkinId);
+  if (mpSkinIds.length === 0) throw new Error("Dealen har hverken en tour i Arpo eller et MP-Skin nummer udfyldt.");
   const monthLabel = currentMonthLabel(language);
 
   const tourData = await fetchMatterportTourData(mpSkinIds);
@@ -257,11 +307,16 @@ export async function generateCombinedCustomerReportPdfBuffer(
   prefetched?: { branches: CombinedCustomerReportBranch[]; coverImage: Buffer }
 ): Promise<Buffer> {
   const allDeals = [deal, ...branches];
-  const reportableDeals = allDeals.filter((d) => parseMpSkinIds(d.mpSkinId).length > 0);
-  if (reportableDeals.length === 0) throw new Error("Ingen af de sammenkoblede deals har et MP-Skin nummer udfyldt.");
-
   const customerName = deal.displayName || deal.companyName;
   const language = deal.reportLanguage;
+  const arpo = await arpoReportDealIds(allDeals);
+  if (arpo) {
+    const built = await buildArpoReport({ customerName, language, interval: deal.reportInterval ?? null, dealIds: arpo });
+    if (built) return built.pdf;
+  }
+
+  const reportableDeals = allDeals.filter((d) => parseMpSkinIds(d.mpSkinId).length > 0);
+  if (reportableDeals.length === 0) throw new Error("Ingen af de sammenkoblede deals har et MP-Skin nummer udfyldt.");
   const monthLabel = currentMonthLabel(language);
 
   const branchReports: CombinedCustomerReportBranch[] = prefetched?.branches ?? [];
@@ -297,8 +352,6 @@ export async function generateAndSendCustomerReport(
   existingReportId?: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
-    const mpSkinIds = parseMpSkinIds(deal.mpSkinId);
-    if (mpSkinIds.length === 0) throw new Error("Dealen har intet MP-Skin nummer udfyldt.");
     const recipient = deal.invoiceEmail || deal.contactEmail;
     if (!recipient) throw new Error("Dealen har ingen e-mail at sende rapporten til.");
 
@@ -306,15 +359,10 @@ export async function generateAndSendCustomerReport(
     const language = deal.reportLanguage;
     const monthLabel = currentMonthLabel(language);
 
-    const tourData = await fetchMatterportTourData(mpSkinIds);
-    const html = buildCustomerReportHtml({
-      customerName,
-      monthLabel,
-      coverImage: tourData.coverImage,
-      stats: tourData.stats,
-      language,
-    });
-    const pdf = await renderCustomerReportPdf(html);
+    // From Arpo's own numbers when the tours are there, else scraped from explore.
+    const arpoIds = await arpoReportDealIds([deal]);
+    const built = arpoIds ? await buildArpoReport({ customerName, language, interval: deal.reportInterval, dealIds: arpoIds }) : null;
+    const pdf = built?.pdf ?? (await generateCustomerReportPdfBuffer(deal));
 
     const account = await findReportSenderAccount();
     const fileName = `${customerName} - ${language === "EN" ? "visitor report" : "besøgsrapport"} ${monthLabel}.pdf`;
@@ -329,7 +377,8 @@ export async function generateAndSendCustomerReport(
       console.error("Kunne ikke arkivere besøgsrapport i Google Drev", err);
     }
 
-    const emailText = buildReportEmailText(customerName, deal.reportInterval, language);
+    const plain = buildReportEmailText(customerName, deal.reportInterval, language);
+    const emailText = built ? withArpoSummary(plain, language, built.mail) : plain;
     // Same open-tracking pattern as the deal-email composer (see
     // sendTemplatedEmailAction) - lets the Stats page show whether/when the
     // customer actually opened this report.
@@ -408,7 +457,8 @@ export async function generateAndSendCombinedCustomerReport(
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
     const allDeals = [deal, ...branches];
-    const reportableDeals = allDeals.filter((d) => parseMpSkinIds(d.mpSkinId).length > 0);
+    const arpoIds = await arpoReportDealIds(allDeals);
+    const reportableDeals = arpoIds ? allDeals : allDeals.filter((d) => parseMpSkinIds(d.mpSkinId).length > 0);
     if (reportableDeals.length === 0) throw new Error("Ingen af de sammenkoblede deals har et MP-Skin nummer udfyldt.");
 
     const recipient = deal.invoiceEmail || deal.contactEmail;
@@ -418,7 +468,8 @@ export async function generateAndSendCombinedCustomerReport(
     const language = deal.reportLanguage;
     const monthLabel = currentMonthLabel(language);
 
-    const pdf = await generateCombinedCustomerReportPdfBuffer(deal, branches, prefetched);
+    const built = arpoIds ? await buildArpoReport({ customerName, language, interval: deal.reportInterval, dealIds: arpoIds }) : null;
+    const pdf = built?.pdf ?? (await generateCombinedCustomerReportPdfBuffer(deal, branches, prefetched));
 
     const account = await findReportSenderAccount();
     const fileName = `${customerName} - ${language === "EN" ? "combined visitor report" : "samlet besøgsrapport"} ${monthLabel}.pdf`;
@@ -441,7 +492,8 @@ export async function generateAndSendCombinedCustomerReport(
       }
     }
 
-    const emailText = buildCombinedReportEmailText(customerName, deal.reportInterval, language);
+    const plain = buildCombinedReportEmailText(customerName, deal.reportInterval, language);
+    const emailText = built ? withArpoSummary(plain, language, built.mail) : plain;
     const trackingId = crypto.randomUUID();
     const pixel = `<img src="${getAppBaseUrl()}/api/track/report-open/${trackingId}" width="1" height="1" style="display:none" alt="" />`;
     await sendGmailMessage(account, {
@@ -520,8 +572,8 @@ export async function enqueueScheduledCustomerReports(): Promise<{ queued: numbe
       reportInterval: { not: null },
       nextReportDueAt: { lte: new Date() },
       // A parent sending combined may have no MP-Skin nummer of its own -
-      // its branches' stats are what goes out.
-      OR: [{ mpSkinId: { not: null } }, { reportCombineBranches: true }],
+      // its branches' stats are what goes out. A tour in Arpo has its own numbers.
+      OR: [{ mpSkinId: { not: null } }, { reportCombineBranches: true }, { tours: { some: { published: true } } }],
       churnedAt: null,
       stage: { in: [...REPORTABLE_STAGES] },
     },
@@ -529,9 +581,10 @@ export async function enqueueScheduledCustomerReports(): Promise<{ queued: numbe
       id: true,
       mpSkinId: true,
       reportCombineBranches: true,
+      _count: { select: { tours: { where: { published: true } } } },
       parent: { select: { reportCombineBranches: true } },
       branches: {
-        where: { mpSkinId: { not: null }, churnedAt: null, stage: { in: [...REPORTABLE_STAGES] } },
+        where: { OR: [{ mpSkinId: { not: null } }, { tours: { some: { published: true } } }], churnedAt: null, stage: { in: [...REPORTABLE_STAGES] } },
         select: { id: true },
       },
     },
@@ -545,7 +598,7 @@ export async function enqueueScheduledCustomerReports(): Promise<{ queued: numbe
     if (d.parent?.reportCombineBranches) continue;
     if (d.reportCombineBranches && d.branches.length > 0) {
       rows.push({ dealId: d.id, branchDealIds: d.branches.map((b) => b.id).join(",") });
-    } else if (d.mpSkinId) {
+    } else if (d.mpSkinId || d._count.tours > 0) {
       rows.push({ dealId: d.id, branchDealIds: null });
     }
   }
@@ -656,6 +709,10 @@ export async function processOneQueuedReport(): Promise<{ processed: boolean; re
         errorMessage: `Sprunget over - kunden fik allerede en rapport kl. ${recentlySent.sentAt.toLocaleTimeString("da-DK", { timeZone: "Europe/Copenhagen", hour: "2-digit", minute: "2-digit" })}.`,
       },
     });
+  } else if (report.branchDealIds && (await coveredByArpo(report.deal, report.branchDealIds))) {
+    // Arpo's own numbers come in one go - nothing to gather over several steps.
+    const branches = await prisma.deal.findMany({ where: { id: { in: report.branchDealIds.split(",").filter(Boolean) } } });
+    await generateAndSendCombinedCustomerReport(report.deal, branches, report.method, report.id);
   } else if (report.branchDealIds) {
     const branchIds = report.branchDealIds.split(",").filter(Boolean);
     const branches = await prisma.deal.findMany({ where: { id: { in: branchIds } } });
@@ -686,6 +743,12 @@ export async function processOneQueuedReport(): Promise<{ processed: boolean; re
 
   const remaining = await prisma.customerReport.count({ where: { status: "PENDING" } });
   return { processed: true, remaining };
+}
+
+/** A combined report whose deals all have their tours in Arpo (see arpoReportDealIds). */
+export async function coveredByArpo(deal: { id: string; mpSkinId: string | null }, branchDealIds: string): Promise<boolean> {
+  const branches = await prisma.deal.findMany({ where: { id: { in: branchDealIds.split(",").filter(Boolean) } }, select: { id: true, mpSkinId: true } });
+  return Boolean(await arpoReportDealIds([deal, ...branches]));
 }
 
 /** Another tour is only started while a queue step has used less than this

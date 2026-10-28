@@ -6,6 +6,7 @@ import {
   COLLECT_BUDGET_MS,
   SEND_STEP_MIN_REMAINING_MS,
   collectCombinedReportData,
+  coveredByArpo,
   generateCustomerReportPdfBuffer,
   generateCombinedCustomerReportPdfBuffer,
   type CollectedDataStore,
@@ -144,9 +145,11 @@ export async function processOneQueuedDownloadJob(
           await prisma.reportDownloadJob.update({ where: { id: job.id }, data: { collectedData } });
         },
       };
-      const collected = await collectCombinedReportData(store, parent, parent.branches, started, deps.fetchTour, deps.budgetMs);
-      if (collected.complete && (!collected.fetchedNow || Date.now() - started < SEND_STEP_MIN_REMAINING_MS)) {
-        const pdf = await generateCombinedCustomerReportPdfBuffer(parent, parent.branches, collected.data);
+      // Tours in Arpo: their own numbers, in one go - nothing to gather.
+      const arpo = parent.branches.length > 0 && (await coveredByArpo(parent, parent.branches.map((b) => b.id).join(",")));
+      const collected = arpo ? null : await collectCombinedReportData(store, parent, parent.branches, started, deps.fetchTour, deps.budgetMs);
+      if (!collected || (collected.complete && (!collected.fetchedNow || Date.now() - started < SEND_STEP_MIN_REMAINING_MS))) {
+        const pdf = await generateCombinedCustomerReportPdfBuffer(parent, parent.branches, collected?.complete ? collected.data : undefined);
         const fileName = `Besøgsrapport ${dealName(parent)} (samlet) ${currentMonthLabel(parent.reportLanguage)}.pdf`;
         await prisma.reportDownloadJob.update({
           where: { id: job.id },
@@ -157,7 +160,7 @@ export async function processOneQueuedDownloadJob(
     } else {
       const deals = await prisma.deal.findMany({
         where: { id: { in: dealIds } },
-        select: { id: true, companyName: true, displayName: true, mpSkinId: true, reportLanguage: true },
+        select: { id: true, companyName: true, displayName: true, mpSkinId: true, reportLanguage: true, reportInterval: true },
       });
       const progress: MergeProgress = (job.collectedData as MergeProgress | null) ?? { done: [], failed: [] };
       let pdfData: Buffer | null = job.pdfData ? Buffer.from(job.pdfData) : null;

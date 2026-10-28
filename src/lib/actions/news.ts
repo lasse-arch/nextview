@@ -63,6 +63,12 @@ export async function getUnreadNewsCount(userId: string, newsReadAt: Date | null
 const DEFAULT_POSTS: { title: string; body: string; minutesAgo: number; screenshotUrl: string }[] = [
   {
     minutesAgo: 0,
+    title: "Ny besøgsrapport - og kunden vælger selv, hvor tit",
+    body: "Besøgsrapporten er lavet helt om. For kunder med tours i Arpo bygges den nu af vores egne tal - de samme som på kundens side - og den viser tydeligt, hvad touren gør for dem: antal besøg (og hvordan det går ift. perioden før), hvor mange timer de besøgende tilsammen har brugt i touren, hvor mange der gik videre til booking eller kontakt, det mest besøgte sted, hvor de blev længst, hvad de valgte i menuen og åbnede, og flere tours side om side. Kun det, touren er sat til at dele med kunden, kommer med.\n\nMailen viser nu de vigtigste tal direkte i selve mailen med en knap til kundens side, så værdien ses uden at åbne PDF'en. Rapporten dækker den periode, den sendes for (1, 2 eller 3 måneder).\n\nKunden kan selv vælge på sin side under Statistik → \"Statistik på mail\": hver måned, hver 2. måned, hver 3. måned eller ikke på mail. I kan stadig ændre det på dealen. Kunder, hvis tours stadig kun ligger på explore, får den gamle rapport.",
+    screenshotUrl: "/news/besoegsrapport.png",
+  },
+  {
+    minutesAgo: 0,
     title: "\"Find din plads\" og gåafstande på luftfotoet",
     body: "Tours med luftfoto kan nu have \"Find din plads\": gæsten svarer på et par spørgsmål (fx hvem kommer, hvad bor I i, hvad er vigtigst), og touren flyver hen til det sted, der passer bedst, med \"Bedst til jer\", andre gode bud og Book-knappen. Spørgsmålene og hvilke steder der passer til hvert svar sættes under Luftfoto og kort → Find din plads. Der er også færdige camping-spørgsmål.\n\nPunkterne kan også have gåafstande (\"2 min til stranden\"). De står på kortet, og når et punkt er åbent, tegnes stregerne til stederne på billedet.\n\nOgså nyt: luftfotos og 360°-billeder fra de første prototyper (fx Hals) kan gøres redigerbare med ét klik, \"Ret med AI\" beholder nu fuld skarphed alle steder, hvor intet blev ændret, og punkternes billeder vises hele.",
     screenshotUrl: "/news/find-din-plads.png",

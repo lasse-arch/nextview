@@ -115,8 +115,8 @@ export async function sendCustomerReportNowAction(
   const user = await requireUser();
   if (user.role !== "ADMIN") throw new Error("Kun admin kan sende besøgsrapporter");
 
-  const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId } });
-  if (!deal.mpSkinId) return { ok: false, error: "Dealen har intet MP-Skin nummer udfyldt." };
+  const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId }, include: { _count: { select: { tours: { where: { published: true } } } } } });
+  if (!deal.mpSkinId && !deal._count.tours) return { ok: false, error: "Dealen har hverken en tour i Arpo eller et MP-Skin nummer udfyldt." };
 
   await prisma.customerReport.create({ data: { dealId, method: "MANUAL", status: "PENDING" } });
   after(() => kickCustomerReportQueue());
@@ -154,13 +154,13 @@ export async function sendCombinedCustomerReportAction(
 
   const parent = await prisma.deal.findUniqueOrThrow({
     where: { id: parentDealId },
-    include: { branches: true },
+    include: { branches: { include: { _count: { select: { tours: { where: { published: true } } } } } }, _count: { select: { tours: { where: { published: true } } } } },
   });
   if (parent.branches.length === 0) {
     return { ok: false, error: "Denne kunde har ingen sammenkoblede afdelinger." };
   }
 
-  const reportable = [parent, ...parent.branches].filter((d) => d.mpSkinId);
+  const reportable = [parent, ...parent.branches].filter((d) => d.mpSkinId || d._count.tours);
   if (reportable.length === 0) {
     return { ok: false, error: "Hverken kunden eller dens afdelinger har et MP-Skin nummer udfyldt." };
   }
@@ -191,8 +191,8 @@ export async function sendCustomerReportsNowAction(
 
   if (dealIds.length === 0) return { ok: false, error: "Ingen kunder valgt." };
 
-  const deals = await prisma.deal.findMany({ where: { id: { in: dealIds } } });
-  const sendable = deals.filter((d) => d.mpSkinId);
+  const deals = await prisma.deal.findMany({ where: { id: { in: dealIds } }, include: { _count: { select: { tours: { where: { published: true } } } } } });
+  const sendable = deals.filter((d) => d.mpSkinId || d._count.tours);
   const skipped = deals.length - sendable.length;
   if (sendable.length === 0) return { ok: false, error: "Ingen af de valgte kunder har et MP-Skin nummer udfyldt." };
 

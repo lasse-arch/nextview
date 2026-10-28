@@ -14,7 +14,7 @@ import type { ReportInterval, ReportSendStatus } from "@prisma/client";
 const INTERVAL_LABELS: Record<ReportInterval, string> = {
   MONTHLY: "Hver måned",
   BIMONTHLY: "Hver 2. måned",
-  QUARTERLY: "Hvert kvartal",
+  QUARTERLY: "Hver 3. måned",
 };
 
 /**
@@ -131,6 +131,7 @@ export function CustomerReportSection({
       </div>
 
       <div className="mt-2 space-y-0.5 text-xs text-slate-400">
+        <p>Kunden kan også selv vælge hvor tit på sin side (/kunde → Statistik). Har kunden tours i Arpo, bygges rapporten af Arpos egne tal.</p>
         {reportInterval && nextReportDueAt && <p>Næste automatiske afsendelse: {formatDate(nextReportDueAt)}</p>}
         <p>
           Sidst sendt:{" "}
