@@ -93,7 +93,7 @@ const LABELS: Record<ContractLanguage, Labels> = {
         bullets: [
           "Fuldt optimeret virtuel rundvisning med produkt- og infohotspots",
           "Udgivelse på egen hjemmeside – med koder til hele touren og til hvert sted i den",
-          "Support samt 1 årlig genoptagelse pr. lokation",
+          "Support samt 1 årlig genoptagelse pr. lokation – yderligere genoptagelser aftales til en pris pr. optagelse",
           "Billeder i høj kvalitet til fri afbenyttelse",
           "Kvartalsvis performance-rapportering (engagement, visninger, henvendelser)",
         ],
@@ -193,7 +193,7 @@ const LABELS: Record<ContractLanguage, Labels> = {
         bullets: [
           "Fully optimized virtual tour with product and info hotspots",
           "Published on the customer's own website – with codes for the whole tour and for each place in it",
-          "Support plus 1 annual re-shoot per location",
+          "Support plus 1 annual re-shoot per location – further re-shoots are agreed at a price per shoot",
           "High-quality images for the customer's free use",
           "Quarterly performance reporting (engagement, views, inquiries)",
         ],
