@@ -52,6 +52,7 @@ const MAIL_KIND: Record<string, string> = {
   bs_signup: "Tilmelding til Betalingsservice",
   review: "Touren sendt til gennemgang",
   review_reminder: "Påmindelse om gennemgang af touren",
+  review_fixed: "Rettelser lavet - se og godkend touren",
 };
 
 export default async function CustomerOverviewPage({ params }: { params: Promise<{ id: string }> }) {

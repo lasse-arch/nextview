@@ -54,7 +54,17 @@ export function FeedbackPanel({
   const [pending, start] = useTransition();
   const [status, setStatus] = useState<ReviewStatus | null>(null);
   const [note, setNote] = useState<{ text: string; error?: boolean } | null>(null);
+  /** After "✓ Løst" on the last open one: the "Jeres rettelser er lavet" mail went out (or didn't). */
+  const [doneNote, setDoneNote] = useState<{ text: string; error?: boolean } | null>(null);
   const reload = () => tourFeedback(slug).then(setItems);
+  async function markDone(id: string, status: "open" | "done") {
+    setDoneNote(null);
+    const r = await setFeedbackStatus(id, status);
+    if (r.mailedTo) setDoneNote({ text: `Alle rettelser er løst - kunden har fået en mail (${r.mailedTo}) med linket til at se touren og godkende.` });
+    else if (r.mailError) setDoneNote({ text: `Alle rettelser er løst, men mailen til kunden kunne ikke sendes: ${r.mailError}`, error: true });
+    await reload();
+    if (r.mailedTo) await reloadStatus();
+  }
   const reloadStatus = () => reviewStatus(slug).then(setStatus);
   useEffect(() => {
     let off = false;
@@ -177,6 +187,8 @@ export function FeedbackPanel({
           ]}
           onChange={setFilter}
         />
+        {status?.sentAt && !status.approvedAt && <p className="text-[12px] leading-snug text-[#8e8e93]">Når den sidste åbne er løst, får kunden automatisk en mail med det, der er rettet, og linket til at se touren og godkende.</p>}
+        {doneNote && <p className={`rounded-lg px-3 py-2 text-[13px] ${doneNote.error ? "bg-[#ff3b30]/10 text-[#d70015]" : "bg-[#34c759]/10 text-[#1d7a35]"}`}>{doneNote.text}</p>}
         {items && shown.length === 0 && <p className="text-[13px] text-[#8e8e93]">{filter === "open" ? "Intet åbent. Send linket til kunden for at få feedback." : "Intet her."}</p>}
         <ul className="space-y-3">
           {shown.map((f) => (
@@ -210,10 +222,7 @@ export function FeedbackPanel({
                                 if (!ai.result?.ok) return;
                                 onApply(ai.result.config);
                                 setAi(null);
-                                start(async () => {
-                                  await setFeedbackStatus(f.id, "done");
-                                  await reload();
-                                });
+                                start(() => markDone(f.id, "done"));
                               }}
                             >
                               Godkend - lav ændringen ({ai.result.changed})
@@ -258,10 +267,7 @@ export function FeedbackPanel({
                     disabled={pending}
                     className="rounded-full bg-[#f2f2f7] px-3 py-1 text-[12px] font-medium"
                     onClick={() =>
-                      start(async () => {
-                        await setFeedbackStatus(f.id, f.status === "done" ? "open" : "done");
-                        await reload();
-                      })
+                      start(() => markDone(f.id, f.status === "done" ? "open" : "done"))
                     }
                   >
                     {f.status === "done" ? "Genåbn" : "✓ Løst"}

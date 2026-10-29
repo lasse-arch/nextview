@@ -3,7 +3,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createCustomerSession } from "@/lib/auth";
-import { consumeLoginLink, requestLoginLink } from "@/lib/customer-login";
+import { consumeLoginLink, PORTAL_PAGES, requestLoginLink } from "@/lib/customer-login";
 
 export type LinkState = { sent?: boolean; error?: string } | undefined;
 
@@ -21,5 +21,7 @@ export async function loginWithLinkAction(formData: FormData): Promise<void> {
   const accountId = await consumeLoginLink(String(formData.get("t") || ""));
   if (!accountId) redirect("/login?error=link_invalid");
   await createCustomerSession(accountId);
-  redirect("/kunde");
+  // Only a known page of their own customer page - never an address from the link.
+  const to = String(formData.get("til") || "");
+  redirect((PORTAL_PAGES as readonly string[]).includes(to) ? `/kunde?side=${to}` : "/kunde");
 }

@@ -104,6 +104,119 @@ ${input.portal ? `<p style="margin:24px 0 4px"><b>${esc(t.portalTitle)}</b></p><
   return { subject: t.subject, bodyText, bodyHtml };
 }
 
+/** "Jeres rettelser er lavet": the corrections they sent are done - see the tour again and approve it. */
+export function buildFixesDoneMail(input: {
+  contactName: string | null;
+  customerName: string;
+  reviewLink: string;
+  /** The customer's own words, one per correction (outside text: only ever escaped). */
+  fixes: string[];
+  language: "da" | "en";
+}): { subject: string; bodyText: string; bodyHtml: string } {
+  const first = input.contactName?.trim().split(/\s+/)[0] || null;
+  const t =
+    input.language === "en"
+      ? {
+          subject: `Your corrections are done - ${input.customerName}`,
+          greeting: `Hi ${first ?? "there"},`,
+          intro: "We have now made all the corrections you sent for your Nextview360 tour.",
+          fixedTitle: "What we have corrected:",
+          ask: "Have another look at the tour and approve it if everything looks right. Then we put it out, and it is ready to be shared.",
+          button: "See the tour and approve",
+          more: "If anything still needs correcting, you can write it directly in the tour as before or reply to this e-mail.",
+          bye: "Kind regards",
+        }
+      : {
+          subject: `Jeres rettelser er lavet - ${input.customerName}`,
+          greeting: `Hej ${first ?? "der"},`,
+          intro: "Nu har vi lavet alle de rettelser, I sendte til jeres Nextview360-tour.",
+          fixedTitle: "Det har vi rettet:",
+          ask: "Se touren igen, og godkend den, hvis alt ser rigtigt ud. Så lægger vi den ud, og den er klar til at blive delt.",
+          button: "Se touren og godkend",
+          more: "Er der stadig noget, der skal rettes, kan I skrive det direkte i touren som før eller svare på denne mail.",
+          bye: "Med venlig hilsen",
+        };
+  // Their own words, shortened and on one line each.
+  const fixes = input.fixes.map((f) => f.replace(/\s+/g, " ").trim()).filter(Boolean).map((f) => (f.length > 200 ? `${f.slice(0, 197)}...` : f));
+  const bodyText = [
+    t.greeting,
+    "",
+    t.intro,
+    ...(fixes.length ? ["", t.fixedTitle, ...fixes.map((f) => `- ${f}`)] : []),
+    "",
+    t.ask,
+    "",
+    `${t.button}: ${input.reviewLink}`,
+    "",
+    t.more,
+    "",
+    t.bye,
+    "Nextview360",
+  ].join("\n");
+  const bodyHtml = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:#1e293b;max-width:560px">
+<p style="margin:0 0 20px"><img src="${esc(getAppBaseUrl())}/logo.png" alt="Nextview360" width="138" height="32" style="display:block;border:0;height:32px;width:auto"></p>
+<p>${esc(t.greeting)}</p>
+<p>${esc(t.intro)}</p>
+${fixes.length ? `<p style="margin-bottom:4px"><b>${esc(t.fixedTitle)}</b></p><ul style="margin-top:0;padding-left:20px">${fixes.map((f) => `<li style="margin-bottom:4px">${esc(f)}</li>`).join("")}</ul>` : ""}
+<p>${esc(t.ask)}</p>
+<p style="margin:20px 0"><a href="${esc(input.reviewLink)}" style="display:inline-block;padding:11px 20px;border-radius:999px;text-decoration:none;font-weight:bold;background:#0f2a3d;color:#ffffff">${esc(t.button)}</a></p>
+<p>${esc(t.more)}</p>
+<p>${esc(t.bye)}<br>Nextview360</p>
+</div>`;
+  return { subject: t.subject, bodyText, bodyHtml };
+}
+
+/**
+ * When the last open correction on a tour is marked done: the customer is
+ * told in one mail (from info@, answers go there) with what was corrected
+ * and the review link to approve. Only while the tour is out for review and
+ * not approved, and only corrections they haven't been told about - marking
+ * one done again (after reopening it) sends nothing new. Returns who was
+ * mailed, or null when no mail was due.
+ */
+export async function sendFixesDoneMail(slug: string, actor: { id: string; name: string }): Promise<string | null> {
+  const tour = await prisma.tour.findUnique({
+    where: { slug },
+    select: { reviewToken: true, reviewSentAt: true, reviewApprovedAt: true, deal: { select: { id: true, companyName: true, displayName: true, contactName: true, contactEmail: true, contractProducts: true } } },
+  });
+  const deal = tour?.deal;
+  if (!tour?.reviewToken || !tour.reviewSentAt || tour.reviewApprovedAt || !deal?.contactEmail) return null;
+  if (await prisma.tourFeedback.count({ where: { tourSlug: slug, status: "open" } })) return null;
+  const fixes = await prisma.tourFeedback.findMany({ where: { tourSlug: slug, status: "done", reportedAt: null }, orderBy: { createdAt: "asc" }, take: 30, select: { id: true, text: true } });
+  if (!fixes.length) return null;
+  const to = normalizeEmail(deal.contactEmail);
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) throw new Error(`Kontakt-e-mailen på dealen ser forkert ud (${deal.contactEmail}).`);
+  const sender = await prisma.emailAccount.findFirst({ where: { provider: "GOOGLE", email: WELCOME_MAIL_SENDER } });
+  const dev = !sender && process.env.NODE_ENV !== "production";
+  if (!sender && !dev) throw new Error(`Ingen forbundet Gmail-konto for ${WELCOME_MAIL_SENDER}. Forbind den under Indstillinger → E-mail.`);
+  const mail = buildFixesDoneMail({
+    contactName: deal.contactName,
+    customerName: dealName(deal),
+    reviewLink: `${getAppBaseUrl()}/p/${tour.reviewToken}`,
+    fixes: fixes.map((f) => f.text),
+    language: parseContractProducts(deal.contractProducts)?.language === "en" ? "en" : "da",
+  });
+  // Marked as told first: two quick presses mustn't send it twice (a failed send puts them back).
+  const ids = fixes.map((f) => f.id);
+  const claimed = await prisma.tourFeedback.updateMany({ where: { id: { in: ids }, reportedAt: null }, data: { reportedAt: new Date() } });
+  if (claimed.count !== ids.length) return null;
+  if (sender) {
+    try {
+      await sendGmailMessage(sender, { to: [to], subject: mail.subject, bodyText: mail.bodyText, bodyHtml: mail.bodyHtml, fromName: "Nextview360", fromAddress: LOGIN_MAIL_FROM, replyTo: LOGIN_MAIL_FROM });
+    } catch (err) {
+      await prisma.tourFeedback.updateMany({ where: { id: { in: ids } }, data: { reportedAt: null } }).catch(() => {});
+      await prisma.systemMail.create({ data: { dealId: deal.id, kind: "review_fixed", to, subject: mail.subject, error: (err instanceof Error ? err.message : String(err)).slice(0, 300) } }).catch(() => {});
+      throw err;
+    }
+  } else {
+    // On a developer's machine there's no Gmail to send from - the mail goes to the server log instead.
+    console.log(`[rettelser lavet] Mail til ${to}: ${mail.subject}\n${mail.bodyText}`);
+  }
+  await prisma.systemMail.create({ data: { dealId: deal.id, kind: "review_fixed", to, subject: mail.subject } }).catch(() => {});
+  await logActivity({ type: "DEAL_UPDATED", message: `Rettelser lavet - mail sendt til ${to}: ${dealName(deal)}`, actorId: actor.id, dealId: deal.id });
+  return to;
+}
+
 /**
  * Sends the review mail (or a reminder) to the customer's contact e-mail -
  * from info@nextview360.dk (answers go there) - and opens their customer

@@ -4,7 +4,7 @@ import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { approveTour, sendReviewMail } from "@/lib/tour-review";
+import { approveTour, sendFixesDoneMail, sendReviewMail } from "@/lib/tour-review";
 
 /*
  * "Kundegennemsyn": a secret link (/p/<token>) we switch on for a tour, where
@@ -34,9 +34,21 @@ export async function tourFeedback(slug: string): Promise<Feedback[]> {
   return rows.map((r) => ({ id: r.id, kind: r.kind, text: r.text, author: r.author, href: r.href, ss: r.ss, room: r.room, topic: r.topic, image: r.image, device: r.device, status: r.status, at: r.createdAt.toISOString() }));
 }
 
-export async function setFeedbackStatus(id: string, status: "open" | "done"): Promise<void> {
-  await admin();
-  await prisma.tourFeedback.update({ where: { id }, data: { status } });
+/**
+ * Marks a correction done (or open again). The last open one done sends the
+ * customer "Jeres rettelser er lavet" - returns who got it, or why it failed
+ * (the correction is marked either way).
+ */
+export async function setFeedbackStatus(id: string, status: "open" | "done"): Promise<{ mailedTo?: string; mailError?: string }> {
+  const user = await admin();
+  const row = await prisma.tourFeedback.update({ where: { id }, data: { status }, select: { tourSlug: true } });
+  if (status !== "done") return {};
+  try {
+    const to = await sendFixesDoneMail(row.tourSlug, { id: user.id, name: user.name });
+    return to ? { mailedTo: to } : {};
+  } catch (err) {
+    return { mailError: err instanceof Error ? err.message : String(err) };
+  }
 }
 
 export async function deleteFeedback(id: string): Promise<void> {

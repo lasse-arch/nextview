@@ -31,16 +31,20 @@ const hash = (token: string) => createHash("sha256").update(token).digest("hex")
 export const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
 /** A fresh one-time link for the account - the token itself only ever exists in the e-mail. */
-async function newLink(accountId: string, minutes: number): Promise<string> {
+async function newLink(accountId: string, minutes: number, to?: PortalPage): Promise<string> {
   const token = randomBytes(32).toString("base64url");
   await prisma.customerLoginToken.create({ data: { tokenHash: hash(token), accountId, expiresAt: new Date(Date.now() + minutes * 60_000) } });
   // Used and expired links are no use - cleared as we go, so the table stays small.
   await prisma.customerLoginToken.deleteMany({ where: { expiresAt: { lt: new Date(Date.now() - 24 * 3600_000) } } });
-  return `${getAppBaseUrl()}/login/link?t=${token}`;
+  return `${getAppBaseUrl()}/login/link?t=${token}${to ? `&til=${to}` : ""}`;
 }
 
-/** The login button in the welcome mail when the customer goes live: one use, for WELCOME_DAYS. */
-export const welcomeLoginLink = (accountId: string) => newLink(accountId, WELCOME_DAYS * 24 * 60);
+/** Pages of the customer page a login link may land on (anything else lands on the front page). */
+export const PORTAL_PAGES = ["tal", "rettelser"] as const;
+export type PortalPage = (typeof PORTAL_PAGES)[number];
+
+/** The login button in the welcome mail when the customer goes live: one use, for WELCOME_DAYS - optionally straight to one page (e.g. their numbers). */
+export const welcomeLoginLink = (accountId: string, to?: PortalPage) => newLink(accountId, WELCOME_DAYS * 24 * 60, to);
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 

@@ -1501,6 +1501,8 @@ model TourFeedback {
   device    String?
   /// "open" or "done".
   status    String   @default("open")
+  /// When the customer was told it's done (in the "Jeres rettelser er lavet" mail) - each one is told once.
+  reportedAt DateTime?
   /// General feedback, not at a spot: "menu", "funktioner", "design" or "andet" (null = at the spot in href).
   topic     String?
   createdAt DateTime @default(now())
