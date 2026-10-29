@@ -9,6 +9,7 @@ import { LOGIN_MAIL_FROM, normalizeEmail, welcomeLoginLink, WELCOME_DAYS } from 
 import { PHONE, WELCOME_MAIL_SENDER } from "@/lib/welcome-mail";
 import { parseContractProducts } from "@/lib/contract-template-data";
 import { notifyTeam } from "@/lib/notification-service";
+import { ringBell } from "@/lib/team-notifications";
 
 /*
  * "Send til gennemgang": the customer gets a mail with the tour in its review
@@ -181,6 +182,13 @@ export async function approveTour(slug: string, by: { name: string; customer: bo
   await logActivity({ type: "DEAL_UPDATED", message: `Touren er godkendt${by.customer ? " af kunden" : ""}: ${name}`, actorId: by.actorId, dealId: tour.dealId });
   if (by.customer) {
     const open = await prisma.tourFeedback.count({ where: { tourSlug: slug, status: "open" } });
+    await ringBell({
+      kind: "approved",
+      title: `Godkendt af kunden: ${name}`,
+      text: `${who} har godkendt touren.${open ? ` ${open} åben${open === 1 ? "" : "e"} rettelse${open === 1 ? "" : "r"}.` : ""}`,
+      href: `/arpo/tour-lab/${slug}/rediger?fane=feedback`,
+      tourSlug: slug,
+    });
     await notifyTeam({
       dealId: tour.dealId,
       subject: `Godkendt af kunden: ${name}`,

@@ -124,6 +124,7 @@ function searchTabs(q: string, menu: MenuEntry[]): { tab: Tab; label: string; se
 const when = (iso: string) => new Date(iso).toLocaleString("da-DK", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
 export function TourEditor({
+  startTab,
   slug,
   initial,
   serverDraft,
@@ -167,6 +168,8 @@ export function TourEditor({
   /** Kundegennemsyn's link token (null = off), and how much feedback is open. */
   reviewToken: string | null;
   feedbackOpen: number;
+  /** The tab to open on (?fane=…). */
+  startTab?: string;
 }) {
   const router = useRouter();
   const [config, setConfig] = useState<TourConfig>(initial);
@@ -222,7 +225,8 @@ export function TourEditor({
     setAutosavedAt(null);
   }
   const [dirty, setDirty] = useState(false);
-  const [tab, setTab] = useState<Tab>("claude");
+  // A link straight to a tab (?fane=feedback - e.g. from the bell, when a customer has written).
+  const [tab, setTab] = useState<Tab>(() => (startTab && TABS.some(([t]) => t === startTab) ? (startTab as Tab) : "claude"));
 
   /** A request for nextviewAI from elsewhere in the editor (a suggestion from Resultater). */
   const [aiAsk, setAiAsk] = useState<{ request: string; at: number } | null>(null);
@@ -805,7 +809,19 @@ export function TourEditor({
               </>
             )}
             {tab === "okonomi" && <EconomyPanel economy={economy} />}
-            {tab === "feedback" && <FeedbackPanel slug={slug} token={reviewToken} preview={preview} />}
+            {tab === "feedback" && (
+              <FeedbackPanel
+                slug={slug}
+                token={reviewToken}
+                preview={preview}
+                config={config}
+                onApply={(c) => {
+                  setConfig(c);
+                  setDirty(true);
+                  setMsg(null);
+                }}
+              />
+            )}
             {tab === "del" && (
               <SharePanel
                 config={config}

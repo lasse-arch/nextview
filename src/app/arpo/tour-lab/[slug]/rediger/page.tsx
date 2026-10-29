@@ -21,7 +21,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 }
 
 /** The tour editor: a tour's whole setup, with a live preview and its versions. */
-export default async function TourEditPage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function TourEditPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ fane?: string }> }) {
   const user = await getCurrentUser();
   if (user?.role !== "ADMIN") redirect("/arpo");
   await ensureToursSeeded().catch(() => {});
@@ -62,6 +62,7 @@ export default async function TourEditPage({ params }: { params: Promise<{ slug:
   };
   return (
     <TourEditor
+      startTab={(await searchParams).fane}
       slug={tour.slug}
       initial={tour.config as unknown as TourConfig}
       serverDraft={tour.draft && tour.draftAt ? { config: tour.draft as unknown as TourConfig, at: tour.draftAt.toISOString(), by: tour.draftByName } : null}

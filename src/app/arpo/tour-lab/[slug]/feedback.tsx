@@ -18,8 +18,18 @@ type Note = {
   author: string | null;
   href: string | null;
   room: string | null;
+  topic?: string | null;
   status: string;
 };
+
+/** What a note can be about: the spot they stand at, or something general. */
+const TOPICS: [string | null, string][] = [
+  [null, "Dette sted"],
+  ["menu", "Menuen"],
+  ["funktioner", "Funktioner"],
+  ["design", "Design"],
+  ["andet", "Andet"],
+];
 
 export function FeedbackLayer({
   token,
@@ -39,6 +49,8 @@ export function FeedbackLayer({
   const [approved, setApproved] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [text, setText] = useState("");
+  /** null = about the spot they stand at; else general feedback about the menu, the functions … */
+  const [topic, setTopic] = useState<string | null>(null);
   const [here, setHere] = useState<{
     view: ReviewView | null;
     image: string | null;
@@ -103,10 +115,14 @@ export function FeedbackLayer({
       body: JSON.stringify({
         token,
         text,
-        href: here?.view?.href,
-        ss: here?.view?.ss,
-        room: here?.view?.room,
-        image: here?.image,
+        ...(topic
+          ? { topic }
+          : {
+              href: here?.view?.href,
+              ss: here?.view?.ss,
+              room: here?.view?.room,
+              image: here?.image,
+            }),
         device: `${window.innerWidth}×${window.innerHeight} · ${navigator.userAgent.slice(0, 80)}`,
       }),
     }).catch(() => null);
@@ -117,6 +133,7 @@ export function FeedbackLayer({
           "Det kunne ikke sendes - prøv igen.",
       );
     setText("");
+    setTopic(null);
     setHere(null);
     setStep(null);
     setMsg("Tak! Vi har fået det.");
@@ -175,11 +192,28 @@ export function FeedbackLayer({
                 ×
               </button>
             </div>
+            <div className="fb-om" role="group" aria-label="Om">
+              {TOPICS.map(([t, label]) => (
+                <button key={label} type="button" aria-pressed={topic === t} className={topic === t ? "on" : ""} onClick={() => setTopic(t)}>
+                  {label}
+                </button>
+              ))}
+            </div>
             <textarea
               autoFocus
               value={text}
               onChange={(e) => setText(e.target.value)}
-              placeholder="Skriv det, du gerne vil have ændret - eller noget, der ikke virker."
+              placeholder={
+                topic === "menu"
+                  ? "Hvad skal ændres i menuen? Fx et punkt, der mangler, eller en anden rækkefølge."
+                  : topic === "funktioner"
+                  ? "Hvad skal touren kunne? Fx en knap, en rundvisning eller noget, der ikke virker."
+                  : topic === "design"
+                  ? "Farver, skrift, logo eller billeder - hvad skal ændres?"
+                  : topic
+                  ? "Skriv din feedback."
+                  : "Skriv det, du gerne vil have ændret her - eller noget, der ikke virker. Vi kan se, hvor du står."
+              }
             />
             <button
               type="button"
@@ -237,7 +271,7 @@ export function FeedbackLayer({
                 )}
                 <p>{n.text}</p>
                 <small>
-                  {n.room}
+                  {n.topic ? `Om ${TOPICS.find(([t]) => t === n.topic)?.[1].toLowerCase() ?? n.topic}` : n.room}
                   {n.href && (
                     <button
                       type="button"
@@ -278,6 +312,9 @@ export const FEEDBACK_CSS = `
 .fb-head button{width:30px;height:30px;border:0;border-radius:50%;background:#f2f2f7;font-size:18px;cursor:pointer}
 .fb-card textarea,.fb-card input{width:100%;border:0;border-radius:12px;background:#f2f2f7;font:inherit;font-size:15px;padding:10px 12px;outline:none}
 .fb-card textarea{min-height:96px;resize:vertical}
+.fb-om{display:flex;flex-wrap:wrap;gap:6px}
+.fb-om button{border:0;border-radius:999px;background:#f2f2f7;color:#1d1d1f;font:inherit;font-size:13px;font-weight:600;padding:6px 12px;cursor:pointer}
+.fb-om button.on{background:#1d1d1f;color:#fff}
 .fb-send{border:0;border-radius:12px;background:#0071e3;color:#fff;font:inherit;font-weight:700;font-size:15px;padding:11px;cursor:pointer}
 .fb-send:disabled{opacity:.4}
 .fb-panel{position:absolute;top:calc(64px + env(safe-area-inset-top,0px));left:50%;translate:-50% 0;z-index:44;max-height:calc(100% - 90px)}

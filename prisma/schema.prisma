@@ -290,6 +290,9 @@ model User {
   /// counted as unread for the little badge on the news icon. Null means
   /// "never opened it", so every post ever made counts as unread.
   newsReadAt        DateTime?
+  /// When this user last opened the notifications (the bell by Nyheder) -
+  /// notifications changed after this count as unread.
+  notificationsSeenAt DateTime?
 
   deals               Deal[]               @relation("DealOwner")
   notes               Note[]
@@ -1498,9 +1501,33 @@ model TourFeedback {
   device    String?
   /// "open" or "done".
   status    String   @default("open")
+  /// General feedback, not at a spot: "menu", "funktioner", "design" or "andet" (null = at the spot in href).
+  topic     String?
   createdAt DateTime @default(now())
 
   @@index([tourSlug, createdAt])
+}
+
+/// Something the team should know about, shown under the bell by Nyheder:
+/// a customer's feedback on a tour in review, an approval. Several of the
+/// same kind on the same tour close together are one notification (count).
+model TeamNotification {
+  id        String   @id @default(cuid())
+  /// "feedback" or "approved".
+  kind      String
+  title     String
+  text      String
+  /// Where it leads in Arpo (always an /arpo path).
+  href      String
+  tourSlug  String?
+  /// Who sees it: "admin" (tours are admin work) or "all".
+  audience  String   @default("admin")
+  count     Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([updatedAt])
+  @@index([kind, tourSlug, updatedAt])
 }
 
 /// A failed password login - to stop password guessing: too many for an

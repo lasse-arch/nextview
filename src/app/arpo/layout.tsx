@@ -10,13 +10,15 @@ import { MobileNav } from "./mobile-nav";
 import { PresentationModeToggle } from "./presentation-mode-toggle";
 import { isPresentationMode } from "@/lib/presentation-mode";
 import { NewsBell } from "./news-bell";
+import { NotificationBell } from "./notification-bell";
+import { unreadNotifications } from "@/lib/team-notifications";
 import { getUnreadNewsCount } from "@/lib/actions/news";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const [user, presenting] = await Promise.all([getCurrentUser(), isPresentationMode()]);
   if (!user) redirect((await getCurrentCustomer()) ? "/kunde" : "/api/auth/session-ended?next=/arpo");
 
-  const unreadNewsCount = await getUnreadNewsCount(user.id, user.newsReadAt ?? null);
+  const [unreadNewsCount, unreadBell] = await Promise.all([getUnreadNewsCount(user.id, user.newsReadAt ?? null), unreadNotifications(user)]);
 
   // The menu in named parts - what a seller uses every day first, the company's own pages and money last.
   const admin = user.role === "ADMIN";
@@ -125,6 +127,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           />
 
           <div className="arpo-topbar flex items-center justify-end gap-2.5 px-4 pt-4 sm:px-6 md:px-10 md:pt-6">
+            <NotificationBell unreadCount={unreadBell} />
             <NewsBell unreadCount={unreadNewsCount} />
             <PresentationModeToggle enabled={presenting} />
             <Link

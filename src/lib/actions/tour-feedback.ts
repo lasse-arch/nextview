@@ -26,12 +26,12 @@ export async function setTourReview(slug: string, on: boolean): Promise<{ token:
   return { token };
 }
 
-export type Feedback = { id: string; kind: string; text: string; author: string | null; href: string | null; ss: number | null; room: string | null; image: string | null; device: string | null; status: string; at: string };
+export type Feedback = { id: string; kind: string; text: string; author: string | null; href: string | null; ss: number | null; room: string | null; topic: string | null; image: string | null; device: string | null; status: string; at: string };
 
 export async function tourFeedback(slug: string): Promise<Feedback[]> {
   await admin();
   const rows = await prisma.tourFeedback.findMany({ where: { tourSlug: slug }, orderBy: { createdAt: "desc" }, take: 300 });
-  return rows.map((r) => ({ id: r.id, kind: r.kind, text: r.text, author: r.author, href: r.href, ss: r.ss, room: r.room, image: r.image, device: r.device, status: r.status, at: r.createdAt.toISOString() }));
+  return rows.map((r) => ({ id: r.id, kind: r.kind, text: r.text, author: r.author, href: r.href, ss: r.ss, room: r.room, topic: r.topic, image: r.image, device: r.device, status: r.status, at: r.createdAt.toISOString() }));
 }
 
 export async function setFeedbackStatus(id: string, status: "open" | "done"): Promise<void> {
