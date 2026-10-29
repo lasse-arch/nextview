@@ -1,7 +1,7 @@
 import "server-only";
 import { randomBytes } from "node:crypto";
 import { prisma } from "@/lib/db";
-import { sendGmailMessage } from "@/lib/gmail";
+import { resendReady, sendSystemMail } from "@/lib/system-mail";
 import { getAppBaseUrl } from "@/lib/email-oauth";
 import { dealName } from "@/lib/labels";
 import { logActivity } from "@/lib/activity";
@@ -195,8 +195,9 @@ export async function sendFixesDoneMail(slug: string, actor: { id: string; name:
   const to = normalizeEmail(deal.contactEmail);
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) throw new Error(`Kontakt-e-mailen på dealen ser forkert ud (${deal.contactEmail}).`);
   const sender = await prisma.emailAccount.findFirst({ where: { provider: "GOOGLE", email: WELCOME_MAIL_SENDER } });
-  const dev = !sender && process.env.NODE_ENV !== "production";
-  if (!sender && !dev) throw new Error(`Ingen forbundet Gmail-konto for ${WELCOME_MAIL_SENDER}. Forbind den under Indstillinger → E-mail.`);
+  const canSend = Boolean(sender) || resendReady();
+  const dev = !canSend && process.env.NODE_ENV !== "production";
+  if (!canSend && !dev) throw new Error(`Ingen mail-afsender: sæt RESEND_API_KEY i Vercel, eller forbind Gmail for ${WELCOME_MAIL_SENDER} under Indstillinger → E-mail.`);
   const mail = buildFixesDoneMail({
     contactName: deal.contactName,
     customerName: dealName(deal),
@@ -208,9 +209,9 @@ export async function sendFixesDoneMail(slug: string, actor: { id: string; name:
   const ids = fixes.map((f) => f.id);
   const claimed = await prisma.tourFeedback.updateMany({ where: { id: { in: ids }, ...(manual ? {} : { reportedAt: null }) }, data: { reportedAt: new Date() } });
   if (claimed.count !== ids.length) return null;
-  if (sender) {
+  if (canSend) {
     try {
-      await sendGmailMessage(sender, { to: [to], subject: mail.subject, bodyText: mail.bodyText, bodyHtml: mail.bodyHtml, fromName: "Nextview360", fromAddress: LOGIN_MAIL_FROM, replyTo: LOGIN_MAIL_FROM });
+      await sendSystemMail(sender, { to: [to], subject: mail.subject, bodyText: mail.bodyText, bodyHtml: mail.bodyHtml, fromName: "Nextview360", fromAddress: LOGIN_MAIL_FROM, replyTo: LOGIN_MAIL_FROM });
     } catch (err) {
       await prisma.tourFeedback.updateMany({ where: { id: { in: ids } }, data: { reportedAt: null } }).catch(() => {});
       await prisma.systemMail.create({ data: { dealId: deal.id, kind: "review_fixed", to, subject: mail.subject, error: (err instanceof Error ? err.message : String(err)).slice(0, 300) } }).catch(() => {});
@@ -243,8 +244,9 @@ export async function sendReviewMail(slug: string, actor: { id: string; name: st
   const to = normalizeEmail(deal.contactEmail);
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) throw new Error(`Kontakt-e-mailen på dealen ser forkert ud (${deal.contactEmail}).`);
   const sender = await prisma.emailAccount.findFirst({ where: { provider: "GOOGLE", email: WELCOME_MAIL_SENDER } });
-  const dev = !sender && process.env.NODE_ENV !== "production";
-  if (!sender && !dev) throw new Error(`Ingen forbundet Gmail-konto for ${WELCOME_MAIL_SENDER}. Forbind den under Indstillinger → E-mail.`);
+  const canSend = Boolean(sender) || resendReady();
+  const dev = !canSend && process.env.NODE_ENV !== "production";
+  if (!canSend && !dev) throw new Error(`Ingen mail-afsender: sæt RESEND_API_KEY i Vercel, eller forbind Gmail for ${WELCOME_MAIL_SENDER} under Indstillinger → E-mail.`);
   const token = tour.reviewToken ?? randomBytes(12).toString("base64url");
 
   // Their customer page: the contact e-mail gets access to this deal (and its locations) - only the deal's own contact.
@@ -267,9 +269,9 @@ export async function sendReviewMail(slug: string, actor: { id: string; name: st
     language: parseContractProducts(deal.contractProducts)?.language === "en" ? "en" : "da",
   });
   const kind = reminder ? "review_reminder" : "review";
-  if (sender) {
+  if (canSend) {
     try {
-      await sendGmailMessage(sender, { to: [to], subject: mail.subject, bodyText: mail.bodyText, bodyHtml: mail.bodyHtml, fromName: "Nextview360", fromAddress: LOGIN_MAIL_FROM, replyTo: LOGIN_MAIL_FROM });
+      await sendSystemMail(sender, { to: [to], subject: mail.subject, bodyText: mail.bodyText, bodyHtml: mail.bodyHtml, fromName: "Nextview360", fromAddress: LOGIN_MAIL_FROM, replyTo: LOGIN_MAIL_FROM });
     } catch (err) {
       await prisma.systemMail.create({ data: { dealId: deal.id, accountId: account.id, kind, to, subject: mail.subject, error: (err instanceof Error ? err.message : String(err)).slice(0, 300) } }).catch(() => {});
       throw err;

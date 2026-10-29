@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { sendGmailMessage } from "@/lib/gmail";
+import { resendReady, sendSystemMail } from "@/lib/system-mail";
 import { getAppBaseUrl } from "@/lib/email-oauth";
 import { dealName } from "@/lib/labels";
 import { CONTRACT_SIGNER } from "@/lib/contract-template-data";
@@ -28,7 +28,7 @@ export async function sendContractSignedNotification(dealId: string): Promise<No
   const adminAccounts = await prisma.emailAccount.findMany({
     where: { userId: { in: admins.map((a) => a.id) }, provider: "GOOGLE" },
   });
-  if (adminAccounts.length === 0) {
+  if (adminAccounts.length === 0 && !resendReady()) {
     return { sent: false, reason: "Ingen admin har forbundet Google under Indstillinger → E-mail." };
   }
 
@@ -36,9 +36,9 @@ export async function sendContractSignedNotification(dealId: string): Promise<No
   const dealUrl = `${getAppBaseUrl()}/arpo/deals/${deal.id}`;
 
   let lastError = "Ukendt fejl ved afsendelse.";
-  for (const account of adminAccounts) {
+  for (const account of adminAccounts.length ? adminAccounts : [null]) {
     try {
-      await sendGmailMessage(account, {
+      await sendSystemMail(account, {
         to: recipients,
         subject: `Kontrakt underskrevet: ${dealName(deal)}`,
         bodyText: `${dealName(deal)} har lige underskrevet kontrakt.\n\nSe dealen: ${dealUrl}`,
@@ -61,12 +61,12 @@ export async function notifyTeam(params: { dealId?: string | null; subject: stri
   const admins = await prisma.user.findMany({ where: { role: "ADMIN" } });
   const owner = params.dealId ? (await prisma.deal.findUnique({ where: { id: params.dealId }, select: { owner: { select: { email: true } } } }))?.owner.email : null;
   const accounts = await prisma.emailAccount.findMany({ where: { userId: { in: admins.map((a) => a.id) }, provider: "GOOGLE" } });
-  if (!accounts.length) return { sent: false, reason: "Ingen admin har forbundet Google under Indstillinger → E-mail." };
+  if (!accounts.length && !resendReady()) return { sent: false, reason: "Ingen admin har forbundet Google under Indstillinger → E-mail." };
   const to = Array.from(new Set([...(owner ? [owner] : []), ...admins.map((a) => a.email)]));
   let lastError = "Ukendt fejl ved afsendelse.";
-  for (const account of accounts) {
+  for (const account of accounts.length ? accounts : [null]) {
     try {
-      await sendGmailMessage(account, { to, subject: params.subject, bodyText: params.text, fromName: "Nextview360", fromAddress: CONTRACT_SIGNER.email });
+      await sendSystemMail(account, { to, subject: params.subject, bodyText: params.text, fromName: "Nextview360", fromAddress: CONTRACT_SIGNER.email });
       return { sent: true };
     } catch (err) {
       lastError = err instanceof Error ? err.message : lastError;

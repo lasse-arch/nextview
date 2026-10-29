@@ -2,7 +2,7 @@ import "server-only";
 import { createHash, randomBytes } from "node:crypto";
 import { prisma } from "@/lib/db";
 import { getAppBaseUrl } from "@/lib/email-oauth";
-import { sendGmailMessage } from "@/lib/gmail";
+import { resendReady, sendSystemMail } from "@/lib/system-mail";
 import { WELCOME_MAIL_SENDER } from "@/lib/welcome-mail";
 
 /*
@@ -72,18 +72,18 @@ export async function sendLoginMail(account: { id: string; email: string; name: 
   // Logged for the customer overview in Arpo - which mail, to whom, when (never the link itself).
   const log = (error: string | null) => prisma.systemMail.create({ data: { accountId: account.id, kind: welcome ? "access" : "login", to: account.email, subject, error } }).catch(() => {});
   const sender = await prisma.emailAccount.findFirst({ where: { provider: "GOOGLE", email: WELCOME_MAIL_SENDER } });
-  if (!sender) {
+  if (!sender && !resendReady()) {
     // On a developer's machine there's no Gmail to send from - the link goes to the server log instead.
     if (process.env.NODE_ENV !== "production") {
       console.log(`[kundelogin] Link til ${account.email}: ${link}`);
       await log(null);
       return;
     }
-    await log("Ingen forbundet Gmail-konto");
-    throw new Error(`Ingen forbundet Gmail-konto for ${WELCOME_MAIL_SENDER}. Forbind den under Indstillinger → E-mail.`);
+    await log("Ingen mail-afsender");
+    throw new Error(`Ingen mail-afsender: sæt RESEND_API_KEY i Vercel, eller forbind Gmail for ${WELCOME_MAIL_SENDER} under Indstillinger → E-mail.`);
   }
   try {
-    await sendGmailMessage(sender, { to: [account.email], subject, bodyText, bodyHtml, fromName: "Nextview360", fromAddress: LOGIN_MAIL_FROM });
+    await sendSystemMail(sender, { to: [account.email], subject, bodyText, bodyHtml, fromName: "Nextview360", fromAddress: LOGIN_MAIL_FROM, replyTo: LOGIN_MAIL_FROM });
   } catch (err) {
     await log((err instanceof Error ? err.message : String(err)).slice(0, 300));
     throw err;

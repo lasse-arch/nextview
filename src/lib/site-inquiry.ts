@@ -2,7 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/db";
 import { logActivity } from "@/lib/activity";
 import { buildDealEmailAddress } from "@/lib/email-address";
-import { sendGmailMessage } from "@/lib/gmail";
+import { sendSystemMail } from "@/lib/system-mail";
 import { getAppBaseUrl } from "@/lib/email-oauth";
 import { CONTRACT_SIGNER } from "@/lib/contract-template-data";
 
@@ -67,9 +67,9 @@ async function notifyAdmins(dealId: string, input: Inquiry) {
     "",
     `Se leadet i Arpo: ${getAppBaseUrl()}/arpo/deals/${dealId}`,
   ].filter((l): l is string => typeof l === "string");
-  for (const account of accounts) {
+  for (const account of accounts.length ? accounts : [null]) {
     try {
-      await sendGmailMessage(account, {
+      await sendSystemMail(account, {
         to: admins.map((a) => a.email),
         subject: `Ny henvendelse fra hjemmesiden: ${input.company || input.name}`,
         bodyText: lines.join("\n"),

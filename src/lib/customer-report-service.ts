@@ -13,7 +13,7 @@ import {
 } from "@/lib/customer-report-template";
 import { renderCustomerReportPdf } from "@/lib/customer-report-pdf";
 import { buildArpoReport } from "@/lib/arpo-report";
-import { sendGmailMessage } from "@/lib/gmail";
+import { sendSystemMail } from "@/lib/system-mail";
 import { findOrCreateCustomerStatsFolder, uploadPdfToDrive } from "@/lib/google-drive";
 import { getAppBaseUrl } from "@/lib/email-oauth";
 import { logActivity } from "@/lib/activity";
@@ -384,7 +384,7 @@ export async function generateAndSendCustomerReport(
     // customer actually opened this report.
     const trackingId = crypto.randomUUID();
     const pixel = `<img src="${getAppBaseUrl()}/api/track/report-open/${trackingId}" width="1" height="1" style="display:none" alt="" />`;
-    await sendGmailMessage(account, {
+    await sendSystemMail(account, {
       to: [recipient],
       cc: parseCcEmails(deal.reportCcEmails),
       subject: emailText.subject,
@@ -392,6 +392,7 @@ export async function generateAndSendCustomerReport(
       bodyHtml: `${emailText.bodyHtml}${pixel}`,
       attachments: [{ filename: fileName, contentType: "application/pdf", data: pdf }],
       fromName: "Nextview360 ApS",
+      fromAddress: REPORT_SENDER_EMAIL,
     });
 
     const nextReportDueAt = computeNextReportDueAt(deal, method);
@@ -496,7 +497,7 @@ export async function generateAndSendCombinedCustomerReport(
     const emailText = built ? withArpoSummary(plain, language, built.mail) : plain;
     const trackingId = crypto.randomUUID();
     const pixel = `<img src="${getAppBaseUrl()}/api/track/report-open/${trackingId}" width="1" height="1" style="display:none" alt="" />`;
-    await sendGmailMessage(account, {
+    await sendSystemMail(account, {
       to: [recipient],
       cc: [...ccEmails],
       subject: emailText.subject,
@@ -504,6 +505,7 @@ export async function generateAndSendCombinedCustomerReport(
       bodyHtml: `${emailText.bodyHtml}${pixel}`,
       attachments: [{ filename: fileName, contentType: "application/pdf", data: pdf }],
       fromName: "Nextview360 ApS",
+      fromAddress: REPORT_SENDER_EMAIL,
     });
 
     const branchDealIds = branches.map((b) => b.id).join(",") || null;

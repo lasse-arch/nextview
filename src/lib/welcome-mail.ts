@@ -1,6 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db";
-import { sendGmailMessage } from "@/lib/gmail";
+import { resendReady, sendSystemMail } from "@/lib/system-mail";
 import { dealName } from "@/lib/labels";
 import { parseContractProducts } from "@/lib/contract-template-data";
 import { logActivity } from "@/lib/activity";
@@ -182,9 +182,10 @@ export async function sendWelcomeMail(dealId: string, actorId: string): Promise<
   const { deal, to, subject, bodyText, bodyHtml } = await welcomeMailFor(dealId, portal, Boolean(picture));
   if (!to) throw new Error("Kunden har ingen kontakt-e-mail.");
   const account = await prisma.emailAccount.findFirst({ where: { provider: "GOOGLE", email: WELCOME_MAIL_SENDER } });
-  if (!account) throw new Error(`Ingen forbundet Gmail-konto for ${WELCOME_MAIL_SENDER}. Forbind den under Indstillinger → E-mail.`);
+  if (!account && !resendReady()) throw new Error(`Ingen mail-afsender: sæt RESEND_API_KEY i Vercel, eller forbind Gmail for ${WELCOME_MAIL_SENDER} under Indstillinger → E-mail.`);
   try {
-    await sendGmailMessage(account, { to: [to], subject, bodyText, bodyHtml, fromName: "Lasse - Nextview360", inline: picture ? [{ cid: "tour", filename: "tour.jpg", contentType: "image/jpeg", data: picture }] : undefined });
+    // From Lasse, and answers go to him.
+    await sendSystemMail(account, { to: [to], subject, bodyText, bodyHtml, fromName: "Lasse - Nextview360", fromAddress: WELCOME_MAIL_SENDER, replyTo: WELCOME_MAIL_SENDER, inline: picture ? [{ cid: "tour", filename: "tour.jpg", contentType: "image/jpeg", data: picture }] : undefined });
   } catch (err) {
     await prisma.systemMail.create({ data: { dealId, accountId: access?.accountId, kind: "welcome", to, subject, error: (err instanceof Error ? err.message : String(err)).slice(0, 300) } }).catch(() => {});
     throw err;

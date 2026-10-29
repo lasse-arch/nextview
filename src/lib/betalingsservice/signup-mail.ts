@@ -5,7 +5,7 @@
  * Mastercard Connect → BS Customer Portal) and the numbers to sign up with.
  */
 import { prisma } from "@/lib/db";
-import { sendGmailMessage } from "@/lib/gmail";
+import { resendReady, sendSystemMail } from "@/lib/system-mail";
 import { dealName } from "@/lib/labels";
 import { parseContractProducts } from "@/lib/contract-template-data";
 import { bsPayerOf, ensureBsCustomerNumber, getBsSettings } from "./service";
@@ -202,7 +202,7 @@ export async function sendSignupMails(dealId?: string): Promise<{
   if (!settings.signupLink) throw new Error("Indsæt jeres tilmeldingslink først.");
   if (!settings.pbsNumber || !settings.debtorGroupNumber) throw new Error("Udfyld PBS-nr. og debitorgruppe under Aftale først.");
   const account = await prisma.emailAccount.findFirst({ where: { provider: "GOOGLE", email: SIGNUP_MAIL_SENDER } });
-  if (!account) throw new Error(`Ingen forbundet Gmail-konto for ${SIGNUP_MAIL_SENDER}. Forbind den under Indstillinger → E-mail.`);
+  if (!account && !resendReady()) throw new Error(`Ingen mail-afsender: sæt RESEND_API_KEY i Vercel, eller forbind Gmail for ${SIGNUP_MAIL_SENDER} under Indstillinger → E-mail.`);
 
   const all = (await notSignedUpCustomers()).filter((d) => d.invoiceEmail || d.contactEmail);
   const queue = dealId ? all.filter((d) => d.id === dealId) : all.filter((d) => !d.bsSignupMailSentAt);
@@ -224,12 +224,13 @@ export async function sendSignupMails(dealId?: string): Promise<{
         signupLink: settings.signupLink,
         language: parseContractProducts(deal.contractProducts)?.language === "en" ? "en" : "da",
       });
-      await sendGmailMessage(account, {
+      await sendSystemMail(account, {
         to: [(deal.invoiceEmail || deal.contactEmail)!],
         subject: mail.subject,
         bodyText: mail.bodyText,
         bodyHtml: mail.bodyHtml,
         fromName: "Nextview360 ApS",
+        fromAddress: SIGNUP_MAIL_SENDER,
       });
       await prisma.deal.update({ where: { id: deal.id }, data: { bsSignupMailSentAt: new Date() } });
       await prisma.systemMail.create({ data: { dealId: deal.id, kind: "bs_signup", to: (deal.invoiceEmail || deal.contactEmail)!, subject: mail.subject } }).catch(() => {});
