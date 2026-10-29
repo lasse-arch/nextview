@@ -26,8 +26,8 @@ export default async function LoginPage({
   const { next, error } = await searchParams;
   const nextPath = safeNextPath(next);
   // Customers only ever see their own login. The team's (Google) shows when they come from Arpo
-  // (nextview360.dk/arpo sends here with next=/arpo…) or back from Google.
-  const team = nextPath.startsWith("/arpo") || Boolean(error?.startsWith("google_"));
+  // (nextview360.dk/arpo sends here with next=/arpo…, the new site under /web with next=/web…) or back from Google.
+  const team = nextPath.startsWith("/arpo") || nextPath.startsWith("/web") || Boolean(error?.startsWith("google_"));
   const [googleRequired, googleAvailable] = [await isGoogleLoginRequired(), isGoogleConfigured()];
 
   const google = googleAvailable && (

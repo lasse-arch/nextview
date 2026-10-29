@@ -15,6 +15,8 @@ const nextConfig: NextConfig = {
     "/*": ["./public/logo.png", "./node_modules/@sparticuz/chromium/bin/**/*"],
     // The tour editor's Claude reads the tour setup's documented types (see tour-ai.ts).
     "/arpo/tour-lab/**": ["./src/app/arpo/tour-lab/tours/types.ts", "./src/app/arpo/tour-lab/tours/PLAYBOOK.md"],
+    // The new site's pages, only shown to the team (see lib/beta-site.ts).
+    "/web/*": ["./site-web/*.html"],
   },
   // Basic hardening on every response: no framing of Arpo by other sites
   // (clickjacking), no MIME sniffing, no full URLs leaked to other sites,

@@ -1145,6 +1145,8 @@ function TourExperience({
   }
 
   async function menuGo(name: string, group: string, href: string) {
+    // Picking a place in the menu during "Vis mig rundt" means the visitor goes their own way: the guide stops.
+    leaveGuide("menu");
     if (isDroneHref(href)) {
       setMenuOpen(false);
       // Turned to the item's own spot, if it has one for this device.
@@ -1222,6 +1224,7 @@ function TourExperience({
 
   /** A place from the cover or the dock: into the tour, right there. */
   async function placeGo(p: TourPlace, from: string) {
+    leaveGuide(from);
     track("place_click", { place_name: p.name, from });
     setCover(false);
     if (phase === "drone") return enterTour(p.href, from, p.name);
@@ -1437,6 +1440,23 @@ function TourExperience({
     setSelected(null);
     if (phase === "drone") return enterTour(step.href, "day", step.title);
     flyTo(step.href, "fly");
+  }
+  /**
+   * The visitor goes somewhere themselves during "Vis mig rundt" (a place in
+   * the menu, the dock …): the guide stops right there - its card goes, and
+   * the moves it had asked for are dropped, so it never flies them back.
+   */
+  function leaveGuide(how: string) {
+    if (guideAtRef.current == null) return;
+    track("guide_close", { stop: guideAtRef.current + 1, stops: GUIDE.length, label: how });
+    guideStep.current++;
+    guideTicket.current++;
+    guideMoving.current = false;
+    guideAtRef.current = null;
+    guideHeldRef.current = false;
+    setGuideHeld(false);
+    setGuideAt(null);
+    setPano(null);
   }
   function closeGuide(completed: boolean) {
     setGuideHeld(false);
@@ -2923,6 +2943,8 @@ const CSS = `
 @media (hover:none){.hv-fotos-pil{display:none}}
 /* The guide shows a 360° photo under its card. */
 .hv-guiding .hv-pano{z-index:10}
+/* "Vis mig rundt" on a 360° photo: the menu button stays on top of it, so the visitor can leave the guide for a place. */
+.hv-guiding .hv-menuknap,.hv-guiding .bm-knap,.hv-guiding .sp-menuknap{z-index:14}
 .hv-guiding .hv-pano-luk,.hv-guiding .hv-pano-titel{display:none}
 .hv-fotos-dots{position:absolute;left:0;right:0;bottom:9px;display:flex;justify-content:center;gap:5px;pointer-events:none}
 .hv-fotos-dots i{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.55);box-shadow:0 1px 3px rgba(0,0,0,.3)}

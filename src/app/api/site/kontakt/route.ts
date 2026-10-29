@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { receiveInquiry } from "@/lib/site-inquiry";
 
 /*
- * The contact form on nextview360.dk posts here (public/web/site.js). A
+ * The contact form on nextview360.dk posts here (public/web/site.js; the pages are in site-web/). A
  * hidden "website" field catches bots: filled in, it's thanked and dropped.
  */
 
