@@ -499,6 +499,8 @@ function TourExperience({
    * moves the tour. The rest is read by those late callbacks through refs.
    */
   const guideStep = useRef(0);
+  /** Matterport is moving between two scan points right now (the visitor's own step, or ours). */
+  const sweepMoving = useRef(false);
   const guideAtRef = useRef<number | null>(null);
   const guideHeldRef = useRef(false);
   const phaseRef = useRef(phase);
@@ -595,6 +597,8 @@ function TourExperience({
       track("tour_ready", { load_ms: Math.round(now() - started) });
       const current = (sdk as unknown as { Sweep: { current: { subscribe(cb: (s: { sid?: string }) => void): { cancel(): void } } } }).Sweep.current;
       sub = current.subscribe((s) => {
+        // No scan point while Matterport is moving between two - the guide waits for it to land (sweepIdle).
+        sweepMoving.current = !s?.sid;
         if (!s?.sid) return;
         const first = currentSweep.current == null;
         currentSweep.current = s.sid;
@@ -1238,6 +1242,10 @@ function TourExperience({
     });
     return now === want;
   }
+  /** Until Matterport has landed (it won't take a new move while one is flying) - at most a few seconds. */
+  async function sweepIdle() {
+    for (let n = 0; n < 50 && sweepMoving.current; n++) await new Promise((r) => setTimeout(r, 120));
+  }
   function guideGo(i: number) {
     const stop = GUIDE[i];
     const step = ++guideStep.current;
@@ -1298,13 +1306,18 @@ function TourExperience({
         if (ticket !== guideTicket.current) return;
         // A room being got ready behind the drone scene finishes first - it mustn't land after the guide's own move.
         await prepared.current?.done.catch(() => {});
-        // Matterport can answer "done" to a move asked for while it's still flying the last one - without moving.
-        // So check that the view really is at the stop, and fly again if not (a few times).
-        for (let attempt = 0; attempt < 4; attempt++) {
+        // Matterport won't take a move while it's flying one (e.g. the visitor's own step to another scan when
+        // Næste is pressed) - and may answer "done" without moving. So: wait for it to land, move, wait for that
+        // to land, and check that the view really is at the stop - again if not (a few times).
+        for (let attempt = 0; attempt < 5; attempt++) {
+          await sweepIdle();
+          if (ticket !== guideTicket.current) return;
           await flyTo(stop.href, "fly");
+          await new Promise((r) => setTimeout(r, 150));
+          await sweepIdle();
           if (ticket !== guideTicket.current) return;
           if (await standsAt(stop.href)) break;
-          await new Promise((r) => setTimeout(r, 450));
+          await new Promise((r) => setTimeout(r, 300));
         }
         if (ticket !== guideTicket.current || turn === "none") return;
         // The slow turn isn't waited for by the queue (the next move may start while it turns) - but it is
