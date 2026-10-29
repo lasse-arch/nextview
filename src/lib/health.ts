@@ -44,7 +44,7 @@ const ago = (d: Date) => {
 
 export async function healthChecks(): Promise<CheckGroup[]> {
   const site = (process.env.APP_BASE_URL || "https://nextview360.dk").replace(/\/+$/, "");
-  const [db, web, tours, explore, gmail, dinero, docuseal, bs, backup, matterport, ai, gemini] = await Promise.all([
+  const [db, web, tours, explore, gmail, resend, dinero, docuseal, bs, backup, matterport, ai, gemini] = await Promise.all([
     timed("Database", async () => {
       const t = Date.now();
       await prisma.$queryRawUnsafe("SELECT 1");
@@ -64,6 +64,20 @@ export async function healthChecks(): Promise<CheckGroup[]> {
       if (!account) return { status: "down", detail: "Ikke forbundet - mails til kunder kan ikke sendes" };
       await getValidAccessToken(account);
       return { status: "ok", detail: "Forbundet" };
+    }),
+    timed("Resend (Arpos egne mails)", async () => {
+      // Login links, the review mail, reports … - without it they go through Gmail.
+      const key = process.env.RESEND_API_KEY;
+      if (!key) return { status: "off", detail: "Ikke sat op - Arpos egne mails sendes via Gmail" };
+      const res = await fetch("https://api.resend.com/domains", { headers: { Authorization: `Bearer ${key}` }, cache: "no-store", signal: AbortSignal.timeout(LIMIT_MS) }).catch(() => null);
+      if (!res) return { status: "warn", detail: "Kunne ikke nå Resend lige nu - mails sendes via Gmail imens" };
+      const body = (await res.json().catch(() => null)) as { data?: { name: string; status: string }[]; name?: string } | null;
+      // A key with only "Sending access" may not list domains - then it's set, and sending tells the rest.
+      if (res.status === 401 && body?.name === "restricted_api_key") return { status: "ok", detail: "Nøgle sat (kun afsendelse)" };
+      if (!res.ok) return { status: "down", detail: `Resend afviser nøglen (${res.status}) - mails sendes via Gmail` };
+      const domain = body?.data?.find((d) => d.name === "nextview360.dk");
+      if (!domain) return { status: "down", detail: "nextview360.dk er ikke tilføjet i Resend - mails sendes via Gmail" };
+      return domain.status === "verified" ? { status: "ok", detail: "nextview360.dk godkendt - mails sendes via Resend" } : { status: "warn", detail: `nextview360.dk er ikke godkendt endnu (${domain.status}) - tjek DNS-posterne` };
     }),
     timed("Dinero (fakturaer)", async () => {
       if (!(await isDineroConfigured())) return { status: "off", detail: "Slået fra" };
@@ -96,7 +110,7 @@ export async function healthChecks(): Promise<CheckGroup[]> {
   ]);
   return [
     { title: "Drift", checks: [db, web, tours, explore, backup] },
-    { title: "Integrationer", checks: [gmail, dinero, docuseal, bs, matterport, ai, gemini] },
+    { title: "Integrationer", checks: [gmail, resend, dinero, docuseal, bs, matterport, ai, gemini] },
   ];
 }
 
