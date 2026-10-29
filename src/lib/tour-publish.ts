@@ -164,6 +164,39 @@ const HEADERS = `/*
 `;
 
 /**
+ * What tour.nextview360.dk shows for an address with no tour (one taken
+ * offline, a mistyped link): a proper "not available" page, served with 404 -
+ * without it Cloudflare treats the site as one app and shows another page.
+ */
+function notFoundPage(): Buffer {
+  const site = "https://nextview360.dk";
+  return Buffer.from(`<!doctype html>
+<html lang="da"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
+<title>Touren er ikke tilgængelig - Nextview360</title>
+<style>
+html,body{margin:0;height:100%}
+body{display:flex;align-items:center;justify-content:center;padding:24px;box-sizing:border-box;background:#f5f5f7;color:#1d1d1f;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
+.k{width:100%;max-width:440px;box-sizing:border-box;background:#fff;border-radius:20px;padding:40px 32px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.06);border:1px solid rgba(0,0,0,.06)}
+img{height:32px;width:auto}
+.t{margin:32px 0 0;font-size:13px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:#0071e3}
+h1{margin:8px 0 0;font-size:26px;letter-spacing:-.01em}
+p{margin:8px 0 0;font-size:15px;line-height:1.55;color:#6e6e73}
+.en{margin-top:14px;font-size:13px;color:#8e8e93}
+a.b{display:inline-block;margin-top:26px;background:#0071e3;color:#fff;text-decoration:none;font-weight:600;font-size:15px;padding:11px 22px;border-radius:12px}
+.h{margin-top:26px;font-size:13px;color:#8e8e93}.h a{color:#0071e3;text-decoration:none}
+</style></head>
+<body><div class="k">
+<a href="${site}" target="_top"><img src="${ARPO_ORIGIN()}/logo.png" alt="Nextview360"></a>
+<p class="t">404</p>
+<h1>Touren er ikke tilgængelig</h1>
+<p>Den virtuelle tour, du leder efter, er taget offline, eller adressen er skrevet forkert.</p>
+<p class="en">This virtual tour is no longer available, or the address is wrong.</p>
+<a class="b" href="${site}" target="_top">Til Nextview360</a>
+<p class="h">Brug for hjælp? Skriv til <a href="mailto:info@nextview360.dk">info@nextview360.dk</a></p>
+</div></body></html>`);
+}
+
+/**
  * Puts every tour's live version out on Cloudflare as one deployment.
  * `fresh`: content made just now (it isn't on Arpo to be fetched again).
  */
@@ -174,6 +207,9 @@ async function deploy(fresh: Map<string, Buffer>, origin: string): Promise<void>
   const pubs = await prisma.tourPublication.findMany({ where: { OR: live.map((t) => ({ tourId: t.id, version: t.liveVersion! })) }, select: { files: true } });
   const all: Files = {};
   for (const p of pubs) Object.assign(all, p.files as Files);
+  const missingPage = notFoundPage();
+  const missingHash = cfHash(missingPage, "html");
+  all["/404.html"] = { h: missingHash, t: "text/html", d: missingPage.toString("base64") };
 
   const { jwt } = await cf<{ jwt: string }>(`${account()}/pages/projects/${PAGES_PROJECT}/upload-token`);
   const hashes = [...new Set(Object.values(all).map((f) => f.h))];
