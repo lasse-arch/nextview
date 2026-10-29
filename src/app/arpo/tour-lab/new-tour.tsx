@@ -32,16 +32,21 @@ const STEPS = ["Kunde", "Matterport", "Branche", "Design", "Indhold", "Plan"] as
 const DEMO_COLORS = { main: "#1d2a30", accent: "#e0533d", accentDark: "#b8402e", soft: "#f4efe8" };
 const thumb = (id: string) => `https://my.matterport.com/api/v1/player/models/${id}/thumb`;
 
-export function NewTour({ tours }: { tours: { slug: string; name: string }[] }) {
+/** `forDeal`: opened from a customer under Tours (no button) - the customer is picked already, so it starts at the space. */
+export function NewTour({ tours, forDeal, onClose }: { tours: { slug: string; name: string }[]; forDeal?: TourCustomer; onClose?: () => void }) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
-  const [step, setStep] = useState(0);
-  const [who, setWho] = useState<Who | null>(null);
+  const [open, setOpenState] = useState(Boolean(forDeal));
+  const setOpen = (v: boolean) => {
+    setOpenState(v);
+    if (!v) onClose?.();
+  };
+  const [step, setStep] = useState(forDeal ? 1 : 0);
+  const [who, setWho] = useState<Who | null>(forDeal ? { kind: "deal", deal: forDeal } : null);
   const [space, setSpace] = useState<Space | null>(null);
   const [branch, setBranch] = useState<Branch | null>(null);
   const [preset, setPreset] = useState<DesignPreset["id"] | null>(null);
-  const [name, setName] = useState("");
-  const [website, setWebsite] = useState("");
+  const [name, setName] = useState(forDeal?.name ?? "");
+  const [website, setWebsite] = useState(forDeal?.website ?? "");
   const [focus, setFocus] = useState("");
   /** The branch and audience in the user's own words - told to nextviewAI as it is. */
   const [about, setAbout] = useState("");
@@ -119,16 +124,18 @@ export function NewTour({ tours }: { tours: { slug: string; name: string }[] }) 
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => {
-          reset();
-          setOpen(true);
-        }}
-        className="rounded-full bg-[#0071e3] px-4 py-2 text-[14px] font-medium text-white hover:bg-[#0077ed]"
-      >
-        + Ny tour
-      </button>
+      {!forDeal && (
+        <button
+          type="button"
+          onClick={() => {
+            reset();
+            setOpen(true);
+          }}
+          className="rounded-full bg-[#0071e3] px-4 py-2 text-[14px] font-medium text-white hover:bg-[#0077ed]"
+        >
+          + Ny tour
+        </button>
+      )}
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4 backdrop-blur-sm" onClick={() => !pending && setOpen(false)}>
           <div

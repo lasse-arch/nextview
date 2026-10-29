@@ -2,12 +2,25 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import type { TourCustomer } from "@/lib/actions/tour-ai";
+import { NewTour } from "./new-tour";
 
 /*
- * All tours as one list - built for hundreds of customers: search, a few
- * filters, sorting, and a compact row per tour (like Finder or Mail) instead
- * of big cards.
+ * All tours as one list - built for hundreds of customers: search, the flow
+ * (Ikke startet → Startet → Gennemgang → Live) as filters and a bar on each
+ * row, sorting, and a compact row per tour (like Finder or Mail) instead of
+ * big cards. Customers who bought a tour that isn't in Arpo yet are rows too,
+ * with "Opret tour".
  */
+
+export type Stage = "ikke" | "startet" | "gennemgang" | "live";
+const STAGES: [Stage, string][] = [
+  ["ikke", "Ikke startet"],
+  ["startet", "Startet"],
+  ["gennemgang", "Gennemgang"],
+  ["live", "Live"],
+];
+const STAGE_COLOR: Record<Stage, string> = { ikke: "#8e8e93", startet: "#0071e3", gennemgang: "#ff9500", live: "#34c759" };
 
 export type TourRow = {
   slug: string;
@@ -17,32 +30,71 @@ export type TourRow = {
   image: string;
   logo: boolean;
   background: string;
+  stage: Stage;
+  /** Gennemgang: the customer (or we) approved it. */
+  approved: boolean;
   published: boolean;
   updatedAt: string;
   visits: number;
   leads: number;
+  /** A customer with no tour in Arpo yet (the row opens "Ny tour" for them). */
+  newTour?: TourCustomer;
+  filmed?: boolean;
 };
 
-type Filter = "alle" | "udgivet" | "kladde" | "uden";
-type Sort = "aendret" | "navn" | "resultat";
+type Filter = "alle" | Stage | "uden";
+type Sort = "status" | "aendret" | "navn" | "resultat";
+
+/** Where a tour is in the flow: four steps, filled up to its own. */
+function FlowBar({ stage, note }: { stage: Stage; note?: string }) {
+  const at = STAGES.findIndex(([s]) => s === stage);
+  return (
+    <span className="block">
+      <span className="flex gap-[3px]">
+        {STAGES.map(([s], i) => (
+          <i key={s} className="h-[5px] flex-1 rounded-full" style={{ background: i <= at ? STAGE_COLOR[stage] : "#e5e5ea" }} />
+        ))}
+      </span>
+      <span className="mt-1 block text-[12px] font-medium" style={{ color: STAGE_COLOR[stage] }}>
+        {STAGES[at][1]}
+        {note && <span className="font-normal text-[#8e8e93]"> · {note}</span>}
+      </span>
+    </span>
+  );
+}
+
+const noteOf = (r: TourRow) =>
+  r.newTour ? (r.stage === "live" ? "tour på explore" : r.filmed ? "filmet" : "solgt") : r.stage === "gennemgang" && r.approved ? "godkendt" : r.stage === "live" && !r.published ? "på Cloudflare" : undefined;
 
 const when = (iso: string) => new Date(iso).toLocaleDateString("da-DK", { day: "numeric", month: "short", year: "numeric" });
 
-export function ToursList({ rows }: { rows: TourRow[] }) {
+export function ToursList({ rows, tours }: { rows: TourRow[]; tours: { slug: string; name: string }[] }) {
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<Filter>("alle");
-  const [sort, setSort] = useState<Sort>("aendret");
+  const [sort, setSort] = useState<Sort>("status");
+  /** "Opret tour" on a customer's row: the new-tour steps, with the customer picked. */
+  const [making, setMaking] = useState<TourCustomer | null>(null);
 
-  const counts = useMemo(
-    () => ({ alle: rows.length, udgivet: rows.filter((r) => r.published).length, kladde: rows.filter((r) => !r.published).length, uden: rows.filter((r) => !r.dealId).length }),
-    [rows]
-  );
+  const counts = useMemo(() => {
+    const c: Record<Filter, number> = { alle: rows.length, ikke: 0, startet: 0, gennemgang: 0, live: 0, uden: rows.filter((r) => !r.dealId).length };
+    for (const r of rows) c[r.stage]++;
+    return c;
+  }, [rows]);
   const shown = useMemo(() => {
     const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+    const order = (r: TourRow) => STAGES.findIndex(([s]) => s === r.stage);
     return rows
-      .filter((r) => (filter === "udgivet" ? r.published : filter === "kladde" ? !r.published : filter === "uden" ? !r.dealId : true))
+      .filter((r) => (filter === "alle" ? true : filter === "uden" ? !r.dealId : r.stage === filter))
       .filter((r) => words.every((w) => `${r.name} ${r.customer ?? ""} ${r.slug}`.toLowerCase().includes(w)))
-      .sort((a, b) => (sort === "navn" ? a.name.localeCompare(b.name, "da") : sort === "resultat" ? b.leads - a.leads || b.visits - a.visits : b.updatedAt.localeCompare(a.updatedAt)));
+      .sort((a, b) =>
+        sort === "navn"
+          ? a.name.localeCompare(b.name, "da")
+          : sort === "resultat"
+          ? b.leads - a.leads || b.visits - a.visits
+          : sort === "status"
+          ? order(a) - order(b) || b.updatedAt.localeCompare(a.updatedAt)
+          : b.updatedAt.localeCompare(a.updatedAt)
+      );
   }, [rows, q, filter, sort]);
 
   return (
@@ -62,14 +114,7 @@ export function ToursList({ rows }: { rows: TourRow[] }) {
           />
         </div>
         <div className="flex rounded-[9px] bg-[#e9e9eb] p-[2px]">
-          {(
-            [
-              ["alle", "Alle"],
-              ["udgivet", "Udgivet"],
-              ["kladde", "Kladder"],
-              ["uden", "Uden kunde"],
-            ] as [Filter, string][]
-          ).map(([f, text]) => (
+          {([["alle", "Alle"], ...STAGES, ["uden", "Uden kunde"]] as [Filter, string][]).map(([f, text]) => (
             <button
               key={f}
               type="button"
@@ -81,13 +126,14 @@ export function ToursList({ rows }: { rows: TourRow[] }) {
           ))}
         </div>
         <select value={sort} onChange={(e) => setSort(e.target.value as Sort)} className="rounded-[10px] border-0 bg-[#f2f2f7] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[#0071e3]">
+          <option value="status">Status (flowet)</option>
           <option value="aendret">Senest ændret</option>
           <option value="navn">Navn A-Å</option>
           <option value="resultat">Flest til booking</option>
         </select>
       </div>
 
-      <div className="hidden grid-cols-[minmax(0,2.4fr)_minmax(0,1.6fr)_110px_150px_110px_70px] gap-4 border-b border-black/[.06] px-4 py-2 text-[12px] font-medium text-[#8e8e93] md:grid">
+      <div className="hidden grid-cols-[minmax(0,2.4fr)_minmax(0,1.6fr)_170px_150px_110px_90px] gap-4 border-b border-black/[.06] px-4 py-2 text-[12px] font-medium text-[#8e8e93] md:grid">
         <span>Tour</span>
         <span>Kunde</span>
         <span>Status</span>
@@ -96,8 +142,32 @@ export function ToursList({ rows }: { rows: TourRow[] }) {
         <span />
       </div>
       <ul className="divide-y divide-black/[.05]">
-        {shown.map((r) => (
-          <li key={r.slug} className="group relative grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-4 py-2.5 hover:bg-[#f9f9fb] md:grid-cols-[minmax(0,2.4fr)_minmax(0,1.6fr)_110px_150px_110px_70px]">
+        {shown.map((r) =>
+          r.newTour ? (
+            <li key={r.slug} className="group relative grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-4 py-2.5 hover:bg-[#f9f9fb] md:grid-cols-[minmax(0,2.4fr)_minmax(0,1.6fr)_170px_150px_110px_90px]">
+              <span className="flex min-w-0 items-center gap-3">
+                <span className="flex h-10 w-16 flex-none items-center justify-center rounded-md border border-dashed border-[#c7c7cc] text-[15px] font-semibold text-[#8e8e93]">{r.name.slice(0, 1).toUpperCase()}</span>
+                <span className="min-w-0">
+                  <span className="block truncate text-[15px] font-medium text-[#6e6e73]">{r.name}</span>
+                  <span className="block truncate text-[12px] text-[#8e8e93]">Ingen tour i Arpo endnu</span>
+                </span>
+              </span>
+              <span className="hidden truncate text-[14px] md:block">
+                <Link href={`/arpo/deals/${r.dealId}`} className="hover:text-[#0071e3] hover:underline">
+                  {r.customer}
+                </Link>
+              </span>
+              <span className="hidden md:block">
+                <FlowBar stage={r.stage} note={noteOf(r)} />
+              </span>
+              <span className="hidden text-[14px] text-[#c7c7cc] md:block">-</span>
+              <span className="hidden text-[13px] text-[#6e6e73] md:block">{r.updatedAt.startsWith("1970") ? "" : when(r.updatedAt)}</span>
+              <button type="button" onClick={() => setMaking(r.newTour!)} className="justify-self-end whitespace-nowrap rounded-full bg-[#0071e3] px-3 py-1 text-[13px] font-medium text-white hover:bg-[#0077ed]">
+                Opret tour
+              </button>
+            </li>
+          ) : (
+          <li key={r.slug} className="group relative grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-4 py-2.5 hover:bg-[#f9f9fb] md:grid-cols-[minmax(0,2.4fr)_minmax(0,1.6fr)_170px_150px_110px_90px]">
             <Link href={`/arpo/tour-lab/${r.slug}/rediger`} className="flex min-w-0 items-center gap-3 after:absolute after:inset-0">
               <span className="relative h-10 w-16 flex-none overflow-hidden rounded-md" style={{ background: r.background }}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -118,7 +188,7 @@ export function ToursList({ rows }: { rows: TourRow[] }) {
               )}
             </span>
             <span className="hidden md:block">
-              <span className={`rounded-full px-2 py-0.5 text-[12px] font-medium ${r.published ? "bg-[#34c759]/15 text-[#248a3d]" : "bg-black/[.05] text-[#6e6e73]"}`}>{r.published ? "Udgivet" : "Kladde"}</span>
+              <FlowBar stage={r.stage} note={noteOf(r)} />
             </span>
             <span className="hidden text-[14px] tabular-nums md:block">
               {r.visits ? (
@@ -134,9 +204,11 @@ export function ToursList({ rows }: { rows: TourRow[] }) {
               Åbn ↗
             </a>
           </li>
-        ))}
+          )
+        )}
       </ul>
       {shown.length === 0 && <p className="px-4 py-10 text-center text-[14px] text-[#8e8e93]">Ingen tours matcher.</p>}
+      {making && <NewTour key={making.id} tours={tours} forDeal={making} onClose={() => setMaking(null)} />}
     </div>
   );
 }

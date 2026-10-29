@@ -68,7 +68,36 @@ export async function listTours() {
   await ensureToursSeeded();
   return prisma.tour.findMany({
     orderBy: [{ updatedAt: "desc" }],
-    select: { id: true, slug: true, name: true, config: true, published: true, updatedAt: true, deal: { select: { id: true, companyName: true, displayName: true } } },
+    select: { id: true, slug: true, name: true, config: true, published: true, liveVersion: true, reviewSentAt: true, reviewApprovedAt: true, updatedAt: true, deal: { select: { id: true, companyName: true, displayName: true } } },
+  });
+}
+
+/**
+ * Customers who have bought a tour but have none in Arpo yet - "Ikke
+ * startet" under Tours (or, live already, an older tour on explore). Bought:
+ * signed, not lost or gone, with a tour on the contract, among the deal's
+ * products or in "solgt produkt".
+ */
+export async function customersWithoutTour() {
+  return prisma.deal.findMany({
+    where: {
+      tours: { none: {} },
+      churnedAt: null,
+      stage: { not: "LOST" },
+      AND: [
+        { OR: [{ contractSignedAt: { not: null } }, { stage: { in: ["CONTRACT_SIGNED", "FILMED", "LIVE"] } }] },
+        {
+          OR: [
+            { contractProducts: { path: ["nextviewTour", "selected"], equals: true } },
+            { items: { some: { productType: { contains: "tour", mode: "insensitive" } } } },
+            { soldProduct: { contains: "tour", mode: "insensitive" } },
+          ],
+        },
+      ],
+    },
+    orderBy: [{ contractSignedAt: { sort: "desc", nulls: "last" } }],
+    take: 500,
+    select: { id: true, companyName: true, displayName: true, address: true, websiteUrl: true, stage: true, contractSignedAt: true, filmedAt: true, mpSkinId: true, items: { select: { url: true } } },
   });
 }
 

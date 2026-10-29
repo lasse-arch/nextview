@@ -3,7 +3,8 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { getSettingValue } from "@/lib/integration-settings";
 import { leadsByTour } from "@/lib/tour-stats";
-import { listTours } from "@/lib/tours";
+import { customersWithoutTour, listTours } from "@/lib/tours";
+import { modelIdsIn } from "@/lib/matterport-graph";
 import { NewTour } from "./new-tour";
 import { TourLab } from "./tour-lab";
 import { ToursList, type TourRow } from "./tours-list";
@@ -31,7 +32,7 @@ function picture(c: TourConfig): { image: string; logo: boolean } {
 export default async function TourLabPage() {
   const user = await getCurrentUser();
   if (user?.role !== "ADMIN") redirect("/arpo");
-  const [tours, sdkKey, results, deleted] = await Promise.all([listTours(), getSettingValue("MATTERPORT_SDK_KEY"), leadsByTour(30), deletedTours()]);
+  const [tours, sdkKey, results, deleted, waiting] = await Promise.all([listTours(), getSettingValue("MATTERPORT_SDK_KEY"), leadsByTour(30), deletedTours(), customersWithoutTour()]);
   const now = new Date().getTime();
   const mpskinsLeft = tours.filter((t) => (t.config as unknown as TourConfig).tourPage).length;
   const rows: TourRow[] = tours.map((t) => {
@@ -45,18 +46,50 @@ export default async function TourLabPage() {
       image: pic.image,
       logo: pic.logo,
       background: pic.logo && c.logoOnLight ? "#f5f5f7" : c.colors.main,
+      // The flow: made in Arpo (Startet) → sent to the customer (Gennemgang) → out there (Live).
+      stage: t.published || t.liveVersion != null ? "live" : t.reviewSentAt ? "gennemgang" : "startet",
+      approved: Boolean(t.reviewApprovedAt),
       published: t.published,
       updatedAt: t.updatedAt.toISOString(),
       visits: results[t.slug]?.visits ?? 0,
       leads: results[t.slug]?.leads ?? 0,
     };
   });
+  // Customers who bought a tour that isn't in Arpo yet: not started - or, live already, an older tour on explore.
+  const notStarted: TourRow[] = waiting.map((d) => ({
+    slug: `kunde:${d.id}`,
+    name: d.displayName ?? d.companyName,
+    customer: d.displayName ?? d.companyName,
+    dealId: d.id,
+    image: "",
+    logo: false,
+    background: "#e9e9eb",
+    stage: d.stage === "LIVE" ? "live" : "ikke",
+    approved: false,
+    published: false,
+    updatedAt: (d.filmedAt ?? d.contractSignedAt ?? new Date(0)).toISOString(),
+    visits: 0,
+    leads: 0,
+    newTour: {
+      id: d.id,
+      name: d.displayName ?? d.companyName,
+      address: d.address,
+      website: d.websiteUrl,
+      stage: d.stage,
+      contractSignedAt: d.contractSignedAt?.toISOString() ?? null,
+      tours: 0,
+      hasModel: modelIdsIn([d.mpSkinId ?? "", ...d.items.map((i) => i.url ?? "")].join(" ")).length > 0,
+    },
+    filmed: Boolean(d.filmedAt),
+  }));
   return (
     <div className="space-y-6" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", system-ui, sans-serif' }}>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-[28px] font-semibold tracking-tight text-[#1d1d1f]">Tours</h1>
-          <p className="text-[14px] text-[#6e6e73]">{tours.length} tours · tryk på en for at redigere den.</p>
+          <p className="text-[14px] text-[#6e6e73]">
+            {tours.length} tours{notStarted.length ? ` · ${notStarted.length} kunder uden tour i Arpo` : ""} · tryk på en for at redigere den.
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <Link href="/arpo/tour-lab/personer" className="rounded-full bg-white px-4 py-2 text-[14px] font-medium text-[#1d1d1f] ring-1 ring-black/[.08] hover:bg-[#f5f5f7]">
@@ -68,7 +101,7 @@ export default async function TourLabPage() {
 
       {mpskinsLeft > 0 && <DetachAll count={mpskinsLeft} />}
 
-      <ToursList rows={rows} />
+      <ToursList rows={[...rows, ...notStarted]} tours={tours.map((t) => ({ slug: t.slug, name: t.name }))} />
 
       <Papirkurv rows={deleted.map((d) => ({ ...d, createdAt: d.createdAt.toISOString(), daysLeft: Math.max(0, 30 - Math.floor((now - d.createdAt.getTime()) / 86_400_000)) }))} />
 
