@@ -1269,7 +1269,10 @@ function TourExperience({
     setGuideAt(i);
     setGuideHeld(false);
     prefetchGuidePanos(i + 1);
-    setGuideImage(null);
+    // A picture on screen (the last stop's) hides the tour: a move to a room happens behind it, and it goes when the room is there.
+    const covered = phaseRef.current === "tour" && Boolean(pano || guideImage);
+    const target = stop.href && !imageOfHref(stop.href) && !pointById(stop.href) ? stop.href : null;
+    if (!(covered && target)) setGuideImage(null);
     if (!stop.href) return; // a stop that stays where it is (e.g. the closing card)
     // A picture (e.g. a drone photo): full screen under the card - a 360° one as 360°, turning slowly.
     const picture = imageOfHref(stop.href);
@@ -1300,13 +1303,22 @@ function TourExperience({
       setTimeout(() => lookAtPoint(point, false), phase === "drone" ? 0 : 400);
       return;
     }
-    setPano(null);
     if (phaseRef.current === "drone") {
+      setPano(null);
       // In from the drone scene - then make sure it's this stop it landed on (a press while going in is caught up with).
       void enterTour(stop.href, "guide", stop.title).then(() => guideSettle(step));
       return;
     }
-    guideFly(stop);
+    if (!covered) {
+      setPano(null);
+      return guideFly(stop);
+    }
+    // Straight there behind the picture (no flight to watch, turning some other way first), then the picture goes.
+    guideFly(stop, () => {
+      if (step !== guideStep.current) return;
+      setPano(null);
+      setGuideImage(null);
+    });
   }
   /**
    * After going in from the drone scene: the view must stand where the card
@@ -1323,7 +1335,7 @@ function TourExperience({
     if (!(await standsAt(stop.href)) && step === guideStep.current) guideFly(stop);
   }
   /** A stop inside the tour: flown to (one move at a time, only the newest), then the slow turn. */
-  function guideFly(stop: (typeof GUIDE)[number]) {
+  function guideFly(stop: (typeof GUIDE)[number], uncover?: () => void) {
     // The slow turn at the stop: as always, the other way, or none (the stop's own, else the guide's).
     const turn = stop.turn ?? T.guide?.turn ?? "as";
     guideMoving.current = true;
@@ -1342,13 +1354,14 @@ function TourExperience({
         for (let attempt = 0; attempt < 5; attempt++) {
           await sweepIdle();
           if (ticket !== guideTicket.current) return;
-          await flyTo(stop.href, "fly");
+          await flyTo(stop.href, uncover ? "instant" : "fly");
           await new Promise((r) => setTimeout(r, 150));
           await sweepIdle();
           if (ticket !== guideTicket.current) return;
           if (await standsAt(stop.href)) break;
           await new Promise((r) => setTimeout(r, 300));
         }
+        uncover?.();
         if (ticket !== guideTicket.current || turn === "none") return;
         // The slow turn isn't waited for by the queue (the next move may start while it turns) - but it is
         // still the guide moving, not the visitor: guideMoving stays on until the turn is done.
@@ -1361,6 +1374,7 @@ function TourExperience({
       .then((r) => {
         if (r !== "turning" && ticket === guideTicket.current) setTimeout(() => ticket === guideTicket.current && guideDone(stop, ticket), 700);
       }, () => {
+        uncover?.();
         if (ticket === guideTicket.current) guideMoving.current = false;
       });
   }
@@ -2076,6 +2090,7 @@ function TourExperience({
 
       {pano && hasPano(pano) && (
         <PanoView
+          key={pano.id}
           name={pano.name}
           dir={pano.pano}
           image={pano.panorama}
@@ -2679,6 +2694,8 @@ function pictureIsPanorama(url: string): Promise<boolean> {
 
 /** 360° photos already asked for (each fetched once) - the browser keeps them, so the viewer gets them from its cache. */
 const prefetchedPanos = new Map<string, Promise<void>>();
+/** The ones that have come (in the browser's cache): a viewer can open with them at once. */
+const loadedPanos = new Set<string>();
 function prefetchPano(url: string, priority: "low" | "high" = "low"): Promise<void> {
   if (typeof window === "undefined") return Promise.resolve();
   const known = prefetchedPanos.get(url);
@@ -2686,7 +2703,7 @@ function prefetchPano(url: string, priority: "low" | "high" = "low"): Promise<vo
   // Fetched as the viewer fetches it (same address, CORS), so it is the same cached file. Low priority: never ahead of what's on screen.
   const p = fetch(url, { mode: "cors", priority } as RequestInit)
     .then((r) => r.blob())
-    .then(() => {})
+    .then(() => void loadedPanos.add(url))
     .catch((err) => {
       prefetchedPanos.delete(url);
       throw err;
@@ -2733,13 +2750,19 @@ function PanoView({
 }) {
   const el = useRef<HTMLDivElement>(null);
   const sharpEl = useRef<HTMLDivElement>(null);
+  // Where it opens, as numbers: a new (equal) object on every render of the tour must not start the picture over.
+  const startYaw = start?.yaw;
+  const startPitch = start?.pitch;
+  // The turn it opened with: the guide moving on to the next stop (with its own turn) mustn't restart this picture.
+  const [turnAtOpen] = useState(turn);
   useEffect(() => {
     let viewer: PannellumViewer | null = null;
     let sharpViewer: PannellumViewer | null = null;
     let cancelled = false;
     const sharpBox = sharpEl.current;
-    const first = quick ?? full ?? image;
-    const later = quick && full && full !== quick ? full : null;
+    // The sharp copy already fetched (the guide gets its pictures ahead): open with that - no swap while it turns.
+    const first = full && loadedPanos.has(full) ? full : (quick ?? full ?? image);
+    const later = quick && full && full !== first ? full : null;
     const options = (at: { yaw: number; pitch: number; hfov: number }, src?: string) => ({
       ...(src
         ? { type: "equirectangular", panorama: src }
@@ -2762,13 +2785,13 @@ function PanoView({
       maxHfov: 120,
       yaw: at.yaw,
       pitch: at.pitch,
-      ...(turn && turn !== "none" ? { autoRotate: turn === "other" ? 2.5 : -2.5, autoRotateInactivityDelay: 4000 } : {}),
+      ...(turnAtOpen && turnAtOpen !== "none" ? { autoRotate: turnAtOpen === "other" ? 2.5 : -2.5, autoRotateInactivityDelay: 4000 } : {}),
     });
     loadPannellum().then(() => {
       if (cancelled || !el.current || !window.pannellum) return;
       if (!image && !(dir && panos)) return;
       const hfov = window.innerWidth <= 760 ? panoHfov(true, zoom?.mobile) : panoHfov(false, zoom?.desktop);
-      const v = window.pannellum.viewer(el.current, options({ yaw: start?.yaw ?? 0, pitch: start?.pitch ?? -10, hfov }, first));
+      const v = window.pannellum.viewer(el.current, options({ yaw: startYaw ?? 0, pitch: startPitch ?? -10, hfov }, first));
       viewer = v;
       openPanoView = () => ({ yaw: v.getYaw(), pitch: v.getPitch(), hfov: v.getHfov(), image });
       if (!later) return;
@@ -2812,7 +2835,7 @@ function PanoView({
       sharpViewer?.destroy();
       sharpBox?.classList.remove("hv-pano-skarp-vist");
     };
-  }, [dir, image, quick, full, panos, start, turn, zoom]);
+  }, [dir, image, quick, full, panos, startYaw, startPitch, turnAtOpen, zoom]);
   return (
     <div className="hv-pano">
       <div ref={el} className="absolute inset-0" />
