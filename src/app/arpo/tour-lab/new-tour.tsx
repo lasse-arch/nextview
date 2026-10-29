@@ -6,6 +6,7 @@ import {
   connectMatterport,
   createTourFromWebsite,
   matterportConnected,
+  peekExploreTour,
   planTourFromWebsite,
   type TourPlanResult,
   matterportModels,
@@ -54,6 +55,8 @@ export function NewTour({ tours, forDeal, onClose }: { tours: { slug: string; na
   /** A drone photo the tour starts on - nextviewAI places the points on it. Made smaller in the browser first. */
   const [drone, setDrone] = useState<string | null>(null);
   const [copyOf, setCopyOf] = useState<string | null>(null);
+  /** The customer's existing explore tour, converted: its menu, tiles and start are copied over. */
+  const [explore, setExplore] = useState("");
   /** nextviewAI's plan, before it builds - and the user's corrections to it. */
   const [plan, setPlan] = useState<TourPlanResult | null>(null);
   const [corrections, setCorrections] = useState("");
@@ -72,6 +75,7 @@ export function NewTour({ tours, forDeal, onClose }: { tours: { slug: string; na
     setNotes("");
     setDrone(null);
     setCopyOf(null);
+    setExplore("");
     setPlan(null);
     setCorrections("");
     setError(null);
@@ -88,6 +92,7 @@ export function NewTour({ tours, forDeal, onClose }: { tours: { slug: string; na
     focus,
     notes,
     droneImage: drone ?? undefined,
+    explore: explore || undefined,
   });
 
   /** Asks for the plan (again, with the corrections, when there is one). */
@@ -181,8 +186,15 @@ export function NewTour({ tours, forDeal, onClose }: { tours: { slug: string; na
                 <SpaceStep
                   dealId={who?.kind === "deal" ? who.deal.id : null}
                   space={space}
+                  explore={explore}
+                  onExplore={(url, s) => {
+                    setExplore(url);
+                    setSpace(s);
+                    if (who?.kind !== "deal" || !name.trim()) setName(s.name);
+                  }}
                   onPick={(s) => {
                     setSpace(s);
+                    setExplore("");
                     if (who?.kind !== "deal") setName(s.name);
                   }}
                 />
@@ -435,7 +447,19 @@ function CustomerStep({ who, onPick, onCopy }: { who: Who | null; onPick: (w: Wh
   );
 }
 
-function SpaceStep({ dealId, space, onPick }: { dealId: string | null; space: Space | null; onPick: (s: Space) => void }) {
+function SpaceStep({
+  dealId,
+  space,
+  onPick,
+  explore,
+  onExplore,
+}: {
+  dealId: string | null;
+  space: Space | null;
+  onPick: (s: Space) => void;
+  explore: string;
+  onExplore: (url: string, s: Space) => void;
+}) {
   const [connected, setConnected] = useState<boolean | null>(null);
   const [customerSpaces, setCustomerSpaces] = useState<Space[]>([]);
   const [q, setQ] = useState("");
@@ -476,6 +500,7 @@ function SpaceStep({ dealId, space, onPick }: { dealId: string | null; space: Sp
   return (
     <div className="space-y-4">
       <h2 className="text-[19px] font-semibold tracking-tight">Vælg Matterport-touren</h2>
+      <ExploreBox url={explore} onRead={onExplore} />
       {customerSpaces.length > 0 && (
         <div className="space-y-2">
           <div className="px-1 text-[12px] font-semibold uppercase tracking-wide text-[#6e6e73]">Kundens tours</div>
@@ -589,3 +614,43 @@ function shrinkImage(file: File, max: number): Promise<string> {
     img.src = url;
   });
 }
+
+/**
+ * Converting an existing explore tour: paste its link, and its menu (and
+ * tile menu), start and Matterport model are read - nextviewAI copies them
+ * over and suggests what the tour can do now.
+ */
+function ExploreBox({ url, onRead }: { url: string; onRead: (url: string, s: Space) => void }) {
+  const [link, setLink] = useState(url);
+  const [info, setInfo] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  return (
+    <div className="space-y-2 rounded-2xl bg-white p-4 ring-1 ring-black/[.04]">
+      <div className="text-[15px] font-semibold">Har kunden en tour på explore?</div>
+      <p className="text-[12px] leading-snug text-[#6e6e73]">Indsæt linket, så konverterer nextviewAI den: menuen, flise-menuen og starten kopieres over, og du får forslag til, hvad touren kan mere nu.</p>
+      <div className="flex gap-2">
+        <input className={`${input} flex-1`} value={link} onChange={(e) => setLink(e.target.value)} placeholder="https://explore.nextview360.dk/da/tour/…" />
+        <button
+          type="button"
+          disabled={pending || !link.trim()}
+          className="rounded-xl bg-[#0071e3] px-4 text-[14px] font-medium text-white disabled:opacity-40"
+          onClick={() =>
+            start(async () => {
+              setError(null);
+              const r = await peekExploreTour(link);
+              if (!r.ok) return setError(r.error);
+              setInfo(`${r.title}: ${r.places} steder i menuen${r.groups ? ` i ${r.groups} grupper` : ""}${r.tiles ? `, ${r.tiles} fliser` : ""}${r.outside ? ` (${r.outside} fører ud af touren)` : ""}.`);
+              onRead(link.trim(), { id: r.modelId, name: r.title.replace(/^TEST\w*\s*-\s*/i, "") });
+            })
+          }
+        >
+          {pending ? "Læser…" : "Hent"}
+        </button>
+      </div>
+      {error && <p className="text-[12px] text-[#ff3b30]">{error}</p>}
+      {(info || url) && !error && <p className="text-[12px] text-[#248a3d]">✓ {info ?? "Explore-touren er valgt"} - Matterport-touren er valgt. Tryk Næste.</p>}
+    </div>
+  );
+}
+

@@ -57,6 +57,7 @@ export const UI_STRINGS = [
   "Menu",
   "Luk",
   "Luk menuen",
+  "Alle områder",
   "Vis mig rundt",
   "Træd indenfor",
   "Gå ind",

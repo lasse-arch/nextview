@@ -24,6 +24,7 @@ import { DAY_CSS, DayBar, DaySheet } from "./day";
 import { FEEDBACK_CSS, FeedbackLayer } from "./feedback";
 import { ICONS } from "../tours/icons";
 import { SIMPLE_CSS, SimpleMenu, SimpleWelcome } from "./simple";
+import { BENTO_CSS, BentoMenu } from "./bento";
 import { INFO_CSS, InfoDots, usePlaceInfo } from "./info";
 import { MAP_CSS, MapScene, type MapApi } from "./map";
 import { CARDS_CSS, NudgeCard, PlaceCard } from "./cards";
@@ -1751,7 +1752,7 @@ function TourExperience({
       }>
       <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.font.replace(/ /g, "+")}:wght@400;600;700;800;900&display=swap`} />
       {T.fontHeading && <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.fontHeading.replace(/ /g, "+")}:wght@500;600&display=swap`} />}
-      <style>{CSS + CONTACT_CSS + STORIES_CSS + LIGHTBOX_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + ONBOARDING_CSS + INFO_CSS + MAP_CSS + ROUTE_CSS + MEASURES_CSS + CARDS_CSS + DAY_CSS + SIMPLE_CSS + LOGO_RIGHT_CSS + LANG_CSS + WEATHER_CSS + FINDER_CSS + (review ? FEEDBACK_CSS : "")}</style>
+      <style>{CSS + CONTACT_CSS + STORIES_CSS + LIGHTBOX_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + ONBOARDING_CSS + INFO_CSS + MAP_CSS + ROUTE_CSS + MEASURES_CSS + CARDS_CSS + DAY_CSS + SIMPLE_CSS + BENTO_CSS + LOGO_RIGHT_CSS + LANG_CSS + WEATHER_CSS + FINDER_CSS + (review ? FEEDBACK_CSS : "")}</style>
       {/* The tour's own design on top (written by Claude or by hand under Avanceret). */}
       {T.customCss && <style>{T.customCss.replace(/<\/?style/gi, "")}</style>}
 
@@ -2082,6 +2083,23 @@ function TourExperience({
             hasGuide={GUIDE.length > 0}
             onGuide={() => startGuide("menu")}
             onDay={() => openDay("menu")}
+            onGo={menuGo}
+          />
+        )
+      ) : T.design?.menu === "bento" ? (
+        phase === "tour" &&
+        !cover &&
+        !welcome && (
+          <BentoMenu
+            T={T}
+            open={menuOpen}
+            setOpen={(o) => {
+              if (o) track("menu_open", { place: phase });
+              setMenuOpen(o);
+            }}
+            room={roomShown}
+            hasGuide={GUIDE.length > 0}
+            onGuide={() => startGuide("menu")}
             onGo={menuGo}
           />
         )

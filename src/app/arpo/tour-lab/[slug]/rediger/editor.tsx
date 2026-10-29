@@ -18,6 +18,7 @@ import { CardsEditor, DroneViewPicker, GuideEditor, StartEditor, TagsEditor } fr
 import { ResultsPanel } from "./results";
 import { DesignGallery } from "./design-gallery";
 import { ScanPointsEditor } from "./scanpoints";
+import { BentoEditor } from "./bento-editor";
 import { DeleteTour } from "./delete-tour";
 import { LiveDataEditor } from "./live";
 import type { ScanMap } from "@/lib/matterport-graph";
@@ -871,10 +872,12 @@ export function TourEditor({
                       ["dock", "Bar i bunden"],
                       ["picker", "Rumvælger"],
                       ["simple", "Helt enkel"],
+                      ["bento", "Fliser"],
                     ]}
                     onChange={(v) => edit((d) => void (d.design = { ...d.design, welcome: d.design?.welcome ?? "tiles", menu: v }))}
                   />
                 </Field>
+                {menuStyle === "bento" && <BentoEditor config={config} edit={edit} />}
                 {menuStyle === "picker" && (
                   <Field title="Når man vælger en størrelse, start i" hint="Findes rummet ikke i en størrelse, starter den i størrelsens første">
                     <select

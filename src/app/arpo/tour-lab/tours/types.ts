@@ -6,6 +6,9 @@
 
 /** The guide's turn at a stop: "as" = the usual slow turn, "other" = the other way, "none" = no turn. */
 export type GuideTurn = "as" | "other" | "none";
+/** A tile in the "Fliser" (bento) menu: `title` may have line breaks (\n); `href` as a menu item's. */
+export type BentoTile = { title: string; kicker?: string; tag?: string; href: string; size?: "wide" | "tall"; style?: "light" | "dark" | "accent" };
+
 /** A 360° photo's copies: 4096 px (phones - and computers at once, while the sharp one comes) and 8192 px (computers); the photo itself where it isn't bigger. */
 export type PanoCopies = { phone: string; computer: string };
 
@@ -150,6 +153,8 @@ export type TourConfig = {
    * closer) and where it looks (yaw/pitch, degrees).
    */
   imageView?: Record<string, { desktop?: number; mobile?: number; yaw?: number; pitch?: number }>;
+  /** The "Fliser" (bento) menu's tiles (design.menu "bento") - left out: made from the main action and the menu. */
+  bento?: { tiles: BentoTile[] };
   /** Set by Arpo when the tour is saved: each 360° photo's smaller copies (by the photo's address). */
   panoCopies?: Record<string, PanoCopies>;
   overviewUi?: {
@@ -238,7 +243,7 @@ export type TourConfig = {
    */
   design?: {
     welcome: "tiles" | "cover" | "simple";
-    menu: "side" | "dock" | "picker" | "simple";
+    menu: "side" | "dock" | "picker" | "simple" | "bento";
     /** Room picker: the room a size opens in when it's picked (e.g. "Tomt"). Left out, or not in that size = the size's first. */
     first?: string;
   };
