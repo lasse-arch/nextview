@@ -833,11 +833,20 @@ function TourExperience({
     return id ? (T.points.find((x) => x.id === id) ?? null) : null;
   };
 
+  /** The 360° photo's copy for this screen (made when the tour was saved: smaller on a phone), else the photo itself. */
+  const panoFor = (url: string) => {
+    const c = T.panoCopies?.[url];
+    return c ? (typeof window !== "undefined" && window.innerWidth <= 760 ? c.phone : c.computer) : url;
+  };
   /** The 360° photos of the guide's stops from `from` on (the next two) - fetched ahead, so a stop opens at once instead of loading. */
   const prefetchGuidePanos = (from: number) => {
     for (const stop of GUIDE.slice(from, from + 2)) {
       const p = stop.href ? pointById(stop.href) : null;
-      if (p?.panorama) prefetchPano(p.panorama);
+      // The 4096 copy first (what shows at once - on a phone all of it), then a computer's sharp one.
+      if (p?.panorama) {
+        const small = T.panoCopies?.[p.panorama]?.phone;
+        (small ? prefetchPano(small) : Promise.resolve()).finally(() => prefetchPano(panoFor(p.panorama!)).catch(() => {}));
+      }
       // Prepared tiles: the two coarse levels (all six faces) - enough to open sharp-ish at once, the finer ones follow.
       else if (p?.pano && T.panos)
         for (const level of [1, 2])
@@ -884,6 +893,9 @@ function TourExperience({
     let declutter = 0;
     let shownTimer = 0;
     const key = droneKey;
+    // The 360° photo's copy for this screen (made when the tour was saved), when there is one.
+    const copies = D.panorama ? T.panoCopies?.[D.panorama] : undefined;
+    const dronePano = copies ? (mobile.current ? copies.phone : copies.computer) : D.panorama;
     loadPannellum().then(() => {
       if (cancelled || !droneEl.current || !window.pannellum) return;
       const start = mobile.current ? D.startMobile : D.start;
@@ -904,7 +916,7 @@ function TourExperience({
       drone.current = window.pannellum.viewer(droneEl.current, {
         // One uploaded 360° photo, or the drone's prepared tiles.
         ...(D.panorama
-          ? { type: "equirectangular", panorama: D.panorama }
+          ? { type: "equirectangular", panorama: dronePano }
           : {
               type: "multires",
               multiRes: {
@@ -937,7 +949,7 @@ function TourExperience({
       const shown = () => setDroneLoaded(key);
       drone.current.on("load", shown);
       drone.current.on("error", shown);
-      const first = D.panorama ? [D.panorama] : ["f", "b", "u", "d", "l", "r"].map((f) => `${D.basePath}/1/${f}0_0.jpg`);
+      const first = dronePano ? [dronePano] : ["f", "b", "u", "d", "l", "r"].map((f) => `${D.basePath}/1/${f}0_0.jpg`);
       Promise.all(first.map((src) => new Promise((done) => Object.assign(new Image(), { onload: done, onerror: done, src })))).then(() => {
         if (!cancelled) shownTimer = window.setTimeout(shown, 350);
       });
@@ -1949,6 +1961,8 @@ function TourExperience({
           name={pano.name}
           dir={pano.pano}
           image={pano.panorama}
+          quick={pano.panorama ? T.panoCopies?.[pano.panorama]?.phone : undefined}
+          full={pano.panorama ? panoFor(pano.panorama) : undefined}
           start={pano.panoStart ?? (pano.panorama && T.imageView?.[pano.panorama]?.yaw != null ? { yaw: T.imageView[pano.panorama].yaw!, pitch: T.imageView[pano.panorama].pitch ?? 0 } : undefined)}
           panos={T.panos}
           turn={guideAt != null ? (GUIDE[guideAt]?.turn ?? T.guide?.turn ?? "as") : null}
@@ -2496,14 +2510,21 @@ function PointPhotos({ images, name, onOpen }: { images: string[]; name: string;
 }
 
 /** 360° photos already asked for (each fetched once) - the browser keeps them, so the viewer gets them from its cache. */
-const prefetchedPanos = new Set<string>();
-function prefetchPano(url: string) {
-  if (prefetchedPanos.has(url) || typeof window === "undefined") return;
-  prefetchedPanos.add(url);
+const prefetchedPanos = new Map<string, Promise<void>>();
+function prefetchPano(url: string, priority: "low" | "high" = "low"): Promise<void> {
+  if (typeof window === "undefined") return Promise.resolve();
+  const known = prefetchedPanos.get(url);
+  if (known) return known;
   // Fetched as the viewer fetches it (same address, CORS), so it is the same cached file. Low priority: never ahead of what's on screen.
-  fetch(url, { mode: "cors", priority: "low" } as RequestInit)
+  const p = fetch(url, { mode: "cors", priority } as RequestInit)
     .then((r) => r.blob())
-    .catch(() => prefetchedPanos.delete(url));
+    .then(() => {})
+    .catch((err) => {
+      prefetchedPanos.delete(url);
+      throw err;
+    });
+  prefetchedPanos.set(url, p);
+  return p;
 }
 
 /** The 360° picture open right now (PanoView) - the editor asks for its view to save where it starts and how zoomed. */
@@ -2513,6 +2534,8 @@ function PanoView({
   name,
   dir,
   image,
+  quick,
+  full,
   start,
   panos,
   turn = null,
@@ -2527,6 +2550,13 @@ function PanoView({
   /** A folder of prepared tiles (under `panos`) - or `image`, one uploaded 360° photo. */
   dir?: string;
   image?: string;
+  /**
+   * What's shown for `image` (which stays the photo's own address, for the
+   * editor): `quick`, the 4096 copy, at once - and then `full`, the copy for
+   * this screen (8192 on a computer), laid over it as soon as it's loaded.
+   */
+  quick?: string;
+  full?: string;
   start?: { yaw: number; pitch: number };
   /** Turns slowly by itself while the guide shows it: as always, the other way, or not ("none"/null). */
   turn?: GuideTurn | null;
@@ -2534,48 +2564,91 @@ function PanoView({
   onClose: () => void;
 }) {
   const el = useRef<HTMLDivElement>(null);
+  const sharpEl = useRef<HTMLDivElement>(null);
   useEffect(() => {
     let viewer: PannellumViewer | null = null;
+    let sharpViewer: PannellumViewer | null = null;
     let cancelled = false;
+    const sharpBox = sharpEl.current;
+    const first = quick ?? full ?? image;
+    const later = quick && full && full !== quick ? full : null;
+    const options = (at: { yaw: number; pitch: number; hfov: number }, src?: string) => ({
+      ...(src
+        ? { type: "equirectangular", panorama: src }
+        : {
+            type: "multires",
+            multiRes: {
+              basePath: `${panos!.basePath}/${dir}`,
+              path: "/%l/%s%y_%x",
+              extension: "jpg",
+              tileResolution: 512,
+              maxLevel: panos!.maxLevel,
+              cubeResolution: panos!.cubeResolution,
+            },
+          }),
+      autoLoad: true,
+      showControls: false,
+      compass: false,
+      hfov: at.hfov,
+      minHfov: 30,
+      maxHfov: 120,
+      yaw: at.yaw,
+      pitch: at.pitch,
+      ...(turn && turn !== "none" ? { autoRotate: turn === "other" ? 2.5 : -2.5, autoRotateInactivityDelay: 4000 } : {}),
+    });
     loadPannellum().then(() => {
       if (cancelled || !el.current || !window.pannellum) return;
       if (!image && !(dir && panos)) return;
-      viewer = window.pannellum.viewer(el.current, {
-        ...(image
-          ? { type: "equirectangular", panorama: image }
-          : {
-              type: "multires",
-              multiRes: {
-                basePath: `${panos!.basePath}/${dir}`,
-                path: "/%l/%s%y_%x",
-                extension: "jpg",
-                tileResolution: 512,
-                maxLevel: panos!.maxLevel,
-                cubeResolution: panos!.cubeResolution,
-              },
-            }),
-        autoLoad: true,
-        showControls: false,
-        compass: false,
-        hfov: window.innerWidth <= 760 ? panoHfov(true, zoom?.mobile) : panoHfov(false, zoom?.desktop),
-        minHfov: 30,
-        maxHfov: 120,
-        yaw: start?.yaw ?? 0,
-        pitch: start?.pitch ?? -10,
-        ...(turn && turn !== "none" ? { autoRotate: turn === "other" ? 2.5 : -2.5, autoRotateInactivityDelay: 4000 } : {}),
-      });
-      const v = viewer;
+      const hfov = window.innerWidth <= 760 ? panoHfov(true, zoom?.mobile) : panoHfov(false, zoom?.desktop);
+      const v = window.pannellum.viewer(el.current, options({ yaw: start?.yaw ?? 0, pitch: start?.pitch ?? -10, hfov }, first));
+      viewer = v;
       openPanoView = () => ({ yaw: v.getYaw(), pitch: v.getPitch(), hfov: v.getHfov(), image });
+      if (!later) return;
+      // The sharp copy: fetched meanwhile, then a second viewer over the first - same view - shown once it has drawn, and the small one let go.
+      let firstShown = false;
+      let sharpReady = false;
+      const swap = () => {
+        if (cancelled || !firstShown || !sharpReady || !sharpBox || sharpViewer) return;
+        const at = { yaw: v.getYaw(), pitch: v.getPitch(), hfov: v.getHfov() };
+        const s = window.pannellum!.viewer(sharpBox, options(at, later));
+        sharpViewer = s;
+        s.on("load", () => {
+          if (cancelled) return;
+          // Where the small one has turned to meanwhile.
+          s.lookAt(v.getPitch(), v.getYaw(), v.getHfov(), 0);
+          sharpBox.classList.add("hv-pano-skarp-vist");
+          openPanoView = () => ({ yaw: s.getYaw(), pitch: s.getPitch(), hfov: s.getHfov(), image });
+          setTimeout(() => {
+            if (viewer === v) {
+              v.destroy();
+              viewer = null;
+            }
+          }, 400);
+        });
+      };
+      v.on("load", () => {
+        firstShown = true;
+        swap();
+      });
+      prefetchPano(later, "high")
+        .then(() => {
+          sharpReady = true;
+          swap();
+        })
+        .catch(() => {});
     });
     return () => {
       cancelled = true;
       openPanoView = null;
       viewer?.destroy();
+      sharpViewer?.destroy();
+      sharpBox?.classList.remove("hv-pano-skarp-vist");
     };
-  }, [dir, image, panos, start, turn, zoom]);
+  }, [dir, image, quick, full, panos, start, turn, zoom]);
   return (
     <div className="hv-pano">
       <div ref={el} className="absolute inset-0" />
+      <div ref={sharpEl} className="hv-pano-skarp absolute inset-0" />
       <div className="hv-pano-titel">{name}</div>
       <button type="button" className="hv-pano-luk" onClick={onClose}>
         ← {backLabel}
@@ -2845,6 +2918,9 @@ const CSS = `
 .hv-social svg{width:30px;height:30px}
 .hv-menu-cta{padding:14px 22px 24px;display:flex;flex-direction:column;gap:8px}
 .hv-pano{position:absolute;inset:0;z-index:15;background:#0d1b20;animation:hvFade .4s ease}
+/* The sharp copy waits unseen over the small one until it has drawn, then fades in. */
+.hv-pano-skarp{opacity:0;pointer-events:none;transition:opacity .35s ease}
+.hv-pano-skarp.hv-pano-skarp-vist{opacity:1;pointer-events:auto}
 @keyframes hvFade{from{opacity:0}to{opacity:1}}
 .hv-pano-titel{position:absolute;top:calc(16px + env(safe-area-inset-top,0px));left:16px;z-index:2;background:rgba(21,50,58,.9);color:#fff;font-weight:800;font-size:16px;padding:8px 16px;border-radius:999px}
 .hv-pano-luk{position:absolute;left:16px;bottom:20px;z-index:2;background:var(--c-main);color:#fff;border:0;border-radius:999px;padding:11px 18px;font-weight:800;font-size:14px;font-family:inherit;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.3)}

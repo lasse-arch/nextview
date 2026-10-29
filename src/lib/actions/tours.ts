@@ -10,6 +10,8 @@ import { tourConfigProblem } from "@/lib/tour-validate";
 import type { ReportShare } from "@/lib/tour-share";
 import { randomBytes } from "node:crypto";
 import { detachFromMpskins } from "@/lib/tour-detach";
+import { after } from "next/server";
+import { makePanoCopies, withPanoCopies } from "@/lib/tour-pano-copies";
 
 type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string };
 
@@ -19,6 +21,13 @@ async function admin() {
   return user;
 }
 
+/** The 360° photos' smaller copies still missing are made after the answer (a big photo takes a few seconds). */
+function panoCopiesLater(slug: string) {
+  after(async () => {
+    if (await makePanoCopies(slug).catch(() => 0)) tourChanged(slug);
+  });
+}
+
 /** Saves a tour's setup as a new version. */
 export async function saveTour(slug: string, config: TourConfig, note: string): Promise<Result<{ versionId: string }>> {
   const user = await admin();
@@ -26,7 +35,8 @@ export async function saveTour(slug: string, config: TourConfig, note: string): 
   if (error) return { ok: false, error };
   const tour = await prisma.tour.findUnique({ where: { slug }, select: { id: true } });
   if (!tour) return { ok: false, error: "Touren findes ikke." };
-  const json = { ...config, slug } as unknown as Prisma.InputJsonValue;
+  // The 360° photos' smaller copies: the ones made before go in now, new ones after the answer.
+  const json = { ...(await withPanoCopies(slug, config)), slug } as unknown as Prisma.InputJsonValue;
   const version = await prisma.$transaction(async (tx) => {
     await tx.tour.update({ where: { id: tour.id }, data: { config: json, name: config.title, draft: Prisma.DbNull, draftAt: null, draftByName: null } });
     return tx.tourVersion.create({ data: { tourId: tour.id, config: json, note: note.trim() || null, createdByName: user.name }, select: { id: true } });
@@ -34,6 +44,7 @@ export async function saveTour(slug: string, config: TourConfig, note: string): 
   revalidatePath("/arpo/tour-lab");
   revalidatePath(`/arpo/tour-lab/${slug}`);
   tourChanged(slug);
+  panoCopiesLater(slug);
   return { ok: true, versionId: version.id };
 }
 
@@ -68,6 +79,7 @@ export async function restoreTourVersion(versionId: string): Promise<Result> {
   revalidatePath("/arpo/tour-lab");
   revalidatePath(`/arpo/tour-lab/${v.tour.slug}`);
   tourChanged(v.tour.slug);
+  panoCopiesLater(v.tour.slug);
   return { ok: true };
 }
 
@@ -123,6 +135,7 @@ export async function setTourPublished(slug: string, published: boolean): Promis
   await prisma.tour.update({ where: { slug }, data: { published } });
   revalidatePath(`/t/${slug}`);
   tourChanged(slug);
+  if (published) panoCopiesLater(slug);
   return { ok: true };
 }
 

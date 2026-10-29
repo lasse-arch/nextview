@@ -46,12 +46,12 @@ export function FeedbackLayer({
   const [notes, setNotes] = useState<Note[]>([]);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
-  // Folded into a small tab at the right edge, so it is not in the way of the tour (stories, menus).
+  // Starts folded into a small tab at the right edge, so it is not in the way of the tour (the welcome, "Vis mig rundt", menus) - a tap opens the bar.
   const [small, setSmall] = useState(() => {
     try {
-      return typeof window !== "undefined" && sessionStorage.getItem("fb-small") === "1";
+      return typeof window === "undefined" || sessionStorage.getItem("fb-small") !== "0";
     } catch {
-      return false;
+      return true;
     }
   });
   const fold = (v: boolean) => {
@@ -301,5 +301,8 @@ export const FEEDBACK_CSS = `
   .hv:has(.hv-story-play) .fb-bar{top:auto}
   .hv:has(.hv-st-m) .fb-bar{bottom:calc(182px + env(safe-area-inset-bottom,0px))}
   .fb-panel{top:auto;bottom:130px;max-height:60%}
+  /* "Vis mig rundt" has its card at the bottom: an opened bar goes to the top instead, under the progress bars. */
+  .hv-guiding .fb-bar{top:calc(30px + env(safe-area-inset-top,0px));bottom:auto}
+  .hv-guiding .fb-panel{top:calc(84px + env(safe-area-inset-top,0px));bottom:auto}
 }
 `;

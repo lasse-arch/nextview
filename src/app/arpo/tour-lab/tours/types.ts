@@ -6,6 +6,9 @@
 
 /** The guide's turn at a stop: "as" = the usual slow turn, "other" = the other way, "none" = no turn. */
 export type GuideTurn = "as" | "other" | "none";
+/** A 360° photo's copies: 4096 px (phones - and computers at once, while the sharp one comes) and 8192 px (computers); the photo itself where it isn't bigger. */
+export type PanoCopies = { phone: string; computer: string };
+
 /** Where the drone picture looks (set from the editor's preview). */
 export type DroneView = { yaw: number; pitch: number; hfov: number };
 /** `view`: a tile to the drone picture can turn it to its own spot, per device - else the start view. */
@@ -147,6 +150,8 @@ export type TourConfig = {
    * closer) and where it looks (yaw/pitch, degrees).
    */
   imageView?: Record<string, { desktop?: number; mobile?: number; yaw?: number; pitch?: number }>;
+  /** Set by Arpo when the tour is saved: each 360° photo's smaller copies (by the photo's address). */
+  panoCopies?: Record<string, PanoCopies>;
   overviewUi?: {
     box?: { desktop?: false; mobile?: false };
     filter?: { desktop?: false; mobile?: false };
