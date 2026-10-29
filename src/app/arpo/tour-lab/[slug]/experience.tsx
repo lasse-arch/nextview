@@ -179,15 +179,13 @@ const slug = placeSlug;
 type Box = { left: number; right: number; top: number; bottom: number };
 const overlaps = (a: Box, b: Box) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
 
-/** Where a name can stand by its icon: under it (normal), over it, to the right, to the left. */
-const NAME_SPOTS = ["", "hv-navn-op", "hv-navn-h", "hv-navn-v"] as const;
-
 /**
  * Keeps the names from covering another point's icon or a name already
- * shown - the open point first, then in setup order: a name that's in the way
- * moves over, right or left of its icon; only if no spot is free is it hidden
- * (it shows when its icon is hovered). With names set to "Altid" nothing is
- * hidden - it keeps the best spot it has.
+ * shown - the open point first, then in setup order. A name always stands
+ * under its icon; one that would be in the way is hidden (it shows when its
+ * icon is hovered). A hidden one needs a little room to spare before it shows
+ * again, so a name on the edge doesn't blink on and off as the view moves.
+ * With names set to "Altid" nothing is hidden.
  */
 function declutterNames(selected: string | null) {
   const root = document.querySelector(".hv");
@@ -197,30 +195,17 @@ function declutterNames(selected: string | null) {
   points.sort((a, b) => Number(b.dataset.punkt === selected) - Number(a.dataset.punkt === selected));
   const icons = points.map((el) => el.querySelector(".hv-ikon")?.getBoundingClientRect());
   const shown: Box[] = [];
+  const grow = (r: DOMRect, m: number): Box => ({ left: r.left - m, right: r.right + m, top: r.top - m, bottom: r.bottom + m });
   points.forEach((el, i) => {
     const name = el.querySelector<HTMLElement>(".hv-navn");
     if (!name) return;
-    const free = (box: DOMRect) => !icons.some((icon, j) => j !== i && icon && icon.width && overlaps(box, icon)) && !shown.some((s) => overlaps(box, s));
-    let spot: string | null = null;
-    let first: DOMRect | null = null;
-    for (const c of NAME_SPOTS) {
-      name.classList.remove(...NAME_SPOTS.filter(Boolean));
-      if (c) name.classList.add(c);
-      const box = name.getBoundingClientRect();
-      if (!box.width) return;
-      first ??= box;
-      if (free(box)) {
-        spot = c;
-        shown.push(box);
-        break;
-      }
-    }
-    if (spot == null) {
-      // No free spot: back under the icon - shown anyway with "Altid", else hidden.
-      name.classList.remove(...NAME_SPOTS.filter(Boolean));
-      if (always && first) shown.push(first);
-    }
-    name.classList.toggle("hv-gemt", spot == null && !always);
+    const box = name.getBoundingClientRect();
+    if (!box.width) return;
+    const wasHidden = name.classList.contains("hv-gemt");
+    const b = grow(box, wasHidden ? 6 : 0);
+    const free = !icons.some((icon, j) => j !== i && icon && icon.width && overlaps(b, icon)) && !shown.some((s) => overlaps(b, s));
+    if (free || always) shown.push(box);
+    name.classList.toggle("hv-gemt", !free && !always);
   });
 }
 
@@ -2792,9 +2777,6 @@ const CSS = `
 .hv-laster-tegn{position:absolute;inset:0;z-index:3;display:flex;align-items:center;justify-content:center;pointer-events:none}
 .hv-laster-tegn img{max-width:180px;max-height:70px;opacity:.85;animation:hvAande 1.8s ease-in-out infinite}
 @keyframes hvAande{0%,100%{opacity:.35;transform:scale(.97)}50%{opacity:.9;transform:scale(1)}}
-.hv-navn.hv-navn-op{top:auto;bottom:100%;margin:0 0 4px}
-.hv-navn.hv-navn-h{top:50%;left:100%;transform:translateY(-50%);margin:0 0 0 5px}
-.hv-navn.hv-navn-v{top:50%;left:auto;right:100%;transform:translateY(-50%);margin:0 5px 0 0}
 .hv-navn.hv-gemt{visibility:hidden;pointer-events:none}
 .hv-pkt:hover .hv-navn.hv-gemt{visibility:visible}
 @media (min-width:761px){
