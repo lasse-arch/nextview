@@ -492,6 +492,22 @@ function TourExperience({
   /** The guide's moves, one after the other - and the newest asked for (only that one is flown to). */
   const guideQueue = useRef<Promise<unknown>>(Promise.resolve());
   const guideTicket = useRef(0);
+  /**
+   * Every press in "Vis mig rundt" (and every step it takes by itself) gets a
+   * number - work started for an older step (getting the next room ready,
+   * going in from the drone scene) checks it's still the newest before it
+   * moves the tour. The rest is read by those late callbacks through refs.
+   */
+  const guideStep = useRef(0);
+  const guideAtRef = useRef<number | null>(null);
+  const guideHeldRef = useRef(false);
+  const phaseRef = useRef(phase);
+  const enteringRef = useRef(false);
+  useEffect(() => {
+    guideAtRef.current = guideAt;
+    guideHeldRef.current = guideHeld;
+    phaseRef.current = phase;
+  });
   const [dayOpen, setDayOpen] = useState(false);
   const [dayAt, setDayAt] = useState<number | null>(null);
   /** Place cards closed for good (by index), and the "comes by itself" card. */
@@ -966,7 +982,8 @@ function TourExperience({
 
   /* ----- Drone → room: zoom in on the point, the tour is moved to the spot underneath, then cross-fade. ----- */
   async function enterTour(href: string, from: string, pointName: string) {
-    if (entering) return;
+    if (enteringRef.current) return;
+    enteringRef.current = true;
     setEntering(true);
     track("tour_enter", { from, destination: pointName });
     const started = now();
@@ -981,6 +998,7 @@ function TourExperience({
     const [ok] = await Promise.all([moved, zoom]);
     prepared.current = null;
     if (!ok) {
+      enteringRef.current = false;
       setEntering(false);
       return;
     }
@@ -988,6 +1006,8 @@ function TourExperience({
     setSelected(null);
     setMenuOpen(false);
     setPhase("tour");
+    phaseRef.current = "tour";
+    enteringRef.current = false;
     setEntering(false);
   }
 
@@ -1220,6 +1240,9 @@ function TourExperience({
   }
   function guideGo(i: number) {
     const stop = GUIDE[i];
+    const step = ++guideStep.current;
+    guideAtRef.current = i;
+    guideHeldRef.current = false;
     setGuideAt(i);
     setGuideHeld(false);
     prefetchGuidePanos(i + 1);
@@ -1228,9 +1251,10 @@ function TourExperience({
     if (point) {
       setSelected(null);
       if (phase !== "drone") setPhase("drone");
-      // The next stop inside the tour is got ready behind this one (the room loaded, standing there), so going in is quick.
+      // The next stop inside the tour is got ready behind this one (the room loaded, standing there), so going in is quick -
+      // unless the visitor has moved on meanwhile (then that room would be the wrong one).
       const next = GUIDE[i + 1]?.href;
-      if (next && !pointById(next)) setTimeout(() => prepare(next), 1200);
+      if (next && !pointById(next)) setTimeout(() => step === guideStep.current && phaseRef.current === "drone" && prepare(next), 1200);
       // With its own 360° photo, the guide shows that (turning slowly) - not just a zoom on the big picture.
       if (hasPano(point)) return setPano(point);
       // Otherwise the point on the drone scene / map, under the guide's card.
@@ -1239,7 +1263,29 @@ function TourExperience({
       return;
     }
     setPano(null);
-    if (phase === "drone") return enterTour(stop.href, "guide", stop.title);
+    if (phaseRef.current === "drone") {
+      // In from the drone scene - then make sure it's this stop it landed on (a press while going in is caught up with).
+      void enterTour(stop.href, "guide", stop.title).then(() => guideSettle(step));
+      return;
+    }
+    guideFly(stop);
+  }
+  /**
+   * After going in from the drone scene: the view must stand where the card
+   * says. A press meanwhile (going in takes a moment, and it can't be
+   * stopped half-way) is flown to now - unless an even newer press takes care
+   * of itself, or the visitor has taken over.
+   */
+  async function guideSettle(step: number) {
+    for (let n = 0; n < 80 && enteringRef.current; n++) await new Promise((r) => setTimeout(r, 150));
+    if (step !== guideStep.current || guideHeldRef.current || phaseRef.current !== "tour") return;
+    const at = guideAtRef.current;
+    const stop = at == null ? null : GUIDE[at];
+    if (!stop?.href || pointById(stop.href)) return;
+    if (!(await standsAt(stop.href)) && step === guideStep.current) guideFly(stop);
+  }
+  /** A stop inside the tour: flown to (one move at a time, only the newest), then the slow turn. */
+  function guideFly(stop: (typeof GUIDE)[number]) {
     // The slow turn at the stop: as always, the other way, or none (the stop's own, else the guide's).
     const turn = stop.turn ?? T.guide?.turn ?? "as";
     guideMoving.current = true;
@@ -1250,6 +1296,8 @@ function TourExperience({
       .catch(() => {})
       .then(async () => {
         if (ticket !== guideTicket.current) return;
+        // A room being got ready behind the drone scene finishes first - it mustn't land after the guide's own move.
+        await prepared.current?.done.catch(() => {});
         // Matterport can answer "done" to a move asked for while it's still flying the last one - without moving.
         // So check that the view really is at the stop, and fly again if not (a few times).
         for (let attempt = 0; attempt < 4; attempt++) {
@@ -1263,15 +1311,29 @@ function TourExperience({
         // still the guide moving, not the visitor: guideMoving stays on until the turn is done.
         const turning = sdk?.Camera.rotate?.(turn === "other" ? -18 : 18, 0, { speed: 3 }).catch(() => {});
         turning?.finally(() => {
-          if (ticket === guideTicket.current) setTimeout(() => ticket === guideTicket.current && (guideMoving.current = false), 700);
+          if (ticket === guideTicket.current) setTimeout(() => ticket === guideTicket.current && guideDone(stop, ticket), 700);
         });
         return "turning";
       })
       .then((r) => {
-        if (r !== "turning" && ticket === guideTicket.current) setTimeout(() => ticket === guideTicket.current && (guideMoving.current = false), 700);
+        if (r !== "turning" && ticket === guideTicket.current) setTimeout(() => ticket === guideTicket.current && guideDone(stop, ticket), 700);
       }, () => {
         if (ticket === guideTicket.current) guideMoving.current = false;
       });
+  }
+  /**
+   * The guide has stopped moving: from here on a move is the visitor's own. A
+   * step the visitor took while the guide was flying (it couldn't be told from
+   * the guide's own) shows now: standing elsewhere than the card says, the
+   * guide waits for them ("På pause - du kigger selv rundt").
+   */
+  async function guideDone(stop: (typeof GUIDE)[number], ticket: number) {
+    guideMoving.current = false;
+    if (ticket !== guideTicket.current || guideHeldRef.current) return;
+    if (!(await standsAt(stop.href)) && ticket === guideTicket.current && !guideMoving.current) {
+      guideHeldRef.current = true;
+      setGuideHeld(true);
+    }
   }
   /*
    * While the guide runs, the visitor may take over: walk to another scan
@@ -2389,7 +2451,16 @@ function TourExperience({
           manual={T.guide?.manual}
           held={guideHeld}
           walkHint={phase === "tour"}
-          onResume={() => setGuideHeld(false)}
+          onResume={() => {
+            // Fortsæt: back to the stop the card shows, if the visitor walked off - card and view always agree.
+            setGuideHeld(false);
+            guideHeldRef.current = false;
+            const stop = guideAt != null ? GUIDE[guideAt] : null;
+            if (stop?.href && !pointById(stop.href) && phaseRef.current === "tour")
+              void standsAt(stop.href).then((there) => {
+                if (!there && guideAtRef.current === guideAt && !guideHeldRef.current) guideFly(stop);
+              });
+          }}
           end={primaryCta && (
             <TourLink href={primaryCta.href} label={primaryCta.label} className="hv-btn hv-primary" onClick={() => track("cta_click", { label: primaryCta.label, link_url: primaryCta.href, place: "guide_end" })}>
               {primaryCta.label}
