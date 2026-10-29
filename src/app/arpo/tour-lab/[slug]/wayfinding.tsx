@@ -7,6 +7,29 @@ import { inFront } from "./info";
 export type RouteGraph = Record<string, { n: string[]; p: [number, number, number] }>;
 export type Destination = { name: string; group?: string; href: string };
 
+/**
+ * The network to find the way in: the model's own (from the server) joined
+ * with the viewer's scan points - every scan point, also those hidden in the
+ * tour or switched off in Matterport, so the way goes through the rooms
+ * (hidden scans are opened while the route passes them) instead of a long
+ * jump that can cut through a wall. In the viewer's coordinates (heights as
+ * the third number), where the viewer knows the point.
+ */
+export function routeNetwork(server: RouteGraph | null, sweeps: Record<string, { position?: { x: number; y: number; z: number }; neighbors?: string[] }>): RouteGraph | null {
+  const out: RouteGraph = {};
+  for (const [id, s] of Object.entries(sweeps)) {
+    if (!s.position) continue;
+    out[id] = { n: [...new Set([...(s.neighbors ?? []), ...(server?.[id]?.n ?? [])])], p: [s.position.x, s.position.z, s.position.y] };
+  }
+  if (!Object.keys(out).length) return server;
+  // Neighbours both ways, and only points we know where are.
+  for (const [id, node] of Object.entries(out)) {
+    node.n = node.n.filter((nb) => out[nb] && nb !== id);
+    for (const nb of node.n) if (!out[nb].n.includes(id)) out[nb].n.push(id);
+  }
+  return out;
+}
+
 /** The walk between two scan points (Dijkstra over the model's scan-point network, in short steps). */
 export function shortestPath(graph: RouteGraph, from: string, to: string): string[] | null {
   if (!graph[from] || !graph[to]) return null;
@@ -56,7 +79,8 @@ export function straighten(graph: RouteGraph, path: string[], maxM = 16): string
       const len = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
       const off = path.slice(i + 1, k).every((m) => {
         const c = graph[m].p;
-        return Math.abs((b[0] - a[0]) * (a[1] - c[1]) - (a[0] - c[0]) * (b[1] - a[1])) / len < 1.2;
+        // Close to the straight line (a glide that bends around a door frame would cut through the wall).
+        return Math.abs((b[0] - a[0]) * (a[1] - c[1]) - (a[0] - c[0]) * (b[1] - a[1])) / len < 0.6;
       });
       if (off) {
         j = k;

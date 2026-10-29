@@ -30,7 +30,7 @@ import { INFO_CSS, InfoDots, usePlaceInfo } from "./info";
 import { MAP_CSS, MapScene, type MapApi } from "./map";
 import { CARDS_CSS, NudgeCard, PlaceCard } from "./cards";
 import { MEASURES_CSS, MeasureShield } from "./measures";
-import { ROUTE_CSS, RouteLine, RouteSheet, RouteStatus, flightMs, shortestPath, straighten, type Destination, type RouteGraph } from "./wayfinding";
+import { ROUTE_CSS, RouteLine, RouteSheet, RouteStatus, flightMs, routeNetwork, shortestPath, straighten, type Destination, type RouteGraph } from "./wayfinding";
 import { LINKS_CSS, LinkPopup, LinkProvider, TourLink, openLink, popupSize, prefetchFrames, siteOf, type LinkPopupState } from "./links";
 import { Stories, STORIES_CSS, storyJpeg, type StoryRoom } from "./stories";
 import { LIGHTBOX_CSS, Lightbox, type LightboxState } from "./lightbox";
@@ -413,6 +413,8 @@ function TourExperience({
   const allSweeps = useRef<string[]>([]);
   /** Every scan point's place in the viewer (to face the way when walking a route). */
   const sweepData = useRef<Record<string, SweepInfo>>({});
+  /** Scan points switched off in Matterport that a move opened (closed again when the visitor leaves them). */
+  const openedSweeps = useRef(new Set<string>());
   const currentSweep = useRef<string | null>(null);
   const roomTimer = useRef<{ name: string | null; at: number } | null>(null);
   /** "Kun punkter": no free walking - only the current scan point is enabled, the menu and points move you. */
@@ -675,7 +677,9 @@ function TourExperience({
     async (sdk: MpSdk, sweep: string, opts: { rotation?: Rotation; transition: string; transitionTime?: number }) => {
       const from = currentSweep.current;
       const locked = pointsOnlyRef.current;
-      if (locked || hiddenSweeps.includes(sweep)) await sdk.Sweep.enable(sweep).catch(() => {});
+      // A scan point switched off in Matterport itself (Find vej may pass it): opened for the move, closed again when left.
+      if (sweepData.current[sweep]?.enabled === false && !hiddenSweeps.includes(sweep)) openedSweeps.current.add(sweep);
+      if (locked || hiddenSweeps.includes(sweep) || openedSweeps.current.has(sweep)) await sdk.Sweep.enable(sweep).catch(() => {});
       try {
         await sdk.Sweep.moveTo(sweep, opts);
       } catch (first) {
@@ -700,7 +704,10 @@ function TourExperience({
             track("move_failed", { sweep, label: `${String(last).slice(0, 60)} / ${String(err).slice(0, 60)}` })
           );
       }
-      if (from && from !== sweep && (locked || hiddenSweeps.includes(from))) await sdk.Sweep.disable(from).catch(() => {});
+      if (from && from !== sweep && (locked || hiddenSweeps.includes(from) || openedSweeps.current.has(from))) {
+        openedSweeps.current.delete(from);
+        await sdk.Sweep.disable(from).catch(() => {});
+      }
     },
     [hiddenSweeps]
   );
@@ -1779,10 +1786,12 @@ function TourExperience({
     const target = uLinkTarget(dest.href);
     const goal = target ? sweepForSs(target.ss) : null;
     const from = currentSweep.current;
-    const path = sdk && routeGraph && goal && from ? shortestPath(routeGraph, from, goal) : null;
-    const flights = path && routeGraph ? straighten(routeGraph, path) : null;
+    // Every scan point - also the hidden ones - so the way goes through the rooms, not through a wall.
+    const net = sdk ? routeNetwork(routeGraph, sweepData.current) : null;
+    const path = net && goal && from ? shortestPath(net, from, goal) : null;
+    const flights = path && net ? straighten(net, path) : null;
     track("route_start", { destination: dest.name, group: dest.group ?? "", flights: flights ? flights.length - 1 : 0 });
-    if (!sdk || !routeGraph || !flights || flights.length < 2) {
+    if (!sdk || !net || !flights || flights.length < 2) {
       // No route to walk (already there, or no network): just go there.
       await flyTo(dest.href, "fly");
       setRoute({ dest, step: 1, steps: 1, arrived: true });
@@ -1800,15 +1809,24 @@ function TourExperience({
       if (routeRun.current !== run) return;
       const sid = flights[i];
       const last = i === steps;
-      // Arrive already facing the next stretch, so the next flight starts straight ahead.
-      const yaw = last ? null : heading(sid, flights[i + 1]) ?? heading(flights[i - 1], sid);
+      // Looking straight ahead the whole flight (the way it goes) - the turn comes at the corner, standing there.
+      const ahead = heading(flights[i - 1], sid);
       await moveSweep(sdk, sid, {
-        rotation: last ? target?.rotation : yaw != null ? { x: -8, y: yaw } : undefined,
+        rotation: ahead != null ? { x: -8, y: ahead } : last ? target?.rotation : undefined,
         transition: sdk.Sweep.Transition.FLY,
-        transitionTime: flightMs(routeGraph, flights[i - 1], sid),
+        transitionTime: flightMs(net, flights[i - 1], sid),
       });
+      if (routeRun.current !== run) return;
       setRoute({ dest, step: i, steps, arrived: last });
       setRouteLine(last ? [] : line(i));
+      // At the corner: turned down the next stretch before setting off (at the end: to the place's own view).
+      const next = last ? (target?.rotation ?? null) : (() => {
+        const y = heading(sid, flights[i + 1]);
+        return y != null ? { x: -8, y } : null;
+      })();
+      if (next && ahead != null && Math.abs((((next.y - ahead) % 360) + 540) % 360 - 180) > 12) {
+        await sdk.Camera.setRotation?.(next, { speed: 90 }).catch(() => {});
+      }
     }
     track("route_arrive", { destination: dest.name, flights: steps });
   }

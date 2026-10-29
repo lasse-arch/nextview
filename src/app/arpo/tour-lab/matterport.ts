@@ -15,7 +15,7 @@ export type Rotation = { x: number; y: number };
 export type Vec3 = { x: number; y: number; z: number };
 export type CameraPose = { position: Vec3; rotation: Rotation; projection: Float32Array | number[]; sweep: string; mode: string };
 
-export type SweepInfo = { id?: string; sid?: string; uuid?: string; index?: number; position?: { x: number; y: number; z: number } };
+export type SweepInfo = { id?: string; sid?: string; uuid?: string; index?: number; position?: { x: number; y: number; z: number }; /** The scan points you can step to from here (seen from it). */ neighbors?: string[]; /** False for a scan point switched off (in Matterport or by the tour). */ enabled?: boolean };
 
 export type MpSdk = {
   App: {
