@@ -557,14 +557,24 @@ export async function setCommissionExcluded(dealId: string, excluded: boolean) {
  * commission, items, renewal history) via cascade - kept whole first, so it
  * can be put back from "Slettede kunder" (lib/deal-archive.ts).
  */
-export async function deleteDeal(dealId: string): Promise<{ error: string } | void> {
+/**
+ * Deletes a deal (kept under Slettede, so it can be put back). A customer
+ * who has signed: only an admin, typing the customer's name as `confirmName`.
+ */
+export async function deleteDeal(dealId: string, confirmName?: string): Promise<{ error: string } | void> {
   const user = await requireUser();
   const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId } });
   if (user.role !== "ADMIN" && deal.ownerId !== user.id) {
     return { error: "Du kan kun slette dine egne deals." };
   }
-  if (hasSigned(deal)) return { error: SIGNED_NO_DELETE };
-  await deleteDealArchived(dealId, user.name);
+  const signed = hasSigned(deal);
+  if (signed) {
+    if (user.role !== "ADMIN") return { error: "Kunden har skrevet under - kun en admin kan slette den." };
+    const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
+    if (!confirmName || norm(confirmName) !== norm(dealName(deal))) return { error: "Navnet passer ikke - dealen er ikke slettet." };
+  }
+  await deleteDealArchived(dealId, user.name, signed);
+  if (signed) await logActivity({ type: "DEAL_UPDATED", message: `${user.name} slettede den underskrevne kunde ${dealName(deal)} (kan sættes tilbage under Slettede)`, actorId: user.id });
   revalidatePath("/arpo/deals");
   redirect("/arpo/deals");
 }

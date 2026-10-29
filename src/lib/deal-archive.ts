@@ -16,8 +16,9 @@ type Tx = Prisma.TransactionClient;
 const SIGNED_STAGES = ["CONTRACT_SIGNED", "FILMED", "LIVE"];
 
 /**
- * A customer who has signed can never be deleted (the database refuses too,
- * see the deal_signed_no_delete trigger) - lost or inactive instead.
+ * A customer who has signed isn't deleted in the normal way (the database
+ * refuses too, see the deal_signed_no_delete trigger) - lost or inactive
+ * instead. Only an admin can, typing the customer's name (deleteDeal).
  */
 export function hasSigned(deal: { contractSignedAt: Date | null; contractStatus: string; stage: string }) {
   return Boolean(deal.contractSignedAt) || deal.contractStatus === "SIGNED" || SIGNED_STAGES.includes(deal.stage);
@@ -40,14 +41,21 @@ async function refsToDeal(tx: Tx): Promise<Ref[]> {
   return rows.map((r) => ({ table: r.table, column: r.column, cascade: r.del === "c" }));
 }
 
-/** Deletes a deal - after keeping everything that goes with it. */
-export async function deleteDealArchived(dealId: string, deletedByName: string) {
+/**
+ * Deletes a deal - after keeping everything that goes with it. `signedOk`:
+ * an admin has confirmed deleting a signed customer (checked by the caller);
+ * the database lets this one transaction through.
+ */
+export async function deleteDealArchived(dealId: string, deletedByName: string, signedOk = false) {
   await prisma.$transaction(
     async (tx) => {
       const [deal] = await tx.$queryRawUnsafe<{ j: Record<string, unknown> }[]>(`SELECT to_jsonb(d) AS j FROM "Deal" d WHERE id = $1`, dealId);
       if (!deal) throw new Error("Dealen findes ikke.");
       const signed = deal.j as { contractSignedAt: string | null; contractStatus: string; stage: string };
-      if (hasSigned({ ...signed, contractSignedAt: signed.contractSignedAt ? new Date(signed.contractSignedAt) : null })) throw new Error(SIGNED_NO_DELETE);
+      if (hasSigned({ ...signed, contractSignedAt: signed.contractSignedAt ? new Date(signed.contractSignedAt) : null })) {
+        if (!signedOk) throw new Error(SIGNED_NO_DELETE);
+        await tx.$executeRawUnsafe(`SET LOCAL arpo.delete_signed = 'on'`);
+      }
       const archive: Archive = { deal: deal.j, rows: {}, links: {} };
       for (const ref of await refsToDeal(tx)) {
         if (ref.cascade) {

@@ -10,13 +10,15 @@ export function DealDangerActions({
   dealName,
   stage,
   canDelete,
+  admin,
   signed,
 }: {
   dealId: string;
   dealName: string;
   stage: string;
   canDelete: boolean;
-  /** Has signed - can't be deleted, only marked lost or inactive. */
+  admin: boolean;
+  /** Has signed - only an admin can delete it, typing the customer's name. */
   signed: boolean;
 }) {
   const [pending, startTransition] = useTransition();
@@ -63,10 +65,27 @@ export function DealDangerActions({
           onConfirm={markLost}
         />
       )}
-      {canDelete && signed && (
-        <span className="px-1 text-xs text-slate-400" title="Kunder, der har skrevet under, kan ikke slettes - brug Markér som tabt eller Inaktiv.">
+      {canDelete && signed && !admin && (
+        <span className="px-1 text-xs text-slate-400" title="Kunder, der har skrevet under, kan kun slettes af en admin - brug Markér som tabt eller Inaktiv.">
           Kan ikke slettes (underskrevet)
         </span>
+      )}
+      {signed && admin && (
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() => {
+            const typed = prompt(`${dealName} har skrevet under. Sletter du dealen, forsvinder den med kontrakt, fakturaer og noter fra Arpo (den kan sættes tilbage under Deals → Slettede).\n\nSkriv kundens navn for at slette:`);
+            if (typed == null) return;
+            startTransition(async () => {
+              const r = await deleteDeal(dealId, typed);
+              if (r?.error) showToast(r.error);
+            });
+          }}
+          className="rounded-md border border-red-300 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50"
+        >
+          Slet deal
+        </button>
       )}
       {canDelete && !signed && (
         <button

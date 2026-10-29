@@ -228,6 +228,7 @@ export default async function DealDetailPage({
             dealId={deal.id}
             stage={deal.stage}
             canDelete={currentUser?.role === "ADMIN" || currentUser?.id === deal.ownerId}
+            admin={currentUser?.role === "ADMIN"}
             signed={hasSigned(deal)}
           />
           </div>
