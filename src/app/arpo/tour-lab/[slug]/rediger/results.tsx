@@ -51,10 +51,10 @@ function Ranked({ rows, empty, show = String }: { rows: { label: string; count: 
 
 type ShareProps = { slug: string; brand: string; share: ReportShare; shareStats: TourStats; token: string | null };
 
-export function ResultsPanel({ stats, ...shareProps }: { stats: TourStats } & ShareProps) {
+export function ResultsPanel({ stats, guideStops = [], ...shareProps }: { stats: TourStats; /** The guide's stops' titles, in order (to name the stop people left at). */ guideStops?: string[] } & ShareProps) {
   return (
     <>
-      <OurNumbers stats={stats} />
+      <OurNumbers stats={stats} guideStops={guideStops} />
       <ShareSettings {...shareProps} />
     </>
   );
@@ -156,7 +156,7 @@ function ShareSettings({ slug, brand, share: initial, shareStats, token: initial
   );
 }
 
-function OurNumbers({ stats }: { stats: TourStats }) {
+function OurNumbers({ stats, guideStops }: { stats: TourStats; guideStops: string[] }) {
   const [hover, setHover] = useState<number | null>(null);
   const max = Math.max(1, ...stats.perDay.map((d) => d.visits));
   const conversion = stats.visits ? stats.leads / stats.visits : 0;
@@ -243,6 +243,25 @@ function OurNumbers({ stats }: { stats: TourStats }) {
       </Group>
       <Group title="Det, de åbnede i touren">
         <Ranked rows={stats.opened} empty="Ingen har åbnet punkter, infopunkter, stedkort eller 360°-billeder endnu." />
+      </Group>
+      <Group title="Vis mig rundt">
+        {stats.guide?.started ? (
+          <>
+            <p className="text-[13px] text-[#1d1d1f]">
+              {stats.guide.started} {stats.guide.started === 1 ? "besøg startede" : "besøg startede"} rundvisningen, og {stats.guide.completed} så den til ende ({pct(stats.guide.completed / stats.guide.started)}).
+            </p>
+            <div className="text-[12px] font-semibold text-[#6e6e73]">Hvor de forlod den</div>
+            <Ranked
+              rows={stats.guide.leftAt.map((r) => ({ label: `Stop ${r.stop}${guideStops[r.stop - 1] ? ` · ${guideStops[r.stop - 1]}` : ""}`, count: r.count })).sort((a, b) => b.count - a.count)}
+              empty="Ingen har forladt rundvisningen undervejs (måles fra nu af)."
+            />
+            <div className="pt-1 text-[12px] font-semibold text-[#6e6e73]">Hvad de skiftede til</div>
+            <Ranked rows={stats.guide.leftFor} empty="-" />
+            <p className="text-[11px] text-[#8e8e93]">Et sted i menuen eller docken, &quot;Gå selv rundt&quot;-knappen - eller &quot;Gik selv rundt&quot;, når de gik videre i touren selv. Mange, der forlader ved samme stop, er et tegn på, at stoppet er for langt eller kedeligt.</p>
+          </>
+        ) : (
+          <p className="text-[13px] text-[#8e8e93]">Ingen har startet rundvisningen endnu.</p>
+        )}
       </Group>
       <Group title="Menuen">
         <p className="text-[13px] text-[#1d1d1f]">

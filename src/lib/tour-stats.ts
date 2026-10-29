@@ -33,6 +33,8 @@ export type TourStats = {
   roomTime: { label: string; seconds: number; count: number }[];
   /** What they opened along the way: points on the aerial photo, info points, place cards, 360° photos. */
   opened: { label: string; count: number }[];
+  /** "Vis mig rundt": visits that started it and saw it to the end, at which stop those who left it did, and what they went to. */
+  guide: { started: number; completed: number; leftAt: { stop: number; count: number }[]; leftFor: { label: string; count: number }[] };
 };
 
 export async function tourStats(slug: string, days = 30): Promise<TourStats> {
@@ -81,6 +83,21 @@ export async function tourStats(slug: string, days = 30): Promise<TourStats> {
     ),
     top(slug, since, `name IN ('drone_point_click','info_open','place_card_view','pano_open') AND label IS NOT NULL`),
   ]);
+  const [guideRuns, guideLeftAt, guideLeftFor] = await Promise.all([
+    prisma.$queryRawUnsafe<{ started: bigint; completed: bigint }[]>(
+      `SELECT count(DISTINCT session) FILTER (WHERE name = 'guide_start') AS started, count(DISTINCT session) FILTER (WHERE name = 'guide_complete') AS completed
+       FROM "TourEvent" WHERE "tourSlug" = $1 AND "createdAt" >= $2 AND name IN ('guide_start', 'guide_complete')`,
+      slug,
+      since
+    ),
+    prisma.$queryRawUnsafe<{ stop: number; count: bigint }[]>(
+      `SELECT value AS stop, count(DISTINCT session) AS count FROM "TourEvent"
+       WHERE "tourSlug" = $1 AND "createdAt" >= $2 AND name = 'guide_leave' AND value IS NOT NULL GROUP BY value ORDER BY value LIMIT 40`,
+      slug,
+      since
+    ),
+    top(slug, since, `name = 'guide_leave'`),
+  ]);
   const s = sessions[0];
   const visits = Number(s?.visits ?? 0);
   const byDay = new Map(perDay.map((d) => [d.day.toISOString().slice(0, 10), d]));
@@ -110,6 +127,12 @@ export async function tourStats(slug: string, days = 30): Promise<TourStats> {
     rooms,
     roomTime: roomTime.map((r) => ({ label: r.label, seconds: Math.round(r.seconds), count: Number(r.count) })),
     opened,
+    guide: {
+      started: Number(guideRuns[0]?.started ?? 0),
+      completed: Number(guideRuns[0]?.completed ?? 0),
+      leftAt: guideLeftAt.map((r) => ({ stop: Number(r.stop), count: Number(r.count) })),
+      leftFor: guideLeftFor,
+    },
   };
 }
 

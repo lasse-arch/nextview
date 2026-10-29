@@ -139,7 +139,8 @@ function track(name: string, params: Record<string, string | number> = {}) {
   if (tracking.slug && !tracking.off && window.parent === window) {
     const label = params.label ?? params.item_name ?? params.place_name ?? params.point_name ?? params.room_name ?? params.kind ?? params.title ?? params.name;
     // A number that matters, kept with the event: the seconds spent in a room.
-    const value = typeof params.seconds === "number" ? Math.round(params.seconds) : undefined;
+    // …or the stop of "Vis mig rundt" it happened at.
+    const value = typeof params.seconds === "number" ? Math.round(params.seconds) : typeof params.stop === "number" ? params.stop : undefined;
     tracking.queue.push({ name, label: label != null ? tracking.da(String(label)) : undefined, url: params.link_url != null ? String(params.link_url) : undefined, value });
     if (name === "cta_click" || name === "contact_click") flushEvents(); // the visitor may be leaving
     else tracking.timer ||= window.setTimeout(flushEvents, 4000);
@@ -1146,7 +1147,7 @@ function TourExperience({
 
   async function menuGo(name: string, group: string, href: string) {
     // Picking a place in the menu during "Vis mig rundt" means the visitor goes their own way: the guide stops.
-    leaveGuide("menu");
+    leaveGuide("menu", name);
     if (isDroneHref(href)) {
       setMenuOpen(false);
       // Turned to the item's own spot, if it has one for this device.
@@ -1224,7 +1225,7 @@ function TourExperience({
 
   /** A place from the cover or the dock: into the tour, right there. */
   async function placeGo(p: TourPlace, from: string) {
-    leaveGuide(from);
+    leaveGuide(from, p.name);
     track("place_click", { place_name: p.name, from });
     setCover(false);
     if (phase === "drone") return enterTour(p.href, from, p.name);
@@ -1350,6 +1351,7 @@ function TourExperience({
     if (!(await standsAt(stop.href)) && ticket === guideTicket.current && !guideMoving.current) {
       guideHeldRef.current = true;
       setGuideHeld(true);
+      track("guide_leave", { stop: (guideAtRef.current ?? 0) + 1, stops: GUIDE.length, label: "Gik selv rundt", kind: "walk" });
     }
   }
   /*
@@ -1365,11 +1367,16 @@ function TourExperience({
         base = { sweep: p.sweep, x: p.rotation.x, y: p.rotation.y };
         return;
       }
-      if (p.sweep !== base.sweep || Math.abs(p.rotation.y - base.y) > 4 || Math.abs(p.rotation.x - base.x) > 4) setGuideHeld(true);
+      if (p.sweep !== base.sweep || Math.abs(p.rotation.y - base.y) > 4 || Math.abs(p.rotation.x - base.x) > 4) {
+        // Once per pause: walking on counts as leaving the guide, only looking around doesn't.
+        if (!guideHeldRef.current && p.sweep !== base.sweep) track("guide_leave", { stop: (guideAtRef.current ?? 0) + 1, stops: GUIDE.length, label: "Gik selv rundt", kind: "walk" });
+        guideHeldRef.current = true;
+        setGuideHeld(true);
+      }
     });
     return () => sub.cancel();
     // guideHeld too: after Fortsæt, the view the visitor stands in is the new starting point.
-  }, [guideAt, sdk, phase, guideHeld]);
+  }, [guideAt, sdk, phase, guideHeld, GUIDE.length]);
   function startGuide(from: string) {
     if (!GUIDE.length) return;
     track("guide_start", { from, stops: GUIDE.length });
@@ -1446,9 +1453,10 @@ function TourExperience({
    * the menu, the dock …): the guide stops right there - its card goes, and
    * the moves it had asked for are dropped, so it never flies them back.
    */
-  function leaveGuide(how: string) {
+  function leaveGuide(how: string, to?: string) {
     if (guideAtRef.current == null) return;
-    track("guide_close", { stop: guideAtRef.current + 1, stops: GUIDE.length, label: how });
+    // Where they left it and for what - Resultater shows it (guide_leave: label = where to, value = the stop).
+    track("guide_leave", { stop: guideAtRef.current + 1, stops: GUIDE.length, label: to || how, kind: how });
     guideStep.current++;
     guideTicket.current++;
     guideMoving.current = false;
@@ -1461,6 +1469,8 @@ function TourExperience({
   function closeGuide(completed: boolean) {
     setGuideHeld(false);
     track(completed ? "guide_complete" : "guide_close", { stop: (guideAt ?? 0) + 1, stops: GUIDE.length });
+    if (!completed)
+      track("guide_leave", { stop: (guideAt ?? 0) + 1, stops: GUIDE.length, label: guideExit(T) === "overview" && OV ? "Tilbage til luften" : "Gå selv rundt (knappen)", kind: "close" });
     setGuideAt(null);
     setPano(null);
     // A tour you can't walk around in: back to the drone scene / map, not left standing inside.
@@ -2502,6 +2512,7 @@ function TourExperience({
           manual={T.guide?.manual}
           held={guideHeld}
           walkHint={phase === "tour"}
+          walkHintStops={T.guide?.walkHint === "all" ? Infinity : T.guide?.walkHint === "none" ? 0 : (T.guide?.walkHint ?? 2)}
           onResume={() => {
             // Fortsæt: back to the stop the card shows, if the visitor walked off - card and view always agree.
             setGuideHeld(false);

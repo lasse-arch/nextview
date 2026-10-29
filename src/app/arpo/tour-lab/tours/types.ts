@@ -290,6 +290,8 @@ export type TourConfig = {
    */
   guide?: {
     seconds?: number;
+    /** The hint "Træk i billedet …" on the guide's card: on every stop ("all"), none ("none"), or the first N (left out: the first 2). */
+    walkHint?: "all" | "none" | number;
     /** The visitor presses "Næste" themselves (no timer) - calm, e.g. for a voice tour. */
     manual?: boolean;
     /** The guide's stop button: "self" = "Gå selv rundt" (stay where you are), "overview" = back to the drone scene / map. Not set: back to it when the guide only shows its points (see guideExit). */

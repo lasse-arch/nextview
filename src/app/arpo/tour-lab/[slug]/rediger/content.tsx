@@ -746,6 +746,36 @@ export function GuideEditor({ config, edit, preview, onEditPoint }: Omit<Props, 
           </Field>
         )}
         {(stops.length > 0 || fromMenu) && (
+          <Field title='"Træk i billedet for at se dig omkring"' hint="Hjælpeteksten på guidens kort inde i touren - ved de første stop, ved alle eller aldrig.">
+            <Choice
+              value={config.guide?.walkHint === "all" ? "all" : config.guide?.walkHint === "none" ? "none" : "first"}
+              options={[
+                ["first", "Ved de første"],
+                ["all", "Ved alle"],
+                ["none", "Aldrig"],
+              ]}
+              onChange={(v) => edit((d) => void (d.guide = { ...d.guide!, walkHint: v === "first" ? undefined : (v as "all" | "none") }))}
+            />
+            {typeof config.guide?.walkHint !== "string" && (
+              <label className="mt-2 flex items-center gap-2 text-[13px] text-[#6e6e73]">
+                Antal stop
+                <input
+                  type="number"
+                  min={1}
+                  max={50}
+                  className={`${input} bg-white py-1.5 text-right`}
+                  style={{ width: 80, flex: "none" }}
+                  value={config.guide?.walkHint ?? 2}
+                  onChange={(e) => {
+                    const n = Math.round(Number(e.target.value));
+                    if (n >= 1 && n <= 50) edit((d) => void (d.guide = { ...d.guide!, walkHint: n === 2 ? undefined : n }));
+                  }}
+                />
+              </label>
+            )}
+          </Field>
+        )}
+        {(stops.length > 0 || fromMenu) && (
           <Toggle
             on={Boolean(config.guide?.manual)}
             onChange={(on) => edit((d) => void (d.guide = { ...d.guide!, manual: on || undefined }))}

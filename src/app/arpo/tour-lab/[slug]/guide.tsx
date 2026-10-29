@@ -35,6 +35,7 @@ export function GuidePlayer({
   manual = false,
   held = false,
   walkHint = false,
+  walkHintStops = 2,
   onResume,
   end,
   onGo,
@@ -53,6 +54,8 @@ export function GuidePlayer({
   held?: boolean;
   /** In the 3D tour: tell the visitor (on the first stops) that they may look around and walk themselves. */
   walkHint?: boolean;
+  /** On how many of the first stops the hint shows (Infinity = all). */
+  walkHintStops?: number;
   onResume?: () => void;
   /** Shown on the last stop - the next step for the visitor (e.g. book a visit). */
   end?: React.ReactNode;
@@ -114,7 +117,7 @@ export function GuidePlayer({
         <h3>{stop.title}</h3>
         {stop.text && <p>{stop.text}</p>}
         {held && timed && <div className="gd-next">{tr("På pause - du kigger selv rundt")}</div>}
-        {walkHint && !held && index < 2 && (
+        {walkHint && !held && index < walkHintStops && (
           <div className="gd-selv">
             <svg viewBox="0 0 24 24" aria-hidden>
               <path d="M9 11V5.5a1.5 1.5 0 0 1 3 0V11m0-1.5a1.5 1.5 0 0 1 3 0V11m0-.5a1.5 1.5 0 0 1 3 0v4a6 6 0 0 1-6 6h-.6a6 6 0 0 1-4.6-2.2L4.6 15a1.5 1.5 0 0 1 2.3-1.9L9 15" />

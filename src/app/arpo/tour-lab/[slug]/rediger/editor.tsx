@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation";
 import { Component, useEffect, useMemo, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import { detachToursFromMpskins, logTourWork, renameTourSlug, restoreTourVersion, saveTour, saveTourDraft, searchDeals, setTourDeal } from "@/lib/actions/tours";
 import { SOCIALS } from "../../tours/social";
+import { guideStops } from "../guide";
 import { askClaudeForTour, saveAnthropicKey, suggestTourFilter, type ChatTurn } from "@/lib/actions/tour-ai";
 import type { MenuEntry, TourConfig } from "../../tours/types";
 import type { TourStats } from "@/lib/tour-stats";
@@ -805,7 +806,7 @@ export function TourEditor({
                     setAiAsk({ request, at: Date.now() });
                   }}
                 />
-                <ResultsPanel stats={stats} slug={slug} brand={config.brand} share={share} shareStats={shareStats} token={shareToken} />
+                <ResultsPanel stats={stats} guideStops={guideStops(config).map((s) => s.title)} slug={slug} brand={config.brand} share={share} shareStats={shareStats} token={shareToken} />
               </>
             )}
             {tab === "okonomi" && <EconomyPanel economy={economy} />}

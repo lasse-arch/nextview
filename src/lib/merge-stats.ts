@@ -53,6 +53,13 @@ export function mergeStats(all: TourStats[]): TourStats | null {
       .sort((a, b) => b.seconds - a.seconds)
       .slice(0, 8),
     opened: sumRows(all.map((s) => s.opened)).slice(0, 10),
+    // Each tour's guide has its own stops - where they left it only means something per tour.
+    guide: {
+      started: all.reduce((n, s) => n + (s.guide?.started ?? 0), 0),
+      completed: all.reduce((n, s) => n + (s.guide?.completed ?? 0), 0),
+      leftAt: [],
+      leftFor: sumRows(all.map((s) => s.guide?.leftFor ?? [])).slice(0, 10),
+    },
   };
 }
 
