@@ -21,6 +21,12 @@ const LINK_MINUTES = 15;
  * alias is ever removed there.)
  */
 export const LOGIN_MAIL_FROM = "info@nextview360.dk";
+/**
+ * The login link itself comes from noreply@ (through Resend - no mailbox
+ * needed): plainly an automatic mail. Answers still reach info@. Through
+ * Gmail (no Resend) it goes as info@, the alias Gmail has.
+ */
+export const LOGIN_LINK_FROM = "noreply@nextview360.dk";
 /** The first link, when access is given in Arpo: the customer may not open the mail the same day. */
 export const WELCOME_DAYS = 7;
 /** Links one customer can ask for in an hour, and requests from one address in 15 minutes. */
@@ -83,7 +89,7 @@ export async function sendLoginMail(account: { id: string; email: string; name: 
     throw new Error(`Ingen mail-afsender: sæt RESEND_API_KEY i Vercel, eller forbind Gmail for ${WELCOME_MAIL_SENDER} under Indstillinger → E-mail.`);
   }
   try {
-    await sendSystemMail(sender, { to: [account.email], subject, bodyText, bodyHtml, fromName: "Nextview360", fromAddress: LOGIN_MAIL_FROM, replyTo: LOGIN_MAIL_FROM });
+    await sendSystemMail(sender, { to: [account.email], subject, bodyText, bodyHtml, fromName: "Nextview360", fromAddress: LOGIN_LINK_FROM, gmailFromAddress: LOGIN_MAIL_FROM, replyTo: LOGIN_MAIL_FROM });
   } catch (err) {
     await log((err instanceof Error ? err.message : String(err)).slice(0, 300));
     throw err;

@@ -18,7 +18,7 @@ export const resendReady = () => Boolean(process.env.RESEND_API_KEY);
 type MailParams = Parameters<typeof sendGmailMessage>[1];
 const PLAIN_ADDRESS = /^[^\s@<>",;]+@[^\s@<>",;]+\.[^\s@<>",;]+$/;
 
-async function sendWithResend(params: MailParams & { fromAddress: string }): Promise<{ id: string }> {
+async function sendWithResend(params: MailParams & { fromAddress: string; gmailFromAddress?: string }): Promise<{ id: string }> {
   const from = params.fromName ? `${params.fromName.replace(/[<>"\r\n]/g, "")} <${params.fromAddress}>` : params.fromAddress;
   const replyTo = params.replyTo && PLAIN_ADDRESS.test(params.replyTo) ? params.replyTo : params.fromAddress;
   const attachments = [
@@ -54,7 +54,7 @@ async function sendWithResend(params: MailParams & { fromAddress: string }): Pro
  */
 export async function sendSystemMail(
   gmail: EmailAccount | null | (() => Promise<EmailAccount | null>),
-  params: MailParams & { fromAddress: string },
+  params: MailParams & { fromAddress: string; /** Sent through Gmail instead: this address (one Gmail has as "Send mail as", e.g. info@ for noreply@). */ gmailFromAddress?: string },
 ): Promise<{ id: string; via: "resend" | "gmail" }> {
   let resendError: unknown = null;
   if (resendReady()) {
@@ -71,5 +71,7 @@ export async function sendSystemMail(
     throw new Error("Ingen mail-afsender: sæt RESEND_API_KEY i Vercel, eller forbind Gmail under Indstillinger → E-mail.");
   }
   // Gmail can only send as an address it has as "Send mail as" - its own otherwise.
-  return { ...(await sendGmailMessage(account, { ...params, fromAddress: params.fromAddress === account.email ? undefined : params.fromAddress })), via: "gmail" };
+  const { gmailFromAddress, ...mail } = params;
+  const fromAddress = gmailFromAddress ?? mail.fromAddress;
+  return { ...(await sendGmailMessage(account, { ...mail, fromAddress: fromAddress === account.email ? undefined : fromAddress })), via: "gmail" };
 }
