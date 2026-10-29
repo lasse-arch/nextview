@@ -1,7 +1,7 @@
 "use client";
 
 import { useT } from "../tours/i18n-react";
-import { isPlaceHref } from "../tours/places";
+import { isInTourHref, isPlaceHref } from "../tours/places";
 import type { TourConfig, WelcomeGo } from "../tours/types";
 
 /*
@@ -64,10 +64,10 @@ export function SimpleMenu({
   const item = (name: string, group: string, href: string) => {
     const here = isPlaceHref(href) && room === name;
     return (
-      <button key={group + name} type="button" className={`sp-btn ${here ? "sp-here" : ""} ${isPlaceHref(href) ? "" : "sp-out"}`} onClick={() => go(name, group, href)}>
+      <button key={group + name} type="button" className={`sp-btn ${here ? "sp-here" : ""} ${isInTourHref(href) ? "" : "sp-out"}`} onClick={() => go(name, group, href)}>
         {name}
         {here && <small>{tr("Du er her")}</small>}
-        {!isPlaceHref(href) && <span aria-hidden>↗</span>}
+        {!isInTourHref(href) && <span aria-hidden>↗</span>}
       </button>
     );
   };

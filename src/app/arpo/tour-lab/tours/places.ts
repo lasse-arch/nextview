@@ -10,7 +10,9 @@ import type { DroneView, TourConfig } from "./types";
 
 /** A menu item (or any link) that shows a picture in the tour: "#billede:" + its address - a 2:1 picture opens as 360°. */
 export const IMAGE_HREF = "#billede:";
-export const imageOfHref = (href: string) => (href.startsWith(IMAGE_HREF) ? href.slice(IMAGE_HREF.length) || null : null);
+/** A picture's address, from "#billede:<address>" - or a plain link straight to a picture file (it's shown, not opened as a page). */
+export const imageOfHref = (href: string) =>
+  href.startsWith(IMAGE_HREF) ? href.slice(IMAGE_HREF.length) || null : /^https:\/\/[^\s"']+\.(?:jpe?g|png|webp|avif|gif)(?:\?[^\s"']*)?$/i.test(href.trim()) ? href.trim() : null;
 export const isPlaceHref = (href: string) => /explore\.nextview360\.dk|my\.matterport\.com\/show/.test(href);
 
 /** The point id of a "#punkt:<id>" link (a point on the drone scene or map), else null. */
@@ -38,7 +40,7 @@ export function droneHref(v: DroneViews): string {
 }
 
 /** A link that stays in the tour: a spot, the drone scene/map or one of its points. */
-export const isInTourHref = (href: string) => isPlaceHref(href) || isDroneHref(href) || href === "#plan" || pointOfHref(href) != null;
+export const isInTourHref = (href: string) => isPlaceHref(href) || href.startsWith("#") || imageOfHref(href) != null;
 
 /** The link to a spot in this tour. */
 export function placeHref(T: Pick<TourConfig, "tourPage" | "modelId">, ss: number | string, rot?: { x: number; y: number }): string {

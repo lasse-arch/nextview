@@ -306,7 +306,7 @@ export type TourConfig = {
     menuTurns?: Record<string, GuideTurn>;
     /** How the view turns at each stop: left out = a slow turn as always, "other" = the other way, "none" = stands still. A stop can have its own. */
     turn?: GuideTurn;
-    /** A stop: where (empty href = stay, e.g. a closing card), its text, and optionally a voice (an audio file) that plays there. */
+    /** A stop: where (empty href = stay, e.g. a closing card; a picture "#billede:<address>" = shown full screen, a 2:1 one as 360°, e.g. a drone photo), its text, and optionally a voice (an audio file) that plays there. */
     stops: ({ point: string; turn?: GuideTurn } | { href: string; title: string; text: string; audio?: string; turn?: GuideTurn })[];
   };
   /**

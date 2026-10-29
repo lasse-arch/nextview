@@ -1,7 +1,7 @@
 "use client";
 
 import { useT } from "../tours/i18n-react";
-import { isPlaceHref } from "../tours/places";
+import { imageOfHref, isInTourHref, isPlaceHref } from "../tours/places";
 import type { BentoTile, TourConfig } from "../tours/types";
 
 /*
@@ -52,7 +52,7 @@ export function BentoMenu({
     setOpen(false);
     onGo(name, group, href);
   };
-  const places = T.menu.flatMap((m) => ("items" in m ? m.items.map(([n, h]) => ({ name: n, href: h, group: m.title })) : [{ name: m.title, href: m.href, group: "" }])).filter((p) => isPlaceHref(p.href));
+  const places = T.menu.flatMap((m) => ("items" in m ? m.items.map(([n, h]) => ({ name: n, href: h, group: m.title })) : [{ name: m.title, href: m.href, group: "" }])).filter((p) => isPlaceHref(p.href) || imageOfHref(p.href) != null);
   const c = T.contact;
   return (
     <>
@@ -78,7 +78,7 @@ export function BentoMenu({
           {bentoTiles(T).map((t, i) => (
             <button key={i} type="button" className={`bm-tile ${t.size ? `bm-${t.size}` : ""} bm-${t.style ?? "light"}`} onClick={() => go(t.title, "fliser", t.href)}>
               {t.tag && <em>{t.tag}</em>}
-              <i aria-hidden>{isPlaceHref(t.href) ? "+" : "↗"}</i>
+              <i aria-hidden>{isInTourHref(t.href) ? "+" : "↗"}</i>
               {t.kicker && <small>{t.kicker}</small>}
               <b>
                 {t.title.split("\n").map((line, j) => (

@@ -1,6 +1,6 @@
 "use client";
 
-import { guideExit, isPlaceHref, PANO_HFOV, placeHref, startPlaces } from "../../tours/places";
+import { guideExit, IMAGE_HREF, imageOfHref, isPlaceHref, PANO_HFOV, placeHref, startPlaces } from "../../tours/places";
 import { AiImageButton } from "./ai-image";
 import { writePlaceCards, type CardDraft } from "@/lib/actions/tour-cards";
 import { useEffect, useState } from "react";
@@ -879,7 +879,9 @@ export function GuideEditor({ config, edit, preview, onEditPoint }: Omit<Props, 
                 <Field title="Tekst" hint="1-2 korte sætninger.">
                   <textarea className={`${textarea} bg-white`} value={s.text} onChange={(e) => set({ ...s, text: e.target.value })} />
                 </Field>
-                {s.href ? (
+                {imageOfHref(s.href) ? (
+                  <StopPicture config={config} url={imageOfHref(s.href)!} onChange={(url) => set({ ...s, href: url ? IMAGE_HREF + url : "" })} />
+                ) : s.href ? (
                   <>
                     <PlacePicker href={s.href} name={s.title} preview={preview} onChange={(href) => set({ ...s, href })} />
                     <button type="button" className="text-[12px] text-[#8e8e93] hover:text-[#ff3b30]" onClick={() => set({ ...s, href: "" })}>
@@ -889,7 +891,8 @@ export function GuideEditor({ config, edit, preview, onEditPoint }: Omit<Props, 
                 ) : (
                   <PlacePicker href="" name={s.title} preview={preview} onChange={(href) => set({ ...s, href })} />
                 )}
-                {s.href && (
+                {!imageOfHref(s.href) && <StopPicture config={config} url={null} onChange={(url) => url && set({ ...s, href: IMAGE_HREF + url })} />}
+                {s.href && !imageOfHref(s.href) && (
                   <Field title="Drejning ved stoppet">
                     <Choice value={s.turn ?? ""} options={[["", "Som de andre"], ...turnOptions]} onChange={(v) => set({ ...s, turn: v ? (v as GuideTurn) : undefined })} />
                   </Field>
@@ -934,6 +937,47 @@ export function GuideEditor({ config, edit, preview, onEditPoint }: Omit<Props, 
       )}
       <DayEditor config={config} edit={edit} preview={preview} />
     </>
+  );
+}
+
+/**
+ * A picture as a stop (e.g. a drone photo): one the menu already opens, or a
+ * new upload. Shown full screen - a 2:1 one as 360°.
+ */
+function StopPicture({ config, url, onChange }: { config: TourConfig; url: string | null; onChange: (url: string | null) => void }) {
+  const known = [
+    ...config.menu.flatMap((m): [string, string][] => ("items" in m ? m.items.map(([n, h]): [string, string] => [`${m.title}: ${n}`, h]) : [[m.title, m.href]])),
+    ...(config.bento?.tiles.map((t): [string, string] => [`Flise: ${t.title.replace(/\n/g, " ")}`, t.href]) ?? []),
+  ].flatMap(([label, h]) => {
+    const u = imageOfHref(h);
+    return u ? [{ label, url: u }] : [];
+  });
+  const pictures = known.filter((p, i) => known.findIndex((q) => q.url === p.url) === i);
+  return (
+    <Field title={url ? "Billede" : "Eller vis et billede (fx et dronefoto)"} hint={url ? "Vises i fuld skærm ved stoppet - et 2:1-billede som 360°. Hentes i baggrunden, før man når hertil." : undefined}>
+      {url && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={config.panoCopies?.[url]?.phone ?? url} alt="" className="mb-2 max-h-40 w-full rounded-lg object-cover" />
+      )}
+      <div className="flex flex-wrap items-center gap-2">
+        {pictures.length > 0 && (
+          <select className={`${input} bg-white py-1.5 text-[13px]`} value={pictures.some((p) => p.url === url) ? url! : ""} onChange={(e) => e.target.value && onChange(e.target.value)}>
+            <option value="">{url ? "Et andet fra menuen …" : "Et billede fra menuen …"}</option>
+            {pictures.map((p) => (
+              <option key={p.url} value={p.url}>
+                {p.label}
+              </option>
+            ))}
+          </select>
+        )}
+        <UploadButton accept="image/jpeg,image/png,image/webp" label={url ? "Skift billede" : "Upload billede"} onDone={(u) => onChange(u)} />
+        {url && (
+          <button type="button" className="text-[13px] text-[#ff3b30] hover:underline" onClick={() => onChange(null)}>
+            Fjern billedet
+          </button>
+        )}
+      </div>
+    </Field>
   );
 }
 

@@ -2,6 +2,7 @@ import "server-only";
 import sharp from "sharp";
 import { prisma } from "@/lib/db";
 import { storeTourFile } from "@/lib/tour-files";
+import { imageOfHref } from "@/app/arpo/tour-lab/tours/places";
 import type { PanoCopies, TourConfig } from "@/app/arpo/tour-lab/tours/types";
 
 /*
@@ -18,9 +19,19 @@ const SIZES = { phone: 4096, computer: 8192 } as const;
 type Size = keyof typeof SIZES;
 const SOURCE = (size: Size, url: string) => `pano-${SIZES[size]}:${url}`;
 
-/** The tour's 360° photos: the points', and the drone scene's / 360° map's. */
+/**
+ * The tour's big photos: the points' 360° photos, the drone scene's / 360°
+ * map's, and the pictures the menu, tiles and "Vis mig rundt" open (a drone
+ * photo shown full screen gets the same copies, so it opens at once).
+ */
 export function tourPanoramas(c: TourConfig): string[] {
-  const urls = [...c.points.map((p) => p.panorama), c.drone?.panorama, c.map?.panorama ? c.map.image : undefined];
+  const hrefs = [
+    ...c.menu.flatMap((m) => ("items" in m ? m.items.map(([, h]) => h) : [m.href])),
+    ...(c.bento?.tiles.map((t) => t.href) ?? []),
+    ...(c.guide?.stops.map((s) => ("href" in s ? s.href : "")) ?? []),
+  ];
+  const pictures = hrefs.map((h) => (h ? imageOfHref(h) : null));
+  const urls = [...c.points.map((p) => p.panorama), c.drone?.panorama, c.map?.panorama ? c.map.image : undefined, ...pictures];
   return [...new Set(urls.filter((u): u is string => Boolean(u)))];
 }
 

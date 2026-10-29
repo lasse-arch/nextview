@@ -467,6 +467,8 @@ function TourExperience({
   const hasPano = (p: Point) => Boolean(p.panorama || (p.pano && T.panos));
   /** Pictures full screen: a place's photos, or the site plan (zoomed in on a point). */
   const [lightbox, setLightbox] = useState<LightboxState>(null);
+  /** "Vis mig rundt" at a picture stop (e.g. a drone photo): the picture, full screen under the guide's card. */
+  const [guideImage, setGuideImage] = useState<string | null>(null);
   const openPlan = (p?: Point) => {
     if (!T.sitePlan) return;
     track("plan_open", { label: p?.name ?? "menu" });
@@ -845,9 +847,22 @@ function TourExperience({
     const c = T.panoCopies?.[url];
     return c ? (typeof window !== "undefined" && window.innerWidth <= 760 ? c.phone : c.computer) : url;
   };
+  /** A big flat picture (a drone photo in the menu or the guide): its 4096 px copy, when the tour has one. */
+  const flatImage = (url: string) => T.panoCopies?.[url]?.phone ?? url;
+  /** Is a picture a 360° one (2:1)? Read from its (small) copy - fetched ahead, so it's known at once. */
+  const isPanorama = (url: string) => pictureIsPanorama(flatImage(url));
   /** The 360° photos of the guide's stops from `from` on (the next two) - fetched ahead, so a stop opens at once instead of loading. */
   const prefetchGuidePanos = (from: number) => {
     for (const stop of GUIDE.slice(from, from + 2)) {
+      // A picture stop (e.g. a drone photo): its copy, and - a 360° one on a computer - the sharp one after it.
+      const picture = stop.href ? imageOfHref(stop.href) : null;
+      if (picture) {
+        prefetchPano(flatImage(picture))
+          .then(() => isPanorama(picture))
+          .then((pano) => (pano ? prefetchPano(panoFor(picture)) : undefined))
+          .catch(() => {});
+        continue;
+      }
       const p = stop.href ? pointById(stop.href) : null;
       // The 4096 copy first (what shows at once - on a phone all of it), then a computer's sharp one.
       if (p?.panorama) {
@@ -861,12 +876,12 @@ function TourExperience({
             for (let y = 0; y < 2 ** (level - 1); y++) for (let x = 0; x < 2 ** (level - 1); x++) prefetchPano(`${T.panos.basePath}/${p.pano}/${level}/${face}${y}_${x}.jpg`);
     }
   };
-  // On the drone scene: the first stops' photos come in quietly, before "Vis mig rundt" is even pressed.
+  // The first stops' pictures come in quietly, before "Vis mig rundt" is even pressed (on the drone scene or in the tour).
   useEffect(() => {
-    if (phase !== "drone" || !GUIDE.length) return;
+    if (!GUIDE.length) return;
     const t = setTimeout(() => prefetchGuidePanos(0), 2500);
     return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per arrival on the drone scene
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per arrival on the drone scene / in the tour
   }, [phase, GUIDE]);
 
   // The drone scene is rebuilt only when it or its points change - not for every edit in the editor's preview.
@@ -1160,13 +1175,8 @@ function TourExperience({
     if (image) {
       track("menu_click", { item_name: name, group });
       setMenuOpen(false);
-      const img = new Image();
-      img.onload = () => {
-        if (Math.abs(img.naturalWidth / img.naturalHeight - 2) < 0.05) setPano({ id: `billede-${name}`, name, panorama: image } as Point);
-        else setLightbox({ images: [image], at: 0, title: name });
-      };
-      img.onerror = () => setLightbox({ images: [image], at: 0, title: name });
-      img.src = image;
+      // The smaller copy, when the tour has one (made when it was saved) - a big drone photo opens at once.
+      void isPanorama(image).then((pano) => (pano ? setPano({ id: `billede-${name}`, name, panorama: image } as Point) : setLightbox({ images: [flatImage(image)], at: 0, title: name })));
       return;
     }
     const point = pointById(href);
@@ -1259,7 +1269,22 @@ function TourExperience({
     setGuideAt(i);
     setGuideHeld(false);
     prefetchGuidePanos(i + 1);
+    setGuideImage(null);
     if (!stop.href) return; // a stop that stays where it is (e.g. the closing card)
+    // A picture (e.g. a drone photo): full screen under the card - a 360° one as 360°, turning slowly.
+    const picture = imageOfHref(stop.href);
+    if (picture) {
+      setSelected(null);
+      void isPanorama(picture).then((pano) => {
+        if (step !== guideStep.current) return;
+        if (pano) setPano({ id: `billede-guide-${i}`, name: stop.title, panorama: picture } as Point);
+        else {
+          setPano(null);
+          setGuideImage(flatImage(picture));
+        }
+      });
+      return;
+    }
     const point = pointById(stop.href);
     if (point) {
       setSelected(null);
@@ -1465,6 +1490,7 @@ function TourExperience({
     setGuideHeld(false);
     setGuideAt(null);
     setPano(null);
+    setGuideImage(null);
   }
   function closeGuide(completed: boolean) {
     setGuideHeld(false);
@@ -1473,6 +1499,7 @@ function TourExperience({
       track("guide_leave", { stop: (guideAt ?? 0) + 1, stops: GUIDE.length, label: guideExit(T) === "overview" && OV ? "Tilbage til luften" : "Gå selv rundt (knappen)", kind: "close" });
     setGuideAt(null);
     setPano(null);
+    setGuideImage(null);
     // A tour you can't walk around in: back to the drone scene / map, not left standing inside.
     if (guideExit(T) === "overview" && OV && phase === "tour") backToDrone();
   }
@@ -2068,6 +2095,12 @@ function TourExperience({
         />
       )}
       {lightbox && <Lightbox key={lightbox.title + lightbox.at} state={lightbox} onClose={() => setLightbox(null)} />}
+      {guideImage && guideAt != null && (
+        <div className="hv-guide-bilde">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={guideImage} alt={GUIDE[guideAt]?.title ?? ""} />
+        </div>
+      )}
 
       {/* Logo (MPSkins: left, 200px, 13px from the edges - or right, with the menu on the left). */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -2627,6 +2660,23 @@ function PointPhotos({ images, name, onOpen }: { images: string[]; name: string;
   );
 }
 
+/** Pictures known to be 360° (2:1) or not - asked once each (the picture comes from the browser's cache when it was fetched ahead). */
+const panoramaCheck = new Map<string, Promise<boolean>>();
+function pictureIsPanorama(url: string): Promise<boolean> {
+  let p = panoramaCheck.get(url);
+  if (!p) {
+    p = new Promise<boolean>((resolve) => {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => resolve(Math.abs(img.naturalWidth / img.naturalHeight - 2) < 0.05);
+      img.onerror = () => resolve(false);
+      img.src = url;
+    });
+    panoramaCheck.set(url, p);
+  }
+  return p;
+}
+
 /** 360° photos already asked for (each fetched once) - the browser keeps them, so the viewer gets them from its cache. */
 const prefetchedPanos = new Map<string, Promise<void>>();
 function prefetchPano(url: string, priority: "low" | "high" = "low"): Promise<void> {
@@ -2954,6 +3004,9 @@ const CSS = `
 @media (hover:none){.hv-fotos-pil{display:none}}
 /* The guide shows a 360° photo under its card. */
 .hv-guiding .hv-pano{z-index:10}
+/* "Vis mig rundt" at a picture: full screen, under the guide's card. */
+.hv-guide-bilde{position:absolute;inset:0;z-index:10;display:flex;align-items:center;justify-content:center;background:#0d1b20;animation:hvFade .4s ease}
+.hv-guide-bilde img{width:100%;height:100%;object-fit:contain}
 /* "Vis mig rundt" on a 360° photo: the menu button stays on top of it, so the visitor can leave the guide for a place. */
 .hv-guiding .hv-menuknap,.hv-guiding .bm-knap,.hv-guiding .sp-menuknap{z-index:14}
 .hv-guiding .hv-pano-luk,.hv-guiding .hv-pano-titel{display:none}

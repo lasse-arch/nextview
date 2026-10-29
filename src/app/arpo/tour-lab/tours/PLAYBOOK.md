@@ -71,6 +71,11 @@ videre" til (`manual`), så gæsten styrer tempoet; ellers kommer næste stop, n
 stemmen er færdig. Et sidste stop uden sted (tom `href`) er et afslutningskort.
 Gæsten kan altid slå lyden fra. Lydfiler hostes hos os som alle andre filer.
 
+Et stop kan også være et billede (`href: "#billede:<adresse>"`), fx et
+dronefoto, der allerede ligger i menuen: det vises i fuld skærm (et 2:1-billede
+som 360°) og hentes i baggrunden, før gæsten når dertil - godt som første stop
+("Her ligger vi") eller til at vise hele området.
+
 ## Specialskoler og gæster, der gerne vil vide, hvad der kommer
 
 Fx specialefterskoler (ADHD, autisme, nedsat kognitivt funktionsniveau):
