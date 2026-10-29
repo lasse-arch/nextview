@@ -21,6 +21,8 @@ export async function sendGmailMessage(
     /** One or more files attached to the email - e.g. a generated report PDF,
      * or whatever the sender picked in the composer's file picker. */
     attachments?: { filename: string; contentType: string; data: Buffer }[];
+    /** Pictures shown in bodyHtml itself, as <img src="cid:<cid>"> - sent with the mail, nothing to fetch from a server. */
+    inline?: { cid: string; filename: string; contentType: string; data: Buffer }[];
     /** Shown as the sender's display name (e.g. "Nextview360 ApS") instead of the raw account email. */
     fromName?: string;
     /** Sends as a different address than the connected account's own e-mail
@@ -48,6 +50,24 @@ export async function sendGmailMessage(
     `Subject: ${encodeHeaderUtf8(params.subject)}`,
   ];
 
+  const b64 = (data: Buffer) => data.toString("base64").replace(/(.{76})/g, "$1\r\n");
+  // The HTML with its own pictures (multipart/related), when it has any.
+  const inline = params.bodyHtml ? (params.inline ?? []).filter((i) => /^[\w.-]+$/.test(i.cid) && /^[\w.-]+$/.test(i.filename)) : [];
+  const relatedBoundary = `nv360r_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  const bodyPart = inline.length
+    ? [
+        `Content-Type: multipart/related; boundary="${relatedBoundary}"`,
+        "",
+        `--${relatedBoundary}`,
+        `Content-Type: text/html; charset="UTF-8"`,
+        "",
+        body,
+        "",
+        ...inline.flatMap((i) => [`--${relatedBoundary}`, `Content-Type: ${i.contentType}; name="${i.filename}"`, `Content-Disposition: inline; filename="${i.filename}"`, `Content-ID: <${i.cid}>`, `Content-Transfer-Encoding: base64`, "", b64(i.data), ""]),
+        `--${relatedBoundary}--`,
+      ]
+    : [`Content-Type: ${bodyContentType}; charset="UTF-8"`, "", body];
+
   let mime: string;
   if (params.attachments && params.attachments.length > 0) {
     const boundary = `nv360_${Date.now()}_${Math.random().toString(36).slice(2)}`;
@@ -73,15 +93,13 @@ export async function sendGmailMessage(
       `Content-Type: multipart/mixed; boundary="${boundary}"`,
       "",
       `--${boundary}`,
-      `Content-Type: ${bodyContentType}; charset="UTF-8"`,
-      "",
-      body,
+      ...bodyPart,
       "",
       ...attachmentParts,
       `--${boundary}--`,
     ].join("\r\n");
   } else {
-    mime = [...headerLines, `Content-Type: ${bodyContentType}; charset="UTF-8"`, "", body].join("\r\n");
+    mime = [...headerLines, ...(inline.length ? ["MIME-Version: 1.0"] : []), ...bodyPart].join("\r\n");
   }
 
   const res = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {

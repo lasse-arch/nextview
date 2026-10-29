@@ -7,6 +7,8 @@ import { logActivity } from "@/lib/activity";
 import { getAppBaseUrl } from "@/lib/email-oauth";
 import { tourUrl } from "@/lib/public-urls";
 import { normalizeEmail, WELCOME_DAYS, welcomeLoginLink } from "@/lib/customer-login";
+import { modelIdsIn } from "@/lib/matterport-graph";
+import { dealTourMockup } from "@/lib/tour-mockup";
 
 /** The welcome mail goes from Lasse's mailbox, so replies land with him. */
 export const WELCOME_MAIL_SENDER = "lasse@nextview360.dk";
@@ -30,6 +32,8 @@ export function buildWelcomeMail(input: {
   language: "da" | "en";
   /** A login link to their own customer page (nextview360.dk/kunde), when they have been given access. */
   portal?: { link: string; statsLink: string; days: number } | null;
+  /** The tour's front page on a MacBook goes with the mail (as cid:tour) - shown for the first product. */
+  picture?: boolean;
 }): { subject: string; bodyText: string; bodyHtml: string } {
   const firstName = input.contactName?.trim().split(/\s+/)[0] || null;
   const en = input.language === "en";
@@ -39,7 +43,7 @@ export function buildWelcomeMail(input: {
         greeting: `Hi ${firstName ?? "there"},`,
         intro: "Welcome to Nextview360! We have now done all the hard work, and everything is ready to start working for your business.",
         product: (n: number) => (n === 1 ? "Your finished product:" : "Your finished products:"),
-        open: "Open",
+        openTour: (name: string) => `Open ${name === "Virtuel tour" ? "your virtual tour" : name}`,
         website: "Your website:",
         share: "Feel free to share the link on your website, social media and in newsletters - the more it is seen, the more it works for you.",
         contact: (portal: boolean) =>
@@ -60,7 +64,7 @@ export function buildWelcomeMail(input: {
         greeting: `Hej ${firstName ?? "der"},`,
         intro: "Velkommen til Nextview360! Vi har nu lavet alt det hårde arbejde, og det hele er klar til at arbejde for jeres virksomhed.",
         product: (n: number) => (n === 1 ? "Her er jeres færdige produkt:" : "Her er jeres færdige produkter:"),
-        open: "Åbn",
+        openTour: (name: string) => `Åbn ${name === "Virtuel tour" ? "jeres virtuelle tour" : name}`,
         website: "Jeres hjemmeside:",
         share: "Del gerne linket på jeres hjemmeside, sociale medier og i nyhedsbreve - jo mere det bliver set, jo mere arbejder det for jer.",
         contact: (portal: boolean) =>
@@ -115,13 +119,14 @@ export function buildWelcomeMail(input: {
 <p>${esc(t.intro)}</p>
 ${
   products.length
-    ? `<p style="margin-bottom:4px">${esc(t.product(products.length))}</p>
-<table style="border-collapse:collapse;margin:8px 0 16px">${products
-        .map(
-          (p) =>
-            `<tr><td style="padding:6px 16px 6px 0;font-weight:bold">${esc(p.name)}</td><td style="padding:6px 0"><a href="${esc(p.url)}" style="background:#b91c1c;color:#ffffff;text-decoration:none;font-weight:bold;padding:8px 18px;border-radius:999px;display:inline-block">${esc(t.open)}</a></td></tr>`
+    ? `<p style="margin-bottom:8px">${esc(t.product(products.length))}</p>${products
+        .map((p, i) =>
+          i === 0 && input.picture
+            ? `<a href="${esc(p.url)}" style="display:block;text-decoration:none"><img src="cid:tour" width="520" alt="${esc(p.name)}" style="display:block;width:100%;max-width:520px;height:auto;border:0"></a>
+<p style="margin:10px 0 18px;text-align:center"><a href="${esc(p.url)}" style="background:#0071e3;color:#ffffff;text-decoration:none;font-weight:bold;padding:10px 22px;border-radius:999px;display:inline-block">${esc(t.openTour(p.name))}</a></p>`
+            : `<p style="margin:6px 0"><a href="${esc(p.url)}" style="color:#0071e3;font-weight:bold;text-decoration:none">${esc(t.openTour(p.name))} &rarr;</a></p>`
         )
-        .join("")}</table>`
+        .join("")}`
     : ""
 }${websiteUrl ? `<p>${esc(t.website)} <a href="${esc(websiteUrl)}">${esc(websiteUrl.replace(/^https?:\/\//, ""))}</a></p>` : ""}
 <p>${esc(t.share)}</p>
@@ -144,7 +149,7 @@ ${
   return { subject: t.subject, bodyText, bodyHtml };
 }
 
-export async function welcomeMailFor(dealId: string, portal: { link: string; statsLink: string; days: number } | null = null) {
+export async function welcomeMailFor(dealId: string, portal: { link: string; statsLink: string; days: number } | null = null, picture = false) {
   const deal = await prisma.deal.findUniqueOrThrow({
     where: { id: dealId },
     include: { items: { where: { url: { not: null } }, orderBy: { createdAt: "asc" } }, tours: { select: { slug: true, name: true, published: true, liveVersion: true } } },
@@ -159,6 +164,7 @@ export async function welcomeMailFor(dealId: string, portal: { link: string; sta
     websiteUrl: deal.websiteUrl,
     language: parseContractProducts(deal.contractProducts)?.language === "en" ? "en" : "da",
     portal,
+    picture,
   });
   return { deal, to: deal.contactEmail, ...mail };
 }
@@ -170,12 +176,15 @@ export async function sendWelcomeMail(dealId: string, actorId: string): Promise<
   // The customer page goes in only when this e-mail has already been given access to this deal (in Arpo, by an admin) - the mail never gives access by itself.
   const access = await prisma.customerAccountDeal.findFirst({ where: { dealId, account: { email: normalizeEmail(contact.contactEmail) } }, select: { accountId: true } });
   const portal = access ? { link: await welcomeLoginLink(access.accountId), statsLink: await welcomeLoginLink(access.accountId, "tal"), days: WELCOME_DAYS } : null;
-  const { deal, to, subject, bodyText, bodyHtml } = await welcomeMailFor(dealId, portal);
+  // Their tour's front page on a MacBook, sent with the mail (made now - never a blocker: without it, a button).
+  const items = await prisma.dealItem.findMany({ where: { dealId, url: { not: null } }, select: { url: true }, orderBy: { createdAt: "asc" }, take: 1 });
+  const picture = await dealTourMockup(dealId, items[0]?.url ? (modelIdsIn(items[0].url)[0] ?? null) : null);
+  const { deal, to, subject, bodyText, bodyHtml } = await welcomeMailFor(dealId, portal, Boolean(picture));
   if (!to) throw new Error("Kunden har ingen kontakt-e-mail.");
   const account = await prisma.emailAccount.findFirst({ where: { provider: "GOOGLE", email: WELCOME_MAIL_SENDER } });
   if (!account) throw new Error(`Ingen forbundet Gmail-konto for ${WELCOME_MAIL_SENDER}. Forbind den under Indstillinger → E-mail.`);
   try {
-    await sendGmailMessage(account, { to: [to], subject, bodyText, bodyHtml, fromName: "Lasse - Nextview360" });
+    await sendGmailMessage(account, { to: [to], subject, bodyText, bodyHtml, fromName: "Lasse - Nextview360", inline: picture ? [{ cid: "tour", filename: "tour.jpg", contentType: "image/jpeg", data: picture }] : undefined });
   } catch (err) {
     await prisma.systemMail.create({ data: { dealId, accountId: access?.accountId, kind: "welcome", to, subject, error: (err instanceof Error ? err.message : String(err)).slice(0, 300) } }).catch(() => {});
     throw err;

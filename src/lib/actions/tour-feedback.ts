@@ -51,6 +51,19 @@ export async function setFeedbackStatus(id: string, status: "open" | "done"): Pr
   }
 }
 
+/** "Send 'Jeres rettelser er lavet' nu": the same mail, by hand. */
+export async function sendFixesDone(slug: string): Promise<{ ok: true; to: string } | { ok: false; error: string }> {
+  const user = await admin();
+  try {
+    const to = await sendFixesDoneMail(slug, { id: user.id, name: user.name }, true);
+    if (!to) return { ok: false, error: "Mailen blev ikke sendt." };
+    revalidatePath(`/arpo/tour-lab/${slug}/rediger`);
+    return { ok: true, to };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
 export async function deleteFeedback(id: string): Promise<void> {
   await admin();
   await prisma.tourFeedback.delete({ where: { id } }).catch(() => {});

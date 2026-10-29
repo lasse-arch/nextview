@@ -2,7 +2,7 @@
 
 import { reviewUrl } from "@/lib/public-urls";
 import { useEffect, useState, useTransition } from "react";
-import { deleteFeedback, reviewStatus, sendForReview, setFeedbackStatus, setTourApproved, setTourReview, tourFeedback, type Feedback, type ReviewStatus } from "@/lib/actions/tour-feedback";
+import { deleteFeedback, reviewStatus, sendFixesDone, sendForReview, setFeedbackStatus, setTourApproved, setTourReview, tourFeedback, type Feedback, type ReviewStatus } from "@/lib/actions/tour-feedback";
 import { askClaudeForTour, type AiEditResult } from "@/lib/actions/tour-ai";
 import type { TourConfig } from "../../tours/types";
 import { Choice, Group, Toggle, type PreviewApi } from "./ui";
@@ -188,6 +188,24 @@ export function FeedbackPanel({
           onChange={setFilter}
         />
         {status?.sentAt && !status.approvedAt && <p className="text-[12px] leading-snug text-[#8e8e93]">Når den sidste åbne er løst, får kunden automatisk en mail med det, der er rettet, og linket til at se touren og godkende.</p>}
+        {status?.sentAt && (
+          <button
+            type="button"
+            disabled={pending}
+            className="w-full rounded-xl bg-white py-2 text-[13px] font-medium text-[#0071e3] ring-1 ring-black/[.06] disabled:opacity-50"
+            onClick={() => {
+              if (open > 0 && !confirm(`Der er stadig ${open} åbne rettelse${open === 1 ? "" : "r"}. Send alligevel mailen om, at rettelserne er lavet?`)) return;
+              setDoneNote(null);
+              start(async () => {
+                const r = await sendFixesDone(slug);
+                setDoneNote(r.ok ? { text: `Mailen "Jeres rettelser er lavet" er sendt til ${r.to}.` } : { text: r.error, error: true });
+                if (r.ok) await reload();
+              });
+            }}
+          >
+            ✉ Send &quot;Jeres rettelser er lavet&quot; nu
+          </button>
+        )}
         {doneNote && <p className={`rounded-lg px-3 py-2 text-[13px] ${doneNote.error ? "bg-[#ff3b30]/10 text-[#d70015]" : "bg-[#34c759]/10 text-[#1d7a35]"}`}>{doneNote.text}</p>}
         {items && shown.length === 0 && <p className="text-[13px] text-[#8e8e93]">{filter === "open" ? "Intet åbent. Send linket til kunden for at få feedback." : "Intet her."}</p>}
         <ul className="space-y-3">

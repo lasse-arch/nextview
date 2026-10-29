@@ -174,16 +174,24 @@ ${fixes.length ? `<p style="margin-bottom:4px"><b>${esc(t.fixedTitle)}</b></p><u
  * one done again (after reopening it) sends nothing new. Returns who was
  * mailed, or null when no mail was due.
  */
-export async function sendFixesDoneMail(slug: string, actor: { id: string; name: string }): Promise<string | null> {
+export async function sendFixesDoneMail(slug: string, actor: { id: string; name: string }, manual = false): Promise<string | null> {
   const tour = await prisma.tour.findUnique({
     where: { slug },
     select: { reviewToken: true, reviewSentAt: true, reviewApprovedAt: true, deal: { select: { id: true, companyName: true, displayName: true, contactName: true, contactEmail: true, contractProducts: true } } },
   });
   const deal = tour?.deal;
-  if (!tour?.reviewToken || !tour.reviewSentAt || tour.reviewApprovedAt || !deal?.contactEmail) return null;
-  if (await prisma.tourFeedback.count({ where: { tourSlug: slug, status: "open" } })) return null;
-  const fixes = await prisma.tourFeedback.findMany({ where: { tourSlug: slug, status: "done", reportedAt: null }, orderBy: { createdAt: "asc" }, take: 30, select: { id: true, text: true } });
-  if (!fixes.length) return null;
+  // Pressed by hand ("Send nu"): also with corrections still open, and then with every done one if all were told before.
+  if (manual) {
+    if (!tour?.reviewToken) throw new Error("Touren er ikke sendt til gennemgang endnu - der er intet link at sende.");
+    if (!deal?.contactEmail) throw new Error("Kunden har ingen kontakt-e-mail på dealen.");
+  } else {
+    if (!tour?.reviewToken || !tour.reviewSentAt || tour.reviewApprovedAt || !deal?.contactEmail) return null;
+    if (await prisma.tourFeedback.count({ where: { tourSlug: slug, status: "open" } })) return null;
+  }
+  const done = (reportedAt: null | undefined) => prisma.tourFeedback.findMany({ where: { tourSlug: slug, status: "done", ...(reportedAt === null ? { reportedAt: null } : {}) }, orderBy: { createdAt: "asc" }, take: 30, select: { id: true, text: true } });
+  let fixes = await done(null);
+  if (!fixes.length && manual) fixes = await done(undefined);
+  if (!fixes.length && !manual) return null;
   const to = normalizeEmail(deal.contactEmail);
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) throw new Error(`Kontakt-e-mailen på dealen ser forkert ud (${deal.contactEmail}).`);
   const sender = await prisma.emailAccount.findFirst({ where: { provider: "GOOGLE", email: WELCOME_MAIL_SENDER } });
@@ -198,7 +206,7 @@ export async function sendFixesDoneMail(slug: string, actor: { id: string; name:
   });
   // Marked as told first: two quick presses mustn't send it twice (a failed send puts them back).
   const ids = fixes.map((f) => f.id);
-  const claimed = await prisma.tourFeedback.updateMany({ where: { id: { in: ids }, reportedAt: null }, data: { reportedAt: new Date() } });
+  const claimed = await prisma.tourFeedback.updateMany({ where: { id: { in: ids }, ...(manual ? {} : { reportedAt: null }) }, data: { reportedAt: new Date() } });
   if (claimed.count !== ids.length) return null;
   if (sender) {
     try {
