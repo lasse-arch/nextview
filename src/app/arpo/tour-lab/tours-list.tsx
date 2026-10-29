@@ -39,7 +39,8 @@ export type TourRow = {
   leads: number;
   /** A customer with no tour in Arpo yet (the row opens "Ny tour" for them). */
   newTour?: TourCustomer;
-  filmed?: boolean;
+  /** A customer without a tour: "solgt", "optagelse 12. nov." or "filmet 3. nov.". */
+  note?: string;
 };
 
 type Filter = "alle" | Stage | "uden";
@@ -64,7 +65,7 @@ function FlowBar({ stage, note }: { stage: Stage; note?: string }) {
 }
 
 const noteOf = (r: TourRow) =>
-  r.newTour ? (r.stage === "live" ? "tour på explore" : r.filmed ? "filmet" : "solgt") : r.stage === "gennemgang" && r.approved ? "godkendt" : r.stage === "live" && !r.published ? "på Cloudflare" : undefined;
+  r.newTour ? (r.stage === "live" ? "tour på explore" : r.note) : r.stage === "gennemgang" && r.approved ? "godkendt" : r.stage === "live" && !r.published ? "på Cloudflare" : undefined;
 
 const when = (iso: string) => new Date(iso).toLocaleDateString("da-DK", { day: "numeric", month: "short", year: "numeric" });
 

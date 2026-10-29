@@ -97,7 +97,7 @@ export async function customersWithoutTour() {
     },
     orderBy: [{ contractSignedAt: { sort: "desc", nulls: "last" } }],
     take: 500,
-    select: { id: true, companyName: true, displayName: true, address: true, websiteUrl: true, stage: true, contractSignedAt: true, filmedAt: true, mpSkinId: true, items: { select: { url: true } } },
+    select: { id: true, companyName: true, displayName: true, address: true, websiteUrl: true, stage: true, contractSignedAt: true, filmingAt: true, filmedAt: true, mpSkinId: true, items: { select: { url: true } } },
   });
 }
 

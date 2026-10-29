@@ -29,6 +29,8 @@ function picture(c: TourConfig): { image: string; logo: boolean } {
   return photo ? { image: photo, logo: false } : { image: c.logo, logo: true };
 }
 
+const day = (d: Date) => d.toLocaleDateString("da-DK", { day: "numeric", month: "short", timeZone: "Europe/Copenhagen" });
+
 export default async function TourLabPage() {
   const user = await getCurrentUser();
   if (user?.role !== "ADMIN") redirect("/arpo");
@@ -80,7 +82,8 @@ export default async function TourLabPage() {
       tours: 0,
       hasModel: modelIdsIn([d.mpSkinId ?? "", ...d.items.map((i) => i.url ?? "")].join(" ")).length > 0,
     },
-    filmed: Boolean(d.filmedAt),
+    // Where the filming stands: done, booked for a day, or not yet.
+    note: d.filmedAt ? `filmet ${day(d.filmedAt)}` : d.filmingAt ? `optagelse ${day(d.filmingAt)}` : "solgt",
   }));
   return (
     <div className="space-y-6" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", system-ui, sans-serif' }}>
