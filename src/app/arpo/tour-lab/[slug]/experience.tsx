@@ -4,9 +4,10 @@ import { LANG_CSS, LangSwitch } from "./lang-switch";
 import { danishOf, LANGUAGES, localize, makeT, tourLanguages } from "../tours/i18n";
 import { TourLang } from "../tours/i18n-react";
 import { socialLinks } from "../tours/social";
-import { cssFilter, droneViewsOfHref, formatPhone, isDroneHref, guideExit, imageOfHref, isInTourHref, isPlaceHref, placeHref, panoHfov, placeSlug, pointOfHref, startPlaces } from "../tours/places";
+import { allGuides, cssFilter, droneViewsOfHref, formatPhone, GUIDE_HREF, guideOfHref, guideSetup, isDroneHref, guideExit, imageOfHref, isInTourHref, isPlaceHref, placeHref, panoHfov, placeSlug, pointOfHref, startPlaces } from "../tours/places";
 import type { LiveUnit } from "@/lib/availability/live";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { flushSync } from "react-dom";
 import { useRouter } from "next/navigation";
 import { saveTourStoryImage } from "@/lib/actions/tour-lab";
 import { connectSdk, showcaseUrl, uLinkTarget, type CameraPose, type MpSdk, type Rotation, type SweepInfo, type Vec3 } from "../matterport";
@@ -141,7 +142,7 @@ function track(name: string, params: Record<string, string | number> = {}) {
     // A number that matters, kept with the event: the seconds spent in a room.
     // …or the stop of "Vis mig rundt" it happened at.
     const value = typeof params.seconds === "number" ? Math.round(params.seconds) : typeof params.stop === "number" ? params.stop : undefined;
-    tracking.queue.push({ name, label: label != null ? tracking.da(String(label)) : undefined, url: params.link_url != null ? String(params.link_url) : undefined, value });
+    tracking.queue.push({ name, label: label != null ? tracking.da(String(label)) : undefined, url: params.link_url != null ? String(params.link_url) : params.guide != null ? String(params.guide) : undefined, value });
     if (name === "cta_click" || name === "contact_click") flushEvents(); // the visitor may be leaving
     else tracking.timer ||= window.setTimeout(flushEvents, 4000);
   }
@@ -463,6 +464,13 @@ function TourExperience({
     window.addEventListener("hv-find", open);
     return () => window.removeEventListener("hv-find", open);
   }, []);
+  // Any link "#rundvisning" / "#rundvisning:<id>" (a button, a tile, the dock) starts that guided tour.
+  const startGuideRef = useRef<(from: string, id: string | null) => void>(() => {});
+  useEffect(() => {
+    const start = (e: Event) => startGuideRef.current("link", ((e as CustomEvent).detail as string | null) ?? null);
+    window.addEventListener("hv-rundvisning", start);
+    return () => window.removeEventListener("hv-rundvisning", start);
+  }, []);
   /** A point has a 360° photo to open: an uploaded picture, or prepared tiles (with the tour's panos). */
   const hasPano = (p: Point) => Boolean(p.panorama || (p.pano && T.panos));
   /** Pictures full screen: a place's photos, or the site plan (zoomed in on a point). */
@@ -533,7 +541,18 @@ function TourExperience({
   const routeRun = useRef(0);
   /** The route still ahead, drawn on the floor. */
   const [routeLine, setRouteLine] = useState<Vec3[]>([]);
-  const GUIDE = useMemo(() => guideStops(T), [T]);
+  /** Which guided tour runs (or ran last): null = the main one ("Vis mig rundt"), else one of `guides` by id. */
+  const [guideId, setGuideId] = useState<string | null>(null);
+  const guideIdRef = useRef<string | null>(null);
+  const GUIDE = useMemo(() => guideStops(T, guideId), [T, guideId]);
+  /** Its settings (seconds, turn, manual …). */
+  const G = guideSetup(T, guideId);
+  /** The guided tours there are - the menu offers a choice when there's more than one. */
+  const GUIDES = useMemo(() => allGuides(T), [T]);
+  /** Kept with its events, so Resultater can tell the guided tours apart. */
+  const guideKey = () => (guideIdRef.current ? `${GUIDE_HREF}:${guideIdRef.current}` : GUIDE_HREF);
+  /** guideGo as of the newest render - after switching guided tour, the one that knows its stops (see startGuide). */
+  const guideGoRef = useRef<(i: number) => void>(() => {});
   const primaryCta = T.cta.find((c) => c.primary);
   const [linkPopup, setLinkPopup] = useState<LinkPopupState>(null);
   // Every link set to open in a popup is checked ahead (can its page be shown here?) - those that can't open in a new tab.
@@ -1145,7 +1164,7 @@ function TourExperience({
       enterTour(go.room, "welcome", go.name);
       return;
     }
-    if ("guide" in go) return startGuide("welcome");
+    if ("guide" in go) return startGuide("welcome", go.guide === true ? null : go.guide);
     if ("day" in go) return openDay("welcome");
     // A tour without a drone scene or map: the menu instead, so the tile still leads somewhere.
     if (!OV) {
@@ -1163,6 +1182,12 @@ function TourExperience({
   async function menuGo(name: string, group: string, href: string) {
     // Picking a place in the menu during "Vis mig rundt" means the visitor goes their own way: the guide stops.
     leaveGuide("menu", name);
+    // Another guided tour (a "#rundvisning" link in the menu).
+    const guide = guideOfHref(href);
+    if (guide !== undefined) {
+      setMenuOpen(false);
+      return startGuide("menu", guide);
+    }
     if (isDroneHref(href)) {
       setMenuOpen(false);
       // Turned to the item's own spot, if it has one for this device.
@@ -1337,7 +1362,7 @@ function TourExperience({
   /** A stop inside the tour: flown to (one move at a time, only the newest), then the slow turn. */
   function guideFly(stop: (typeof GUIDE)[number], uncover?: () => void) {
     // The slow turn at the stop: as always, the other way, or none (the stop's own, else the guide's).
-    const turn = stop.turn ?? T.guide?.turn ?? "as";
+    const turn = stop.turn ?? G?.turn ?? "as";
     guideMoving.current = true;
     // One move at a time: Matterport refuses a move while the last one is still flying, so a quick
     // Næste waits for it - and only the newest stop is flown to (the ones skipped meanwhile are dropped).
@@ -1390,7 +1415,7 @@ function TourExperience({
     if (!(await standsAt(stop.href)) && ticket === guideTicket.current && !guideMoving.current) {
       guideHeldRef.current = true;
       setGuideHeld(true);
-      track("guide_leave", { stop: (guideAtRef.current ?? 0) + 1, stops: GUIDE.length, label: "Gik selv rundt", kind: "walk" });
+      track("guide_leave", { stop: (guideAtRef.current ?? 0) + 1, stops: GUIDE.length, label: "Gik selv rundt", kind: "walk", guide: guideKey() });
     }
   }
   /*
@@ -1408,7 +1433,7 @@ function TourExperience({
       }
       if (p.sweep !== base.sweep || Math.abs(p.rotation.y - base.y) > 4 || Math.abs(p.rotation.x - base.x) > 4) {
         // Once per pause: walking on counts as leaving the guide, only looking around doesn't.
-        if (!guideHeldRef.current && p.sweep !== base.sweep) track("guide_leave", { stop: (guideAtRef.current ?? 0) + 1, stops: GUIDE.length, label: "Gik selv rundt", kind: "walk" });
+        if (!guideHeldRef.current && p.sweep !== base.sweep) track("guide_leave", { stop: (guideAtRef.current ?? 0) + 1, stops: GUIDE.length, label: "Gik selv rundt", kind: "walk", guide: guideKey() });
         guideHeldRef.current = true;
         setGuideHeld(true);
       }
@@ -1416,16 +1441,30 @@ function TourExperience({
     return () => sub.cancel();
     // guideHeld too: after Fortsæt, the view the visitor stands in is the new starting point.
   }, [guideAt, sdk, phase, guideHeld, GUIDE.length]);
-  function startGuide(from: string) {
-    if (!GUIDE.length) return;
-    track("guide_start", { from, stops: GUIDE.length });
+  /** Starts a guided tour from the beginning: the main one (null) or one of `guides` by id. */
+  function startGuide(from: string, id: string | null = null) {
+    // The main one when asked for (or the id isn't there) - or the first there is, when the main one has no stops.
+    let known = id != null && T.guides?.some((g) => g.id === id) ? id : null;
+    if (known == null && !guideStops(T, null).length) known = GUIDES[0]?.id ?? null;
+    const stops = guideStops(T, known);
+    if (!stops.length) return;
+    // One running already stops here (its own leave is counted).
+    leaveGuide("guide", known ?? "Vis mig rundt");
+    guideIdRef.current = known;
+    track("guide_start", { from, stops: stops.length, guide: guideKey() });
     setDayAt(null);
     setMenuOpen(false);
     setWelcome(false);
     setCover(false);
     setSelected(null);
-    guideGo(0);
+    // Another guided tour than the last: rendered with its stops at once, then started from there.
+    if (known !== guideId) {
+      flushSync(() => setGuideId(known));
+      guideGoRef.current(0);
+    } else guideGo(0);
   }
+  startGuideRef.current = startGuide;
+  guideGoRef.current = guideGo;
   /*
    * How zoomed out the view is, per device (the editor's "Zoom"): set when the
    * tour is ready, again after every move (Matterport resets it) and when the
@@ -1495,7 +1534,7 @@ function TourExperience({
   function leaveGuide(how: string, to?: string) {
     if (guideAtRef.current == null) return;
     // Where they left it and for what - Resultater shows it (guide_leave: label = where to, value = the stop).
-    track("guide_leave", { stop: guideAtRef.current + 1, stops: GUIDE.length, label: to || how, kind: how });
+    track("guide_leave", { stop: guideAtRef.current + 1, stops: GUIDE.length, label: to || how, kind: how, guide: guideKey() });
     guideStep.current++;
     guideTicket.current++;
     guideMoving.current = false;
@@ -1508,14 +1547,14 @@ function TourExperience({
   }
   function closeGuide(completed: boolean) {
     setGuideHeld(false);
-    track(completed ? "guide_complete" : "guide_close", { stop: (guideAt ?? 0) + 1, stops: GUIDE.length });
+    track(completed ? "guide_complete" : "guide_close", { stop: (guideAt ?? 0) + 1, stops: GUIDE.length, guide: guideKey() });
     if (!completed)
-      track("guide_leave", { stop: (guideAt ?? 0) + 1, stops: GUIDE.length, label: guideExit(T) === "overview" && OV ? "Tilbage til luften" : "Gå selv rundt (knappen)", kind: "close" });
+      track("guide_leave", { stop: (guideAt ?? 0) + 1, stops: GUIDE.length, label: guideExit(T, guideId) === "overview" && OV ? "Tilbage til luften" : "Gå selv rundt (knappen)", kind: "close", guide: guideKey() });
     setGuideAt(null);
     setPano(null);
     setGuideImage(null);
     // A tour you can't walk around in: back to the drone scene / map, not left standing inside.
-    if (guideExit(T) === "overview" && OV && phase === "tour") backToDrone();
+    if (guideExit(T, guideId) === "overview" && OV && phase === "tour") backToDrone();
   }
 
   /** Prototype tool: the exact view the visitor stands in, as a link for the tour's setup. */
@@ -2051,7 +2090,7 @@ function TourExperience({
               <div className="hv-wel-kick">{T.welcome.kicker}</div>
               <h1>{T.welcome.title}</h1>
               <p>{T.welcome.lead}</p>
-              {GUIDE.length > 0 && !T.welcome.tiles.some((t) => "guide" in t.go) && (
+              {GUIDES.length > 0 && !T.welcome.tiles.some((t) => "guide" in t.go) && (
                 <button type="button" className="hv-wel-guide" onClick={() => chooseWelcome({ guide: true }, "Vis mig rundt")}>
                   ▶ {tx("Vis mig rundt")}
                 </button>
@@ -2098,7 +2137,7 @@ function TourExperience({
           full={pano.panorama ? panoFor(pano.panorama) : undefined}
           start={pano.panoStart ?? (pano.panorama && T.imageView?.[pano.panorama]?.yaw != null ? { yaw: T.imageView[pano.panorama].yaw!, pitch: T.imageView[pano.panorama].pitch ?? 0 } : undefined)}
           panos={T.panos}
-          turn={guideAt != null ? (GUIDE[guideAt]?.turn ?? T.guide?.turn ?? "as") : null}
+          turn={guideAt != null ? (GUIDE[guideAt]?.turn ?? G?.turn ?? "as") : null}
           zoom={pano.panorama ? T.imageView?.[pano.panorama] : undefined}
           // A picture opened from the menu goes back to the menu - "Tilbage til luften" only when you came from the drone scene / map.
           backLabel={pano.id.startsWith("billede-") ? tx("Tilbage") : tx("Tilbage til luften")}
@@ -2158,8 +2197,8 @@ function TourExperience({
               setMenuOpen(o);
             }}
             room={roomShown}
-            hasGuide={GUIDE.length > 0}
-            onGuide={() => startGuide("menu")}
+            guides={GUIDES}
+            onGuide={(id) => startGuide("menu", id)}
             onDay={() => openDay("menu")}
             onGo={menuGo}
           />
@@ -2176,8 +2215,8 @@ function TourExperience({
               setMenuOpen(o);
             }}
             room={roomShown}
-            hasGuide={GUIDE.length > 0}
-            onGuide={() => startGuide("menu")}
+            guides={GUIDES}
+            onGuide={(id) => startGuide("menu", id)}
             onGo={menuGo}
           />
         )
@@ -2222,15 +2261,21 @@ function TourExperience({
             })}
           </div>
         )}
-        {GUIDE.length > 0 && (
-          <button type="button" className="hv-guide-knap" onClick={() => startGuide("menu")}>
-            ▶
-            <span>
-              Vis mig rundt
-              <small>{GUIDE.length} steder, ca. {Math.ceil((GUIDE.length * (T.guide?.seconds ?? 9)) / 60)} min</small>
-            </span>
-          </button>
-        )}
+        {GUIDES.map((g) => {
+          // One button per guided tour, with how long it is.
+          const n = guideStops(T, g.id).length;
+          return (
+            <button key={g.id ?? ""} type="button" className="hv-guide-knap" onClick={() => startGuide("menu", g.id)}>
+              ▶
+              <span>
+                {g.id == null ? "Vis mig rundt" : g.title}
+                <small>
+                  {n} steder, ca. {Math.ceil((n * (guideSetup(T, g.id)?.seconds ?? 9)) / 60)} min
+                </small>
+              </span>
+            </button>
+          );
+        })}
         {T.day && (
           <button type="button" className="hv-day-knap" onClick={() => openDay("menu")}>
             ◷
@@ -2356,7 +2401,7 @@ function TourExperience({
             setCover(false);
           }}
           onPlace={(p) => placeGo(p, "cover")}
-          onGuide={GUIDE.length ? () => startGuide("cover") : undefined}
+          onGuide={GUIDES.length ? () => startGuide("cover") : undefined}
           onCta={(label, href) => ctaClick(label, href, "cover")}
         />
       )}
@@ -2545,7 +2590,7 @@ function TourExperience({
       {T.onboarding && !helpDone && phase === "tour" && !cover && !welcome && !intro && sdk && guideAt == null && !menuOpen && !contactOpen && (
         <Onboarding
           hasMenu={T.menu.length > 0}
-          onGuide={GUIDE.length ? () => startGuide("onboarding") : undefined}
+          onGuide={GUIDES.length ? () => startGuide("onboarding") : undefined}
           onDone={() => {
             track("onboarding_done", {});
             doneHelp();
@@ -2556,11 +2601,11 @@ function TourExperience({
         <GuidePlayer
           stops={GUIDE}
           index={guideAt}
-          seconds={T.guide?.seconds ?? 9}
-          manual={T.guide?.manual}
+          seconds={G?.seconds ?? 9}
+          manual={G?.manual}
           held={guideHeld}
           walkHint={phase === "tour"}
-          walkHintStops={T.guide?.walkHint === "all" ? Infinity : T.guide?.walkHint === "none" ? 0 : (T.guide?.walkHint ?? 2)}
+          walkHintStops={G?.walkHint === "all" ? Infinity : G?.walkHint === "none" ? 0 : (G?.walkHint ?? 2)}
           onResume={() => {
             // Fortsæt: back to the stop the card shows, if the visitor walked off - card and view always agree.
             setGuideHeld(false);
@@ -2579,7 +2624,7 @@ function TourExperience({
           onGo={guideGo}
           onClose={closeGuide}
           onEvent={track}
-          stopLabel={guideExit(T) === "overview" && OV ? tx(OV.backLabel || "Tilbage til luften") : undefined}
+          stopLabel={guideExit(T, guideId) === "overview" && OV ? tx(OV.backLabel || "Tilbage til luften") : undefined}
         />
       )}
       {showCard != null && (

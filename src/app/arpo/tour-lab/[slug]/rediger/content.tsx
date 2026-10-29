@@ -465,6 +465,16 @@ export function StartEditor({ config, edit, slug, preview }: Props) {
                       }}
                     />
                   </Field>
+                  {"guide" in t.go && (config.guides?.length ?? 0) > 0 && (
+                    <select className={`${input} bg-white`} value={t.go.guide === true ? "" : t.go.guide} onChange={(e) => set({ ...t, go: { guide: e.target.value || true } })}>
+                      <option value="">Vis mig rundt</option>
+                      {config.guides!.map((g) => (
+                        <option key={g.id} value={g.id}>
+                          {g.title}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                   {"room" in t.go && <PlacePicker href={t.go.room} name={t.title} preview={preview} onChange={(href) => set({ ...t, go: { room: href, name: t.title } })} />}
                   {"href" in t.go && <input className={`${input} bg-white`} value={t.go.href} placeholder="https://…" onChange={(e) => set({ ...t, go: { href: e.target.value } })} />}
                   {"drone" in t.go && <DroneViewPicker views={t.go.view} preview={preview} onChange={(view) => set({ ...t, go: { drone: (t.go as { drone: string | null }).drone, view } })} />}
@@ -717,7 +727,95 @@ function PointStop({ config, id, edit, onEdit, preview }: { config: TourConfig; 
   );
 }
 
+/**
+ * "Vis mig rundt": the main guided tour and any more (`guides`, e.g. one per
+ * linjefag) - pick one at the top, and the editor below edits that one.
+ */
 export function GuideEditor({ config, edit, preview, onEditPoint }: Omit<Props, "slug"> & { onEditPoint?: (id: string) => void }) {
+  const [sel, setSel] = useState<string | null>(null);
+  const extra = sel != null ? config.guides?.find((g) => g.id === sel) : undefined;
+  // The one picked is edited as if it were `guide`: a copy with it there, and what changed written back to it (anything else the editor changed, too).
+  const view: TourConfig = extra ? { ...config, guide: extra } : config;
+  const editPicked: Edit = extra
+    ? (fn) =>
+        edit((d) => {
+          const i = d.guides!.findIndex((g) => g.id === extra.id);
+          if (i < 0) return;
+          const tmp = { ...d, guide: d.guides![i] } as TourConfig;
+          fn(tmp);
+          for (const k of Object.keys(d) as (keyof TourConfig)[]) if (!(k in tmp) && k !== "guide") delete d[k];
+          for (const [k, v] of Object.entries(tmp)) if (k !== "guide") (d as Record<string, unknown>)[k] = v;
+          d.guides![i] = { ...(tmp.guide ?? { stops: [] }), id: extra.id, title: d.guides![i].title };
+        })
+    : edit;
+  const newId = () => {
+    let n = (config.guides?.length ?? 0) + 1;
+    while (config.guides?.some((g) => g.id === `rundvisning-${n}`)) n++;
+    return `rundvisning-${n}`;
+  };
+  const pill = (on: boolean) => `rounded-full px-3 py-1.5 text-[13px] font-medium ${on ? "bg-[#0071e3] text-white" : "bg-white text-[#1d1d1f] ring-1 ring-black/[.08]"}`;
+  return (
+    <>
+      <Group title="Rundvisninger">
+        <p className={small}>Touren kan have flere rundvisninger - fx én for hele stedet og én pr. linjefag. Menuen får en knap til hver. Vælg den, du vil rette.</p>
+        <div className="flex flex-wrap gap-1.5">
+          <button type="button" className={pill(!extra)} onClick={() => setSel(null)}>
+            Vis mig rundt
+          </button>
+          {config.guides?.map((g) => (
+            <button key={g.id} type="button" className={pill(extra?.id === g.id)} onClick={() => setSel(g.id)}>
+              {g.title || "Uden navn"}
+            </button>
+          ))}
+          <button
+            type="button"
+            className="rounded-full px-3 py-1.5 text-[13px] font-medium text-[#0071e3] hover:bg-[#0071e3]/5"
+            onClick={() => {
+              const id = newId();
+              edit((d) => void (d.guides = [...(d.guides ?? []), { id, title: "Ny rundvisning", stops: [] }]));
+              setSel(id);
+            }}
+          >
+            + Ny rundvisning
+          </button>
+        </div>
+        {extra && (
+          <>
+            <Field title="Navn" hint="Står på knappen i menuen, fx Padel.">
+              <input className={`${input} bg-white`} value={extra.title} onChange={(e) => edit((d) => void (d.guides = d.guides!.map((g) => (g.id === extra.id ? { ...g, title: e.target.value } : g))))} />
+            </Field>
+            <p className={small}>
+              En flise på velkomsten kan starte netop denne (vælg den under flisen), og ethvert link kan starte den, fx en knap eller et menupunkt: <code className="rounded bg-black/5 px-1">#rundvisning:{extra.id}</code>
+            </p>
+            <button
+              type="button"
+              className="self-start text-[13px] text-[#ff3b30] hover:underline"
+              onClick={() => {
+                if (!confirm(`Slet rundvisningen "${extra.title}"?`)) return;
+                edit((d) => {
+                  d.guides = d.guides!.filter((g) => g.id !== extra.id);
+                  if (!d.guides.length) d.guides = undefined;
+                  // Tiles that started it start the main one instead.
+                  d.welcome?.tiles.forEach((t) => {
+                    if ("guide" in t.go && t.go.guide === extra.id) t.go = { guide: true };
+                  });
+                });
+                setSel(null);
+              }}
+            >
+              Slet rundvisningen
+            </button>
+          </>
+        )}
+      </Group>
+      <GuideSetupEditor key={extra?.id ?? ""} config={view} edit={editPicked} preview={preview} onEditPoint={onEditPoint} />
+      <DayEditor config={config} edit={edit} preview={preview} />
+    </>
+  );
+}
+
+/** One guided tour's settings and stops (shown as `config.guide`). */
+function GuideSetupEditor({ config, edit, preview, onEditPoint }: Omit<Props, "slug"> & { onEditPoint?: (id: string) => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const stops = config.guide?.stops ?? [];
@@ -935,7 +1033,6 @@ export function GuideEditor({ config, edit, preview, onEditPoint }: Omit<Props, 
         {error && <p className="px-1 text-[12px] text-[#ff3b30]">{error}</p>}
       </Group>
       )}
-      <DayEditor config={config} edit={edit} preview={preview} />
     </>
   );
 }

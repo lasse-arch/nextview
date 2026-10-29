@@ -99,9 +99,27 @@ export const panoHfov = (phone: boolean, zoom = 1) => Math.max(30, Math.min(120,
  * aerial photo when the guide only shows points on it (nothing to walk around
  * in), else "Gå selv rundt".
  */
-export function guideExit(T: TourConfig): "self" | "overview" {
-  if (T.guide?.exit) return T.guide.exit;
-  const stops = T.guide?.stops ?? [];
-  const onlyPoints = !T.guide?.fromMenu && stops.length > 0 && stops.every((s) => "point" in s || !s.href);
+export function guideExit(T: TourConfig, guideId: string | null = null): "self" | "overview" {
+  const G = guideSetup(T, guideId);
+  if (G?.exit) return G.exit;
+  const stops = G?.stops ?? [];
+  const onlyPoints = !G?.fromMenu && stops.length > 0 && stops.every((s) => "point" in s || !s.href);
   return onlyPoints && (T.drone || T.map) ? "overview" : "self";
+}
+
+/** A link that starts a guided tour: "#rundvisning" (the main one) or "#rundvisning:<id>" (one of `guides`). */
+export const GUIDE_HREF = "#rundvisning";
+/** The guided tour a link starts: null = the main one, an id = one of `guides`, undefined = not a guide link. */
+export function guideOfHref(href: string): string | null | undefined {
+  if (href === GUIDE_HREF) return null;
+  return href.startsWith(`${GUIDE_HREF}:`) ? href.slice(GUIDE_HREF.length + 1) || null : undefined;
+}
+/** One guided tour's setup: the main one (null, or an id that isn't there) or one of `guides`. */
+export function guideSetup(T: TourConfig, guideId: string | null = null) {
+  return (guideId != null ? T.guides?.find((g) => g.id === guideId) : undefined) ?? T.guide;
+}
+/** Every guided tour with stops: the main one first (id null). Its title: the extra one's own, else "Vis mig rundt". */
+export function allGuides(T: TourConfig): { id: string | null; title: string }[] {
+  const has = (g: TourConfig["guide"]) => Boolean(g && (g.fromMenu || g.stops.length));
+  return [...(has(T.guide) ? [{ id: null, title: "Vis mig rundt" }] : []), ...(T.guides ?? []).filter(has).map((g) => ({ id: g.id, title: g.title }))];
 }

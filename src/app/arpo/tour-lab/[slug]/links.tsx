@@ -4,6 +4,7 @@ import { useT } from "../tours/i18n-react";
 import { createContext, useContext, useEffect, useState } from "react";
 import { apiUrl } from "../tours/api";
 import type { LinkOpen, PopupSize, TourConfig } from "../tours/types";
+import { guideOfHref } from "../tours/places";
 
 /*
  * Every link out of a tour (book, menu card, webshop…) opens the way the tour
@@ -178,9 +179,18 @@ export function LinkPopup({
 /** Links that open something inside the tour rather than a page: the contact form and the live data list. */
 const IN_TOUR: Record<string, string> = { "#kontakt": "hv-kontakt", "#live": "hv-live", "#find": "hv-find" };
 
+/** "#rundvisning" / "#rundvisning:<id>": starts that guided tour (the engine listens for "hv-rundvisning", detail = the id or null). */
+function startsGuide(href: string): boolean {
+  const id = guideOfHref(href);
+  if (id === undefined) return false;
+  window.dispatchEvent(new CustomEvent("hv-rundvisning", { detail: id }));
+  return true;
+}
+
 /** Opens a link from code (a button rather than an <a>) the tour's way. */
 export function openLink(T: TourConfig, href: string, label: string, popup: (href: string, label: string) => void) {
   if (IN_TOUR[href]) return void window.dispatchEvent(new Event(IN_TOUR[href]));
+  if (startsGuide(href)) return;
   const mode = linkMode(T, href);
   const url = tagged(T, href);
   if (mode === "popup") popup(url, label);
@@ -217,6 +227,11 @@ export function TourLink({
           // Opens inside the tour (the contact form, the live data list).
           e.preventDefault();
           window.dispatchEvent(new Event(IN_TOUR[href]));
+          return;
+        }
+        if (guideOfHref(href) !== undefined) {
+          e.preventDefault();
+          startsGuide(href);
           return;
         }
         if (mode === "popup") {

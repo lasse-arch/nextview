@@ -143,6 +143,7 @@ Regler:
   - et kort/en tekst, der kommer frem ved et sted → placeCards (stedkort)
   - et kort efter et stykke tid / "book nu"-påmindelse → nudge
   - en rundtur der kører af sig selv → guide ("Vis mig rundt")
+  - flere rundture (fx én pr. linjefag ved siden af den for hele stedet) → guides (hver med id, title og egne stop); start dem med en velkomstflise { guide: "<id>" } eller et link "#rundvisning:<id>". Touren kan godt have mange rundvisninger - sig aldrig, at den kun kan have én
   - en dagsplan/et skema → day
   - små prikker med info på ting i rummet → info (tags)
   - billeder af rummene i bunden → stories (stories.desktop / stories.mobile slår dem til - aldrig med CSS)

@@ -71,6 +71,11 @@ videre" til (`manual`), så gæsten styrer tempoet; ellers kommer næste stop, n
 stemmen er færdig. Et sidste stop uden sted (tom `href`) er et afslutningskort.
 Gæsten kan altid slå lyden fra. Lydfiler hostes hos os som alle andre filer.
 
+Flere rundvisninger (`guides`): hver med sit navn og sine stop, fx én for hele
+skolen og én pr. linjefag ("Padel", "Ridning"). Menuen får en knap til hver,
+og en velkomstflise ({ guide: "<id>" }) eller et link "#rundvisning:<id>"
+starter én bestemt. Godt, når gæsterne kommer for noget forskelligt.
+
 Et stop kan også være et billede (`href: "#billede:<adresse>"`), fx et
 dronefoto, der allerede ligger i menuen: det vises i fuld skærm (et 2:1-billede
 som 360°) og hentes i baggrunden, før gæsten når dertil - godt som første stop

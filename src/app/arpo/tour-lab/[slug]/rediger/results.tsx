@@ -51,10 +51,10 @@ function Ranked({ rows, empty, show = String }: { rows: { label: string; count: 
 
 type ShareProps = { slug: string; brand: string; share: ReportShare; shareStats: TourStats; token: string | null };
 
-export function ResultsPanel({ stats, guideStops = [], ...shareProps }: { stats: TourStats; /** The guide's stops' titles, in order (to name the stop people left at). */ guideStops?: string[] } & ShareProps) {
+export function ResultsPanel({ stats, guideStops = [], guideNames = {}, ...shareProps }: { stats: TourStats; /** The guide's stops' titles, in order (to name the stop people left at). */ guideStops?: string[]; /** Each guided tour's name by its link ("#rundvisning…"). */ guideNames?: Record<string, string> } & ShareProps) {
   return (
     <>
-      <OurNumbers stats={stats} guideStops={guideStops} />
+      <OurNumbers stats={stats} guideStops={guideStops} guideNames={guideNames} />
       <ShareSettings {...shareProps} />
     </>
   );
@@ -156,7 +156,7 @@ function ShareSettings({ slug, brand, share: initial, shareStats, token: initial
   );
 }
 
-function OurNumbers({ stats, guideStops }: { stats: TourStats; guideStops: string[] }) {
+function OurNumbers({ stats, guideStops, guideNames }: { stats: TourStats; guideStops: string[]; guideNames: Record<string, string> }) {
   const [hover, setHover] = useState<number | null>(null);
   const max = Math.max(1, ...stats.perDay.map((d) => d.visits));
   const conversion = stats.visits ? stats.leads / stats.visits : 0;
@@ -250,7 +250,22 @@ function OurNumbers({ stats, guideStops }: { stats: TourStats; guideStops: strin
             <p className="text-[13px] text-[#1d1d1f]">
               {stats.guide.started} {stats.guide.started === 1 ? "besøg startede" : "besøg startede"} rundvisningen, og {stats.guide.completed} så den til ende ({pct(stats.guide.completed / stats.guide.started)}).
             </p>
-            <div className="text-[12px] font-semibold text-[#6e6e73]">Hvor de forlod den</div>
+            {stats.guide.byGuide && (
+              <>
+                <div className="text-[12px] font-semibold text-[#6e6e73]">Hver rundvisning</div>
+                <ul className="divide-y divide-black/[.05] text-[13px]">
+                  {stats.guide.byGuide.map((g) => (
+                    <li key={g.guide} className="flex justify-between gap-3 py-1.5">
+                      <span className="truncate">{guideNames[g.guide] ?? (g.guide.replace(/^#rundvisning:?/, "") || "Vis mig rundt")}</span>
+                      <span className="shrink-0 text-[#6e6e73]">
+                        {g.started} startede · {g.completed} så den til ende{g.started ? ` (${pct(g.completed / g.started)})` : ""}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+            <div className="text-[12px] font-semibold text-[#6e6e73]">Hvor de forlod {stats.guide.byGuide ? `"${guideNames["#rundvisning"] ?? "Vis mig rundt"}"` : "den"}</div>
             <Ranked
               rows={stats.guide.leftAt.map((r) => ({ label: `Stop ${r.stop}${guideStops[r.stop - 1] ? ` · ${guideStops[r.stop - 1]}` : ""}`, count: r.count })).sort((a, b) => b.count - a.count)}
               empty="Ingen har forladt rundvisningen undervejs (måles fra nu af)."

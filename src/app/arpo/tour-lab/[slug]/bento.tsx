@@ -34,7 +34,7 @@ export function BentoMenu({
   open,
   setOpen,
   room,
-  hasGuide,
+  guides,
   onGuide,
   onGo,
 }: {
@@ -42,8 +42,9 @@ export function BentoMenu({
   open: boolean;
   setOpen: (open: boolean) => void;
   room: string | null;
-  hasGuide: boolean;
-  onGuide: () => void;
+  /** The guided tours (the main one has id null) - a pill each. */
+  guides: { id: string | null; title: string }[];
+  onGuide: (id: string | null) => void;
   /** A place in the tour or a link out (the engine's menuGo). */
   onGo: (name: string, group: string, href: string) => void;
 }) {
@@ -89,13 +90,13 @@ export function BentoMenu({
           ))}
         </div>
         <div className="bm-sub">
-          {(hasGuide || places.length > 0) && <h4>{tr("Alle områder")}</h4>}
+          {(guides.length > 0 || places.length > 0) && <h4>{tr("Alle områder")}</h4>}
           <div className="bm-pills">
-            {hasGuide && (
-              <button type="button" className="bm-pill bm-guide" onClick={() => (setOpen(false), onGuide())}>
-                ▶ {tr("Vis mig rundt")}
+            {guides.map((g) => (
+              <button key={g.id ?? ""} type="button" className="bm-pill bm-guide" onClick={() => (setOpen(false), onGuide(g.id))}>
+                ▶ {g.id == null ? tr("Vis mig rundt") : g.title}
               </button>
-            )}
+            ))}
             {places.map((p) => (
               <button key={p.group + p.name} type="button" className={`bm-pill ${room === p.name ? "here" : ""}`} onClick={() => go(p.name, p.group, p.href)}>
                 {p.name}

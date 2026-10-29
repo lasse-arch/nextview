@@ -41,7 +41,7 @@ export function SimpleMenu({
   open,
   setOpen,
   room,
-  hasGuide,
+  guides,
   onGuide,
   onDay,
   onGo,
@@ -50,8 +50,9 @@ export function SimpleMenu({
   open: boolean;
   setOpen: (open: boolean) => void;
   room: string | null;
-  hasGuide: boolean;
-  onGuide: () => void;
+  /** The guided tours (the main one has id null) - one button each. */
+  guides: { id: string | null; title: string }[];
+  onGuide: (id: string | null) => void;
   onDay: () => void;
   /** A place in the tour or a link out (the engine's menuGo). */
   onGo: (name: string, group: string, href: string) => void;
@@ -88,11 +89,11 @@ export function SimpleMenu({
             </button>
           </div>
           <div className="sp-list sp-menu-list">
-            {hasGuide && (
-              <button type="button" className="sp-btn sp-main" onClick={() => (setOpen(false), onGuide())}>
-                Start rundturen
+            {guides.map((g, i) => (
+              <button key={g.id ?? ""} type="button" className={`sp-btn ${i === 0 ? "sp-main" : ""}`} onClick={() => (setOpen(false), onGuide(g.id))}>
+                {guides.length > 1 ? g.id == null ? tr("Vis mig rundt") : g.title : "Start rundturen"}
               </button>
-            )}
+            ))}
             {T.day && (
               <button type="button" className="sp-btn" onClick={() => (setOpen(false), onDay())}>
                 {T.day.title}

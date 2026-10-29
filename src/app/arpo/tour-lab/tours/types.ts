@@ -15,7 +15,30 @@ export type PanoCopies = { phone: string; computer: string };
 /** Where the drone picture looks (set from the editor's preview). */
 export type DroneView = { yaw: number; pitch: number; hfov: number };
 /** `view`: a tile to the drone picture can turn it to its own spot, per device - else the start view. */
-export type WelcomeGo = { drone: string | null; view?: { desktop?: DroneView; mobile?: DroneView } } | { room: string; name: string } | { href: string } | { guide: true } | { day: true };
+export type WelcomeGo = { drone: string | null; view?: { desktop?: DroneView; mobile?: DroneView } } | { room: string; name: string } | { href: string } | { guide: true | string } | { day: true };
+
+/** One guided tour ("Vis mig rundt"): its stops and how it runs. */
+export type GuideSetup = {
+  seconds?: number;
+  /** The hint "Træk i billedet …" on the guide's card: on every stop ("all"), none ("none"), or the first N (left out: the first 2). */
+  walkHint?: "all" | "none" | number;
+  /** The visitor presses "Næste" themselves (no timer) - calm, e.g. for a voice tour. */
+  manual?: boolean;
+  /** The guide's stop button: "self" = "Gå selv rundt" (stay where you are), "overview" = back to the drone scene / map. Not set: back to it when the guide only shows its points (see guideExit). */
+  exit?: "self" | "overview";
+  /**
+   * Made from the menu instead of `stops`: one stop per place in the menu,
+   * in the menu's order - `menuPlaces` = the places to include, by their
+   * key (as in ?rum=; all when left out), `menuTurns` = a place's own turn (by key).
+   */
+  fromMenu?: boolean;
+  menuPlaces?: string[];
+  menuTurns?: Record<string, GuideTurn>;
+  /** How the view turns at each stop: left out = a slow turn as always, "other" = the other way, "none" = stands still. A stop can have its own. */
+  turn?: GuideTurn;
+  /** A stop: where (empty href = stay, e.g. a closing card; a picture "#billede:<address>" = shown full screen, a 2:1 one as 360°, e.g. a drone photo), its text, and optionally a voice (an audio file) that plays there. */
+  stops: ({ point: string; turn?: GuideTurn } | { href: string; title: string; text: string; audio?: string; turn?: GuideTurn })[];
+};
 
 /** A real spot in the tour with a photo of it (e.g. one of the model's own Matterport photos). */
 export type TourPlace = { name: string; kicker?: string; href: string; image: string };
@@ -287,28 +310,18 @@ export type TourConfig = {
   /**
    * "Vis mig rundt": the tour flies from stop to stop by itself with a short
    * text at each - and a voice, if the stop has one. A stop can borrow a drone point's name and text ({ point: id }).
+   * The tour's main guided tour; more of them in `guides`.
    */
-  guide?: {
-    seconds?: number;
-    /** The hint "Træk i billedet …" on the guide's card: on every stop ("all"), none ("none"), or the first N (left out: the first 2). */
-    walkHint?: "all" | "none" | number;
-    /** The visitor presses "Næste" themselves (no timer) - calm, e.g. for a voice tour. */
-    manual?: boolean;
-    /** The guide's stop button: "self" = "Gå selv rundt" (stay where you are), "overview" = back to the drone scene / map. Not set: back to it when the guide only shows its points (see guideExit). */
-    exit?: "self" | "overview";
-    /**
-     * Made from the menu instead of `stops`: one stop per place in the menu,
-     * in the menu's order - `menuPlaces` = the places to include, by their
-     * key (as in ?rum=; all when left out), `menuTurns` = a place's own turn (by key).
-     */
-    fromMenu?: boolean;
-    menuPlaces?: string[];
-    menuTurns?: Record<string, GuideTurn>;
-    /** How the view turns at each stop: left out = a slow turn as always, "other" = the other way, "none" = stands still. A stop can have its own. */
-    turn?: GuideTurn;
-    /** A stop: where (empty href = stay, e.g. a closing card; a picture "#billede:<address>" = shown full screen, a 2:1 one as 360°, e.g. a drone photo), its text, and optionally a voice (an audio file) that plays there. */
-    stops: ({ point: string; turn?: GuideTurn } | { href: string; title: string; text: string; audio?: string; turn?: GuideTurn })[];
-  };
+  guide?: GuideSetup;
+  /**
+   * More guided tours beside the main one (`guide`), each with its own name,
+   * stops and settings - e.g. one per linjefag ("Padel", "Ridning") next to
+   * "Vis mig rundt" for the whole school. Started from a welcome tile
+   * ({ guide: "<id>" }) or any link "#rundvisning:<id>" (menu, tiles, buttons,
+   * dock); the menu's "Vis mig rundt" then lets the visitor choose. The main
+   * one is "#rundvisning". `id`: short, lowercase, no spaces (e.g. "padel").
+   */
+  guides?: (GuideSetup & { id: string; title: string })[];
   /**
    * "Sådan ser en dag ud": the day as a calm timeline (time, what happens,
    * and where - "Se stedet" shows it). For visitors who like to know what's

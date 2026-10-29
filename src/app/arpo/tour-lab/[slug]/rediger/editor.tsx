@@ -806,7 +806,7 @@ export function TourEditor({
                     setAiAsk({ request, at: Date.now() });
                   }}
                 />
-                <ResultsPanel stats={stats} guideStops={guideStops(config).map((s) => s.title)} slug={slug} brand={config.brand} share={share} shareStats={shareStats} token={shareToken} />
+                <ResultsPanel stats={stats} guideStops={guideStops(config).map((s) => s.title)} guideNames={Object.fromEntries([["#rundvisning", "Vis mig rundt"], ...(config.guides ?? []).map((g) => [`#rundvisning:${g.id}`, g.title])])} slug={slug} brand={config.brand} share={share} shareStats={shareStats} token={shareToken} />
               </>
             )}
             {tab === "okonomi" && <EconomyPanel economy={economy} />}

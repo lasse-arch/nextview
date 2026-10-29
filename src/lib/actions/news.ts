@@ -63,6 +63,12 @@ export async function getUnreadNewsCount(userId: string, newsReadAt: Date | null
 const DEFAULT_POSTS: { title: string; body: string; minutesAgo: number; screenshotUrl: string }[] = [
   {
     minutesAgo: 0,
+    title: "Flere rundvisninger i samme tour",
+    body: "En tour kan nu have flere \"Vis mig rundt\" - fx én for hele skolen og én pr. linjefag (Padel, Ridning …). Hver rundvisning har sit eget navn, sine egne stop, tekster, stemme og tempo.\n\nI editoren under Vis mig rundt vælger du øverst, hvilken rundvisning du retter, eller trykker \"+ Ny rundvisning\". Menuen i touren får en knap til hver, en velkomstflise kan starte en bestemt, og ethvert link \"#rundvisning:<navn>\" (en knap, et menupunkt, docken) starter den. Under Resultater kan du se, hvor mange der starter og gennemfører hver af dem. nextviewAI kan også lave dem - fx én pr. linjefag.",
+    screenshotUrl: "/news/flere-rundvisninger.png",
+  },
+  {
+    minutesAgo: 0,
     title: "Mailgenerator under Salg",
     body: "Under Salg → Mailgenerator skriver nextviewAI et mailforslag ud fra et par linjer: hvem den er til, hvad I talte om, og om det er efter et møde, en første henvendelse, et tilbud eller en opfølgning. En deal er valgfri - vælger du en, udfyldes navn, firma og e-mail.\n\nSkriv prisen ind (etablering, månedlig pris, afdelinger, binding og betingelser), så kommer den med - præcis som du har skrevet den, for prisen sættes ind af Arpo og ikke af AI'en. Du kan også vælge op til 3 tours, som kunden kan se, og linkene kommer med.\n\nRet i forslaget, tryk \"Kortere\", \"Mere personlig\" osv., eller skriv selv, hvad der skal laves om. Send den fra din egen Gmail (med en deal ligger den på dealen) eller kopiér den. Den skriver som en sælger, ikke som en reklame - og den lærer: de mails, I sender herfra, bruges som eksempler næste gang, også dét I har rettet.",
     screenshotUrl: "/news/mailgenerator.png",
