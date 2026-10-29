@@ -20,7 +20,7 @@ const LINK_MINUTES = 15;
  * the shared inbox, not one person. (Gmail sends as lasse@ instead if the
  * alias is ever removed there.)
  */
-const LOGIN_MAIL_FROM = "info@nextview360.dk";
+export const LOGIN_MAIL_FROM = "info@nextview360.dk";
 /** The first link, when access is given in Arpo: the customer may not open the mail the same day. */
 export const WELCOME_DAYS = 7;
 /** Links one customer can ask for in an hour, and requests from one address in 15 minutes. */

@@ -68,7 +68,7 @@ export function FeedbackPanel({ slug, token: initialToken, preview }: { slug: st
           </div>
         ) : (
           <p className="text-[13px] leading-snug text-[#6e6e73]">
-            Send touren til kunden: de får en mail med touren, hvor de kan gå rundt, skrive rettelser der, hvor de står, og trykke Godkend. Har de adgang til kundesiden, kommer den med i mailen.
+            Send touren til kunden: de får én mail med touren, hvor de kan gå rundt, skrive rettelser der, hvor de står, og trykke Godkend - og deres kundeside åbnes (kontakt-e-mailen får adgang til denne kunde), med en login-knap i samme mail.
           </p>
         )}
         <div className="flex flex-wrap gap-2">
@@ -98,7 +98,7 @@ export function FeedbackPanel({ slug, token: initialToken, preview }: { slug: st
           )}
         </div>
         <p className={`text-[12px] leading-snug ${note?.error ? "text-[#ff3b30]" : note ? "text-[#34c759]" : "text-[#8e8e93]"}`}>
-          {note?.text ?? (status?.to ? `Mailen går til ${status.to} (kontakt-e-mailen på dealen) fra lasse@. Godkender kunden, får I besked på mail.` : status ? "Touren er ikke koblet til en kunde med kontakt-e-mail." : "")}
+          {note?.text ?? (status?.to ? `Mailen går til ${status.to} (kontakt-e-mailen på dealen) fra info@nextview360.dk - svar lander der. Godkender kunden, får I besked på mail.` : status ? "Touren er ikke koblet til en kunde med kontakt-e-mail." : "")}
         </p>
       </Group>
       <Group title="Linket til gennemsyn">
