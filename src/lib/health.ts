@@ -122,6 +122,37 @@ export async function healthChecks(): Promise<CheckGroup[]> {
   ];
 }
 
+export type TourSpeed = { slug: string; name: string; device: string; visits: number; median: number; slow: number };
+
+/**
+ * How fast the tours are for real visitors (the last 7 days): the time until
+ * the tour is ready (event tour_ready, kept in tenths of a second) - the
+ * typical visit (median) and the slowest tenth (90 %), per tour and device.
+ */
+export async function tourSpeed(): Promise<{ all: { device: string; visits: number; median: number; slow: number }[]; tours: TourSpeed[] }> {
+  const since = new Date(Date.now() - 7 * 86400_000);
+  const rows = await prisma.$queryRaw<{ slug: string; device: string | null; visits: bigint; median: number; slow: number }[]>`
+    SELECT "tourSlug" AS slug, device, count(*) AS visits,
+      percentile_cont(0.5) WITHIN GROUP (ORDER BY value) / 10.0 AS median,
+      percentile_cont(0.9) WITHIN GROUP (ORDER BY value) / 10.0 AS slow
+    FROM "TourEvent" WHERE name = 'tour_ready' AND value IS NOT NULL AND "createdAt" > ${since}
+    GROUP BY "tourSlug", device`;
+  const all = await prisma.$queryRaw<{ device: string | null; visits: bigint; median: number; slow: number }[]>`
+    SELECT device, count(*) AS visits,
+      percentile_cont(0.5) WITHIN GROUP (ORDER BY value) / 10.0 AS median,
+      percentile_cont(0.9) WITHIN GROUP (ORDER BY value) / 10.0 AS slow
+    FROM "TourEvent" WHERE name = 'tour_ready' AND value IS NOT NULL AND "createdAt" > ${since}
+    GROUP BY device`;
+  const names = new Map((await prisma.tour.findMany({ where: { slug: { in: [...new Set(rows.map((r) => r.slug))] } }, select: { slug: true, name: true } })).map((t) => [t.slug, t.name]));
+  const r1 = (n: number) => Math.round(Number(n) * 10) / 10;
+  return {
+    all: all.map((a) => ({ device: a.device ?? "ukendt", visits: Number(a.visits), median: r1(a.median), slow: r1(a.slow) })),
+    tours: rows
+      .map((r) => ({ slug: r.slug, name: names.get(r.slug) ?? r.slug, device: r.device ?? "ukendt", visits: Number(r.visits), median: r1(r.median), slow: r1(r.slow) }))
+      .sort((a, b) => b.slow - a.slow),
+  };
+}
+
 export type TourVisits = { slug: string; name: string; now: number; day: number; week: number; month: number };
 
 /** Visitors on the tours that are out there: right now (last 5 min.), the last day, 7 and 30 days - one visit = one browser tab. */

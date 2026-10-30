@@ -149,7 +149,9 @@ function track(name: string, params: Record<string, string | number> = {}) {
     const label = params.label ?? params.item_name ?? params.place_name ?? params.point_name ?? params.room_name ?? params.kind ?? params.title ?? params.name;
     // A number that matters, kept with the event: the seconds spent in a room.
     // …or the stop of "Vis mig rundt" it happened at.
-    const value = typeof params.seconds === "number" ? Math.round(params.seconds) : typeof params.stop === "number" ? params.stop : undefined;
+    // …or how long the tour took to be ready / to go in (tenths of a second - Health shows how fast the tours are for real visitors).
+    const ms = typeof params.load_ms === "number" ? params.load_ms : typeof params.enter_ms === "number" ? params.enter_ms : null;
+    const value = typeof params.seconds === "number" ? Math.round(params.seconds) : typeof params.stop === "number" ? params.stop : ms != null ? Math.min(3600, Math.round(ms / 100)) : undefined;
     tracking.queue.push({ name, label: label != null ? tracking.da(String(label)) : undefined, url: params.link_url != null ? String(params.link_url) : params.guide != null ? String(params.guide) : undefined, value });
     if (name === "cta_click" || name === "contact_click") flushEvents(); // the visitor may be leaving
     else tracking.timer ||= window.setTimeout(flushEvents, 4000);

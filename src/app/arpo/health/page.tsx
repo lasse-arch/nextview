@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
-import { healthChecks, tourVisits, type Status } from "@/lib/health";
+import { healthChecks, tourSpeed, tourVisits, type Status } from "@/lib/health";
 import { AutoRefresh } from "./auto-refresh";
 import { BackupNow } from "./backup-now";
 
@@ -20,7 +20,7 @@ export default async function HealthPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/api/auth/session-ended?next=/arpo");
   if (user.role !== "ADMIN") redirect("/arpo");
-  const [groups, visits] = await Promise.all([healthChecks(), tourVisits()]);
+  const [groups, visits, speed] = await Promise.all([healthChecks(), tourVisits(), tourSpeed().catch(() => null)]);
   const checks = groups.flatMap((g) => g.checks);
   const down = checks.filter((c) => c.status === "down");
   const warn = checks.filter((c) => c.status === "warn");
@@ -102,6 +102,43 @@ export default async function HealthPage() {
           </ul>
           </details>
         )}
+      </section>
+
+      <section>
+        <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-[.08em] text-slate-400">Tourenes hastighed (7 dage)</h2>
+        {speed && speed.all.length ? (
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              {speed.all.map((a) => (
+                <div key={a.device} className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                  <p className="text-xs font-medium capitalize text-slate-500">{a.device}</p>
+                  <p className="mt-1 text-2xl font-semibold tabular-nums text-slate-900">{a.median.toLocaleString("da-DK")} sek.</p>
+                  <p className={`text-xs ${a.slow > 6 ? "text-[#c4271d]" : a.slow > 4 ? "text-[#9a5b00]" : "text-slate-400"}`}>
+                    De langsomste 10 %: {a.slow.toLocaleString("da-DK")} sek. · {num(a.visits)} besøg
+                  </p>
+                </div>
+              ))}
+            </div>
+            <details className="group mt-3">
+              <summary className="flex cursor-pointer list-none items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-[14px] font-medium text-slate-900 hover:bg-slate-50 [&::-webkit-details-marker]:hidden">
+                <span className="text-slate-400 transition-transform group-open:rotate-90">›</span>
+                Hver tour - de langsomste først
+              </summary>
+              <ul className="mt-2 divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                {speed.tours.map((t) => (
+                  <li key={`${t.slug}-${t.device}`} className="flex items-center gap-3 px-4 py-2.5 text-[13px]">
+                    <span className="min-w-0 flex-1 truncate font-medium text-slate-900">{t.name}</span>
+                    <span className="w-16 text-xs capitalize text-slate-400">{t.device}</span>
+                    <span className="w-24 text-right tabular-nums text-slate-900">{t.median.toLocaleString("da-DK")} sek.</span>
+                    <span className={`w-28 text-right tabular-nums ${t.slow > 6 ? "text-[#c4271d]" : t.slow > 4 ? "text-[#9a5b00]" : "text-slate-500"}`}>10 %: {t.slow.toLocaleString("da-DK")} sek.</span>
+                    <span className="w-14 text-right text-xs tabular-nums text-slate-400">{num(t.visits)}</span>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          </>
+        ) : null}
+        <p className="mt-2 text-xs text-slate-400">Tiden fra en besøgende åbner touren, til den er klar at bruge - målt hos rigtige besøgende (ikke os selv i Arpo). Typisk besøg og de 10 % langsomste.</p>
       </section>
 
       {groups.map((g) => (

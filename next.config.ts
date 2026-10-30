@@ -47,6 +47,12 @@ const nextConfig: NextConfig = {
         ],
       },
       {
+        // The website's and the tours' own pictures, styles and scripts: kept by the browser for a while instead of
+        // asked for again on every visit (a changed file still shows within the hour, and at once on a hard reload).
+        source: "/:dir(site|web|tours)/:path*",
+        headers: [{ key: "Cache-Control", value: "public, max-age=3600, stale-while-revalidate=604800" }],
+      },
+      {
         // Published tours are made to be embedded on customers' websites.
         source: "/t/:slug",
         headers: [{ key: "Content-Security-Policy", value: "frame-ancestors *" }],
