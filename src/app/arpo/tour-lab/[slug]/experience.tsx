@@ -517,6 +517,13 @@ function TourExperience({
     window.addEventListener("hv-kontakt", open);
     return () => window.removeEventListener("hv-kontakt", open);
   }, []);
+  // Any link "#dag" opens "Sådan ser en dag ud" (also when its button isn't in the menu).
+  const openDayRef = useRef<(from: string) => void>(() => {});
+  useEffect(() => {
+    const open = () => openDayRef.current("link");
+    window.addEventListener("hv-dag", open);
+    return () => window.removeEventListener("hv-dag", open);
+  }, []);
   /** "Vej til skolen" is open - from any link "#vej". */
   const [commuteOpen, setCommuteOpen] = useState(false);
   useEffect(() => {
@@ -935,6 +942,7 @@ function TourExperience({
   }
   useEffect(() => {
     openFinderRef.current = () => openFinder("link");
+    openDayRef.current = (from) => T.day && openDay(from);
   });
   /** "#punkt:<id>" → that point, if the setup has it. */
   const pointById = (href: string) => {
@@ -2014,6 +2022,39 @@ function TourExperience({
     if (p) showPoint(p);
   }
 
+  /** The guided tours' and the day's buttons in the menu - at the top (as always) or the bottom, each by its own setting; left out of the menu, they start from tiles, points and buttons. */
+  function menuExtras(at: "top" | "bottom") {
+    const here = (m: "bottom" | false | undefined) => (m === false ? false : (m === "bottom" ? "bottom" : "top") === at);
+    return (
+      <>
+        {GUIDES.filter((g) => here(guideSetup(T, g.id)?.menu)).map((g) => {
+          // One button per guided tour, with how long it is.
+          const n = guideStops(T, g.id).length;
+          return (
+            <button key={g.id ?? ""} type="button" className="hv-guide-knap" onClick={() => startGuide("menu", g.id)}>
+              ▶
+              <span>
+                {g.id == null ? tx("Vis mig rundt") : g.title}
+                <small>{tx("{n} steder, ca. {min} min", { n, min: Math.ceil((n * (guideSetup(T, g.id)?.seconds ?? 9)) / 60) })}</small>
+              </span>
+            </button>
+          );
+        })}
+        {T.day && here(T.day.menu) && (
+          <button type="button" className="hv-day-knap" onClick={() => openDay("menu")}>
+            ◷
+            <span>
+              {T.day.title}
+              <small>
+                {T.day.steps[0]?.time} - {T.day.steps[T.day.steps.length - 1]?.time}
+              </small>
+            </span>
+          </button>
+        )}
+      </>
+    );
+  }
+
   const ctaClick = (label: string, href: string, place: string) => track("cta_click", { label, link_url: href, place });
 
   return (
@@ -2449,30 +2490,7 @@ function TourExperience({
             })}
           </div>
         )}
-        {GUIDES.map((g) => {
-          // One button per guided tour, with how long it is.
-          const n = guideStops(T, g.id).length;
-          return (
-            <button key={g.id ?? ""} type="button" className="hv-guide-knap" onClick={() => startGuide("menu", g.id)}>
-              ▶
-              <span>
-                {g.id == null ? tx("Vis mig rundt") : g.title}
-                <small>{tx("{n} steder, ca. {min} min", { n, min: Math.ceil((n * (guideSetup(T, g.id)?.seconds ?? 9)) / 60) })}</small>
-              </span>
-            </button>
-          );
-        })}
-        {T.day && (
-          <button type="button" className="hv-day-knap" onClick={() => openDay("menu")}>
-            ◷
-            <span>
-              {T.day.title}
-              <small>
-                {T.day.steps[0]?.time} - {T.day.steps[T.day.steps.length - 1]?.time}
-              </small>
-            </span>
-          </button>
-        )}
+        {menuExtras("top")}
         {T.live && liveUnits.length > 0 && (
           <button type="button" className="hv-gtitel hv-enkel hv-live-knap" onClick={() => openLive("menu")}>
             <i /> {T.live.title} {!livePrices && <span>{liveUnits.length}</span>}
@@ -2510,6 +2528,7 @@ function TourExperience({
             </button>
           )
         )}
+        {menuExtras("bottom")}
         <div className="hv-menu-cta">
           {T.cta.map((c) => (
             <TourLink key={c.label} className={`hv-btn ${c.primary ? "hv-primary" : "hv-secondary"}`} href={c.href} label={c.label} onClick={() => ctaClick(c.label, c.href, "menu")}>

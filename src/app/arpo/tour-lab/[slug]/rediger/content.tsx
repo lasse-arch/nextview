@@ -874,6 +874,7 @@ function GuideSetupEditor({ config, edit, preview, onEditPoint }: Omit<Props, "s
       <Group>
         <p className="text-[14px] leading-snug text-[#1d1d1f]">&quot;Vis mig rundt&quot; flyver fra stop til stop med en kort tekst ved hvert - og en stemme, hvis stoppet har en lydfil. Som en rundvisning med en medarbejder.</p>
         <p className={small}>Hold den kort: 4-7 stop, der fortæller en historie og slutter der, hvor man skal handle (fx book, bliv elev).</p>
+        {(stops.length > 0 || fromMenu) && <MenuPlace value={config.guide?.menu} onChange={(v) => edit((d) => void (d.guide = { ...d.guide!, menu: v }))} link="#rundvisning" />}
         <Toggle
           on={fromMenu}
           onChange={(on) => edit((d) => void (d.guide = on ? { ...d.guide, stops: d.guide?.stops ?? [], fromMenu: true } : d.guide?.stops.length ? { ...d.guide, fromMenu: undefined, menuPlaces: undefined, menuTurns: undefined } : undefined))}
@@ -1143,6 +1144,7 @@ function DayEditor({ config, edit, preview }: Omit<Props, "slug">) {
       <Field title="Kort intro (valgfri)">
         <input className={input} value={day.lead ?? ""} onChange={(e) => edit((d) => void (d.day!.lead = e.target.value || undefined))} />
       </Field>
+      <MenuPlace value={day.menu} onChange={(v) => edit((d) => void (d.day!.menu = v))} link="#dag" />
       <Rows<DayStep>
         items={day.steps}
         onChange={(steps) => edit((d) => void (d.day!.steps = steps))}
@@ -1538,5 +1540,22 @@ export function TagsEditor({ config, edit, slug, preview }: Props) {
         />
       </Group>
     </>
+  );
+}
+
+/** Where a guided tour's (or the day's) button is in the menu: at the top, at the bottom, or not there. */
+function MenuPlace({ value, onChange, link }: { value: "bottom" | false | undefined; onChange: (v: "bottom" | false | undefined) => void; link: string }) {
+  return (
+    <Field title="Knappen i menuen" hint={value === false ? `Ikke i menuen - start den fra en flise, et punkt eller en knap med linket ${link}.` : "Øverst (over menupunkterne) eller nederst (under dem)."}>
+      <Choice
+        value={value === false ? "ingen" : value ?? "top"}
+        options={[
+          ["top", "Øverst"],
+          ["bottom", "Nederst"],
+          ["ingen", "Ikke i menuen"],
+        ]}
+        onChange={(v) => onChange(v === "ingen" ? false : v === "bottom" ? "bottom" : undefined)}
+      />
+    </Field>
   );
 }

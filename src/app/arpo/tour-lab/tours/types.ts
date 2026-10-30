@@ -21,6 +21,8 @@ export type WelcomeGo = { drone: string | null; view?: { desktop?: DroneView; mo
 /** One guided tour ("Vis mig rundt"): its stops and how it runs. */
 export type GuideSetup = {
   seconds?: number;
+  /** Where its button is in the menu: at the top (left out), at the bottom, or not there (then started from a tile, a point or a button - "#rundvisning"). */
+  menu?: "bottom" | false;
   /** The hint "Træk i billedet …" on the guide's card: on every stop ("all"), none ("none"), or the first N (left out: the first 2). */
   walkHint?: "all" | "none" | number;
   /** The visitor presses "Næste" themselves (no timer) - calm, e.g. for a voice tour. */
@@ -352,7 +354,7 @@ export type TourConfig = {
    * and where - "Se stedet" shows it). For visitors who like to know what's
    * coming, e.g. a special efterskole. A step without href has no place.
    */
-  day?: { title: string; lead?: string; steps: { time: string; title: string; text?: string; href?: string }[] };
+  day?: { title: string; lead?: string; /** Its place in the menu, as a guided tour's. */ menu?: "bottom" | false; steps: { time: string; title: string; text?: string; href?: string }[] };
   /**
    * Info points: small pulsing dots on things in the room; a tap opens a card.
    * `position` is a spot in the 3D model (placed with "Placér infopunkt" in the

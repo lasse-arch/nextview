@@ -196,7 +196,7 @@ export function LinkPopup({
 }
 
 /** Links that open something inside the tour rather than a page: the contact form and the live data list. */
-const IN_TOUR: Record<string, string> = { "#kontakt": "hv-kontakt", "#live": "hv-live", "#find": "hv-find", "#vej": "hv-vej" };
+const IN_TOUR: Record<string, string> = { "#kontakt": "hv-kontakt", "#live": "hv-live", "#find": "hv-find", "#vej": "hv-vej", "#dag": "hv-dag" };
 
 /** "#rundvisning" / "#rundvisning:<id>": starts that guided tour (the engine listens for "hv-rundvisning", detail = the id or null). */
 function startsGuide(href: string): boolean {
