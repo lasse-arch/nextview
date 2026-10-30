@@ -51,7 +51,7 @@ export async function translateTour(slug: string, config: TourConfig, langs: str
       model: "claude-opus-5-5",
       max_tokens: 16000,
       system:
-        `Du oversætter en virtuel rundvisning (en 360°-tour af en virksomhed) fra dansk til ${langName(lang)}. ` +
+        `Du oversætter en virtuel rundvisning (en 360°-tour af en virksomhed) fra dansk til ${lang === "kl" ? "grønlandsk (kalaallisut, vestgrønlandsk - det officielle sprog i Grønland)" : langName(lang)}. ` +
         "Teksterne er overskrifter, menupunkter, knapper, korte fortællinger og faste ord i touren. Skriv dem, som en indfødt tekstforfatter ville skrive dem på en premium hjemmeside: naturligt, varmt og kort - knapper og menupunkter skal være lige så korte som på dansk. " +
         "Navne på virksomheder, steder og produkter (fx Jalsa, Halvorsminde, GastroFabrikken) oversættes ikke. Pladsholdere i krøllede parenteser som {sted} og {pris} skal stå uændret i oversættelsen. Bevar tal, priser, emojis og tegn som ▶ › ▴. " +
         "Ingen \"·\", \"—\" eller \"|\" mellem ord - brug komma eller bindestreg. Svar med én oversættelse pr. nummer.",

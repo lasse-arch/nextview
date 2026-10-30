@@ -53,6 +53,7 @@ export function LanguagesPanel({ slug, config, edit, showIn }: { slug: string; c
     <>
       <Group title="Sprog i touren">
         <p className="text-[13px] leading-snug text-[#6e6e73]">Touren er skrevet på dansk. Vælg flere sprog, så får de besøgende en sprogknap, og touren starter selv på deres sprog, når den har det. Et link kan vælge sprog med ?sprog=en.</p>
+        {langs.includes("kl") && <p className="text-[12px] leading-snug text-[#a05a00]">Grønlandsk oversætter nextviewAI mindre sikkert end de store sprog - få en, der taler grønlandsk, til at læse dem igennem og rette dem nedenfor under &quot;Teksterne&quot;, før touren går live.</p>}
         <div className="flex flex-wrap gap-2">
           {LANGUAGES.filter((l) => l.code !== "da").map((l) => {
             const on = langs.includes(l.code);
@@ -64,7 +65,7 @@ export function LanguagesPanel({ slug, config, edit, showIn }: { slug: string; c
                 className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-medium ring-1 transition ${on ? "bg-[#0071e3] text-white ring-[#0071e3]" : "bg-white text-[#1d1d1f] ring-black/[.08] hover:bg-[#f5f5f7]"}`}
               >
                 <span aria-hidden>{l.flag}</span>
-                {l.name}
+                {l.code === "kl" ? "Kalaallisut (grønlandsk)" : l.name}
                 {on && missing(l.code) > 0 && <span className="rounded-full bg-white/25 px-1.5 text-[11px]">{missing(l.code)} mangler</span>}
               </button>
             );
