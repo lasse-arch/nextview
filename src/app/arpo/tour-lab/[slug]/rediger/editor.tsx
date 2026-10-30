@@ -360,7 +360,7 @@ export function TourEditor({
   }, [dirty]);
   const preview = useMemo<PreviewApi>(() => {
     /** Asks the preview something and waits for its answer (or gives up after a while). */
-    const ask = <T extends object>(type: string, wait = 5000) =>
+    const ask = <T extends object>(type: string, wait = 5000, progress?: (text: string) => void) =>
       new Promise<T & { error?: string }>((resolve) => {
         const id = Math.random().toString(36).slice(2);
         const done = (r: T & { error?: string }) => {
@@ -369,7 +369,9 @@ export function TourEditor({
           resolve(r);
         };
         const onMessage = (e: MessageEvent) => {
-          if (e.origin === location.origin && e.data?.type === type && e.data.id === id) done(e.data);
+          if (e.origin !== location.origin || e.data?.id !== id) return;
+          if (e.data.type === `${type}-progress`) progress?.(String(e.data.text ?? ""));
+          else if (e.data.type === type) done(e.data);
         };
         const timer = setTimeout(() => done({ error: "Forhåndsvisningen svarede ikke - er touren indlæst?" } as T & { error?: string }), wait);
         window.addEventListener("message", onMessage);
@@ -378,6 +380,7 @@ export function TourEditor({
     return {
       view: () => ask<{ href?: string; room?: string | null }>("tour-view"),
       shot: () => ask<{ image?: string }>("tour-shot", 15000),
+      storyPictures: (progress) => ask<{ done?: boolean }>("tour-stories", 10 * 60_000, progress),
       pick: () => ask<{ position?: { x: number; y: number; z: number }; ss?: number | null; room?: string | null }>("tour-pick", 120000),
       go: (name, href) => frame.current?.contentWindow?.postMessage({ type: "tour-go", name, href }, location.origin),
       device: () => deviceRef.current,
@@ -1004,6 +1007,7 @@ export function TourEditor({
                   onChange={(on) => edit((d) => void (d.stories = { mobile: d.stories?.mobile ?? false, desktop: on, rooms: d.stories?.rooms, scroll: d.stories?.scroll }))}
                   title="Historier på computer"
                 />
+                {(config.stories?.mobile || config.stories?.desktop) && <StoryPictures preview={preview} />}
                 {(config.stories?.mobile || config.stories?.desktop) && (
                   <Field title="Scroll sidelæns i historierne" hint="Fra: alle historierne vises på én gang, fordelt på flere rækker.">
                     <Choice
@@ -2364,5 +2368,30 @@ function MatterportParams({ config, edit }: { config: TourConfig; edit: (fn: (d:
       ))}
       {extra.length > 0 && <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">Også sat (kan rettes under Avanceret → JSON): {extra.map((k) => `${k}=${P[k]}`).join(", ")}</p>}
     </>
+  );
+}
+
+/** "Tag billeder til historierne": the preview visits every story room and keeps a picture of it (gemt med det samme). */
+function StoryPictures({ preview }: { preview: PreviewApi }) {
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<{ text: string; error?: boolean } | null>(null);
+  return (
+    <div className="space-y-1">
+      <button
+        type="button"
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true);
+          setNote({ text: "Går rundt i touren …" });
+          const r = await preview.storyPictures((text) => setNote({ text }));
+          setBusy(false);
+          setNote(r.error ? { text: r.error, error: true } : { text: "Billederne er taget og gemt - de ses på historierne nu." });
+        }}
+        className="w-full rounded-xl bg-white py-2 text-[14px] font-medium text-[#0071e3] ring-1 ring-black/[.06] hover:bg-[#0071e3]/5 disabled:opacity-50"
+      >
+        {busy ? "Tager billeder …" : "📷 Tag billeder til historierne fra touren"}
+      </button>
+      <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">{note ? <span className={note.error ? "text-[#ff3b30]" : ""}>{note.text}</span> : "Forhåndsvisningen går til hvert rum og tager et billede. Gem først, hvis du har ændret menuen."}</p>
+    </div>
   );
 }

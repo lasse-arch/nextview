@@ -296,6 +296,8 @@ export const STORIES_CSS = `
   /* A place card stands above the stories, not on them. */
   .hv-st-on-m .pc{bottom:calc(150px + env(safe-area-inset-bottom,0px))}
   .hv-st-on-m .hv-dev{bottom:calc(150px + env(safe-area-inset-bottom,0px))}
+  /* Find vej (and anything else at the bottom) stands above the stories too. */
+  .hv-st-on-m.hv-i-tour .rt-knap{bottom:calc(150px + env(safe-area-inset-bottom,0px))}
   .hv-st-on-m .hv-logo{transition:opacity .2s}
   .hv-st-on-m:has(.hv-story-play) .hv-logo{opacity:0}
 }

@@ -1764,16 +1764,16 @@ function TourExperience({
     setSelected(null);
     if (phase === "drone" && !entering) enterTour(T.start, "editor", "Start");
   }
-  const bridge = useRef({ sdk, room, menuGo, peek, phase });
+  const bridge = useRef({ sdk, room, menuGo, peek, phase, captureStories });
   useEffect(() => {
-    bridge.current = { sdk, room, menuGo, peek, phase };
+    bridge.current = { sdk, room, menuGo, peek, phase, captureStories };
   });
   useEffect(() => {
     if (window.parent === window) return;
     const reply = (msg: object) => window.parent.postMessage(msg, location.origin);
     async function onMessage(e: MessageEvent) {
       if (e.origin !== location.origin || e.source !== window.parent || !e.data?.type) return;
-      const { sdk, room, menuGo } = bridge.current;
+      const { sdk, room, menuGo, captureStories: capture } = bridge.current;
       if (e.data.type === "tour-go") {
         // The editor shows a place (Vis start, a scan point, a menu item): straight there - the front page / welcome mustn't cover it.
         setCover(false);
@@ -1785,6 +1785,19 @@ function TourExperience({
         // The editor places a tag: the next click in the tour says where.
         if (!sdk) return reply({ type: "tour-pick", id: e.data.id, error: "Touren er ikke klar endnu - vent et øjeblik." });
         setPicking(e.data.id);
+        return;
+      }
+      if (e.data.type === "tour-stories") {
+        // "Tag billeder til historierne": every story room visited and photographed, with progress to the editor.
+        if (!sdk) return reply({ type: "tour-stories", id: e.data.id, error: "Touren er ikke klar endnu - vent et øjeblik." });
+        setCover(false);
+        setWelcome(false);
+        try {
+          await capture((text) => reply({ type: "tour-stories-progress", id: e.data.id, text }));
+          reply({ type: "tour-stories", id: e.data.id, done: true });
+        } catch (err) {
+          reply({ type: "tour-stories", id: e.data.id, error: err instanceof Error ? err.message : "Kunne ikke tage billederne." });
+        }
         return;
       }
       if (e.data.type === "tour-shot") {

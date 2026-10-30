@@ -110,6 +110,8 @@ export function Choice<T extends string>({ value, options, onChange }: { value: 
 export type PreviewApi = {
   view: () => Promise<{ href?: string; room?: string | null; error?: string }>;
   shot: () => Promise<{ image?: string; error?: string }>;
+  /** Visits every story room in the preview and saves its picture; `progress` hears "3/8: Spisesalen". */
+  storyPictures: (progress: (text: string) => void) => Promise<{ done?: boolean; error?: string }>;
   /** Waits for a click in the preview: the spot in the room (for a tag), the scan point and the room. */
   pick: () => Promise<{ position?: { x: number; y: number; z: number }; ss?: number | null; room?: string | null; error?: string }>;
   go: (name: string, href: string) => void;
