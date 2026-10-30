@@ -2098,7 +2098,7 @@ function TourExperience({
   return (
     <TourLang.Provider value={{ lang, t: tx }}>
     <LinkProvider T={T} popup={popup}>
-    <div className={`hv fixed inset-0 z-50 overflow-hidden bg-[#0d1b20] ${selected ? "hv-punkt" : ""} ${zoomed ? "hv-zoom" : ""} ${welcome ? "hv-welcome" : ""} ${phase === "tour" && T.stories?.mobile ? "hv-st-on-m" : ""} ${menuOpen ? "hv-menu-aaben" : ""} ${T.overviewUi?.box?.desktop === false ? "hv-boks-ud-d" : ""} ${T.overviewUi?.box?.mobile === false ? "hv-boks-ud-m" : ""} ${T.overviewUi?.filter?.desktop === false ? "hv-filter-ud-d" : ""} ${T.overviewUi?.filter?.mobile === false ? "hv-filter-ud-m" : ""} ${T.overviewUi?.names?.desktop ? `hv-navne-d-${T.overviewUi.names.desktop}` : ""} ${T.overviewUi?.names?.mobile ? `hv-navne-m-${T.overviewUi.names.mobile}` : ""} ${T.overviewUi?.filterColumns ? `hv-filter-kol hv-filter-kol-${T.overviewUi.filterColumns}` : T.overviewUi?.filterScroll ? "hv-filter-rul" : ""} ${langClasses} ${T.design?.menu === "dock" ? "hv-dock" : ""} ${T.logoSide === "right" ? "hv-logo-h" : ""} ${T.logoBg ? `hv-logobg-${T.logoBg}` : ""} ${guideAt != null || (dayAt != null && !dayOpen) ? "hv-guiding" : ""} ${route ? "hv-routing" : ""} ${phase === "tour" ? "hv-i-tour" : ""} ${T.wayfinding ? "hv-har-rute" : ""} ${T.wayfinding?.button?.desktop ? `rt-d-${T.wayfinding.button.desktop}` : ""} ${T.wayfinding?.button?.mobile ? `rt-m-${T.wayfinding.button.mobile}` : ""} ${showCard != null || (nudgeOn && T.nudge && phase === "tour") ? "hv-med-kort" : ""} ${showMeasures && phase === "tour" ? "hv-maler" : ""} ${phase === "tour" && T.stories?.desktop ? "hv-st-on-d" : ""}`} style={
+    <div className={`hv fixed inset-0 z-50 overflow-hidden bg-[#0d1b20] ${selected ? "hv-punkt" : ""} ${zoomed ? "hv-zoom" : ""} ${welcome ? "hv-welcome" : ""} ${phase === "tour" && T.stories?.mobile ? "hv-st-on-m" : ""} ${menuOpen ? "hv-menu-aaben" : ""} ${T.overviewUi?.box?.desktop === false ? "hv-boks-ud-d" : ""} ${T.overviewUi?.box?.mobile === false ? "hv-boks-ud-m" : ""} ${T.overviewUi?.filter?.desktop === false ? "hv-filter-ud-d" : ""} ${T.overviewUi?.filter?.mobile === false ? "hv-filter-ud-m" : ""} ${T.overviewUi?.names?.desktop ? `hv-navne-d-${T.overviewUi.names.desktop}` : ""} ${T.overviewUi?.names?.mobile ? `hv-navne-m-${T.overviewUi.names.mobile}` : ""} ${T.overviewUi?.filterColumns ? `hv-filter-kol hv-filter-kol-${T.overviewUi.filterColumns}` : T.overviewUi?.filterScroll ? "hv-filter-rul" : ""} ${langClasses} ${T.design?.menu === "dock" ? "hv-dock" : ""} ${T.logoSide === "right" ? "hv-logo-h" : ""} ${T.logoBg ? `hv-logobg-${T.logoBg}` : ""} ${T.logoBgTiles ?? T.logoBg ? `hv-tlogobg-${T.logoBgTiles ?? T.logoBg}` : ""} hv-tlogo-${T.logoAlignTiles ?? "midt"} ${guideAt != null || (dayAt != null && !dayOpen) ? "hv-guiding" : ""} ${route ? "hv-routing" : ""} ${phase === "tour" ? "hv-i-tour" : ""} ${T.wayfinding ? "hv-har-rute" : ""} ${T.wayfinding?.button?.desktop ? `rt-d-${T.wayfinding.button.desktop}` : ""} ${T.wayfinding?.button?.mobile ? `rt-m-${T.wayfinding.button.mobile}` : ""} ${showCard != null || (nudgeOn && T.nudge && phase === "tour") ? "hv-med-kort" : ""} ${showMeasures && phase === "tour" ? "hv-maler" : ""} ${phase === "tour" && T.stories?.desktop ? "hv-st-on-d" : ""}`} style={
         {
           fontFamily: `'${T.font}', system-ui, sans-serif`,
           "--c-main": T.colors.main,
@@ -3388,13 +3388,20 @@ const CSS = `
 /* A dark logo straight on the tour, no card and no glow - exactly as it is (as in MPSkins). */
 .hv-logo-lys{filter:none}
 /* What's behind the logo, when chosen (else automatic from whether it's a dark or a light logo). */
-.hv-logobg-none .hv-wel-main img{background:none;padding:0;border-radius:0}
+/* The logo at the top of the tour… */
 .hv-logobg-none .hv-logo{background:none;box-shadow:none;padding:0;filter:none}
-.hv-logobg-light .hv-wel-main img{background:#fff;padding:8px;border-radius:12px;box-shadow:0 0 0 1px rgba(0,0,0,.06)}
 .hv-logobg-light .hv-logo,.hv-logobg-main .hv-logo{box-sizing:content-box;height:calc(var(--logo-h) - 12px);padding:9px 14px;border-radius:14px;filter:none;box-shadow:0 6px 18px rgba(0,0,0,.18)}
 .hv-logobg-light .hv-logo{background:rgba(255,255,255,.94)}
-.hv-logobg-main .hv-wel-main img{background:var(--c-main);padding:8px;border-radius:12px}
 .hv-logobg-main .hv-logo{background:var(--c-main)}
+/* …and on the welcome tiles' box - each its own setting. */
+.hv-tlogobg-none .hv-wel-main img{background:none;padding:0;border-radius:0}
+.hv-tlogobg-light .hv-wel-main img{background:#fff;padding:8px;border-radius:12px;box-shadow:0 0 0 1px rgba(0,0,0,.06)}
+.hv-tlogobg-main .hv-wel-main img{background:var(--c-main);padding:8px;border-radius:12px}
+/* Where it sits in the box: in the middle (standard), left or right - always the same place. */
+.hv-wel-main img{display:block;object-position:center}
+.hv-tlogo-midt .hv-wel-main img{align-self:center;margin-left:auto;margin-right:auto;object-position:center}
+.hv-tlogo-left .hv-wel-main img{align-self:flex-start;margin-right:auto;object-position:left}
+.hv-tlogo-right .hv-wel-main img{align-self:flex-end;margin-left:auto;object-position:right}
 .hv-logo-kort{box-sizing:content-box;height:calc(var(--logo-h) - 12px);padding:9px 14px;border-radius:14px;background:rgba(255,255,255,.94);filter:none;box-shadow:0 6px 18px rgba(0,0,0,.18)}
 .hv-signatur{display:flex;align-items:center;justify-content:center;gap:8px;padding:6px 22px 22px;font-size:11px;letter-spacing:.04em;color:#7b878c;text-decoration:none}
 .hv-signatur img{height:14px;width:auto;opacity:.85}

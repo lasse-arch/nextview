@@ -803,7 +803,7 @@ export function TourEditor({
                     onChange={(v) => edit((d) => void (d.logoSide = v === "right" ? "right" : undefined))}
                   />
                 </Field>
-                <Field title="Baggrund bag logoet" hint={logoNote ?? "Automatisk: et mørkt logo får lys baggrund, et lyst logo får hovedfarven - så det altid kan ses."}>
+                <Field title="Baggrund bag logoet øverst i touren" hint={logoNote ?? "Automatisk: et mørkt logo får lys baggrund, et lyst logo får hovedfarven - så det altid kan ses."}>
                   <Choice<"auto" | "none" | "light" | "main">
                     value={config.logoBg ?? "auto"}
                     options={[
@@ -816,6 +816,27 @@ export function TourEditor({
                       edit((d) => void (d.logoBg = v === "auto" ? undefined : v));
                       if (v === "auto") void autoLogoTone(config.logo);
                     }}
+                  />
+                </Field>
+                <Field title="Logoet på fliserne (velkomsten)" hint="Baggrund og placering i boksen med overskriften.">
+                  <Choice<"same" | "auto" | "none" | "light" | "main">
+                    value={config.logoBgTiles ?? "same"}
+                    options={[
+                      ["same", "Som øverst"],
+                      ["none", "Gennemsigtig"],
+                      ["light", "Lys"],
+                      ["main", "Farve"],
+                    ]}
+                    onChange={(v) => edit((d) => void (d.logoBgTiles = v === "same" || v === "auto" ? undefined : v))}
+                  />
+                  <Choice<"left" | "midt" | "right">
+                    value={config.logoAlignTiles ?? "midt"}
+                    options={[
+                      ["left", "Venstre"],
+                      ["midt", "Midten"],
+                      ["right", "Højre"],
+                    ]}
+                    onChange={(v) => edit((d) => void (d.logoAlignTiles = v === "midt" ? undefined : v))}
                   />
                 </Field>
                 <Toggle on={Boolean(config.logoOnLight)} onChange={(on) => edit((d) => void (d.logoOnLight = on))} title="Mørkt logo" hint="Et logo lavet til lys baggrund (bruges også i menuens top). Sættes af sig selv, når du uploader et logo." />

@@ -145,6 +145,10 @@ export type TourConfig = {
   logoCard?: false;
   /** What's behind the logo (the welcome box, the logo in the tour): left out = automatic (a light card behind a dark logo, the main colour behind a light one); "none" = transparent; "light" = white; "main" = the main colour. */
   logoBg?: "none" | "light" | "main";
+  /** The same for the logo on the welcome tiles' box (left out: as logoBg). */
+  logoBgTiles?: "none" | "light" | "main";
+  /** Where the logo sits in the welcome tiles' box (left out: in the middle). */
+  logoAlignTiles?: "left" | "right";
   /** Which top corner the logo sits in - the menu button takes the other one. Default "left". */
   logoSide?: "left" | "right";
   /** The logo's height over the tour, in px (computer; a phone shows it a bit smaller). Default 46. */
