@@ -1976,7 +1976,7 @@ function TourExperience({
   return (
     <TourLang.Provider value={{ lang, t: tx }}>
     <LinkProvider T={T} popup={popup}>
-    <div className={`hv fixed inset-0 z-50 overflow-hidden bg-[#0d1b20] ${selected ? "hv-punkt" : ""} ${zoomed ? "hv-zoom" : ""} ${welcome ? "hv-welcome" : ""} ${phase === "tour" && T.stories?.mobile ? "hv-st-on-m" : ""} ${menuOpen ? "hv-menu-aaben" : ""} ${T.overviewUi?.box?.desktop === false ? "hv-boks-ud-d" : ""} ${T.overviewUi?.box?.mobile === false ? "hv-boks-ud-m" : ""} ${T.overviewUi?.filter?.desktop === false ? "hv-filter-ud-d" : ""} ${T.overviewUi?.filter?.mobile === false ? "hv-filter-ud-m" : ""} ${T.overviewUi?.names?.desktop ? `hv-navne-d-${T.overviewUi.names.desktop}` : ""} ${T.overviewUi?.names?.mobile ? `hv-navne-m-${T.overviewUi.names.mobile}` : ""} ${T.overviewUi?.filterColumns ? `hv-filter-kol hv-filter-kol-${T.overviewUi.filterColumns}` : T.overviewUi?.filterScroll ? "hv-filter-rul" : ""} ${langClasses} ${T.design?.menu === "dock" ? "hv-dock" : ""} ${T.logoSide === "right" ? "hv-logo-h" : ""} ${guideAt != null || (dayAt != null && !dayOpen) ? "hv-guiding" : ""} ${route ? "hv-routing" : ""} ${phase === "tour" ? "hv-i-tour" : ""} ${showMeasures && phase === "tour" ? "hv-maler" : ""} ${phase === "tour" && T.stories?.desktop ? "hv-st-on-d" : ""}`} style={
+    <div className={`hv fixed inset-0 z-50 overflow-hidden bg-[#0d1b20] ${selected ? "hv-punkt" : ""} ${zoomed ? "hv-zoom" : ""} ${welcome ? "hv-welcome" : ""} ${phase === "tour" && T.stories?.mobile ? "hv-st-on-m" : ""} ${menuOpen ? "hv-menu-aaben" : ""} ${T.overviewUi?.box?.desktop === false ? "hv-boks-ud-d" : ""} ${T.overviewUi?.box?.mobile === false ? "hv-boks-ud-m" : ""} ${T.overviewUi?.filter?.desktop === false ? "hv-filter-ud-d" : ""} ${T.overviewUi?.filter?.mobile === false ? "hv-filter-ud-m" : ""} ${T.overviewUi?.names?.desktop ? `hv-navne-d-${T.overviewUi.names.desktop}` : ""} ${T.overviewUi?.names?.mobile ? `hv-navne-m-${T.overviewUi.names.mobile}` : ""} ${T.overviewUi?.filterColumns ? `hv-filter-kol hv-filter-kol-${T.overviewUi.filterColumns}` : T.overviewUi?.filterScroll ? "hv-filter-rul" : ""} ${langClasses} ${T.design?.menu === "dock" ? "hv-dock" : ""} ${T.logoSide === "right" ? "hv-logo-h" : ""} ${guideAt != null || (dayAt != null && !dayOpen) ? "hv-guiding" : ""} ${route ? "hv-routing" : ""} ${phase === "tour" ? "hv-i-tour" : ""} ${showCard != null || (nudgeOn && T.nudge && phase === "tour") ? "hv-med-kort" : ""} ${showMeasures && phase === "tour" ? "hv-maler" : ""} ${phase === "tour" && T.stories?.desktop ? "hv-st-on-d" : ""}`} style={
         {
           fontFamily: `'${T.font}', system-ui, sans-serif`,
           "--c-main": T.colors.main,
@@ -3413,6 +3413,8 @@ const CSS = `
   .hv-logo-kort{height:calc(var(--logo-h) * .74 - 8px);padding:7px 10px;border-radius:11px}
   .hv-menu{width:100%}
   .hv-room{bottom:76px}
+  /* A place card has that spot - the room's name steps aside while it shows. */
+  .hv-med-kort .hv-room{opacity:0;pointer-events:none}
   .hv-dev{bottom:calc(64px + env(safe-area-inset-bottom,0px));right:10px}
   .hv-dev>button{font-size:10px;padding:3px 7px}
   .hv-punkt .hv-dev{display:none}
