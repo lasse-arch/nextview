@@ -1200,6 +1200,17 @@ export function CardsEditor({ config, edit, preview, scanMap, mpskinsHidden }: O
       )}
       <Group title="Stedkort">
         <p className={small}>Et lille kort, der kommer frem, når man lander et bestemt sted - med en tekst om stedet og evt. knapper. Det forsvinder selv igen.</p>
+        <Field title="Størrelse" hint="Gælder alle stedkort og kortet, der kommer af sig selv. De skalerer altid med skærmen - en lille telefon får et mindre kort.">
+          <Choice
+            value={config.placeCardSize ?? "mellem"}
+            options={[
+              ["lille", "Lille"],
+              ["mellem", "Mellem"],
+              ["stor", "Stor"],
+            ]}
+            onChange={(v) => edit((d) => void (d.placeCardSize = v === "mellem" ? undefined : (v as "lille" | "stor")))}
+          />
+        </Field>
         <Rows<PlaceCard>
           items={cards}
           onChange={(c) => edit((d) => void (d.placeCards = c.length ? c : undefined))}

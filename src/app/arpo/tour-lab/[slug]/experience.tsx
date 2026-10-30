@@ -2735,6 +2735,7 @@ function TourExperience({
         <PlaceCard
           key={showCard}
           card={T.placeCards![showCard]}
+          size={T.placeCardSize}
           onClose={(how) => {
             track("place_card_close", { title: T.placeCards![showCard].title, how });
             setClosedCards((c) => [...c, showCard]);
@@ -3400,6 +3401,22 @@ const CSS = `
   .hv-tile b{font-size:18px}
   .hv-wel-x{top:calc(10px + env(safe-area-inset-top,0px));right:10px;width:38px;height:38px}
   .hv-devpanel{width:calc(100vw - 20px)}
+}
+/*
+ * A phone on its side: wider than the phone layout's 760 px, but only ~350-430 px high - the computer layout would cover
+ * the tour. Everything on top of the tour is drawn smaller (the 3D view and the drone picture stay as they are), and
+ * whole-screen layers (welcome, sheets) scroll instead of being cut off. The notch side is kept clear.
+ */
+@media (max-height:500px) and (min-width:500px){
+  .gd-card,.gd-bars,.hv-intro,.hv-panel,.ip-card,.hv-menuknap,.bm-knap,.ls,.hv-logo,.hv-filtre,.hv-luften,.hv-room,.hv-live-chip,
+  .hv-pano-luk,.hv-pano-titel,.hv-pick,.rt-knap,.vj-chip,.vj-kort,.km-soeg,.km-zoom,.pk,.pk-mini,.dz-dock,.dz-here,.dz-sheet,.dy-bar,.fb-bar,.fb-tab,.hv-maal,
+  .hv-menu > *,.hv-wel > *,.bm > *,.hv-live > *,.dy > *,.fd > *,.cf-bg > *,.ob > *,.dz-cover > *{zoom:.72}
+  .hv-wel > *,.dz-cover > *{zoom:.6}
+  .hv-wel,.bm,.hv-live,.dy,.fd,.cf-bg,.ob{overflow-y:auto;-webkit-overflow-scrolling:touch;align-items:flex-start}
+  .hv-menu{overflow-y:auto}
+  .gd-card{max-height:calc((100dvh - 24px) / .72);overflow-y:auto}
+  .gd-card,.hv-intro,.hv-filtre,.hv-luften{left:max(16px,env(safe-area-inset-left,0px))}
+  .hv-menuknap,.bm-knap{right:max(14px,env(safe-area-inset-right,0px))}
 }
 `;
 

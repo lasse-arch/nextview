@@ -341,6 +341,8 @@ export type TourConfig = {
    * ("Læs mere"); a button flies to a room by its menu name or opens a link.
    */
   placeCards?: PlaceCard[];
+  /** How big the place cards (and the card that comes by itself) are: "lille" (title, two lines, the buttons - for phones above all), "mellem" (the default), "stor". They scale with the screen either way (a small phone gets smaller ones). */
+  placeCardSize?: "lille" | "mellem" | "stor";
   /** A card that comes by itself after a while (e.g. "Din plads venter") - never while the menu or a place card is open. */
   nudge?: { afterSeconds: number; title: string; text: string; buttons: { label: string; href: string; primary?: boolean }[] };
   /**
