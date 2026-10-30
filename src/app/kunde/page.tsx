@@ -122,6 +122,8 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
     d.tours.map((x) => ({ ...x, dealId: d.id, location: many ? dealName(d) : null, config: x.config as unknown as TourConfig, share: shareOf(x.share), url: tourUrl(x.slug, origin, x.liveVersion != null) }))
   );
   const tours = reviewTours.filter((x) => x.published);
+  // Sent for review, not out yet: "not out yet" says where to look instead.
+  const notLive = reviewTours.some((x) => x.reviewSentAt && !x.published) ? t.review.waiting : t.notLive;
   const older = scope.flatMap((d) =>
     d.tours.length
       ? []
@@ -214,6 +216,25 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
           {page === "hjem" && (
             <>
               <h1 className="pt-1 text-[30px] font-bold tracking-tight">{first ? t.hello(first) : t.welcome}</h1>
+              {/* Sent for review (not out yet): the one thing to do now, up top - see it, write changes, approve. */}
+              {reviewTours
+                .filter((x) => x.reviewSentAt && !x.published)
+                .map((x) => (
+                  <section key={x.slug} className="overflow-hidden rounded-[28px] bg-gradient-to-br from-[#0071e3] to-[#0a3d91] p-6 text-white shadow-[0_18px_40px_rgba(0,80,200,.25)] sm:p-8">
+                    <p className="text-[12px] font-bold uppercase tracking-[.14em] text-white/70">{x.reviewApprovedAt ? "✓" : t.review.kicker} · {x.config.title || x.name}</p>
+                    <h2 className="mt-1.5 text-[26px] font-bold leading-tight tracking-tight sm:text-[30px]">{x.reviewApprovedAt ? t.review.approvedTitle : t.review.title}</h2>
+                    <p className="mt-2 max-w-2xl text-[15.5px] leading-relaxed text-white/85">{x.reviewApprovedAt ? t.review.approvedText : t.review.text}</p>
+                    {!x.reviewApprovedAt && (
+                      <div className="mt-5 flex flex-wrap items-center gap-3 [&_button]:!rounded-full">
+                        <ReviewLauncher slug={x.slug} title={x.config.title || x.name} words={{ open: t.fix.open, opening: t.fix.opening, hint: t.fix.windowHint, close: t.fix.close }} />
+                        <ApproveTour slug={x.slug} approved={null} preview={Boolean(who.preview)} words={{ approve: t.fix.approve, confirm: t.fix.approveConfirm, approved: t.fix.approved, previewOnly: t.fix.previewOnly }} />
+                        <a href={href({ side: "rettelser" })} className="text-[14px] font-semibold text-white/85 underline-offset-4 hover:underline">
+                          {t.review.fixes} →
+                        </a>
+                      </div>
+                    )}
+                  </section>
+                ))}
               <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
                 <div className="min-w-0 space-y-5">
                   <section className={card}>
@@ -232,7 +253,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
                       )}
                     </div>
                     {!together ? (
-                      <p className="mt-4 rounded-2xl bg-[#f7f7f9] p-4 text-[15px] text-[#3a3a3c]">{tours.length || older.length ? t.noStatsYet : t.notLive}</p>
+                      <p className="mt-4 rounded-2xl bg-[#f7f7f9] p-4 text-[15px] text-[#3a3a3c]">{tours.length || older.length ? t.noStatsYet : notLive}</p>
                     ) : together.visits === 0 ? (
                       <p className="mt-4 rounded-2xl bg-[#f7f7f9] p-4 text-[15px] text-[#3a3a3c]">{t.noVisits}</p>
                     ) : (
@@ -265,7 +286,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
                       <span className="text-[13px] text-[#6e6e73]">{t.tourCount(tours.length + older.length)}</span>
                     </div>
                     {tours.length + older.length === 0 ? (
-                      <p className="mt-3 text-[15px] text-[#3a3a3c]">{t.notLive}</p>
+                      <p className="mt-3 text-[15px] text-[#3a3a3c]">{notLive}</p>
                     ) : (
                       <ul className="mt-3 divide-y divide-black/[.06]">
                         {tours.map((x) => (
@@ -351,7 +372,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
               )}
               {!together || !togetherShare ? (
                 <section className={card}>
-                  <p className="text-[15px] text-[#3a3a3c]">{tours.length || older.length ? t.noStatsYet : t.notLive}</p>
+                  <p className="text-[15px] text-[#3a3a3c]">{tours.length || older.length ? t.noStatsYet : notLive}</p>
                 </section>
               ) : (
                 <>
@@ -392,7 +413,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
               </div>
               {tours.length + older.length === 0 && (
                 <section className={card}>
-                  <p className="text-[15px]">{t.notLive}</p>
+                  <p className="text-[15px]">{notLive}</p>
                 </section>
               )}
               {tours.map((x) => (
@@ -433,7 +454,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
               </div>
               <section className={card}>
                 {reviewTours.length + older.length === 0 ? (
-                  <p className="text-[15px]">{t.notLive}</p>
+                  <p className="text-[15px]">{notLive}</p>
                 ) : (
                   <ul className="divide-y divide-black/[.06]">
                     {reviewTours.map((x) => (
@@ -503,7 +524,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
               </div>
               {tours.length + older.length === 0 ? (
                 <section className={card}>
-                  <p className="text-[15px]">{t.notLive}</p>
+                  <p className="text-[15px]">{notLive}</p>
                 </section>
               ) : (
                 <section className={card}>
