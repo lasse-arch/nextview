@@ -3493,8 +3493,8 @@ const CSS = `
  */
 @media (max-height:500px) and (min-width:500px){
   .gd-card,.gd-bars,.hv-intro,.hv-panel,.ip-card,.hv-menuknap,.bm-knap,.ls,.hv-logo,.hv-filtre,.hv-luften,.hv-room,.hv-live-chip,
-  .hv-pano-luk,.hv-pano-titel,.hv-pick,.rt-knap,.vj-chip,.vj-kort,.km-soeg,.km-zoom,.pk,.pk-mini,.dz-dock,.dz-here,.dz-sheet,.dy-bar,.fb-bar,.fb-tab,.hv-maal,
-  .hv-menu > *,.hv-wel > *,.bm > *,.hv-live > *,.dy > *,.fd > *,.cf-bg > *,.ob > *,.dz-cover > *{zoom:var(--ui-zoom,.72)}
+  .hv-pano-luk,.hv-pano-titel,.hv-pick,.rt-knap,.vj-chip,.vj-kort,.km-soeg,.km-zoom,.pk,.pk-mini,.dz-dock,.dz-here,.dz-sheet,.dy-bar,.fb-bar,.fb-tab,.hv-maal,.pc,.hv-find-m,
+  .hv-stories > *,.hv-menu > *,.hv-wel > *,.bm > *,.hv-live > *,.dy > *,.fd > *,.cf-bg > *,.ob > *,.dz-cover > *{zoom:var(--ui-zoom,.72)}
   .hv-wel > *,.dz-cover > *{zoom:calc(var(--ui-zoom,.72) * .83)}
   .hv-wel,.bm,.hv-live,.dy,.fd,.cf-bg,.ob{overflow-y:auto;-webkit-overflow-scrolling:touch;align-items:flex-start}
   .hv-menu{overflow-y:auto}
