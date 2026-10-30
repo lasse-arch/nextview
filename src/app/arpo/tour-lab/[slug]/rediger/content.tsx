@@ -3,7 +3,7 @@
 import { LinkInput } from "./links-open";
 import { StopVoice, VoiceGroup, voiceState } from "./voice-editor";
 import { guideExit, IMAGE_HREF, imageOfHref, isPlaceHref, PANO_HFOV, placeHref, startPlaces } from "../../tours/places";
-import { AiImageButton } from "./ai-image";
+import { AiImageButton, AiImageList } from "./ai-image";
 import { writePlaceCards, type CardDraft } from "@/lib/actions/tour-cards";
 import { useEffect, useState } from "react";
 import { saveTourStoryImage } from "@/lib/actions/tour-lab";
@@ -745,7 +745,7 @@ function PointStop({ config, id, edit, onEdit, preview }: { config: TourConfig; 
         )}
         <div className="flex flex-wrap items-center gap-2">
           <UploadButton accept="image/*" label="Tilføj billede" onDone={(url) => setPoint((x) => void (x.images = [...(x.images ?? []), url]))} />
-          {images[0] && <AiImageButton src={images[0]} onUse={(url) => setPoint((x) => void (x.images = [url, ...(x.images ?? []).slice(1)]))} />}
+          <AiImageList images={images} onReplace={(i, url) => setPoint((x) => void (x.images = (x.images ?? []).map((y, j) => (j === i ? url : y))))} />
         </div>
       </Field>
       <p className={small}>Punktets tekst og placering rettes ved punktet under Luftfoto og kort.</p>
@@ -1112,6 +1112,7 @@ function StopPicture({ config, url, onChange }: { config: TourConfig; url: strin
           </select>
         )}
         <UploadButton accept="image/jpeg,image/png,image/webp" label={url ? "Skift billede" : "Upload billede"} onDone={(u) => onChange(u)} />
+        {url && <AiImageButton src={url} onUse={(u) => onChange(u)} />}
         {url && (
           <button type="button" className="text-[13px] text-[#ff3b30] hover:underline" onClick={() => onChange(null)}>
             Fjern billedet

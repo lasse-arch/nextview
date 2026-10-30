@@ -9,7 +9,7 @@ import { PANO_HFOV, isPlaceHref, panoHfov, pointOfHref } from "../../tours/place
 import "pannellum/build/pannellum.css";
 import type { DroneLook, TourConfig, TourPoint } from "../../tours/types";
 import { Choice, Field, FilesContext, Group, Icon, input, PanoZoom, Toggle, UploadButton, type PreviewApi } from "./ui";
-import { AiImageButton } from "./ai-image";
+import { AiImageButton, AiImageList } from "./ai-image";
 
 /*
  * "Luftfoto og kort": an illustrated map (or site plan, or drone photo) the
@@ -1047,8 +1047,8 @@ function PointPanel({
             </div>
           )}
           <UploadButton accept="image/*" label="Tilføj billede" onDone={(url) => setPoint((x) => void (x.images = [...(x.images ?? []), url]))} />
-          {/* The first photo (the one shown first) - e.g. a closed pool made summery. */}
-          <AiImageButton src={p.images?.[0] ?? ""} onUse={(url) => setPoint((x) => void (x.images = [url, ...(x.images ?? []).slice(1)]))} />
+          {/* Any of the photos - e.g. a closed pool made summery. */}
+          <AiImageList images={p.images ?? []} onReplace={(i, url) => setPoint((x) => void (x.images = (x.images ?? []).map((y, j) => (j === i ? url : y))))} />
         </Field>
         <Field title="360°-billede (valgfrit)" hint='Et 360°-foto taget lige her (2:1). Kortet får knappen "Oplev i 360°", og billedet åbner, så man kan kigge rundt.'>
           {p.panorama ? (

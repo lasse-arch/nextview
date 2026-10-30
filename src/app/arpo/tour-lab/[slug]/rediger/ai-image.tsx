@@ -503,3 +503,24 @@ function hasCut(slug: string, base: string): boolean {
     return false;
   }
 }
+
+/** "Redigér med AI" for a row of photos: pick which one (when there are more), then edit it like a single one. */
+export function AiImageList({ images, onReplace }: { images: string[]; onReplace: (index: number, url: string) => void }) {
+  const [at, setAt] = useState(0);
+  const i = Math.min(at, images.length - 1);
+  if (!images.length) return null;
+  return (
+    <span className="inline-flex flex-wrap items-center gap-2">
+      {images.length > 1 && (
+        <select className="rounded-lg bg-[#f2f2f7] px-2 py-1.5 text-[13px]" value={i} onChange={(e) => setAt(Number(e.target.value))} aria-label="Hvilket billede">
+          {images.map((_, n) => (
+            <option key={n} value={n}>
+              Billede {n + 1}
+            </option>
+          ))}
+        </select>
+      )}
+      <AiImageButton key={images[i]} src={images[i]} onUse={(url) => onReplace(i, url)} />
+    </span>
+  );
+}

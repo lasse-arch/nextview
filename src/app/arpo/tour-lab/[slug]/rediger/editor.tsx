@@ -35,6 +35,7 @@ import { MapEditor } from "./map-editor";
 import { FeedbackPanel } from "./feedback-panel";
 import { LinkInput, LinkOpenContext, LinksOpenEditor } from "./links-open";
 import { CommuteEditor } from "./commute-editor";
+import { AiImageButton } from "./ai-image";
 import { deleteStoryImages } from "@/lib/actions/tour-lab";
 import { suggestSiteLook } from "@/lib/actions/tour-ai";
 
@@ -735,6 +736,7 @@ export function TourEditor({
                     <input className={input} value={config.logo} onChange={(e) => edit((d) => void (d.logo = e.target.value))} />
                     <UploadButton accept="image/*" onDone={(url) => edit((d) => void (d.logo = url))} />
                   </div>
+                  {config.logo && !/\.svg(\?|$)/i.test(config.logo) && <AiImageButton src={config.logo} onUse={(url) => edit((d) => void (d.logo = url))} />}
                 </Field>
                 <Field title="Favicon" hint="Det lille ikon i browserfanen. Tomt = logoet.">
                   <div className="flex items-center gap-2">
@@ -2152,7 +2154,10 @@ function MenuEditor({
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={imageOfHref(it.href ?? "")!} alt="" className="max-h-32 w-full rounded-lg object-cover ring-1 ring-black/[.06]" />
                     )}
-                    <UploadButton accept="image/*" label={imageOfHref(it.href ?? "") ? "Skift billede" : "Upload billede"} onDone={(url) => set(a, { href: IMAGE_HREF + url })} />
+                    <div className="flex flex-wrap items-center gap-2">
+                      <UploadButton accept="image/*" label={imageOfHref(it.href ?? "") ? "Skift billede" : "Upload billede"} onDone={(url) => set(a, { href: IMAGE_HREF + url })} />
+                      {imageOfHref(it.href ?? "") && <AiImageButton src={imageOfHref(it.href ?? "")!} onUse={(url) => set(a, { href: IMAGE_HREF + url })} />}
+                    </div>
                     <p className="text-[12px] leading-snug text-[#8e8e93]">Vises i fuld skærm i touren - fx et dronefoto, et situationskort eller en plantegning. Et 360°-billede (2:1) åbner som 360°.</p>
                     {imageOfHref(it.href ?? "") && (
                       <PanoZoom src={imageOfHref(it.href ?? "")!} name={it.title} preview={preview} value={imageView?.[imageOfHref(it.href ?? "")!]} onChange={(z) => onImageView(imageOfHref(it.href ?? "")!, z)} />
