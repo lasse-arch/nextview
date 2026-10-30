@@ -35,7 +35,23 @@ export function Stories({
   const [playing, setPlaying] = useState<number | null>(null);
   const [paused, setPaused] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  /** On the way to the story's room: its time doesn't run until the tour stands there (a slow room still gets its full time). */
+  const [arriving, setArriving] = useState(false);
   const cards = useRef<Record<string, HTMLButtonElement | null>>({});
+  const row = useRef<HTMLDivElement | null>(null);
+
+  // The row's real height, for what stands above it (a place card, Find vej) - two-line names or a wrapped row are taller.
+  useEffect(() => {
+    const el = row.current;
+    const root = el?.closest<HTMLElement>(".hv");
+    if (!el || !root || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => root.style.setProperty("--st-h", `${Math.round(el.getBoundingClientRect().height)}px`));
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+      root.style.removeProperty("--st-h");
+    };
+  }, []);
 
   // A room counts as seen once the visitor has been there, however they got there.
   if (current && !seen.includes(current)) setSeen([...seen, current]);
@@ -62,10 +78,17 @@ export function Stories({
     return () => window.removeEventListener("hv-pause", pause);
   }, []);
 
+  const goingTo = useRef<number | null>(null);
   function play(index: number) {
     setPlaying(index);
     setPaused(false);
-    onGo(rooms[index]);
+    setArriving(true);
+    goingTo.current = index;
+    // A moment after arriving, so the room's sharp pictures are in before its time starts.
+    Promise.resolve(onGo(rooms[index]))
+      .catch(() => {})
+      .then(() => new Promise((r) => setTimeout(r, 600)))
+      .then(() => goingTo.current === index && setArriving(false));
   }
 
   function next(how: "auto" | "tap") {
@@ -97,7 +120,7 @@ export function Stories({
                     key={playing}
                     style={{
                       animationDuration: `${STORY_MS}ms`,
-                      animationPlayState: paused ? "paused" : "running",
+                      animationPlayState: paused || arriving ? "paused" : "running",
                     }}
                     onAnimationEnd={() => next("auto")}
                   />
@@ -146,6 +169,7 @@ export function Stories({
       )}
 
       <div
+        ref={row}
         className={`hv-stories ${visible} ${collapsed ? "hv-st-lukket" : ""} ${devices.scroll?.mobile === false ? "hv-st-wrap-m" : ""} ${devices.scroll?.desktop === false ? "hv-st-wrap-d" : ""}`}
       >
         <button
@@ -156,7 +180,7 @@ export function Stories({
             setCollapsed((c) => !c);
           }}
         >
-          Historier {collapsed ? "▴" : "▾"}
+          {tr("Historier")} {collapsed ? "▴" : "▾"}
         </button>
         {!collapsed && (
           <div className="hv-st-strip">
@@ -294,10 +318,11 @@ export const STORIES_CSS = `
   .hv-stories.hv-st-m,.hv-story-play.hv-st-m{display:flex}
   .hv-st-m~.hv-room,.hv-st-on-m .hv-room,.hv-st-on-m .hv-luften{display:none}
   /* A place card stands above the stories, not on them. */
-  .hv-st-on-m .pc{bottom:calc(150px + env(safe-area-inset-bottom,0px))}
-  .hv-st-on-m .hv-dev{bottom:calc(150px + env(safe-area-inset-bottom,0px))}
+  /* (.pc and Find vej are drawn at the phone's zoom, so their distance is too.) */
+  .hv-st-on-m .pc{bottom:calc((var(--st-h,150px) + 8px) / var(--ui-zoom,1))}
+  .hv-st-on-m .hv-dev{bottom:calc(var(--st-h,150px) + 8px)}
   /* Find vej (and anything else at the bottom) stands above the stories too. */
-  .hv-st-on-m.hv-i-tour .rt-knap{bottom:calc(150px + env(safe-area-inset-bottom,0px))}
+  .hv-st-on-m.hv-i-tour .rt-knap{bottom:calc((var(--st-h,150px) + 8px) / var(--ui-zoom,1))}
   .hv-st-on-m .hv-logo{transition:opacity .2s}
   .hv-st-on-m:has(.hv-story-play) .hv-logo{opacity:0}
 }
@@ -316,7 +341,7 @@ export const STORIES_CSS = `
   .hv-st-d .hv-st-strip .hv-st-row{flex:0 1 auto}
   .hv-stories.hv-st-d{transition:left .3s ease}
   .hv-st-d~.hv-room,.hv-st-on-d .hv-room,.hv-st-on-d .hv-luften{display:none}
-  .hv-st-on-d .pc{bottom:156px}
+  .hv-st-on-d .pc{bottom:calc(var(--st-h,148px) + 8px)}
   .hv-story-play.hv-st-d{left:50%;right:auto;width:min(620px,100vw);transform:translateX(-50%)}
 }
 `;
