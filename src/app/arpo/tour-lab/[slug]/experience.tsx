@@ -2386,8 +2386,18 @@ function TourExperience({
       {lightbox && <Lightbox key={lightbox.title + lightbox.at} state={lightbox} onClose={() => setLightbox(null)} />}
       {guideImage && guideAt != null && (
         <div className="hv-guide-bilde">
+          {/* The picture blurred behind it, and a wide one on an upright phone filling the height and gliding slowly from side to side. */}
+          <div className="hv-guide-bilde-bag" style={{ backgroundImage: `url("${guideImage.replace(/"/g, "%22")}")` }} />
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={guideImage} alt={GUIDE[guideAt]?.title ?? ""} />
+          <img
+            key={guideImage}
+            src={guideImage}
+            alt={GUIDE[guideAt]?.title ?? ""}
+            onLoad={(e) => {
+              const img = e.currentTarget;
+              img.classList.toggle("bred", img.naturalWidth / Math.max(1, img.naturalHeight) > (window.innerWidth / Math.max(1, window.innerHeight)) * 1.3);
+            }}
+          />
         </div>
       )}
 
@@ -3298,7 +3308,14 @@ const CSS = `
 .hv-guiding .hv-pano{z-index:10}
 /* "Vis mig rundt" at a picture: full screen, under the guide's card. */
 .hv-guide-bilde{position:absolute;inset:0;z-index:10;display:flex;align-items:center;justify-content:center;background:#0d1b20;animation:hvFade .4s ease}
-.hv-guide-bilde img{width:100%;height:100%;object-fit:contain}
+.hv-guide-bilde{overflow:hidden}
+.hv-guide-bilde img{position:relative;width:100%;height:100%;object-fit:contain}
+.hv-guide-bilde-bag{position:absolute;inset:-40px;background-size:cover;background-position:center;filter:blur(28px) brightness(.5) saturate(1.2)}
+@media (max-width:760px) and (orientation:portrait){
+  .hv-guide-bilde img.bred{flex:none;width:auto;height:100%;max-width:none;object-fit:cover;animation:hvGlid 18s ease-in-out infinite alternate}
+}
+@keyframes hvGlid{from{transform:translateX(calc(50% - 50vw))}to{transform:translateX(calc(50vw - 50%))}}
+@media (prefers-reduced-motion:reduce){.hv-guide-bilde img.bred{animation:none}}
 /* "Vis mig rundt" on a 360° photo: the menu button stays on top of it, so the visitor can leave the guide for a place. */
 .hv-guiding .hv-menuknap,.hv-guiding .bm-knap,.hv-guiding .sp-menuknap{z-index:14}
 .hv-guiding .hv-pano-luk,.hv-guiding .hv-pano-titel{display:none}

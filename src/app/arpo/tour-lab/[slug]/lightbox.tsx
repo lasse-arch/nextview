@@ -24,6 +24,20 @@ export function Lightbox({ state, onClose }: { state: NonNullable<LightboxState>
   const n = state.images.length;
   const step = (d: number) => setAt((i) => (i + d + n) % n);
   const touch = useRef<number | null>(null);
+  /** A phone held upright and a wide picture: it fills the screen's height and is dragged sideways - not a thin strip in the middle. */
+  const [fill, setFill] = useState(true);
+  const [ratios, setRatios] = useState<Record<string, number>>({});
+  const [upright, setUpright] = useState(false);
+  useEffect(() => {
+    const check = () => setUpright(window.innerWidth <= 760 && window.innerHeight > window.innerWidth);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+  const src = state.images[at];
+  const wide = upright && (ratios[src] ?? 0) > 1.15;
+  const pan = useRef<HTMLDivElement>(null);
+  const [hint, setHint] = useState(true);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -36,7 +50,9 @@ export function Lightbox({ state, onClose }: { state: NonNullable<LightboxState>
   }, [n, onClose]);
 
   return (
-    <div className="lb" role="dialog" aria-modal="true" aria-label={state.title}>
+    <div className={`lb ${wide && fill ? "lb-fyld" : ""}`} role="dialog" aria-modal="true" aria-label={state.title}>
+      {/* The picture itself, blurred, behind it - instead of a black frame round a small picture. */}
+      {!state.focus && <div className="lb-bg" style={{ backgroundImage: `url("${src.replace(/"/g, "%22")}")` }} />}
       <div className="lb-head">
         <b>{state.title}</b>
         {n > 1 && (
@@ -50,6 +66,26 @@ export function Lightbox({ state, onClose }: { state: NonNullable<LightboxState>
       </div>
       {state.focus ? (
         <PlanView src={state.images[0]} focus={state.focus} />
+      ) : wide && fill ? (
+        <div
+          ref={pan}
+          className="lb-pan"
+          onTouchStart={() => hint && setHint(false)}
+          onWheel={() => hint && setHint(false)}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            key={src}
+            src={src}
+            alt={state.title}
+            draggable={false}
+            onLoad={(e) => {
+              const box = pan.current;
+              if (box) box.scrollLeft = (e.currentTarget.clientWidth - box.clientWidth) / 2;
+            }}
+          />
+          {hint && <span className="lb-hint">‹ {tr("Træk for at se hele billedet")} ›</span>}
+        </div>
       ) : (
         <div
           className="lb-stage"
@@ -63,7 +99,18 @@ export function Lightbox({ state, onClose }: { state: NonNullable<LightboxState>
         >
           {state.images.map((src, i) => (
             // eslint-disable-next-line @next/next/no-img-element
-            <img key={src} src={src} alt={i === at ? state.title : ""} className={i === at ? "on" : ""} loading={Math.abs(i - at) <= 1 ? "eager" : "lazy"} draggable={false} />
+            <img
+              key={src}
+              src={src}
+              alt={i === at ? state.title : ""}
+              className={i === at ? "on" : ""}
+              loading={Math.abs(i - at) <= 1 ? "eager" : "lazy"}
+              draggable={false}
+              onLoad={(e) => {
+                const r = e.currentTarget.naturalWidth / Math.max(1, e.currentTarget.naturalHeight);
+                setRatios((x) => (x[src] === r ? x : { ...x, [src]: r }));
+              }}
+            />
           ))}
           {n > 1 && (
             <>
@@ -75,6 +122,21 @@ export function Lightbox({ state, onClose }: { state: NonNullable<LightboxState>
               </button>
             </>
           )}
+        </div>
+      )}
+      {wide && (
+        <button type="button" className="lb-fit" onClick={() => (setFill((f) => !f), setHint(false))}>
+          {fill ? tr("Se hele billedet") : tr("Fyld skærmen")}
+        </button>
+      )}
+      {wide && fill && n > 1 && (
+        <div className="lb-skift">
+          <button type="button" aria-label={tr("Forrige")} onClick={() => (step(-1), setHint(false))}>
+            ‹
+          </button>
+          <button type="button" aria-label={tr("Næste")} onClick={() => (step(1), setHint(false))}>
+            ›
+          </button>
         </div>
       )}
       {!state.focus && n > 1 && (
@@ -140,7 +202,24 @@ function PlanView({ src, focus }: { src: string; focus: [number, number, number,
 
 export const LIGHTBOX_CSS = `
 .lb{position:absolute;inset:0;z-index:45;display:flex;flex-direction:column;background:rgba(8,12,14,.94);color:#fff;animation:hvFade .2s ease;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
-.lb-head{display:flex;align-items:center;gap:12px;padding:14px 16px 10px}
+.lb-bg{position:absolute;inset:-40px;background-size:cover;background-position:center;filter:blur(28px) brightness(.45) saturate(1.2);opacity:.9;pointer-events:none}
+.lb>*:not(.lb-bg){position:relative}
+.lb-head{display:flex;align-items:center;gap:12px;padding:calc(14px + env(safe-area-inset-top,0px)) 16px 10px}
+.lb-pan{flex:1;min-height:0;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none;overscroll-behavior:contain}
+.lb-pan::-webkit-scrollbar{display:none}
+.lb-pan img{display:block;height:100%;width:auto;max-width:none;user-select:none}
+/* Filling the screen: the picture edge to edge, the title and the buttons floating over it. */
+.lb.lb-fyld .lb-head{position:absolute;top:0;left:0;right:0;z-index:2;background:linear-gradient(rgba(0,0,0,.6),rgba(0,0,0,0));padding-bottom:28px;text-shadow:0 1px 6px rgba(0,0,0,.5)}
+.lb.lb-fyld .lb-pan{position:absolute;inset:0}
+.lb-fit{white-space:nowrap}
+.lb.lb-fyld .lb-fit{position:absolute;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));translate:-50% 0;margin:0;z-index:2;background:rgba(0,0,0,.45);box-shadow:0 6px 20px rgba(0,0,0,.3)}
+.lb.lb-fyld .lb-thumbs{position:absolute;left:0;right:0;bottom:calc(64px + env(safe-area-inset-bottom,0px));z-index:2;padding-bottom:0}
+.lb-stage img.on{filter:drop-shadow(0 14px 34px rgba(0,0,0,.45))}
+.lb-hint{position:absolute;left:50%;top:50%;translate:-50% -50%;padding:9px 15px;border-radius:999px;background:rgba(0,0,0,.55);color:#fff;font-size:13.5px;font-weight:700;white-space:nowrap;pointer-events:none;backdrop-filter:blur(6px);animation:lbHint 4.5s ease forwards}
+@keyframes lbHint{0%,70%{opacity:1}100%{opacity:0}}
+.lb-fit{align-self:center;margin:10px auto calc(14px + env(safe-area-inset-bottom,0px));border:0;border-radius:999px;padding:9px 16px;background:rgba(255,255,255,.16);color:#fff;font:inherit;font-weight:700;font-size:13.5px;cursor:pointer;backdrop-filter:blur(6px)}
+.lb-skift{position:absolute!important;left:0;right:0;top:50%;display:flex;justify-content:space-between;padding:0 8px;pointer-events:none}
+.lb-skift button{pointer-events:auto;width:40px;height:40px;border:0;border-radius:50%;background:rgba(0,0,0,.45);color:#fff;font-size:26px;line-height:1;cursor:pointer}
 .lb-head b{font-family:var(--font-heading);font-size:18px;font-weight:800}
 .lb-head span{font-size:13px;opacity:.7;font-variant-numeric:tabular-nums}
 .lb-head button{margin-left:auto;width:38px;height:38px;border:0;border-radius:50%;background:rgba(255,255,255,.14);color:#fff;font-size:22px;line-height:1;cursor:pointer}
