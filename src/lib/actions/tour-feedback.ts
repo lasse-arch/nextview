@@ -4,7 +4,7 @@ import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { approveTour, sendFixesDoneMail, sendReviewMail } from "@/lib/tour-review";
+import { approveTour, reviewRecipient, sendFixesDoneMail, sendReviewMail } from "@/lib/tour-review";
 import { checkTour, type CheckItem } from "@/lib/tour-check";
 import { getTourConfig } from "@/lib/tours";
 
@@ -75,6 +75,10 @@ export async function deleteFeedback(id: string): Promise<void> {
 
 export type ReviewStatus = {
   to: string | null;
+  /** The name the mail greets (Hej …). */
+  toName: string | null;
+  /** The deal's contact - who it goes to unless someone else is chosen. */
+  contact: string | null;
   sentAt: string | null;
   remindedAt: string | null;
   reminders: number;
@@ -87,11 +91,14 @@ export async function reviewStatus(slug: string): Promise<ReviewStatus> {
   await admin();
   const t = await prisma.tour.findUnique({
     where: { slug },
-    select: { reviewSentAt: true, reviewRemindedAt: true, reviewReminders: true, reviewApprovedAt: true, reviewApprovedBy: true, deal: { select: { contactEmail: true } } },
+    select: { reviewSentAt: true, reviewRemindedAt: true, reviewReminders: true, reviewApprovedAt: true, reviewApprovedBy: true, reviewEmail: true, reviewName: true, deal: { select: { contactEmail: true, contactName: true } } },
   });
   const open = await prisma.tourFeedback.count({ where: { tourSlug: slug, status: "open" } });
+  const who = t?.deal ? reviewRecipient(t, t.deal) : null;
   return {
-    to: t?.deal?.contactEmail ?? null,
+    to: who?.email ?? null,
+    toName: who?.name ?? null,
+    contact: t?.deal?.contactEmail ?? null,
     sentAt: t?.reviewSentAt?.toISOString() ?? null,
     remindedAt: t?.reviewRemindedAt?.toISOString() ?? null,
     reminders: t?.reviewReminders ?? 0,
@@ -102,10 +109,10 @@ export async function reviewStatus(slug: string): Promise<ReviewStatus> {
 }
 
 /** Sends the review mail to the customer - or a reminder. */
-export async function sendForReview(slug: string, reminder: boolean): Promise<{ ok: true; to: string; token: string } | { ok: false; error: string }> {
+export async function sendForReview(slug: string, reminder: boolean, recipient?: { email: string; name: string }): Promise<{ ok: true; to: string; token: string } | { ok: false; error: string }> {
   const user = await admin();
   try {
-    const r = await sendReviewMail(slug, { id: user.id, name: user.name }, reminder);
+    const r = await sendReviewMail(slug, { id: user.id, name: user.name }, reminder, recipient ? { email: String(recipient.email ?? ""), name: String(recipient.name ?? "") } : undefined);
     revalidatePath(`/arpo/tour-lab/${slug}/rediger`);
     return { ok: true, to: r.to, token: r.token };
   } catch (err) {

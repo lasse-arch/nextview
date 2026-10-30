@@ -1326,6 +1326,10 @@ model Tour {
   reviewReminders  Int               @default(0)
   reviewApprovedAt DateTime?
   reviewApprovedBy String?
+  /// Who the review mail (and its customer page) goes to, when not the deal's contact - e.g. the one who
+  /// knows the place, while the director signed the contract. Reminders and "rettelser lavet" go there too.
+  reviewEmail      String?
+  reviewName       String?
   dealId           String?
   deal             Deal?             @relation(fields: [dealId], references: [id], onDelete: SetNull)
   config           Json

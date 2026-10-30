@@ -19,6 +19,14 @@ import { ringBell } from "@/lib/team-notifications";
  * ourselves when we don't hear back. Approving tells the team.
  */
 
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Who gets the review mails: the one chosen when it was sent (reviewEmail), otherwise the deal's contact. */
+export function reviewRecipient(tour: { reviewEmail: string | null; reviewName: string | null }, deal: { contactEmail: string | null; contactName: string | null }) {
+  const email = tour.reviewEmail ?? deal.contactEmail;
+  return email ? { email: normalizeEmail(email), name: tour.reviewEmail ? tour.reviewName : deal.contactName } : null;
+}
+
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 export function buildReviewMail(input: {
@@ -177,29 +185,31 @@ ${fixes.length ? `<p style="margin-bottom:4px"><b>${esc(t.fixedTitle)}</b></p><u
 export async function sendFixesDoneMail(slug: string, actor: { id: string; name: string }, manual = false): Promise<string | null> {
   const tour = await prisma.tour.findUnique({
     where: { slug },
-    select: { reviewToken: true, reviewSentAt: true, reviewApprovedAt: true, deal: { select: { id: true, companyName: true, displayName: true, contactName: true, contactEmail: true, contractProducts: true } } },
+    select: { reviewToken: true, reviewSentAt: true, reviewApprovedAt: true, reviewEmail: true, reviewName: true, deal: { select: { id: true, companyName: true, displayName: true, contactName: true, contactEmail: true, contractProducts: true } } },
   });
   const deal = tour?.deal;
+  const who = tour && deal ? reviewRecipient(tour, deal) : null;
   // Pressed by hand ("Send nu"): also with corrections still open, and then with every done one if all were told before.
   if (manual) {
     if (!tour?.reviewToken) throw new Error("Touren er ikke sendt til gennemgang endnu - der er intet link at sende.");
-    if (!deal?.contactEmail) throw new Error("Kunden har ingen kontakt-e-mail på dealen.");
+    if (!who) throw new Error("Kunden har ingen kontakt-e-mail på dealen.");
   } else {
-    if (!tour?.reviewToken || !tour.reviewSentAt || tour.reviewApprovedAt || !deal?.contactEmail) return null;
+    if (!tour?.reviewToken || !tour.reviewSentAt || tour.reviewApprovedAt || !deal || !who) return null;
     if (await prisma.tourFeedback.count({ where: { tourSlug: slug, status: "open" } })) return null;
   }
   const done = (reportedAt: null | undefined) => prisma.tourFeedback.findMany({ where: { tourSlug: slug, status: "done", ...(reportedAt === null ? { reportedAt: null } : {}) }, orderBy: { createdAt: "asc" }, take: 30, select: { id: true, text: true } });
   let fixes = await done(null);
   if (!fixes.length && manual) fixes = await done(undefined);
   if (!fixes.length && !manual) return null;
-  const to = normalizeEmail(deal.contactEmail);
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) throw new Error(`Kontakt-e-mailen på dealen ser forkert ud (${deal.contactEmail}).`);
+  if (!deal || !who) return null;
+  const to = who.email;
+  if (!EMAIL.test(to)) throw new Error(`E-mailen ser forkert ud (${to}).`);
   const sender = await prisma.emailAccount.findFirst({ where: { provider: "GOOGLE", email: WELCOME_MAIL_SENDER } });
   const canSend = Boolean(sender) || resendReady();
   const dev = !canSend && process.env.NODE_ENV !== "production";
   if (!canSend && !dev) throw new Error(`Ingen mail-afsender: sæt RESEND_API_KEY i Vercel, eller forbind Gmail for ${WELCOME_MAIL_SENDER} under Indstillinger → E-mail.`);
   const mail = buildFixesDoneMail({
-    contactName: deal.contactName,
+    contactName: who.name,
     customerName: dealName(deal),
     reviewLink: `${getAppBaseUrl()}/p/${tour.reviewToken}`,
     fixes: fixes.map((f) => f.text),
@@ -233,16 +243,29 @@ export async function sendFixesDoneMail(slug: string, actor: { id: string; name:
  * locations, nothing else), with a login button in the same mail. Turns the
  * review link on if it's off.
  */
-export async function sendReviewMail(slug: string, actor: { id: string; name: string }, reminder: boolean): Promise<{ to: string; token: string }> {
+export async function sendReviewMail(
+  slug: string,
+  actor: { id: string; name: string },
+  reminder: boolean,
+  /** Someone else than the deal's contact (kept for reminders and "rettelser lavet"). Empty e-mail = back to the contact. */
+  recipient?: { email: string; name: string },
+): Promise<{ to: string; token: string }> {
   const tour = await prisma.tour.findUnique({
     where: { slug },
-    select: { slug: true, reviewToken: true, reviewApprovedAt: true, deal: { select: { id: true, companyName: true, displayName: true, contactName: true, contactEmail: true, contractProducts: true, branches: { select: { id: true } } } } },
+    select: { slug: true, reviewToken: true, reviewApprovedAt: true, reviewEmail: true, reviewName: true, deal: { select: { id: true, companyName: true, displayName: true, contactName: true, contactEmail: true, contractProducts: true, branches: { select: { id: true } } } } },
   });
   const deal = tour?.deal;
   if (!tour || !deal) throw new Error("Touren er ikke koblet til en kunde i Arpo.");
-  if (!deal.contactEmail) throw new Error("Kunden har ingen kontakt-e-mail på dealen - tilføj den først.");
-  const to = normalizeEmail(deal.contactEmail);
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) throw new Error(`Kontakt-e-mailen på dealen ser forkert ud (${deal.contactEmail}).`);
+  // A chosen recipient: their own e-mail (none = the deal's contact again) - saved with the tour once the mail is sent.
+  const chosen = recipient
+    ? recipient.email.trim() && normalizeEmail(recipient.email) !== normalizeEmail(deal.contactEmail ?? "")
+      ? { reviewEmail: normalizeEmail(recipient.email).slice(0, 200), reviewName: recipient.name.trim().slice(0, 120) || null }
+      : { reviewEmail: null, reviewName: null }
+    : { reviewEmail: tour.reviewEmail, reviewName: tour.reviewName };
+  const who = reviewRecipient(chosen, deal);
+  if (!who) throw new Error("Kunden har ingen kontakt-e-mail på dealen - tilføj den først, eller skriv en e-mail herover.");
+  const to = who.email;
+  if (!EMAIL.test(to)) throw new Error(`E-mailen ser forkert ud (${to}).`);
   const sender = await prisma.emailAccount.findFirst({ where: { provider: "GOOGLE", email: WELCOME_MAIL_SENDER } });
   const canSend = Boolean(sender) || resendReady();
   const dev = !canSend && process.env.NODE_ENV !== "production";
@@ -253,7 +276,7 @@ export async function sendReviewMail(slug: string, actor: { id: string; name: st
   const existing = await prisma.customerAccount.findUnique({ where: { email: to }, select: { id: true, deals: { where: { dealId: deal.id }, select: { dealId: true } } } });
   const account =
     existing ??
-    (await prisma.customerAccount.create({ data: { email: to, name: deal.contactName?.trim() || null, invitedByName: actor.name }, select: { id: true, deals: { select: { dealId: true } } } }));
+    (await prisma.customerAccount.create({ data: { email: to, name: who.name?.trim() || null, invitedByName: actor.name }, select: { id: true, deals: { select: { dealId: true } } } }));
   const newAccess = !account.deals.length;
   for (const id of [deal.id, ...deal.branches.map((b) => b.id)]) {
     await prisma.customerAccountDeal.upsert({ where: { accountId_dealId: { accountId: account.id, dealId: id } }, create: { accountId: account.id, dealId: id }, update: {} });
@@ -261,7 +284,7 @@ export async function sendReviewMail(slug: string, actor: { id: string; name: st
   const portal = { link: await welcomeLoginLink(account.id), days: WELCOME_DAYS };
 
   const mail = buildReviewMail({
-    contactName: deal.contactName,
+    contactName: who.name,
     customerName: dealName(deal),
     reviewLink: `${getAppBaseUrl()}/p/${token}`,
     portal,
@@ -285,7 +308,7 @@ export async function sendReviewMail(slug: string, actor: { id: string; name: st
   const now = new Date();
   await prisma.tour.update({
     where: { slug },
-    data: reminder ? { reviewToken: token, reviewRemindedAt: now, reviewReminders: { increment: 1 } } : { reviewToken: token, reviewSentAt: now, reviewApprovedAt: null, reviewApprovedBy: null },
+    data: reminder ? { ...chosen, reviewToken: token, reviewRemindedAt: now, reviewReminders: { increment: 1 } } : { ...chosen, reviewToken: token, reviewSentAt: now, reviewApprovedAt: null, reviewApprovedBy: null },
   });
   await logActivity({ type: "DEAL_UPDATED", message: `${reminder ? "Påmindelse om gennemgang" : "Tour sendt til gennemgang"}${newAccess ? " (kundesiden åbnet)" : ""}: ${dealName(deal)}`, actorId: actor.id, dealId: deal.id });
   return { to, token };

@@ -5,7 +5,7 @@ import { useEffect, useState, useTransition } from "react";
 import { checkTourForReview, deleteFeedback, reviewStatus, sendFixesDone, sendForReview, setFeedbackStatus, setTourApproved, setTourReview, tourFeedback, type Feedback, type ReviewStatus } from "@/lib/actions/tour-feedback";
 import { askClaudeForTour, type AiEditResult } from "@/lib/actions/tour-ai";
 import type { TourConfig } from "../../tours/types";
-import { Choice, Group, Toggle, type PreviewApi } from "./ui";
+import { Choice, Group, input, Toggle, type PreviewApi } from "./ui";
 
 const TOPIC_NAMES: Record<string, string> = { menu: "Menuen", funktioner: "Funktioner", design: "Design", andet: "Andet" };
 
@@ -89,11 +89,14 @@ export function FeedbackPanel({
     if (!r.ok) return setNote({ text: r.error, error: true });
     setCheck({ items: r.items, ai: r.ai });
   }
+  /** Someone else than the deal's contact (the director signed, the head of house shows the place): e-mail and name. */
+  const [who, setWho] = useState<{ email: string; name: string } | null>(null);
   function send(reminder: boolean) {
     setCheck(null);
     setNote(null);
     start(async () => {
-      const r = await sendForReview(slug, reminder);
+      const r = await sendForReview(slug, reminder, who ?? undefined);
+      if (r.ok) setWho(null);
       if (!r.ok) return setNote({ text: r.error, error: true });
       setNote({ text: `${reminder ? "Påmindelsen" : "Mailen"} er sendt til ${r.to}.` });
       reloadStatus();
@@ -125,7 +128,7 @@ export function FeedbackPanel({
         )}
         <div className="flex flex-wrap gap-2">
           {!status?.sentAt || status.approvedAt ? (
-            <button type="button" disabled={pending || checking || !status?.to} onClick={() => void runCheck()} className="flex-1 rounded-xl bg-[#0071e3] py-2 text-[14px] font-medium text-white disabled:opacity-40">
+            <button type="button" disabled={pending || checking || !(status?.to || who?.email.trim())} onClick={() => void runCheck()} className="flex-1 rounded-xl bg-[#0071e3] py-2 text-[14px] font-medium text-white disabled:opacity-40">
               {checking ? "nextviewAI tjekker touren …" : status?.approvedAt ? "Tjek og send til ny gennemgang" : "Tjek og send til gennemgang"}
             </button>
           ) : (
@@ -149,6 +152,34 @@ export function FeedbackPanel({
             </button>
           )}
         </div>
+        {status && (
+          <div className="rounded-xl bg-[#f2f2f7] px-3 py-2.5">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0 text-[13px] leading-snug">
+                <span className="block text-[12px] font-medium text-[#6e6e73]">Mailen og kundesiden går til</span>
+                <span className="block truncate text-[#1d1d1f]">{status.to ? `${status.toName ? `${status.toName} · ` : ""}${status.to}` : "Ingen e-mail endnu"}</span>
+                {status.to && status.contact && status.to !== status.contact.trim().toLowerCase() && <span className="block text-[11px] text-[#8e8e93]">Ikke kontakten på dealen ({status.contact})</span>}
+              </div>
+              {!who && (
+                <button type="button" className="shrink-0 text-[13px] font-medium text-[#0071e3]" onClick={() => setWho({ email: status.to ?? "", name: status.toName ?? "" })}>
+                  Skift
+                </button>
+              )}
+            </div>
+            {who && (
+              <div className="mt-2 space-y-1.5">
+                <input className={input} type="email" placeholder="E-mail" value={who.email} onChange={(e) => setWho({ ...who, email: e.target.value })} />
+                <input className={input} placeholder="Navn (Hej …)" value={who.name} onChange={(e) => setWho({ ...who, name: e.target.value })} />
+                <p className="text-[11px] leading-snug text-[#8e8e93]">
+                  Fx den der kender stedet, når direktøren har skrevet under. Gemmes, når mailen sendes - påmindelser og &quot;rettelser lavet&quot; går hertil, og kundesiden åbnes for denne e-mail. Tom e-mail = kontakten på dealen.{" "}
+                  <button type="button" className="font-medium text-[#0071e3]" onClick={() => setWho(null)}>
+                    Fortryd
+                  </button>
+                </p>
+              </div>
+            )}
+          </div>
+        )}
         {!check && (
           <button type="button" disabled={checking} onClick={() => void runCheck()} className="self-start text-[13px] font-medium text-[#b4532f] disabled:opacity-50">
             {checking ? "nextviewAI tjekker touren …" : "✦ Tjek touren (hastighed og funktioner)"}
@@ -165,7 +196,7 @@ export function FeedbackPanel({
           />
         )}
         <p className={`text-[12px] leading-snug ${note?.error ? "text-[#ff3b30]" : note ? "text-[#34c759]" : "text-[#8e8e93]"}`}>
-          {note?.text ?? (status?.to ? `Mailen går til ${status.to} (kontakt-e-mailen på dealen) fra info@nextview360.dk - svar lander der. Godkender kunden, får I besked på mail.` : status ? "Touren er ikke koblet til en kunde med kontakt-e-mail." : "")}
+          {note?.text ?? (status?.to ? `Sendes fra info@nextview360.dk - svar lander der. Godkender kunden, får I besked på mail.` : status ? "Touren er ikke koblet til en kunde med kontakt-e-mail - skriv en e-mail herover." : "")}
         </p>
       </Group>
       <Group title="Linket til gennemsyn">

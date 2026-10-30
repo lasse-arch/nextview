@@ -31,7 +31,7 @@ export function buildWelcomeMail(input: {
   websiteUrl: string | null;
   language: "da" | "en";
   /** A login link to their own customer page (nextview360.dk/kunde), when they have been given access. */
-  portal?: { link: string; statsLink: string; days: number } | null;
+  portal?: { link: string; statsLink: string; days: number; /** They have had the page since the review mail - so it isn't news. */ known?: boolean } | null;
   /** The tour's front page on a MacBook goes with the mail (as cid:tour) - shown for the first product. */
   picture?: boolean;
 }): { subject: string; bodyText: string; bodyHtml: string } {
@@ -80,6 +80,12 @@ export function buildWelcomeMail(input: {
         statsButton: "Se jeres statistik",
         portalAfter: (days: number) => `Knapperne logger jer direkte ind og virker i de næste ${days} dage. Derefter skriver I bare jeres e-mail på nextview360.dk/login, så sender vi et nyt link - der er ingen adgangskode.`,
       };
+  if (input.portal?.known) {
+    // They already have the page (opened with the review mail, where they sent their corrections) - what's new now it's live.
+    t.portalTitle = en ? "Your customer page" : "Jeres kundeside";
+    t.portalIntro = en ? "It's the same page where you sent your corrections. Now that the tour is live, you can also:" : "Det er den samme side, hvor I har sendt jeres rettelser. Nu hvor touren er live, kan I også:";
+    t.portalPoints = t.portalPoints.filter((_, i) => i !== 1);
+  }
   const products = input.products
     .filter((p) => p.url.trim())
     .map((p) => ({ name: p.name, url: withProtocol(p.url.trim()) }));
@@ -149,13 +155,13 @@ ${
   return { subject: t.subject, bodyText, bodyHtml };
 }
 
-export async function welcomeMailFor(dealId: string, portal: { link: string; statsLink: string; days: number } | null = null, picture = false) {
+export async function welcomeMailFor(dealId: string, portal: { link: string; statsLink: string; days: number; known?: boolean } | null = null, picture = false, person?: { email: string; name: string | null }) {
   const deal = await prisma.deal.findUniqueOrThrow({
     where: { id: dealId },
     include: { items: { where: { url: { not: null } }, orderBy: { createdAt: "asc" } }, tours: { select: { slug: true, name: true, published: true, liveVersion: true } } },
   });
   const mail = buildWelcomeMail({
-    contactName: deal.contactName,
+    contactName: person ? person.name : deal.contactName,
     customerName: dealName(deal),
     products: deal.items.length
       ? deal.items.map((i) => ({ name: i.location ? `${i.productType} (${i.location})` : i.productType, url: i.url! }))
@@ -166,20 +172,35 @@ export async function welcomeMailFor(dealId: string, portal: { link: string; sta
     portal,
     picture,
   });
-  return { deal, to: deal.contactEmail, ...mail };
+  return { deal, to: person?.email ?? deal.contactEmail, ...mail };
 }
 
 /** Sends the welcome mail now (also again, from the deal page's button). */
 export async function sendWelcomeMail(dealId: string, actorId: string): Promise<void> {
-  const contact = await prisma.deal.findUniqueOrThrow({ where: { id: dealId }, select: { contactEmail: true } });
+  const contact = await prisma.deal.findUniqueOrThrow({ where: { id: dealId }, select: { contactEmail: true, contactName: true, tours: { select: { reviewEmail: true, reviewName: true } } } });
   if (!contact.contactEmail) throw new Error("Kunden har ingen kontakt-e-mail.");
-  // The customer page goes in only when this e-mail has already been given access to this deal (in Arpo, by an admin) - the mail never gives access by itself.
-  const access = await prisma.customerAccountDeal.findFirst({ where: { dealId, account: { email: normalizeEmail(contact.contactEmail) } }, select: { accountId: true } });
-  const portal = access ? { link: await welcomeLoginLink(access.accountId), statsLink: await welcomeLoginLink(access.accountId, "tal"), days: WELCOME_DAYS } : null;
+  // The deal's contact - and whoever the tour was sent to for review, when that's someone else (they have the customer page).
+  const people = new Map<string, string | null>([[normalizeEmail(contact.contactEmail), contact.contactName]]);
+  for (const t of contact.tours) if (t.reviewEmail && !people.has(normalizeEmail(t.reviewEmail))) people.set(normalizeEmail(t.reviewEmail), t.reviewName);
+  const sent: string[] = [];
+  for (const [email, name] of people) {
+    await sendWelcomeMailTo(dealId, actorId, { email, name });
+    sent.push(email);
+  }
+  await prisma.deal.update({ where: { id: dealId }, data: { welcomeMailSentAt: new Date() } });
+  await prisma.note.create({ data: { dealId, authorId: actorId, kind: "MANUAL", body: `Velkomstmail sendt til ${sent.join(" og ")}.` } });
+}
+
+async function sendWelcomeMailTo(dealId: string, actorId: string, person: { email: string; name: string | null }): Promise<void> {
+  // The customer page goes in only when this e-mail has already been given access to this deal (in Arpo, by an admin, or with the review mail) - the mail never gives access by itself.
+  const access = await prisma.customerAccountDeal.findFirst({ where: { dealId, account: { email: person.email } }, select: { accountId: true } });
+  // Had the page since the review mail: then it's "the same page where you sent your corrections".
+  const known = access ? (await prisma.systemMail.count({ where: { dealId, accountId: access.accountId, kind: { in: ["review", "review_reminder"] }, error: null } })) > 0 : false;
+  const portal = access ? { link: await welcomeLoginLink(access.accountId), statsLink: await welcomeLoginLink(access.accountId, "tal"), days: WELCOME_DAYS, known } : null;
   // Their tour's front page on a MacBook, sent with the mail (made now - never a blocker: without it, a button).
   const items = await prisma.dealItem.findMany({ where: { dealId, url: { not: null } }, select: { url: true }, orderBy: { createdAt: "asc" }, take: 1 });
   const picture = await dealTourMockup(dealId, items[0]?.url ? (modelIdsIn(items[0].url)[0] ?? null) : null);
-  const { deal, to, subject, bodyText, bodyHtml } = await welcomeMailFor(dealId, portal, Boolean(picture));
+  const { deal, to, subject, bodyText, bodyHtml } = await welcomeMailFor(dealId, portal, Boolean(picture), person);
   if (!to) throw new Error("Kunden har ingen kontakt-e-mail.");
   const account = await prisma.emailAccount.findFirst({ where: { provider: "GOOGLE", email: WELCOME_MAIL_SENDER } });
   if (!account && !resendReady()) throw new Error(`Ingen mail-afsender: sæt RESEND_API_KEY i Vercel, eller forbind Gmail for ${WELCOME_MAIL_SENDER} under Indstillinger → E-mail.`);
@@ -191,9 +212,7 @@ export async function sendWelcomeMail(dealId: string, actorId: string): Promise<
     throw err;
   }
   await prisma.systemMail.create({ data: { dealId, accountId: access?.accountId, kind: "welcome", to, subject } }).catch(() => {});
-  await prisma.deal.update({ where: { id: dealId }, data: { welcomeMailSentAt: new Date() } });
-  await prisma.note.create({ data: { dealId, authorId: actorId, kind: "MANUAL", body: `Velkomstmail sendt til ${to}.` } });
-  await logActivity({ type: "DEAL_UPDATED", message: `Velkomstmail sendt til ${dealName(deal)}`, actorId, dealId });
+  await logActivity({ type: "DEAL_UPDATED", message: `Velkomstmail sendt til ${dealName(deal)} (${to})`, actorId, dealId });
 }
 
 /**
