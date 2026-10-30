@@ -17,6 +17,8 @@ import { PortalEmbeds } from "@/app/r/[token]/embeds";
 import { PHONE, WELCOME_MAIL_SENDER } from "@/lib/welcome-mail";
 import { LangToggle, LocationSwitcher, ReviewLauncher, TourThumb, ApproveTour, ReportMailChoice } from "./portal-ui";
 import { TourShare } from "./tour-share";
+import { tourEmbeds } from "@/lib/tour-embeds";
+import { EMBED_WORDS, TourEmbedList } from "@/components/tour-embed-list";
 import { TEXT, type Lang } from "./text";
 
 /*
@@ -128,6 +130,8 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
           .map((i) => ({ id: i.id, name: i.location ? `${dealName(d)} - ${i.location}` : dealName(d), url: /^https?:\/\//i.test(i.url!) ? i.url! : `https://${i.url}` }))
   );
   const needStats = page === "hjem" || page === "tal";
+  // "Her er touren vist": the pages showing their tours (only their own tours - the list above is theirs).
+  const embeds = page === "hjemmeside" ? await tourEmbeds(tours.map((x) => x.slug)) : [];
   const feedback =
     page === "rettelser" && reviewTours.length
       ? await prisma.tourFeedback.findMany({ where: { tourSlug: { in: reviewTours.map((x) => x.slug) } }, orderBy: { createdAt: "desc" }, take: 100, select: { id: true, tourSlug: true, kind: true, text: true, room: true, author: true, status: true, createdAt: true } })
@@ -411,6 +415,13 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
                   <PortalEmbeds url={x.url} title={x.name} places={[]} whole={null} lang={lang} heading={false} />
                 </section>
               ))}
+              {tours.length > 0 && (
+                <section className={card}>
+                  <h2 className="text-[18px] font-bold tracking-tight">{t.use.shownTitle}</h2>
+                  <p className="mb-3 mt-1 text-[14px] leading-snug text-[#6e6e73]">{t.use.shownLead}</p>
+                  <TourEmbedList embeds={embeds} words={EMBED_WORDS[lang]} />
+                </section>
+              )}
             </>
           )}
 

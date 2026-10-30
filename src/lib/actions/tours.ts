@@ -4,6 +4,7 @@ import { tourChanged } from "@/lib/tour-cache";
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { requireUser } from "@/lib/auth";
+import { tourEmbeds, type TourEmbed } from "@/lib/tour-embeds";
 import { prisma } from "@/lib/db";
 import type { TourConfig } from "@/app/arpo/tour-lab/tours/types";
 import { tourConfigProblem } from "@/lib/tour-validate";
@@ -277,4 +278,11 @@ export async function deletedTours() {
   const cutoff = new Date(Date.now() - KEEP_DELETED_DAYS * 86_400_000);
   await prisma.deletedTour.deleteMany({ where: { OR: [{ createdAt: { lt: cutoff } }, { restoredAt: { not: null } }] } }).catch(() => {});
   return prisma.deletedTour.findMany({ orderBy: { createdAt: "desc" }, select: { id: true, slug: true, name: true, deletedByName: true, createdAt: true } });
+}
+
+/** "Her er touren vist": the pages showing the tour in a frame (last 90 days) - for the editor's Del og udgiv. */
+export async function tourEmbedsOf(slug: string): Promise<TourEmbed[]> {
+  const user = await requireUser();
+  if (user.role !== "ADMIN") throw new Error("Kun admin.");
+  return tourEmbeds([slug]);
 }

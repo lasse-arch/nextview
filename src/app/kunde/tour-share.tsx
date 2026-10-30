@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { DEFAULT_EMBED, embedCode, type EmbedSize } from "@/app/arpo/tour-lab/[slug]/rediger/share";
+import { EmbedSizePicker } from "@/components/embed-size-picker";
 
 /*
  * "Brug touren": pick a tour and a place in it, then what you need for it -
@@ -33,6 +34,9 @@ export function TourShare({ tours, words }: { tours: ShareTour[]; words: Words }
   const [what, setWhat] = useState<"link" | "qr" | "code">("link");
   const [copied, setCopied] = useState(false);
   const tour = tours.find((x) => x.key === tourKey) ?? tours[0];
+  // The size on their page: the tour's own (set by us) to start with, and theirs to change.
+  const [chosenSize, setChosenSize] = useState<EmbedSize | null>(null);
+  const size = chosenSize ?? tour?.size ?? DEFAULT_EMBED;
   const groups = useMemo(() => {
     const m = new Map<string, { key: string; name: string; group: string | null }[]>();
     for (const p of tour?.places ?? []) {
@@ -44,7 +48,7 @@ export function TourShare({ tours, words }: { tours: ShareTour[]; words: Words }
   if (!tour) return null;
   const chosen = tour.places.find((p) => p.key === place);
   const url = chosen ? `${tour.url}?rum=${chosen.key}` : tour.url;
-  const code = embedCode(url, chosen ? `${tour.title} - ${chosen.name}` : tour.title, tour.size ?? DEFAULT_EMBED);
+  const code = embedCode(url, chosen ? `${tour.title} - ${chosen.name}` : tour.title, size);
   const qr = `/api/qr?url=${encodeURIComponent(url)}`;
   const copy = (text: string) => {
     navigator.clipboard?.writeText(text).catch(() => {});
@@ -151,6 +155,7 @@ export function TourShare({ tours, words }: { tours: ShareTour[]; words: Words }
 
       {what === "code" && (
         <div className="space-y-3">
+          <EmbedSizePicker size={size} onChange={setChosenSize} lang={words.copy === "Copy" ? "en" : "da"} />
           <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-all rounded-2xl bg-[#1d1d1f] p-4 text-[12px] leading-relaxed text-white/85">{code}</pre>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="max-w-md text-[13px] leading-snug text-[#8e8e93]">{words.codeHint}</p>

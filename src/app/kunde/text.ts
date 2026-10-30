@@ -110,6 +110,8 @@ export const TEXT = {
       qr: "QR-kode",
       qrHint: "QR-koden kan printes på skilte, foldere og visitkort - den åbner touren på mobilen.",
       ideasTitle: "Idéer",
+      shownTitle: "Her er touren vist",
+      shownLead: "De sider, hvor touren er sat ind og bliver åbnet - så I kan se, at den virker, og hvor den bliver brugt.",
       ideas: [
         ["Google", "Sæt linket på jeres Google-profil (under Website eller som et opslag), så folk kan gå rundt, før de kommer."],
         ["Sociale medier", "Lav et opslag med linket til et bestemt sted - \"Kig ind i vores nye …\" - og sæt det i jeres bio."],
@@ -227,6 +229,8 @@ export const TEXT = {
       qr: "QR code",
       qrHint: "The QR code can be printed on signs, flyers and business cards - it opens the tour on a phone.",
       ideasTitle: "Ideas",
+      shownTitle: "Where the tour is shown",
+      shownLead: "The pages where the tour is embedded and being opened - so you can see that it works and where it's used.",
       ideas: [
         ["Google", "Put the link on your Google profile (under Website or as a post), so people can look around before they come."],
         ["Social media", "Make a post with the link to a particular place - \"Take a look inside our new …\" - and put it in your bio."],

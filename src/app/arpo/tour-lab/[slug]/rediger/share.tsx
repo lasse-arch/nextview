@@ -1,8 +1,10 @@
 "use client";
 
 import { tourUrl } from "@/lib/public-urls";
-import { useState, useTransition } from "react";
-import { setTourPublished } from "@/lib/actions/tours";
+import { useEffect, useState, useTransition } from "react";
+import { setTourPublished, tourEmbedsOf } from "@/lib/actions/tours";
+import type { TourEmbed } from "@/lib/tour-embeds";
+import { EMBED_WORDS, TourEmbedList } from "@/components/tour-embed-list";
 import { suggestEmbedPages } from "@/lib/actions/tour-embeds";
 import { startPlaces } from "../../tours/places";
 import type { TourConfig } from "../../tours/types";
@@ -125,6 +127,7 @@ export function SharePanel({
         <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">Indsæt koden i en HTML-/kode-blok på siden (WordPress: blokken &quot;Tilpasset HTML&quot;).</p>
       </Group>
       <PagesGroup config={config} edit={edit} slug={slug} title={title} size={size} published={published} url={url} />
+      <ShownGroup slug={slug} />
       <CloudflarePublish slug={slug} />
     </>
   );
@@ -147,6 +150,26 @@ export function guessSite(T: TourConfig): string {
  * suggested from their sitemap, confirmed or changed here. The customer sees
  * the same list with the codes in their portal.
  */
+/** "Her er touren vist": the pages showing the tour in a frame now (the customer sees the same on their page). */
+function ShownGroup({ slug }: { slug: string }) {
+  const [embeds, setEmbeds] = useState<TourEmbed[] | null>(null);
+  useEffect(() => {
+    let off = false;
+    tourEmbedsOf(slug)
+      .then((e) => !off && setEmbeds(e))
+      .catch(() => !off && setEmbeds([]));
+    return () => {
+      off = true;
+    };
+  }, [slug]);
+  return (
+    <Group title="Her er touren vist">
+      <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">Sider, hvor touren er sat ind og er blevet åbnet de sidste 90 dage. Kunden ser det samme på sin kundeside.</p>
+      {embeds ? <TourEmbedList embeds={embeds} words={EMBED_WORDS.da} /> : <p className="px-1 text-[13px] text-[#8e8e93]">Henter …</p>}
+    </Group>
+  );
+}
+
 function PagesGroup({ config, edit, slug, title, size, published, url }: { config: TourConfig; edit: (fn: (d: TourConfig) => void) => void; slug: string; title: string; size: EmbedSize; published: boolean; url: string }) {
   const places = startPlaces(config);
   const pages = config.embeds?.pages ?? {};

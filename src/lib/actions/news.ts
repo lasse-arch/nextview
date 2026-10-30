@@ -63,6 +63,12 @@ export async function getUnreadNewsCount(userId: string, newsReadAt: Date | null
 const DEFAULT_POSTS: { title: string; body: string; minutesAgo: number; screenshotUrl: string }[] = [
   {
     minutesAgo: 0,
+    title: "Kunden vælger størrelsen på touren - og ser, hvor den er vist",
+    body: "På kundesiden under \"På hjemmesiden\" kan kunden nu selv vælge, hvor stor touren skal være på deres side: bred, høj, fast højde (med en skyder) eller hele skærmen. En lille side tegnet i målestok viser, hvor meget touren fylder - på computer og mobil, med en streg for hvor langt man ser uden at scrolle. Koden, de kopierer, laves i den størrelse.\n\nNederst står \"Her er touren vist\": de sider, hvor touren er sat ind og er blevet åbnet de sidste 90 dage, hvornår senest og hvor mange besøg. Vi ser det samme i tour-editoren under Del og udgiv. Samtidig tæller statistikken nu også besøg i touren, når den er sat ind på kundens hjemmeside (før talte kun besøg, hvor touren blev åbnet direkte).",
+    screenshotUrl: "/news/touren-paa-hjemmesiden.png",
+  },
+  {
+    minutesAgo: 0,
     title: "Flere rundvisninger i samme tour",
     body: "En tour kan nu have flere \"Vis mig rundt\" - fx én for hele skolen og én pr. linjefag (Padel, Ridning …). Hver rundvisning har sit eget navn, sine egne stop, tekster, stemme og tempo.\n\nI editoren under Vis mig rundt vælger du øverst, hvilken rundvisning du retter, eller trykker \"+ Ny rundvisning\". Menuen i touren får en knap til hver, en velkomstflise kan starte en bestemt, og ethvert link \"#rundvisning:<navn>\" (en knap, et menupunkt, docken) starter den. Under Resultater kan du se, hvor mange der starter og gennemfører hver af dem. nextviewAI kan også lave dem - fx én pr. linjefag.",
     screenshotUrl: "/news/flere-rundvisninger.png",

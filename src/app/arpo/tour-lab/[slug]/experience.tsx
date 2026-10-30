@@ -120,7 +120,7 @@ const eventLog: TrackedEvent[] = [];
 const logListeners = new Set<() => void>();
 
 /** The tour being measured (set when the tour mounts). */
-const tracking = { slug: "", session: "", off: false, queue: [] as { name: string; label?: string; url?: string; value?: number }[], timer: 0, da: (s: string) => s };
+const tracking = { slug: "", session: "", off: false, inArpo: false, queue: [] as { name: string; label?: string; url?: string; value?: number }[], timer: 0, da: (s: string) => s };
 
 /** Sends the waiting events to Arpo's own measurement (/api/tour-events) - also when the page is closed. */
 function flushEvents() {
@@ -136,8 +136,8 @@ function flushEvents() {
 
 function track(name: string, params: Record<string, string | number> = {}) {
   const full = { tour: tracking.slug, ...params };
-  // Arpo's own count - not from the editor's preview (the tour in an iframe there).
-  if (tracking.slug && !tracking.off && window.parent === window) {
+  // Arpo's own count - not from Arpo's own previews (the editor's, the share page's); a customer's site showing it in a frame counts.
+  if (tracking.slug && !tracking.off && !tracking.inArpo) {
     const label = params.label ?? params.item_name ?? params.place_name ?? params.point_name ?? params.room_name ?? params.kind ?? params.title ?? params.name;
     // A number that matters, kept with the event: the seconds spent in a room.
     // …or the stop of "Vis mig rundt" it happened at.
@@ -365,7 +365,20 @@ function TourExperience({
     }
     tracking.slug = savedTour.slug;
     tracking.off = Boolean(review); // the customer's review isn't a visit
-    track("tour_open", { label: document.referrer ? new URL(document.referrer).hostname : "direkte" });
+    // In a frame: on Arpo's own pages (a preview) - or on a site showing the tour ("Her er touren vist").
+    const from = (() => {
+      try {
+        return document.referrer ? new URL(document.referrer) : null;
+      } catch {
+        return null;
+      }
+    })();
+    const arpo = isStaticTour() ? new URL(apiUrl("/"), location.href).origin : location.origin;
+    const framed = window.parent !== window;
+    tracking.inArpo = framed && from?.origin === arpo;
+    track("tour_open", { label: from ? from.hostname : "direkte" });
+    // The page it's shown on - without anything after "?" or "#" (it may hold someone's details).
+    if (framed && !tracking.inArpo) track("tour_embed", { label: from?.hostname ?? "ukendt side", ...(from && /^https?:$/.test(from.protocol) ? { link_url: `${from.origin}${from.pathname}` } : {}) });
     const leave = () => flushEvents();
     window.addEventListener("pagehide", leave);
     return () => {

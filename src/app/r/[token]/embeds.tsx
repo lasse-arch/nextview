@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { DEFAULT_EMBED, embedCode, type EmbedSize } from "@/app/arpo/tour-lab/[slug]/rediger/share";
+import { EmbedSizePicker } from "@/components/embed-size-picker";
 
 /*
  * The customer portal's "Touren på jeres hjemmeside": a code for the whole
@@ -61,8 +62,10 @@ export function PortalEmbeds({ url, title, size, places, whole, lang = "da", hea
   const t = T[lang];
   const [copied, setCopied] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
+  // The size the code is made in: ours (set in Arpo) to start with - theirs to change.
+  const [chosen, setChosen] = useState<EmbedSize>(size ?? DEFAULT_EMBED);
   const copy = (key: string) => {
-    navigator.clipboard?.writeText(embedCode(key ? `${url}?rum=${key}` : url, title, size ?? DEFAULT_EMBED)).catch(() => {});
+    navigator.clipboard?.writeText(embedCode(key ? `${url}?rum=${key}` : url, title, chosen)).catch(() => {});
     setCopied(key);
     setTimeout(() => setCopied(null), 1800);
   };
@@ -93,6 +96,9 @@ export function PortalEmbeds({ url, title, size, places, whole, lang = "da", hea
           <p className="mt-1 text-[14px] leading-snug text-[#6e6e73]">{t.lead}</p>
         </div>
       )}
+      <div className="rounded-2xl bg-white p-1 ring-1 ring-black/[.05]">
+        <EmbedSizePicker size={chosen} onChange={setChosen} lang={lang} />
+      </div>
       <ul className="divide-y divide-black/[.05] overflow-hidden rounded-2xl bg-white ring-1 ring-black/[.05]">
         {row("", t.whole, t.wholeSub, whole)}
         {suggested.map((p) => row(p.key, p.name, p.group, p.page))}
