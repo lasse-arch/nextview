@@ -6,6 +6,7 @@
 
 /** The guide's turn at a stop: "as" = the usual slow turn, "other" = the other way, "none" = no turn. */
 export type GuideTurn = "as" | "other" | "none";
+export type DroneLook = { down?: number; up?: number; zoomIn?: number; zoomOut?: number; point?: "keep" | number };
 /** A tile in the "Fliser" (bento) menu: `title` may have line breaks (\n); `href` as a menu item's. */
 export type BentoTile = { title: string; kicker?: string; tag?: string; href: string; size?: "wide" | "tall"; style?: "light" | "dark" | "accent" };
 
@@ -192,6 +193,13 @@ export type TourConfig = {
     /** Phones: the categories in one row to scroll sideways instead (fewer lines over the picture). */
     filterScroll?: true;
   };
+  /**
+   * How one can look around the 360° aerial photo, per device (left out = as always):
+   * `down`/`up` = how far down/up one can look (degrees, -90 = straight down),
+   * `zoomIn`/`zoomOut` = the closest and widest view (field of view in degrees),
+   * `point` = the view when a point is pressed: "keep" the zoom, or a field of view (small = in, big = out).
+   */
+  droneLook?: { desktop?: DroneLook; mobile?: DroneLook };
   drone?: {
     /** One 360° photo (equirectangular) instead of the tiles below - set by the engine for a 360° map. */
     panorama?: string;

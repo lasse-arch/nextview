@@ -858,14 +858,15 @@ function TourExperience({
         // On a computer the panel covers the right side, so the point is centred in what's left of the screen.
         const phone = window.innerWidth <= 760;
         const shift = panel && !phone ? 183 : 0;
-        // On a phone the card covers the bottom half: zoom in a little and look lower, so the point stands above the card.
-        const hfov = panel && phone ? Math.min(v.getHfov(), 40) : v.getHfov();
+        // The tour's own choice (zoom in/out, or keep), else: on a phone the card covers the bottom half - zoom in a little and look lower, so the point stands above the card.
+        const own = panel ? T.droneLook?.[phone ? "mobile" : "desktop"]?.point : undefined;
+        const hfov = typeof own === "number" ? own : own === "keep" ? v.getHfov() : panel && phone ? Math.min(v.getHfov(), 40) : v.getHfov();
         const yaw = p.yaw + (shift / window.innerWidth) * hfov;
         const box = droneEl.current;
         const vfov = box ? (2 * Math.atan(Math.tan((hfov * Math.PI) / 360) * (box.clientHeight / Math.max(1, box.clientWidth))) * 180) / Math.PI : 90;
         const pitch = panel && phone ? p.pitch - vfov * 0.3 : p.pitch;
         // No further down than the picture goes (a tall phone screen sees ~110° from top to bottom).
-        v.lookAt(Math.max(pitch, -70, -89 + vfov / 2), yaw, hfov, 700);
+        v.lookAt(Math.max(pitch, -70, T.droneLook?.[phone ? "mobile" : "desktop"]?.down ?? -90, -89 + vfov / 2), yaw, hfov, 700);
       }
     },
     [T]
@@ -974,7 +975,7 @@ function TourExperience({
   }, [phase, GUIDE]);
 
   // The drone scene is rebuilt only when it or its points change - not for every edit in the editor's preview.
-  const droneKey = JSON.stringify([T.drone, Boolean(T.map), T.points, T.categories]);
+  const droneKey = JSON.stringify([T.drone, Boolean(T.map), T.points, T.categories, T.droneLook]);
   /** The filter at the bottom: its height is given to what stands just above it (weather, Find din plads), which moves up with it. */
   const filterEl = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -1010,6 +1011,7 @@ function TourExperience({
     loadPannellum().then(() => {
       if (cancelled || !droneEl.current || !window.pannellum) return;
       const start = mobile.current ? D.startMobile : D.start;
+      const look = T.droneLook?.[mobile.current ? "mobile" : "desktop"] ?? {};
       const hotSpots: PannellumHotspot[] = T.points.map((p) => ({
         id: p.id,
         pitch: p.pitch,
@@ -1045,12 +1047,13 @@ function TourExperience({
         yaw: start.yaw,
         pitch: start.pitch,
         hfov: start.hfov,
-        minHfov: mobile.current ? 40 : 50,
+        // The tour's own limits (Luftfoto og kort → Bevægelse), else as always.
+        minHfov: look.zoomIn ?? (mobile.current ? 40 : 50),
         // On a tall phone screen, zooming out past the start makes the view taller than the picture lets it look down,
         // so pannellum tilts it up - and everything, points too, slides up and down. Out to the start, no further.
-        maxHfov: mobile.current ? Math.min(110, Math.max(start.hfov, 60)) : 115,
-        minPitch: -90,
-        maxPitch: D.panorama ? 90 : 25,
+        maxHfov: look.zoomOut ?? (mobile.current ? Math.min(110, Math.max(start.hfov, 60)) : 115),
+        minPitch: look.down ?? -90,
+        maxPitch: look.up ?? (D.panorama ? 90 : 25),
         mouseZoom: true,
         keyboardZoom: false,
         hotSpots,
@@ -3279,7 +3282,7 @@ const CSS = `
 .hv-menu-aaben :is(.hv-stories,.hv-room,.hv-luften,.hv-filtre){opacity:0;translate:0 24px;pointer-events:none}
 .hv-menu-aaben .hv-stories>*{pointer-events:none}
 .hv-menu-head{padding:56px 20px 16px;text-align:center;color:#fff}
-.hv-menu-head img{width:58px;height:58px;display:block;margin:0 auto 10px}
+.hv-menu-head img{height:58px;width:auto;max-width:220px;object-fit:contain;display:block;margin:0 auto 10px}
 .hv-menu-titel{font-size:20px;font-weight:800;letter-spacing:.08em}
 .hv-gruppe{border-bottom:1px solid #e6eaeb}
 .hv-gtitel{display:flex;justify-content:space-between;align-items:center;width:100%;padding:12px 22px;border:0;background:none;font:600 16px inherit;font-family:inherit;color:var(--c-main);cursor:pointer;text-align:left}
@@ -3325,7 +3328,7 @@ const CSS = `
 }
 .hv-film button{position:absolute;right:20px;bottom:24px;border:1px solid rgba(255,255,255,.5);background:rgba(0,0,0,.35);color:#fff;border-radius:999px;padding:9px 18px;font:inherit;font-weight:700;font-size:13px;letter-spacing:.06em;cursor:pointer;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
 .hv-wel-main.hv-light img{width:auto;height:64px;max-width:200px;object-fit:contain;object-position:left;padding:0;background:none;border-radius:0}
-.hv-wel-main img{width:56px;height:56px;background:var(--c-main);border-radius:12px;padding:8px;margin-bottom:18px}
+.hv-wel-main img{box-sizing:border-box;height:56px;width:auto;min-width:56px;max-width:220px;object-fit:contain;background:var(--c-main);border-radius:12px;padding:8px;margin-bottom:18px}
 .hv-wel-kick{font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:#7a8a90}
 .hv-wel-main h1{margin:6px 0 10px;font-size:42px;line-height:1.02;font-weight:900;color:var(--c-main);letter-spacing:-.01em;text-wrap:balance}
 .hv-wel-main p{margin:0;font-size:16px;line-height:1.55;color:#3d4a50}
@@ -3438,7 +3441,7 @@ const CSS = `
   .hv-wel{align-items:flex-start;padding:12px;overflow-y:auto}
   .hv-wel-grid{grid-template-columns:1fr 1fr;gap:10px;grid-auto-rows:auto}
   .hv-wel-main{grid-column:span 2;grid-row:auto;padding:16px 18px}
-  .hv-wel-main img{width:40px;height:40px;padding:6px;margin-bottom:10px}
+  .hv-wel-main img{height:40px;min-width:40px;max-width:160px;padding:6px;margin-bottom:10px}
   .hv-wel-kick{display:none}
   .hv-wel-main h1{font-size:26px;margin-top:0}
   .hv-wel-main p{font-size:14px}

@@ -6,7 +6,7 @@ import { placeMapSpots } from "@/lib/actions/tour-ai";
 import { ICONS, ICON_NAMES, guessIcon } from "../../tours/icons";
 import { PANO_HFOV, isPlaceHref, panoHfov, pointOfHref } from "../../tours/places";
 import "pannellum/build/pannellum.css";
-import type { TourConfig, TourPoint } from "../../tours/types";
+import type { DroneLook, TourConfig, TourPoint } from "../../tours/types";
 import { Choice, Field, Group, Icon, input, PanoZoom, Toggle, UploadButton, type PreviewApi } from "./ui";
 import { AiImageButton } from "./ai-image";
 
@@ -93,6 +93,7 @@ export function MapEditor({ config, edit, focus, preview }: { config: TourConfig
     return (
       <>
       {config.drone && <OverviewUiToggles config={config} edit={edit} preview={preview} />}
+      {config.drone && <DroneLookEditor config={config} edit={edit} panorama={Boolean(config.drone.panorama)} />}
       {config.drone && <DroneToMap config={config} edit={edit} />}
       <Group>
         <p className="text-[14px] leading-snug">Start touren på et kort over stedet - en tegning, en situationsplan eller et dronefoto - med punkter man kan trykke på og gå ind fra.</p>
@@ -145,6 +146,7 @@ export function MapEditor({ config, edit, focus, preview }: { config: TourConfig
         )}
       </Group>
       <OverviewUiToggles config={config} edit={edit} preview={preview} />
+      {M.panorama && <DroneLookEditor config={config} edit={edit} panorama />}
       <Group title="Billede">
         <div className="flex gap-2">
           <UploadButton accept="image/*" label="Skift kortbillede" onDone={setImage} />
@@ -1261,6 +1263,85 @@ function CategoriesPanel({ config, edit }: { config: TourConfig; edit: Edit }) {
       >
         + Kategori
       </button>
+    </Group>
+  );
+}
+
+/* ----- "Bevægelse på luftfotoet": how far one can look and zoom, and what a pressed point does - per device. ----- */
+
+type Device = "desktop" | "mobile";
+const DEVICE_NAME: Record<Device, string> = { desktop: "Computer", mobile: "Mobil" };
+
+function DroneLookEditor({ config, edit, panorama }: { config: TourConfig; edit: Edit; panorama: boolean }) {
+  const [device, setDevice] = useState<Device>("mobile");
+  const L = config.droneLook?.[device] ?? {};
+  // What the tour does when nothing is set (the engine's own values).
+  const std: Required<Omit<DroneLook, "point">> = { down: -90, up: panorama ? 90 : 25, zoomIn: device === "mobile" ? 40 : 50, zoomOut: device === "mobile" ? 110 : 115 };
+  const set = (k: keyof DroneLook, v: DroneLook[keyof DroneLook] | undefined) =>
+    edit((d) => {
+      const next: DroneLook = { ...d.droneLook?.[device], [k]: v };
+      if (v === undefined) delete next[k];
+      const all = { ...d.droneLook, [device]: Object.keys(next).length ? next : undefined };
+      if (!all[device]) delete all[device];
+      d.droneLook = Object.keys(all).length ? all : undefined;
+    });
+  const point = L.point === undefined ? "standard" : L.point === "keep" ? "keep" : L.point < 60 ? "in" : "out";
+  const slider = (k: "down" | "up" | "zoomIn" | "zoomOut", title: string, min: number, max: number, label: (v: number) => string, hint?: string) => {
+    const v = L[k] ?? std[k];
+    return (
+      <Field title={`${title}: ${label(v)}${L[k] === undefined ? " (standard)" : ""}`} hint={hint}>
+        <div className="flex items-center gap-2">
+          <input type="range" min={min} max={max} step={1} className="w-full accent-[#0071e3]" value={v} onChange={(e) => set(k, Number(e.target.value) === std[k] ? undefined : Number(e.target.value))} />
+          {L[k] !== undefined && (
+            <button type="button" className="shrink-0 text-[12px] text-[#0071e3]" onClick={() => set(k, undefined)}>
+              Nulstil
+            </button>
+          )}
+        </div>
+      </Field>
+    );
+  };
+  return (
+    <Group
+      title="Bevægelse på luftfotoet"
+      more={
+        <>
+          <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">Grænserne for, hvor meget man kan kigge og zoome på {DEVICE_NAME[device].toLowerCase()} (skift ovenfor).</p>
+          {slider("down", "Kig ned højst", -90, 0, (v) => (v <= -90 ? "lige ned" : `${-v}° ned`), "Hold den over jorden, hvis billedet er grimt lige under dronen.")}
+          {slider("up", "Kig op højst", 0, 90, (v) => (v >= 90 ? "lige op" : `${v}° op`), "Fx lidt over horisonten, så man ikke kigger op i den tomme himmel.")}
+          {slider("zoomIn", "Zoom ind højst", 15, 90, (v) => `${v}°`, "Lille tal = man kan komme tættere på.")}
+          {slider("zoomOut", "Zoom ud højst", 60, 120, (v) => `${v}°`, "Stort tal = man kan se mere af gangen.")}
+        </>
+      }
+    >
+      <Choice<Device>
+        value={device}
+        options={[
+          ["mobile", "Mobil"],
+          ["desktop", "Computer"],
+        ]}
+        onChange={setDevice}
+      />
+      <Field
+        title="Når man trykker på et punkt"
+        hint={device === "mobile" ? "Standard på mobil: zoomer lidt ind, så punktet står over kortet med teksten." : "Standard på computer: drejer hen til punktet uden at zoome."}
+      >
+        <Choice
+          value={point}
+          options={[
+            ["standard", "Standard"],
+            ["in", "Zoom ind"],
+            ["keep", "Behold zoom"],
+            ["out", "Zoom ud"],
+          ]}
+          onChange={(v) => set("point", v === "standard" ? undefined : v === "keep" ? "keep" : v === "in" ? 35 : 90)}
+        />
+      </Field>
+      {typeof L.point === "number" && (
+        <Field title={`Hvor meget: ${L.point}°`} hint="Lille tal = tæt på punktet, stort tal = mere af området omkring.">
+          <input type="range" min={20} max={115} step={1} className="w-full accent-[#0071e3]" value={L.point} onChange={(e) => set("point", Number(e.target.value))} />
+        </Field>
+      )}
     </Group>
   );
 }
