@@ -1490,6 +1490,33 @@ function TourExperience({
     }
   }
   /*
+   * Fitted to the phone it's on: the screen's own size (a web page can't
+   * know the model, but it knows the size) sets how big everything on top
+   * of the tour is drawn - "--ui-zoom" on the page, measured at the start,
+   * on every turn of the phone and when the browser's bars come and go.
+   * Portrait: an iPhone (393 x 852) is 1, a smaller phone smaller (an SE
+   * 0.86), never bigger. On its side: by the height (0.6-0.8). Computers: 1.
+   */
+  useEffect(() => {
+    const root = document.documentElement;
+    const fit = () => {
+      const w = window.visualViewport?.width ?? window.innerWidth;
+      const h = window.visualViewport?.height ?? window.innerHeight;
+      const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+      const z = h <= 500 && w >= 500 ? clamp(h / 540, 0.6, 0.8) : w <= 760 ? clamp(Math.min(w / 393, h / 800), 0.86, 1) : 1;
+      root.style.setProperty("--ui-zoom", z.toFixed(3));
+    };
+    fit();
+    window.addEventListener("resize", fit);
+    window.addEventListener("orientationchange", fit);
+    window.visualViewport?.addEventListener("resize", fit);
+    return () => {
+      window.removeEventListener("resize", fit);
+      window.removeEventListener("orientationchange", fit);
+      window.visualViewport?.removeEventListener("resize", fit);
+    };
+  }, []);
+  /*
    * Using the tour also means just looking around in the 3D view: a drag or
    * swipe there happens in Matterport's own frame (on a phone a touch there
    * can't be seen), so a turn of the view the tour didn't make itself counts.
@@ -3410,13 +3437,20 @@ const CSS = `
 @media (max-height:500px) and (min-width:500px){
   .gd-card,.gd-bars,.hv-intro,.hv-panel,.ip-card,.hv-menuknap,.bm-knap,.ls,.hv-logo,.hv-filtre,.hv-luften,.hv-room,.hv-live-chip,
   .hv-pano-luk,.hv-pano-titel,.hv-pick,.rt-knap,.vj-chip,.vj-kort,.km-soeg,.km-zoom,.pk,.pk-mini,.dz-dock,.dz-here,.dz-sheet,.dy-bar,.fb-bar,.fb-tab,.hv-maal,
-  .hv-menu > *,.hv-wel > *,.bm > *,.hv-live > *,.dy > *,.fd > *,.cf-bg > *,.ob > *,.dz-cover > *{zoom:.72}
-  .hv-wel > *,.dz-cover > *{zoom:.6}
+  .hv-menu > *,.hv-wel > *,.bm > *,.hv-live > *,.dy > *,.fd > *,.cf-bg > *,.ob > *,.dz-cover > *{zoom:var(--ui-zoom,.72)}
+  .hv-wel > *,.dz-cover > *{zoom:calc(var(--ui-zoom,.72) * .83)}
   .hv-wel,.bm,.hv-live,.dy,.fd,.cf-bg,.ob{overflow-y:auto;-webkit-overflow-scrolling:touch;align-items:flex-start}
   .hv-menu{overflow-y:auto}
-  .gd-card{max-height:calc((100dvh - 24px) / .72);overflow-y:auto}
+  .gd-card{max-height:calc((100dvh - 24px) / var(--ui-zoom,.72));overflow-y:auto}
   .gd-card,.hv-intro,.hv-filtre,.hv-luften{left:max(16px,env(safe-area-inset-left,0px))}
   .hv-menuknap,.bm-knap{right:max(14px,env(safe-area-inset-right,0px))}
+}
+/* An upright phone: the floating parts drawn to the phone's size (--ui-zoom, 0.86-1 - a small phone a little smaller). */
+@media (max-width:760px) and (min-height:501px){
+  .gd-card,.gd-bars,.hv-intro,.hv-panel,.ip-card,.hv-menuknap,.bm-knap,.ls,.hv-logo,.hv-filtre,.hv-luften,.hv-room,.hv-live-chip,.hv-find-m,
+  .hv-pano-luk,.hv-pano-titel,.hv-pick,.rt-knap,.vj-chip,.vj-kort,.km-soeg,.km-zoom,.pk,.pk-mini,.dz-dock,.dz-here,.dy-bar,.hv-maal,.pc,
+  .hv-menu > *,.hv-wel > *,.dz-cover > *{zoom:var(--ui-zoom,1)}
+  .gd-card{max-height:calc((100dvh - 120px) / var(--ui-zoom,1));overflow-y:auto}
 }
 `;
 
