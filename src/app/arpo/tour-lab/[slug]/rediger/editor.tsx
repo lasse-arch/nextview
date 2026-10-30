@@ -893,7 +893,6 @@ export function TourEditor({
                 <MapEditor config={config} edit={edit} focus={pointFocus} preview={preview} />
                 {(config.drone || config.map) && <FinderEditor config={config} edit={edit} />}
                 {(config.drone || config.map) && <WeatherEditor config={config} edit={edit} />}
-                <CommuteEditor config={config} edit={edit} />
               </>
             )}
             {tab === "sprog" && (
@@ -1107,6 +1106,7 @@ export function TourEditor({
                 <Toggle on={Boolean(config.measure)} onChange={(on) => edit((d) => void (d.measure = on || undefined))} title="Vis mål" hint="En knap, der viser Matterports mål i rummet." />
                 <Toggle on={Boolean(config.matterportUi)} onChange={(on) => edit((d) => void (d.matterportUi = on || undefined))} title="Behold Matterports egne knapper" hint="Normalt skjult - tourens egne knapper er brugerfladen." />
                 </Group>
+                <CommuteEditor config={config} edit={edit} />
                 <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">
                   Tags på ting i rummet laves under Tags.
                 </p>
