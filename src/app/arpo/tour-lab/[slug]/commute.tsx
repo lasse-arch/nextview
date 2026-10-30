@@ -92,7 +92,7 @@ export function CommuteSheet({ T, onClose, onEvent }: { T: TourConfig; onClose: 
           />
           {list.length > 0 && (
             <ul className="vt-liste">
-              {list.map((s) => (
+              {list.slice(0, 5).map((s) => (
                 <li key={`${s.text}${s.lat}`}>
                   <button type="button" onClick={() => void pick(s)}>
                     {s.text}
@@ -140,16 +140,26 @@ export function CommuteSheet({ T, onClose, onEvent }: { T: TourConfig; onClose: 
 export const COMMUTE_CSS = `
 .vt-bg{position:absolute;inset:0;z-index:40;display:flex;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.35);animation:hvFade .25s ease}
 .vt-ark{position:relative;width:min(420px,calc(100% - 24px));margin:12px;max-height:calc(100% - 24px);overflow-y:auto;background:#fff;border-radius:22px;padding:18px 18px 14px;box-shadow:0 12px 40px rgba(0,0,0,.3);color:var(--c-main);font-family:inherit}
-@media (min-width:761px){.vt-bg{align-items:center}}
+@media (min-width:761px){
+  .vt-bg{align-items:center}
+  .vt-ark{width:min(540px,calc(100% - 48px));padding:26px 28px 20px;border-radius:24px}
+  .vt-ark h2{font-size:26px;margin-bottom:16px}
+  .vt-felt input{font-size:17px;padding:14px 16px}
+  .vt-tal b{font-size:19px}
+  .vt-ark .vt-knap{font-size:16px;padding:13px}
+}
 .vt-x{position:absolute;right:12px;top:12px;width:32px;height:32px;border:0;border-radius:50%;background:#f2f2f2;font-size:19px;cursor:pointer;color:#1d2a30}
 .vt-kick{font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--c-accent);margin-right:40px}
 .vt-ark h2{margin:4px 40px 12px 0;font-size:21px;line-height:1.15;font-weight:900}
 .vt-felt{position:relative}
 .vt-felt input{box-sizing:border-box;width:100%;border:0;border-radius:12px;background:#f2f2f2;padding:12px 13px;font:inherit;font-size:16px;color:#1d2a30;outline:none}
 .vt-felt input:focus{box-shadow:0 0 0 2px var(--c-accent)}
-.vt-liste{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:2;margin:0;padding:4px;list-style:none;background:#fff;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.2)}
-.vt-liste button{display:block;width:100%;text-align:left;border:0;background:none;padding:9px 10px;border-radius:8px;font:inherit;font-size:14.5px;color:#1d2a30;cursor:pointer}
-.vt-liste button:hover{background:#f2f2f2}
+/* The suggestions: a calm list right under the field, inside the card (it grows with them - nothing to scroll). */
+.vt-liste{margin:6px 0 0;padding:4px;list-style:none;background:#fff;border-radius:14px;border:1px solid rgba(0,0,0,.08);box-shadow:0 8px 24px rgba(0,0,0,.08);animation:hvFade .15s ease}
+.vt-liste li+li{border-top:1px solid rgba(0,0,0,.05)}
+.vt-liste button{display:flex;align-items:center;gap:10px;width:100%;text-align:left;border:0;background:none;padding:11px 10px;border-radius:10px;font:inherit;font-size:15px;color:#1d2a30;cursor:pointer}
+.vt-liste button::before{content:"";flex:none;width:8px;height:8px;border-radius:50%;background:var(--c-accent);opacity:.7}
+.vt-liste button:hover,.vt-liste button:focus-visible{background:#f4f4f2;outline:none}
 .vt-note{margin:12px 2px 0;font-size:13px;color:#6b7a80}
 .vt-fejl{color:#c0392b}
 .vt-tal{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px;margin-top:8px}
@@ -160,20 +170,20 @@ export const COMMUTE_CSS = `
 .vt-bus p{margin:4px 0 10px;font-size:14px;line-height:1.4;color:#33474d}
 .vt-knap{display:block;text-align:center;border-radius:999px;background:var(--c-accent);color:#fff;font-weight:800;padding:11px;font-size:15px;text-decoration:none}
 .vt-lille{margin:10px 2px 0;text-align:center;font-size:11.5px;color:#8a979c}
-@media (max-height:500px) and (min-width:500px){.vt-ark,.vt-knap{zoom:var(--ui-zoom,.72)}}
+@media (max-height:500px) and (min-width:500px){.vt-ark,.vt-tur-knap{zoom:var(--ui-zoom,.72)}}
 /* Its own button on the tour (when chosen) - under the menu button, or bottom left/right. */
-.vt-knap{position:absolute;z-index:7;display:flex;align-items:center;gap:7px;border:0;border-radius:999px;padding:9px 15px;background:#fff;color:var(--c-main);font:inherit;font-weight:800;font-size:13.5px;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.22)}
-.vt-knap-under-menu{top:calc(68px + env(safe-area-inset-top,0px));right:16px}
-.hv:has(.hv-live-chip) .vt-knap-under-menu{top:calc(124px + env(safe-area-inset-top,0px))}
-.vt-knap-bottom-left{bottom:calc(18px + env(safe-area-inset-bottom,0px));left:16px}
-.vt-knap-bottom-right{bottom:calc(18px + env(safe-area-inset-bottom,0px));right:16px}
-.hv-menu-aaben .vt-knap,.hv-med-kort .vt-knap,.hv:has(.hv-story-play) .vt-knap{opacity:0;pointer-events:none}
-.hv-st-on-d .vt-knap-bottom-left,.hv-st-on-d .vt-knap-bottom-right{bottom:calc(var(--st-h,148px) + 10px)}
+.vt-tur-knap{position:absolute;z-index:7;display:flex;align-items:center;gap:7px;border:0;border-radius:999px;padding:9px 15px;background:#fff;color:var(--c-main);font:inherit;font-weight:800;font-size:13.5px;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.22)}
+.vt-tur-knap-under-menu{top:calc(68px + env(safe-area-inset-top,0px));right:16px}
+.hv:has(.hv-live-chip) .vt-tur-knap-under-menu{top:calc(124px + env(safe-area-inset-top,0px))}
+.vt-tur-knap-bottom-left{bottom:calc(18px + env(safe-area-inset-bottom,0px));left:16px}
+.vt-tur-knap-bottom-right{bottom:calc(18px + env(safe-area-inset-bottom,0px));right:16px}
+.hv-menu-aaben .vt-tur-knap,.hv-med-kort .vt-tur-knap,.hv:has(.hv-story-play) .vt-tur-knap{opacity:0;pointer-events:none}
+.hv-st-on-d .vt-tur-knap-bottom-left,.hv-st-on-d .vt-tur-knap-bottom-right{bottom:calc(var(--st-h,148px) + 10px)}
 @media (max-width:760px){
-  .vt-knap{font-size:13px;padding:8px 13px}
-  .vt-knap-under-menu{top:calc(60px + env(safe-area-inset-top,0px));right:10px}
-  .hv:has(.hv-live-chip) .vt-knap-under-menu{top:calc(108px + env(safe-area-inset-top,0px))}
-  .hv-st-on-m .vt-knap-bottom-left,.hv-st-on-m .vt-knap-bottom-right{bottom:calc(var(--st-h,150px) + 8px)}
-  .vt-knap-bottom-left{left:12px}.vt-knap-bottom-right{right:12px}
+  .vt-tur-knap{font-size:13px;padding:8px 13px}
+  .vt-tur-knap-under-menu{top:calc(60px + env(safe-area-inset-top,0px));right:10px}
+  .hv:has(.hv-live-chip) .vt-tur-knap-under-menu{top:calc(108px + env(safe-area-inset-top,0px))}
+  .hv-st-on-m .vt-tur-knap-bottom-left,.hv-st-on-m .vt-tur-knap-bottom-right{bottom:calc(var(--st-h,150px) + 8px)}
+  .vt-tur-knap-bottom-left{left:12px}.vt-tur-knap-bottom-right{right:12px}
 }
 `;

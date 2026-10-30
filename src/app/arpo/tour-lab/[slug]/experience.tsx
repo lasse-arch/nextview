@@ -2841,7 +2841,7 @@ function TourExperience({
         />
       )}
       {T.commute?.button && !welcome && !(cover && T.cover) && guideAt == null && !route && (
-        <button type="button" className={`vt-knap vt-knap-${T.commute.button}`} onClick={() => (track("commute_open", { from: "button" }), setCommuteOpen(true))}>
+        <button type="button" className={`vt-tur-knap vt-tur-knap-${T.commute.button}`} onClick={() => (track("commute_open", { from: "button" }), setCommuteOpen(true))}>
           🚌 {T.commute.title || tx("Hvor langt har du til os?")}
         </button>
       )}
