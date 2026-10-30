@@ -1982,6 +1982,8 @@ function TourExperience({
   }, [T, phase, cover, nudgeRound]);
   /** A card's "Se …" button: to the room with that name in the menu, or the drone point with that name. */
   function goRoom(name: string) {
+    // A card's button to one scan point (also a hidden one, e.g. the same room set for a party).
+    if (isPlaceHref(name)) return void flyTo(name, "fly");
     const item = T.menu.flatMap((m) => ("items" in m ? m.items.map((i) => ({ name: i[0], href: i[1], group: m.title })) : [{ name: m.title, href: m.href, group: "" }])).find((i) => i.name === name);
     if (item) return menuGo(item.name, item.group, item.href);
     const p = T.points.find((x) => x.name === name);

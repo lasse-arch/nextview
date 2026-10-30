@@ -219,7 +219,20 @@ function PhotoPicker({ image, onChange, preview, slug, photoKey }: { image: stri
 type CardButton = { label: string; href: string; primary?: boolean } | { label: string; room: string };
 
 /** Buttons on a card: to a room (by its menu name) or a page. */
-function ButtonsEditor({ buttons, onChange, rooms, allowRoom }: { buttons: CardButton[]; onChange: (b: CardButton[]) => void; rooms: string[]; allowRoom: boolean }) {
+function ButtonsEditor({
+  buttons,
+  onChange,
+  rooms,
+  allowRoom,
+  scan,
+}: {
+  buttons: CardButton[];
+  onChange: (b: CardButton[]) => void;
+  rooms: string[];
+  allowRoom: boolean;
+  /** A button to one scan point - also a hidden one (e.g. the same room set for a party): pick it on the scan point plan, and its link. */
+  scan?: { pick: (title: string, value: number | null, apply: (ss: number) => void) => void; href: (ss: number) => string };
+}) {
   return (
     <Field title="Knapper">
       <div className="space-y-2">
@@ -233,15 +246,31 @@ function ButtonsEditor({ buttons, onChange, rooms, allowRoom }: { buttons: CardB
             </div>
             {allowRoom && (
               <Choice
-                value={"room" in b ? "room" : "href"}
+                value={"room" in b ? (isPlaceHref(b.room) ? "scan" : "room") : "href"}
                 options={[
                   ["href", "Webside"],
-                  ["room", "Rum i touren"],
+                  ["room", "Rum i menuen"],
+                  ...(scan ? [["scan", "Scanpunkt"] as ["scan", string]] : []),
                 ]}
-                onChange={(v) => onChange(buttons.map((x, j) => (j === i ? (v === "room" ? { label: x.label, room: rooms[0] ?? "" } : { label: x.label, href: "https://" }) : x)))}
+                onChange={(v) =>
+                  v === "scan"
+                    ? scan?.pick(b.label, null, (ss) => onChange(buttons.map((x, j) => (j === i ? { label: x.label, room: scan.href(ss) } : x))))
+                    : onChange(buttons.map((x, j) => (j === i ? (v === "room" ? { label: x.label, room: rooms[0] ?? "" } : { label: x.label, href: "https://" }) : x)))
+                }
               />
             )}
-            {"room" in b ? (
+            {"room" in b && isPlaceHref(b.room) ? (
+              <div className="flex items-center justify-between gap-2 px-1 text-[13px]">
+                <span className="text-[#1d1d1f]">Scanpunkt {ssOfHref(b.room) ?? "?"}</span>
+                <button
+                  type="button"
+                  className="font-medium text-[#0071e3]"
+                  onClick={() => scan?.pick(b.label, ssOfHref(b.room), (ss) => onChange(buttons.map((x, j) => (j === i ? { label: x.label, room: scan.href(ss) } : x))))}
+                >
+                  Vælg på kortet
+                </button>
+              </div>
+            ) : "room" in b ? (
               <select className={input} value={b.room} onChange={(e) => onChange(buttons.map((x, j) => (j === i ? { label: x.label, room: e.target.value } : x)))}>
                 {rooms.map((r) => (
                   <option key={r}>{r}</option>
@@ -1286,7 +1315,16 @@ export function CardsEditor({ config, edit, preview, scanMap, mpskinsHidden }: O
                   <textarea className={`${textarea} bg-white`} placeholder="Den lange tekst" value={c.more?.text ?? ""} onChange={(e) => set({ ...c, more: { label: c.more?.label || "Læs mere", text: e.target.value } })} />
                 </div>
               </details>
-              <ButtonsEditor buttons={c.buttons ?? []} rooms={rooms} allowRoom onChange={(b) => set({ ...c, buttons: b.length ? b : undefined })} />
+              <ButtonsEditor
+                buttons={c.buttons ?? []}
+                rooms={rooms}
+                allowRoom
+                scan={scanMap ? { pick: (title, value, apply) => setPicking({ title: `Knappen "${title}": vælg ét scanpunkt`, value: value != null ? [value] : [], apply: (ss) => ss.length && apply(ss[ss.length - 1]) }), href: (ss) => placeHref(config, ss) } : undefined}
+                onChange={(b) => set({ ...c, buttons: b.length ? b : undefined })}
+              />
+              {c.buttons?.some((b) => "room" in b && isPlaceHref(b.room)) && (
+                <p className={small}>Et scanpunkt kan også være et skjult - fx samme rum filmet opdækket. Knappen viser det, og man kommer tilbage ved at gå videre i touren.</p>
+              )}
             </>
           )}
         />
