@@ -50,7 +50,7 @@ export async function resolveTourLink(url: string): Promise<ResolvedTourLink> {
  * Stores a room's picture for the tour's story cards - a JPEG captured from
  * the tour in the browser (Renderer.takeScreenShot), sent as a data URL.
  */
-export async function saveTourStoryImage(slug: string, room: string, dataUrl: string): Promise<{ ok: true } | { ok: false; error: string }> {
+export async function saveTourStoryImage(slug: string, room: string, dataUrl: string, quiet = false): Promise<{ ok: true } | { ok: false; error: string }> {
   const user = await requireUser();
   if (user.role !== "ADMIN") return { ok: false, error: "Kun admin." };
   const match = /^data:image\/jpeg;base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl);
@@ -62,6 +62,24 @@ export async function saveTourStoryImage(slug: string, room: string, dataUrl: st
     create: { tourSlug: slug, room, image },
     update: { image },
   });
-  tourChanged(slug);
+  // Many pictures in a row ("Tag billeder til historierne"): the tour is told once at the end (storyImagesSaved) -
+  // telling it after each one reloads the preview, which jumps back to the start mid-round.
+  if (!quiet) tourChanged(slug);
   return { ok: true };
+}
+
+/** "Fjern billederne": the story cards' pictures taken from the tour are removed (the cards show the room's letter again). Pictures used elsewhere (foto:) stay. */
+export async function deleteStoryImages(slug: string): Promise<{ ok: true; removed: number } | { ok: false; error: string }> {
+  const user = await requireUser();
+  if (user.role !== "ADMIN") return { ok: false, error: "Kun admin." };
+  const { count } = await prisma.tourStoryImage.deleteMany({ where: { tourSlug: slug, NOT: { room: { startsWith: "foto:" } } } });
+  tourChanged(slug);
+  return { ok: true, removed: count };
+}
+
+/** "Tag billeder til historierne" is done: the tour's cached copy is renewed once, with all the new pictures. */
+export async function storyImagesSaved(slug: string): Promise<void> {
+  const user = await requireUser();
+  if (user.role !== "ADMIN") return;
+  tourChanged(slug);
 }

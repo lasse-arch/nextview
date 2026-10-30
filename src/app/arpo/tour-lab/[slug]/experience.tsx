@@ -9,7 +9,7 @@ import type { LiveUnit } from "@/lib/availability/live";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { flushSync } from "react-dom";
 import { useRouter } from "next/navigation";
-import { saveTourStoryImage } from "@/lib/actions/tour-lab";
+import { saveTourStoryImage, storyImagesSaved } from "@/lib/actions/tour-lab";
 import { connectSdk, showcaseUrl, uLinkTarget, type CameraPose, type MpSdk, type Rotation, type SweepInfo, type Vec3 } from "../matterport";
 import type { AvailableUnit } from "@/lib/availability/boxdepotet";
 import { WeatherChip, WEATHER_CSS } from "./weather";
@@ -1334,9 +1334,10 @@ function TourExperience({
       if (!(await flyTo(r.href, "instant"))) continue;
       await new Promise((res) => setTimeout(res, 2500)); // let the room's sharp textures load
       const shot = await sdk.Renderer.takeScreenShot({ width: 600, height: 800 }, { mattertags: false, sweeps: false, views: false, measurements: false });
-      const saved = await saveTourStoryImage(T.slug, r.name, await storyJpeg(shot));
+      const saved = await saveTourStoryImage(T.slug, r.name, await storyJpeg(shot), true);
       if (!saved.ok) throw new Error(saved.error);
     }
+    await storyImagesSaved(T.slug);
     progress(`Færdig - ${storyRooms.length} billeder.`);
     router.refresh();
   }

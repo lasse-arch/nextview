@@ -3,7 +3,7 @@ import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { Experience } from "@/app/arpo/tour-lab/[slug]/experience";
-import { loadTour } from "@/app/arpo/tour-lab/[slug]/load";
+import { reviewTour } from "@/lib/tour-cache";
 import type { TourConfig } from "@/app/arpo/tour-lab/tours/types";
 import type { Viewport } from "next";
 
@@ -32,8 +32,8 @@ export async function generateMetadata({ params }: { params: Promise<{ token: st
 
 export default async function ReviewTourPage({ params, searchParams }: { params: Promise<{ token: string }>; searchParams: Promise<{ sprog?: string }> }) {
   const { token } = await params;
-  const setup = await byToken(token);
-  if (!setup) notFound();
-  const data = await loadTour(setup);
-  return <Experience {...data} lang={(await searchParams).sprog} review={token} phone={/Android|iPhone|iPad|iPod|Mobile/i.test((await headers()).get("user-agent") ?? "")} />;
+  const data = await reviewTour(token);
+  if (!data) notFound();
+  const h = await headers();
+  return <Experience {...data} lang={(await searchParams).sprog} review={token} country={h.get("x-vercel-ip-country") ?? undefined} phone={/Android|iPhone|iPad|iPod|Mobile/i.test(h.get("user-agent") ?? "")} />;
 }

@@ -35,6 +35,7 @@ import { MapEditor } from "./map-editor";
 import { FeedbackPanel } from "./feedback-panel";
 import { LinkInput, LinkOpenContext, LinksOpenEditor } from "./links-open";
 import { CommuteEditor } from "./commute-editor";
+import { deleteStoryImages } from "@/lib/actions/tour-lab";
 
 /** A zoom level in words, for the Zoom sliders (1 = Matterport's normal view). */
 const zoomLabel = (z: number) => (Math.abs(z - 1) < 0.01 ? "normal" : z < 1 ? `zoomet ud (${Math.round(z * 100)} %)` : `zoomet ind (${Math.round(z * 100)} %)`);
@@ -1009,7 +1010,7 @@ export function TourEditor({
                   onChange={(on) => edit((d) => void (d.stories = { mobile: d.stories?.mobile ?? false, desktop: on, rooms: d.stories?.rooms, scroll: d.stories?.scroll }))}
                   title="Historier på computer"
                 />
-                {(config.stories?.mobile || config.stories?.desktop) && <StoryPictures preview={preview} />}
+                {(config.stories?.mobile || config.stories?.desktop) && <StoryPictures slug={slug} preview={preview} />}
                 {(config.stories?.mobile || config.stories?.desktop) && (
                   <Field title="Scroll sidelæns i historierne" hint="Fra: alle historierne vises på én gang, fordelt på flere rækker.">
                     <Choice
@@ -2374,7 +2375,7 @@ function MatterportParams({ config, edit }: { config: TourConfig; edit: (fn: (d:
 }
 
 /** "Tag billeder til historierne": the preview visits every story room and keeps a picture of it (gemt med det samme). */
-function StoryPictures({ preview }: { preview: PreviewApi }) {
+function StoryPictures({ slug, preview }: { slug: string; preview: PreviewApi }) {
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<{ text: string; error?: boolean } | null>(null);
   return (
@@ -2392,6 +2393,20 @@ function StoryPictures({ preview }: { preview: PreviewApi }) {
         className="w-full rounded-xl bg-white py-2 text-[14px] font-medium text-[#0071e3] ring-1 ring-black/[.06] hover:bg-[#0071e3]/5 disabled:opacity-50"
       >
         {busy ? "Tager billeder …" : "📷 Tag billeder til historierne fra touren"}
+      </button>
+      <button
+        type="button"
+        disabled={busy}
+        onClick={async () => {
+          if (!confirm("Fjern billederne fra historierne? Kortene viser så rummets forbogstav igen - du kan altid tage nye.")) return;
+          setBusy(true);
+          const r = await deleteStoryImages(slug).catch((err: unknown) => ({ ok: false as const, error: err instanceof Error ? err.message : String(err) }));
+          setBusy(false);
+          setNote(r.ok ? { text: `${r.removed} billeder fjernet. Genindlæs forhåndsvisningen for at se det.` } : { text: r.error, error: true });
+        }}
+        className="w-full text-[13px] font-medium text-[#ff3b30] disabled:opacity-50"
+      >
+        Fjern billederne fra historierne
       </button>
       <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">{note ? <span className={note.error ? "text-[#ff3b30]" : ""}>{note.text}</span> : "Forhåndsvisningen går til hvert rum og tager et billede. Gem først, hvis du har ændret menuen."}</p>
     </div>

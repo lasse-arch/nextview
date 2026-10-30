@@ -32,6 +32,19 @@ export function publicTour(slug: string) {
   )();
 }
 
+/**
+ * The review link's tour (/p/<token>): as it is in Arpo right now, published
+ * or not - but read through the same cache as the published ones (by its last
+ * change), so the customer gets the tour at the speed it will have, not a
+ * slower one built from scratch on every visit.
+ */
+export async function reviewTour(token: string) {
+  const row = await prisma.tour.findUnique({ where: { reviewToken: token }, select: { slug: true, config: true, updatedAt: true } });
+  if (!row) return null;
+  const setup = { ...(row.config as unknown as TourConfig), slug: row.slug };
+  return unstable_cache(() => loadTour(setup), ["review-tour", row.slug, String(row.updatedAt.getTime())], { tags: [tag(row.slug)], revalidate: 3600 })();
+}
+
 /** A tour was changed: its cached public copy is dropped, so the next visit gets the change. */
 export function tourChanged(...slugs: string[]) {
   for (const slug of slugs) revalidateTag(tag(slug), { expire: 0 });

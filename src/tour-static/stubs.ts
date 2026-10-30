@@ -6,6 +6,7 @@
  */
 const off = async () => ({ ok: false as const, error: "Ikke i en udgivet tour." });
 export const saveTourStoryImage = off;
+export const storyImagesSaved = async () => {};
 export function useRouter() {
   return { refresh() {}, push() {}, replace() {}, back() {}, prefetch() {} };
 }
