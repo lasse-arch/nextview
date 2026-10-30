@@ -174,6 +174,8 @@ export const FINDER_CSS = `
   .hv-find-m{position:absolute;left:10px;bottom:calc(var(--filtre-h, 50px) + 18px + env(safe-area-inset-bottom,0px));z-index:6;display:flex;align-items:center;gap:7px;height:36px;padding:0 14px 0 11px;border:0;border-radius:999px;background:var(--c-accent);color:#fff;font:inherit;font-size:13.5px;font-weight:800;box-shadow:0 6px 20px rgba(0,0,0,.25);cursor:pointer}
   .hv-find-m svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round}
   .hv-filter-ud-m .hv-find-m{bottom:calc(10px + env(safe-area-inset-bottom,0px))}
+  /* Inside the tour "Tilbage til luften" has the bottom left - Find vej goes to the right, never on top of it. */
+  .hv-i-tour .hv-find-m{left:auto;right:10px;bottom:calc(20px + env(safe-area-inset-bottom,0px))}
 }
 .hv-punkt .hv-find-m,.hv-welcome .hv-find-m,.hv-menu-aaben .hv-find-m{opacity:0;pointer-events:none}
 `;
