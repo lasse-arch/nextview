@@ -63,6 +63,12 @@ export async function getUnreadNewsCount(userId: string, newsReadAt: Date | null
 const DEFAULT_POSTS: { title: string; body: string; minutesAgo: number; screenshotUrl: string }[] = [
   {
     minutesAgo: 0,
+    title: "Tours på mobil - også på tværs - og \"Tjek touren\" før gennemgang",
+    body: "Touren er gjort bedre til mobil: stedkortene er mindre og skalerer med telefonen (en lille iPhone får et mindre kort end en Pro Max), og under Stedkort kan I vælge Lille, Mellem eller Stor. Holdes telefonen på tværs, bliver alt oven på touren mindre (velkomst, menu, guidekort, knapper), så man kan se touren - før fik man computerens store udgave på en lav skærm. \"Find vej\" ligger ikke længere oven i \"Tilbage til luften\" inde i touren.\n\nUnder Gennemgang tjekker \"Tjek og send til gennemgang\" touren først: er den hurtig (360°-billedernes mindre kopier, store billeder), findes alle steder i scanningen, virker linkene, finder live data noget, er oversættelserne færdige - og nextviewAI kommer med et par punkter, en besøgende ville støde på. Derefter sender I, eller retter først.\n\nOgså: live data viser æ, ø og å rigtigt (\"Søndag\" i stedet for \"S&oslash;ndag\"), og bliver en side i pop-up'en ved med at spørge om cookies (iPhone gemmer ikke valget i en ramme), tilbyder touren at åbne den i en ny fane.",
+    screenshotUrl: "/news/mobil-og-tjek.png",
+  },
+  {
+    minutesAgo: 0,
     title: "Kunden vælger størrelsen på touren - og ser, hvor den er vist",
     body: "På kundesiden under \"På hjemmesiden\" kan kunden nu selv vælge, hvor stor touren skal være på deres side: bred, høj, fast højde (med en skyder) eller hele skærmen. En lille side tegnet i målestok viser, hvor meget touren fylder - på computer og mobil, med en streg for hvor langt man ser uden at scrolle. Koden, de kopierer, laves i den størrelse.\n\nNederst står \"Her er touren vist\": de sider, hvor touren er sat ind og er blevet åbnet de sidste 90 dage, hvornår senest og hvor mange besøg. Vi ser det samme i tour-editoren under Del og udgiv. Samtidig tæller statistikken nu også besøg i touren, når den er sat ind på kundens hjemmeside (før talte kun besøg, hvor touren blev åbnet direkte).",
     screenshotUrl: "/news/touren-paa-hjemmesiden.png",
