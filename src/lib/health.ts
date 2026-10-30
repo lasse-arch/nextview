@@ -79,6 +79,14 @@ export async function healthChecks(): Promise<CheckGroup[]> {
       if (!domain) return { status: "down", detail: "nextview360.dk er ikke tilføjet i Resend - mails sendes via Gmail" };
       return domain.status === "verified" ? { status: "ok", detail: "nextview360.dk godkendt - mails sendes via Resend" } : { status: "warn", detail: `nextview360.dk er ikke godkendt endnu (${domain.status}) - tjek DNS-posterne` };
     }),
+    timed("ElevenLabs (stemme i Vis mig rundt)", async () => {
+      const key = process.env.ELEVENLABS_API_KEY;
+      if (!key) return { status: "off", detail: "Ikke sat op - lyd kan stadig uploades som fil" };
+      const res = await fetch("https://api.elevenlabs.io/v1/voices", { headers: { "xi-api-key": key }, cache: "no-store", signal: AbortSignal.timeout(LIMIT_MS) }).catch(() => null);
+      if (!res) return { status: "warn", detail: "Kunne ikke nå ElevenLabs lige nu" };
+      if (res.status === 401 || res.status === 403) return { status: "down", detail: `ElevenLabs afviser nøglen (${res.status}) - den skal have Voices: Read og Text to Speech` };
+      return res.ok ? { status: "ok", detail: "Forbundet" } : { status: "warn", detail: `ElevenLabs svarede ${res.status}` };
+    }),
     timed("Dinero (fakturaer)", async () => {
       if (!(await isDineroConfigured())) return { status: "off", detail: "Slået fra" };
       await pingDinero();

@@ -4,7 +4,7 @@ import { useT } from "../tours/i18n-react";
 import { useEffect, useRef, useState } from "react";
 
 // The stops live with the other shared helpers (the server's "Tjek touren" needs them too).
-import type { GuideStop } from "../tours/places";
+import { stopVoice, type GuideStop } from "../tours/places";
 export { guideStops, type GuideStop } from "../tours/places";
 
 /**
@@ -53,7 +53,8 @@ export function GuidePlayer({
   const tr = useT();
   const [paused, setPaused] = useState(false);
   const stop = stops[index];
-  const hasVoice = stops.some((s) => s.audio);
+  const hasVoice = stops.some((s) => stopVoice(s));
+  const voice = stopVoice(stop);
   const audio = useRef<HTMLAudioElement | null>(null);
   const [muted, setMuted] = useState(() => {
     try {
@@ -65,8 +66,8 @@ export function GuidePlayer({
   // The stop's voice: plays when the stop comes (the visitor started the tour, so sound is allowed).
   useEffect(() => {
     audio.current?.pause();
-    if (!stop.audio || muted) return;
-    const a = new Audio(stop.audio);
+    if (!voice || muted) return;
+    const a = new Audio(voice);
     audio.current = a;
     // Without "Man trykker selv videre", the next stop comes when the voice is done.
     if (!manual) a.onended = () => step(index + 1, "auto");
@@ -75,7 +76,7 @@ export function GuidePlayer({
     return () => a.pause();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [index, muted]);
-  const timed = !manual && !stop.audio;
+  const timed = !manual && !voice;
 
   function step(to: number, how: string) {
     if (to >= stops.length) return onClose(true);
@@ -139,7 +140,7 @@ export function GuidePlayer({
               <button type="button" className="gd-play" onClick={() => step(index + 1, "next")}>
                 {index === stops.length - 1 ? tr("Afslut") : tr("Næste ›")}
               </button>
-              {stop.audio && !muted && (
+              {voice && !muted && (
                 <button
                   type="button"
                   aria-label={tr("Hør igen")}

@@ -37,7 +37,7 @@ export type GuideSetup = {
   /** How the view turns at each stop: left out = a slow turn as always, "other" = the other way, "none" = stands still. A stop can have its own. */
   turn?: GuideTurn;
   /** A stop: where (empty href = stay, e.g. a closing card; a picture "#billede:<address>" = shown full screen, a 2:1 one as 360°, e.g. a drone photo), its text, and optionally a voice (an audio file) that plays there. */
-  stops: ({ point: string; turn?: GuideTurn } | { href: string; title: string; text: string; audio?: string; turn?: GuideTurn })[];
+  stops: ({ point: string; turn?: GuideTurn } | { href: string; title: string; text: string; audio?: string; /** The text a made voice (ElevenLabs) was read from - it only plays while the stop says just that (not after a change, not in another language). */ audioText?: string; turn?: GuideTurn })[];
 };
 
 /** A real spot in the tour with a photo of it (e.g. one of the model's own Matterport photos). */
@@ -322,6 +322,8 @@ export type TourConfig = {
    * one is "#rundvisning". `id`: short, lowercase, no spaces (e.g. "padel").
    */
   guides?: (GuideSetup & { id: string; title: string })[];
+  /** The voice that reads the guided tours' stops aloud (ElevenLabs) - each tour its own. */
+  voice?: { id: string; name: string };
   /**
    * "Sådan ser en dag ud": the day as a calm timeline (time, what happens,
    * and where - "Se stedet" shows it). For visitors who like to know what's

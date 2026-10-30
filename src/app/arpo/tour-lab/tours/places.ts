@@ -124,7 +124,11 @@ export function allGuides(T: TourConfig): { id: string | null; title: string }[]
   return [...(has(T.guide) ? [{ id: null, title: "Vis mig rundt" }] : []), ...(T.guides ?? []).filter(has).map((g) => ({ id: g.id, title: g.title }))];
 }
 
-export type GuideStop = { href: string; title: string; text: string; audio?: string; turn?: GuideTurn };
+export type GuideStop = { href: string; title: string; text: string; audio?: string; audioText?: string; turn?: GuideTurn };
+
+const sameWords = (a: string, b: string) => a.replace(/\s+/g, " ").trim() === b.replace(/\s+/g, " ").trim();
+/** The stop's voice, when there is one to play: an uploaded file always, a made one only while the text is still what it read (so never a Danish voice in the English tour). */
+export const stopVoice = (s: GuideStop): string | undefined => (s.audio && (s.audioText == null || sameWords(s.audioText, s.text)) ? s.audio : undefined);
 
 /** A guided tour's stops (the main one, or one of `guides` by id), with a drone point's name and text filled in where a stop borrows them - or one per menu place when it's made from the menu. */
 export function guideStops(T: TourConfig, guideId: string | null = null): GuideStop[] {

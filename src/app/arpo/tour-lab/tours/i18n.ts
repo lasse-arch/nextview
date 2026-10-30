@@ -136,7 +136,7 @@ const SKIP = new Set([
   "id", "slug", "key", "cat", "icon", "kind", "start", "startMobile", "tourPage", "modelId", "font", "fontHeading",
   "colors", "color", "customCss", "filter", "matterportParams", "hiddenSweeps", "linkOpen", "utm", "panos", "spots",
   "pattern", "flags", "embeds", "design", "navigation", "jump", "position", "go", "ss", "sr", "address", "mapUrl",
-  "phone", "email", "instagram", "social", "translations", "languages", "zoom", "source", "wayfinding",
+  "phone", "email", "instagram", "social", "translations", "languages", "zoom", "source", "wayfinding", "audioText", "voice",
 ]);
 
 /** A string that is words for people - not a link, a path, a colour or an id. */

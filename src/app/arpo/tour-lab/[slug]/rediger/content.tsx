@@ -1,6 +1,7 @@
 "use client";
 
 import { LinkInput } from "./links-open";
+import { StopVoice, VoiceGroup, voiceState } from "./voice-editor";
 import { guideExit, IMAGE_HREF, imageOfHref, isPlaceHref, PANO_HFOV, placeHref, startPlaces } from "../../tours/places";
 import { AiImageButton } from "./ai-image";
 import { writePlaceCards, type CardDraft } from "@/lib/actions/tour-cards";
@@ -911,6 +912,7 @@ function GuideSetupEditor({ config, edit, preview, onEditPoint }: Omit<Props, "s
           </Field>
         )}
       </Group>
+      {!fromMenu && <VoiceGroup config={config} edit={edit} />}
       {fromMenu ? (
         <Group title={`Steder fra menuen (${(config.guide?.menuPlaces ?? places.map((p) => p.key)).filter((n) => places.some((p) => p.key === n)).length} af ${places.length})`}>
           {places.length === 0 && <p className={small}>Menuen har ingen steder i touren endnu.</p>}
@@ -971,7 +973,7 @@ function GuideSetupEditor({ config, edit, preview, onEditPoint }: Omit<Props, "s
           onChange={setStops}
           icon={["bg-[#ff2d55]", '<path d="M8 5v14l11-7z"/>']}
           title={(s) => ("point" in s ? (config.points.find((p) => p.id === s.point)?.name ?? `Punkt: ${s.point}`) : s.title)}
-          subtitle={(s) => ("point" in s ? "Punkt på luftfotoet - tekst og billeder fra punktet" : [s.audio ? "🔊" : null, s.href ? null : "Bliver stående", s.text || "Mangler tekst"].filter(Boolean).join(" · "))}
+          subtitle={(s) => ("point" in s ? "Punkt på luftfotoet - tekst og billeder fra punktet" : [s.audio ? (voiceState(s) === "old" ? "🔇 lav lyden igen" : "🔊") : null, s.href ? null : "Bliver stående", s.text || "Mangler tekst"].filter(Boolean).join(" · "))}
           empty='Ingen stop endnu. Gå til det første sted i forhåndsvisningen og tryk "+ Stop her".'
           editor={(s, set) =>
             "point" in s ? (
@@ -1007,21 +1009,12 @@ function GuideSetupEditor({ config, edit, preview, onEditPoint }: Omit<Props, "s
                     <Choice value={s.turn ?? ""} options={[["", "Som de andre"], ...turnOptions]} onChange={(v) => set({ ...s, turn: v ? (v as GuideTurn) : undefined })} />
                   </Field>
                 )}
-                <Field title="Stemme (valgfri)" hint="En lydfil (mp3/m4a), der spilles ved stoppet. Gæsten kan slå lyden fra.">
-                  {s.audio ? (
-                    <div className="space-y-1.5">
-                      <audio controls preload="none" src={s.audio} className="h-9 w-full" />
-                      <div className="flex gap-2">
-                        <UploadButton accept="audio/mpeg,audio/mp4,audio/x-m4a,audio/wav,.mp3,.m4a" label="Skift lyd" onDone={(audio) => set({ ...s, audio })} />
-                        <button type="button" className="text-[13px] text-[#ff3b30] hover:underline" onClick={() => set({ ...s, audio: undefined })}>
-                          Fjern
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <UploadButton accept="audio/mpeg,audio/mp4,audio/x-m4a,audio/wav,.mp3,.m4a" label="Upload lydfil" onDone={(audio) => set({ ...s, audio })} />
-                  )}
-                </Field>
+                <StopVoice
+                  config={config}
+                  stop={s}
+                  set={set}
+                  upload={<UploadButton accept="audio/mpeg,audio/mp4,audio/x-m4a,audio/wav,.mp3,.m4a" label={s.audio ? "Upload anden lyd" : "Upload lydfil"} onDone={(audio) => set({ ...s, audio, audioText: undefined })} />}
+                />
               </>
             )
           }
