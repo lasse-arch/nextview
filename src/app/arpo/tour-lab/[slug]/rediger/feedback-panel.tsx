@@ -132,6 +132,14 @@ export function FeedbackPanel({
             <button type="button" disabled={pending || checking || !(status?.to || who?.email.trim())} onClick={() => void runCheck()} className="flex-1 rounded-xl bg-[#0071e3] py-2 text-[14px] font-medium text-white disabled:opacity-40">
               {checking ? "nextviewAI tjekker touren …" : status?.approvedAt ? "Tjek og send til ny gennemgang" : "Tjek og send til gennemgang"}
             </button>
+            <button
+              type="button"
+              disabled={pending || checking || !(status?.to || who?.email.trim())}
+              onClick={() => confirm(`Send touren til gennemgang uden tjek - til ${who?.email.trim() || status?.to}?`) && send(false)}
+              className="w-full rounded-xl bg-white py-2 text-[14px] font-medium text-[#0071e3] ring-1 ring-black/[.08] disabled:opacity-40"
+            >
+              {pending ? "Sender …" : status?.approvedAt ? "Send til ny gennemgang" : "Send til gennemgang"}
+            </button>
           ) : (
             <button type="button" disabled={pending} onClick={() => send(true)} className="flex-1 rounded-xl bg-[#0071e3] py-2 text-[14px] font-medium text-white disabled:opacity-40">
               Send påmindelse
