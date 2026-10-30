@@ -187,7 +187,8 @@ export type TourConfig = {
    * picture's address: zoom per device (1 = the device's normal, over 1
    * closer) and where it looks (yaw/pitch, degrees).
    */
-  imageView?: Record<string, { desktop?: number; mobile?: number; yaw?: number; pitch?: number }>;
+  /** `phone` (a flat picture on an upright phone): "fit" = the whole picture, or how much of the screen's height it fills (0.5-1; left out = 1, fills it - dragged sideways). */
+  imageView?: Record<string, { desktop?: number; mobile?: number; yaw?: number; pitch?: number; phone?: "fit" | number }>;
   /** The "Fliser" (bento) menu's tiles (design.menu "bento") - left out: made from the main action and the menu. */
   bento?: { tiles: BentoTile[] };
   /** Set by Arpo when the tour is saved: each 360° photo's smaller copies (by the photo's address). */

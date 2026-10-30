@@ -193,7 +193,7 @@ export function outsideFiles(c: TourConfig): string[] {
 /** A typed address with https:// in front when it has no scheme (links, # and mailto/tel are kept). */
 export const withProtocol = (url: string) => (/^(https?:|mailto:|tel:|#)/i.test(url.trim()) ? url.trim() : `https://${url.trim()}`);
 
-type PanoViewSetting = { desktop?: number; mobile?: number; yaw?: number; pitch?: number };
+type PanoViewSetting = { desktop?: number; mobile?: number; yaw?: number; pitch?: number; phone?: "fit" | number };
 
 /**
  * How a 360° picture opens (shown only for a 2:1 picture): where it looks -
@@ -254,12 +254,39 @@ export function PanoZoom({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- opened once per picking; the saved view is only where it opens
   }, [picking, src]);
-  if (!is360) return null;
   const put = (patch: Partial<PanoViewSetting>) => {
     const next: PanoViewSetting = { ...value, ...patch };
     (Object.keys(next) as (keyof PanoViewSetting)[]).forEach((k) => next[k] == null && delete next[k]);
     onChange(Object.keys(next).length ? next : undefined);
   };
+  if (is360 === false) {
+    // A flat picture: how it opens on an upright phone - filling the screen (dragged sideways), less of it, or the whole picture.
+    const phone = value?.phone ?? 1;
+    return (
+      <div className="space-y-2 rounded-xl bg-white p-2.5 ring-1 ring-black/[.06]">
+        <p className="text-[12px] font-medium text-[#1d1d1f]">Når billedet åbner på mobil <span className="font-normal text-[#8e8e93]">· gælder billedet overalt</span></p>
+        <Choice
+          value={phone === "fit" ? "fit" : "fill"}
+          options={[
+            ["fill", "Fyld skærmen"],
+            ["fit", "Hele billedet"],
+          ]}
+          onChange={(v) => put({ phone: v === "fit" ? "fit" : undefined })}
+        />
+        {phone !== "fit" && (
+          <div className="flex items-center gap-2 text-[12px] text-[#6e6e73]">
+            <span>Mere</span>
+            <input type="range" min={0.5} max={1} step={0.05} className="flex-1 accent-[#0071e3]" value={phone} onChange={(e) => put({ phone: Number(e.target.value) >= 1 ? undefined : Number(e.target.value) })} />
+            <span>Fyld</span>
+          </div>
+        )}
+        <p className="text-[11px] leading-snug text-[#8e8e93]">
+          {phone === "fit" ? "Hele billedet midt på skærmen, med billedet sløret bag." : phone >= 1 ? "Billedet fylder hele skærmens højde - man trækker sidelæns for at se resten." : `Billedet fylder ${Math.round(phone * 100)} % af højden - man ser mere af det med det samme og trækker for resten.`} Den besøgende kan altid skifte.
+        </p>
+      </div>
+    );
+  }
+  if (!is360) return null;
   return (
     // Inside a menu row you can drag to reorder: dragging here turns the picture instead, never moves the row.
     <div

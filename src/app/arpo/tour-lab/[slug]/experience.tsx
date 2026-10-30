@@ -1318,7 +1318,7 @@ function TourExperience({
       track("menu_click", { item_name: name, group });
       setMenuOpen(false);
       // The smaller copy, when the tour has one (made when it was saved) - a big drone photo opens at once.
-      void isPanorama(image).then((pano) => (pano ? setPano({ id: `billede-${name}`, name, panorama: image } as Point) : setLightbox({ images: [flatImage(image)], at: 0, title: name })));
+      void isPanorama(image).then((pano) => (pano ? setPano({ id: `billede-${name}`, name, panorama: image } as Point) : setLightbox({ images: [flatImage(image)], at: 0, title: name, phone: T.imageView?.[image]?.phone })));
       return;
     }
     const point = pointById(href);

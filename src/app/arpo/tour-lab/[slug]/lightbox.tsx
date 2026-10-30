@@ -16,6 +16,8 @@ export type LightboxState = {
   title: string;
   /** On a plan: the area to show, as fractions of the picture (x1, y1, x2, y2). */
   focus?: [number, number, number, number];
+  /** How a picture opens on an upright phone (the tour's imageView "phone"): the whole picture, or how much of the height it fills. */
+  phone?: "fit" | number;
 } | null;
 
 export function Lightbox({ state, onClose }: { state: NonNullable<LightboxState>; onClose: () => void }) {
@@ -25,7 +27,8 @@ export function Lightbox({ state, onClose }: { state: NonNullable<LightboxState>
   const step = (d: number) => setAt((i) => (i + d + n) % n);
   const touch = useRef<number | null>(null);
   /** A phone held upright and a wide picture: it fills the screen's height and is dragged sideways - not a thin strip in the middle. */
-  const [fill, setFill] = useState(true);
+  const [fill, setFill] = useState(state.phone !== "fit");
+  const share = typeof state.phone === "number" ? Math.min(1, Math.max(0.5, state.phone)) : 1;
   const [ratios, setRatios] = useState<Record<string, number>>({});
   const [upright, setUpright] = useState(false);
   useEffect(() => {
@@ -79,6 +82,7 @@ export function Lightbox({ state, onClose }: { state: NonNullable<LightboxState>
             src={src}
             alt={state.title}
             draggable={false}
+            style={share < 1 ? { height: `${share * 100}%`, marginTop: `${((1 - share) / 2) * 100}dvh` } : undefined}
             onLoad={(e) => {
               const box = pan.current;
               if (box) box.scrollLeft = (e.currentTarget.clientWidth - box.clientWidth) / 2;
