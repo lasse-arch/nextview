@@ -1991,27 +1991,24 @@ function TourExperience({
       if (routeRun.current !== run) return;
       const sid = flights[i];
       const last = i === steps;
-      // Looking straight ahead the whole flight (the way it goes) - the turn comes at the corner, standing there.
+      // Turning while flying, like a person walking: on the way to a corner the view already swings round to the
+      // next stretch, so the corner is one smooth move - not stop, turn, go. (A slight turn: just look ahead.)
       const ahead = heading(flights[i - 1], sid);
+      const after = last ? null : heading(sid, flights[i + 1]);
+      const bend = ahead != null && after != null ? Math.abs(((((after - ahead) % 360) + 540) % 360) - 180) : 0;
+      // Half-way into the turn at a gentle bend, all the way at a sharp one (the next flight finishes it).
+      const look = ahead == null ? null : after == null || bend < 15 ? ahead : ahead + (((((after - ahead) % 360) + 540) % 360) - 180) * (bend > 60 ? 1 : 0.6);
       // The last flight turns into the place's own view as it lands - one smooth finish, no turn after.
+      const ms = flightMs(net, flights[i - 1], sid);
       await moveSweep(sdk, sid, {
-        rotation: last && target?.rotation ? target.rotation : ahead != null ? { x: -8, y: ahead } : undefined,
+        rotation: last && target?.rotation ? target.rotation : look != null ? { x: -8, y: look } : undefined,
         transition: sdk.Sweep.Transition.FLY,
-        transitionTime: flightMs(net, flights[i - 1], sid) + (last ? 400 : 0),
+        // A sharp corner gets a little more time, so the turn isn't rushed.
+        transitionTime: ms + (last ? 400 : bend > 60 ? 250 : 0),
       });
       if (routeRun.current !== run) return;
       setRoute({ dest, step: i, steps, arrived: last });
       setRouteLine(last ? [] : line(i));
-      // At the corner: turned down the next stretch before setting off (at the end: to the place's own view).
-      const next = last ? null : (() => {
-        const y = heading(sid, flights[i + 1]);
-        return y != null ? { x: -8, y } : null;
-      })();
-      if (next && ahead != null && Math.abs((((next.y - ahead) % 360) + 540) % 360 - 180) > 20) {
-        selfMoveAt.current = now() + 2000;
-        await sdk.Camera.setRotation?.(next, { speed: 140 }).catch(() => {});
-        selfMoveAt.current = now();
-      }
     }
     track("route_arrive", { destination: dest.name, flights: steps });
   }
@@ -2071,6 +2068,16 @@ function TourExperience({
             </button>
           );
         })}
+        {/* Find vej, when its button isn't on the tour (on this device) - up here by the guided tours, not lost among the menu items. */}
+        {at === "top" && T.wayfinding && (T.wayfinding.button?.desktop === "menu" || T.wayfinding.button?.mobile === "menu") && (
+          <button type="button" className="hv-day-knap hv-find-knap" onClick={() => (track("route_open", { from: "menu" }), setMenuOpen(false), setRouteOpen(true))}>
+            ✦
+            <span>
+              {tx("Find vej")}
+              <small>{tx("Vælg et rum - touren går vejen derhen")}</small>
+            </span>
+          </button>
+        )}
         {T.day && here(T.day.menu) && (
           <button type="button" className="hv-day-knap" onClick={() => openDay("menu")}>
             ◷
@@ -2091,7 +2098,7 @@ function TourExperience({
   return (
     <TourLang.Provider value={{ lang, t: tx }}>
     <LinkProvider T={T} popup={popup}>
-    <div className={`hv fixed inset-0 z-50 overflow-hidden bg-[#0d1b20] ${selected ? "hv-punkt" : ""} ${zoomed ? "hv-zoom" : ""} ${welcome ? "hv-welcome" : ""} ${phase === "tour" && T.stories?.mobile ? "hv-st-on-m" : ""} ${menuOpen ? "hv-menu-aaben" : ""} ${T.overviewUi?.box?.desktop === false ? "hv-boks-ud-d" : ""} ${T.overviewUi?.box?.mobile === false ? "hv-boks-ud-m" : ""} ${T.overviewUi?.filter?.desktop === false ? "hv-filter-ud-d" : ""} ${T.overviewUi?.filter?.mobile === false ? "hv-filter-ud-m" : ""} ${T.overviewUi?.names?.desktop ? `hv-navne-d-${T.overviewUi.names.desktop}` : ""} ${T.overviewUi?.names?.mobile ? `hv-navne-m-${T.overviewUi.names.mobile}` : ""} ${T.overviewUi?.filterColumns ? `hv-filter-kol hv-filter-kol-${T.overviewUi.filterColumns}` : T.overviewUi?.filterScroll ? "hv-filter-rul" : ""} ${langClasses} ${T.design?.menu === "dock" ? "hv-dock" : ""} ${T.logoSide === "right" ? "hv-logo-h" : ""} ${guideAt != null || (dayAt != null && !dayOpen) ? "hv-guiding" : ""} ${route ? "hv-routing" : ""} ${phase === "tour" ? "hv-i-tour" : ""} ${T.wayfinding ? "hv-har-rute" : ""} ${T.wayfinding?.button?.desktop ? `rt-d-${T.wayfinding.button.desktop}` : ""} ${T.wayfinding?.button?.mobile ? `rt-m-${T.wayfinding.button.mobile}` : ""} ${showCard != null || (nudgeOn && T.nudge && phase === "tour") ? "hv-med-kort" : ""} ${showMeasures && phase === "tour" ? "hv-maler" : ""} ${phase === "tour" && T.stories?.desktop ? "hv-st-on-d" : ""}`} style={
+    <div className={`hv fixed inset-0 z-50 overflow-hidden bg-[#0d1b20] ${selected ? "hv-punkt" : ""} ${zoomed ? "hv-zoom" : ""} ${welcome ? "hv-welcome" : ""} ${phase === "tour" && T.stories?.mobile ? "hv-st-on-m" : ""} ${menuOpen ? "hv-menu-aaben" : ""} ${T.overviewUi?.box?.desktop === false ? "hv-boks-ud-d" : ""} ${T.overviewUi?.box?.mobile === false ? "hv-boks-ud-m" : ""} ${T.overviewUi?.filter?.desktop === false ? "hv-filter-ud-d" : ""} ${T.overviewUi?.filter?.mobile === false ? "hv-filter-ud-m" : ""} ${T.overviewUi?.names?.desktop ? `hv-navne-d-${T.overviewUi.names.desktop}` : ""} ${T.overviewUi?.names?.mobile ? `hv-navne-m-${T.overviewUi.names.mobile}` : ""} ${T.overviewUi?.filterColumns ? `hv-filter-kol hv-filter-kol-${T.overviewUi.filterColumns}` : T.overviewUi?.filterScroll ? "hv-filter-rul" : ""} ${langClasses} ${T.design?.menu === "dock" ? "hv-dock" : ""} ${T.logoSide === "right" ? "hv-logo-h" : ""} ${T.logoBg ? `hv-logobg-${T.logoBg}` : ""} ${guideAt != null || (dayAt != null && !dayOpen) ? "hv-guiding" : ""} ${route ? "hv-routing" : ""} ${phase === "tour" ? "hv-i-tour" : ""} ${T.wayfinding ? "hv-har-rute" : ""} ${T.wayfinding?.button?.desktop ? `rt-d-${T.wayfinding.button.desktop}` : ""} ${T.wayfinding?.button?.mobile ? `rt-m-${T.wayfinding.button.mobile}` : ""} ${showCard != null || (nudgeOn && T.nudge && phase === "tour") ? "hv-med-kort" : ""} ${showMeasures && phase === "tour" ? "hv-maler" : ""} ${phase === "tour" && T.stories?.desktop ? "hv-st-on-d" : ""}`} style={
         {
           fontFamily: `'${T.font}', system-ui, sans-serif`,
           "--c-main": T.colors.main,
@@ -3375,6 +3382,14 @@ const CSS = `
 /* A dark logo gets a light card, so it reads on any wall. */
 /* A dark logo straight on the tour, no card and no glow - exactly as it is (as in MPSkins). */
 .hv-logo-lys{filter:none}
+/* What's behind the logo, when chosen (else automatic from whether it's a dark or a light logo). */
+.hv-logobg-none .hv-wel-main img{background:none;padding:0;border-radius:0}
+.hv-logobg-none .hv-logo{background:none;box-shadow:none;padding:0;filter:none}
+.hv-logobg-light .hv-wel-main img{background:#fff;padding:8px;border-radius:12px;box-shadow:0 0 0 1px rgba(0,0,0,.06)}
+.hv-logobg-light .hv-logo,.hv-logobg-main .hv-logo{box-sizing:content-box;height:calc(var(--logo-h) - 12px);padding:9px 14px;border-radius:14px;filter:none;box-shadow:0 6px 18px rgba(0,0,0,.18)}
+.hv-logobg-light .hv-logo{background:rgba(255,255,255,.94)}
+.hv-logobg-main .hv-wel-main img{background:var(--c-main);padding:8px;border-radius:12px}
+.hv-logobg-main .hv-logo{background:var(--c-main)}
 .hv-logo-kort{box-sizing:content-box;height:calc(var(--logo-h) - 12px);padding:9px 14px;border-radius:14px;background:rgba(255,255,255,.94);filter:none;box-shadow:0 6px 18px rgba(0,0,0,.18)}
 .hv-signatur{display:flex;align-items:center;justify-content:center;gap:8px;padding:6px 22px 22px;font-size:11px;letter-spacing:.04em;color:#7b878c;text-decoration:none}
 .hv-signatur img{height:14px;width:auto;opacity:.85}

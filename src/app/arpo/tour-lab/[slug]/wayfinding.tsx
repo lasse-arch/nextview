@@ -271,7 +271,7 @@ export const ROUTE_CSS = `
 .rt-list button:hover{background:#f4f6f7}
 .rt-list button span{color:var(--c-accent)}
 .rt-none{font-size:14px;color:#56636a;padding:6px}
-.rt-status{position:absolute;left:50%;bottom:22px;translate:-50% 0;z-index:11;width:min(420px,calc(100% - 24px));background:#fff;color:#1d2a30;border-radius:18px;box-shadow:0 16px 44px rgba(0,0,0,.35);padding:14px 16px;animation:hvUp .3s ease both}
+.rt-status{position:absolute;left:50%;bottom:calc(22px + env(safe-area-inset-bottom,0px));translate:-50% 0;z-index:11;width:min(420px,calc(100% - 24px));background:#fff;color:#1d2a30;border-radius:18px;box-shadow:0 16px 44px rgba(0,0,0,.35);padding:14px 16px;animation:hvUp .3s ease both}
 .rt-kick{font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--c-accent)}
 .rt-status b{display:block;margin:3px 0 8px;font-size:17px;color:var(--c-main)}
 .rt-bar{height:5px;border-radius:3px;background:#eef1f2;overflow:hidden;margin-bottom:10px}
@@ -280,7 +280,7 @@ export const ROUTE_CSS = `
 .rt-btns button,.rt-cta{border:0;border-radius:999px;padding:9px 16px;font:inherit;font-weight:800;font-size:14px;cursor:pointer;background:#eef1f2;color:#1d2a30;text-decoration:none}
 .rt-cta{background:var(--c-accent);color:#fff;margin-right:auto}
 .rt-status.fremme{border:2px solid var(--c-accent)}
-.rt-status{position:relative}
+
 .rt-x{position:absolute;top:8px;right:8px;width:28px;height:28px;border:0;border-radius:50%;background:#eef1f2;color:#1d2a30;font-size:17px;line-height:28px;cursor:pointer}
 .rt-kick{padding-right:30px}
 .rt-btns .rt-fortsaet{background:var(--c-accent);color:#fff}
@@ -288,7 +288,10 @@ export const ROUTE_CSS = `
 .hv-guiding .rt-knap{display:none}
 /* While the stories play, their bar has the top and the bottom: Find vej waits (never two things on top of each other). */
 .hv:has(.hv-story-play) .rt-knap{display:none}
-/* Where the button stands - chosen per device in the editor. */
+/* Where the button stands - chosen per device in the editor. "Kun i menuen": the menu's Find vej button shows on that device only. */
+.hv-find-knap{display:none!important}
+@media (min-width:761px){.rt-d-menu .hv-find-knap{display:flex!important}}
+@media (max-width:760px){.rt-m-menu .hv-find-knap{display:flex!important}}
 @media (min-width:761px){
   .rt-d-menu .rt-knap{display:none}
   .rt-d-bottom-left .rt-knap,.rt-d-bottom-right .rt-knap{top:auto;bottom:calc(18px + env(safe-area-inset-bottom,0px));translate:none}

@@ -181,6 +181,60 @@ export function UploadButton({ accept, onDone, label = "Upload", className }: { 
   );
 }
 
+/**
+ * Is a logo dark (made for a light background) or light? Its visible pixels'
+ * average brightness - null when the picture can't be read (another site that
+ * doesn't allow it, or an svg that won't draw).
+ */
+export function logoTone(src: string): Promise<"dark" | "light" | null> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      try {
+        const w = 64;
+        const h = Math.max(1, Math.round((img.naturalHeight / Math.max(1, img.naturalWidth)) * w));
+        const c = document.createElement("canvas");
+        c.width = w;
+        c.height = h;
+        const g = c.getContext("2d");
+        if (!g) return resolve(null);
+        g.drawImage(img, 0, 0, w, h);
+        const d = g.getImageData(0, 0, w, h).data;
+        let sum = 0;
+        let n = 0;
+        let edge = 0;
+        let edges = 0;
+        for (let i = 0; i < d.length; i += 4) {
+          const a = d[i + 3] / 255;
+          const lum = (0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]) / 255;
+          if (a > 0.5) {
+            sum += lum;
+            n++;
+          }
+          // An opaque picture (no transparency): its own background is in the corners.
+          const p = i / 4;
+          const x = p % w;
+          const y = Math.floor(p / w);
+          if ((x < 3 || x > w - 4) && (y < 3 || y > h - 4)) {
+            edge += a;
+            edges++;
+          }
+        }
+        if (!n) return resolve(null);
+        const opaque = edges && edge / edges > 0.9;
+        // A logo on its own background (no transparency) is shown as it is - it carries its own background.
+        if (opaque) return resolve(null);
+        resolve(sum / n < 0.5 ? "dark" : "light");
+      } catch {
+        resolve(null);
+      }
+    };
+    img.onerror = () => resolve(null);
+    img.src = src;
+  });
+}
+
 /** The files a setup takes from other sites (that could disappear) - mirrors fileSlots in src/lib/tour-files.ts. */
 export function outsideFiles(c: TourConfig): string[] {
   const all = [c.logo, c.favicon, c.cover?.image, c.cover?.imageMobile, c.intro?.poster, c.map?.image, ...(c.places ?? []).map((p) => p.image), ...(c.intro?.sources ?? []).map((s) => s.src), ...(c.info ?? []).map((i) => i.image), ...(c.guide?.stops ?? []).map((s) => ("audio" in s ? s.audio : undefined))];

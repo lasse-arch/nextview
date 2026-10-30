@@ -26,7 +26,7 @@ import type { ScanMap } from "@/lib/matterport-graph";
 import { currentPreset } from "../../tours/presets";
 import { EconomyPanel, type TourEconomy } from "./economy";
 import { DEFAULT_EMBED, SharePanel, SitePreview, type EmbedSize } from "./share";
-import { Choice, Field, FilesContext, Group, Icon, input, outsideFiles, PanoZoom, Toggle, UploadButton, withProtocol, type PreviewApi } from "./ui";
+import { Choice, Field, FilesContext, Group, Icon, input, logoTone, outsideFiles, PanoZoom, Toggle, UploadButton, withProtocol, type PreviewApi } from "./ui";
 import { fetchSiteFavicon, hostTourFiles } from "@/lib/actions/tour-files";
 import { AiMemoryPanel } from "./memory";
 import { WeatherEditor } from "./weather-editor";
@@ -440,6 +440,15 @@ export function TourEditor({
 
   const menuStyle = config.design?.menu ?? "side";
   const linkCtx = { config, edit };
+  /** A new logo: is it dark or light? Then it gets the background it can be seen on (Baggrund bag logoet → Automatisk). */
+  const [logoNote, setLogoNote] = useState<string | null>(null);
+  async function autoLogoTone(src: string) {
+    if (!src) return;
+    const tone = await logoTone(src);
+    if (!tone) return setLogoNote("Kunne ikke se, om logoet er lyst eller mørkt - vælg selv nedenfor.");
+    edit((d) => void (d.logoOnLight = tone === "dark"));
+    setLogoNote(tone === "dark" ? "Mørkt logo fundet - det får en lys baggrund." : "Lyst logo fundet - det får hovedfarven bag sig.");
+  }
 
   return (
     <FilesContext.Provider value={{ slug, blob }}>
@@ -734,7 +743,7 @@ export function TourEditor({
                       {config.logo && <img src={config.logo} alt="" className="max-h-full max-w-full object-contain" />}
                     </div>
                     <input className={input} value={config.logo} onChange={(e) => edit((d) => void (d.logo = e.target.value))} />
-                    <UploadButton accept="image/*" onDone={(url) => edit((d) => void (d.logo = url))} />
+                    <UploadButton accept="image/*" onDone={(url) => (edit((d) => void (d.logo = url)), void autoLogoTone(url))} />
                   </div>
                   {config.logo && !/\.svg(\?|$)/i.test(config.logo) && <AiImageButton src={config.logo} onUse={(url) => edit((d) => void (d.logo = url))} />}
                 </Field>
@@ -794,7 +803,22 @@ export function TourEditor({
                     onChange={(v) => edit((d) => void (d.logoSide = v === "right" ? "right" : undefined))}
                   />
                 </Field>
-                <Toggle on={Boolean(config.logoOnLight)} onChange={(on) => edit((d) => void (d.logoOnLight = on))} title="Mørkt logo" hint="Et logo lavet til lys baggrund (bruges også i menuens top)." />
+                <Field title="Baggrund bag logoet" hint={logoNote ?? "Automatisk: et mørkt logo får lys baggrund, et lyst logo får hovedfarven - så det altid kan ses."}>
+                  <Choice<"auto" | "none" | "light" | "main">
+                    value={config.logoBg ?? "auto"}
+                    options={[
+                      ["auto", "Automatisk"],
+                      ["none", "Gennemsigtig"],
+                      ["light", "Lys"],
+                      ["main", "Farve"],
+                    ]}
+                    onChange={(v) => {
+                      edit((d) => void (d.logoBg = v === "auto" ? undefined : v));
+                      if (v === "auto") void autoLogoTone(config.logo);
+                    }}
+                  />
+                </Field>
+                <Toggle on={Boolean(config.logoOnLight)} onChange={(on) => edit((d) => void (d.logoOnLight = on))} title="Mørkt logo" hint="Et logo lavet til lys baggrund (bruges også i menuens top). Sættes af sig selv, når du uploader et logo." />
                 {config.logoOnLight && (
                   <Toggle
                     on={config.logoCard !== false}
