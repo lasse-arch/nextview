@@ -176,6 +176,9 @@ export const FINDER_CSS = `
   .hv-filter-ud-m .hv-find-m{bottom:calc(10px + env(safe-area-inset-bottom,0px))}
   /* Inside the tour "Tilbage til luften" has the bottom left - Find vej goes to the right, never on top of it. */
   .hv-i-tour .hv-find-m{left:auto;right:10px;bottom:calc(20px + env(safe-area-inset-bottom,0px))}
+  /* With Find vej there too, above it - and out of the way while a place card shows. */
+  .hv-i-tour.hv-har-rute .hv-find-m{bottom:calc(68px + env(safe-area-inset-bottom,0px))}
+  .hv-med-kort .hv-find-m{opacity:0;pointer-events:none}
 }
 .hv-punkt .hv-find-m,.hv-welcome .hv-find-m,.hv-menu-aaben .hv-find-m{opacity:0;pointer-events:none}
 `;

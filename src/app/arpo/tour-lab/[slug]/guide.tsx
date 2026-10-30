@@ -14,6 +14,7 @@ export { guideStops, type GuideStop } from "../tours/places";
  */
 export function GuidePlayer({
   stops,
+  size = "mellem",
   index,
   seconds,
   manual = false,
@@ -30,6 +31,8 @@ export function GuidePlayer({
   /** The stop button's words (default "Gå selv rundt"). */
   stopLabel?: string;
   stops: GuideStop[];
+  /** The card's size (see guideCardSize). */
+  size?: "lille" | "mellem" | "stor";
   index: number;
   seconds: number;
   /** No timer - the visitor presses Næste (a calm voice tour). */
@@ -94,7 +97,7 @@ export function GuidePlayer({
           </span>
         ))}
       </div>
-      <div className="gd-card" key={index}>
+      <div className={`gd-card gd-${size}`} key={index}>
         <div className="gd-count">
           {index + 1} / {stops.length}
         </div>
@@ -211,8 +214,25 @@ export const GUIDE_CSS = `
 @media (max-width:760px){
   .hv-guiding .hv-logo{display:none}
   .gd-bars{width:calc(100% - 120px);left:12px;translate:none}
+  /* Stor: the whole width (as it was). Mellem (default) and lille leave the tour visible beside them. */
   .gd-card{left:10px;right:10px;width:auto;bottom:calc(10px + env(safe-area-inset-bottom,0px));padding:14px 16px 12px}
   .gd-card h3{font-size:20px}
   .gd-card p{font-size:14px;margin-bottom:10px}
+  .gd-mellem{right:auto;width:min(84vw,340px);padding:11px 14px 10px;border-radius:15px}
+  .gd-mellem h3{font-size:clamp(16px,4.6vw,18px);margin:2px 0 4px}
+  .gd-mellem p{font-size:clamp(12.5px,3.5vw,13.5px);line-height:1.45;margin-bottom:8px;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+  .gd-mellem .gd-next{margin:-4px 0 8px;font-size:11.5px}
+  .gd-mellem .gd-ctrl button{height:32px;min-width:32px;font-size:13.5px;padding:0 10px}
+  .gd-lille{right:auto;width:min(74vw,290px);padding:9px 12px 8px;border-radius:13px}
+  .gd-lille .gd-count{font-size:10px}
+  .gd-lille h3{font-size:clamp(14.5px,4.1vw,16px);margin:1px 0 3px}
+  .gd-lille p{font-size:clamp(12px,3.3vw,12.5px);line-height:1.4;margin-bottom:6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .gd-lille .gd-next,.gd-lille .gd-selv{display:none}
+  .gd-lille .gd-ctrl button{height:30px;min-width:30px;font-size:13px;padding:0 9px}
+  .gd-mellem .gd-stop,.gd-lille .gd-stop{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:46%;font-size:12px}
+}
+@media (min-width:761px){
+  .gd-lille{width:min(320px,calc(100% - 48px));padding:14px 16px 12px}.gd-lille h3{font-size:20px}.gd-lille p{font-size:14px}
+  .gd-stor{width:min(460px,calc(100% - 48px))}.gd-stor h3{font-size:26px}.gd-stor p{font-size:16px}
 }
 `;

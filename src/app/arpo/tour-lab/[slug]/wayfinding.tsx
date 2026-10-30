@@ -257,6 +257,7 @@ export const ROUTE_CSS = `
 .rt-cta{background:var(--c-accent);color:#fff;margin-right:auto}
 .rt-status.fremme{border:2px solid var(--c-accent)}
 .hv-routing .hv-room,.hv-routing .hv-stories{display:none}
+.hv-guiding .rt-knap{display:none}
 .rt-line{position:absolute;inset:0;width:100%;height:100%;z-index:4;pointer-events:none;overflow:visible}
 .rt-line path{fill:none;stroke-linecap:round;stroke-linejoin:round}
 .rt-line-glow{stroke:var(--c-accent);stroke-width:16;opacity:.28;filter:blur(3px)}
@@ -264,6 +265,8 @@ export const ROUTE_CSS = `
 @keyframes rtFlow{to{stroke-dashoffset:-18}}
 @media (max-width:760px){
   .rt-knap{top:auto;bottom:calc(14px + env(safe-area-inset-bottom,0px));left:12px;translate:none;padding:11px 16px}
+  /* Inside the tour "Tilbage til luften" has the bottom left: Find vej goes to the bottom right. */
+  .hv-i-tour .rt-knap{left:auto;right:12px}
   .rt-sheet{top:auto;bottom:0;left:0;right:0;width:auto;translate:none;max-height:80%;border-radius:18px 18px 0 0;padding-bottom:calc(10px + env(safe-area-inset-bottom,0px))}
   .rt-status{bottom:calc(10px + env(safe-area-inset-bottom,0px))}
 }
