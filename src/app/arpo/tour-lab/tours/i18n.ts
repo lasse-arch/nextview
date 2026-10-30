@@ -128,6 +128,7 @@ export const UI_STRINGS = [
   "Skjul rumvælgeren",
   "Zoom ud",
   "Stoppet",
+  "Åbn i Google Maps",
   "Vælg et rum - touren går vejen derhen",
   "Træk for at se hele billedet",
   "Se hele billedet",
@@ -267,6 +268,7 @@ export function danishOf(config: TourConfig, lang: string): (s: string) => strin
  */
 const BUILT_IN: Record<string, Record<string, string>> = {
   en: {
+    "Åbn i Google Maps": "Open in Google Maps",
     "Vælg et rum - touren går vejen derhen": "Choose a room - the tour walks you there",
     "Træk for at se hele billedet": "Drag to see the whole picture", "Se hele billedet": "See the whole picture", "Fyld skærmen": "Fill the screen",
     "Hvor langt har du til os?": "How far do you live from us?", "Find din vej til": "Find your way to", "Din adresse eller dit postnummer": "Your address or postcode", "Finder vejen …": "Finding the way …", "Kunne ikke finde vejen lige nu - prøv igen.": "Couldn't find the way right now - try again.", "Fra": "From", "I bil": "By car", "På cykel": "By bike", "Til fods": "On foot", "Vi mødes kl.": "We meet at", "Se hvilken bus eller hvilket tog du skal tage - Google Maps finder den bedste rejse.": "See which bus or train to take - Google Maps finds the best journey.", "Se rejsen med bus og tog": "See the journey by bus and train", "Tiderne er cirka. Din adresse gemmes ikke.": "Times are approximate. Your address is not saved.",
@@ -279,6 +281,7 @@ const BUILT_IN: Record<string, Record<string, string>> = {
     "Zoom ind": "Zoom in", "Zoom ud": "Zoom out", "Skjul rumvælgeren": "Hide the room picker",
   },
   de: {
+    "Åbn i Google Maps": "In Google Maps öffnen",
     "Vælg et rum - touren går vejen derhen": "Raum wählen - die Tour führt Sie hin",
     "Træk for at se hele billedet": "Ziehen, um das ganze Bild zu sehen", "Se hele billedet": "Ganzes Bild ansehen", "Fyld skærmen": "Bildschirm füllen",
     "Hvor langt har du til os?": "Wie weit haben Sie zu uns?", "Find din vej til": "Finden Sie Ihren Weg zu", "Din adresse eller dit postnummer": "Ihre Adresse oder Postleitzahl", "Finder vejen …": "Weg wird gesucht …", "Kunne ikke finde vejen lige nu - prøv igen.": "Der Weg konnte gerade nicht gefunden werden - bitte erneut versuchen.", "Fra": "Von", "I bil": "Mit dem Auto", "På cykel": "Mit dem Rad", "Til fods": "Zu Fuß", "Vi mødes kl.": "Treffpunkt um", "Se hvilken bus eller hvilket tog du skal tage - Google Maps finder den bedste rejse.": "Sehen Sie, welchen Bus oder Zug Sie nehmen - Google Maps findet die beste Verbindung.", "Se rejsen med bus og tog": "Verbindung mit Bus und Bahn ansehen", "Tiderne er cirka. Din adresse gemmes ikke.": "Die Zeiten sind ungefähr. Ihre Adresse wird nicht gespeichert.",
@@ -291,6 +294,7 @@ const BUILT_IN: Record<string, Record<string, string>> = {
     "Zoom ind": "Vergrößern", "Zoom ud": "Verkleinern", "Skjul rumvælgeren": "Raumauswahl ausblenden",
   },
   sv: {
+    "Åbn i Google Maps": "Öppna i Google Maps",
     "Vælg et rum - touren går vejen derhen": "Välj ett rum - turen visar vägen dit",
     "Træk for at se hele billedet": "Dra för att se hela bilden", "Se hele billedet": "Se hela bilden", "Fyld skærmen": "Fyll skärmen",
     "Hvor langt har du til os?": "Hur långt har du till oss?", "Find din vej til": "Hitta vägen till", "Din adresse eller dit postnummer": "Din adress eller ditt postnummer", "Finder vejen …": "Hittar vägen …", "Kunne ikke finde vejen lige nu - prøv igen.": "Kunde inte hitta vägen just nu - försök igen.", "Fra": "Från", "I bil": "Med bil", "På cykel": "Med cykel", "Til fods": "Till fots", "Vi mødes kl.": "Vi träffas kl.", "Se hvilken bus eller hvilket tog du skal tage - Google Maps finder den bedste rejse.": "Se vilken buss eller vilket tåg du ska ta - Google Maps hittar den bästa resan.", "Se rejsen med bus og tog": "Se resan med buss och tåg", "Tiderne er cirka. Din adresse gemmes ikke.": "Tiderna är ungefärliga. Din adress sparas inte.",
@@ -299,6 +303,7 @@ const BUILT_IN: Record<string, Record<string, string>> = {
     "Tilbage til 360°-billedet": "Tillbaka till 360°-bilden", "Tilbage til luften": "Tillbaka till flygbilden", Fortsæt: "Fortsätt", Næste: "Nästa", Forrige: "Föregående",
   },
   nb: {
+    "Åbn i Google Maps": "Åpne i Google Maps",
     "Vælg et rum - touren går vejen derhen": "Velg et rom - turen viser veien dit",
     "Træk for at se hele billedet": "Dra for å se hele bildet", "Se hele billedet": "Se hele bildet", "Fyld skærmen": "Fyll skjermen",
     "Hvor langt har du til os?": "Hvor langt har du til oss?", "Find din vej til": "Finn veien til", "Din adresse eller dit postnummer": "Din adresse eller ditt postnummer", "Finder vejen …": "Finner veien …", "Kunne ikke finde vejen lige nu - prøv igen.": "Kunne ikke finne veien akkurat nå - prøv igjen.", "Fra": "Fra", "I bil": "Med bil", "På cykel": "På sykkel", "Til fods": "Til fots", "Vi mødes kl.": "Vi møtes kl.", "Se hvilken bus eller hvilket tog du skal tage - Google Maps finder den bedste rejse.": "Se hvilken buss eller hvilket tog du skal ta - Google Maps finner den beste reisen.", "Se rejsen med bus og tog": "Se reisen med buss og tog", "Tiderne er cirka. Din adresse gemmes ikke.": "Tidene er omtrentlige. Adressen din lagres ikke.",

@@ -44,6 +44,7 @@ export function CommuteSheet({ T, onClose, onEvent }: { T: TourConfig; onClose: 
   }, [q, from, T.slug, C.lat, C.lon]);
 
   async function pick(s: Suggestion) {
+    setMapOpen(false);
     setFrom(s);
     setQ(s.text);
     setList([]);
@@ -58,6 +59,11 @@ export function CommuteSheet({ T, onClose, onEvent }: { T: TourConfig; onClose: 
     onEvent("commute", { km: j.km });
   }
 
+  const [mapOpen, setMapOpen] = useState(false);
+  // Google's own embeddable map with the journey by public transport (dirflg=r) - no key, nothing about the visitor kept by us.
+  // (Its embed address directly - the short maps?output=embed one redirects through a page that refuses to be framed.)
+  const n = (v: number) => Number(v.toFixed(5));
+  const embed = from ? `https://www.google.com/maps/embed?origin=mfe&pb=!1m10!4m9!3e3!4m3!3m2!1d${n(from.lat)}!2d${n(from.lon)}!4m3!3m2!1d${n(C.lat)}!2d${n(C.lon)}!3m1!1sda!5m1!1sda` : null;
   const maps = from
     ? `https://www.google.com/maps/dir/?${new URLSearchParams({ api: "1", origin: `${from.lat},${from.lon}`, destination: `${C.lat},${C.lon}`, travelmode: "transit" })}`
     : null;
@@ -122,12 +128,20 @@ export function CommuteSheet({ T, onClose, onEvent }: { T: TourConfig; onClose: 
             </div>
           </>
         )}
-        {maps && (
+        {maps && !C.hide?.transit && (
           <div className="vt-bus">
             {C.meet && <div className="vt-bus-h">{tr("Vi mødes kl.")} {C.meet}</div>}
             <p>{tr("Se hvilken bus eller hvilket tog du skal tage - Google Maps finder den bedste rejse.")}</p>
-            <a href={maps} target="_blank" rel="noopener noreferrer" className="vt-knap" onClick={() => onEvent("commute_transit")}>
-              🚌 {tr("Se rejsen med bus og tog")}
+            {mapOpen && embed ? (
+              // The journey right here, in Google Maps' own map (the embeddable one - the normal page can't be shown inside another).
+              <iframe className="vt-kort" src={embed} title={tr("Se rejsen med bus og tog")} loading="lazy" referrerPolicy="no-referrer-when-downgrade" />
+            ) : (
+              <button type="button" className="vt-knap" onClick={() => (setMapOpen(true), onEvent("commute_transit"))}>
+                🚌 {tr("Se rejsen med bus og tog")}
+              </button>
+            )}
+            <a href={maps} target="_blank" rel="noopener noreferrer" className="vt-ny" onClick={() => onEvent("commute_transit_tab")}>
+              {tr("Åbn i Google Maps")} ↗
             </a>
           </div>
         )}
@@ -169,6 +183,9 @@ export const COMMUTE_CSS = `
 .vt-bus-h{font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--c-accent)}
 .vt-bus p{margin:4px 0 10px;font-size:14px;line-height:1.4;color:#33474d}
 .vt-knap{display:block;text-align:center;border-radius:999px;background:var(--c-accent);color:#fff;font-weight:800;padding:11px;font-size:15px;text-decoration:none}
+.vt-kort{display:block;width:100%;height:340px;border:0;border-radius:12px;background:#eee}
+.vt-ny{display:block;margin-top:8px;text-align:center;font-size:12.5px;font-weight:700;color:var(--c-main);text-decoration:none;opacity:.75}
+.vt-ark button.vt-knap{width:100%;border:0;cursor:pointer;font:inherit;font-weight:800}
 .vt-lille{margin:10px 2px 0;text-align:center;font-size:11.5px;color:#8a979c}
 @media (max-height:500px) and (min-width:500px){.vt-ark,.vt-tur-knap{zoom:var(--ui-zoom,.72)}}
 /* Its own button on the tour (when chosen) - under the menu button, or bottom left/right. */

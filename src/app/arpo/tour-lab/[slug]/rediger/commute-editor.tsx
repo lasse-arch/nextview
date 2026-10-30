@@ -109,6 +109,7 @@ export function CommuteEditor({ config, edit }: { config: TourConfig; edit: (fn:
                   ["car", "🚗 Bil"],
                   ["bike", "🚲 Cykel"],
                   ["walk", "🚶 Til fods"],
+                  ["transit", "🚌 Bus og tog"],
                 ] as const
               ).map(([k, label]) => (
                 <label key={k} className="flex items-center gap-1.5">

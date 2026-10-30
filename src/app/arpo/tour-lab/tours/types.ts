@@ -363,7 +363,7 @@ export type TourConfig = {
     /** The address as found (shown in the editor). */
     address?: string;
     /** Ways left out (a bike or a walk over 45 / 60 minutes is never shown anyway). */
-    hide?: { car?: true; bike?: true; walk?: true };
+    hide?: { car?: true; bike?: true; walk?: true; transit?: true };
     /** A button on the tour that opens it (left out: none - from the menu and links "#vej" only). */
     button?: "under-menu" | "bottom-left" | "bottom-right";
   };
