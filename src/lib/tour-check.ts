@@ -24,6 +24,8 @@ import type { TourConfig } from "@/app/arpo/tour-lab/tours/types";
  */
 
 export type CheckItem = { level: "ok" | "warn" | "fejl"; area: "Hastighed" | "Funktioner" | "Indhold"; text: string };
+/** One of nextviewAI's notes: where, what (short), what to do - and whether it matters much. */
+export type AiNote = { where: string; title: string; fix: string; important: boolean };
 
 const ssOf = (href: string) => {
   const m = /[?&]ss=(\d+)/.exec(href);
@@ -78,7 +80,7 @@ async function answers(url: string): Promise<number | "down"> {
   }
 }
 
-export async function checkTour(c: TourConfig, opts: { ai?: boolean } = {}): Promise<{ items: CheckItem[]; ai: string | null }> {
+export async function checkTour(c: TourConfig, opts: { ai?: boolean } = {}): Promise<{ items: CheckItem[]; ai: AiNote[] | null }> {
   const items: CheckItem[] = [];
   const add = (level: CheckItem["level"], area: CheckItem["area"], text: string) => items.push({ level, area, text });
 
@@ -208,17 +210,28 @@ export async function checkTour(c: TourConfig, opts: { ai?: boolean } = {}): Pro
 }
 
 /** nextviewAI's own short look: what a visitor would stumble on, in a few lines (never the setup itself). */
-async function aiLook(c: TourConfig, items: CheckItem[]): Promise<string | null> {
+async function aiLook(c: TourConfig, items: CheckItem[]): Promise<AiNote[] | null> {
   const key = process.env.ANTHROPIC_API_KEY || (await getSettingValue("ANTHROPIC_API_KEY"));
   if (!key) return null;
   const client = new Anthropic({ apiKey: key });
-  const Out = z.object({ notes: z.array(z.string()).max(8) });
+  const Out = z.object({
+    notes: z
+      .array(
+        z.object({
+          where: z.string().describe('Hvor i touren, 1-3 ord: fx "Menuen", "Velkomsten", "Vis mig rundt", "Stedkort", "Dagsprogram", "Vej til stedet", "Historier".'),
+          title: z.string().describe("Hvad der er galt, højst 8 ord - fx 'Fodbold viser et AI-billede'."),
+          fix: z.string().describe("Hvad der skal gøres, én kort sætning."),
+          important: z.boolean().describe("true: noget kunden vil lægge mærke til eller som er forkert. false: en lille forbedring."),
+        })
+      )
+      .max(8),
+  });
   const res = await client.messages
     .stream({
       model: "claude-opus-5-5",
       max_tokens: 3000,
       system:
-        "Du er nextviewAI i Nextview360's CRM. Du tjekker en virtuel tour (en JSON-opsætning) igennem, lige før kunden får den til gennemgang. Mobil først: 90 % ser den på en telefon. Gå det hele igennem, som en kunde og en besøgende ville: teksterne (stavefejl, sprog der ikke lyder som kunden, for lange tekster på mobil, gentagelser, tekster der siger noget forkert om stedet), funktionerne (er der et tydeligt næste skridt, virker rækkefølgen, er der funktioner, der står tomme eller halvt sat op, fx en rundvisning, live data eller stedkort), og om der mangler noget, som denne slags sted normalt bør have (fx book/kontakt, priser, åbningstider, adresse, de vigtigste rum i menuen). Skriv højst 8 korte, konkrete punkter på dansk, hvert med hvor det er og hvad der skal gøres. Ingen ros, ingen gentagelse af tjeklisten ovenfor, ingen teknisk snak om JSON. Er alt fint, så returnér en tom liste.",
+        "Du er nextviewAI i Nextview360's CRM. Du tjekker en virtuel tour (en JSON-opsætning) igennem, lige før kunden får den til gennemgang. Mobil først: 90 % ser den på en telefon. Gå det hele igennem, som en kunde og en besøgende ville: teksterne (stavefejl, sprog der ikke lyder som kunden, for lange tekster på mobil, gentagelser, tekster der siger noget forkert om stedet), funktionerne (er der et tydeligt næste skridt, virker rækkefølgen, er der funktioner, der står tomme eller halvt sat op, fx en rundvisning, live data eller stedkort), og om der mangler noget, som denne slags sted normalt bør have (fx book/kontakt, priser, åbningstider, adresse, de vigtigste rum i menuen). Skriv højst 8 punkter på dansk - hvert med hvor det er, en kort overskrift (højst 8 ord) og hvad der skal gøres (én kort sætning). De vigtigste først. Ingen ros, ingen gentagelse af tjeklisten ovenfor, ingen teknisk snak om JSON. Er alt fint, så returnér en tom liste.",
       messages: [{ role: "user", content: `Tjekket har fundet:\n${items.map((i) => `- [${i.level}] ${i.text}`).join("\n")}\n\nOpsætningen:\n\`\`\`json\n${JSON.stringify({ ...c, translations: undefined, panoCopies: undefined, customCss: undefined })}\n\`\`\`` }],
       output_config: { effort: "low", format: zodOutputFormat(Out) },
     })
@@ -226,6 +239,5 @@ async function aiLook(c: TourConfig, items: CheckItem[]): Promise<string | null>
   await prisma.tourAiUsage
     .create({ data: { tourSlug: c.slug, userName: "Tjek", kind: "check", inputTokens: res.usage.input_tokens, outputTokens: res.usage.output_tokens, cacheReadTokens: res.usage.cache_read_input_tokens ?? 0, cacheWriteTokens: res.usage.cache_creation_input_tokens ?? 0, costUsd: claudeCostUsd(res.usage) } })
     .catch(() => {});
-  const notes = res.parsed_output?.notes ?? [];
-  return notes.length ? notes.map((n) => `• ${n}`).join("\n") : "";
+  return (res.parsed_output?.notes ?? []).map((n) => ({ where: n.where.slice(0, 40), title: n.title.slice(0, 90), fix: n.fix.slice(0, 300), important: n.important })).sort((a, b) => Number(b.important) - Number(a.important));
 }

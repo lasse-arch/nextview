@@ -5,6 +5,7 @@ import { useEffect, useState, useTransition } from "react";
 import { checkTourForReview, deleteFeedback, reviewStatus, sendFixesDone, sendForReview, setFeedbackStatus, setTourApproved, setTourReview, tourFeedback, type Feedback, type ReviewStatus } from "@/lib/actions/tour-feedback";
 import { askClaudeForTour, type AiEditResult } from "@/lib/actions/tour-ai";
 import type { TourConfig } from "../../tours/types";
+import type { AiNote } from "@/lib/tour-check";
 import { Choice, Group, input, Toggle, type PreviewApi } from "./ui";
 
 const TOPIC_NAMES: Record<string, string> = { menu: "Menuen", funktioner: "Funktioner", design: "Design", andet: "Andet" };
@@ -79,7 +80,7 @@ export function FeedbackPanel({
   const shown = (items ?? []).filter((f) => filter === "all" || f.status === filter);
   const open = (items ?? []).filter((f) => f.status === "open").length;
   /** "Tjek touren": run before the first review mail - and on its own. */
-  const [check, setCheck] = useState<{ items: { level: "ok" | "warn" | "fejl"; area: string; text: string }[]; ai: string | null } | null>(null);
+  const [check, setCheck] = useState<{ items: { level: "ok" | "warn" | "fejl"; area: string; text: string }[]; ai: AiNote[] | null } | null>(null);
   const [checking, setChecking] = useState(false);
   async function runCheck() {
     setNote(null);
@@ -388,7 +389,7 @@ function CheckResult({
   onClose,
   onAgain,
 }: {
-  check: { items: { level: "ok" | "warn" | "fejl"; area: string; text: string }[]; ai: string | null };
+  check: { items: { level: "ok" | "warn" | "fejl"; area: string; text: string }[]; ai: AiNote[] | null };
   pending: boolean;
   sendLabel: string;
   onSend: () => void;
@@ -420,12 +421,7 @@ function CheckResult({
           </div>
         ) : null;
       })}
-      {check.ai != null && (
-        <div className="rounded-lg bg-[#d97757]/[.08] p-2.5">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-[#b4532f]">✦ nextviewAI</p>
-          <p className="mt-1 whitespace-pre-wrap text-[13px] leading-snug text-[#1d1d1f]">{check.ai || "Intet at bemærke - touren er let at finde rundt i."}</p>
-        </div>
-      )}
+      {check.ai != null && <AiNotes notes={check.ai} />}
       <div className="flex flex-wrap gap-2 pt-1">
         <button type="button" disabled={pending} onClick={onSend} className={`flex-1 rounded-xl py-2 text-[14px] font-medium text-white disabled:opacity-40 ${errors ? "bg-[#ff3b30]" : "bg-[#0071e3]"}`}>
           {errors ? `${sendLabel} alligevel` : sendLabel}
@@ -438,6 +434,61 @@ function CheckResult({
         </button>
       </div>
       <p className="text-[11px] leading-snug text-[#8e8e93]">Tjekket ser på den gemte tour. Gem først, hvis du har rettet noget.</p>
+    </div>
+  );
+}
+
+/** nextviewAI's look at the tour, as a checklist: where, what, what to do - the important ones first, ticked off as they're done. */
+function AiNotes({ notes }: { notes: AiNote[] }) {
+  const [done, setDone] = useState<Set<number>>(() => new Set());
+  const [open, setOpen] = useState<number | null>(null);
+  if (!notes.length)
+    return (
+      <div className="rounded-lg bg-[#d97757]/[.08] p-2.5">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-[#b4532f]">✦ nextviewAI</p>
+        <p className="mt-1 text-[13px] text-[#1d1d1f]">Intet at bemærke - touren er let at finde rundt i.</p>
+      </div>
+    );
+  const left = notes.length - done.size;
+  return (
+    <div className="rounded-lg bg-[#d97757]/[.06] p-2.5">
+      <div className="flex items-center justify-between">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-[#b4532f]">✦ nextviewAI · {left ? `${left} forslag` : "alle klaret"}</p>
+        <p className="text-[11px] text-[#8e8e93]">Tryk for at læse</p>
+      </div>
+      <ul className="mt-2 space-y-1.5">
+        {notes.map((n, i) => {
+          const isDone = done.has(i);
+          return (
+            <li key={i} className={`rounded-lg bg-white ring-1 ring-black/[.05] ${isDone ? "opacity-50" : ""}`}>
+              <div className="flex items-start gap-2 p-2">
+                <input
+                  type="checkbox"
+                  aria-label="Klaret"
+                  className="mt-0.5 h-4 w-4 flex-none accent-[#34c759]"
+                  checked={isDone}
+                  onChange={() =>
+                    setDone((d) => {
+                      const next = new Set(d);
+                      if (next.has(i)) next.delete(i);
+                      else next.add(i);
+                      return next;
+                    })
+                  }
+                />
+                <button type="button" className="min-w-0 flex-1 text-left" onClick={() => setOpen(open === i ? null : i)}>
+                  <span className="flex flex-wrap items-center gap-1.5">
+                    <span className={`rounded-full px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide ${n.important ? "bg-[#ff9500]/15 text-[#a05a00]" : "bg-[#f2f2f7] text-[#6e6e73]"}`}>{n.where}</span>
+                    {n.important && <span className="text-[10px] font-semibold text-[#a05a00]">Vigtig</span>}
+                  </span>
+                  <span className={`mt-0.5 block text-[13px] font-semibold leading-snug text-[#1d1d1f] ${isDone ? "line-through" : ""}`}>{n.title}</span>
+                  {open === i && <span className="mt-1 block text-[12.5px] leading-snug text-[#3c3c43]">{n.fix}</span>}
+                </button>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }

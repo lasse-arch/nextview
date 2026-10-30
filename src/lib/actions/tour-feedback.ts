@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { approveTour, reviewRecipient, sendFixesDoneMail, sendReviewMail } from "@/lib/tour-review";
-import { checkTour, type CheckItem } from "@/lib/tour-check";
+import { checkTour, type AiNote, type CheckItem } from "@/lib/tour-check";
 import { getTourConfig } from "@/lib/tours";
 
 /*
@@ -129,7 +129,7 @@ export async function setTourApproved(slug: string, approved: boolean): Promise<
 }
 
 /** "Tjek touren" before the review mail: speed, that everything works, and nextviewAI's own look (the saved tour). */
-export async function checkTourForReview(slug: string): Promise<{ ok: true; items: CheckItem[]; ai: string | null } | { ok: false; error: string }> {
+export async function checkTourForReview(slug: string): Promise<{ ok: true; items: CheckItem[]; ai: AiNote[] | null } | { ok: false; error: string }> {
   await admin();
   const config = await getTourConfig(slug);
   if (!config) return { ok: false, error: "Touren findes ikke." };
