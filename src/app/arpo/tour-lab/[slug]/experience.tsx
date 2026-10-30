@@ -755,6 +755,12 @@ function TourExperience({
       // The tour's own move (not the visitor's step) - see "tour_use" below.
       selfMoveAt.current = now();
       const from = currentSweep.current;
+      // Already standing there (e.g. the guide's first stop is where the tour starts): Matterport won't "move" to
+      // the same scan point - it refuses, and the retries below would keep the visitor waiting ~4 s. Just turn.
+      if (from === sweep) {
+        if (opts.rotation) await sdk.Camera.setRotation?.(opts.rotation, { speed: opts.transition === sdk.Sweep.Transition.INSTANT ? 1000 : 120 }).catch(() => {});
+        return;
+      }
       const locked = pointsOnlyRef.current;
       // A scan point switched off in Matterport itself (Find vej may pass it): opened for the move, closed again when left.
       if (sweepData.current[sweep]?.enabled === false && !hiddenSweeps.includes(sweep)) openedSweeps.current.add(sweep);

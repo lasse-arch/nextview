@@ -36,6 +36,7 @@ import { FeedbackPanel } from "./feedback-panel";
 import { LinkInput, LinkOpenContext, LinksOpenEditor } from "./links-open";
 import { CommuteEditor } from "./commute-editor";
 import { deleteStoryImages } from "@/lib/actions/tour-lab";
+import { suggestSiteLook } from "@/lib/actions/tour-ai";
 
 /** A zoom level in words, for the Zoom sliders (1 = Matterport's normal view). */
 const zoomLabel = (z: number) => (Math.abs(z - 1) < 0.01 ? "normal" : z < 1 ? `zoomet ud (${Math.round(z * 100)} %)` : `zoomet ind (${Math.round(z * 100)} %)`);
@@ -87,17 +88,17 @@ const FINDS: Partial<Record<Tab, string[]>> = {
   del: ["Udgiv", "Link", "QR-kode", "Indlejr", "iframe", "Kode til hjemmesiden", "Cloudflare"],
   start: ["Hvor touren starter|startpunkt|startposition|start-link|start her", "Forsiden", "Velkomsten", "Fliser", "Kort film før touren", "Intro-video", "Steder med foto", "Træd indenfor"],
   menu: ["Menuens udseende|menu-design|sidemenu|dock|bar i bunden|rumvælger", "Menu åben på computer", "Menu åben på mobil", "Dæmp touren bag menuen", "Menupunkter", "Grupper", "Tilføj det sted, du ser", "Billede i menuen", "360°-billede", "Webside", "Luftfotoet", "Scanpunkter i menuen"],
-  rundvisning: ["Sådan ser en dag ud|dagen|program", "Vis mig rundt", "Guide", "Guidet tur", "Stop", "Drejning", "Sekunder ved hvert stop", "Stemme", "Lav den ud fra menuen"],
-  kortet: ["Interaktivt kort", "Luftfoto", "Dronebillede", "360°-kort", "Punkter på kortet", "Kategorier", "Skyer", "Boksen øverst", "Filteret", "Luftfotoets første udsnit|startudsnit", "Ikoner", "Vejret|vejr|temperatur|dmi|sol", "Find din plads|finder|spørgsmål|guide til plads", "Gåafstande|gåafstand|minutter|afstand"],
+  rundvisning: ["Sådan ser en dag ud|dagen|program", "Vis mig rundt", "Guide", "Guidet tur", "Stop", "Drejning", "Sekunder ved hvert stop", "Stemme|lyd|elevenlabs|speak|oplæsning", "Lav den ud fra menuen", "Knappen i menuen|øverst|nederst|ikke i menuen", "Egen knap på stop"],
+  kortet: ["Interaktivt kort", "Luftfoto", "Dronebillede", "360°-kort", "Punkter på kortet", "Kategorier", "Skyer", "Boksen øverst", "Filteret", "Luftfotoets første udsnit|startudsnit", "Ikoner", "Vejret|vejr|temperatur|dmi|sol", "Find din plads|finder|spørgsmål|guide til plads", "Gåafstande|gåafstand|minutter|afstand", "Bevægelse på luftfotoet|kig ned|kig op|zoom ved punkt", "Hent fra en kortside|lovable|importer kort"],
   scan: ["Scanpunkter", "Skjul scanpunkter", "Personer i scans"],
   tags: ["Tags", "Infotags", "Hotspots", "Pris", "Video"],
   live: ["Live data", "Ledige pladser", "Ledige rum", "Book-knap", "Hent nye data"],
-  kort: ["Stedkort", "Kort ved punkt", "Din plads venter", "Kort efter et stykke tid"],
+  kort: ["Stedkort", "Kort ved punkt", "Din plads venter", "Kort efter et stykke tid", "Knap til scanpunkt|opdækket|skjult scan"],
   links: ["Knapper", "Book", "Kontakt", "Telefon", "E-mail", "Adresse", "Sociale medier", "Kontaktformular", "Skriv til os", "Åbning", "Popup", "Ny fane", "Kort-link"],
-  design: ["Farver", "Skrift", "Font", "Logo", "Logostørrelse", "Logoets afstand", "Favicon", "Mørkt logo", "Farvefilter", "Skabelon|design|tema|preset"],
+  design: ["Farver", "Skrift", "Font", "Logo", "Logostørrelse", "Logoets afstand", "Favicon", "Mørkt logo", "Farvefilter", "Skabelon|design|tema|preset", "Brug hjemmesidens farver|hjemmeside|rød tråd|brand"],
   sprog: ["Sprog", "Engelsk", "Tysk", "Oversæt"],
-  funktioner: ["Navigation", "Bevægelse", "Fri bevægelse", "Kun punkter", "Skift mellem steder", "Fade", "Flyv", "Zoom", "Lås zoom på mobil", "Historier", "Scroll i historierne", "Find vej", "Vis mål", "Matterports egne knapper", "Sådan går du rundt|hjælp ved start|onboarding"],
-  generelt: ["Navn", "Firmanavn", "Undertitel", "Matterport-model"],
+  funktioner: ["Navigation", "Bevægelse", "Fri bevægelse", "Kun punkter", "Skift mellem steder", "Fade", "Flyv", "Zoom", "Lås zoom på mobil", "Historier", "Scroll i historierne", "Find vej", "Vis mål", "Matterports egne knapper", "Sådan går du rundt|hjælp ved start|onboarding", "Vej til stedet|vej til skolen|hvor langt|afstand|adresse|postnummer|bus|tog|rejseplan|google maps|mødetid", "Tag billeder til historierne|fjern billederne", "Flyvetid"],
+  generelt: ["Navn", "Firmanavn", "Undertitel", "Matterport-model", "Matterports indstillinger|dukkehus|plantegning|etagevælger"],
   okonomi: ["Tid", "Pris", "Timer", "Økonomi"],
   versioner: ["Versioner", "Fortryd", "Gendan", "Historik"],
   avanceret: ["Eget design", "CSS", "JSON", "Opsætningen"],
@@ -656,6 +657,7 @@ export function TourEditor({
                   />
                 </Group>
                 <Group title="Farver og skrift">
+                <SiteLookButton slug={slug} config={config} edit={edit} />
                 <div className="grid grid-cols-2 gap-3">
                   {(
                     [
@@ -2409,6 +2411,50 @@ function StoryPictures({ slug, preview }: { slug: string; preview: PreviewApi })
         Fjern billederne fra historierne
       </button>
       <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">{note ? <span className={note.error ? "text-[#ff3b30]" : ""}>{note.text}</span> : "Forhåndsvisningen går til hvert rum og tager et billede. Gem først, hvis du har ændret menuen."}</p>
+    </div>
+  );
+}
+
+/** "Brug hjemmesidens farver": nextviewAI reads the customer's site and sets the tour's colours and font - menu, stories, buttons and cards follow. */
+function SiteLookButton({ slug, config, edit }: { slug: string; config: TourConfig; edit: (fn: (d: TourConfig) => void) => void }) {
+  const guess = config.cta.find((c) => /^https?:/.test(c.href))?.href ?? "";
+  const [site, setSite] = useState(() => {
+    try {
+      return guess ? new URL(guess).origin : "";
+    } catch {
+      return "";
+    }
+  });
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<{ text: string; error?: boolean } | null>(null);
+  return (
+    <div className="space-y-1.5 rounded-xl bg-[#f2f2f7] p-2.5">
+      <div className="flex gap-1.5">
+        <input className={`${input} bg-white`} value={site} placeholder="Kundens hjemmeside, fx https://kunden.dk" onChange={(e) => setSite(e.target.value)} />
+        <button
+          type="button"
+          disabled={busy || !site.trim()}
+          onClick={async () => {
+            setBusy(true);
+            setNote(null);
+            const r = await suggestSiteLook(slug, withProtocol(site)).catch((err: unknown) => ({ ok: false as const, error: err instanceof Error ? err.message : String(err) }));
+            setBusy(false);
+            if (!r.ok) return setNote({ text: r.error, error: true });
+            edit((d) => {
+              d.colors = r.colors;
+              d.font = r.font;
+              d.fontHeading = r.fontHeading || undefined;
+            });
+            setNote({ text: `${r.reason} Ret selv nedenfor - eller Fortryd.` });
+          }}
+          className="shrink-0 rounded-[10px] bg-gradient-to-r from-[#7c3aed] to-[#0071e3] px-3 text-[13px] font-medium text-white disabled:opacity-50"
+        >
+          {busy ? "Læser siden …" : "✦ Brug hjemmesidens farver"}
+        </button>
+      </div>
+      <p className={`px-1 text-[12px] leading-snug ${note?.error ? "text-[#ff3b30]" : "text-[#6e6e73]"}`}>
+        {note?.text ?? "Farver og skrift fra kundens hjemmeside - så menu, historier, Afspil, knapper og kort har samme røde tråd som siden (bruger de blå knapper, bliver touren blå)."}
+      </p>
     </div>
   );
 }
