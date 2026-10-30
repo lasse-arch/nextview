@@ -165,6 +165,44 @@ export async function checkTour(c: TourConfig, opts: { ai?: boolean } = {}): Pro
   }
   if (!c.cta.length) add("warn", "Indhold", "Touren har ingen knap til næste skridt (fx Book, Kontakt).");
 
+  // Texts and the things a tour should have.
+  const empty = (v?: string | null) => !v || !v.trim();
+  const list = (xs: string[]) => (xs.length > 3 ? `${xs.slice(0, 3).join(", ")} og ${xs.length - 3} mere` : xs.join(", "));
+  if (empty(c.logo)) add("warn", "Indhold", "Touren har intet logo.");
+  if (empty(c.title) || empty(c.brand)) add("fejl", "Indhold", "Touren mangler navn eller titel.");
+  if (!c.welcome && !c.cover && !c.intro && !c.drone && !c.map) add("warn", "Indhold", "Touren har ingen velkomst - de besøgende starter direkte uden at få at vide, hvad de kan.");
+  if (c.welcome) {
+    if (empty(c.welcome.title)) add("warn", "Indhold", "Velkomsten har ingen overskrift.");
+    const noTitle = c.welcome.tiles.filter((t) => empty(t.title)).length;
+    if (noTitle) add("fejl", "Indhold", `${noTitle} velkomstflise${noTitle === 1 ? "" : "r"} uden tekst.`);
+    if (c.welcome.tiles.length > 6) add("warn", "Indhold", `Velkomsten har ${c.welcome.tiles.length} fliser - på mobil er 3-5 nok.`);
+  }
+  if (c.cover && empty(c.cover.image)) add("warn", "Indhold", "Forsiden har intet billede.");
+  const unnamed = c.menu.flatMap((m) => ("items" in m ? m.items.filter(([n]) => empty(n)).map(() => m.title) : empty(m.title) ? ["(menupunkt)"] : []));
+  if (unnamed.length) add("fejl", "Indhold", `${unnamed.length} menupunkt${unnamed.length === 1 ? "" : "er"} uden navn (i ${list([...new Set(unnamed)])}).`);
+  const emptyGroups = c.menu.filter((m) => "items" in m && !m.items.length).map((m) => m.title);
+  if (emptyGroups.length) add("fejl", "Indhold", `Tomme menugrupper: ${list(emptyGroups)}.`);
+  const names = c.menu.flatMap((m) => ("items" in m ? m.items.map(([n]) => n.trim()) : []));
+  const twice = [...new Set(names.filter((n, i) => n && names.indexOf(n) !== i))];
+  if (twice.length) add("warn", "Indhold", `Samme navn står flere gange i menuen: ${list(twice)}.`);
+  if (!c.menu.length) add("warn", "Indhold", "Touren har ingen menu.");
+  const cardsNoText = (c.placeCards ?? []).filter((k) => empty(k.text)).map((k) => k.title || "(uden titel)");
+  if (cardsNoText.length) add("fejl", "Indhold", `Stedkort uden tekst: ${list(cardsNoText)}.`);
+  const cardsNoPlace = (c.placeCards ?? []).filter((k) => !k.ss.length).map((k) => k.title);
+  if (cardsNoPlace.length) add("fejl", "Funktioner", `Stedkort, der ikke er sat til et sted, og derfor aldrig vises: ${list(cardsNoPlace)}.`);
+  const longCards = (c.placeCards ?? []).filter((k) => k.text.length > 260).map((k) => k.title);
+  if (longCards.length) add("warn", "Indhold", `Lange stedkort (over 260 tegn - på mobil skal man læse mere for at se det hele): ${list(longCards)}.`);
+  for (const g of allGuides(c)) {
+    const noText = guideStops(c, g.id).filter((s) => empty(s.text) && s.href).map((s) => s.title || "(uden navn)");
+    if (noText.length) add("warn", "Indhold", `"${g.title}" har stop uden tekst: ${list(noText)}.`);
+  }
+  const pointsNoText = c.points.filter((p) => empty(p.text) && !p.images?.length).map((p) => p.name);
+  if (pointsNoText.length) add("warn", "Indhold", `Punkter på luftfotoet uden tekst og billeder: ${list(pointsNoText)}.`);
+  const ct = c.contact;
+  if (!ct || (empty(ct.phone) && empty(ct.email))) add("warn", "Indhold", "Der er ingen telefon eller e-mail at kontakte stedet på.");
+  if (c.live && empty(c.live.title)) add("warn", "Indhold", "Live data har ingen overskrift.");
+  if (c.nudge && !c.nudge.buttons.length && !c.cta.some((b) => b.primary)) add("warn", "Funktioner", "Kortet, der kommer af sig selv, har ingen knap.");
+
   const ai = opts.ai ? await aiLook(c, items).catch(() => null) : null;
   return { items, ai };
 }
@@ -174,13 +212,13 @@ async function aiLook(c: TourConfig, items: CheckItem[]): Promise<string | null>
   const key = process.env.ANTHROPIC_API_KEY || (await getSettingValue("ANTHROPIC_API_KEY"));
   if (!key) return null;
   const client = new Anthropic({ apiKey: key });
-  const Out = z.object({ notes: z.array(z.string()).max(6) });
+  const Out = z.object({ notes: z.array(z.string()).max(8) });
   const res = await client.messages
     .stream({
       model: "claude-opus-5-5",
       max_tokens: 3000,
       system:
-        "Du er nextviewAI i Nextview360's CRM. Du tjekker en virtuel tour (en JSON-opsætning) igennem, lige før kunden får den til gennemgang. Mobil først: 90 % ser den på en telefon. Skriv højst 6 korte, konkrete punkter på dansk om det, en besøgende ville støde på: tomme eller for lange tekster, stavefejl, et forvirrende første valg, steder uden navn, manglende næste skridt, for mange valg på mobil. Ingen ros, ingen gentagelse af tjeklisten, ingen teknisk snak om JSON. Er alt fint, så returnér en tom liste.",
+        "Du er nextviewAI i Nextview360's CRM. Du tjekker en virtuel tour (en JSON-opsætning) igennem, lige før kunden får den til gennemgang. Mobil først: 90 % ser den på en telefon. Gå det hele igennem, som en kunde og en besøgende ville: teksterne (stavefejl, sprog der ikke lyder som kunden, for lange tekster på mobil, gentagelser, tekster der siger noget forkert om stedet), funktionerne (er der et tydeligt næste skridt, virker rækkefølgen, er der funktioner, der står tomme eller halvt sat op, fx en rundvisning, live data eller stedkort), og om der mangler noget, som denne slags sted normalt bør have (fx book/kontakt, priser, åbningstider, adresse, de vigtigste rum i menuen). Skriv højst 8 korte, konkrete punkter på dansk, hvert med hvor det er og hvad der skal gøres. Ingen ros, ingen gentagelse af tjeklisten ovenfor, ingen teknisk snak om JSON. Er alt fint, så returnér en tom liste.",
       messages: [{ role: "user", content: `Tjekket har fundet:\n${items.map((i) => `- [${i.level}] ${i.text}`).join("\n")}\n\nOpsætningen:\n\`\`\`json\n${JSON.stringify({ ...c, translations: undefined, panoCopies: undefined, customCss: undefined })}\n\`\`\`` }],
       output_config: { effort: "low", format: zodOutputFormat(Out) },
     })
