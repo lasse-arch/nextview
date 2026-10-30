@@ -4,7 +4,7 @@ import path from "node:path";
 import sharp from "sharp";
 import type { ReportInterval, ReportLanguage } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { tourStats } from "@/lib/tour-stats";
+import { SHOWN, tourStats } from "@/lib/tour-stats";
 import { shareOf } from "@/lib/tour-share";
 import { mergeShare, mergeStats } from "@/lib/merge-stats";
 import { fetchModelInfo } from "@/lib/matterport-graph";
@@ -69,7 +69,7 @@ async function visitsBefore(slugs: string[], days: number): Promise<number> {
   const end = new Date(Date.now() - days * 86_400_000);
   const start = new Date(end.getTime() - days * 86_400_000);
   const rows = await prisma.$queryRawUnsafe<{ n: bigint }[]>(
-    `SELECT count(DISTINCT session) AS n FROM "TourEvent" WHERE "tourSlug" = ANY($1) AND "createdAt" >= $2 AND "createdAt" < $3`,
+    `SELECT count(*) AS n FROM (SELECT session FROM "TourEvent" WHERE "tourSlug" = ANY($1) AND "createdAt" >= $2 AND "createdAt" < $3 GROUP BY "tourSlug", session HAVING ${SHOWN}) s`,
     slugs,
     start,
     end

@@ -381,9 +381,44 @@ function TourExperience({
     if (framed && !tracking.inArpo) track("tour_embed", { label: from?.hostname ?? "ukendt side", ...(from && /^https?:$/.test(from.protocol) ? { link_url: `${from.origin}${from.pathname}` } : {}) });
     const leave = () => flushEvents();
     window.addEventListener("pagehide", leave);
+    // A tour on a page starts by itself (e.g. on the front page) - loading it isn't a visit. "tour_seen": at least half of it
+    // was on the screen for a second (in a frame the browser measures it against the page's own window).
+    let seenTimer = 0;
+    const seen = framed && !tracking.inArpo && "IntersectionObserver" in window
+      ? new IntersectionObserver(
+          ([e]) => {
+            window.clearTimeout(seenTimer);
+            if (e?.isIntersecting && e.intersectionRatio >= 0.5)
+              seenTimer = window.setTimeout(() => {
+                track("tour_seen");
+                seen?.disconnect();
+              }, 1000);
+          },
+          { threshold: [0, 0.5, 1] }
+        )
+      : null;
+    seen?.observe(document.documentElement);
+    // "tour_use": the visitor did something in it - a tap, a drag, a key, a scroll in the tour, or a click into the 3D view
+    // (Matterport's own frame takes the focus then). Once per visit.
+    const events = ["pointerdown", "keydown", "wheel", "touchstart"] as const;
+    let done = false;
+    const used = () => {
+      if (done) return;
+      done = true;
+      track("tour_use");
+      events.forEach((ev) => window.removeEventListener(ev, used, true));
+      window.removeEventListener("blur", blurred);
+    };
+    const blurred = () => setTimeout(() => document.activeElement?.tagName === "IFRAME" && document.hasFocus() && used(), 0);
+    events.forEach((ev) => window.addEventListener(ev, used, { capture: true, passive: true }));
+    window.addEventListener("blur", blurred);
     return () => {
       flushEvents();
       window.removeEventListener("pagehide", leave);
+      seen?.disconnect();
+      window.clearTimeout(seenTimer);
+      events.forEach((ev) => window.removeEventListener(ev, used, true));
+      window.removeEventListener("blur", blurred);
     };
   }, [savedTour.slug]);
   // Rooms are known by their Danish names (Matterport and statistics); `roomShown` is the name in the visitor's language.

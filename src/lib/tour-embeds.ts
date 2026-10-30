@@ -7,16 +7,31 @@ import { prisma } from "@/lib/db";
  * address without anything after ? or #). Arpo's own previews don't count.
  */
 
-export type TourEmbed = { host: string; url: string | null; visits: number; lastSeen: string; /** Whole days since it was last opened there (0 = today). */ daysAgo: number };
+/** One page showing the tour: visits where the tour was on the screen there (`seen`) and where it was used (`used`) - not just loaded with the page. */
+export type TourEmbed = { host: string; url: string | null; seen: number; used: number; lastSeen: string; /** Whole days since it was last loaded there (0 = today). */ daysAgo: number };
 
 /** The pages showing these tours in the last 90 days, the newest first. */
 export async function tourEmbeds(slugs: string[]): Promise<TourEmbed[]> {
   if (!slugs.length) return [];
-  const rows = await prisma.$queryRawUnsafe<{ host: string | null; url: string | null; visits: bigint; last: Date }[]>(
-    `SELECT label AS host, url, count(DISTINCT session) AS visits, max("createdAt") AS last FROM "TourEvent"
-     WHERE "tourSlug" = ANY($1::text[]) AND name = 'tour_embed' AND "createdAt" >= now() - interval '90 days'
-     GROUP BY label, url ORDER BY last DESC LIMIT 30`,
+  // Each visit's page, then whether the tour was seen (half of it on the screen for a second) or used there.
+  const rows = await prisma.$queryRawUnsafe<{ host: string | null; url: string | null; seen: bigint; used: bigint; last: Date }[]>(
+    `WITH e AS (
+       SELECT DISTINCT ON (session) session, label AS host, url, "createdAt" FROM "TourEvent"
+       WHERE "tourSlug" = ANY($1::text[]) AND name = 'tour_embed' AND "createdAt" >= now() - interval '90 days'
+       ORDER BY session, "createdAt" DESC),
+     u AS (
+       SELECT session, bool_or(name IN ('tour_seen', 'tour_use')) AS seen, bool_or(name = 'tour_use') AS used FROM "TourEvent"
+       WHERE "tourSlug" = ANY($1::text[]) AND "createdAt" >= now() - interval '90 days' AND session IN (SELECT session FROM e) GROUP BY session)
+     SELECT e.host, e.url, count(*) FILTER (WHERE u.seen) AS seen, count(*) FILTER (WHERE u.used) AS used, max(e."createdAt") AS last
+     FROM e LEFT JOIN u USING (session) GROUP BY e.host, e.url ORDER BY last DESC LIMIT 30`,
     slugs
   );
-  return rows.map((r) => ({ host: r.host ?? "ukendt side", url: r.url && /^https?:\/\//.test(r.url) ? r.url : null, visits: Number(r.visits), lastSeen: r.last.toISOString(), daysAgo: Math.max(0, Math.floor((Date.now() - r.last.getTime()) / 86_400_000)) }));
+  return rows.map((r) => ({
+    host: r.host ?? "ukendt side",
+    url: r.url && /^https?:\/\//.test(r.url) ? r.url : null,
+    seen: Number(r.seen),
+    used: Number(r.used),
+    lastSeen: r.last.toISOString(),
+    daysAgo: Math.max(0, Math.floor((Date.now() - r.last.getTime()) / 86_400_000)),
+  }));
 }

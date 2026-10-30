@@ -12,6 +12,16 @@ import { prisma } from "@/lib/db";
 /** Events that mean the visitor acted: a link out of the tour (booking, order …) or a call/mail. */
 export const ACTION = `(name IN ('cta_click', 'live_book', 'contact_form') OR (name = 'contact_click' AND label IN ('phone', 'email')))`;
 
+/*
+ * A tour on a customer's page (tour_embed) may start by itself, e.g. on the
+ * front page - loaded isn't a visit. Such a visit counts once the tour was on
+ * the screen (tour_seen) or used (tour_use), and it was engaged only when the
+ * visitor actually did something in it (tour_use). A visit straight to the
+ * tour (a link, a QR code) counts as before. Per session (in GROUP BY session).
+ */
+export const SHOWN = `(NOT bool_or(name = 'tour_embed') OR bool_or(name IN ('tour_seen', 'tour_use')))`;
+const ENGAGED = `(bool_or(name = 'tour_use') OR (NOT bool_or(name = 'tour_embed') AND bool_or(name IN ('menu_click','place_click','room_view','guide_start','welcome_choice','route_start','info_open','place_card_view'))))`;
+
 export type TourStats = {
   days: number;
   visits: number;
@@ -44,20 +54,22 @@ export async function tourStats(slug: string, days = 30): Promise<TourStats> {
     prisma.$queryRawUnsafe<{ visits: bigint; engaged: bigint; leads: bigint; median: number | null; mobile: bigint }[]>(
       `WITH s AS (
          SELECT session,
-                bool_or(name IN ('menu_click','place_click','room_view','guide_start','welcome_choice','route_start','info_open','place_card_view')) AS engaged,
+                ${SHOWN} AS shown,
+                ${ENGAGED} AS engaged,
                 bool_or(${ACTION}) AS lead,
                 LEAST(EXTRACT(EPOCH FROM max("createdAt") - min("createdAt")), 1800) AS secs, -- a tab left open isn't a 3-hour visit
                 bool_or(device = 'mobil') AS mobile
          FROM "TourEvent" WHERE "tourSlug" = $1 AND "createdAt" >= $2 GROUP BY session)
        SELECT count(*) AS visits, count(*) FILTER (WHERE engaged) AS engaged, count(*) FILTER (WHERE lead) AS leads,
-              percentile_cont(0.5) WITHIN GROUP (ORDER BY secs) AS median, count(*) FILTER (WHERE mobile) AS mobile FROM s`,
+              percentile_cont(0.5) WITHIN GROUP (ORDER BY secs) AS median, count(*) FILTER (WHERE mobile) AS mobile FROM s WHERE shown`,
       slug,
       since
     ),
     prisma.$queryRawUnsafe<{ day: Date; visits: bigint; leads: bigint }[]>(
-      `SELECT date_trunc('day', "createdAt" AT TIME ZONE 'Europe/Copenhagen') AS day,
-              count(DISTINCT session) AS visits, count(DISTINCT session) FILTER (WHERE ${ACTION}) AS leads
-       FROM "TourEvent" WHERE "tourSlug" = $1 AND "createdAt" >= $2 GROUP BY 1 ORDER BY 1`,
+      `WITH s AS (SELECT session FROM "TourEvent" WHERE "tourSlug" = $1 AND "createdAt" >= $2 GROUP BY session HAVING ${SHOWN})
+       SELECT date_trunc('day', e."createdAt" AT TIME ZONE 'Europe/Copenhagen') AS day,
+              count(DISTINCT e.session) AS visits, count(DISTINCT e.session) FILTER (WHERE ${ACTION}) AS leads
+       FROM "TourEvent" e JOIN s ON s.session = e.session WHERE e."tourSlug" = $1 AND e."createdAt" >= $2 GROUP BY 1 ORDER BY 1`,
       slug,
       since
     ),
@@ -158,8 +170,8 @@ async function top(slug: string, since: Date, where: string) {
 /** Leads per tour in the last `days` days (for the overview). */
 export async function leadsByTour(days = 30): Promise<Record<string, { visits: number; leads: number }>> {
   const rows = await prisma.$queryRawUnsafe<{ tourSlug: string; visits: bigint; leads: bigint }[]>(
-    `SELECT "tourSlug", count(DISTINCT session) AS visits, count(DISTINCT session) FILTER (WHERE ${ACTION}) AS leads
-     FROM "TourEvent" WHERE "createdAt" >= $1 GROUP BY "tourSlug"`,
+    `WITH s AS (SELECT "tourSlug", session, bool_or(${ACTION}) AS lead FROM "TourEvent" WHERE "createdAt" >= $1 GROUP BY "tourSlug", session HAVING ${SHOWN})
+     SELECT "tourSlug", count(*) AS visits, count(*) FILTER (WHERE lead) AS leads FROM s GROUP BY "tourSlug"`,
     new Date(Date.now() - days * 86_400_000)
   );
   return Object.fromEntries(rows.map((r) => [r.tourSlug, { visits: Number(r.visits), leads: Number(r.leads) }]));
