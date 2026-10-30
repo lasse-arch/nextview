@@ -120,7 +120,7 @@ const eventLog: TrackedEvent[] = [];
 const logListeners = new Set<() => void>();
 
 /** The tour being measured (set when the tour mounts). */
-const tracking = { slug: "", session: "", off: false, inArpo: false, queue: [] as { name: string; label?: string; url?: string; value?: number }[], timer: 0, da: (s: string) => s };
+const tracking = { slug: "", session: "", off: false, inArpo: false, used: false, queue: [] as { name: string; label?: string; url?: string; value?: number }[], timer: 0, da: (s: string) => s };
 
 /** Sends the waiting events to Arpo's own measurement (/api/tour-events) - also when the page is closed. */
 function flushEvents() {
@@ -132,6 +132,13 @@ function flushEvents() {
   if (!navigator.sendBeacon?.(apiUrl("/api/tour-events"), new Blob([body], { type: "text/plain" }))) {
     fetch(apiUrl("/api/tour-events"), { method: "POST", body, keepalive: true }).catch(() => {});
   }
+}
+
+/** The visitor did something in the tour (once per visit) - see "tour_use" where the tour mounts. */
+function markUsed() {
+  if (tracking.used) return;
+  tracking.used = true;
+  track("tour_use");
 }
 
 function track(name: string, params: Record<string, string | number> = {}) {
@@ -401,11 +408,9 @@ function TourExperience({
     // "tour_use": the visitor did something in it - a tap, a drag, a key, a scroll in the tour, or a click into the 3D view
     // (Matterport's own frame takes the focus then). Once per visit.
     const events = ["pointerdown", "keydown", "wheel", "touchstart"] as const;
-    let done = false;
+    tracking.used = false;
     const used = () => {
-      if (done) return;
-      done = true;
-      track("tour_use");
+      markUsed();
       events.forEach((ev) => window.removeEventListener(ev, used, true));
       window.removeEventListener("blur", blurred);
     };
@@ -461,6 +466,8 @@ function TourExperience({
   const allSweeps = useRef<string[]>([]);
   /** Every scan point's place in the viewer (to face the way when walking a route). */
   const sweepData = useRef<Record<string, SweepInfo>>({});
+  /** When the tour last moved the view itself (a move it asked for) - a step to another scan point long after is the visitor's. */
+  const selfMoveAt = useRef(-Infinity);
   /** Scan points switched off in Matterport that a move opened (closed again when the visitor leaves them). */
   const openedSweeps = useRef(new Set<string>());
   const currentSweep = useRef<string | null>(null);
@@ -674,6 +681,9 @@ function TourExperience({
         sweepMoving.current = !s?.sid;
         if (!s?.sid) return;
         const first = currentSweep.current == null;
+        // The visitor stepped to another scan point themselves (a tap or drag in the 3D view - which happens in Matterport's own
+        // frame, where a phone's touch can't be seen): that's using the tour too. Not the tour's own moves (a menu place, the guide, Find vej).
+        if (!first && s.sid !== currentSweep.current && now() - selfMoveAt.current > 2500 && guideAtRef.current == null) markUsed();
         currentSweep.current = s.sid;
         if (first && pointsOnlyRef.current) lockTo(sdk, allSweeps.current, s.sid);
         const ss = ssBySweep[s.sid];
@@ -723,6 +733,8 @@ function TourExperience({
    */
   const moveSweep = useCallback(
     async (sdk: MpSdk, sweep: string, opts: { rotation?: Rotation; transition: string; transitionTime?: number }) => {
+      // The tour's own move (not the visitor's step) - see "tour_use" below.
+      selfMoveAt.current = now();
       const from = currentSweep.current;
       const locked = pointsOnlyRef.current;
       // A scan point switched off in Matterport itself (Find vej may pass it): opened for the move, closed again when left.
@@ -752,6 +764,7 @@ function TourExperience({
             track("move_failed", { sweep, label: `${String(last).slice(0, 60)} / ${String(err).slice(0, 60)}` })
           );
       }
+      selfMoveAt.current = now();
       if (from && from !== sweep && (locked || hiddenSweeps.includes(from) || openedSweeps.current.has(from))) {
         openedSweeps.current.delete(from);
         await sdk.Sweep.disable(from).catch(() => {});
