@@ -2,7 +2,7 @@
 
 import { reviewUrl } from "@/lib/public-urls";
 import { useEffect, useState, useTransition } from "react";
-import { deleteFeedback, reviewStatus, sendFixesDone, sendForReview, setFeedbackStatus, setTourApproved, setTourReview, tourFeedback, type Feedback, type ReviewStatus } from "@/lib/actions/tour-feedback";
+import { checkTourForReview, deleteFeedback, reviewStatus, sendFixesDone, sendForReview, setFeedbackStatus, setTourApproved, setTourReview, tourFeedback, type Feedback, type ReviewStatus } from "@/lib/actions/tour-feedback";
 import { askClaudeForTour, type AiEditResult } from "@/lib/actions/tour-ai";
 import type { TourConfig } from "../../tours/types";
 import { Choice, Group, Toggle, type PreviewApi } from "./ui";
@@ -78,7 +78,19 @@ export function FeedbackPanel({
   const url = token && typeof window !== "undefined" ? reviewUrl(token, location.origin) : null;
   const shown = (items ?? []).filter((f) => filter === "all" || f.status === filter);
   const open = (items ?? []).filter((f) => f.status === "open").length;
+  /** "Tjek touren": run before the first review mail - and on its own. */
+  const [check, setCheck] = useState<{ items: { level: "ok" | "warn" | "fejl"; area: string; text: string }[]; ai: string | null } | null>(null);
+  const [checking, setChecking] = useState(false);
+  async function runCheck() {
+    setNote(null);
+    setChecking(true);
+    const r = await checkTourForReview(slug).catch((err: unknown) => ({ ok: false as const, error: err instanceof Error ? err.message : String(err) }));
+    setChecking(false);
+    if (!r.ok) return setNote({ text: r.error, error: true });
+    setCheck({ items: r.items, ai: r.ai });
+  }
   function send(reminder: boolean) {
+    setCheck(null);
     setNote(null);
     start(async () => {
       const r = await sendForReview(slug, reminder);
@@ -113,8 +125,8 @@ export function FeedbackPanel({
         )}
         <div className="flex flex-wrap gap-2">
           {!status?.sentAt || status.approvedAt ? (
-            <button type="button" disabled={pending || !status?.to} onClick={() => send(false)} className="flex-1 rounded-xl bg-[#0071e3] py-2 text-[14px] font-medium text-white disabled:opacity-40">
-              {status?.approvedAt ? "Send til ny gennemgang" : "Send til gennemgang"}
+            <button type="button" disabled={pending || checking || !status?.to} onClick={() => void runCheck()} className="flex-1 rounded-xl bg-[#0071e3] py-2 text-[14px] font-medium text-white disabled:opacity-40">
+              {checking ? "nextviewAI tjekker touren …" : status?.approvedAt ? "Tjek og send til ny gennemgang" : "Tjek og send til gennemgang"}
             </button>
           ) : (
             <button type="button" disabled={pending} onClick={() => send(true)} className="flex-1 rounded-xl bg-[#0071e3] py-2 text-[14px] font-medium text-white disabled:opacity-40">
@@ -137,6 +149,21 @@ export function FeedbackPanel({
             </button>
           )}
         </div>
+        {!check && (
+          <button type="button" disabled={checking} onClick={() => void runCheck()} className="self-start text-[13px] font-medium text-[#b4532f] disabled:opacity-50">
+            {checking ? "nextviewAI tjekker touren …" : "✦ Tjek touren (hastighed og funktioner)"}
+          </button>
+        )}
+        {check && (
+          <CheckResult
+            check={check}
+            pending={pending}
+            sendLabel={status?.sentAt && !status.approvedAt ? "Send påmindelse" : status?.approvedAt ? "Send til ny gennemgang" : "Send til gennemgang"}
+            onSend={() => send(Boolean(status?.sentAt && !status.approvedAt))}
+            onClose={() => setCheck(null)}
+            onAgain={() => void runCheck()}
+          />
+        )}
         <p className={`text-[12px] leading-snug ${note?.error ? "text-[#ff3b30]" : note ? "text-[#34c759]" : "text-[#8e8e93]"}`}>
           {note?.text ?? (status?.to ? `Mailen går til ${status.to} (kontakt-e-mailen på dealen) fra info@nextview360.dk - svar lander der. Godkender kunden, får I besked på mail.` : status ? "Touren er ikke koblet til en kunde med kontakt-e-mail." : "")}
         </p>
@@ -318,5 +345,68 @@ export function FeedbackPanel({
         </button>
       )}
     </>
+  );
+}
+
+/** The check before the review mail: what's fine, what to look at, what doesn't work - then send, or fix first. */
+function CheckResult({
+  check,
+  pending,
+  sendLabel,
+  onSend,
+  onClose,
+  onAgain,
+}: {
+  check: { items: { level: "ok" | "warn" | "fejl"; area: string; text: string }[]; ai: string | null };
+  pending: boolean;
+  sendLabel: string;
+  onSend: () => void;
+  onClose: () => void;
+  onAgain: () => void;
+}) {
+  const errors = check.items.filter((i) => i.level === "fejl").length;
+  const warnings = check.items.filter((i) => i.level === "warn").length;
+  const order = { fejl: 0, warn: 1, ok: 2 } as const;
+  const mark = { ok: ["✓", "text-[#1f7a35]"], warn: ["!", "text-[#a05a00]"], fejl: ["✕", "text-[#d70015]"] } as const;
+  return (
+    <div className="space-y-2.5 rounded-xl bg-white p-3 ring-1 ring-black/[.08]">
+      <p className={`text-[14px] font-semibold ${errors ? "text-[#d70015]" : warnings ? "text-[#a05a00]" : "text-[#1f7a35]"}`}>
+        {errors ? `${errors} ting virker ikke` : warnings ? `Klar - ${warnings} ting at se på` : "Touren er klar til kunden"}
+      </p>
+      {["Funktioner", "Hastighed", "Indhold"].map((area) => {
+        const rows = check.items.filter((i) => i.area === area).sort((a, b) => order[a.level] - order[b.level]);
+        return rows.length ? (
+          <div key={area}>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-[#8e8e93]">{area}</p>
+            <ul className="mt-1 space-y-1">
+              {rows.map((r, i) => (
+                <li key={i} className="flex gap-2 text-[13px] leading-snug">
+                  <span className={`w-3 flex-none font-bold ${mark[r.level][1]}`}>{mark[r.level][0]}</span>
+                  <span className="break-words">{r.text}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null;
+      })}
+      {check.ai != null && (
+        <div className="rounded-lg bg-[#d97757]/[.08] p-2.5">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-[#b4532f]">✦ nextviewAI</p>
+          <p className="mt-1 whitespace-pre-wrap text-[13px] leading-snug text-[#1d1d1f]">{check.ai || "Intet at bemærke - touren er let at finde rundt i."}</p>
+        </div>
+      )}
+      <div className="flex flex-wrap gap-2 pt-1">
+        <button type="button" disabled={pending} onClick={onSend} className={`flex-1 rounded-xl py-2 text-[14px] font-medium text-white disabled:opacity-40 ${errors ? "bg-[#ff3b30]" : "bg-[#0071e3]"}`}>
+          {errors ? `${sendLabel} alligevel` : sendLabel}
+        </button>
+        <button type="button" onClick={onAgain} className="rounded-xl bg-white px-3 py-2 text-[14px] font-medium text-[#0071e3] ring-1 ring-black/[.06]">
+          Tjek igen
+        </button>
+        <button type="button" onClick={onClose} className="rounded-xl px-3 py-2 text-[14px] text-[#8e8e93]">
+          Ret først
+        </button>
+      </div>
+      <p className="text-[11px] leading-snug text-[#8e8e93]">Tjekket ser på den gemte tour. Gem først, hvis du har rettet noget.</p>
+    </div>
   );
 }

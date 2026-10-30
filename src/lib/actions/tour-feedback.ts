@@ -5,6 +5,8 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { approveTour, sendFixesDoneMail, sendReviewMail } from "@/lib/tour-review";
+import { checkTour, type CheckItem } from "@/lib/tour-check";
+import { getTourConfig } from "@/lib/tours";
 
 /*
  * "Kundegennemsyn": a secret link (/p/<token>) we switch on for a tour, where
@@ -117,4 +119,17 @@ export async function setTourApproved(slug: string, approved: boolean): Promise<
   if (approved) await approveTour(slug, { name: user.name, customer: false, actorId: user.id });
   else await prisma.tour.update({ where: { slug }, data: { reviewApprovedAt: null, reviewApprovedBy: null } });
   revalidatePath(`/arpo/tour-lab/${slug}/rediger`);
+}
+
+/** "Tjek touren" before the review mail: speed, that everything works, and nextviewAI's own look (the saved tour). */
+export async function checkTourForReview(slug: string): Promise<{ ok: true; items: CheckItem[]; ai: string | null } | { ok: false; error: string }> {
+  await admin();
+  const config = await getTourConfig(slug);
+  if (!config) return { ok: false, error: "Touren findes ikke." };
+  try {
+    const r = await checkTour(config, { ai: true });
+    return { ok: true, ...r };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Tjekket kunne ikke køre." };
+  }
 }

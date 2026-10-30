@@ -2,27 +2,10 @@
 
 import { useT } from "../tours/i18n-react";
 import { useEffect, useRef, useState } from "react";
-import type { GuideTurn, TourConfig } from "../tours/types";
-import { guideSetup, startPlaces } from "../tours/places";
 
-export type GuideStop = { href: string; title: string; text: string; audio?: string; turn?: GuideTurn };
-
-/** A guided tour's stops (the main one, or one of `guides` by id), with a drone point's name and text filled in where a stop borrows them - or one per menu place when it's made from the menu. */
-export function guideStops(T: TourConfig, guideId: string | null = null): GuideStop[] {
-  const G = guideSetup(T, guideId);
-  if (G?.fromMenu) {
-    const pick = G.menuPlaces;
-    return startPlaces(T)
-      .filter((p) => !pick || pick.includes(p.key))
-      .map((p) => ({ href: p.href, title: p.name, text: p.group ?? "", turn: G.menuTurns?.[p.key] }));
-  }
-  return (G?.stops ?? []).flatMap((s) => {
-    if (!("point" in s)) return [s];
-    const p = T.points.find((x) => x.id === s.point);
-    // A point without a room is shown on the drone scene / map itself.
-    return p ? [{ href: p.tour ?? `#punkt:${p.id}`, title: p.name, text: p.text, turn: s.turn }] : [];
-  });
-}
+// The stops live with the other shared helpers (the server's "Tjek touren" needs them too).
+import type { GuideStop } from "../tours/places";
+export { guideStops, type GuideStop } from "../tours/places";
 
 /**
  * "Vis mig rundt": the caption card and progress bars while the tour flies

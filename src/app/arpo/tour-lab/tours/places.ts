@@ -1,4 +1,4 @@
-import type { DroneView, TourConfig } from "./types";
+import type { DroneView, GuideTurn, TourConfig } from "./types";
 
 /*
  * A spot in the tour is a link with the scan point (ss) and, if picked in
@@ -122,4 +122,23 @@ export function guideSetup(T: TourConfig, guideId: string | null = null) {
 export function allGuides(T: TourConfig): { id: string | null; title: string }[] {
   const has = (g: TourConfig["guide"]) => Boolean(g && (g.fromMenu || g.stops.length));
   return [...(has(T.guide) ? [{ id: null, title: "Vis mig rundt" }] : []), ...(T.guides ?? []).filter(has).map((g) => ({ id: g.id, title: g.title }))];
+}
+
+export type GuideStop = { href: string; title: string; text: string; audio?: string; turn?: GuideTurn };
+
+/** A guided tour's stops (the main one, or one of `guides` by id), with a drone point's name and text filled in where a stop borrows them - or one per menu place when it's made from the menu. */
+export function guideStops(T: TourConfig, guideId: string | null = null): GuideStop[] {
+  const G = guideSetup(T, guideId);
+  if (G?.fromMenu) {
+    const pick = G.menuPlaces;
+    return startPlaces(T)
+      .filter((p) => !pick || pick.includes(p.key))
+      .map((p) => ({ href: p.href, title: p.name, text: p.group ?? "", turn: G.menuTurns?.[p.key] }));
+  }
+  return (G?.stops ?? []).flatMap((s) => {
+    if (!("point" in s)) return [s];
+    const p = T.points.find((x) => x.id === s.point);
+    // A point without a room is shown on the drone scene / map itself.
+    return p ? [{ href: p.tour ?? `#punkt:${p.id}`, title: p.name, text: p.text, turn: s.turn }] : [];
+  });
 }
