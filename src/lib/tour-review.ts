@@ -1,4 +1,6 @@
 import "server-only";
+import { after } from "next/server";
+import { goLiveAfterApproval } from "@/lib/auto-live";
 import { randomBytes } from "node:crypto";
 import { prisma } from "@/lib/db";
 import { resendReady, sendSystemMail } from "@/lib/system-mail";
@@ -340,6 +342,8 @@ export async function approveTour(slug: string, by: { name: string; customer: bo
       subject: `Godkendt af kunden: ${name}`,
       text: `${who} har godkendt touren "${tour.name}".${open ? `\n\nDer er stadig ${open} åben${open === 1 ? "" : "e"} rettelse${open === 1 ? "" : "r"} fra kunden.` : ""}\n\nSe den i editoren: ${getAppBaseUrl()}/arpo/tour-lab/${slug}/rediger`,
     });
+    // Then out it goes by itself: published, Live, the welcome mail (after the answer - it takes a while).
+    after(() => goLiveAfterApproval(slug).catch((err) => console.error("[auto-live]", slug, err)));
   }
   return { already: false };
 }

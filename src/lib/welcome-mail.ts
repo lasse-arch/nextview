@@ -34,6 +34,8 @@ export function buildWelcomeMail(input: {
   portal?: { link: string; statsLink: string; days: number; /** They have had the page since the review mail - so it isn't news. */ known?: boolean } | null;
   /** The tour's front page on a MacBook goes with the mail (as cid:tour) - shown for the first product. */
   picture?: boolean;
+  /** Sent because the customer approved the tour themselves: thanks for that, and they're live now. */
+  approved?: boolean;
 }): { subject: string; bodyText: string; bodyHtml: string } {
   const firstName = input.contactName?.trim().split(/\s+/)[0] || null;
   const en = input.language === "en";
@@ -86,6 +88,16 @@ export function buildWelcomeMail(input: {
     t.portalIntro = en ? "It's the same page where you sent your corrections. Now that the tour is live, you can also:" : "Det er den samme side, hvor I har sendt jeres rettelser. Nu hvor touren er live, kan I også:";
     t.portalPoints = t.portalPoints.filter((_, i) => i !== 1);
   }
+  if (input.approved) {
+    // The customer approved it themselves - the mail says thanks, and that it's out there now.
+    t.subject = en ? `Your tour is live - welcome to Nextview360` : `Jeres tour er live - velkommen til Nextview360`;
+    t.intro = en ? "Thank you for approving the tour - it's live now and ready to work for you." : "Tak fordi I har godkendt touren - nu er den live og klar til at arbejde for jer.";
+    (t as { product: (n: number) => string }).product = en ? () => "Your finished tour:" : () => "Her er jeres færdige tour:";
+    t.share += en ? " We're also happy to help put the tour on your website - just reply to this e-mail." : " Vi hjælper også gerne med at sætte touren ind på jeres hjemmeside - svar bare på denne mail.";
+    (t as { contact: (portal: boolean) => string }).contact = en
+      ? () => `If you have more changes, you can send them on your customer page or simply reply to this e-mail. If you have any questions, you are welcome to call ${PHONE}.`
+      : () => `Har I flere rettelser, kan I sende dem på jeres kundeside eller svare direkte på denne mail. Har I spørgsmål, er I velkomne til at ringe på ${PHONE}.`;
+  }
   const products = input.products
     .filter((p) => p.url.trim())
     .map((p) => ({ name: p.name, url: withProtocol(p.url.trim()) }));
@@ -98,7 +110,7 @@ export function buildWelcomeMail(input: {
   };
   // Their own website, unless it's already one of the delivered links.
   const website = input.websiteUrl?.trim() ? withProtocol(input.websiteUrl.trim()) : null;
-  const websiteUrl = website && !products.some((p) => host(p.url) === host(website)) ? website : null;
+  const websiteUrl = !input.approved && website && !products.some((p) => host(p.url) === host(website)) ? website : null;
 
   const bodyText = [
     t.greeting,
@@ -156,6 +168,7 @@ ${
 }
 
 export async function welcomeMailFor(dealId: string, portal: { link: string; statsLink: string; days: number; known?: boolean } | null = null, picture = false, person?: { email: string; name: string | null }) {
+  const approvedByCustomer = (await prisma.tour.count({ where: { dealId, reviewApprovedBy: { endsWith: "(kunden)" } } })) > 0;
   const deal = await prisma.deal.findUniqueOrThrow({
     where: { id: dealId },
     include: { items: { where: { url: { not: null } }, orderBy: { createdAt: "asc" } }, tours: { select: { slug: true, name: true, published: true, liveVersion: true } } },
@@ -163,7 +176,8 @@ export async function welcomeMailFor(dealId: string, portal: { link: string; sta
   const mail = buildWelcomeMail({
     contactName: person ? person.name : deal.contactName,
     customerName: dealName(deal),
-    products: deal.items.length
+    // Approved by the customer: the tour just published is the product (its new link) - not an older link on the deal's Ydelser.
+    products: deal.items.length && !approvedByCustomer
       ? deal.items.map((i) => ({ name: i.location ? `${i.productType} (${i.location})` : i.productType, url: i.url! }))
       : // No links on Ydelser: the customer's own published tours from Arpo.
         deal.tours.filter((t) => t.published).map((t) => ({ name: deal.tours.length > 1 ? t.name : "Virtuel tour", url: tourUrl(t.slug, getAppBaseUrl(), t.liveVersion != null) })),
@@ -171,6 +185,7 @@ export async function welcomeMailFor(dealId: string, portal: { link: string; sta
     language: parseContractProducts(deal.contractProducts)?.language === "en" ? "en" : "da",
     portal,
     picture,
+    approved: approvedByCustomer,
   });
   return { deal, to: person?.email ?? deal.contactEmail, ...mail };
 }
