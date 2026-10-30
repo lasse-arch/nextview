@@ -118,6 +118,32 @@ export function Stories({
     play(playing + 1);
   }
 
+  // While they play: → next, ← previous, space pauses - not while typing somewhere.
+  const keys = useRef({ next, play, playing });
+  useEffect(() => {
+    keys.current = { next, play, playing };
+  });
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const k = keys.current;
+      if (k.playing == null || e.metaKey || e.ctrlKey || e.altKey) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+      if (e.key === "ArrowRight") {
+        e.preventDefault();
+        k.next("tap");
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        if (k.playing > 0) k.play(k.playing - 1);
+      } else if (e.key === " ") {
+        e.preventDefault();
+        setPaused((p) => !p);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   const visible = `${devices.mobile ? "hv-st-m" : ""} ${devices.desktop ? "hv-st-d" : ""}`;
 
   return (
