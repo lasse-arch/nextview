@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
-import { isDocuSealConfigured, createAndSendSubmission, cancelDocuSealSubmission } from "@/lib/docuseal";
+import { isDocuSealConfigured, createAndSendSubmission, cancelDocuSealSubmission, customerSigningLink, resendCustomerSigningMail } from "@/lib/docuseal";
 import { lookupCvrNumber } from "@/lib/cvr";
 import {
   buildContractHtmlData,
@@ -269,4 +269,33 @@ function contractSummary(products: ContractProducts): string {
   const mrr = computeMonthlyTotal(products);
   const value = setup + totalContractValue({ saleAmount: mrr, bindingMonths: products.bindingMonths });
   return `(Etablering: ${n(setup)}, MRR: ${n(mrr)}, Binding: ${products.bindingMonths} måneder, Kontraktværdi: ${n(value)})`;
+}
+
+/** Only the deal's seller and admins - the signing link lets whoever has it sign as the customer. */
+async function sentContractOf(dealId: string) {
+  const user = await requireUser();
+  const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId }, select: { ownerId: true, contractStatus: true, docusealSubmissionId: true } });
+  if (user.role !== "ADMIN" && deal.ownerId !== user.id) throw new Error("Kun dealens sælger eller en admin.");
+  if ((deal.contractStatus !== "SENT" && deal.contractStatus !== "VIEWED") || !deal.docusealSubmissionId) throw new Error("Der er ingen sendt, uunderskrevet kontrakt.");
+  return deal.docusealSubmissionId;
+}
+
+/** The customer's signing link - to send it another way (sms, a plain mail) when DocuSeal's button doesn't work for them. */
+export async function getCustomerSigningLink(dealId: string): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
+  try {
+    const url = await customerSigningLink(await sentContractOf(dealId));
+    return url ? { ok: true, url } : { ok: false, error: "DocuSeal gav ikke noget link til kunden." };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Linket kunne ikke hentes." };
+  }
+}
+
+/** DocuSeal sends the customer the signing mail once more. */
+export async function resendContractMail(dealId: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    await resendCustomerSigningMail(await sentContractOf(dealId));
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Mailen kunne ikke sendes igen." };
+  }
 }

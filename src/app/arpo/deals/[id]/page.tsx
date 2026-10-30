@@ -32,6 +32,7 @@ import { lookupEanRecipient } from "@/lib/ean";
 import { CommissionExcludedToggle } from "./commission-excluded-toggle";
 import { SendContractButton } from "./send-contract-button";
 import { DownloadContractButton } from "./download-contract-button";
+import { SigningLinkButtons } from "./signing-link-buttons";
 import { PreviewContractButton } from "./preview-contract-button";
 import { ArchiveContractButton } from "./archive-contract-button";
 import { ArchiveToDriveButton } from "./archive-to-drive-button";
@@ -566,6 +567,9 @@ export default async function DealDetailPage({
               )}
               {(deal.contractStatus === "SENT" || deal.contractStatus === "VIEWED") && (
                 <PreviewContractButton dealId={deal.id} />
+              )}
+              {(deal.contractStatus === "SENT" || deal.contractStatus === "VIEWED") && deal.docusealSubmissionId && (currentUser?.role === "ADMIN" || currentUser?.id === deal.ownerId) && (
+                <SigningLinkButtons dealId={deal.id} />
               )}
               {deal.contractStatus !== "SIGNED" && (
                 <SendContractButton

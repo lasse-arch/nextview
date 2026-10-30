@@ -82,8 +82,26 @@ type DocuSealSubmissionDetails = {
   status: string;
   combined_document_url: string | null;
   documents?: { name: string; url: string }[];
-  submitters?: { documents?: { name: string; url: string }[] }[];
+  submitters?: { id?: number; role?: string; external_id?: string; embed_src?: string; status?: string; documents?: { name: string; url: string }[] }[];
 };
+
+/** The customer's own signing page in DocuSeal (the same link as the button in DocuSeal's mail), or null when it isn't there. */
+export async function customerSigningLink(submissionId: string): Promise<string | null> {
+  const s = await getSubmission(submissionId);
+  const customer = s.submitters?.find((x) => x.external_id === "customer" || x.role === "Customer");
+  const url = customer?.embed_src ?? null;
+  // Only DocuSeal's own address - never anything else from the answer.
+  return url && /^https:\/\/([a-z0-9-]+\.)*docuseal\.(eu|com)\//i.test(url) ? url : null;
+}
+
+/** DocuSeal sends the customer the signing mail again. */
+export async function resendCustomerSigningMail(submissionId: string): Promise<void> {
+  const s = await getSubmission(submissionId);
+  const customer = s.submitters?.find((x) => x.external_id === "customer" || x.role === "Customer");
+  if (!customer?.id) throw new Error("DocuSeal: kunden blev ikke fundet på kontrakten.");
+  const res = await fetch(`${DOCUSEAL_API_BASE}/submitters/${customer.id}`, { method: "PUT", headers: headers(), body: JSON.stringify({ send_email: true }) });
+  if (!res.ok) throw new Error(`DocuSeal: kunne ikke sende mailen igen (${res.status})`);
+}
 
 async function getSubmission(submissionId: string): Promise<DocuSealSubmissionDetails> {
   const res = await fetch(`${DOCUSEAL_API_BASE}/submissions/${submissionId}`, { headers: headers() });
