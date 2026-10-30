@@ -1,13 +1,14 @@
 "use client";
 
 import { LinkInput } from "./links-open";
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useContext, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { placeMapSpots } from "@/lib/actions/tour-ai";
+import { importMapPageAction } from "@/lib/actions/tour-files";
 import { ICONS, ICON_NAMES, guessIcon } from "../../tours/icons";
 import { PANO_HFOV, isPlaceHref, panoHfov, pointOfHref } from "../../tours/places";
 import "pannellum/build/pannellum.css";
 import type { DroneLook, TourConfig, TourPoint } from "../../tours/types";
-import { Choice, Field, Group, Icon, input, PanoZoom, Toggle, UploadButton, type PreviewApi } from "./ui";
+import { Choice, Field, FilesContext, Group, Icon, input, PanoZoom, Toggle, UploadButton, type PreviewApi } from "./ui";
 import { AiImageButton } from "./ai-image";
 
 /*
@@ -95,6 +96,7 @@ export function MapEditor({ config, edit, focus, preview }: { config: TourConfig
       {config.drone && <OverviewUiToggles config={config} edit={edit} preview={preview} />}
       {config.drone && <DroneLookEditor config={config} edit={edit} panorama={Boolean(config.drone.panorama)} />}
       {config.drone && <DroneToMap config={config} edit={edit} />}
+      <MapPageImport config={config} edit={edit} />
       <Group>
         <p className="text-[14px] leading-snug">Start touren på et kort over stedet - en tegning, en situationsplan eller et dronefoto - med punkter man kan trykke på og gå ind fra.</p>
         <p className="text-[12px] leading-snug text-[#8e8e93]">Brug et stort billede (fx 4000 px bredt) - man kan zoome ind på det. JPG eller PNG.</p>
@@ -147,6 +149,7 @@ export function MapEditor({ config, edit, focus, preview }: { config: TourConfig
       </Group>
       <OverviewUiToggles config={config} edit={edit} preview={preview} />
       {M.panorama && <DroneLookEditor config={config} edit={edit} panorama />}
+      <MapPageImport config={config} edit={edit} />
       <Group title="Billede">
         <div className="flex gap-2">
           <UploadButton accept="image/*" label="Skift kortbillede" onDone={setImage} />
@@ -974,6 +977,40 @@ function PointPanel({
         <Field title="Små mærker" hint="Adskilt af komma, fx: 2 elever, Udsigt, Nyt i år">
           <input className={`${input} bg-white`} value={p.chips.join(", ")} onChange={(e) => setPoint((x) => void (x.chips = e.target.value.split(",").map((c) => c.trim()).filter(Boolean)))} />
         </Field>
+        <Field title="Overlinje" hint='Kort linje over navnet, fx "Med traktor og vogn, alle åbningsdage". Tom = ingen.'>
+          <input className={`${input} bg-white`} value={p.kicker ?? ""} onChange={(e) => setPoint((x) => void (x.kicker = e.target.value || undefined))} />
+        </Field>
+        <Field title="Fakta" hint='To kolonner på kortet, fx "Pris" og "20 kr. pr. person".'>
+          <div className="space-y-1.5">
+            {(p.facts ?? []).map(([k, v], i) => (
+              <div key={i} className="flex gap-1.5">
+                <input className={`${input} bg-white`} placeholder="Fx Pris" value={k} onChange={(e) => setPoint((x) => void (x.facts![i] = [e.target.value, x.facts![i][1]]))} />
+                <input className={`${input} bg-white`} placeholder="Fx 20 kr." value={v} onChange={(e) => setPoint((x) => void (x.facts![i] = [x.facts![i][0], e.target.value]))} />
+                <button type="button" className="px-1 text-[#c7c7cc] hover:text-[#ff3b30]" aria-label="Slet" onClick={() => setPoint((x) => void (x.facts = x.facts!.filter((_, j) => j !== i).length ? x.facts!.filter((_, j) => j !== i) : undefined))}>
+                  ×
+                </button>
+              </div>
+            ))}
+            <button type="button" className="text-[13px] font-medium text-[#0071e3]" onClick={() => setPoint((x) => void (x.facts = [...(x.facts ?? []), ["", ""]]))}>
+              + Fakta
+            </button>
+          </div>
+        </Field>
+        <Field title="Godt tip" hint="Lille tekst under teksten. Tom = intet tip.">
+          <input className={`${input} bg-white`} value={p.tip ?? ""} onChange={(e) => setPoint((x) => void (x.tip = e.target.value || undefined))} />
+        </Field>
+        <Field title="Video øverst på kortet" hint="Vises i stedet for billederne (mp4).">
+          {p.video ? (
+            <div className="space-y-1.5">
+              <video src={p.video.src} poster={p.video.poster} controls preload="none" className="w-full rounded-lg" />
+              <button type="button" className="text-[13px] text-[#ff3b30] hover:underline" onClick={() => setPoint((x) => void (x.video = undefined))}>
+                Fjern video
+              </button>
+            </div>
+          ) : (
+            <UploadButton accept="video/mp4,video/webm" label="Upload video" onDone={(src) => setPoint((x) => void (x.video = { src }))} />
+          )}
+        </Field>
         <Field title='"Gå ind" fører til' hint="Et rum fra menuen.">
           <select className={`${input} bg-white`} value={p.tour ?? ""} onChange={(e) => setPoint((x) => void (x.tour = e.target.value || null))}>
             <option value="">Ingen - kun teksten</option>
@@ -1342,6 +1379,46 @@ function DroneLookEditor({ config, edit, panorama }: { config: TourConfig; edit:
           <input type="range" min={20} max={115} step={1} className="w-full accent-[#0071e3]" value={L.point} onChange={(e) => set("point", Number(e.target.value))} />
         </Field>
       )}
+    </Group>
+  );
+}
+
+/* ----- "Hent fra en kortside": a map page made elsewhere (lovable.app) - aerial photo, points, cards and the day's programme. ----- */
+
+function MapPageImport({ config, edit }: { config: TourConfig; edit: Edit }) {
+  const { slug } = useContext(FilesContext);
+  const [url, setUrl] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<{ text: string; error?: boolean } | null>(null);
+  async function run() {
+    if (config.points.length && !confirm(`Hent kortet fra ${url}? Luftfotoet, punkterne (${config.points.length} nu) og kategorierne bliver erstattet af kortsidens.`)) return;
+    setBusy(true);
+    setNote(null);
+    const r = await importMapPageAction(slug, url).catch((err: unknown) => ({ ok: false as const, error: err instanceof Error ? err.message : String(err) }));
+    setBusy(false);
+    if (!r.ok) return setNote({ text: r.error, error: true });
+    const x = r.result;
+    edit((d) => {
+      d.map = x.map;
+      d.points = x.points;
+      d.categories = x.categories;
+      if (x.day && !d.day) d.day = x.day;
+    });
+    setNote({ text: `Hentet: ${x.points.length} punkter, ${Object.keys(x.categories).length} kategorier og luftfotoet som 360°-billede (${x.copied} filer kopieret til os)${x.day ? ' og "Sådan ser en dag ud"' : ""}. Husk at gemme.${x.failed.length ? ` Kunne ikke hentes: ${x.failed.join("; ")}` : ""}`, error: x.failed.length > 0 });
+  }
+  return (
+    <Group title="Hent fra en kortside">
+      <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">
+        Et luftfoto-kort lavet som sin egen side (fx nymarksminde.lovable.app): luftfotoet, punkterne med tekster, billeder, 360°-billeder, video, fakta og stikord, og dagens program. Alt kopieres til os, så det kan rettes her bagefter.
+      </p>
+      <div className="flex gap-1.5">
+        <input className={input} placeholder="https://….lovable.app" value={url} onChange={(e) => setUrl(e.target.value)} />
+        <button type="button" disabled={busy || !/^https:\/\/[a-z0-9-]+\.lovable\.app/i.test(url.trim())} onClick={() => void run()} className="shrink-0 rounded-[10px] bg-[#0071e3] px-3 text-[14px] font-medium text-white disabled:opacity-40">
+          {busy ? "Henter …" : "Hent"}
+        </button>
+      </div>
+      {busy && <p className="px-1 text-[12px] text-[#8e8e93]">Sætter luftfotoet sammen og kopierer filerne - det tager typisk ½-1 minut.</p>}
+      {note && <p className={`px-1 text-[12px] leading-snug ${note.error ? "text-[#ff3b30]" : "text-[#34c759]"}`}>{note.text}</p>}
     </Group>
   );
 }

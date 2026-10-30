@@ -101,6 +101,14 @@ export type TourPoint = {
   planBox?: [number, number, number, number];
   text: string;
   chips: string[];
+  /** A short line over the name, e.g. "Med traktor og vogn, alle åbningsdage". */
+  kicker?: string;
+  /** Facts in two columns, e.g. ["Afgang", "Kl. 13.30"], ["Pris", "20 kr. pr. person"]. */
+  facts?: [string, string][];
+  /** A video at the top of the card (instead of the photos). */
+  video?: { src: string; poster?: string };
+  /** A good tip, in small type under the text. */
+  tip?: string;
   /** How big the point is on the map: 1 = normal (0.6-1.8). */
   size?: number;
   /** Walking times to other points (by id): "2 min til Stranden" on the card, and lines on the picture while it's open. */

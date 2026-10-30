@@ -2135,13 +2135,16 @@ function TourExperience({
             <button type="button" className="hv-luk" aria-label={tx("Luk")} onClick={() => setSelected(null)}>
               ×
             </button>
-            {selected.images?.length ? (
+            {selected.video ? (
+              <video key={selected.id} className="hv-pvideo" src={selected.video.src} poster={selected.video.poster} controls playsInline preload="metadata" />
+            ) : selected.images?.length ? (
               <PointPhotos key={selected.id} images={selected.images} name={selected.name} onOpen={(at) => setLightbox({ images: selected.images!, at, title: selected.name })} />
             ) : null}
             <div className="hv-kat" style={{ color: T.categories[selected.cat].color }}>
               {T.categories[selected.cat].name}
             </div>
             {finderPick?.best === selected.id && <div className="hv-bedst">★ {tx("Bedst til jer")}</div>}
+            {selected.kicker && <div className="hv-pkick">{selected.kicker}</div>}
             <h2>{selected.name}</h2>
             {/* On a phone the text is cut to a few lines (a tap shows it all), so the card fits without scrolling. */}
             <p className={`hv-ptekst ${textOpenFor === selected.id ? "aaben" : ""}`} onClick={() => setTextOpenFor((x) => (x === selected.id ? null : selected.id))}>
@@ -2175,6 +2178,17 @@ function TourExperience({
                 ))}
               </div>
             )}
+            {selected.facts?.length ? (
+              <dl className="hv-fakta">
+                {selected.facts.map(([k, v]) => (
+                  <div key={k}>
+                    <dt>{k}</dt>
+                    <dd>{v}</dd>
+                  </div>
+                ))}
+              </dl>
+            ) : null}
+            {selected.tip && <p className="hv-ptip">💡 {selected.tip}</p>}
             <div className="hv-pchips">
               {selected.chips.map((c) => (
                 <span key={c}>{c}</span>
@@ -3214,6 +3228,12 @@ const CSS = `
 .hv-panel h2{margin:2px 40px 8px 0;font-size:25px;line-height:1.1;font-weight:900;color:var(--c-main)}
 .hv-panel p{margin:0 0 12px;font-size:15px;line-height:1.5;color:#3d4a50}
 .hv-pchips{display:flex;flex-wrap:wrap;gap:5px}
+.hv-pvideo{display:block;width:calc(100% + 36px);margin:-18px -18px 14px;aspect-ratio:16/9;background:#000;border-radius:16px 16px 0 0;object-fit:cover}
+.hv-pkick{margin-top:6px;font-size:11.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#5e7d3a;color:color-mix(in srgb,var(--c-main) 70%,#5e7d3a)}
+.hv-fakta{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px;margin:0 0 12px;padding-top:12px;border-top:1px solid rgba(0,0,0,.08)}
+.hv-fakta dt{font-size:12.5px;color:#6b7a80}
+.hv-fakta dd{margin:1px 0 0;font-size:14px;font-weight:800;color:#1d2a30}
+.hv-ptip{font-size:13px!important;color:#5a676c!important;background:rgba(0,0,0,.04);border-radius:10px;padding:8px 10px}
 .hv-fotos{position:relative;margin:-18px -18px 14px;border-radius:16px 16px 0 0;overflow:hidden;background:#dfe5e7;aspect-ratio:16/10;cursor:pointer;user-select:none}
 .hv-foto{position:absolute;inset:0;opacity:0;transition:opacity .35s ease}
 .hv-foto.on{opacity:1}

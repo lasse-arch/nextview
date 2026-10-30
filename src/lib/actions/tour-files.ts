@@ -74,3 +74,15 @@ export async function fetchSiteFavicon(slug: string, site: string): Promise<{ ok
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
 }
+
+/** "Hent fra en kortside": an aerial-photo map page on lovable.app, read and copied into this tour (the editor puts it in its draft). */
+export async function importMapPageAction(slug: string, url: string): Promise<{ ok: true; result: import("@/lib/lovable-map").MapImport } | { ok: false; error: string }> {
+  await admin();
+  if (!(await prisma.tour.findUnique({ where: { slug }, select: { slug: true } }))) return { ok: false, error: "Touren findes ikke." };
+  try {
+    const { importMapPage } = await import("@/lib/lovable-map");
+    return { ok: true, result: await importMapPage(slug, String(url)) };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
