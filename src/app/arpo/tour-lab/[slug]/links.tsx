@@ -1,7 +1,7 @@
 "use client";
 
 import { useT } from "../tours/i18n-react";
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { apiUrl } from "../tours/api";
 import type { LinkOpen, PopupSize, TourConfig } from "../tours/types";
 import { guideOfHref } from "../tours/places";
@@ -139,6 +139,15 @@ export function LinkPopup({
     };
   }, [slug, open.href]);
   const refused = blocked?.href === open.href && blocked.no;
+  // A page that keeps loading again (e.g. a cookie banner: in a frame the browser - Safari on iPhone always - won't keep its
+  // cookie, so the choice is forgotten and the banner comes back): after two quick reloads, a clear way out to a new tab.
+  const loads = useRef<number[]>([]);
+  const [looping, setLooping] = useState(false);
+  const onFrameLoad = () => {
+    const t = Date.now();
+    loads.current = [...loads.current.filter((x) => t - x < 40_000), t];
+    if (loads.current.length >= 3) setLooping(true);
+  };
   return (
     <div className={`lk-overlay lk-${size}`} onClick={onClose}>
       <div className="lk-popup" style={size === "egen" && custom ? ({ "--lk-w": `${custom.w}px`, "--lk-h": `${custom.h}px` } as React.CSSProperties) : undefined} onClick={(e) => e.stopPropagation()}>
@@ -169,7 +178,17 @@ export function LinkPopup({
             </a>
           </div>
         ) : (
-          <iframe src={embeddable(open.href)} title={open.label} allow="payment; clipboard-write" />
+          <>
+            <iframe src={embeddable(open.href)} title={open.label} allow="payment; clipboard-write; storage-access" onLoad={onFrameLoad} />
+            {looping && (
+              <div className="lk-loop">
+                <span>{tr("Bliver siden ved med at spørge om cookies? Åbn den i en ny fane.")}</span>
+                <a href={open.href} target="_blank" rel="noopener" onClick={onClose}>
+                  {tr("Åbn i ny fane ↗")}
+                </a>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
@@ -265,6 +284,9 @@ export const LINKS_CSS = `
 .lk-head a:hover{color:#1d2a30}
 .lk-head button{width:36px;height:36px;border:0;border-radius:10px;background:#f1f2f3;font-size:22px;cursor:pointer;color:#1d2a30}
 .lk-popup iframe{flex:1;width:100%;border:0;background:#fafafa}
+.lk-loop{display:flex;align-items:center;gap:12px;padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));background:#1d2a30;color:#fff;font-size:14px;line-height:1.35;animation:hvUp .3s ease both}
+.lk-loop span{flex:1}
+.lk-loop a{flex:none;padding:10px 16px;border-radius:999px;background:var(--c-accent,#e0533d);color:#fff;font-weight:800;text-decoration:none;white-space:nowrap}
 @media (max-width:760px){
   .lk-overlay{padding:0;align-items:flex-end}
   .lk-popup,.lk-egen .lk-popup{width:100%;height:94%;border-radius:18px 18px 0 0}

@@ -107,6 +107,7 @@ export const UI_STRINGS = [
   "Vis",
   "Sprog",
   "Åbn i ny fane ↗",
+  "Bliver siden ved med at spørge om cookies? Åbn den i en ny fane.",
   "Fra {side}",
   "Oplev i 360°",
   "Se hele kortet",

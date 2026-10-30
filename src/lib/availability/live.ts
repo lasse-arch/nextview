@@ -12,7 +12,28 @@ import { publicUrl } from "@/lib/site-digest";
 export type LiveUnit = { name: string; size?: string; price?: string; from?: string; link?: string };
 type LiveSpec = NonNullable<TourConfig["live"]>;
 
-const decode = (s: string) => s.replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#0?39;/g, "'").replace(/&nbsp;/g, " ").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
+/** HTML's own letters as letters: æ ø å (&aelig; &oslash; &aring; …), numbers (&#248; &#xf8;) and the usual signs - "&amp;" last, so nothing is decoded twice. */
+const NAMED: Record<string, string> = {
+  aelig: "æ", AElig: "Æ", oslash: "ø", Oslash: "Ø", aring: "å", Aring: "Å", auml: "ä", Auml: "Ä", ouml: "ö", Ouml: "Ö", uuml: "ü", Uuml: "Ü",
+  eacute: "é", Eacute: "É", egrave: "è", aacute: "á", oacute: "ó", iacute: "í", szlig: "ß", ntilde: "ñ",
+  nbsp: " ", quot: '"', apos: "'", lt: "<", gt: ">", ndash: "–", mdash: "—", hellip: "…", laquo: "«", raquo: "»",
+  lsquo: "‘", rsquo: "’", ldquo: "“", rdquo: "”", bdquo: "„", euro: "€", copy: "©", reg: "®", deg: "°", times: "×", half: "½", frac12: "½",
+};
+const decodeOnce = (s: string) =>
+  s
+    .replace(/&#(\d+);/g, (m, n: string) => (Number(n) < 0x110000 ? String.fromCodePoint(Number(n)) : m))
+    .replace(/&#x([0-9a-f]+);/gi, (m, h: string) => (parseInt(h, 16) < 0x110000 ? String.fromCodePoint(parseInt(h, 16)) : m))
+    .replace(/&([a-z][a-z0-9]*);/gi, (m, name: string) => (name !== "amp" && NAMED[name] != null ? NAMED[name] : m))
+    .replace(/&amp;/g, "&");
+/** Some pages write them twice ("S&amp;oslash;ndag" shows as "S&oslash;ndag") - decoded until nothing changes (a few rounds at most). */
+const decode = (s: string) => {
+  for (let i = 0; i < 3; i++) {
+    const next = decodeOnce(s);
+    if (next === s) break;
+    s = next;
+  }
+  return s;
+};
 
 /** HTML as readable text, links as [text](href) (made absolute against `base`). */
 function htmlToText(html: string, base: URL): string {
@@ -91,11 +112,12 @@ export function readUnits(text: string, spec: Pick<LiveSpec, "pattern" | "flags"
   const seen = new Set<string>();
   for (const m of text.matchAll(re)) {
     const g = m.groups ?? {};
-    const name = g.name?.trim();
+    // The page's letters as letters (also when the text was read before they were decoded).
+    const clean = (v?: string) => (v ? decode(v) : v)?.replace(/\s+/g, " ").trim() || undefined;
+    const name = clean(g.name);
     if (!name || seen.has(name)) continue;
     seen.add(name);
-    const clean = (v?: string) => v?.replace(/\s+/g, " ").trim() || undefined;
-    units.push({ name, size: clean(g.size), price: clean(g.price), from: clean(g.from), link: clean(g.link) });
+    units.push({ name, size: clean(g.size), price: clean(g.price), from: clean(g.from), link: g.link?.trim() || undefined });
     if (units.length >= 300) break;
   }
   return units;
