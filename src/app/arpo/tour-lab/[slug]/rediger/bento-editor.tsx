@@ -1,5 +1,6 @@
 "use client";
 
+import { LinkInput } from "./links-open";
 import { bentoTiles } from "../bento";
 import type { BentoTile, TourConfig } from "../../tours/types";
 import { Choice, Field, Group, input } from "./ui";
@@ -81,7 +82,7 @@ export function BentoEditor({ config, edit }: { config: TourConfig; edit: Edit }
                     </option>
                   ))}
                 </select>
-                {!known && <input className={`${input} mt-1.5 py-1.5 text-[13px]`} value={t.href} placeholder="https://…" onChange={(e) => put(i, { ...t, href: e.target.value })} />}
+                {!known && <LinkInput className="mt-1.5" value={t.href} onChange={(href) => put(i, { ...t, href })} />}
               </Field>
             </div>
           );

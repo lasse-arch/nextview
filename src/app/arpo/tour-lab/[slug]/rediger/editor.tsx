@@ -33,7 +33,7 @@ import { WeatherEditor } from "./weather-editor";
 import { FinderEditor } from "./finder-editor";
 import { MapEditor } from "./map-editor";
 import { FeedbackPanel } from "./feedback-panel";
-import { LinksOpenEditor } from "./links-open";
+import { LinkInput, LinkOpenContext, LinksOpenEditor } from "./links-open";
 
 /** A zoom level in words, for the Zoom sliders (1 = Matterport's normal view). */
 const zoomLabel = (z: number) => (Math.abs(z - 1) < 0.01 ? "normal" : z < 1 ? `zoomet ud (${Math.round(z * 100)} %)` : `zoomet ind (${Math.round(z * 100)} %)`);
@@ -432,9 +432,11 @@ export function TourEditor({
   }
 
   const menuStyle = config.design?.menu ?? "side";
+  const linkCtx = { config, edit };
 
   return (
     <FilesContext.Provider value={{ slug, blob }}>
+    <LinkOpenContext.Provider value={linkCtx}>
     {/* Arpo's own menu and top bar folded away, so the editor and its preview get the whole screen. */}
     {wide && <style>{`.arpo-sidebar,.arpo-topbar{display:none!important}.arpo-main{padding-top:12px!important}`}</style>}
     <div
@@ -618,7 +620,7 @@ export function TourEditor({
                   <input className={input} value={config.subtitle ?? ""} onChange={(e) => edit((d) => void (d.subtitle = e.target.value || undefined))} />
                 </Field>
                 </Group>
-                <Group title="Matterport">
+                <Group title="Matterport" more={<MatterportParams config={config} edit={edit} />}>
                 <Field title="Matterport-model" hint="Det ID, der står efter m= i Matterport-linket. Scanpunkterne hentes direkte fra Matterport.">
                   <input className={input} value={config.modelId ?? ""} placeholder={config.tourPage ? "Hentes fra MPSkins - frakobl herunder" : "Fx rxaXbNZcETf"} onChange={(e) => edit((d) => void (d.modelId = e.target.value.trim() || undefined))} />
                 </Field>
@@ -928,7 +930,14 @@ export function TourEditor({
 
             {tab === "funktioner" && (
               <>
-                <Group title="Navigation">
+                <Group
+                  title="Navigation"
+                  more={
+                    <Field title={`Flyvetid mellem steder: ${((config.flyMs ?? 800) / 1000).toLocaleString("da-DK")} sek.`} hint="Standard 0,8 sek. Gælder når der flyves - også i Vis mig rundt og Find vej.">
+                      <input type="range" min={300} max={3000} step={100} className="w-full accent-[#0071e3]" value={config.flyMs ?? 800} onChange={(e) => edit((d) => void (d.flyMs = Number(e.target.value)))} />
+                    </Field>
+                  }
+                >
                 <Field title="Bevægelse">
                   <Choice
                     value={config.navigation}
@@ -1288,6 +1297,7 @@ export function TourEditor({
       </div>
       </SafeArea>
     </div>
+    </LinkOpenContext.Provider>
     </FilesContext.Provider>
   );
 }
@@ -2140,7 +2150,7 @@ function MenuEditor({
                     )}
                   </div>
                 ) : kindOf(it.href ?? "") === "web" ? (
-                  <input className={`${input} mt-2 bg-white`} value={it.href} placeholder="https://…" onChange={(e) => set(a, { href: e.target.value })} />
+                  <LinkInput className="mt-2 bg-white" value={it.href ?? ""} onChange={(href) => set(a, { href })} />
                 ) : (
                   <div className="mt-2 space-y-2">
                     <button
@@ -2262,7 +2272,7 @@ function CtaEditor({ cta, live, form, onChange }: { cta: TourConfig["cta"]; live
                 <Choice<To> value={to} options={options.some(([v]) => v === to) ? options : [...options, [to, to === "live" ? "Live data" : "Kontaktformular"]]} onChange={(v) => set(i, { href: v === "live" ? "#live" : v === "form" ? "#kontakt" : "" })} />
               )}
               {to === "web" ? (
-                <input className={input} value={c.href} placeholder="https://…" onChange={(e) => set(i, { href: e.target.value })} onBlur={(e) => e.target.value && set(i, { href: withProtocol(e.target.value) })} />
+                <LinkInput value={c.href} onChange={(href) => set(i, { href })} onBlur={(v) => v && set(i, { href: withProtocol(v) })} />
               ) : (
                 <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">{to === "live" ? "Åbner listen med de ledige (Live data) inde i touren." : "Åbner kontaktformularen inde i touren."}</p>
               )}
@@ -2310,5 +2320,49 @@ function AiFilterButton({ slug, config, preview, onFilter }: { slug: string; con
       </button>
       {note && <p className={`px-1 text-[12px] leading-snug ${note.error ? "text-[#ff3b30]" : "text-[#6e6e73]"}`}>{note.text}</p>}
     </div>
+  );
+}
+
+/* Matterport's own viewer settings (matterportParams) - behind the ⚙ on Matterport. Left as they are, the tour works as always. */
+const MP_PARAMS: [string, string, string, string][] = [
+  // key, title, hint, Matterport's own standard when the setup leaves it out
+  ["dh", "Dukkehus-knap", "Matterports knap til 3D-modellen udefra.", "1"],
+  ["fp", "Plantegning-knap", "Matterports knap til plantegningen.", "1"],
+  ["f", "Etagevælger", "Matterports knap til at skifte etage.", "1"],
+  ["gt", "Matterports guidede tur", "Matterports egne afspil-knapper (vores Vis mig rundt er uafhængig af den).", "1"],
+  ["hr", "Matterports highlights", "Billedstrimlen nederst fra Matterport.", "1"],
+  ["mls", "Matterport-tilstand uden branding", "Til = Matterports \"MLS\"-visning (skjuler bl.a. links).", "0"],
+  ["search", "Matterports søgning", "", "1"],
+  ["vr", "VR-knap", "", "1"],
+  ["help", "Hjælp ved start", "Matterports egen hjælp, første gang touren åbnes.", "0"],
+  ["title", "Matterports titel", "Modellens navn øverst fra Matterport.", "1"],
+  ["brand", "Matterports branding", "", "1"],
+  ["qs", "Hurtig start", "Springer Matterports indflyvning over.", "0"],
+  ["play", "Start af sig selv", "Touren åbner uden et ekstra tryk.", "0"],
+];
+
+function MatterportParams({ config, edit }: { config: TourConfig; edit: (fn: (d: TourConfig) => void) => void }) {
+  const P = config.matterportParams ?? {};
+  const extra = Object.keys(P).filter((k) => !MP_PARAMS.some(([key]) => key === k));
+  return (
+    <>
+      <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">Matterports egne knapper og indstillinger. Standarden passer til næsten alle tours - tourens egne knapper er brugerfladen.</p>
+      {MP_PARAMS.map(([key, title, hint, std]) => (
+        <Toggle
+          key={key}
+          on={(P[key] ?? std) === "1"}
+          onChange={(on) =>
+            edit((d) => {
+              const next = { ...d.matterportParams };
+              next[key] = on ? "1" : "0";
+              d.matterportParams = next;
+            })
+          }
+          title={title}
+          hint={hint || undefined}
+        />
+      ))}
+      {extra.length > 0 && <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">Også sat (kan rettes under Avanceret → JSON): {extra.map((k) => `${k}=${P[k]}`).join(", ")}</p>}
+    </>
   );
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { LinkInput } from "./links-open";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { previewLiveData, setupLiveData } from "@/lib/actions/tour-ai";
 import type { LiveUnit } from "@/lib/availability/live";
@@ -119,12 +120,11 @@ export function LiveDataEditor({ config, edit, slug, preview }: { config: TourCo
               <input className={input} value={live.bookLabel ?? ""} placeholder="Book" onChange={(e) => edit((d) => void (d.live!.bookLabel = e.target.value || undefined))} />
             </Field>
             <Field title="Knappen åbner" hint={live.bookHref ? "Alle knapper åbner denne side." : "Tom: hver enheds egen side fra kundens liste - ellers tourens hovedknap."}>
-              <input
-                className={input}
+              <LinkInput
                 value={live.bookHref ?? ""}
                 placeholder="https://kunden.dk/book"
-                onChange={(e) => edit((d) => void (d.live!.bookHref = e.target.value.trim() || undefined))}
-                onBlur={(e) => e.target.value && edit((d) => void (d.live!.bookHref = withProtocol(e.target.value)))}
+                onChange={(v) => edit((d) => void (d.live!.bookHref = v.trim() || undefined))}
+                onBlur={(v) => v && edit((d) => void (d.live!.bookHref = withProtocol(v)))}
               />
             </Field>
             <Toggle

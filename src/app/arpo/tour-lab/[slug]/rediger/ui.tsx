@@ -17,12 +17,41 @@ export function Icon({ d, className = "h-[18px] w-[18px]" }: { d: string; classN
 }
 
 /** A white, rounded group of settings - like a section in the iPhone's Settings. */
-export function Group({ title, children }: { title?: string; children: React.ReactNode }) {
+export function Group({ title, children, more }: { title?: string; children: React.ReactNode; /** Finer settings behind a ⚙ - the standard works without them. */ more?: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
   return (
     <section>
-      {title && <h3 className="mb-1.5 px-1 text-[13px] font-medium uppercase tracking-wide text-[#6e6e73]">{title}</h3>}
-      <div className="space-y-4 rounded-2xl bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,.04)] ring-1 ring-black/[.04]">{children}</div>
+      {(title || more) && (
+        <div className="mb-1.5 flex items-center justify-between px-1">
+          <h3 className="text-[13px] font-medium uppercase tracking-wide text-[#6e6e73]">{title}</h3>
+          {more && <GearButton open={open} onClick={() => setOpen(!open)} />}
+        </div>
+      )}
+      <div className="space-y-4 rounded-2xl bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,.04)] ring-1 ring-black/[.04]">
+        {children}
+        {more && open && <div className="space-y-4 border-t border-black/[.06] pt-4">{more}</div>}
+      </div>
     </section>
+  );
+}
+
+export const GEAR =
+  '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>';
+
+/** The ⚙ that shows (or hides) a thing's finer settings. A dot on it: something there isn't standard. */
+export function GearButton({ open, onClick, changed, title = "Flere indstillinger" }: { open: boolean; onClick: () => void; changed?: boolean; title?: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      aria-label={title}
+      aria-expanded={open}
+      className={`relative shrink-0 rounded-lg p-1.5 transition ${open ? "bg-[#0071e3]/10 text-[#0071e3]" : "text-[#8e8e93] hover:bg-black/[.04] hover:text-[#1d1d1f]"}`}
+    >
+      <Icon d={GEAR} className="h-[16px] w-[16px]" />
+      {changed && <span className="absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full bg-[#ff9500]" />}
+    </button>
   );
 }
 

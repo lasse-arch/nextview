@@ -1,7 +1,8 @@
 "use client";
 
+import { createContext, useContext, useState } from "react";
 import type { LinkOpen, PopupSize, TourConfig } from "../../tours/types";
-import { Choice, Field, input, Toggle } from "./ui";
+import { Choice, Field, GearButton, input, Toggle } from "./ui";
 
 /*
  * How the tour's links open (Knapper og kontakt → Åbning): the default, a
@@ -72,5 +73,71 @@ export function LinksOpenEditor({ config, edit }: { config: TourConfig; edit: (f
         hint={`Fx "Fra boxdepotet.dk" eller "Fra onlinebooking.dk" øverst i popup'en, så de besøgende ved, hvilken side de er på.`}
       />
     </>
+  );
+}
+
+/* ----- One link's own way of opening: the ⚙ next to every link field. ----- */
+
+type Edit = (fn: (d: TourConfig) => void) => void;
+/** The setup and its edit, for the link fields deep in the editor (set once round the editor). */
+export const LinkOpenContext = createContext<{ config: TourConfig; edit: Edit } | null>(null);
+
+const MODE_NAME: Record<LinkOpen, string> = { popup: "popup over touren", tab: "ny fane", same: "samme fane" };
+
+/**
+ * A web link's field, with a ⚙ beside it: how this one link opens - the
+ * tour's standard (Knapper og kontakt → Åbning), or its own: new tab, popup
+ * over the tour or the same tab. Saved by the link's address (linkOpen.byUrl).
+ */
+export function LinkInput({ value, onChange, onBlur, className = "", placeholder = "https://…" }: { value: string; onChange: (href: string) => void; onBlur?: (href: string) => void; className?: string; placeholder?: string }) {
+  const ctx = useContext(LinkOpenContext);
+  const [open, setOpen] = useState(false);
+  const href = value.trim();
+  const web = /^https?:\/\/\S+\.\S+/i.test(href);
+  const def = ctx?.config.linkOpen?.default ?? "tab";
+  const own = ctx?.config.linkOpen?.byUrl?.[href];
+  const setOwn = (mode: LinkOpen | "standard") =>
+    ctx?.edit((d) => {
+      const byUrl = { ...d.linkOpen?.byUrl };
+      if (mode === "standard") delete byUrl[href];
+      else byUrl[href] = mode;
+      d.linkOpen = { ...(d.linkOpen ?? { default: "tab" as LinkOpen }), byUrl: Object.keys(byUrl).length ? byUrl : undefined };
+    });
+  // A new address takes its old one's setting along.
+  const change = (next: string) => {
+    onChange(next);
+    if (own && ctx && next.trim() !== href)
+      ctx.edit((d) => {
+        const byUrl = { ...d.linkOpen?.byUrl };
+        delete byUrl[href];
+        if (next.trim()) byUrl[next.trim()] = own;
+        d.linkOpen = { ...(d.linkOpen ?? { default: "tab" as LinkOpen }), byUrl: Object.keys(byUrl).length ? byUrl : undefined };
+      });
+  };
+  return (
+    <div className={className}>
+      <div className="flex items-center gap-1">
+        <input className={`${input} ${className.includes("bg-white") ? "bg-white" : ""}`} value={value} placeholder={placeholder} onChange={(e) => change(e.target.value)} onBlur={onBlur ? (e) => onBlur(e.target.value) : undefined} />
+        {ctx && web && <GearButton open={open} changed={own != null} onClick={() => setOpen(!open)} title="Hvordan linket åbner" />}
+      </div>
+      {ctx && web && open && (
+        <div className="mt-1.5 space-y-1.5 rounded-xl bg-[#f2f2f7] p-2">
+          <span className="block px-1 text-[12px] font-medium text-[#6e6e73]">Linket åbner som</span>
+          <Choice<LinkOpen | "standard">
+            value={own ?? "standard"}
+            options={[
+              ["standard", "Standard"],
+              ["tab", "Ny fane"],
+              ["popup", "Popup"],
+              ["same", "Samme fane"],
+            ]}
+            onChange={setOwn}
+          />
+          <p className="px-1 text-[11px] leading-snug text-[#8e8e93]">
+            {own ? "Gælder alle steder i touren, hvor netop dette link bruges." : `Standard = tourens indstilling (${MODE_NAME[def]}) under Knapper og kontakt → Åbning.`}
+          </p>
+        </div>
+      )}
+    </div>
   );
 }

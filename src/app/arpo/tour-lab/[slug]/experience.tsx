@@ -794,7 +794,12 @@ function TourExperience({
       const sweep = target ? sweepForSs(target.ss) : null;
       if (!sdkRef.current || !sweep) return false;
       const sdk = await sdkRef.current;
-      if (transition === "fly" && T.jump === "fade") {
+      // A fly goes in a straight line - to a scan point you can't see from here, that's through a wall.
+      // Those get the cross-fade instead (a step you can see still flies).
+      const from = currentSweep.current;
+      const seen = from ? sweepData.current[from]?.neighbors : undefined;
+      const throughWall = Boolean(from && from !== sweep && seen?.length && !seen.includes(sweep));
+      if (transition === "fly" && (T.jump === "fade" || (T.jump !== "instant" && throughWall))) {
         // A real cross-fade instead of Matterport's fade to black: a picture of the view on top,
         // the new room underneath at once, then the picture fades away - like stepping to the next scan.
         const shot = crossfade.current;

@@ -1,5 +1,6 @@
 "use client";
 
+import { LinkInput } from "./links-open";
 import { guideExit, IMAGE_HREF, imageOfHref, isPlaceHref, PANO_HFOV, placeHref, startPlaces } from "../../tours/places";
 import { AiImageButton } from "./ai-image";
 import { writePlaceCards, type CardDraft } from "@/lib/actions/tour-cards";
@@ -246,7 +247,7 @@ function ButtonsEditor({ buttons, onChange, rooms, allowRoom }: { buttons: CardB
                 ))}
               </select>
             ) : (
-              <input className={input} value={b.href} placeholder="https://…" onChange={(e) => onChange(buttons.map((x, j) => (j === i ? { ...x, href: e.target.value } : x)))} />
+              <LinkInput value={b.href} onChange={(href) => onChange(buttons.map((x, j) => (j === i ? { ...x, href } : x)))} />
             )}
           </div>
         ))}
@@ -476,7 +477,7 @@ export function StartEditor({ config, edit, slug, preview }: Props) {
                     </select>
                   )}
                   {"room" in t.go && <PlacePicker href={t.go.room} name={t.title} preview={preview} onChange={(href) => set({ ...t, go: { room: href, name: t.title } })} />}
-                  {"href" in t.go && <input className={`${input} bg-white`} value={t.go.href} placeholder="https://…" onChange={(e) => set({ ...t, go: { href: e.target.value } })} />}
+                  {"href" in t.go && <LinkInput className="bg-white" value={t.go.href} onChange={(href) => set({ ...t, go: { href } })} />}
                   {"drone" in t.go && <DroneViewPicker views={t.go.view} preview={preview} onChange={(view) => set({ ...t, go: { drone: (t.go as { drone: string | null }).drone, view } })} />}
                 </>
               )}
@@ -1450,7 +1451,7 @@ export function TagsEditor({ config, edit, slug, preview }: Props) {
               <Field title="Knap (valgfri)">
                 <div className="flex gap-1.5">
                   <input className={`${input} w-2/5 bg-white`} placeholder="Fx Book" value={t.link?.label ?? ""} onChange={(e) => set({ ...t, link: e.target.value || t.link?.href ? { label: e.target.value, href: t.link?.href ?? "" } : undefined })} />
-                  <input className={`${input} bg-white`} placeholder="https://…" value={t.link?.href ?? ""} onChange={(e) => set({ ...t, link: e.target.value || t.link?.label ? { label: t.link?.label || "Læs mere", href: e.target.value } : undefined })} />
+                  <LinkInput className="bg-white" value={t.link?.href ?? ""} onChange={(href) => set({ ...t, link: href || t.link?.label ? { label: t.link?.label || "Læs mere", href } : undefined })} />
                 </div>
               </Field>
               <Field title="Ses fra punkt" hint="Tagget vises kun fra disse scanpunkter, så det aldrig ses gennem en væg.">

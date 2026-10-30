@@ -1,5 +1,6 @@
 "use client";
 
+import { LinkInput } from "./links-open";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { placeMapSpots } from "@/lib/actions/tour-ai";
 import { ICONS, ICON_NAMES, guessIcon } from "../../tours/icons";
@@ -1036,11 +1037,10 @@ function PointPanel({
             value={p.button?.label ?? ""}
             onChange={(e) => setPoint((x) => void (x.button = e.target.value || x.button?.href ? { label: e.target.value, href: x.button?.href ?? "" } : undefined))}
           />
-          <input
-            className={`${input} mt-1.5 bg-white`}
-            placeholder="https://…"
+          <LinkInput
+            className="mt-1.5 bg-white"
             value={p.button?.href ?? ""}
-            onChange={(e) => setPoint((x) => void (x.button = e.target.value || x.button?.label ? { label: x.button?.label ?? "", href: e.target.value } : undefined))}
+            onChange={(href) => setPoint((x) => void (x.button = href || x.button?.label ? { label: x.button?.label ?? "", href } : undefined))}
           />
         </Field>
       </Group>
