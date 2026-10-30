@@ -127,6 +127,7 @@ export const UI_STRINGS = [
   "Start rundturen",
   "Skjul rumvælgeren",
   "Zoom ud",
+  "Stoppet",
 ] as const;
 
 /** Keys whose values are never words to translate (links, ids, files, layout, code). */
@@ -252,7 +253,7 @@ const BUILT_IN: Record<string, Record<string, string>> = {
     "Vis mig rundt": "Show me around", "{n} steder, ca. {min} min": "{n} places, about {min} min", "Start rundturen": "Start the tour", "Find vej": "Find your way",
     "Vælg hvor du skal hen - så går touren vejen derhen fra der, hvor du står.": "Choose where to go - the tour walks you there from where you are.",
     "Søg rum eller boksnummer…": "Search a room or unit number…", "Søg…": "Search…", "Ingen fundet - prøv et boksnummer, fx 160.": "Nothing found - try a unit number, e.g. 160.", "Ingen fundet.": "Nothing found.",
-    "Du er fremme": "You have arrived", "På vej: {n} af {m}": "On the way: {n} of {m}", Stop: "Stop", Luk: "Close", "Læs mere": "Read more", Tilbage: "Back",
+    "Du er fremme": "You have arrived", "På vej: {n} af {m}": "On the way: {n} of {m}", Stoppet: "Stopped", Stop: "Stop", Luk: "Close", "Læs mere": "Read more", Tilbage: "Back",
     "Præsenteret af": "Presented by", "Spring over": "Skip", "Tilbage til 360°-billedet": "Back to the 360° view", "Tilbage til luften": "Back to the aerial view",
     "Tryk på et sted for at se mere - eller gå direkte ind.": "Tap a place to see more - or go straight in.", Pause: "Pause", Fortsæt: "Continue", Næste: "Next", Forrige: "Previous",
     "Zoom ind": "Zoom in", "Zoom ud": "Zoom out", "Skjul rumvælgeren": "Hide the room picker",
@@ -261,19 +262,19 @@ const BUILT_IN: Record<string, Record<string, string>> = {
     "Vis mig rundt": "Zeig mir alles", "{n} steder, ca. {min} min": "{n} Orte, ca. {min} Min.", "Start rundturen": "Rundgang starten", "Find vej": "Weg finden",
     "Vælg hvor du skal hen - så går touren vejen derhen fra der, hvor du står.": "Wählen Sie, wohin Sie möchten - die Tour führt Sie von Ihrem Standort dorthin.",
     "Søg rum eller boksnummer…": "Raum oder Nummer suchen…", "Søg…": "Suchen…", "Ingen fundet - prøv et boksnummer, fx 160.": "Nichts gefunden - versuchen Sie eine Nummer, z. B. 160.", "Ingen fundet.": "Nichts gefunden.",
-    "Du er fremme": "Sie sind angekommen", "På vej: {n} af {m}": "Unterwegs: {n} von {m}", Stop: "Stopp", Luk: "Schließen", "Læs mere": "Mehr lesen", Tilbage: "Zurück",
+    "Du er fremme": "Sie sind angekommen", "På vej: {n} af {m}": "Unterwegs: {n} von {m}", Stoppet: "Angehalten", Stop: "Stopp", Luk: "Schließen", "Læs mere": "Mehr lesen", Tilbage: "Zurück",
     "Præsenteret af": "Präsentiert von", "Spring over": "Überspringen", "Tilbage til 360°-billedet": "Zurück zum 360°-Bild", "Tilbage til luften": "Zurück zur Luftansicht",
     "Tryk på et sted for at se mere - eller gå direkte ind.": "Tippen Sie auf einen Ort, um mehr zu sehen - oder gehen Sie direkt hinein.", Pause: "Pause", Fortsæt: "Weiter", Næste: "Weiter", Forrige: "Zurück",
     "Zoom ind": "Vergrößern", "Zoom ud": "Verkleinern", "Skjul rumvælgeren": "Raumauswahl ausblenden",
   },
   sv: {
     "Vis mig rundt": "Visa mig runt", "{n} steder, ca. {min} min": "{n} platser, ca. {min} min", "Start rundturen": "Starta rundturen", "Find vej": "Hitta vägen",
-    "Du er fremme": "Du är framme", "På vej: {n} af {m}": "På väg: {n} av {m}", Luk: "Stäng", "Læs mere": "Läs mer", Tilbage: "Tillbaka", "Præsenteret af": "Presenteras av", "Spring over": "Hoppa över",
+    "Du er fremme": "Du är framme", "På vej: {n} af {m}": "På väg: {n} av {m}", Stoppet: "Stoppad", Luk: "Stäng", "Læs mere": "Läs mer", Tilbage: "Tillbaka", "Præsenteret af": "Presenteras av", "Spring over": "Hoppa över",
     "Tilbage til 360°-billedet": "Tillbaka till 360°-bilden", "Tilbage til luften": "Tillbaka till flygbilden", Fortsæt: "Fortsätt", Næste: "Nästa", Forrige: "Föregående",
   },
   nb: {
     "Vis mig rundt": "Vis meg rundt", "{n} steder, ca. {min} min": "{n} steder, ca. {min} min", "Start rundturen": "Start omvisningen", "Find vej": "Finn veien",
-    "Du er fremme": "Du er fremme", "På vej: {n} af {m}": "På vei: {n} av {m}", Luk: "Lukk", "Læs mere": "Les mer", Tilbage: "Tilbake", "Præsenteret af": "Presentert av", "Spring over": "Hopp over",
+    "Du er fremme": "Du er fremme", "På vej: {n} af {m}": "På vei: {n} av {m}", Stoppet: "Stoppet", Luk: "Lukk", "Læs mere": "Les mer", Tilbage: "Tilbake", "Præsenteret af": "Presentert av", "Spring over": "Hopp over",
     "Tilbage til 360°-billedet": "Tilbake til 360°-bildet", "Tilbage til luften": "Tilbake til luftfotoet", Fortsæt: "Fortsett", Næste: "Neste", Forrige: "Forrige",
   },
 };

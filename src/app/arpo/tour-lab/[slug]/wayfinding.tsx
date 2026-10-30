@@ -172,7 +172,8 @@ export function RouteSheet({
         </button>
       </div>
       <p className="rt-lead">{tr("Vælg hvor du skal hen - så går touren vejen derhen fra der, hvor du står.")}</p>
-      <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder={boxes ? tr("Søg rum eller boksnummer…") : tr("Søg…")} />
+      {/* Focused at once only with a mouse: on a phone the keyboard would cover the list - it comes when they tap the field. */}
+      <input ref={(el) => void (el && matchMedia("(pointer: fine)").matches && !el.dataset.focused && ((el.dataset.focused = "1"), el.focus()))} value={q} onChange={(e) => setQ(e.target.value)} placeholder={boxes ? tr("Søg rum eller boksnummer…") : tr("Søg…")} />
       <div className="rt-list">
         {groups.map((g) => (
           <div key={g}>
@@ -198,22 +199,32 @@ export function RouteStatus({
   step,
   steps,
   arrived,
+  paused = false,
   cta,
   onStop,
+  onResume,
+  onClose,
   onCta,
 }: {
   dest: Destination;
   step: number;
   steps: number;
   arrived: boolean;
+  /** Stopped on the way: "Fortsæt" walks on from where they stand. */
+  paused?: boolean;
   cta?: { label: string; href: string };
   onStop: () => void;
+  onResume: () => void;
+  onClose: () => void;
   onCta: () => void;
 }) {
   const tr = useT();
   return (
     <div className={`rt-status ${arrived ? "fremme" : ""}`}>
-      <div className="rt-kick">{arrived ? tr("Du er fremme") : tr("På vej: {n} af {m}", { n: Math.min(step, steps), m: steps })}</div>
+      <button type="button" className="rt-x" aria-label={tr("Luk")} onClick={onClose}>
+        ×
+      </button>
+      <div className="rt-kick">{arrived ? tr("Du er fremme") : paused ? tr("Stoppet") : tr("På vej: {n} af {m}", { n: Math.min(step, steps), m: steps })}</div>
       <b>{dest.group ? `${dest.group}: ${dest.name}` : dest.name}</b>
       {!arrived && (
         <div className="rt-bar">
@@ -226,9 +237,19 @@ export function RouteStatus({
             {cta.label}
           </a>
         )}
-        <button type="button" onClick={onStop}>
-          {arrived ? tr("Luk") : tr("Stop")}
-        </button>
+        {arrived ? (
+          <button type="button" onClick={onClose}>
+            {tr("Luk")}
+          </button>
+        ) : paused ? (
+          <button type="button" className="rt-fortsaet" onClick={onResume}>
+            ▶ {tr("Fortsæt")}
+          </button>
+        ) : (
+          <button type="button" onClick={onStop}>
+            {tr("Stop")}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -259,6 +280,10 @@ export const ROUTE_CSS = `
 .rt-btns button,.rt-cta{border:0;border-radius:999px;padding:9px 16px;font:inherit;font-weight:800;font-size:14px;cursor:pointer;background:#eef1f2;color:#1d2a30;text-decoration:none}
 .rt-cta{background:var(--c-accent);color:#fff;margin-right:auto}
 .rt-status.fremme{border:2px solid var(--c-accent)}
+.rt-status{position:relative}
+.rt-x{position:absolute;top:8px;right:8px;width:28px;height:28px;border:0;border-radius:50%;background:#eef1f2;color:#1d2a30;font-size:17px;line-height:28px;cursor:pointer}
+.rt-kick{padding-right:30px}
+.rt-btns .rt-fortsaet{background:var(--c-accent);color:#fff}
 .hv-routing .hv-room,.hv-routing .hv-stories{display:none}
 .hv-guiding .rt-knap{display:none}
 .rt-line{position:absolute;inset:0;width:100%;height:100%;z-index:4;pointer-events:none;overflow:visible}
@@ -270,6 +295,8 @@ export const ROUTE_CSS = `
   .rt-knap{top:auto;bottom:calc(14px + env(safe-area-inset-bottom,0px));left:12px;translate:none;padding:11px 16px}
   /* Inside the tour "Tilbage til luften" has the bottom left: Find vej goes to the bottom right. */
   .hv-i-tour .rt-knap{left:auto;right:12px}
+  /* Side by side with "Tilbage til luften": the same height and line. */
+  .hv-i-tour .rt-knap,.hv-i-tour .hv-luften{bottom:calc(16px + env(safe-area-inset-bottom,0px));height:44px;padding:0 16px;font-size:14px;box-sizing:border-box}
   .rt-sheet{top:auto;bottom:0;left:0;right:0;width:auto;translate:none;max-height:80%;border-radius:18px 18px 0 0;padding-bottom:calc(10px + env(safe-area-inset-bottom,0px))}
   .rt-status{bottom:calc(10px + env(safe-area-inset-bottom,0px))}
 }

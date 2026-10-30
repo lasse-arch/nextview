@@ -594,7 +594,7 @@ function TourExperience({
     if (!T.measure || !sdk?.Measurements) return;
     sdk.Measurements.toggleMode(showMeasures && phase === "tour").catch((err) => console.warn("Measurements", err));
   }, [sdk, showMeasures, phase, T.measure]);
-  const [route, setRoute] = useState<{ dest: Destination; step: number; steps: number; arrived: boolean } | null>(null);
+  const [route, setRoute] = useState<{ dest: Destination; step: number; steps: number; arrived: boolean; paused?: boolean } | null>(null);
   const routeRun = useRef(0);
   /** The route still ahead, drawn on the floor. */
   const [routeLine, setRouteLine] = useState<Vec3[]>([]);
@@ -1914,37 +1914,51 @@ function TourExperience({
     setRouteLine(line(0));
     // A moment to see the way before setting off - and look down it.
     const first = heading(flights[0], flights[1]);
-    if (first != null) await sdk.Sweep.moveTo(flights[0], { rotation: { x: -8, y: first }, transition: sdk.Sweep.Transition.FLY, transitionTime: 700 }).catch(() => {});
-    await new Promise((r) => setTimeout(r, 500));
+    // Turned down the way on the spot - a smooth turn, not a move to the same scan point.
+    if (first != null) {
+      selfMoveAt.current = now() + 2000;
+      await sdk.Camera.setRotation?.({ x: -8, y: first }, { speed: 110 }).catch(() => {});
+      selfMoveAt.current = now();
+    }
+    await new Promise((r) => setTimeout(r, 250));
     for (let i = 1; i <= steps; i++) {
       if (routeRun.current !== run) return;
       const sid = flights[i];
       const last = i === steps;
       // Looking straight ahead the whole flight (the way it goes) - the turn comes at the corner, standing there.
       const ahead = heading(flights[i - 1], sid);
+      // The last flight turns into the place's own view as it lands - one smooth finish, no turn after.
       await moveSweep(sdk, sid, {
-        rotation: ahead != null ? { x: -8, y: ahead } : last ? target?.rotation : undefined,
+        rotation: last && target?.rotation ? target.rotation : ahead != null ? { x: -8, y: ahead } : undefined,
         transition: sdk.Sweep.Transition.FLY,
-        transitionTime: flightMs(net, flights[i - 1], sid),
+        transitionTime: flightMs(net, flights[i - 1], sid) + (last ? 400 : 0),
       });
       if (routeRun.current !== run) return;
       setRoute({ dest, step: i, steps, arrived: last });
       setRouteLine(last ? [] : line(i));
       // At the corner: turned down the next stretch before setting off (at the end: to the place's own view).
-      const next = last ? (target?.rotation ?? null) : (() => {
+      const next = last ? null : (() => {
         const y = heading(sid, flights[i + 1]);
         return y != null ? { x: -8, y } : null;
       })();
-      if (next && ahead != null && Math.abs((((next.y - ahead) % 360) + 540) % 360 - 180) > 12) {
+      if (next && ahead != null && Math.abs((((next.y - ahead) % 360) + 540) % 360 - 180) > 20) {
         selfMoveAt.current = now() + 2000;
-        await sdk.Camera.setRotation?.(next, { speed: 90 }).catch(() => {});
+        await sdk.Camera.setRotation?.(next, { speed: 140 }).catch(() => {});
         selfMoveAt.current = now();
       }
     }
     track("route_arrive", { destination: dest.name, flights: steps });
   }
+  /** "Stop" on the way: the walk stops where they are, with "Fortsæt" to walk on (or close). */
   function stopRoute() {
-    if (route && !route.arrived) track("route_stop", { destination: route.dest.name, step: route.step });
+    if (!route || route.arrived) return closeRoute();
+    track("route_stop", { destination: route.dest.name, step: route.step });
+    routeRun.current++;
+    setRoute({ ...route, paused: true });
+    setRouteLine([]);
+  }
+  function closeRoute() {
+    if (route && !route.arrived && !route.paused) track("route_stop", { destination: route.dest.name, step: route.step });
     routeRun.current++;
     setRoute(null);
     setRouteLine([]);
@@ -2672,8 +2686,11 @@ function TourExperience({
           step={route.step}
           steps={route.steps}
           arrived={route.arrived}
+          paused={route.paused}
           cta={T.cta.find((c) => c.primary)}
           onStop={stopRoute}
+          onResume={() => walkTo(route.dest)}
+          onClose={closeRoute}
           onCta={() => ctaClick(T.cta.find((c) => c.primary)!.label, T.cta.find((c) => c.primary)!.href, "route")}
         />
       )}
