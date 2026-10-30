@@ -2840,6 +2840,11 @@ function TourExperience({
           }}
         />
       )}
+      {T.commute?.button && !welcome && !(cover && T.cover) && guideAt == null && !route && (
+        <button type="button" className={`vt-knap vt-knap-${T.commute.button}`} onClick={() => (track("commute_open", { from: "button" }), setCommuteOpen(true))}>
+          🚌 {T.commute.title || tx("Hvor langt har du til os?")}
+        </button>
+      )}
       {commuteOpen && T.commute && <CommuteSheet T={T} onClose={() => setCommuteOpen(false)} onEvent={(name, params) => track(name, params ?? {})} />}
       {contactOpen && T.contactForm && (
         <ContactForm T={T} preview={inPreview} onClose={() => setContactOpen(false)} onSent={() => track("contact_form", { place: "form" })} />

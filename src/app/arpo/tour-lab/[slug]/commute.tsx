@@ -61,12 +61,13 @@ export function CommuteSheet({ T, onClose, onEvent }: { T: TourConfig; onClose: 
   const maps = from
     ? `https://www.google.com/maps/dir/?${new URLSearchParams({ api: "1", origin: `${from.lat},${from.lon}`, destination: `${C.lat},${C.lon}`, travelmode: "transit" })}`
     : null;
+  // Only the ways that make sense: no bike ride over 45 minutes, no walk over an hour - and none the tour leaves out.
   const tiles: [string, string, number | null][] = result
-    ? [
-        ["🚗", tr("I bil"), result.car],
-        ["🚲", tr("På cykel"), result.bike],
-        ["🚶", tr("Til fods"), result.walk],
-      ]
+    ? ([
+        ["🚗", tr("I bil"), C.hide?.car ? null : result.car],
+        ["🚲", tr("På cykel"), C.hide?.bike || (result.bike ?? 0) > 45 ? null : result.bike],
+        ["🚶", tr("Til fods"), C.hide?.walk || (result.walk ?? 0) > 60 ? null : result.walk],
+      ] as [string, string, number | null][])
     : [];
 
   return (
@@ -159,5 +160,20 @@ export const COMMUTE_CSS = `
 .vt-bus p{margin:4px 0 10px;font-size:14px;line-height:1.4;color:#33474d}
 .vt-knap{display:block;text-align:center;border-radius:999px;background:var(--c-accent);color:#fff;font-weight:800;padding:11px;font-size:15px;text-decoration:none}
 .vt-lille{margin:10px 2px 0;text-align:center;font-size:11.5px;color:#8a979c}
-@media (max-height:500px) and (min-width:500px){.vt-ark{zoom:var(--ui-zoom,.72)}}
+@media (max-height:500px) and (min-width:500px){.vt-ark,.vt-knap{zoom:var(--ui-zoom,.72)}}
+/* Its own button on the tour (when chosen) - under the menu button, or bottom left/right. */
+.vt-knap{position:absolute;z-index:7;display:flex;align-items:center;gap:7px;border:0;border-radius:999px;padding:9px 15px;background:#fff;color:var(--c-main);font:inherit;font-weight:800;font-size:13.5px;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.22)}
+.vt-knap-under-menu{top:calc(68px + env(safe-area-inset-top,0px));right:16px}
+.hv:has(.hv-live-chip) .vt-knap-under-menu{top:calc(124px + env(safe-area-inset-top,0px))}
+.vt-knap-bottom-left{bottom:calc(18px + env(safe-area-inset-bottom,0px));left:16px}
+.vt-knap-bottom-right{bottom:calc(18px + env(safe-area-inset-bottom,0px));right:16px}
+.hv-menu-aaben .vt-knap,.hv-med-kort .vt-knap,.hv:has(.hv-story-play) .vt-knap{opacity:0;pointer-events:none}
+.hv-st-on-d .vt-knap-bottom-left,.hv-st-on-d .vt-knap-bottom-right{bottom:calc(var(--st-h,148px) + 10px)}
+@media (max-width:760px){
+  .vt-knap{font-size:13px;padding:8px 13px}
+  .vt-knap-under-menu{top:calc(60px + env(safe-area-inset-top,0px));right:10px}
+  .hv:has(.hv-live-chip) .vt-knap-under-menu{top:calc(108px + env(safe-area-inset-top,0px))}
+  .hv-st-on-m .vt-knap-bottom-left,.hv-st-on-m .vt-knap-bottom-right{bottom:calc(var(--st-h,150px) + 8px)}
+  .vt-knap-bottom-left{left:12px}.vt-knap-bottom-right{right:12px}
+}
 `;

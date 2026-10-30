@@ -237,7 +237,7 @@ export function sunTimes(lat: number, lon: number, day: Date): { sunrise: string
  * A place name → coordinates (OpenStreetMap's Nominatim; for the editor,
  * one search at a time by a person - within its usage policy). Denmark only.
  */
-export async function findPlace(query: string): Promise<{ lat: number; lon: number; name: string } | null> {
+export async function findPlace(query: string): Promise<{ lat: number; lon: number; name: string; address: string } | null> {
   const q = new URLSearchParams({ q: query.slice(0, 120), format: "json", limit: "1", countrycodes: "dk" });
   const res = await fetch(`https://nominatim.openstreetmap.org/search?${q}`, {
     headers: { "User-Agent": "Arpo/1.0 (+https://nextview360.dk)", "Accept-Language": "da" },
@@ -246,5 +246,8 @@ export async function findPlace(query: string): Promise<{ lat: number; lon: numb
   });
   if (!res.ok) return null;
   const [hit] = (await res.json()) as { lat: string; lon: string; display_name: string }[];
-  return hit ? { lat: Number(hit.lat), lon: Number(hit.lon), name: hit.display_name.split(",")[0] } : null;
+  // The name: the place's own (a town, a school) - a house number alone ("2") is no name, so the street goes with it.
+  const parts = hit?.display_name.split(",").map((p) => p.trim()) ?? [];
+  const name = /^\d+[a-z]?$/i.test(parts[0] ?? "") ? `${parts[1] ?? ""} ${parts[0]}`.trim() : (parts[0] ?? "");
+  return hit ? { lat: Number(hit.lat), lon: Number(hit.lon), name, address: parts.filter((p) => !/^(Danmark|Region .*)$/.test(p)).slice(0, 4).join(", ") } : null;
 }

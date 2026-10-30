@@ -4,7 +4,7 @@ import { requireUser } from "@/lib/auth";
 import { findPlace, weatherMonths, weatherNow, type WeatherMonth, type WeatherNow } from "@/lib/weather";
 
 /** The editor's place search for "Vejret" (the team only). */
-export async function findWeatherPlace(query: string): Promise<{ lat: number; lon: number; name: string } | { error: string }> {
+export async function findWeatherPlace(query: string): Promise<{ lat: number; lon: number; name: string; address: string } | { error: string }> {
   await requireUser();
   const q = query.trim();
   if (q.length < 2) return { error: "Skriv en by eller et sted." };

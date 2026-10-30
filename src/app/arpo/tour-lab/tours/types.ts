@@ -350,7 +350,19 @@ export type TourConfig = {
    * to the journey by bus/train in Google Maps. `meet` = when one meets
    * ("08:10"), shown with the bus link. Opened from any link "#vej".
    */
-  commute?: { place: string; lat: number; lon: number; title?: string; meet?: string };
+  commute?: {
+    place: string;
+    lat: number;
+    lon: number;
+    title?: string;
+    meet?: string;
+    /** The address as found (shown in the editor). */
+    address?: string;
+    /** Ways left out (a bike or a walk over 45 / 60 minutes is never shown anyway). */
+    hide?: { car?: true; bike?: true; walk?: true };
+    /** A button on the tour that opens it (left out: none - from the menu and links "#vej" only). */
+    button?: "under-menu" | "bottom-left" | "bottom-right";
+  };
   /** The voice that reads the guided tours' stops aloud (ElevenLabs) - each tour its own. */
   voice?: { id: string; name: string };
   /**
