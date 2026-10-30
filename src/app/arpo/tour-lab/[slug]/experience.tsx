@@ -668,6 +668,8 @@ function TourExperience({
         },
       });
       setTourReadyMs(now() - started);
+      // Matterport may still settle the view just after it's ready - not the visitor looking around.
+      selfMoveAt.current = now() + 1500;
       setSdk(sdk);
       if (coverWaitingRef.current) {
         coverWaitingRef.current = false;
@@ -1458,6 +1460,7 @@ function TourExperience({
         if (ticket !== guideTicket.current || turn === "none") return;
         // The slow turn isn't waited for by the queue (the next move may start while it turns) - but it is
         // still the guide moving, not the visitor: guideMoving stays on until the turn is done.
+        selfMoveAt.current = now() + 8000; // the slow turn takes a few seconds - not the visitor looking around
         const turning = sdk?.Camera.rotate?.(turn === "other" ? -18 : 18, 0, { speed: 3 }).catch(() => {});
         turning?.finally(() => {
           if (ticket === guideTicket.current) setTimeout(() => ticket === guideTicket.current && guideDone(stop, ticket), 700);
@@ -1486,6 +1489,26 @@ function TourExperience({
       track("guide_leave", { stop: (guideAtRef.current ?? 0) + 1, stops: GUIDE.length, label: "Gik selv rundt", kind: "walk", guide: guideKey() });
     }
   }
+  /*
+   * Using the tour also means just looking around in the 3D view: a drag or
+   * swipe there happens in Matterport's own frame (on a phone a touch there
+   * can't be seen), so a turn of the view the tour didn't make itself counts.
+   */
+  useEffect(() => {
+    if (!sdk) return;
+    let base: { x: number; y: number } | null = null;
+    const sub = sdk.Camera.pose.subscribe((p) => {
+      if (tracking.used) return;
+      // The tour's own moves and turns (a place, the guide, Find vej) set a new starting point.
+      if (!base || now() - selfMoveAt.current < 2500 || guideAtRef.current != null) {
+        base = { x: p.rotation.x, y: p.rotation.y };
+        return;
+      }
+      const dy = Math.abs(((p.rotation.y - base.y + 540) % 360) - 180);
+      if (dy > 10 || Math.abs(p.rotation.x - base.x) > 10) markUsed();
+    });
+    return () => sub.cancel();
+  }, [sdk]);
   /*
    * While the guide runs, the visitor may take over: walk to another scan
    * point or turn to look at something. Then the guide waits (its timer
@@ -1886,7 +1909,9 @@ function TourExperience({
         return y != null ? { x: -8, y } : null;
       })();
       if (next && ahead != null && Math.abs((((next.y - ahead) % 360) + 540) % 360 - 180) > 12) {
+        selfMoveAt.current = now() + 2000;
         await sdk.Camera.setRotation?.(next, { speed: 90 }).catch(() => {});
+        selfMoveAt.current = now();
       }
     }
     track("route_arrive", { destination: dest.name, flights: steps });
