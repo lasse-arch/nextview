@@ -6,6 +6,7 @@
 
 /** The guide's turn at a stop: "as" = the usual slow turn, "other" = the other way, "none" = no turn. */
 export type GuideTurn = "as" | "other" | "none";
+export type FindButtonPlace = "top" | "bottom-left" | "bottom-right" | "under-menu" | "under-live" | "menu";
 export type DroneLook = { down?: number; up?: number; zoomIn?: number; zoomOut?: number; point?: "keep" | number };
 /** A tile in the "Fliser" (bento) menu: `title` may have line breaks (\n); `href` as a menu item's. */
 export type BentoTile = { title: string; kicker?: string; tag?: string; href: string; size?: "wide" | "tall"; style?: "light" | "dark" | "accent" };
@@ -390,7 +391,8 @@ export type TourConfig = {
    * the tour walks them there from where they stand, scan point by scan point.
    * `boxes`: box number -> link to the scan point in front of it.
    */
-  wayfinding?: { boxes?: Record<string, string> };
+  /** `button`: where the Find vej button stands, per device ("menu" = not shown; open it from a menu item "#findvej"). Left out: top centre on a computer, bottom right on a phone. */
+  wayfinding?: { boxes?: Record<string, string>; button?: { desktop?: FindButtonPlace; mobile?: FindButtonPlace } };
   /**
    * "Find din plads": a few questions on the drone scene/map (who are you,
    * what do you sleep in, what matters most); each answer points at the

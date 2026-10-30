@@ -12,7 +12,7 @@ import { detachToursFromMpskins, logTourWork, renameTourSlug, restoreTourVersion
 import { SOCIALS } from "../../tours/social";
 import { guideStops } from "../guide";
 import { askClaudeForTour, saveAnthropicKey, suggestTourFilter, type ChatTurn } from "@/lib/actions/tour-ai";
-import type { MenuEntry, TourConfig } from "../../tours/types";
+import type { FindButtonPlace, MenuEntry, TourConfig } from "../../tours/types";
 import type { TourStats } from "@/lib/tour-stats";
 import type { ReportShare } from "@/lib/tour-share";
 import { CardsEditor, DroneViewPicker, GuideEditor, StartEditor, TagsEditor } from "./content";
@@ -1049,6 +1049,37 @@ export function TourEditor({
                   hint='En kort "Sådan går du rundt", når man trykker Træd indenfor: træk for at kigge, tryk på cirklerne for at gå, menuen for at hoppe - og Vis mig rundt, hvis touren har den. Vises én gang pr. besøgende (i forhåndsvisningen hver gang).'
                 />
                 <Toggle on={Boolean(config.wayfinding)} onChange={(on) => edit((d) => void (d.wayfinding = on ? d.wayfinding ?? {} : undefined))} title="Find vej" hint="Vælg et rum, og touren går vejen derhen fra der, man står." />
+                {config.wayfinding &&
+                  (["desktop", "mobile"] as const).map((dev) => (
+                    <Field key={dev} title={`Find vej-knappen - ${dev === "desktop" ? "computer" : "mobil"}`} hint={config.wayfinding?.button?.[dev] === "menu" ? 'Ingen knap - læg "Find vej" i menuen med linket #findvej.' : undefined}>
+                      <select
+                        className={input}
+                        value={config.wayfinding?.button?.[dev] ?? "std"}
+                        onChange={(e) =>
+                          edit((d) => {
+                            const v = e.target.value as FindButtonPlace | "std";
+                            const b = { ...d.wayfinding?.button, [dev]: v === "std" ? undefined : v };
+                            if (!b[dev]) delete b[dev];
+                            d.wayfinding = { ...d.wayfinding, button: Object.keys(b).length ? b : undefined };
+                          })
+                        }
+                      >
+                        {(
+                          [
+                            ["std", dev === "desktop" ? "Øverst i midten (standard)" : "Nederst til højre (standard)"],
+                            ...(dev === "desktop" ? ([["bottom-left", "Nederst til venstre"], ["bottom-right", "Nederst til højre"]] as const) : ([["top", "Øverst i midten"], ["bottom-left", "Nederst til venstre"]] as const)),
+                            ["under-menu", "Under menuknappen"],
+                            ...(config.live ? ([["under-live", "Under live data"]] as const) : []),
+                            ["menu", "Ingen knap - kun i menuen"],
+                          ] as [string, string][]
+                        ).map(([v, l]) => (
+                          <option key={v} value={v}>
+                            {l}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                  ))}
                 <Toggle on={Boolean(config.measure)} onChange={(on) => edit((d) => void (d.measure = on || undefined))} title="Vis mål" hint="En knap, der viser Matterports mål i rummet." />
                 <Toggle on={Boolean(config.matterportUi)} onChange={(on) => edit((d) => void (d.matterportUi = on || undefined))} title="Behold Matterports egne knapper" hint="Normalt skjult - tourens egne knapper er brugerfladen." />
                 </Group>

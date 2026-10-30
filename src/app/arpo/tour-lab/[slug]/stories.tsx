@@ -39,6 +39,8 @@ export function Stories({
   const [arriving, setArriving] = useState(false);
   const cards = useRef<Record<string, HTMLButtonElement | null>>({});
   const row = useRef<HTMLDivElement | null>(null);
+  /** The story being flown to (its time starts when it's there). */
+  const goingTo = useRef<number | null>(null);
 
   // The row's real height, for what stands above it (a place card, Find vej) - two-line names or a wrapped row are taller.
   useEffect(() => {
@@ -77,9 +79,19 @@ export function Stories({
     window.addEventListener("hv-pause", pause);
     return () => window.removeEventListener("hv-pause", pause);
   }, []);
+  // Something else takes over (Vis mig rundt, Find vej): the stories stop - never two at once.
+  useEffect(() => {
+    const stop = () => {
+      goingTo.current = null;
+      setPlaying(null);
+    };
+    window.addEventListener("hv-stop-stories", stop);
+    return () => window.removeEventListener("hv-stop-stories", stop);
+  }, []);
 
-  const goingTo = useRef<number | null>(null);
   function play(index: number) {
+    // The stories take over: a guided tour or a Find vej walk in progress stops.
+    if (playing == null) window.dispatchEvent(new Event("hv-story-start"));
     setPlaying(index);
     setPaused(false);
     setArriving(true);

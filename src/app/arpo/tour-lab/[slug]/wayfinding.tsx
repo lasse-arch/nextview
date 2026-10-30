@@ -286,6 +286,29 @@ export const ROUTE_CSS = `
 .rt-btns .rt-fortsaet{background:var(--c-accent);color:#fff}
 .hv-routing .hv-room,.hv-routing .hv-stories{display:none}
 .hv-guiding .rt-knap{display:none}
+/* While the stories play, their bar has the top and the bottom: Find vej waits (never two things on top of each other). */
+.hv:has(.hv-story-play) .rt-knap{display:none}
+/* Where the button stands - chosen per device in the editor. */
+@media (min-width:761px){
+  .rt-d-menu .rt-knap{display:none}
+  .rt-d-bottom-left .rt-knap,.rt-d-bottom-right .rt-knap{top:auto;bottom:calc(18px + env(safe-area-inset-bottom,0px));translate:none}
+  .rt-d-bottom-left .rt-knap{left:18px;right:auto}
+  .rt-d-bottom-right .rt-knap{left:auto;right:18px}
+  .hv-st-on-d.rt-d-bottom-left .rt-knap,.hv-st-on-d.rt-d-bottom-right .rt-knap{bottom:calc(var(--st-h,148px) + 10px)}
+  /* Under the menu button (live data, if any, steps down below it) - or under live data (under the menu button when there is none). */
+  .rt-d-under-menu .rt-knap,.rt-d-under-live .rt-knap{top:calc(68px + env(safe-area-inset-top,0px));left:auto;right:16px;translate:none;padding:8px 15px;font-size:13.5px}
+  .rt-d-under-menu .hv-live-chip{top:calc(118px + env(safe-area-inset-top,0px))}
+  .hv:has(.hv-live-chip).rt-d-under-live .rt-knap{top:calc(124px + env(safe-area-inset-top,0px))}
+}
+@media (max-width:760px){
+  .rt-m-menu .rt-knap{display:none}
+  .hv.rt-m-top .rt-knap{top:calc(64px + env(safe-area-inset-top,0px));bottom:auto;left:50%;right:auto;translate:-50% 0}
+  .hv.rt-m-bottom-left.hv-i-tour .rt-knap{left:12px;right:auto}
+  .hv.rt-m-bottom-right.hv-i-tour .rt-knap{left:auto;right:12px}
+  .hv.rt-m-under-menu .rt-knap,.hv.rt-m-under-live .rt-knap{top:calc(60px + env(safe-area-inset-top,0px));bottom:auto;left:auto;right:10px;translate:none;height:38px;padding:0 13px;font-size:13px}
+  .hv.rt-m-under-menu .hv-live-chip{top:calc(106px + env(safe-area-inset-top,0px))}
+  .hv.rt-m-under-live:has(.hv-live-chip) .rt-knap{top:calc(108px + env(safe-area-inset-top,0px))}
+}
 .rt-line{position:absolute;inset:0;width:100%;height:100%;z-index:4;pointer-events:none;overflow:visible}
 .rt-line path{fill:none;stroke-linecap:round;stroke-linejoin:round}
 .rt-line-glow{stroke:var(--c-accent);stroke-width:16;opacity:.28;filter:blur(3px)}

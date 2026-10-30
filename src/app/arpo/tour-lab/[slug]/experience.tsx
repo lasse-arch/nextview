@@ -524,6 +524,9 @@ function TourExperience({
     window.addEventListener("hv-dag", open);
     return () => window.removeEventListener("hv-dag", open);
   }, []);
+  /** The other ones stop when one starts (stories, Vis mig rundt, Find vej) - kept current for the listeners below. */
+  const closeRouteRef = useRef<() => void>(() => {});
+  const closeGuideRef = useRef<(completed: boolean) => void>(() => {});
   /** "Vej til skolen" is open - from any link "#vej". */
   const [commuteOpen, setCommuteOpen] = useState(false);
   useEffect(() => {
@@ -612,6 +615,21 @@ function TourExperience({
     sdk.Measurements.toggleMode(showMeasures && phase === "tour").catch((err) => console.warn("Measurements", err));
   }, [sdk, showMeasures, phase, T.measure]);
   const [route, setRoute] = useState<{ dest: Destination; step: number; steps: number; arrived: boolean; paused?: boolean } | null>(null);
+  // Any link "#findvej" opens Find vej's picker (e.g. from the menu, when its button isn't shown) - and when the stories start,
+  // a guided tour or a Find vej walk in progress stops: never two at once.
+  useEffect(() => {
+    const open = () => setRouteOpen(true);
+    const storiesStart = () => {
+      closeRouteRef.current();
+      closeGuideRef.current(false);
+    };
+    window.addEventListener("hv-findvej", open);
+    window.addEventListener("hv-story-start", storiesStart);
+    return () => {
+      window.removeEventListener("hv-findvej", open);
+      window.removeEventListener("hv-story-start", storiesStart);
+    };
+  }, []);
   const routeRun = useRef(0);
   /** The route still ahead, drawn on the floor. */
   const [routeLine, setRouteLine] = useState<Vec3[]>([]);
@@ -947,6 +965,8 @@ function TourExperience({
     setTimeout(() => setFinderOpen(true), 700);
   }
   useEffect(() => {
+    closeRouteRef.current = () => route && closeRoute();
+    closeGuideRef.current = (completed) => guideAt != null && closeGuide(completed);
     openFinderRef.current = () => openFinder("link");
     openDayRef.current = (from) => T.day && openDay(from);
   });
@@ -1594,8 +1614,10 @@ function TourExperience({
     if (known == null && !guideStops(T, null).length) known = GUIDES[0]?.id ?? null;
     const stops = guideStops(T, known);
     if (!stops.length) return;
-    // One running already stops here (its own leave is counted).
+    // One running already stops here (its own leave is counted) - and so do the stories and a Find vej walk: never two at once.
     leaveGuide("guide", known ?? "Vis mig rundt");
+    window.dispatchEvent(new Event("hv-stop-stories"));
+    closeRouteRef.current();
     guideIdRef.current = known;
     track("guide_start", { from, stops: stops.length, guide: guideKey() });
     setDayAt(null);
@@ -1934,6 +1956,9 @@ function TourExperience({
   async function walkTo(dest: Destination) {
     setRouteOpen(false);
     setMenuOpen(false);
+    // Find vej takes over: the stories and a guided tour stop.
+    window.dispatchEvent(new Event("hv-stop-stories"));
+    if (guideAtRef.current != null) closeGuideRef.current(false);
     const run = ++routeRun.current;
     const target = uLinkTarget(dest.href);
     const goal = target ? sweepForSs(target.ss) : null;
@@ -2066,7 +2091,7 @@ function TourExperience({
   return (
     <TourLang.Provider value={{ lang, t: tx }}>
     <LinkProvider T={T} popup={popup}>
-    <div className={`hv fixed inset-0 z-50 overflow-hidden bg-[#0d1b20] ${selected ? "hv-punkt" : ""} ${zoomed ? "hv-zoom" : ""} ${welcome ? "hv-welcome" : ""} ${phase === "tour" && T.stories?.mobile ? "hv-st-on-m" : ""} ${menuOpen ? "hv-menu-aaben" : ""} ${T.overviewUi?.box?.desktop === false ? "hv-boks-ud-d" : ""} ${T.overviewUi?.box?.mobile === false ? "hv-boks-ud-m" : ""} ${T.overviewUi?.filter?.desktop === false ? "hv-filter-ud-d" : ""} ${T.overviewUi?.filter?.mobile === false ? "hv-filter-ud-m" : ""} ${T.overviewUi?.names?.desktop ? `hv-navne-d-${T.overviewUi.names.desktop}` : ""} ${T.overviewUi?.names?.mobile ? `hv-navne-m-${T.overviewUi.names.mobile}` : ""} ${T.overviewUi?.filterColumns ? `hv-filter-kol hv-filter-kol-${T.overviewUi.filterColumns}` : T.overviewUi?.filterScroll ? "hv-filter-rul" : ""} ${langClasses} ${T.design?.menu === "dock" ? "hv-dock" : ""} ${T.logoSide === "right" ? "hv-logo-h" : ""} ${guideAt != null || (dayAt != null && !dayOpen) ? "hv-guiding" : ""} ${route ? "hv-routing" : ""} ${phase === "tour" ? "hv-i-tour" : ""} ${T.wayfinding ? "hv-har-rute" : ""} ${showCard != null || (nudgeOn && T.nudge && phase === "tour") ? "hv-med-kort" : ""} ${showMeasures && phase === "tour" ? "hv-maler" : ""} ${phase === "tour" && T.stories?.desktop ? "hv-st-on-d" : ""}`} style={
+    <div className={`hv fixed inset-0 z-50 overflow-hidden bg-[#0d1b20] ${selected ? "hv-punkt" : ""} ${zoomed ? "hv-zoom" : ""} ${welcome ? "hv-welcome" : ""} ${phase === "tour" && T.stories?.mobile ? "hv-st-on-m" : ""} ${menuOpen ? "hv-menu-aaben" : ""} ${T.overviewUi?.box?.desktop === false ? "hv-boks-ud-d" : ""} ${T.overviewUi?.box?.mobile === false ? "hv-boks-ud-m" : ""} ${T.overviewUi?.filter?.desktop === false ? "hv-filter-ud-d" : ""} ${T.overviewUi?.filter?.mobile === false ? "hv-filter-ud-m" : ""} ${T.overviewUi?.names?.desktop ? `hv-navne-d-${T.overviewUi.names.desktop}` : ""} ${T.overviewUi?.names?.mobile ? `hv-navne-m-${T.overviewUi.names.mobile}` : ""} ${T.overviewUi?.filterColumns ? `hv-filter-kol hv-filter-kol-${T.overviewUi.filterColumns}` : T.overviewUi?.filterScroll ? "hv-filter-rul" : ""} ${langClasses} ${T.design?.menu === "dock" ? "hv-dock" : ""} ${T.logoSide === "right" ? "hv-logo-h" : ""} ${guideAt != null || (dayAt != null && !dayOpen) ? "hv-guiding" : ""} ${route ? "hv-routing" : ""} ${phase === "tour" ? "hv-i-tour" : ""} ${T.wayfinding ? "hv-har-rute" : ""} ${T.wayfinding?.button?.desktop ? `rt-d-${T.wayfinding.button.desktop}` : ""} ${T.wayfinding?.button?.mobile ? `rt-m-${T.wayfinding.button.mobile}` : ""} ${showCard != null || (nudgeOn && T.nudge && phase === "tour") ? "hv-med-kort" : ""} ${showMeasures && phase === "tour" ? "hv-maler" : ""} ${phase === "tour" && T.stories?.desktop ? "hv-st-on-d" : ""}`} style={
         {
           fontFamily: `'${T.font}', system-ui, sans-serif`,
           "--c-main": T.colors.main,
