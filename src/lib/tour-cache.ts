@@ -1,4 +1,5 @@
 import "server-only";
+import { createHash } from "node:crypto";
 import { revalidateTag, unstable_cache } from "next/cache";
 import { prisma } from "@/lib/db";
 import { loadTour } from "@/app/arpo/tour-lab/[slug]/load";
@@ -36,13 +37,16 @@ export function publicTour(slug: string) {
  * The review link's tour (/p/<token>): as it is in Arpo right now, published
  * or not - but read through the same cache as the published ones (by its last
  * change), so the customer gets the tour at the speed it will have, not a
- * slower one built from scratch on every visit.
+ * slower one built from scratch on every visit. A saved change ("Gem") shows
+ * at once; the editor's autosaved, unsaved changes never do.
  */
 export async function reviewTour(token: string) {
-  const row = await prisma.tour.findUnique({ where: { reviewToken: token }, select: { slug: true, config: true, updatedAt: true } });
+  const row = await prisma.tour.findUnique({ where: { reviewToken: token }, select: { slug: true, config: true } });
   if (!row) return null;
   const setup = { ...(row.config as unknown as TourConfig), slug: row.slug };
-  return unstable_cache(() => loadTour(setup), ["review-tour", row.slug, String(row.updatedAt.getTime())], { tags: [tag(row.slug)], revalidate: 3600 })();
+  // Keyed by the setup itself (not the row's last change - the editor's autosave changes that without changing the tour).
+  const version = createHash("sha1").update(JSON.stringify(row.config)).digest("hex").slice(0, 16);
+  return unstable_cache(() => loadTour(setup), ["review-tour", row.slug, version], { tags: [tag(row.slug)], revalidate: 3600 })();
 }
 
 /** A tour was changed: its cached public copy is dropped, so the next visit gets the change. */
