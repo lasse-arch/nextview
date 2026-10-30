@@ -13,6 +13,7 @@ import { saveTourStoryImage } from "@/lib/actions/tour-lab";
 import { connectSdk, showcaseUrl, uLinkTarget, type CameraPose, type MpSdk, type Rotation, type SweepInfo, type Vec3 } from "../matterport";
 import type { AvailableUnit } from "@/lib/availability/boxdepotet";
 import { WeatherChip, WEATHER_CSS } from "./weather";
+import { CommuteSheet, COMMUTE_CSS } from "./commute";
 import { FinderSheet, FINDER_CSS, WalkLines } from "./finder";
 import { apiUrl, isStaticTour } from "../tours/api";
 import type { DroneView, GuideTurn, MenuEntry, TourConfig, TourPlace, TourPoint, WelcomeGo } from "../tours/types";
@@ -513,6 +514,13 @@ function TourExperience({
     const open = () => setContactOpen(true);
     window.addEventListener("hv-kontakt", open);
     return () => window.removeEventListener("hv-kontakt", open);
+  }, []);
+  /** "Vej til skolen" is open - from any link "#vej". */
+  const [commuteOpen, setCommuteOpen] = useState(false);
+  useEffect(() => {
+    const open = () => setCommuteOpen(true);
+    window.addEventListener("hv-vej", open);
+    return () => window.removeEventListener("hv-vej", open);
   }, []);
   // Any link "#find" opens "Find din plads" - on the drone scene / map, where the places are.
   const openFinderRef = useRef<() => void>(() => {});
@@ -2025,7 +2033,7 @@ function TourExperience({
       }>
       <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.font.replace(/ /g, "+")}:wght@400;600;700;800;900&display=swap`} />
       {T.fontHeading && <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.fontHeading.replace(/ /g, "+")}:wght@500;600&display=swap`} />}
-      <style>{CSS + CONTACT_CSS + STORIES_CSS + LIGHTBOX_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + ONBOARDING_CSS + INFO_CSS + MAP_CSS + ROUTE_CSS + MEASURES_CSS + CARDS_CSS + DAY_CSS + SIMPLE_CSS + BENTO_CSS + LOGO_RIGHT_CSS + LANG_CSS + WEATHER_CSS + FINDER_CSS + (review ? FEEDBACK_CSS : "")}</style>
+      <style>{CSS + CONTACT_CSS + STORIES_CSS + LIGHTBOX_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + ONBOARDING_CSS + INFO_CSS + MAP_CSS + ROUTE_CSS + MEASURES_CSS + CARDS_CSS + DAY_CSS + SIMPLE_CSS + BENTO_CSS + LOGO_RIGHT_CSS + LANG_CSS + WEATHER_CSS + COMMUTE_CSS + FINDER_CSS + (review ? FEEDBACK_CSS : "")}</style>
       {/* The tour's own design on top (written by Claude or by hand under Avanceret). */}
       {T.customCss && <style>{T.customCss.replace(/<\/?style/gi, "")}</style>}
 
@@ -2762,6 +2770,7 @@ function TourExperience({
           }}
         />
       )}
+      {commuteOpen && T.commute && <CommuteSheet T={T} onClose={() => setCommuteOpen(false)} onEvent={(name, params) => track(name, params ?? {})} />}
       {contactOpen && T.contactForm && (
         <ContactForm T={T} preview={inPreview} onClose={() => setContactOpen(false)} onSent={() => track("contact_form", { place: "form" })} />
       )}
@@ -3469,7 +3478,7 @@ const CSS = `
   .hv-menu{width:100%}
   .hv-room{bottom:76px}
   /* A place card has that spot - the room's name steps aside while it shows. */
-  .hv-med-kort .hv-room{opacity:0;pointer-events:none}
+  .hv-med-kort .hv-room,.hv-med-kort .rt-knap{opacity:0;pointer-events:none}
   .hv-dev{bottom:calc(64px + env(safe-area-inset-bottom,0px));right:10px}
   .hv-dev>button{font-size:10px;padding:3px 7px}
   .hv-punkt .hv-dev{display:none}

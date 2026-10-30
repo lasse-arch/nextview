@@ -128,6 +128,19 @@ export const UI_STRINGS = [
   "Skjul rumvælgeren",
   "Zoom ud",
   "Stoppet",
+  "Hvor langt har du til os?",
+  "Find din vej til",
+  "Din adresse eller dit postnummer",
+  "Finder vejen …",
+  "Kunne ikke finde vejen lige nu - prøv igen.",
+  "Fra",
+  "I bil",
+  "På cykel",
+  "Til fods",
+  "Vi mødes kl.",
+  "Se hvilken bus eller hvilket tog du skal tage - Google Maps finder den bedste rejse.",
+  "Se rejsen med bus og tog",
+  "Tiderne er cirka. Din adresse gemmes ikke.",
 ] as const;
 
 /** Keys whose values are never words to translate (links, ids, files, layout, code). */
@@ -250,6 +263,7 @@ export function danishOf(config: TourConfig, lang: string): (s: string) => strin
  */
 const BUILT_IN: Record<string, Record<string, string>> = {
   en: {
+    "Hvor langt har du til os?": "How far do you live from us?", "Find din vej til": "Find your way to", "Din adresse eller dit postnummer": "Your address or postcode", "Finder vejen …": "Finding the way …", "Kunne ikke finde vejen lige nu - prøv igen.": "Couldn't find the way right now - try again.", "Fra": "From", "I bil": "By car", "På cykel": "By bike", "Til fods": "On foot", "Vi mødes kl.": "We meet at", "Se hvilken bus eller hvilket tog du skal tage - Google Maps finder den bedste rejse.": "See which bus or train to take - Google Maps finds the best journey.", "Se rejsen med bus og tog": "See the journey by bus and train", "Tiderne er cirka. Din adresse gemmes ikke.": "Times are approximate. Your address is not saved.",
     "Vis mig rundt": "Show me around", "{n} steder, ca. {min} min": "{n} places, about {min} min", "Start rundturen": "Start the tour", "Find vej": "Find your way",
     "Vælg hvor du skal hen - så går touren vejen derhen fra der, hvor du står.": "Choose where to go - the tour walks you there from where you are.",
     "Søg rum eller boksnummer…": "Search a room or unit number…", "Søg…": "Search…", "Ingen fundet - prøv et boksnummer, fx 160.": "Nothing found - try a unit number, e.g. 160.", "Ingen fundet.": "Nothing found.",
@@ -259,6 +273,7 @@ const BUILT_IN: Record<string, Record<string, string>> = {
     "Zoom ind": "Zoom in", "Zoom ud": "Zoom out", "Skjul rumvælgeren": "Hide the room picker",
   },
   de: {
+    "Hvor langt har du til os?": "Wie weit haben Sie zu uns?", "Find din vej til": "Finden Sie Ihren Weg zu", "Din adresse eller dit postnummer": "Ihre Adresse oder Postleitzahl", "Finder vejen …": "Weg wird gesucht …", "Kunne ikke finde vejen lige nu - prøv igen.": "Der Weg konnte gerade nicht gefunden werden - bitte erneut versuchen.", "Fra": "Von", "I bil": "Mit dem Auto", "På cykel": "Mit dem Rad", "Til fods": "Zu Fuß", "Vi mødes kl.": "Treffpunkt um", "Se hvilken bus eller hvilket tog du skal tage - Google Maps finder den bedste rejse.": "Sehen Sie, welchen Bus oder Zug Sie nehmen - Google Maps findet die beste Verbindung.", "Se rejsen med bus og tog": "Verbindung mit Bus und Bahn ansehen", "Tiderne er cirka. Din adresse gemmes ikke.": "Die Zeiten sind ungefähr. Ihre Adresse wird nicht gespeichert.",
     "Vis mig rundt": "Zeig mir alles", "{n} steder, ca. {min} min": "{n} Orte, ca. {min} Min.", "Start rundturen": "Rundgang starten", "Find vej": "Weg finden",
     "Vælg hvor du skal hen - så går touren vejen derhen fra der, hvor du står.": "Wählen Sie, wohin Sie möchten - die Tour führt Sie von Ihrem Standort dorthin.",
     "Søg rum eller boksnummer…": "Raum oder Nummer suchen…", "Søg…": "Suchen…", "Ingen fundet - prøv et boksnummer, fx 160.": "Nichts gefunden - versuchen Sie eine Nummer, z. B. 160.", "Ingen fundet.": "Nichts gefunden.",
@@ -268,11 +283,13 @@ const BUILT_IN: Record<string, Record<string, string>> = {
     "Zoom ind": "Vergrößern", "Zoom ud": "Verkleinern", "Skjul rumvælgeren": "Raumauswahl ausblenden",
   },
   sv: {
+    "Hvor langt har du til os?": "Hur långt har du till oss?", "Find din vej til": "Hitta vägen till", "Din adresse eller dit postnummer": "Din adress eller ditt postnummer", "Finder vejen …": "Hittar vägen …", "Kunne ikke finde vejen lige nu - prøv igen.": "Kunde inte hitta vägen just nu - försök igen.", "Fra": "Från", "I bil": "Med bil", "På cykel": "Med cykel", "Til fods": "Till fots", "Vi mødes kl.": "Vi träffas kl.", "Se hvilken bus eller hvilket tog du skal tage - Google Maps finder den bedste rejse.": "Se vilken buss eller vilket tåg du ska ta - Google Maps hittar den bästa resan.", "Se rejsen med bus og tog": "Se resan med buss och tåg", "Tiderne er cirka. Din adresse gemmes ikke.": "Tiderna är ungefärliga. Din adress sparas inte.",
     "Vis mig rundt": "Visa mig runt", "{n} steder, ca. {min} min": "{n} platser, ca. {min} min", "Start rundturen": "Starta rundturen", "Find vej": "Hitta vägen",
     "Du er fremme": "Du är framme", "På vej: {n} af {m}": "På väg: {n} av {m}", Stoppet: "Stoppad", Luk: "Stäng", "Læs mere": "Läs mer", Tilbage: "Tillbaka", "Præsenteret af": "Presenteras av", "Spring over": "Hoppa över",
     "Tilbage til 360°-billedet": "Tillbaka till 360°-bilden", "Tilbage til luften": "Tillbaka till flygbilden", Fortsæt: "Fortsätt", Næste: "Nästa", Forrige: "Föregående",
   },
   nb: {
+    "Hvor langt har du til os?": "Hvor langt har du til oss?", "Find din vej til": "Finn veien til", "Din adresse eller dit postnummer": "Din adresse eller ditt postnummer", "Finder vejen …": "Finner veien …", "Kunne ikke finde vejen lige nu - prøv igen.": "Kunne ikke finne veien akkurat nå - prøv igjen.", "Fra": "Fra", "I bil": "Med bil", "På cykel": "På sykkel", "Til fods": "Til fots", "Vi mødes kl.": "Vi møtes kl.", "Se hvilken bus eller hvilket tog du skal tage - Google Maps finder den bedste rejse.": "Se hvilken buss eller hvilket tog du skal ta - Google Maps finner den beste reisen.", "Se rejsen med bus og tog": "Se reisen med buss og tog", "Tiderne er cirka. Din adresse gemmes ikke.": "Tidene er omtrentlige. Adressen din lagres ikke.",
     "Vis mig rundt": "Vis meg rundt", "{n} steder, ca. {min} min": "{n} steder, ca. {min} min", "Start rundturen": "Start omvisningen", "Find vej": "Finn veien",
     "Du er fremme": "Du er fremme", "På vej: {n} af {m}": "På vei: {n} av {m}", Stoppet: "Stoppet", Luk: "Lukk", "Læs mere": "Les mer", Tilbage: "Tilbake", "Præsenteret af": "Presentert av", "Spring over": "Hopp over",
     "Tilbage til 360°-billedet": "Tilbake til 360°-bildet", "Tilbage til luften": "Tilbake til luftfotoet", Fortsæt: "Fortsett", Næste: "Neste", Forrige: "Forrige",

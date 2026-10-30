@@ -1038,6 +1038,15 @@ function GuideSetupEditor({ config, edit, preview, onEditPoint }: Omit<Props, "s
                     <Choice value={s.turn ?? ""} options={[["", "Som de andre"], ...turnOptions]} onChange={(v) => set({ ...s, turn: v ? (v as GuideTurn) : undefined })} />
                   </Field>
                 )}
+                <Field title="Egen knap (valgfri)" hint="Fx &quot;Se alle linjer&quot; til jeres side om linjerne. På det sidste stop står den i stedet for tourens hovedknap.">
+                  <input
+                    className={`${input} bg-white`}
+                    placeholder="Tekst på knappen"
+                    value={s.button?.label ?? ""}
+                    onChange={(e) => set({ ...s, button: e.target.value || s.button?.href ? { label: e.target.value, href: s.button?.href ?? "" } : undefined })}
+                  />
+                  <LinkInput className="mt-1.5 bg-white" value={s.button?.href ?? ""} onChange={(href) => set({ ...s, button: href || s.button?.label ? { label: s.button?.label ?? "", href } : undefined })} />
+                </Field>
                 <StopVoice
                   config={config}
                   stop={s}

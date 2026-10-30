@@ -34,6 +34,7 @@ import { FinderEditor } from "./finder-editor";
 import { MapEditor } from "./map-editor";
 import { FeedbackPanel } from "./feedback-panel";
 import { LinkInput, LinkOpenContext, LinksOpenEditor } from "./links-open";
+import { CommuteEditor } from "./commute-editor";
 
 /** A zoom level in words, for the Zoom sliders (1 = Matterport's normal view). */
 const zoomLabel = (z: number) => (Math.abs(z - 1) < 0.01 ? "normal" : z < 1 ? `zoomet ud (${Math.round(z * 100)} %)` : `zoomet ind (${Math.round(z * 100)} %)`);
@@ -863,6 +864,7 @@ export function TourEditor({
                 <MapEditor config={config} edit={edit} focus={pointFocus} preview={preview} />
                 {(config.drone || config.map) && <FinderEditor config={config} edit={edit} />}
                 {(config.drone || config.map) && <WeatherEditor config={config} edit={edit} />}
+                <CommuteEditor config={config} edit={edit} />
               </>
             )}
             {tab === "sprog" && (

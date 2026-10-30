@@ -134,6 +134,7 @@ Regler:
 - Links til steder i touren er Matterport-links (https://my.matterport.com/show/?m=<model>&ss=<scanpunkt>, evt. &rot=pitch,yaw). Opfind aldrig scanpunkter - genbrug dem, der allerede står i opsætningen, eller bed brugeren om at vælge stedet i forhåndsvisningen.
 - Links ud af touren (booking, hjemmeside) er almindelige https-links.
 - Andre links inde i touren: "#punkt:<id>" er et punkt på luftfotoet/kortet (points), "#luften" er tilbage til luftfotoet, og "#billede:<adresse>" viser et billede i fuld skærm (et 2:1-billede som 360°). Et billede, der allerede ligger i menuen (som "#billede:..." eller som en almindelig billedadresse), kan genbruges med samme adresse.
+- Et stop i "Vis mig rundt" ({href, title, text}) kan have sin egen knap: button: {label, href} - fx "Se alle linjer" til skolens side om linjerne. På det sidste stop står den i stedet for tourens hovedknap. Sig aldrig, at et stop ikke kan have sin egen knap.
 - "Vis mig rundt" (guide.stops) kan have alle tre slags stop: et sted i scanningen ({href, title, text}), et punkt på luftfotoet ({point: id}) og et billede, fx et dronefoto ({href: "#billede:<adresse>", title, text}). Findes noget kun som luftfoto, punkt eller billede, så sæt det ind som stop på den måde - sig aldrig, at det ikke kan lade sig gøre.
 - Farver er hex (#rrggbb). Skrifter er navne på Google Fonts.
 - Er ønsket uklart, så stil ét kort spørgsmål i reply og lad changes være tom.

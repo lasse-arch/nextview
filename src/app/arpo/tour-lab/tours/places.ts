@@ -124,7 +124,7 @@ export function allGuides(T: TourConfig): { id: string | null; title: string }[]
   return [...(has(T.guide) ? [{ id: null, title: "Vis mig rundt" }] : []), ...(T.guides ?? []).filter(has).map((g) => ({ id: g.id, title: g.title }))];
 }
 
-export type GuideStop = { href: string; title: string; text: string; audio?: string; audioText?: string; turn?: GuideTurn };
+export type GuideStop = { href: string; title: string; text: string; audio?: string; audioText?: string; turn?: GuideTurn; button?: { label: string; href: string } };
 
 const sameWords = (a: string, b: string) => a.replace(/\s+/g, " ").trim() === b.replace(/\s+/g, " ").trim();
 /** The stop's voice, when there is one to play: an uploaded file always, a made one only while the text is still what it read (so never a Danish voice in the English tour). */

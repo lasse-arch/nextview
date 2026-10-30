@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 
 // The stops live with the other shared helpers (the server's "Tjek touren" needs them too).
 import { stopVoice, type GuideStop } from "../tours/places";
+import { TourLink } from "./links";
 export { guideStops, type GuideStop } from "../tours/places";
 
 /**
@@ -114,7 +115,15 @@ export function GuidePlayer({
             {tr("Træk i billedet for at se dig omkring, og tryk for at gå - guiden venter på dig.")}
           </div>
         )}
-        {index < stops.length - 1 ? <div className="gd-next">{tr("Næste: {sted}", { sted: stops[index + 1].title })}</div> : end && <div className="gd-end">{end}</div>}
+        {stop.button?.label && stop.button.href ? (
+          // The stop's own button - on the last stop it takes the place of the tour's main one.
+          <div className="gd-end">
+            <TourLink href={stop.button.href} label={stop.button.label} className="hv-btn hv-primary" onClick={() => onEvent("cta_click", { label: stop.button!.label, link_url: stop.button!.href, place: "guide_stop" })}>
+              {stop.button.label}
+            </TourLink>
+          </div>
+        ) : null}
+        {index < stops.length - 1 ? <div className="gd-next">{tr("Næste: {sted}", { sted: stops[index + 1].title })}</div> : !stop.button?.label && end && <div className="gd-end">{end}</div>}
         <div className="gd-ctrl">
           <button type="button" aria-label={tr("Forrige")} disabled={index === 0} onClick={() => step(index - 1, "back")}>
             ‹
