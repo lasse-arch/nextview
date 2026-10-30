@@ -65,7 +65,15 @@ function FlowBar({ stage, note }: { stage: Stage; note?: string }) {
 }
 
 const noteOf = (r: TourRow) =>
-  r.newTour ? (r.stage === "live" ? "tour på explore" : r.note) : r.stage === "gennemgang" && r.approved ? "godkendt" : r.stage === "live" && !r.published ? "på Cloudflare" : undefined;
+  r.newTour
+    ? r.stage === "live"
+      ? "tour på explore"
+      : r.note
+    : r.stage === "gennemgang" && r.approved
+      ? "godkendt"
+      : r.stage !== "live" && r.published
+        ? "udgivet, ikke på Cloudflare endnu"
+        : undefined;
 
 const when = (iso: string) => new Date(iso).toLocaleDateString("da-DK", { day: "numeric", month: "short", year: "numeric" });
 

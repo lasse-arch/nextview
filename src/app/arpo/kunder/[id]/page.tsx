@@ -275,7 +275,7 @@ export default async function CustomerOverviewPage({ params }: { params: Promise
                         <div className="min-w-0">
                           <p className="truncate text-sm font-medium text-slate-900">{t.name}</p>
                           <p className="text-xs text-slate-500">
-                            {t.liveVersion != null ? `Udgivet · version ${t.liveVersion}` : t.published ? "Udgivet i Arpo" : "Ikke udgivet"}
+                            {t.liveVersion != null ? `Live på tour.nextview360.dk · version ${t.liveVersion}` : t.published ? "Udgivet i Arpo - ikke live endnu" : "Ikke udgivet"}
                           </p>
                         </div>
                         <div className="flex gap-3 text-xs font-medium">

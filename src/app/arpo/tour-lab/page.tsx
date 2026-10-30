@@ -48,8 +48,9 @@ export default async function TourLabPage() {
       image: pic.image,
       logo: pic.logo,
       background: pic.logo && c.logoOnLight ? "#f5f5f7" : c.colors.main,
-      // The flow: made in Arpo (Startet) → sent to the customer (Gennemgang) → out there (Live).
-      stage: t.published || t.liveVersion != null ? "live" : t.reviewSentAt ? "gennemgang" : "startet",
+      // The flow: made in Arpo (Startet) → sent to the customer (Gennemgang) → on tour.nextview360.dk (Live). Only a version put
+      // on Cloudflare is live - "Udgiv" alone (the /t/ page) isn't.
+      stage: t.liveVersion != null ? "live" : t.reviewSentAt ? "gennemgang" : "startet",
       approved: Boolean(t.reviewApprovedAt),
       published: t.published,
       updatedAt: t.updatedAt.toISOString(),
