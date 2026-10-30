@@ -1,5 +1,7 @@
 "use client";
 
+import { useT } from "../tours/i18n-react";
+
 import { useEffect, useRef, useState } from "react";
 import type { CameraPose, MpSdk, Vec3 } from "../matterport";
 import type { TourInfo } from "../tours/types";
@@ -33,6 +35,7 @@ export function InfoDots({
   onOpen: (i: TourInfo) => void;
   onLink: (label: string, href: string) => void;
 }) {
+  const tr = useT();
   const dots = useRef<(HTMLButtonElement | null)[]>([]);
   const [open, setOpen] = useState<number | null>(null);
   const here = info.map((i) => currentSs != null && i.ss.includes(currentSs));
@@ -82,7 +85,7 @@ export function InfoDots({
       ))}
       {card && (
         <div className="ip-card" key={open}>
-          <button type="button" className="ip-luk" aria-label="Luk" onClick={() => setOpen(null)}>
+          <button type="button" className="ip-luk" aria-label={tr("Luk")} onClick={() => setOpen(null)}>
             ×
           </button>
           {card.image && (

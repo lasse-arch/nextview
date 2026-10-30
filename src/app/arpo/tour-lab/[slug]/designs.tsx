@@ -222,7 +222,7 @@ export function PickerMenu({
   }
   return (
     <div className="pk">
-      <button type="button" className="pk-luk" aria-label="Skjul rumvælgeren" onClick={() => (setOpen(false), setShowFree(false))}>
+      <button type="button" className="pk-luk" aria-label={tr("Skjul rumvælgeren")} onClick={() => (setOpen(false), setShowFree(false))}>
         ▾
       </button>
       {showFree && free.length > 0 && (

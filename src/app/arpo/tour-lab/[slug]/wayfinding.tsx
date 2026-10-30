@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { MpSdk, Vec3 } from "../matterport";
+import { useT } from "../tours/i18n-react";
 import { inFront } from "./info";
 
 export type RouteGraph = Record<string, { n: string[]; p: [number, number, number] }>;
@@ -155,6 +156,7 @@ export function RouteSheet({
   onGo: (d: Destination) => void;
   onClose: () => void;
 }) {
+  const tr = useT();
   const [q, setQ] = useState("");
   const query = q.trim().toLowerCase();
   const box = query.replace(/^(box|boks|rum|nr\.?)\s*/, "");
@@ -164,13 +166,13 @@ export function RouteSheet({
   return (
     <div className="rt-sheet">
       <div className="rt-head">
-        <b>Find vej</b>
-        <button type="button" aria-label="Luk" onClick={onClose}>
+        <b>{tr("Find vej")}</b>
+        <button type="button" aria-label={tr("Luk")} onClick={onClose}>
           ×
         </button>
       </div>
-      <p className="rt-lead">Vælg hvor du skal hen - så går touren vejen derhen fra der, hvor du står.</p>
-      <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder={boxes ? "Søg rum eller boksnummer…" : "Søg…"} />
+      <p className="rt-lead">{tr("Vælg hvor du skal hen - så går touren vejen derhen fra der, hvor du står.")}</p>
+      <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder={boxes ? tr("Søg rum eller boksnummer…") : tr("Søg…")} />
       <div className="rt-list">
         {groups.map((g) => (
           <div key={g}>
@@ -184,7 +186,7 @@ export function RouteSheet({
               ))}
           </div>
         ))}
-        {!list.length && <p className="rt-none">Ingen fundet{boxes ? " - prøv et boksnummer, fx 160." : "."}</p>}
+        {!list.length && <p className="rt-none">{boxes ? tr("Ingen fundet - prøv et boksnummer, fx 160.") : tr("Ingen fundet.")}</p>}
       </div>
     </div>
   );
@@ -208,9 +210,10 @@ export function RouteStatus({
   onStop: () => void;
   onCta: () => void;
 }) {
+  const tr = useT();
   return (
     <div className={`rt-status ${arrived ? "fremme" : ""}`}>
-      <div className="rt-kick">{arrived ? "Du er fremme" : `På vej: ${Math.min(step, steps)} af ${steps}`}</div>
+      <div className="rt-kick">{arrived ? tr("Du er fremme") : tr("På vej: {n} af {m}", { n: Math.min(step, steps), m: steps })}</div>
       <b>{dest.group ? `${dest.group}: ${dest.name}` : dest.name}</b>
       {!arrived && (
         <div className="rt-bar">
@@ -224,7 +227,7 @@ export function RouteStatus({
           </a>
         )}
         <button type="button" onClick={onStop}>
-          {arrived ? "Luk" : "Stop"}
+          {arrived ? tr("Luk") : tr("Stop")}
         </button>
       </div>
     </div>

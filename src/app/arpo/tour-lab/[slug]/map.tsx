@@ -240,10 +240,10 @@ export function MapScene({
         )}
       </div>
       <div className="km-zoom" onPointerDown={(e) => e.stopPropagation()}>
-        <button type="button" aria-label="Zoom ind" onClick={() => view && zoomAt(box.current!.clientWidth / 2, box.current!.clientHeight / 2, view.s * 1.5)}>
+        <button type="button" aria-label={tr("Zoom ind")} onClick={() => view && zoomAt(box.current!.clientWidth / 2, box.current!.clientHeight / 2, view.s * 1.5)}>
           +
         </button>
-        <button type="button" aria-label="Zoom ud" onClick={() => view && zoomAt(box.current!.clientWidth / 2, box.current!.clientHeight / 2, view.s / 1.5)}>
+        <button type="button" aria-label={tr("Zoom ud")} onClick={() => view && zoomAt(box.current!.clientWidth / 2, box.current!.clientHeight / 2, view.s / 1.5)}>
           −
         </button>
       </div>

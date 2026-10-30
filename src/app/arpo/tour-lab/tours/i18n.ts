@@ -113,6 +113,20 @@ export const UI_STRINGS = [
   "Oplev i 360°",
   "Se hele kortet",
   "Zoom ind",
+  "{n} steder, ca. {min} min",
+  "Præsenteret af",
+  "Spring over",
+  "Tilbage til 360°-billedet",
+  "Vælg hvor du skal hen - så går touren vejen derhen fra der, hvor du står.",
+  "Søg rum eller boksnummer…",
+  "Ingen fundet - prøv et boksnummer, fx 160.",
+  "Ingen fundet.",
+  "Du er fremme",
+  "På vej: {n} af {m}",
+  "Stop",
+  "Start rundturen",
+  "Skjul rumvælgeren",
+  "Zoom ud",
 ] as const;
 
 /** Keys whose values are never words to translate (links, ids, files, layout, code). */

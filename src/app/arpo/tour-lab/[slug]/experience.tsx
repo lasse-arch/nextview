@@ -2,7 +2,7 @@
 
 import { LANG_CSS, LangSwitch } from "./lang-switch";
 import { danishOf, LANGUAGES, localize, makeT, tourLanguages } from "../tours/i18n";
-import { TourLang } from "../tours/i18n-react";
+import { TourLang, useT } from "../tours/i18n-react";
 import { socialLinks } from "../tours/social";
 import { allGuides, cssFilter, droneViewsOfHref, formatPhone, GUIDE_HREF, guideOfHref, guideSetup, isDroneHref, guideExit, imageOfHref, isInTourHref, isPlaceHref, placeHref, panoHfov, placeSlug, pointOfHref, startPlaces } from "../tours/places";
 import type { LiveUnit } from "@/lib/availability/live";
@@ -2045,7 +2045,7 @@ function TourExperience({
           </div>
           <div className="hv-intro-body">
             <h1>{OV?.intro.title}</h1>
-            <p>{OV?.intro.lead}</p>
+            <p>{OV?.intro.lead && tx(OV.intro.lead)}</p>
             <TourLink className="hv-btn hv-primary" href={T.cta[0].href} label={T.cta[0].label} onClick={() => ctaClick(T.cta[0].label, T.cta[0].href, "intro")}>
               {T.cta[0].label}
             </TourLink>
@@ -2299,7 +2299,7 @@ function TourExperience({
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M5 5l4 4M19 5l-4 4M5 19l4-4M19 19l-4-4M9 9h6v6H9z" />
             </svg>
-            {OV.backLabel}
+            {tx(OV.backLabel)}
           </button>
           )}
           {T.stories && storyRooms.length > 0 && (
@@ -2307,7 +2307,7 @@ function TourExperience({
               rooms={storyRooms}
               current={roomShown}
               devices={T.stories}
-              leading={OV ? { label: OV.backLabel, onClick: () => backToDrone() } : undefined}
+              leading={OV ? { label: tx(OV.backLabel), onClick: () => backToDrone() } : undefined}
               onGo={storyGo}
               onEvent={track}
             />
@@ -2399,10 +2399,8 @@ function TourExperience({
             <button key={g.id ?? ""} type="button" className="hv-guide-knap" onClick={() => startGuide("menu", g.id)}>
               ▶
               <span>
-                {g.id == null ? "Vis mig rundt" : g.title}
-                <small>
-                  {n} steder, ca. {Math.ceil((n * (guideSetup(T, g.id)?.seconds ?? 9)) / 60)} min
-                </small>
+                {g.id == null ? tx("Vis mig rundt") : g.title}
+                <small>{tx("{n} steder, ca. {min} min", { n, min: Math.ceil((n * (guideSetup(T, g.id)?.seconds ?? 9)) / 60) })}</small>
               </span>
             </button>
           );
@@ -2508,7 +2506,7 @@ function TourExperience({
           </div>
         )}
         <a className="hv-signatur" href="https://nextview360.dk" target="_blank" rel="noopener" onClick={() => track("nextview_click", { place: "menu" })}>
-          Præsenteret af
+          {tx("Præsenteret af")}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.png" alt="nextview360.dk" />
         </a>
@@ -2558,7 +2556,7 @@ function TourExperience({
             ))}
           </video>
           <button type="button" onClick={(e) => endIntro("skip", (e.currentTarget.previousElementSibling as HTMLVideoElement).currentTime)}>
-            Spring over
+            {tx("Spring over")}
           </button>
         </div>
       )}
@@ -2574,7 +2572,7 @@ function TourExperience({
             <div className="hv-live-head">
               <b>{T.live.title}</b>
               {!livePrices && <span>{liveUnits.length} lige nu</span>}
-              <button type="button" aria-label="Luk" onClick={() => setLiveOpen(false)}>
+              <button type="button" aria-label={tx("Luk")} onClick={() => setLiveOpen(false)}>
                 ×
               </button>
             </div>
@@ -2644,7 +2642,7 @@ function TourExperience({
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M12 2l3 7 7 3-7 3-3 7-3-7-7-3 7-3z" />
           </svg>
-          Find vej
+          {tx("Find vej")}
         </button>
       )}
       {T.measure && phase === "tour" && sdk?.Measurements && (
@@ -2803,6 +2801,7 @@ function TourExperience({
 /** A 360° photo at a point, full screen over the drone scene. */
 /** A point's photos at the top of its card - swiped or tapped through, with dots (cross-faded, no scroll box: a scrolling layer over the drone scene can blank it on phones). */
 function PointPhotos({ images, name, onOpen }: { images: string[]; name: string; onOpen: (at: number) => void }) {
+  const tr = useT();
   const [at, setAt] = useState(0);
   const touch = useRef<number | null>(null);
   const step = (d: number) => setAt((i) => (i + d + images.length) % images.length);
@@ -2834,10 +2833,10 @@ function PointPhotos({ images, name, onOpen }: { images: string[]; name: string;
       </span>
       {images.length > 1 && (
         <>
-          <button type="button" className="hv-fotos-pil hv-fotos-forrige" aria-label="Forrige" onClick={(e) => (e.stopPropagation(), step(-1))}>
+          <button type="button" className="hv-fotos-pil hv-fotos-forrige" aria-label={tr("Forrige")} onClick={(e) => (e.stopPropagation(), step(-1))}>
             ‹
           </button>
-          <button type="button" className="hv-fotos-pil hv-fotos-naeste" aria-label="Næste" onClick={(e) => (e.stopPropagation(), step(1))}>
+          <button type="button" className="hv-fotos-pil hv-fotos-naeste" aria-label={tr("Næste")} onClick={(e) => (e.stopPropagation(), step(1))}>
             ›
           </button>
         </>

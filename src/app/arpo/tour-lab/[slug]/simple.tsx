@@ -91,7 +91,7 @@ export function SimpleMenu({
           <div className="sp-list sp-menu-list">
             {guides.map((g, i) => (
               <button key={g.id ?? ""} type="button" className={`sp-btn ${i === 0 ? "sp-main" : ""}`} onClick={() => (setOpen(false), onGuide(g.id))}>
-                {guides.length > 1 ? g.id == null ? tr("Vis mig rundt") : g.title : "Start rundturen"}
+                {guides.length > 1 ? (g.id == null ? tr("Vis mig rundt") : g.title) : tr("Start rundturen")}
               </button>
             ))}
             {T.day && (

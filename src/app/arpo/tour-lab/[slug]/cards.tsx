@@ -54,7 +54,7 @@ export function PlaceCard({
           </p>
           {!open && clipped && (
             <button type="button" className="pc-mere-mobil" onClick={() => setOpen(true)}>
-              Læs mere
+              {tr("Læs mere")}
             </button>
           )}
           <div className="pc-btns">
@@ -82,7 +82,7 @@ export function PlaceCard({
           <p>{card.more?.text}</p>
           <div className="pc-btns">
             <button type="button" className="pc-btn" onClick={() => setPage(1)}>
-              ← Tilbage
+              ← {tr("Tilbage")}
             </button>
           </div>
         </>

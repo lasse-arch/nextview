@@ -128,7 +128,7 @@ export function GuidePlayer({
                   setPaused((p) => !p);
                 }}
               >
-                {paused || held ? "▶ Fortsæt" : "❚❚ Pause"}
+                {paused || held ? `▶ ${tr("Fortsæt")}` : `❚❚ ${tr("Pause")}`}
               </button>
               <button type="button" aria-label={tr("Næste")} onClick={() => step(index + 1, "next")}>
                 ›
