@@ -206,6 +206,8 @@ export function FeedbackPanel({
             onSend={() => send(Boolean(status?.sentAt && !status.approvedAt))}
             onClose={() => setCheck(null)}
             onAgain={() => void runCheck()}
+            config={config}
+            onApply={onApply}
           />
         )}
         <p className={`text-[12px] leading-snug ${note?.error ? "text-[#ff3b30]" : note ? "text-[#34c759]" : "text-[#8e8e93]"}`}>
@@ -400,7 +402,11 @@ function CheckResult({
   onSend,
   onClose,
   onAgain,
+  config,
+  onApply,
 }: {
+  config: TourConfig;
+  onApply: (c: TourConfig) => void;
   check: { items: { level: "ok" | "warn" | "fejl"; area: string; text: string }[]; ai: AiNote[] | null };
   pending: boolean;
   sendLabel: string;
@@ -433,7 +439,7 @@ function CheckResult({
           </div>
         ) : null;
       })}
-      {check.ai != null && <AiNotes notes={check.ai} />}
+      {check.ai != null && <AiNotes notes={check.ai} config={config} onApply={onApply} />}
       <div className="flex flex-wrap gap-2 pt-1">
         <button type="button" disabled={pending} onClick={onSend} className={`flex-1 rounded-xl py-2 text-[14px] font-medium text-white disabled:opacity-40 ${errors ? "bg-[#ff3b30]" : "bg-[#0071e3]"}`}>
           {errors ? `${sendLabel} alligevel` : sendLabel}
@@ -450,10 +456,16 @@ function CheckResult({
   );
 }
 
-/** nextviewAI's look at the tour, as a checklist: where, what, what to do - the important ones first, ticked off as they're done. */
-function AiNotes({ notes }: { notes: AiNote[] }) {
+/**
+ * nextviewAI's look at the tour, as a checklist: where, what, what to do - the important ones first. Tick the ones
+ * to fix and let nextviewAI do them (shown first, made on "Godkend"), or mark one as done by hand.
+ */
+function AiNotes({ notes, config, onApply }: { notes: AiNote[]; config: TourConfig; onApply: (c: TourConfig) => void }) {
   const [done, setDone] = useState<Set<number>>(() => new Set());
+  const [picked, setPicked] = useState<Set<number>>(() => new Set());
   const [open, setOpen] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<{ notes: number[]; r: AiEditResult } | null>(null);
   if (!notes.length)
     return (
       <div className="rounded-lg bg-[#d97757]/[.08] p-2.5">
@@ -462,32 +474,45 @@ function AiNotes({ notes }: { notes: AiNote[] }) {
       </div>
     );
   const left = notes.length - done.size;
+  const toggle = (set: Set<number>, i: number) => {
+    const next = new Set(set);
+    if (next.has(i)) next.delete(i);
+    else next.add(i);
+    return next;
+  };
+  const chosen = [...picked].filter((i) => !done.has(i)).sort((a, b) => a - b);
+  async function fix() {
+    if (!chosen.length || busy) return;
+    setBusy(true);
+    setResult(null);
+    const list = chosen.map((i, n) => `${n + 1}. ${notes[i].where}: ${notes[i].title} - ${notes[i].fix}`).join("\n");
+    const r = await askClaudeForTour(config, [], `Ret disse punkter fra tjekket af touren (lav kun det, de beder om):\n${list}`).catch(
+      (err: unknown): AiEditResult => ({ ok: false, error: `Kunne ikke nå nextviewAI (${err instanceof Error ? err.message : err}).` })
+    );
+    setResult({ notes: chosen, r });
+    setBusy(false);
+  }
   return (
     <div className="rounded-lg bg-[#d97757]/[.06] p-2.5">
       <div className="flex items-center justify-between">
         <p className="text-[11px] font-semibold uppercase tracking-wide text-[#b4532f]">✦ nextviewAI · {left ? `${left} forslag` : "alle klaret"}</p>
-        <p className="text-[11px] text-[#8e8e93]">Tryk for at læse</p>
+        {left > 0 && (
+          <button type="button" className="text-[11px] font-medium text-[#b4532f]" onClick={() => setPicked(new Set(notes.map((_, i) => i).filter((i) => !done.has(i))))}>
+            Vælg alle
+          </button>
+        )}
       </div>
       <ul className="mt-2 space-y-1.5">
         {notes.map((n, i) => {
           const isDone = done.has(i);
           return (
-            <li key={i} className={`rounded-lg bg-white ring-1 ring-black/[.05] ${isDone ? "opacity-50" : ""}`}>
+            <li key={i} className={`rounded-lg bg-white ring-1 ${picked.has(i) && !isDone ? "ring-[#d97757]/60" : "ring-black/[.05]"} ${isDone ? "opacity-50" : ""}`}>
               <div className="flex items-start gap-2 p-2">
-                <input
-                  type="checkbox"
-                  aria-label="Klaret"
-                  className="mt-0.5 h-4 w-4 flex-none accent-[#34c759]"
-                  checked={isDone}
-                  onChange={() =>
-                    setDone((d) => {
-                      const next = new Set(d);
-                      if (next.has(i)) next.delete(i);
-                      else next.add(i);
-                      return next;
-                    })
-                  }
-                />
+                {isDone ? (
+                  <span className="mt-0.5 w-4 flex-none text-center text-[13px] font-bold text-[#34c759]">✓</span>
+                ) : (
+                  <input type="checkbox" aria-label="Vælg til at rette" className="mt-0.5 h-4 w-4 flex-none accent-[#d97757]" checked={picked.has(i)} onChange={() => setPicked((p) => toggle(p, i))} />
+                )}
                 <button type="button" className="min-w-0 flex-1 text-left" onClick={() => setOpen(open === i ? null : i)}>
                   <span className="flex flex-wrap items-center gap-1.5">
                     <span className={`rounded-full px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide ${n.important ? "bg-[#ff9500]/15 text-[#a05a00]" : "bg-[#f2f2f7] text-[#6e6e73]"}`}>{n.where}</span>
@@ -496,11 +521,57 @@ function AiNotes({ notes }: { notes: AiNote[] }) {
                   <span className={`mt-0.5 block text-[13px] font-semibold leading-snug text-[#1d1d1f] ${isDone ? "line-through" : ""}`}>{n.title}</span>
                   {open === i && <span className="mt-1 block text-[12.5px] leading-snug text-[#3c3c43]">{n.fix}</span>}
                 </button>
+                {open === i && (
+                  <button type="button" className="flex-none rounded-full bg-[#f2f2f7] px-2 py-0.5 text-[11px] font-medium" onClick={() => setDone((d) => toggle(d, i))}>
+                    {isDone ? "Genåbn" : "✓ Klaret"}
+                  </button>
+                )}
               </div>
             </li>
           );
         })}
       </ul>
+      {chosen.length > 0 && !result && (
+        <button type="button" disabled={busy} onClick={() => void fix()} className="mt-2 w-full rounded-xl bg-[#d97757] py-2 text-[13px] font-semibold text-white disabled:opacity-60">
+          {busy ? "nextviewAI retter …" : `✦ Ret ${chosen.length === 1 ? "det valgte" : `de ${chosen.length} valgte`} med nextviewAI`}
+        </button>
+      )}
+      {result && (
+        <div className="mt-2 space-y-2 rounded-lg bg-white p-2.5 ring-1 ring-black/[.06]">
+          {result.r.ok ? (
+            <>
+              <p className="whitespace-pre-wrap text-[13px] leading-snug text-[#1d1d1f]">{result.r.reply}</p>
+              {result.r.changed > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    className="rounded-full bg-[#d97757] px-3 py-1 text-[12px] font-semibold text-white"
+                    onClick={() => {
+                      if (!result.r.ok) return;
+                      onApply(result.r.config);
+                      setDone((d) => new Set([...d, ...result.notes]));
+                      setPicked(new Set());
+                      setResult(null);
+                    }}
+                  >
+                    Godkend - lav ændringerne ({result.r.changed})
+                  </button>
+                  <button type="button" className="rounded-full bg-white px-3 py-1 text-[12px] font-medium ring-1 ring-black/[.08]" onClick={() => setResult(null)}>
+                    Nej tak
+                  </button>
+                </div>
+              ) : (
+                <button type="button" className="text-[12px] text-[#8e8e93]" onClick={() => setResult(null)}>
+                  Luk
+                </button>
+              )}
+              <p className="text-[11px] text-[#8e8e93]">Ændringerne ses i forhåndsvisningen og gemmes, når du trykker Gem.</p>
+            </>
+          ) : (
+            <p className="text-[13px] text-[#ff3b30]">{result.r.error}</p>
+          )}
+        </div>
+      )}
     </div>
   );
 }
