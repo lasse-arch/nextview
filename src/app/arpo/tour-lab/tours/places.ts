@@ -147,3 +147,19 @@ export function guideStops(T: TourConfig, guideId: string | null = null): GuideS
     return p ? [{ href: p.tour ?? `#punkt:${p.id}`, title: p.name, text: p.text, turn: s.turn }] : [];
   });
 }
+
+/**
+ * A tour without an aerial photo or map has nowhere for "#luften" to go: such
+ * menu items and welcome tiles (e.g. "… fra luften", made by nextviewAI from a
+ * template) are left out rather than shown as buttons that do nothing.
+ */
+export function withoutDeadAerialLinks<T extends TourConfig>(c: T): T {
+  if (c.drone || c.map) return c;
+  const dead = (href: string) => isDroneHref(href) || href.startsWith("#punkt:");
+  const hasDead = c.menu.some((m) => ("items" in m ? m.items.some(([, h]) => dead(h)) : dead(m.href))) || Boolean(c.welcome?.tiles.some((t) => "drone" in t.go));
+  if (!hasDead) return c;
+  const menu = c.menu
+    .map((m) => ("items" in m ? { ...m, items: m.items.filter(([, h]) => !dead(h)) } : m))
+    .filter((m) => ("items" in m ? true : !dead(m.href)));
+  return { ...c, menu, ...(c.welcome ? { welcome: { ...c.welcome, tiles: c.welcome.tiles.filter((t) => !("drone" in t.go)) } } : {}) };
+}

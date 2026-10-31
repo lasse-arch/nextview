@@ -16,6 +16,7 @@ import { siteDigest, siteResearch } from "@/lib/site-digest";
 import { pageAsText, readUnits, type LiveUnit } from "@/lib/availability/live";
 import { hostFiles } from "@/lib/tour-files";
 import { claudeCostUsd } from "@/lib/claude-cost";
+import { withoutDeadAerialLinks } from "@/app/arpo/tour-lab/tours/places";
 import { BRANCHES, DESIGN_PRESETS, type Branch, type DesignPreset } from "@/app/arpo/tour-lab/tours/presets";
 
 /** The prototype tour each ready-made design starts from (for its kind of features). */
@@ -583,6 +584,8 @@ Udfyld ud fra kundens hjemmeside nedenfor, efter drejebogen:
 - cta og contact: hjemmesidens vigtigste handling(er) og kontaktoplysninger. linkOpen: popup for booking.
 - velkomst: vælg den start, drejebogen anbefaler til branchen (design.welcome + welcome eller cover). Brug ikke fotos, du ikke har, og aldrig Matterports automatiske billeder (de er for dårlige) - forsiden får hjemmesidens delingsbillede, hvis det er et rigtigt foto af stedet; ellers sig i reply, at brugeren skal tage et forsidebillede i forhåndsvisningen (Start → Forsiden → Tag billede).
 - nudge ("Din plads venter") med hovedhandlingen.
+- Hovedhandlingen (cta) står allerede som knap under menuen og i kontaktboksen: læg den ikke også som menupunkt, og giv aldrig to knapper samme tekst (kontaktformularens knap hedder fx "Skriv til os").
+- Ingen "#luften", "#punkt:" eller "… fra luften" i menuen eller på fliserne, medmindre touren har et dronebillede/kort (drone eller map) - ${drone ? "det har den her (dronebilledet nedenfor)" : "det har den IKKE her, så nævn heller ikke luftfoto eller dronebillede"}.
 - Læs undersiderne og eventuelle PDF'er (vedhæftet): find ud af, hvem stedet er for, og hvad besøgende har brug for - og byg touren til dem (se "Sådan arbejder du"). Brug rigtige fakta (fx dagsrytme fra et skema → day).
 - Gem det vigtigste, du har lært om kunden, i remember (scope "tour"), så du ved det næste gang.
 Skriv al tekst på dansk i kundens stemme. Opfind ingen fakta.${input.plan ? `\n\nBrugeren har godkendt denne plan - byg præcis efter den (den går forud for skabelonen og drejebogen, hvor de er uenige):\n<plan>\n${planText(input.plan)}\n</plan>` : ""} I reply: fortæl kort, hvad du har valgt og hvorfor, og hvad brugeren selv bør tjekke eller tilføje (fx fotos af stederne).
@@ -625,7 +628,7 @@ Steder i touren skrives som https://my.matterport.com/show/?m=${model.id}&ss=<sc
   if (!result.ok) return result;
 
   // From the explore tour, as it was: the menu (and its tiles), the start, the hidden scan points and the colour filter.
-  let built: TourConfig = { ...result.config, slug };
+  let built: TourConfig = tidyBuilt({ ...result.config, slug });
   if (explore) {
     built = {
       ...built,
@@ -647,6 +650,28 @@ Steder i touren skrives som https://my.matterport.com/show/?m=${model.id}&ss=<sc
   revalidatePath("/arpo/tour-lab");
   const failed = hosted.failed.length ? `\n\nDisse filer kunne ikke hentes til os: ${hosted.failed.join("; ")}` : "";
   return { ok: true, slug, reply: result.reply + failed };
+}
+
+/**
+ * What nextviewAI tends to get wrong in a new tour, put right: links to an
+ * aerial photo the tour hasn't got, the main button also as a menu item, and
+ * two buttons with the same text (the second, e.g. the contact form's, gets
+ * its own).
+ */
+function tidyBuilt(c: TourConfig): TourConfig {
+  let t = withoutDeadAerialLinks(c);
+  const norm = (x: string) => x.trim().toLowerCase();
+  const ctaHrefs = new Set(t.cta.map((x) => x.href));
+  const ctaLabels = new Set(t.cta.map((x) => norm(x.label)));
+  const menu = t.menu.filter((m) => "items" in m || !(ctaHrefs.has(m.href) || ctaLabels.has(norm(m.title))));
+  const seen = new Set<string>();
+  const cta = t.cta.map((x) => {
+    const k = norm(x.label);
+    if (!seen.has(k)) return seen.add(k), x;
+    return { ...x, label: x.href === "#kontakt" ? "Skriv til os" : x.label };
+  }).filter((x, i, all) => all.findIndex((y) => norm(y.label) === norm(x.label) && y.href === x.href) === i);
+  t = { ...t, menu, cta };
+  return t;
 }
 
 const slugify = (s: string) =>

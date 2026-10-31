@@ -4,7 +4,7 @@ import { LANG_CSS, LangSwitch } from "./lang-switch";
 import { danishOf, LANGUAGES, localize, makeT, tourLanguages } from "../tours/i18n";
 import { TourLang, useT } from "../tours/i18n-react";
 import { socialLinks } from "../tours/social";
-import { allGuides, cssFilter, droneViewsOfHref, formatPhone, GUIDE_HREF, guideOfHref, guideSetup, isDroneHref, guideExit, imageOfHref, isInTourHref, isPlaceHref, placeHref, panoHfov, placeSlug, pointOfHref, startPlaces } from "../tours/places";
+import { allGuides, cssFilter, droneViewsOfHref, formatPhone, GUIDE_HREF, guideOfHref, guideSetup, isDroneHref, guideExit, imageOfHref, isInTourHref, isPlaceHref, placeHref, panoHfov, placeSlug, pointOfHref, startPlaces, withoutDeadAerialLinks } from "../tours/places";
 import type { LiveUnit } from "@/lib/availability/live";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { flushSync } from "react-dom";
@@ -356,7 +356,7 @@ function TourExperience({
   played = false,
 }: ExperienceProps & { setLang?: (lang: string) => void; /** Started from the play button - that was the front page, so the cover isn't shown again. */ played?: boolean }) {
   // The setup in the visitor's language; names that reach outside it (statistics, ?rum=, pictures) stay Danish.
-  const T = useMemo(() => asScene(localize(savedTour, lang)), [savedTour, lang]);
+  const T = useMemo(() => withoutDeadAerialLinks(asScene(localize(savedTour, lang))), [savedTour, lang]);
   const tx = useMemo(() => makeT(savedTour, lang), [savedTour, lang]);
   const da = useMemo(() => danishOf(savedTour, lang), [savedTour, lang]);
   /** What the start ran with: only a change to how the tour starts runs it again (not a new language, nor an edit in the editor - a colour, a text). */
