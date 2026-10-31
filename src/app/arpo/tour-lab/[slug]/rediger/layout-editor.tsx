@@ -1,6 +1,7 @@
 "use client";
 
 import type { FindButtonPlace, TourConfig } from "../../tours/types";
+import { MENU_STYLES as MENUS, START_STYLES as STARTS, setLayout, startStyleOf } from "../../tours/presets";
 import { BentoEditor } from "./bento-editor";
 import { Choice, Field, Group, Toggle, input } from "./ui";
 
@@ -15,23 +16,6 @@ import { Choice, Field, Group, Toggle, input } from "./ui";
  */
 
 type Edit = (fn: (draft: TourConfig) => void) => void;
-type StartStyle = "none" | "tiles" | "simple" | "cover";
-
-const STARTS: [StartStyle, string, string][] = [
-  ["cover", "Forside med foto", "Et stort foto af stedet med en knap ind og stederne at vælge imellem - premium, og fortsætter hjemmesidens fortælling."],
-  ["tiles", "Velkomst med fliser", "En kort velkomst med fliser til de vigtigste steder. Godt når der er få, tydelige valg."],
-  ["simple", "Helt enkel", "Få store knapper under hinanden - intet andet. Til gæster, der skal have det helt roligt (fx specialskoler). Hold det til 2-3 knapper."],
-  ["none", "Direkte i touren", "Touren starter med det samme - godt når folk kommer fra en knap på hjemmesiden, der allerede har fortalt historien."],
-];
-
-const MENUS: [NonNullable<TourConfig["design"]>["menu"], string, string][] = [
-  ["side", "Sidemenu", "En menu i siden med grupper - til mange rum."],
-  ["dock", "Bar i bunden", "Stederne, rundvisningen og hovedknappen i en bar nederst."],
-  ["bento", "Fliser", "Menuen som store billedfliser."],
-  ["simple", "Helt enkel", "Én knap med én liste - intet andet."],
-  ["picker", "Rumvælger", "Vælg størrelse og rum i bunden. Kun til få kunder (fx depotrum)."],
-];
-
 /** Where Find vej stands for a choice: its standard is top centre on a computer, bottom right on a phone; "menu" = no button. */
 function slotOfFind(v: string, dev: "desktop" | "mobile"): string | null {
   if (v === "menu") return null;
@@ -73,7 +57,7 @@ function Cards<T extends string>({ value, options, onChange }: { value: T; optio
 }
 
 export function LayoutEditor({ config, edit, onTab }: { config: TourConfig; edit: Edit; /** Jump to the tab where the texts/items are edited. */ onTab: (tab: "start" | "menu" | "sprog" | "funktioner") => void }) {
-  const style: StartStyle = config.design?.welcome === "cover" ? "cover" : config.welcome ? (config.design?.welcome === "simple" ? "simple" : "tiles") : "none";
+  const style = startStyleOf(config);
   const menuStyle = config.design?.menu ?? "side";
   const langs = (config.languages ?? []).filter((l) => l !== "da");
   const more = "px-1 text-left text-[13px] font-medium text-[#0071e3] hover:underline";
@@ -91,20 +75,7 @@ export function LayoutEditor({ config, edit, onTab }: { config: TourConfig; edit
           <Cards
             value={style}
             options={STARTS}
-            onChange={(v) =>
-              edit((d) => {
-                if (v === "none") {
-                  d.welcome = undefined;
-                  d.design = { ...d.design, welcome: "tiles", menu: menuStyle };
-                } else if (v === "tiles" || v === "simple") {
-                  d.welcome ??= { kicker: d.brand, title: `Velkommen til ${d.brand}`, lead: "Tag en tur rundt - eller hop direkte derhen, du vil se.", tiles: [], skip: "Jeg kigger selv rundt" };
-                  d.design = { ...d.design, welcome: v, menu: menuStyle };
-                } else {
-                  d.cover ??= { kicker: d.subtitle ?? d.brand, title: `Velkommen til ${d.brand}`, lead: "Kig indenfor før du kommer.", image: d.places?.[0]?.image ?? d.logo, enter: "Træd indenfor", placesTitle: "Vælg hvor du vil starte" };
-                  d.design = { ...d.design, welcome: "cover", menu: menuStyle };
-                }
-              })
-            }
+            onChange={(v) => edit((d) => setLayout(d, v, menuStyle))}
           />
           {style !== "none" && (
             <button type="button" className={more} onClick={() => onTab("start")}>

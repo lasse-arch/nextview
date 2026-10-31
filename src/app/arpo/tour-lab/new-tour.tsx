@@ -16,9 +16,8 @@ import {
 } from "@/lib/actions/tour-ai";
 import { createTour } from "@/lib/actions/tours";
 import type { AccountModel } from "@/lib/matterport-graph";
-import { DesignGallery } from "./[slug]/rediger/design-gallery";
 import { Field, input } from "./[slug]/rediger/ui";
-import { BRANCHES, DESIGN_PRESETS, FOCUS, type Branch, type DesignPreset } from "./tours/presets";
+import { BRANCHES, DESIGN_PRESETS, FOCUS, MENU_STYLES, PRESET_LAYOUT, START_STYLES, type Branch, type DesignPreset, type NewTourLayout } from "./tours/presets";
 
 /*
  * "Ny tour", step by step: who it's for (a customer, a test, or nobody yet)
@@ -29,8 +28,7 @@ import { BRANCHES, DESIGN_PRESETS, FOCUS, type Branch, type DesignPreset } from 
 
 type Who = { kind: "deal"; deal: TourCustomer } | { kind: "test" } | { kind: "none" };
 type Space = { id: string; name: string };
-const STEPS = ["Kunde", "Matterport", "Branche", "Design", "Indhold", "Plan"] as const;
-const DEMO_COLORS = { main: "#1d2a30", accent: "#e0533d", accentDark: "#b8402e", soft: "#f4efe8" };
+const STEPS = ["Kunde", "Matterport", "Branche", "Layout", "Indhold", "Plan"] as const;
 const thumb = (id: string) => `https://my.matterport.com/api/v1/player/models/${id}/thumb`;
 
 /** `forDeal`: opened from a customer under Tours (no button) - the customer is picked already, so it starts at the space. */
@@ -45,7 +43,13 @@ export function NewTour({ tours, forDeal, onClose }: { tours: { slug: string; na
   const [who, setWho] = useState<Who | null>(forDeal ? { kind: "deal", deal: forDeal } : null);
   const [space, setSpace] = useState<Space | null>(null);
   const [branch, setBranch] = useState<Branch | null>(null);
-  const [preset, setPreset] = useState<DesignPreset["id"] | null>(null);
+  const [preset, setPresetId] = useState<DesignPreset["id"] | null>(null);
+  /** The three layout steps - filled in from the branch's recommended design, then chosen one by one. */
+  const [layout, setLayout] = useState<NewTourLayout | null>(null);
+  const setPreset = (id: DesignPreset["id"]) => {
+    setPresetId(id);
+    setLayout((l) => ({ logoSide: l?.logoSide ?? "left", menuHint: l?.menuHint ?? "mobile", ...PRESET_LAYOUT[id] }));
+  };
   const [name, setName] = useState(forDeal?.name ?? "");
   const [website, setWebsite] = useState(forDeal?.website ?? "");
   const [focus, setFocus] = useState("");
@@ -68,7 +72,8 @@ export function NewTour({ tours, forDeal, onClose }: { tours: { slug: string; na
     setWho(null);
     setSpace(null);
     setBranch(null);
-    setPreset(null);
+    setPresetId(null);
+    setLayout(null);
     setName("");
     setWebsite("");
     setFocus("");
@@ -87,6 +92,7 @@ export function NewTour({ tours, forDeal, onClose }: { tours: { slug: string; na
     modelId: space?.id,
     dealId: who?.kind === "deal" ? who.deal.id : undefined,
     preset: preset ?? undefined,
+    layout: layout ?? undefined,
     branch: branch ?? undefined,
     about,
     focus,
@@ -125,7 +131,7 @@ export function NewTour({ tours, forDeal, onClose }: { tours: { slug: string; na
     });
   }
 
-  const canNext = [Boolean(who), Boolean(space), Boolean(branch) || Boolean(about.trim()), Boolean(preset), Boolean(name.trim()), Boolean(plan)][step];
+  const canNext = [Boolean(who), Boolean(space), Boolean(branch) || Boolean(about.trim()), Boolean(layout), Boolean(name.trim()), Boolean(plan)][step];
 
   return (
     <>
@@ -223,7 +229,7 @@ export function NewTour({ tours, forDeal, onClose }: { tours: { slug: string; na
                       value={about}
                       onChange={(e) => {
                         setAbout(e.target.value);
-                        if (!branch && e.target.value.trim()) setPreset((p) => p ?? "klassisk");
+                        if (!branch && e.target.value.trim() && !preset) setPreset("klassisk");
                       }}
                       placeholder="Fx Specialefterskole for unge med autisme - forældre og kommuner vælger skolen"
                     />
@@ -244,10 +250,36 @@ export function NewTour({ tours, forDeal, onClose }: { tours: { slug: string; na
                   </Field>
                 </div>
               ) : step === 3 ? (
-                <div className="space-y-3">
-                  <h2 className="text-[19px] font-semibold tracking-tight">Vælg design</h2>
-                  <p className="text-[13px] text-[#6e6e73]">De anbefalede passer til branchen. Alt kan ændres bagefter i editoren - også et helt eget design via nextviewAI.</p>
-                  <DesignGallery colors={DEMO_COLORS} selected={preset} branch={branch} onPick={(p) => setPreset(p.id)} />
+                <div className="space-y-5">
+                  <div>
+                    <h2 className="text-[19px] font-semibold tracking-tight">Layout</h2>
+                    <p className="text-[13px] text-[#6e6e73]">Tre trin: hvordan touren starter, menuen og hvor tingene sidder. Det anbefalede til branchen er valgt - alt kan ændres bagefter under Layout i editoren.</p>
+                  </div>
+                  {layout && (
+                    <>
+                      <LayoutStep n={1} title="Sådan starter touren" value={layout.start} options={START_STYLES} onChange={(start) => setLayout({ ...layout, start })} />
+                      <LayoutStep n={2} title="Menuen" value={layout.menu} options={MENU_STYLES} onChange={(menu) => setLayout({ ...layout, menu })} />
+                      <LayoutStep
+                        n={3}
+                        title="Placering"
+                        value={layout.logoSide}
+                        options={[
+                          ["left", "Logo til venstre", "Menuen til højre."],
+                          ["right", "Logo til højre", "Menuen til venstre."],
+                        ]}
+                        onChange={(logoSide) => setLayout({ ...layout, logoSide })}
+                      />
+                      <LayoutStep
+                        value={layout.menuHint}
+                        options={[
+                          ["mobile", "Pil til menuen på mobil", "Viser én gang, hvor menuen er."],
+                          ["all", "Pil på mobil og computer", ""],
+                          ["off", "Ingen pil", ""],
+                        ]}
+                        onChange={(menuHint) => setLayout({ ...layout, menuHint })}
+                      />
+                    </>
+                  )}
                 </div>
               ) : step === 4 ? (
                 <div className="space-y-3">
@@ -654,3 +686,32 @@ function ExploreBox({ url, onRead }: { url: string; onRead: (url: string, s: Spa
   );
 }
 
+
+/** One of the three layout steps: a numbered heading and the choices as cards. */
+function LayoutStep<T extends string>({ n, title, value, options, onChange }: { n?: number; title?: string; value: T; options: [T, string, string][]; onChange: (v: T) => void }) {
+  return (
+    <div className="space-y-2">
+      {title && (
+        <div className="flex items-center gap-2">
+          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#0071e3] text-[12px] font-bold text-white">{n}</span>
+          <h3 className="text-[15px] font-semibold">{title}</h3>
+        </div>
+      )}
+      <div role="radiogroup" className="grid grid-cols-2 gap-2">
+        {options.map(([v, name, what]) => (
+          <button
+            key={v}
+            type="button"
+            role="radio"
+            aria-checked={value === v}
+            onClick={() => onChange(v)}
+            className={`rounded-xl px-3 py-2.5 text-left ring-1 ${value === v ? "bg-[#0071e3] text-white ring-[#0071e3]" : "bg-white ring-black/[.06] hover:shadow-md"}`}
+          >
+            <span className="block text-[14px] font-semibold">{name}</span>
+            {what && <span className={`block text-[12px] leading-snug ${value === v ? "text-white/85" : "text-[#8e8e93]"}`}>{what}</span>}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
