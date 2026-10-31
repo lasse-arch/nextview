@@ -12,18 +12,16 @@ import { detachToursFromMpskins, logTourWork, renameTourSlug, restoreTourVersion
 import { SOCIALS } from "../../tours/social";
 import { guideStops } from "../guide";
 import { askClaudeForTour, saveAnthropicKey, suggestTourFilter, type ChatTurn } from "@/lib/actions/tour-ai";
-import type { FindButtonPlace, FindStepAside, MenuEntry, TourConfig } from "../../tours/types";
+import type { FindStepAside, MenuEntry, TourConfig } from "../../tours/types";
 import type { TourStats } from "@/lib/tour-stats";
 import type { ReportShare } from "@/lib/tour-share";
 import { CardsEditor, DroneViewPicker, GuideEditor, StartEditor, TagsEditor } from "./content";
 import { ResultsPanel } from "./results";
-import { DesignGallery } from "./design-gallery";
+import { LayoutEditor } from "./layout-editor";
 import { ScanPointsEditor } from "./scanpoints";
-import { BentoEditor } from "./bento-editor";
 import { DeleteTour } from "./delete-tour";
 import { LiveDataEditor } from "./live";
 import type { ScanMap } from "@/lib/matterport-graph";
-import { currentPreset } from "../../tours/presets";
 import { EconomyPanel, type TourEconomy } from "./economy";
 import { DEFAULT_EMBED, SharePanel, SitePreview, type EmbedSize } from "./share";
 import { Choice, Field, FilesContext, Group, Icon, input, logoTone, outsideFiles, PanoZoom, Toggle, UploadButton, withProtocol, type PreviewApi } from "./ui";
@@ -52,7 +50,7 @@ const FIND_ASIDE: [FindStepAside, string][] = [
 const zoomLabel = (z: number) => (Math.abs(z - 1) < 0.01 ? "normal" : z < 1 ? `zoomet ud (${Math.round(z * 100)} %)` : `zoomet ind (${Math.round(z * 100)} %)`);
 
 type Version = { id: string; note: string | null; by: string | null; at: string };
-type Tab = "sprog" | "claude" | "live" | "scan" | "okonomi" | "resultater" | "del" | "tags" | "start" | "rundvisning" | "kort" | "kortet" | "feedback" | "generelt" | "design" | "menu" | "funktioner" | "links" | "avanceret" | "versioner";
+type Tab = "layout" | "sprog" | "claude" | "live" | "scan" | "okonomi" | "resultater" | "del" | "tags" | "start" | "rundvisning" | "kort" | "kortet" | "feedback" | "generelt" | "design" | "menu" | "funktioner" | "links" | "avanceret" | "versioner";
 
 /** Claude's mark: a small sunburst. */
 const SPARK = '<path d="M12 3v5M12 16v5M3 12h5M16 12h5M5.6 5.6l3.5 3.5M14.9 14.9l3.5 3.5M5.6 18.4l3.5-3.5M14.9 9.1l3.5-3.5"/>';
@@ -68,7 +66,8 @@ const TABS: [Tab, string, string, string?][] = [
   ["generelt", "Generelt", '<circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/>', "1 · Grundlag"],
   ["design", "Design", '<path d="M12 3a9 9 0 1 0 0 18c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.3-.3-.4-.5-.8-.5-1.3 0-1.1.9-2 2-2h2.3A4.7 4.7 0 0 0 21 9.7C21 5.9 17 3 12 3z"/><circle cx="7.5" cy="11.5" r="1"/><circle cx="10.5" cy="7.5" r="1"/><circle cx="15.5" cy="8" r="1"/>'],
   ["scan", "Scanpunkter", '<circle cx="6" cy="6" r="2"/><circle cx="18" cy="8" r="2"/><circle cx="9" cy="17" r="2"/><circle cx="17" cy="18" r="2"/><path d="M8 6.5l8 1M7 8l1.5 7M11 17h4"/>'],
-  ["start", "Start", '<path d="M5 4v16M5 5h11l-2 4 2 4H5"/>', "2 · Touren"],
+  ["layout", "Layout", '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M9 9v11"/>', "2 · Touren"],
+  ["start", "Start", '<path d="M5 4v16M5 5h11l-2 4 2 4H5"/>'],
   ["menu", "Menu", '<path d="M4 6h16M4 12h16M4 18h10"/>'],
   ["kortet", "Luftfoto og kort", '<path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/>'],
   ["rundvisning", "Vis mig rundt", '<circle cx="12" cy="12" r="9"/><path d="M10 8.5v7l5.5-3.5z"/>'],
@@ -96,8 +95,9 @@ const FINDS: Partial<Record<Tab, string[]>> = {
   resultater: ["Statistik", "Besøg", "Klik", "Rapport", "Leads"],
   feedback: ["Rettelser", "Kundegennemsyn", "Kommentarer"],
   del: ["Udgiv", "Link", "QR-kode", "Indlejr", "iframe", "Kode til hjemmesiden", "Cloudflare"],
+  layout: ["Sådan starter touren|når touren åbner|velkomst|forside|direkte|skabelon|design|tema|preset", "Menuens udseende|menu-design|sidemenu|dock|bar i bunden|rumvælger|fliser", "Menu åben på computer", "Menu åben på mobil", "Dæmp touren bag menuen", "Placering|computer|mobil", "Logoet sidder til|logo venstre|logo højre", "Vis hvor menuen er|pil til menuen|menu-pil", "Skift sprog|sprogknap", "Find vej-knappen"],
   start: ["Hvor touren starter|startpunkt|startposition|start-link|start her", "Forsiden", "Velkomsten", "Fliser", "Kort film før touren", "Intro-video", "Steder med foto", "Træd indenfor"],
-  menu: ["Menuens udseende|menu-design|sidemenu|dock|bar i bunden|rumvælger", "Vis hvor menuen er|pil til menuen|menu-pil", "Menu åben på computer", "Menu åben på mobil", "Dæmp touren bag menuen", "Menupunkter", "Grupper", "Tilføj det sted, du ser", "Billede i menuen", "360°-billede", "Webside", "Luftfotoet", "Scanpunkter i menuen"],
+  menu: ["Menupunkter", "Grupper", "Tilføj det sted, du ser", "Billede i menuen", "360°-billede", "Webside", "Luftfotoet", "Scanpunkter i menuen"],
   rundvisning: ["Sådan ser en dag ud|dagen|program", "Vis mig rundt", "Guide", "Guidet tur", "Stop", "Drejning", "Sekunder ved hvert stop", "Stemme|lyd|elevenlabs|speak|oplæsning", "Lav den ud fra menuen", "Knappen i menuen|øverst|nederst|ikke i menuen", "Egen knap på stop"],
   kortet: ["Interaktivt kort", "Luftfoto", "Dronebillede", "360°-kort", "Punkter på kortet", "Kategorier", "Skyer", "Boksen øverst", "Filteret", "Luftfotoets første udsnit|startudsnit", "Ikoner", "Vejret|vejr|temperatur|dmi|sol", "Find din plads|finder|spørgsmål|guide til plads", "Gåafstande|gåafstand|minutter|afstand", "Bevægelse på luftfotoet|kig ned|kig op|zoom ved punkt", "Hent fra en kortside|lovable|importer kort"],
   scan: ["Scanpunkter", "Skjul scanpunkter", "Personer i scans"],
@@ -105,7 +105,7 @@ const FINDS: Partial<Record<Tab, string[]>> = {
   live: ["Live data", "Ledige pladser", "Ledige rum", "Book-knap", "Hent nye data"],
   kort: ["Stedkort", "Kort ved punkt", "Din plads venter", "Kort efter et stykke tid", "Knap til scanpunkt|opdækket|skjult scan"],
   links: ["Knapper", "Book", "Kontakt", "Telefon", "E-mail", "Adresse", "Sociale medier", "Kontaktformular", "Skriv til os", "Åbning", "Popup", "Ny fane", "Kort-link"],
-  design: ["Farver", "Skrift", "Font", "Logo", "Logostørrelse", "Logoets afstand", "Favicon", "Mørkt logo", "Farvefilter", "Skabelon|design|tema|preset", "Brug hjemmesidens farver|hjemmeside|rød tråd|brand"],
+  design: ["Farver", "Skrift", "Font", "Logo", "Logostørrelse", "Logoets afstand", "Favicon", "Mørkt logo", "Farvefilter", "Brug hjemmesidens farver|hjemmeside|rød tråd|brand"],
   sprog: ["Sprog", "Engelsk", "Tysk", "Oversæt"],
   funktioner: ["Navigation", "Bevægelse", "Fri bevægelse", "Kun punkter", "Skift mellem steder", "Fade", "Flyv", "Zoom", "Lås zoom på mobil", "Historier", "Scroll i historierne", "Find vej", "Vis mål", "Matterports egne knapper", "Sådan går du rundt|hjælp ved start|onboarding", "Vej til stedet|vej til skolen|hvor langt|afstand|adresse|postnummer|bus|tog|rejseplan|google maps|mødetid", "Tag billeder til historierne|fjern billederne", "Flyvetid"],
   generelt: ["Navn", "Firmanavn", "Undertitel", "Matterport-model", "Matterports indstillinger|dukkehus|plantegning|etagevælger"],
@@ -455,7 +455,6 @@ export function TourEditor({
     });
   }
 
-  const menuStyle = config.design?.menu ?? "side";
   const linkCtx = { config, edit };
   /** A new logo: is it dark or light? Then it gets the background it can be seen on (Baggrund bag logoet → Automatisk). */
   const [logoNote, setLogoNote] = useState<string | null>(null);
@@ -622,24 +621,6 @@ export function TourEditor({
 
             {tab === "design" && (
               <>
-                <Group title="Start fra en skabelon">
-                  <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">
-                    Hold musen over en skabelon for at se den i forhåndsvisningen. Et klik sætter flere ting på én gang: hvordan touren åbner (Start), menuens udseende (Menu), navigation og historier (Funktioner), &quot;Din plads venter&quot; (Stedkort) og Vis mig rundt. Bagefter rettes de enkelte ting i deres egne faner - og du kan altid fortryde.
-                  </p>
-                  <DesignGallery
-                    colors={config.colors}
-                    selected={currentPreset(config)}
-                    onHover={(p) => {
-                      const shown = p ? { ...structuredClone(config), ...p.apply(config) } : config;
-                      hovered.current = p ? shown : null;
-                      frame.current?.contentWindow?.postMessage({ type: "tour-draft", config: shown }, location.origin);
-                    }}
-                    onPick={(p) => {
-                      hovered.current = null;
-                      edit((d) => Object.assign(d, p.apply(d)));
-                    }}
-                  />
-                </Group>
                 <Group title="Farver og skrift">
                 <SiteLookButton slug={slug} config={config} edit={edit} />
                 <div className="grid grid-cols-2 gap-3">
@@ -767,16 +748,6 @@ export function TourEditor({
                     </Field>
                   );
                 })}
-                <Field title="Logoet sidder til - menuen tager den anden side">
-                  <Choice
-                    value={config.logoSide ?? "left"}
-                    options={[
-                      ["left", "Venstre"],
-                      ["right", "Højre"],
-                    ]}
-                    onChange={(v) => edit((d) => void (d.logoSide = v === "right" ? "right" : undefined))}
-                  />
-                </Field>
                 <Field title="Baggrund bag logoet øverst i touren" hint={logoNote ?? "Automatisk: et mørkt logo får lys baggrund, et lyst logo får hovedfarven - så det altid kan ses."}>
                   <Choice<"auto" | "none" | "light" | "main">
                     value={config.logoBg ?? "auto"}
@@ -868,6 +839,7 @@ export function TourEditor({
                 }}
               />
             )}
+            {tab === "layout" && <LayoutEditor config={config} edit={edit} onTab={setTab} />}
             {tab === "start" && <StartEditor config={config} edit={edit} slug={slug} preview={preview} />}
             {tab === "rundvisning" && (
               <GuideEditor
@@ -910,57 +882,9 @@ export function TourEditor({
                       d.imageView = Object.keys(all).length ? all : undefined;
                     })}
                 />
-                <Group title="Menuens udseende">
-                <Field title="Menu">
-                  <Choice
-                    value={menuStyle}
-                    options={[
-                      ["side", "Sidemenu"],
-                      ["dock", "Bar i bunden"],
-                      ["picker", "Rumvælger"],
-                      ["simple", "Helt enkel"],
-                      ["bento", "Fliser"],
-                    ]}
-                    onChange={(v) => edit((d) => void (d.design = { ...d.design, welcome: d.design?.welcome ?? "tiles", menu: v }))}
-                  />
-                </Field>
-                <Field title="Vis hvor menuen er" hint={config.menuHint ? "Lige efter man er gået ind: en pil og en blinkende ring om menuen i et par sekunder (én gang pr. besøg). Prøv den på Mobil i forhåndsvisningen." : "Ingen pil - som i dag."}>
-                  <Choice<"off" | "mobile" | "all">
-                    value={config.menuHint ?? "off"}
-                    options={[
-                      ["off", "Fra"],
-                      ["mobile", "På mobil"],
-                      ["all", "Mobil og computer"],
-                    ]}
-                    onChange={(v) => edit((d) => void (d.menuHint = v === "off" ? undefined : v))}
-                  />
-                </Field>
-                {menuStyle === "bento" && <BentoEditor config={config} edit={edit} />}
-                {menuStyle === "picker" && (
-                  <Field title="Når man vælger en størrelse, start i" hint="Findes rummet ikke i en størrelse, starter den i størrelsens første">
-                    <select
-                      className={input}
-                      value={config.design?.first ?? ""}
-                      onChange={(e) => edit((d) => void (d.design = { welcome: d.design?.welcome ?? "tiles", menu: d.design?.menu ?? "picker", first: e.target.value || undefined }))}
-                    >
-                      <option value="">Det første i hver størrelse</option>
-                      {[...new Set(config.menu.flatMap((m) => ("items" in m ? m.items.map((i) => i[0]) : [])))].map((n) => (
-                        <option key={n} value={n}>
-                          {n}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                )}
-                  <Toggle on={config.menuOpenOnStart.desktop} onChange={(on) => edit((d) => void (d.menuOpenOnStart.desktop = on))} title="Menu åben på computer" />
-                  <Toggle on={config.menuOpenOnStart.mobile} onChange={(on) => edit((d) => void (d.menuOpenOnStart.mobile = on))} title="Menu åben på mobil" />
-                  <Toggle
-                    on={config.menuDim !== false}
-                    onChange={(on) => edit((d) => void (d.menuDim = on ? undefined : false))}
-                    title="Dæmp touren bag menuen"
-                    hint="Touren bliver lidt mørkere, når menuen er åben, og et tryk på den lukker menuen. Fra: touren står klar og kan bruges, mens menuen er åben."
-                  />
-                </Group>
+                <button type="button" onClick={() => setTab("layout")} className="w-full rounded-xl bg-white px-4 py-3 text-left text-[14px] font-medium text-[#0071e3] ring-1 ring-black/[.06] hover:bg-[#0071e3]/5">
+                  Menuens udseende, åben ved start og placering vælges under Layout →
+                </button>
                 <button type="button" onClick={() => setTab("scan")} className="w-full rounded-xl bg-white px-4 py-3 text-left text-[14px] font-medium text-[#0071e3] ring-1 ring-black/[.06] hover:bg-[#0071e3]/5">
                   Alle scanpunkter - spring rundt, skjul og læg i menuen under Scanpunkter →
                 </button>
@@ -1179,37 +1103,6 @@ export function TourEditor({
                     </div>
                   </Field>
                 )}
-                {config.wayfinding &&
-                  (["desktop", "mobile"] as const).map((dev) => (
-                    <Field key={dev} title={`Find vej-knappen - ${dev === "desktop" ? "computer" : "mobil"}`} hint={config.wayfinding?.button?.[dev] === "menu" ? 'Ingen knap - læg "Find vej" i menuen med linket #findvej.' : undefined}>
-                      <select
-                        className={input}
-                        value={config.wayfinding?.button?.[dev] ?? "std"}
-                        onChange={(e) =>
-                          edit((d) => {
-                            const v = e.target.value as FindButtonPlace | "std";
-                            const b = { ...d.wayfinding?.button, [dev]: v === "std" ? undefined : v };
-                            if (!b[dev]) delete b[dev];
-                            d.wayfinding = { ...d.wayfinding, button: Object.keys(b).length ? b : undefined };
-                          })
-                        }
-                      >
-                        {(
-                          [
-                            ["std", dev === "desktop" ? "Øverst i midten (standard)" : "Nederst til højre (standard)"],
-                            ...(dev === "desktop" ? ([["bottom-left", "Nederst til venstre"], ["bottom-right", "Nederst til højre"]] as const) : ([["top", "Øverst i midten"], ["bottom-left", "Nederst til venstre"]] as const)),
-                            ["under-menu", "Under menuknappen"],
-                            ...(config.live ? ([["under-live", "Under live data"]] as const) : []),
-                            ["menu", "Ingen knap - kun i menuen"],
-                          ] as [string, string][]
-                        ).map(([v, l]) => (
-                          <option key={v} value={v}>
-                            {l}
-                          </option>
-                        ))}
-                      </select>
-                    </Field>
-                  ))}
                 <Toggle on={Boolean(config.measure)} onChange={(on) => edit((d) => void (d.measure = on || undefined))} title="Vis mål" hint="En knap, der viser Matterports mål i rummet." />
                 <Toggle on={Boolean(config.matterportUi)} onChange={(on) => edit((d) => void (d.matterportUi = on || undefined))} title="Behold Matterports egne knapper" hint="Normalt skjult - tourens egne knapper er brugerfladen." />
                 </Group>

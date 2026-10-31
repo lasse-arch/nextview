@@ -388,38 +388,12 @@ export function StartEditor({ config, edit, slug, preview }: Props) {
           </>
         )}
       </Group>
-      <Group title="Når touren åbner">
-        <Choice
-          value={style}
-          options={[
-            ["none", "Direkte i touren"],
-            ["tiles", "Velkomst"],
-            ["simple", "Helt enkel"],
-            ["cover", "Forside"],
-          ]}
-          onChange={(v) =>
-            edit((d) => {
-              if (v === "none") {
-                d.welcome = undefined;
-                d.design = { ...d.design, welcome: "tiles", menu: menuStyle };
-              } else if (v === "tiles" || v === "simple") {
-                d.welcome ??= { kicker: d.brand, title: `Velkommen til ${d.brand}`, lead: "Tag en tur rundt - eller hop direkte derhen, du vil se.", tiles: [], skip: "Jeg kigger selv rundt" };
-                d.design = { ...d.design, welcome: v, menu: menuStyle };
-              } else {
-                d.cover ??= { kicker: d.subtitle ?? d.brand, title: `Velkommen til ${d.brand}`, lead: "Kig indenfor før du kommer.", image: d.places?.[0]?.image ?? d.logo, enter: "Træd indenfor", placesTitle: "Vælg hvor du vil starte" };
-                d.design = { ...d.design, welcome: "cover", menu: menuStyle };
-              }
-            })
-          }
-        />
-        <p className={small}>
-          {style === "none" && "Touren starter med det samme - godt når folk kommer fra en knap på hjemmesiden, der allerede har fortalt historien."}
-          {style === "tiles" && "En kort velkomst med fliser til de vigtigste steder. Godt når der er få, tydelige valg."}
-          {style === "simple" && "Få store knapper under hinanden - intet andet. Til gæster, der skal have det helt roligt og enkelt (fx specialskoler). Hold det til 2-3 knapper."}
-          {style === "cover" && "Et stort foto af stedet med en knap ind og stederne at vælge imellem - premium, og fortsætter hjemmesidens fortælling."}
-        </p>
-        {config.intro && <Toggle on={Boolean(config.intro)} onChange={(on) => !on && edit((d) => void (d.intro = undefined))} title="Kort film før touren" hint="Fx en drone, der flyver ned til indgangen. Slå fra for at fjerne den." />}
-      </Group>
+      {config.intro && (
+        <Group title="Kort film før touren">
+          <Toggle on={Boolean(config.intro)} onChange={(on) => !on && edit((d) => void (d.intro = undefined))} title="Kort film før touren" hint="Fx en drone, der flyver ned til indgangen. Slå fra for at fjerne den." />
+        </Group>
+      )}
+      <p className={small}>Hvordan touren starter (forside, velkomst, helt enkel eller direkte ind) vælges under Layout. Her er teksterne og billederne.</p>
 
       {style === "cover" && cover && (
         <Group title="Forsiden">
