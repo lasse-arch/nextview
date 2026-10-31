@@ -1359,7 +1359,7 @@ function TourExperience({
 
   function chooseWelcome(go: WelcomeGo | "last" | "skip", label: string) {
     // A tile that goes into the tour, tapped before Matterport is ready: the welcome closes, and it waits for the tour.
-    if (!tourReady() && go !== "skip" && !("href" in (go as object)) && !("drone" in (go as object)) && phaseRef.current !== "drone") {
+    if (!tourReady() && go !== "skip" && !("href" in (go as object)) && !("drone" in (go as object)) && !("menu" in (go as object)) && phaseRef.current !== "drone") {
       setWelcome(false);
       return void holdUntilReady(() => chooseWelcome(go, label));
     }
@@ -1383,6 +1383,12 @@ function TourExperience({
     }
     if ("guide" in go) return startGuide("welcome", go.guide === true ? null : go.guide);
     if ("day" in go) return openDay("welcome");
+    // The menu, opened on one group.
+    if ("menu" in go) {
+      setOpenGroup(go.menu || null);
+      setMenuOpen(true);
+      return;
+    }
     // A tour without a drone scene or map: the menu instead, so the tile still leads somewhere.
     if (!OV) {
       setMenuOpen(true);

@@ -16,8 +16,8 @@ export type PanoCopies = { phone: string; computer: string };
 
 /** Where the drone picture looks (set from the editor's preview). */
 export type DroneView = { yaw: number; pitch: number; hfov: number };
-/** `view`: a tile to the drone picture can turn it to its own spot, per device - else the start view. */
-export type WelcomeGo = { drone: string | null; view?: { desktop?: DroneView; mobile?: DroneView } } | { room: string; name: string } | { href: string } | { guide: true | string } | { day: true };
+/** `view`: a tile to the drone picture can turn it to its own spot, per device - else the start view. `menu`: opens the menu on that group (by its title; the side menu opens the group, other menus just open). */
+export type WelcomeGo = { drone: string | null; view?: { desktop?: DroneView; mobile?: DroneView } } | { room: string; name: string } | { href: string } | { guide: true | string } | { day: true } | { menu: string };
 
 /** One guided tour ("Vis mig rundt"): its stops and how it runs. */
 export type GuideSetup = {

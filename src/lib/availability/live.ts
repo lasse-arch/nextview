@@ -117,7 +117,7 @@ export function readUnits(text: string, spec: Pick<LiveSpec, "pattern" | "flags"
     const name = clean(g.name);
     if (!name || seen.has(name)) continue;
     seen.add(name);
-    units.push({ name, size: clean(g.size), price: clean(g.price), from: clean(g.from), link: g.link?.trim() || undefined });
+    units.push({ name, size: clean(g.size), price: clean(g.price), from: clean(g.from), link: cleanLink(g.link) });
     if (units.length >= 300) break;
   }
   return units;
@@ -133,5 +133,21 @@ export async function fetchLiveUnits(spec: LiveSpec): Promise<LiveUnit[]> {
     return readUnits(await pageAsText(spec.url, refreshSeconds(spec)), spec).filter((u) => !exclude.has(u.name));
   } catch {
     return [];
+  }
+}
+
+/** Ad and tracking parameters (Google, Facebook, Microsoft, Mailchimp, HubSpot …) a customer's page may carry - never passed on in the tour's links. */
+const TRACKING = /^(gclid|gbraid|wbraid|gad_source|gad_campaignid|_gl|_ga|fbclid|msclkid|mc_cid|mc_eid|_hsenc|_hsmi|igshid|yclid|dclid|srsltid|utm_[a-z]+)$/i;
+
+/** A link from the customer's page, clean: decoded and without tracking parameters (a link that isn't a full address is kept as it is). */
+function cleanLink(raw?: string): string | undefined {
+  const link = raw ? decode(raw).trim() : "";
+  if (!link) return undefined;
+  try {
+    const u = new URL(link);
+    for (const k of [...u.searchParams.keys()]) if (TRACKING.test(k)) u.searchParams.delete(k);
+    return u.toString();
+  } catch {
+    return link;
   }
 }

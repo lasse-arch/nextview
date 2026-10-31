@@ -438,7 +438,7 @@ export function StartEditor({ config, edit, slug, preview }: Props) {
               onChange={(tiles) => edit((d) => void (d.welcome!.tiles = tiles))}
               icon={["bg-[#af52de]", '<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/>']}
               title={(t) => t.title || t.place || ""}
-              subtitle={(t) => t.place ? `Fra Stederne: ${t.place}` : `${t.kicker} · ${"room" in t.go ? "sted i touren" : "guide" in t.go ? "Vis mig rundt" : "href" in t.go ? "webside" : "luftfoto"}${t.recommended ? " · anbefalet" : ""}`}
+              subtitle={(t) => t.place ? `Fra Stederne: ${t.place}` : `${t.kicker} · ${"room" in t.go ? "sted i touren" : "guide" in t.go ? "Vis mig rundt" : "href" in t.go ? "webside" : "menu" in t.go ? "menu-gruppe" : "luftfoto"}${t.recommended ? " · anbefalet" : ""}`}
               empty="Ingen fliser endnu."
               editor={(t, set) => (
                 <>
@@ -488,10 +488,10 @@ export function StartEditor({ config, edit, slug, preview }: Props) {
                   <Toggle on={Boolean(t.recommended)} onChange={(on) => set({ ...t, recommended: on || undefined })} title="Anbefalet" hint='Får et "Anbefalet"-mærke.' />
                   <Field title="Fører til">
                     <Choice
-                      value={"room" in t.go ? "room" : "guide" in t.go ? "guide" : "day" in t.go ? "day" : "href" in t.go ? "href" : "drone"}
-                      options={[["room", "Sted"], ["guide", "Rundvisning"], ...(config.day ? ([["day", "Dagen"]] as [string, string][]) : []), ["href", "Webside"], ...(config.drone || config.map ? ([["drone", "Luftfoto"]] as ["drone", string][]) : [])] as [string, string][]}
+                      value={"room" in t.go ? "room" : "guide" in t.go ? "guide" : "day" in t.go ? "day" : "href" in t.go ? "href" : "menu" in t.go ? "menu" : "drone"}
+                      options={[["room", "Sted"], ["guide", "Rundvisning"], ...(config.day ? ([["day", "Dagen"]] as [string, string][]) : []), ["menu", "Menu-gruppe"], ["href", "Webside"], ...(config.drone || config.map ? ([["drone", "Luftfoto"]] as ["drone", string][]) : [])] as [string, string][]}
                       onChange={(v) => {
-                        const go: WelcomeGo = v === "room" ? { room: "", name: t.title } : v === "guide" ? { guide: true } : v === "day" ? { day: true } : v === "href" ? { href: "https://" } : { drone: null };
+                        const go: WelcomeGo = v === "room" ? { room: "", name: t.title } : v === "guide" ? { guide: true } : v === "day" ? { day: true } : v === "href" ? { href: "https://" } : v === "menu" ? { menu: config.menu.find((m) => "items" in m)?.title ?? "" } : { drone: null };
                         set({ ...t, go });
                       }}
                     />
@@ -508,6 +508,16 @@ export function StartEditor({ config, edit, slug, preview }: Props) {
                   )}
                   {"room" in t.go && !t.place && <PlacePicker href={t.go.room} name={t.title} preview={preview} onChange={(href) => set({ ...t, go: { room: href, name: t.title } })} />}
                   {"href" in t.go && <LinkInput className="bg-white" value={t.go.href} onChange={(href) => set({ ...t, go: { href } })} />}
+                  {"menu" in t.go && (
+                    <select className={`${input} bg-white`} value={t.go.menu} onChange={(e) => set({ ...t, go: { menu: e.target.value } })}>
+                      <option value="">Bare menuen</option>
+                      {config.menu.flatMap((m) => ("items" in m ? [m.title] : [])).map((g) => (
+                        <option key={g} value={g}>
+                          {g}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                   {"drone" in t.go && <DroneViewPicker views={t.go.view} preview={preview} onChange={(view) => set({ ...t, go: { drone: (t.go as { drone: string | null }).drone, view } })} />}
                 </>
               )}
