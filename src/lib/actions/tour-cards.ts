@@ -81,7 +81,7 @@ Skriv ét stedkort til hvert sted ovenfor.`,
       model: "claude-opus-5-5",
       max_tokens: 12000,
       system: `Du er nextviewAI og skriver stedkort til en virtuel 360°-tour: et lille kort, der kommer frem, når den besøgende lander et bestemt sted.
-- Skriv i kundens stemme til målgruppen (du/I), varmt og konkret - som kundens bedste sælger ville sige det, mens man står der.
+- Skriv i kundens stemme til målgruppen, varmt og konkret - som kundens bedste sælger ville sige det, mens man står der. Ram hjemmesidens tone: samme ordvalg, samme tiltale (du/I/De), samme stemning og deres egne navne for stederne, så kortet lyder, som om de selv har skrevet det.
 - Overskriften er 2-5 ord. Teksten 1-3 korte sætninger: hvad stedet er, og hvorfor det er godt for den besøgende. Brug kundens egne fakta fra hjemmesiden om netop dette sted. Opfind aldrig priser, antal, tider eller navne.
 - Kun en "Læs mere"-side, hvis hjemmesiden har mere at fortælle om stedet. Hovedhandlingen som knap kun dér, hvor lysten opstår (fx værelset, restaurantens sal, et ledigt rum).
 - Skriv som et menneske: aldrig "·", "—", "–" eller "|" mellem ord.
