@@ -1,4 +1,5 @@
 import "server-only";
+import { elevenLabsKey } from "@/lib/elevenlabs";
 import { prisma } from "@/lib/db";
 import { backups } from "@/lib/backup";
 import { isDineroConfigured, pingDinero } from "@/lib/dinero";
@@ -80,11 +81,21 @@ export async function healthChecks(): Promise<CheckGroup[]> {
       return domain.status === "verified" ? { status: "ok", detail: "nextview360.dk godkendt - mails sendes via Resend" } : { status: "warn", detail: `nextview360.dk er ikke godkendt endnu (${domain.status}) - tjek DNS-posterne` };
     }),
     timed("ElevenLabs (stemme i Vis mig rundt)", async () => {
-      const key = process.env.ELEVENLABS_API_KEY;
+      const key = elevenLabsKey();
       if (!key) return { status: "off", detail: "Ikke sat op - lyd kan stadig uploades som fil" };
       const res = await fetch("https://api.elevenlabs.io/v1/voices", { headers: { "xi-api-key": key }, cache: "no-store", signal: AbortSignal.timeout(LIMIT_MS) }).catch(() => null);
       if (!res) return { status: "warn", detail: "Kunne ikke nå ElevenLabs lige nu" };
-      if (res.status === 401 || res.status === 403) return { status: "down", detail: `ElevenLabs afviser nøglen (${res.status}) - den skal have Voices: Read og Text to Speech` };
+      if (res.status === 401 || res.status === 403) {
+        // ElevenLabs' own reason (never the key): a wrong key, or one without the access it needs.
+        const body = (await res.json().catch(() => null)) as { detail?: { status?: string; message?: string } | string } | null;
+        const why = typeof body?.detail === "string" ? body.detail : `${body?.detail?.status ?? ""} ${body?.detail?.message ?? ""}`.trim();
+        const hint = /permission/i.test(why)
+          ? "Nøglen mangler adgang: giv den Text to Speech og Voices: Read i ElevenLabs"
+          : /invalid|api.?key/i.test(why)
+            ? "Nøglen findes ikke hos ElevenLabs: lav en ny, og læg den i Vercel"
+            : "ElevenLabs afviser nøglen";
+        return { status: "down", detail: `${hint} (${res.status}${why ? `: ${why.slice(0, 140)}` : ""})` };
+      }
       return res.ok ? { status: "ok", detail: "Forbundet" } : { status: "warn", detail: `ElevenLabs svarede ${res.status}` };
     }),
     timed("Dinero (fakturaer)", async () => {

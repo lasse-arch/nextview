@@ -13,10 +13,15 @@ const MODEL = "eleven_multilingual_v2";
 export const VOICE_ID = /^[A-Za-z0-9]{8,40}$/;
 export const MAX_CHARS = 2500;
 
-export const elevenLabsReady = () => Boolean(process.env.ELEVENLABS_API_KEY);
+/** The key as pasted in Vercel - without the spaces, line breaks or quotes that easily come along when it's copied. */
+export function elevenLabsKey(): string | null {
+  const k = (process.env.ELEVENLABS_API_KEY ?? "").trim().replace(/^["']|["']$/g, "").trim();
+  return k || null;
+}
+export const elevenLabsReady = () => Boolean(elevenLabsKey());
 
 function key(): string {
-  const k = process.env.ELEVENLABS_API_KEY;
+  const k = elevenLabsKey();
   if (!k) throw new Error("ElevenLabs er ikke sat op: læg ELEVENLABS_API_KEY i Vercel (en nøgle med adgang til Text to Speech og Voices: Read).");
   return k;
 }
