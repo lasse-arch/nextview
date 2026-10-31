@@ -26,6 +26,8 @@ export function mergeStats(all: TourStats[]): TourStats | null {
     }
   return {
     days: Math.max(...all.map((s) => s.days)),
+    from: all[0]?.from ?? null,
+    to: all[0]?.to ?? null,
     visits,
     engaged: all.reduce((n, s) => n + s.engaged, 0),
     leads: all.reduce((n, s) => n + s.leads, 0),

@@ -3,7 +3,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getSettingValue } from "@/lib/integration-settings";
 import { blobReady } from "@/lib/tour-files";
-import { tourStats } from "@/lib/tour-stats";
+import { addDays, todayDK, tourStats } from "@/lib/tour-stats";
 import { shareOf } from "@/lib/tour-share";
 import { ensureToursSeeded } from "@/lib/tours";
 import type { TourConfig } from "../../tours/types";
@@ -52,7 +52,8 @@ export default async function TourEditPage({ params, searchParams }: { params: P
     prisma.tourAiUsage.aggregate({ where: { tourSlug: tour.slug }, _sum: { costUsd: true }, _count: true }),
     modelId ? fetchScanMap(modelId) : Promise.resolve(null),
   ]);
-  const stats = await tourStats(tour.slug);
+  // Resultater opens on the last 7 days (today included) - another period is picked there.
+  const stats = await tourStats(tour.slug, { from: addDays(todayDK(), -6), to: todayDK() });
   const share = shareOf(tour.share);
   const economy: TourEconomy = {
     filmingMinutes: tour.deal ? (await filmingTime(tour.deal)).minutes : null,
@@ -69,7 +70,7 @@ export default async function TourEditPage({ params, searchParams }: { params: P
       deal={tour.deal ? { id: tour.deal.id, name: tour.deal.displayName ?? tour.deal.companyName } : null}
       stats={stats}
       share={share}
-      shareStats={share.days === 30 ? stats : await tourStats(tour.slug, share.days)}
+      shareStats={await tourStats(tour.slug, share.days)}
       shareToken={tour.shareToken}
       blob={blobReady()}
       published={tour.published}

@@ -4,6 +4,8 @@ import { portalUrl } from "@/lib/public-urls";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { setTourShare, tourShareLink } from "@/lib/actions/tours";
+import { tourStatsForPeriod } from "@/lib/actions/tour-period-stats";
+import { DateRangePicker, periodText, presetName, type Period } from "@/components/date-range-picker";
 import type { TourStats } from "@/lib/tour-stats";
 import { shown, type ReportShare, type ShareWhen } from "@/lib/tour-share";
 import { CustomerReport } from "./customer-report";
@@ -54,7 +56,7 @@ type ShareProps = { slug: string; brand: string; share: ReportShare; shareStats:
 export function ResultsPanel({ stats, guideStops = [], guideNames = {}, ...shareProps }: { stats: TourStats; /** The guide's stops' titles, in order (to name the stop people left at). */ guideStops?: string[]; /** Each guided tour's name by its link ("#rundvisning…"). */ guideNames?: Record<string, string> } & ShareProps) {
   return (
     <>
-      <OurNumbers stats={stats} guideStops={guideStops} guideNames={guideNames} />
+      <OurNumbers slug={shareProps.slug} initial={stats} guideStops={guideStops} guideNames={guideNames} />
       <ShareSettings {...shareProps} />
     </>
   );
@@ -156,26 +158,52 @@ function ShareSettings({ slug, brand, share: initial, shareStats, token: initial
   );
 }
 
-function OurNumbers({ stats, guideStops, guideNames }: { stats: TourStats; guideStops: string[]; guideNames: Record<string, string> }) {
+function OurNumbers({ slug, initial, guideStops, guideNames }: { slug: string; initial: TourStats; guideStops: string[]; guideNames: Record<string, string> }) {
   const [hover, setHover] = useState<number | null>(null);
+  // The period: the last 7 days to begin with (what the page loaded), any other picked above the numbers.
+  const [stats, setStats] = useState(initial);
+  const [period, setPeriod] = useState<Period>({ preset: "7", from: initial.from ?? initial.perDay[0]?.day ?? "", to: initial.to ?? initial.perDay.at(-1)?.day ?? "" });
+  const [loading, startLoading] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const choose = (p: Period) => {
+    setPeriod(p);
+    setError(null);
+    startLoading(async () => {
+      const r = await tourStatsForPeriod(slug, p.from, p.to);
+      if (r.ok) setStats(r.stats);
+      else setError(r.error);
+    });
+  };
+  const picker = (
+    <div className="space-y-1">
+      <DateRangePicker value={period} onChange={choose} disabled={loading} />
+      {error && <p className="px-1 text-[12px] text-[#ff3b30]">{error}</p>}
+    </div>
+  );
   const max = Math.max(1, ...stats.perDay.map((d) => d.visits));
   const conversion = stats.visits ? stats.leads / stats.visits : 0;
   const shown = hover != null ? stats.perDay[hover] : null;
 
   if (!stats.visits)
     return (
+      <>
+      {picker}
       <Group>
         <p className="text-[15px] font-medium">Ingen besøg endnu</p>
         <p className="text-[13px] leading-snug text-[#6e6e73]">
-          Touren tæller selv besøg, klik på booking og kontakt, og hvad folk kigger på. Tallene kommer her, så snart touren bliver brugt (besøg fra forhåndsvisningen her tæller ikke med).
+          {period.preset === "7" ? "" : `Ingen besøg i perioden (${periodText(period)}). `}Touren tæller selv besøg, klik på booking og kontakt, og hvad folk kigger på. Tallene kommer her, så snart touren bliver brugt (besøg fra forhåndsvisningen her tæller ikke med).
         </p>
       </Group>
+      </>
     );
 
   return (
-    <>
+    <div className={`space-y-5 transition-opacity ${loading ? "opacity-50" : ""}`}>
+      {picker}
       <Group>
-        <div className="text-[13px] font-medium text-[#6e6e73]">Seneste {stats.days} dage</div>
+        <div className="text-[13px] font-medium text-[#6e6e73]">
+          {presetName(period.preset)} · {periodText(period)}
+        </div>
         <div>
           <div className="text-[44px] font-semibold leading-none tracking-tight tabular-nums">{stats.leads}</div>
           <p className="mt-1 text-[15px] leading-snug">
@@ -207,7 +235,7 @@ function OurNumbers({ stats, guideStops, guideNames }: { stats: TourStats; guide
         </div>
         <div className="flex justify-between border-t border-black/[.06] pt-1 text-[11px] text-[#8e8e93]">
           <span>{dayLabel(stats.perDay[0].day)}</span>
-          <span>I dag</span>
+          <span>{stats.perDay.at(-1)?.day === new Date().toISOString().slice(0, 10) ? "I dag" : dayLabel(stats.perDay.at(-1)?.day ?? stats.perDay[0].day)}</span>
         </div>
       </Group>
 
@@ -288,6 +316,6 @@ function OurNumbers({ stats, guideStops, guideNames }: { stats: TourStats; guide
       <Group title="Kom fra">
         <Ranked rows={stats.sources} empty="-" />
       </Group>
-    </>
+    </div>
   );
 }

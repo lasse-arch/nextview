@@ -24,6 +24,9 @@ const ENGAGED = `(bool_or(name = 'tour_use') OR (NOT bool_or(name = 'tour_embed'
 
 export type TourStats = {
   days: number;
+  /** The chosen period ("YYYY-MM-DD", both included) - null for "the last `days` days". */
+  from: string | null;
+  to: string | null;
   visits: number;
   engaged: number;
   leads: number;
@@ -48,8 +51,37 @@ export type TourStats = {
   guide: { started: number; completed: number; leftAt: { stop: number; count: number }[]; leftFor: { label: string; count: number }[]; byGuide?: { guide: string; started: number; completed: number }[] };
 };
 
-export async function tourStats(slug: string, days = 30): Promise<TourStats> {
-  const since = new Date(Date.now() - days * 86_400_000);
+/** A chosen period, as days "YYYY-MM-DD" (both included). */
+export type StatsRange = { from: string; to: string };
+
+const YMD = /^\d{4}-\d{2}-\d{2}$/;
+export const isYmd = (s: unknown): s is string => typeof s === "string" && YMD.test(s) && !Number.isNaN(Date.parse(`${s}T12:00:00Z`));
+
+/** Today in Denmark, "YYYY-MM-DD". */
+export const todayDK = () => new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Copenhagen" }).format(new Date());
+
+/** A day plus n days, as "YYYY-MM-DD". */
+export function addDays(ymd: string, n: number): string {
+  const d = new Date(`${ymd}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Midnight at the start of a day in Danish time (summer or winter). */
+function dayStart(ymd: string): Date {
+  const noon = new Date(`${ymd}T12:00:00Z`);
+  const off = new Intl.DateTimeFormat("en-US", { timeZone: "Europe/Copenhagen", timeZoneName: "shortOffset" }).formatToParts(noon).find((p) => p.type === "timeZoneName")?.value ?? "GMT+1";
+  const hours = Number(/GMT([+-]\d+)/.exec(off)?.[1] ?? 1);
+  return new Date(Date.parse(`${ymd}T00:00:00Z`) - hours * 3_600_000);
+}
+
+export async function tourStats(slug: string, range: number | StatsRange = 30): Promise<TourStats> {
+  // The last N days up to now, or a chosen period: from the start of its first day to the end of its last (Danish time).
+  const span = typeof range === "number" ? null : range;
+  const last = typeof range === "number" ? range : 0;
+  const since = span ? dayStart(span.from) : new Date(Date.now() - last * 86_400_000);
+  const until = span ? dayStart(addDays(span.to, 1)) : new Date(Date.now() + 60_000);
+  const days = span ? Math.round((Date.parse(`${addDays(span.to, 1)}T12:00:00Z`) - Date.parse(`${span.from}T12:00:00Z`)) / 86_400_000) : last;
   const [sessions, perDay, actions, places, sources, liveFunnel, liveUnits, menuOpened, menuGroups, rooms, roomTime, opened] = await Promise.all([
     prisma.$queryRawUnsafe<{ visits: bigint; engaged: bigint; leads: bigint; median: number | null; mobile: bigint }[]>(
       `WITH s AS (
@@ -59,63 +91,70 @@ export async function tourStats(slug: string, days = 30): Promise<TourStats> {
                 bool_or(${ACTION}) AS lead,
                 LEAST(EXTRACT(EPOCH FROM max("createdAt") - min("createdAt")), 1800) AS secs, -- a tab left open isn't a 3-hour visit
                 bool_or(device = 'mobil') AS mobile
-         FROM "TourEvent" WHERE "tourSlug" = $1 AND "createdAt" >= $2 GROUP BY session)
+         FROM "TourEvent" WHERE "tourSlug" = $1 AND "createdAt" >= $2 AND "createdAt" < $3 GROUP BY session)
        SELECT count(*) AS visits, count(*) FILTER (WHERE engaged) AS engaged, count(*) FILTER (WHERE lead) AS leads,
               percentile_cont(0.5) WITHIN GROUP (ORDER BY secs) AS median, count(*) FILTER (WHERE mobile) AS mobile FROM s WHERE shown`,
       slug,
-      since
+      since,
+      until
     ),
     prisma.$queryRawUnsafe<{ day: Date; visits: bigint; leads: bigint }[]>(
-      `WITH s AS (SELECT session FROM "TourEvent" WHERE "tourSlug" = $1 AND "createdAt" >= $2 GROUP BY session HAVING ${SHOWN})
+      `WITH s AS (SELECT session FROM "TourEvent" WHERE "tourSlug" = $1 AND "createdAt" >= $2 AND "createdAt" < $3 GROUP BY session HAVING ${SHOWN})
        SELECT date_trunc('day', e."createdAt" AT TIME ZONE 'Europe/Copenhagen') AS day,
               count(DISTINCT e.session) AS visits, count(DISTINCT e.session) FILTER (WHERE ${ACTION}) AS leads
-       FROM "TourEvent" e JOIN s ON s.session = e.session WHERE e."tourSlug" = $1 AND e."createdAt" >= $2 GROUP BY 1 ORDER BY 1`,
+       FROM "TourEvent" e JOIN s ON s.session = e.session WHERE e."tourSlug" = $1 AND e."createdAt" >= $2 AND e."createdAt" < $3 GROUP BY 1 ORDER BY 1`,
       slug,
-      since
+      since,
+      until
     ),
-    top(slug, since, `${ACTION}`),
-    top(slug, since, `name IN ('menu_click','place_click')`),
-    top(slug, since, `name = 'tour_open'`),
+    top(slug, since, until, `${ACTION}`),
+    top(slug, since, until, `name IN ('menu_click','place_click')`),
+    top(slug, since, until, `name = 'tour_open'`),
     prisma.$queryRawUnsafe<{ seen: bigint; opened: bigint; viewed: bigint; booked: bigint }[]>(
       `SELECT count(DISTINCT session) FILTER (WHERE name = 'live_seen') AS seen, count(DISTINCT session) FILTER (WHERE name = 'live_open') AS opened,
               count(DISTINCT session) FILTER (WHERE name = 'live_view') AS viewed, count(DISTINCT session) FILTER (WHERE name = 'live_book') AS booked
-       FROM "TourEvent" WHERE "tourSlug" = $1 AND "createdAt" >= $2 AND name LIKE 'live_%'`,
+       FROM "TourEvent" WHERE "tourSlug" = $1 AND "createdAt" >= $2 AND "createdAt" < $3 AND name LIKE 'live_%'`,
       slug,
-      since
+      since,
+      until
     ),
-    top(slug, since, `name = 'live_book'`),
-    prisma.$queryRawUnsafe<{ n: bigint }[]>(`SELECT count(DISTINCT session) AS n FROM "TourEvent" WHERE "tourSlug" = $1 AND "createdAt" >= $2 AND name = 'menu_open'`, slug, since),
-    top(slug, since, `name = 'menu_group_open'`),
-    top(slug, since, `name = 'room_view' AND label IS NOT NULL AND label <> '(uden navn)'`),
+    top(slug, since, until, `name = 'live_book'`),
+    prisma.$queryRawUnsafe<{ n: bigint }[]>(`SELECT count(DISTINCT session) AS n FROM "TourEvent" WHERE "tourSlug" = $1 AND "createdAt" >= $2 AND "createdAt" < $3 AND name = 'menu_open'`, slug, since, until),
+    top(slug, since, until, `name = 'menu_group_open'`),
+    top(slug, since, until, `name = 'room_view' AND label IS NOT NULL AND label <> '(uden navn)'`),
     prisma.$queryRawUnsafe<{ label: string; seconds: number; count: bigint }[]>(
       `SELECT label, percentile_cont(0.5) WITHIN GROUP (ORDER BY value) AS seconds, count(DISTINCT session) AS count FROM "TourEvent"
-       WHERE "tourSlug" = $1 AND "createdAt" >= $2 AND name = 'room_time' AND value IS NOT NULL AND value >= 2 AND label IS NOT NULL
+       WHERE "tourSlug" = $1 AND "createdAt" >= $2 AND "createdAt" < $3 AND name = 'room_time' AND value IS NOT NULL AND value >= 2 AND label IS NOT NULL
        GROUP BY label HAVING count(DISTINCT session) >= 3 ORDER BY seconds DESC LIMIT 8`,
       slug,
-      since
+      since,
+      until
     ),
-    top(slug, since, `name IN ('drone_point_click','info_open','place_card_view','pano_open') AND label IS NOT NULL`),
+    top(slug, since, until, `name IN ('drone_point_click','info_open','place_card_view','pano_open') AND label IS NOT NULL`),
   ]);
   const [guideRuns, guideLeftAt, guideLeftFor, byGuide] = await Promise.all([
     prisma.$queryRawUnsafe<{ started: bigint; completed: bigint }[]>(
       `SELECT count(DISTINCT session) FILTER (WHERE name = 'guide_start') AS started, count(DISTINCT session) FILTER (WHERE name = 'guide_complete') AS completed
-       FROM "TourEvent" WHERE "tourSlug" = $1 AND "createdAt" >= $2 AND name IN ('guide_start', 'guide_complete')`,
+       FROM "TourEvent" WHERE "tourSlug" = $1 AND "createdAt" >= $2 AND "createdAt" < $3 AND name IN ('guide_start', 'guide_complete')`,
       slug,
-      since
+      since,
+      until
     ),
     prisma.$queryRawUnsafe<{ stop: number; count: bigint }[]>(
       `SELECT value AS stop, count(DISTINCT session) AS count FROM "TourEvent"
-       WHERE "tourSlug" = $1 AND "createdAt" >= $2 AND name = 'guide_leave' AND value IS NOT NULL AND (url IS NULL OR url = '#rundvisning') GROUP BY value ORDER BY value LIMIT 40`,
+       WHERE "tourSlug" = $1 AND "createdAt" >= $2 AND "createdAt" < $3 AND name = 'guide_leave' AND value IS NOT NULL AND (url IS NULL OR url = '#rundvisning') GROUP BY value ORDER BY value LIMIT 40`,
       slug,
-      since
+      since,
+      until
     ),
-    top(slug, since, `name = 'guide_leave' AND (url IS NULL OR url = '#rundvisning')`),
+    top(slug, since, until, `name = 'guide_leave' AND (url IS NULL OR url = '#rundvisning')`),
     // Each guided tour by its link (events from before there were more have none: the main one).
     prisma.$queryRawUnsafe<{ guide: string; started: bigint; completed: bigint }[]>(
       `SELECT COALESCE(url, '#rundvisning') AS guide, count(DISTINCT session) FILTER (WHERE name = 'guide_start') AS started, count(DISTINCT session) FILTER (WHERE name = 'guide_complete') AS completed
-       FROM "TourEvent" WHERE "tourSlug" = $1 AND "createdAt" >= $2 AND name IN ('guide_start', 'guide_complete') GROUP BY 1 ORDER BY 2 DESC LIMIT 20`,
+       FROM "TourEvent" WHERE "tourSlug" = $1 AND "createdAt" >= $2 AND "createdAt" < $3 AND name IN ('guide_start', 'guide_complete') GROUP BY 1 ORDER BY 2 DESC LIMIT 20`,
       slug,
-      since
+      since,
+      until
     ),
   ]);
   const s = sessions[0];
@@ -128,8 +167,10 @@ export async function tourStats(slug: string, days = 30): Promise<TourStats> {
     leads: Number(s?.leads ?? 0),
     medianSeconds: Math.round(s?.median ?? 0),
     mobileShare: visits ? Number(s.mobile) / visits : 0,
+    from: span?.from ?? null,
+    to: span?.to ?? null,
     perDay: Array.from({ length: days }, (_, i) => {
-      const day = new Date(Date.now() - (days - 1 - i) * 86_400_000).toISOString().slice(0, 10);
+      const day = span ? addDays(span.from, i) : new Date(Date.now() - (days - 1 - i) * 86_400_000).toISOString().slice(0, 10);
       const d = byDay.get(day);
       return { day, visits: Number(d?.visits ?? 0), leads: Number(d?.leads ?? 0) };
     }),
@@ -157,12 +198,13 @@ export async function tourStats(slug: string, days = 30): Promise<TourStats> {
   };
 }
 
-async function top(slug: string, since: Date, where: string) {
+async function top(slug: string, since: Date, until: Date, where: string) {
   const rows = await prisma.$queryRawUnsafe<{ label: string | null; count: bigint }[]>(
     `SELECT label, count(DISTINCT session) AS count FROM "TourEvent"
-     WHERE "tourSlug" = $1 AND "createdAt" >= $2 AND ${where} GROUP BY label ORDER BY count DESC LIMIT 8`,
+     WHERE "tourSlug" = $1 AND "createdAt" >= $2 AND "createdAt" < $3 AND ${where} GROUP BY label ORDER BY count DESC LIMIT 8`,
     slug,
-    since
+    since,
+    until
   );
   return rows.map((r) => ({ label: r.label ?? "(uden navn)", count: Number(r.count) }));
 }
