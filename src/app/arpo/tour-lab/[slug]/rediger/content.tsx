@@ -8,7 +8,7 @@ import { AiImageButton, AiImageList } from "./ai-image";
 import { writePlaceCards, type CardDraft } from "@/lib/actions/tour-cards";
 import { useEffect, useState } from "react";
 import { saveTourStoryImage } from "@/lib/actions/tour-lab";
-import type { DroneView, GuideTurn, GuideTurnSpeed, PlaceCard, TourConfig, TourInfo, TourPlace, WelcomeGo } from "../../tours/types";
+import type { DroneView, GuideTurn, GuideTurnMode, GuideTurnSpeed, PlaceCard, TourConfig, TourInfo, TourPlace, WelcomeGo } from "../../tours/types";
 import type { DroneViews } from "../../tours/places";
 import type { ScanMap } from "@/lib/matterport-graph";
 import { ScanPointPicker } from "./scanpoints";
@@ -919,16 +919,21 @@ function GuideSetupEditor({ config, edit, preview, onEditPoint }: Omit<Props, "s
           <Field title="Ved hvert stop">
             <Choice value={config.guide?.turn ?? "as"} options={turnOptions} onChange={(v) => edit((d) => void (d.guide = { ...d.guide!, turn: v === "as" ? undefined : (v as GuideTurn) }))} />
             {config.guide?.turn !== "none" && (
-              <Choice<"once" | "continuous">
+              <Choice<"once" | "round" | "continuous">
                 value={config.guide?.turnMode ?? "once"}
                 options={[
-                  ["once", "Én kort drejning"],
-                  ["continuous", "Drejer hele tiden"],
+                  ["once", "Kort drejning"],
+                  ["round", "Hele vejen rundt"],
+                  ["continuous", "Hele tiden"],
                 ]}
-                onChange={(v) => edit((d) => void (d.guide = { ...d.guide!, turnMode: v === "continuous" ? "continuous" : undefined }))}
+                onChange={(v) => edit((d) => void (d.guide = { ...d.guide!, turnMode: v === "once" ? undefined : v }))}
               />
             )}
-            {config.guide?.turnMode === "continuous" && config.guide?.turn !== "none" && <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">Drejer jævnt, til næste stop - og stopper, så snart gæsten selv rører touren (rundvisningen venter så på Fortsæt).</p>}
+            {config.guide?.turnMode && config.guide?.turn !== "none" && (
+              <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">
+                {config.guide.turnMode === "round" ? "Drejer jævnt én gang hele vejen rundt ved hvert stop og står så stille." : "Drejer jævnt, til næste stop."} Stopper, så snart gæsten selv rører touren (rundvisningen venter så på Fortsæt).
+              </p>
+            )}
             {config.guide?.turn !== "none" && <p className="px-1 pt-1 text-[12px] text-[#8e8e93]">Hastighed - for alle stop (et stop kan få sin egen under ⚙)</p>}
             {config.guide?.turn !== "none" && <Choice value={config.guide?.turnSpeed ?? "normal"} options={speedOptions} onChange={(v) => edit((d) => void (d.guide = { ...d.guide!, turnSpeed: v === "normal" ? undefined : (v as GuideTurnSpeed) }))} />}
           </Field>
@@ -1057,7 +1062,7 @@ function GuideSetupEditor({ config, edit, preview, onEditPoint }: Omit<Props, "s
               <>
                 <PointStop config={config} id={s.point} edit={edit} onEdit={onEditPoint} preview={preview} />
                 <Field title="Drejning ved stoppet" hint="Hvilken vej og hvor hurtigt billedet drejer rundt, mens stoppet vises.">
-                  <StopTurn turn={s.turn} speed={s.turnSpeed} still={(s.turn ?? config.guide?.turn) === "none"} turnOptions={turnOptions} speedOptions={speedOptions} onChange={(turn, turnSpeed) => set({ ...s, turn, turnSpeed })} />
+                  <StopTurn turn={s.turn} speed={s.turnSpeed} mode={s.turnMode} still={(s.turn ?? config.guide?.turn) === "none"} turnOptions={turnOptions} speedOptions={speedOptions} onChange={(turn, turnSpeed, turnMode) => set({ ...s, turn, turnSpeed, turnMode })} />
                 </Field>
               </>
             ) : (
@@ -1086,7 +1091,7 @@ function GuideSetupEditor({ config, edit, preview, onEditPoint }: Omit<Props, "s
                 {!imageOfHref(s.href) && <StopPicture config={config} url={null} onChange={(url) => url && set({ ...s, href: IMAGE_HREF + url })} />}
                 {s.href && !imageOfHref(s.href) && (
                   <Field title="Drejning ved stoppet" hint="Hvilken vej og hvor hurtigt billedet drejer rundt, mens stoppet vises.">
-                    <StopTurn turn={s.turn} speed={s.turnSpeed} still={(s.turn ?? config.guide?.turn) === "none"} turnOptions={turnOptions} speedOptions={speedOptions} onChange={(turn, turnSpeed) => set({ ...s, turn, turnSpeed })} />
+                    <StopTurn turn={s.turn} speed={s.turnSpeed} mode={s.turnMode} still={(s.turn ?? config.guide?.turn) === "none"} turnOptions={turnOptions} speedOptions={speedOptions} onChange={(turn, turnSpeed, turnMode) => set({ ...s, turn, turnSpeed, turnMode })} />
                   </Field>
                 )}
                 <Field title="Egen knap (valgfri)" hint="Fx &quot;Se alle linjer&quot; til jeres side om linjerne. På det sidste stop står den i stedet for tourens hovedknap.">
@@ -1615,6 +1620,7 @@ function MenuPlace({ value, onChange, link }: { value: "bottom" | false | undefi
 function StopTurn({
   turn,
   speed,
+  mode,
   still,
   turnOptions,
   speedOptions,
@@ -1622,24 +1628,36 @@ function StopTurn({
 }: {
   turn?: GuideTurn;
   speed?: GuideTurnSpeed;
+  mode?: GuideTurnMode;
   still: boolean;
   turnOptions: [string, string][];
   speedOptions: [string, string][];
-  onChange: (turn: GuideTurn | undefined, speed: GuideTurnSpeed | undefined) => void;
+  onChange: (turn: GuideTurn | undefined, speed: GuideTurnSpeed | undefined, mode: GuideTurnMode | undefined) => void;
 }) {
-  const [open, setOpen] = useState(Boolean(speed));
+  const [open, setOpen] = useState(Boolean(speed || mode));
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-1.5">
         <div className="min-w-0 flex-1">
-          <Choice value={turn ?? ""} options={[["", "Som de andre"], ...turnOptions]} onChange={(v) => onChange(v ? (v as GuideTurn) : undefined, speed)} />
+          <Choice value={turn ?? ""} options={[["", "Som de andre"], ...turnOptions]} onChange={(v) => onChange(v ? (v as GuideTurn) : undefined, speed, mode)} />
         </div>
-        {!still && <GearButton open={open} onClick={() => setOpen(!open)} changed={Boolean(speed)} title="Hastighed ved dette stop" />}
+        {!still && <GearButton open={open} onClick={() => setOpen(!open)} changed={Boolean(speed || mode)} title="Hvor længe og hvor hurtigt ved dette stop" />}
       </div>
       {open && !still && (
         <div className="space-y-1">
-          <p className="px-1 text-[12px] text-[#8e8e93]">Hastighed ved dette stop</p>
-          <Choice value={speed ?? ""} options={[["", "Som de andre"], ...speedOptions]} onChange={(v) => onChange(turn, v ? (v as GuideTurnSpeed) : undefined)} />
+          <p className="px-1 text-[12px] text-[#8e8e93]">Hvor længe den drejer ved dette stop</p>
+          <Choice
+            value={mode ?? ""}
+            options={[
+              ["", "Som de andre"],
+              ["once", "Kort"],
+              ["round", "Hele vejen rundt"],
+              ["continuous", "Hele tiden"],
+            ]}
+            onChange={(v) => onChange(turn, speed, v ? (v as GuideTurnMode) : undefined)}
+          />
+          <p className="px-1 pt-1 text-[12px] text-[#8e8e93]">Hastighed ved dette stop</p>
+          <Choice value={speed ?? ""} options={[["", "Som de andre"], ...speedOptions]} onChange={(v) => onChange(turn, v ? (v as GuideTurnSpeed) : undefined, mode)} />
         </div>
       )}
     </div>

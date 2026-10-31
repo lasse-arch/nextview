@@ -1610,7 +1610,7 @@ function TourExperience({
    * frames looks jerky), so it's as smooth as the screen. Stops at the next stop, when the guide closes, or the
    * moment the visitor touches, drags, scrolls (see the input watch) or the view is turned by anyone else.
    */
-  function guideTurnOn(ticket: number, dir: number, speed: number) {
+  function guideTurnOn(ticket: number, dir: number, speed: number, /** Degrees to turn in all (360 = once round), then it stands still. */ limit = Infinity) {
     const cam = sdk?.Camera;
     if (!cam?.setRotation) return;
     guideTurnDir.current = dir;
@@ -1622,6 +1622,7 @@ function TourExperience({
     let sign = dir;
     let last = 0;
     let pending = 0;
+    let turned = 0;
     const stop = () => {
       sub.cancel();
       if (ticket === guideTicket.current && guideTurnDir.current === dir) guideTurnDir.current = 0;
@@ -1639,8 +1640,13 @@ function TourExperience({
           guideHeldRef.current = true;
           setGuideHeld(true);
           return stop();
+        } else if (turned >= limit) {
+          // All the way round: it stands still now - the view is the visitor's.
+          return stop();
         } else if (pending < 2) {
-          yaw = off(yaw + sign * speed * (Math.min(100, t - last) / 1000), 0);
+          const step = Math.min(limit - turned, speed * (Math.min(100, t - last) / 1000));
+          turned += step;
+          yaw = off(yaw + sign * step, 0);
           last = t;
           pending++;
           void cam.setRotation!({ x: c.x, y: yaw }, { speed: 2000 })
@@ -1699,8 +1705,10 @@ function TourExperience({
         const speed = { slow: 1.5, normal: 3, fast: 6 }[stop.turnSpeed ?? G?.turnSpeed ?? "normal"];
         // The slow turn as it has always been - one short, smooth Matterport turn (its way and speed chosen in the
         // editor), and then the view stands still for the visitor.
-        if (G?.turnMode === "continuous" && sdk?.Camera.setRotation) {
-          guideTurnOn(ticket, dir, speed);
+        // How long it turns: the stop's own, else the guide's - one short turn when neither says.
+        const mode = stop.turnMode ?? G?.turnMode ?? "once";
+        if (mode !== "once" && sdk?.Camera.setRotation) {
+          guideTurnOn(ticket, dir, speed, mode === "round" ? 360 : Infinity);
           setTimeout(() => ticket === guideTicket.current && void guideDone(stop, ticket), 700);
           return "turning";
         }

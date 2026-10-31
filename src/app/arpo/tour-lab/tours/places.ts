@@ -1,4 +1,4 @@
-import type { DroneView, GuideTurn, GuideTurnSpeed, TourConfig } from "./types";
+import type { DroneView, GuideTurn, GuideTurnMode, GuideTurnSpeed, TourConfig } from "./types";
 
 /*
  * A spot in the tour is a link with the scan point (ss) and, if picked in
@@ -125,7 +125,7 @@ export function allGuides(T: TourConfig): { id: string | null; title: string }[]
   return [...(has(T.guide) ? [{ id: null, title: "Vis mig rundt" }] : []), ...(T.guides ?? []).filter(has).map((g) => ({ id: g.id, title: g.title }))];
 }
 
-export type GuideStop = { href: string; title: string; text: string; audio?: string; audioText?: string; short?: string; turn?: GuideTurn; turnSpeed?: GuideTurnSpeed; button?: { label: string; href: string } };
+export type GuideStop = { href: string; title: string; text: string; audio?: string; audioText?: string; short?: string; turn?: GuideTurn; turnSpeed?: GuideTurnSpeed; turnMode?: GuideTurnMode; button?: { label: string; href: string } };
 
 const sameWords = (a: string, b: string) => a.replace(/\s+/g, " ").trim() === b.replace(/\s+/g, " ").trim();
 /**
@@ -169,7 +169,7 @@ export function guideStops(T: TourConfig, guideId: string | null = null): GuideS
     if (!("point" in s)) return [s];
     const p = T.points.find((x) => x.id === s.point);
     // A point without a room is shown on the drone scene / map itself.
-    return p ? [{ href: p.tour ?? `#punkt:${p.id}`, title: p.name, text: p.text, turn: s.turn, turnSpeed: s.turnSpeed }] : [];
+    return p ? [{ href: p.tour ?? `#punkt:${p.id}`, title: p.name, text: p.text, turn: s.turn, turnSpeed: s.turnSpeed, turnMode: s.turnMode }] : [];
   });
 }
 
