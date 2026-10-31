@@ -5,6 +5,7 @@ import { useState } from "react";
 import { TourLink } from "./links";
 import type { AvailableUnit } from "@/lib/availability/boxdepotet";
 import type { DockIcon, TourConfig, TourPlace } from "../tours/types";
+import { allGuides, guideStops } from "../tours/places";
 
 /*
  * Designs a tour can pick besides the classic ones (tile welcome, side menu):
@@ -117,7 +118,18 @@ export function DockMenu({
 }) {
   const tr = useT();
   const [sheet, setSheet] = useState(false);
-  const primary = T.dock?.find((d) => d.primary && typeof d.go !== "string");
+  // The bar's buttons: the tour's own - or, when none are set up (the editor has no list for them), made from what the tour has.
+  const dock: NonNullable<TourConfig["dock"]> = T.dock?.length
+    ? T.dock
+    : [
+        ...(T.places?.length ? [{ label: T.cover?.placesTitle || tr("Steder"), icon: "places" as const, go: "places" as const }] : []),
+        ...(allGuides(T).some((g) => guideStops(T, g.id).length) ? [{ label: tr("Vis mig rundt"), icon: "play" as const, go: "guide" as const }] : []),
+        ...T.cta
+          .filter((c) => c.primary)
+          .slice(0, 1)
+          .map((c) => ({ label: c.label, icon: "book" as const, go: { href: c.href }, primary: true })),
+      ];
+  const primary = dock.find((d) => d.primary && typeof d.go !== "string");
   const atPlace = room && T.places?.some((p) => p.name === room);
   return (
     <>
@@ -146,7 +158,7 @@ export function DockMenu({
         </TourLink>
       )}
       <nav className="dz-dock">
-        {T.dock?.map((d) =>
+        {dock.map((d) =>
           d.go === "guide" ? (
             <button key={d.label} type="button" onClick={onGuide}>
               <Icon name={d.icon} />
