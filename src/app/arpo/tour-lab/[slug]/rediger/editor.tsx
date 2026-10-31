@@ -98,7 +98,7 @@ const FINDS: Partial<Record<Tab, string[]>> = {
   layout: ["Sådan starter touren|når touren åbner|velkomst|forside|direkte|skabelon|design|tema|preset", "Menuens udseende|menu-design|sidemenu|dock|bar i bunden|rumvælger|fliser", "Menu åben på computer", "Menu åben på mobil", "Dæmp touren bag menuen", "Placering|computer|mobil", "Logoet sidder til|logo venstre|logo højre", "Vis hvor menuen er|pil til menuen|menu-pil", "Skift sprog|sprogknap", "Find vej-knappen"],
   start: ["Hvor touren starter|startpunkt|startposition|start-link|start her", "Forsiden", "Velkomsten", "Fliser", "Kort film før touren", "Intro-video", "Steder med foto", "Træd indenfor"],
   menu: ["Menupunkter", "Grupper", "Tilføj det sted, du ser", "Billede i menuen", "360°-billede", "Webside", "Luftfotoet", "Scanpunkter i menuen"],
-  rundvisning: ["Sådan ser en dag ud|dagen|program", "Vis mig rundt", "Guide", "Guidet tur", "Stop", "Drejning", "Sekunder ved hvert stop", "Stemme|lyd|elevenlabs|speak|oplæsning", "Lav den ud fra menuen", "Knappen i menuen|øverst|nederst|ikke i menuen", "Egen knap på stop"],
+  rundvisning: ["Historier|stories", "Scroll i historierne", "Tag billeder til historierne|fjern billederne", "Sådan ser en dag ud|dagen|program", "Vis mig rundt", "Guide", "Guidet tur", "Stop", "Drejning", "Sekunder ved hvert stop", "Stemme|lyd|elevenlabs|speak|oplæsning", "Lav den ud fra menuen", "Knappen i menuen|øverst|nederst|ikke i menuen", "Egen knap på stop"],
   kortet: ["Interaktivt kort", "Luftfoto", "Dronebillede", "360°-kort", "Punkter på kortet", "Kategorier", "Skyer", "Boksen øverst", "Filteret", "Luftfotoets første udsnit|startudsnit", "Ikoner", "Vejret|vejr|temperatur|dmi|sol", "Find din plads|finder|spørgsmål|guide til plads", "Gåafstande|gåafstand|minutter|afstand", "Bevægelse på luftfotoet|kig ned|kig op|zoom ved punkt", "Hent fra en kortside|lovable|importer kort"],
   scan: ["Scanpunkter", "Skjul scanpunkter", "Personer i scans"],
   tags: ["Tags", "Infotags", "Hotspots", "Pris", "Video"],
@@ -107,7 +107,7 @@ const FINDS: Partial<Record<Tab, string[]>> = {
   links: ["Knapper", "Book", "Kontakt", "Telefon", "E-mail", "Adresse", "Sociale medier", "Kontaktformular", "Skriv til os", "Åbning", "Popup", "Ny fane", "Kort-link"],
   design: ["Farver", "Skrift", "Font", "Logo", "Logostørrelse", "Logoets afstand", "Favicon", "Mørkt logo", "Farvefilter", "Brug hjemmesidens farver|hjemmeside|rød tråd|brand"],
   sprog: ["Sprog", "Engelsk", "Tysk", "Oversæt"],
-  funktioner: ["Navigation", "Bevægelse", "Fri bevægelse", "Kun punkter", "Skift mellem steder", "Fade", "Flyv", "Zoom", "Lås zoom på mobil", "Historier", "Scroll i historierne", "Find vej", "Vis mål", "Matterports egne knapper", "Sådan går du rundt|hjælp ved start|onboarding", "Vej til stedet|vej til skolen|hvor langt|afstand|adresse|postnummer|bus|tog|rejseplan|google maps|mødetid", "Tag billeder til historierne|fjern billederne", "Flyvetid"],
+  funktioner: ["Navigation", "Bevægelse", "Fri bevægelse", "Kun punkter", "Skift mellem steder", "Fade", "Flyv", "Zoom", "Lås zoom på mobil", "Find vej", "Vis mål", "Matterports egne knapper", "Sådan går du rundt|hjælp ved start|onboarding", "Vej til stedet|vej til skolen|hvor langt|afstand|adresse|postnummer|bus|tog|rejseplan|google maps|mødetid", "Flyvetid"],
   generelt: ["Navn", "Firmanavn", "Undertitel", "Matterport-model", "Matterports indstillinger|dukkehus|plantegning|etagevælger"],
   okonomi: ["Tid", "Pris", "Timer", "Økonomi"],
   versioner: ["Versioner", "Fortryd", "Gendan", "Historik"],
@@ -842,6 +842,7 @@ export function TourEditor({
             {tab === "layout" && <LayoutEditor config={config} edit={edit} onTab={setTab} />}
             {tab === "start" && <StartEditor config={config} edit={edit} slug={slug} preview={preview} />}
             {tab === "rundvisning" && (
+              <>
               <GuideEditor
                 config={config}
                 edit={edit}
@@ -851,6 +852,41 @@ export function TourEditor({
                   setTab("kortet");
                 }}
               />
+                <Group title="Historier - rummene som kort, der kører af sig selv">
+                <Toggle
+                  on={Boolean(config.stories?.mobile)}
+                  onChange={(on) => edit((d) => void (d.stories = { mobile: on, desktop: d.stories?.desktop ?? false, rooms: d.stories?.rooms, scroll: d.stories?.scroll }))}
+                  title="Historier på mobil"
+                  hint="Rummene som kort nederst, som Instagram-stories."
+                />
+                <Toggle
+                  on={Boolean(config.stories?.desktop)}
+                  onChange={(on) => edit((d) => void (d.stories = { mobile: d.stories?.mobile ?? false, desktop: on, rooms: d.stories?.rooms, scroll: d.stories?.scroll }))}
+                  title="Historier på computer"
+                />
+                {(config.stories?.mobile || config.stories?.desktop) && <StoryPictures slug={slug} preview={preview} />}
+                {(config.stories?.mobile || config.stories?.desktop) && (
+                  <Field title="Scroll sidelæns i historierne" hint="Fra: alle historierne vises på én gang, fordelt på flere rækker.">
+                    <Choice
+                      value={config.stories?.scroll?.mobile === false ? (config.stories?.scroll?.desktop === false ? "ingen" : "computer") : config.stories?.scroll?.desktop === false ? "mobil" : "begge"}
+                      options={[
+                        ["begge", "Begge"],
+                        ["mobil", "Kun mobil"],
+                        ["computer", "Kun computer"],
+                        ["ingen", "Ingen"],
+                      ]}
+                      onChange={(v) =>
+                        edit((d) => {
+                          const scroll = { ...(v === "computer" || v === "ingen" ? { mobile: false as const } : {}), ...(v === "mobil" || v === "ingen" ? { desktop: false as const } : {}) };
+                          d.stories = { ...d.stories!, scroll: Object.keys(scroll).length ? scroll : undefined };
+                        })
+                      }
+                    />
+                  </Field>
+                )}
+                </Group>
+              <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">Vis mig rundt, Sådan ser en dag ud og historierne kører af sig selv - der kører altid kun én ad gangen: starter man en, stopper de andre.</p>
+              </>
             )}
             {tab === "scan" && <ScanPointsEditor config={config} edit={edit} preview={preview} map={scanMap} mpskinsHidden={mpskinsHidden} expected={scanCount} />}
             {tab === "tags" && <TagsEditor config={config} edit={edit} slug={slug} preview={preview} />}
@@ -954,39 +990,6 @@ export function TourEditor({
                     );
                   })}
                   <Toggle on={Boolean(config.mobileZoomLock)} onChange={(on) => edit((d) => void (d.mobileZoomLock = on || undefined))} title="Lås zoom på mobil" hint="Gæsten kan ikke knibe-zoome - så man ikke ved et uheld zoomer helt ind." />
-                </Group>
-                <Group title="Historier">
-                <Toggle
-                  on={Boolean(config.stories?.mobile)}
-                  onChange={(on) => edit((d) => void (d.stories = { mobile: on, desktop: d.stories?.desktop ?? false, rooms: d.stories?.rooms, scroll: d.stories?.scroll }))}
-                  title="Historier på mobil"
-                  hint="Rummene som kort nederst, som Instagram-stories."
-                />
-                <Toggle
-                  on={Boolean(config.stories?.desktop)}
-                  onChange={(on) => edit((d) => void (d.stories = { mobile: d.stories?.mobile ?? false, desktop: on, rooms: d.stories?.rooms, scroll: d.stories?.scroll }))}
-                  title="Historier på computer"
-                />
-                {(config.stories?.mobile || config.stories?.desktop) && <StoryPictures slug={slug} preview={preview} />}
-                {(config.stories?.mobile || config.stories?.desktop) && (
-                  <Field title="Scroll sidelæns i historierne" hint="Fra: alle historierne vises på én gang, fordelt på flere rækker.">
-                    <Choice
-                      value={config.stories?.scroll?.mobile === false ? (config.stories?.scroll?.desktop === false ? "ingen" : "computer") : config.stories?.scroll?.desktop === false ? "mobil" : "begge"}
-                      options={[
-                        ["begge", "Begge"],
-                        ["mobil", "Kun mobil"],
-                        ["computer", "Kun computer"],
-                        ["ingen", "Ingen"],
-                      ]}
-                      onChange={(v) =>
-                        edit((d) => {
-                          const scroll = { ...(v === "computer" || v === "ingen" ? { mobile: false as const } : {}), ...(v === "mobil" || v === "ingen" ? { desktop: false as const } : {}) };
-                          d.stories = { ...d.stories!, scroll: Object.keys(scroll).length ? scroll : undefined };
-                        })
-                      }
-                    />
-                  </Field>
-                )}
                 </Group>
                 <Group title="Ekstra">
                 <Toggle
