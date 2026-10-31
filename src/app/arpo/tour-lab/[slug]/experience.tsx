@@ -1603,6 +1603,28 @@ function TourExperience({
     if (!(await standsAt(stop.href)) && step === guideStep.current) guideFly(stop);
   }
   /** A stop inside the tour: flown to (one move at a time, only the newest), then the slow turn. */
+  /**
+   * The short turn at a stop - and again if Matterport didn't take it: right after the tour has loaded (the first
+   * stop) or a move, it can answer at once without turning. Up to three tries, checking that the view turned.
+   */
+  async function guideTurnShort(ticket: number, dir: number, speed: number) {
+    const cam = sdk?.Camera;
+    if (!cam?.rotate) return;
+    let yaw: number | null = null;
+    const sub = cam.pose.subscribe((p) => void (yaw = p.rotation.y));
+    try {
+      for (let attempt = 0; attempt < 3 && ticket === guideTicket.current && !guideHeldRef.current; attempt++) {
+        await new Promise((r) => setTimeout(r, attempt ? 600 : 50));
+        const before = yaw as number | null;
+        await cam.rotate(dir * 18, 0, { speed }).catch(() => {});
+        const after = yaw as number | null;
+        // Turned (or no pose to tell by): done.
+        if (before == null || after == null || Math.abs(((((after - before + 540) % 360) + 360) % 360) - 180) > 3) return;
+      }
+    } finally {
+      sub.cancel();
+    }
+  }
   /** The guide's continuous turn (turnMode "continuous"): its direction while it turns, 0 = not turning. */
   const guideTurnDir = useRef(0);
   /**
@@ -1659,11 +1681,18 @@ function TourExperience({
     // Which way the yaw runs for "Mod højre": read from a tiny real turn (rotate is what it has always meant).
     void (async () => {
       await new Promise((r) => setTimeout(r, 80));
-      const before = (cur as { y: number } | null)?.y;
-      await cam.rotate?.(dir * 1, 0, { speed: 20 }).catch(() => {});
-      await new Promise((r) => setTimeout(r, 40));
-      const after = (cur as { y: number } | null)?.y;
-      if (before != null && after != null && Math.abs(off(after, before)) > 0.1) sign = Math.sign(off(after, before));
+      // Right after loading or a move Matterport may not take a turn at once - a few tries.
+      for (let attempt = 0; attempt < 4 && live(); attempt++) {
+        if (attempt) await new Promise((r) => setTimeout(r, 500));
+        const before = (cur as { y: number } | null)?.y;
+        await cam.rotate?.(dir * 1, 0, { speed: 20 }).catch(() => {});
+        await new Promise((r) => setTimeout(r, 40));
+        const after = (cur as { y: number } | null)?.y;
+        if (before != null && after != null && Math.abs(off(after, before)) > 0.1) {
+          sign = Math.sign(off(after, before));
+          break;
+        }
+      }
       if (live()) requestAnimationFrame(frame);
       else stop();
     })();
@@ -1712,8 +1741,8 @@ function TourExperience({
           setTimeout(() => ticket === guideTicket.current && void guideDone(stop, ticket), 700);
           return "turning";
         }
-        const turning = sdk?.Camera.rotate?.(dir * 18, 0, { speed }).catch(() => {});
-        turning?.finally(() => {
+        const turning = guideTurnShort(ticket, dir, speed);
+        turning.finally(() => {
           if (ticket === guideTicket.current) setTimeout(() => ticket === guideTicket.current && guideDone(stop, ticket), 700);
         });
         return "turning";
