@@ -12,7 +12,7 @@ import type { DroneView, GuideTurn, GuideTurnSpeed, PlaceCard, TourConfig, TourI
 import type { DroneViews } from "../../tours/places";
 import type { ScanMap } from "@/lib/matterport-graph";
 import { ScanPointPicker } from "./scanpoints";
-import { Choice, Field, Group, Icon, input, PanoZoom, Toggle, UploadButton, ssOfHref, type PreviewApi } from "./ui";
+import { Choice, Field, GearButton, Group, Icon, input, PanoZoom, Toggle, UploadButton, ssOfHref, type PreviewApi } from "./ui";
 
 /*
  * The editors for a tour's content - the start, its places, "Vis mig rundt"
@@ -918,6 +918,7 @@ function GuideSetupEditor({ config, edit, preview, onEditPoint }: Omit<Props, "s
         {(stops.length > 0 || fromMenu) && (
           <Field title="Ved hvert stop">
             <Choice value={config.guide?.turn ?? "as"} options={turnOptions} onChange={(v) => edit((d) => void (d.guide = { ...d.guide!, turn: v === "as" ? undefined : (v as GuideTurn) }))} />
+            {config.guide?.turn !== "none" && <p className="px-1 pt-1 text-[12px] text-[#8e8e93]">Hastighed - for alle stop (et stop kan få sin egen under ⚙)</p>}
             {config.guide?.turn !== "none" && <Choice value={config.guide?.turnSpeed ?? "normal"} options={speedOptions} onChange={(v) => edit((d) => void (d.guide = { ...d.guide!, turnSpeed: v === "normal" ? undefined : (v as GuideTurnSpeed) }))} />}
           </Field>
         )}
@@ -1045,8 +1046,7 @@ function GuideSetupEditor({ config, edit, preview, onEditPoint }: Omit<Props, "s
               <>
                 <PointStop config={config} id={s.point} edit={edit} onEdit={onEditPoint} preview={preview} />
                 <Field title="Drejning ved stoppet" hint="Hvilken vej og hvor hurtigt billedet drejer rundt, mens stoppet vises.">
-                  <Choice value={s.turn ?? ""} options={[["", "Som de andre"], ...turnOptions]} onChange={(v) => set({ ...s, turn: v ? (v as GuideTurn) : undefined })} />
-                  {(s.turn ?? config.guide?.turn) !== "none" && <Choice value={s.turnSpeed ?? ""} options={[["", "Som de andre"], ...speedOptions]} onChange={(v) => set({ ...s, turnSpeed: v ? (v as GuideTurnSpeed) : undefined })} />}
+                  <StopTurn turn={s.turn} speed={s.turnSpeed} still={(s.turn ?? config.guide?.turn) === "none"} turnOptions={turnOptions} speedOptions={speedOptions} onChange={(turn, turnSpeed) => set({ ...s, turn, turnSpeed })} />
                 </Field>
               </>
             ) : (
@@ -1075,8 +1075,7 @@ function GuideSetupEditor({ config, edit, preview, onEditPoint }: Omit<Props, "s
                 {!imageOfHref(s.href) && <StopPicture config={config} url={null} onChange={(url) => url && set({ ...s, href: IMAGE_HREF + url })} />}
                 {s.href && !imageOfHref(s.href) && (
                   <Field title="Drejning ved stoppet" hint="Hvilken vej og hvor hurtigt billedet drejer rundt, mens stoppet vises.">
-                    <Choice value={s.turn ?? ""} options={[["", "Som de andre"], ...turnOptions]} onChange={(v) => set({ ...s, turn: v ? (v as GuideTurn) : undefined })} />
-                  {(s.turn ?? config.guide?.turn) !== "none" && <Choice value={s.turnSpeed ?? ""} options={[["", "Som de andre"], ...speedOptions]} onChange={(v) => set({ ...s, turnSpeed: v ? (v as GuideTurnSpeed) : undefined })} />}
+                    <StopTurn turn={s.turn} speed={s.turnSpeed} still={(s.turn ?? config.guide?.turn) === "none"} turnOptions={turnOptions} speedOptions={speedOptions} onChange={(turn, turnSpeed) => set({ ...s, turn, turnSpeed })} />
                   </Field>
                 )}
                 <Field title="Egen knap (valgfri)" hint="Fx &quot;Se alle linjer&quot; til jeres side om linjerne. På det sidste stop står den i stedet for tourens hovedknap.">
@@ -1598,5 +1597,40 @@ function MenuPlace({ value, onChange, link }: { value: "bottom" | false | undefi
         onChange={(v) => onChange(v === "ingen" ? false : v === "bottom" ? "bottom" : undefined)}
       />
     </Field>
+  );
+}
+
+/** A stop's turn: which way (or not at all) - and behind the ⚙ how fast, when it isn't as the others. */
+function StopTurn({
+  turn,
+  speed,
+  still,
+  turnOptions,
+  speedOptions,
+  onChange,
+}: {
+  turn?: GuideTurn;
+  speed?: GuideTurnSpeed;
+  still: boolean;
+  turnOptions: [string, string][];
+  speedOptions: [string, string][];
+  onChange: (turn: GuideTurn | undefined, speed: GuideTurnSpeed | undefined) => void;
+}) {
+  const [open, setOpen] = useState(Boolean(speed));
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-1.5">
+        <div className="min-w-0 flex-1">
+          <Choice value={turn ?? ""} options={[["", "Som de andre"], ...turnOptions]} onChange={(v) => onChange(v ? (v as GuideTurn) : undefined, speed)} />
+        </div>
+        {!still && <GearButton open={open} onClick={() => setOpen(!open)} changed={Boolean(speed)} title="Hastighed ved dette stop" />}
+      </div>
+      {open && !still && (
+        <div className="space-y-1">
+          <p className="px-1 text-[12px] text-[#8e8e93]">Hastighed ved dette stop</p>
+          <Choice value={speed ?? ""} options={[["", "Som de andre"], ...speedOptions]} onChange={(v) => onChange(turn, v ? (v as GuideTurnSpeed) : undefined)} />
+        </div>
+      )}
+    </div>
   );
 }
