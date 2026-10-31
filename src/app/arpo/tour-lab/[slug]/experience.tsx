@@ -341,9 +341,15 @@ export function Experience(props: ExperienceProps) {
     () => window.innerWidth <= 760 && !inEditorPreview(),
     () => false
   );
-  if ((T.autoplay === false || (phoneGate && T.phoneEmbed === "play")) && embedded && !played) return <PlayGate T={T} isPreview={inEditorPreview} onPlay={() => setPlayed(true)} />;
+  // A phone that can't make a frame full screen (an iPhone): the play button, which opens the tour full screen in its own tab - like Matterport.
+  const noFullscreen = useSyncExternalStore(
+    noop,
+    () => !(document.fullscreenEnabled && document.documentElement.requestFullscreen),
+    () => false
+  );
+  if ((T.autoplay === false || (phoneGate && (T.phoneEmbed === "play" || (!T.phoneEmbed && noFullscreen)))) && embedded && !played) return <PlayGate T={T} isPreview={inEditorPreview} onPlay={() => setPlayed(true)} />;
   // On a phone in someone's page (the standard): it loads in the frame, and goes full screen at the first tap.
-  const fullOnUse = phoneGate && embedded && !T.phoneEmbed && T.autoplay !== false;
+  const fullOnUse = phoneGate && embedded && !T.phoneEmbed && T.autoplay !== false && !noFullscreen;
   return (
     <>
       <TourExperience key={startSignature(T)} {...props} tour={T} lang={langs.includes(lang) ? lang : "da"} setLang={pickLang} played={played} />

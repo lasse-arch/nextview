@@ -1070,7 +1070,7 @@ export function TourEditor({
                       ? "Touren bliver i rammen på siden, som på en computer."
                       : config.phoneEmbed === "play"
                         ? "Et billede med en stor afspil-knap - intet hentes, før man trykker, og så åbner touren i fuld skærm (på en iPhone i sin egen fane)."
-                        : "Standard: touren loader i rammen, og første gang man trykker i den, går den i fuld skærm. En iPhone kan ikke gøre en ramme fuld skærm - dér får touren en lille \"Fuld skærm\"-knap, der åbner den i sin egen fane."
+                        : "Standard: touren loader i rammen, og første gang man trykker i den, går den i fuld skærm. En iPhone kan ikke gøre en ramme fuld skærm - dér viser touren en afspil-knap, der åbner den i fuld skærm i sin egen fane (som Matterport)."
                   }
                 >
                   <Choice<"use" | "play" | "inline">
