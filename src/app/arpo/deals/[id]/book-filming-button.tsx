@@ -6,6 +6,8 @@ import { bookFilming } from "@/lib/actions/filming";
 import { useToast } from "@/components/toast";
 
 const HOUR_OPTIONS = [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8];
+/** Today as YYYY-MM-DD (outside render's purity rule). */
+const today = () => new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Copenhagen" });
 
 /**
  * "Book filming" next to "Book møde": picks when we come out to film, who
@@ -31,7 +33,9 @@ export function BookFilmingButton({
   defaultCrewIds: string[];
 }) {
   const [open, setOpen] = useState(false);
-  const [startLocal, setStartLocal] = useState(currentFilmingAtIso ? currentFilmingAtIso.slice(0, 16) : "");
+  // The filming's day is over: a new booking sends a new invitation and leaves the old one as it was.
+  const [past] = useState(() => Boolean(currentFilmingAtIso && currentFilmingAtIso.slice(0, 10) < today()));
+  const [startLocal, setStartLocal] = useState(currentFilmingAtIso && !past ? currentFilmingAtIso.slice(0, 16) : "");
   const [hours, setHours] = useState(currentHours ?? 2);
   const [crew, setCrew] = useState<string[]>(currentCrewIds.length ? currentCrewIds : defaultCrewIds);
   const [email, setEmail] = useState(contactEmail ?? "");
@@ -73,7 +77,7 @@ export function BookFilmingButton({
         onClick={() => setOpen((o) => !o)}
         className="rounded-lg bg-rose-600 px-4 py-2 text-[13px] font-semibold text-white shadow-sm transition-colors hover:bg-rose-700"
       >
-        🎬 {currentFilmingAtIso ? "Ret filming" : "Book filming"}
+        🎬 {currentFilmingAtIso && !past ? "Ret filming" : past ? "Book ny filming" : "Book filming"}
       </button>
       {open && (
         <div className="fixed inset-x-4 top-20 z-30 max-h-[80vh] overflow-y-auto rounded-lg border border-rose-200 bg-white p-4 shadow-lg sm:absolute sm:inset-x-auto sm:left-0 sm:top-full sm:mt-2 sm:max-h-none sm:w-80 sm:overflow-visible">

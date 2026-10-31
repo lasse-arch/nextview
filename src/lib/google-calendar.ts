@@ -68,15 +68,23 @@ export async function upsertCalendarEvent(account: EmailAccount, input: Calendar
   // current answer over from the event as it stands.
   const existingResponses = new Map<string, string>();
   let hasMeet = false;
-  if (input.eventId) {
-    const current = await fetch(`${CALENDAR_API_BASE}/calendars/primary/events/${input.eventId}`, {
+  let reuseId = input.eventId;
+  if (reuseId) {
+    const current = await fetch(`${CALENDAR_API_BASE}/calendars/primary/events/${reuseId}`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
     if (current.ok) {
-      const data = (await current.json()) as { attendees?: { email?: string; responseStatus?: string }[]; hangoutLink?: string };
-      hasMeet = Boolean(data.hangoutLink);
-      for (const a of data.attendees ?? []) {
-        if (a.email && a.responseStatus) existingResponses.set(a.email.toLowerCase(), a.responseStatus);
+      const data = (await current.json()) as { status?: string; end?: { dateTime?: string; date?: string }; attendees?: { email?: string; responseStatus?: string }[]; hangoutLink?: string };
+      // An invitation whose day is over (or that was cancelled) is left as it
+      // is - the meeting or filming happened then - and a new one is sent.
+      const ended = data.end?.dateTime ?? data.end?.date;
+      if (data.status === "cancelled" || (ended && new Date(ended).getTime() < Date.now())) {
+        reuseId = null;
+      } else {
+        hasMeet = Boolean(data.hangoutLink);
+        for (const a of data.attendees ?? []) {
+          if (a.email && a.responseStatus) existingResponses.set(a.email.toLowerCase(), a.responseStatus);
+        }
       }
     }
   }
@@ -109,7 +117,7 @@ export async function upsertCalendarEvent(account: EmailAccount, input: Calendar
   // then the guests are added in the same update that strips the Meet -
   // that way the invitation they receive never carries the link.
   // conferenceDataVersion=1 is what lets conferenceData: null remove it.
-  let eventId = input.eventId;
+  let eventId = reuseId;
   if (!eventId) {
     const created = await fetch(`${eventsUrl}?sendUpdates=none&conferenceDataVersion=1`, {
       method: "POST",
