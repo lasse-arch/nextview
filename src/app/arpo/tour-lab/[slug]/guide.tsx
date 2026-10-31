@@ -19,6 +19,7 @@ export function GuidePlayer({
   index,
   seconds,
   manual = false,
+  voiceDelay = 0,
   held = false,
   walkHint = false,
   walkHintStops = 2,
@@ -38,6 +39,8 @@ export function GuidePlayer({
   seconds: number;
   /** No timer - the visitor presses Næste (a calm voice tour). */
   manual?: boolean;
+  /** Seconds before the stop's voice starts (the tour's voiceDelay). */
+  voiceDelay?: number;
   /** The visitor took over (walked on or looked around) - the guide waits until they press Fortsæt or Næste. */
   held?: boolean;
   /** In the 3D tour: tell the visitor (on the first stops) that they may look around and walk themselves. */
@@ -72,9 +75,15 @@ export function GuidePlayer({
     audio.current = a;
     // Without "Man trykker selv videre", the next stop comes when the voice is done.
     if (!manual) a.onended = () => step(index + 1, "auto");
-    a.play().catch(() => {});
-    onEvent("guide_audio", { stop: index + 1, title: stop.title });
-    return () => a.pause();
+    // After the tour's chosen pause (seconds), so the visitor sees the place first.
+    const start = setTimeout(() => {
+      a.play().catch(() => {});
+      onEvent("guide_audio", { stop: index + 1, title: stop.title });
+    }, Math.max(0, voiceDelay) * 1000);
+    return () => {
+      clearTimeout(start);
+      a.pause();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [index, muted]);
   const timed = !manual && !voice;

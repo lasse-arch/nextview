@@ -51,7 +51,8 @@ export function VoiceGroup({ config, edit }: { config: TourConfig; edit: Edit })
   }, []);
 
   const stops = config.guide?.stops ?? [];
-  const todo = stops.flatMap((s, i) => ("text" in s && s.text.trim() && voiceState(s) !== "ok" ? [i] : []));
+  // Only stops without a voice - a voice made from older words keeps playing (see StopVoice), it's made again from its own button.
+  const todo = stops.flatMap((s, i) => ("text" in s && s.text.trim() && voiceState(s) === "none" ? [i] : []));
   const voice = config.voice;
   const listen = (url: string | null) => {
     player.current?.pause();
@@ -115,6 +116,20 @@ export function VoiceGroup({ config, edit }: { config: TourConfig; edit: Edit })
         </Field>
       )}
       {!voices && !error && <p className={small}>Henter stemmerne …</p>}
+      <Field title="Sekunder før stemmen starter" hint="Ved hvert stop, i alle rundvisninger. 0: med det samme. Fx 2, så man når at se stedet først.">
+        <input
+          type="number"
+          min={0}
+          max={30}
+          step={0.5}
+          className="w-28 rounded-[10px] bg-[#f2f2f7] px-3 py-2 text-[15px]"
+          value={config.voiceDelay ?? 0}
+          onChange={(e) => {
+            const n = Math.min(30, Math.max(0, Number(e.target.value) || 0));
+            edit((d) => void (d.voiceDelay = n || undefined));
+          }}
+        />
+      </Field>
       {voice && stops.length > 0 && (
         <button
           type="button"
@@ -148,7 +163,7 @@ export function StopVoice({ config, stop, set, upload }: { config: TourConfig; s
   return (
     <Field title="Stemme" hint={voice ? undefined : 'Vælg tourens stemme under "Stemme" ovenfor - eller upload en lydfil (mp3/m4a).'}>
       {stop.audio && <audio controls preload="none" src={stop.audio} className="h-9 w-full" />}
-      {state === "old" && <p className="text-[12px] font-medium text-[#c26a00]">Teksten er ændret siden lyden blev lavet - lyden spilles ikke, før den er lavet igen.</p>}
+      {state === "old" && <p className="text-[12px] leading-snug text-[#6e6e73]">Stemmen spiller som før - skærmen viser den nye tekst. Når du gemmer, bliver den nye tekst til &quot;Kort tekst på skærmen&quot;. Skal stemmen sige det nye, så tryk Lav lyden igen.</p>}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
         {voice && stop.text.trim() && (
           <button type="button" disabled={busy} onClick={() => void make()} className="text-[13px] font-medium text-[#0071e3] disabled:opacity-50">

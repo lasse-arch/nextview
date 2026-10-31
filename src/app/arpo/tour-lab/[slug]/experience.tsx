@@ -3034,6 +3034,7 @@ function TourExperience({
           size={T.guideCardSize}
           seconds={G?.seconds ?? 9}
           manual={G?.manual}
+          voiceDelay={T.voiceDelay}
           held={guideHeld}
           walkHint={phase === "tour"}
           walkHintStops={G?.walkHint === "all" ? Infinity : G?.walkHint === "none" ? 0 : (G?.walkHint ?? 2)}

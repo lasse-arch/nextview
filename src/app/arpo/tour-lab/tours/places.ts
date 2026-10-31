@@ -128,8 +128,33 @@ export function allGuides(T: TourConfig): { id: string | null; title: string }[]
 export type GuideStop = { href: string; title: string; text: string; audio?: string; audioText?: string; short?: string; turn?: GuideTurn; button?: { label: string; href: string } };
 
 const sameWords = (a: string, b: string) => a.replace(/\s+/g, " ").trim() === b.replace(/\s+/g, " ").trim();
-/** The stop's voice, when there is one to play: an uploaded file always, a made one only while the text is still what it read (so never a Danish voice in the English tour). */
-export const stopVoice = (s: GuideStop): string | undefined => (s.audio && (s.audioText == null || sameWords(s.audioText, s.text)) ? s.audio : undefined);
+/**
+ * The stop's voice: it always plays - a changed text on screen doesn't stop it
+ * (the card shows the new words, the voice says what it was made from). Never
+ * a Danish voice in another language: localize() drops `audio` there.
+ */
+export const stopVoice = (s: GuideStop): string | undefined => s.audio || undefined;
+
+/**
+ * A stop whose text was changed after its voice was made: the new words become
+ * the card's short text, and `text` is again what the voice says - so the
+ * setup says plainly what is shown and what is heard. Run when a tour is saved.
+ */
+export function keepVoiceTexts<C extends TourConfig>(c: C): C {
+  const fix = (g: NonNullable<TourConfig["guide"]>) => {
+    let changed = false;
+    const stops = g.stops.map((s) => {
+      if ("point" in s || !s.audio || s.audioText == null || s.short || sameWords(s.audioText, s.text)) return s;
+      changed = true;
+      return { ...s, short: s.text, text: s.audioText };
+    });
+    return changed ? { ...g, stops } : g;
+  };
+  const guide = c.guide ? fix(c.guide) : c.guide;
+  const guides = c.guides?.map(fix);
+  if (guide === c.guide && (guides ?? []).every((g, i) => g === c.guides![i])) return c;
+  return { ...c, guide, ...(guides ? { guides } : {}) };
+}
 
 /** A guided tour's stops (the main one, or one of `guides` by id), with a drone point's name and text filled in where a stop borrows them - or one per menu place when it's made from the menu. */
 export function guideStops(T: TourConfig, guideId: string | null = null): GuideStop[] {

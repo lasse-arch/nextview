@@ -1,7 +1,7 @@
 "use client";
 
 import { LinkInput } from "./links-open";
-import { StopVoice, VoiceGroup, voiceState } from "./voice-editor";
+import { StopVoice, VoiceGroup } from "./voice-editor";
 import { startStyleOf } from "../../tours/presets";
 import { guideExit, IMAGE_HREF, imageOfHref, isPlaceHref, PANO_HFOV, placeHref, startPlaces } from "../../tours/places";
 import { AiImageButton, AiImageList } from "./ai-image";
@@ -1032,7 +1032,7 @@ function GuideSetupEditor({ config, edit, preview, onEditPoint }: Omit<Props, "s
           onChange={setStops}
           icon={["bg-[#ff2d55]", '<path d="M8 5v14l11-7z"/>']}
           title={(s) => ("point" in s ? (config.points.find((p) => p.id === s.point)?.name ?? `Punkt: ${s.point}`) : s.title)}
-          subtitle={(s) => ("point" in s ? "Punkt på luftfotoet - tekst og billeder fra punktet" : [s.audio ? (voiceState(s) === "old" ? "🔇 lav lyden igen" : "🔊") : null, s.href ? null : "Bliver stående", s.text || "Mangler tekst"].filter(Boolean).join(" · "))}
+          subtitle={(s) => ("point" in s ? "Punkt på luftfotoet - tekst og billeder fra punktet" : [s.audio ? "🔊" : null, s.href ? null : "Bliver stående", s.text || "Mangler tekst"].filter(Boolean).join(" · "))}
           empty='Ingen stop endnu. Gå til det første sted i forhåndsvisningen og tryk "+ Stop her".'
           editor={(s, set) =>
             "point" in s ? (

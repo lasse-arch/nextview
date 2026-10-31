@@ -372,6 +372,8 @@ export type TourConfig = {
   };
   /** The voice that reads the guided tours' stops aloud (ElevenLabs) - each tour its own. */
   voice?: { id: string; name: string };
+  /** Seconds from a stop showing until its voice starts (all stops, every guided tour) - left out: at once. */
+  voiceDelay?: number;
   /**
    * "Sådan ser en dag ud": the day as a calm timeline (time, what happens,
    * and where - "Se stedet" shows it). For visitors who like to know what's
