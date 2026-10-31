@@ -1693,7 +1693,7 @@ function ClaudePanel({
         )}
         {mentionHits.length > 0 && (
           <div className="relative">
-            <div className="absolute bottom-1 left-0 right-0 [&>ul]:mt-0">
+            <div className="absolute bottom-1 left-0 right-0 z-30 [&>div]:mt-0">
               <MentionList items={mentionHits} active={mentionIndex} onPick={pickMention} />
             </div>
           </div>
