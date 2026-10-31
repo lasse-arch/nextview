@@ -2,7 +2,7 @@
 
 import { reviewUrl } from "@/lib/public-urls";
 import { useEffect, useState, useTransition } from "react";
-import { checkTourForReview, lastTourCheck, setTourCheckDone, type SavedCheck, deleteFeedback, reviewStatus, sendFixesDone, sendForReview, setFeedbackStatus, setTourApproved, setTourReview, tourFeedback, type Feedback, type ReviewStatus } from "@/lib/actions/tour-feedback";
+import { setReviewRecipient, checkTourForReview, lastTourCheck, setTourCheckDone, type SavedCheck, deleteFeedback, reviewStatus, sendFixesDone, sendForReview, setFeedbackStatus, setTourApproved, setTourReview, tourFeedback, type Feedback, type ReviewStatus } from "@/lib/actions/tour-feedback";
 import { askClaudeForTour, type AiEditResult } from "@/lib/actions/tour-ai";
 import { addManualTimeEntry, filmingTimeForm } from "@/lib/actions/time-entries";
 import type { TourConfig } from "../../tours/types";
@@ -199,12 +199,28 @@ export function FeedbackPanel({
               <div className="mt-2 space-y-1.5">
                 <input className={input} type="email" placeholder="E-mail" value={who.email} onChange={(e) => setWho({ ...who, email: e.target.value })} />
                 <input className={input} placeholder="Navn (Hej …)" value={who.name} onChange={(e) => setWho({ ...who, name: e.target.value })} />
-                <p className="text-[11px] leading-snug text-[#8e8e93]">
-                  Fx den der kender stedet, når direktøren har skrevet under. Gemmes, når mailen sendes - påmindelser og &quot;rettelser lavet&quot; går hertil, og kundesiden åbnes for denne e-mail. Tom e-mail = kontakten på dealen.{" "}
-                  <button type="button" className="font-medium text-[#0071e3]" onClick={() => setWho(null)}>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={pending}
+                    className="rounded-lg bg-[#0071e3] px-3 py-1.5 text-[13px] font-medium text-white disabled:opacity-50"
+                    onClick={() =>
+                      start(async () => {
+                        const r = await setReviewRecipient(slug, who.email, who.name);
+                        if (!r.ok) return setNote({ text: r.error, error: true });
+                        setWho(null);
+                        setNote({ text: "Gemt - mailene går hertil." });
+                        await reloadStatus();
+                      })
+                    }
+                  >
+                    Gem
+                  </button>
+                  <button type="button" className="text-[13px] font-medium text-[#0071e3]" onClick={() => setWho(null)}>
                     Fortryd
                   </button>
-                </p>
+                </div>
+                <p className="text-[11px] leading-snug text-[#8e8e93]">Fx den der kender stedet, når direktøren har skrevet under. Mailen om gennemgang, påmindelser og &quot;rettelser lavet&quot; går hertil, og kundesiden åbnes for denne e-mail, når der sendes. Tom e-mail = kontakten på dealen.</p>
               </div>
             )}
           </div>

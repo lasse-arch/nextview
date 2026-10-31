@@ -170,3 +170,14 @@ export async function setTourCheckDone(slug: string, done: number[]): Promise<vo
   const clean = [...new Set(done.filter((n) => Number.isInteger(n) && n >= 0 && n < (c.ai?.length ?? 0)))];
   await prisma.tour.update({ where: { slug }, data: { reviewCheck: { ...c, done: clean } as unknown as Prisma.InputJsonValue } });
 }
+
+/** "Gem" on who the review mails go to - without sending anything. An empty e-mail = the deal's contact again. */
+export async function setReviewRecipient(slug: string, email: string, name: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  await admin();
+  const e = email.trim().toLowerCase();
+  if (e && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return { ok: false, error: "Skriv en gyldig e-mail." };
+  const tour = await prisma.tour.findUnique({ where: { slug }, select: { id: true } });
+  if (!tour) return { ok: false, error: "Touren findes ikke." };
+  await prisma.tour.update({ where: { slug }, data: e ? { reviewEmail: e.slice(0, 200), reviewName: name.trim().slice(0, 120) || null } : { reviewEmail: null, reviewName: null } });
+  return { ok: true };
+}
