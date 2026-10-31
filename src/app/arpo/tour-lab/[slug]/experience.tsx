@@ -1640,22 +1640,22 @@ function TourExperience({
         const dir = turn === "other" ? -1 : 1;
         // Degrees a second: slow, normal (as always) or fast - the stop's own, else the guide's.
         const speed = { slow: 1.5, normal: 3, fast: 6 }[stop.turnSpeed ?? G?.turnSpeed ?? "normal"];
-        const turning = sdk?.Camera.rotate?.(dir * 18, 0, { speed }).catch(() => {});
-        turning?.finally(() => {
-          if (ticket !== guideTicket.current) return;
-          setTimeout(async () => {
-            if (ticket !== guideTicket.current) return;
-            await guideDone(stop, ticket);
-            // Then it keeps turning slowly - all the while the stop is shown (the voice, the visitor reading) - until the
-            // next stop, or the visitor takes over (walks, or looks up/down: see the guide's takeover watch).
-            guideTurnDir.current = dir;
-            while (ticket === guideTicket.current && !guideHeldRef.current && guideAtRef.current != null && phaseRef.current === "tour" && sdk?.Camera.rotate) {
-              selfMoveAt.current = now() + 8000;
-              await sdk.Camera.rotate(dir * 18, 0, { speed }).catch(() => {});
-            }
-            if (ticket === guideTicket.current) guideTurnDir.current = 0;
-          }, 700);
-        });
+        // One long, even turn (a whole round at a time) - not short pieces that each speed up and slow down. It
+        // goes on until the next stop (a move there takes over from it), the guide closes, or the visitor takes
+        // over (a walk, or a look up/down - the takeover watch lets the turn's own sideways movement through).
+        guideTurnDir.current = dir;
+        void (async () => {
+          while (ticket === guideTicket.current && !guideHeldRef.current && guideAtRef.current != null && phaseRef.current === "tour" && sdk?.Camera.rotate) {
+            const began = now();
+            selfMoveAt.current = now() + 8000;
+            await sdk.Camera.rotate(dir * 360, 0, { speed }).catch(() => {});
+            // A turn Matterport refused (e.g. mid-move) answers at once - never spin round in a tight loop.
+            if (now() - began < 1000) await new Promise((r) => setTimeout(r, 1000));
+          }
+          if (ticket === guideTicket.current) guideTurnDir.current = 0;
+        })();
+        // The guide has landed: from here on a walk is the visitor's own (checked after a moment, as before).
+        setTimeout(() => ticket === guideTicket.current && void guideDone(stop, ticket), 700);
         return "turning";
       })
       .then((r) => {
