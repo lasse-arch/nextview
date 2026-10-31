@@ -2744,7 +2744,7 @@ function TourExperience({
                 {T.contact.email}
               </a>
             )}
-            {T.contactForm && T.contactForm.inBox !== false && (
+            {T.contactForm && (T.contactForm.inBox ?? !T.cta.some((c) => c.href === "#kontakt")) && (
               <button
                 type="button"
                 className="hv-contact-form"

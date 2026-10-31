@@ -1258,11 +1258,11 @@ export function TourEditor({
                     on={Boolean(config.contactForm)}
                     onChange={(on) => edit((d) => void (d.contactForm = on ? { to: "" } : undefined))}
                     title='"Skriv til os" inde i touren'
-                    hint="Gæsten skriver navn, e-mail, telefon og besked i touren. Når de trykker, åbner deres eget mailprogram med mailen færdigskrevet til kunden - de trykker Send, og mailen går direkte fra gæst til kunde. Intet går gennem os. Knappen kommer i kontaktboksen; linket #kontakt kan også bruges i menuen og på knapper."
+                    hint="Gæsten skriver navn, e-mail, telefon og besked i touren og trykker Send. Vi sender den fra kontaktformular@nextview360.dk til kunden, med gæstens e-mail som svar-adresse - kunden trykker bare Svar. Beskeden gemmes ikke hos os. Linket #kontakt åbner formularen fra menuen og knapper."
                   />
                   {config.contactForm && (
                     <>
-                      <Field title="Mailen skrives til" hint={config.contact?.email ? `Tom: kontakt-mailen ovenfor (${config.contact.email}). Skriv kun her, hvis formularen skal til en anden.` : "Kundens e-mail - gæsten ser den i sit mailprogram."}>
+                      <Field title="Beskederne sendes til" hint={config.contact?.email ? `Tom: kontakt-mailen ovenfor (${config.contact.email}). Skriv kun her, hvis formularen skal til en anden.` : "Kundens e-mail."}>
                         <input type="email" className={input} placeholder={config.contact?.email || "Fx info@kunde.dk"} value={config.contactForm.to} onChange={(e) => edit((d) => void (d.contactForm = { ...d.contactForm!, to: e.target.value.trim() }))} />
                       </Field>
                       <Field title="Overskrift">
@@ -1272,23 +1272,59 @@ export function TourEditor({
                         <input className={input} placeholder="Fx Vi svarer inden for en dag." value={config.contactForm.lead ?? ""} onChange={(e) => edit((d) => void (d.contactForm = { ...d.contactForm!, lead: e.target.value || undefined }))} />
                       </Field>
                       <Toggle on={config.contactForm.phone !== false} onChange={(on) => edit((d) => void (d.contactForm = { ...d.contactForm!, phone: on ? undefined : false }))} title="Felt til telefonnummer" />
-                      <Toggle
-                        on={config.contactForm.inBox !== false}
-                        onChange={(on) => edit((d) => void (d.contactForm = { ...d.contactForm!, inBox: on ? undefined : false }))}
-                        title="Knap i kontaktboksen"
-                        hint="Fra: formularen åbnes kun fra et menupunkt eller en knap med #kontakt - fx når hovedknappen allerede er formularen."
-                      />
-                      {config.contactForm.inBox !== false && (
-                        <Field title="Tekst på knappen i kontaktboksen" hint="Tom: formularens overskrift - eller &quot;Skriv til os&quot;, hvis en knap lige over siger det samme.">
-                          <input className={input} placeholder="Skriv til os" value={config.contactForm.boxLabel ?? ""} onChange={(e) => edit((d) => void (d.contactForm = { ...d.contactForm!, boxLabel: e.target.value || undefined }))} />
-                        </Field>
-                      )}
+                      {(() => {
+                        // The main button(s) that already open the form - then one button may be enough.
+                        const mains = config.cta.map((c, i) => ({ c, i })).filter(({ c }) => c.href === "#kontakt");
+                        const two = config.contactForm.inBox ?? !mains.length;
+                        return (
+                          <>
+                            <Field
+                              title="Knapper til formularen"
+                              hint={
+                                mains.length
+                                  ? two
+                                    ? "To knapper: hovedknappen og en knap i kontaktboksen - giv dem forskellig tekst."
+                                    : "Én knap: hovedknappen åbner formularen, så kontaktboksen viser kun telefon og e-mail."
+                                  : two
+                                    ? "Knappen står i kontaktboksen."
+                                    : "Ingen knap i kontaktboksen - formularen åbnes fra menuen eller en knap med #kontakt."
+                              }
+                            >
+                              <Choice<"one" | "two">
+                                value={two ? "two" : "one"}
+                                options={
+                                  mains.length
+                                    ? [
+                                        ["one", "Én (hovedknappen)"],
+                                        ["two", "To (også i kontaktboksen)"],
+                                      ]
+                                    : [
+                                        ["two", "I kontaktboksen"],
+                                        ["one", "Ikke i kontaktboksen"],
+                                      ]
+                                }
+                                onChange={(v) => edit((d) => void (d.contactForm = { ...d.contactForm!, inBox: (v === "two") === !mains.length ? undefined : v === "two" }))}
+                              />
+                            </Field>
+                            {mains.map(({ c, i }) => (
+                              <Field key={i} title="Tekst på hovedknappen" hint="Den store knap under menuen - den åbner formularen.">
+                                <input className={input} value={c.label} onChange={(e) => edit((d) => void (d.cta = d.cta.map((x, j) => (j === i ? { ...x, label: e.target.value } : x))))} />
+                              </Field>
+                            ))}
+                            {two && (
+                              <Field title="Tekst på knappen i kontaktboksen" hint="Tom: formularens overskrift - eller &quot;Skriv til os&quot;, hvis hovedknappen siger det samme.">
+                                <input className={input} placeholder="Skriv til os" value={config.contactForm.boxLabel ?? ""} onChange={(e) => edit((d) => void (d.contactForm = { ...d.contactForm!, boxLabel: e.target.value || undefined }))} />
+                              </Field>
+                            )}
+                          </>
+                        );
+                      })()}
                       {!config.menu.some((m) => ("items" in m ? m.items.some((i) => i[1] === "#kontakt") : m.href === "#kontakt")) && (
                         <button type="button" onClick={() => edit((d) => void d.menu.push({ title: d.contactForm?.title || "Skriv til os", href: "#kontakt" }))} className="w-full rounded-xl bg-white py-2 text-[14px] font-medium text-[#0071e3] ring-1 ring-black/[.06] hover:bg-[#0071e3]/5">
                           + Læg &quot;Skriv til os&quot; i menuen
                         </button>
                       )}
-                      <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">I forhåndsvisningen kan formularen prøves, men mailprogrammet åbnes ikke.</p>
+                      <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">I forhåndsvisningen kan formularen prøves, men intet sendes.</p>
                     </>
                   )}
                 </Group>
