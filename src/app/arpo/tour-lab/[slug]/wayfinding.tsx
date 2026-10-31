@@ -68,7 +68,7 @@ const flat = (graph: RouteGraph, a: string, b: string) => Math.hypot(graph[a].p[
  * as long as the route in between stays close to that straight line - so it
  * glides down a corridor and only stops at the corners.
  */
-export function straighten(graph: RouteGraph, path: string[], maxM = 16): string[] {
+export function straighten(graph: RouteGraph, path: string[], maxM = 30): string[] {
   const out = [path[0]];
   let i = 0;
   while (i < path.length - 1) {
@@ -76,7 +76,10 @@ export function straighten(graph: RouteGraph, path: string[], maxM = 16): string
     for (let k = path.length - 1; k > i + 1; k--) {
       const a = graph[path[i]].p;
       const b = graph[path[k]].p;
-      if (!graph[path[i]].n.includes(path[k]) || flat(graph, path[i], path[k]) > maxM || Math.abs(a[2] - b[2]) > 0.5) continue;
+      // One long glide instead of a hop per scan point (that stop-and-go is what makes it feel like a robot): any
+      // later point on the way will do - not only one Matterport counts as a neighbour - as long as every scan point
+      // between lies on the straight line (they're on the walked way, so the glide can't cut through a wall), and it's level.
+      if (flat(graph, path[i], path[k]) > maxM || Math.abs(a[2] - b[2]) > 0.5) continue;
       const len = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
       const off = path.slice(i + 1, k).every((m) => {
         const c = graph[m].p;
@@ -96,7 +99,8 @@ export function straighten(graph: RouteGraph, path: string[], maxM = 16): string
 
 /** How long a flight takes: a steady walking-glide pace, never a jerk or a crawl. */
 export function flightMs(graph: RouteGraph, a: string, b: string) {
-  return Math.round(Math.min(2000, Math.max(700, (flat(graph, a, b) / 6) * 1000)));
+  // A calm walking-glide pace (about 5 m a second) - a long stretch gets the time it needs, not a rush.
+  return Math.round(Math.min(4500, Math.max(800, (flat(graph, a, b) / 5) * 1000)));
 }
 
 /**
