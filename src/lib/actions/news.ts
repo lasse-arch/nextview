@@ -63,6 +63,12 @@ export async function getUnreadNewsCount(userId: string, newsReadAt: Date | null
 const DEFAULT_POSTS: { title: string; body: string; minutesAgo: number; screenshotUrl: string }[] = [
   {
     minutesAgo: 0,
+    title: "nextviewAI finder stedet til touren på kundens hjemmeside - og viser, hvordan det ser ud",
+    body: "På kundesiden under \"På hjemmesiden\" skriver kunden nu bare adressen på deres hjemmeside. nextviewAI læser forsiden og de vigtigste sider fra menuen (fx om stedet, overnatning og kontakt) og foreslår op til 3 steder til touren: hvilken side, hvor på siden og hvorfor, i hvilken størrelse, en overskrift - og om touren skal starte et bestemt sted (fx inde i hytten på siden om hytterne).\n\nHvert forslag kommer med et billede af kundens egen side med touren sat ind - på computer og på mobil - og koden klar til at kopiere. Vi kan se, hvad siden er lavet i (WordPress, Wix, Squarespace, Shopify, Webflow m.fl.), og viser trinene til netop det system.\n\nSikkerhed: kun kunden selv (for egne tours) eller teamet kan bruge den, siden åbnes kun, hvis den er en offentlig hjemmeside (alt, siden henter, tjekkes), og koden laves altid af os - ikke af AI'en. Et svar gemmes et døgn, og der er en grænse for, hvor mange gange man kan spørge i timen.",
+    screenshotUrl: "/news/touren-paa-jeres-hjemmeside.png",
+  },
+  {
+    minutesAgo: 0,
     title: "\"Det kan jeres tour\" - når kunden åbner gennemgangen første gang",
     body: "Når kunden åbner linket til gennemgang første gang, viser touren nu, hvad den kan: et kort pr. smart funktion, der faktisk er i netop deres tour - luftfotoet med punkter, \"Vis mig rundt\" (hver rundvisning), historier, Find vej, live data, stedkort, \"Hvor langt har du til os?\", en dag på stedet, søgning og sprog. Hvert kort har en lille animation af, hvordan funktionen ser ud, og en knap \"Prøv det\", der starter den direkte i touren.\n\nKortene er i tourens egne farver og på tourens sprog. Krydser kunden \"Vis ikke igen\" af, kommer de ikke igen på den computer eller telefon. Det er kun på gennemgangslinket - besøgende på den udgivne tour ser dem ikke.",
     screenshotUrl: "/news/det-kan-jeres-tour.png",

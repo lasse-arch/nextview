@@ -17,6 +17,7 @@ import { PortalEmbeds } from "@/app/r/[token]/embeds";
 import { PHONE, WELCOME_MAIL_SENDER } from "@/lib/welcome-mail";
 import { LangToggle, LocationSwitcher, ReviewLauncher, TourThumb, ApproveTour, ReportMailChoice } from "./portal-ui";
 import { TourShare } from "./tour-share";
+import { SitePlacement } from "./site-placement";
 import { tourEmbeds } from "@/lib/tour-embeds";
 import { EMBED_WORDS, TourEmbedList } from "@/components/tour-embed-list";
 import { TEXT, type Lang } from "./text";
@@ -82,6 +83,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
       nextReportDueAt: true,
       invoiceEmail: true,
       contactEmail: true,
+      websiteUrl: true,
       items: { where: { url: { not: null } }, orderBy: { createdAt: "asc" }, select: { id: true, productType: true, location: true, url: true } },
       // Published tours - and one sent to them for review before it's published (only on Rettelser).
       tours: {
@@ -415,6 +417,13 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
                 <section className={card}>
                   <p className="text-[15px]">{notLive}</p>
                 </section>
+              )}
+              {tours.length > 0 && (
+                <SitePlacement
+                  tours={tours.map((x) => ({ slug: x.slug, title: x.config.title || x.name, url: x.url, places: startPlaces(x.config).map((p) => ({ key: p.key, name: p.name })) }))}
+                  site={scope.find((d) => d.websiteUrl)?.websiteUrl ?? ""}
+                  lang={lang}
+                />
               )}
               {tours.map((x) => (
                 <section key={x.slug} className="space-y-3">

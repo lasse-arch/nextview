@@ -18,9 +18,11 @@ export async function launchHeadlessChromium(): Promise<Browser> {
   const attempts = 4;
   for (let attempt = 1; ; attempt++) {
     try {
+      // CHROMIUM_PATH: a Chromium of one's own when developing locally (the serverless one is for Vercel).
+      const own = process.env.NODE_ENV !== "production" ? process.env.CHROMIUM_PATH : undefined;
       return await puppeteer.launch({
-        args: chromium.args,
-        executablePath: await chromium.executablePath(),
+        args: own ? [] : chromium.args,
+        executablePath: own || (await chromium.executablePath()),
         headless: true,
       });
     } catch (err) {
