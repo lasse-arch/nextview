@@ -244,7 +244,6 @@ export function FeedbackPanel({
             pending={pending}
             sendLabel={status?.sentAt && !status.approvedAt ? "Send påmindelse" : status?.approvedAt ? "Send til ny gennemgang" : "Send til gennemgang"}
             onSend={() => send(Boolean(status?.sentAt && !status.approvedAt))}
-            onClose={() => setCheck(null)}
             onAgain={() => void runCheck()}
             config={config}
             onApply={onApply}
@@ -446,7 +445,6 @@ function CheckResult({
   pending,
   sendLabel,
   onSend,
-  onClose,
   onAgain,
   config,
   onApply,
@@ -460,7 +458,6 @@ function CheckResult({
   pending: boolean;
   sendLabel: string;
   onSend: () => void;
-  onClose: () => void;
   onAgain: () => void;
 }) {
   const errors = check.items.filter((i) => i.level === "fejl").length;
@@ -490,19 +487,13 @@ function CheckResult({
         ) : null;
       })}
       {check.ai != null && <AiNotes key={check.at} notes={check.ai} initialDone={check.done} onDone={onDone} config={config} onApply={onApply} />}
-      {/* The send button on its own line (never broken over two), the two others under it. */}
-      <div className="space-y-1.5 pt-1">
-        <button type="button" disabled={pending} onClick={onSend} className={`w-full whitespace-nowrap rounded-xl py-2.5 text-[14px] font-semibold text-white disabled:opacity-40 ${errors ? "bg-[#ff3b30]" : "bg-[#0071e3]"}`}>
+      <div className="flex gap-2 pt-1">
+        <button type="button" disabled={pending} onClick={onSend} className={`flex-1 whitespace-nowrap rounded-xl py-2.5 text-[14px] font-semibold text-white disabled:opacity-40 ${errors ? "bg-[#ff3b30]" : "bg-[#0071e3]"}`}>
           {errors ? `${sendLabel} alligevel` : sendLabel}
         </button>
-        <div className="grid grid-cols-2 gap-1.5">
-          <button type="button" onClick={onAgain} className="whitespace-nowrap rounded-xl bg-white py-2 text-[14px] font-medium text-[#0071e3] ring-1 ring-black/[.08]">
-            Tjek igen
-          </button>
-          <button type="button" onClick={onClose} className="whitespace-nowrap rounded-xl bg-[#f2f2f7] py-2 text-[14px] font-medium text-[#3c3c43]">
-            Ret først
-          </button>
-        </div>
+        <button type="button" onClick={onAgain} className="whitespace-nowrap rounded-xl bg-white px-4 py-2 text-[14px] font-medium text-[#0071e3] ring-1 ring-black/[.08]">
+          Tjek igen
+        </button>
       </div>
       <p className="text-[11px] leading-snug text-[#8e8e93]">Tjekket ser på den gemte tour. Gem først, hvis du har rettet noget.</p>
     </div>
