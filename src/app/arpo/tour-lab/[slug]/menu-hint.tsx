@@ -16,6 +16,29 @@ const TRIGGERS = [".hv-menuknap", ".bm-knap", ".sp-menuknap", ".dz-dock", ".pk-m
 
 type Spot = { x: number; y: number; w: number; h: number };
 
+/** The menu's button as it is on screen now - only when it can really be seen (not hidden, faded or covered by a picture, the drone scene …). */
+function visibleTrigger(): HTMLElement | null {
+  for (const s of TRIGGERS) {
+    const el = document.querySelector<HTMLElement>(s);
+    if (!el || el.offsetParent === null) continue;
+    const r = el.getBoundingClientRect();
+    if (r.width < 4 || r.height < 4) continue;
+    let seen = true;
+    for (let at: HTMLElement | null = el; at; at = at.parentElement) {
+      const cs = getComputedStyle(at);
+      if (cs.visibility === "hidden" || Number(cs.opacity) < 0.3) {
+        seen = false;
+        break;
+      }
+    }
+    if (!seen) continue;
+    // On top at its middle - nothing else lying over it.
+    const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    if (top && (el === top || el.contains(top) || top.closest(".mh"))) return el;
+  }
+  return null;
+}
+
 export function MenuHint({ slug, again }: { slug: string; again: boolean }) {
   const tr = useT();
   const [spot, setSpot] = useState<Spot | null>(null);
@@ -27,9 +50,10 @@ export function MenuHint({ slug, again }: { slug: string; again: boolean }) {
       if (!again && sessionStorage.getItem(key)) return;
     } catch {}
     let hide: ReturnType<typeof setTimeout> | undefined;
+    let watch: ReturnType<typeof setInterval> | undefined;
     // A moment after stepping in, so it isn't lost among everything else appearing.
     const show = setTimeout(() => {
-      const el = TRIGGERS.map((s) => document.querySelector<HTMLElement>(s)).find((e) => e && e.offsetParent !== null && e.getBoundingClientRect().width > 0);
+      const el = visibleTrigger();
       if (!el) return;
       const r = el.getBoundingClientRect();
       setSpot({ x: r.left, y: r.top, w: r.width, h: r.height });
@@ -37,12 +61,21 @@ export function MenuHint({ slug, again }: { slug: string; again: boolean }) {
         sessionStorage.setItem(key, "1");
       } catch {}
       hide = setTimeout(() => setGone(true), 4500);
+      // The visitor may move on meanwhile (a tap inside the 3D tour never reaches this page): gone the moment the button
+      // can't be seen any more, and following it if it moves.
+      watch = setInterval(() => {
+        const now = visibleTrigger();
+        if (!now) return setGone(true);
+        const n = now.getBoundingClientRect();
+        setSpot((s) => (s && Math.abs(s.x - n.left) < 1 && Math.abs(s.y - n.top) < 1 && Math.abs(s.w - n.width) < 1 ? s : { x: n.left, y: n.top, w: n.width, h: n.height }));
+      }, 200);
     }, 1200);
     const touched = () => setGone(true);
     window.addEventListener("pointerdown", touched, { once: true });
     return () => {
       clearTimeout(show);
       if (hide) clearTimeout(hide);
+      if (watch) clearInterval(watch);
       window.removeEventListener("pointerdown", touched);
     };
   }, [slug, again]);

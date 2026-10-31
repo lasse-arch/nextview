@@ -3050,7 +3050,7 @@ function TourExperience({
           {tx("Gør touren klar …")}
         </div>
       )}
-      {T.menuHint && (T.menuHint === "all" || (typeof window !== "undefined" && window.innerWidth <= 760)) && (helpDone || !T.onboarding) && phase === "tour" && !cover && !welcome && !intro && sdk && guideAt == null && !menuOpen && !contactOpen && (
+      {T.menuHint && (T.menuHint === "all" || (typeof window !== "undefined" && window.innerWidth <= 760)) && (helpDone || !T.onboarding) && phase === "tour" && !cover && !welcome && !intro && sdk && guideAt == null && !menuOpen && !contactOpen && !pano && !guideImage && (
         <MenuHint slug={T.slug} again={inEditorPreview()} />
       )}
       {guideAt != null && GUIDE[guideAt] && (
