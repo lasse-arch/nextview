@@ -155,7 +155,7 @@ export type MenuStyle = NonNullable<TourConfig["design"]>["menu"];
 
 export const START_STYLES: [StartStyle, string, string][] = [
   ["cover", "Forside med foto", "Et stort foto af stedet med en knap ind og stederne at vælge imellem - premium, og fortsætter hjemmesidens fortælling."],
-  ["tiles", "Velkomst med fliser", "En kort velkomst med fliser til de vigtigste steder. Godt når der er få, tydelige valg."],
+  ["tiles", "Fliser", "En kort velkomst med fliser til de vigtigste steder. Godt når der er få, tydelige valg."],
   ["simple", "Helt enkel", "Få store knapper under hinanden - intet andet. Til gæster, der skal have det helt roligt (fx specialskoler). Hold det til 2-3 knapper."],
   ["none", "Direkte i touren", "Touren starter med det samme - godt når folk kommer fra en knap på hjemmesiden, der allerede har fortalt historien."],
 ];
@@ -163,19 +163,19 @@ export const START_STYLES: [StartStyle, string, string][] = [
 export const MENU_STYLES: [MenuStyle, string, string][] = [
   ["side", "Sidemenu", "En menu i siden med grupper - til mange rum."],
   ["dock", "Bar i bunden", "Stederne, rundvisningen og hovedknappen i en bar nederst."],
-  ["bento", "Fliser", "Menuen som store billedfliser."],
+  ["bento", "Flisemenu", "Menuen som store billedfliser."],
   ["simple", "Helt enkel", "Én knap med én liste - intet andet."],
   ["picker", "Rumvælger", "Vælg størrelse og rum i bunden. Kun til få kunder (fx depotrum)."],
 ];
 
 /** How a tour starts now. */
-export const startStyleOf = (T: TourConfig): StartStyle => (T.design?.welcome === "cover" ? "cover" : T.welcome ? (T.design?.welcome === "simple" ? "simple" : "tiles") : "none");
+export const startStyleOf = (T: TourConfig): StartStyle => (T.design?.welcome === "cover" ? "cover" : T.design?.welcome === "none" ? "none" : T.welcome ? (T.design?.welcome === "simple" ? "simple" : "tiles") : "none");
 
-/** Sets the start and the menu on a tour (changes `d`), filling in a welcome or a cover from the tour itself when it has none. */
+/** Sets the start and the menu on a tour (changes `d`), filling in a welcome or a cover from the tour itself when it has none - never removing one already made. */
 export function setLayout(d: TourConfig, start: StartStyle, menu: MenuStyle): void {
   if (start === "none") {
-    d.welcome = undefined;
-    d.design = { ...d.design, welcome: "tiles", menu };
+    // The tiles are kept - only not shown - so switching back brings them back.
+    d.design = { ...d.design, welcome: "none", menu };
   } else if (start === "tiles" || start === "simple") {
     d.welcome ??= { kicker: d.brand, title: `Velkommen til ${d.brand}`, lead: "Tag en tur rundt - eller hop direkte derhen, du vil se.", tiles: [], skip: "Jeg kigger selv rundt" };
     d.design = { ...d.design, welcome: start, menu };

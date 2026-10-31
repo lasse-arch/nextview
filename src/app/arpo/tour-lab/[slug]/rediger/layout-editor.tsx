@@ -3,7 +3,7 @@
 import type { FindButtonPlace, TourConfig } from "../../tours/types";
 import { MENU_STYLES as MENUS, START_STYLES as STARTS, setLayout, startStyleOf } from "../../tours/presets";
 import { BentoEditor } from "./bento-editor";
-import { Choice, Field, Group, Toggle, input } from "./ui";
+import { Choice, Field, Group, Toggle, input, type PreviewApi } from "./ui";
 
 /*
  * "Layout": the one place a tour's look is chosen, in the order it is made -
@@ -56,7 +56,7 @@ function Cards<T extends string>({ value, options, onChange }: { value: T; optio
   );
 }
 
-export function LayoutEditor({ config, edit, onTab }: { config: TourConfig; edit: Edit; /** Jump to the tab where the texts/items are edited. */ onTab: (tab: "start" | "menu" | "sprog" | "funktioner") => void }) {
+export function LayoutEditor({ config, edit, onTab, preview }: { config: TourConfig; edit: Edit; /** Jump to the tab where the texts/items are edited. */ onTab: (tab: "start" | "menu" | "sprog" | "funktioner") => void; preview: PreviewApi }) {
   const style = startStyleOf(config);
   const menuStyle = config.design?.menu ?? "side";
   const langs = (config.languages ?? []).filter((l) => l !== "da");
@@ -87,7 +87,15 @@ export function LayoutEditor({ config, edit, onTab }: { config: TourConfig; edit
 
       <Step n={2} title="Menuen">
         <Group>
-          <Cards value={menuStyle} options={MENUS} onChange={(v) => edit((d) => void (d.design = { ...d.design, welcome: d.design?.welcome ?? "tiles", menu: v }))} />
+          <Cards
+            value={menuStyle}
+            options={MENUS}
+            onChange={(v) => {
+              edit((d) => void (d.design = { ...d.design, welcome: d.design?.welcome ?? "tiles", menu: v }));
+              // Straight to the menu in the preview, so it's seen at once - after the new draft (sent 250 ms after a change) has arrived.
+              setTimeout(() => preview.showMenu(), 700);
+            }}
+          />
           {menuStyle === "bento" && <BentoEditor config={config} edit={edit} />}
           {menuStyle === "picker" && (
             <Field title="Når man vælger en størrelse, start i" hint="Findes rummet ikke i en størrelse, starter den i størrelsens første">

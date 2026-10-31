@@ -398,6 +398,7 @@ export function TourEditor({
       shot: () => ask<{ image?: string }>("tour-shot", 15000),
       storyPictures: (progress) => ask<{ done?: boolean }>("tour-stories", 10 * 60_000, progress),
       pick: () => ask<{ position?: { x: number; y: number; z: number }; ss?: number | null; room?: string | null }>("tour-pick", 120000),
+      showMenu: () => frame.current?.contentWindow?.postMessage({ type: "tour-show-menu" }, location.origin),
       go: (name, href) => frame.current?.contentWindow?.postMessage({ type: "tour-go", name, href }, location.origin),
       device: () => deviceRef.current,
       panoView: () => ask<{ yaw?: number; pitch?: number; hfov?: number; phone?: boolean; image?: string }>("tour-pano-view"),
@@ -839,7 +840,7 @@ export function TourEditor({
                 }}
               />
             )}
-            {tab === "layout" && <LayoutEditor config={config} edit={edit} onTab={setTab} />}
+            {tab === "layout" && <LayoutEditor config={config} edit={edit} onTab={setTab} preview={preview} />}
             {tab === "start" && <StartEditor config={config} edit={edit} slug={slug} preview={preview} />}
             {tab === "rundvisning" && (
               <>

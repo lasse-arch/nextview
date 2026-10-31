@@ -2,6 +2,7 @@
 
 import { LinkInput } from "./links-open";
 import { StopVoice, VoiceGroup, voiceState } from "./voice-editor";
+import { startStyleOf } from "../../tours/presets";
 import { guideExit, IMAGE_HREF, imageOfHref, isPlaceHref, PANO_HFOV, placeHref, startPlaces } from "../../tours/places";
 import { AiImageButton, AiImageList } from "./ai-image";
 import { writePlaceCards, type CardDraft } from "@/lib/actions/tour-cards";
@@ -297,7 +298,7 @@ const menuRooms = (c: TourConfig) => c.menu.flatMap((m) => ("items" in m ? m.ite
 /* ------------------------------------------------------------------ */
 
 export function StartEditor({ config, edit, slug, preview }: Props) {
-  const style = config.design?.welcome === "cover" ? "cover" : config.welcome ? (config.design?.welcome === "simple" ? "simple" : "tiles") : "none";
+  const style = startStyleOf(config);
   const menuStyle = config.design?.menu ?? "side";
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -418,7 +419,7 @@ export function StartEditor({ config, edit, slug, preview }: Props) {
 
       {(style === "tiles" || style === "simple") && welcome && (
         <>
-          <Group title="Velkomsten">
+          <Group title="Fliserne - teksten over dem">
             <Field title="Lille overskrift">
               <input className={input} value={welcome.kicker} onChange={(e) => edit((d) => void (d.welcome!.kicker = e.target.value))} />
             </Field>

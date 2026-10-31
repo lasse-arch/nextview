@@ -293,7 +293,8 @@ export type TourConfig = {
    * side panels. For visitors who need it calm and plain (special schools).
    */
   design?: {
-    welcome: "tiles" | "cover" | "simple";
+    /** "none" = straight into the tour - the welcome's tiles are kept (not shown), so they're back when a start with tiles is chosen again. */
+    welcome: "tiles" | "cover" | "simple" | "none";
     menu: "side" | "dock" | "picker" | "simple" | "bento";
     /** Room picker: the room a size opens in when it's picked (e.g. "Tomt"). Left out, or not in that size = the size's first. */
     first?: string;

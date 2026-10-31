@@ -382,7 +382,8 @@ function TourExperience({
   played = false,
 }: ExperienceProps & { setLang?: (lang: string) => void; /** Started from the play button - that was the front page, so the cover isn't shown again. */ played?: boolean }) {
   // The setup in the visitor's language; names that reach outside it (statistics, ?rum=, pictures) stay Danish.
-  const T = useMemo(() => withoutDeadAerialLinks(asScene(localize(savedTour, lang))), [savedTour, lang]);
+  // "Direkte i touren" (design.welcome "none"): the welcome's tiles are kept in the setup, never shown.
+  const T = useMemo(() => withoutDeadAerialLinks(asScene(localize(savedTour.design?.welcome === "none" ? { ...savedTour, welcome: undefined } : savedTour, lang))), [savedTour, lang]);
   const tx = useMemo(() => makeT(savedTour, lang), [savedTour, lang]);
   const da = useMemo(() => danishOf(savedTour, lang), [savedTour, lang]);
   /** What the start ran with: only a change to how the tour starts runs it again (not a new language, nor an edit in the editor - a colour, a text). */
@@ -1960,6 +1961,13 @@ function TourExperience({
         menuGo(e.data.name ?? "", "editor", e.data.href);
       }
       if (e.data.type === "tour-peek") bridge.current.peek(); // e.g. the colour filter: show the 3D tour itself
+      if (e.data.type === "tour-show-menu") {
+        // A menu design picked in the editor: the menu as it looks now - not the front page again.
+        setCover(false);
+        setWelcome(false);
+        setSelected(null);
+        setMenuOpen(true);
+      }
       if (e.data.type === "tour-pick") {
         // The editor places a tag: the next click in the tour says where.
         if (!sdk) return reply({ type: "tour-pick", id: e.data.id, error: "Touren er ikke klar endnu - vent et øjeblik." });

@@ -115,6 +115,8 @@ export type PreviewApi = {
   /** Waits for a click in the preview: the spot in the room (for a tag), the scan point and the room. */
   pick: () => Promise<{ position?: { x: number; y: number; z: number }; ss?: number | null; room?: string | null; error?: string }>;
   go: (name: string, href: string) => void;
+  /** Shows the menu as it looks now - past the front page / welcome (when a menu design is picked). */
+  showMenu: () => void;
   /** The 360° picture open in the preview: its direction, zoom (view width) and whether the preview is a phone. */
   /** The device the preview is set to (Computer / Mobil over it). */
   device: () => "computer" | "mobil";
