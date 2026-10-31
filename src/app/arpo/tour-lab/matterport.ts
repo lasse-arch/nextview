@@ -8,7 +8,11 @@
  * by" and loading screen. Only the few SDK calls we use are typed here.
  */
 
-/** The SDK Bundle version in public/matterport - upgrading = unzip the new one next to it and change this. */
+/**
+ * The SDK Bundle version in public/matterport - upgrading = unzip the new one next to it and change this.
+ * Our one change to it: how far out one can zoom (minZoom .7 → .5, in js/3907.js and js/autotours.js), so a
+ * tall phone can show more of a room ("Zoom" under Navigation). Make it again in a new version.
+ */
 export const BUNDLE_VERSION = "26.5.4_webgl-708-g332adb66f5";
 
 export type Rotation = { x: number; y: number };
