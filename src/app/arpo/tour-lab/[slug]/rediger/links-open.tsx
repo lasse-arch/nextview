@@ -3,6 +3,7 @@
 import { createContext, useContext, useState } from "react";
 import type { LinkOpen, PopupSize, TourConfig } from "../../tours/types";
 import { Choice, Field, GearButton, input, Toggle } from "./ui";
+import { matchTargets, MentionList, tourTargets, type Target } from "./mentions";
 
 /*
  * How the tour's links open (Knapper og kontakt → Åbning): the default, a
@@ -92,6 +93,13 @@ const MODE_NAME: Record<LinkOpen, string> = { popup: "popup over touren", tab: "
 export function LinkInput({ value, onChange, onBlur, className = "", placeholder = "https://…" }: { value: string; onChange: (href: string) => void; onBlur?: (href: string) => void; className?: string; placeholder?: string }) {
   const ctx = useContext(LinkOpenContext);
   const [open, setOpen] = useState(false);
+  // "@": a place, a point, a picture or a feature in the tour - picked, the field gets its link.
+  const [active, setActive] = useState(0);
+  const typing = /^@/.test(value) && ctx ? matchTargets(tourTargets(ctx.config), value.slice(1)) : [];
+  const pick = (t: Target) => {
+    onChange(t.href);
+    setActive(0);
+  };
   const href = value.trim();
   const web = /^https?:\/\/\S+\.\S+/i.test(href);
   const def = ctx?.config.linkOpen?.default ?? "tab";
@@ -116,8 +124,32 @@ export function LinkInput({ value, onChange, onBlur, className = "", placeholder
   };
   return (
     <div className={className}>
-      <div className="flex items-center gap-1">
-        <input className={`${input} ${className.includes("bg-white") ? "bg-white" : ""}`} value={value} placeholder={placeholder} onChange={(e) => change(e.target.value)} onBlur={onBlur ? (e) => onBlur(e.target.value) : undefined} />
+      <div className="relative flex items-center gap-1">
+        <input
+          className={`${input} ${className.includes("bg-white") ? "bg-white" : ""}`}
+          value={value}
+          placeholder={ctx ? `${placeholder} - eller @ for et sted i touren` : placeholder}
+          onChange={(e) => (change(e.target.value), setActive(0))}
+          onKeyDown={(e) => {
+            if (!typing.length) return;
+            if (e.key === "ArrowDown") {
+              e.preventDefault();
+              setActive((a) => (a + 1) % typing.length);
+            } else if (e.key === "ArrowUp") {
+              e.preventDefault();
+              setActive((a) => (a - 1 + typing.length) % typing.length);
+            } else if (e.key === "Enter") {
+              e.preventDefault();
+              pick(typing[active] ?? typing[0]);
+            }
+          }}
+          onBlur={onBlur ? (e) => !/^@/.test(e.target.value) && onBlur(e.target.value) : undefined}
+        />
+        {typing.length > 0 && (
+          <div className="absolute left-0 right-0 top-full">
+            <MentionList items={typing} active={active} onPick={pick} />
+          </div>
+        )}
         {ctx && web && <GearButton open={open} changed={own != null} onClick={() => setOpen(!open)} title="Hvordan linket åbner" />}
       </div>
       {ctx && web && open && (

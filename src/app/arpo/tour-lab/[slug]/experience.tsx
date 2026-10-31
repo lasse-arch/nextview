@@ -517,6 +517,16 @@ function TourExperience({
     window.addEventListener("hv-kontakt", open);
     return () => window.removeEventListener("hv-kontakt", open);
   }, []);
+  // A button or link to a place in the tour (written with @ in the editor): there, as if picked in the menu.
+  const goToRef = useRef<(href: string, label: string) => void>(() => {});
+  useEffect(() => {
+    const go = (e: Event) => {
+      const d = (e as CustomEvent<{ href: string; label: string }>).detail;
+      if (d?.href) goToRef.current(d.href, d.label ?? "");
+    };
+    window.addEventListener("hv-gaa-til", go);
+    return () => window.removeEventListener("hv-gaa-til", go);
+  }, []);
   // Any link "#dag" opens "Sådan ser en dag ud" (also when its button isn't in the menu).
   const openDayRef = useRef<(from: string) => void>(() => {});
   useEffect(() => {
@@ -1350,6 +1360,14 @@ function TourExperience({
     setMenuOpen(false);
     await flyTo(href, "fly");
   }
+  // (See "hv-gaa-til" above: a button to a place in the tour goes there as the menu would.)
+  useEffect(() => {
+    goToRef.current = (href, label) => {
+      setLightbox(null);
+      setSelected(null);
+      void menuGo(label, "link", href);
+    };
+  });
 
   async function storyGo(r: StoryRoom) {
     track("menu_click", { item_name: r.name, group: "Historier" });

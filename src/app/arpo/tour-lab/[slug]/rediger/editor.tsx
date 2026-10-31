@@ -36,6 +36,7 @@ import { FeedbackPanel } from "./feedback-panel";
 import { LinkInput, LinkOpenContext, LinksOpenEditor } from "./links-open";
 import { CommuteEditor } from "./commute-editor";
 import { AiImageButton } from "./ai-image";
+import { matchTargets, mentionAt, MentionList, tourTargets, type Target } from "./mentions";
 import { deleteStoryImages } from "@/lib/actions/tour-lab";
 import { suggestSiteLook } from "@/lib/actions/tour-ai";
 
@@ -1477,6 +1478,16 @@ function ClaudePanel({
 }) {
   const [ready, setReady] = useState(initiallyReady);
   const [text, setText] = useState("");
+  /** "@" typed: the places, points and features to pick from - picked, "@Name" goes into the message. */
+  const [mention, setMention] = useState<{ start: number; query: string } | null>(null);
+  const [mentionIndex, setMentionAt] = useState(0);
+  const mentionHits = mention ? matchTargets(tourTargets(config), mention.query) : [];
+  function pickMention(t: Target) {
+    if (!mention) return;
+    const end = mention.start + 1 + mention.query.length;
+    setText((x) => `${x.slice(0, mention.start)}@${t.label} ${x.slice(end)}`);
+    setMention(null);
+  }
   /** Pictures to send with the next message (pasted, dropped or picked). */
   const [images, setImages] = useState<string[]>([]);
   const [dragging, setDragging] = useState(false);
@@ -1509,7 +1520,10 @@ function ClaudePanel({
     setImages([]);
     const before = config;
     start(async () => {
-      const r = await askClaudeForTour(config, history, ask, pics).catch((err: unknown) => ({ ok: false as const, error: `Kunne ikke nå nextviewAI (${err instanceof Error ? err.message : err}) - prøv igen.` }));
+      // "@Name" in the message: nextviewAI is told exactly which place, point or feature it means (and its link).
+      const named = tourTargets(config).filter((t) => ask.includes(`@${t.label}`));
+      const sent = named.length ? `${ask}\n\n(@-henvisninger: ${named.map((t) => `@${t.label} = ${t.kind.toLowerCase()} med linket ${t.href}`).join("; ")})` : ask;
+      const r = await askClaudeForTour(config, history, sent, pics).catch((err: unknown) => ({ ok: false as const, error: `Kunne ikke nå nextviewAI (${err instanceof Error ? err.message : err}) - prøv igen.` }));
       if (!r.ok) {
         // A revoked/changed key: ask for the new one right here.
         if (r.error.startsWith("nextviewAI-nøglen")) setReady(false);
@@ -1677,6 +1691,13 @@ function ClaudePanel({
             ))}
           </div>
         )}
+        {mentionHits.length > 0 && (
+          <div className="relative">
+            <div className="absolute bottom-1 left-0 right-0 [&>ul]:mt-0">
+              <MentionList items={mentionHits} active={mentionIndex} onPick={pickMention} />
+            </div>
+          </div>
+        )}
         <textarea
           value={text}
           rows={2}
@@ -1686,14 +1707,24 @@ function ClaudePanel({
             e.preventDefault();
             addImages(files);
           }}
-          onChange={(e) => setText(e.target.value)}
+          onChange={(e) => {
+            setText(e.target.value);
+            setMention(mentionAt(e.target.value, e.target.selectionStart ?? e.target.value.length));
+            setMentionAt(0);
+          }}
           onKeyDown={(e) => {
+            if (mentionHits.length) {
+              if (e.key === "ArrowDown") return (e.preventDefault(), setMentionAt((a) => (a + 1) % mentionHits.length));
+              if (e.key === "ArrowUp") return (e.preventDefault(), setMentionAt((a) => (a - 1 + mentionHits.length) % mentionHits.length));
+              if (e.key === "Enter" || e.key === "Tab") return (e.preventDefault(), pickMention(mentionHits[mentionIndex] ?? mentionHits[0]));
+              if (e.key === "Escape") return setMention(null);
+            }
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
               send(text);
             }
           }}
-          placeholder="Beskriv en ændring… (indsæt eller træk et billede ind)"
+          placeholder="Beskriv en ændring… (@ for et sted i touren - indsæt eller træk et billede ind)"
           className="block w-full resize-none border-0 bg-transparent px-2 py-1 text-[15px] placeholder:text-[#8e8e93] focus:outline-none focus:ring-0"
         />
         <div className="flex items-center justify-between gap-2 px-1">

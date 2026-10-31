@@ -4,7 +4,7 @@ import { useT } from "../tours/i18n-react";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { apiUrl } from "../tours/api";
 import type { LinkOpen, PopupSize, TourConfig } from "../tours/types";
-import { guideOfHref } from "../tours/places";
+import { guideOfHref, isPlaceHref } from "../tours/places";
 
 /*
  * Every link out of a tour (book, menu card, webshop…) opens the way the tour
@@ -206,10 +206,18 @@ function startsGuide(href: string): boolean {
   return true;
 }
 
+/** A place in the tour itself (a scan point, a point on the aerial photo, a picture, the aerial photo): the tour goes there - "hv-gaa-til", detail { href, label }. */
+function goesInTour(href: string, label: string): boolean {
+  if (!(isPlaceHref(href) || /^#(punkt:|billede:|luften$)/.test(href))) return false;
+  window.dispatchEvent(new CustomEvent("hv-gaa-til", { detail: { href, label } }));
+  return true;
+}
+
 /** Opens a link from code (a button rather than an <a>) the tour's way. */
 export function openLink(T: TourConfig, href: string, label: string, popup: (href: string, label: string) => void) {
   if (IN_TOUR[href]) return void window.dispatchEvent(new Event(IN_TOUR[href]));
   if (startsGuide(href)) return;
+  if (goesInTour(href, label)) return;
   const mode = linkMode(T, href);
   const url = tagged(T, href);
   if (mode === "popup") popup(url, label);
@@ -251,6 +259,10 @@ export function TourLink({
         if (guideOfHref(href) !== undefined) {
           e.preventDefault();
           startsGuide(href);
+          return;
+        }
+        if (goesInTour(href, label)) {
+          e.preventDefault();
           return;
         }
         if (mode === "popup") {
