@@ -918,6 +918,17 @@ function GuideSetupEditor({ config, edit, preview, onEditPoint }: Omit<Props, "s
         {(stops.length > 0 || fromMenu) && (
           <Field title="Ved hvert stop">
             <Choice value={config.guide?.turn ?? "as"} options={turnOptions} onChange={(v) => edit((d) => void (d.guide = { ...d.guide!, turn: v === "as" ? undefined : (v as GuideTurn) }))} />
+            {config.guide?.turn !== "none" && (
+              <Choice<"once" | "continuous">
+                value={config.guide?.turnMode ?? "once"}
+                options={[
+                  ["once", "Én kort drejning"],
+                  ["continuous", "Drejer hele tiden"],
+                ]}
+                onChange={(v) => edit((d) => void (d.guide = { ...d.guide!, turnMode: v === "continuous" ? "continuous" : undefined }))}
+              />
+            )}
+            {config.guide?.turnMode === "continuous" && config.guide?.turn !== "none" && <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">Drejer jævnt, til næste stop - og stopper, så snart gæsten selv rører touren (rundvisningen venter så på Fortsæt).</p>}
             {config.guide?.turn !== "none" && <p className="px-1 pt-1 text-[12px] text-[#8e8e93]">Hastighed - for alle stop (et stop kan få sin egen under ⚙)</p>}
             {config.guide?.turn !== "none" && <Choice value={config.guide?.turnSpeed ?? "normal"} options={speedOptions} onChange={(v) => edit((d) => void (d.guide = { ...d.guide!, turnSpeed: v === "normal" ? undefined : (v as GuideTurnSpeed) }))} />}
           </Field>

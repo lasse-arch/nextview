@@ -44,6 +44,8 @@ export type GuideSetup = {
   turn?: GuideTurn;
   /** How fast it turns at each stop. A stop can have its own. */
   turnSpeed?: GuideTurnSpeed;
+  /** "continuous": it keeps turning (evenly, in step with the screen) until the next stop or until the visitor touches the tour. Left out: one short turn, then it stands still (as always). */
+  turnMode?: "continuous";
   /** A stop: where (empty href = stay, e.g. a closing card; a picture "#billede:<address>" = shown full screen, a 2:1 one as 360°, e.g. a drone photo), its text, and optionally a voice (an audio file) that plays there. */
   stops: ({ point: string; turn?: GuideTurn; turnSpeed?: GuideTurnSpeed } | { href: string; title: string; text: string; audio?: string; /** The text a made voice (ElevenLabs) was read from - it only plays while the stop says just that (not after a change, not in another language). */ audioText?: string; /** What the card shows instead of `text` - e.g. short, concrete words (one thing per sentence) for a special school. `text` stays what the voice says, so the voice keeps playing; left out = `text` is shown. When a stop has a voice, rewrite this - never `text`. */ short?: string; turn?: GuideTurn; turnSpeed?: GuideTurnSpeed; /** The stop's own button, e.g. "Se alle linjer" to the school's page - on the last stop instead of the tour's main button. */ button?: { label: string; href: string } })[];
 };
