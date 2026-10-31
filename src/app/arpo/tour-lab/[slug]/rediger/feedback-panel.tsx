@@ -490,16 +490,19 @@ function CheckResult({
         ) : null;
       })}
       {check.ai != null && <AiNotes key={check.at} notes={check.ai} initialDone={check.done} onDone={onDone} config={config} onApply={onApply} />}
-      <div className="flex flex-wrap gap-2 pt-1">
-        <button type="button" disabled={pending} onClick={onSend} className={`flex-1 rounded-xl py-2 text-[14px] font-medium text-white disabled:opacity-40 ${errors ? "bg-[#ff3b30]" : "bg-[#0071e3]"}`}>
+      {/* The send button on its own line (never broken over two), the two others under it. */}
+      <div className="space-y-1.5 pt-1">
+        <button type="button" disabled={pending} onClick={onSend} className={`w-full whitespace-nowrap rounded-xl py-2.5 text-[14px] font-semibold text-white disabled:opacity-40 ${errors ? "bg-[#ff3b30]" : "bg-[#0071e3]"}`}>
           {errors ? `${sendLabel} alligevel` : sendLabel}
         </button>
-        <button type="button" onClick={onAgain} className="rounded-xl bg-white px-3 py-2 text-[14px] font-medium text-[#0071e3] ring-1 ring-black/[.06]">
-          Tjek igen
-        </button>
-        <button type="button" onClick={onClose} className="rounded-xl px-3 py-2 text-[14px] text-[#8e8e93]">
-          Ret først
-        </button>
+        <div className="grid grid-cols-2 gap-1.5">
+          <button type="button" onClick={onAgain} className="whitespace-nowrap rounded-xl bg-white py-2 text-[14px] font-medium text-[#0071e3] ring-1 ring-black/[.08]">
+            Tjek igen
+          </button>
+          <button type="button" onClick={onClose} className="whitespace-nowrap rounded-xl bg-[#f2f2f7] py-2 text-[14px] font-medium text-[#3c3c43]">
+            Ret først
+          </button>
+        </div>
       </div>
       <p className="text-[11px] leading-snug text-[#8e8e93]">Tjekket ser på den gemte tour. Gem først, hvis du har rettet noget.</p>
     </div>
