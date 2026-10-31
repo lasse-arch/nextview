@@ -12,10 +12,11 @@ import { guideOfHref, isPlaceHref } from "../tours/places";
  * One default per tour, and any single link can be set differently.
  */
 
-const LinkCtx = createContext<{ modeFor: (href: string) => LinkOpen; tag: (href: string) => string; popup: (href: string, label: string) => void }>({
+const LinkCtx = createContext<{ modeFor: (href: string) => LinkOpen; tag: (href: string) => string; popup: (href: string, label: string) => void; check: (href: string) => void }>({
   modeFor: () => "tab",
   tag: (href) => href,
   popup: () => {},
+  check: () => {},
 });
 
 /**
@@ -81,6 +82,26 @@ export function prefetchFrames(T: TourConfig) {
   for (const href of links) if (!NEVER_FRAMED.test(href) && linkMode(T, href) === "popup") void checkFrame(T.slug, href);
 }
 
+/** The same for links that only come later (e.g. each unit's own page in live data) - asked as soon as they're known. */
+export function prefetchLinks(T: TourConfig, hrefs: (string | undefined | null)[]) {
+  for (const href of new Set(hrefs)) if (href && /^https?:\/\//.test(href) && !NEVER_FRAMED.test(href) && linkMode(T, href) === "popup") void checkFrame(T.slug, href);
+}
+
+/**
+ * Opens a page in a new tab from code. The browser only allows it shortly
+ * after a tap - false when it was refused (then a button is shown instead).
+ * Without "noopener" so the answer can be seen; the new tab's link back to
+ * the tour is cut at once, before the page has loaded.
+ */
+export function openTab(href: string): boolean {
+  const w = window.open(href, "_blank");
+  if (!w) return false;
+  try {
+    w.opener = null;
+  } catch {}
+  return true;
+}
+
 /** Social media, maps and the like - they forbid being shown in a frame. */
 const NEVER_FRAMED = /^https?:\/\/([a-z0-9-]+\.)*(facebook\.com|fb\.com|fb\.me|instagram\.com|linkedin\.com|tiktok\.com|twitter\.com|x\.com|threads\.net|pinterest\.[a-z.]+|google\.[a-z.]+\/maps|maps\.google\.[a-z.]+|maps\.app\.goo\.gl|goo\.gl|wa\.me|whatsapp\.com|m\.me|messenger\.com)(\/|$)/i;
 
@@ -107,7 +128,7 @@ export function siteOf(href: string): string | null {
 
 /** Gives every TourLink below it the tour's opening rule; `popup` shows a link over the tour. */
 export function LinkProvider({ T, popup, children }: { T: TourConfig; popup: (href: string, label: string) => void; children: React.ReactNode }) {
-  return <LinkCtx.Provider value={{ modeFor: (href) => linkMode(T, href), tag: (href) => tagged(T, href), popup }}>{children}</LinkCtx.Provider>;
+  return <LinkCtx.Provider value={{ modeFor: (href) => linkMode(T, href), tag: (href) => tagged(T, href), popup, check: (href) => prefetchLinks(T, [href]) }}>{children}</LinkCtx.Provider>;
 }
 
 /** The popup: the page over the tour, with a way out to a new tab (some sites refuse to be shown inside others). */
@@ -131,9 +152,18 @@ export function LinkPopup({
   const tr = useT();
   // Opened before the answer came: if the page refuses to be shown inside ours, a clear way out instead of a blank page.
   const [blocked, setBlocked] = useState<{ href: string; no: boolean } | null>(null);
+  const close = useRef(onClose);
+  useEffect(() => {
+    close.current = onClose;
+  });
   useEffect(() => {
     let alive = true;
-    checkFrame(slug, open.href).then((ok) => alive && setBlocked({ href: open.href, no: !ok }));
+    checkFrame(slug, open.href).then((ok) => {
+      if (!alive) return;
+      // Can't be shown here: straight to a new tab (allowed while the tap is fresh) - else the button below.
+      if (!ok && openTab(open.href)) return close.current();
+      setBlocked({ href: open.href, no: !ok });
+    });
     return () => {
       alive = false;
     };
@@ -239,7 +269,7 @@ export function TourLink({
   className?: string;
   children: React.ReactNode;
 }) {
-  const { modeFor, tag, popup } = useContext(LinkCtx);
+  const { modeFor, tag, popup, check } = useContext(LinkCtx);
   const mode = modeFor(href);
   const url = tag(href);
   return (
@@ -248,6 +278,9 @@ export function TourLink({
       className={className}
       target={mode === "tab" ? "_blank" : undefined}
       rel={mode === "tab" ? "noopener" : undefined}
+      // A finger or the mouse on its way: ask now whether the page can be shown in a popup, so the answer is there at the tap.
+      onPointerEnter={mode === "popup" ? () => check(href) : undefined}
+      onPointerDown={mode === "popup" ? () => check(href) : undefined}
       onClick={(e) => {
         onClick?.();
         if (IN_TOUR[href]) {
@@ -267,7 +300,9 @@ export function TourLink({
         }
         if (mode === "popup") {
           e.preventDefault();
-          popup(url, label);
+          // Known by now not to show in a popup: a new tab straight away.
+          if (modeFor(href) === "tab") window.open(url, "_blank", "noopener");
+          else popup(url, label);
         }
       }}
     >

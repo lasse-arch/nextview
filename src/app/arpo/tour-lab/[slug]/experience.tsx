@@ -33,7 +33,7 @@ import { MAP_CSS, MapScene, type MapApi } from "./map";
 import { CARDS_CSS, NudgeCard, PlaceCard } from "./cards";
 import { MEASURES_CSS, MeasureShield } from "./measures";
 import { ROUTE_CSS, RouteLine, RouteSheet, RouteStatus, flightMs, routeNetwork, shortestPath, straighten, type Destination, type RouteGraph } from "./wayfinding";
-import { LINKS_CSS, LinkPopup, LinkProvider, TourLink, openLink, popupSize, prefetchFrames, siteOf, type LinkPopupState } from "./links";
+import { LINKS_CSS, LinkPopup, LinkProvider, TourLink, openLink, popupSize, prefetchFrames, prefetchLinks, siteOf, type LinkPopupState } from "./links";
 import { Stories, STORIES_CSS, storyJpeg, type StoryRoom } from "./stories";
 import { LIGHTBOX_CSS, Lightbox, type LightboxState } from "./lightbox";
 import "pannellum/build/pannellum.css";
@@ -1782,6 +1782,8 @@ function TourExperience({
   /* Live units (free pitches, rooms …) from the customer's site. */
   const [liveOpen, setLiveOpen] = useState(false);
   const [liveUnits, setLiveUnits] = useState<LiveUnit[]>([]);
+  // Each unit's own page (only known now): can it be shown in a popup? Asked ahead, so a tap on "Book" opens it the right way at once.
+  useEffect(() => prefetchLinks(T, liveUnits.map((u) => T.live?.bookHref || u.link)), [T, liveUnits]);
   // Fetched after the tour has opened - the tour never waits for the customer's site.
   useEffect(() => {
     if (!T.live) return;

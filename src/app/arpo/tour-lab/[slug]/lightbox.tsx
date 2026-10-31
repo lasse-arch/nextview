@@ -41,6 +41,38 @@ export function Lightbox({ state, onClose }: { state: NonNullable<LightboxState>
   const wide = upright && (ratios[src] ?? 0) > 1.15;
   const pan = useRef<HTMLDivElement>(null);
   const [hint, setHint] = useState(true);
+  /** Which part of the wide picture is on the screen (0-1 from the left, and how much of it) - the little bar at the bottom. */
+  const [view, setView] = useState<{ at: number; size: number } | null>(null);
+  const peek = useRef(0);
+  const touched = () => {
+    cancelAnimationFrame(peek.current);
+    if (hint) setHint(false);
+  };
+  const measure = () => {
+    const box = pan.current;
+    if (!box || !box.scrollWidth) return;
+    setView({ at: box.scrollLeft / box.scrollWidth, size: box.clientWidth / box.scrollWidth });
+  };
+  /*
+   * Opened: the picture glides a little to one side and the other and back,
+   * so one sees at once that there's more of it - as the place cards do.
+   */
+  function glide(box: HTMLDivElement) {
+    const mid = box.scrollLeft;
+    const reach = Math.min(70, (box.scrollWidth - box.clientWidth) / 2);
+    if (reach < 8 || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const start = performance.now() + 450;
+    const dur = 2200;
+    const step = (now: number) => {
+      const t = Math.min(1, Math.max(0, (now - start) / dur));
+      // Out to the right, over to the left, back to the middle - one soft sway.
+      box.scrollLeft = mid + reach * Math.sin(t * Math.PI * 2) * (1 - t * 0.15);
+      if (t < 1) peek.current = requestAnimationFrame(step);
+      else box.scrollLeft = mid;
+    };
+    peek.current = requestAnimationFrame(step);
+  }
+  useEffect(() => () => cancelAnimationFrame(peek.current), []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -73,8 +105,10 @@ export function Lightbox({ state, onClose }: { state: NonNullable<LightboxState>
         <div
           ref={pan}
           className="lb-pan"
-          onTouchStart={() => hint && setHint(false)}
-          onWheel={() => hint && setHint(false)}
+          onTouchStart={touched}
+          onWheel={touched}
+          onMouseDown={touched}
+          onScroll={measure}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -85,12 +119,33 @@ export function Lightbox({ state, onClose }: { state: NonNullable<LightboxState>
             style={share < 1 ? { height: `${share * 100}%`, marginTop: `${((1 - share) / 2) * 100}dvh` } : undefined}
             onLoad={(e) => {
               const box = pan.current;
-              if (box) box.scrollLeft = (e.currentTarget.clientWidth - box.clientWidth) / 2;
+              if (!box) return;
+              box.scrollLeft = (e.currentTarget.clientWidth - box.clientWidth) / 2;
+              measure();
+              glide(box);
             }}
           />
-          {hint && <span className="lb-hint">‹ {tr("Træk for at se hele billedet")} ›</span>}
         </div>
-      ) : (
+      ) : null}
+      {wide && fill && !state.focus && (
+        <>
+          {/* Over the picture (not in it, or it would scroll away): a hand showing the way, until one touches it. */}
+          {hint && (
+            <span className="lb-hint" aria-hidden>
+              <svg viewBox="0 0 24 24" className="lb-haand">
+                <path d="M9 11V5.5a1.5 1.5 0 0 1 3 0V11m0-1.5a1.5 1.5 0 0 1 3 0V11m0-.5a1.5 1.5 0 0 1 3 0v4a6 6 0 0 1-6 6h-.6a6 6 0 0 1-4.6-2.2L4.6 15a1.5 1.5 0 0 1 2.3-1.9L9 15" />
+              </svg>
+              {tr("Træk for at se hele billedet")}
+            </span>
+          )}
+          {view && view.size < 0.98 && (
+            <span className={`lb-mini ${n > 1 ? "lb-mini-op" : ""}`} aria-hidden>
+              <i style={{ left: `${view.at * 100}%`, width: `${view.size * 100}%` }} />
+            </span>
+          )}
+        </>
+      )}
+      {state.focus || (wide && fill) ? null : (
         <div
           className="lb-stage"
           onClick={(e) => e.target === e.currentTarget && onClose()}
@@ -219,8 +274,15 @@ export const LIGHTBOX_CSS = `
 .lb.lb-fyld .lb-fit{position:absolute;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));translate:-50% 0;margin:0;z-index:2;background:rgba(0,0,0,.45);box-shadow:0 6px 20px rgba(0,0,0,.3)}
 .lb.lb-fyld .lb-thumbs{position:absolute;left:0;right:0;bottom:calc(64px + env(safe-area-inset-bottom,0px));z-index:2;padding-bottom:0}
 .lb-stage img.on{filter:drop-shadow(0 14px 34px rgba(0,0,0,.45))}
-.lb-hint{position:absolute;left:50%;top:50%;translate:-50% -50%;padding:9px 15px;border-radius:999px;background:rgba(0,0,0,.55);color:#fff;font-size:13.5px;font-weight:700;white-space:nowrap;pointer-events:none;backdrop-filter:blur(6px);animation:lbHint 4.5s ease forwards}
-@keyframes lbHint{0%,70%{opacity:1}100%{opacity:0}}
+.lb-hint{position:absolute!important;left:50%;top:50%;z-index:2;translate:-50% -50%;display:flex;align-items:center;gap:9px;padding:10px 17px 10px 13px;border-radius:999px;background:rgba(0,0,0,.5);color:#fff;font-size:14px;font-weight:700;white-space:nowrap;pointer-events:none;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:0 8px 26px rgba(0,0,0,.3);animation:lbHint 9s ease forwards}
+.lb-haand{width:24px;height:24px;flex:none;fill:none;stroke:#fff;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;animation:lbHaand 1.6s ease-in-out infinite}
+@keyframes lbHint{0%{opacity:0;scale:.92}6%,82%{opacity:1;scale:1}100%{opacity:0}}
+@keyframes lbHaand{0%,100%{translate:-7px 0;rotate:-8deg}50%{translate:7px 0;rotate:8deg}}
+/* Where on the wide picture one is - like the strip under a panorama photo. */
+.lb-mini{position:absolute!important;left:50%;bottom:calc(70px + env(safe-area-inset-bottom,0px));z-index:2;translate:-50% 0;width:76px;height:5px;border-radius:999px;background:rgba(255,255,255,.28);overflow:hidden;pointer-events:none;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+.lb-mini.lb-mini-op{bottom:calc(126px + env(safe-area-inset-bottom,0px))}
+.lb-mini i{position:absolute;top:0;bottom:0;border-radius:999px;background:#fff}
+@media (prefers-reduced-motion:reduce){.lb-haand{animation:none}}
 .lb-fit{align-self:center;margin:10px auto calc(14px + env(safe-area-inset-bottom,0px));border:0;border-radius:999px;padding:9px 16px;background:rgba(255,255,255,.16);color:#fff;font:inherit;font-weight:700;font-size:13.5px;cursor:pointer;backdrop-filter:blur(6px)}
 .lb-skift{position:absolute!important;left:0;right:0;top:50%;display:flex;justify-content:space-between;padding:0 8px;pointer-events:none}
 .lb-skift button{pointer-events:auto;width:40px;height:40px;border:0;border-radius:50%;background:rgba(0,0,0,.45);color:#fff;font-size:26px;line-height:1;cursor:pointer}
