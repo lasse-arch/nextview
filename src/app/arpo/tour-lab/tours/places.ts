@@ -163,3 +163,40 @@ export function withoutDeadAerialLinks<T extends TourConfig>(c: T): T {
     .filter((m) => ("items" in m ? true : !dead(m.href)));
   return { ...c, menu, ...(c.welcome ? { welcome: { ...c.welcome, tiles: c.welcome.tiles.filter((t) => !("drone" in t.go)) } } : {}) };
 }
+
+export type WelcomeTile = NonNullable<TourConfig["welcome"]>["tiles"][number];
+
+/** The welcome tiles as shown: a tile that is one of the Steder (`place`) gets the place's name, heading, photo and spot - its own only where filled in. */
+export function welcomeTiles(T: Pick<TourConfig, "welcome" | "places">): WelcomeTile[] {
+  return (T.welcome?.tiles ?? []).map((t) => {
+    const p = t.place ? T.places?.find((x) => x.name === t.place) : undefined;
+    if (!p) return t;
+    const title = t.title || p.name;
+    return { ...t, title, kicker: t.kicker || p.kicker || "", image: t.image ?? p.image, go: { room: p.href, name: title } };
+  });
+}
+
+/**
+ * Moves a tour's welcome tiles onto its Steder where they are the same spot:
+ * a tile going to a place's spot is linked to it, and what it repeats from the
+ * place is dropped - so it looks exactly as before, and the place is written
+ * once. Run when a tour is saved.
+ */
+export function linkWelcomeTiles<C extends TourConfig>(c: C): C {
+  if (!c.welcome?.tiles.length || !c.places?.length) return c;
+  let changed = false;
+  const tiles = c.welcome.tiles.map((t) => {
+    if (t.place || !("room" in t.go)) return t;
+    const href = t.go.room;
+    // Only where the tile shows the place's own name - and nothing would appear that the tile left empty (so it looks exactly as before).
+    const p = c.places!.find((x) => x.href === href && x.name === t.title && (t.kicker !== "" || !x.kicker) && (t.image !== undefined || !x.image));
+    if (!p) return t;
+    changed = true;
+    const next: WelcomeTile = { ...t, place: p.name, go: { room: p.href, name: t.title || p.name } };
+    next.title = "";
+    if (next.kicker === (p.kicker ?? "")) next.kicker = "";
+    if (next.image === p.image) delete next.image;
+    return next;
+  });
+  return changed ? { ...c, welcome: { ...c.welcome, tiles } } : c;
+}

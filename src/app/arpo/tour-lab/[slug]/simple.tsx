@@ -1,7 +1,7 @@
 "use client";
 
 import { useT } from "../tours/i18n-react";
-import { isInTourHref, isPlaceHref } from "../tours/places";
+import { isInTourHref, isPlaceHref, welcomeTiles } from "../tours/places";
 import type { TourConfig, WelcomeGo } from "../tours/types";
 
 /*
@@ -22,7 +22,7 @@ export function SimpleWelcome({ T, onChoose }: { T: TourConfig; onChoose: (go: W
         <h1>{w.title}</h1>
         {w.lead && <p>{w.lead}</p>}
         <div className="sp-list">
-          {w.tiles.map((t, i) => (
+          {welcomeTiles(T).map((t, i) => (
             <button key={t.title} type="button" className={`sp-btn ${i === 0 ? "sp-main" : ""}`} onClick={() => onChoose(t.go, t.title)}>
               {t.title}
             </button>

@@ -1,5 +1,7 @@
 "use server";
 
+import { linkWelcomeTiles } from "@/app/arpo/tour-lab/tours/places";
+
 import { startStatsIfFirst } from "@/lib/tour-stats";
 import { tourChanged } from "@/lib/tour-cache";
 import { revalidatePath } from "next/cache";
@@ -38,7 +40,8 @@ export async function saveTour(slug: string, config: TourConfig, note: string): 
   const tour = await prisma.tour.findUnique({ where: { slug }, select: { id: true } });
   if (!tour) return { ok: false, error: "Touren findes ikke." };
   // The 360° photos' smaller copies: the ones made before go in now, new ones after the answer.
-  const json = { ...(await withPanoCopies(slug, config)), slug } as unknown as Prisma.InputJsonValue;
+  // Welcome tiles that are one of the Steder are linked to it (looks the same - the place is then written once).
+  const json = { ...(await withPanoCopies(slug, linkWelcomeTiles(config))), slug } as unknown as Prisma.InputJsonValue;
   const version = await prisma.$transaction(async (tx) => {
     await tx.tour.update({ where: { id: tour.id }, data: { config: json, name: config.title, draft: Prisma.DbNull, draftAt: null, draftByName: null } });
     return tx.tourVersion.create({ data: { tourId: tour.id, config: json, note: note.trim() || null, createdByName: user.name }, select: { id: true } });

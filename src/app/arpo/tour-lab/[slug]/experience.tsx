@@ -4,7 +4,7 @@ import { LANG_CSS, LangSwitch } from "./lang-switch";
 import { danishOf, LANGUAGES, localize, makeT, tourLanguages } from "../tours/i18n";
 import { TourLang, useT } from "../tours/i18n-react";
 import { socialLinks } from "../tours/social";
-import { allGuides, cssFilter, droneViewsOfHref, formatPhone, GUIDE_HREF, guideOfHref, guideSetup, isDroneHref, guideExit, imageOfHref, isInTourHref, isPlaceHref, placeHref, panoHfov, placeSlug, pointOfHref, startPlaces, withoutDeadAerialLinks } from "../tours/places";
+import { allGuides, cssFilter, droneViewsOfHref, formatPhone, GUIDE_HREF, guideOfHref, guideSetup, isDroneHref, guideExit, imageOfHref, isInTourHref, isPlaceHref, placeHref, panoHfov, placeSlug, pointOfHref, startPlaces, welcomeTiles, withoutDeadAerialLinks } from "../tours/places";
 import type { LiveUnit } from "@/lib/availability/live";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { flushSync } from "react-dom";
@@ -2514,7 +2514,7 @@ function TourExperience({
                 <b>{tx(lastRoom.name)}</b>
               </button>
             )}
-            {T.welcome.tiles.map((t) => (
+            {welcomeTiles(T).map((t) => (
               <button
                 key={t.title}
                 type="button"

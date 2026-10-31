@@ -437,17 +437,43 @@ export function StartEditor({ config, edit, slug, preview }: Props) {
               items={welcome.tiles}
               onChange={(tiles) => edit((d) => void (d.welcome!.tiles = tiles))}
               icon={["bg-[#af52de]", '<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/>']}
-              title={(t) => t.title}
-              subtitle={(t) => `${t.kicker} · ${"room" in t.go ? "sted i touren" : "guide" in t.go ? "Vis mig rundt" : "href" in t.go ? "webside" : "luftfoto"}${t.recommended ? " · anbefalet" : ""}`}
+              title={(t) => t.title || t.place || ""}
+              subtitle={(t) => t.place ? `Fra Stederne: ${t.place}` : `${t.kicker} · ${"room" in t.go ? "sted i touren" : "guide" in t.go ? "Vis mig rundt" : "href" in t.go ? "webside" : "luftfoto"}${t.recommended ? " · anbefalet" : ""}`}
               empty="Ingen fliser endnu."
               editor={(t, set) => (
                 <>
-                  <Field title="Lille overskrift">
-                    <input className={`${input} bg-white`} value={t.kicker} onChange={(e) => set({ ...t, kicker: e.target.value })} />
-                  </Field>
-                  <Field title="Titel">
-                    <input className={`${input} bg-white`} value={t.title} onChange={(e) => set({ ...t, title: e.target.value })} />
-                  </Field>
+                  {(() => {
+                    const place = t.place ? config.places?.find((p) => p.name === t.place) : undefined;
+                    return (
+                      <>
+                        {(config.places?.length ?? 0) > 0 && (
+                          <Field title="Et af Stederne" hint={place ? "Navn, foto og sted kommer fra Stederne nedenfor - ret dem dér, så følger flisen med. Skriv kun her, hvis flisen skal sige noget andet." : "Vælg et sted, så henter flisen navn, foto og sted derfra."}>
+                            <select
+                              className={`${input} bg-white`}
+                              value={t.place ?? ""}
+                              onChange={(e) => {
+                                const p = config.places?.find((x) => x.name === e.target.value);
+                                set(p ? { ...t, place: p.name, title: "", kicker: "", image: undefined, go: { room: p.href, name: p.name } } : { ...t, place: undefined, title: t.title || t.place || "Ny flise" });
+                              }}
+                            >
+                              <option value="">Ingen - flisen har sine egne</option>
+                              {config.places!.map((p) => (
+                                <option key={p.name} value={p.name}>
+                                  {p.name}
+                                </option>
+                              ))}
+                            </select>
+                          </Field>
+                        )}
+                        <Field title="Lille overskrift">
+                          <input className={`${input} bg-white`} value={t.kicker} placeholder={place?.kicker} onChange={(e) => set({ ...t, kicker: e.target.value })} />
+                        </Field>
+                        <Field title="Titel">
+                          <input className={`${input} bg-white`} value={t.title} placeholder={place?.name} onChange={(e) => set({ ...t, title: e.target.value })} />
+                        </Field>
+                      </>
+                    );
+                  })()}
                   <Field title="Udseende">
                     <Choice
                       value={t.style}
@@ -480,7 +506,7 @@ export function StartEditor({ config, edit, slug, preview }: Props) {
                       ))}
                     </select>
                   )}
-                  {"room" in t.go && <PlacePicker href={t.go.room} name={t.title} preview={preview} onChange={(href) => set({ ...t, go: { room: href, name: t.title } })} />}
+                  {"room" in t.go && !t.place && <PlacePicker href={t.go.room} name={t.title} preview={preview} onChange={(href) => set({ ...t, go: { room: href, name: t.title } })} />}
                   {"href" in t.go && <LinkInput className="bg-white" value={t.go.href} onChange={(href) => set({ ...t, go: { href } })} />}
                   {"drone" in t.go && <DroneViewPicker views={t.go.view} preview={preview} onChange={(view) => set({ ...t, go: { drone: (t.go as { drone: string | null }).drone, view } })} />}
                 </>
@@ -493,14 +519,32 @@ export function StartEditor({ config, edit, slug, preview }: Props) {
         </>
       )}
 
-      {(style === "cover" || menuStyle === "dock" || (config.places?.length ?? 0) > 0) && (
-      <Group title={style === "cover" ? "Forsidens steder" : "Steder med foto"}>
+      {(style === "cover" || style === "tiles" || style === "simple" || menuStyle === "dock" || (config.places?.length ?? 0) > 0) && (
+      <Group title="Steder">
         <p className={small}>
-          {style === "cover" ? "Stederne man kan vælge at starte i på forsiden" : "Stederne i barens \"Steder\""} - med foto. Det er ikke menuen (den laves under Menu). Gå hen til et sted i forhåndsvisningen og tryk på knappen - så kommer både stedet og et foto med.
+          Hvert sted skrives én gang her - med navn, foto og sted i touren. Forsidens steder, barens &quot;Steder&quot; og velkomstfliserne (vælg &quot;Et af Stederne&quot; på flisen) henter herfra. Det er ikke menuen (den laves under Menu). Gå hen til et sted i forhåndsvisningen og tryk på knappen - så kommer både stedet og et foto med.
         </p>
         <Rows<TourPlace>
           items={config.places ?? []}
-          onChange={(places) => edit((d) => void (d.places = places.length ? places : undefined))}
+          onChange={(places) =>
+            edit((d) => {
+              // Welcome tiles follow their place: a new name is carried over, a removed place leaves the tile its own name.
+              const before = d.places ?? [];
+              const renamed = new Map(before.length === places.length ? before.map((p, i) => [p.name, places[i].name] as const).filter(([a, b]) => a !== b) : []);
+              d.welcome?.tiles.forEach((t) => {
+                if (!t.place) return;
+                if (renamed.has(t.place)) t.place = renamed.get(t.place);
+                else if (!places.some((p) => p.name === t.place)) {
+                  const old = before.find((p) => p.name === t.place);
+                  t.title ||= t.place;
+                  t.kicker ||= old?.kicker ?? "";
+                  t.image ??= old?.image;
+                  t.place = undefined;
+                }
+              });
+              d.places = places.length ? places : undefined;
+            })
+          }
           icon={["bg-[#34c759]", PIN]}
           title={(p) => p.name}
           subtitle={(p) => (p.kicker ? `${p.kicker} · punkt ${ssOfHref(p.href) ?? "?"}` : `Punkt ${ssOfHref(p.href) ?? "?"}`)}

@@ -331,7 +331,7 @@ export type TourConfig = {
   customCss?: string;
   /** Font for big headings (a Google font), if not the body font. */
   fontHeading?: string;
-  /** Real spots with a photo - the cover's and the dock's "places". */
+  /** Steder: real spots with a photo, written once - the cover's places, the dock's "Steder" and welcome tiles with `place`. */
   places?: TourPlace[];
   cover?: { kicker: string; title: string; lead: string; image: string; imageMobile?: string; enter: string; placesTitle: string };
   dock?: { label: string; icon: DockIcon; go: "places" | "guide" | { href: string }; primary?: boolean }[];
@@ -503,7 +503,12 @@ export type TourConfig = {
     title: string;
     lead: string;
     /** `image`: a photo behind the tile (white text on it) - makes the welcome feel like the place itself. */
-    tiles: { kicker: string; title: string; go: WelcomeGo; style: "dark" | "light" | "accent"; recommended?: boolean; image?: string }[];
+    /**
+     * `place`: the tile is one of the tour's Steder (`places`, by name) - it
+     * takes its name, small heading, photo and spot from there, so a place is
+     * written once. The tile's own title/kicker/image only win when filled in.
+     */
+    tiles: { kicker: string; title: string; go: WelcomeGo; style: "dark" | "light" | "accent"; recommended?: boolean; image?: string; place?: string }[];
     skip: string;
   };
   /** "free": walk around as in Matterport. "points": only the menu and points move you. */

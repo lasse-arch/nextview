@@ -2,6 +2,7 @@
 
 import { useT } from "../tours/i18n-react";
 import type { TourConfig } from "../tours/types";
+import { welcomeTiles } from "../tours/places";
 
 /**
  * "Afspil-knap" (as in MPSkins): with autoplay off, a tour on a website shows
@@ -11,7 +12,7 @@ import type { TourConfig } from "../tours/types";
  */
 export function PlayGate({ T, isPreview, onPlay }: { T: TourConfig; /** Asked when pressed (it reads the window): the editor's preview just starts, no full screen. */ isPreview: () => boolean; onPlay: () => void }) {
   const tr = useT();
-  const image = T.cover?.image || T.places?.find((p) => p.image)?.image || T.welcome?.tiles.find((t) => t.image)?.image || "";
+  const image = T.cover?.image || T.places?.find((p) => p.image)?.image || welcomeTiles(T).find((t) => t.image)?.image || "";
   const title = T.cover?.title || T.brand || T.title;
   const lead = T.cover?.lead || T.subtitle || "";
 
