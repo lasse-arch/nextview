@@ -1603,10 +1603,7 @@ function TourExperience({
     if (!(await standsAt(stop.href)) && step === guideStep.current) guideFly(stop);
   }
   /** A stop inside the tour: flown to (one move at a time, only the newest), then the slow turn. */
-  /** The guide's endless slow turn at a stop: its direction while it turns (0 = not turning). */
-  const guideTurnDir = useRef(0);
   function guideFly(stop: (typeof GUIDE)[number], uncover?: () => void) {
-    guideTurnDir.current = 0;
     // The slow turn at the stop: as always, the other way, or none (the stop's own, else the guide's).
     const turn = stop.turn ?? G?.turn ?? "as";
     guideMoving.current = true;
@@ -1640,51 +1637,12 @@ function TourExperience({
         const dir = turn === "other" ? -1 : 1;
         // Degrees a second: slow, normal (as always) or fast - the stop's own, else the guide's.
         const speed = { slow: 1.5, normal: 3, fast: 6 }[stop.turnSpeed ?? G?.turnSpeed ?? "normal"];
-        // An even turn in small steps (20 a second) - smooth, and it stops the moment the visitor takes over: a drag,
-        // a scroll or a tap in the tour (see the guide's input watch), or the view moved by anyone but the turn.
-        // It goes on until the next stop, the guide closes or the visitor takes over.
-        guideTurnDir.current = dir;
-        void (async () => {
-          const cam = sdk?.Camera;
-          if (!cam?.setRotation) return;
-          let cur: { x: number; y: number } | null = null;
-          const sub = cam.pose.subscribe((p) => void (cur = { x: p.rotation.x, y: p.rotation.y }));
-          const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-          const off = (a: number, b: number) => ((((a - b + 540) % 360) + 360) % 360) - 180;
-          const live = () => ticket === guideTicket.current && guideTurnDir.current === dir && !guideHeldRef.current && guideAtRef.current != null && phaseRef.current === "tour";
-          try {
-            await sleep(80);
-            if (!cur) return;
-            // Which way the view's yaw runs for this turn: a tiny real turn tells (rotate is what "Mod højre" has always been).
-            const y0 = (cur as { y: number }).y;
-            await cam.rotate?.(dir * 2, 0, { speed: 40 }).catch(() => {});
-            await sleep(60);
-            const sign = Math.sign(off((cur as { y: number }).y, y0)) || dir;
-            let yaw = (cur as { y: number }).y;
-            let last = now();
-            while (live()) {
-              await sleep(50);
-              if (!live() || !cur) break;
-              const c: { x: number; y: number } = cur;
-              // Turned by someone else (the visitor dragging): theirs from now on.
-              if (Math.abs(off(c.y, yaw)) > 3) {
-                guideTurnDir.current = 0;
-                guideHeldRef.current = true;
-                setGuideHeld(true);
-                break;
-              }
-              const t = now();
-              yaw = off(yaw + sign * speed * ((t - last) / 1000), 0);
-              last = t;
-              void cam.setRotation({ x: c.x, y: yaw }, { speed: 1000 }).catch(() => {});
-            }
-          } finally {
-            sub.cancel();
-            if (ticket === guideTicket.current && guideTurnDir.current === dir) guideTurnDir.current = 0;
-          }
-        })();
-        // The guide has landed: from here on a walk is the visitor's own (checked after a moment, as before).
-        setTimeout(() => ticket === guideTicket.current && void guideDone(stop, ticket), 700);
+        // The slow turn as it has always been - one short, smooth Matterport turn (its way and speed chosen in the
+        // editor), and then the view stands still for the visitor.
+        const turning = sdk?.Camera.rotate?.(dir * 18, 0, { speed }).catch(() => {});
+        turning?.finally(() => {
+          if (ticket === guideTicket.current) setTimeout(() => ticket === guideTicket.current && guideDone(stop, ticket), 700);
+        });
         return "turning";
       })
       .then((r) => {
@@ -1769,14 +1727,6 @@ function TourExperience({
         base = { sweep: p.sweep, x: p.rotation.x, y: p.rotation.y };
         return;
       }
-      // While the guide turns by itself, sideways is its own move: only a walk or a look up/down is the visitor's.
-      if (guideTurnDir.current) {
-        if (p.sweep === base.sweep && Math.abs(p.rotation.x - base.x) <= 4) {
-          base.y = p.rotation.y;
-          return;
-        }
-        guideTurnDir.current = 0;
-      }
       if (p.sweep !== base.sweep || Math.abs(p.rotation.y - base.y) > 4 || Math.abs(p.rotation.x - base.x) > 4) {
         // Once per pause: walking on counts as leaving the guide, only looking around doesn't.
         if (!guideHeldRef.current && p.sweep !== base.sweep) track("guide_leave", { stop: (guideAtRef.current ?? 0) + 1, stops: GUIDE.length, label: "Gik selv rundt", kind: "walk", guide: guideKey() });
@@ -1787,22 +1737,6 @@ function TourExperience({
     return () => sub.cancel();
     // guideHeld too: after Fortsæt, the view the visitor stands in is the new starting point.
   }, [guideAt, sdk, phase, guideHeld, GUIDE.length]);
-  /* While the guide turns by itself: a touch, drag, scroll or key in the 3D tour is the visitor taking over - at once. */
-  useEffect(() => {
-    if (guideAt == null || phase !== "tour") return;
-    const doc = iframe.current?.contentDocument;
-    const take = () => {
-      if (!guideTurnDir.current) return;
-      guideTurnDir.current = 0;
-      guideHeldRef.current = true;
-      setGuideHeld(true);
-    };
-    const events = ["pointerdown", "wheel", "touchstart", "keydown"] as const;
-    for (const e of events) doc?.addEventListener(e, take, { passive: true });
-    return () => {
-      for (const e of events) doc?.removeEventListener(e, take);
-    };
-  }, [guideAt, phase]);
   /** Starts a guided tour from the beginning: the main one (null) or one of `guides` by id. */
   function startGuide(from: string, id: string | null = null) {
     if (!tourReady()) {
