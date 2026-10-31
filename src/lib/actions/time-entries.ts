@@ -73,3 +73,22 @@ export async function deleteTimeEntry(entryId: string): Promise<{ ok: true } | {
   return { ok: true };
 }
 
+
+/**
+ * For "Udfyld filmtiden" in the tour editor: the team to pick who filmed, and
+ * who was booked to film and when (the filming booking) as the starting point.
+ */
+export async function filmingTimeForm(dealId: string): Promise<{ users: { id: string; name: string }[]; crewIds: string[]; date: string | null; hours: number | null }> {
+  await requireUser();
+  const [users, deal] = await Promise.all([
+    prisma.user.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, email: true } }),
+    prisma.deal.findUnique({ where: { id: dealId }, select: { filmingCrewIds: true, filmingAt: true, filmingDurationMinutes: true } }),
+  ]);
+  return {
+    users: users.map((u) => ({ id: u.id, name: u.name })),
+    // Who was booked to film - else Lasse, as "Book filming" on the deal suggests.
+    crewIds: deal?.filmingCrewIds?.split(",").filter(Boolean).length ? deal.filmingCrewIds.split(",").filter(Boolean) : users.filter((u) => u.email === "lasse@nextview360.dk").map((u) => u.id),
+    date: deal?.filmingAt ? deal.filmingAt.toISOString().slice(0, 10) : null,
+    hours: deal?.filmingDurationMinutes ? deal.filmingDurationMinutes / 60 : null,
+  };
+}

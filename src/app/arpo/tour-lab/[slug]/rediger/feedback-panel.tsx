@@ -4,7 +4,7 @@ import { reviewUrl } from "@/lib/public-urls";
 import { useEffect, useState, useTransition } from "react";
 import { checkTourForReview, deleteFeedback, reviewStatus, sendFixesDone, sendForReview, setFeedbackStatus, setTourApproved, setTourReview, tourFeedback, type Feedback, type ReviewStatus } from "@/lib/actions/tour-feedback";
 import { askClaudeForTour, type AiEditResult } from "@/lib/actions/tour-ai";
-import { setFilmingActual } from "@/lib/actions/deals";
+import { addManualTimeEntry, filmingTimeForm } from "@/lib/actions/time-entries";
 import type { TourConfig } from "../../tours/types";
 import type { AiNote } from "@/lib/tour-check";
 import { Choice, Group, input, Toggle, type PreviewApi } from "./ui";
@@ -505,33 +505,78 @@ function AiNotes({ notes }: { notes: AiNote[] }) {
   );
 }
 
-/** The filming time, right here - it has to be there before the review mail (the customer's approval makes the deal Live). */
+/**
+ * The filming time, right here - it has to be there before the review mail (the customer's approval makes the deal
+ * Live). As in the deal's time registration: the day, the hours and who filmed (each one gets the hours as "Filming").
+ */
 function FilmingTime({ dealId, onSaved }: { dealId: string; onSaved: () => void }) {
+  const [form, setForm] = useState<{ users: { id: string; name: string }[] } | null>(null);
+  const [crew, setCrew] = useState<string[]>([]);
+  const [date, setDate] = useState(() => new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Copenhagen" }));
   const [hours, setHours] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    let off = false;
+    filmingTimeForm(dealId)
+      .then((f) => {
+        if (off) return;
+        setForm(f);
+        setCrew(f.crewIds);
+        if (f.date) setDate(f.date);
+        if (f.hours) setHours(String(f.hours).replace(".", ","));
+      })
+      .catch(() => !off && setForm({ users: [] }));
+    return () => {
+      off = true;
+    };
+  }, [dealId]);
   return (
-    <div className="space-y-1.5 rounded-xl bg-[#ff9500]/10 p-3">
+    <div className="space-y-2 rounded-xl bg-[#ff9500]/10 p-3">
       <p className="text-[13px] font-semibold text-[#a05a00]">Udfyld filmtiden først</p>
-      <p className="text-[12px] leading-snug text-[#7a5a2a]">Når kunden godkender, går touren live af sig selv - og Live kræver filmtiden. Den kan også registreres i timeregistreringen.</p>
+      <p className="text-[12px] leading-snug text-[#7a5a2a]">Når kunden godkender, går touren live af sig selv - og Live kræver filmtiden. Den lægges i timeregistreringen som &quot;Filming&quot; for hver, der filmede.</p>
       <div className="flex gap-2">
-        <input className={`${input} bg-white`} inputMode="decimal" placeholder="Timer, fx 2,5" value={hours} onChange={(e) => setHours(e.target.value)} />
-        <button
-          type="button"
-          disabled={busy || !hours.trim()}
-          onClick={async () => {
-            setBusy(true);
-            setError(null);
-            const r = await setFilmingActual(dealId, Number(hours.replace(",", ".")));
-            setBusy(false);
-            if (!r.ok) return setError(r.error);
-            onSaved();
-          }}
-          className="shrink-0 rounded-xl bg-[#0071e3] px-3 text-[14px] font-medium text-white disabled:opacity-40"
-        >
-          {busy ? "…" : "Gem"}
-        </button>
+        <input type="date" className={`${input} bg-white`} value={date} onChange={(e) => setDate(e.target.value)} />
+        <input className={`${input} w-28 flex-none bg-white`} inputMode="decimal" placeholder="Timer, fx 2,5" value={hours} onChange={(e) => setHours(e.target.value)} />
       </div>
+      <div>
+        <p className="mb-1 text-[12px] font-medium text-[#7a5a2a]">Hvem filmede{crew.length > 1 ? ` (${crew.length} - hver får timerne)` : ""}</p>
+        <div className="flex flex-wrap gap-1.5">
+          {form?.users.map((u) => {
+            const on = crew.includes(u.id);
+            return (
+              <button
+                key={u.id}
+                type="button"
+                onClick={() => setCrew((c) => (on ? c.filter((x) => x !== u.id) : [...c, u.id]))}
+                className={`rounded-full px-3 py-1 text-[13px] font-medium ring-1 ${on ? "bg-[#0071e3] text-white ring-[#0071e3]" : "bg-white text-[#1d1d1f] ring-black/[.08]"}`}
+              >
+                {u.name}
+              </button>
+            );
+          }) ?? <span className="text-[12px] text-[#7a5a2a]">Henter …</span>}
+        </div>
+      </div>
+      <button
+        type="button"
+        disabled={busy || !hours.trim() || !crew.length || !date}
+        onClick={async () => {
+          setBusy(true);
+          setError(null);
+          const fd = new FormData();
+          fd.set("date", date);
+          fd.set("hours", hours);
+          fd.set("category", "FILMING");
+          for (const id of crew) fd.append("userIds", id);
+          const r = await addManualTimeEntry(dealId, fd).catch(() => ({ ok: false as const, error: "Kunne ikke gemme - prøv igen." }));
+          setBusy(false);
+          if (!r.ok) return setError(r.error);
+          onSaved();
+        }}
+        className="w-full rounded-xl bg-[#0071e3] py-2 text-[14px] font-medium text-white disabled:opacity-40"
+      >
+        {busy ? "Gemmer …" : "Gem filmtiden"}
+      </button>
       {error && <p className="text-[12px] text-[#ff3b30]">{error}</p>}
     </div>
   );
