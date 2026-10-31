@@ -1093,6 +1093,42 @@ export function TourEditor({
                   hint='En kort "Sådan går du rundt", når man trykker Træd indenfor: træk for at kigge, tryk på cirklerne for at gå, menuen for at hoppe - og Vis mig rundt, hvis touren har den. Vises én gang pr. besøgende (i forhåndsvisningen hver gang).'
                 />
                 <Toggle on={Boolean(config.wayfinding)} onChange={(on) => edit((d) => void (d.wayfinding = on ? d.wayfinding ?? {} : undefined))} title="Find vej" hint="Vælg et rum, og touren går vejen derhen fra der, man står." />
+                {config.wayfinding && (
+                  <Field title='Knap på "Du er fremme"' hint="Kortet, når Find vej er nået frem. Linket kan også være #live (listen med ledige), #kontakt (formularen) eller #vej.">
+                    <Choice<"main" | "own" | "none">
+                      value={config.wayfinding.arrive === false ? "none" : config.wayfinding.arrive ? "own" : "main"}
+                      options={[
+                        ["main", "Hovedknappen"],
+                        ["own", "Egen knap"],
+                        ["none", "Ingen"],
+                      ]}
+                      onChange={(v) =>
+                        edit((d) => {
+                          const main = d.cta.find((c) => c.primary);
+                          d.wayfinding = { ...d.wayfinding, arrive: v === "none" ? false : v === "own" ? { label: main?.label ?? "Book", href: main?.href ?? "" } : undefined };
+                        })
+                      }
+                    />
+                    {config.wayfinding.arrive && (
+                      <>
+                        <input
+                          className={input}
+                          placeholder="Tekst på knappen"
+                          value={config.wayfinding.arrive.label}
+                          onChange={(e) => edit((d) => void (d.wayfinding = { ...d.wayfinding, arrive: { ...(d.wayfinding!.arrive as { label: string; href: string }), label: e.target.value } }))}
+                        />
+                        <LinkInput
+                          value={config.wayfinding.arrive.href}
+                          placeholder="https://… eller #live"
+                          onChange={(href) => edit((d) => void (d.wayfinding = { ...d.wayfinding, arrive: { ...(d.wayfinding!.arrive as { label: string; href: string }), href } }))}
+                        />
+                      </>
+                    )}
+                    {!config.wayfinding.arrive && config.wayfinding.arrive !== false && (
+                      <p className="px-1 text-[12px] text-[#8e8e93]">Nu: {config.cta.find((c) => c.primary)?.label ?? "ingen hovedknap"}</p>
+                    )}
+                  </Field>
+                )}
                 {config.wayfinding &&
                   (["desktop", "mobile"] as const).map((dev) => (
                     <Field key={dev} title={`Find vej-knappen - ${dev === "desktop" ? "computer" : "mobil"}`} hint={config.wayfinding?.button?.[dev] === "menu" ? 'Ingen knap - læg "Find vej" i menuen med linket #findvej.' : undefined}>

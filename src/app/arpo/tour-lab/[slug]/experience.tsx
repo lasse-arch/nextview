@@ -2093,6 +2093,8 @@ function TourExperience({
     );
   }
 
+  /** The button on Find vej's "Du er fremme": the tour's own choice (or none), else its main button. */
+  const arriveCta = T.wayfinding?.arrive === false ? undefined : T.wayfinding?.arrive?.label && T.wayfinding.arrive.href ? T.wayfinding.arrive : T.cta.find((c) => c.primary);
   const ctaClick = (label: string, href: string, place: string) => track("cta_click", { label, link_url: href, place });
 
   return (
@@ -2797,11 +2799,11 @@ function TourExperience({
           steps={route.steps}
           arrived={route.arrived}
           paused={route.paused}
-          cta={T.cta.find((c) => c.primary)}
+          cta={arriveCta}
           onStop={stopRoute}
           onResume={() => walkTo(route.dest)}
           onClose={closeRoute}
-          onCta={() => ctaClick(T.cta.find((c) => c.primary)!.label, T.cta.find((c) => c.primary)!.href, "route")}
+          onCta={() => arriveCta && ctaClick(arriveCta.label, arriveCta.href, "route")}
         />
       )}
       {review && (
