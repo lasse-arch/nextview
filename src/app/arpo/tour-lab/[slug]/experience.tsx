@@ -3163,6 +3163,7 @@ function TourExperience({
           stops={GUIDE}
           index={guideAt}
           size={T.guideCardSize}
+          sizeMobile={T.guideCardSizeMobile}
           seconds={G?.seconds ?? 9}
           manual={G?.manual}
           voiceDelay={T.voiceDelay}

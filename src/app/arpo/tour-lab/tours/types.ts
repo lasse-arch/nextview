@@ -409,6 +409,8 @@ export type TourConfig = {
   placeCardSize?: "lille" | "mellem" | "stor";
   /** How big the card of "Vis mig rundt" is: "lille" (title, a few lines, the buttons), "mellem" (the default), "stor" (the whole width on a phone). Scales with the screen either way. */
   guideCardSize?: "lille" | "mellem" | "stor";
+  /** Its size on a phone, when it should differ from guideCardSize (left out: the same). */
+  guideCardSizeMobile?: "lille" | "mellem" | "stor";
   /** A card that comes by itself after a while (e.g. "Din plads venter") - never while the menu or a place card is open. */
   nudge?: { afterSeconds: number; title: string; text: string; buttons: { label: string; href: string; primary?: boolean }[] };
   /**

@@ -817,7 +817,7 @@ export function GuideEditor({ config, edit, preview, onEditPoint }: Omit<Props, 
   return (
     <>
       <Group title="Rundvisninger">
-        <Field title="Kortets størrelse" hint="Kortet med teksten ved hvert stop - gælder alle rundvisninger. Skalerer altid med skærmen.">
+        <Field title="Kortets størrelse - computer" hint="Kortet med teksten ved hvert stop - gælder alle rundvisninger. Skalerer altid med skærmen.">
           <Choice
             value={config.guideCardSize ?? "mellem"}
             options={[
@@ -826,6 +826,18 @@ export function GuideEditor({ config, edit, preview, onEditPoint }: Omit<Props, 
               ["stor", "Stor"],
             ]}
             onChange={(v) => edit((d) => void (d.guideCardSize = v === "mellem" ? undefined : (v as "lille" | "stor")))}
+          />
+        </Field>
+        <Field title="Kortets størrelse - mobil" hint="Som computer: samme størrelse som ovenfor.">
+          <Choice
+            value={config.guideCardSizeMobile ?? "same"}
+            options={[
+              ["same", "Som computer"],
+              ["lille", "Lille"],
+              ["mellem", "Mellem"],
+              ["stor", "Stor"],
+            ]}
+            onChange={(v) => edit((d) => void (d.guideCardSizeMobile = v === "same" ? undefined : (v as "lille" | "mellem" | "stor")))}
           />
         </Field>
         <p className={small}>Touren kan have flere rundvisninger - fx én for hele stedet og én pr. linjefag. Menuen får en knap til hver. Vælg den, du vil rette.</p>

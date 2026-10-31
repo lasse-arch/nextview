@@ -1,7 +1,7 @@
 "use client";
 
 import { useT } from "../tours/i18n-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 // The stops live with the other shared helpers (the server's "Tjek touren" needs them too).
 import { stopVoice, type GuideStop } from "../tours/places";
@@ -16,6 +16,7 @@ export { guideStops, type GuideStop } from "../tours/places";
 export function GuidePlayer({
   stops,
   size = "mellem",
+  sizeMobile,
   index,
   seconds,
   manual = false,
@@ -35,6 +36,8 @@ export function GuidePlayer({
   stops: GuideStop[];
   /** The card's size (see guideCardSize). */
   size?: "lille" | "mellem" | "stor";
+  /** Its size on a phone, when it differs (see guideCardSizeMobile). */
+  sizeMobile?: "lille" | "mellem" | "stor";
   index: number;
   seconds: number;
   /** No timer - the visitor presses Næste (a calm voice tour). */
@@ -55,6 +58,16 @@ export function GuidePlayer({
   onEvent: (name: string, params: Record<string, string | number>) => void;
 }) {
   const tr = useT();
+  // A phone (as the card's own CSS counts one) - its own size, when one is chosen for phones.
+  const phone = useSyncExternalStore(
+    (cb) => {
+      const m = window.matchMedia("(max-width: 760px)");
+      m.addEventListener("change", cb);
+      return () => m.removeEventListener("change", cb);
+    },
+    () => window.matchMedia("(max-width: 760px)").matches,
+    () => false
+  );
   const [paused, setPaused] = useState(false);
   const stop = stops[index];
   const hasVoice = stops.some((s) => stopVoice(s));
@@ -125,7 +138,7 @@ export function GuidePlayer({
           </span>
         ))}
       </div>
-      <div className={`gd-card gd-${size}`} key={index}>
+      <div className={`gd-card gd-${phone && sizeMobile ? sizeMobile : size}`} key={index}>
         <div className="gd-count">
           {index + 1} / {stops.length}
         </div>
