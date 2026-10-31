@@ -1,27 +1,36 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useT } from "../tours/i18n-react";
+import { apiUrl } from "../tours/api";
 import type { TourConfig } from "../tours/types";
 
 /** The link that opens the tour's contact form - in the menu, on a button, anywhere a link goes. */
 export const CONTACT_HREF = "#kontakt";
 
+/** The time now, for how long the form took to fill in. */
+const clock = () => Date.now();
+
 const EMAIL = /^[^\s@<>",;?&]+@[^\s@<>",;?&]+\.[^\s@<>",;?&]+$/;
 
 /**
  * "Skriv til os": the customer's contact form inside the tour - name, e-mail,
- * phone and message. Nothing goes through us: the finished mail opens in the
- * visitor's own mail (Gmail, Outlook, the device's mail app) or is copied, and
- * the visitor presses Send there. In the editor's preview nothing is opened.
+ * phone and message. Sent by us (from kontaktformular@nextview360.dk to the
+ * tour's own address, the visitor as Reply-To - see /api/tour-contact). Should
+ * that fail, the finished mail opens in the visitor's own mail instead (Gmail,
+ * Outlook, the device's mail app) or is copied. In the editor's preview
+ * nothing is sent.
  */
 export function ContactForm({
   T,
   preview,
   onClose,
   onSent,
+  room,
 }: {
   T: TourConfig;
+  /** Where the visitor stands - so the customer knows what they were looking at. */
+  room?: string | null;
   /** The editor's preview: the form can be tried, but nothing is sent. */
   preview: boolean;
   onClose: () => void;
@@ -31,7 +40,13 @@ export function ContactForm({
   // No address of its own: the tour's contact e-mail (Knapper og kontakt).
   const F = { ...T.contactForm!, to: T.contactForm!.to || T.contact?.email || "" };
   const [v, setV] = useState({ name: "", email: "", phone: "", message: "" });
-  const [state, setState] = useState<"edit" | "send">("edit");
+  const [state, setState] = useState<"edit" | "send" | "sending" | "sent">("edit");
+  // When the form opened, and a field only robots fill in - checked on our side, nothing for a person to do.
+  const opened = useRef(0);
+  useEffect(() => {
+    opened.current = clock();
+  }, []);
+  const [trap, setTrap] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const set = (k: keyof typeof v) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setV((x) => ({ ...x, [k]: e.target.value }));
@@ -41,7 +56,32 @@ export function ContactForm({
     setError(null);
     if (!v.name.trim() || !v.email.trim() || !v.message.trim()) return setError(tr("Udfyld navn, e-mail og besked."));
     if (!preview && !EMAIL.test(F.to)) return setError(tr("Formularen virker ikke lige nu."));
-    setState("send");
+    if (preview) return setState("sent");
+    setState("sending");
+    // Plain text: no extra round trip before it (the tour may be on its own address).
+    fetch(apiUrl(`/api/tour-contact/${encodeURIComponent(T.slug)}`), {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=UTF-8" },
+      body: JSON.stringify({ ...v, room: room ?? "", website: trap, ms: clock() - opened.current }),
+    })
+      .then(async (r) => {
+        if (r.ok) {
+          setState("sent");
+          if (!counted.current) {
+            counted.current = true;
+            onSent();
+          }
+          return;
+        }
+        const j = (await r.json().catch(() => null)) as { error?: string } | null;
+        if (r.status === 400) {
+          setState("edit");
+          return setError(j?.error ?? tr("Udfyld navn, e-mail og besked."));
+        }
+        // Couldn't be sent by us right now: the visitor's own mail instead.
+        setState("send");
+      })
+      .catch(() => setState("send"));
   }
 
   // The finished mail - sent by the visitor's own mail, never through us.
@@ -77,7 +117,19 @@ export function ContactForm({
         <button type="button" className="cf-luk" aria-label={tr("Luk")} onClick={onClose}>
           ×
         </button>
-        {state === "send" ? (
+        {state === "sent" ? (
+          <div className="cf-tak">
+            <span className="cf-tak-ok" aria-hidden>
+              ✓
+            </span>
+            <h3>{tr("Tak for din besked")}</h3>
+            <p className="cf-lead">{F.thanks || tr("Vi har fået den og vender tilbage hurtigst muligt.")}</p>
+            {preview && <p className="cf-til">Forhåndsvisning - intet er sendt.</p>}
+            <button type="button" className="hv-btn hv-primary cf-send" onClick={onClose}>
+              {tr("Luk")}
+            </button>
+          </div>
+        ) : state === "send" ? (
           <div className="cf-send-med">
             <h3>{tr("Send beskeden")}</h3>
             <p className="cf-lead">{tr("Din besked er skrevet færdig. Vælg, hvordan du vil sende den - så trykker du bare Send.")}</p>
@@ -133,9 +185,11 @@ export function ContactForm({
               <span>{tr("Besked")}</span>
               <textarea value={v.message} onChange={set("message")} rows={4} maxLength={2000} required />
             </label>
+            {/* Only robots fill this in (it can't be seen or reached). */}
+            <input className="cf-faelde" tabIndex={-1} autoComplete="off" aria-hidden value={trap} onChange={(e) => setTrap(e.target.value)} name="website" />
             {error && <p className="cf-fejl">{error}</p>}
-            <button type="submit" className="hv-btn hv-primary cf-send">
-              {tr("Fortsæt")}
+            <button type="submit" className="hv-btn hv-primary cf-send" disabled={state === "sending"}>
+              {state === "sending" ? tr("Sender …") : tr("Send")}
             </button>
           </>
         )}
@@ -145,6 +199,10 @@ export function ContactForm({
 }
 
 export const CONTACT_CSS = `
+.cf-faelde{position:absolute!important;left:-9999px;width:1px;height:1px;opacity:0}
+.cf-tak{text-align:center;padding:8px 0 2px}
+.cf-tak-ok{display:inline-flex;align-items:center;justify-content:center;width:52px;height:52px;margin-bottom:10px;border-radius:50%;background:color-mix(in srgb,var(--c-accent) 15%,#fff);color:var(--c-accent);font-size:26px;font-weight:800}
+.cf-tak h3{margin:0 0 6px}
 .cf-bg{position:absolute;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(10,16,20,.55);backdrop-filter:blur(3px);animation:hvFade .25s both}
 .cf{position:relative;width:min(440px,100%);max-height:calc(100% - 8px);overflow:auto;padding:22px 22px 20px;border-radius:20px;background:#fff;color:#1d2a30;box-shadow:0 24px 60px rgba(0,0,0,.35);font-family:var(--font-body,inherit);animation:hvUp .4s cubic-bezier(.2,.7,.2,1) both}
 .cf h3{margin:0 28px 6px 0;font-family:var(--font-heading);font-size:24px;line-height:1.15;font-weight:800;color:var(--c-main)}

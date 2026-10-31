@@ -2948,7 +2948,7 @@ function TourExperience({
       {featuresOpen && <FeatureTour T={T} onClose={() => setFeaturesOpen(false)} onEvent={(name, params) => track(name, params ?? {})} />}
       {commuteOpen && T.commute && <CommuteSheet T={T} onClose={() => setCommuteOpen(false)} onEvent={(name, params) => track(name, params ?? {})} />}
       {contactOpen && T.contactForm && (
-        <ContactForm T={T} preview={inPreview} onClose={() => setContactOpen(false)} onSent={() => track("contact_form", { place: "form" })} />
+        <ContactForm T={T} preview={inPreview} room={room} onClose={() => setContactOpen(false)} onSent={() => track("contact_form", { place: "form" })} />
       )}
       {T.onboarding && !helpDone && phase === "tour" && !cover && !welcome && !intro && sdk && guideAt == null && !menuOpen && !contactOpen && (
         <Onboarding
