@@ -54,6 +54,8 @@ enum DealStage {
   CONTRACT_SENT
   CONTRACT_SIGNED
   FILMED
+  /// "Gennemgang inden live": the tour is with the customer to look through (set when it's sent for review).
+  REVIEW
   LIVE
   LOST
 }

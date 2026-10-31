@@ -13,7 +13,7 @@ import { prisma } from "@/lib/db";
 type Tx = Prisma.TransactionClient;
 
 /** Stages a customer only reaches by signing. */
-const SIGNED_STAGES = ["CONTRACT_SIGNED", "FILMED", "LIVE"];
+const SIGNED_STAGES = ["CONTRACT_SIGNED", "FILMED", "REVIEW", "LIVE"];
 
 /**
  * A customer who has signed isn't deleted in the normal way (the database

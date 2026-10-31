@@ -14,7 +14,7 @@ import type { BsMandateStatus, DealStage, PaymentMethod } from "@prisma/client";
 import { collectionDateForPeriod, deliveryDeadline, earliestCollectionDate, utcDay } from "@/lib/betalingsservice/banking-days";
 import { ensureBsCustomerNumber, resolveBsPayer } from "@/lib/betalingsservice/service";
 
-const ACTIVE_CUSTOMER_STAGES: DealStage[] = ["CONTRACT_SIGNED", "FILMED", "LIVE"];
+const ACTIVE_CUSTOMER_STAGES: DealStage[] = ["CONTRACT_SIGNED", "FILMED", "REVIEW", "LIVE"];
 const HANDLED_STATUSES = ["DRAFT_CREATED", "IMPORTED", "SENT_MANUALLY"];
 /** How far past "now" to keep generating rolling periods for, so upcoming
  * quarters are always ready to draft ahead of their trigger date. */

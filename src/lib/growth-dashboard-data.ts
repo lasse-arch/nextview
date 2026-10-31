@@ -11,7 +11,7 @@ import {
 import { da } from "date-fns/locale";
 import { totalContractValue, contractedContractValue, dealName } from "@/lib/labels";
 
-const PIPELINE_STAGES = ["CONTRACT_SIGNED", "FILMED"] as const;
+const PIPELINE_STAGES = ["CONTRACT_SIGNED", "FILMED", "REVIEW"] as const;
 const RISK_WINDOWS = [30, 60, 90] as const;
 
 type DealForGrowth = {

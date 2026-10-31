@@ -31,7 +31,7 @@ export const forPicker = (cards: CustomerCard[]): PickerCustomer[] =>
 
 export async function customerCards(): Promise<CustomerCard[]> {
   const deals = await prisma.deal.findMany({
-    where: { OR: [{ stage: { in: ["LIVE", "FILMED", "CONTRACT_SIGNED"] } }, { churnedAt: { not: null } }] },
+    where: { OR: [{ stage: { in: ["LIVE", "REVIEW", "FILMED", "CONTRACT_SIGNED"] } }, { churnedAt: { not: null } }] },
     select: {
       id: true,
       companyName: true,

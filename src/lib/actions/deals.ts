@@ -223,7 +223,7 @@ async function updateDealInner(
       : existing.liveAt;
 
   const stageDateUpdates: Record<string, Date> = {};
-  if (["CONTRACT_SIGNED", "FILMED", "LIVE"].includes(stage) && !existing.contractSignedAt) {
+  if (["CONTRACT_SIGNED", "FILMED", "REVIEW", "LIVE"].includes(stage) && !existing.contractSignedAt) {
     stageDateUpdates.contractSignedAt = new Date();
   }
   if (stage === "FILMED" && !existing.filmedAt) stageDateUpdates.filmedAt = new Date();
@@ -361,6 +361,7 @@ async function logStageActivity(
   const stageActivityMessage: Partial<Record<DealStage, string>> = {
     MEETING_BOOKED: `${user.name} bookede møde med ${name}`,
     FILMED: `${user.name} markerede ${name} som filmet`,
+    REVIEW: `${user.name} flyttede ${name} til gennemgang inden live`,
     LIVE: `${name} gik live`,
     LOST: `${user.name} markerede ${name} som tabt`,
   };
@@ -387,7 +388,7 @@ export async function updateDealStage(dealId: string, newStage: DealStage) {
   }
 
   const stageDateUpdates: Record<string, Date> = {};
-  if (["CONTRACT_SIGNED", "FILMED", "LIVE"].includes(newStage) && !existing.contractSignedAt) {
+  if (["CONTRACT_SIGNED", "FILMED", "REVIEW", "LIVE"].includes(newStage) && !existing.contractSignedAt) {
     stageDateUpdates.contractSignedAt = new Date();
   }
   if (newStage === "FILMED" && !existing.filmedAt) stageDateUpdates.filmedAt = new Date();

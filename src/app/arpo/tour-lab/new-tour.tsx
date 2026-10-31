@@ -438,7 +438,7 @@ function CustomerStep({ who, onPick, onCopy }: { who: Who | null; onPick: (w: Wh
     const t = setTimeout(() => searchTourCustomers(q).then(setRows).catch(() => setRows([])), q ? 250 : 0);
     return () => clearTimeout(t);
   }, [q]);
-  const stage: Record<string, string> = { CONTRACT_SIGNED: "Kontrakt underskrevet", FILMED: "Filmet", LIVE: "Live" };
+  const stage: Record<string, string> = { CONTRACT_SIGNED: "Kontrakt underskrevet", FILMED: "Filmet", REVIEW: "Gennemgang", LIVE: "Live" };
   return (
     <div className="space-y-3">
       <h2 className="text-[19px] font-semibold tracking-tight">Hvem er touren til?</h2>

@@ -12,7 +12,7 @@ import { bsPayerOf, ensureBsCustomerNumber, getBsSettings } from "./service";
 
 export const SIGNUP_MAIL_SENDER = "lasse@nextview360.dk";
 const BATCH_SIZE = 10;
-const CUSTOMER_STAGES = ["CONTRACT_SIGNED", "FILMED", "LIVE"] as const;
+const CUSTOMER_STAGES = ["CONTRACT_SIGNED", "FILMED", "REVIEW", "LIVE"] as const;
 
 /** A link made "med kundeoplysninger" can hold {kundenr}, filled in per customer. */
 export function signupLinkFor(link: string, customerNumber: string): string {

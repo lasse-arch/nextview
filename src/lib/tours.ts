@@ -85,7 +85,7 @@ export async function customersWithoutTour() {
       churnedAt: null,
       stage: { not: "LOST" },
       AND: [
-        { OR: [{ contractSignedAt: { not: null } }, { stage: { in: ["CONTRACT_SIGNED", "FILMED", "LIVE"] } }] },
+        { OR: [{ contractSignedAt: { not: null } }, { stage: { in: ["CONTRACT_SIGNED", "FILMED", "REVIEW", "LIVE"] } }] },
         {
           OR: [
             { contractProducts: { path: ["nextviewTour", "selected"], equals: true } },

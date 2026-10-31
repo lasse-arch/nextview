@@ -61,7 +61,7 @@ export async function ensureBsCustomerNumber(dealId: string): Promise<string> {
   });
 }
 
-const CUSTOMER_STAGES = ["CONTRACT_SIGNED", "FILMED", "LIVE"] as const;
+const CUSTOMER_STAGES = ["CONTRACT_SIGNED", "FILMED", "REVIEW", "LIVE"] as const;
 
 /** Deals the one-off "move everyone to Betalingsservice" would switch:
  * every deal still on normal invoices, except churned and lost ones. */

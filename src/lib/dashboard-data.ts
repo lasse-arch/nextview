@@ -11,12 +11,13 @@ const PIPELINE_STAGES = [
   "CONTRACT_SENT",
   "CONTRACT_SIGNED",
   "FILMED",
+  "REVIEW",
 ] as const;
 
 const FUNNEL_STAGES = [...PIPELINE_STAGES, "LIVE"] as const;
 
 /** The "Aktiv pipeline" KPI only counts deals that have actually had a meeting booked or further - not raw leads/contacted. */
-const ACTIVE_PIPELINE_STAGES = ["MEETING_BOOKED", "FOLLOW_UP", "CONTRACT_SENT", "CONTRACT_SIGNED", "FILMED"] as const;
+const ACTIVE_PIPELINE_STAGES = ["MEETING_BOOKED", "FOLLOW_UP", "CONTRACT_SENT", "CONTRACT_SIGNED", "FILMED", "REVIEW"] as const;
 
 /**
  * "Solgt" = has a signed contract (Live, or signed and on its way to Live).
@@ -24,7 +25,7 @@ const ACTIVE_PIPELINE_STAGES = ["MEETING_BOOKED", "FOLLOW_UP", "CONTRACT_SENT", 
  * (src/lib/growth-dashboard-data.ts) - the two pages show the same "total
  * sold" figure and must be computed the same way.
  */
-const SOLD_STAGES = ["LIVE", "CONTRACT_SIGNED", "FILMED"] as const;
+const SOLD_STAGES = ["LIVE", "CONTRACT_SIGNED", "FILMED", "REVIEW"] as const;
 
 export type FunnelBar = { stage: string; label: string; count: number; value: number };
 export type MonthBar = { label: string; value: number };

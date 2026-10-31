@@ -213,10 +213,10 @@ export default async function DealDetailPage({
             crewOptions={users.map((u) => ({ id: u.id, name: u.name }))}
             defaultCrewIds={users.filter((u) => u.email === "lasse@nextview360.dk").map((u) => u.id)}
           />
-          {["CONTRACT_SIGNED", "FILMED", "LIVE"].includes(deal.stage) || deal.filmingAt ? (
+          {["CONTRACT_SIGNED", "FILMED", "REVIEW", "LIVE"].includes(deal.stage) || deal.filmingAt ? (
             <FilmingTimeButton dealId={deal.id} minutes={filming.minutes} registered={filming.registered} plannedMinutes={deal.filmingDurationMinutes} />
           ) : null}
-          {["CONTRACT_SIGNED", "FILMED", "LIVE"].includes(deal.stage) && (
+          {["CONTRACT_SIGNED", "FILMED", "REVIEW", "LIVE"].includes(deal.stage) && (
             <Link href={`/arpo/kunder/${deal.id}`} className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-[13px] font-semibold text-slate-700 shadow-sm hover:bg-slate-50">
               Kundeoverblik
             </Link>

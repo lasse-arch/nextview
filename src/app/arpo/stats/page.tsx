@@ -34,7 +34,7 @@ export default async function StatsPage() {
 
   const deals = (
     await prisma.deal.findMany({
-      where: { stage: { in: ["FILMED", "LIVE"] }, churnedAt: null },
+      where: { stage: { in: ["FILMED", "REVIEW", "LIVE"] }, churnedAt: null },
       include: {
         reports: { orderBy: { sentAt: "desc" }, take: 10 },
         branches: { select: { id: true, displayName: true, companyName: true, mpSkinId: true } },

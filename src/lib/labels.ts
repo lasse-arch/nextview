@@ -105,6 +105,7 @@ export const stageOrder = [
   "CONTRACT_SENT",
   "CONTRACT_SIGNED",
   "FILMED",
+  "REVIEW",
   "LIVE",
   "LOST",
 ] as const;
@@ -117,6 +118,7 @@ export const stageLabels: Record<string, string> = {
   CONTRACT_SENT: "Kontrakt sendt",
   CONTRACT_SIGNED: "Kontrakt underskrevet",
   FILMED: "Filmet",
+  REVIEW: "Gennemgang inden live",
   LIVE: "Live",
   LOST: "Tabt",
 };

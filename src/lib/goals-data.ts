@@ -7,7 +7,7 @@ import { contractedContractValue } from "@/lib/labels";
 /// i alt" stat tile (src/lib/dashboard-data.ts) - kept in sync by hand since
 /// duplicating a 3-item array beats importing a whole dashboard-data module
 /// just for this one constant.
-const SOLD_STAGES = ["LIVE", "CONTRACT_SIGNED", "FILMED"] as const;
+const SOLD_STAGES = ["LIVE", "CONTRACT_SIGNED", "FILMED", "REVIEW"] as const;
 
 export const goalMetricLabels: Record<GoalMetric, string> = {
   MEETINGS_BOOKED: "Møder booket",

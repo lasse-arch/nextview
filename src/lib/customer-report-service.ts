@@ -556,7 +556,7 @@ export async function generateAndSendCombinedCustomerReport(
   }
 }
 
-const REPORTABLE_STAGES = ["FILMED", "LIVE"] as const;
+const REPORTABLE_STAGES = ["FILMED", "REVIEW", "LIVE"] as const;
 
 /**
  * Queues every deal whose nextReportDueAt has arrived as a PENDING
