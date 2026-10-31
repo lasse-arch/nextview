@@ -27,6 +27,8 @@ export type TourStats = {
   /** The chosen period ("YYYY-MM-DD", both included) - null for "the last `days` days". */
   from: string | null;
   to: string | null;
+  /** When the numbers were started (first published or reset) - null: all along. */
+  countedFrom?: string | null;
   visits: number;
   engaged: number;
   leads: number;
@@ -50,6 +52,15 @@ export type TourStats = {
   /** "Vis mig rundt" - where they left it is for the main one; `byGuide` = each guided tour (its "#rundvisning…" link) when there are more. */
   guide: { started: number; completed: number; leftAt: { stop: number; count: number }[]; leftFor: { label: string; count: number }[]; byGuide?: { guide: string; started: number; completed: number }[] };
 };
+
+/**
+ * The first time a tour goes out, its numbers start from that moment - the
+ * team's own looks while it was made aren't the customer's visitors. Only the
+ * first time (a tour published again keeps its numbers).
+ */
+export async function startStatsIfFirst(slug: string): Promise<void> {
+  await prisma.tour.updateMany({ where: { slug, statsSince: null }, data: { statsSince: new Date() } }).catch(() => {});
+}
 
 /** A chosen period, as days "YYYY-MM-DD" (both included). */
 export type StatsRange = { from: string; to: string };
@@ -79,7 +90,10 @@ export async function tourStats(slug: string, range: number | StatsRange = 30): 
   // The last N days up to now, or a chosen period: from the start of its first day to the end of its last (Danish time).
   const span = typeof range === "number" ? null : range;
   const last = typeof range === "number" ? range : 0;
-  const since = span ? dayStart(span.from) : new Date(Date.now() - last * 86_400_000);
+  const asked = span ? dayStart(span.from) : new Date(Date.now() - last * 86_400_000);
+  // Nothing from before the numbers were started (first published, or reset by hand).
+  const counted = (await prisma.tour.findUnique({ where: { slug }, select: { statsSince: true } }))?.statsSince ?? null;
+  const since = counted && counted > asked ? counted : asked;
   const until = span ? dayStart(addDays(span.to, 1)) : new Date(Date.now() + 60_000);
   const days = span ? Math.round((Date.parse(`${addDays(span.to, 1)}T12:00:00Z`) - Date.parse(`${span.from}T12:00:00Z`)) / 86_400_000) : last;
   const [sessions, perDay, actions, places, sources, liveFunnel, liveUnits, menuOpened, menuGroups, rooms, roomTime, opened] = await Promise.all([
@@ -167,6 +181,7 @@ export async function tourStats(slug: string, range: number | StatsRange = 30): 
     leads: Number(s?.leads ?? 0),
     medianSeconds: Math.round(s?.median ?? 0),
     mobileShare: visits ? Number(s.mobile) / visits : 0,
+    countedFrom: counted?.toISOString() ?? null,
     from: span?.from ?? null,
     to: span?.to ?? null,
     perDay: Array.from({ length: days }, (_, i) => {

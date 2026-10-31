@@ -4,7 +4,7 @@ import { portalUrl } from "@/lib/public-urls";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { setTourShare, tourShareLink } from "@/lib/actions/tours";
-import { tourStatsForPeriod } from "@/lib/actions/tour-period-stats";
+import { resetTourStats, tourStatsForPeriod } from "@/lib/actions/tour-period-stats";
 import { DateRangePicker, periodText, presetName, type Period } from "@/components/date-range-picker";
 import type { TourStats } from "@/lib/tour-stats";
 import { shown, type ReportShare, type ShareWhen } from "@/lib/tour-share";
@@ -174,9 +174,24 @@ function OurNumbers({ slug, initial, guideStops, guideNames }: { slug: string; i
       else setError(r.error);
     });
   };
+  const reset = () => {
+    if (!confirm("Nulstil tallene? Touren tæller så besøg fra nu af - fx når den lige er gået live, og det kun er os, der har kigget på den. Intet slettes, men besøgene fra før tælles ikke med (heller ikke på kundesiden og i rapporterne).")) return;
+    startLoading(async () => {
+      const r = await resetTourStats(slug);
+      if (!r.ok) return setError(r.error);
+      const again = await tourStatsForPeriod(slug, period.from, period.to);
+      if (again.ok) setStats(again.stats);
+    });
+  };
   const picker = (
     <div className="space-y-1">
       <DateRangePicker value={period} onChange={choose} disabled={loading} />
+      <p className="flex flex-wrap items-center justify-between gap-2 px-1 text-[11.5px] text-[#8e8e93]">
+        <span>{stats.countedFrom ? `Tæller fra ${new Date(stats.countedFrom).toLocaleDateString("da-DK", { day: "numeric", month: "short", year: "numeric" })}` : "Tæller alle besøg"}</span>
+        <button type="button" onClick={reset} disabled={loading} className="font-medium text-[#0071e3] hover:underline disabled:opacity-50">
+          Nulstil tallene
+        </button>
+      </p>
       {error && <p className="px-1 text-[12px] text-[#ff3b30]">{error}</p>}
     </div>
   );

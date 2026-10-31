@@ -1,5 +1,6 @@
 "use server";
 
+import { startStatsIfFirst } from "@/lib/tour-stats";
 import { tourChanged } from "@/lib/tour-cache";
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
@@ -134,6 +135,7 @@ export async function createTour(name: string, copyOf: string): Promise<Result<{
 export async function setTourPublished(slug: string, published: boolean): Promise<Result> {
   await admin();
   await prisma.tour.update({ where: { slug }, data: { published } });
+  if (published) await startStatsIfFirst(slug);
   revalidatePath(`/t/${slug}`);
   tourChanged(slug);
   if (published) panoCopiesLater(slug);

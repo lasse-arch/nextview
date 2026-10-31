@@ -1,4 +1,5 @@
 import "server-only";
+import { startStatsIfFirst } from "@/lib/tour-stats";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { logActivity } from "@/lib/activity";
@@ -53,6 +54,7 @@ export async function goLiveAfterApproval(slug: string): Promise<void> {
   try {
     if (cloudflareReady()) await publishTour(slug, "Kunden (godkendt)", "Godkendt af kunden - udgivet og sat live", arpoOrigin(process.env.APP_BASE_URL || "https://nextview360.dk"));
     else await prisma.tour.update({ where: { slug }, data: { published: true } });
+    await startStatsIfFirst(slug);
   } catch (err) {
     return stop(`Touren kunne ikke udgives (${err instanceof Error ? err.message : String(err)}).`);
   }

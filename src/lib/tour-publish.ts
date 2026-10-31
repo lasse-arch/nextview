@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import "server-only";
+import { startStatsIfFirst } from "@/lib/tour-stats";
 import { hash as blake3 } from "blake3-wasm";
 import { prisma } from "@/lib/db";
 import { loadTour } from "@/app/arpo/tour-lab/[slug]/load";
@@ -274,6 +275,7 @@ export async function publishTour(slug: string, who: string, note: string | null
   await prisma.tourPublication.create({ data: { tourId: tour.id, version, slug, files: built.files, engine: built.engine, configHash: configHash(tour.config), note, createdByName: who } });
   const before = await prisma.tour.findUnique({ where: { slug }, select: { liveVersion: true } });
   await prisma.tour.update({ where: { slug }, data: { liveVersion: version, published: true } });
+  await startStatsIfFirst(slug);
   try {
     await deploy(built.contents, origin);
   } catch (err) {

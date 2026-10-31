@@ -1342,6 +1342,8 @@ model Tour {
   liveVersion      Int?
 
   @@index([dealId])
+  /// Visits are counted from here: set when the tour is first published (or reset by hand in Resultater), so our own looks before don't count.
+  statsSince DateTime?
 }
 
 /// One version of a tour published as plain files on Cloudflare - frozen: its

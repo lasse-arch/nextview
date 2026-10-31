@@ -12,3 +12,15 @@ export async function tourStatsForPeriod(slug: string, from: string, to: string)
   if (!(await prisma.tour.findUnique({ where: { slug }, select: { slug: true } }))) return { ok: false, error: "Touren findes ikke." };
   return { ok: true, stats: await tourStats(slug, { from, to }) };
 }
+
+/**
+ * "Nulstil tallene": the tour's numbers start from now - e.g. when it went out
+ * with our own looks in them. Nothing is deleted: the visits from before just
+ * aren't counted (in Resultater, the customer page and the reports).
+ */
+export async function resetTourStats(slug: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireUser();
+  const r = await prisma.tour.updateMany({ where: { slug }, data: { statsSince: new Date() } });
+  if (!r.count) return { ok: false, error: "Touren findes ikke." };
+  return { ok: true };
+}
