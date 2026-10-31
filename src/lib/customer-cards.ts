@@ -2,6 +2,8 @@ import "server-only";
 import { prisma } from "@/lib/db";
 import { dealName, needsDeliveryLink } from "@/lib/labels";
 import { industryOf } from "@/lib/industries";
+import { getAppBaseUrl } from "@/lib/email-oauth";
+import { tourUrl } from "@/lib/public-urls";
 
 /*
  * The customers as the pickers and lists in Arpo show them: name, address,
@@ -40,7 +42,7 @@ export async function customerCards(): Promise<CustomerCard[]> {
       liveAt: true,
       churnedAt: true,
       items: { orderBy: { createdAt: "asc" }, select: { id: true, productType: true, url: true, imageUrl: true } },
-      tours: { where: { OR: [{ published: true }, { liveVersion: { not: null } }] }, take: 1, select: { slug: true } },
+      tours: { where: { OR: [{ published: true }, { liveVersion: { not: null } }] }, orderBy: { createdAt: "asc" }, select: { slug: true, liveVersion: true } },
       _count: { select: { customerAccounts: true } },
     },
   });
@@ -55,7 +57,13 @@ export async function customerCards(): Promise<CustomerCard[]> {
         state: d.churnedAt ? ("stopped" as const) : d.stage === "LIVE" ? ("live" as const) : ("coming" as const),
         liveAt: d.liveAt?.toISOString() ?? null,
         thumb: d.tours[0] ? `/api/tour-thumb?tour=${encodeURIComponent(d.tours[0].slug)}` : tourItem ? `/api/tour-thumb?item=${tourItem.id}` : null,
-        products: d.items,
+        // The deal's products - and its tours from Arpo that are out, when no product has their link yet (e.g. approved and set live by itself).
+        products: [
+          ...d.items,
+          ...d.tours
+            .map((t) => ({ id: `tour:${t.slug}`, productType: "Nextview360 Tour", url: tourUrl(t.slug, getAppBaseUrl(), t.liveVersion != null), imageUrl: null }))
+            .filter((t) => !d.items.some((i) => i.url && (i.url === t.url || i.url.includes(t.id.slice(5))))),
+        ],
         hasLogin: d._count.customerAccounts > 0,
       };
     })

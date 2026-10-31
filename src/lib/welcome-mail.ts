@@ -1,7 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/db";
 import { resendReady, sendSystemMail } from "@/lib/system-mail";
-import { dealName } from "@/lib/labels";
+import { dealName, needsDeliveryLink } from "@/lib/labels";
 import { parseContractProducts } from "@/lib/contract-template-data";
 import { logActivity } from "@/lib/activity";
 import { getAppBaseUrl } from "@/lib/email-oauth";
@@ -191,6 +191,29 @@ export async function welcomeMailFor(dealId: string, portal: { link: string; sta
 }
 
 /**
+ * The deal's tour product without a link (e.g. "Nextview360 Tour" from the
+ * contract) gets the link to its tour from Arpo once that is out - so the
+ * welcome mail, Live kunder and the customer page all have it. Only a link
+ * is filled in; nothing about the product (price, billing) is touched.
+ */
+export async function linkDealTours(dealId: string): Promise<void> {
+  const deal = await prisma.deal.findUnique({
+    where: { id: dealId },
+    select: { items: { orderBy: { createdAt: "asc" }, select: { id: true, productType: true, url: true } }, tours: { where: { OR: [{ published: true }, { liveVersion: { not: null } }] }, orderBy: { createdAt: "asc" }, select: { slug: true, liveVersion: true } } },
+  });
+  if (!deal?.tours.length) return;
+  const open = deal.items.filter((i) => !i.url && needsDeliveryLink(i.productType) && !/hjemmeside/i.test(i.productType));
+  const linked = new Set(deal.items.map((i) => i.url).filter(Boolean));
+  for (const t of deal.tours) {
+    const url = tourUrl(t.slug, getAppBaseUrl(), t.liveVersion != null);
+    if (linked.has(url)) continue;
+    const item = open.shift();
+    if (!item) return;
+    await prisma.dealItem.update({ where: { id: item.id }, data: { url } });
+  }
+}
+
+/**
  * What the welcome mail can't go without: the link to their tour, and the
  * customer page for everyone it goes to. Checked before every send (by
  * hand and when the deal goes Live) - a mail without them is never sent.
@@ -214,6 +237,7 @@ export async function welcomeMailMissing(dealId: string): Promise<string[]> {
 
 /** Sends the welcome mail now (also again, from the deal page's button). */
 export async function sendWelcomeMail(dealId: string, actorId: string): Promise<void> {
+  await linkDealTours(dealId).catch(() => {});
   const missing = await welcomeMailMissing(dealId);
   if (missing.length) throw new Error(`Velkomstmailen er ikke sendt - der mangler noget: ${missing.join(" ")}`);
   const contact = await prisma.deal.findUniqueOrThrow({ where: { id: dealId }, select: { contactEmail: true, contactName: true, tours: { select: { reviewEmail: true, reviewName: true } } } });
