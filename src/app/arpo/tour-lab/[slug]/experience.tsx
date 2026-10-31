@@ -17,7 +17,7 @@ import { CommuteSheet, COMMUTE_CSS } from "./commute";
 import { FeatureTour, featuresSeen, FEATURES_CSS } from "./features";
 import { FinderSheet, FINDER_CSS, WalkLines } from "./finder";
 import { apiUrl, isStaticTour } from "../tours/api";
-import type { DroneView, GuideTurn, MenuEntry, TourConfig, TourPlace, TourPoint, WelcomeGo } from "../tours/types";
+import type { DroneView, FindStepAside, GuideTurn, MenuEntry, TourConfig, TourPlace, TourPoint, WelcomeGo } from "../tours/types";
 import { CoverWelcome, DESIGNS_CSS, DockMenu, PickerMenu } from "./designs";
 import { GUIDE_CSS, GuidePlayer, guideStops } from "./guide";
 import { ONBOARDING_CSS, Onboarding } from "./onboarding";
@@ -646,6 +646,8 @@ function TourExperience({
    * LAST thing asked for is kept, "Gør touren klar …" shows, and it runs once the
    * tour is ready - one thing, never two on top of each other.
    */
+  /** What the Find vej button steps aside for (nothing: it always stays - the standard). */
+  const findAside: FindStepAside[] = T.wayfinding?.always === false ? ["cards", "nudge", "stories", "arrived"] : (T.wayfinding?.stepAside ?? []);
   const sdkReadyRef = useRef(false);
   /** menuGo, for running it later (held until the tour is ready). */
   const menuGoRef = useRef<((name: string, group: string, href: string) => Promise<unknown>) | null>(null);
@@ -2237,7 +2239,7 @@ function TourExperience({
   return (
     <TourLang.Provider value={{ lang, t: tx }}>
     <LinkProvider T={T} popup={popup}>
-    <div className={`hv fixed inset-0 z-50 overflow-hidden bg-[#0d1b20] ${selected ? "hv-punkt" : ""} ${zoomed ? "hv-zoom" : ""} ${welcome ? "hv-welcome" : ""} ${phase === "tour" && T.stories?.mobile ? "hv-st-on-m" : ""} ${menuOpen ? "hv-menu-aaben" : ""} ${T.overviewUi?.box?.desktop === false ? "hv-boks-ud-d" : ""} ${T.overviewUi?.box?.mobile === false ? "hv-boks-ud-m" : ""} ${T.overviewUi?.filter?.desktop === false ? "hv-filter-ud-d" : ""} ${T.overviewUi?.filter?.mobile === false ? "hv-filter-ud-m" : ""} ${T.overviewUi?.names?.desktop ? `hv-navne-d-${T.overviewUi.names.desktop}` : ""} ${T.overviewUi?.names?.mobile ? `hv-navne-m-${T.overviewUi.names.mobile}` : ""} ${T.overviewUi?.filterColumns ? `hv-filter-kol hv-filter-kol-${T.overviewUi.filterColumns}` : T.overviewUi?.filterScroll ? "hv-filter-rul" : ""} ${langClasses} ${T.design?.menu === "dock" ? "hv-dock" : ""} ${T.logoSide === "right" ? "hv-logo-h" : ""} ${T.logoBg ? `hv-logobg-${T.logoBg}` : ""} ${T.logoBgTiles ?? T.logoBg ? `hv-tlogobg-${T.logoBgTiles ?? T.logoBg}` : ""} hv-tlogo-${T.logoAlignTiles ?? "midt"} ${guideAt != null || (dayAt != null && !dayOpen) ? "hv-guiding" : ""} ${route ? "hv-routing" : ""} ${phase === "tour" ? "hv-i-tour" : ""} ${T.wayfinding ? "hv-har-rute" : ""} ${T.wayfinding?.always ? "rt-altid" : ""} ${T.wayfinding?.button?.desktop ? `rt-d-${T.wayfinding.button.desktop}` : ""} ${T.wayfinding?.button?.mobile ? `rt-m-${T.wayfinding.button.mobile}` : ""} ${showCard != null || (nudgeOn && T.nudge && phase === "tour") ? "hv-med-kort" : ""} ${showMeasures && phase === "tour" ? "hv-maler" : ""} ${phase === "tour" && T.stories?.desktop ? "hv-st-on-d" : ""}`} style={
+    <div className={`hv fixed inset-0 z-50 overflow-hidden bg-[#0d1b20] ${selected ? "hv-punkt" : ""} ${zoomed ? "hv-zoom" : ""} ${welcome ? "hv-welcome" : ""} ${phase === "tour" && T.stories?.mobile ? "hv-st-on-m" : ""} ${menuOpen ? "hv-menu-aaben" : ""} ${T.overviewUi?.box?.desktop === false ? "hv-boks-ud-d" : ""} ${T.overviewUi?.box?.mobile === false ? "hv-boks-ud-m" : ""} ${T.overviewUi?.filter?.desktop === false ? "hv-filter-ud-d" : ""} ${T.overviewUi?.filter?.mobile === false ? "hv-filter-ud-m" : ""} ${T.overviewUi?.names?.desktop ? `hv-navne-d-${T.overviewUi.names.desktop}` : ""} ${T.overviewUi?.names?.mobile ? `hv-navne-m-${T.overviewUi.names.mobile}` : ""} ${T.overviewUi?.filterColumns ? `hv-filter-kol hv-filter-kol-${T.overviewUi.filterColumns}` : T.overviewUi?.filterScroll ? "hv-filter-rul" : ""} ${langClasses} ${T.design?.menu === "dock" ? "hv-dock" : ""} ${T.logoSide === "right" ? "hv-logo-h" : ""} ${T.logoBg ? `hv-logobg-${T.logoBg}` : ""} ${T.logoBgTiles ?? T.logoBg ? `hv-tlogobg-${T.logoBgTiles ?? T.logoBg}` : ""} hv-tlogo-${T.logoAlignTiles ?? "midt"} ${guideAt != null || (dayAt != null && !dayOpen) ? "hv-guiding" : ""} ${route ? "hv-routing" : ""} ${phase === "tour" ? "hv-i-tour" : ""} ${T.wayfinding ? "hv-har-rute" : ""} ${findAside.map((a) => `rt-vig-${a}`).join(" ")} ${showCard != null ? "hv-med-stedkort" : ""} ${nudgeOn && T.nudge && phase === "tour" ? "hv-med-nudge" : ""} ${T.wayfinding?.button?.desktop ? `rt-d-${T.wayfinding.button.desktop}` : ""} ${T.wayfinding?.button?.mobile ? `rt-m-${T.wayfinding.button.mobile}` : ""} ${showCard != null || (nudgeOn && T.nudge && phase === "tour") ? "hv-med-kort" : ""} ${showMeasures && phase === "tour" ? "hv-maler" : ""} ${phase === "tour" && T.stories?.desktop ? "hv-st-on-d" : ""}`} style={
         {
           fontFamily: `'${T.font}', system-ui, sans-serif`,
           "--c-main": T.colors.main,
@@ -2902,7 +2904,8 @@ function TourExperience({
           onLink={(label, href) => ctaClick(label, href, "info")}
         />
       )}
-      {T.wayfinding && phase === "tour" && !route && !routeOpen && !cover && guideAt == null && (
+      {/* Find vej stays (the standard): also over a place card or "Din plads venter", and while "Du er fremme" shows - a new way can be found from there. */}
+      {T.wayfinding && phase === "tour" && (!route || (route.arrived && !findAside.includes("arrived"))) && !routeOpen && !cover && guideAt == null && (
         <button type="button" className="rt-knap" onClick={() => (track("route_open"), setRouteOpen(true))}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M12 2l3 7 7 3-7 3-3 7-3-7-7-3 7-3z" />
@@ -3729,7 +3732,7 @@ const CSS = `
   .hv-menu{width:100%}
   .hv-room{bottom:76px}
   /* A place card has that spot - the room's name steps aside while it shows. */
-  .hv-med-kort .hv-room,.hv-med-kort .rt-knap{opacity:0;pointer-events:none}
+  .hv-med-kort .hv-room{opacity:0;pointer-events:none}
   .hv-dev{bottom:calc(64px + env(safe-area-inset-bottom,0px));right:10px}
   .hv-dev>button{font-size:10px;padding:3px 7px}
   .hv-punkt .hv-dev{display:none}

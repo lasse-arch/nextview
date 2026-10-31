@@ -12,7 +12,7 @@ import { detachToursFromMpskins, logTourWork, renameTourSlug, restoreTourVersion
 import { SOCIALS } from "../../tours/social";
 import { guideStops } from "../guide";
 import { askClaudeForTour, saveAnthropicKey, suggestTourFilter, type ChatTurn } from "@/lib/actions/tour-ai";
-import type { FindButtonPlace, MenuEntry, TourConfig } from "../../tours/types";
+import type { FindButtonPlace, FindStepAside, MenuEntry, TourConfig } from "../../tours/types";
 import type { TourStats } from "@/lib/tour-stats";
 import type { ReportShare } from "@/lib/tour-share";
 import { CardsEditor, DroneViewPicker, GuideEditor, StartEditor, TagsEditor } from "./content";
@@ -39,6 +39,14 @@ import { AiImageButton } from "./ai-image";
 import { matchTargets, mentionAt, MentionList, tourTargets, type Target } from "./mentions";
 import { deleteStoryImages } from "@/lib/actions/tour-lab";
 import { suggestSiteLook } from "@/lib/actions/tour-ai";
+
+/** The situations Find vej can step aside for (wayfinding.stepAside). None = it always stays. */
+const FIND_ASIDE: [FindStepAside, string][] = [
+  ["cards", "stedkort"],
+  ["nudge", "\"Din plads venter\""],
+  ["stories", "historierne"],
+  ["arrived", "\"Du er fremme\""],
+];
 
 /** A zoom level in words, for the Zoom sliders (1 = Matterport's normal view). */
 const zoomLabel = (z: number) => (Math.abs(z - 1) < 0.01 ? "normal" : z < 1 ? `zoomet ud (${Math.round(z * 100)} %)` : `zoomet ind (${Math.round(z * 100)} %)`);
@@ -1140,12 +1148,36 @@ export function TourEditor({
                   </Field>
                 )}
                 {config.wayfinding && (
-                  <Toggle
-                    on={Boolean(config.wayfinding.always)}
-                    onChange={(on) => edit((d) => void (d.wayfinding = { ...d.wayfinding, always: on || undefined }))}
-                    title="Find vej-knappen står der altid"
-                    hint="Også mens et stedkort eller historierne vises - på en telefon rykker den op under menuen, så den ikke ligger oven i kortet. Fra: den træder til side, som i dag."
-                  />
+                  <Field
+                    title="Find vej træder til side for"
+                    hint={(() => {
+                      const vig = config.wayfinding.always === false ? FIND_ASIDE.map(([k]) => k) : (config.wayfinding.stepAside ?? []);
+                      return vig.length
+                        ? `Knappen gemmer sig, mens ${FIND_ASIDE.filter(([k]) => vig.includes(k)).map(([, l]) => l).join(", ")} vises - ellers står den der.`
+                        : "Intet valgt: knappen står der altid. På en telefon rykker den op under menuen, så den ikke ligger oven i et kort.";
+                    })()}
+                  >
+                    <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+                      {FIND_ASIDE.map(([k, label]) => {
+                        const vig = config.wayfinding?.always === false ? FIND_ASIDE.map(([x]) => x) : (config.wayfinding?.stepAside ?? []);
+                        return (
+                          <label key={k} className="flex items-center gap-1.5 text-sm">
+                            <input
+                              type="checkbox"
+                              checked={vig.includes(k)}
+                              onChange={(e) =>
+                                edit((d) => {
+                                  const next = e.target.checked ? [...vig.filter((x) => x !== k), k] : vig.filter((x) => x !== k);
+                                  d.wayfinding = { ...d.wayfinding, always: undefined, stepAside: next.length ? next : undefined };
+                                })
+                              }
+                            />
+                            {label}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </Field>
                 )}
                 {config.wayfinding &&
                   (["desktop", "mobile"] as const).map((dev) => (

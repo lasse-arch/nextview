@@ -74,6 +74,8 @@ export type PlaceCard = {
   seconds?: number;
 };
 
+/** What the Find vej button can step aside for: a place card, "Din plads venter", the stories playing, "Du er fremme". */
+export type FindStepAside = "cards" | "nudge" | "stories" | "arrived";
 export type DockIcon = "places" | "menu" | "book" | "order" | "map" | "phone" | "play";
 
 export type TourPoint = {
@@ -417,8 +419,8 @@ export type TourConfig = {
    */
   /** `button`: where the Find vej button stands, per device ("menu" = not shown; open it from a menu item "#findvej"). Left out: top centre on a computer, bottom right on a phone. */
   /** `arrive`: the button on "Du er fremme" - its own (label and link, e.g. "#live"), or false for none. Left out: the tour's main button. */
-  /** `always`: the button stays on the screen - also while a place card or the stories show (on a phone it moves up out of their way). `arriveHide`: "Du er fremme" goes by itself after so many seconds (left out = it stays until closed). */
-  wayfinding?: { boxes?: Record<string, string>; button?: { desktop?: FindButtonPlace; mobile?: FindButtonPlace }; arrive?: { label: string; href: string } | false; always?: boolean; arriveHide?: number };
+  /** The button stays on the screen (the standard); `stepAside`: what it steps aside for instead ("Træd til side for"). `always: false` (older): steps aside for all of them. Staying - also while a place card, "Din plads venter", the stories or "Du er fremme" show (on a phone it moves up out of their way). `arriveHide`: "Du er fremme" goes by itself after so many seconds (left out = it stays until closed). */
+  wayfinding?: { boxes?: Record<string, string>; button?: { desktop?: FindButtonPlace; mobile?: FindButtonPlace }; arrive?: { label: string; href: string } | false; always?: boolean; stepAside?: FindStepAside[]; arriveHide?: number };
   /**
    * "Find din plads": a few questions on the drone scene/map (who are you,
    * what do you sleep in, what matters most); each answer points at the
