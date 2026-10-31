@@ -190,8 +190,32 @@ export async function welcomeMailFor(dealId: string, portal: { link: string; sta
   return { deal, to: person?.email ?? deal.contactEmail, ...mail };
 }
 
+/**
+ * What the welcome mail can't go without: the link to their tour, and the
+ * customer page for everyone it goes to. Checked before every send (by
+ * hand and when the deal goes Live) - a mail without them is never sent.
+ */
+export async function welcomeMailMissing(dealId: string): Promise<string[]> {
+  const deal = await prisma.deal.findUniqueOrThrow({
+    where: { id: dealId },
+    select: { contactEmail: true, contactName: true, items: { where: { url: { not: null } }, select: { id: true } }, tours: { select: { published: true, reviewEmail: true } } },
+  });
+  const missing: string[] = [];
+  if (!deal.contactEmail) missing.push("Kunden har ingen kontakt-e-mail.");
+  if (!deal.items.length && !deal.tours.some((t) => t.published)) missing.push('Linket til touren mangler: tilføj det ved produktet under Ydelser ("+ Tilføj link") - eller udgiv touren i Arpo.');
+  const people = [...new Set([deal.contactEmail, ...deal.tours.map((t) => t.reviewEmail)].filter((e): e is string => Boolean(e)).map(normalizeEmail))];
+  const withAccess = new Set(
+    (await prisma.customerAccountDeal.findMany({ where: { dealId, account: { email: { in: people } } }, select: { account: { select: { email: true } } } })).map((a) => normalizeEmail(a.account.email))
+  );
+  const without = people.filter((e) => !withAccess.has(e));
+  if (without.length) missing.push(`${without.join(" og ")} har ikke adgang til kundesiden endnu: giv adgang under "Kundens login" på dealen.`);
+  return missing;
+}
+
 /** Sends the welcome mail now (also again, from the deal page's button). */
 export async function sendWelcomeMail(dealId: string, actorId: string): Promise<void> {
+  const missing = await welcomeMailMissing(dealId);
+  if (missing.length) throw new Error(`Velkomstmailen er ikke sendt - der mangler noget: ${missing.join(" ")}`);
   const contact = await prisma.deal.findUniqueOrThrow({ where: { id: dealId }, select: { contactEmail: true, contactName: true, tours: { select: { reviewEmail: true, reviewName: true } } } });
   if (!contact.contactEmail) throw new Error("Kunden har ingen kontakt-e-mail.");
   // The deal's contact - and whoever the tour was sent to for review, when that's someone else (they have the customer page).
@@ -250,7 +274,7 @@ export async function sendWelcomeMailOnLive(
   } catch (err) {
     const reason = err instanceof Error ? err.message : "Ukendt fejl";
     await prisma.note.create({
-      data: { dealId, authorId: actorId, kind: "MANUAL", body: `Velkomstmailen blev ikke sendt: ${reason}` },
+      data: { dealId, authorId: actorId, kind: "MANUAL", body: `Velkomstmailen blev ikke sendt: ${reason} Send den fra dealen ("Send nu" under Ydelser), når det er på plads.` },
     });
   }
 }
