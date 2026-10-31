@@ -213,8 +213,11 @@ export function GuidePlayer({
               {muted ? "🔇" : "🔊"}
             </button>
           )}
-          <button type="button" className="gd-stop" onClick={() => onClose(false)}>
-            {stopLabel ?? tr("Gå selv rundt")}
+          <button type="button" className="gd-stop" aria-label={stopLabel ?? tr("Gå selv rundt")} title={stopLabel ?? tr("Gå selv rundt")} onClick={() => onClose(false)}>
+            <span className="gd-stop-tekst">{stopLabel ?? tr("Gå selv rundt")}</span>
+            <span className="gd-stop-x" aria-hidden>
+              ✕
+            </span>
           </button>
         </div>
       </div>
@@ -243,12 +246,13 @@ export const GUIDE_CSS = `
 @keyframes gdSelv{0%,100%{transform:translateX(-3px)}50%{transform:translateX(3px)}}
 .gd-end .hv-btn{display:inline-flex;padding:10px 16px;font-size:14px}
 .gd-ctrl{display:flex;align-items:center;gap:6px}
-.gd-ctrl button{height:36px;min-width:36px;border:0;border-radius:999px;background:#eef1f2;color:var(--c-main);font:inherit;font-weight:800;font-size:15px;cursor:pointer;padding:0 12px}
+.gd-ctrl button{white-space:nowrap;flex:none;height:36px;min-width:36px;border:0;border-radius:999px;background:#eef1f2;color:var(--c-main);font:inherit;font-weight:800;font-size:15px;cursor:pointer;padding:0 12px}
 .gd-ctrl button:disabled{opacity:.35;cursor:default}
 .gd-ctrl .gd-play{background:var(--c-main);color:#fff;font-size:13px}
 .gd-ctrl .gd-pause{font-size:11px;letter-spacing:-1px}
 .gd-ctrl .gd-pause.paa{background:var(--c-main);color:#fff;letter-spacing:0}
-.gd-ctrl .gd-stop{margin-left:auto;background:none;font-size:13px;font-weight:700;color:#56636a;padding:0 4px}
+.gd-ctrl .gd-stop{margin-left:auto;flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;background:none;font-size:13px;font-weight:700;color:#56636a;padding:0 4px}
+.gd-stop-x{display:none}
 .hv-guide-knap{display:flex;align-items:center;gap:10px;width:calc(100% - 44px);margin:14px 22px 4px;padding:12px 16px;border:0;border-radius:14px;background:var(--c-accent);color:#fff;font:inherit;font-weight:800;font-size:15px;cursor:pointer;text-align:left}
 .hv-guide-knap small{display:block;font-weight:600;font-size:12px;opacity:.85}
 .hv-wel-guide{display:inline-flex;align-items:center;gap:8px;align-self:flex-start;margin-top:14px;border:0;border-radius:999px;background:var(--c-main);color:#fff;padding:11px 18px;font:inherit;font-weight:800;font-size:14px;cursor:pointer}
@@ -270,7 +274,11 @@ export const GUIDE_CSS = `
   .gd-lille h3{font-size:clamp(14.5px,4.1vw,16px);margin:1px 0 3px}
   .gd-lille p{font-size:clamp(12px,3.3vw,12.5px);line-height:1.4;margin-bottom:6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
   .gd-lille .gd-next,.gd-lille .gd-selv{display:none}
-  .gd-lille .gd-ctrl button{height:30px;min-width:30px;font-size:13px;padding:0 9px}
+  .gd-lille .gd-ctrl{gap:5px}
+  .gd-lille .gd-ctrl button{height:30px;min-width:30px;font-size:12.5px;padding:0 9px}
+  /* The small card: "Gå selv rundt" as a round ✕ - the words don't fit beside the buttons. */
+  .gd-lille .gd-ctrl .gd-stop{flex:none;width:30px;padding:0;background:#eef1f2;font-size:12px}
+  .gd-lille .gd-stop-tekst{display:none}.gd-lille .gd-stop-x{display:inline}
   .gd-mellem .gd-stop,.gd-lille .gd-stop{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:46%;font-size:12px}
 }
 @media (min-width:761px){
