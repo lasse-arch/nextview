@@ -2705,7 +2705,7 @@ function TourExperience({
                 {T.contact.email}
               </a>
             )}
-            {T.contactForm && (
+            {T.contactForm && T.contactForm.inBox !== false && (
               <button
                 type="button"
                 className="hv-contact-form"
@@ -2715,7 +2715,9 @@ function TourExperience({
                 }}
               >
                 <ContactIcon kind="write" />
-                {T.contactForm.title || tx("Skriv til os")}
+                {/* Its own text - or the form's title, unless a button right above says the same (then "Skriv til os"). */}
+                {T.contactForm.boxLabel ||
+                  (T.contactForm.title && !T.cta.some((c) => c.label.trim().toLowerCase() === T.contactForm!.title!.trim().toLowerCase()) ? T.contactForm.title : tx("Skriv til os"))}
               </button>
             )}
             {socialLinks(T.contact).length > 0 && (

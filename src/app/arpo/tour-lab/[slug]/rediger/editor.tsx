@@ -1252,6 +1252,17 @@ export function TourEditor({
                         <input className={input} placeholder="Fx Vi svarer inden for en dag." value={config.contactForm.lead ?? ""} onChange={(e) => edit((d) => void (d.contactForm = { ...d.contactForm!, lead: e.target.value || undefined }))} />
                       </Field>
                       <Toggle on={config.contactForm.phone !== false} onChange={(on) => edit((d) => void (d.contactForm = { ...d.contactForm!, phone: on ? undefined : false }))} title="Felt til telefonnummer" />
+                      <Toggle
+                        on={config.contactForm.inBox !== false}
+                        onChange={(on) => edit((d) => void (d.contactForm = { ...d.contactForm!, inBox: on ? undefined : false }))}
+                        title="Knap i kontaktboksen"
+                        hint="Fra: formularen åbnes kun fra et menupunkt eller en knap med #kontakt - fx når hovedknappen allerede er formularen."
+                      />
+                      {config.contactForm.inBox !== false && (
+                        <Field title="Tekst på knappen i kontaktboksen" hint="Tom: formularens overskrift - eller &quot;Skriv til os&quot;, hvis en knap lige over siger det samme.">
+                          <input className={input} placeholder="Skriv til os" value={config.contactForm.boxLabel ?? ""} onChange={(e) => edit((d) => void (d.contactForm = { ...d.contactForm!, boxLabel: e.target.value || undefined }))} />
+                        </Field>
+                      )}
                       {!config.menu.some((m) => ("items" in m ? m.items.some((i) => i[1] === "#kontakt") : m.href === "#kontakt")) && (
                         <button type="button" onClick={() => edit((d) => void d.menu.push({ title: d.contactForm?.title || "Skriv til os", href: "#kontakt" }))} className="w-full rounded-xl bg-white py-2 text-[14px] font-medium text-[#0071e3] ring-1 ring-black/[.06] hover:bg-[#0071e3]/5">
                           + Læg &quot;Skriv til os&quot; i menuen

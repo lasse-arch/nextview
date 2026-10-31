@@ -400,7 +400,8 @@ export type TourConfig = {
    * the visitor's address to answer. Opened from the contact box, and from any
    * link "#kontakt" (menu, buttons). `phone`: false = no phone field.
    */
-  contactForm?: { to: string; title?: string; lead?: string; phone?: boolean; thanks?: string };
+  /** `inBox: false`: no button for it in the contact box (open it from a menu item or button with #kontakt). `boxLabel`: that button's own text. */
+  contactForm?: { to: string; title?: string; lead?: string; phone?: boolean; thanks?: string; inBox?: false; boxLabel?: string };
   /** Phones: no pinch-zoom in the tour, and a little zoomed out (MPSkins' mobile zoom lock). */
   mobileZoomLock?: boolean;
   /** How zoomed the view is, per device: 1 = Matterport's normal, under 1 = zoomed out (more of the room), over 1 = zoomed in. */
