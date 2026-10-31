@@ -412,7 +412,8 @@ export type TourConfig = {
    */
   /** `button`: where the Find vej button stands, per device ("menu" = not shown; open it from a menu item "#findvej"). Left out: top centre on a computer, bottom right on a phone. */
   /** `arrive`: the button on "Du er fremme" - its own (label and link, e.g. "#live"), or false for none. Left out: the tour's main button. */
-  wayfinding?: { boxes?: Record<string, string>; button?: { desktop?: FindButtonPlace; mobile?: FindButtonPlace }; arrive?: { label: string; href: string } | false };
+  /** `always`: the button stays on the screen - also while a place card or the stories show (on a phone it moves up out of their way). `arriveHide`: "Du er fremme" goes by itself after so many seconds (left out = it stays until closed). */
+  wayfinding?: { boxes?: Record<string, string>; button?: { desktop?: FindButtonPlace; mobile?: FindButtonPlace }; arrive?: { label: string; href: string } | false; always?: boolean; arriveHide?: number };
   /**
    * "Find din plads": a few questions on the drone scene/map (who are you,
    * what do you sleep in, what matters most); each answer points at the

@@ -294,6 +294,9 @@ export const ROUTE_CSS = `
 .hv-guiding .rt-knap{display:none}
 /* While the stories play, their bar has the top and the bottom: Find vej waits (never two things on top of each other). */
 .hv:has(.hv-story-play) .rt-knap{display:none}
+/* "Altid synlig": the button stays - with a place card on a phone it moves up under the menu, out of the card's way. */
+.hv.rt-altid:has(.hv-story-play) .rt-knap{display:flex}
+@media (max-width:760px){.hv.rt-altid.hv-med-kort .rt-knap{opacity:1;pointer-events:auto;top:calc(60px + env(safe-area-inset-top,0px));bottom:auto;left:auto;right:10px;translate:none;height:38px;padding:0 13px;font-size:13px}}
 /* Where the button stands - chosen per device in the editor. "Kun i menuen": the menu's Find vej button shows on that device only. */
 .hv-find-knap{display:none!important}
 @media (min-width:761px){.rt-d-menu .hv-find-knap{display:flex!important}}

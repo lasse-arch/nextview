@@ -1106,6 +1106,27 @@ export function TourEditor({
                     )}
                   </Field>
                 )}
+                {config.wayfinding && (
+                  <Field title='"Du er fremme" forsvinder' hint={config.wayfinding.arriveHide ? `Kortet går selv efter ${config.wayfinding.arriveHide} sekunder (eller når man lukker det).` : "Kortet bliver hængende, til man lukker det - som i dag."}>
+                    <Choice<"stay" | "5" | "8">
+                      value={config.wayfinding.arriveHide ? (String(config.wayfinding.arriveHide) as "5" | "8") : "stay"}
+                      options={[
+                        ["stay", "Bliver hængende"],
+                        ["5", "Efter 5 sek."],
+                        ["8", "Efter 8 sek."],
+                      ]}
+                      onChange={(v) => edit((d) => void (d.wayfinding = { ...d.wayfinding, arriveHide: v === "stay" ? undefined : Number(v) }))}
+                    />
+                  </Field>
+                )}
+                {config.wayfinding && (
+                  <Toggle
+                    on={Boolean(config.wayfinding.always)}
+                    onChange={(on) => edit((d) => void (d.wayfinding = { ...d.wayfinding, always: on || undefined }))}
+                    title="Find vej-knappen står der altid"
+                    hint="Også mens et stedkort eller historierne vises - på en telefon rykker den op under menuen, så den ikke ligger oven i kortet. Fra: den træder til side, som i dag."
+                  />
+                )}
                 {config.wayfinding &&
                   (["desktop", "mobile"] as const).map((dev) => (
                     <Field key={dev} title={`Find vej-knappen - ${dev === "desktop" ? "computer" : "mobil"}`} hint={config.wayfinding?.button?.[dev] === "menu" ? 'Ingen knap - læg "Find vej" i menuen med linket #findvej.' : undefined}>
