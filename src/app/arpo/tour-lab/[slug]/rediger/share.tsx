@@ -8,7 +8,7 @@ import { EMBED_WORDS, TourEmbedList } from "@/components/tour-embed-list";
 import { suggestEmbedPages } from "@/lib/actions/tour-embeds";
 import { startPlaces } from "../../tours/places";
 import type { TourConfig } from "../../tours/types";
-import { Choice, Field, Group, input, Toggle } from "./ui";
+import { Choice, Field, Group, input } from "./ui";
 import { CloudflarePublish } from "./cloudflare";
 
 /*
@@ -73,24 +73,37 @@ export function SharePanel({
   return (
     <>
       <Group title="Udgiv">
-        <Toggle
-          on={published}
-          onChange={(on) =>
-            start(async () => {
-              await setTourPublished(slug, on);
-              setPublished(on);
-            })
-          }
-          title={pending ? "Gemmer…" : published ? "Udgivet" : "Ikke udgivet"}
-          hint={published ? "Alle kan se touren på linket og på kundens hjemmeside. Gemte ændringer er live med det samme." : "Kun Arpo kan se touren. Slå til, når den er klar til kunden."}
-        />
-        {published && (
-          <div className="flex gap-2">
-            <input readOnly className={`${input} text-[13px]`} value={url} onFocus={(e) => e.target.select()} />
-            <button type="button" className="flex-none rounded-xl bg-white px-3 text-[14px] font-medium text-[#0071e3] ring-1 ring-black/[.06]" onClick={() => copy(url, "link")}>
-              {copied === "link" ? "Kopieret" : "Kopiér"}
+        {/* One way out: "Udgiv på tour.nextview360.dk" below. Before that, the customer sees the tour through the review link (Gennemgang). */}
+        {published && onCloudflare ? (
+          <>
+            <p className="px-1 text-[13px] text-[#1d1d1f]">Touren er udgivet på tour.nextview360.dk.</p>
+            <div className="flex gap-2">
+              <input readOnly className={`${input} text-[13px]`} value={url} onFocus={(e) => e.target.select()} />
+              <button type="button" className="flex-none rounded-xl bg-white px-3 text-[14px] font-medium text-[#0071e3] ring-1 ring-black/[.06]" onClick={() => copy(url, "link")}>
+                {copied === "link" ? "Kopieret" : "Kopiér"}
+              </button>
+            </div>
+          </>
+        ) : published ? (
+          <>
+            <p className="px-1 text-[13px] leading-snug text-[#1d1d1f]">Touren er udgivet på den gamle måde (direkte fra Arpo på {url.replace(/^https?:\/\//, "")}). Udgiv den på tour.nextview360.dk nedenfor - så kører den videre derfra. Eller tag den af nettet.</p>
+            <button
+              type="button"
+              disabled={pending}
+              className="w-full rounded-xl bg-white py-2 text-[14px] font-medium text-[#ff3b30] ring-1 ring-black/[.06] disabled:opacity-50"
+              onClick={() =>
+                confirm("Tag touren af nettet? Linket og koden på kundens hjemmeside holder op med at virke.") &&
+                start(async () => {
+                  const r = await setTourPublished(slug, false);
+                  if (r.ok) setPublished(false);
+                })
+              }
+            >
+              {pending ? "Tager af nettet…" : "Tag af nettet"}
             </button>
-          </div>
+          </>
+        ) : (
+          <p className="px-1 text-[13px] leading-snug text-[#6e6e73]">Ikke udgivet - kun Arpo kan se touren. Skal kunden se den først, så send gennemgangslinket under Gennemgang. Når den er klar: Udgiv på tour.nextview360.dk nederst her.</p>
         )}
       </Group>
 

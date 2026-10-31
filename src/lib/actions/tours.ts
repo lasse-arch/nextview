@@ -131,9 +131,14 @@ export async function createTour(name: string, copyOf: string): Promise<Result<{
   return { ok: true, slug };
 }
 
-/** Publishes a tour at /t/<slug> (for the iframe on the customer's site) - or takes it down again. */
+/**
+ * Takes a tour off the net (/t/<slug>). Putting one out is only done by
+ * "Udgiv på tour.nextview360.dk" (a frozen version) - the old Arpo-only
+ * switch is gone; to show a tour before that, send the review link.
+ */
 export async function setTourPublished(slug: string, published: boolean): Promise<Result> {
   await admin();
+  if (published) return { ok: false, error: 'Udgiv på tour.nextview360.dk i stedet - eller send gennemgangslinket under Gennemgang.' };
   await prisma.tour.update({ where: { slug }, data: { published } });
   if (published) await startStatsIfFirst(slug);
   revalidatePath(`/t/${slug}`);
