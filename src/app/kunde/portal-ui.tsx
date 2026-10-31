@@ -126,37 +126,85 @@ export function TourThumb({ src }: { src: string }) {
   );
 }
 
-/** "Godkend touren" on the customer's page - approving tells us; an admin looking as the customer can't do it in their name. */
-export function ApproveTour({ slug, approved, preview, words }: { slug: string; approved: string | null; preview: boolean; words: { approve: string; confirm: string; approved: string; previewOnly: string } }) {
+/**
+ * "Godkend touren" on the customer's page - approving tells us (and puts the
+ * tour out). Asked twice on purpose: a popup says what happens, and only its
+ * own button approves - so it's never done by an accidental tap. An admin
+ * looking as the customer can't do it in their name.
+ */
+export function ApproveTour({
+  slug,
+  approved,
+  preview,
+  words,
+}: {
+  slug: string;
+  approved: string | null;
+  preview: boolean;
+  words: { approve: string; confirm: string; confirmTitle: string; yes: string; no: string; approved: string; previewOnly: string };
+}) {
   const router = useRouter();
+  const [asking, setAsking] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!asking) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && !busy && setAsking(false);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [asking, busy]);
   if (approved)
     return (
       <span className="rounded-full bg-[#34c759]/15 px-3 py-1.5 text-[13px] font-semibold text-[#1d7a33]">
         {words.approved} {approved}
       </span>
     );
+  async function approve() {
+    setBusy(true);
+    setError(null);
+    const r = await portalApprove(slug);
+    setBusy(false);
+    if (!r.ok) return setError(r.error);
+    setAsking(false);
+    router.refresh();
+  }
   return (
     <span className="flex flex-col items-end gap-1">
       <button
         type="button"
         disabled={busy || preview}
         title={preview ? words.previewOnly : undefined}
-        onClick={async () => {
-          if (!confirm(words.confirm)) return;
-          setBusy(true);
+        onClick={() => {
           setError(null);
-          const r = await portalApprove(slug);
-          setBusy(false);
-          if (!r.ok) return setError(r.error);
-          router.refresh();
+          setAsking(true);
         }}
         className="rounded-full bg-[#34c759] px-4 py-2 text-[14px] font-semibold text-white disabled:opacity-50"
       >
         {words.approve}
       </button>
-      {error && <span className="text-[12px] text-[#c4271d]">{error}</span>}
+      {error && !asking && <span className="text-[12px] text-[#c4271d]">{error}</span>}
+      {asking && (
+        <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/40 p-4 backdrop-blur-sm sm:items-center" onClick={() => !busy && setAsking(false)}>
+          <div role="dialog" aria-modal="true" aria-label={words.confirmTitle} className="w-full max-w-[420px] rounded-[22px] bg-white p-6 text-left shadow-[0_24px_70px_rgba(0,0,0,.3)]" onClick={(e) => e.stopPropagation()}>
+            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[#34c759]/15 text-[#1d7a33]">
+              <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+                <path d="M5 12.5l4.5 4.5L19 7.5" />
+              </svg>
+            </span>
+            <h2 className="mt-4 text-[20px] font-semibold tracking-tight text-[#1d1d1f]">{words.confirmTitle}</h2>
+            <p className="mt-2 text-[15px] leading-relaxed text-[#424245]">{words.confirm}</p>
+            {error && <p className="mt-3 text-[13px] text-[#c4271d]">{error}</p>}
+            <div className="mt-6 flex flex-col gap-2 sm:flex-row-reverse">
+              <button type="button" disabled={busy} onClick={approve} className="flex-1 rounded-full bg-[#34c759] px-4 py-3 text-[15px] font-semibold text-white disabled:opacity-60">
+                {busy ? "…" : words.yes}
+              </button>
+              <button type="button" disabled={busy} onClick={() => setAsking(false)} className="flex-1 rounded-full bg-[#f2f2f7] px-4 py-3 text-[15px] font-semibold text-[#1d1d1f]">
+                {words.no}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </span>
   );
 }

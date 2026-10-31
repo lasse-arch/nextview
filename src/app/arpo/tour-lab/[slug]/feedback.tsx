@@ -231,18 +231,21 @@ export function FeedbackLayer({
         <div className="fb-sheet" role="dialog" aria-label="Godkend touren">
           <div className="fb-card">
             <div className="fb-head">
-              <b>Godkend touren</b>
+              <b>Godkend touren?</b>
               <button type="button" aria-label="Luk" onClick={() => setStep(null)}>
                 ×
               </button>
             </div>
             <p className="fb-tekst">
-              Er I tilfredse med touren? Så godkender I den her, og vi får besked.
+              Touren bliver godkendt og meldt færdig, og vi gør den klar til jer med det samme. I får linket på mail.
               {notes.some((n) => n.status !== "done") ? " Jeres rettelser, der ikke er løst endnu, retter vi stadig." : ""}
             </p>
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Jeres navn (valgfrit)" maxLength={80} />
             <button type="button" className="fb-send fb-send-ok" disabled={busy} onClick={approve}>
               {busy ? "Sender…" : "Ja, godkend touren"}
+            </button>
+            <button type="button" className="fb-ikke" disabled={busy} onClick={() => setStep(null)}>
+              Ikke endnu
             </button>
           </div>
         </div>
@@ -305,6 +308,7 @@ export const FEEDBACK_CSS = `
 .fb-ok{padding:8px 12px;font-size:13px;font-weight:700;color:#7ee29a;white-space:nowrap}
 .fb-tekst{margin:0;font-size:14px;line-height:1.45;color:#3a3a3c}
 .fb-send.fb-send-ok{background:#34c759}
+.fb-ikke{display:block;width:100%;margin-top:8px;padding:12px;border:0;border-radius:999px;background:#f2f2f7;color:#1d1d1f;font:inherit;font-weight:700;font-size:15px;cursor:pointer}
 .fb-sheet{position:absolute;inset:0;z-index:46;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(0,0,0,.4)}
 .fb-card,.fb-panel{width:min(440px,100%);max-height:100%;overflow-y:auto;border-radius:20px;background:#fff;color:#1d1d1f;padding:16px;box-shadow:0 20px 60px rgba(0,0,0,.4);display:flex;flex-direction:column;gap:10px}
 .fb-head{display:flex;align-items:center;justify-content:space-between}

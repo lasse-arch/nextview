@@ -227,7 +227,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
                     {!x.reviewApprovedAt && (
                       <div className="mt-5 flex flex-wrap items-center gap-3 [&_button]:!rounded-full">
                         <ReviewLauncher slug={x.slug} title={x.config.title || x.name} words={{ open: t.fix.open, opening: t.fix.opening, hint: t.fix.windowHint, close: t.fix.close }} />
-                        <ApproveTour slug={x.slug} approved={null} preview={Boolean(who.preview)} words={{ approve: t.fix.approve, confirm: t.fix.approveConfirm, approved: t.fix.approved, previewOnly: t.fix.previewOnly }} />
+                        <ApproveTour slug={x.slug} approved={null} preview={Boolean(who.preview)} words={{ approve: t.fix.approve, confirm: t.fix.approveConfirm, confirmTitle: t.fix.approveTitle, yes: t.fix.approveYes, no: t.fix.approveNo, approved: t.fix.approved, previewOnly: t.fix.previewOnly }} />
                         <a href={href({ side: "rettelser" })} className="text-[14px] font-semibold text-white/85 underline-offset-4 hover:underline">
                           {t.review.fixes} →
                         </a>
@@ -471,7 +471,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
                             slug={x.slug}
                             approved={x.reviewApprovedAt ? fmtDate(x.reviewApprovedAt, lang) : null}
                             preview={Boolean(who.preview)}
-                            words={{ approve: t.fix.approve, confirm: t.fix.approveConfirm, approved: t.fix.approved, previewOnly: t.fix.previewOnly }}
+                            words={{ approve: t.fix.approve, confirm: t.fix.approveConfirm, confirmTitle: t.fix.approveTitle, yes: t.fix.approveYes, no: t.fix.approveNo, approved: t.fix.approved, previewOnly: t.fix.previewOnly }}
                           />
                         )}
                       </li>
