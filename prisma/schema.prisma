@@ -1334,6 +1334,8 @@ model Tour {
   /// knows the place, while the director signed the contract. Reminders and "rettelser lavet" go there too.
   reviewEmail      String?
   reviewName       String?
+  /// The last "Tjek touren" before review: { at, items, ai, done } - shown again when the editor is opened, its suggestions can be run again.
+  reviewCheck      Json?
   dealId           String?
   deal             Deal?             @relation(fields: [dealId], references: [id], onDelete: SetNull)
   config           Json

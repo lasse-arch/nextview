@@ -4,6 +4,7 @@ import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { Prisma } from "@prisma/client";
 import { approveTour, reviewRecipient, sendFixesDoneMail, sendReviewMail } from "@/lib/tour-review";
 import { filmingTime } from "@/lib/filming-time";
 import { checkTour, type AiNote, type CheckItem } from "@/lib/tour-check";
@@ -141,8 +142,31 @@ export async function checkTourForReview(slug: string): Promise<{ ok: true; item
   if (!config) return { ok: false, error: "Touren findes ikke." };
   try {
     const r = await checkTour(config, { ai: true });
+    // Kept on the tour: shown again next time, and its suggestions can be run again.
+    const saved: SavedCheck = { at: new Date().toISOString(), items: r.items, ai: r.ai, done: [] };
+    await prisma.tour.update({ where: { slug }, data: { reviewCheck: saved as unknown as Prisma.InputJsonValue } });
     return { ok: true, ...r };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Tjekket kunne ikke køre." };
   }
+}
+
+/** The last "Tjek touren", as kept on the tour - and which of its suggestions are ticked off. */
+export type SavedCheck = { at: string; items: CheckItem[]; ai: AiNote[] | null; done: number[] };
+
+export async function lastTourCheck(slug: string): Promise<SavedCheck | null> {
+  await admin();
+  const t = await prisma.tour.findUnique({ where: { slug }, select: { reviewCheck: true } });
+  const c = t?.reviewCheck as unknown as SavedCheck | null;
+  return c && Array.isArray(c.items) ? { ...c, done: Array.isArray(c.done) ? c.done : [] } : null;
+}
+
+/** Which of the last check's suggestions are done (ticked by hand, or fixed by nextviewAI). */
+export async function setTourCheckDone(slug: string, done: number[]): Promise<void> {
+  await admin();
+  const t = await prisma.tour.findUnique({ where: { slug }, select: { reviewCheck: true } });
+  const c = t?.reviewCheck as unknown as SavedCheck | null;
+  if (!c) return;
+  const clean = [...new Set(done.filter((n) => Number.isInteger(n) && n >= 0 && n < (c.ai?.length ?? 0)))];
+  await prisma.tour.update({ where: { slug }, data: { reviewCheck: { ...c, done: clean } as unknown as Prisma.InputJsonValue } });
 }

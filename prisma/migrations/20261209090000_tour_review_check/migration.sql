@@ -1,0 +1,1 @@
+ALTER TABLE "Tour" ADD COLUMN "reviewCheck" JSONB;

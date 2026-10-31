@@ -2,7 +2,7 @@
 
 import { reviewUrl } from "@/lib/public-urls";
 import { useEffect, useState, useTransition } from "react";
-import { checkTourForReview, deleteFeedback, reviewStatus, sendFixesDone, sendForReview, setFeedbackStatus, setTourApproved, setTourReview, tourFeedback, type Feedback, type ReviewStatus } from "@/lib/actions/tour-feedback";
+import { checkTourForReview, lastTourCheck, setTourCheckDone, type SavedCheck, deleteFeedback, reviewStatus, sendFixesDone, sendForReview, setFeedbackStatus, setTourApproved, setTourReview, tourFeedback, type Feedback, type ReviewStatus } from "@/lib/actions/tour-feedback";
 import { askClaudeForTour, type AiEditResult } from "@/lib/actions/tour-ai";
 import { addManualTimeEntry, filmingTimeForm } from "@/lib/actions/time-entries";
 import type { TourConfig } from "../../tours/types";
@@ -81,15 +81,32 @@ export function FeedbackPanel({
   const shown = (items ?? []).filter((f) => filter === "all" || f.status === filter);
   const open = (items ?? []).filter((f) => f.status === "open").length;
   /** "Tjek touren": run before the first review mail - and on its own. */
-  const [check, setCheck] = useState<{ items: { level: "ok" | "warn" | "fejl"; area: string; text: string }[]; ai: AiNote[] | null } | null>(null);
+  const [check, setCheck] = useState<SavedCheck | null>(null);
+  /** The last check, kept on the tour - shown again ("Vis sidste tjek") after it's been put away. */
+  const [saved, setSaved] = useState<SavedCheck | null>(null);
   const [checking, setChecking] = useState(false);
+  useEffect(() => {
+    let off = false;
+    lastTourCheck(slug)
+      .then((c) => {
+        if (off || !c) return;
+        setSaved(c);
+        setCheck(c);
+      })
+      .catch(() => {});
+    return () => {
+      off = true;
+    };
+  }, [slug]);
   async function runCheck() {
     setNote(null);
     setChecking(true);
     const r = await checkTourForReview(slug).catch((err: unknown) => ({ ok: false as const, error: err instanceof Error ? err.message : String(err) }));
     setChecking(false);
     if (!r.ok) return setNote({ text: r.error, error: true });
-    setCheck({ items: r.items, ai: r.ai });
+    const fresh: SavedCheck = { at: new Date().toISOString(), items: r.items, ai: r.ai, done: [] };
+    setCheck(fresh);
+    setSaved(fresh);
   }
   /** Someone else than the deal's contact (the director signed, the head of house shows the place): e-mail and name. */
   const [who, setWho] = useState<{ email: string; name: string } | null>(null);
@@ -194,9 +211,16 @@ export function FeedbackPanel({
         )}
         {status?.filmingMissing && !status.sentAt && status.dealId && <FilmingTime dealId={status.dealId} onSaved={reloadStatus} />}
         {!check && (
-          <button type="button" disabled={checking} onClick={() => void runCheck()} className="self-start text-[13px] font-medium text-[#b4532f] disabled:opacity-50">
-            {checking ? "nextviewAI tjekker touren …" : "✦ Tjek touren (hastighed og funktioner)"}
-          </button>
+          <div className="flex flex-wrap gap-x-4 gap-y-1">
+            <button type="button" disabled={checking} onClick={() => void runCheck()} className="self-start text-[13px] font-medium text-[#b4532f] disabled:opacity-50">
+              {checking ? "nextviewAI tjekker touren …" : "✦ Tjek touren (hastighed og funktioner)"}
+            </button>
+            {saved && !checking && (
+              <button type="button" onClick={() => setCheck(saved)} className="self-start text-[13px] font-medium text-[#0071e3]">
+                Vis sidste tjek ({when(saved.at)})
+              </button>
+            )}
+          </div>
         )}
         {check && (
           <CheckResult
@@ -208,6 +232,12 @@ export function FeedbackPanel({
             onAgain={() => void runCheck()}
             config={config}
             onApply={onApply}
+            onDone={(done) => {
+              const next = { ...check, done };
+              setCheck(next);
+              setSaved(next);
+              void setTourCheckDone(slug, done).catch(() => {});
+            }}
           />
         )}
         <p className={`text-[12px] leading-snug ${note?.error ? "text-[#ff3b30]" : note ? "text-[#34c759]" : "text-[#8e8e93]"}`}>
@@ -404,10 +434,13 @@ function CheckResult({
   onAgain,
   config,
   onApply,
+  onDone,
 }: {
   config: TourConfig;
   onApply: (c: TourConfig) => void;
-  check: { items: { level: "ok" | "warn" | "fejl"; area: string; text: string }[]; ai: AiNote[] | null };
+  /** The suggestions ticked off - kept on the tour. */
+  onDone: (done: number[]) => void;
+  check: SavedCheck;
   pending: boolean;
   sendLabel: string;
   onSend: () => void;
@@ -423,6 +456,7 @@ function CheckResult({
       <p className={`text-[14px] font-semibold ${errors ? "text-[#d70015]" : warnings ? "text-[#a05a00]" : "text-[#1f7a35]"}`}>
         {errors ? `${errors} ting virker ikke` : warnings ? `Klar - ${warnings} ting at se på` : "Touren er klar til kunden"}
       </p>
+      <p className="-mt-1.5 text-[11px] text-[#8e8e93]">Tjekket {when(check.at)}</p>
       {["Funktioner", "Hastighed", "Indhold"].map((area) => {
         const rows = check.items.filter((i) => i.area === area).sort((a, b) => order[a.level] - order[b.level]);
         return rows.length ? (
@@ -439,7 +473,7 @@ function CheckResult({
           </div>
         ) : null;
       })}
-      {check.ai != null && <AiNotes notes={check.ai} config={config} onApply={onApply} />}
+      {check.ai != null && <AiNotes key={check.at} notes={check.ai} initialDone={check.done} onDone={onDone} config={config} onApply={onApply} />}
       <div className="flex flex-wrap gap-2 pt-1">
         <button type="button" disabled={pending} onClick={onSend} className={`flex-1 rounded-xl py-2 text-[14px] font-medium text-white disabled:opacity-40 ${errors ? "bg-[#ff3b30]" : "bg-[#0071e3]"}`}>
           {errors ? `${sendLabel} alligevel` : sendLabel}
@@ -460,8 +494,14 @@ function CheckResult({
  * nextviewAI's look at the tour, as a checklist: where, what, what to do - the important ones first. Tick the ones
  * to fix and let nextviewAI do them (shown first, made on "Godkend"), or mark one as done by hand.
  */
-function AiNotes({ notes, config, onApply }: { notes: AiNote[]; config: TourConfig; onApply: (c: TourConfig) => void }) {
-  const [done, setDone] = useState<Set<number>>(() => new Set());
+function AiNotes({ notes, config, onApply, initialDone, onDone }: { notes: AiNote[]; config: TourConfig; onApply: (c: TourConfig) => void; initialDone: number[]; onDone: (done: number[]) => void }) {
+  const [done, setDoneState] = useState<Set<number>>(() => new Set(initialDone));
+  // Kept on the tour each time (outside the state update - the parent saves it).
+  const setDone = (f: (d: Set<number>) => Set<number>) => {
+    const next = f(done);
+    setDoneState(next);
+    onDone([...next]);
+  };
   const [picked, setPicked] = useState<Set<number>>(() => new Set());
   const [open, setOpen] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
@@ -480,7 +520,8 @@ function AiNotes({ notes, config, onApply }: { notes: AiNote[]; config: TourConf
     else next.add(i);
     return next;
   };
-  const chosen = [...picked].filter((i) => !done.has(i)).sort((a, b) => a - b);
+  // Ticked-off ones may be picked again - to run them once more.
+  const chosen = [...picked].sort((a, b) => a - b);
   async function fix() {
     if (!chosen.length || busy) return;
     setBusy(true);
@@ -498,7 +539,7 @@ function AiNotes({ notes, config, onApply }: { notes: AiNote[]; config: TourConf
         <p className="text-[11px] font-semibold uppercase tracking-wide text-[#b4532f]">✦ nextviewAI · {left ? `${left} forslag` : "alle klaret"}</p>
         {left > 0 && (
           <button type="button" className="text-[11px] font-medium text-[#b4532f]" onClick={() => setPicked(new Set(notes.map((_, i) => i).filter((i) => !done.has(i))))}>
-            Vælg alle
+            Vælg alle åbne
           </button>
         )}
       </div>
@@ -506,17 +547,14 @@ function AiNotes({ notes, config, onApply }: { notes: AiNote[]; config: TourConf
         {notes.map((n, i) => {
           const isDone = done.has(i);
           return (
-            <li key={i} className={`rounded-lg bg-white ring-1 ${picked.has(i) && !isDone ? "ring-[#d97757]/60" : "ring-black/[.05]"} ${isDone ? "opacity-50" : ""}`}>
+            <li key={i} className={`rounded-lg bg-white ring-1 ${picked.has(i) ? "ring-[#d97757]/60" : "ring-black/[.05]"} ${isDone && !picked.has(i) ? "opacity-60" : ""}`}>
               <div className="flex items-start gap-2 p-2">
-                {isDone ? (
-                  <span className="mt-0.5 w-4 flex-none text-center text-[13px] font-bold text-[#34c759]">✓</span>
-                ) : (
-                  <input type="checkbox" aria-label="Vælg til at rette" className="mt-0.5 h-4 w-4 flex-none accent-[#d97757]" checked={picked.has(i)} onChange={() => setPicked((p) => toggle(p, i))} />
-                )}
+                <input type="checkbox" aria-label={isDone ? "Vælg til at køre igen" : "Vælg til at rette"} className="mt-0.5 h-4 w-4 flex-none accent-[#d97757]" checked={picked.has(i)} onChange={() => setPicked((p) => toggle(p, i))} />
                 <button type="button" className="min-w-0 flex-1 text-left" onClick={() => setOpen(open === i ? null : i)}>
                   <span className="flex flex-wrap items-center gap-1.5">
                     <span className={`rounded-full px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide ${n.important ? "bg-[#ff9500]/15 text-[#a05a00]" : "bg-[#f2f2f7] text-[#6e6e73]"}`}>{n.where}</span>
                     {n.important && <span className="text-[10px] font-semibold text-[#a05a00]">Vigtig</span>}
+                    {isDone && <span className="text-[10px] font-semibold text-[#1f7a35]">✓ Klaret</span>}
                   </span>
                   <span className={`mt-0.5 block text-[13px] font-semibold leading-snug text-[#1d1d1f] ${isDone ? "line-through" : ""}`}>{n.title}</span>
                   {open === i && <span className="mt-1 block text-[12.5px] leading-snug text-[#3c3c43]">{n.fix}</span>}
@@ -533,7 +571,7 @@ function AiNotes({ notes, config, onApply }: { notes: AiNote[]; config: TourConf
       </ul>
       {chosen.length > 0 && !result && (
         <button type="button" disabled={busy} onClick={() => void fix()} className="mt-2 w-full rounded-xl bg-[#d97757] py-2 text-[13px] font-semibold text-white disabled:opacity-60">
-          {busy ? "nextviewAI retter …" : `✦ Ret ${chosen.length === 1 ? "det valgte" : `de ${chosen.length} valgte`} med nextviewAI`}
+          {busy ? "nextviewAI retter …" : `✦ ${chosen.some((i) => done.has(i)) ? "Kør" : "Ret"} ${chosen.length === 1 ? "det valgte" : `de ${chosen.length} valgte`} med nextviewAI${chosen.some((i) => done.has(i)) ? " igen" : ""}`}
         </button>
       )}
       {result && (
