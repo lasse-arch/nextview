@@ -614,6 +614,37 @@ function TourExperience({
   const guideHeldRef = useRef(false);
   const phaseRef = useRef(phase);
   const enteringRef = useRef(false);
+  /*
+   * Before Matterport is ready, a tap on a tile, a menu place, "Vis mig rundt",
+   * Find vej or a story doesn't run straight away (it would race the tour still
+   * loading, and several taps would all run at once when it's there): only the
+   * LAST thing asked for is kept, "Gør touren klar …" shows, and it runs once the
+   * tour is ready - one thing, never two on top of each other.
+   */
+  const sdkReadyRef = useRef(false);
+  /** menuGo, for running it later (held until the tour is ready). */
+  const menuGoRef = useRef<((name: string, group: string, href: string) => Promise<unknown>) | null>(null);
+  const heldRef = useRef<{ run: () => void; done: () => void } | null>(null);
+  const [holding, setHolding] = useState(false);
+  const tourReady = () => sdkReadyRef.current || !sdkKey || !modelId;
+  function holdUntilReady(run: () => void): Promise<void> {
+    // A new choice replaces the one waiting (it never runs).
+    heldRef.current?.done();
+    return new Promise<void>((done) => {
+      heldRef.current = { run, done };
+      setHolding(true);
+    });
+  }
+  function releaseHeld() {
+    const held = heldRef.current;
+    if (!held) return setHolding(false);
+    // Still stepping in from the drone scene: wait for that first, so the two don't cross.
+    if (enteringRef.current) return void setTimeout(releaseHeld, 200);
+    heldRef.current = null;
+    setHolding(false);
+    held.run();
+    held.done();
+  }
   useEffect(() => {
     guideAtRef.current = guideAt;
     guideHeldRef.current = guideHeld;
@@ -723,6 +754,9 @@ function TourExperience({
         },
       });
       setTourReadyMs(now() - started);
+      sdkReadyRef.current = true;
+      // What the visitor asked for while it loaded - after Matterport has settled the first view.
+      setTimeout(releaseHeld, 400);
       // Matterport may still settle the view just after it's ready - not the visitor looking around.
       selfMoveAt.current = now() + 1500;
       setSdk(sdk);
@@ -1283,6 +1317,11 @@ function TourExperience({
   }, [openPoint, T, savedTour, startKey, ROOM_NAMES, LAST_ROOM_KEY]);
 
   function chooseWelcome(go: WelcomeGo | "last" | "skip", label: string) {
+    // A tile that goes into the tour, tapped before Matterport is ready: the welcome closes, and it waits for the tour.
+    if (!tourReady() && go !== "skip" && !("href" in (go as object)) && !("drone" in (go as object)) && phaseRef.current !== "drone") {
+      setWelcome(false);
+      return void holdUntilReady(() => chooseWelcome(go, label));
+    }
     track("welcome_choice", { choice: label });
     setWelcome(false);
     if (go === "skip") return;
@@ -1317,6 +1356,11 @@ function TourExperience({
   }
 
   async function menuGo(name: string, group: string, href: string) {
+    // A place in the tour (or a guided tour) before Matterport is ready: kept until it is - the last one asked for.
+    if (!tourReady() && phaseRef.current !== "drone" && (isPlaceHref(href) || guideOfHref(href) !== undefined)) {
+      setMenuOpen(false);
+      return holdUntilReady(() => void menuGoRef.current?.(name, group, href));
+    }
     // Picking a place in the menu during "Vis mig rundt" means the visitor goes their own way: the guide stops.
     leaveGuide("menu", name);
     // Another guided tour (a "#rundvisning" link in the menu).
@@ -1379,7 +1423,11 @@ function TourExperience({
     };
   });
 
+  useEffect(() => {
+    menuGoRef.current = menuGo;
+  });
   async function storyGo(r: StoryRoom) {
+    if (!tourReady() && phase !== "drone") return holdUntilReady(() => void storyGo(r));
     track("menu_click", { item_name: r.name, group: "Historier" });
     if (phase === "drone") return enterTour(r.href, "story", r.name);
     await flyTo(r.href, "fly");
@@ -1406,6 +1454,7 @@ function TourExperience({
 
   /** A place from the cover or the dock: into the tour, right there. */
   async function placeGo(p: TourPlace, from: string) {
+    if (!tourReady() && phase !== "drone") return holdUntilReady(() => void placeGo(p, from));
     leaveGuide(from, p.name);
     track("place_click", { place_name: p.name, from });
     setCover(false);
@@ -1637,6 +1686,11 @@ function TourExperience({
   }, [guideAt, sdk, phase, guideHeld, GUIDE.length]);
   /** Starts a guided tour from the beginning: the main one (null) or one of `guides` by id. */
   function startGuide(from: string, id: string | null = null) {
+    if (!tourReady()) {
+      setMenuOpen(false);
+      setWelcome(false);
+      return void holdUntilReady(() => startGuide(from, id));
+    }
     // The main one when asked for (or the id isn't there) - or the first there is, when the main one has no stops.
     let known = id != null && T.guides?.some((g) => g.id === id) ? id : null;
     if (known == null && !guideStops(T, null).length) known = GUIDES[0]?.id ?? null;
@@ -1713,6 +1767,7 @@ function TourExperience({
     setDayOpen(true);
   }
   function dayGo(i: number) {
+    if (!tourReady()) return void holdUntilReady(() => dayGo(i));
     const step = T.day?.steps[i];
     if (!step?.href) return;
     track("day_view", { label: `${step.time} ${step.title}`, stop: i + 1 });
@@ -1984,6 +2039,11 @@ function TourExperience({
     return { x: p.x, y: g ? Math.min(p.y, g[2]) : p.y - 1.5, z: p.z };
   }
   async function walkTo(dest: Destination) {
+    if (!tourReady()) {
+      setRouteOpen(false);
+      setMenuOpen(false);
+      return holdUntilReady(() => void walkTo(dest));
+    }
     setRouteOpen(false);
     setMenuOpen(false);
     // Find vej takes over: the stories and a guided tour stop.
@@ -2900,6 +2960,12 @@ function TourExperience({
           }}
         />
       )}
+      {holding && (
+        <div className="hv-holder" role="status">
+          <span className="hv-holder-spin" aria-hidden />
+          {tx("Gør touren klar …")}
+        </div>
+      )}
       {T.menuHint && (T.menuHint === "all" || (typeof window !== "undefined" && window.innerWidth <= 760)) && (helpDone || !T.onboarding) && phase === "tour" && !cover && !welcome && !intro && sdk && guideAt == null && !menuOpen && !contactOpen && (
         <MenuHint slug={T.slug} again={inEditorPreview()} />
       )}
@@ -3307,6 +3373,9 @@ function DevPanel({
 }
 
 const CSS = `
+.hv-holder{position:absolute;left:50%;top:50%;translate:-50% -50%;z-index:35;display:flex;align-items:center;gap:10px;padding:12px 18px;border-radius:999px;background:rgba(10,18,20,.78);color:#fff;font-size:14.5px;font-weight:700;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:0 10px 30px rgba(0,0,0,.35);pointer-events:none;animation:hvFade .25s ease}
+.hv-holder-spin{width:18px;height:18px;border-radius:50%;border:2.5px solid rgba(255,255,255,.3);border-top-color:#fff;animation:hvSpin .8s linear infinite}
+@keyframes hvSpin{to{rotate:360deg}}
 /* A tour is touched, not read: no text selection or iOS copy menu from a long press (it can't be dismissed over the tour). Fields stay selectable. */
 /* clip, not just hidden: nothing (a scrollIntoView, a focused button) can scroll the tour itself sideways and show the hidden menu. */
 .hv{overflow:clip;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
