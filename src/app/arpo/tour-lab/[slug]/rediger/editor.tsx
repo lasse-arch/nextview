@@ -7,7 +7,7 @@ import { droneHref, droneViewsOfHref, formatPhone, IMAGE_HREF, imageOfHref, isDr
 import { tourConfigProblem } from "@/lib/tour-validate";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Component, useEffect, useMemo, useRef, useState, useSyncExternalStore, useTransition } from "react";
+import { Component, memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import { detachToursFromMpskins, logTourWork, renameTourSlug, restoreTourVersion, saveTour, saveTourDraft, searchDeals, setTourDeal } from "@/lib/actions/tours";
 import { SOCIALS } from "../../tours/social";
 import { guideStops } from "../guide";
@@ -179,8 +179,6 @@ export function TourEditor({
 }) {
   const router = useRouter();
   const [config, setConfig] = useState<TourConfig>(initial);
-  /** The search over the sections (above nextviewAI). */
-  const [search, setSearch] = useState("");
   /** Arpo's menu folded away (the default in the editor) - remembered on this computer. */
   const wide = useSyncExternalStore(
     (cb) => (window.addEventListener("tour-editor-wide", cb), () => window.removeEventListener("tour-editor-wide", cb)),
@@ -201,7 +199,6 @@ export function TourEditor({
   };
   /** A point to open on the map (Luftfoto og kort) - asked from another tab, e.g. a guide stop. */
   const [pointFocus, setPointFocus] = useState<{ id: string; n: number } | null>(null);
-  const found = searchTabs(search, config.menu);
   /*
    * Autosave: every change is kept in the browser at once (survives a lost
    * connection or a closed browser) and as a draft on the server every 15
@@ -233,6 +230,12 @@ export function TourEditor({
   const [dirty, setDirty] = useState(false);
   // A link straight to a tab (?fane=feedback - e.g. from the bell, when a customer has written).
   const [tab, setTab] = useState<Tab>(() => (startTab && TABS.some(([t]) => t === startTab) ? (startTab as Tab) : "claude"));
+  /** On a phone one thing at a time: the sections, a section's settings, or the preview (on a computer all three side by side). */
+  const [pane, setPane] = useState<"nav" | "settings" | "preview">(startTab ? "settings" : "nav");
+  const pickTab = useCallback((t: Tab) => {
+    setTab(t);
+    setPane("settings");
+  }, []);
 
   /** A request for nextviewAI from elsewhere in the editor (a suggestion from Resultater). */
   const [aiAsk, setAiAsk] = useState<{ request: string; at: number } | null>(null);
@@ -399,6 +402,11 @@ export function TourEditor({
    * frame (nothing reloads); to or from "På hjemmeside" the tour loads again,
    * so the spot it stood in is taken along and flown back to.
    */
+  // On a phone the preview shows the tour as on a phone.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the screen's width is only known in the browser
+    if (window.matchMedia("(max-width: 767px)").matches) setDeviceNow("mobil");
+  }, []);
   function setDevice(next: "computer" | "mobil" | "site") {
     if (next === device) return;
     if ((next === "site") === (device === "site")) return setDeviceNow(next);
@@ -457,17 +465,17 @@ export function TourEditor({
     {/* Arpo's own menu and top bar folded away, so the editor and its preview get the whole screen. */}
     {wide && <style>{`.arpo-sidebar,.arpo-topbar{display:none!important}.arpo-main{padding-top:12px!important}`}</style>}
     <div
-      className={`-mx-4 -mb-4 flex ${wide ? "h-[calc(100vh-1.5rem)]" : "h-[calc(100vh-6rem)]"} flex-col overflow-hidden rounded-t-2xl bg-[#f5f5f7] text-[#1d1d1f] sm:-mx-6 sm:-mb-6 lg:-mx-8 lg:-mb-8`}
+      className={`-mx-4 -mb-4 flex ${wide ? "h-[calc(100vh-1.5rem)]" : "h-[calc(100vh-6rem)]"} max-md:h-[calc(100dvh-97px)] flex-col overflow-hidden rounded-t-2xl bg-[#f5f5f7] text-[#1d1d1f] sm:-mx-6 sm:-mb-6 lg:-mx-8 lg:-mb-8`}
       style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", system-ui, sans-serif' }}
     >
       {/* Header */}
-      <div className="flex items-center gap-3 border-b border-black/[.06] bg-white/80 px-5 py-3 backdrop-blur-xl">
+      <div className="flex items-center gap-2 border-b border-black/[.06] bg-white/80 px-3 py-2 backdrop-blur-xl md:gap-3 md:px-5 md:py-3">
         <button
           type="button"
           onClick={() => setWide(!wide)}
           title={wide ? "Vis Arpo-menuen" : "Skjul Arpo-menuen (større forhåndsvisning)"}
           aria-label={wide ? "Vis Arpo-menuen" : "Skjul Arpo-menuen"}
-          className="rounded-lg p-1.5 text-[#6e6e73] hover:bg-black/[.05] hover:text-[#1d1d1f]"
+          className="hidden rounded-lg p-1.5 text-[#6e6e73] hover:bg-black/[.05] hover:text-[#1d1d1f] md:block"
         >
           <Icon d='<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/>' className="h-[18px] w-[18px]" />
         </button>
@@ -476,21 +484,21 @@ export function TourEditor({
           Tours
         </Link>
         <div className="mx-auto min-w-0 text-center">
-          <h1 className="text-[15px] font-semibold tracking-tight">{config.title}</h1>
-          <p className="text-[12px] text-[#8e8e93]">
+          <h1 className="truncate text-[15px] font-semibold tracking-tight">{config.title}</h1>
+          <p className="truncate text-[12px] text-[#8e8e93]">
             {dirty ? `Ændringer ikke gemt${autosavedAt ? ` · autogemt ${new Date(autosavedAt).toLocaleTimeString("da-DK", { hour: "2-digit", minute: "2-digit" })}` : ""}` : `Gemt · ${versions[0] ? when(versions[0].at) : ""}`}
           </p>
         </div>
         {/* Saving lives up here - never over the preview (where the tour's own bottom menu is). */}
         <div className="flex items-center gap-2">
-          {msg && <span className={`text-[13px] ${msg.ok ? "text-[#248a3d]" : "text-[#ff3b30]"}`}>{msg.ok ? "✓ " : ""}{msg.text}</span>}
+          {msg && <span className={`hidden text-[13px] md:inline ${msg.ok ? "text-[#248a3d]" : "text-[#ff3b30]"}`}>{msg.ok ? "✓ " : ""}{msg.text}</span>}
           {dirty ? (
             <>
               <input
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 placeholder="Hvad har du ændret? (valgfrit)"
-                className="w-56 rounded-full border-0 bg-[#f2f2f7] px-3.5 py-1.5 text-[13px] placeholder:text-[#8e8e93] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0071e3]"
+                className="hidden w-56 rounded-full border-0 bg-[#f2f2f7] md:block px-3.5 py-1.5 text-[13px] placeholder:text-[#8e8e93] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0071e3]"
               />
               <button
                 type="button"
@@ -548,63 +556,20 @@ export function TourEditor({
       <SafeArea onUndo={() => { setConfig(initial); setDirty(false); }}>
       <div className="flex min-h-0 flex-1">
         {/* Sections */}
-        <nav className="flex min-h-0 w-[210px] flex-none flex-col gap-0.5 overflow-y-auto overscroll-contain p-3">
-          <div className="relative mb-1.5">
-            <Icon d='<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>' className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8e8e93]" />
-            <input
-              type="search"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Escape") setSearch("");
-                if (e.key === "Enter" && found[0]) {
-                  setTab(found[0].tab);
-                  setSearch("");
-                }
-              }}
-              placeholder="Søg i funktioner og menu"
-              className="w-full rounded-[9px] bg-black/[.05] py-[7px] pl-8 pr-2 text-[13px] outline-none placeholder:text-[#8e8e93] focus:bg-white focus:ring-2 focus:ring-[#0071e3]/40"
-            />
-          </div>
-          {search.trim() &&
-            (found.length ? (
-              found.map((f, i) => (
-                <button
-                  key={`${f.tab}-${f.label}-${i}`}
-                  type="button"
-                  onClick={() => {
-                    setTab(f.tab);
-                    setSearch("");
-                  }}
-                  className="rounded-[9px] px-2.5 py-[6px] text-left hover:bg-black/[.04]"
-                >
-                  <span className="block text-[14px] text-[#1d1d1f]">{f.label}</span>
-                  {f.section && <span className="block text-[11px] text-[#8e8e93]">{f.section}</span>}
-                </button>
-              ))
-            ) : (
-              <p className="px-2.5 py-2 text-[12px] text-[#8e8e93]">Intet fundet - prøv et andet ord, eller spørg nextviewAI.</p>
-            ))}
-          {!search.trim() && TABS.map(([t, text, icon, heading]) => (
-            <div key={t} className="contents">
-            {heading && <div className="mt-4 px-2.5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-[#8e8e93]">{heading}</div>}
-            <button
-              type="button"
-              onClick={() => setTab(t)}
-              className={`flex items-center gap-2.5 rounded-[9px] px-2.5 py-[7px] text-left text-[14px] transition ${tab === t ? "bg-white font-medium shadow-[0_1px_3px_rgba(0,0,0,.08)]" : "text-[#1d1d1f]/80 hover:bg-black/[.04]"}`}
-            >
-              <span className={`flex h-7 w-7 items-center justify-center rounded-[7px] ${tab === t ? "bg-[#0071e3] text-white" : "bg-white text-[#6e6e73] ring-1 ring-black/[.06]"}`}>
-                <Icon d={icon} className="h-4 w-4" />
-              </span>
-              {text}
-              {t === "feedback" && feedbackOpen > 0 && <span className="ml-auto rounded-full bg-[#ff9500] px-1.5 text-[11px] font-semibold text-white">{feedbackOpen}</span>}
-            </button>
-            </div>
-          ))}
-        </nav>
+        <SectionNav tab={tab} menu={config.menu} feedbackOpen={feedbackOpen} onPick={pickTab} className={pane === "nav" ? "flex" : "hidden md:flex"} />
 
         {/* Settings */}
-        <div className="flex w-[400px] flex-none flex-col">
+        <div className={`${pane === "settings" ? "flex" : "hidden md:flex"} min-h-0 w-full flex-none flex-col md:w-[400px]`}>
+          <div className="flex items-center gap-1 border-b border-black/[.06] bg-white/70 px-1.5 py-1.5 md:hidden">
+            <button type="button" onClick={() => setPane("nav")} className="flex flex-none items-center gap-0.5 rounded-lg px-1.5 py-1 text-[15px] text-[#0071e3]">
+              <Icon d='<path d="M15 5l-7 7 7 7"/>' className="h-4 w-4" />
+              Alle
+            </button>
+            <span className="min-w-0 flex-1 truncate text-center text-[15px] font-semibold">{TABS.find(([t]) => t === tab)?.[1]}</span>
+            <button type="button" onClick={() => setPane("preview")} className="flex-none rounded-full bg-[#0071e3] px-3 py-1 text-[13px] font-semibold text-white">
+              Se touren
+            </button>
+          </div>
           {tab === "claude" ? (
             <ClaudePanel
               ask={aiAsk}
@@ -1358,9 +1323,13 @@ export function TourEditor({
         </div>
 
         {/* Preview */}
-        <div className="relative flex min-w-0 flex-1 flex-col p-3 pl-4">
-          <div className="mb-3 flex items-center gap-3">
-            <div className="w-80">
+        <div className={`${pane === "preview" ? "flex" : "hidden md:flex"} relative min-w-0 flex-1 flex-col p-2 md:p-3 md:pl-4`}>
+          <button type="button" onClick={() => setPane("settings")} className="mb-2 flex items-center gap-0.5 self-start rounded-lg px-1 py-1 text-[15px] text-[#0071e3] md:hidden">
+            <Icon d='<path d="M15 5l-7 7 7 7"/>' className="h-4 w-4" />
+            {TABS.find(([t]) => t === tab)?.[1]}
+          </button>
+          <div className="mb-2 flex flex-wrap items-center gap-2 md:mb-3 md:gap-3">
+            <div className="w-full md:w-80">
               <Choice
                 value={device}
                 options={[
@@ -1383,7 +1352,7 @@ export function TourEditor({
                 />
               </div>
             )}
-            <span className="text-[12px] text-[#8e8e93]">{dirty ? "Live · ikke gemt endnu" : "Som den er gemt"}</span>
+            <span className="hidden text-[12px] text-[#8e8e93] md:inline">{dirty ? "Live · ikke gemt endnu" : "Som den er gemt"}</span>
             <button type="button" onClick={() => setPreviewKey((k) => k + 1)} className="ml-auto rounded-full px-3 py-1 text-[13px] text-[#0071e3] hover:bg-[#0071e3]/10" title="Start touren forfra (fx for at se en ny velkomst)">
               Start forfra
             </button>
@@ -1429,6 +1398,76 @@ export function TourEditor({
 type ChatMsg = { role: "user" | "assistant"; text: string; images?: string[]; error?: boolean; changed?: number; before?: TourConfig; undone?: boolean; remembered?: string[] };
 
 /** A picture made small enough to send to nextviewAI (longest side 1600 px, JPEG) - as a data URL. */
+/**
+ * The sections down the left (on a phone: the first screen) with the search
+ * over them. Its own component, so typing in the search only redraws this
+ * list - not the whole editor and its preview.
+ */
+/** nextviewAI's memory under the chat - not drawn again while one types. */
+const MemoryPanel = memo(AiMemoryPanel);
+
+const SectionNav = memo(function SectionNav({ tab, menu, feedbackOpen, onPick, className }: { tab: Tab; menu: MenuEntry[]; feedbackOpen: number; onPick: (t: Tab) => void; className: string }) {
+  const [search, setSearch] = useState("");
+  const found = useMemo(() => searchTabs(search, menu), [search, menu]);
+  return (
+    <nav className={`${className} min-h-0 w-full flex-none flex-col md:w-[210px] gap-0.5 overflow-y-auto overscroll-contain p-3`}>
+      <div className="relative mb-1.5">
+        <Icon d='<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>' className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8e8e93]" />
+        <input
+          type="search"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") setSearch("");
+            if (e.key === "Enter" && found[0]) {
+              onPick(found[0].tab);
+              setSearch("");
+            }
+          }}
+          placeholder="Søg i funktioner og menu"
+          className="w-full rounded-[9px] bg-black/[.05] py-[7px] pl-8 pr-2 text-[13px] outline-none placeholder:text-[#8e8e93] focus:bg-white focus:ring-2 focus:ring-[#0071e3]/40"
+        />
+      </div>
+      {search.trim() &&
+        (found.length ? (
+          found.map((f, i) => (
+            <button
+              key={`${f.tab}-${f.label}-${i}`}
+              type="button"
+              onClick={() => {
+                onPick(f.tab);
+                setSearch("");
+              }}
+              className="rounded-[9px] px-2.5 py-[6px] text-left hover:bg-black/[.04]"
+            >
+              <span className="block text-[14px] text-[#1d1d1f]">{f.label}</span>
+              {f.section && <span className="block text-[11px] text-[#8e8e93]">{f.section}</span>}
+            </button>
+          ))
+        ) : (
+          <p className="px-2.5 py-2 text-[12px] text-[#8e8e93]">Intet fundet - prøv et andet ord, eller spørg nextviewAI.</p>
+        ))}
+      {!search.trim() &&
+        TABS.map(([t, text, icon, heading]) => (
+          <div key={t} className="contents">
+            {heading && <div className="mt-4 px-2.5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-[#8e8e93]">{heading}</div>}
+            <button
+              type="button"
+              onClick={() => onPick(t)}
+              className={`flex items-center gap-2.5 rounded-[9px] px-2.5 py-[7px] text-left text-[14px] transition ${tab === t ? "bg-white font-medium shadow-[0_1px_3px_rgba(0,0,0,.08)]" : "text-[#1d1d1f]/80 hover:bg-black/[.04]"}`}
+            >
+              <span className={`flex h-7 w-7 items-center justify-center rounded-[7px] ${tab === t ? "bg-[#0071e3] text-white" : "bg-white text-[#6e6e73] ring-1 ring-black/[.06]"}`}>
+                <Icon d={icon} className="h-4 w-4" />
+              </span>
+              {text}
+              {t === "feedback" && feedbackOpen > 0 && <span className="ml-auto rounded-full bg-[#ff9500] px-1.5 text-[11px] font-semibold text-white">{feedbackOpen}</span>}
+            </button>
+          </div>
+        ))}
+    </nav>
+  );
+});
+
 function shrinkImage(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
@@ -1544,6 +1583,100 @@ function ClaudePanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ask]);
 
+  /*
+   * The conversation, drawn again only when it changes - not on every letter
+   * typed in the box below (a long chat made typing slow, on a phone above all).
+   */
+  const sendRef = useRef(send);
+  const applyRef = useRef(onApply);
+  useEffect(() => {
+    sendRef.current = send;
+    applyRef.current = onApply;
+  });
+  const log = useMemo(
+    () => (
+      <>
+            {chat.length === 0 && (
+              <div className="px-2 pt-6">
+                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#d97757] text-white">
+                  <Icon d={SPARK} className="h-5 w-5" />
+                </span>
+                <h2 className="mt-3 text-[20px] font-semibold tracking-tight">Hvad skal ændres?</h2>
+                <p className="mt-1 text-[14px] leading-snug text-[#6e6e73]">
+                  Skriv det, som du ville sige det til en kollega. Ændringen vises med det samme i forhåndsvisningen - intet gemmes, før du trykker Gem.
+                </p>
+                <div className="mt-5 flex flex-col items-start gap-2">
+                  {SUGGESTIONS.map((sug) => (
+                    <button key={sug} type="button" onClick={() => sendRef.current(sug)} className="rounded-full bg-white px-3.5 py-1.5 text-left text-[13px] text-[#1d1d1f] ring-1 ring-black/[.08] transition hover:ring-black/20">
+                      {sug}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {chat.map((m, i) =>
+              m.role === "user" ? (
+                <div key={i} className="flex flex-col items-end gap-1.5">
+                  {m.images && (
+                    <div className="flex max-w-[85%] flex-wrap justify-end gap-1.5">
+                      {m.images.map((src, j) => (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img key={j} src={src} alt="" className="h-24 rounded-xl object-cover ring-1 ring-black/[.06]" />
+                      ))}
+                    </div>
+                  )}
+                  <p className="max-w-[85%] whitespace-pre-wrap rounded-[18px] bg-[#e9e9eb] px-3.5 py-2 text-[14px] leading-snug">{m.text}</p>
+                </div>
+              ) : (
+                <div key={i} className="flex gap-2.5">
+                  <span className={`mt-0.5 flex h-6 w-6 flex-none items-center justify-center rounded-full text-white ${m.error ? "bg-[#ff3b30]" : "bg-[#d97757]"}`}>
+                    <Icon d={m.error ? '<path d="M12 8v5M12 16h.01"/>' : SPARK} className="h-3.5 w-3.5" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className={`whitespace-pre-wrap text-[14px] leading-relaxed ${m.error ? "text-[#ff3b30]" : ""}`}>{m.text}</p>
+                    {m.remembered?.map((t) => (
+                      <p key={t} className="mt-1 text-[12px] leading-snug text-[#8e8e93]">
+                        Husker nu: {t}
+                      </p>
+                    ))}
+                    {m.before && (
+                      <div className="mt-1.5 flex items-center gap-2 text-[12px] text-[#8e8e93]">
+                        {m.undone ? (
+                          <span>Fortrudt</span>
+                        ) : (
+                          <>
+                            <span className="text-[#248a3d]">✓ {m.changed === 1 ? "1 ændring" : `${m.changed} ændringer`} - se forhåndsvisningen</span>
+                            <button
+                              type="button"
+                              className="text-[#0071e3] hover:underline"
+                              onClick={() => {
+                                applyRef.current(m.before!);
+                                setChat((c) => c.map((x, j) => (j >= i && x.before ? { ...x, undone: true } : x)));
+                              }}
+                            >
+                              Fortryd
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            )}
+            {pending && (
+              <div className="flex items-center gap-2.5">
+                <span className="flex h-6 w-6 flex-none animate-spin items-center justify-center rounded-full bg-[#d97757] text-white [animation-duration:2.5s]">
+                  <Icon d={SPARK} className="h-3.5 w-3.5" />
+                </span>
+                <span className="text-[14px] text-[#8e8e93]">Arbejder på det…</span>
+              </div>
+            )}
+      </>
+    ),
+    [chat, pending, setChat]
+  );
+
   if (!ready)
     return (
       <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
@@ -1575,85 +1708,10 @@ function ClaudePanel({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex-1 space-y-4 overflow-y-auto px-3 pb-4 pt-3">
-        {chat.length === 0 && (
-          <div className="px-2 pt-6">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#d97757] text-white">
-              <Icon d={SPARK} className="h-5 w-5" />
-            </span>
-            <h2 className="mt-3 text-[20px] font-semibold tracking-tight">Hvad skal ændres?</h2>
-            <p className="mt-1 text-[14px] leading-snug text-[#6e6e73]">
-              Skriv det, som du ville sige det til en kollega. Ændringen vises med det samme i forhåndsvisningen - intet gemmes, før du trykker Gem.
-            </p>
-            <div className="mt-5 flex flex-col items-start gap-2">
-              {SUGGESTIONS.map((sug) => (
-                <button key={sug} type="button" onClick={() => send(sug)} className="rounded-full bg-white px-3.5 py-1.5 text-left text-[13px] text-[#1d1d1f] ring-1 ring-black/[.08] transition hover:ring-black/20">
-                  {sug}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-        {chat.map((m, i) =>
-          m.role === "user" ? (
-            <div key={i} className="flex flex-col items-end gap-1.5">
-              {m.images && (
-                <div className="flex max-w-[85%] flex-wrap justify-end gap-1.5">
-                  {m.images.map((src, j) => (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img key={j} src={src} alt="" className="h-24 rounded-xl object-cover ring-1 ring-black/[.06]" />
-                  ))}
-                </div>
-              )}
-              <p className="max-w-[85%] whitespace-pre-wrap rounded-[18px] bg-[#e9e9eb] px-3.5 py-2 text-[14px] leading-snug">{m.text}</p>
-            </div>
-          ) : (
-            <div key={i} className="flex gap-2.5">
-              <span className={`mt-0.5 flex h-6 w-6 flex-none items-center justify-center rounded-full text-white ${m.error ? "bg-[#ff3b30]" : "bg-[#d97757]"}`}>
-                <Icon d={m.error ? '<path d="M12 8v5M12 16h.01"/>' : SPARK} className="h-3.5 w-3.5" />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className={`whitespace-pre-wrap text-[14px] leading-relaxed ${m.error ? "text-[#ff3b30]" : ""}`}>{m.text}</p>
-                {m.remembered?.map((t) => (
-                  <p key={t} className="mt-1 text-[12px] leading-snug text-[#8e8e93]">
-                    Husker nu: {t}
-                  </p>
-                ))}
-                {m.before && (
-                  <div className="mt-1.5 flex items-center gap-2 text-[12px] text-[#8e8e93]">
-                    {m.undone ? (
-                      <span>Fortrudt</span>
-                    ) : (
-                      <>
-                        <span className="text-[#248a3d]">✓ {m.changed === 1 ? "1 ændring" : `${m.changed} ændringer`} - se forhåndsvisningen</span>
-                        <button
-                          type="button"
-                          className="text-[#0071e3] hover:underline"
-                          onClick={() => {
-                            onApply(m.before!);
-                            setChat((c) => c.map((x, j) => (j >= i && x.before ? { ...x, undone: true } : x)));
-                          }}
-                        >
-                          Fortryd
-                        </button>
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          )
-        )}
-        {pending && (
-          <div className="flex items-center gap-2.5">
-            <span className="flex h-6 w-6 flex-none animate-spin items-center justify-center rounded-full bg-[#d97757] text-white [animation-duration:2.5s]">
-              <Icon d={SPARK} className="h-3.5 w-3.5" />
-            </span>
-            <span className="text-[14px] text-[#8e8e93]">Arbejder på det…</span>
-          </div>
-        )}
+        {log}
         <div ref={end} />
       </div>
-      <AiMemoryPanel slug={config.slug} refresh={learned} />
+      <MemoryPanel slug={config.slug} refresh={learned} />
       <form
         className={`mx-2 mb-3 rounded-[22px] bg-white p-2 shadow-[0_2px_12px_rgba(0,0,0,.06)] ring-1 focus-within:ring-black/20 ${dragging ? "ring-2 ring-[#0071e3]" : "ring-black/[.08]"}`}
         onSubmit={(e) => {
