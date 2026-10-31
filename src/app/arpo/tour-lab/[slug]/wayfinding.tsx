@@ -1,5 +1,6 @@
 "use client";
 
+import { TourLink } from "./links";
 import { useEffect, useRef, useState } from "react";
 import type { MpSdk, Vec3 } from "../matterport";
 import { useT } from "../tours/i18n-react";
@@ -237,9 +238,10 @@ export function RouteStatus({
       )}
       <div className="rt-btns">
         {arrived && cta && (
-          <a className="rt-cta" href={cta.href} target="_blank" rel="noopener" onClick={onCta}>
+          // The tour's own way of opening a link: "#live" opens the list, "#kontakt" the form, a page per its setting.
+          <TourLink className="rt-cta" href={cta.href} label={cta.label} onClick={onCta}>
             {cta.label}
-          </a>
+          </TourLink>
         )}
         {arrived ? (
           <button type="button" onClick={onClose}>
