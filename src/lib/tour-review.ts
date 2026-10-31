@@ -1,5 +1,6 @@
 import "server-only";
 import { after } from "next/server";
+import { filmingTime } from "@/lib/filming-time";
 import { goLiveAfterApproval } from "@/lib/auto-live";
 import { randomBytes } from "node:crypto";
 import { prisma } from "@/lib/db";
@@ -254,10 +255,12 @@ export async function sendReviewMail(
 ): Promise<{ to: string; token: string }> {
   const tour = await prisma.tour.findUnique({
     where: { slug },
-    select: { slug: true, reviewToken: true, reviewApprovedAt: true, reviewEmail: true, reviewName: true, deal: { select: { id: true, companyName: true, displayName: true, contactName: true, contactEmail: true, contractProducts: true, branches: { select: { id: true } } } } },
+    select: { slug: true, reviewToken: true, reviewApprovedAt: true, reviewEmail: true, reviewName: true, deal: { select: { id: true, companyName: true, displayName: true, contactName: true, contactEmail: true, contractProducts: true, filmingActualMinutes: true, branches: { select: { id: true } } } } },
   });
   const deal = tour?.deal;
   if (!tour || !deal) throw new Error("Touren er ikke koblet til en kunde i Arpo.");
+  // When the customer approves, the tour goes live by itself - and Live needs the filming time.
+  if (!reminder && (await filmingTime(deal)).minutes == null) throw new Error("Udfyld filmtiden først - så kan touren gå live af sig selv, når kunden godkender.");
   // A chosen recipient: their own e-mail (none = the deal's contact again) - saved with the tour once the mail is sent.
   const chosen = recipient
     ? recipient.email.trim() && normalizeEmail(recipient.email) !== normalizeEmail(deal.contactEmail ?? "")

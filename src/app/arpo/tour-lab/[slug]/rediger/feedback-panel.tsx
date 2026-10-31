@@ -4,6 +4,7 @@ import { reviewUrl } from "@/lib/public-urls";
 import { useEffect, useState, useTransition } from "react";
 import { checkTourForReview, deleteFeedback, reviewStatus, sendFixesDone, sendForReview, setFeedbackStatus, setTourApproved, setTourReview, tourFeedback, type Feedback, type ReviewStatus } from "@/lib/actions/tour-feedback";
 import { askClaudeForTour, type AiEditResult } from "@/lib/actions/tour-ai";
+import { setFilmingActual } from "@/lib/actions/deals";
 import type { TourConfig } from "../../tours/types";
 import type { AiNote } from "@/lib/tour-check";
 import { Choice, Group, input, Toggle, type PreviewApi } from "./ui";
@@ -130,12 +131,12 @@ export function FeedbackPanel({
         <div className="flex flex-wrap gap-2">
           {!status?.sentAt || status.approvedAt ? (
             <>
-            <button type="button" disabled={pending || checking || !(status?.to || who?.email.trim())} onClick={() => void runCheck()} className="flex-1 rounded-xl bg-[#0071e3] py-2 text-[14px] font-medium text-white disabled:opacity-40">
+            <button type="button" disabled={pending || checking || !(status?.to || who?.email.trim()) || Boolean(status?.filmingMissing)} onClick={() => void runCheck()} className="flex-1 rounded-xl bg-[#0071e3] py-2 text-[14px] font-medium text-white disabled:opacity-40">
               {checking ? "nextviewAI tjekker touren …" : status?.approvedAt ? "Tjek og send til ny gennemgang" : "Tjek og send til gennemgang"}
             </button>
             <button
               type="button"
-              disabled={pending || checking || !(status?.to || who?.email.trim())}
+              disabled={pending || checking || !(status?.to || who?.email.trim()) || Boolean(status?.filmingMissing)}
               onClick={() => confirm(`Send touren til gennemgang uden tjek - til ${who?.email.trim() || status?.to}?`) && send(false)}
               className="w-full rounded-xl bg-white py-2 text-[14px] font-medium text-[#0071e3] ring-1 ring-black/[.08] disabled:opacity-40"
             >
@@ -191,6 +192,7 @@ export function FeedbackPanel({
             )}
           </div>
         )}
+        {status?.filmingMissing && !status.sentAt && status.dealId && <FilmingTime dealId={status.dealId} onSaved={reloadStatus} />}
         {!check && (
           <button type="button" disabled={checking} onClick={() => void runCheck()} className="self-start text-[13px] font-medium text-[#b4532f] disabled:opacity-50">
             {checking ? "nextviewAI tjekker touren …" : "✦ Tjek touren (hastighed og funktioner)"}
@@ -499,6 +501,38 @@ function AiNotes({ notes }: { notes: AiNote[] }) {
           );
         })}
       </ul>
+    </div>
+  );
+}
+
+/** The filming time, right here - it has to be there before the review mail (the customer's approval makes the deal Live). */
+function FilmingTime({ dealId, onSaved }: { dealId: string; onSaved: () => void }) {
+  const [hours, setHours] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <div className="space-y-1.5 rounded-xl bg-[#ff9500]/10 p-3">
+      <p className="text-[13px] font-semibold text-[#a05a00]">Udfyld filmtiden først</p>
+      <p className="text-[12px] leading-snug text-[#7a5a2a]">Når kunden godkender, går touren live af sig selv - og Live kræver filmtiden. Den kan også registreres i timeregistreringen.</p>
+      <div className="flex gap-2">
+        <input className={`${input} bg-white`} inputMode="decimal" placeholder="Timer, fx 2,5" value={hours} onChange={(e) => setHours(e.target.value)} />
+        <button
+          type="button"
+          disabled={busy || !hours.trim()}
+          onClick={async () => {
+            setBusy(true);
+            setError(null);
+            const r = await setFilmingActual(dealId, Number(hours.replace(",", ".")));
+            setBusy(false);
+            if (!r.ok) return setError(r.error);
+            onSaved();
+          }}
+          className="shrink-0 rounded-xl bg-[#0071e3] px-3 text-[14px] font-medium text-white disabled:opacity-40"
+        >
+          {busy ? "…" : "Gem"}
+        </button>
+      </div>
+      {error && <p className="text-[12px] text-[#ff3b30]">{error}</p>}
     </div>
   );
 }

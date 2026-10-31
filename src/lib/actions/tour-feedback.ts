@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { approveTour, reviewRecipient, sendFixesDoneMail, sendReviewMail } from "@/lib/tour-review";
+import { filmingTime } from "@/lib/filming-time";
 import { checkTour, type AiNote, type CheckItem } from "@/lib/tour-check";
 import { getTourConfig } from "@/lib/tours";
 
@@ -79,6 +80,9 @@ export type ReviewStatus = {
   toName: string | null;
   /** The deal's contact - who it goes to unless someone else is chosen. */
   contact: string | null;
+  /** The deal, and whether its filming time is still missing (needed before the review mail: approving makes it Live). */
+  dealId: string | null;
+  filmingMissing: boolean;
   sentAt: string | null;
   remindedAt: string | null;
   reminders: number;
@@ -91,7 +95,7 @@ export async function reviewStatus(slug: string): Promise<ReviewStatus> {
   await admin();
   const t = await prisma.tour.findUnique({
     where: { slug },
-    select: { reviewSentAt: true, reviewRemindedAt: true, reviewReminders: true, reviewApprovedAt: true, reviewApprovedBy: true, reviewEmail: true, reviewName: true, deal: { select: { contactEmail: true, contactName: true } } },
+    select: { reviewSentAt: true, reviewRemindedAt: true, reviewReminders: true, reviewApprovedAt: true, reviewApprovedBy: true, reviewEmail: true, reviewName: true, deal: { select: { id: true, contactEmail: true, contactName: true, filmingActualMinutes: true } } },
   });
   const open = await prisma.tourFeedback.count({ where: { tourSlug: slug, status: "open" } });
   const who = t?.deal ? reviewRecipient(t, t.deal) : null;
@@ -99,6 +103,8 @@ export async function reviewStatus(slug: string): Promise<ReviewStatus> {
     to: who?.email ?? null,
     toName: who?.name ?? null,
     contact: t?.deal?.contactEmail ?? null,
+    dealId: t?.deal?.id ?? null,
+    filmingMissing: t?.deal ? (await filmingTime(t.deal)).minutes == null : false,
     sentAt: t?.reviewSentAt?.toISOString() ?? null,
     remindedAt: t?.reviewRemindedAt?.toISOString() ?? null,
     reminders: t?.reviewReminders ?? 0,
