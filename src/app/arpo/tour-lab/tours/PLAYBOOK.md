@@ -69,6 +69,9 @@ Med stemme (en lydfil pr. stop, `audio`): godt til skoler og steder, hvor en
 rolig fortæller sælger stemningen (fx Tolne Efterskole). Slå "Man trykker selv
 videre" til (`manual`), så gæsten styrer tempoet; ellers kommer næste stop, når
 stemmen er færdig. Et sidste stop uden sted (tom `href`) er et afslutningskort.
+Skal kortet sige det kortere end stemmen (fx korte, konkrete sætninger til en
+specialskole), så skriv det i stoppets `short` - `text` er det, stemmen siger, og
+rettes den, holder stemmen op med at spille.
 Gæsten kan altid slå lyden fra. Lydfiler hostes hos os som alle andre filer.
 
 Flere rundvisninger (`guides`): hver med sit navn og sine stop, fx én for hele

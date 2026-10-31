@@ -41,7 +41,7 @@ export type GuideSetup = {
   /** How the view turns at each stop: left out = a slow turn as always, "other" = the other way, "none" = stands still. A stop can have its own. */
   turn?: GuideTurn;
   /** A stop: where (empty href = stay, e.g. a closing card; a picture "#billede:<address>" = shown full screen, a 2:1 one as 360°, e.g. a drone photo), its text, and optionally a voice (an audio file) that plays there. */
-  stops: ({ point: string; turn?: GuideTurn } | { href: string; title: string; text: string; audio?: string; /** The text a made voice (ElevenLabs) was read from - it only plays while the stop says just that (not after a change, not in another language). */ audioText?: string; turn?: GuideTurn; /** The stop's own button, e.g. "Se alle linjer" to the school's page - on the last stop instead of the tour's main button. */ button?: { label: string; href: string } })[];
+  stops: ({ point: string; turn?: GuideTurn } | { href: string; title: string; text: string; audio?: string; /** The text a made voice (ElevenLabs) was read from - it only plays while the stop says just that (not after a change, not in another language). */ audioText?: string; /** What the card shows instead of `text` - e.g. short, concrete words (one thing per sentence) for a special school. `text` stays what the voice says, so the voice keeps playing; left out = `text` is shown. When a stop has a voice, rewrite this - never `text`. */ short?: string; turn?: GuideTurn; /** The stop's own button, e.g. "Se alle linjer" to the school's page - on the last stop instead of the tour's main button. */ button?: { label: string; href: string } })[];
 };
 
 /** A real spot in the tour with a photo of it (e.g. one of the model's own Matterport photos). */

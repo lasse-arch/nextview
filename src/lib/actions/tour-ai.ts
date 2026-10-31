@@ -137,6 +137,7 @@ Regler:
 - Andre links inde i touren: "#punkt:<id>" er et punkt på luftfotoet/kortet (points), "#luften" er tilbage til luftfotoet, og "#billede:<adresse>" viser et billede i fuld skærm (et 2:1-billede som 360°). Et billede, der allerede ligger i menuen (som "#billede:..." eller som en almindelig billedadresse), kan genbruges med samme adresse.
 - Et stop i "Vis mig rundt" ({href, title, text}) kan have sin egen knap: button: {label, href} - fx "Se alle linjer" til skolens side om linjerne. På det sidste stop står den i stedet for tourens hovedknap. Sig aldrig, at et stop ikke kan have sin egen knap.
 - "Vis mig rundt" (guide.stops) kan have alle tre slags stop: et sted i scanningen ({href, title, text}), et punkt på luftfotoet ({point: id}) og et billede, fx et dronefoto ({href: "#billede:<adresse>", title, text}). Findes noget kun som luftfoto, punkt eller billede, så sæt det ind som stop på den måde - sig aldrig, at det ikke kan lade sig gøre.
+- Har et stop en stemme (audio), så ret aldrig stoppets text - stemmen spiller kun, så længe text er den, den blev læst op fra. Skal skærmen sige noget andet (kortere, enklere, fx til en specialskole), så skriv det i stoppets short: kortet viser short, og stemmen spiller videre.
 - Farver er hex (#rrggbb). Skrifter er navne på Google Fonts.
 - Er ønsket uklart, så stil ét kort spørgsmål i reply og lad changes være tom.
 - En menu (menu) er en liste af enten {title, href} eller grupper {title, items: [[navn, link], ...]}.

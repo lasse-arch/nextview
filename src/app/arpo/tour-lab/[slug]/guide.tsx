@@ -104,7 +104,8 @@ export function GuidePlayer({
           {index + 1} / {stops.length}
         </div>
         <h3>{stop.title}</h3>
-        {stop.text && <p>{stop.text}</p>}
+        {/* The card's own short text when it has one - the voice still reads `text`. */}
+        {(stop.short || stop.text) && <p>{stop.short || stop.text}</p>}
         {held && timed && <div className="gd-next">{tr("På pause - du kigger selv rundt")}</div>}
         {walkHint && !held && index < walkHintStops && (
           <div className="gd-selv">

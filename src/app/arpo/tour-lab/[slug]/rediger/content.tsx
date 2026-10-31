@@ -992,8 +992,11 @@ function GuideSetupEditor({ config, edit, preview, onEditPoint }: Omit<Props, "s
                 <Field title="Titel">
                   <input className={`${input} bg-white`} value={s.title} onChange={(e) => set({ ...s, title: e.target.value })} />
                 </Field>
-                <Field title="Tekst" hint="1-2 korte sætninger.">
+                <Field title={s.audio ? "Tekst - det stemmen siger" : "Tekst"} hint={s.audio ? "Retter du den, holder stemmen op med at spille. Skal skærmen sige det kortere, så brug feltet herunder." : "1-2 korte sætninger."}>
                   <textarea className={`${textarea} bg-white`} value={s.text} onChange={(e) => set({ ...s, text: e.target.value })} />
+                </Field>
+                <Field title="Kort tekst på skærmen (valgfri)" hint="Vises på kortet i stedet for teksten ovenfor - stemmen spiller videre som før. Fx korte, konkrete sætninger med én ting i hver.">
+                  <textarea className={`${textarea} bg-white`} value={s.short ?? ""} placeholder="Tom: teksten ovenfor vises" onChange={(e) => set({ ...s, short: e.target.value || undefined })} />
                 </Field>
                 {imageOfHref(s.href) ? (
                   <StopPicture config={config} url={imageOfHref(s.href)!} onChange={(url) => set({ ...s, href: url ? IMAGE_HREF + url : "" })} />
