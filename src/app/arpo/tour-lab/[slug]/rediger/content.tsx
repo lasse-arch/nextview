@@ -8,7 +8,7 @@ import { AiImageButton, AiImageList } from "./ai-image";
 import { writePlaceCards, type CardDraft } from "@/lib/actions/tour-cards";
 import { useEffect, useState } from "react";
 import { saveTourStoryImage } from "@/lib/actions/tour-lab";
-import type { DroneView, GuideTurn, PlaceCard, TourConfig, TourInfo, TourPlace, WelcomeGo } from "../../tours/types";
+import type { DroneView, GuideTurn, GuideTurnSpeed, PlaceCard, TourConfig, TourInfo, TourPlace, WelcomeGo } from "../../tours/types";
 import type { DroneViews } from "../../tours/places";
 import type { ScanMap } from "@/lib/matterport-graph";
 import { ScanPointPicker } from "./scanpoints";
@@ -894,9 +894,14 @@ function GuideSetupEditor({ config, edit, preview, onEditPoint }: Omit<Props, "s
   const places = startPlaces(config);
   const setStops = (s: Stop[]) => edit((d) => void (d.guide = s.length || d.guide?.fromMenu ? { ...d.guide, stops: s } : undefined));
   const turnOptions: [string, string][] = [
-    ["as", "Drej som nu"],
-    ["other", "Drej den anden vej"],
+    ["as", "Mod højre"],
+    ["other", "Mod venstre"],
     ["none", "Drej ikke"],
+  ];
+  const speedOptions: [string, string][] = [
+    ["slow", "Langsomt"],
+    ["normal", "Normalt"],
+    ["fast", "Hurtigt"],
   ];
   return (
     <>
@@ -913,6 +918,7 @@ function GuideSetupEditor({ config, edit, preview, onEditPoint }: Omit<Props, "s
         {(stops.length > 0 || fromMenu) && (
           <Field title="Ved hvert stop">
             <Choice value={config.guide?.turn ?? "as"} options={turnOptions} onChange={(v) => edit((d) => void (d.guide = { ...d.guide!, turn: v === "as" ? undefined : (v as GuideTurn) }))} />
+            {config.guide?.turn !== "none" && <Choice value={config.guide?.turnSpeed ?? "normal"} options={speedOptions} onChange={(v) => edit((d) => void (d.guide = { ...d.guide!, turnSpeed: v === "normal" ? undefined : (v as GuideTurnSpeed) }))} />}
           </Field>
         )}
         {(stops.length > 0 || fromMenu) && (
@@ -1038,8 +1044,9 @@ function GuideSetupEditor({ config, edit, preview, onEditPoint }: Omit<Props, "s
             "point" in s ? (
               <>
                 <PointStop config={config} id={s.point} edit={edit} onEdit={onEditPoint} preview={preview} />
-                <Field title="Drejning ved stoppet" hint="Om billedet drejer langsomt rundt, mens stoppet vises.">
+                <Field title="Drejning ved stoppet" hint="Hvilken vej og hvor hurtigt billedet drejer rundt, mens stoppet vises.">
                   <Choice value={s.turn ?? ""} options={[["", "Som de andre"], ...turnOptions]} onChange={(v) => set({ ...s, turn: v ? (v as GuideTurn) : undefined })} />
+                  {(s.turn ?? config.guide?.turn) !== "none" && <Choice value={s.turnSpeed ?? ""} options={[["", "Som de andre"], ...speedOptions]} onChange={(v) => set({ ...s, turnSpeed: v ? (v as GuideTurnSpeed) : undefined })} />}
                 </Field>
               </>
             ) : (
@@ -1067,8 +1074,9 @@ function GuideSetupEditor({ config, edit, preview, onEditPoint }: Omit<Props, "s
                 )}
                 {!imageOfHref(s.href) && <StopPicture config={config} url={null} onChange={(url) => url && set({ ...s, href: IMAGE_HREF + url })} />}
                 {s.href && !imageOfHref(s.href) && (
-                  <Field title="Drejning ved stoppet">
+                  <Field title="Drejning ved stoppet" hint="Hvilken vej og hvor hurtigt billedet drejer rundt, mens stoppet vises.">
                     <Choice value={s.turn ?? ""} options={[["", "Som de andre"], ...turnOptions]} onChange={(v) => set({ ...s, turn: v ? (v as GuideTurn) : undefined })} />
+                  {(s.turn ?? config.guide?.turn) !== "none" && <Choice value={s.turnSpeed ?? ""} options={[["", "Som de andre"], ...speedOptions]} onChange={(v) => set({ ...s, turnSpeed: v ? (v as GuideTurnSpeed) : undefined })} />}
                   </Field>
                 )}
                 <Field title="Egen knap (valgfri)" hint="Fx &quot;Se alle linjer&quot; til jeres side om linjerne. På det sidste stop står den i stedet for tourens hovedknap.">

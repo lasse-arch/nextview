@@ -87,6 +87,23 @@ export function GuidePlayer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [index, muted]);
   const timed = !manual && !voice;
+  // How long they stay at each stop (for Resultater) - when they go on, close it or leave the page.
+  useEffect(() => {
+    const at = Date.now();
+    let sent = false;
+    const send = () => {
+      if (sent) return;
+      sent = true;
+      const seconds = (Date.now() - at) / 1000;
+      if (seconds >= 1) onEvent("guide_stop_time", { seconds: Math.min(3600, seconds), title: stop.title, stop: index + 1 });
+    };
+    window.addEventListener("pagehide", send);
+    return () => {
+      window.removeEventListener("pagehide", send);
+      send();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [index]);
 
   function step(to: number, how: string) {
     if (to >= stops.length) return onClose(true);

@@ -1603,7 +1603,10 @@ function TourExperience({
     if (!(await standsAt(stop.href)) && step === guideStep.current) guideFly(stop);
   }
   /** A stop inside the tour: flown to (one move at a time, only the newest), then the slow turn. */
+  /** The guide's endless slow turn at a stop: its direction while it turns (0 = not turning). */
+  const guideTurnDir = useRef(0);
   function guideFly(stop: (typeof GUIDE)[number], uncover?: () => void) {
+    guideTurnDir.current = 0;
     // The slow turn at the stop: as always, the other way, or none (the stop's own, else the guide's).
     const turn = stop.turn ?? G?.turn ?? "as";
     guideMoving.current = true;
@@ -1634,9 +1637,24 @@ function TourExperience({
         // The slow turn isn't waited for by the queue (the next move may start while it turns) - but it is
         // still the guide moving, not the visitor: guideMoving stays on until the turn is done.
         selfMoveAt.current = now() + 8000; // the slow turn takes a few seconds - not the visitor looking around
-        const turning = sdk?.Camera.rotate?.(turn === "other" ? -18 : 18, 0, { speed: 3 }).catch(() => {});
+        const dir = turn === "other" ? -1 : 1;
+        // Degrees a second: slow, normal (as always) or fast - the stop's own, else the guide's.
+        const speed = { slow: 1.5, normal: 3, fast: 6 }[stop.turnSpeed ?? G?.turnSpeed ?? "normal"];
+        const turning = sdk?.Camera.rotate?.(dir * 18, 0, { speed }).catch(() => {});
         turning?.finally(() => {
-          if (ticket === guideTicket.current) setTimeout(() => ticket === guideTicket.current && guideDone(stop, ticket), 700);
+          if (ticket !== guideTicket.current) return;
+          setTimeout(async () => {
+            if (ticket !== guideTicket.current) return;
+            await guideDone(stop, ticket);
+            // Then it keeps turning slowly - all the while the stop is shown (the voice, the visitor reading) - until the
+            // next stop, or the visitor takes over (walks, or looks up/down: see the guide's takeover watch).
+            guideTurnDir.current = dir;
+            while (ticket === guideTicket.current && !guideHeldRef.current && guideAtRef.current != null && phaseRef.current === "tour" && sdk?.Camera.rotate) {
+              selfMoveAt.current = now() + 8000;
+              await sdk.Camera.rotate(dir * 18, 0, { speed }).catch(() => {});
+            }
+            if (ticket === guideTicket.current) guideTurnDir.current = 0;
+          }, 700);
         });
         return "turning";
       })
@@ -1721,6 +1739,14 @@ function TourExperience({
       if (guideMoving.current || !base) {
         base = { sweep: p.sweep, x: p.rotation.x, y: p.rotation.y };
         return;
+      }
+      // While the guide turns by itself, sideways is its own move: only a walk or a look up/down is the visitor's.
+      if (guideTurnDir.current) {
+        if (p.sweep === base.sweep && Math.abs(p.rotation.x - base.x) <= 4) {
+          base.y = p.rotation.y;
+          return;
+        }
+        guideTurnDir.current = 0;
       }
       if (p.sweep !== base.sweep || Math.abs(p.rotation.y - base.y) > 4 || Math.abs(p.rotation.x - base.x) > 4) {
         // Once per pause: walking on counts as leaving the guide, only looking around doesn't.
@@ -3055,7 +3081,7 @@ function TourExperience({
           )}
           onGo={guideGo}
           onClose={closeGuide}
-          onEvent={track}
+          onEvent={(name, params) => track(name, { ...params, guide: guideKey() })}
           stopLabel={guideExit(T, guideId) === "overview" && OV ? tx(OV.backLabel || "Tilbage til luften") : undefined}
         />
       )}

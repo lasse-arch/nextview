@@ -89,14 +89,16 @@ export function Toggle({ on, onChange, title, hint }: { on: boolean; onChange: (
 
 /** A segmented control. */
 export function Choice<T extends string>({ value, options, onChange }: { value: T; options: [T, string][]; onChange: (v: T) => void }) {
+  // Many or long choices don't fit one row in the editor's column: two per row then, never a word broken over two lines.
+  const crowded = options.length > 3 && options.reduce((n, [, t]) => n + t.length, 0) > 24;
   return (
-    <div className="flex rounded-[9px] bg-[#e9e9eb] p-[2px]">
+    <div className={`${crowded ? "grid grid-cols-2 gap-[2px]" : "flex"} rounded-[9px] bg-[#e9e9eb] p-[2px]`}>
       {options.map(([v, text]) => (
         <button
           key={v}
           type="button"
           onClick={() => onChange(v)}
-          className={`flex-1 rounded-[7px] px-3 py-[5px] text-[13px] font-medium transition ${v === value ? "bg-white text-[#1d1d1f] shadow-[0_3px_8px_rgba(0,0,0,.12),0_3px_1px_rgba(0,0,0,.04)]" : "text-[#1d1d1f]/70 hover:text-[#1d1d1f]"}`}
+          className={`flex-1 whitespace-nowrap rounded-[7px] px-2.5 py-[5px] text-[13px] font-medium transition ${v === value ? "bg-white text-[#1d1d1f] shadow-[0_3px_8px_rgba(0,0,0,.12),0_3px_1px_rgba(0,0,0,.04)]" : "text-[#1d1d1f]/70 hover:text-[#1d1d1f]"}`}
         >
           {text}
         </button>

@@ -50,7 +50,15 @@ export type TourStats = {
   opened: { label: string; count: number }[];
   /** "Vis mig rundt": visits that started it and saw it to the end, at which stop those who left it did, and what they went to. */
   /** "Vis mig rundt" - where they left it is for the main one; `byGuide` = each guided tour (its "#rundvisning…" link) when there are more. */
-  guide: { started: number; completed: number; leftAt: { stop: number; count: number }[]; leftFor: { label: string; count: number }[]; byGuide?: { guide: string; started: number; completed: number }[] };
+  guide: {
+    started: number;
+    completed: number;
+    leftAt: { stop: number; count: number }[];
+    leftFor: { label: string; count: number }[];
+    byGuide?: { guide: string; started: number; completed: number }[];
+    /** Each stop of the main one, by its title: how many saw it, how long they stayed (median seconds) and how often its voice was played. */
+    stops?: { title: string; seen: number; medianSeconds: number; voice: number }[];
+  };
 };
 
 /**
@@ -146,7 +154,7 @@ export async function tourStats(slug: string, range: number | StatsRange = 30): 
     ),
     top(slug, since, until, `name IN ('drone_point_click','info_open','place_card_view','pano_open') AND label IS NOT NULL`),
   ]);
-  const [guideRuns, guideLeftAt, guideLeftFor, byGuide] = await Promise.all([
+  const [guideRuns, guideLeftAt, guideLeftFor, byGuide, guideStopRows] = await Promise.all([
     prisma.$queryRawUnsafe<{ started: bigint; completed: bigint }[]>(
       `SELECT count(DISTINCT session) FILTER (WHERE name = 'guide_start') AS started, count(DISTINCT session) FILTER (WHERE name = 'guide_complete') AS completed
        FROM "TourEvent" WHERE "tourSlug" = $1 AND "createdAt" >= $2 AND "createdAt" < $3 AND name IN ('guide_start', 'guide_complete')`,
@@ -166,6 +174,18 @@ export async function tourStats(slug: string, range: number | StatsRange = 30): 
     prisma.$queryRawUnsafe<{ guide: string; started: bigint; completed: bigint }[]>(
       `SELECT COALESCE(url, '#rundvisning') AS guide, count(DISTINCT session) FILTER (WHERE name = 'guide_start') AS started, count(DISTINCT session) FILTER (WHERE name = 'guide_complete') AS completed
        FROM "TourEvent" WHERE "tourSlug" = $1 AND "createdAt" >= $2 AND "createdAt" < $3 AND name IN ('guide_start', 'guide_complete') GROUP BY 1 ORDER BY 2 DESC LIMIT 20`,
+      slug,
+      since,
+      until
+    ),
+    // Per stop of the main one: the time at it (guide_stop_time, seconds) and its voice played (guide_audio).
+    prisma.$queryRawUnsafe<{ title: string; seen: bigint; median: number | null; voice: bigint }[]>(
+      `SELECT label AS title,
+              count(DISTINCT session) FILTER (WHERE name = 'guide_stop_time') AS seen,
+              percentile_cont(0.5) WITHIN GROUP (ORDER BY value) FILTER (WHERE name = 'guide_stop_time') AS median,
+              count(*) FILTER (WHERE name = 'guide_audio') AS voice
+       FROM "TourEvent" WHERE "tourSlug" = $1 AND "createdAt" >= $2 AND "createdAt" < $3 AND name IN ('guide_stop_time', 'guide_audio') AND label IS NOT NULL AND (url IS NULL OR url = '#rundvisning')
+       GROUP BY label LIMIT 60`,
       slug,
       since,
       until
@@ -209,6 +229,7 @@ export async function tourStats(slug: string, range: number | StatsRange = 30): 
       leftAt: guideLeftAt.map((r) => ({ stop: Number(r.stop), count: Number(r.count) })),
       leftFor: guideLeftFor,
       byGuide: byGuide.length > 1 ? byGuide.map((r) => ({ guide: r.guide, started: Number(r.started), completed: Number(r.completed) })) : undefined,
+      stops: guideStopRows.length ? guideStopRows.map((r) => ({ title: r.title, seen: Number(r.seen), medianSeconds: Math.round(Number(r.median ?? 0)), voice: Number(r.voice) })) : undefined,
     },
   };
 }

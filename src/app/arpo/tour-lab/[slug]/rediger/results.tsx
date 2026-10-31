@@ -308,6 +308,41 @@ function OurNumbers({ slug, initial, guideStops, guideNames }: { slug: string; i
                 </ul>
               </>
             )}
+            {stats.guide.stops && (
+              <>
+                <div className="text-[12px] font-semibold text-[#6e6e73]">Hvert stop{stats.guide.byGuide ? ` i "${guideNames["#rundvisning"] ?? "Vis mig rundt"}"` : ""}</div>
+                <table className="w-full text-[13px]">
+                  <thead>
+                    <tr className="text-left text-[11px] text-[#8e8e93]">
+                      <th className="py-1 font-medium">Stop</th>
+                      <th className="py-1 text-right font-medium">Set af</th>
+                      <th className="py-1 text-right font-medium">Tid (typisk)</th>
+                      <th className="py-1 text-right font-medium">Lyd afspillet</th>
+                      <th className="py-1 text-right font-medium">Forlod her</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-black/[.05]">
+                    {/* In the guide's order; stops that aren't in it any more (renamed, removed) last. */}
+                    {[...stats.guide.stops]
+                      .sort((a, b) => (guideStops.indexOf(a.title) + 1 || 999) - (guideStops.indexOf(b.title) + 1 || 999))
+                      .map((s) => {
+                        const n = guideStops.indexOf(s.title) + 1;
+                        const left = n ? (stats.guide.leftAt.find((l) => l.stop === n)?.count ?? 0) : null;
+                        return (
+                          <tr key={s.title}>
+                            <td className="max-w-[180px] truncate py-1.5">{n ? `${n}. ` : ""}{s.title}</td>
+                            <td className="py-1.5 text-right tabular-nums">{s.seen}</td>
+                            <td className="py-1.5 text-right tabular-nums">{s.medianSeconds >= 60 ? `${Math.floor(s.medianSeconds / 60)} min ${s.medianSeconds % 60} s` : `${s.medianSeconds} s`}</td>
+                            <td className="py-1.5 text-right tabular-nums">{s.voice ? `${s.voice} gange` : "-"}</td>
+                            <td className="py-1.5 text-right tabular-nums">{left ?? "-"}</td>
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
+                <p className="text-[11px] text-[#8e8e93]">Tid: hvor længe de typisk blev ved stoppet (medianen). Lyd: hvor mange gange stoppets stemme blev spillet (også igen med ↺). Måles fra nu af.</p>
+              </>
+            )}
             <div className="text-[12px] font-semibold text-[#6e6e73]">Hvor de forlod {stats.guide.byGuide ? `"${guideNames["#rundvisning"] ?? "Vis mig rundt"}"` : "den"}</div>
             <Ranked
               rows={stats.guide.leftAt.map((r) => ({ label: `Stop ${r.stop}${guideStops[r.stop - 1] ? ` · ${guideStops[r.stop - 1]}` : ""}`, count: r.count })).sort((a, b) => b.count - a.count)}
