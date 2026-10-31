@@ -63,6 +63,12 @@ export async function getUnreadNewsCount(userId: string, newsReadAt: Date | null
 const DEFAULT_POSTS: { title: string; body: string; minutesAgo: number; screenshotUrl: string }[] = [
   {
     minutesAgo: 0,
+    title: "\"Det kan jeres tour\" - når kunden åbner gennemgangen første gang",
+    body: "Når kunden åbner linket til gennemgang første gang, viser touren nu, hvad den kan: et kort pr. smart funktion, der faktisk er i netop deres tour - luftfotoet med punkter, \"Vis mig rundt\" (hver rundvisning), historier, Find vej, live data, stedkort, \"Hvor langt har du til os?\", en dag på stedet, søgning og sprog. Hvert kort har en lille animation af, hvordan funktionen ser ud, og en knap \"Prøv det\", der starter den direkte i touren.\n\nKortene er i tourens egne farver og på tourens sprog. Krydser kunden \"Vis ikke igen\" af, kommer de ikke igen på den computer eller telefon. Det er kun på gennemgangslinket - besøgende på den udgivne tour ser dem ikke.",
+    screenshotUrl: "/news/det-kan-jeres-tour.png",
+  },
+  {
+    minutesAgo: 0,
     title: "Tours på mobil - også på tværs - og \"Tjek touren\" før gennemgang",
     body: "Touren er gjort bedre til mobil: stedkortene er mindre og skalerer med telefonen (en lille iPhone får et mindre kort end en Pro Max), og under Stedkort kan I vælge Lille, Mellem eller Stor. Holdes telefonen på tværs, bliver alt oven på touren mindre (velkomst, menu, guidekort, knapper), så man kan se touren - før fik man computerens store udgave på en lav skærm. \"Find vej\" ligger ikke længere oven i \"Tilbage til luften\" inde i touren.\n\nUnder Gennemgang tjekker \"Tjek og send til gennemgang\" touren først: er den hurtig (360°-billedernes mindre kopier, store billeder), findes alle steder i scanningen, virker linkene, finder live data noget, er oversættelserne færdige - og nextviewAI kommer med et par punkter, en besøgende ville støde på. Derefter sender I, eller retter først.\n\nOgså: live data viser æ, ø og å rigtigt (\"Søndag\" i stedet for \"S&oslash;ndag\"), og bliver en side i pop-up'en ved med at spørge om cookies (iPhone gemmer ikke valget i en ramme), tilbyder touren at åbne den i en ny fane.",
     screenshotUrl: "/news/mobil-og-tjek.png",

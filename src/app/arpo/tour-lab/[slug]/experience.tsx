@@ -14,6 +14,7 @@ import { connectSdk, showcaseUrl, uLinkTarget, type CameraPose, type MpSdk, type
 import type { AvailableUnit } from "@/lib/availability/boxdepotet";
 import { WeatherChip, WEATHER_CSS } from "./weather";
 import { CommuteSheet, COMMUTE_CSS } from "./commute";
+import { FeatureTour, featuresSeen, FEATURES_CSS } from "./features";
 import { FinderSheet, FINDER_CSS, WalkLines } from "./finder";
 import { apiUrl, isStaticTour } from "../tours/api";
 import type { DroneView, GuideTurn, MenuEntry, TourConfig, TourPlace, TourPoint, WelcomeGo } from "../tours/types";
@@ -537,6 +538,14 @@ function TourExperience({
   /** The other ones stop when one starts (stories, Vis mig rundt, Find vej) - kept current for the listeners below. */
   const closeRouteRef = useRef<() => void>(() => {});
   const closeGuideRef = useRef<(completed: boolean) => void>(() => {});
+  /** On the review link, the first time: "Det kan jeres tour" - the tour's smart features, each with a little animation. */
+  const [featuresOpen, setFeaturesOpen] = useState(false);
+  useEffect(() => {
+    if (!review) return;
+    const t = window.setTimeout(() => !featuresSeen(T.slug) && setFeaturesOpen(true), 900);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, when the review link opens
+  }, []);
   /** "Vej til skolen" is open - from any link "#vej". */
   const [commuteOpen, setCommuteOpen] = useState(false);
   useEffect(() => {
@@ -2135,7 +2144,7 @@ function TourExperience({
       }>
       <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.font.replace(/ /g, "+")}:wght@400;600;700;800;900&display=swap`} />
       {T.fontHeading && <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.fontHeading.replace(/ /g, "+")}:wght@500;600&display=swap`} />}
-      <style>{CSS + CONTACT_CSS + STORIES_CSS + LIGHTBOX_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + ONBOARDING_CSS + INFO_CSS + MAP_CSS + ROUTE_CSS + MEASURES_CSS + CARDS_CSS + DAY_CSS + SIMPLE_CSS + BENTO_CSS + LOGO_RIGHT_CSS + LANG_CSS + WEATHER_CSS + COMMUTE_CSS + FINDER_CSS + (review ? FEEDBACK_CSS : "")}</style>
+      <style>{CSS + CONTACT_CSS + STORIES_CSS + LIGHTBOX_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + ONBOARDING_CSS + INFO_CSS + MAP_CSS + ROUTE_CSS + MEASURES_CSS + CARDS_CSS + DAY_CSS + SIMPLE_CSS + BENTO_CSS + LOGO_RIGHT_CSS + LANG_CSS + WEATHER_CSS + COMMUTE_CSS + FEATURES_CSS + FINDER_CSS + (review ? FEEDBACK_CSS : "")}</style>
       {/* The tour's own design on top (written by Claude or by hand under Avanceret). */}
       {T.customCss && <style>{T.customCss.replace(/<\/?style/gi, "")}</style>}
 
@@ -2865,6 +2874,7 @@ function TourExperience({
           🚌 {T.commute.title || tx("Hvor langt har du til os?")}
         </button>
       )}
+      {featuresOpen && <FeatureTour T={T} onClose={() => setFeaturesOpen(false)} onEvent={(name, params) => track(name, params ?? {})} />}
       {commuteOpen && T.commute && <CommuteSheet T={T} onClose={() => setCommuteOpen(false)} onEvent={(name, params) => track(name, params ?? {})} />}
       {contactOpen && T.contactForm && (
         <ContactForm T={T} preview={inPreview} onClose={() => setContactOpen(false)} onSent={() => track("contact_form", { place: "form" })} />
