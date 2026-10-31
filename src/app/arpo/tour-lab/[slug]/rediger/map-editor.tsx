@@ -516,7 +516,7 @@ function MapCanvas({ config, edit, onClose, startWith }: { config: TourConfig; e
                     )}
                     {M[k] && (
                       <Field title={`Zoom ${k === "start" ? "computer" : "mobil"}: ${M[k]!.zoom.toFixed(2)}×`}>
-                        <input type="range" min={0.7} max={3} step={0.05} className="w-full accent-[#0071e3]" value={M[k]!.zoom} onChange={(e) => edit((d) => void (d.map![k] = { ...d.map![k]!, zoom: Number(e.target.value) }))} />
+                        <input type="range" min={0.5} max={3} step={0.05} className="w-full accent-[#0071e3]" value={M[k]!.zoom} onChange={(e) => edit((d) => void (d.map![k] = { ...d.map![k]!, zoom: Number(e.target.value) }))} />
                       </Field>
                     )}
                   </div>
@@ -632,7 +632,7 @@ function Pano360({
         ...toDir(s.x, s.y),
         hfov: panoHfov(phone, s.zoom),
         minHfov: 25,
-        maxHfov: 120,
+        maxHfov: 150,
         hotSpots: [], // addHotSpot needs the list to be there
       }) as unknown as PanoViewer;
       v.on("error", () => setError("360°-billedet kunne ikke vises - prøv Fladt."));
@@ -1347,7 +1347,7 @@ function DroneLookEditor({ config, edit, panorama }: { config: TourConfig; edit:
           {slider("down", "Kig ned højst", -90, 0, (v) => (v <= -90 ? "lige ned" : `${-v}° ned`), "Hold den over jorden, hvis billedet er grimt lige under dronen.")}
           {slider("up", "Kig op højst", 0, 90, (v) => (v >= 90 ? "lige op" : `${v}° op`), "Fx lidt over horisonten, så man ikke kigger op i den tomme himmel.")}
           {slider("zoomIn", "Zoom ind højst", 15, 90, (v) => `${v}°`, "Lille tal = man kan komme tættere på.")}
-          {slider("zoomOut", "Zoom ud højst", 60, 120, (v) => `${v}°`, "Stort tal = man kan se mere af gangen.")}
+          {slider("zoomOut", "Zoom ud højst", 60, 150, (v) => `${v}°`, "Stort tal = man kan se mere af gangen.")}
         </>
       }
     >

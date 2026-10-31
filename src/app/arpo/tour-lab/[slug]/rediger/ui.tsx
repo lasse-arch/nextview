@@ -423,7 +423,7 @@ export function PanoZoom({
           <span className="w-16 flex-none">{k === "desktop" ? "Computer" : "Mobil"}</span>
           <input
             type="range"
-            min={0.7}
+            min={0.5}
             max={2.5}
             step={0.05}
             className="w-full accent-[#0071e3]"
@@ -487,7 +487,7 @@ function ZoomPeek({ src, yaw, pitch, hfov, phone }: { src: string; yaw: number; 
         mouseZoom: false,
         draggable: false,
         minHfov: 20,
-        maxHfov: 130,
+        maxHfov: 150,
         hfov: v.hfov,
         yaw: v.yaw,
         pitch: v.pitch,

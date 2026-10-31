@@ -92,7 +92,8 @@ export function formatPhone(phone: string): string {
 /** A 360° picture's view width (degrees) per device at zoom 1: a computer a little zoomed out, a phone a little zoomed in. */
 export const PANO_HFOV = { desktop: 110, mobile: 80 } as const;
 /** The view width for a zoom (1 = the device's normal; over 1 is closer). */
-export const panoHfov = (phone: boolean, zoom = 1) => Math.max(30, Math.min(120, (phone ? PANO_HFOV.mobile : PANO_HFOV.desktop) / (zoom || 1)));
+/** Zoomed far out (down to 0.5×), a picture may show up to 150° across - more on a narrow phone, where 120° is still little of it. */
+export const panoHfov = (phone: boolean, zoom = 1) => Math.max(30, Math.min(150, (phone ? PANO_HFOV.mobile : PANO_HFOV.desktop) / (zoom || 1)));
 
 /**
  * What the guide's stop button does: its own setting - else back to the
