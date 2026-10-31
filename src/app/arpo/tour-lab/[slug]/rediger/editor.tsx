@@ -1178,81 +1178,75 @@ export function TourEditor({
                   </Field>
                 )}
                 </Group>
-                <Group title="Kontaktformular i touren">
-                  <Toggle
-                    on={Boolean(config.contactForm)}
-                    onChange={(on) => edit((d) => void (d.contactForm = on ? { to: "" } : undefined))}
-                    title='"Skriv til os" inde i touren'
-                    hint="Gæsten skriver navn, e-mail, telefon og besked i touren og trykker Send. Vi sender den fra kontaktformular@nextview360.dk til kunden, med gæstens e-mail som svar-adresse - kunden trykker bare Svar. Beskeden gemmes ikke hos os. Linket #kontakt åbner formularen fra menuen og knapper."
-                  />
-                  {config.contactForm && (
-                    <>
-                      <Field title="Beskederne sendes til" hint={config.contact?.email ? `Tom: kontakt-mailen ovenfor (${config.contact.email}). Skriv kun her, hvis formularen skal til en anden.` : "Kundens e-mail."}>
-                        <input type="email" className={input} placeholder={config.contact?.email || "Fx info@kunde.dk"} value={config.contactForm.to} onChange={(e) => edit((d) => void (d.contactForm = { ...d.contactForm!, to: e.target.value.trim() }))} />
-                      </Field>
-                      <Field title="Overskrift">
-                        <input className={input} placeholder="Skriv til os" value={config.contactForm.title ?? ""} onChange={(e) => edit((d) => void (d.contactForm = { ...d.contactForm!, title: e.target.value || undefined }))} />
-                      </Field>
-                      <Field title="Kort tekst (valgfri)">
-                        <input className={input} placeholder="Fx Vi svarer inden for en dag." value={config.contactForm.lead ?? ""} onChange={(e) => edit((d) => void (d.contactForm = { ...d.contactForm!, lead: e.target.value || undefined }))} />
-                      </Field>
-                      <Toggle on={config.contactForm.phone !== false} onChange={(on) => edit((d) => void (d.contactForm = { ...d.contactForm!, phone: on ? undefined : false }))} title="Felt til telefonnummer" />
-                      {(() => {
-                        // The main button(s) that already open the form - then one button may be enough.
-                        const mains = config.cta.map((c, i) => ({ c, i })).filter(({ c }) => c.href === "#kontakt");
-                        const two = config.contactForm.inBox ?? !mains.length;
-                        return (
-                          <>
-                            <Field
-                              title="Knapper til formularen"
-                              hint={
-                                mains.length
-                                  ? two
-                                    ? "To knapper: hovedknappen og en knap i kontaktboksen - giv dem forskellig tekst."
-                                    : "Én knap: hovedknappen åbner formularen, så kontaktboksen viser kun telefon og e-mail."
-                                  : two
-                                    ? "Knappen står i kontaktboksen."
-                                    : "Ingen knap i kontaktboksen - formularen åbnes fra menuen eller en knap med #kontakt."
-                              }
-                            >
-                              <Choice<"one" | "two">
-                                value={two ? "two" : "one"}
-                                options={
-                                  mains.length
-                                    ? [
-                                        ["one", "Én (hovedknappen)"],
-                                        ["two", "To (også i kontaktboksen)"],
-                                      ]
-                                    : [
-                                        ["two", "I kontaktboksen"],
-                                        ["one", "Ikke i kontaktboksen"],
-                                      ]
-                                }
-                                onChange={(v) => edit((d) => void (d.contactForm = { ...d.contactForm!, inBox: (v === "two") === !mains.length ? undefined : v === "two" }))}
-                              />
+                {(() => {
+                  // One e-mail (the contact e-mail above - a different one only behind ⚙) and one place to choose where "Skriv til os" is.
+                  const form = config.contactForm;
+                  const mains = config.cta.map((c, i) => ({ c, i })).filter(({ c }) => c.href === "#kontakt");
+                  const inBox = form ? (form.inBox ?? !mains.length) : false;
+                  const inMenu = config.menu.some((m) => ("items" in m ? m.items.some((i) => i[1] === "#kontakt") : m.href === "#kontakt"));
+                  const ownTo = Boolean(form?.to && form.to !== config.contact?.email);
+                  const toField = form && (
+                    <Field title="Send beskederne til en anden e-mail" hint={config.contact?.email ? `Tom: kontakt-mailen (${config.contact.email}).` : "Kunden har ingen kontakt-e-mail ovenfor - skriv den her eller dér."}>
+                      <input type="email" className={input} placeholder={config.contact?.email || "Fx info@kunde.dk"} value={form.to} onChange={(e) => edit((d) => void (d.contactForm = { ...d.contactForm!, to: e.target.value.trim() }))} />
+                    </Field>
+                  );
+                  return (
+                    <Group title="Kontaktformular i touren" more={form && config.contact?.email && !ownTo ? toField : undefined}>
+                      <Toggle
+                        on={Boolean(form)}
+                        onChange={(on) => edit((d) => void (d.contactForm = on ? { to: "" } : undefined))}
+                        title='"Skriv til os" inde i touren'
+                        hint={`Gæsten skriver navn, e-mail, telefon og besked i touren og trykker Send. Vi sender den fra kontaktformular@nextview360.dk til ${config.contact?.email || "kundens kontakt-mail"}, med gæstens e-mail som svar-adresse - kunden trykker bare Svar. Beskeden gemmes ikke hos os.`}
+                      />
+                      {form && (
+                        <>
+                          {(!config.contact?.email || ownTo) && toField}
+                          <Field title="Overskrift">
+                            <input className={input} placeholder="Skriv til os" value={form.title ?? ""} onChange={(e) => edit((d) => void (d.contactForm = { ...d.contactForm!, title: e.target.value || undefined }))} />
+                          </Field>
+                          <Field title="Kort tekst (valgfri)">
+                            <input className={input} placeholder="Fx Vi svarer inden for en dag." value={form.lead ?? ""} onChange={(e) => edit((d) => void (d.contactForm = { ...d.contactForm!, lead: e.target.value || undefined }))} />
+                          </Field>
+                          <Toggle on={form.phone !== false} onChange={(on) => edit((d) => void (d.contactForm = { ...d.contactForm!, phone: on ? undefined : false }))} title="Felt til telefonnummer" />
+                          <Field
+                            title='Hvor "Skriv til os" vises'
+                            hint={mains.length ? `Hovedknappen "${mains[0].c.label}" åbner også formularen (sættes under Knapper). Vælg kontaktboksen med, og giv knapperne forskellig tekst.` : "Eller giv en knap linket #kontakt under Knapper."}
+                          >
+                            <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+                              <label className="flex items-center gap-1.5 text-sm">
+                                <input type="checkbox" checked={inBox} onChange={(e) => edit((d) => void (d.contactForm = { ...d.contactForm!, inBox: e.target.checked === !mains.length ? undefined : e.target.checked }))} />I kontaktboksen
+                              </label>
+                              <label className="flex items-center gap-1.5 text-sm">
+                                <input
+                                  type="checkbox"
+                                  checked={inMenu}
+                                  onChange={(e) =>
+                                    edit((d) => {
+                                      if (e.target.checked) d.menu.push({ title: d.contactForm?.title || "Skriv til os", href: "#kontakt" });
+                                      else d.menu = d.menu.filter((m) => "items" in m || m.href !== "#kontakt").map((m) => ("items" in m ? { ...m, items: m.items.filter((i) => i[1] !== "#kontakt") } : m));
+                                    })
+                                  }
+                                />
+                                I menuen
+                              </label>
+                            </div>
+                          </Field>
+                          {mains.map(({ c, i }) => (
+                            <Field key={i} title="Tekst på hovedknappen">
+                              <input className={input} value={c.label} onChange={(e) => edit((d) => void (d.cta = d.cta.map((x, j) => (j === i ? { ...x, label: e.target.value } : x))))} />
                             </Field>
-                            {mains.map(({ c, i }) => (
-                              <Field key={i} title="Tekst på hovedknappen" hint="Den store knap under menuen - den åbner formularen.">
-                                <input className={input} value={c.label} onChange={(e) => edit((d) => void (d.cta = d.cta.map((x, j) => (j === i ? { ...x, label: e.target.value } : x))))} />
-                              </Field>
-                            ))}
-                            {two && (
-                              <Field title="Tekst på knappen i kontaktboksen" hint="Tom: formularens overskrift - eller &quot;Skriv til os&quot;, hvis hovedknappen siger det samme.">
-                                <input className={input} placeholder="Skriv til os" value={config.contactForm.boxLabel ?? ""} onChange={(e) => edit((d) => void (d.contactForm = { ...d.contactForm!, boxLabel: e.target.value || undefined }))} />
-                              </Field>
-                            )}
-                          </>
-                        );
-                      })()}
-                      {!config.menu.some((m) => ("items" in m ? m.items.some((i) => i[1] === "#kontakt") : m.href === "#kontakt")) && (
-                        <button type="button" onClick={() => edit((d) => void d.menu.push({ title: d.contactForm?.title || "Skriv til os", href: "#kontakt" }))} className="w-full rounded-xl bg-white py-2 text-[14px] font-medium text-[#0071e3] ring-1 ring-black/[.06] hover:bg-[#0071e3]/5">
-                          + Læg &quot;Skriv til os&quot; i menuen
-                        </button>
+                          ))}
+                          {inBox && (
+                            <Field title="Tekst på knappen i kontaktboksen" hint="Tom: formularens overskrift - eller &quot;Skriv til os&quot;, hvis hovedknappen siger det samme.">
+                              <input className={input} placeholder="Skriv til os" value={form.boxLabel ?? ""} onChange={(e) => edit((d) => void (d.contactForm = { ...d.contactForm!, boxLabel: e.target.value || undefined }))} />
+                            </Field>
+                          )}
+                          <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">I forhåndsvisningen kan formularen prøves, men intet sendes.</p>
+                        </>
                       )}
-                      <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">I forhåndsvisningen kan formularen prøves, men intet sendes.</p>
-                    </>
-                  )}
-                </Group>
+                    </Group>
+                  );
+                })()}
               </>
             )}
 
