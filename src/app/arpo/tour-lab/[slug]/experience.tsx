@@ -1064,10 +1064,24 @@ function TourExperience({
             for (let y = 0; y < 2 ** (level - 1); y++) for (let x = 0; x < 2 ** (level - 1); x++) prefetchPano(`${T.panos.basePath}/${p.pano}/${level}/${face}${y}_${x}.jpg`);
     }
   };
-  // The first stops' pictures come in quietly, before "Vis mig rundt" is even pressed (on the drone scene or in the tour).
+  /*
+   * The first stops' pictures come in quietly, before "Vis mig rundt" is even
+   * pressed - but only once Matterport is ready and the device has a moment to
+   * spare (fetched at the start, they competed with Matterport for a phone's
+   * connection and made the tour slow to load), and not at all on a slow or
+   * data-saving connection (there they come when the guide gets to them).
+   */
   useEffect(() => {
     if (!GUIDE.length) return;
-    const t = setTimeout(() => prefetchGuidePanos(0), 2500);
+    const net = (navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }).connection;
+    if (net?.saveData || /2g/.test(net?.effectiveType ?? "")) return;
+    let t: ReturnType<typeof setTimeout>;
+    const idle = (fn: () => void) => ("requestIdleCallback" in window ? window.requestIdleCallback(fn, { timeout: 4000 }) : setTimeout(fn, 500));
+    const wait = () => {
+      if (!tourReady()) return void (t = setTimeout(wait, 1000));
+      t = setTimeout(() => idle(() => prefetchGuidePanos(0)), 3000);
+    };
+    wait();
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once per arrival on the drone scene / in the tour
   }, [phase, GUIDE]);
