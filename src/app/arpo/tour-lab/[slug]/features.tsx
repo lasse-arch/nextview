@@ -13,7 +13,7 @@ import type { TourConfig } from "../tours/types";
  * away on this device.
  */
 
-type Feature = { key: string; title: string; text: string; scene: React.ReactNode; action?: () => void; actionLabel?: string };
+type Feature = { key: string; title: string; text: string; why?: string; scene: React.ReactNode; action?: () => void; actionLabel?: string; kicker?: string };
 
 const fire = (name: string, detail?: unknown) => window.dispatchEvent(detail === undefined ? new Event(name) : new CustomEvent(name, { detail }));
 const seenKey = (slug: string) => `hv-features-seen:${slug}`;
@@ -190,7 +190,43 @@ function featuresOf(T: TourConfig, tr: (s: string, v?: Record<string, string | n
         </div>
       ),
     });
+  // Why each one is there - what it does for them, not just what it is.
+  for (const f of out) f.why = whyOf(f.key, tr);
+  if (!out.length) return out;
+  // First: what we've made for them, and that everything in it is there for a reason.
+  out.unshift({
+    key: "intro",
+    kicker: tr("Første udkast til jer"),
+    title: tr("Det har vi bygget til {navn}", { navn: T.brand || T.title }),
+    text: tr("Touren er mere end billeder. Hver funktion er med for at hjælpe jeres gæster et skridt videre: at forstå stedet, få lyst og tage kontakt. Her er, hvad den kan - og hvorfor vi har taget det med."),
+    scene: (
+      <div className="ft-scene ft-intro">
+        {out.slice(0, 6).map((f, i) => (
+          <span key={f.key} style={{ animationDelay: `${0.15 + i * 0.12}s` }}>
+            {f.title}
+          </span>
+        ))}
+      </div>
+    ),
+  });
   return out;
+}
+
+/** "Derfor er det med" - the reason behind each feature, in the customer's terms. */
+function whyOf(key: string, tr: (s: string, v?: Record<string, string | number>) => string): string | undefined {
+  if (key.startsWith("guide-")) return tr("Mange klikker ikke selv rundt. Rundvisningen tager dem i hånden og viser det vigtigste i den rigtige rækkefølge - så de ser det, I er stolte af.");
+  const why: Record<string, string> = {
+    luften: tr("Gæster vil først forstå, hvor alt ligger. Overblikket fra luften giver dem det på få sekunder - og gør det let at vælge, hvor de vil hen."),
+    stories: tr("Det korte format, folk kender fra Instagram: hurtigt at se, og de bliver hængende længere i jeres tour."),
+    findvej: tr("På et stort sted er det let at fare vild i en 360°-tour. Find vej fører dem direkte hen til det, de leder efter - så de ikke giver op."),
+    live: tr("Når gæsterne kan se, hvad der er ledigt lige nu, er der kortere vej fra at kigge til at booke."),
+    cards: tr("Billeder fortæller ikke alt. Kortet giver de vigtigste fakta lige dér, hvor man står - og en vej videre til at booke eller spørge."),
+    vej: tr("Afstanden afgør tit, om man vælger jer. Her ser de selv, hvor tæt på de er - uden at skulle spørge."),
+    dag: tr("Det gør det nemt at forestille sig selv hos jer - og det er dét, der får folk til at tage næste skridt."),
+    finder: tr("I stedet for at lede selv får gæsten et svar, der passer til dem - færre spørgsmål til jer og hurtigere beslutninger."),
+    sprog: tr("Gæster fra udlandet får touren på deres eget sprog - så I når flere uden ekstra arbejde."),
+  };
+  return why[key];
 }
 
 export function FeatureTour({ T, onClose, onEvent }: { T: TourConfig; onClose: () => void; onEvent: (name: string, params?: Record<string, string | number>) => void }) {
@@ -217,12 +253,24 @@ export function FeatureTour({ T, onClose, onEvent }: { T: TourConfig; onClose: (
           ×
         </button>
         <p className="ft-kick">
-          {tr("Det kan jeres tour")} · {at + 1} / {all.length}
+          {f.kicker ?? tr("Det kan jeres tour")} · {at + 1} / {all.length}
         </p>
         <div key={f.key} className="ft-slide">
           {f.scene}
           <h2>{f.title}</h2>
           <p>{f.text}</p>
+          {f.why && (
+            <div className="ft-hvorfor">
+              <svg viewBox="0 0 24 24" aria-hidden>
+                <path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2V16h5v-.1c0-.8.4-1.5 1-2A6 6 0 0 0 12 3Z" />
+              </svg>
+              <span>
+                <b>{tr("Derfor er det med")}</b>
+                {f.why}
+              </span>
+            </div>
+          )}
+          {at === all.length - 1 && <p className="ft-sidst">{tr("Er der noget, I vil have ændret? Tryk \"Giv feedback\" i touren, og skriv det dér, hvor I står.")}</p>}
         </div>
         <div className="ft-dots" aria-hidden>
           {all.map((x, i) => (
@@ -277,6 +325,13 @@ export const FEATURES_CSS = `
 .ft-knapper button{flex:1;border:0;border-radius:999px;padding:12px 14px;font:inherit;font-weight:800;font-size:15px;cursor:pointer}
 .ft-prov{background:var(--c-accent);color:#fff}
 .ft-naeste{background:#eef1f2;color:#1d2a30}
+.ft-hvorfor{display:flex;gap:11px;align-items:flex-start;margin:14px 2px 0;padding:12px 14px;border-radius:16px;background:color-mix(in srgb,var(--c-accent) 9%,#fff);border:1px solid color-mix(in srgb,var(--c-accent) 22%,transparent);font-size:14px;line-height:1.45;color:#2b383e}
+.ft-hvorfor svg{flex:none;width:22px;height:22px;margin-top:1px;fill:none;stroke:var(--c-accent);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.ft-hvorfor b{display:block;margin-bottom:2px;font-size:11.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--c-accent)}
+.ft-sidst{margin-top:12px!important;font-size:13.5px!important;color:#6b7a80!important}
+.ft-intro{display:flex;flex-wrap:wrap;align-content:center;justify-content:center;gap:7px;padding:14px;background:linear-gradient(135deg,var(--c-main),color-mix(in srgb,var(--c-main) 60%,var(--c-accent)))!important}
+.ft-intro span{padding:6px 11px;border-radius:999px;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis;background:rgba(255,255,255,.95);color:var(--c-main);font-size:12.5px;font-weight:800;box-shadow:0 4px 14px rgba(0,0,0,.15);opacity:0;animation:ftChip .45s cubic-bezier(.2,.8,.3,1.3) forwards}
+@keyframes ftChip{from{opacity:0;transform:translateY(8px) scale(.9)}to{opacity:1;transform:none}}
 .ft-aldrig{display:flex;align-items:center;justify-content:center;gap:7px;margin-top:12px;font-size:13px;color:#6b7a80;cursor:pointer}
 .ft-aldrig input{accent-color:var(--c-accent)}
 /* The little scenes - drawn in the tour's own colours. */
@@ -320,6 +375,6 @@ export const FEATURES_CSS = `
 .ft-dag{display:flex;flex-direction:column;justify-content:center;gap:7px;padding:14px 18px}
 .ft-dag span{background:#fff;border-radius:10px;padding:7px 11px;font-size:13px;color:#1d2a30;animation:ftUp 3s ease-in-out infinite both}
 .ft-dag b{color:var(--c-accent);margin-right:6px}
-@media (prefers-reduced-motion:reduce){.ft-scene *{animation:none!important}}
+@media (prefers-reduced-motion:reduce){.ft-scene *{animation:none!important}.ft-intro span{opacity:1}}
 @media (max-height:500px) and (min-width:500px){.ft-ark{zoom:var(--ui-zoom,.72)}}
 `;
