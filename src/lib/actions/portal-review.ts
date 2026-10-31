@@ -5,6 +5,7 @@ import { getCurrentCustomer, getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { approveTour } from "@/lib/tour-review";
 import { revalidatePath } from "next/cache";
+import { can } from "@/lib/customer-roles";
 
 /*
  * "Rettelser" on the customer's page: their tour in review mode (/p/<token>),
@@ -15,7 +16,7 @@ import { revalidatePath } from "next/cache";
 export async function portalReview(slug: string): Promise<{ ok: true; token: string } | { ok: false; error: string }> {
   const tour = await prisma.tour.findUnique({ where: { slug }, select: { dealId: true, reviewToken: true, published: true, reviewSentAt: true } });
   const customer = await getCurrentCustomer();
-  const allowed = customer ? Boolean(tour?.dealId && customer.deals.some((d) => d.dealId === tour.dealId)) : (await getCurrentUser())?.role === "ADMIN";
+  const allowed = customer ? can(customer, tour?.dealId, "review") : (await getCurrentUser())?.role === "ADMIN";
   // A tour sent to them for review is theirs to see before it's published.
   if (!tour || !allowed || !(tour.published || tour.reviewSentAt)) return { ok: false, error: "Touren findes ikke." };
   if (tour.reviewToken) return { ok: true, token: tour.reviewToken };
@@ -34,6 +35,7 @@ export async function portalApprove(slug: string): Promise<{ ok: true } | { ok: 
   if (!customer) return { ok: false, error: "Kun kunden selv kan godkende her - godkend i tour-editoren i stedet." };
   const tour = await prisma.tour.findUnique({ where: { slug }, select: { dealId: true, published: true, reviewSentAt: true } });
   if (!tour?.dealId || !customer.deals.some((d) => d.dealId === tour.dealId) || !(tour.published || tour.reviewSentAt)) return { ok: false, error: "Touren findes ikke." };
+  if (!can(customer, tour.dealId, "approve")) return { ok: false, error: "Din rolle kan ikke godkende touren - spørg en ejer hos jer." };
   await approveTour(slug, { name: customer.name ?? customer.email, customer: true });
   revalidatePath("/kunde");
   return { ok: true };

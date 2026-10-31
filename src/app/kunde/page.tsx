@@ -22,6 +22,9 @@ import { SitePlacement } from "./site-placement";
 import { tourEmbeds } from "@/lib/tour-embeds";
 import { EMBED_WORDS, TourEmbedList } from "@/components/tour-embed-list";
 import { TEXT, type Lang } from "./text";
+import { roleCan, type CustomerPerm, type DealAccess } from "@/lib/customer-roles";
+import { PortalUsers } from "./portal-users";
+import { portalUsers } from "@/lib/portal-users";
 
 /*
  * The customer's own page, nextview360.dk/kunde - after logging in with the
@@ -38,7 +41,7 @@ import { TEXT, type Lang } from "./text";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Jeres side - Nextview360", robots: { index: false, follow: false } };
 
-const PAGES = ["hjem", "tal", "hjemmeside", "tips", "rettelser", "kontrakt", "hjaelp"] as const;
+const PAGES = ["hjem", "tal", "hjemmeside", "tips", "rettelser", "kontrakt", "brugere", "hjaelp"] as const;
 type Page = (typeof PAGES)[number];
 
 /**
@@ -46,19 +49,21 @@ type Page = (typeof PAGES)[number];
  * kunde" from a deal in Arpo (?som=<dealId>): exactly what that customer
  * sees (the deal and its locations, as access is given), with a bar saying so.
  */
-async function viewer(som: string | undefined): Promise<{ dealIds: string[]; name: string | null; preview: { dealId: string } | null } | null> {
+async function viewer(som: string | undefined): Promise<{ dealIds: string[]; access: DealAccess[]; name: string | null; accountId: string | null; preview: { dealId: string } | null } | null> {
   const account = await getCurrentCustomer();
   if (account) {
     // "Sidst set" in Arpo's customer overview - at most one write every 10 minutes.
     if (!account.lastSeenAt || Date.now() - account.lastSeenAt.getTime() > 10 * 60_000) await prisma.customerAccount.update({ where: { id: account.id }, data: { lastSeenAt: new Date() } }).catch(() => {});
-    return { dealIds: account.deals.map((d) => d.dealId), name: account.name, preview: null };
+    return { dealIds: account.deals.map((d) => d.dealId), access: account.deals, name: account.name, accountId: account.id, preview: null };
   }
   const user = await getCurrentUser();
   if (!user) redirect("/api/auth/session-ended");
   if (user.role !== "ADMIN" || !som) redirect("/arpo");
   const deal = await prisma.deal.findUnique({ where: { id: som }, select: { id: true, contactName: true, branches: { select: { id: true } }, customerAccounts: { take: 1, orderBy: { createdAt: "asc" }, select: { account: { select: { name: true } } } } } });
   if (!deal) redirect("/arpo");
-  return { dealIds: [deal.id, ...deal.branches.map((b) => b.id)], name: deal.customerAccounts[0]?.account.name ?? deal.contactName, preview: { dealId: deal.id } };
+  // As the customer's owner sees it (the team's own look at everything).
+  const dealIds = [deal.id, ...deal.branches.map((b) => b.id)];
+  return { dealIds, access: dealIds.map((dealId) => ({ dealId, role: "OWNER" as const, canApprove: true })), name: deal.customerAccounts[0]?.account.name ?? deal.contactName, accountId: null, preview: { dealId: deal.id } };
 }
 
 const fmtDate = (d: Date, lang: Lang) => d.toLocaleDateString(lang === "en" ? "en-GB" : "da-DK", { day: "numeric", month: "short", year: "numeric" });
@@ -103,7 +108,16 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
   // The locations, and which one is chosen (only ever one of their own).
   const many = deals.length > 1;
   const sted = many && deals.some((d) => d.id === sp.sted) ? sp.sted! : null;
-  const page: Page = (PAGES as readonly string[]).includes(sp.side ?? "") ? (sp.side as Page) : "hjem";
+  // What this login may do, per deal (src/lib/customer-roles.ts) - each page only shows the deals its role covers.
+  const accessOf = new Map(who.access.map((a) => [a.dealId, a]));
+  const canOn = (dealId: string, perm: CustomerPerm) => {
+    const a = accessOf.get(dealId);
+    return Boolean(a && roleCan(a, perm));
+  };
+  const PAGE_PERM: Partial<Record<Page, CustomerPerm>> = { tal: "stats", hjemmeside: "embed", tips: "embed", rettelser: "review", kontrakt: "contract", brugere: "users" };
+  const pageOk = (p: Page) => !PAGE_PERM[p] || deals.some((d) => canOn(d.id, PAGE_PERM[p]!));
+  const asked: Page = (PAGES as readonly string[]).includes(sp.side ?? "") ? (sp.side as Page) : "hjem";
+  const page: Page = pageOk(asked) ? asked : "hjem";
   const scope = sted ? deals.filter((d) => d.id === sted) : deals;
   const root = deals.find((d) => !d.parentDealId || !deals.some((x) => x.id === d.parentDealId)) ?? deals[0];
   const company = root ? dealName(root) : (who.name ?? "Nextview360");
@@ -121,22 +135,31 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
   const h = await headers();
   const origin = `${h.get("x-forwarded-proto") ?? "https"}://${h.get("host")}`;
   // Their tours: ours (with numbers), and older ones still on explore (a link only).
-  const reviewTours = scope.flatMap((d) =>
+  const allTours = scope.flatMap((d) =>
     d.tours.map((x) => ({ ...x, dealId: d.id, location: many ? dealName(d) : null, config: x.config as unknown as TourConfig, share: shareOf(x.share), url: tourUrl(x.slug, origin, x.liveVersion != null) }))
   );
-  const tours = reviewTours.filter((x) => x.published);
+  const reviewTours = allTours.filter((x) => canOn(x.dealId, "review"));
+  // Out: the ones they may see (numbers or the website codes), and those split by what they may do with them.
+  const tours = allTours.filter((x) => x.published && (canOn(x.dealId, "stats") || canOn(x.dealId, "embed")));
+  const statTours = tours.filter((x) => canOn(x.dealId, "stats"));
+  const embedTours = tours.filter((x) => canOn(x.dealId, "embed"));
   // Sent for review, not out yet: "not out yet" says where to look instead.
-  const notLive = reviewTours.some((x) => x.reviewSentAt && !x.published) ? t.review.waiting : t.notLive;
+  const notLive = allTours.some((x) => x.reviewSentAt && !x.published) ? t.review.waiting : t.notLive;
   const older = scope.flatMap((d) =>
     d.tours.length
       ? []
       : d.items
           .filter((i) => needsDeliveryLink(i.productType) && !/hjemmeside/i.test(i.productType))
-          .map((i) => ({ id: i.id, name: i.location ? `${dealName(d)} - ${i.location}` : dealName(d), url: /^https?:\/\//i.test(i.url!) ? i.url! : `https://${i.url}` }))
+          .map((i) => ({ id: i.id, dealId: d.id, name: i.location ? `${dealName(d)} - ${i.location}` : dealName(d), url: /^https?:\/\//i.test(i.url!) ? i.url! : `https://${i.url}` }))
   );
-  const needStats = page === "hjem" || page === "tal";
+  const statOlder = older.filter((x) => canOn(x.dealId, "stats"));
+  const embedOlder = older.filter((x) => canOn(x.dealId, "embed"));
+  const reviewOlder = older.filter((x) => canOn(x.dealId, "review"));
+  const seesOlder = older.filter((x) => canOn(x.dealId, "stats") || canOn(x.dealId, "embed"));
+  const seesStats = scope.some((d) => canOn(d.id, "stats"));
+  const needStats = seesStats && (page === "hjem" || page === "tal");
   // "Her er touren vist": the pages showing their tours (only their own tours - the list above is theirs).
-  const embeds = page === "hjemmeside" ? await tourEmbeds(tours.map((x) => x.slug)) : [];
+  const embeds = page === "hjemmeside" ? await tourEmbeds(embedTours.map((x) => x.slug)) : [];
   const feedback =
     page === "rettelser" && reviewTours.length
       ? await prisma.tourFeedback.findMany({ where: { tourSlug: { in: reviewTours.map((x) => x.slug) } }, orderBy: { createdAt: "desc" }, take: 100, select: { id: true, tourSlug: true, kind: true, text: true, room: true, author: true, status: true, createdAt: true } })
@@ -147,9 +170,10 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
   const period: Period = ownPeriod
     ? { preset: (["idag", "igaar", "7", "30", "uge", "maaned", "aar"].includes(sp.periode ?? "") ? sp.periode : "egen") as Period["preset"], from: sp.fra!, to: sp.til! }
     : { preset: "7", from: addDays(today, -6), to: today };
-  const stats: TourStats[] = needStats ? await Promise.all(tours.map((x) => tourStats(x.slug, { from: period.from, to: period.to }))) : [];
+  const stats: TourStats[] = needStats ? await Promise.all(statTours.map((x) => tourStats(x.slug, { from: period.from, to: period.to }))) : [];
   const together = needStats ? mergeStats(stats) : null;
-  const togetherShare = mergeShare(tours.map((x) => x.share));
+  const togetherShare = mergeShare(statTours.map((x) => x.share));
+  const users = page === "brugere" ? await portalUsers(deals.filter((d) => canOn(d.id, "users")).map((d) => d.id)) : null;
   const first = who.name?.split(" ")[0];
 
   const nav: [Page, string, React.ReactNode][] = [
@@ -159,8 +183,10 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
     ["tips", t.nav.tips, <path key="i" d="M10 2.5v2M4.7 4.7l1.4 1.4M2.5 10h2m11 0h2m-3.2-5.3-1.4 1.4M7.5 14.5h5M8 17.5h4M10 6.5a3.5 3.5 0 0 0-2 6.4v1.6h4v-1.6a3.5 3.5 0 0 0-2-6.4Z" strokeLinecap="round" strokeLinejoin="round" />],
     ["rettelser", t.nav.rettelser, <path key="i" d="M4 14.5V16h1.5l8.6-8.6-1.5-1.5L4 14.5Zm10.2-10.2 1.5 1.5M4 3.5h6m-6 3h3" strokeLinecap="round" strokeLinejoin="round" />],
     ["kontrakt", t.nav.kontrakt, <path key="i" d="M6 3h6l4 4v10H6V3Zm6 0v4h4M8.5 11h5m-5 3h5" strokeLinejoin="round" />],
+    ["brugere", t.nav.brugere, <path key="i" d="M7.5 9.5a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm-5 7.5c.4-2.9 2.5-4.5 5-4.5s4.6 1.6 5 4.5M13 3.7a3 3 0 0 1 0 5.6m1.8 3.4c1.5.6 2.5 2 2.7 4.3" strokeLinecap="round" />],
     ["hjaelp", t.nav.hjaelp, <path key="i" d="M10 17.5a7.5 7.5 0 1 0 0-15 7.5 7.5 0 0 0 0 15Zm-2.2-9.6a2.3 2.3 0 0 1 4.4 1c0 1.5-2.2 1.9-2.2 3.3m0 2.3h.01" strokeLinecap="round" />],
   ];
+  const shownNav = nav.filter(([p]) => pageOk(p));
   const card = "rounded-3xl bg-white p-5 sm:p-6";
 
   return (
@@ -203,7 +229,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
       <div className="mx-auto flex max-w-[1240px] gap-6 px-4 pb-14 sm:px-6">
         {/* The menu: down the side on a computer, a row of tabs on a phone. */}
         <nav className="sticky top-4 hidden h-fit w-[196px] shrink-0 space-y-1 pt-2 md:block">
-          {nav.map(([p, label, icon]) => (
+          {shownNav.map(([p, label, icon]) => (
             <a key={p} href={href({ side: p })} className={`flex items-center gap-3 rounded-2xl px-3.5 py-2.5 text-[15px] font-semibold ${page === p ? "bg-white shadow-sm" : "text-[#3a3a3c] hover:bg-white/60"}`}>
               <svg viewBox="0 0 20 20" className="h-5 w-5 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden>
                 {icon}
@@ -215,7 +241,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
 
         <main className="min-w-0 flex-1 space-y-5">
           <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1 md:hidden">
-            {nav.map(([p, label]) => (
+            {shownNav.map(([p, label]) => (
               <a key={p} href={href({ side: p })} className={`shrink-0 rounded-full px-3.5 py-1.5 text-[14px] font-semibold ${page === p ? "bg-[#1d1d1f] text-white" : "bg-white text-[#3a3a3c]"}`}>
                 {label}
               </a>
@@ -236,7 +262,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
                     {!x.reviewApprovedAt && (
                       <div className="mt-5 flex flex-wrap items-center gap-3 [&_button]:!rounded-full">
                         <ReviewLauncher slug={x.slug} title={x.config.title || x.name} words={{ open: t.fix.open, opening: t.fix.opening, hint: t.fix.windowHint, close: t.fix.close }} />
-                        <ApproveTour slug={x.slug} approved={null} preview={Boolean(who.preview)} words={{ approve: t.fix.approve, confirm: t.fix.approveConfirm, confirmTitle: t.fix.approveTitle, yes: t.fix.approveYes, no: t.fix.approveNo, approved: t.fix.approved, previewOnly: t.fix.previewOnly }} />
+                        {canOn(x.dealId, "approve") && <ApproveTour slug={x.slug} approved={null} preview={Boolean(who.preview)} words={{ approve: t.fix.approve, confirm: t.fix.approveConfirm, confirmTitle: t.fix.approveTitle, yes: t.fix.approveYes, no: t.fix.approveNo, approved: t.fix.approved, previewOnly: t.fix.previewOnly }} />}
                         <a href={href({ side: "rettelser" })} className="text-[14px] font-semibold text-white/85 underline-offset-4 hover:underline">
                           {t.review.fixes} →
                         </a>
@@ -246,6 +272,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
                 ))}
               <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
                 <div className="min-w-0 space-y-5">
+                  {seesStats && (
                   <section className={card}>
                     <div className="flex items-center justify-between gap-3">
                       <div>
@@ -266,7 +293,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
                       </div>
                     )}
                     {!together ? (
-                      <p className="mt-4 rounded-2xl bg-[#f7f7f9] p-4 text-[15px] text-[#3a3a3c]">{tours.length || older.length ? t.noStatsYet : notLive}</p>
+                      <p className="mt-4 rounded-2xl bg-[#f7f7f9] p-4 text-[15px] text-[#3a3a3c]">{tours.length || seesOlder.length ? t.noStatsYet : notLive}</p>
                     ) : together.visits === 0 ? (
                       <p className="mt-4 rounded-2xl bg-[#f7f7f9] p-4 text-[15px] text-[#3a3a3c]">{t.noVisits}</p>
                     ) : (
@@ -292,13 +319,14 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
                       </>
                     )}
                   </section>
+                  )}
 
                   <section className={card}>
                     <div className="flex items-baseline justify-between">
                       <h2 className="text-[18px] font-bold tracking-tight">{t.yourTours}</h2>
-                      <span className="text-[13px] text-[#6e6e73]">{t.tourCount(tours.length + older.length)}</span>
+                      <span className="text-[13px] text-[#6e6e73]">{t.tourCount(tours.length + seesOlder.length)}</span>
                     </div>
-                    {tours.length + older.length === 0 ? (
+                    {tours.length + seesOlder.length === 0 ? (
                       <p className="mt-3 text-[15px] text-[#3a3a3c]">{notLive}</p>
                     ) : (
                       <ul className="mt-3 divide-y divide-black/[.06]">
@@ -314,7 +342,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
                             </a>
                           </li>
                         ))}
-                        {older.map((x) => (
+                        {seesOlder.map((x) => (
                           <li key={x.id} className="flex items-center gap-3 py-3">
                             <TourThumb src={`/api/tour-thumb?item=${x.id}`} />
                             <p className="min-w-0 flex-1 truncate text-[15px] font-semibold">{x.name}</p>
@@ -332,7 +360,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
                   <section className={card}>
                     <h2 className="text-[18px] font-bold tracking-tight">{t.getStarted}</h2>
                     <ul className="mt-3 space-y-2.5">
-                      {t.tips.map(([title, text, to], i) => {
+                      {t.tips.filter(([, , to]) => !to || pageOk(to as Page)).map(([title, text, to], i) => {
                         const body = (
                           <>
                             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#eef3ff] text-[14px] font-bold text-[#0071e3]">{i + 1}</span>
@@ -368,7 +396,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
                 <h1 className="text-[30px] font-bold tracking-tight">{t.statsTitle}</h1>
                 <p className="mt-1 text-[15px] text-[#6e6e73]">{t.statsLead}</p>
               </div>
-              {root && (tours.length > 0 || older.length > 0) && (
+              {root && (accessOf.get(root.id)?.role === "OWNER" || accessOf.get(root.id)?.role === "STAFF") && (statTours.length > 0 || statOlder.length > 0) && (
                 <section className={card}>
                   <h2 className="text-[18px] font-bold tracking-tight">{t.reportMail.title}</h2>
                   <p className="mb-3 mt-0.5 text-[14px] text-[#6e6e73]">{who.preview ? t.reportMail.preview : t.reportMail.lead}</p>
@@ -385,7 +413,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
               )}
               {!together || !togetherShare ? (
                 <section className={card}>
-                  <p className="text-[15px] text-[#3a3a3c]">{tours.length || older.length ? t.noStatsYet : notLive}</p>
+                  <p className="text-[15px] text-[#3a3a3c]">{statTours.length || statOlder.length ? t.noStatsYet : notLive}</p>
                 </section>
               ) : (
                 <>
@@ -393,12 +421,12 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
                     <PortalPeriod value={period} lang={lang} />
                   </div>
                   <section className={card}>
-                    <CustomerReport stats={together} share={togetherShare} brand={sted ? dealName(scope[0]) : company} lang={lang} title={`${tours.length > 1 ? t.allTogether(tours.length).replace(/afdelinger|locations/, lang === "en" ? "tours" : "tours") : t.overview} · ${periodText(period, lang)}`} />
+                    <CustomerReport stats={together} share={togetherShare} brand={sted ? dealName(scope[0]) : company} lang={lang} title={`${statTours.length > 1 ? t.allTogether(statTours.length).replace(/afdelinger|locations/, lang === "en" ? "tours" : "tours") : t.overview} · ${periodText(period, lang)}`} />
                   </section>
-                  {tours.length > 1 && (
+                  {statTours.length > 1 && (
                     <>
                       <h2 className="px-1 pt-2 text-[18px] font-bold tracking-tight">{t.perTour}</h2>
-                      {tours.map((x, i) => (
+                      {statTours.map((x, i) => (
                         <details key={x.slug} className={`${card} group`}>
                           <summary className="flex cursor-pointer list-none items-center justify-between gap-3 [&::-webkit-details-marker]:hidden">
                             <span className="min-w-0">
@@ -427,21 +455,21 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
                 <h1 className="text-[30px] font-bold tracking-tight">{t.websiteTitle}</h1>
                 <p className="mt-1 max-w-2xl text-[15px] text-[#6e6e73]">{t.websiteLead}</p>
               </div>
-              {tours.length + older.length === 0 && (
+              {embedTours.length + embedOlder.length === 0 && (
                 <section className={card}>
                   <p className="text-[15px]">{notLive}</p>
                 </section>
               )}
-              {tours.length > 0 && (
+              {embedTours.length > 0 && (
                 <SitePlacement
-                  tours={tours.map((x) => ({ slug: x.slug, title: x.config.title || x.name, url: x.url, places: startPlaces(x.config).map((p) => ({ key: p.key, name: p.name })) }))}
+                  tours={embedTours.map((x) => ({ slug: x.slug, title: x.config.title || x.name, url: x.url, places: startPlaces(x.config).map((p) => ({ key: p.key, name: p.name })) }))}
                   site={scope.find((d) => d.websiteUrl)?.websiteUrl ?? ""}
                   lang={lang}
                 />
               )}
-              {tours.map((x) => (
+              {embedTours.map((x) => (
                 <section key={x.slug} className="space-y-3">
-                  {tours.length + older.length > 1 && <h2 className="px-1 text-[18px] font-bold tracking-tight">{x.config.title || x.name}</h2>}
+                  {embedTours.length + embedOlder.length > 1 && <h2 className="px-1 text-[18px] font-bold tracking-tight">{x.config.title || x.name}</h2>}
                   <PortalEmbeds
                     url={x.url}
                     title={x.config.title}
@@ -453,13 +481,13 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
                   />
                 </section>
               ))}
-              {older.map((x) => (
+              {embedOlder.map((x) => (
                 <section key={x.id} className="space-y-3">
-                  {tours.length + older.length > 1 && <h2 className="px-1 text-[18px] font-bold tracking-tight">{x.name}</h2>}
+                  {embedTours.length + embedOlder.length > 1 && <h2 className="px-1 text-[18px] font-bold tracking-tight">{x.name}</h2>}
                   <PortalEmbeds url={x.url} title={x.name} places={[]} whole={null} lang={lang} heading={false} />
                 </section>
               ))}
-              {tours.length > 0 && (
+              {embedTours.length > 0 && (
                 <section className={card}>
                   <h2 className="text-[18px] font-bold tracking-tight">{t.use.shownTitle}</h2>
                   <p className="mb-3 mt-1 text-[14px] leading-snug text-[#6e6e73]">{t.use.shownLead}</p>
@@ -476,7 +504,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
                 <p className="mt-1 max-w-2xl text-[15px] text-[#6e6e73]">{t.fix.lead}</p>
               </div>
               <section className={card}>
-                {reviewTours.length + older.length === 0 ? (
+                {reviewTours.length + reviewOlder.length === 0 ? (
                   <p className="text-[15px]">{notLive}</p>
                 ) : (
                   <ul className="divide-y divide-black/[.06]">
@@ -489,7 +517,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
                           {x.reviewSentAt && !x.reviewApprovedAt && <p className="text-[13px] font-medium text-[#a05a00]">{t.fix.waiting}</p>}
                         </div>
                         <ReviewLauncher slug={x.slug} title={x.config.title || x.name} words={{ open: t.fix.open, opening: t.fix.opening, hint: t.fix.windowHint, close: t.fix.close }} />
-                        {(x.reviewSentAt || x.reviewApprovedAt) && (
+                        {(x.reviewSentAt || x.reviewApprovedAt) && canOn(x.dealId, "approve") && (
                           <ApproveTour
                             slug={x.slug}
                             approved={x.reviewApprovedAt ? fmtDate(x.reviewApprovedAt, lang) : null}
@@ -499,7 +527,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
                         )}
                       </li>
                     ))}
-                    {older.map((x) => (
+                    {reviewOlder.map((x) => (
                       <li key={x.id} className="flex flex-wrap items-center gap-3 py-3">
                         <TourThumb src={`/api/tour-thumb?item=${x.id}`} />
                         <div className="min-w-0 flex-1">
@@ -545,7 +573,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
                 <h1 className="text-[30px] font-bold tracking-tight">{t.use.title}</h1>
                 <p className="mt-1 max-w-2xl text-[15px] text-[#6e6e73]">{t.use.lead}</p>
               </div>
-              {tours.length + older.length === 0 ? (
+              {embedTours.length + embedOlder.length === 0 ? (
                 <section className={card}>
                   <p className="text-[15px]">{notLive}</p>
                 </section>
@@ -555,8 +583,8 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
                   <p className="mb-4 mt-1 text-[14px] leading-snug text-[#6e6e73]">{t.use.linksLead}</p>
                   <TourShare
                     tours={[
-                      ...tours.map((x) => ({ key: x.slug, title: x.config.title || x.name, url: x.url, size: x.config.embeds?.size, places: startPlaces(x.config).map((p) => ({ key: p.key, name: p.name, group: p.group })) })),
-                      ...older.map((x) => ({ key: x.id, title: x.name, url: x.url, places: [] })),
+                      ...embedTours.map((x) => ({ key: x.slug, title: x.config.title || x.name, url: x.url, size: x.config.embeds?.size, places: startPlaces(x.config).map((p) => ({ key: p.key, name: p.name, group: p.group })) })),
+                      ...embedOlder.map((x) => ({ key: x.id, title: x.name, url: x.url, places: [] })),
                     ]}
                     words={t.use.builder}
                   />
@@ -606,6 +634,28 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
                 <p className="mt-3 text-[13px] text-[#8e8e93]">{t.invoicesNote}</p>
               </section>
             </>
+          )}
+
+          {page === "brugere" && users && (
+            <PortalUsers
+              users={users.users.map((u) => ({
+                id: u.id,
+                email: u.email,
+                name: u.name,
+                role: u.role,
+                canApprove: u.canApprove,
+                seen: u.lastLoginAt ? t.seen(fmtDate(u.lastLoginAt, lang)) : t.notSeen,
+                expires: u.expiresAt ? t.stops(fmtDate(u.expiresAt, lang)) : null,
+                invitedBy: u.invitedByName,
+                fromNextview: u.fromNextview,
+                deals: u.deals,
+              }))}
+              deals={users.deals}
+              meId={who.accountId}
+              mayInvite={users.mayInvite}
+              preview={Boolean(who.preview)}
+              lang={lang}
+            />
           )}
 
           {page === "hjaelp" && (

@@ -1,10 +1,14 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { grantCustomerAccess, resendCustomerLogin, revokeCustomerAccess } from "@/lib/actions/customer-access";
+import { grantCustomerAccess, resendCustomerLogin, revokeCustomerAccess, setCustomersMayInvite } from "@/lib/actions/customer-access";
+import { ROLE_NAMES } from "@/lib/customer-roles";
+import type { CustomerRole } from "@prisma/client";
 import { useToast } from "@/components/toast";
 
-type Access = { id: string; email: string; name: string | null; lastLoginAt: Date | null };
+type Access = { id: string; email: string; name: string | null; lastLoginAt: Date | null; invitedByName: string | null; role: CustomerRole; canApprove: boolean; expiresAt: Date | null; byCustomer: boolean };
+
+const day = (d: Date) => new Date(d).toLocaleDateString("da-DK", { day: "numeric", month: "short" });
 
 const when = (d: Date | null) => (d ? `Sidst logget ind ${new Date(d).toLocaleDateString("da-DK", { day: "numeric", month: "short" })}` : "Har ikke logget ind endnu");
 
@@ -19,12 +23,15 @@ export function CustomerAccessSection({
   defaultEmail,
   defaultName,
   branchCount,
+  mayInvite,
 }: {
   dealId: string;
   accounts: Access[];
   defaultEmail: string | null;
   defaultName: string | null;
   branchCount: number;
+  /** Deal.customersMayInvite - the customer's owners may invite their own people on /kunde. */
+  mayInvite: boolean;
 }) {
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -45,13 +52,37 @@ export function CustomerAccessSection({
         {branchCount > 0 && ` Adgangen gælder også de ${branchCount} afdelinger.`}
       </p>
 
+      <label className="mt-3 flex items-center gap-2 text-xs text-slate-600">
+        <input
+          type="checkbox"
+          checked={mayInvite}
+          disabled={pending}
+          onChange={(e) =>
+            start(async () => {
+              const r = await setCustomersMayInvite(dealId, e.target.checked);
+              showToast(r.ok ? (e.target.checked ? "Kunden kan nu invitere brugere" : "Kunden kan ikke længere invitere brugere") : r.error);
+            })
+          }
+        />
+        Kundens ejere må selv invitere brugere (fx deres udvikler) under Brugere på kundesiden
+      </label>
+
       {accounts.length > 0 && (
         <ul className="mt-4 divide-y divide-slate-100 rounded-md border border-slate-100">
           {accounts.map((a) => (
             <li key={a.id} className="flex items-center gap-3 px-3 py-2 text-sm">
               <div className="min-w-0 flex-1">
                 <p className="truncate font-medium text-slate-900">{a.name ? `${a.name} · ${a.email}` : a.email}</p>
-                <p className="text-xs text-slate-500">{when(a.lastLoginAt)}</p>
+                <p className="text-xs text-slate-500">
+                  {[
+                    `${ROLE_NAMES.da[a.role]}${a.role === "STAFF" && a.canApprove ? " (må godkende)" : ""}`,
+                    when(a.lastLoginAt),
+                    a.expiresAt && (new Date(a.expiresAt) < new Date() ? `Udløbet ${day(a.expiresAt)}` : `Stopper ${day(a.expiresAt)}`),
+                    a.byCustomer && a.invitedByName && `Inviteret af ${a.invitedByName} (kunden)`,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </p>
               </div>
               <button
                 type="button"

@@ -57,7 +57,6 @@ const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replac
 /** Sends the login mail from lasse@nextview360.dk. `welcome` = the first one, when access is given in Arpo. */
 export async function sendLoginMail(account: { id: string; email: string; name: string | null }, welcome = false): Promise<void> {
   const link = await newLink(account.id, welcome ? WELCOME_DAYS * 24 * 60 : LINK_MINUTES);
-  const hi = account.name ? `Hej ${account.name.split(" ")[0]}` : "Hej";
   const subject = welcome ? "Jeres egen side hos Nextview360" : "Dit login til Nextview360";
   const lead = welcome
     ? "I har nu jeres egen side hos Nextview360. Her kan I se, hvordan jeres virtuelle tour klarer sig, hente koderne til jeres hjemmeside og finde jeres kontrakt."
@@ -65,18 +64,44 @@ export async function sendLoginMail(account: { id: string; email: string; name: 
   const after = welcome
     ? `Linket virker én gang i de næste ${WELCOME_DAYS} dage. Næste gang skriver I bare jeres e-mail på nextview360.dk/login, så får I et nyt link.`
     : `Linket virker én gang og i ${LINK_MINUTES} minutter. Har du ikke bedt om det, kan du se bort fra mailen.`;
-  const bodyText = `${hi}\n\n${lead}\n\nLog ind her:\n${link}\n\n${after}\n\nVenlig hilsen\nNextview360`;
+  await mailWithLink(account, welcome ? "access" : "login", subject, [lead], link, after);
+}
+
+/**
+ * The invitation, when a customer's owner gives someone access on /kunde
+ * (Brugere) - the text approved by Lasse. One login link, for WELCOME_DAYS.
+ */
+export async function sendInviteMail(
+  account: { id: string; email: string; name: string | null },
+  o: { inviter: string; company: string; roleName: string; gets: string[]; expiresAt: Date | null }
+): Promise<void> {
+  const link = await newLink(account.id, WELCOME_DAYS * 24 * 60);
+  const list = o.gets.length > 1 ? `${o.gets.slice(0, -1).join(", ")} og ${o.gets[o.gets.length - 1]}` : (o.gets[0] ?? "");
+  const until = o.expiresAt ? ` Din adgang stopper ${o.expiresAt.toLocaleDateString("da-DK", { day: "numeric", month: "long", timeZone: "Europe/Copenhagen" })}.` : "";
+  await mailWithLink(
+    account,
+    "invite",
+    `${o.inviter} har givet dig adgang til jeres tour hos Nextview360`,
+    [`${o.inviter} fra ${o.company} har givet dig adgang til jeres side hos Nextview360 som ${o.roleName}.`, `Du får adgang til ${list}.${until}`],
+    link,
+    `Linket virker i ${WELCOME_DAYS} dage. Har du ikke ventet denne mail, kan du bare se bort fra den.`
+  );
+}
+
+/** One mail with a login button - logged for the customer overview in Arpo (never the link itself). */
+async function mailWithLink(account: { id: string; email: string; name: string | null }, kind: string, subject: string, paragraphs: string[], link: string, after: string): Promise<void> {
+  const hi = account.name ? `Hej ${account.name.split(" ")[0]}` : "Hej";
+  const bodyText = `${hi}\n\n${paragraphs.join("\n\n")}\n\nLog ind her:\n${link}\n\n${after}\n\nVenlig hilsen\nNextview360`;
   const bodyHtml = `<div style="font-family:-apple-system,Segoe UI,Arial,sans-serif;font-size:15px;line-height:1.5;color:#1d1d1f;max-width:520px">
 <p style="margin:0 0 24px"><img src="${esc(getAppBaseUrl())}/logo.png" alt="Nextview360" width="138" height="32" style="display:block;border:0;height:32px;width:auto"></p>
 <p>${esc(hi)}</p>
-<p>${esc(lead)}</p>
+${paragraphs.map((p) => `<p>${esc(p)}</p>`).join("\n")}
 <p><a href="${esc(link)}" style="display:inline-block;background:#0071e3;color:#fff;text-decoration:none;font-weight:600;padding:12px 22px;border-radius:12px">Log ind</a></p>
 <p style="color:#6e6e73;font-size:13px">${esc(after)}</p>
 <p>Venlig hilsen<br>Nextview360</p>
 </div>`;
 
-  // Logged for the customer overview in Arpo - which mail, to whom, when (never the link itself).
-  const log = (error: string | null) => prisma.systemMail.create({ data: { accountId: account.id, kind: welcome ? "access" : "login", to: account.email, subject, error } }).catch(() => {});
+  const log = (error: string | null) => prisma.systemMail.create({ data: { accountId: account.id, kind, to: account.email, subject, error } }).catch(() => {});
   const sender = await prisma.emailAccount.findFirst({ where: { provider: "GOOGLE", email: WELCOME_MAIL_SENDER } });
   if (!sender && !resendReady()) {
     // On a developer's machine there's no Gmail to send from - the link goes to the server log instead.

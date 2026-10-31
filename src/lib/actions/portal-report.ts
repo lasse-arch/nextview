@@ -28,7 +28,8 @@ export async function setMyReportInterval(choice: PortalReportChoice): Promise<{
   const interval: ReportInterval | null = choice === "OFF" ? null : choice;
 
   const deals = await prisma.deal.findMany({
-    where: { id: { in: account.deals.map((d) => d.dealId) } },
+    // Owners and staff only - it changes what is mailed to the customer.
+    where: { id: { in: account.deals.filter((d) => d.role === "OWNER" || d.role === "STAFF").map((d) => d.dealId) } },
     select: { id: true, companyName: true, displayName: true, parentDealId: true, reportInterval: true, nextReportDueAt: true },
   });
   if (!deals.length) return { ok: false, error: "Ingen tours at sende tal for." };

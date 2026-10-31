@@ -101,7 +101,11 @@ export async function getCurrentUser(): Promise<User | null> {
 export async function getCurrentCustomer() {
   const session = await getSessionFromCookie();
   if (session?.kind !== "customer") return null;
-  return prisma.customerAccount.findUnique({ where: { id: session.customerId }, include: { deals: { select: { dealId: true } } } });
+  // Only access that hasn't run out (a developer's 30 days) - with the role, so every check can ask can() (src/lib/customer-roles.ts).
+  return prisma.customerAccount.findUnique({
+    where: { id: session.customerId },
+    include: { deals: { where: { OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] }, select: { dealId: true, role: true, canApprove: true } } },
+  });
 }
 
 export async function requireUser(): Promise<User> {

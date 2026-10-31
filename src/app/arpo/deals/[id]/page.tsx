@@ -136,7 +136,7 @@ export default async function DealDetailPage({
         tasks: { orderBy: { createdAt: "asc" } },
         reports: { orderBy: { sentAt: "desc" }, take: 1 },
         timeEntries: { include: { user: true }, orderBy: { date: "desc" } },
-        customerAccounts: { orderBy: { createdAt: "asc" }, include: { account: { select: { id: true, email: true, name: true, lastLoginAt: true } } } },
+        customerAccounts: { orderBy: { createdAt: "asc" }, include: { account: { select: { id: true, email: true, name: true, lastLoginAt: true, invitedByName: true } } } },
       },
     }),
     prisma.user.findMany({ orderBy: { name: "asc" } }),
@@ -772,7 +772,8 @@ export default async function DealDetailPage({
           {currentUser?.role === "ADMIN" && (
             <CustomerAccessSection
               dealId={deal.id}
-              accounts={deal.customerAccounts.map((c) => c.account)}
+              accounts={deal.customerAccounts.map((c) => ({ ...c.account, role: c.role, canApprove: c.canApprove, expiresAt: c.expiresAt, byCustomer: Boolean(c.invitedById) }))}
+              mayInvite={deal.customersMayInvite}
               defaultEmail={deal.contactEmail}
               defaultName={deal.contactName}
               branchCount={deal.branches.length}

@@ -72,3 +72,14 @@ export async function revokeCustomerAccess(dealId: string, accountId: string): P
   revalidatePath(`/arpo/deals/${dealId}`);
   return { ok: true };
 }
+
+/** "Kundens ejere må selv invitere brugere" on the deal page - for the deal and its locations. */
+export async function setCustomersMayInvite(dealId: string, on: boolean): Promise<Result> {
+  const user = await requireAdmin();
+  const deal = await prisma.deal.findUnique({ where: { id: dealId }, select: { id: true, branches: { select: { id: true } } } });
+  if (!deal) return { ok: false, error: "Kunden findes ikke." };
+  await prisma.deal.updateMany({ where: { id: { in: [deal.id, ...deal.branches.map((b) => b.id)] } }, data: { customersMayInvite: Boolean(on) } });
+  await logActivity({ type: "DEAL_UPDATED", message: `Kunden må ${on ? "nu" : "ikke længere"} selv invitere brugere`, actorId: user.id, dealId });
+  revalidatePath(`/arpo/deals/${dealId}`);
+  return { ok: true };
+}

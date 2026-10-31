@@ -237,7 +237,8 @@ export default async function CustomerOverviewPage({ params }: { params: Promise
           {isAdmin && (
             <CustomerAccessSection
               dealId={deal.id}
-              accounts={deal.customerAccounts.map((c) => c.account)}
+              accounts={deal.customerAccounts.map((c) => ({ ...c.account, role: c.role, canApprove: c.canApprove, expiresAt: c.expiresAt, byCustomer: Boolean(c.invitedById) }))}
+              mayInvite={deal.customersMayInvite}
               defaultEmail={deal.contactEmail}
               defaultName={deal.contactName}
               branchCount={deal.branches.length}

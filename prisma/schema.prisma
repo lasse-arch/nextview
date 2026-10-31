@@ -639,6 +639,8 @@ model Deal {
   tours            Tour[]
   /// Customer logins (nextview360.dk/kunde) that may see this deal.
   customerAccounts CustomerAccountDeal[]
+  /// The customer's owners may invite their own people (Brugere on /kunde). Turned off per customer in Arpo.
+  customersMayInvite Boolean @default(true)
   systemMails      SystemMail[]
 
   @@index([inLeadInbox, stage])
@@ -1625,7 +1627,7 @@ model SystemMail {
   deal      Deal?            @relation(fields: [dealId], references: [id], onDelete: Cascade)
   accountId String?
   account   CustomerAccount? @relation(fields: [accountId], references: [id], onDelete: SetNull)
-  /// "login", "access" (the first login, when access is given), "welcome", "bs_signup".
+  /// "login", "access" (the first login, when access is given), "welcome", "bs_signup", "invite" (a customer invited someone on /kunde).
   kind      String
   to        String
   subject   String
@@ -1638,12 +1640,28 @@ model SystemMail {
 }
 
 /// Which deals (and so tours, contract, invoices) a customer login may see.
+/// What a login may do on the customer page, per deal (src/lib/customer-roles.ts).
+enum CustomerRole {
+  OWNER
+  STAFF
+  DEVELOPER
+  VIEWER
+}
+
 model CustomerAccountDeal {
-  accountId String
-  account   CustomerAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  dealId    String
-  deal      Deal            @relation(fields: [dealId], references: [id], onDelete: Cascade)
-  createdAt DateTime        @default(now())
+  accountId   String
+  account     CustomerAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  dealId      String
+  deal        Deal            @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  createdAt   DateTime        @default(now())
+  /// Access given in Arpo is OWNER - as before roles existed.
+  role        CustomerRole    @default(OWNER)
+  /// STAFF only: may approve tour changes too.
+  canApprove  Boolean         @default(false)
+  /// The access stops by itself (a developer's 30 days) - null = always.
+  expiresAt   DateTime?
+  /// The customer login that invited them on /kunde - null = given by Nextview in Arpo.
+  invitedById String?
 
   @@id([accountId, dealId])
   @@index([dealId])

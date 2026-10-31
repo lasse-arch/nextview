@@ -2,6 +2,7 @@ import "server-only";
 import { getCurrentCustomer, getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import type { TourConfig } from "@/app/arpo/tour-lab/tours/types";
+import { can } from "@/lib/customer-roles";
 
 /*
  * Who may ask where a tour should sit on a website: the customer, for a tour
@@ -18,7 +19,7 @@ export async function placementAccess(request: Request, slug: unknown): Promise<
   const user = await getCurrentUser();
   if (user) return { T: tour.config as unknown as TourConfig, slug, who: `team:${user.id}` };
   const customer = await getCurrentCustomer();
-  if (!customer || !tour.dealId || !customer.deals.some((d) => d.dealId === tour.dealId) || !(tour.published || tour.reviewSentAt)) return { error: "Touren findes ikke.", status: 404 };
+  if (!customer || !can(customer, tour.dealId, "embed") || !(tour.published || tour.reviewSentAt)) return { error: "Touren findes ikke.", status: 404 };
   return { T: tour.config as unknown as TourConfig, slug, who: `kunde:${customer.id}` };
 }
 
