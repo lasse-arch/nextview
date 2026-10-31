@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { findWeatherPlace } from "@/lib/actions/tour-weather";
 import type { MenuEntry, TourConfig } from "../../tours/types";
-import { Choice, Field, Group, Toggle, input } from "./ui";
+import { Field, Group, Toggle, input } from "./ui";
 
 type Commute = NonNullable<TourConfig["commute"]>;
 
@@ -130,18 +130,7 @@ export function CommuteEditor({ config, edit }: { config: TourConfig; edit: (fn:
               ))}
             </div>
           </Field>
-          <Field title="Knap på touren" hint={C.button ? "Står på touren - og i menuen, hvis den ligger der." : "Ingen knap - den åbnes fra menuen eller en flise/knap med linket #vej."}>
-            <Choice<"none" | NonNullable<Commute["button"]>>
-              value={C.button ?? "none"}
-              options={[
-                ["none", "Kun menu"],
-                ["under-menu", "Under menu"],
-                ["bottom-left", "Nede tv."],
-                ["bottom-right", "Nede th."],
-              ]}
-              onChange={(v) => set((c) => void (c.button = v === "none" ? undefined : v))}
-            />
-          </Field>
+          <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">{C.button ? "Knappen står på touren" : "Ingen knap på touren"} - hvor den står, vælges under Layout → Placering, så den aldrig lander oven i en anden knap.</p>
           {!inMenu ? (
             <button type="button" className="text-[13px] font-medium text-[#0071e3]" onClick={() => edit((d) => void d.menu.push({ title, href: "#vej" }))}>
               + Læg den i menuen

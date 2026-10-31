@@ -32,6 +32,14 @@ const MENUS: [NonNullable<TourConfig["design"]>["menu"], string, string][] = [
   ["picker", "Rumvælger", "Vælg størrelse og rum i bunden. Kun til få kunder (fx depotrum)."],
 ];
 
+/** Where Find vej stands for a choice: its standard is top centre on a computer, bottom right on a phone; "menu" = no button. */
+function slotOfFind(v: string, dev: "desktop" | "mobile"): string | null {
+  if (v === "menu") return null;
+  if (v === "std") return dev === "desktop" ? "top" : "bottom-right";
+  return v;
+}
+const SLOT_NAMES: Record<string, string> = { top: "øverst i midten", "bottom-left": "nederst til venstre", "bottom-right": "nederst til højre", "under-menu": "under menuknappen", "under-live": "under live data" };
+
 function Step({ n, title, children }: { n: number; title: string; children: React.ReactNode }) {
   return (
     <div className="space-y-3">
@@ -69,6 +77,10 @@ export function LayoutEditor({ config, edit, onTab }: { config: TourConfig; edit
   const menuStyle = config.design?.menu ?? "side";
   const langs = (config.languages ?? []).filter((l) => l !== "da");
   const more = "px-1 text-left text-[13px] font-medium text-[#0071e3] hover:underline";
+  // The floating buttons' places - one button per place and device.
+  const commuteSlot = config.commute?.button ?? null;
+  const findSlots = config.wayfinding ? (["desktop", "mobile"] as const).map((dev) => slotOfFind(config.wayfinding?.button?.[dev] ?? "std", dev)) : [];
+  const clash = commuteSlot && findSlots.includes(commuteSlot) ? SLOT_NAMES[commuteSlot] : null;
 
   return (
     <div className="space-y-6">
@@ -180,37 +192,74 @@ export function LayoutEditor({ config, edit, onTab }: { config: TourConfig; edit
                 />
               </Field>
             ))}
-          {config.wayfinding &&
-            (["desktop", "mobile"] as const).map((dev) => (
-              <Field key={`find-${dev}`} title={`Find vej-knappen - ${dev === "desktop" ? "computer" : "mobil"}`} hint={config.wayfinding?.button?.[dev] === "menu" ? 'Ingen knap - læg "Find vej" i menuen med linket #findvej.' : undefined}>
-                <select
-                  className={input}
-                  value={config.wayfinding?.button?.[dev] ?? "std"}
-                  onChange={(e) =>
-                    edit((d) => {
-                      const v = e.target.value as FindButtonPlace | "std";
-                      const b = { ...d.wayfinding?.button, [dev]: v === "std" ? undefined : v };
-                      if (!b[dev]) delete b[dev];
-                      d.wayfinding = { ...d.wayfinding, button: Object.keys(b).length ? b : undefined };
-                    })
-                  }
-                >
-                  {(
-                    [
-                      ["std", dev === "desktop" ? "Øverst i midten (standard)" : "Nederst til højre (standard)"],
-                      ...(dev === "desktop" ? ([["bottom-left", "Nederst til venstre"], ["bottom-right", "Nederst til højre"]] as const) : ([["top", "Øverst i midten"], ["bottom-left", "Nederst til venstre"]] as const)),
-                      ["under-menu", "Under menuknappen"],
-                      ...(config.live ? ([["under-live", "Under live data"]] as const) : []),
-                      ["menu", "Ingen knap - kun i menuen"],
-                    ] as [string, string][]
-                  ).map(([v, l]) => (
-                    <option key={v} value={v}>
-                      {l}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-            ))}
+          {(config.wayfinding || config.commute) && (
+            <div className="space-y-3 border-t border-black/[.06] pt-3">
+              <p className="text-[13px] font-medium text-[#6e6e73]">Knapper på touren</p>
+              <p className="text-[12px] leading-snug text-[#8e8e93]">Hver plads kan kun have én knap - en plads, der er taget, kan ikke vælges til en anden.</p>
+              {config.wayfinding &&
+                (["desktop", "mobile"] as const).map((dev) => (
+                  <Field key={`find-${dev}`} title={`Find vej - ${dev === "desktop" ? "computer" : "mobil"}`} hint={config.wayfinding?.button?.[dev] === "menu" ? 'Ingen knap - læg "Find vej" i menuen med linket #findvej.' : undefined}>
+                    <select
+                      className={input}
+                      value={config.wayfinding?.button?.[dev] ?? "std"}
+                      onChange={(e) =>
+                        edit((d) => {
+                          const v = e.target.value as FindButtonPlace | "std";
+                          const b = { ...d.wayfinding?.button, [dev]: v === "std" ? undefined : v };
+                          if (!b[dev]) delete b[dev];
+                          d.wayfinding = { ...d.wayfinding, button: Object.keys(b).length ? b : undefined };
+                        })
+                      }
+                    >
+                      {(
+                        [
+                          ["std", dev === "desktop" ? "Øverst i midten (standard)" : "Nederst til højre (standard)"],
+                          ...(dev === "desktop" ? ([["bottom-left", "Nederst til venstre"], ["bottom-right", "Nederst til højre"]] as const) : ([["top", "Øverst i midten"], ["bottom-left", "Nederst til venstre"]] as const)),
+                          ["under-menu", "Under menuknappen"],
+                          ...(config.live ? ([["under-live", "Under live data"]] as const) : []),
+                          ["menu", "Ingen knap - kun i menuen"],
+                        ] as [string, string][]
+                      ).map(([v, l]) => {
+                        const taken = slotOfFind(v, dev) !== null && slotOfFind(v, dev) === commuteSlot && v !== (config.wayfinding?.button?.[dev] ?? "std");
+                        return (
+                          <option key={v} value={v} disabled={taken}>
+                            {l}
+                            {taken ? " (optaget: Vej til stedet)" : ""}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </Field>
+                ))}
+              {config.commute && (
+                <Field title="Vej til stedet" hint={config.commute.button ? "Samme plads på computer og mobil - og i menuen, hvis den ligger der." : "Ingen knap - den åbnes fra menuen eller en flise/knap med linket #vej."}>
+                  <select
+                    className={input}
+                    value={config.commute.button ?? "none"}
+                    onChange={(e) => edit((d) => void (d.commute = { ...d.commute!, button: e.target.value === "none" ? undefined : (e.target.value as NonNullable<NonNullable<TourConfig["commute"]>["button"]>) }))}
+                  >
+                    {(
+                      [
+                        ["none", "Ingen knap - kun i menuen"],
+                        ["under-menu", "Under menuknappen"],
+                        ["bottom-left", "Nederst til venstre"],
+                        ["bottom-right", "Nederst til højre"],
+                      ] as [string, string][]
+                    ).map(([v, l]) => {
+                      const taken = v !== "none" && v !== config.commute?.button && findSlots.includes(v);
+                      return (
+                        <option key={v} value={v} disabled={taken}>
+                          {l}
+                          {taken ? " (optaget: Find vej)" : ""}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </Field>
+              )}
+              {clash && <p className="text-[12px] font-medium text-[#ff3b30]">Find vej og Vej til stedet står samme sted ({clash}) - flyt den ene.</p>}
+            </div>
+          )}
         </Group>
       </Step>
     </div>
