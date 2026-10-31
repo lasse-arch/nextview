@@ -435,6 +435,8 @@ export type TourConfig = {
   weather?: { lat: number; lon: number; place: string };
   /** "Sådan går du rundt": a short help (drag, walk, the menu) when the visitor first steps inside - once per visitor. */
   onboarding?: boolean;
+  /** Right after stepping in: a short arrow to where the menu is - on phones, or on every screen. Left out = none. */
+  menuHint?: "mobile" | "all";
   /**
    * false: on a website the tour starts with a play button (a picture, its
    * name and "Gå ind i touren") - nothing loads until it's pressed, and then

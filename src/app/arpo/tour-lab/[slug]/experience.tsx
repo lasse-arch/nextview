@@ -21,6 +21,7 @@ import type { DroneView, GuideTurn, MenuEntry, TourConfig, TourPlace, TourPoint,
 import { CoverWelcome, DESIGNS_CSS, DockMenu, PickerMenu } from "./designs";
 import { GUIDE_CSS, GuidePlayer, guideStops } from "./guide";
 import { ONBOARDING_CSS, Onboarding } from "./onboarding";
+import { MENU_HINT_CSS, MenuHint } from "./menu-hint";
 import { PlayGate } from "./play-gate";
 import { CONTACT_CSS, CONTACT_HREF, ContactForm } from "./contact-form";
 import { DAY_CSS, DayBar, DaySheet } from "./day";
@@ -2146,7 +2147,7 @@ function TourExperience({
       }>
       <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.font.replace(/ /g, "+")}:wght@400;600;700;800;900&display=swap`} />
       {T.fontHeading && <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.fontHeading.replace(/ /g, "+")}:wght@500;600&display=swap`} />}
-      <style>{CSS + CONTACT_CSS + STORIES_CSS + LIGHTBOX_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + ONBOARDING_CSS + INFO_CSS + MAP_CSS + ROUTE_CSS + MEASURES_CSS + CARDS_CSS + DAY_CSS + SIMPLE_CSS + BENTO_CSS + LOGO_RIGHT_CSS + LANG_CSS + WEATHER_CSS + COMMUTE_CSS + FEATURES_CSS + FINDER_CSS + (review ? FEEDBACK_CSS : "")}</style>
+      <style>{CSS + CONTACT_CSS + STORIES_CSS + LIGHTBOX_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + ONBOARDING_CSS + MENU_HINT_CSS + INFO_CSS + MAP_CSS + ROUTE_CSS + MEASURES_CSS + CARDS_CSS + DAY_CSS + SIMPLE_CSS + BENTO_CSS + LOGO_RIGHT_CSS + LANG_CSS + WEATHER_CSS + COMMUTE_CSS + FEATURES_CSS + FINDER_CSS + (review ? FEEDBACK_CSS : "")}</style>
       {/* The tour's own design on top (written by Claude or by hand under Avanceret). */}
       {T.customCss && <style>{T.customCss.replace(/<\/?style/gi, "")}</style>}
 
@@ -2890,6 +2891,9 @@ function TourExperience({
             doneHelp();
           }}
         />
+      )}
+      {T.menuHint && (T.menuHint === "all" || (typeof window !== "undefined" && window.innerWidth <= 760)) && (helpDone || !T.onboarding) && phase === "tour" && !cover && !welcome && !intro && sdk && guideAt == null && !menuOpen && !contactOpen && (
+        <MenuHint slug={T.slug} again={inEditorPreview()} />
       )}
       {guideAt != null && GUIDE[guideAt] && (
         <GuidePlayer

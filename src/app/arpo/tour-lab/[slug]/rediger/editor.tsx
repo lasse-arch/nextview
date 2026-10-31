@@ -89,7 +89,7 @@ const FINDS: Partial<Record<Tab, string[]>> = {
   feedback: ["Rettelser", "Kundegennemsyn", "Kommentarer"],
   del: ["Udgiv", "Link", "QR-kode", "Indlejr", "iframe", "Kode til hjemmesiden", "Cloudflare"],
   start: ["Hvor touren starter|startpunkt|startposition|start-link|start her", "Forsiden", "Velkomsten", "Fliser", "Kort film før touren", "Intro-video", "Steder med foto", "Træd indenfor"],
-  menu: ["Menuens udseende|menu-design|sidemenu|dock|bar i bunden|rumvælger", "Menu åben på computer", "Menu åben på mobil", "Dæmp touren bag menuen", "Menupunkter", "Grupper", "Tilføj det sted, du ser", "Billede i menuen", "360°-billede", "Webside", "Luftfotoet", "Scanpunkter i menuen"],
+  menu: ["Menuens udseende|menu-design|sidemenu|dock|bar i bunden|rumvælger", "Vis hvor menuen er|pil til menuen|menu-pil", "Menu åben på computer", "Menu åben på mobil", "Dæmp touren bag menuen", "Menupunkter", "Grupper", "Tilføj det sted, du ser", "Billede i menuen", "360°-billede", "Webside", "Luftfotoet", "Scanpunkter i menuen"],
   rundvisning: ["Sådan ser en dag ud|dagen|program", "Vis mig rundt", "Guide", "Guidet tur", "Stop", "Drejning", "Sekunder ved hvert stop", "Stemme|lyd|elevenlabs|speak|oplæsning", "Lav den ud fra menuen", "Knappen i menuen|øverst|nederst|ikke i menuen", "Egen knap på stop"],
   kortet: ["Interaktivt kort", "Luftfoto", "Dronebillede", "360°-kort", "Punkter på kortet", "Kategorier", "Skyer", "Boksen øverst", "Filteret", "Luftfotoets første udsnit|startudsnit", "Ikoner", "Vejret|vejr|temperatur|dmi|sol", "Find din plads|finder|spørgsmål|guide til plads", "Gåafstande|gåafstand|minutter|afstand", "Bevægelse på luftfotoet|kig ned|kig op|zoom ved punkt", "Hent fra en kortside|lovable|importer kort"],
   scan: ["Scanpunkter", "Skjul scanpunkter", "Personer i scans"],
@@ -914,6 +914,17 @@ export function TourEditor({
                       ["bento", "Fliser"],
                     ]}
                     onChange={(v) => edit((d) => void (d.design = { ...d.design, welcome: d.design?.welcome ?? "tiles", menu: v }))}
+                  />
+                </Field>
+                <Field title="Vis hvor menuen er" hint={config.menuHint ? "Lige efter man er gået ind: en pil og en blinkende ring om menuen i et par sekunder (én gang pr. besøg). Prøv den på Mobil i forhåndsvisningen." : "Ingen pil - som i dag."}>
+                  <Choice<"off" | "mobile" | "all">
+                    value={config.menuHint ?? "off"}
+                    options={[
+                      ["off", "Fra"],
+                      ["mobile", "På mobil"],
+                      ["all", "Mobil og computer"],
+                    ]}
+                    onChange={(v) => edit((d) => void (d.menuHint = v === "off" ? undefined : v))}
                   />
                 </Field>
                 {menuStyle === "bento" && <BentoEditor config={config} edit={edit} />}
