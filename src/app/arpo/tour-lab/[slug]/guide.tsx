@@ -130,18 +130,21 @@ export function GuidePlayer({
           </button>
           {timed ? (
             <>
+              {/* Pause is there, but small - the way on ("Næste") is what the eye goes to. */}
               <button
                 type="button"
-                className="gd-play"
+                className={`gd-pause ${paused || held ? "paa" : ""}`}
+                aria-label={paused || held ? tr("Fortsæt") : tr("Pause")}
+                title={paused || held ? tr("Fortsæt") : tr("Pause")}
                 onClick={() => {
                   if (held) return onResume?.();
                   setPaused((p) => !p);
                 }}
               >
-                {paused || held ? `▶ ${tr("Fortsæt")}` : `❚❚ ${tr("Pause")}`}
+                {paused || held ? "▶" : "❚❚"}
               </button>
-              <button type="button" aria-label={tr("Næste")} onClick={() => step(index + 1, "next")}>
-                ›
+              <button type="button" className="gd-play" onClick={() => step(index + 1, "next")}>
+                {index === stops.length - 1 ? tr("Afslut") : tr("Næste ›")}
               </button>
             </>
           ) : (
@@ -216,6 +219,8 @@ export const GUIDE_CSS = `
 .gd-ctrl button{height:36px;min-width:36px;border:0;border-radius:999px;background:#eef1f2;color:var(--c-main);font:inherit;font-weight:800;font-size:15px;cursor:pointer;padding:0 12px}
 .gd-ctrl button:disabled{opacity:.35;cursor:default}
 .gd-ctrl .gd-play{background:var(--c-main);color:#fff;font-size:13px}
+.gd-ctrl .gd-pause{font-size:11px;letter-spacing:-1px}
+.gd-ctrl .gd-pause.paa{background:var(--c-main);color:#fff;letter-spacing:0}
 .gd-ctrl .gd-stop{margin-left:auto;background:none;font-size:13px;font-weight:700;color:#56636a;padding:0 4px}
 .hv-guide-knap{display:flex;align-items:center;gap:10px;width:calc(100% - 44px);margin:14px 22px 4px;padding:12px 16px;border:0;border-radius:14px;background:var(--c-accent);color:#fff;font:inherit;font-weight:800;font-size:15px;cursor:pointer;text-align:left}
 .hv-guide-knap small{display:block;font-weight:600;font-size:12px;opacity:.85}

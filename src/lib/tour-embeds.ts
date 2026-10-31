@@ -11,6 +11,22 @@ import { prisma } from "@/lib/db";
 export type TourEmbed = { host: string; url: string | null; seen: number; used: number; lastSeen: string; /** Whole days since it was last loaded there (0 = today). */ daysAgo: number };
 
 /** The pages showing these tours in the last 90 days, the newest first. */
+/**
+ * Where a web developer tries the page, not where visitors come: their own
+ * computer (localhost, an IP address, .local) and the builders' preview
+ * addresses (Lovable's id-preview--… and …lovableproject.com, Vercel's
+ * preview deployments, StackBlitz, CodeSandbox, ngrok …). Left out of "Her er
+ * touren vist" - the customer's own site (also a published lovable.app) stays.
+ */
+export function isDevHost(host: string | null): boolean {
+  const h = (host ?? "").toLowerCase().replace(/:\d+$/, "");
+  if (!h) return false;
+  if (h === "localhost" || h.endsWith(".localhost") || h.endsWith(".local") || /^\d{1,3}(\.\d{1,3}){3}$/.test(h) || h.startsWith("[")) return true;
+  if (/^id-preview-[a-z0-9-]*--/.test(h) || h.endsWith(".lovableproject.com")) return true;
+  if (/-git-[a-z0-9-]+\.vercel\.app$/.test(h) || /\.(webcontainer\.io|stackblitz\.io|csb\.app|codesandbox\.io|ngrok-free\.app|ngrok\.io|ngrok\.app|trycloudflare\.com)$/.test(h)) return true;
+  return false;
+}
+
 export async function tourEmbeds(slugs: string[]): Promise<TourEmbed[]> {
   if (!slugs.length) return [];
   // Each visit's page, then whether the tour was seen (half of it on the screen for a second) or used there.
@@ -26,7 +42,7 @@ export async function tourEmbeds(slugs: string[]): Promise<TourEmbed[]> {
      FROM e LEFT JOIN u USING (session) GROUP BY e.host, e.url ORDER BY last DESC LIMIT 30`,
     slugs
   );
-  return rows.map((r) => ({
+  return rows.filter((r) => !isDevHost(r.host)).map((r) => ({
     host: r.host ?? "ukendt side",
     url: r.url && /^https?:\/\//.test(r.url) ? r.url : null,
     seen: Number(r.seen),

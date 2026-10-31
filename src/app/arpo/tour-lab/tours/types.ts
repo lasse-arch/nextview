@@ -446,6 +446,14 @@ export type TourConfig = {
    */
   autoplay?: false;
   /**
+   * On a phone, where the tour sits in someone's page. Left out (the
+   * standard): it loads in the frame, and the first tap in it puts it in full
+   * screen (an iPhone, where a frame can't go full screen, gets a "Fuld skærm"
+   * button that opens it in its own tab). "play": a picture with a play button
+   * first - nothing loads until it's pressed. "inline": it stays in the frame.
+   */
+  phoneEmbed?: "inline" | "play";
+  /**
    * Available rooms fetched live (every 10 min) and shown in the room picker:
    * per menu group (by its title) the size range (m³) it covers.
    */

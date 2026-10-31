@@ -1063,6 +1063,26 @@ export function TourEditor({
                   title="Start af sig selv på hjemmesider"
                   hint="Slået fra: på en hjemmeside viser touren et billede med en stor afspil-knap (som MPSkins). Intet hentes, før man trykker - og så åbner touren i fuld skærm (på en telefon i sin egen fane). Åbnes touren via sit eget link, starter den altid med det samme."
                 />
+                <Field
+                  title="På en telefon, når touren sidder på en hjemmeside"
+                  hint={
+                    config.phoneEmbed === "inline"
+                      ? "Touren bliver i rammen på siden, som på en computer."
+                      : config.phoneEmbed === "play"
+                        ? "Et billede med en stor afspil-knap - intet hentes, før man trykker, og så åbner touren i fuld skærm (på en iPhone i sin egen fane)."
+                        : "Standard: touren loader i rammen, og første gang man trykker i den, går den i fuld skærm. En iPhone kan ikke gøre en ramme fuld skærm - dér får touren en lille \"Fuld skærm\"-knap, der åbner den i sin egen fane."
+                  }
+                >
+                  <Choice<"use" | "play" | "inline">
+                    value={config.phoneEmbed ?? "use"}
+                    options={[
+                      ["use", "Fuld skærm ved brug"],
+                      ["play", "Afspil-knap"],
+                      ["inline", "I rammen"],
+                    ]}
+                    onChange={(v) => edit((d) => void (d.phoneEmbed = v === "use" ? undefined : v))}
+                  />
+                </Field>
                 <Toggle
                   on={Boolean(config.onboarding)}
                   onChange={(on) => edit((d) => void (d.onboarding = on || undefined))}

@@ -74,7 +74,7 @@ export function ContactForm({
           return;
         }
         const j = (await r.json().catch(() => null)) as { error?: string } | null;
-        if (r.status === 400) {
+        if (r.status === 400 || r.status === 429) {
           setState("edit");
           return setError(j?.error ?? tr("Udfyld navn, e-mail og besked."));
         }

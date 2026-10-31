@@ -23,6 +23,7 @@ import { GUIDE_CSS, GuidePlayer, guideStops } from "./guide";
 import { ONBOARDING_CSS, Onboarding } from "./onboarding";
 import { MENU_HINT_CSS, MenuHint } from "./menu-hint";
 import { PlayGate } from "./play-gate";
+import { FULLSCREEN_CSS, FullscreenOnUse } from "./fullscreen-on-use";
 import { CONTACT_CSS, CONTACT_HREF, ContactForm } from "./contact-form";
 import { DAY_CSS, DayBar, DaySheet } from "./day";
 import { FEEDBACK_CSS, FeedbackLayer } from "./feedback";
@@ -334,8 +335,26 @@ export function Experience(props: ExperienceProps) {
     () => true
   );
   const [played, setPlayed] = useState(false);
-  if (T.autoplay === false && embedded && !played) return <PlayGate T={T} isPreview={inEditorPreview} onPlay={() => setPlayed(true)} />;
-  return <TourExperience key={startSignature(T)} {...props} tour={T} lang={langs.includes(lang) ? lang : "da"} setLang={pickLang} played={played} />;
+  // A phone (not the editor's own preview): full screen from a play button, unless the tour is set to run in the frame.
+  const phoneGate = useSyncExternalStore(
+    noop,
+    () => window.innerWidth <= 760 && !inEditorPreview(),
+    () => false
+  );
+  if ((T.autoplay === false || (phoneGate && T.phoneEmbed === "play")) && embedded && !played) return <PlayGate T={T} isPreview={inEditorPreview} onPlay={() => setPlayed(true)} />;
+  // On a phone in someone's page (the standard): it loads in the frame, and goes full screen at the first tap.
+  const fullOnUse = phoneGate && embedded && !T.phoneEmbed && T.autoplay !== false;
+  return (
+    <>
+      <TourExperience key={startSignature(T)} {...props} tour={T} lang={langs.includes(lang) ? lang : "da"} setLang={pickLang} played={played} />
+      {fullOnUse && (
+        <>
+          <style>{FULLSCREEN_CSS}</style>
+          <FullscreenOnUse />
+        </>
+      )}
+    </>
+  );
 }
 
 const noop = () => () => {};
