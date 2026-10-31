@@ -1416,7 +1416,7 @@ export function TourEditor({
   );
 }
 
-type ChatMsg = { role: "user" | "assistant"; text: string; images?: string[]; error?: boolean; changed?: number; before?: TourConfig; undone?: boolean; remembered?: string[] };
+type ChatMsg = { role: "user" | "assistant"; text: string; images?: string[]; error?: boolean; changed?: number; before?: TourConfig; undone?: boolean; remembered?: string[]; forgot?: string[] };
 
 /** A picture made small enough to send to nextviewAI (longest side 1600 px, JPEG) - as a data URL. */
 /**
@@ -1590,8 +1590,8 @@ function ClaudePanel({
         return setChat((c) => [...c, { role: "assistant", text: r.error, error: true }]);
       }
       if (r.changed) onApply(r.config);
-      if (r.remembered.length) setLearned((n) => n + 1);
-      setChat((c) => [...c, { role: "assistant", text: r.reply, changed: r.changed, before: r.changed ? before : undefined, remembered: r.remembered }]);
+      if (r.remembered.length || r.forgot.length) setLearned((n) => n + 1);
+      setChat((c) => [...c, { role: "assistant", text: r.reply, changed: r.changed, before: r.changed ? before : undefined, remembered: r.remembered, forgot: r.forgot }]);
     });
   }
 
@@ -1658,6 +1658,11 @@ function ClaudePanel({
                     {m.remembered?.map((t) => (
                       <p key={t} className="mt-1 text-[12px] leading-snug text-[#8e8e93]">
                         Husker nu: {t}
+                      </p>
+                    ))}
+                    {m.forgot?.map((t) => (
+                      <p key={t} className="mt-1 text-[12px] leading-snug text-[#8e8e93] line-through decoration-[#c7c7cc]">
+                        Glemt: {t}
                       </p>
                     ))}
                     {m.before && (

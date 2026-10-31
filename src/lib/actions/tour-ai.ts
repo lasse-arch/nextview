@@ -89,10 +89,13 @@ const Edits = z.object({
       })
     )
     .describe("Det, du har lært og skal huske til næste gang (se Hukommelse). Ofte tom."),
+  forget: z
+    .array(z.string())
+    .describe("Noter, der skal slettes fra hukommelsen - hver skrevet præcis, som den står i <hukommelse>. Kun når brugeren beder om det, eller en note er blevet forkert (se Hukommelse). Ofte tom."),
 });
 
 export type ChatTurn = { role: "user" | "assistant"; text: string };
-export type AiEditResult = { ok: true; reply: string; config: TourConfig; changed: number; remembered: string[] } | { ok: false; error: string };
+export type AiEditResult = { ok: true; reply: string; config: TourConfig; changed: number; remembered: string[]; forgot: string[] } | { ok: false; error: string };
 
 
 /** Applies one change to a copy-in-progress of the setup. Paths are "/"-separated keys and list indexes. */
@@ -170,6 +173,7 @@ Hukommelse (remember):
 - Motoren bliver løbende bygget ud. Står der i hukommelsen eller i samtalen, at touren ikke kan noget, men typerne nedenfor viser, at den kan, så følg typerne.
 - Gem en kort sætning, når du lærer noget, der skal bruges igen: når brugeren retter dig eller siger, hvordan Nextview360 vil have tingene (scope "all"), eller vigtige fakta om kunden, som ikke står i opsætningen (scope "tour").
 - Gem ikke det, der allerede står i drejebogen eller hukommelsen, og ikke selve ændringen. Oftest er listen tom.
+- Du kan selv slette noter (forget): beder brugeren dig glemme eller slette noget fra hukommelsen, så skriv notens tekst præcis, som den står, i forget - sig aldrig, at du ikke kan. Er en note blevet forkert (fx "skal bygges ind i motoren", men typerne viser, at motoren kan det nu), så slet den også og sig det i dit svar.
 
 <drejebog>
 ${playbook}
@@ -186,6 +190,17 @@ async function memories(slug: string) {
   const rows = await prisma.tourAiMemory.findMany({ where: { scope: { in: ["all", slug] } }, orderBy: { createdAt: "asc" }, take: 300 });
   const list = (scope: string) => rows.filter((r) => r.scope === scope).map((r) => `- ${r.text}`).join("\n");
   return { all: list("all"), tour: list(slug) };
+}
+
+/** Deletes the notes nextviewAI was asked to forget - only notes it can see (all tours', and this tour's), matched on their exact words. */
+async function forget(slug: string, texts: string[]): Promise<string[]> {
+  const norm = (s: string) => s.replace(/^[-•*\s]+/, "").replace(/\s+/g, " ").trim();
+  const wanted = new Set(texts.map(norm).filter(Boolean));
+  if (!wanted.size) return [];
+  const rows = await prisma.tourAiMemory.findMany({ where: { scope: { in: ["all", slug] } }, select: { id: true, text: true } });
+  const gone = rows.filter((r) => wanted.has(norm(r.text)));
+  if (gone.length) await prisma.tourAiMemory.deleteMany({ where: { id: { in: gone.map((r) => r.id) } } });
+  return gone.map((r) => r.text);
 }
 
 /** Keeps what nextviewAI learned (skipping what it already knew). */
@@ -266,7 +281,8 @@ async function claudeEdits(key: string, who: { name: string; kind: string }, con
     return { ok: false, error: `nextviewAIs ændring kunne ikke bruges (${problem}) - prøv at formulere det anderledes.` };
   }
   const remembered = await remember(config.slug, who.name, parsed.remember ?? []).catch((err: unknown) => (console.error("remember", err), []));
-  return { ok: true, reply: parsed.reply, config: plainWordsInConfig({ ...(next as unknown as TourConfig), slug: config.slug }), changed: parsed.changes.length, remembered };
+  const forgot = await forget(config.slug, parsed.forget ?? []).catch((err: unknown) => (console.error("forget", err), []));
+  return { ok: true, reply: parsed.reply, config: plainWordsInConfig({ ...(next as unknown as TourConfig), slug: config.slug }), changed: parsed.changes.length, remembered, forgot };
 }
 
 /** Screenshots sent with a request (data URLs from the editor, made small there) as image blocks - anything else is dropped. */
