@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { getCurrentCustomer, getCurrentUser } from "@/lib/auth";
 import { logout } from "@/lib/actions/auth";
 import { ToastProvider } from "@/components/toast";
+import { DropFiles } from "@/components/drop-files";
 import { SettingsMenu } from "./settings-menu";
 import { SidebarNav, type SidebarNavItem } from "./sidebar-nav";
 import { MobileNav } from "./mobile-nav";
@@ -86,6 +87,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <ToastProvider>
+      <DropFiles />
       <div className="flex min-h-screen" data-presentation={presenting ? "true" : "false"}>
         <aside className="arpo-sidebar sticky top-0 hidden h-screen w-60 shrink-0 flex-col overflow-y-auto border-r border-slate-200 bg-slate-50 p-3 md:flex">
           <Link href="/arpo" className="flex items-center px-2.5 pb-3 pt-3">
