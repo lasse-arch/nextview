@@ -6,7 +6,7 @@ import { logout } from "@/lib/actions/auth";
 import { prisma } from "@/lib/db";
 import { dealName, needsDeliveryLink } from "@/lib/labels";
 import { tourUrl } from "@/lib/public-urls";
-import { tourStats, type TourStats } from "@/lib/tour-stats";
+import { addDays, isYmd, todayDK, tourStats, type TourStats } from "@/lib/tour-stats";
 import { shareOf, shown } from "@/lib/tour-share";
 import { mergeShare, mergeStats } from "@/lib/merge-stats";
 import { parseContractProducts } from "@/lib/contract-template-data";
@@ -15,7 +15,8 @@ import type { TourConfig } from "@/app/arpo/tour-lab/tours/types";
 import { startPlaces } from "@/app/arpo/tour-lab/tours/places";
 import { PortalEmbeds } from "@/app/r/[token]/embeds";
 import { PHONE, WELCOME_MAIL_SENDER } from "@/lib/welcome-mail";
-import { LangToggle, LocationSwitcher, ReviewLauncher, TourThumb, ApproveTour, ReportMailChoice } from "./portal-ui";
+import { LangToggle, LocationSwitcher, ReviewLauncher, TourThumb, ApproveTour, ReportMailChoice, PortalPeriod } from "./portal-ui";
+import { periodText, type Period } from "@/lib/periods";
 import { TourShare } from "./tour-share";
 import { SitePlacement } from "./site-placement";
 import { tourEmbeds } from "@/lib/tour-embeds";
@@ -62,7 +63,7 @@ async function viewer(som: string | undefined): Promise<{ dealIds: string[]; nam
 
 const fmtDate = (d: Date, lang: Lang) => d.toLocaleDateString(lang === "en" ? "en-GB" : "da-DK", { day: "numeric", month: "short", year: "numeric" });
 
-export default async function CustomerPage({ searchParams }: { searchParams: Promise<{ som?: string; sted?: string; side?: string }> }) {
+export default async function CustomerPage({ searchParams }: { searchParams: Promise<{ som?: string; sted?: string; side?: string; fra?: string; til?: string; periode?: string }> }) {
   const sp = await searchParams;
   const who = await viewer(sp.som);
   if (!who) redirect("/arpo");
@@ -140,7 +141,13 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
     page === "rettelser" && reviewTours.length
       ? await prisma.tourFeedback.findMany({ where: { tourSlug: { in: reviewTours.map((x) => x.slug) } }, orderBy: { createdAt: "desc" }, take: 100, select: { id: true, tourSlug: true, kind: true, text: true, room: true, author: true, status: true, createdAt: true } })
       : [];
-  const stats: TourStats[] = needStats ? await Promise.all(tours.map((x) => tourStats(x.slug, x.share.days))) : [];
+  // The period: the last 7 days (today included), unless they picked another (at most a little over a year).
+  const today = todayDK();
+  const ownPeriod = isYmd(sp.fra) && isYmd(sp.til) && sp.fra <= sp.til && sp.til <= addDays(today, 366) && (Date.parse(sp.til) - Date.parse(sp.fra)) / 86_400_000 <= 400;
+  const period: Period = ownPeriod
+    ? { preset: (["idag", "igaar", "7", "30", "uge", "maaned", "aar"].includes(sp.periode ?? "") ? sp.periode : "egen") as Period["preset"], from: sp.fra!, to: sp.til! }
+    : { preset: "7", from: addDays(today, -6), to: today };
+  const stats: TourStats[] = needStats ? await Promise.all(tours.map((x) => tourStats(x.slug, { from: period.from, to: period.to }))) : [];
   const together = needStats ? mergeStats(stats) : null;
   const togetherShare = mergeShare(tours.map((x) => x.share));
   const first = who.name?.split(" ")[0];
@@ -245,7 +252,6 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
                         <h2 className="text-[18px] font-bold tracking-tight">{t.overview}</h2>
                         <p className="text-[13px] text-[#6e6e73]">
                           {sted ? dealName(scope[0]) : many ? t.allTogether(deals.length) : company}
-                          {together ? ` · ${t.lastDays(together.days)}` : ""}
                         </p>
                       </div>
                       {together && (
@@ -254,6 +260,11 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
                         </a>
                       )}
                     </div>
+                    {together && (
+                      <div className="mt-3 max-w-xs">
+                        <PortalPeriod value={period} lang={lang} />
+                      </div>
+                    )}
                     {!together ? (
                       <p className="mt-4 rounded-2xl bg-[#f7f7f9] p-4 text-[15px] text-[#3a3a3c]">{tours.length || older.length ? t.noStatsYet : notLive}</p>
                     ) : together.visits === 0 ? (
@@ -277,7 +288,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
                               </div>
                             ))}
                         </div>
-                        {togetherShare?.perDay && <Bars days={together.perDay} label={t.visits} />}
+                        {togetherShare?.perDay && <Bars days={together.perDay} label={t.visits} lang={lang} />}
                       </>
                     )}
                   </section>
@@ -378,8 +389,11 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
                 </section>
               ) : (
                 <>
+                  <div className="max-w-xs">
+                    <PortalPeriod value={period} lang={lang} />
+                  </div>
                   <section className={card}>
-                    <CustomerReport stats={together} share={togetherShare} brand={sted ? dealName(scope[0]) : company} lang={lang} title={`${tours.length > 1 ? t.allTogether(tours.length).replace(/afdelinger|locations/, lang === "en" ? "tours" : "tours") : t.overview} · ${t.lastDays(together.days)}`} />
+                    <CustomerReport stats={together} share={togetherShare} brand={sted ? dealName(scope[0]) : company} lang={lang} title={`${tours.length > 1 ? t.allTogether(tours.length).replace(/afdelinger|locations/, lang === "en" ? "tours" : "tours") : t.overview} · ${periodText(period, lang)}`} />
                   </section>
                   {tours.length > 1 && (
                     <>
@@ -638,15 +652,35 @@ function Contact({ t, card }: { t: (typeof TEXT)[Lang]; card: string }) {
   );
 }
 
-function Bars({ days, label }: { days: { day: string; visits: number }[]; label: string }) {
+/** Visits per day: the number over each day's bar, and the dates under them (every one for a week, fewer for longer periods). */
+function Bars({ days, label, lang }: { days: { day: string; visits: number }[]; label: string; lang: Lang }) {
   const max = Math.max(1, ...days.map((d) => d.visits));
+  const every = days.length <= 10 ? 1 : days.length <= 31 ? Math.ceil(days.length / 8) : Math.ceil(days.length / 6);
+  const numbers = days.length <= 31;
+  const fmt = (iso: string) => {
+    const d = new Date(`${iso}T12:00:00Z`);
+    return days.length <= 10
+      ? `${d.toLocaleDateString(lang === "en" ? "en-GB" : "da-DK", { weekday: "short", timeZone: "UTC" }).replace(".", "")} ${d.getUTCDate()}`
+      : d.toLocaleDateString(lang === "en" ? "en-GB" : "da-DK", { day: "numeric", month: "short", timeZone: "UTC" });
+  };
   return (
-    <div className="mt-5 flex h-24 items-end gap-[3px]">
-      {days.map((d) => (
-        <div key={d.day} title={`${d.day}: ${d.visits} ${label.toLowerCase()}`} className="flex h-full flex-1 items-end">
-          <div className="w-full rounded-t-[4px] bg-[#0071e3]" style={{ height: d.visits ? `${Math.max(4, (d.visits / max) * 100)}%` : 0, opacity: d.visits ? 1 : 0 }} />
-        </div>
-      ))}
+    <div className="mt-5">
+      <div className="flex h-28 items-end gap-[3px]">
+        {days.map((d) => (
+          <div key={d.day} title={`${fmt(d.day)}: ${d.visits} ${label.toLowerCase()}`} className="flex h-full min-w-0 flex-1 flex-col items-center justify-end">
+            {numbers && d.visits > 0 && <span className="mb-1 text-[11px] font-semibold tabular-nums text-[#3a3a3c]">{d.visits}</span>}
+            <div className="w-full rounded-t-[5px] bg-[#0071e3]" style={{ height: d.visits ? `${Math.max(5, (d.visits / max) * 78)}%` : 2, opacity: d.visits ? 1 : 0.15 }} />
+          </div>
+        ))}
+      </div>
+      <div className="mt-1.5 flex gap-[3px] border-t border-black/[.06] pt-1.5">
+        {days.map((d, i) => (
+          <span key={d.day} className={`min-w-0 flex-1 overflow-visible whitespace-nowrap text-center text-[10.5px] text-[#8e8e93] ${days.length <= 10 ? "capitalize" : ""}`}>
+            {/* Every so many days - and the last one, unless the one before it is labelled so close it would run into it. */}
+            {i % every === 0 || (i === days.length - 1 && i % every >= Math.ceil(every / 2) + 1) ? fmt(d.day) : ""}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }

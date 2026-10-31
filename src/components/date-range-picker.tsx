@@ -9,61 +9,13 @@ import { useEffect, useRef, useState } from "react";
  * time; both ends are included.
  */
 
-export type Period = { preset: PresetKey; from: string; to: string };
-export type PresetKey = "idag" | "igaar" | "7" | "30" | "uge" | "maaned" | "aar" | "egen";
+import { MONTHS, MONTHS_EN, PRESETS, PRESETS_EN, periodText, presetName, presetPeriod, today, ymd, type Period, type PresetKey } from "@/lib/periods";
 
-const PRESETS: [PresetKey, string][] = [
-  ["idag", "I dag"],
-  ["igaar", "I går"],
-  ["7", "Sidste 7 dage"],
-  ["30", "Sidste 30 dage"],
-  ["uge", "Denne uge"],
-  ["maaned", "Denne måned"],
-  ["aar", "I år"],
-  ["egen", "Brugerdefineret"],
-];
-const MONTHS = ["januar", "februar", "marts", "april", "maj", "juni", "juli", "august", "september", "oktober", "november", "december"];
+export type { Period, PresetKey };
+export { periodText, presetName, presetPeriod, today };
 
-const ymd = (d: Date) => d.toISOString().slice(0, 10);
-const at = (s: string) => new Date(`${s}T12:00:00Z`);
-const plus = (s: string, n: number) => {
-  const d = at(s);
-  d.setUTCDate(d.getUTCDate() + n);
-  return ymd(d);
-};
-/** Today in Denmark. */
-export function today(): string {
-  return new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Copenhagen" }).format(new Date());
-}
-
-/** A ready-made period's days, counted from today. */
-export function presetPeriod(key: Exclude<PresetKey, "egen">, now = today()): Period {
-  const d = at(now);
-  const y = d.getUTCFullYear();
-  const m = d.getUTCMonth();
-  const range: Record<Exclude<PresetKey, "egen">, [string, string]> = {
-    idag: [now, now],
-    igaar: [plus(now, -1), plus(now, -1)],
-    "7": [plus(now, -6), now],
-    "30": [plus(now, -29), now],
-    uge: [plus(now, -((d.getUTCDay() + 6) % 7)), plus(now, 6 - ((d.getUTCDay() + 6) % 7))],
-    maaned: [ymd(new Date(Date.UTC(y, m, 1, 12))), ymd(new Date(Date.UTC(y, m + 1, 0, 12)))],
-    aar: [`${y}-01-01`, `${y}-12-31`],
-  };
-  const [from, to] = range[key];
-  return { preset: key, from, to };
-}
-
-const short = (s: string) => at(s).toLocaleDateString("da-DK", { day: "numeric", month: "short", timeZone: "UTC" });
-/** "25. okt.–31. okt. 2026" (one day: "31. okt. 2026"). */
-export function periodText(p: { from: string; to: string }): string {
-  const year = p.to.slice(0, 4);
-  if (p.from === p.to) return `${short(p.from)} ${year}`;
-  return `${short(p.from)}${p.from.slice(0, 4) !== year ? ` ${p.from.slice(0, 4)}` : ""}–${short(p.to)} ${year}`;
-}
-export const presetName = (k: PresetKey) => PRESETS.find(([x]) => x === k)?.[1] ?? "";
-
-export function DateRangePicker({ value, onChange, disabled }: { value: Period; onChange: (p: Period) => void; disabled?: boolean }) {
+export function DateRangePicker({ value, onChange, disabled, lang = "da" }: { value: Period; onChange: (p: Period) => void; disabled?: boolean; lang?: "da" | "en" }) {
+  const en = lang === "en";
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<{ preset: PresetKey; from: string; to: string | null }>(value);
   const [month, setMonth] = useState(() => value.to.slice(0, 7));
@@ -130,8 +82,8 @@ export function DateRangePicker({ value, onChange, disabled }: { value: Period; 
           <path d="M3 8h14M7 3v3M13 3v3" strokeLinecap="round" />
         </svg>
         <span className="min-w-0 flex-1">
-          <span className="block text-[13px] font-semibold leading-tight">{presetName(value.preset)}</span>
-          <span className="block truncate text-[11.5px] leading-tight text-[#6e6e73]">{periodText(value)}</span>
+          <span className="block text-[13px] font-semibold leading-tight">{presetName(value.preset, lang)}</span>
+          <span className="block truncate text-[11.5px] leading-tight text-[#6e6e73]">{periodText(value, lang)}</span>
         </span>
         <svg viewBox="0 0 20 20" className={`h-4 w-4 flex-none text-[#8e8e93] transition ${open ? "rotate-180" : ""}`} fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
           <path d="m5 8 5 5 5-5" strokeLinecap="round" strokeLinejoin="round" />
@@ -141,14 +93,15 @@ export function DateRangePicker({ value, onChange, disabled }: { value: Period; 
       {open && (
         <div
           role="dialog"
-          aria-label="Vælg periode"
+          aria-label={en ? "Choose a period" : "Vælg periode"}
           style={pos ? ({ "--dl": `${pos.left}px`, "--dt": `${pos.top}px` } as React.CSSProperties) : undefined}
           className="fixed inset-x-2 bottom-2 z-[70] overflow-hidden rounded-2xl bg-white shadow-[0_20px_60px_rgba(0,0,0,.25)] ring-1 ring-black/[.08] sm:inset-x-auto sm:bottom-auto sm:left-[var(--dl)] sm:top-[var(--dt)] sm:w-[560px]"
         >
           <div className="flex flex-col sm:flex-row">
             {/* Ready-made periods: a column on a computer, a row to swipe on a phone. */}
             <div className="flex gap-1 overflow-x-auto border-b border-black/[.06] p-2 sm:w-[200px] sm:flex-none sm:flex-col sm:overflow-visible sm:border-b-0 sm:border-r">
-              {PRESETS.map(([k, label]) => {
+              {PRESETS.map(([k, da]) => {
+                const label = en ? PRESETS_EN[k] : da;
                 const p = k === "egen" ? null : presetPeriod(k);
                 const on = draft.preset === k;
                 return (
@@ -160,7 +113,7 @@ export function DateRangePicker({ value, onChange, disabled }: { value: Period; 
                   >
                     <span className="min-w-0 flex-1">
                       <span className="block whitespace-nowrap text-[13.5px] font-semibold">{label}</span>
-                      {p && <span className="hidden whitespace-nowrap text-[11.5px] text-[#6e6e73] sm:block">{periodText(p)}</span>}
+                      {p && <span className="hidden whitespace-nowrap text-[11.5px] text-[#6e6e73] sm:block">{periodText(p, lang)}</span>}
                     </span>
                     {on && (
                       <svg viewBox="0 0 20 20" className="hidden h-4 w-4 flex-none sm:block" fill="none" stroke="currentColor" strokeWidth={2.2} aria-hidden>
@@ -175,29 +128,29 @@ export function DateRangePicker({ value, onChange, disabled }: { value: Period; 
             {/* The calendar. */}
             <div className="flex-1 p-3 sm:p-4">
               <div className="mb-2 flex items-center justify-center gap-2">
-                <button type="button" aria-label="Forrige måned" onClick={() => shift(-1)} className="flex h-8 w-8 items-center justify-center rounded-full text-[18px] hover:bg-[#f2f2f7]">
+                <button type="button" aria-label={en ? "Previous month" : "Forrige måned"} onClick={() => shift(-1)} className="flex h-8 w-8 items-center justify-center rounded-full text-[18px] hover:bg-[#f2f2f7]">
                   ‹
                 </button>
-                <select aria-label="Måned" value={m - 1} onChange={(e) => setMonth(`${y}-${String(Number(e.target.value) + 1).padStart(2, "0")}`)} className="rounded-lg bg-white px-2 py-1 text-[14px] font-medium ring-1 ring-black/[.1]">
-                  {MONTHS.map((name, i) => (
+                <select aria-label={en ? "Month" : "Måned"} value={m - 1} onChange={(e) => setMonth(`${y}-${String(Number(e.target.value) + 1).padStart(2, "0")}`)} className="rounded-lg bg-white px-2 py-1 text-[14px] font-medium ring-1 ring-black/[.1]">
+                  {(en ? MONTHS_EN : MONTHS).map((name, i) => (
                     <option key={name} value={i}>
                       {name}
                     </option>
                   ))}
                 </select>
-                <select aria-label="År" value={y} onChange={(e) => setMonth(`${e.target.value}-${String(m).padStart(2, "0")}`)} className="rounded-lg bg-white px-2 py-1 text-[14px] font-medium ring-1 ring-black/[.1]">
+                <select aria-label={en ? "Year" : "År"} value={y} onChange={(e) => setMonth(`${e.target.value}-${String(m).padStart(2, "0")}`)} className="rounded-lg bg-white px-2 py-1 text-[14px] font-medium ring-1 ring-black/[.1]">
                   {years.map((yy) => (
                     <option key={yy} value={yy}>
                       {yy}
                     </option>
                   ))}
                 </select>
-                <button type="button" aria-label="Næste måned" onClick={() => shift(1)} className="flex h-8 w-8 items-center justify-center rounded-full text-[18px] hover:bg-[#f2f2f7]">
+                <button type="button" aria-label={en ? "Next month" : "Næste måned"} onClick={() => shift(1)} className="flex h-8 w-8 items-center justify-center rounded-full text-[18px] hover:bg-[#f2f2f7]">
                   ›
                 </button>
               </div>
               <div className="grid grid-cols-7 text-center text-[11.5px] font-semibold text-[#8e8e93]">
-                {["Ma", "Ti", "On", "To", "Fr", "Lø", "Sø"].map((d) => (
+                {(en ? ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"] : ["Ma", "Ti", "On", "To", "Fr", "Lø", "Sø"]).map((d) => (
                   <span key={d} className="py-1">
                     {d}
                   </span>
@@ -225,10 +178,10 @@ export function DateRangePicker({ value, onChange, disabled }: { value: Period; 
                   );
                 })}
               </div>
-              <p className="mt-2 min-h-[18px] text-center text-[12px] text-[#6e6e73]">{draft.to === null ? "Vælg slutdatoen" : periodText({ from: draft.from, to: draft.to })}</p>
+              <p className="mt-2 min-h-[18px] text-center text-[12px] text-[#6e6e73]">{draft.to === null ? (en ? "Pick the end date" : "Vælg slutdatoen") : periodText({ from: draft.from, to: draft.to }, lang)}</p>
               <div className="mt-2 flex justify-end gap-2 border-t border-black/[.06] pt-3">
                 <button type="button" onClick={() => setOpen(false)} className="rounded-full bg-[#f2f2f7] px-4 py-2 text-[14px] font-semibold">
-                  Annuller
+                  {en ? "Cancel" : "Annuller"}
                 </button>
                 <button
                   type="button"
@@ -239,7 +192,7 @@ export function DateRangePicker({ value, onChange, disabled }: { value: Period; 
                   }}
                   className="rounded-full bg-[#0071e3] px-5 py-2 text-[14px] font-semibold text-white disabled:opacity-40"
                 >
-                  Anvend
+                  {en ? "Apply" : "Anvend"}
                 </button>
               </div>
             </div>

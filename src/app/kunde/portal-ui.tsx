@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { setPortalLanguage } from "@/lib/actions/portal-language";
 import { portalApprove, portalReview } from "@/lib/actions/portal-review";
+import { DateRangePicker, type Period } from "@/components/date-range-picker";
 import { setMyReportInterval, type PortalReportChoice } from "@/lib/actions/portal-report";
 
 /*
@@ -305,6 +306,29 @@ export function ReportMailChoice({
       <p aria-live="polite" className={`mt-2 h-4 text-[12.5px] ${state === "saved" ? "text-[#1a7f37]" : state === "idle" || state === "saving" ? "text-[#6e6e73]" : "text-[#d70015]"}`}>
         {state === "saved" ? `✓ ${words.saved}` : state === "idle" || state === "saving" ? "" : state}
       </p>
+    </div>
+  );
+}
+
+/** The period for the numbers (Overblik and Statistik): the last 7 days to begin with, any other picked here - kept in the address. */
+export function PortalPeriod({ value, lang }: { value: Period; lang: "da" | "en" }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  return (
+    <div className={busy ? "opacity-60 transition-opacity" : ""}>
+      <DateRangePicker
+        value={value}
+        lang={lang}
+        onChange={(p) => {
+          const q = new URLSearchParams(window.location.search);
+          q.set("fra", p.from);
+          q.set("til", p.to);
+          q.set("periode", p.preset);
+          setBusy(true);
+          router.push(`?${q.toString()}`, { scroll: false });
+          setTimeout(() => setBusy(false), 1500);
+        }}
+      />
     </div>
   );
 }
