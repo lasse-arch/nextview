@@ -186,6 +186,16 @@ export async function requireTeam(perm: TeamPerm): Promise<User> {
 /** Where to go after logging in - only a path on this site ("//evil.com"
  * and "/\\evil.com" are other sites to a browser). */
 export function safeNextPath(next: string | null | undefined): string {
-  if (!next || !next.startsWith("/") || next.startsWith("//") || next.startsWith("/\\")) return "/";
-  return next;
+  if (!next || !next.startsWith("/")) return "/";
+  // Browsers drop tabs and newlines and read "\\" as "/": "/\t/evil.com" would become //evil.com. No control characters, no backslash at all.
+  if (/[\u0000-\u001f\u007f\\]/.test(next)) return "/";
+  // And it must stay on our own site once a browser has read it.
+  const base = "https://arpo.invalid";
+  try {
+    const u = new URL(next, base);
+    if (u.origin !== base) return "/";
+    return u.pathname + u.search + u.hash;
+  } catch {
+    return "/";
+  }
 }
