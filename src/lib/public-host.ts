@@ -39,6 +39,9 @@ function publicV6(ip: string): boolean {
   if (/^fe[89ab]/.test(s)) return false; // link-local
   if (/^ff/.test(s)) return false; // multicast
   if (/^2001:0?db8:/.test(s)) return false; // documentation
+  if (/^2002:/.test(s)) return false; // 6to4 - carries an IPv4 address inside
+  if (/^2001:0{0,4}:/.test(s)) return false; // Teredo - carries an IPv4 address inside
+  if (/^::(\d+\.\d+\.\d+\.\d+)$/.test(s)) return false; // IPv4-compatible (deprecated)
   return true;
 }
 
@@ -60,7 +63,8 @@ const known = new Map<string, { ok: boolean; at: number }>();
  * always refused.
  */
 export async function isPublicHost(hostname: string): Promise<boolean> {
-  const host = hostname.replace(/^\[|\]$/g, "").toLowerCase();
+  // "localhost." and "x.internal." are the same names as without the dot.
+  const host = hostname.replace(/^\[|\]$/g, "").toLowerCase().replace(/\.+$/, "");
   if (!host || host === "localhost" || /\.(local|localhost|internal|lan|home|corp|intranet)$/.test(host)) return false;
   if (isIP(host)) return isPublicIp(host);
   if (!host.includes(".")) return false;

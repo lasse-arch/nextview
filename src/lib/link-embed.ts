@@ -1,3 +1,4 @@
+import { safeFetch } from "@/lib/safe-fetch";
 import "server-only";
 
 /**
@@ -8,7 +9,7 @@ import "server-only";
 export async function canEmbed(url: string): Promise<boolean> {
   const embedUrl = url.replace(/(drive\.google\.com\/file\/d\/[^/]+)\/view.*$/, "$1/preview");
   try {
-    const res = await fetch(embedUrl, { redirect: "follow", next: { revalidate: 86400 }, signal: AbortSignal.timeout(5000) });
+    const res = await safeFetch(embedUrl, { next: { revalidate: 86400 }, signal: AbortSignal.timeout(5000) } as RequestInit);
     const xfo = res.headers.get("x-frame-options");
     if (xfo && /deny|sameorigin/i.test(xfo)) return false;
     const ancestors = /frame-ancestors([^;]*)/i.exec(res.headers.get("content-security-policy") ?? "")?.[1]?.trim();

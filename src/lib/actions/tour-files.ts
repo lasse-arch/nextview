@@ -1,5 +1,6 @@
 "use server";
 
+import { readLimited, safeFetch } from "@/lib/safe-fetch";
 import { requireTour } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { copyToTour, DB_MAX, hostFiles, storeTourFile } from "@/lib/tour-files";
@@ -41,10 +42,10 @@ export async function fetchSiteFavicon(slug: string, site: string): Promise<{ ok
   await requireTour(slug);
   try {
     const base = new URL(/^https?:\/\//i.test(site.trim()) ? site.trim() : `https://${site.trim()}`);
-    if (!/^https?:$/.test(base.protocol) || /^(localhost|\d+\.\d+\.\d+\.\d+)$|\.(local|internal)$/.test(base.hostname)) return { ok: false, error: "Skriv kundens offentlige hjemmeside." };
-    const res = await fetch(base, { headers: { "User-Agent": "Mozilla/5.0 (compatible; ArpoTourBuilder/1.0)" }, signal: AbortSignal.timeout(15_000), redirect: "follow" });
+    const res = await safeFetch(base, { headers: { "User-Agent": "Mozilla/5.0 (compatible; ArpoTourBuilder/1.0)" }, signal: AbortSignal.timeout(15_000) }).catch(() => null);
+    if (!res) return { ok: false, error: "Skriv kundens offentlige hjemmeside." };
     if (!res.ok) return { ok: false, error: `${base.hostname} svarede ${res.status}.` };
-    const html = (await res.text()).slice(0, 1_500_000);
+    const html = (await readLimited(res, 1_500_000).catch(() => Buffer.alloc(0))).toString("utf8");
     const icons = [...html.matchAll(/<link\b[^>]*>/gi)]
       .map((m) => m[0])
       .filter((tag) => /\brel\s*=\s*["'][^"']*icon[^"']*["']/i.test(tag) && !/mask-icon/i.test(tag))

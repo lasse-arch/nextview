@@ -1,5 +1,6 @@
 "use server";
 
+import { readLimited, safeFetch } from "@/lib/safe-fetch";
 import Papa from "papaparse";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
@@ -175,11 +176,18 @@ export async function importFromGoogleDocs(formData: FormData) {
   let csvText = pastedText;
 
   if (!csvText && sourceUrl) {
-    const res = await fetch(sourceUrl);
-    if (!res.ok) {
+    // Only a Google Docs/Sheets/Drive address - never anything else our server would fetch on someone's behalf.
+    let host = "";
+    try {
+      const u = new URL(sourceUrl);
+      host = u.protocol === "https:" ? u.hostname : "";
+    } catch {}
+    if (!["docs.google.com", "drive.google.com"].includes(host)) throw new Error("Indsæt et link fra Google Sheets/Docs (https://docs.google.com/…).");
+    const res = await safeFetch(sourceUrl, { signal: AbortSignal.timeout(20_000) }).catch(() => null);
+    if (!res?.ok) {
       throw new Error("Kunne ikke hente dokumentet. Sørg for at det er delt/publiceret offentligt.");
     }
-    csvText = await res.text();
+    csvText = (await readLimited(res, 5_000_000)).toString("utf8");
   }
 
   if (!csvText) {

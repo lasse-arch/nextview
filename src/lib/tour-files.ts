@@ -1,3 +1,4 @@
+import { BlockedAddress, readLimited, safeFetch } from "@/lib/safe-fetch";
 import "server-only";
 import { put } from "@vercel/blob";
 import { prisma } from "@/lib/db";
@@ -63,12 +64,14 @@ export async function copyToTour(slug: string, url: string): Promise<string> {
   const known = await prisma.tourFile.findFirst({ where: { tourSlug: slug, sourceUrl: url }, select: { id: true, url: true } });
   if (known) return known.url ?? `/api/tour-files/${known.id}`;
   const parsed = new URL(url);
-  if (!/^https?:$/.test(parsed.protocol) || /^(localhost|\d+\.\d+\.\d+\.\d+)$/.test(parsed.hostname)) throw new Error(`${url}: ikke en offentlig adresse.`);
-  const res = await fetch(downloadable(url), { signal: AbortSignal.timeout(60_000), headers: { "User-Agent": "Mozilla/5.0 (compatible; ArpoTourBuilder/1.0)" } });
+  // Only public websites, every redirect checked (safeFetch) - never our own server or a private network.
+  const res = await safeFetch(downloadable(url), { signal: AbortSignal.timeout(60_000), headers: { "User-Agent": "Mozilla/5.0 (compatible; ArpoTourBuilder/1.0)" } }).catch((err) => {
+    throw err instanceof BlockedAddress ? new Error(`${url}: ikke en offentlig adresse.`) : err;
+  });
   if (!res.ok) throw new Error(`${parsed.hostname} svarede ${res.status}.`);
   const max = blobReady() ? BLOB_MAX : DB_MAX;
   if (Number(res.headers.get("content-length") ?? 0) > max) throw new Error(`${parsed.pathname.split("/").pop()} er for stor${blobReady() ? "" : " - filer over 4 MB (fx video) kræver Vercel Blob"}.`);
-  const bytes = Buffer.from(await res.arrayBuffer());
+  const bytes = await readLimited(res, max);
   const name = decodeURIComponent(parsed.pathname.split("/").pop() || parsed.hostname);
   let type = res.headers.get("content-type") ?? "";
   if (!EXT[type.split(";")[0]]) type = /\.svg$/i.test(name) ? "image/svg+xml" : /\.mp3$/i.test(name) ? "audio/mpeg" : /\.m4a$/i.test(name) ? "audio/mp4" : type;

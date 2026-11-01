@@ -1,3 +1,4 @@
+import { BlockedAddress, readLimited, safeFetch } from "@/lib/safe-fetch";
 import crypto from "node:crypto";
 import { lookupCvrNumber } from "@/lib/cvr";
 
@@ -57,13 +58,15 @@ export async function fetchPageText(url: string): Promise<PageFetchResult> {
   }
 
   try {
-    const res = await fetch(parsed.toString(), {
+    // Only public websites, every redirect checked - also the links found on the page.
+    const res = await safeFetch(parsed.toString(), {
       headers: { "User-Agent": USER_AGENT },
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-    });
+    }).catch((err) => (err instanceof BlockedAddress ? null : Promise.reject(err)));
+    if (!res) return { ok: false, error: "URL'en skal være en offentlig hjemmeside." };
     if (!res.ok) return { ok: false, error: `Siden svarede med fejl ${res.status}.` };
 
-    const html = await res.text();
+    const html = (await readLimited(res, 3_000_000).catch(() => Buffer.alloc(0))).toString("utf8");
     const titleMatch = html.match(/<title[^>]*>([^<]*)<\/title>/i);
     return {
       ok: true,

@@ -319,7 +319,7 @@ async function webContext(config: TourConfig, request: string): Promise<string> 
       const text = await pageAsText(L.url, 0);
       let found = "";
       try {
-        const units = readUnits(text, L).filter((u) => !L.exclude?.includes(u.name));
+        const units = (await readUnits(text, L)).filter((u) => !L.exclude?.includes(u.name));
         found = units.length
           ? `Mønsteret finder ${units.length} lige nu: ${units.slice(0, 15).map((u) => [u.name, u.size, u.price, u.from].filter(Boolean).join(" / ")).join("; ")}${units.length > 15 ? " …" : ""}`
           : "Mønsteret finder INGEN lige nu - så vises live data ingen steder i touren.";
@@ -854,7 +854,7 @@ export async function setupLiveData(slug: string, url: string, what: string): Pr
     const spec: LiveSpec = { url, title: recipe.title, pattern: recipe.pattern, flags: recipe.flags.replace(/[^imsu]/g, "") };
     let units: LiveUnit[] = [];
     try {
-      units = readUnits(text, spec);
+      units = await readUnits(text, spec);
     } catch (err) {
       feedback = `\n(Dit forrige regex virkede ikke: ${err instanceof Error ? err.message : err}. Prøv igen.)\n`;
       continue;
@@ -869,7 +869,7 @@ export async function setupLiveData(slug: string, url: string, what: string): Pr
 export async function previewLiveData(spec: LiveSpec): Promise<{ ok: true; units: LiveUnit[] } | { ok: false; error: string }> {
   await admin();
   try {
-    return { ok: true, units: readUnits(await pageAsText(spec.url, 0), spec).slice(0, 300) };
+    return { ok: true, units: (await readUnits(await pageAsText(spec.url, 0), spec)).slice(0, 300) };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }

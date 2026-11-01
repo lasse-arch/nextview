@@ -1,3 +1,4 @@
+import { BlockedAddress, readLimited, safeFetch } from "@/lib/safe-fetch";
 import "server-only";
 import { prisma } from "@/lib/db";
 
@@ -20,9 +21,12 @@ export function publicUrl(raw: string): URL {
 }
 
 async function fetchText(url: URL, max: number): Promise<string> {
-  const res = await fetch(url, { headers: { "User-Agent": UA, Accept: "text/html,text/css,*/*" }, signal: AbortSignal.timeout(15_000), redirect: "follow" });
+  // Every address and redirect checked by DNS too (publicUrl above only checks the text).
+  const res = await safeFetch(url, { headers: { "User-Agent": UA, Accept: "text/html,text/css,*/*" }, signal: AbortSignal.timeout(15_000) }).catch((err) => {
+    throw err instanceof BlockedAddress ? new Error("Adressen skal være en offentlig hjemmeside.") : err;
+  });
   if (!res.ok) throw new Error(`${url.hostname} svarede ${res.status}.`);
-  return (await res.text()).slice(0, max);
+  return (await readLimited(res, Math.max(max * 4, 2_000_000)).catch(() => Buffer.alloc(0))).toString("utf8").slice(0, max);
 }
 
 const decode = (s: string) =>

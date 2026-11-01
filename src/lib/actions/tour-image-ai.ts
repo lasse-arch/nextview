@@ -1,8 +1,9 @@
 "use server";
 
+import { BlockedAddress, readLimited, safeFetch } from "@/lib/safe-fetch";
+import { getAppBaseUrl } from "@/lib/email-oauth";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { headers } from "next/headers";
 import sharp from "sharp";
 import { requireTeam, requireTour } from "@/lib/auth";
 import { prisma } from "@/lib/db";
@@ -44,24 +45,36 @@ export async function saveGeminiKey(key: string): Promise<{ ok: true } | { ok: f
   return { ok: true };
 }
 
-/** The picture's bytes: our own files from disk or the database, anything else over the net. */
-async function load(src: string): Promise<Buffer> {
+/**
+ * The picture's bytes: our own files from disk or the database, anything else
+ * over the net. A tour file must belong to `slug` (or, without one, to a tour
+ * this person may work on); an address from outside goes through safeFetch.
+ */
+async function load(src: string, slug?: string): Promise<Buffer> {
   if (src.startsWith("/api/tour-files/")) {
-    const row = await prisma.tourFile.findUnique({ where: { id: src.split("/").pop()!.split("?")[0] }, select: { data: true, url: true } });
-    if (row?.data) return Buffer.from(row.data);
-    if (row?.url) src = row.url;
+    const row = await prisma.tourFile.findUnique({ where: { id: src.split("/").pop()!.split("?")[0] }, select: { data: true, url: true, tourSlug: true } });
+    if (!row) throw new Error("Billedet findes ikke.");
+    if (slug ? row.tourSlug !== slug : !(await requireTour(row.tourSlug).catch(() => null))) throw new Error("Billedet hører ikke til touren.");
+    if (row.data) return Buffer.from(row.data);
+    if (!row.url) throw new Error("Billedet findes ikke.");
+    src = row.url;
   } else if (src.startsWith("/")) {
-    const file = path.join(process.cwd(), "public", decodeURIComponent(src.split("?")[0]));
-    if (file.startsWith(path.join(process.cwd(), "public"))) {
+    const pub = path.join(process.cwd(), "public") + path.sep;
+    const file = path.normalize(path.join(pub, decodeURIComponent(src.split("?")[0])));
+    if (file.startsWith(pub)) {
       const local = await readFile(file).catch(() => null);
       if (local) return local;
     }
-    const h = await headers();
-    src = `${h.get("x-forwarded-proto") ?? "https"}://${h.get("host")}${src}`;
+    // Our own site's address - never one built from the request's Host header.
+    const own = await fetch(new URL(src, getAppBaseUrl()), { signal: AbortSignal.timeout(30_000) });
+    if (!own.ok) throw new Error(`Billedet kunne ikke hentes (${own.status}).`);
+    return readLimited(own, 60_000_000);
   }
-  const res = await fetch(src, { signal: AbortSignal.timeout(30_000) });
+  const res = await safeFetch(src, { signal: AbortSignal.timeout(30_000) }).catch((err) => {
+    throw err instanceof BlockedAddress ? new Error("Billedet skal ligge på en offentlig hjemmeside.") : err;
+  });
   if (!res.ok) throw new Error(`Billedet kunne ikke hentes (${res.status}).`);
-  return Buffer.from(await res.arrayBuffer());
+  return readLimited(res, 60_000_000);
 }
 
 /** The aspect ratios the model can make, as numbers - the closest one is asked for. */
@@ -120,7 +133,7 @@ export async function editTourImage(slug: string, src: string, request: string, 
   if (!key) return { ok: false, error: "Billed-AI er ikke sat op endnu - indsæt en Gemini-nøgle." };
   if (!request.trim()) return { ok: false, error: "Skriv, hvad der skal ændres." };
   try {
-    const original = await load(src);
+    const original = await load(src, slug);
     const meta = await sharp(original).metadata();
     const w = meta.width ?? 1600;
     const h = meta.height ?? 1000;
@@ -217,7 +230,7 @@ export async function pasteTourEdit(
     const edited = Buffer.from(await file.arrayBuffer());
     const em = await sharp(edited, { limitInputPixels: 100_000_000 }).metadata();
     if (!em.width || !em.height) return { ok: false, error: "Billedet kunne ikke læses." };
-    const original = await load(src);
+    const original = await load(src, slug);
     let out: Buffer;
     let type: string;
     if (view) {

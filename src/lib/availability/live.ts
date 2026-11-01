@@ -1,3 +1,5 @@
+import { safeFetch } from "@/lib/safe-fetch";
+import { Worker } from "node:worker_threads";
 import "server-only";
 import type { TourConfig } from "@/app/arpo/tour-lab/tours/types";
 import { publicUrl } from "@/lib/site-digest";
@@ -86,7 +88,8 @@ function embedsOf(html: string, base: URL): string[] {
 /** A page as readable text, links as [text](href) - what the pattern runs on (and what Claude is shown). Pages it embeds are read too and added after it. */
 export async function pageAsText(address: string, cacheSeconds = 600): Promise<string> {
   const url = publicUrl(address);
-  const get = (u: URL | string) => fetch(u, { headers: { "User-Agent": "Mozilla/5.0 (compatible; ArpoTour/1.0)" }, signal: AbortSignal.timeout(15_000), next: { revalidate: cacheSeconds } });
+  // The customer's page and every page it embeds (iframes, YoungCRM) - each address and every redirect checked: only public websites.
+  const get = (u: URL | string) => safeFetch(u, { headers: { "User-Agent": "Mozilla/5.0 (compatible; ArpoTour/1.0)" }, signal: AbortSignal.timeout(15_000), next: { revalidate: cacheSeconds } } as RequestInit);
   const res = await get(url);
   if (!res.ok) throw new Error(`${url.hostname} svarede ${res.status}.`);
   const html = (await res.text()).slice(0, 2_000_000);
@@ -103,15 +106,44 @@ export async function pageAsText(address: string, cacheSeconds = 600): Promise<s
   return htmlToText(html, url) + embedded.join("");
 }
 
+/**
+ * The pattern's matches (named groups), run in a worker thread with a time
+ * limit: the pattern and the page are both from outside, and a pattern that
+ * backtracks badly on a crafted page would otherwise hang the server (ReDoS).
+ * Too slow = no units.
+ */
+const MATCH_WORKER = `
+const { parentPort, workerData } = require("node:worker_threads");
+const { text, pattern, flags } = workerData;
+const out = [];
+for (const m of text.matchAll(new RegExp(pattern, flags))) { out.push(m.groups || {}); if (out.length >= 2000) break; }
+parentPort.postMessage(out);
+`;
+function matchGroups(text: string, pattern: string, flags: string, ms = 1500): Promise<Record<string, string | undefined>[]> {
+  return new Promise((resolve) => {
+    let worker: Worker;
+    try {
+      worker = new Worker(MATCH_WORKER, { eval: true, workerData: { text, pattern, flags }, resourceLimits: { maxOldGenerationSizeMb: 64 } });
+    } catch {
+      return resolve([]);
+    }
+    const timer = setTimeout(() => void worker.terminate().then(() => resolve([])), ms);
+    worker.once("message", (groups) => (clearTimeout(timer), resolve(groups), void worker.terminate()));
+    worker.once("error", () => (clearTimeout(timer), resolve([])));
+  });
+}
+
+export { riskyPattern } from "@/lib/availability/pattern-check";
+
 /** The units the pattern finds in the page text (first one per name). */
-export function readUnits(text: string, spec: Pick<LiveSpec, "pattern" | "flags">): LiveUnit[] {
-  const re = new RegExp(spec.pattern, `${(spec.flags ?? "").replace(/g/g, "")}g`);
+export async function readUnits(text: string, spec: Pick<LiveSpec, "pattern" | "flags">): Promise<LiveUnit[]> {
+  // Checked first in this thread (a broken pattern throws here, as before), then run in the worker.
+  new RegExp(spec.pattern, (spec.flags ?? "").replace(/g/g, ""));
   // A bounded text keeps even a clumsy pattern quick.
-  text = text.slice(0, 400_000);
+  text = text.slice(0, 200_000);
   const units: LiveUnit[] = [];
   const seen = new Set<string>();
-  for (const m of text.matchAll(re)) {
-    const g = m.groups ?? {};
+  for (const g of await matchGroups(text, spec.pattern, `${(spec.flags ?? "").replace(/g/g, "")}g`)) {
     // The page's letters as letters (also when the text was read before they were decoded).
     const clean = (v?: string) => (v ? decode(v) : v)?.replace(/\s+/g, " ").trim() || undefined;
     const name = clean(g.name);
@@ -130,7 +162,7 @@ export const refreshSeconds = (spec: Pick<LiveSpec, "refreshMinutes">) => Math.m
 export async function fetchLiveUnits(spec: LiveSpec): Promise<LiveUnit[]> {
   try {
     const exclude = new Set(spec.exclude ?? []);
-    return readUnits(await pageAsText(spec.url, refreshSeconds(spec)), spec).filter((u) => !exclude.has(u.name));
+    return (await readUnits(await pageAsText(spec.url, refreshSeconds(spec)), spec)).filter((u) => !exclude.has(u.name));
   } catch {
     return [];
   }

@@ -1,3 +1,4 @@
+import { riskyPattern } from "@/lib/availability/pattern-check";
 import { safeColor, UNSAFE_SCHEME } from "@/app/arpo/tour-lab/tours/safe";
 import type { TourConfig } from "@/app/arpo/tour-lab/tours/types";
 
@@ -43,6 +44,9 @@ export function tourConfigProblem(config: unknown): string | null {
   if (c.languages !== undefined && (!arr(c.languages) || !c.languages.every(str))) return '"languages" skal være en liste af sprogkoder.';
   if (c.translations !== undefined && (!obj(c.translations) || !Object.values(c.translations).every((m) => obj(m) && Object.values(m as object).every(str)))) return '"translations" skal være sprog med tekst -> oversættelse.';
   if (c.embeds && (!obj(c.embeds) || (c.embeds.pages !== undefined && (!obj(c.embeds.pages) || !Object.values(c.embeds.pages).every(str))))) return '"embeds.pages" skal være steder med en adresse.';
+  // Live data's pattern runs on outside pages: one that backtracks without end could hang the server.
+  const live = (c as { live?: { pattern?: unknown } }).live;
+  if (live && typeof live.pattern === "string" && riskyPattern(live.pattern)) return "Live data-mønsteret har en gentagelse inde i en gentagelse (fx (a+)+) - det kan låse serveren. Skriv det enklere.";
   // Untrusted text (developers, nextviewAI, the customer's site): no link that runs code, no colour that isn't a colour.
   const bad = unsafeStrings(c);
   if (bad) return `Et link må ikke starte med ${bad.split(":")[0]}: (${bad.slice(0, 40)}).`;
