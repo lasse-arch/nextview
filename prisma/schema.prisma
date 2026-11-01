@@ -264,6 +264,10 @@ model User {
   role              Role                @default(SALES)
   /// More roles on top of `role` - e.g. one who both films and builds tours. Never ADMIN (that is only `role`).
   extraRoles        Role[]              @default([])
+  /// Deactivated (left the company): no login, and every session ends at once. Null = active.
+  disabledAt        DateTime?
+  /// Bumped to end every session of this user (new password, deactivation, "Log ud overalt") - sessions carry the number they were made with.
+  sessionVersion    Int                 @default(0)
   /// Tours given to this person to build (developers).
   assignedTours     Tour[]              @relation("TourAssignee")
   isCommissionBased Boolean             @default(true)

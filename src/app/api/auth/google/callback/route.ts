@@ -55,7 +55,8 @@ export async function GET(request: NextRequest) {
     if (!info.email || info.email_verified !== true) return fail("google_unverified");
 
     const user = await prisma.user.findFirst({ where: { email: { equals: info.email.trim(), mode: "insensitive" } } });
-    if (!user) return fail("google_unknown_user");
+    // A deactivated team member is treated as unknown (no hint that the account exists).
+    if (!user || user.disabledAt) return fail("google_unknown_user");
 
     await prisma.user.update({ where: { id: user.id }, data: { lastGoogleLoginAt: new Date() } });
     await createSession(user.id, "google");

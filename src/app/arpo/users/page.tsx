@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
-import { createUser, updateUser } from "@/lib/actions/users";
+import { createUser, endUserSessions, setUserActive, updateUser } from "@/lib/actions/users";
 import { commissionFrequencyLabels } from "@/lib/labels";
 import { AvatarUploader } from "../avatar-uploader";
 import { RequireGoogleLoginToggle } from "./require-google-login-toggle";
@@ -196,6 +196,21 @@ export default async function UsersPage() {
                   Gem
                 </button>
               </form>
+              {u.id !== currentUser.id && (
+                <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
+                  {u.disabledAt && <span className="rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-700">Deaktiveret {formatDate(u.disabledAt)}</span>}
+                  <form action={endUserSessions.bind(null, u.id)}>
+                    <button type="submit" className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50">
+                      Log ud overalt
+                    </button>
+                  </form>
+                  <form action={setUserActive.bind(null, u.id, Boolean(u.disabledAt))}>
+                    <button type="submit" className={`rounded-lg px-3 py-1.5 text-xs font-medium ${u.disabledAt ? "border border-slate-300 text-slate-700 hover:bg-slate-50" : "bg-red-600 text-white hover:bg-red-700"}`}>
+                      {u.disabledAt ? "Genaktivér" : "Deaktivér (stopper login med det samme)"}
+                    </button>
+                  </form>
+                </div>
+              )}
             </div>
           );
         })}

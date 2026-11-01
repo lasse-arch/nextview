@@ -139,15 +139,18 @@ async function arpoGate(token: string, pathname: string): Promise<string | null>
   const secret = process.env.AUTH_SECRET;
   if (!secret) return null;
   let userId: string | null = null;
+  let sv = 0;
   try {
     const { payload } = await jwtVerify(token, new TextEncoder().encode(secret));
     userId = typeof payload.userId === "string" ? payload.userId : null;
+    sv = typeof payload.sv === "number" ? payload.sv : 0;
   } catch {
     return null;
   }
   if (!userId) return null;
-  const user = await prisma.user.findUnique({ where: { id: userId }, select: { role: true, extraRoles: true } });
-  if (!user) return null;
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { role: true, extraRoles: true, disabledAt: true, sessionVersion: true } });
+  // A deactivated user or an ended session: the page itself sends them to log in again (session-ended clears the cookie).
+  if (!user || user.disabledAt || user.sessionVersion !== sv) return null;
   if (arpoPathAllowed(user, pathname)) return null;
   const home = homeOf(user);
   // Never a loop: if their home isn't open to them either, the page that says so.

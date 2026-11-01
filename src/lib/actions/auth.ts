@@ -41,7 +41,8 @@ export async function login(_prevState: LoginState, formData: FormData): Promise
   if (byEmail >= MAX_PER_EMAIL || byIp >= MAX_PER_IP) return { error: PAUSED };
 
   const user = await prisma.user.findUnique({ where: { email }, omit: { passwordHash: false } });
-  if (!user || !(await verifyPassword(password, user.passwordHash))) {
+  // A deactivated user gets the same answer as a wrong password.
+  if (!user || !(await verifyPassword(password, user.passwordHash)) || user.disabledAt) {
     await prisma.loginFailure.create({ data: { email, ip } });
     // Old failures are no use - cleared as we go, so the table stays small.
     await prisma.loginFailure.deleteMany({ where: { createdAt: { lt: new Date(Date.now() - 24 * 3600_000) } } });

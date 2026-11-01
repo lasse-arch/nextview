@@ -68,6 +68,8 @@ export async function updateUser(userId: string, formData: FormData) {
   const data: Record<string, unknown> = { name, role, extraRoles, isCommissionBased, canAccessBilling, commissionRate, payoutFrequency };
   if (newPassword) {
     data.passwordHash = await hashPassword(newPassword);
+    // A new password ends every session made with the old one.
+    data.sessionVersion = { increment: 1 };
   }
 
   await prisma.user.update({ where: { id: userId }, data });
@@ -88,4 +90,25 @@ export async function updateUser(userId: string, formData: FormData) {
   revalidatePath("/arpo/deals");
   revalidatePath("/arpo/commission");
   redirect("/arpo/users?saved=1");
+}
+
+/**
+ * Deactivates a team member (left the company): no login, every session ends
+ * at once, nothing of theirs is deleted (deals, notes and commission keep
+ * their name). Admins only, and never yourself.
+ */
+export async function setUserActive(userId: string, active: boolean) {
+  const me = await requireAdmin();
+  if (userId === me.id) throw new Error("Du kan ikke deaktivere dig selv.");
+  await prisma.user.update({ where: { id: userId }, data: active ? { disabledAt: null, sessionVersion: { increment: 1 } } : { disabledAt: new Date(), sessionVersion: { increment: 1 } } });
+  revalidatePath("/arpo/users");
+  redirect(`/arpo/users?saved=${encodeURIComponent(active ? "Genaktiveret" : "Deaktiveret - alle sessioner er afsluttet")}`);
+}
+
+/** Ends every session of a user (e.g. a lost phone) - they log in again. */
+export async function endUserSessions(userId: string) {
+  await requireAdmin();
+  await prisma.user.update({ where: { id: userId }, data: { sessionVersion: { increment: 1 } } });
+  revalidatePath("/arpo/users");
+  redirect(`/arpo/users?saved=${encodeURIComponent("Alle sessioner er afsluttet")}`);
 }

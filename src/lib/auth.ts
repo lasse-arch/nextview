@@ -38,9 +38,9 @@ export type LoginMethod = "password" | "google";
 
 /** The team (Arpo) or a customer (their own page, /kunde) - never both: a
  * customer's session doesn't open Arpo, and the team's doesn't open /kunde. */
-type Session = { kind: "staff"; userId: string; method: LoginMethod } | { kind: "customer"; customerId: string };
+type Session = { kind: "staff"; userId: string; method: LoginMethod; sv: number } | { kind: "customer"; customerId: string };
 
-async function setSessionCookie(payload: Record<string, string>) {
+async function setSessionCookie(payload: Record<string, string | number>) {
   const token = await new SignJWT(payload)
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
@@ -59,8 +59,11 @@ async function setSessionCookie(payload: Record<string, string>) {
   });
 }
 
+/** A team member's session - it carries their sessionVersion, so bumping it (new password, deactivation, "Log ud overalt") ends it. */
 export async function createSession(userId: string, method: LoginMethod) {
-  await setSessionCookie({ userId, method });
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { sessionVersion: true, disabledAt: true } });
+  if (!user || user.disabledAt) throw new Error("Brugeren er deaktiveret.");
+  await setSessionCookie({ userId, method, sv: user.sessionVersion });
 }
 
 /** A customer logged in with the link from their e-mail. */
@@ -82,7 +85,7 @@ async function getSessionFromCookie(): Promise<Session | null> {
     if (typeof payload.customerId === "string") return { kind: "customer", customerId: payload.customerId };
     if (typeof payload.userId !== "string") return null;
     // Sessions from before login methods were recorded were all password ones.
-    return { kind: "staff", userId: payload.userId, method: payload.method === "google" ? "google" : "password" };
+    return { kind: "staff", userId: payload.userId, method: payload.method === "google" ? "google" : "password", sv: typeof payload.sv === "number" ? payload.sv : 0 };
   } catch {
     return null;
   }
@@ -107,7 +110,9 @@ export async function getTeamUser(): Promise<User | null> {
   // before it was turned on) no longer counts - log in again with Google.
   if (session.method === "password" && (await isGoogleLoginRequired())) return null;
   const user = await prisma.user.findUnique({ where: { id: session.userId } });
-  if (user) touchLastActive(user);
+  // Deactivated, or the session is older than the last "end all sessions" - no longer a session.
+  if (!user || user.disabledAt || user.sessionVersion !== session.sv) return null;
+  touchLastActive(user);
   return user;
 }
 
