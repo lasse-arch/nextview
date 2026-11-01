@@ -2,7 +2,8 @@
 
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
-import { requireUser } from "@/lib/auth";
+import { requireTour } from "@/lib/auth";
+import { teamCan } from "@/lib/team-roles";
 import { prisma } from "@/lib/db";
 import { normalizeEmail } from "@/lib/customer-login";
 import { setFilmingActual, updateDealStage } from "@/lib/actions/deals";
@@ -19,9 +20,16 @@ export type GoLiveState = { name: string; contactEmail: string | null; filmingMi
 export type PublishState = { ready: boolean; project: string; live: number | null; upToDate: boolean; versions: Publication[]; deal: GoLiveState | null };
 type Result<T> = { ok: true; value: T } | { ok: false; error: string };
 
-async function admin() {
-  const user = await requireUser();
-  if (user.role !== "ADMIN") throw new Error("Kun admin kan udgive tours.");
+/** Putting a tour (version) live on tour.nextview360.dk - admins and developers. */
+async function admin(slug: string) {
+  const user = await requireTour(slug);
+  if (!teamCan(user, "tourPublish")) throw new Error("Du har ikke adgang til at udgive tours.");
+  return user;
+}
+/** Setting the customer Live starts their billing - also needs the company's numbers (admin or seller), not just publishing. */
+async function liveAllowed(slug: string) {
+  const user = await admin(slug);
+  if (!teamCan(user, "numbers")) throw new Error("At sætte kunden live starter faktureringen - det gør en admin eller sælger. Du kan godt udgive nye versioner.");
   return user;
 }
 async function origin() {
@@ -30,7 +38,7 @@ async function origin() {
 }
 
 export async function publishState(slug: string): Promise<PublishState> {
-  await admin();
+  await requireTour(slug); // anyone on the tour may see what's live; putting it live is admin()
   const tour = await prisma.tour.findUnique({
     where: { slug },
     select: {
@@ -62,7 +70,7 @@ export async function publishState(slug: string): Promise<PublishState> {
 
 export async function publishNow(slug: string, note: string, anyway = false): Promise<Result<{ version: number; missing: string[] }>> {
   try {
-    const user = await admin();
+    const user = await admin(slug);
     // Nothing new since the live version: no new version unless asked for on purpose ("Udgiv alligevel").
     if (!anyway && (await publishState(slug)).upToDate) return { ok: false, error: "Den live version har allerede touren, som den er nu - intet nyt at udgive." };
     const r = await publishTour(slug, user.name, note.trim().slice(0, 200) || null, await origin());
@@ -75,7 +83,7 @@ export async function publishNow(slug: string, note: string, anyway = false): Pr
 
 export async function putVersionLive(slug: string, version: number | null): Promise<Result<null>> {
   try {
-    await admin();
+    await admin(slug);
     await setLiveVersion(slug, version, await origin());
     revalidatePath(`/arpo/tour-lab/${slug}/rediger`);
     return { ok: true, value: null };
@@ -93,7 +101,7 @@ export async function putVersionLive(slug: string, version: number | null): Prom
  */
 export async function goLive(slug: string, filmingHours: number | null): Promise<Result<{ mail: string | null; version: number | null }>> {
   try {
-    const user = await admin();
+    const user = await liveAllowed(slug);
     const tour = await prisma.tour.findUnique({
       where: { slug },
       select: { deal: { select: { id: true, companyName: true, displayName: true, contactName: true, contactEmail: true, filmingActualMinutes: true, stage: true, welcomeMailSentAt: true, branches: { select: { id: true } } } } },

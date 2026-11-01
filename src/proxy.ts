@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { jwtVerify } from "jose";
+import { prisma } from "@/lib/db";
+import { arpoPathAllowed, homeOf } from "@/lib/team-roles";
 
 const SESSION_COOKIE = "nv360_session";
 // "/t" = published tours, shown in an iframe on customers' sites (and their pictures, /t/<slug>/historie); "/r" = a customer's report on their tour.
@@ -83,7 +86,7 @@ function siteHost(request: NextRequest): NextResponse | null {
   return null;
 }
 
-export function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const site = siteHost(request);
   if (site) return site;
   const moved = movedHost(request);
@@ -117,7 +120,38 @@ export function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL("/", request.url));
   }
 
+  // Arpo by role: a filmer or developer only gets their own part - checked here for every request, page or in-app navigation.
+  if (hasSession && (pathname === "/arpo" || pathname.startsWith("/arpo/"))) {
+    const home = await arpoGate(request.cookies.get(SESSION_COOKIE)!.value, pathname);
+    if (home) return NextResponse.redirect(new URL(home, request.url));
+  }
+
   return NextResponse.next();
+}
+
+/**
+ * Where to send a team member who may not open `pathname` - null when they may
+ * (or when it isn't a team session: the page itself sends customers and dead
+ * sessions on). The role is read from the database on every request, so a
+ * changed role counts at once.
+ */
+async function arpoGate(token: string, pathname: string): Promise<string | null> {
+  const secret = process.env.AUTH_SECRET;
+  if (!secret) return null;
+  let userId: string | null = null;
+  try {
+    const { payload } = await jwtVerify(token, new TextEncoder().encode(secret));
+    userId = typeof payload.userId === "string" ? payload.userId : null;
+  } catch {
+    return null;
+  }
+  if (!userId) return null;
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { role: true, extraRoles: true } });
+  if (!user) return null;
+  if (arpoPathAllowed(user, pathname)) return null;
+  const home = homeOf(user);
+  // Never a loop: if their home isn't open to them either, the page that says so.
+  return arpoPathAllowed(user, home) && home !== pathname ? home : "/arpo/ingen-adgang";
 }
 
 export const config = {

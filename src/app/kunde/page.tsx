@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { getCurrentCustomer, getCurrentUser } from "@/lib/auth";
+import { getCurrentCustomer, getTeamUser, teamSeesTour } from "@/lib/auth";
+import { teamCan } from "@/lib/team-roles";
 import { logout } from "@/lib/actions/auth";
 import { prisma } from "@/lib/db";
 import { dealName, needsDeliveryLink } from "@/lib/labels";
@@ -56,14 +57,17 @@ async function viewer(som: string | undefined): Promise<{ dealIds: string[]; acc
     if (!account.lastSeenAt || Date.now() - account.lastSeenAt.getTime() > 10 * 60_000) await prisma.customerAccount.update({ where: { id: account.id }, data: { lastSeenAt: new Date() } }).catch(() => {});
     return { dealIds: account.deals.map((d) => d.dealId), access: account.deals, name: account.name, accountId: account.id, preview: null };
   }
-  const user = await getCurrentUser();
+  const user = await getTeamUser();
   if (!user) redirect("/api/auth/session-ended");
-  if (user.role !== "ADMIN" || !som) redirect("/arpo");
+  // Admins see it as the owner; developers (tours) as staff - the tours, numbers and codes, never the contract, users or approving.
+  const asOwner = teamCan(user, "admin");
+  // Developers: only customers with a tour given to them.
+  if (!som || (!asOwner && !(await teamSeesTour(null, som)))) redirect("/arpo");
   const deal = await prisma.deal.findUnique({ where: { id: som }, select: { id: true, contactName: true, branches: { select: { id: true } }, customerAccounts: { take: 1, orderBy: { createdAt: "asc" }, select: { account: { select: { name: true } } } } } });
   if (!deal) redirect("/arpo");
   // As the customer's owner sees it (the team's own look at everything).
   const dealIds = [deal.id, ...deal.branches.map((b) => b.id)];
-  return { dealIds, access: dealIds.map((dealId) => ({ dealId, role: "OWNER" as const, canApprove: true })), name: deal.customerAccounts[0]?.account.name ?? deal.contactName, accountId: null, preview: { dealId: deal.id } };
+  return { dealIds, access: dealIds.map((dealId) => ({ dealId, role: asOwner ? ("OWNER" as const) : ("STAFF" as const), canApprove: asOwner })), name: deal.customerAccounts[0]?.account.name ?? deal.contactName, accountId: null, preview: { dealId: deal.id } };
 }
 
 const fmtDate = (d: Date, lang: Lang) => d.toLocaleDateString(lang === "en" ? "en-GB" : "da-DK", { day: "numeric", month: "short", year: "numeric" });

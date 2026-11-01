@@ -6,7 +6,8 @@ import { startStatsIfFirst } from "@/lib/tour-stats";
 import { tourChanged } from "@/lib/tour-cache";
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
-import { requireUser } from "@/lib/auth";
+import { requireTeam, requireTour } from "@/lib/auth";
+import { teamCan } from "@/lib/team-roles";
 import { tourEmbeds, type TourEmbed } from "@/lib/tour-embeds";
 import { prisma } from "@/lib/db";
 import type { TourConfig } from "@/app/arpo/tour-lab/tours/types";
@@ -19,11 +20,6 @@ import { makePanoCopies, withPanoCopies } from "@/lib/tour-pano-copies";
 
 type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string };
 
-async function admin() {
-  const user = await requireUser();
-  if (user.role !== "ADMIN") throw new Error("Kun admin kan redigere tours.");
-  return user;
-}
 
 /** The 360° photos' smaller copies still missing are made after the answer (a big photo takes a few seconds). */
 function panoCopiesLater(slug: string) {
@@ -34,7 +30,7 @@ function panoCopiesLater(slug: string) {
 
 /** Saves a tour's setup as a new version. */
 export async function saveTour(slug: string, config: TourConfig, note: string): Promise<Result<{ versionId: string }>> {
-  const user = await admin();
+  const user = await requireTour(slug);
   const error = tourConfigProblem(config);
   if (error) return { ok: false, error };
   const tour = await prisma.tour.findUnique({ where: { slug }, select: { id: true } });
@@ -60,7 +56,7 @@ export async function saveTour(slug: string, config: TourConfig, note: string): 
  * browser …). `null` throws the draft away.
  */
 export async function saveTourDraft(slug: string, config: TourConfig | null): Promise<Result<{ at: string }>> {
-  const user = await admin();
+  const user = await requireTour(slug);
   const at = new Date();
   if (config && JSON.stringify(config).length > 3_000_000) return { ok: false, error: "Udkastet er for stort til at autogemme." };
   await prisma.tour.update({
@@ -72,7 +68,10 @@ export async function saveTourDraft(slug: string, config: TourConfig | null): Pr
 
 /** Puts an earlier version back (as a new version, so nothing is lost). */
 export async function restoreTourVersion(versionId: string): Promise<Result> {
-  const user = await admin();
+  const user = await requireTeam("tours");
+  const owner = await prisma.tourVersion.findUnique({ where: { id: versionId }, select: { tour: { select: { slug: true } } } });
+  if (!owner) throw new Error("Versionen findes ikke.");
+  await requireTour(owner.tour.slug);
   const v = await prisma.tourVersion.findUnique({ where: { id: versionId }, select: { config: true, createdAt: true, tour: { select: { id: true, slug: true } } } });
   if (!v) return { ok: false, error: "Versionen findes ikke." };
   const config = v.config as unknown as TourConfig;
@@ -90,7 +89,7 @@ export async function restoreTourVersion(versionId: string): Promise<Result> {
 
 /** Links a tour to a customer (or unlinks it). */
 export async function setTourDeal(slug: string, dealId: string | null): Promise<Result> {
-  await admin();
+  await requireTeam("admin");
   await prisma.tour.update({ where: { slug }, data: { dealId } });
   revalidatePath("/arpo/tour-lab");
   return { ok: true };
@@ -98,7 +97,7 @@ export async function setTourDeal(slug: string, dealId: string | null): Promise<
 
 /** Customers to pick from, by name - only those who have signed (a lead can't have a tour). */
 export async function searchDeals(query: string) {
-  await admin();
+  await requireTeam("admin");
   const q = query.trim();
   if (q.length < 2) return [];
   return prisma.deal.findMany({
@@ -119,7 +118,7 @@ const slugify = (s: string) =>
 
 /** A new tour, started as a copy of an existing one (its design, menu and features) - then edited. */
 export async function createTour(name: string, copyOf: string): Promise<Result<{ slug: string }>> {
-  const user = await admin();
+  const user = await requireTeam("admin");
   const title = name.trim();
   if (!title) return { ok: false, error: "Giv touren et navn." };
   const source = await prisma.tour.findUnique({ where: { slug: copyOf }, select: { config: true, dealId: true } });
@@ -140,7 +139,7 @@ export async function createTour(name: string, copyOf: string): Promise<Result<{
  * switch is gone; to show a tour before that, send the review link.
  */
 export async function setTourPublished(slug: string, published: boolean): Promise<Result> {
-  await admin();
+  await requireTour(slug);
   if (published) return { ok: false, error: 'Udgiv på tour.nextview360.dk i stedet - eller send gennemgangslinket under Gennemgang.' };
   await prisma.tour.update({ where: { slug }, data: { published } });
   if (published) await startStatsIfFirst(slug);
@@ -152,7 +151,7 @@ export async function setTourPublished(slug: string, published: boolean): Promis
 
 /** The editor says someone is working on the tour: a minute more on today's time for them (see "Tid og pris"). */
 export async function logTourWork(slug: string, seconds: number): Promise<void> {
-  const user = await admin();
+  const user = await requireTour(slug);
   const s = Math.max(0, Math.min(120, Math.round(seconds)));
   if (!s) return;
   const day = new Date(new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Copenhagen" }));
@@ -169,7 +168,7 @@ export async function logTourWork(slug: string, seconds: number): Promise<void> 
  * don't break. Everything kept under the old address moves along.
  */
 export async function renameTourSlug(slug: string, wanted: string): Promise<Result<{ slug: string }>> {
-  await admin();
+  await requireTour(slug);
   const next = slugify(wanted);
   if (next.length < 3) return { ok: false, error: "Adressen skal være mindst 3 tegn (a-z, 0-9 og -)." };
   if (next === slug) return { ok: true, slug };
@@ -196,14 +195,14 @@ export async function renameTourSlug(slug: string, wanted: string): Promise<Resu
 
 /** Which numbers the customer sees (Resultater → Kundens rapport). */
 export async function setTourShare(slug: string, share: ReportShare): Promise<Result> {
-  await admin();
+  await requireTour(slug);
   await prisma.tour.update({ where: { slug }, data: { share: share as unknown as Prisma.InputJsonValue } });
   return { ok: true };
 }
 
 /** The customer's own link to their report - made the first time it's asked for. */
 export async function tourShareLink(slug: string): Promise<Result<{ token: string }>> {
-  await admin();
+  await requireTour(slug);
   const tour = await prisma.tour.findUnique({ where: { slug }, select: { shareToken: true } });
   if (!tour) return { ok: false, error: "Touren findes ikke." };
   if (tour.shareToken) return { ok: true, token: tour.shareToken };
@@ -214,7 +213,7 @@ export async function tourShareLink(slug: string): Promise<Result<{ token: strin
 
 /** Moves tours off MPSkins (one, or all that still use it) - each gets a new version, so it can be undone. */
 export async function detachToursFromMpskins(slug?: string): Promise<Result<{ moved: number; failed: string[] }>> {
-  const user = await admin();
+  const user = await (slug ? requireTour(slug) : requireTeam("admin"));
   const tours = await prisma.tour.findMany({ where: slug ? { slug } : {}, select: { id: true, slug: true, name: true, config: true } });
   let moved = 0;
   const failed: string[] = [];
@@ -247,7 +246,7 @@ const KEEP_DELETED_DAYS = 30;
  * that's off the net: never one a customer's website may be showing.
  */
 export async function deleteTour(slug: string, typedName: string): Promise<Result> {
-  const user = await admin();
+  const user = await requireTeam("admin");
   const tour = await prisma.tour.findUnique({ where: { slug }, include: { versions: true, publications: true } });
   if (!tour) return { ok: false, error: "Touren findes ikke." };
   const names = [tour.name, (tour.config as unknown as TourConfig).title].filter(Boolean).map((n) => n.trim().toLowerCase());
@@ -264,7 +263,7 @@ export async function deleteTour(slug: string, typedName: string): Promise<Resul
 
 /** Back from the papirkurv - as it was, versions and publications included. */
 export async function restoreTour(deletedId: string): Promise<Result<{ slug: string }>> {
-  await admin();
+  await requireTeam("admin");
   const d = await prisma.deletedTour.findUnique({ where: { id: deletedId } });
   if (!d || d.restoredAt) return { ok: false, error: "Touren er ikke i papirkurven." };
   if (await prisma.tour.findUnique({ where: { slug: d.slug }, select: { id: true } })) return { ok: false, error: `Der findes allerede en tour med adressen "${d.slug}".` };
@@ -284,15 +283,31 @@ export async function restoreTour(deletedId: string): Promise<Result<{ slug: str
 
 /** The papirkurv: tours deleted within the last 30 days (older ones are let go here). */
 export async function deletedTours() {
-  await admin();
+  await requireTeam("admin");
   const cutoff = new Date(Date.now() - KEEP_DELETED_DAYS * 86_400_000);
   await prisma.deletedTour.deleteMany({ where: { OR: [{ createdAt: { lt: cutoff } }, { restoredAt: { not: null } }] } }).catch(() => {});
   return prisma.deletedTour.findMany({ orderBy: { createdAt: "desc" }, select: { id: true, slug: true, name: true, deletedByName: true, createdAt: true } });
 }
 
+/**
+ * Gives a tour to a developer (or takes it back) with a deadline - admins only.
+ * The person must be someone who works on tours; the deadline a day (YYYY-MM-DD).
+ */
+export async function assignTour(slug: string, userId: string | null, deadline: string | null): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireTeam("admin");
+  if (deadline != null && !/^\d{4}-\d{2}-\d{2}$/.test(deadline)) return { ok: false, error: "Vælg en dato." };
+  if (userId) {
+    const u = await prisma.user.findUnique({ where: { id: userId }, select: { role: true, extraRoles: true } });
+    if (!u || !teamCan(u, "tours")) return { ok: false, error: "Personen arbejder ikke med tours - giv dem rollen Udvikler under Brugere." };
+  }
+  const r = await prisma.tour.updateMany({ where: { slug }, data: { assignedToId: userId, deadline: deadline ? new Date(`${deadline}T00:00:00Z`) : null } });
+  if (!r.count) return { ok: false, error: "Touren findes ikke." };
+  revalidatePath("/arpo/tour-lab");
+  return { ok: true };
+}
+
 /** "Her er touren vist": the pages showing the tour in a frame (last 90 days) - for the editor's Del og udgiv. */
 export async function tourEmbedsOf(slug: string): Promise<TourEmbed[]> {
-  const user = await requireUser();
-  if (user.role !== "ADMIN") throw new Error("Kun admin.");
+  await requireTour(slug);
   return tourEmbeds([slug]);
 }

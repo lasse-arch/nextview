@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
-import { getCurrentUser } from "@/lib/auth";
+import { getTeamUser } from "@/lib/auth";
+import { teamCan } from "@/lib/team-roles";
 import { peopleFindings } from "@/lib/actions/tour-people";
 import { PeopleReview } from "./review";
 
@@ -10,7 +11,7 @@ export const metadata = { title: "Personer i scans" };
 
 /** Scans with people in them, across all tours: check them, and hide or keep each one. */
 export default async function PeoplePage() {
-  const user = await getCurrentUser();
-  if (user?.role !== "ADMIN") redirect("/arpo");
+  const user = await getTeamUser();
+  if (!user || !teamCan(user, "tours")) redirect("/arpo");
   return <PeopleReview initial={await peopleFindings()} />;
 }

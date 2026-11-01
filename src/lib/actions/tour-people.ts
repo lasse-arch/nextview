@@ -5,7 +5,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 import type { Prisma } from "@prisma/client";
-import { requireUser } from "@/lib/auth";
+import { requireTeam, requireTour, toursOf } from "@/lib/auth";
+import { teamCan } from "@/lib/team-roles";
 import { prisma } from "@/lib/db";
 import { claudeCostUsd } from "@/lib/claude-cost";
 import { getSettingValue } from "@/lib/integration-settings";
@@ -22,11 +23,6 @@ import type { TourConfig } from "@/app/arpo/tour-lab/tours/types";
  * it finds waits for review on /tour-lab/personer: hide the scan, or keep it.
  */
 
-async function admin() {
-  const user = await requireUser();
-  if (user.role !== "ADMIN") throw new Error("Kun admin.");
-  return user;
-}
 
 async function modelOf(slug: string): Promise<{ modelId: string; config: TourConfig } | null> {
   const tour = await prisma.tour.findUnique({ where: { slug }, select: { config: true } });
@@ -40,8 +36,9 @@ export type ScanPlan = { slug: string; name: string; total: number; todo: string
 
 /** What's left to check on each tour (or one), and what's waiting for review. */
 export async function peoplePlan(slug?: string): Promise<ScanPlan[]> {
-  await admin();
-  const tours = await prisma.tour.findMany({ where: slug ? { slug } : {}, select: { slug: true, name: true }, orderBy: { name: "asc" } });
+  // One tour: whoever may work on it. All: the ones this person may see (every tour for admins, their own for developers).
+  const user = await (slug ? requireTour(slug) : requireTeam("tours"));
+  const tours = await prisma.tour.findMany({ where: slug ? { slug } : toursOf(user), select: { slug: true, name: true }, orderBy: { name: "asc" } });
   return Promise.all(
     tours.map(async (t) => {
       try {
@@ -114,7 +111,7 @@ async function ask<T extends z.ZodTypeAny>(client: Anthropic, slug: string, by: 
 
 /** Checks some of a tour's scans (the client sends them a dozen at a time, so it never runs too long). */
 export async function checkScansForPeople(slug: string, sweepIds: string[]): Promise<{ ok: true; checked: number; found: number } | { ok: false; error: string }> {
-  const user = await admin();
+  const user = await requireTour(slug);
   const key = process.env.ANTHROPIC_API_KEY || (await getSettingValue("ANTHROPIC_API_KEY"));
   if (!key) return { ok: false, error: "nextviewAI er ikke sat op - indsæt en nøgle i en tours editor." };
   const m = await modelOf(slug);
@@ -211,8 +208,10 @@ async function walkOf(slug: string, modelId: string, config: TourConfig, scans: 
 
 /** The scans with people waiting for review (or all decided ones too), with fresh pictures of their walls. */
 export async function peopleFindings(includeDecided = false): Promise<ScanFinding[]> {
-  await admin();
-  const rows = await prisma.tourScanCheck.findMany({ where: { status: { in: includeDecided ? ["person", "hidden", "kept"] : ["person"] } }, orderBy: [{ tourSlug: "asc" }, { ss: "asc" }] });
+  const user = await requireTeam("tours");
+  // Developers: only the scans of the tours given to them.
+  const mine = teamCan(user, "admin") ? null : (await prisma.tour.findMany({ where: toursOf(user), select: { slug: true } })).map((t) => t.slug);
+  const rows = await prisma.tourScanCheck.findMany({ where: { status: { in: includeDecided ? ["person", "hidden", "kept"] : ["person"] }, ...(mine ? { tourSlug: { in: mine } } : {}) }, orderBy: [{ tourSlug: "asc" }, { ss: "asc" }] });
   const slugs = [...new Set(rows.map((r) => r.tourSlug))];
   const tours = await prisma.tour.findMany({ where: { slug: { in: slugs } }, select: { slug: true, name: true } });
   const images: Record<string, ScanImages[]> = {};
@@ -249,7 +248,7 @@ export async function peopleFindings(includeDecided = false): Promise<ScanFindin
 
 /** Hide the scan in the tour (saved as a new version) - or keep it. */
 export async function decideScan(slug: string, sweepId: string, decision: "hide" | "keep" | "undo"): Promise<{ ok: true } | { ok: false; error: string }> {
-  const user = await admin();
+  const user = await requireTour(slug);
   const check = await prisma.tourScanCheck.findUnique({ where: { tourSlug_sweepId: { tourSlug: slug, sweepId } } });
   if (!check) return { ok: false, error: "Scannet findes ikke." };
   const tour = await prisma.tour.findUnique({ where: { slug }, select: { config: true } });

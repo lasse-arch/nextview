@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
-import { getCurrentUser } from "@/lib/auth";
+import { requireTour } from "@/lib/auth";
+import { teamCan } from "@/lib/team-roles";
 import { prisma } from "@/lib/db";
 import { getSettingValue } from "@/lib/integration-settings";
 import { blobReady } from "@/lib/tour-files";
@@ -22,8 +23,8 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
 /** The tour editor: a tour's whole setup, with a live preview and its versions. */
 export default async function TourEditPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ fane?: string }> }) {
-  const user = await getCurrentUser();
-  if (user?.role !== "ADMIN") redirect("/arpo");
+  const user = await requireTour((await params).slug).catch(() => null);
+  if (!user) redirect("/arpo/tour-lab");
   await ensureToursSeeded().catch(() => {});
   const tour = await prisma.tour.findUnique({
     where: { slug: (await params).slug },
@@ -38,6 +39,8 @@ export default async function TourEditPage({ params, searchParams }: { params: P
       share: true,
       shareToken: true,
       reviewToken: true,
+      deadline: true,
+      assignedTo: { select: { id: true, name: true } },
       deal: { select: { id: true, companyName: true, displayName: true, filmingActualMinutes: true } },
       versions: { orderBy: { createdAt: "desc" }, take: 40, select: { id: true, note: true, createdByName: true, createdAt: true } },
     },
@@ -55,7 +58,8 @@ export default async function TourEditPage({ params, searchParams }: { params: P
   // Resultater opens on the last 7 days (today included) - another period is picked there.
   const stats = await tourStats(tour.slug, { from: addDays(todayDK(), -6), to: todayDK() });
   const share = shareOf(tour.share);
-  const economy: TourEconomy = {
+  // Time and price are the company's numbers - not for developers.
+  const economy: TourEconomy | null = !teamCan(user, "numbers") ? null : {
     filmingMinutes: tour.deal ? (await filmingTime(tour.deal)).minutes : null,
     work: work.map((w) => ({ name: w.userName, seconds: w._sum.seconds ?? 0 })).sort((a, b) => b.seconds - a.seconds),
     ai: { calls: ai._count, usd: ai._sum.costUsd ?? 0 },
@@ -82,6 +86,16 @@ export default async function TourEditPage({ params, searchParams }: { params: P
       reviewToken={tour.reviewToken}
       feedbackOpen={await prisma.tourFeedback.count({ where: { tourSlug: tour.slug, status: "open" } })}
       aiReady={Boolean(process.env.ANTHROPIC_API_KEY || (await getSettingValue("ANTHROPIC_API_KEY")))}
+      assignment={{
+        canAssign: teamCan(user, "admin"),
+        // Everyone who works on tours (developers, and admins themselves).
+        developers: teamCan(user, "admin")
+          ? (await prisma.user.findMany({ select: { id: true, name: true, role: true, extraRoles: true }, orderBy: { name: "asc" } })).filter((u) => teamCan(u, "tours") && !teamCan(u, "admin")).map((u) => ({ id: u.id, name: u.name }))
+          : [],
+        assignedToId: tour.assignedTo?.id ?? null,
+        assignedToName: tour.assignedTo?.name ?? null,
+        deadline: tour.deadline ? tour.deadline.toISOString().slice(0, 10) : null,
+      }}
       versions={tour.versions.map((v) => ({ id: v.id, note: v.note, by: v.createdByName, at: v.createdAt.toISOString() }))}
     />
   );

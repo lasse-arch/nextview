@@ -1,4 +1,5 @@
 import "server-only";
+import { teamCan, type TeamPerm } from "@/lib/team-roles";
 import { cookies } from "next/headers";
 import { after } from "next/server";
 import { SignJWT, jwtVerify } from "jose";
@@ -85,8 +86,19 @@ async function getSessionFromCookie(): Promise<Session | null> {
   }
 }
 
-/** The logged-in team member (admin or seller) - null for customers, who only ever get getCurrentCustomer. */
+/**
+ * The logged-in team member with sales access (admin or seller) - null for
+ * customers, and for filmers and developers: everything that uses this stays
+ * shut to them unless it asks getTeamUser()/requireTeam() on purpose
+ * (src/lib/team-roles.ts).
+ */
 export async function getCurrentUser(): Promise<User | null> {
+  const user = await getTeamUser();
+  return user && teamCan(user, "sales") ? user : null;
+}
+
+/** Any logged-in team member, whatever their role - only for what is meant for them all (check teamCan before showing anything). */
+export async function getTeamUser(): Promise<User | null> {
   const session = await getSessionFromCookie();
   if (session?.kind !== "staff") return null;
   // With "Kræv Google-login" on, a password session (even one started
@@ -111,6 +123,61 @@ export async function getCurrentCustomer() {
 export async function requireUser(): Promise<User> {
   const user = await getCurrentUser();
   if (!user) throw new Error("Unauthorized");
+  return user;
+}
+
+/**
+ * May this member work on this tour? Admins: every tour. Developers: only the
+ * tours given to them (Tour.assignedToId). Throws otherwise - and for a tour
+ * that doesn't exist, the same answer (nothing to learn from trying slugs).
+ */
+export async function requireTour(slug: string): Promise<User> {
+  const user = await requireTeam("tours");
+  if (teamCan(user, "admin")) return user;
+  const tour = await prisma.tour.findUnique({ where: { slug: String(slug) }, select: { assignedToId: true } });
+  if (!tour || tour.assignedToId !== user.id) throw new Error("Du har ikke adgang til den tour.");
+  return user;
+}
+
+/** Work on a customer's deal from the tour side (filming time): sellers on any deal; developers only on deals with a tour given to them. */
+export async function requireDealWork(dealId: string): Promise<User> {
+  const user = await getTeamUser();
+  if (!user) throw new Error("Unauthorized");
+  if (teamCan(user, "sales")) return user;
+  if (teamCan(user, "tours") && (await prisma.tour.count({ where: { dealId: String(dealId), assignedToId: user.id } })) > 0) return user;
+  throw new Error("Du har ikke adgang til den kunde.");
+}
+
+/**
+ * The team member who may look at this tour (or deal) in a preview - sellers and
+ * admins any (as before roles), developers only the tours given to them; null
+ * for everyone else. For the preview helpers (pictures, weather, the way there).
+ */
+export async function teamSeesTour(slug: string | null | undefined, dealId?: string | null): Promise<User | null> {
+  const user = await getTeamUser();
+  if (!user) return null;
+  if (teamCan(user, "sales") || teamCan(user, "admin")) return user;
+  if (!teamCan(user, "tours")) return null;
+  const where = slug ? { slug: String(slug), assignedToId: user.id } : dealId ? { dealId: String(dealId), assignedToId: user.id } : null;
+  return where && (await prisma.tour.count({ where })) > 0 ? user : null;
+}
+
+/** Which tours a member may see - for lists: all for admins, the given ones for developers. */
+export function toursOf(user: User): { assignedToId?: string } {
+  return teamCan(user, "admin") ? {} : { assignedToId: user.id };
+}
+
+/** A team member who may do any of `perms` - e.g. tour tools used by both sellers and developers. */
+export async function requireTeamAny(...perms: TeamPerm[]): Promise<User> {
+  const user = await getTeamUser();
+  if (!user || !perms.some((p) => teamCan(user, p))) throw new Error("Unauthorized");
+  return user;
+}
+
+/** A team member who may do `perm` - for the actions opened to filmers and developers. */
+export async function requireTeam(perm: TeamPerm): Promise<User> {
+  const user = await getTeamUser();
+  if (!user || !teamCan(user, perm)) throw new Error("Unauthorized");
   return user;
 }
 

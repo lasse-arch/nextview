@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
+import { teamSeesTour } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { tourCors } from "@/lib/tour-cors";
 import { journey, suggestAddresses } from "@/lib/commute";
@@ -35,7 +35,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
   const to = (q.get("to") ?? "").split(",").map(Number);
   const asked = to.length === 2 && to.every(Number.isFinite) && Math.abs(to[0] - 56) < 3 && Math.abs(to[1] - 11) < 5 ? { lat: to[0], lon: to[1] } : null;
   const same = asked && stored && Math.abs(asked.lat - stored.lat) < 1e-5 && Math.abs(asked.lon - stored.lon) < 1e-5;
-  const team = (!tour?.published || (asked && !same)) && tour ? Boolean(await getCurrentUser()) : false;
+  const team = (!tour?.published || (asked && !same)) && tour ? Boolean(await teamSeesTour((await params).slug)) : false;
   const place = asked && !same && team ? asked : tour?.published || team ? stored ?? (team ? asked : undefined) : undefined;
   if (!tour || !place) return NextResponse.json({ error: "Ikke slået til." }, { status: 404, headers: tourCors(request) });
   const priv: Record<string, string> = team ? { "Cache-Control": "private, no-store" } : { "Cache-Control": "private, max-age=300" };

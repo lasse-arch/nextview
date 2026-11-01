@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
+import { teamSeesTour } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { canEmbed } from "@/lib/link-embed";
 import { tourCors } from "@/lib/tour-cors";
@@ -50,7 +50,7 @@ export async function GET(request: Request) {
   // As written in the setup (a bare address may have got a "/" on the way).
   const setup = tour?.published ? JSON.stringify(tour.config) : "";
   const inSetup = [url, url.replace(/\/$/, "")].some((u) => setup.includes(`"${JSON.stringify(u).slice(1, -1)}"`));
-  const team = inSetup ? false : Boolean(await getCurrentUser());
+  const team = inSetup ? false : Boolean(await teamSeesTour(slug));
   if (!inSetup && !team) return NextResponse.json({ ok: true }, { status: 404, headers: tourCors(request) });
   const ok = await canEmbed(url);
   return NextResponse.json({ ok }, { headers: tourCors(request, { "Cache-Control": inSetup ? "public, s-maxage=86400, stale-while-revalidate=86400" : "private, max-age=3600" }) });

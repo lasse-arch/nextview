@@ -3,7 +3,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
-import { requireUser } from "@/lib/auth";
+import { requireTour } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getSettingValue } from "@/lib/integration-settings";
 import { claudeCostUsd } from "@/lib/claude-cost";
@@ -22,8 +22,9 @@ const Translated = z.object({ items: z.array(z.object({ i: z.number().int(), tex
 export type TranslateResult = { ok: true; translations: Record<string, Record<string, string>>; count: number } | { ok: false; error: string };
 
 export async function translateTour(slug: string, config: TourConfig, langs: string[], all = false): Promise<TranslateResult> {
-  const user = await requireUser();
-  if (user.role !== "ADMIN") return { ok: false, error: "Kun admin kan redigere tours." };
+  const user = await requireTour(slug).catch(() => null);
+  if (!user) return { ok: false, error: "Du har ikke adgang til tours." };
+  const userName = user.name;
   const key = process.env.ANTHROPIC_API_KEY || (await getSettingValue("ANTHROPIC_API_KEY"));
   if (!key) return { ok: false, error: "nextviewAI er ikke sat op endnu - indsæt en nøgle under fanen nextviewAI." };
   const client = new Anthropic({ apiKey: key });
@@ -65,7 +66,7 @@ export async function translateTour(slug: string, config: TourConfig, langs: str
     });
     const u = r.usage;
     await prisma.tourAiUsage
-      .create({ data: { tourSlug: slug, userName: user.name, kind: `oversæt ${lang}`, inputTokens: u.input_tokens, outputTokens: u.output_tokens, cacheReadTokens: u.cache_read_input_tokens ?? 0, cacheWriteTokens: u.cache_creation_input_tokens ?? 0, costUsd: claudeCostUsd(u) } })
+      .create({ data: { tourSlug: slug, userName, kind: `oversæt ${lang}`, inputTokens: u.input_tokens, outputTokens: u.output_tokens, cacheReadTokens: u.cache_read_input_tokens ?? 0, cacheWriteTokens: u.cache_creation_input_tokens ?? 0, costUsd: claudeCostUsd(u) } })
       .catch(() => {});
     for (const { i, text } of r.parsed_output?.items ?? []) {
       if (todo[i] && text.trim()) {

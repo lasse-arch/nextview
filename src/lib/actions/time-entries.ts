@@ -1,7 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
-import { requireUser } from "@/lib/auth";
+import { requireDealWork, requireTeamAny } from "@/lib/auth";
 import type { TimeEntryCategory } from "@prisma/client";
 
 const QUARTER_HOUR_MINUTES = 15;
@@ -24,7 +24,7 @@ export async function addManualTimeEntry(
   dealId: string,
   formData: FormData
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  const currentUser = await requireUser();
+  const currentUser = await requireDealWork(dealId); // the filming time is also logged from the tour editor's Gennemgang
 
   const dateRaw = String(formData.get("date") || "");
   const hoursRaw = String(formData.get("hours") || "").replace(",", ".");
@@ -62,8 +62,9 @@ export async function addManualTimeEntry(
  * same rule as notes (deleteNote), since one person can log hours on
  * another's behalf (see TimeEntry.createdBy). */
 export async function deleteTimeEntry(entryId: string): Promise<{ ok: true } | { ok: false; error: string }> {
-  const currentUser = await requireUser();
+  await requireTeamAny("sales", "tours"); // nothing is looked up for anyone else
   const entry = await prisma.timeEntry.findUniqueOrThrow({ where: { id: entryId } });
+  const currentUser = await requireDealWork(entry.dealId);
   if (currentUser.role !== "ADMIN" && entry.createdById !== currentUser.id) {
     return { ok: false, error: "Du kan kun slette tidsregistreringer du selv har tilføjet." };
   }
@@ -79,7 +80,7 @@ export async function deleteTimeEntry(entryId: string): Promise<{ ok: true } | {
  * who was booked to film and when (the filming booking) as the starting point.
  */
 export async function filmingTimeForm(dealId: string): Promise<{ users: { id: string; name: string }[]; crewIds: string[]; date: string | null; hours: number | null }> {
-  await requireUser();
+  await requireDealWork(dealId);
   const [users, deal] = await Promise.all([
     prisma.user.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, email: true } }),
     prisma.deal.findUnique({ where: { id: dealId }, select: { filmingCrewIds: true, filmingAt: true, filmingDurationMinutes: true } }),

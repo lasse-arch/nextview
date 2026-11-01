@@ -1,24 +1,20 @@
 "use server";
 
-import { requireUser } from "@/lib/auth";
+import { requireTour } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { copyToTour, DB_MAX, hostFiles, storeTourFile } from "@/lib/tour-files";
 import type { TourConfig } from "@/app/arpo/tour-lab/tours/types";
 
-async function admin() {
-  const user = await requireUser();
-  if (user.role !== "ADMIN") throw new Error("Kun admin kan redigere tours.");
-}
 
 /** Copies every file the setup takes from other sites to us; the editor puts the new setup in its draft. */
 export async function hostTourFiles(slug: string, config: TourConfig): Promise<{ ok: true; config: TourConfig; copied: number; failed: string[] }> {
-  await admin();
+  await requireTour(slug);
   return { ok: true, ...(await hostFiles(slug, config)) };
 }
 
 /** An upload from the editor (without Vercel Blob: up to 4 MB, kept in the database). */
 export async function uploadTourFile(slug: string, form: FormData): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
-  await admin();
+  await requireTour(slug);
   const file = form.get("file");
   if (!(file instanceof File)) return { ok: false, error: "Ingen fil." };
   if (file.size > DB_MAX) return { ok: false, error: "Filen er over 4 MB - store filer som video kræver Vercel Blob." };
@@ -31,7 +27,7 @@ export async function uploadTourFile(slug: string, form: FormData): Promise<{ ok
 
 /** Records a file the editor uploaded straight to Vercel Blob. */
 export async function registerTourFile(slug: string, file: { url: string; name: string; contentType: string; size: number }): Promise<void> {
-  await admin();
+  await requireTour(slug);
   if (!/^https:\/\/[\w.-]+\.blob\.vercel-storage\.com\//.test(file.url)) throw new Error("Ukendt filadresse.");
   await prisma.tourFile.create({ data: { tourSlug: slug, name: file.name.slice(0, 200), contentType: file.contentType, size: file.size, url: file.url } });
 }
@@ -42,7 +38,7 @@ export async function registerTourFile(slug: string, file: { url: string; name: 
  * /favicon.ico when it names none.
  */
 export async function fetchSiteFavicon(slug: string, site: string): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
-  await admin();
+  await requireTour(slug);
   try {
     const base = new URL(/^https?:\/\//i.test(site.trim()) ? site.trim() : `https://${site.trim()}`);
     if (!/^https?:$/.test(base.protocol) || /^(localhost|\d+\.\d+\.\d+\.\d+)$|\.(local|internal)$/.test(base.hostname)) return { ok: false, error: "Skriv kundens offentlige hjemmeside." };
@@ -77,7 +73,7 @@ export async function fetchSiteFavicon(slug: string, site: string): Promise<{ ok
 
 /** "Hent fra en kortside": an aerial-photo map page on lovable.app, read and copied into this tour (the editor puts it in its draft). */
 export async function importMapPageAction(slug: string, url: string): Promise<{ ok: true; result: import("@/lib/lovable-map").MapImport } | { ok: false; error: string }> {
-  await admin();
+  await requireTour(slug);
   if (!(await prisma.tour.findUnique({ where: { slug }, select: { slug: true } }))) return { ok: false, error: "Touren findes ikke." };
   try {
     const { importMapPage } = await import("@/lib/lovable-map");

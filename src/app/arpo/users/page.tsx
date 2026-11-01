@@ -8,6 +8,24 @@ import { RequireGoogleLoginToggle } from "./require-google-login-toggle";
 import { isGoogleLoginRequired, googleLoginRedirectUri } from "@/lib/google-login";
 import { getAppBaseUrl } from "@/lib/email-oauth";
 import { formatDate } from "@/lib/labels";
+import { TEAM_ROLES, TEAM_ROLE_NAMES, TEAM_ROLE_SCOPE } from "@/lib/team-roles";
+
+/** Extra roles on top of the main one (never Admin). */
+function ExtraRoles({ id, value }: { id: string; value: string[] }) {
+  return (
+    <div className="col-span-2 sm:col-span-4">
+      <span className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Også</span>
+      <div className="mt-1 flex flex-wrap gap-3">
+        {TEAM_ROLES.filter((r) => r !== "ADMIN").map((r) => (
+          <label key={r} className="flex items-center gap-1.5 text-xs text-slate-600">
+            <input type="checkbox" name="extraRoles" value={r} id={`${id}-${r}`} defaultChecked={value.includes(r)} />
+            {TEAM_ROLE_NAMES[r]}
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default async function UsersPage() {
   const currentUser = await getCurrentUser();
@@ -45,6 +63,18 @@ export default async function UsersPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <h1 className="text-2xl font-semibold text-slate-900">Brugere</h1>
+
+      <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <h2 className="text-sm font-semibold text-slate-900">Roller</h2>
+        <ul className="mt-2 space-y-1 text-sm">
+          {TEAM_ROLES.map((r) => (
+            <li key={r} className="text-slate-700">
+              <span className="font-medium text-slate-900">{TEAM_ROLE_NAMES[r]}:</span> {TEAM_ROLE_SCOPE[r]}
+            </li>
+          ))}
+        </ul>
+        <p className="mt-2 text-xs text-slate-500">En person kan have flere roller (fx Filmer og Udvikler) - de får det hele samlet. Kun Admin kan ikke gives som ekstra rolle.</p>
+      </section>
 
       <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <h2 className="text-sm font-semibold text-slate-900">Sikkerhedstjek</h2>
@@ -98,8 +128,11 @@ export default async function UsersPage() {
                   <div>
                     <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Rolle</label>
                     <select name="role" defaultValue={u.role} className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm">
-                      <option value="SALES">Sælger</option>
-                      <option value="ADMIN">Admin</option>
+                      {TEAM_ROLES.map((r) => (
+                        <option key={r} value={r}>
+                          {TEAM_ROLE_NAMES[r]}
+                        </option>
+                      ))}
                     </select>
                   </div>
                   <div className="flex items-end gap-2">
@@ -138,6 +171,7 @@ export default async function UsersPage() {
                       ))}
                     </select>
                   </div>
+                  <ExtraRoles id={u.id} value={u.extraRoles} />
                   <div>
                     <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Ny adgangskode</label>
                     <input
@@ -168,15 +202,20 @@ export default async function UsersPage() {
       </div>
 
       <section className="rounded-lg border border-dashed border-slate-300 bg-white p-4">
-        <h2 className="text-sm font-semibold text-slate-900">Opret ny bruger</h2>
+        <h2 className="text-sm font-semibold text-slate-900">Opret ny medarbejder</h2>
+        <p className="mt-1 text-xs text-slate-500">Uden adgangskode logger de ind med Google på deres arbejdsmail (samme e-mail som her).</p>
         <form action={createUser} className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <input name="name" placeholder="Navn" required className="rounded-md border border-slate-300 px-2 py-1.5 text-sm" />
           <input name="email" type="email" placeholder="E-mail" required className="rounded-md border border-slate-300 px-2 py-1.5 text-sm" />
-          <input name="password" type="password" placeholder="Adgangskode" required className="rounded-md border border-slate-300 px-2 py-1.5 text-sm" />
+          <input name="password" type="password" placeholder="Adgangskode (valgfri)" className="rounded-md border border-slate-300 px-2 py-1.5 text-sm" />
           <select name="role" defaultValue="SALES" className="rounded-md border border-slate-300 px-2 py-1.5 text-sm">
-            <option value="SALES">Sælger</option>
-            <option value="ADMIN">Admin</option>
+            {TEAM_ROLES.map((r) => (
+                        <option key={r} value={r}>
+                          {TEAM_ROLE_NAMES[r]}
+                        </option>
+                      ))}
           </select>
+          <ExtraRoles id="new" value={[]} />
           <div className="flex items-center gap-2">
             <input type="checkbox" name="isCommissionBased" id="new-comm" defaultChecked />
             <label htmlFor="new-comm" className="text-xs font-medium text-slate-600">

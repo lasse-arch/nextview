@@ -9,7 +9,7 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { storeTourFile } from "@/lib/tour-files";
 import type { Prisma } from "@prisma/client";
-import { requireUser } from "@/lib/auth";
+import { requireTeam, requireTour } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getSettingValue, setSettingValue } from "@/lib/integration-settings";
 import { siteDigest, siteResearch } from "@/lib/site-digest";
@@ -42,8 +42,7 @@ import { plainWordsInConfig } from "@/app/arpo/tour-lab/tours/i18n";
  */
 
 async function admin() {
-  const user = await requireUser();
-  if (user.role !== "ADMIN") throw new Error("Kun admin kan redigere tours.");
+  const user = await requireTeam("tours");
   return user;
 }
 
@@ -58,7 +57,7 @@ export async function tourAiReady(): Promise<boolean> {
 
 /** Saves the Claude API key in Arpo's settings (used when it isn't set as an environment variable). */
 export async function saveAnthropicKey(key: string): Promise<{ ok: true } | { ok: false; error: string }> {
-  await admin();
+  await requireTeam("admin");
   const value = key.trim();
   if (!value.startsWith("sk-ant-")) return { ok: false, error: "En nøgle fra Anthropic starter med sk-ant-" };
   try {
@@ -358,7 +357,7 @@ ${digest.slice(0, 8000)}
 
 /** A change asked for in the editor's chat - `images`: screenshots the user sent along (of the preview, the customer's site …). */
 export async function askClaudeForTour(config: TourConfig, history: ChatTurn[], request: string, images: string[] = []): Promise<AiEditResult> {
-  const user = await admin();
+  const user = await requireTour(config.slug);
   const key = await apiKey();
   if (!key) return { ok: false, error: "nextviewAI er ikke sat op endnu - indsæt en nøgle." };
   try {
@@ -438,7 +437,7 @@ async function exploreOf(input: NewTourInput): Promise<ExploreTour | null> {
  * so the user sees that it was read (and its Matterport model is picked).
  */
 export async function peekExploreTour(url: string): Promise<{ ok: true; title: string; modelId: string; groups: number; places: number; tiles: number; outside: number } | { ok: false; error: string }> {
-  await admin();
+  await requireTeam("admin");
   const e = await readExploreTour(url).catch(() => null);
   if (!e) return { ok: false, error: "Kunne ikke læse touren - indsæt et link som https://explore.nextview360.dk/da/tour/…" };
   const places = e.menu.reduce((n, m) => n + ("items" in m ? m.items.length : 1), 0);
@@ -456,7 +455,7 @@ export async function planTourFromWebsite(
   previous?: TourPlanResult,
   corrections?: string
 ): Promise<{ ok: true; plan: TourPlanResult } | { ok: false; error: string }> {
-  const user = await admin();
+  const user = await requireTeam("admin");
   const key = await apiKey();
   if (!key) return { ok: false, error: "nextviewAI er ikke sat op endnu - indsæt en nøgle i en tours editor (fanen nextviewAI)." };
   const model = input.modelId ? await fetchModelInfo(input.modelId) : null;
@@ -544,7 +543,7 @@ ${research.text}
  * tour's features (its kind of menu, start and functions).
  */
 export async function createTourFromWebsite(input: NewTourInput & { plan?: TourPlanResult}): Promise<{ ok: true; slug: string; reply: string } | { ok: false; error: string }> {
-  const user = await admin();
+  const user = await requireTeam("admin");
   const key = await apiKey();
   if (!key) return { ok: false, error: "nextviewAI er ikke sat op endnu - indsæt en nøgle i en tours editor (fanen nextviewAI)." };
   const name = input.name.trim();
@@ -744,7 +743,7 @@ export type TourCustomer = { id: string; name: string; address: string | null; w
 
 /** Customers to make a tour for - signed/filmed/live first, then by name. */
 export async function searchTourCustomers(query: string): Promise<TourCustomer[]> {
-  await admin();
+  await requireTeam("admin");
   const q = query.trim();
   const deals = await prisma.deal.findMany({
     where: q.length >= 2 ? { OR: [{ companyName: { contains: q, mode: "insensitive" } }, { displayName: { contains: q, mode: "insensitive" } }] } : { OR: [{ contractSignedAt: { not: null } }, { mpSkinId: { not: null } }] },
@@ -766,7 +765,7 @@ export async function searchTourCustomers(query: string): Promise<TourCustomer[]
 
 /** The customer's Matterport tours (from the deal's MP-Space ids and product links), with name and photo from Matterport - or one pasted link/id. */
 export async function matterportModels(dealId: string | null, pasted?: string): Promise<ModelInfo[]> {
-  await admin();
+  await requireTeam("admin");
   let text = pasted ?? "";
   if (dealId && !pasted) {
     const d = await prisma.deal.findUnique({ where: { id: dealId }, select: { mpSkinId: true, items: { select: { url: true } } } });
@@ -785,7 +784,7 @@ export async function matterportConnected(): Promise<boolean> {
 
 /** Connects our Matterport account (an API token: id and secret) - checked against Matterport before it's kept. */
 export async function connectMatterport(tokenId: string, secret: string): Promise<{ ok: true } | { ok: false; error: string }> {
-  await admin();
+  await requireTeam("admin");
   const token = `${tokenId.trim()}:${secret.trim()}`;
   if (token.length < 10) return { ok: false, error: "Indsæt både token-id og secret." };
   const test = await searchAccountModels(token, "");
@@ -796,7 +795,7 @@ export async function connectMatterport(tokenId: string, secret: string): Promis
 
 /** Spaces on our Matterport account, searchable. */
 export async function searchMatterportSpaces(query: string, offset?: string | null) {
-  await admin();
+  await requireTeam("admin");
   const token = process.env.MATTERPORT_API_TOKEN || (await getSettingValue("MATTERPORT_API_TOKEN"));
   if (!token) return { ok: false as const, error: "Matterport er ikke forbundet." };
   return searchAccountModels(token, query, offset);
@@ -820,7 +819,7 @@ type LiveSpec = NonNullable<TourConfig["live"]>;
  * the page itself, no AI.
  */
 export async function setupLiveData(slug: string, url: string, what: string): Promise<{ ok: true; spec: LiveSpec; units: LiveUnit[]; explanation: string } | { ok: false; error: string }> {
-  const user = await admin();
+  const user = await requireTour(slug);
   const key = await apiKey();
   if (!key) return { ok: false, error: "nextviewAI er ikke sat op endnu - indsæt en nøgle under fanen nextviewAI." };
   let text: string;
@@ -881,21 +880,26 @@ export async function previewLiveData(spec: LiveSpec): Promise<{ ok: true; units
 export type AiMemory = { id: string; scope: "all" | "tour"; text: string; by: string | null; at: string };
 
 export async function tourAiMemories(slug: string): Promise<AiMemory[]> {
-  await admin();
+  await requireTour(slug);
   const rows = await prisma.tourAiMemory.findMany({ where: { scope: { in: ["all", slug] } }, orderBy: { createdAt: "desc" }, take: 300 });
   return rows.map((r) => ({ id: r.id, scope: r.scope === "all" ? "all" : "tour", text: r.text, by: r.createdBy, at: r.createdAt.toISOString() }));
 }
 
 /** Teaches nextviewAI something by hand - for every tour, or about this customer. */
 export async function addTourAiMemory(slug: string, scope: "all" | "tour", text: string): Promise<{ ok: true } | { ok: false; error: string }> {
-  const user = await admin();
+  const user = await requireTour(slug);
   if (!text.trim()) return { ok: false, error: "Skriv det, nextviewAI skal huske." };
   await remember(slug, user.name, [{ scope, text }]);
   return { ok: true };
 }
 
 export async function forgetTourAiMemory(id: string): Promise<void> {
-  await admin();
+  await requireTeam("tours");
+  const memory = await prisma.tourAiMemory.findUnique({ where: { id }, select: { scope: true } });
+  if (!memory) return;
+  // A memory for one tour: whoever may work on it. One for all tours: admins only.
+  if (memory.scope !== "all") await requireTour(memory.scope);
+  else await requireTeam("admin");
   await prisma.tourAiMemory.delete({ where: { id } }).catch(() => {});
 }
 
@@ -930,7 +934,7 @@ export async function placeMapSpots(
   places: { key: string; name: string; text?: string }[],
   panorama: boolean
 ): Promise<{ ok: true; spots: Record<string, [number, number]>; note: string } | { ok: false; error: string }> {
-  const user = await admin();
+  const user = await requireTour(slug);
   const key = await apiKey();
   if (!key) return { ok: false, error: "nextviewAI er ikke sat op endnu - indsæt en nøgle under fanen nextviewAI." };
   if (!places.length) return { ok: false, error: "Der er ingen steder at sætte ind." };
@@ -1000,7 +1004,7 @@ export async function suggestTourFilter(
   image: string,
   look: { brand: string; colors: Record<string, string> }
 ): Promise<{ ok: true; filter: NonNullable<TourConfig["filter"]>; reason: string } | { ok: false; error: string }> {
-  const user = await admin();
+  const user = await requireTour(slug);
   const key = await apiKey();
   if (!key) return { ok: false, error: "nextviewAI er ikke sat op endnu - indsæt en nøgle under fanen nextviewAI." };
   const shot = imageBlocks([image])[0];
@@ -1060,7 +1064,7 @@ export async function suggestSiteLook(
   slug: string,
   site: string
 ): Promise<{ ok: true; colors: TourConfig["colors"]; font: string; fontHeading?: string; reason: string } | { ok: false; error: string }> {
-  const user = await admin();
+  const user = await requireTour(slug);
   const key = await apiKey();
   if (!key) return { ok: false, error: "nextviewAI er ikke sat op endnu - indsæt en nøgle under fanen nextviewAI." };
   let digest: string;

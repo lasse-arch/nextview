@@ -80,6 +80,7 @@ export async function searchMentionableCustomers(query: string): Promise<Mention
  * any of the customer's products), falls back to whichever link is first.
  */
 export async function resolveCustomerMentions(text: string): Promise<string> {
+  await requireUser(); // a server action anyone could call otherwise - only the team's mails use it
   const mentions = [...new Set([...text.matchAll(MENTION_PATTERN)].map((m) => m[1]))];
   if (mentions.length === 0) return text;
 

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
+import { teamSeesTour } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { tourCors } from "@/lib/tour-cors";
 import { weatherMonths, weatherNow } from "@/lib/weather";
@@ -35,7 +35,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
   const asked = { lat: Number(q.get("lat")), lon: Number(q.get("lon")), place: (q.get("place") ?? "").slice(0, 40) };
   const same = stored && Math.abs(stored.lat - asked.lat) < 1e-6 && Math.abs(stored.lon - asked.lon) < 1e-6;
   const open = Boolean(tour?.published && (same || !q.has("lat")));
-  const team = !open && Boolean(await getCurrentUser());
+  const team = !open && Boolean(await teamSeesTour((await params).slug));
   const inDenmarkish = Math.abs(asked.lat - 56) < 6 && Math.abs(asked.lon - 11) < 10;
   const w = open ? stored : team ? (q.has("lat") && inDenmarkish ? asked : stored) : undefined;
   if (!w || !Number.isFinite(w.lat) || !Number.isFinite(w.lon)) return NextResponse.json({ now: null, months: null }, { status: 404, headers: tourCors(request) });

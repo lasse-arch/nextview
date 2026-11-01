@@ -1,12 +1,13 @@
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
+import { getTeamUser } from "@/lib/auth";
+import { teamCan } from "@/lib/team-roles";
 import { ALLOWED_TYPES } from "@/lib/tour-files";
 
 /**
  * Uploads straight from the editor to Vercel Blob (big files like videos can't
- * go through a server function). Only admins get an upload token; the editor
- * then records the file with registerTourFile.
+ * go through a server function). Only those on tours get an upload token; the editor
+ * then records the file with registerTourFile (which checks the tour is theirs).
  */
 export async function POST(request: Request) {
   const body = (await request.json()) as HandleUploadBody;
@@ -15,8 +16,8 @@ export async function POST(request: Request) {
       body,
       request,
       onBeforeGenerateToken: async () => {
-        const user = await getCurrentUser();
-        if (user?.role !== "ADMIN") throw new Error("Kun admin kan uploade.");
+        const user = await getTeamUser();
+        if (!user || !teamCan(user, "tours")) throw new Error("Du har ikke adgang til at uploade.");
         return { allowedContentTypes: ALLOWED_TYPES, maximumSizeInBytes: 200 * 1024 * 1024, addRandomSuffix: true };
       },
     });

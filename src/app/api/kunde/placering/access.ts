@@ -1,5 +1,5 @@
 import "server-only";
-import { getCurrentCustomer, getCurrentUser } from "@/lib/auth";
+import { getCurrentCustomer, teamSeesTour } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import type { TourConfig } from "@/app/arpo/tour-lab/tours/types";
 import { can } from "@/lib/customer-roles";
@@ -16,7 +16,7 @@ export async function placementAccess(request: Request, slug: unknown): Promise<
   if (typeof slug !== "string" || !/^[a-z0-9-]{1,80}$/.test(slug)) return { error: "Touren findes ikke.", status: 404 };
   const tour = await prisma.tour.findUnique({ where: { slug }, select: { config: true, dealId: true, published: true, reviewSentAt: true } });
   if (!tour) return { error: "Touren findes ikke.", status: 404 };
-  const user = await getCurrentUser();
+  const user = await teamSeesTour(slug);
   if (user) return { T: tour.config as unknown as TourConfig, slug, who: `team:${user.id}` };
   const customer = await getCurrentCustomer();
   if (!customer || !can(customer, tour.dealId, "embed") || !(tour.published || tour.reviewSentAt)) return { error: "Touren findes ikke.", status: 404 };

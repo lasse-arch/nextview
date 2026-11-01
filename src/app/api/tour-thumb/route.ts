@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import sharp from "sharp";
-import { getCurrentCustomer, getCurrentUser } from "@/lib/auth";
+import { getCurrentCustomer, teamSeesTour } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { fetchModelInfo, modelIdsIn } from "@/lib/matterport-graph";
 import { fetchMpskinsCfg } from "@/lib/mpskins";
@@ -18,11 +18,12 @@ import type { TourConfig } from "@/app/arpo/tour-lab/tours/types";
 const KEEP_MS = 30 * 86_400_000;
 const NONE_MS = 3_600_000;
 export async function GET(req: Request) {
-  const user = await getCurrentUser();
+  const q = new URL(req.url).searchParams;
+  // The team: sellers and admins any tour, developers the ones given to them (by the tour, or the deal of an item).
+  const user = await teamSeesTour(q.get("tour"), q.get("tour") ? null : (await prisma.dealItem.findUnique({ where: { id: q.get("item") ?? "" }, select: { dealId: true } }))?.dealId);
   const customer = user ? null : await getCurrentCustomer();
   if (!user && !customer) return new NextResponse(null, { status: 401 });
   const mine = (dealId: string | null | undefined) => Boolean(user) || Boolean(dealId && customer?.deals.some((d) => d.dealId === dealId));
-  const q = new URL(req.url).searchParams;
   let modelId: string | null = null;
   const slug = q.get("tour");
   const item = q.get("item");

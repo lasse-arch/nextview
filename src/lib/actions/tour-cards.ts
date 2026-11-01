@@ -5,7 +5,7 @@ import path from "node:path";
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
-import { requireUser } from "@/lib/auth";
+import { requireTour } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getSettingValue } from "@/lib/integration-settings";
 import { siteResearch } from "@/lib/site-digest";
@@ -45,8 +45,8 @@ async function websiteOf(slug: string, config: TourConfig): Promise<string | nul
  * the menu, and a picture of the view when the editor could take one).
  */
 export async function writePlaceCards(slug: string, config: TourConfig, places: { ss: number; name: string | null; image?: string }[]): Promise<CardsResult> {
-  const user = await requireUser();
-  if (user.role !== "ADMIN") return { ok: false, error: "Kun admin kan redigere tours." };
+  const user = await requireTour(slug).catch(() => null);
+  if (!user) return { ok: false, error: "Du har ikke adgang til tours." };
   const key = process.env.ANTHROPIC_API_KEY || (await getSettingValue("ANTHROPIC_API_KEY"));
   if (!key) return { ok: false, error: "nextviewAI er ikke sat op endnu - indsæt en nøgle under fanen nextviewAI." };
   if (!places.length) return { ok: false, error: "Ingen steder at skrive kort til." };

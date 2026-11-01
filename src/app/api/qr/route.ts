@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import QRCode from "qrcode";
-import { getCurrentCustomer, getCurrentUser } from "@/lib/auth";
+import { getCurrentCustomer, getTeamUser } from "@/lib/auth";
+import { teamCanAny } from "@/lib/team-roles";
 import { CLOUDFLARE_TOUR_ORIGIN, TOUR_ORIGIN } from "@/lib/public-urls";
 import { getAppBaseUrl } from "@/lib/email-oauth";
 
@@ -10,7 +11,7 @@ import { getAppBaseUrl } from "@/lib/email-oauth";
  * it can't be used as a QR maker for anything else.
  */
 export async function GET(req: Request) {
-  if (!(await getCurrentUser()) && !(await getCurrentCustomer())) return new NextResponse(null, { status: 401 });
+  if (!teamCanAny(await getTeamUser(), "sales", "tours") && !(await getCurrentCustomer())) return new NextResponse(null, { status: 401 });
   const raw = new URL(req.url).searchParams.get("url") ?? "";
   let url: URL;
   try {

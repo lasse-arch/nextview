@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getCurrentUser } from "@/lib/auth";
+import { getTeamUser, toursOf } from "@/lib/auth";
+import { teamCan } from "@/lib/team-roles";
 import { getSettingValue } from "@/lib/integration-settings";
 import { leadsByTour } from "@/lib/tour-stats";
 import { customersWithoutTour, listTours } from "@/lib/tours";
@@ -32,9 +33,17 @@ function picture(c: TourConfig): { image: string; logo: boolean } {
 const day = (d: Date) => d.toLocaleDateString("da-DK", { day: "numeric", month: "short", timeZone: "Europe/Copenhagen" });
 
 export default async function TourLabPage() {
-  const user = await getCurrentUser();
-  if (user?.role !== "ADMIN") redirect("/arpo");
-  const [tours, sdkKey, results, deleted, waiting] = await Promise.all([listTours(), getSettingValue("MATTERPORT_SDK_KEY"), leadsByTour(30), deletedTours(), customersWithoutTour()]);
+  const user = await getTeamUser();
+  if (!user || !teamCan(user, "tours")) redirect("/arpo");
+  const isAdmin = teamCan(user, "admin");
+  // Developers see only the tours given to them - and none of the admin's tools (new tours, the bin, customers without a tour).
+  const [tours, sdkKey, results, deleted, waiting] = await Promise.all([
+    listTours(toursOf(user)),
+    isAdmin ? getSettingValue("MATTERPORT_SDK_KEY") : null,
+    leadsByTour(30),
+    isAdmin ? deletedTours() : [],
+    isAdmin ? customersWithoutTour() : [],
+  ]);
   const now = new Date().getTime();
   const mpskinsLeft = tours.filter((t) => (t.config as unknown as TourConfig).tourPage).length;
   const rows: TourRow[] = tours.map((t) => {
@@ -56,6 +65,8 @@ export default async function TourLabPage() {
       updatedAt: t.updatedAt.toISOString(),
       visits: results[t.slug]?.visits ?? 0,
       leads: results[t.slug]?.leads ?? 0,
+      assignee: t.assignedTo?.name ?? null,
+      deadline: t.deadline ? t.deadline.toISOString().slice(0, 10) : null,
     };
   });
   // Customers who bought a tour that isn't in Arpo yet: not started - or, live already, an older tour on explore.
@@ -99,22 +110,24 @@ export default async function TourLabPage() {
           <Link href="/arpo/tour-lab/personer" className="rounded-full bg-white px-4 py-2 text-[14px] font-medium text-[#1d1d1f] ring-1 ring-black/[.08] hover:bg-[#f5f5f7]">
             Personer i scans
           </Link>
-          <NewTour tours={tours.map((t) => ({ slug: t.slug, name: t.name }))} />
+          {isAdmin && <NewTour tours={tours.map((t) => ({ slug: t.slug, name: t.name }))} />}
         </div>
       </div>
 
-      {mpskinsLeft > 0 && <DetachAll count={mpskinsLeft} />}
+      {isAdmin && mpskinsLeft > 0 && <DetachAll count={mpskinsLeft} />}
 
-      <ToursList rows={[...rows, ...notStarted]} tours={tours.map((t) => ({ slug: t.slug, name: t.name }))} />
+      <ToursList rows={[...rows, ...notStarted]} tours={tours.map((t) => ({ slug: t.slug, name: t.name }))} portal={!teamCan(user, "sales")} />
 
-      <Papirkurv rows={deleted.map((d) => ({ ...d, createdAt: d.createdAt.toISOString(), daysLeft: Math.max(0, 30 - Math.floor((now - d.createdAt.getTime()) / 86_400_000)) }))} />
+      {isAdmin && <Papirkurv rows={deleted.map((d) => ({ ...d, createdAt: d.createdAt.toISOString(), daysLeft: Math.max(0, 30 - Math.floor((now - d.createdAt.getTime()) / 86_400_000)) }))} />}
 
-      <details className="rounded-2xl bg-white/60 px-4 py-3 ring-1 ring-black/[.05]">
-        <summary className="cursor-pointer select-none text-[14px] text-[#6e6e73]">Udviklerværktøjer (Matterport SDK-nøgle og testværktøj)</summary>
-        <div className="mt-4">
-          <TourLab sdkKey={sdkKey} />
-        </div>
-      </details>
+      {isAdmin && (
+        <details className="rounded-2xl bg-white/60 px-4 py-3 ring-1 ring-black/[.05]">
+          <summary className="cursor-pointer select-none text-[14px] text-[#6e6e73]">Udviklerværktøjer (Matterport SDK-nøgle og testværktøj)</summary>
+          <div className="mt-4">
+            <TourLab sdkKey={sdkKey} />
+          </div>
+        </details>
+      )}
     </div>
   );
 }

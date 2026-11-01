@@ -7,9 +7,13 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+/// What a team member does - decides what they can see in Arpo (src/lib/team-roles.ts).
+/// FILMER and DEVELOPER never see sales or money.
 enum Role {
   ADMIN
   SALES
+  FILMER
+  DEVELOPER
 }
 
 enum CommissionFrequency {
@@ -258,6 +262,10 @@ model User {
   email             String              @unique
   passwordHash      String
   role              Role                @default(SALES)
+  /// More roles on top of `role` - e.g. one who both films and builds tours. Never ADMIN (that is only `role`).
+  extraRoles        Role[]              @default([])
+  /// Tours given to this person to build (developers).
+  assignedTours     Tour[]              @relation("TourAssignee")
   isCommissionBased Boolean             @default(true)
   /// Leadgeneration's "N nye tilføjet siden sidst": when this user last had
   /// the page open, and the start of the visit before that (what's counted
@@ -1350,6 +1358,13 @@ model Tour {
   @@index([dealId])
   /// Visits are counted from here: set when the tour is first published (or reset by hand in Resultater), so our own looks before don't count.
   statsSince DateTime?
+  /// The developer the tour is given to - a developer only sees (and may change) the tours given to them; admins see all.
+  assignedToId String?
+  assignedTo   User?     @relation("TourAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  /// When it should be done (a day) - shown to the developer and in the tour list.
+  deadline     DateTime? @db.Date
+
+  @@index([assignedToId])
 }
 
 /// One version of a tour published as plain files on Cloudflare - frozen: its

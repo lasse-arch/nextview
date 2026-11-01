@@ -1,7 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getCurrentCustomer, getCurrentUser } from "@/lib/auth";
+import { getCurrentCustomer, getTeamUser } from "@/lib/auth";
+import { teamCan } from "@/lib/team-roles";
 import { logout } from "@/lib/actions/auth";
 import { ToastProvider } from "@/components/toast";
 import { DropFiles } from "@/components/drop-files";
@@ -16,14 +17,25 @@ import { unreadNotifications } from "@/lib/team-notifications";
 import { getUnreadNewsCount } from "@/lib/actions/news";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const [user, presenting] = await Promise.all([getCurrentUser(), isPresentationMode()]);
+  // Every team member gets the frame; what's in the menu follows their role (src/lib/team-roles.ts), and each page checks again.
+  const [user, presenting] = await Promise.all([getTeamUser(), isPresentationMode()]);
   if (!user) redirect((await getCurrentCustomer()) ? "/kunde" : "/api/auth/session-ended?next=/arpo");
+  const sales = teamCan(user, "sales");
+  const tours = teamCan(user, "tours");
+  const filming = teamCan(user, "filming");
 
-  const [unreadNewsCount, unreadBell] = await Promise.all([getUnreadNewsCount(user.id, user.newsReadAt ?? null), unreadNotifications(user)]);
+  const [unreadNewsCount, unreadBell] = sales ? await Promise.all([getUnreadNewsCount(user.id, user.newsReadAt ?? null), unreadNotifications(user)]) : [0, 0];
 
   // The menu in named parts - what a seller uses every day first, the company's own pages and money last.
   const admin = user.role === "ADMIN";
-  const navItems: SidebarNavItem[] = [
+  const navItems: SidebarNavItem[] = !sales
+    ? [
+        ...(tours
+          ? [{ section: "Tours", items: [{ href: "/arpo/tour-lab", label: "Tours", icon: "tour" as const }, { href: "/arpo/tour-lab/personer", label: "Personer i scans", icon: "scanPeople" as const }] }]
+          : []),
+        ...(filming ? [{ section: "Filmning", items: [{ href: "/arpo/filmninger", label: "Mine filmninger", icon: "calendar" as const }] }] : []),
+      ]
+    : [
     {
       section: "Salg",
       items: [
@@ -40,7 +52,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { section: "Kunder", items: [{ href: "/arpo/kunder", label: "Live kunder", icon: "users" }] },
     {
       section: "Tours",
-      items: admin
+      items: tours
         ? [
             { href: "/arpo/tour-lab", label: "Tours", icon: "tour" },
             { href: "/arpo/tour-lab/personer", label: "Personer i scans", icon: "scanPeople" },
@@ -67,7 +79,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     },
   ];
 
-  const settingsItems = [
+  const settingsItems = !sales
+    ? []
+    : [
     { href: "/arpo/profile", label: "Min profil" },
     { href: "/arpo/deals/import", label: "Importér" },
     { href: "/arpo/settings/email", label: "E-mail" },
@@ -90,7 +104,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <DropFiles />
       <div className="flex min-h-screen" data-presentation={presenting ? "true" : "false"}>
         <aside className="arpo-sidebar sticky top-0 hidden h-screen w-60 shrink-0 flex-col overflow-y-auto border-r border-slate-200 bg-slate-50 p-3 md:flex">
-          <Link href="/arpo" className="flex items-center px-2.5 pb-3 pt-3">
+          <Link href={sales ? "/arpo" : tours ? "/arpo/tour-lab" : "/arpo/filmninger"} className="flex items-center px-2.5 pb-3 pt-3">
             <Image src="/logo.png" alt="Nextview360" width={942} height={219} className="h-6 w-auto" priority />
           </Link>
 
@@ -98,7 +112,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
           <div className="flex-1" />
 
-          <SettingsMenu items={settingsItems} up />
+          {settingsItems.length > 0 && <SettingsMenu items={settingsItems} up />}
 
           <div className="flex items-center gap-2.5 border-t border-slate-200 px-2.5 pt-3">
             {user.avatarUrl ? (
@@ -129,15 +143,19 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           />
 
           <div className="arpo-topbar flex items-center justify-end gap-2.5 px-4 pt-4 sm:px-6 md:px-10 md:pt-6">
-            <NotificationBell unreadCount={unreadBell} />
-            <NewsBell unreadCount={unreadNewsCount} />
-            <PresentationModeToggle enabled={presenting} />
-            <Link
-              href="/arpo/deals/new"
-              className="rounded-lg bg-slate-900 px-4 py-2 text-[13px] font-semibold text-white shadow-sm transition-colors hover:bg-slate-800"
-            >
-              + Ny lead
-            </Link>
+            {sales && (
+              <>
+                <NotificationBell unreadCount={unreadBell} />
+                <NewsBell unreadCount={unreadNewsCount} />
+                <PresentationModeToggle enabled={presenting} />
+                <Link
+                  href="/arpo/deals/new"
+                  className="rounded-lg bg-slate-900 px-4 py-2 text-[13px] font-semibold text-white shadow-sm transition-colors hover:bg-slate-800"
+                >
+                  + Ny lead
+                </Link>
+              </>
+            )}
           </div>
           <main className="arpo-main flex-1 px-4 pb-10 pt-4 sm:px-6 md:px-10">{children}</main>
         </div>

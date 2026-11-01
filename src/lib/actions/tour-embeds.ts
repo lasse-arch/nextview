@@ -1,6 +1,6 @@
 "use server";
 
-import { requireUser } from "@/lib/auth";
+import { requireTour } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { matchPages, sitePages } from "@/lib/site-pages";
 import { startPlaces } from "@/app/arpo/tour-lab/tours/places";
@@ -8,8 +8,8 @@ import type { TourConfig } from "@/app/arpo/tour-lab/tours/types";
 
 /** Suggests which of the customer's pages each place in the tour goes on (the editor shows them to confirm). */
 export async function suggestEmbedPages(slug: string, site: string): Promise<{ ok: true; pages: Record<string, { url: string; title: string }>; checked: number } | { ok: false; error: string }> {
-  const user = await requireUser();
-  if (user.role !== "ADMIN") return { ok: false, error: "Kun admin." };
+  const user = await requireTour(slug).catch(() => null);
+  if (!user) return { ok: false, error: "Du har ikke adgang til tours." };
   const tour = await prisma.tour.findUnique({ where: { slug }, select: { config: true } });
   if (!tour) return { ok: false, error: "Touren findes ikke." };
   try {

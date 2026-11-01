@@ -41,7 +41,18 @@ export type TourRow = {
   newTour?: TourCustomer;
   /** A customer without a tour: "solgt", "optagelse 12. nov." or "filmet 3. nov.". */
   note?: string;
+  /** The developer it's given to, and when it should be done (YYYY-MM-DD). */
+  assignee?: string | null;
+  deadline?: string | null;
 };
+
+/** "Deadline 12. nov." - red when it has passed (and the tour isn't live), orange the last 3 days. */
+function DeadlineChip({ deadline, live }: { deadline: string; live: boolean }) {
+  const days = Math.round((Date.parse(`${deadline}T00:00:00Z`) - Date.parse(`${new Date().toISOString().slice(0, 10)}T00:00:00Z`)) / 86_400_000);
+  const color = live ? "#8e8e93" : days < 0 ? "#ff3b30" : days <= 3 ? "#ff9500" : "#6e6e73";
+  const label = new Date(`${deadline}T12:00:00Z`).toLocaleDateString("da-DK", { day: "numeric", month: "short" });
+  return <span style={{ color }}>Deadline {label}{!live && days < 0 ? " · overskredet" : ""}</span>;
+}
 
 type Filter = "alle" | Stage | "uden";
 type Sort = "status" | "aendret" | "navn" | "resultat";
@@ -77,7 +88,9 @@ const noteOf = (r: TourRow) =>
 
 const when = (iso: string) => new Date(iso).toLocaleDateString("da-DK", { day: "numeric", month: "short", year: "numeric" });
 
-export function ToursList({ rows, tours }: { rows: TourRow[]; tours: { slug: string; name: string }[] }) {
+/** `portal`: the customer opens in the customer portal as the customer sees it (for developers, who don't see deals) instead of the deal. */
+export function ToursList({ rows, tours, portal = false }: { rows: TourRow[]; tours: { slug: string; name: string }[]; portal?: boolean }) {
+  const customerHref = (dealId: string | null) => (portal ? `/kunde?som=${dealId}` : `/arpo/deals/${dealId}`);
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<Filter>("alle");
   const [sort, setSort] = useState<Sort>("status");
@@ -162,7 +175,7 @@ export function ToursList({ rows, tours }: { rows: TourRow[]; tours: { slug: str
                 </span>
               </span>
               <span className="hidden truncate text-[14px] md:block">
-                <Link href={`/arpo/deals/${r.dealId}`} className="hover:text-[#0071e3] hover:underline">
+                <Link href={customerHref(r.dealId)} target={portal ? "_blank" : undefined} className="hover:text-[#0071e3] hover:underline">
                   {r.customer}
                 </Link>
               </span>
@@ -185,11 +198,18 @@ export function ToursList({ rows, tours }: { rows: TourRow[]; tours: { slug: str
               <span className="min-w-0">
                 <span className="block truncate text-[15px] font-medium">{r.name}</span>
                 <span className="block truncate text-[12px] text-[#8e8e93] md:hidden">{r.customer ?? "Ingen kunde"}</span>
+                {(r.assignee || r.deadline) && (
+                  <span className="block truncate text-[12px] text-[#6e6e73]">
+                    {r.assignee && <span>{r.assignee}</span>}
+                    {r.assignee && r.deadline && " · "}
+                    {r.deadline && <DeadlineChip deadline={r.deadline} live={r.stage === "live"} />}
+                  </span>
+                )}
               </span>
             </Link>
             <span className="hidden truncate text-[14px] md:block">
               {r.dealId ? (
-                <Link href={`/arpo/deals/${r.dealId}`} className="relative z-10 hover:text-[#0071e3] hover:underline">
+                <Link href={customerHref(r.dealId)} target={portal ? "_blank" : undefined} className="relative z-10 hover:text-[#0071e3] hover:underline">
                   {r.customer}
                 </Link>
               ) : (

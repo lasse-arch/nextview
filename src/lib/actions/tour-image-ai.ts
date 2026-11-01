@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { headers } from "next/headers";
 import sharp from "sharp";
-import { requireUser } from "@/lib/auth";
+import { requireTeam, requireTour } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getSettingValue, setSettingValue } from "@/lib/integration-settings";
 import { storeTourFile } from "@/lib/tour-files";
@@ -23,8 +23,7 @@ const MODEL = process.env.GEMINI_IMAGE_MODEL || "gemini-2.5-flash-image";
 const API = "https://generativelanguage.googleapis.com/v1beta";
 
 async function admin() {
-  const user = await requireUser();
-  if (user.role !== "ADMIN") throw new Error("Kun admin kan redigere tours.");
+  const user = await requireTeam("tours");
   return user;
 }
 
@@ -36,7 +35,7 @@ export async function imageAiReady(): Promise<boolean> {
 }
 
 export async function saveGeminiKey(key: string): Promise<{ ok: true } | { ok: false; error: string }> {
-  await admin();
+  await requireTeam("admin");
   const k = key.trim();
   if (!k) return { ok: false, error: "Indsæt nøglen." };
   const res = await fetch(`${API}/models?pageSize=1`, { headers: { "x-goog-api-key": k }, signal: AbortSignal.timeout(15_000) }).catch(() => null);
@@ -116,7 +115,7 @@ async function askGemini(key: string, jpeg: Buffer, ratio: string, request: stri
  * (which the model understands), changed, and laid back in its place.
  */
 export async function editTourImage(slug: string, src: string, request: string, view?: PanoView): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
-  const user = await admin();
+  const user = await requireTour(slug);
   const key = await geminiKey();
   if (!key) return { ok: false, error: "Billed-AI er ikke sat op endnu - indsæt en Gemini-nøgle." };
   if (!request.trim()) return { ok: false, error: "Skriv, hvad der skal ændres." };
@@ -210,7 +209,7 @@ export async function pasteTourEdit(
   /** "hele": the whole changed picture is used (cleaning, colours, light - changes too fine to detect); "aendret": only where it differs, the rest keeps the original's sharpness. */
   mode: "hele" | "aendret" = "hele"
 ): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
-  const user = await admin();
+  const user = await requireTour(slug);
   const file = form.get("file");
   if (!(file instanceof File) || !file.type.startsWith("image/")) return { ok: false, error: "Vælg et billede." };
   if (file.size > 25_000_000) return { ok: false, error: "Billedet er for stort (max 25 MB)." };

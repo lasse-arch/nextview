@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { safeNextPath } from "@/lib/auth";
+import { getTeamUser, safeNextPath } from "@/lib/auth";
+import { homeOf } from "@/lib/team-roles";
 import { getAppBaseUrl } from "@/lib/email-oauth";
 
 /**
@@ -10,6 +11,9 @@ import { getAppBaseUrl } from "@/lib/email-oauth";
  * the dead cookie is there.
  */
 export async function GET(request: NextRequest) {
+  // Still logged in, just without access to that page (a filmer or developer on a sales page): to their own part of Arpo, not logged out.
+  const member = await getTeamUser();
+  if (member) return NextResponse.redirect(new URL(homeOf(member), getAppBaseUrl()));
   // ?next=/arpo from Arpo's pages: back to the team's login, and on to Arpo after it.
   const next = safeNextPath(request.nextUrl.searchParams.get("next"));
   const res = NextResponse.redirect(new URL(`/login?error=session_ended${next !== "/" ? `&next=${encodeURIComponent(next)}` : ""}`, getAppBaseUrl()));

@@ -64,11 +64,13 @@ export function ensureToursSeeded() {
   return seeded;
 }
 
-export async function listTours() {
+/** The tours in Arpo - `where` narrows them (a developer: only the ones given to them, see toursOf in auth.ts). */
+export async function listTours(where: { assignedToId?: string } = {}) {
   await ensureToursSeeded();
   return prisma.tour.findMany({
+    where,
     orderBy: [{ updatedAt: "desc" }],
-    select: { id: true, slug: true, name: true, config: true, published: true, liveVersion: true, reviewSentAt: true, reviewApprovedAt: true, updatedAt: true, deal: { select: { id: true, companyName: true, displayName: true } } },
+    select: { id: true, slug: true, name: true, config: true, published: true, liveVersion: true, reviewSentAt: true, reviewApprovedAt: true, updatedAt: true, deadline: true, assignedTo: { select: { id: true, name: true } }, deal: { select: { id: true, companyName: true, displayName: true } } },
   });
 }
 

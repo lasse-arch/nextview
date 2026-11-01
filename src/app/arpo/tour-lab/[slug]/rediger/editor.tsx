@@ -23,6 +23,7 @@ import { DeleteTour } from "./delete-tour";
 import { LiveDataEditor } from "./live";
 import type { ScanMap } from "@/lib/matterport-graph";
 import { EconomyPanel, type TourEconomy } from "./economy";
+import { AssignmentGroup, type Assignment } from "./assignment";
 import { DEFAULT_EMBED, SharePanel, SitePreview, type EmbedSize } from "./share";
 import { Choice, Field, FilesContext, Group, Icon, input, logoTone, outsideFiles, PanoZoom, Toggle, UploadButton, withProtocol, type PreviewApi } from "./ui";
 import { fetchSiteFavicon, hostTourFiles } from "@/lib/actions/tour-files";
@@ -53,6 +54,9 @@ type Version = { id: string; note: string | null; by: string | null; at: string 
 type Tab = "layout" | "sprog" | "claude" | "live" | "scan" | "okonomi" | "resultater" | "del" | "tags" | "start" | "rundvisning" | "kort" | "kortet" | "feedback" | "generelt" | "design" | "menu" | "funktioner" | "links" | "avanceret" | "versioner";
 
 /** Claude's mark: a small sunburst. */
+const NO_TABS: Tab[] = [];
+/** Left out for those who may not see the company's numbers. */
+const NUMBERS_TABS: Tab[] = ["okonomi"];
 const SPARK = '<path d="M12 3v5M12 16v5M3 12h5M16 12h5M5.6 5.6l3.5 3.5M14.9 14.9l3.5 3.5M5.6 18.4l3.5-3.5M14.9 9.1l3.5-3.5"/>';
 
 /**
@@ -158,6 +162,7 @@ export function TourEditor({
   scanCount,
   reviewToken,
   feedbackOpen,
+  assignment,
 }: {
   slug: string;
   initial: TourConfig;
@@ -175,7 +180,8 @@ export function TourEditor({
   published: boolean;
   /** The tour has a live version on Cloudflare - its embed code points there. */
   onCloudflare: boolean;
-  economy: TourEconomy;
+  /** Time and price - null for those who may not see the company's numbers (developers): the tab is then left out. */
+  economy: TourEconomy | null;
   scanMap: ScanMap | null;
   mpskinsHidden: string[];
   scanCount: number | null;
@@ -184,6 +190,8 @@ export function TourEditor({
   feedbackOpen: number;
   /** The tab to open on (?fane=…). */
   startTab?: string;
+  /** Who builds the tour and by when (admins can change it). */
+  assignment: Assignment;
 }) {
   const router = useRouter();
   const [config, setConfig] = useState<TourConfig>(initial);
@@ -237,7 +245,7 @@ export function TourEditor({
   }
   const [dirty, setDirty] = useState(false);
   // A link straight to a tab (?fane=feedback - e.g. from the bell, when a customer has written).
-  const [tab, setTab] = useState<Tab>(() => (startTab && TABS.some(([t]) => t === startTab) ? (startTab as Tab) : "claude"));
+  const [tab, setTab] = useState<Tab>(() => (startTab && TABS.some(([t]) => t === startTab) && (economy || startTab !== "okonomi") ? (startTab as Tab) : "claude"));
   /** On a phone one thing at a time: the sections, a section's settings, or the preview (on a computer all three side by side). */
   const [pane, setPane] = useState<"nav" | "settings" | "preview">(startTab ? "settings" : "nav");
   const pickTab = useCallback((t: Tab) => {
@@ -564,7 +572,7 @@ export function TourEditor({
       <SafeArea onUndo={() => { setConfig(initial); setDirty(false); }}>
       <div className="flex min-h-0 flex-1">
         {/* Sections */}
-        <SectionNav tab={tab} menu={config.menu} feedbackOpen={feedbackOpen} onPick={pickTab} className={pane === "nav" ? "flex" : "hidden md:flex"} />
+        <SectionNav tab={tab} menu={config.menu} feedbackOpen={feedbackOpen} onPick={pickTab} className={pane === "nav" ? "flex" : "hidden md:flex"} hidden={economy ? NO_TABS : NUMBERS_TABS} />
 
         {/* Settings */}
         <div className={`${pane === "settings" ? "flex" : "hidden md:flex"} min-h-0 w-full flex-none flex-col md:w-[400px]`}>
@@ -599,8 +607,9 @@ export function TourEditor({
                 <Field title="Navn">
                   <input className={input} value={config.title} onChange={(e) => edit((d) => void (d.title = e.target.value))} />
                 </Field>
-                <DealPicker slug={slug} initial={deal} />
+                {assignment.canAssign && <DealPicker slug={slug} initial={deal} />}
                 </Group>
+                <AssignmentGroup slug={slug} a={assignment} />
                 <SlugField slug={slug} dirty={dirty} />
                 <Group title="I touren">
                 <Field title="Firmanavn i touren">
@@ -811,7 +820,7 @@ export function TourEditor({
                 <ResultsPanel stats={stats} guideStops={guideStops(config).map((s) => s.title)} guideNames={Object.fromEntries([["#rundvisning", "Vis mig rundt"], ...(config.guides ?? []).map((g) => [`#rundvisning:${g.id}`, g.title])])} slug={slug} brand={config.brand} share={share} shareStats={shareStats} token={shareToken} />
               </>
             )}
-            {tab === "okonomi" && <EconomyPanel economy={economy} />}
+            {tab === "okonomi" && economy && <EconomyPanel economy={economy} />}
             {tab === "feedback" && (
               <FeedbackPanel
                 slug={slug}
@@ -1430,9 +1439,9 @@ type ChatMsg = { role: "user" | "assistant"; text: string; images?: string[]; er
 /** nextviewAI's memory under the chat - not drawn again while one types. */
 const MemoryPanel = memo(AiMemoryPanel);
 
-const SectionNav = memo(function SectionNav({ tab, menu, feedbackOpen, onPick, className }: { tab: Tab; menu: MenuEntry[]; feedbackOpen: number; onPick: (t: Tab) => void; className: string }) {
+const SectionNav = memo(function SectionNav({ tab, menu, feedbackOpen, onPick, className, hidden }: { tab: Tab; menu: MenuEntry[]; feedbackOpen: number; onPick: (t: Tab) => void; className: string; hidden: Tab[] }) {
   const [search, setSearch] = useState("");
-  const found = useMemo(() => searchTabs(search, menu), [search, menu]);
+  const found = useMemo(() => searchTabs(search, menu).filter((f) => !hidden.includes(f.tab)), [search, menu, hidden]);
   return (
     <nav className={`${className} min-h-0 w-full flex-none flex-col md:w-[210px] gap-0.5 overflow-y-auto overscroll-contain p-3`}>
       <div className="relative mb-1.5">
@@ -1472,7 +1481,7 @@ const SectionNav = memo(function SectionNav({ tab, menu, feedbackOpen, onPick, c
           <p className="px-2.5 py-2 text-[12px] text-[#8e8e93]">Intet fundet - prøv et andet ord, eller spørg nextviewAI.</p>
         ))}
       {!search.trim() &&
-        TABS.map(([t, text, icon, heading]) => (
+        TABS.filter(([t]) => !hidden.includes(t)).map(([t, text, icon, heading]) => (
           <div key={t} className="contents">
             {heading && <div className="mt-4 px-2.5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-[#8e8e93]">{heading}</div>}
             <button

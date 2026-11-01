@@ -2,7 +2,8 @@
 
 import { tourChanged } from "@/lib/tour-cache";
 import { revalidatePath } from "next/cache";
-import { requireUser } from "@/lib/auth";
+import { getTeamUser, requireTour, requireUser } from "@/lib/auth";
+import { teamCan } from "@/lib/team-roles";
 import { prisma } from "@/lib/db";
 import { setSettingValue } from "@/lib/integration-settings";
 import { fetchMpskinsCfg, ssOf, sweepForSs } from "@/lib/mpskins";
@@ -25,8 +26,8 @@ export type ResolvedTourLink = { modelId: string; sweepId: string | null; ss: nu
  * order the ss numbers count (from 1) - so no guessing and no pressing U.
  */
 export async function resolveTourLink(url: string): Promise<ResolvedTourLink> {
-  const user = await requireUser();
-  if (user.role !== "ADMIN") return { error: "Kun admin." };
+  const user = await getTeamUser();
+  if (!user || !teamCan(user, "tours")) return { error: "Du har ikke adgang til tours." };
   let parsed: URL;
   try {
     parsed = new URL(url.trim());
@@ -51,8 +52,8 @@ export async function resolveTourLink(url: string): Promise<ResolvedTourLink> {
  * the tour in the browser (Renderer.takeScreenShot), sent as a data URL.
  */
 export async function saveTourStoryImage(slug: string, room: string, dataUrl: string, quiet = false): Promise<{ ok: true } | { ok: false; error: string }> {
-  const user = await requireUser();
-  if (user.role !== "ADMIN") return { ok: false, error: "Kun admin." };
+  const user = await requireTour(slug).catch(() => null);
+  if (!user) return { ok: false, error: "Du har ikke adgang til tours." };
   const match = /^data:image\/jpeg;base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl);
   if (!match) return { ok: false, error: "Billedet skal være en JPEG." };
   const image = Buffer.from(match[1], "base64");
@@ -70,8 +71,8 @@ export async function saveTourStoryImage(slug: string, room: string, dataUrl: st
 
 /** "Fjern billederne": the story cards' pictures taken from the tour are removed (the cards show the room's letter again). Pictures used elsewhere (foto:) stay. */
 export async function deleteStoryImages(slug: string): Promise<{ ok: true; removed: number } | { ok: false; error: string }> {
-  const user = await requireUser();
-  if (user.role !== "ADMIN") return { ok: false, error: "Kun admin." };
+  const user = await requireTour(slug).catch(() => null);
+  if (!user) return { ok: false, error: "Du har ikke adgang til tours." };
   const { count } = await prisma.tourStoryImage.deleteMany({ where: { tourSlug: slug, NOT: { room: { startsWith: "foto:" } } } });
   tourChanged(slug);
   return { ok: true, removed: count };
@@ -79,7 +80,7 @@ export async function deleteStoryImages(slug: string): Promise<{ ok: true; remov
 
 /** "Tag billeder til historierne" is done: the tour's cached copy is renewed once, with all the new pictures. */
 export async function storyImagesSaved(slug: string): Promise<void> {
-  const user = await requireUser();
-  if (user.role !== "ADMIN") return;
+  const user = await requireTour(slug).catch(() => null);
+  if (!user) return;
   tourChanged(slug);
 }
