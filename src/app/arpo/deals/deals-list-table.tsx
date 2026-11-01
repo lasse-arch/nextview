@@ -40,7 +40,7 @@ export type ListDeal = {
   createdAt: Date;
 };
 
-export function DealsListTable({ deals, users }: { deals: ListDeal[]; users: { id: string; name: string }[] }) {
+export function DealsListTable({ deals, users, isAdmin = false }: { deals: ListDeal[]; users: { id: string; name: string }[]; isAdmin?: boolean }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [saleAmountInput, setSaleAmountInput] = useState("");
   const [bindingMonthsInput, setBindingMonthsInput] = useState("");
@@ -163,6 +163,8 @@ export function DealsListTable({ deals, users }: { deals: ListDeal[]; users: { i
         <div className="flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
           <span className="text-sm font-medium text-slate-700">{selected.size} valgt</span>
 
+          {isAdmin && (
+          <>
           <div className="flex items-end gap-2">
             <div>
               <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Sæt salgsbeløb (DKK/måned)</label>
@@ -210,6 +212,8 @@ export function DealsListTable({ deals, users }: { deals: ListDeal[]; users: { i
           </div>
 
           <div className="h-8 w-px bg-slate-200" />
+          </>
+          )}
 
           <div className="flex items-end gap-2">
             <div>
@@ -282,6 +286,7 @@ export function DealsListTable({ deals, users }: { deals: ListDeal[]; users: { i
 
           <div className="h-8 w-px bg-slate-200" />
 
+          {isAdmin && (
           <div className="flex items-end gap-2">
             <div>
               <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Sæt produkt(er) (erstatter)</label>
@@ -308,6 +313,7 @@ export function DealsListTable({ deals, users }: { deals: ListDeal[]; users: { i
               Anvend
             </button>
           </div>
+          )}
 
           <div className="h-8 w-px bg-slate-200" />
 

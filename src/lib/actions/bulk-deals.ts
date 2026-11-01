@@ -3,11 +3,18 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
+
+/** Sale amount, binding and sold product are contract fields: like on a single deal (deals.ts canEditContractFields), only an admin changes them - they move commission and what the customer is billed. */
+async function requireContractAdmin() {
+  const user = await requireUser();
+  if (user.role !== "ADMIN") throw new Error("Kun en admin kan ændre salgsbeløb, binding og solgt produkt.");
+  return user;
+}
 import { recalcCommission } from "@/lib/commission-service";
 import { createDuplicateDealRecord } from "@/lib/deal-duplicate";
 
 export async function bulkUpdateSaleAmount(dealIds: string[], amountRaw: string) {
-  await requireUser();
+  await requireContractAdmin();
   if (dealIds.length === 0) throw new Error("Ingen deals valgt.");
 
   const amount = Math.round(parseFloat(amountRaw));
@@ -24,7 +31,7 @@ export async function bulkUpdateSaleAmount(dealIds: string[], amountRaw: string)
 }
 
 export async function bulkUpdateBindingMonths(dealIds: string[], monthsRaw: string) {
-  await requireUser();
+  await requireContractAdmin();
   if (dealIds.length === 0) throw new Error("Ingen deals valgt.");
 
   const months = parseInt(monthsRaw, 10);
@@ -64,7 +71,7 @@ export async function bulkSetOwner(dealIds: string[], ownerId: string) {
 }
 
 export async function bulkSetSoldProduct(dealIds: string[], products: string[]) {
-  await requireUser();
+  await requireContractAdmin();
   if (dealIds.length === 0) throw new Error("Ingen deals valgt.");
 
   await prisma.deal.updateMany({

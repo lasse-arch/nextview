@@ -209,7 +209,7 @@ export default async function DealsPage({
           <DealsBoard initialDeals={boardDeals} isAdmin={currentUser?.role === "ADMIN"} />
         </div>
       ) : (
-        <DealsListTable deals={deals} users={users} />
+        <DealsListTable deals={deals} users={users} isAdmin={currentUser?.role === "ADMIN"} />
       )}
     </div>
   );
