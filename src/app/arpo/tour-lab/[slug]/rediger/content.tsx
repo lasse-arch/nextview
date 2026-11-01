@@ -9,7 +9,7 @@ import { writePlaceCards, type CardDraft } from "@/lib/actions/tour-cards";
 import { useEffect, useState } from "react";
 import { tourUrl } from "@/lib/public-urls";
 import { saveTourStoryImage } from "@/lib/actions/tour-lab";
-import type { DroneView, GuideTurn, GuideTurnMode, GuideTurnSpeed, PlaceCard, TourConfig, TourInfo, TourPlace, WelcomeGo } from "../../tours/types";
+import type { CardPerson, DroneView, GuideTurn, GuideTurnMode, GuideTurnSpeed, PlaceCard, TourConfig, TourInfo, TourPlace, WelcomeGo } from "../../tours/types";
 import type { DroneViews } from "../../tours/places";
 import type { ScanMap } from "@/lib/matterport-graph";
 import { ScanPointPicker } from "./scanpoints";
@@ -1294,6 +1294,34 @@ function DayEditor({ config, edit, preview }: Omit<Props, "slug">) {
 
 /* ------------------------------------------------------------------ */
 
+/** "Personer på kortet": up to three small photos with name and role, e.g. the kitchen staff. */
+function CardPeople({ people, onChange }: { people: CardPerson[]; onChange: (p: CardPerson[]) => void }) {
+  const setAt = (i: number, p: Partial<CardPerson>) => onChange(people.map((x, j) => (j === i ? { ...x, ...p } : x)));
+  return (
+    <Field title="Personer på kortet" hint="Op til 3 - fx køkkenpersonalet ved spisesalen. Små runde billeder med navn og evt. rolle under teksten.">
+      <div className="flex flex-col gap-2">
+        {people.map((p, i) => (
+          <div key={i} className="flex items-center gap-2.5 rounded-xl bg-white p-2 ring-1 ring-black/[.06]">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={p.image} alt="" className="h-11 w-11 shrink-0 rounded-full bg-[#f2f2f7] object-cover object-[50%_20%]" />
+            <div className="flex min-w-0 flex-1 flex-col gap-1">
+              <input className={`${input} bg-[#f5f5f7] py-1.5 text-[14px]`} placeholder="Navn, fx Hanne" value={p.name} onChange={(e) => setAt(i, { name: e.target.value })} />
+              <input className={`${input} bg-[#f5f5f7] py-1.5 text-[13px]`} placeholder="Rolle (valgfri), fx Køkkenleder" value={p.role ?? ""} onChange={(e) => setAt(i, { role: e.target.value || undefined })} />
+            </div>
+            <div className="flex shrink-0 flex-col items-end gap-1">
+              <UploadButton accept="image/*" label="Skift" className="cursor-pointer text-[12px] font-medium text-[#0071e3]" onDone={(url) => setAt(i, { image: url })} />
+              <button type="button" className="text-[12px] text-[#ff3b30]" onClick={() => onChange(people.filter((_, j) => j !== i))}>
+                Fjern
+              </button>
+            </div>
+          </div>
+        ))}
+        {people.length < 3 && <UploadButton accept="image/*" label={people.length ? "+ Tilføj en person mere" : "+ Tilføj person (billede)"} onDone={(url) => onChange([...people, { name: "", image: url }])} />}
+      </div>
+    </Field>
+  );
+}
+
 export function CardsEditor({ config, edit, preview, scanMap, mpskinsHidden }: Omit<Props, "slug"> & { scanMap: ScanMap | null; mpskinsHidden: string[] }) {
   const [busy, setBusy] = useState<number | "new" | "all" | null>(null);
   /** "Vælg på kortet": the big scan point plan, picking the points a card shows at. */
@@ -1423,6 +1451,7 @@ export function CardsEditor({ config, edit, preview, scanMap, mpskinsHidden }: O
                   )}
                 </div>
               </Field>
+              <CardPeople people={c.people ?? []} onChange={(people) => set({ ...c, people: people.length ? people : undefined })} />
               <details className="text-[13px]">
                 <summary className="cursor-pointer select-none text-[#0071e3]">&quot;Læs mere&quot;-side (valgfri)</summary>
                 <div className="mt-2 space-y-2">

@@ -38,6 +38,8 @@ export function PlaceCard({
     return () => ro.disconnect();
   }, [card.text, page]);
   const seconds = card.seconds ?? 15;
+  // At most three, and only those with a photo and a name.
+  const people = (card.people ?? []).filter((p) => p.image && p.name.trim()).slice(0, 3);
   return (
     <div className={`pc pc-${size}`} onPointerDown={() => setStopped(true)}>
       <div className="pc-bar">
@@ -56,6 +58,20 @@ export function PlaceCard({
             <button type="button" className="pc-mere-mobil" onClick={() => setOpen(true)}>
               {tr("Læs mere")}
             </button>
+          )}
+          {people.length > 0 && (
+            <div className={`pc-folk pc-folk-${people.length}`}>
+              {people.map((p, i) => (
+                <figure key={i}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={p.image} alt="" loading="lazy" />
+                  <figcaption>
+                    <b>{p.name}</b>
+                    {p.role && <span>{p.role}</span>}
+                  </figcaption>
+                </figure>
+              ))}
+            </div>
           )}
           <div className="pc-btns">
             {card.more && (
@@ -122,6 +138,14 @@ export const CARDS_CSS = `
 .pc h3{margin:0 34px 8px 0;font-family:var(--font-heading);font-size:21px;font-weight:800;line-height:1.2}
 .pc p{margin:0 0 12px;font-size:15px;line-height:1.55;color:#33494f}
 .pc-mere-mobil{display:none}
+/* The people you meet here: small round photos with name and role - one beside its text, two or three side by side from the left. */
+.pc-folk{display:flex;gap:14px;margin:2px 0 14px}
+.pc-folk figure{margin:0;flex:0 1 92px;display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0;text-align:center}
+.pc-folk img{width:52px;height:52px;border-radius:50%;object-fit:cover;object-position:50% 20%;background:#eef2f2;box-shadow:0 0 0 2px #fff,0 0 0 3.5px color-mix(in srgb,var(--c-accent) 55%,transparent)}
+.pc-folk figcaption{display:flex;flex-direction:column;min-width:0;max-width:100%;line-height:1.25}
+.pc-folk b{font-size:13px;font-weight:800;color:var(--c-main);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pc-folk span{font-size:12px;color:#5d7177;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+.pc-folk-1 figure{flex:1 1 auto;flex-direction:row;align-items:center;gap:12px;text-align:left}
 .pc-btns{display:flex;flex-wrap:wrap;gap:6px}
 .pc-btn{display:inline-block;border:2px solid var(--c-main);background:#fff;color:var(--c-main);border-radius:999px;padding:7px 14px;font:inherit;font-size:14px;font-weight:800;cursor:pointer;text-decoration:none}
 .pc-btn:hover{background:var(--c-main);color:#fff}
@@ -140,6 +164,13 @@ export const CARDS_CSS = `
   .pc p{font-size:clamp(12.5px,3.5vw,13.5px);line-height:1.45;margin-bottom:6px}
   .pc p.pc-klip{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
   .pc-mere-mobil{display:block;margin:-2px 0 4px;padding:4px 0;border:0;background:none;font:inherit;font-size:13px;font-weight:800;color:var(--c-accent);cursor:pointer}
+  .pc-folk{gap:8px;margin:2px 0 8px}
+  .pc-folk figure{flex-basis:76px}
+  .pc-folk img{width:38px;height:38px}
+  .pc-folk figure{gap:4px}
+  .pc-folk-1 figure{gap:9px}
+  .pc-folk b{font-size:11.5px}
+  .pc-folk span{font-size:10.5px}
   .pc-btn{font-size:12.5px;padding:5px 11px;border-width:1.5px}
   .pc-luk{top:7px;right:7px;width:26px;height:26px;line-height:26px;font-size:16px}
   .pc-lille{width:min(66vw,250px);max-height:26dvh}
@@ -157,6 +188,9 @@ export const CARDS_CSS = `
   .pc p.pc-klip{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
   .pc-mere-mobil{display:block;margin:-2px 0 4px;padding:2px 0;border:0;background:none;font:inherit;font-size:13px;font-weight:800;color:var(--c-accent);cursor:pointer}
   .pc-btn{font-size:12.5px;padding:4px 10px}
+  .pc-folk{gap:6px;margin:0 0 6px}
+  .pc-folk img{width:32px;height:32px}
+  .pc-folk span{display:none}
   .pc-stor{width:min(42vw,340px)}.pc-lille{width:min(30vw,250px)}
 }
 @media (min-width:761px) and (min-height:501px){.pc p.pc-klip{display:block}}

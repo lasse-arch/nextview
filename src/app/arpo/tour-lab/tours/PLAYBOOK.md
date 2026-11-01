@@ -106,6 +106,10 @@ Fx specialefterskoler (ADHD, autisme, nedsat kognitivt funktionsniveau):
 - **Stedkort**: når man lander et vigtigt sted, kommer et lille kort med 1-3
   sætninger om stedet og evt. en knap (til et andet rum eller en side). Kun på
   de vigtigste steder - ikke overalt.
+- **Personer på stedkortet**: vis de mennesker, man møder netop dér - fx
+  køkkenpersonalet ved spisesalen eller linjens lærere i deres lokale. Højst 3,
+  rigtige portrætter (ansigtet tydeligt), fornavn og evt. rolle. Det gør stedet
+  trygt og personligt - især på skoler.
 - **"Din plads venter"**: et kort efter ca. 90 sekunder med kundens vigtigste
   handling. Ét kort, aldrig mens menuen er åben.
 
