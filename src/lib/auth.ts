@@ -4,7 +4,9 @@ import { cookies } from "next/headers";
 import { after } from "next/server";
 import { SignJWT, jwtVerify } from "jose";
 import { prisma } from "@/lib/db";
-import type { User } from "@prisma/client";
+import type { User as UserRow } from "@prisma/client";
+/** A team member as the app sees them - never with the password hash (see db.ts). */
+export type User = Omit<UserRow, "passwordHash">;
 import { isGoogleLoginRequired } from "@/lib/google-login";
 
 /** Only bother writing lastActiveAt if it's this stale - getCurrentUser runs

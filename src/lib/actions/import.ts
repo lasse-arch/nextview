@@ -7,7 +7,7 @@ import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { buildDealEmailAddress } from "@/lib/email-address";
 import { findDuplicateDeals } from "@/lib/duplicates";
-import type { ImportType, DealStage, User } from "@prisma/client";
+import type { ImportType, DealStage } from "@prisma/client";
 
 import { pick, parseAmount, type ParsedRow } from "@/lib/import-helpers";
 
@@ -25,7 +25,7 @@ function mapStatusToStage(raw: string): DealStage {
 }
 
 /** Matches an owner column value against a user by email, full name, or first name. */
-function matchOwner(raw: string | null, users: User[]): User | null {
+function matchOwner<U extends { id: string; name: string; email: string }>(raw: string | null, users: U[]): U | null {
   if (!raw) return null;
   const needle = raw.trim().toLowerCase();
   return (

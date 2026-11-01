@@ -4,7 +4,7 @@ import { NewDealForm } from "./new-deal-form";
 
 export default async function NewDealPage() {
   const [users, currentUser] = await Promise.all([
-    prisma.user.findMany({ orderBy: { name: "asc" } }),
+    prisma.user.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
     getCurrentUser(),
   ]);
 

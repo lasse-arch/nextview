@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { upsertGoal, deleteGoal, reorderGoals } from "@/lib/actions/goals";
-import { goalMetricLabels, goalMetricIsMoney, goalPeriodLabels, type GoalWithProgress } from "@/lib/goals-data";
+import { goalMetricLabels, goalMetricIsMoney, goalPeriodLabels, type GoalWithProgress } from "@/lib/goals-labels";
 import { formatDKK } from "@/lib/labels";
 import { useToast } from "@/components/toast";
 import type { GoalMetric, GoalPeriod } from "@prisma/client";

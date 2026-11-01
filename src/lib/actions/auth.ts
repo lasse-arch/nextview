@@ -40,7 +40,7 @@ export async function login(_prevState: LoginState, formData: FormData): Promise
   ]);
   if (byEmail >= MAX_PER_EMAIL || byIp >= MAX_PER_IP) return { error: PAUSED };
 
-  const user = await prisma.user.findUnique({ where: { email } });
+  const user = await prisma.user.findUnique({ where: { email }, omit: { passwordHash: false } });
   if (!user || !(await verifyPassword(password, user.passwordHash))) {
     await prisma.loginFailure.create({ data: { email, ip } });
     // Old failures are no use - cleared as we go, so the table stays small.

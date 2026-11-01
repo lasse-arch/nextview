@@ -1,3 +1,4 @@
+import "server-only";
 import { PrismaClient } from "@prisma/client";
 
 /**
@@ -18,11 +19,18 @@ function withConnectionLimit(url: string, limit = 1): string {
   return /[?&]pool_timeout=/.test(withLimit) ? withLimit : `${withLimit}&pool_timeout=20`;
 }
 
-function createPrismaClient(): PrismaClient {
+/**
+ * Password hashes are never read unless asked for by name (login asks with
+ * `omit: { passwordHash: false }`) - so a user row passed to a page or a
+ * client component can't carry one to the browser by accident.
+ */
+const OMIT = { user: { passwordHash: true } } as const;
+
+function createPrismaClient() {
   const databaseUrl = process.env.DATABASE_URL;
-  if (!databaseUrl) return new PrismaClient();
-  return new PrismaClient({ datasources: { db: { url: withConnectionLimit(databaseUrl) } } });
+  return new PrismaClient({ omit: OMIT, ...(databaseUrl ? { datasources: { db: { url: withConnectionLimit(databaseUrl) } } } : {}) });
 }
+type Db = ReturnType<typeof createPrismaClient>;
 
 // Cached unconditionally (not just outside production) - a warm serverless
 // instance reuses this module across invocations, and every additional
@@ -30,7 +38,7 @@ function createPrismaClient(): PrismaClient {
 // production was only ever needed to dodge dev's hot-reload duplication;
 // in production it just meant more clients (and more DB connections) than
 // necessary piling up.
-const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
+const globalForPrisma = globalThis as unknown as { prisma?: Db };
 
 export const prisma = globalForPrisma.prisma ?? createPrismaClient();
 

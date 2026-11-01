@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/db";
 import { startOfMonth, startOfQuarter, startOfYear, startOfDay, endOfMonth, endOfQuarter, endOfYear, isWithinInterval } from "date-fns";
 import type { GoalMetric, GoalPeriod } from "@prisma/client";
+import type { GoalWithProgress } from "@/lib/goals-labels";
+export { goalMetricLabels, goalMetricIsMoney, goalPeriodLabels, type GoalWithProgress } from "@/lib/goals-labels";
 import { contractedContractValue } from "@/lib/labels";
 
 /// Same definition of "currently sold/active" as the dashboard's own "Solgt
@@ -8,29 +10,6 @@ import { contractedContractValue } from "@/lib/labels";
 /// duplicating a 3-item array beats importing a whole dashboard-data module
 /// just for this one constant.
 const SOLD_STAGES = ["LIVE", "CONTRACT_SIGNED", "FILMED", "REVIEW"] as const;
-
-export const goalMetricLabels: Record<GoalMetric, string> = {
-  MEETINGS_BOOKED: "Møder booket",
-  ESTABLISHMENT_FEE: "Etableringsgebyr solgt",
-  MRR_SOLD: "MRR solgt",
-  DEALS_SOLD: "Antal solgt",
-  TOTAL_SOLD: "Solgt i alt",
-};
-
-export const goalMetricIsMoney: Record<GoalMetric, boolean> = {
-  MEETINGS_BOOKED: false,
-  ESTABLISHMENT_FEE: true,
-  MRR_SOLD: true,
-  DEALS_SOLD: false,
-  TOTAL_SOLD: true,
-};
-
-export const goalPeriodLabels: Record<GoalPeriod, string> = {
-  MONTH: "Denne måned",
-  QUARTER: "Dette kvartal",
-  REST_OF_YEAR: "Resten af året",
-  YEAR: "Hele året",
-};
 
 /** The start a fresh goal's `month` field should be saved with, for the
  * given period - recomputed every time a goal is (re-)saved (see
@@ -65,16 +44,7 @@ export function goalPeriodEnd(period: GoalPeriod, start: Date): Date {
   }
 }
 
-export type GoalWithProgress = {
-  id: string;
-  userId: string | null;
-  userName: string | null;
-  metric: GoalMetric;
-  period: GoalPeriod;
-  targetValue: number;
-  currentValue: number;
-  canEdit: boolean;
-};
+
 
 export async function getGoalsForDashboard(viewer: { id: string; role: string }): Promise<GoalWithProgress[]> {
   const now = new Date();

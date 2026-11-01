@@ -47,9 +47,10 @@ export default async function DealsPage({
     prisma.deal.findMany({
       where,
       orderBy,
-      include: { owner: true, importBatch: true },
+      // Only what the list shows of the owner - never a colleague's e-mail, phone or rates in the browser.
+      include: { owner: { select: { id: true, name: true, avatarUrl: true } }, importBatch: true },
     }),
-    prisma.user.findMany({ orderBy: { name: "asc" } }),
+    prisma.user.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
     prisma.importBatch.findMany({ orderBy: { createdAt: "desc" } }),
     getCurrentUser(),
     params.importBatchId ? findDuplicatePairsForBatch(params.importBatchId) : Promise.resolve([]),
