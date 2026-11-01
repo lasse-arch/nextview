@@ -220,6 +220,8 @@ export type TourConfig = {
   logoOnLight?: boolean;
   /** A dark logo sits on a light card in the tour - false: straight on the tour, transparent, no glow (as in MPSkins). */
   logoCard?: false;
+  /** false: the menu's top shows only the logo - no name and subtitle under it (for a logo that already says the name). */
+  menuName?: false;
   /** What's behind the logo (the welcome box, the logo in the tour): left out = automatic (a light card behind a dark logo, the main colour behind a light one); "none" = transparent; "light" = white; "main" = the main colour. */
   logoBg?: "none" | "light" | "main";
   /** The same for the logo on the welcome tiles' box (left out: as logoBg). */

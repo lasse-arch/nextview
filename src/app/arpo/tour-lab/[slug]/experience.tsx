@@ -2830,8 +2830,12 @@ function TourExperience({
         <div className={`hv-menu-head ${T.logoOnLight ? "hv-light" : ""}`} style={{ background: T.logoOnLight ? "#fff" : T.colors.main }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={T.logo} alt="" />
-          <div className="hv-menu-titel">{T.brand.toUpperCase()}</div>
-          <div className="hv-sub">{T.subtitle}</div>
+          {T.menuName !== false && (
+            <>
+              <div className="hv-menu-titel">{T.brand.toUpperCase()}</div>
+              {T.subtitle && <div className="hv-sub">{T.subtitle}</div>}
+            </>
+          )}
         </div>
         {setLang && (T.design?.menu ?? "side") === "side" && tourLanguages(savedTour).length > 1 && (
           <div className="hv-menu-sprog" role="group" aria-label={tx("Sprog")}>
@@ -3769,6 +3773,7 @@ const CSS = `
 .hv-menu-aaben .hv-stories>*{pointer-events:none}
 .hv-menu-head{padding:56px 20px 16px;text-align:center;color:#fff}
 .hv-menu-head img{height:58px;width:auto;max-width:220px;object-fit:contain;display:block;margin:0 auto 10px}
+.hv-menu-head img:last-child{margin-bottom:4px;height:72px;max-width:260px}
 .hv-menu-titel{font-size:20px;font-weight:800;letter-spacing:.08em}
 .hv-gruppe{border-bottom:1px solid #e6eaeb}
 .hv-gtitel{display:flex;justify-content:space-between;align-items:center;width:100%;padding:12px 22px;border:0;background:none;font:600 16px inherit;font-family:inherit;color:var(--c-main);cursor:pointer;text-align:left}
