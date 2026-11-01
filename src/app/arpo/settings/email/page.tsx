@@ -11,6 +11,7 @@ const errorMessages: Record<string, string> = {
   google_not_configured: "Google-integration er ikke konfigureret endnu (mangler GOOGLE_CLIENT_ID/SECRET).",
   google_denied: "Google-godkendelse blev afbrudt eller afvist.",
   google_failed: "Der opstod en fejl under forbindelse til Google.",
+  google_state: "Forbindelsen blev ikke startet herfra (eller er udløbet) - tryk Forbind igen.",
 };
 
 export default async function EmailSettingsPage({

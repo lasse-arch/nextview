@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { getAppBaseUrl, GOOGLE_SCOPES, isGoogleConfigured } from "@/lib/email-oauth";
+import { MAILBOX_STATE_COOKIE, MAILBOX_STATE_PATH, newMailboxState } from "@/lib/oauth-state";
 
 export async function GET() {
+  let user;
   try {
-    await requireUser();
+    user = await requireUser();
   } catch {
     return NextResponse.redirect(new URL("/api/auth/session-ended", getAppBaseUrl()));
   }
@@ -23,6 +25,13 @@ export async function GET() {
   url.searchParams.set("scope", GOOGLE_SCOPES);
   url.searchParams.set("access_type", "offline");
   url.searchParams.set("prompt", "consent");
+  // One-time state (bound to this user) and PKCE - the callback refuses an answer it didn't ask for.
+  const { state, challenge, cookie } = newMailboxState(user.id);
+  url.searchParams.set("state", state);
+  url.searchParams.set("code_challenge", challenge);
+  url.searchParams.set("code_challenge_method", "S256");
 
-  return NextResponse.redirect(url.toString());
+  const res = NextResponse.redirect(url.toString());
+  res.cookies.set(MAILBOX_STATE_COOKIE, cookie, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: MAILBOX_STATE_PATH, maxAge: 600 });
+  return res;
 }

@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getAppBaseUrl } from "@/lib/email-oauth";
+import { checkMailboxState, MAILBOX_STATE_COOKIE, MAILBOX_STATE_PATH } from "@/lib/oauth-state";
 
 export async function GET(request: NextRequest) {
   let user;
@@ -14,8 +15,16 @@ export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get("code");
   const errorParam = request.nextUrl.searchParams.get("error");
 
+  // The state must be the one this user's own "Forbind" set - else it's someone else's code (or a replay): nothing is saved.
+  const verifier = checkMailboxState(request.cookies.get(MAILBOX_STATE_COOKIE)?.value, request.nextUrl.searchParams.get("state"), user.id);
+  const done = (to: string) => {
+    const res = NextResponse.redirect(new URL(to, getAppBaseUrl()));
+    res.cookies.delete({ name: MAILBOX_STATE_COOKIE, path: MAILBOX_STATE_PATH });
+    return res;
+  };
+  if (!verifier) return done("/arpo/settings/email?error=google_state");
   if (errorParam || !code) {
-    return NextResponse.redirect(new URL("/arpo/settings/email?error=google_denied", getAppBaseUrl()));
+    return done("/arpo/settings/email?error=google_denied");
   }
 
   try {
@@ -29,6 +38,7 @@ export async function GET(request: NextRequest) {
         client_secret: process.env.GOOGLE_CLIENT_SECRET!,
         redirect_uri: redirectUri,
         grant_type: "authorization_code",
+        code_verifier: verifier,
       }),
     });
 
@@ -64,9 +74,9 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    return NextResponse.redirect(new URL("/arpo/settings/email?connected=google", getAppBaseUrl()));
+    return done("/arpo/settings/email?connected=google");
   } catch (err) {
-    console.error("Google OAuth callback error", err);
-    return NextResponse.redirect(new URL("/arpo/settings/email?error=google_failed", getAppBaseUrl()));
+    console.error("Google OAuth callback error", err instanceof Error ? err.message : err);
+    return done("/arpo/settings/email?error=google_failed");
   }
 }
