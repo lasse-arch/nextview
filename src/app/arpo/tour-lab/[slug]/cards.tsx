@@ -38,8 +38,8 @@ export function PlaceCard({
     return () => ro.disconnect();
   }, [card.text, page]);
   const seconds = card.seconds ?? 15;
-  // At most three, and only those with a photo and a name.
-  const people = (card.people ?? []).filter((p) => p.image && p.name.trim()).slice(0, 3);
+  // At most three, and only those with a photo (name and role are optional).
+  const people = (card.people ?? []).filter((p) => p.image).slice(0, 3);
   return (
     <div className={`pc pc-${size}`} onPointerDown={() => setStopped(true)}>
       <div className="pc-bar">
@@ -60,15 +60,17 @@ export function PlaceCard({
             </button>
           )}
           {people.length > 0 && (
-            <div className={`pc-folk pc-folk-${people.length}`}>
+            <div className={`pc-folk pc-folk-${people.length}${people.some((p) => p.name?.trim() || p.role?.trim()) ? "" : " pc-folk-bare"}`}>
               {people.map((p, i) => (
                 <figure key={i}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={p.image} alt="" loading="lazy" />
-                  <figcaption>
-                    <b>{p.name}</b>
-                    {p.role && <span>{p.role}</span>}
-                  </figcaption>
+                  {(p.name?.trim() || p.role?.trim()) && (
+                    <figcaption>
+                      {p.name?.trim() && <b>{p.name}</b>}
+                      {p.role?.trim() && <span>{p.role}</span>}
+                    </figcaption>
+                  )}
                 </figure>
               ))}
             </div>
@@ -146,6 +148,9 @@ export const CARDS_CSS = `
 .pc-folk b{font-size:13px;font-weight:800;color:var(--c-main);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pc-folk span{font-size:12px;color:#5d7177;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
 .pc-folk-1 figure{flex:1 1 auto;flex-direction:row;align-items:center;gap:12px;text-align:left}
+/* Only photos, no names: close together. */
+.pc-folk-bare{gap:8px}
+.pc-folk-bare figure{flex:0 0 auto}
 .pc-btns{display:flex;flex-wrap:wrap;gap:6px}
 .pc-btn{display:inline-block;border:2px solid var(--c-main);background:#fff;color:var(--c-main);border-radius:999px;padding:7px 14px;font:inherit;font-size:14px;font-weight:800;cursor:pointer;text-decoration:none}
 .pc-btn:hover{background:var(--c-main);color:#fff}

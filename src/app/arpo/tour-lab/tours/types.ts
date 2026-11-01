@@ -86,13 +86,13 @@ export type PlaceCard = {
   seconds?: number;
   /**
    * The people you meet here - e.g. the kitchen staff by the dining hall, or
-   * a line's teachers in its room: up to 3, each a small round photo with
-   * the name (and role) under the text. More than 3 are left out. Left out =
+   * a line's teachers in its room: up to 3, each a small round photo under
+   * the text, with name and role if given (both may be left out - then just the photo). More than 3 are left out. Left out =
    * none.
    */
   people?: CardPerson[];
 };
-export type CardPerson = { name: string; role?: string; image: string };
+export type CardPerson = { name?: string; role?: string; image: string };
 
 /** What the Find vej button can step aside for: a place card, "Din plads venter", the stories playing, "Du er fremme". */
 export type FindStepAside = "cards" | "nudge" | "stories" | "arrived";

@@ -1298,14 +1298,14 @@ function DayEditor({ config, edit, preview }: Omit<Props, "slug">) {
 function CardPeople({ people, onChange }: { people: CardPerson[]; onChange: (p: CardPerson[]) => void }) {
   const setAt = (i: number, p: Partial<CardPerson>) => onChange(people.map((x, j) => (j === i ? { ...x, ...p } : x)));
   return (
-    <Field title="Personer på kortet" hint="Op til 3 - fx køkkenpersonalet ved spisesalen. Små runde billeder med navn og evt. rolle under teksten.">
+    <Field title="Personer på kortet" hint="Op til 3 - fx køkkenpersonalet ved spisesalen. Små runde billeder under teksten - navn og rolle kan udelades.">
       <div className="flex flex-col gap-2">
         {people.map((p, i) => (
           <div key={i} className="flex items-center gap-2.5 rounded-xl bg-white p-2 ring-1 ring-black/[.06]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={p.image} alt="" className="h-11 w-11 shrink-0 rounded-full bg-[#f2f2f7] object-cover object-[50%_20%]" />
             <div className="flex min-w-0 flex-1 flex-col gap-1">
-              <input className={`${input} bg-[#f5f5f7] py-1.5 text-[14px]`} placeholder="Navn, fx Hanne" value={p.name} onChange={(e) => setAt(i, { name: e.target.value })} />
+              <input className={`${input} bg-[#f5f5f7] py-1.5 text-[14px]`} placeholder="Navn (valgfri), fx Hanne" value={p.name ?? ""} onChange={(e) => setAt(i, { name: e.target.value || undefined })} />
               <input className={`${input} bg-[#f5f5f7] py-1.5 text-[13px]`} placeholder="Rolle (valgfri), fx Køkkenleder" value={p.role ?? ""} onChange={(e) => setAt(i, { role: e.target.value || undefined })} />
             </div>
             <div className="flex shrink-0 flex-col items-end gap-1">
@@ -1316,7 +1316,7 @@ function CardPeople({ people, onChange }: { people: CardPerson[]; onChange: (p: 
             </div>
           </div>
         ))}
-        {people.length < 3 && <UploadButton accept="image/*" label={people.length ? "+ Tilføj en person mere" : "+ Tilføj person (billede)"} onDone={(url) => onChange([...people, { name: "", image: url }])} />}
+        {people.length < 3 && <UploadButton accept="image/*" label={people.length ? "+ Tilføj en person mere" : "+ Tilføj person (billede)"} onDone={(url) => onChange([...people, { image: url }])} />}
       </div>
     </Field>
   );
