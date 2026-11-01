@@ -1,3 +1,4 @@
+import { safeColor, UNSAFE_SCHEME } from "@/app/arpo/tour-lab/tours/safe";
 import type { TourConfig } from "@/app/arpo/tour-lab/tours/types";
 
 /*
@@ -42,5 +43,27 @@ export function tourConfigProblem(config: unknown): string | null {
   if (c.languages !== undefined && (!arr(c.languages) || !c.languages.every(str))) return '"languages" skal være en liste af sprogkoder.';
   if (c.translations !== undefined && (!obj(c.translations) || !Object.values(c.translations).every((m) => obj(m) && Object.values(m as object).every(str)))) return '"translations" skal være sprog med tekst -> oversættelse.';
   if (c.embeds && (!obj(c.embeds) || (c.embeds.pages !== undefined && (!obj(c.embeds.pages) || !Object.values(c.embeds.pages).every(str))))) return '"embeds.pages" skal være steder med en adresse.';
+  // Untrusted text (developers, nextviewAI, the customer's site): no link that runs code, no colour that isn't a colour.
+  const bad = unsafeStrings(c);
+  if (bad) return `Et link må ikke starte med ${bad.split(":")[0]}: (${bad.slice(0, 40)}).`;
+  for (const [name, cat] of Object.entries((c.categories ?? {}) as Record<string, { color?: unknown }>))
+    if (cat && obj(cat) && cat.color !== undefined && safeColor(cat.color, "") === "") return `Kategorien "${name}" har en ugyldig farve.`;
+  return null;
+}
+
+/** The first string anywhere in the setup that is a javascript:/vbscript:/data:/file:/blob: link - images as data:image/… are fine. */
+function unsafeStrings(v: unknown): string | null {
+  if (typeof v === "string") return UNSAFE_SCHEME.test(v) && !/^\s*data:image\/(png|jpe?g|webp|gif|avif);/i.test(v) ? v : null;
+  if (Array.isArray(v)) {
+    for (const x of v) {
+      const b = unsafeStrings(x);
+      if (b) return b;
+    }
+  } else if (v && typeof v === "object") {
+    for (const x of Object.values(v)) {
+      const b = unsafeStrings(x);
+      if (b) return b;
+    }
+  }
   return null;
 }

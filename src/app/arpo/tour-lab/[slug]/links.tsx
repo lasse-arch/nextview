@@ -1,5 +1,6 @@
 "use client";
 
+import { safeHref } from "../tours/safe";
 import { useT } from "../tours/i18n-react";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { apiUrl } from "../tours/api";
@@ -248,6 +249,8 @@ export function openLink(T: TourConfig, href: string, label: string, popup: (hre
   if (IN_TOUR[href]) return void window.dispatchEvent(new Event(IN_TOUR[href]));
   if (startsGuide(href)) return;
   if (goesInTour(href, label)) return;
+  // Never a javascript:/data: link from the setup - it would run in the visitor's page.
+  if (!safeHref(href)) return;
   const mode = linkMode(T, href);
   const url = tagged(T, href);
   if (mode === "popup") popup(url, label);
