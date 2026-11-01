@@ -848,6 +848,8 @@ export function TourEditor({
                 config={config}
                 edit={edit}
                 preview={preview}
+                slug={slug}
+                onCloudflare={onCloudflare}
                 onEditPoint={(id) => {
                   setPointFocus((f) => ({ id, n: (f?.n ?? 0) + 1 }));
                   setTab("kortet");

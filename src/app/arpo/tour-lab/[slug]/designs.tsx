@@ -5,7 +5,7 @@ import { useState } from "react";
 import { TourLink } from "./links";
 import type { AvailableUnit } from "@/lib/availability/boxdepotet";
 import type { DockIcon, TourConfig, TourPlace } from "../tours/types";
-import { allGuides, guideStops } from "../tours/places";
+import { shownGuides, guideStops } from "../tours/places";
 
 /*
  * Designs a tour can pick besides the classic ones (tile welcome, side menu):
@@ -123,7 +123,7 @@ export function DockMenu({
     ? T.dock
     : [
         ...(T.places?.length ? [{ label: T.cover?.placesTitle || tr("Steder"), icon: "places" as const, go: "places" as const }] : []),
-        ...(allGuides(T).some((g) => guideStops(T, g.id).length) ? [{ label: tr("Vis mig rundt"), icon: "play" as const, go: "guide" as const }] : []),
+        ...(shownGuides(T).some((g) => guideStops(T, g.id).length) ? [{ label: tr("Vis mig rundt"), icon: "play" as const, go: "guide" as const }] : []),
         ...T.cta
           .filter((c) => c.primary)
           .slice(0, 1)

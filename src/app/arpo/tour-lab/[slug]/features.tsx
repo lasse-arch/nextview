@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useT } from "../tours/i18n-react";
-import { allGuides, guideStops, startPlaces } from "../tours/places";
+import { shownGuides, guideStops, startPlaces } from "../tours/places";
 import type { TourConfig } from "../tours/types";
 
 /*
@@ -30,7 +30,7 @@ export function featuresSeen(slug: string): boolean {
 function featuresOf(T: TourConfig, tr: (s: string, v?: Record<string, string | number>) => string): Feature[] {
   const places = startPlaces(T).map((p) => p.name);
   const somewhere = places[Math.min(2, places.length - 1)] ?? tr("Spisesalen");
-  const guides = allGuides(T).filter((g) => guideStops(T, g.id).length);
+  const guides = shownGuides(T).filter((g) => guideStops(T, g.id).length);
   const out: Feature[] = [];
   const pano = T.map?.panorama || T.drone;
   if (pano || T.map)

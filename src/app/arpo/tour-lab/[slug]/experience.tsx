@@ -4,7 +4,7 @@ import { LANG_CSS, LangSwitch } from "./lang-switch";
 import { danishOf, LANGUAGES, localize, makeT, tourLanguages } from "../tours/i18n";
 import { TourLang, useT } from "../tours/i18n-react";
 import { socialLinks } from "../tours/social";
-import { allGuides, cssFilter, droneViewsOfHref, formatPhone, GUIDE_HREF, guideOfHref, guideSetup, isDroneHref, guideExit, imageOfHref, isInTourHref, isPlaceHref, placeHref, panoHfov, placeSlug, pointOfHref, startPlaces, welcomeTiles, withoutDeadAerialLinks } from "../tours/places";
+import { shownGuides, cssFilter, droneViewsOfHref, formatPhone, GUIDE_HREF, guideOfHref, guideSetup, isDroneHref, guideExit, imageOfHref, isInTourHref, isPlaceHref, placeHref, panoHfov, placeSlug, pointOfHref, startPlaces, welcomeTiles, withoutDeadAerialLinks } from "../tours/places";
 import type { LiveUnit } from "@/lib/availability/live";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { flushSync } from "react-dom";
@@ -719,7 +719,7 @@ function TourExperience({
   /** Its settings (seconds, turn, manual …). */
   const G = guideSetup(T, guideId);
   /** The guided tours there are - the menu offers a choice when there's more than one. */
-  const GUIDES = useMemo(() => allGuides(T), [T]);
+  const GUIDES = useMemo(() => shownGuides(T), [T]);
   /** Kept with its events, so Resultater can tell the guided tours apart. */
   const guideKey = () => (guideIdRef.current ? `${GUIDE_HREF}:${guideIdRef.current}` : GUIDE_HREF);
   /** guideGo as of the newest render - after switching guided tour, the one that knows its stops (see startGuide). */
@@ -1323,7 +1323,19 @@ function TourExperience({
     const rum = q.get("rum");
     const punkt = q.get("punkt");
     const ss = q.get("ss");
+    // "?rundvisning=<id>" starts that guided tour - also one only a link may start (linkOnly); "?rundvisning" alone the main one.
+    const rundvisning = q.get("rundvisning");
     requestAnimationFrame(() => {
+      if (rundvisning != null) {
+        const id = T.guides?.some((g) => g.id === rundvisning) ? rundvisning : null;
+        if (guideStops(T, id).length || (id == null && GUIDES.length)) {
+          setIntro(null);
+          setCover(false);
+          track("start_link", { kind: "rundvisning", target: id ?? "Vis mig rundt" });
+          startGuideRef.current("link", id);
+          return;
+        }
+      }
       if (rum || punkt || ss) {
         // a link to a place goes straight there
         setIntro(null);
@@ -1356,7 +1368,7 @@ function TourExperience({
       if (T.intro) return; // the welcome comes when the film ends
       afterStartRef.current();
     });
-  }, [openPoint, T, savedTour, startKey, ROOM_NAMES, LAST_ROOM_KEY]);
+  }, [openPoint, T, savedTour, startKey, ROOM_NAMES, LAST_ROOM_KEY, GUIDES]);
 
   function chooseWelcome(go: WelcomeGo | "last" | "skip", label: string) {
     // A tile that goes into the tour, tapped before Matterport is ready: the welcome closes, and it waits for the tour.

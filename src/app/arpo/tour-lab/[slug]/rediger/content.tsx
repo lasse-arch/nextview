@@ -7,6 +7,7 @@ import { guideExit, IMAGE_HREF, imageOfHref, isPlaceHref, PANO_HFOV, placeHref, 
 import { AiImageButton, AiImageList } from "./ai-image";
 import { writePlaceCards, type CardDraft } from "@/lib/actions/tour-cards";
 import { useEffect, useState } from "react";
+import { tourUrl } from "@/lib/public-urls";
 import { saveTourStoryImage } from "@/lib/actions/tour-lab";
 import type { DroneView, GuideTurn, GuideTurnMode, GuideTurnSpeed, PlaceCard, TourConfig, TourInfo, TourPlace, WelcomeGo } from "../../tours/types";
 import type { DroneViews } from "../../tours/places";
@@ -500,7 +501,7 @@ export function StartEditor({ config, edit, slug, preview }: Props) {
                   {"guide" in t.go && (config.guides?.length ?? 0) > 0 && (
                     <select className={`${input} bg-white`} value={t.go.guide === true ? "" : t.go.guide} onChange={(e) => set({ ...t, go: { guide: e.target.value || true } })}>
                       <option value="">Vis mig rundt</option>
-                      {config.guides!.map((g) => (
+                      {config.guides!.filter((g) => !g.linkOnly || ("guide" in t.go && g.id === t.go.guide)).map((g) => (
                         <option key={g.id} value={g.id}>
                           {g.title}
                         </option>
@@ -791,7 +792,7 @@ function PointStop({ config, id, edit, onEdit, preview }: { config: TourConfig; 
  * "Vis mig rundt": the main guided tour and any more (`guides`, e.g. one per
  * linjefag) - pick one at the top, and the editor below edits that one.
  */
-export function GuideEditor({ config, edit, preview, onEditPoint }: Omit<Props, "slug"> & { onEditPoint?: (id: string) => void }) {
+export function GuideEditor({ config, edit, preview, onEditPoint, slug, onCloudflare = false }: Props & { onEditPoint?: (id: string) => void; onCloudflare?: boolean }) {
   const [sel, setSel] = useState<string | null>(null);
   const extra = sel != null ? config.guides?.find((g) => g.id === sel) : undefined;
   // The one picked is edited as if it were `guide`: a copy with it there, and what changed written back to it (anything else the editor changed, too).
@@ -808,6 +809,8 @@ export function GuideEditor({ config, edit, preview, onEditPoint }: Omit<Props, 
           d.guides![i] = { ...(tmp.guide ?? { stops: [] }), id: extra.id, title: d.guides![i].title };
         })
     : edit;
+  const [copied, setCopied] = useState(false);
+  const linkOf = (id: string) => `${tourUrl(slug, typeof window === "undefined" ? "" : location.origin, onCloudflare)}?rundvisning=${encodeURIComponent(id)}`;
   const newId = () => {
     let n = (config.guides?.length ?? 0) + 1;
     while (config.guides?.some((g) => g.id === `rundvisning-${n}`)) n++;
@@ -848,6 +851,7 @@ export function GuideEditor({ config, edit, preview, onEditPoint }: Omit<Props, 
           {config.guides?.map((g) => (
             <button key={g.id} type="button" className={pill(extra?.id === g.id)} onClick={() => setSel(g.id)}>
               {g.title || "Uden navn"}
+              {g.linkOnly && <span className="ml-1 opacity-70">· link</span>}
             </button>
           ))}
           <button
@@ -867,8 +871,40 @@ export function GuideEditor({ config, edit, preview, onEditPoint }: Omit<Props, 
             <Field title="Navn" hint="Står på knappen i menuen, fx Padel.">
               <input className={`${input} bg-white`} value={extra.title} onChange={(e) => edit((d) => void (d.guides = d.guides!.map((g) => (g.id === extra.id ? { ...g, title: e.target.value } : g))))} />
             </Field>
+            <Field title="Hvor kan den startes?" hint={extra.linkOnly ? "Vises ingen steder i touren - kun linket herunder starter den, fx fra skolens side om faciliteterne eller i en mail." : "Fra menuen og \"Vis mig rundt\" - og fra linket herunder."}>
+              <Choice
+                value={extra.linkOnly ? "link" : "tour"}
+                options={[
+                  ["tour", "I touren og via link"],
+                  ["link", "Kun via link"],
+                ]}
+                onChange={(v) =>
+                  edit((d) => {
+                    const g = d.guides!.find((x) => x.id === extra.id);
+                    if (!g) return;
+                    if (v === "link") g.linkOnly = true;
+                    else delete g.linkOnly;
+                  })
+                }
+              />
+            </Field>
+            <div className="flex items-center gap-2 rounded-xl bg-white px-3 py-2 ring-1 ring-black/[.06]">
+              <code className="min-w-0 flex-1 truncate text-[12px] text-[#1d1d1f]">{linkOf(extra.id)}</code>
+              <button
+                type="button"
+                className="shrink-0 text-[13px] font-medium text-[#0071e3]"
+                onClick={() => {
+                  navigator.clipboard?.writeText(linkOf(extra.id)).then(() => {
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 1500);
+                  }, () => {});
+                }}
+              >
+                {copied ? "Kopieret" : "Kopiér"}
+              </button>
+            </div>
             <p className={small}>
-              En flise på velkomsten kan starte netop denne (vælg den under flisen), og ethvert link kan starte den, fx en knap eller et menupunkt: <code className="rounded bg-black/5 px-1">#rundvisning:{extra.id}</code>
+              Linket åbner touren og starter rundvisningen med det samme. {extra.linkOnly ? "" : <>En flise på velkomsten kan også starte den (vælg den under flisen), og det kan ethvert link i touren: <code className="rounded bg-black/5 px-1">#rundvisning:{extra.id}</code></>}
             </p>
             <button
               type="button"

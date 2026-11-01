@@ -361,8 +361,12 @@ export type TourConfig = {
    * ({ guide: "<id>" }) or any link "#rundvisning:<id>" (menu, tiles, buttons,
    * dock); the menu's "Vis mig rundt" then lets the visitor choose. The main
    * one is "#rundvisning". `id`: short, lowercase, no spaces (e.g. "padel").
+   * `linkOnly`: shown nowhere in the tour (menu, "Vis mig rundt", welcome,
+   * cover) - only the tour's own link with "?rundvisning=<id>" starts it, e.g.
+   * a guided tour of just the facilities for one page on the customer's site
+   * or a mail. Left out = shown like the others.
    */
-  guides?: (GuideSetup & { id: string; title: string })[];
+  guides?: (GuideSetup & { id: string; title: string; linkOnly?: true })[];
   /**
    * "Vej til skolen": the visitor types their address (or postcode) and sees
    * how far it is and how long it takes by car, bike and on foot - and a link

@@ -120,10 +120,12 @@ export function guideSetup(T: TourConfig, guideId: string | null = null) {
   return (guideId != null ? T.guides?.find((g) => g.id === guideId) : undefined) ?? T.guide;
 }
 /** Every guided tour with stops: the main one first (id null). Its title: the extra one's own, else "Vis mig rundt". */
-export function allGuides(T: TourConfig): { id: string | null; title: string }[] {
+export function allGuides(T: TourConfig): { id: string | null; title: string; linkOnly?: true }[] {
   const has = (g: TourConfig["guide"]) => Boolean(g && (g.fromMenu || g.stops.length));
-  return [...(has(T.guide) ? [{ id: null, title: "Vis mig rundt" }] : []), ...(T.guides ?? []).filter(has).map((g) => ({ id: g.id, title: g.title }))];
+  return [...(has(T.guide) ? [{ id: null, title: "Vis mig rundt" }] : []), ...(T.guides ?? []).filter(has).map((g) => ({ id: g.id, title: g.title, ...(g.linkOnly ? { linkOnly: true as const } : {}) }))];
 }
+/** The guided tours the visitor can find in the tour - all but those only a link starts (`linkOnly`). */
+export const shownGuides = (T: TourConfig) => allGuides(T).filter((g) => !g.linkOnly);
 
 export type GuideStop = { href: string; title: string; text: string; audio?: string; audioText?: string; short?: string; turn?: GuideTurn; turnSpeed?: GuideTurnSpeed; turnMode?: GuideTurnMode; button?: { label: string; href: string } };
 
