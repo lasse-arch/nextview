@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useMemo, useState, useTransition } from "react";
 import type { TourCustomer } from "@/lib/actions/tour-ai";
+import { assignDealTour } from "@/lib/actions/tours";
 import { NewTour } from "./new-tour";
 
 /*
@@ -43,8 +45,65 @@ export type TourRow = {
   note?: string;
   /** The developer it's given to, and when it should be done (YYYY-MM-DD). */
   assignee?: string | null;
+  /** A customer without a tour: the developer it's given to (the tour becomes theirs when it's made). */
+  assigneeId?: string | null;
   deadline?: string | null;
 };
+
+type Developer = { id: string; name: string };
+
+/** "Giv til udvikler" on a customer without a tour: who makes it, and by when. */
+function GiveToDeveloper({ row, developers, onClose }: { row: TourRow; developers: Developer[]; onClose: () => void }) {
+  const router = useRouter();
+  const [who, setWho] = useState(row.assigneeId ?? "");
+  const [deadline, setDeadline] = useState(row.deadline ?? "");
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  const save = (userId: string, date: string) =>
+    start(async () => {
+      const r = await assignDealTour(row.dealId!, userId || null, userId && date ? date : null);
+      if (!r.ok) return setError(r.error);
+      router.refresh();
+      onClose();
+    });
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/30 p-4 sm:items-center" onClick={onClose}>
+      <div className="w-full max-w-sm space-y-3 rounded-2xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div>
+          <h2 className="text-[17px] font-semibold tracking-tight">Giv til udvikler</h2>
+          <p className="text-[13px] leading-snug text-[#6e6e73]">{row.name} - udvikleren ser kunden i sin liste og opretter selv touren, når scanningen er klar.</p>
+        </div>
+        <label className="block space-y-1">
+          <span className="block text-[13px] font-medium text-[#6e6e73]">Udvikler</span>
+          <select value={who} onChange={(e) => setWho(e.target.value)} className="w-full rounded-[10px] border-0 bg-[#f2f2f7] px-3 py-2.5 text-[15px] focus:outline-none focus:ring-2 focus:ring-[#0071e3]">
+            <option value="">Ingen - kun admin</option>
+            {developers.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        {developers.length === 0 && <p className="text-[12px] text-[#8e8e93]">Ingen har rollen Udvikler endnu - giv den under Brugere.</p>}
+        {who && (
+          <label className="block space-y-1">
+            <span className="block text-[13px] font-medium text-[#6e6e73]">Deadline (valgfri)</span>
+            <input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} className="w-full rounded-[10px] border-0 bg-[#f2f2f7] px-3 py-2.5 text-[15px] focus:outline-none focus:ring-2 focus:ring-[#0071e3]" />
+          </label>
+        )}
+        {error && <p className="text-[13px] text-[#ff3b30]">{error}</p>}
+        <div className="flex justify-end gap-2 pt-1">
+          <button type="button" onClick={onClose} className="rounded-xl px-4 py-2 text-[15px] text-[#0071e3] hover:bg-[#0071e3]/5">
+            Annullér
+          </button>
+          <button type="button" disabled={pending} onClick={() => save(who, deadline)} className="rounded-xl bg-[#0071e3] px-5 py-2 text-[15px] font-medium text-white disabled:opacity-50">
+            {pending ? "Gemmer…" : "Gem"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 /** "Deadline 12. nov." - red when it has passed (and the tour isn't live), orange the last 3 days. */
 function DeadlineChip({ deadline, live }: { deadline: string; live: boolean }) {
@@ -89,7 +148,9 @@ const noteOf = (r: TourRow) =>
 const when = (iso: string) => new Date(iso).toLocaleDateString("da-DK", { day: "numeric", month: "short", year: "numeric" });
 
 /** `portal`: the customer opens in the customer portal as the customer sees it (for developers, who don't see deals) instead of the deal. */
-export function ToursList({ rows, tours, portal = false }: { rows: TourRow[]; tours: { slug: string; name: string }[]; portal?: boolean }) {
+/** `developers`: given to an admin, who can give customers without a tour to one of them. */
+export function ToursList({ rows, tours, portal = false, developers }: { rows: TourRow[]; tours: { slug: string; name: string }[]; portal?: boolean; developers?: Developer[] }) {
+  const [giving, setGiving] = useState<TourRow | null>(null);
   const customerHref = (dealId: string | null) => (portal ? `/kunde?som=${dealId}` : `/arpo/deals/${dealId}`);
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<Filter>("alle");
@@ -135,13 +196,13 @@ export function ToursList({ rows, tours, portal = false }: { rows: TourRow[]; to
             className="w-full rounded-[10px] border-0 bg-[#f2f2f7] py-2 pl-9 pr-3 text-[15px] placeholder:text-[#8e8e93] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0071e3]"
           />
         </div>
-        <div className="flex rounded-[9px] bg-[#e9e9eb] p-[2px]">
+        <div className="flex max-w-full overflow-x-auto rounded-[9px] bg-[#e9e9eb] p-[2px] [scrollbar-width:none]">
           {([["alle", "Alle"], ...STAGES, ["uden", "Uden kunde"]] as [Filter, string][]).map(([f, text]) => (
             <button
               key={f}
               type="button"
               onClick={() => setFilter(f)}
-              className={`rounded-[7px] px-3 py-[5px] text-[13px] font-medium transition ${filter === f ? "bg-white shadow-[0_3px_8px_rgba(0,0,0,.12)]" : "text-[#1d1d1f]/70 hover:text-[#1d1d1f]"}`}
+              className={`flex-none whitespace-nowrap rounded-[7px] px-3 py-[5px] text-[13px] font-medium transition ${filter === f ? "bg-white shadow-[0_3px_8px_rgba(0,0,0,.12)]" : "text-[#1d1d1f]/70 hover:text-[#1d1d1f]"}`}
             >
               {text} <span className="text-[#8e8e93]">{counts[f]}</span>
             </button>
@@ -172,6 +233,13 @@ export function ToursList({ rows, tours, portal = false }: { rows: TourRow[]; to
                 <span className="min-w-0">
                   <span className="block truncate text-[15px] font-medium text-[#6e6e73]">{r.name}</span>
                   <span className="block truncate text-[12px] text-[#8e8e93]">Ingen tour i Arpo endnu</span>
+                  {(r.assignee || r.deadline) && (
+                    <span className="block truncate text-[12px] text-[#6e6e73]">
+                      {r.assignee && <span>Til {r.assignee}</span>}
+                      {r.assignee && r.deadline && " · "}
+                      {r.deadline && <DeadlineChip deadline={r.deadline} live={false} />}
+                    </span>
+                  )}
                 </span>
               </span>
               <span className="hidden truncate text-[14px] md:block">
@@ -184,9 +252,16 @@ export function ToursList({ rows, tours, portal = false }: { rows: TourRow[]; to
               </span>
               <span className="hidden text-[14px] text-[#c7c7cc] md:block">-</span>
               <span className="hidden text-[13px] text-[#6e6e73] md:block">{r.updatedAt.startsWith("1970") ? "" : when(r.updatedAt)}</span>
-              <button type="button" onClick={() => setMaking(r.newTour!)} className="justify-self-end whitespace-nowrap rounded-full bg-[#0071e3] px-3 py-1 text-[13px] font-medium text-white hover:bg-[#0077ed]">
-                Opret tour
-              </button>
+              <span className="flex flex-col items-end gap-1 justify-self-end">
+                <button type="button" onClick={() => setMaking(r.newTour!)} className="whitespace-nowrap rounded-full bg-[#0071e3] px-3 py-1 text-[13px] font-medium text-white hover:bg-[#0077ed]">
+                  Opret tour
+                </button>
+                {developers && r.dealId && (
+                  <button type="button" onClick={() => setGiving(r)} className="whitespace-nowrap px-1 text-[12px] font-medium text-[#0071e3] hover:underline">
+                    {r.assignee ? "Skift udvikler" : "Giv til udvikler"}
+                  </button>
+                )}
+              </span>
             </li>
           ) : (
           <li key={r.slug} className="group relative grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-4 py-2.5 hover:bg-[#f9f9fb] md:grid-cols-[minmax(0,2.4fr)_minmax(0,1.6fr)_170px_150px_110px_90px]">
@@ -238,6 +313,7 @@ export function ToursList({ rows, tours, portal = false }: { rows: TourRow[]; to
       </ul>
       {shown.length === 0 && <p className="px-4 py-10 text-center text-[14px] text-[#8e8e93]">Ingen tours matcher.</p>}
       {making && <NewTour key={making.id} tours={tours} forDeal={making} onClose={() => setMaking(null)} />}
+      {giving && developers && <GiveToDeveloper row={giving} developers={developers} onClose={() => setGiving(null)} />}
     </div>
   );
 }

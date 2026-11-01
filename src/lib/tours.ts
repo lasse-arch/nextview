@@ -80,9 +80,10 @@ export async function listTours(where: { assignedToId?: string } = {}) {
  * signed, not lost or gone, with a tour on the contract, among the deal's
  * products or in "solgt produkt".
  */
-export async function customersWithoutTour() {
+export async function customersWithoutTour(only: { tourAssigneeId?: string } = {}) {
   return prisma.deal.findMany({
     where: {
+      ...only,
       tours: { none: {} },
       churnedAt: null,
       stage: { not: "LOST" },
@@ -99,7 +100,7 @@ export async function customersWithoutTour() {
     },
     orderBy: [{ contractSignedAt: { sort: "desc", nulls: "last" } }],
     take: 500,
-    select: { id: true, companyName: true, displayName: true, address: true, websiteUrl: true, stage: true, contractSignedAt: true, filmingAt: true, filmedAt: true, mpSkinId: true, items: { select: { url: true } } },
+    select: { id: true, companyName: true, displayName: true, address: true, websiteUrl: true, stage: true, contractSignedAt: true, filmingAt: true, filmedAt: true, mpSkinId: true, items: { select: { url: true } }, tourAssigneeId: true, tourAssignee: { select: { name: true } }, tourDeadline: true },
   });
 }
 

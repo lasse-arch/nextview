@@ -9,7 +9,8 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { storeTourFile } from "@/lib/tour-files";
 import type { Prisma } from "@prisma/client";
-import { requireTeam, requireTour } from "@/lib/auth";
+import { requireNewTour, requireTeam, requireTour } from "@/lib/auth";
+import { teamCan } from "@/lib/team-roles";
 import { prisma } from "@/lib/db";
 import { getSettingValue, setSettingValue } from "@/lib/integration-settings";
 import { siteDigest, siteResearch } from "@/lib/site-digest";
@@ -437,7 +438,7 @@ async function exploreOf(input: NewTourInput): Promise<ExploreTour | null> {
  * so the user sees that it was read (and its Matterport model is picked).
  */
 export async function peekExploreTour(url: string): Promise<{ ok: true; title: string; modelId: string; groups: number; places: number; tiles: number; outside: number } | { ok: false; error: string }> {
-  await requireTeam("admin");
+  await mayMakeAnyTour();
   const e = await readExploreTour(url).catch(() => null);
   if (!e) return { ok: false, error: "Kunne ikke læse touren - indsæt et link som https://explore.nextview360.dk/da/tour/…" };
   const places = e.menu.reduce((n, m) => n + ("items" in m ? m.items.length : 1), 0);
@@ -455,7 +456,7 @@ export async function planTourFromWebsite(
   previous?: TourPlanResult,
   corrections?: string
 ): Promise<{ ok: true; plan: TourPlanResult } | { ok: false; error: string }> {
-  const user = await requireTeam("admin");
+  const user = await requireNewTour(input.dealId);
   const key = await apiKey();
   if (!key) return { ok: false, error: "nextviewAI er ikke sat op endnu - indsæt en nøgle i en tours editor (fanen nextviewAI)." };
   const model = input.modelId ? await fetchModelInfo(input.modelId) : null;
@@ -543,7 +544,9 @@ ${research.text}
  * tour's features (its kind of menu, start and functions).
  */
 export async function createTourFromWebsite(input: NewTourInput & { plan?: TourPlanResult}): Promise<{ ok: true; slug: string; reply: string } | { ok: false; error: string }> {
-  const user = await requireTeam("admin");
+  const user = await requireNewTour(input.dealId);
+  // A developer builds from a ready-made design - never from another customer's tour.
+  if (!teamCan(user, "admin")) input = { ...input, base: undefined };
   const key = await apiKey();
   if (!key) return { ok: false, error: "nextviewAI er ikke sat op endnu - indsæt en nøgle i en tours editor (fanen nextviewAI)." };
   const name = input.name.trim();
@@ -668,8 +671,10 @@ Steder i touren skrives som https://my.matterport.com/show/?m=${model.id}&ss=<sc
   // The logo and pictures from the website are copied to us, so the tour keeps them whatever happens to the site.
   const hosted = await hostFiles(slug, built);
   const config = hosted.config as unknown as Prisma.InputJsonValue;
+  // The customer's tour was given to a developer: the new tour is theirs, with the same deadline.
+  const given = input.dealId ? await prisma.deal.findUnique({ where: { id: input.dealId }, select: { tourAssigneeId: true, tourDeadline: true } }) : null;
   await prisma.tour.create({
-    data: { slug, name, dealId: input.dealId || null, config, versions: { create: { config, note: explore ? `Konverteret fra explore (${explore.url}) af nextviewAI` : `Bygget af nextviewAI${input.website.trim() ? ` ud fra ${input.website.trim()}` : ""}`, createdByName: user.name } } },
+    data: { slug, name, dealId: input.dealId || null, assignedToId: given?.tourAssigneeId ?? null, deadline: given?.tourDeadline ?? null, config, versions: { create: { config, note: explore ? `Konverteret fra explore (${explore.url}) af nextviewAI` : `Bygget af nextviewAI${input.website.trim() ? ` ud fra ${input.website.trim()}` : ""}`, createdByName: user.name } } },
   });
   revalidatePath("/arpo/tour-lab");
   const failed = hosted.failed.length ? `\n\nDisse filer kunne ikke hentes til os: ${hosted.failed.join("; ")}` : "";
@@ -765,7 +770,7 @@ export async function searchTourCustomers(query: string): Promise<TourCustomer[]
 
 /** The customer's Matterport tours (from the deal's MP-Space ids and product links), with name and photo from Matterport - or one pasted link/id. */
 export async function matterportModels(dealId: string | null, pasted?: string): Promise<ModelInfo[]> {
-  await requireTeam("admin");
+  await requireNewTour(dealId);
   let text = pasted ?? "";
   if (dealId && !pasted) {
     const d = await prisma.deal.findUnique({ where: { id: dealId }, select: { mpSkinId: true, items: { select: { url: true } } } });
@@ -777,8 +782,16 @@ export async function matterportModels(dealId: string | null, pasted?: string): 
 
 /* ----- Our Matterport account: pick the space ----- */
 
+/** Admins - or a developer with a customer given to them that has no tour yet (they pick its Matterport space). */
+async function mayMakeAnyTour() {
+  const user = await requireTeam("tours");
+  if (teamCan(user, "admin")) return user;
+  if ((await prisma.deal.count({ where: { tourAssigneeId: user.id, tours: { none: {} } } })) === 0) throw new Error("Unauthorized");
+  return user;
+}
+
 export async function matterportConnected(): Promise<boolean> {
-  await admin();
+  await mayMakeAnyTour();
   return Boolean(process.env.MATTERPORT_API_TOKEN || (await getSettingValue("MATTERPORT_API_TOKEN")));
 }
 
@@ -795,7 +808,7 @@ export async function connectMatterport(tokenId: string, secret: string): Promis
 
 /** Spaces on our Matterport account, searchable. */
 export async function searchMatterportSpaces(query: string, offset?: string | null) {
-  await requireTeam("admin");
+  await mayMakeAnyTour();
   const token = process.env.MATTERPORT_API_TOKEN || (await getSettingValue("MATTERPORT_API_TOKEN"));
   if (!token) return { ok: false as const, error: "Matterport er ikke forbundet." };
   return searchAccountModels(token, query, offset);

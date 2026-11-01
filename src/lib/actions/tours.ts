@@ -306,6 +306,24 @@ export async function assignTour(slug: string, userId: string | null, deadline: 
   return { ok: true };
 }
 
+/**
+ * A customer's tour given to a developer before the tour exists: they see the
+ * customer in their list and make the tour themselves when the scan is ready
+ * (it becomes theirs, with this deadline). Admins only.
+ */
+export async function assignDealTour(dealId: string, userId: string | null, deadline: string | null): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireTeam("admin");
+  if (deadline != null && !/^\d{4}-\d{2}-\d{2}$/.test(deadline)) return { ok: false, error: "Vælg en dato." };
+  if (userId) {
+    const u = await prisma.user.findUnique({ where: { id: String(userId) }, select: { role: true, extraRoles: true, disabledAt: true } });
+    if (!u || u.disabledAt || !teamCan(u, "tours")) return { ok: false, error: "Personen arbejder ikke med tours - giv dem rollen Udvikler under Brugere." };
+  }
+  const r = await prisma.deal.updateMany({ where: { id: String(dealId) }, data: { tourAssigneeId: userId || null, tourDeadline: userId && deadline ? new Date(`${deadline}T00:00:00Z`) : null } });
+  if (!r.count) return { ok: false, error: "Kunden findes ikke." };
+  revalidatePath("/arpo/tour-lab");
+  return { ok: true };
+}
+
 /** "Her er touren vist": the pages showing the tour in a frame (last 90 days) - for the editor's Del og udgiv. */
 export async function tourEmbedsOf(slug: string): Promise<TourEmbed[]> {
   await requireTour(slug);

@@ -270,6 +270,8 @@ model User {
   sessionVersion    Int                 @default(0)
   /// Tours given to this person to build (developers).
   assignedTours     Tour[]              @relation("TourAssignee")
+  /// Customers whose tour is given to this person to build before it exists (developers).
+  dealsToBuild      Deal[]              @relation("DealTourAssignee")
   isCommissionBased Boolean             @default(true)
   /// Leadgeneration's "N nye tilføjet siden sidst": when this user last had
   /// the page open, and the start of the visit before that (what's counted
@@ -442,6 +444,10 @@ model ImportBatch {
 
 model Deal {
   id           String  @id @default(cuid())
+  /// The developer who builds this customer's tour - given before the tour exists; carried onto the tour when it's made.
+  tourAssigneeId String?
+  tourAssignee   User?     @relation("DealTourAssignee", fields: [tourAssigneeId], references: [id], onDelete: SetNull)
+  tourDeadline   DateTime? @db.Date
   companyName  String
   /// Kaldenavn - shown instead of companyName wherever the deal appears, for
   /// when the CVR-registered legal name differs from what the customer is
@@ -658,6 +664,7 @@ model Deal {
   systemMails      SystemMail[]
 
   @@index([inLeadInbox, stage])
+  @@index([tourAssigneeId])
 }
 
 /// How many "mandetimer" (man-hours) the team has spent on a customer, one

@@ -151,8 +151,29 @@ export async function requireDealWork(dealId: string): Promise<User> {
   const user = await getTeamUser();
   if (!user) throw new Error("Unauthorized");
   if (teamCan(user, "sales")) return user;
-  if (teamCan(user, "tours") && (await prisma.tour.count({ where: { dealId: String(dealId), assignedToId: user.id } })) > 0) return user;
+  if (teamCan(user, "tours") && (await developerHasDeal(user.id, String(dealId)))) return user;
   throw new Error("Du har ikke adgang til den kunde.");
+}
+
+/** A developer's customer: one whose tour is given to them - the tour itself, or the customer before the tour exists. */
+async function developerHasDeal(userId: string, dealId: string): Promise<boolean> {
+  const [tours, deals] = await Promise.all([
+    prisma.tour.count({ where: { dealId, assignedToId: userId } }),
+    prisma.deal.count({ where: { id: dealId, tourAssigneeId: userId } }),
+  ]);
+  return tours + deals > 0;
+}
+
+/**
+ * May this member make a new tour (for this customer)? Admins: any. Developers:
+ * only for a customer whose tour is given to them and who has no tour yet -
+ * never a tour without a customer, and never a copy of someone else's.
+ */
+export async function requireNewTour(dealId: string | null | undefined): Promise<User> {
+  const user = await requireTeam("tours");
+  if (teamCan(user, "admin")) return user;
+  if (!dealId || (await prisma.deal.count({ where: { id: String(dealId), tourAssigneeId: user.id, tours: { none: {} } } })) === 0) throw new Error("Du har ikke adgang til at lave en tour for den kunde.");
+  return user;
 }
 
 /**
@@ -165,8 +186,8 @@ export async function teamSeesTour(slug: string | null | undefined, dealId?: str
   if (!user) return null;
   if (teamCan(user, "sales") || teamCan(user, "admin")) return user;
   if (!teamCan(user, "tours")) return null;
-  const where = slug ? { slug: String(slug), assignedToId: user.id } : dealId ? { dealId: String(dealId), assignedToId: user.id } : null;
-  return where && (await prisma.tour.count({ where })) > 0 ? user : null;
+  if (slug) return (await prisma.tour.count({ where: { slug: String(slug), assignedToId: user.id } })) > 0 ? user : null;
+  return dealId && (await developerHasDeal(user.id, String(dealId))) ? user : null;
 }
 
 /** Which tours a member may see - for lists: all for admins, the given ones for developers. */

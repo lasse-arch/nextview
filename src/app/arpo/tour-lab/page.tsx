@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getTeamUser, toursOf } from "@/lib/auth";
 import { teamCan } from "@/lib/team-roles";
+import { prisma } from "@/lib/db";
 import { getSettingValue } from "@/lib/integration-settings";
 import { leadsByTour } from "@/lib/tour-stats";
 import { customersWithoutTour, listTours } from "@/lib/tours";
@@ -42,8 +43,14 @@ export default async function TourLabPage() {
     isAdmin ? getSettingValue("MATTERPORT_SDK_KEY") : null,
     leadsByTour(30),
     isAdmin ? deletedTours() : [],
-    isAdmin ? customersWithoutTour() : [],
+    // Developers: the customers given to them that have no tour yet - they make it themselves.
+    customersWithoutTour(isAdmin ? {} : { tourAssigneeId: user.id }),
   ]);
+  const developers = isAdmin
+    ? (await prisma.user.findMany({ where: { disabledAt: null }, select: { id: true, name: true, role: true, extraRoles: true }, orderBy: { name: "asc" } }))
+        .filter((u) => teamCan(u, "tours") && !teamCan(u, "admin"))
+        .map((u) => ({ id: u.id, name: u.name }))
+    : [];
   const now = new Date().getTime();
   const mpskinsLeft = tours.filter((t) => (t.config as unknown as TourConfig).tourPage).length;
   const rows: TourRow[] = tours.map((t) => {
@@ -94,6 +101,9 @@ export default async function TourLabPage() {
       tours: 0,
       hasModel: modelIdsIn([d.mpSkinId ?? "", ...d.items.map((i) => i.url ?? "")].join(" ")).length > 0,
     },
+    assignee: d.tourAssignee?.name ?? null,
+    assigneeId: d.tourAssigneeId,
+    deadline: d.tourDeadline ? d.tourDeadline.toISOString().slice(0, 10) : null,
     // Where the filming stands: done, booked for a day, or not yet.
     note: d.filmedAt ? `filmet ${day(d.filmedAt)}` : d.filmingAt ? `optagelse ${day(d.filmingAt)}` : "solgt",
   }));
@@ -116,7 +126,7 @@ export default async function TourLabPage() {
 
       {isAdmin && mpskinsLeft > 0 && <DetachAll count={mpskinsLeft} />}
 
-      <ToursList rows={[...rows, ...notStarted]} tours={tours.map((t) => ({ slug: t.slug, name: t.name }))} portal={!teamCan(user, "sales")} />
+      <ToursList rows={[...rows, ...notStarted]} tours={tours.map((t) => ({ slug: t.slug, name: t.name }))} portal={!teamCan(user, "sales")} developers={isAdmin ? developers : undefined} />
 
       {isAdmin && <Papirkurv rows={deleted.map((d) => ({ ...d, createdAt: d.createdAt.toISOString(), daysLeft: Math.max(0, 30 - Math.floor((now - d.createdAt.getTime()) / 86_400_000)) }))} />}
 
