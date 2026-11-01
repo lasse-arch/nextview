@@ -390,11 +390,7 @@ export function StartEditor({ config, edit, slug, preview }: Props) {
           </>
         )}
       </Group>
-      {config.intro && (
-        <Group title="Kort film før touren">
-          <Toggle on={Boolean(config.intro)} onChange={(on) => !on && edit((d) => void (d.intro = undefined))} title="Kort film før touren" hint="Fx en drone, der flyver ned til indgangen. Slå fra for at fjerne den." />
-        </Group>
-      )}
+      <IntroFilm config={config} edit={edit} />
       <p className={small}>Hvordan touren starter (forside, velkomst, helt enkel eller direkte ind) vælges under Layout. Her er teksterne og billederne.</p>
 
       {style === "cover" && cover && (
@@ -1738,5 +1734,62 @@ function StopTurn({
         </div>
       )}
     </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+
+const PHONE = "(max-width: 760px)";
+const videoType = (src: string): "video/webm" | "video/mp4" => (/\.webm(\?|#|$)/i.test(src) ? "video/webm" : "video/mp4");
+
+/**
+ * "Kort film før touren": a short film (e.g. a drone flying down to the
+ * entrance) that plays silently when the tour opens and fades into it where
+ * it starts - then the welcome or the menu. Optional: its own upright version
+ * for phones, and a still shown while it loads. Visitors can skip it.
+ */
+function IntroFilm({ config, edit }: { config: TourConfig; edit: Edit }) {
+  const intro = config.intro;
+  const main = intro?.sources.find((s) => !s.media)?.src ?? "";
+  const phone = intro?.sources.find((s) => s.media === PHONE)?.src ?? "";
+  const set = (next: { main?: string; phone?: string; poster?: string }) =>
+    edit((d) => {
+      const m = next.main ?? main;
+      const ph = next.phone ?? phone;
+      const poster = next.poster ?? d.intro?.poster ?? "";
+      // The phone's version first (the browser takes the first source it may play), the computer's after it.
+      d.intro = m
+        ? { sources: [...(ph ? [{ src: ph, type: videoType(ph), media: PHONE }] : []), { src: m, type: videoType(m) }], ...(poster ? { poster } : {}) }
+        : undefined;
+    });
+  return (
+    <Group title="Kort film før touren">
+      <p className={small}>Touren kan starte med en kort film - fx en drone, der flyver ned til indgangen. Den kører uden lyd, kan springes over og glider over i touren, der hvor den starter. Hold den under 10-15 sekunder.</p>
+      <Field title="Film" hint="mp4 (eller webm). Over 4 MB kræver Vercel Blob.">
+        <div className="flex gap-1.5">
+          <input className={input} placeholder="https://… eller upload" value={main} onChange={(e) => set({ main: e.target.value.trim() })} />
+          <UploadButton accept="video/mp4,video/webm" onDone={(url) => set({ main: url })} />
+        </div>
+      </Field>
+      {intro && (
+        <>
+          <Field title="Egen film til mobil (valgfri)" hint="Stående format - ellers bruges filmen ovenfor.">
+            <div className="flex gap-1.5">
+              <input className={input} placeholder="https://… eller upload" value={phone} onChange={(e) => set({ phone: e.target.value.trim() })} />
+              <UploadButton accept="video/mp4,video/webm" onDone={(url) => set({ phone: url })} />
+            </div>
+          </Field>
+          <Field title="Stillbillede (valgfri)" hint="Vises, mens filmen henter - typisk filmens første billede.">
+            <div className="flex gap-1.5">
+              <input className={input} placeholder="https://… eller upload" value={intro.poster ?? ""} onChange={(e) => set({ poster: e.target.value.trim() })} />
+              <UploadButton accept="image/*" onDone={(url) => set({ poster: url })} />
+            </div>
+          </Field>
+          <button type="button" className="px-1 text-[13px] text-[#ff3b30]" onClick={() => edit((d) => void (d.intro = undefined))}>
+            Fjern filmen
+          </button>
+        </>
+      )}
+    </Group>
   );
 }

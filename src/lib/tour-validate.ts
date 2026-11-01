@@ -44,6 +44,8 @@ export function tourConfigProblem(config: unknown): string | null {
   if (c.languages !== undefined && (!arr(c.languages) || !c.languages.every(str))) return '"languages" skal være en liste af sprogkoder.';
   if (c.translations !== undefined && (!obj(c.translations) || !Object.values(c.translations).every((m) => obj(m) && Object.values(m as object).every(str)))) return '"translations" skal være sprog med tekst -> oversættelse.';
   if (c.embeds && (!obj(c.embeds) || (c.embeds.pages !== undefined && (!obj(c.embeds.pages) || !Object.values(c.embeds.pages).every(str))))) return '"embeds.pages" skal være steder med en adresse.';
+  if (c.intro !== undefined && (!obj(c.intro) || !arr(c.intro.sources) || !c.intro.sources.length || !c.intro.sources.every((v) => obj(v) && str(v.src) && v.src.trim() !== "")))
+    return "Filmen før touren mangler sin fil.";
   const num = (v: unknown) => typeof v === "number" && Number.isFinite(v);
   if (c.staging !== undefined) {
     if (!arr(c.staging) || c.staging.length > 40) return "Virtual staging skal være en liste (højst 40).";
