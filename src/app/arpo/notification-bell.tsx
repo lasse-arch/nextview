@@ -24,6 +24,8 @@ export function NotificationBell({ unreadCount }: { unreadCount: number }) {
   const [unread, setUnread] = useState(unreadCount);
   const [items, setItems] = useState<BellItem[] | null>(null);
   const box = useRef<HTMLDivElement>(null);
+  /** On a phone the panel spans the screen just under the bell (anchored to the bell it would run off the left edge). */
+  const [phoneTop, setPhoneTop] = useState<number | null>(null);
   useEffect(() => {
     if (!open) return;
     const close = (e: MouseEvent) => !box.current?.contains(e.target as Node) && setOpen(false);
@@ -38,6 +40,8 @@ export function NotificationBell({ unreadCount }: { unreadCount: number }) {
         aria-expanded={open}
         onClick={() => {
           const next = !open;
+          const r = box.current?.getBoundingClientRect();
+          setPhoneTop(next && r && window.innerWidth < 640 ? r.bottom + 8 : null);
           setOpen(next);
           if (next)
             openBell()
@@ -60,9 +64,12 @@ export function NotificationBell({ unreadCount }: { unreadCount: number }) {
         )}
       </button>
       {open && (
-        <div className="absolute right-0 top-11 z-50 w-[340px] max-w-[calc(100vw-24px)] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
+        <div
+          className={`${phoneTop != null ? "fixed left-3 right-3" : "absolute right-0 top-11 w-[340px] max-w-[calc(100vw-24px)]"} z-50 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl`}
+          style={phoneTop != null ? { top: phoneTop } : undefined}
+        >
           <div className="border-b border-slate-100 px-4 py-2.5 text-[13px] font-semibold text-slate-900">Notifikationer</div>
-          <div className="max-h-[420px] overflow-y-auto">
+          <div className="max-h-[min(420px,70dvh)] overflow-y-auto">
             {items == null ? (
               <p className="px-4 py-6 text-center text-[13px] text-slate-400">Henter …</p>
             ) : items.length === 0 ? (
