@@ -164,10 +164,8 @@ export async function cancelDocuSealSubmission(submissionId: string): Promise<vo
  */
 export function verifyWebhookSignature(rawBody: string, signatureHeader: string | null): boolean {
   const secret = process.env.DOCUSEAL_WEBHOOK_SECRET;
-  if (!secret) {
-    // Not yet configured - accept but this should be locked down once set.
-    return true;
-  }
+  // Not configured: refused (a forged "signed" event would mark a contract signed and move the invoice e-mail) - only a developer's own machine lets it through.
+  if (!secret) return process.env.NODE_ENV === "development";
   if (!signatureHeader) return false;
 
   const [timestamp, signature] = signatureHeader.split(".", 2);

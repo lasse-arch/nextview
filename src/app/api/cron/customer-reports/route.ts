@@ -1,3 +1,4 @@
+import { cronAuthorized } from "@/lib/cron-auth";
 import { NextResponse, type NextRequest, after } from "next/server";
 import { enqueueScheduledCustomerReports, kickCustomerReportQueue } from "@/lib/customer-report-service";
 import { cleanupOldDownloadJobs } from "@/lib/report-download-service";
@@ -11,10 +12,8 @@ import { cleanupOldDownloadJobs } from "@/lib/report-download-service";
  * also gives any report stuck PENDING from an earlier interrupted run a
  * daily chance to resume, without any separate retry mechanism. */
 export async function GET(request: NextRequest) {
-  const secret = process.env.CRON_SECRET;
-  const authHeader = request.headers.get("authorization");
 
-  if (secret && authHeader !== `Bearer ${secret}`) {
+  if (!cronAuthorized(request)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 

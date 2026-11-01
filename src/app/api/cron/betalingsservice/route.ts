@@ -1,3 +1,4 @@
+import { cronAuthorized } from "@/lib/cron-auth";
 import { NextResponse, type NextRequest } from "next/server";
 import { getBsSettings } from "@/lib/betalingsservice/service";
 import { runSftpExchange } from "@/lib/betalingsservice/sftp";
@@ -8,8 +9,7 @@ export const maxDuration = 120;
  * file when "send automatisk" is on, and takes in receipts and result files.
  * Once a day on purpose - Mastercard asks clients not to poll continuously. */
 export async function GET(request: NextRequest) {
-  const secret = process.env.CRON_SECRET;
-  if (secret && request.headers.get("authorization") !== `Bearer ${secret}`) {
+  if (!cronAuthorized(request)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
   const settings = await getBsSettings();

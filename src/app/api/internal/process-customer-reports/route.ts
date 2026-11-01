@@ -1,3 +1,4 @@
+import { cronAuthorized } from "@/lib/cron-auth";
 import { NextResponse, type NextRequest } from "next/server";
 import { after } from "next/server";
 import { revalidatePath } from "next/cache";
@@ -18,9 +19,7 @@ export const maxDuration = 300;
  * through the whole batch and risking a timeout partway through.
  */
 export async function POST(request: NextRequest) {
-  const secret = process.env.CRON_SECRET;
-  const authHeader = request.headers.get("authorization");
-  if (secret && authHeader !== `Bearer ${secret}`) {
+  if (!cronAuthorized(request)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 

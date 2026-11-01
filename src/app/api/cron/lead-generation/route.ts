@@ -1,3 +1,4 @@
+import { cronAuthorized } from "@/lib/cron-auth";
 import { NextResponse, type NextRequest } from "next/server";
 import { runAllEnabledLeadFilters, runAllEnabledWatchedUrls } from "@/lib/lead-generation-service";
 
@@ -9,10 +10,8 @@ export const maxDuration = 300;
 
 /** Runs daily - re-runs every enabled LeadFilter and WatchedUrl, queuing any newly-found companies. */
 export async function GET(request: NextRequest) {
-  const secret = process.env.CRON_SECRET;
-  const authHeader = request.headers.get("authorization");
 
-  if (secret && authHeader !== `Bearer ${secret}`) {
+  if (!cronAuthorized(request)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
