@@ -1,5 +1,8 @@
 "use server";
 
+import { noteTokenOf } from "@/lib/review-tokens";
+import { teamCan } from "@/lib/team-roles";
+import type { Role } from "@prisma/client";
 import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { requireTeam, requireTour } from "@/lib/auth";
@@ -18,11 +21,29 @@ import { getTourConfig } from "@/lib/tours";
 
 
 export async function setTourReview(slug: string, on: boolean): Promise<{ token: string | null }> {
-  await requireTour(slug);
+  const user = await requireTour(slug);
+  // New links both: switched off (or on again), the old ones stop working.
   const token = on ? randomBytes(12).toString("base64url") : null;
-  await prisma.tour.update({ where: { slug }, data: { reviewToken: token } });
+  await prisma.tour.update({ where: { slug }, data: { reviewToken: token, reviewNoteToken: null } });
   revalidatePath(`/arpo/tour-lab/${slug}/rediger`);
-  return { token };
+  return { token: token ? await teamReviewLink(user, slug, token) : null };
+}
+
+/** The recipient asked for is the one already set (the deal's contact, or the chosen reviewer) - nothing new chosen. */
+async function sameRecipient(slug: string, email: string): Promise<boolean> {
+  const e = String(email ?? "").trim().toLowerCase();
+  if (!e) return true; // empty = back to the deal's contact
+  const t = await prisma.tour.findUnique({ where: { slug }, select: { reviewEmail: true, deal: { select: { contactEmail: true } } } });
+  return [t?.reviewEmail, t?.deal?.contactEmail].some((x) => x && x.trim().toLowerCase() === e);
+}
+
+/**
+ * The review link the team sees: the one that can approve for those who may
+ * put a customer live (admins, sellers) - the notes-only one for developers,
+ * so they can't approve in the customer's name.
+ */
+async function teamReviewLink(user: { role: Role; extraRoles: Role[] }, slug: string, full: string): Promise<string> {
+  return teamCan(user, "numbers") ? full : ((await noteTokenOf(slug)) ?? "");
 }
 
 export type Feedback = { id: string; kind: string; text: string; author: string | null; href: string | null; ss: number | null; room: string | null; topic: string | null; image: string | null; device: string | null; status: string; at: string };
@@ -119,10 +140,12 @@ export async function reviewStatus(slug: string): Promise<ReviewStatus> {
 /** Sends the review mail to the customer - or a reminder. */
 export async function sendForReview(slug: string, reminder: boolean, recipient?: { email: string; name: string }): Promise<{ ok: true; to: string; token: string } | { ok: false; error: string }> {
   const user = await requireTour(slug);
+  // Who gets the link that approves (and access to the customer's page) is chosen by admins and sellers only.
+  if (recipient && !teamCan(user, "numbers") && !(await sameRecipient(slug, recipient.email))) return { ok: false, error: "Kun en admin eller sælger kan sende gennemgangen til en anden end kundens kontaktperson." };
   try {
     const r = await sendReviewMail(slug, { id: user.id, name: user.name }, reminder, recipient ? { email: String(recipient.email ?? ""), name: String(recipient.name ?? "") } : undefined);
     revalidatePath(`/arpo/tour-lab/${slug}/rediger`);
-    return { ok: true, to: r.to, token: r.token };
+    return { ok: true, to: r.to, token: await teamReviewLink(user, slug, r.token) };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
@@ -174,7 +197,8 @@ export async function setTourCheckDone(slug: string, done: number[]): Promise<vo
 
 /** "Gem" on who the review mails go to - without sending anything. An empty e-mail = the deal's contact again. */
 export async function setReviewRecipient(slug: string, email: string, name: string): Promise<{ ok: true } | { ok: false; error: string }> {
-  await requireTour(slug);
+  const user = await requireTour(slug);
+  if (!teamCan(user, "numbers")) return { ok: false, error: "Kun en admin eller sælger kan vælge, hvem gennemgangen sendes til." };
   const e = email.trim().toLowerCase();
   if (e && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return { ok: false, error: "Skriv en gyldig e-mail." };
   const tour = await prisma.tour.findUnique({ where: { slug }, select: { id: true } });

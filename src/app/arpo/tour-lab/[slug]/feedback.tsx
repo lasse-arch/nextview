@@ -47,6 +47,8 @@ export function FeedbackLayer({
   const [step, setStep] = useState<null | "write" | "list" | "approve">(null);
   /** "Godkend touren": done already (by them or us), and the name they sign with. */
   const [approved, setApproved] = useState<string | null>(null);
+  /** The notes-only link (reviewNoteToken) can't approve - the button is left out. */
+  const [mayApprove, setMayApprove] = useState(true);
   const [name, setName] = useState("");
   const [text, setText] = useState("");
   /** null = about the spot they stand at; else general feedback about the menu, the functions … */
@@ -82,7 +84,10 @@ export function FeedbackLayer({
     load();
     fetch(apiUrl(`/api/tour-review?token=${encodeURIComponent(token)}`))
       .then((r) => (r.ok ? r.json() : null))
-      .then((r: { approvedAt: string | null } | null) => r?.approvedAt && setApproved(r.approvedAt))
+      .then((r: { approvedAt: string | null; canApprove?: boolean } | null) => {
+        if (r?.approvedAt) setApproved(r.approvedAt);
+        if (r && r.canApprove === false) setMayApprove(false);
+      })
       .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
@@ -155,11 +160,11 @@ export function FeedbackLayer({
           </button>
           {approved ? (
             <span className="fb-ok">Godkendt ✓</span>
-          ) : (
+          ) : mayApprove ? (
             <button type="button" className="fb-godkend" onClick={() => setStep("approve")}>
               Godkend
             </button>
-          )}
+          ) : null}
           <button
             type="button"
             className="fb-list"

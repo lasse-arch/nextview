@@ -1,5 +1,6 @@
 "use server";
 
+import { noteTokenOf } from "@/lib/review-tokens";
 import { randomBytes } from "node:crypto";
 import { getCurrentCustomer, getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
@@ -19,10 +20,13 @@ export async function portalReview(slug: string): Promise<{ ok: true; token: str
   const allowed = customer ? can(customer, tour?.dealId, "review") : (await getCurrentUser())?.role === "ADMIN";
   // A tour sent to them for review is theirs to see before it's published.
   if (!tour || !allowed || !(tour.published || tour.reviewSentAt)) return { ok: false, error: "Touren findes ikke." };
-  if (tour.reviewToken) return { ok: true, token: tour.reviewToken };
-  const token = randomBytes(12).toString("base64url");
-  await prisma.tour.update({ where: { slug }, data: { reviewToken: token } });
-  return { ok: true, token };
+  const token = tour.reviewToken ?? randomBytes(12).toString("base64url");
+  if (!tour.reviewToken) await prisma.tour.update({ where: { slug }, data: { reviewToken: token } });
+  // Only those who may approve get the link that can approve - everyone else the notes-only one.
+  const mayApprove = customer ? can(customer, tour.dealId, "approve") : true;
+  if (mayApprove) return { ok: true, token };
+  const notes = await noteTokenOf(slug);
+  return notes ? { ok: true, token: notes } : { ok: false, error: "Touren findes ikke." };
 }
 
 /**

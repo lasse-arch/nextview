@@ -283,8 +283,11 @@ export async function sendReviewMail(
     existing ??
     (await prisma.customerAccount.create({ data: { email: to, name: who.name?.trim() || null, invitedByName: actor.name }, select: { id: true, deals: { select: { dealId: true } } } }));
   const newAccess = !account.deals.length;
+  // The deal's own contact is the owner (contract, users); anyone else we send it to may look, write notes and approve - never more.
+  const isContact = normalizeEmail(to) === normalizeEmail(deal.contactEmail ?? "");
+  const access = isContact ? { role: "OWNER" as const, canApprove: true } : { role: "STAFF" as const, canApprove: true };
   for (const id of [deal.id, ...deal.branches.map((b) => b.id)]) {
-    await prisma.customerAccountDeal.upsert({ where: { accountId_dealId: { accountId: account.id, dealId: id } }, create: { accountId: account.id, dealId: id }, update: {} });
+    await prisma.customerAccountDeal.upsert({ where: { accountId_dealId: { accountId: account.id, dealId: id } }, create: { accountId: account.id, dealId: id, ...access }, update: {} });
   }
   const portal = { link: await welcomeLoginLink(account.id), days: WELCOME_DAYS };
 

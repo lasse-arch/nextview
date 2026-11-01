@@ -1,3 +1,4 @@
+import { tourOfReviewToken } from "@/lib/review-tokens";
 import "server-only";
 import { createHash } from "node:crypto";
 import { revalidateTag, unstable_cache } from "next/cache";
@@ -41,7 +42,8 @@ export function publicTour(slug: string) {
  * at once; the editor's autosaved, unsaved changes never do.
  */
 export async function reviewTour(token: string) {
-  const row = await prisma.tour.findUnique({ where: { reviewToken: token }, select: { slug: true, config: true } });
+  const hit = await tourOfReviewToken(token);
+  const row = hit ? await prisma.tour.findUnique({ where: { slug: hit.slug }, select: { slug: true, config: true } }) : null;
   if (!row) return null;
   const setup = { ...(row.config as unknown as TourConfig), slug: row.slug };
   // Keyed by the setup itself (not the row's last change - the editor's autosave changes that without changing the tour).

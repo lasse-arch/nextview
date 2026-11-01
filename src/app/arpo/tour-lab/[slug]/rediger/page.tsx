@@ -1,3 +1,4 @@
+import { noteTokenOf } from "@/lib/review-tokens";
 import { notFound, redirect } from "next/navigation";
 import { requireTour } from "@/lib/auth";
 import { teamCan } from "@/lib/team-roles";
@@ -83,7 +84,7 @@ export default async function TourEditPage({ params, searchParams }: { params: P
       scanMap={scanMap}
       mpskinsHidden={cfg ? hiddenSweeps(cfg) : []}
       scanCount={cfg?.sweep?.length ?? null}
-      reviewToken={tour.reviewToken}
+      reviewToken={tour.reviewToken && !teamCan(user, "numbers") ? await noteTokenOf(tour.slug) : tour.reviewToken}
       feedbackOpen={await prisma.tourFeedback.count({ where: { tourSlug: tour.slug, status: "open" } })}
       aiReady={Boolean(process.env.ANTHROPIC_API_KEY || (await getSettingValue("ANTHROPIC_API_KEY")))}
       assignment={{

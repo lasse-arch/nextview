@@ -1,3 +1,4 @@
+import { tourOfReviewToken } from "@/lib/review-tokens";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { storeTourFile } from "@/lib/tour-files";
@@ -14,8 +15,9 @@ const TOPIC_NAMES: Record<string, string> = { menu: "menuen", funktioner: "funkt
  */
 
 async function tourOf(token: unknown) {
-  if (typeof token !== "string" || token.length < 10) return null;
-  return prisma.tour.findUnique({ where: { reviewToken: token }, select: { slug: true, name: true } });
+  // Either review link may write notes (the notes-only one too).
+  const hit = await tourOfReviewToken(token);
+  return hit ? prisma.tour.findUnique({ where: { slug: hit.slug }, select: { slug: true, name: true } }) : null;
 }
 
 export async function GET(request: Request) {

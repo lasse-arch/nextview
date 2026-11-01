@@ -1,3 +1,4 @@
+import { tourOfReviewToken } from "@/lib/review-tokens";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
@@ -19,7 +20,8 @@ export const viewport: Viewport = { viewportFit: "cover", themeColor: "#0d1b20" 
 export const dynamic = "force-dynamic";
 
 async function byToken(token: string): Promise<TourConfig | null> {
-  const row = await prisma.tour.findUnique({ where: { reviewToken: token }, select: { slug: true, config: true } });
+  const hit = await tourOfReviewToken(token);
+  const row = hit ? await prisma.tour.findUnique({ where: { slug: hit.slug }, select: { slug: true, config: true } }) : null;
   return row ? { ...(row.config as unknown as TourConfig), slug: row.slug } : null;
 }
 
