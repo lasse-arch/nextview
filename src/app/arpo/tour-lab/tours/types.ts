@@ -77,6 +77,61 @@ export type TourInfo = {
   ss: number[];
 };
 
+/** A point in the tour's 3D room (Matterport's world coordinates, metres). */
+export type Point3 = { x: number; y: number; z: number };
+
+/**
+ * Virtual staging: something put onto a surface in the tour - a video on the
+ * TV in the common room, a picture or poster on a wall, a web page (iframe) on
+ * a screen, a sign, or the year wheel (`yearWheel`). Placed by its four corners
+ * in the room, clicked in the editor's preview in the order top left, top
+ * right, bottom right, bottom left - it follows the surface in perspective.
+ * Shown only from the scan points in `ss` (never through a wall), and only
+ * inside the tour (not in the dollhouse or floor plan).
+ */
+export type StagingItem = {
+  id: string;
+  /** What it shows. "yearwheel" = the tour's `yearWheel`, playing by itself and clickable. */
+  kind: "video" | "image" | "iframe" | "sign" | "yearwheel";
+  /** Its name in the editor (and for screen readers). */
+  title?: string;
+  /** The file (video: MP4, image) or the page (iframe: https only - a YouTube/Vimeo link plays its video). */
+  src?: string;
+  /** A sign's text (a line break = a new line). */
+  text?: string;
+  /** Top left, top right, bottom right, bottom left. */
+  corners: [Point3, Point3, Point3, Point3];
+  /** The scan points it is seen from. */
+  ss: number[];
+  /** A tap opens this - a page, or in the tour ("#rundvisning", "#kontakt", a place, "#aarshjul" …). Without one, a tap on a video turns its sound on. */
+  action?: { label: string; href: string };
+  /** How a picture or video fills the surface: "cover" (fills it, may crop - default) or "contain" (all of it, may leave edges). */
+  fit?: "cover" | "contain";
+};
+
+/**
+ * "Et år på …": the school year as a wheel - month by month with what happens
+ * (a picture, a title, a line), turning by itself like a film, and the
+ * visitor can tap a month or a card. Shown full screen from any link
+ * "#aarshjul" and, as virtual staging (kind "yearwheel"), on a screen in the
+ * tour. Ends with `cta` (e.g. book a visit).
+ */
+export type YearWheel = {
+  /** The opening line, e.g. "Et år. Én årgang." */
+  title: string;
+  /** Under the month in the middle, e.g. "på Stidsholt". */
+  subtitle?: string;
+  /** The month the year starts with (1-12) - a school year: 8 (August). Default 8. */
+  startMonth?: number;
+  /** The picture behind the opening line. */
+  image?: string;
+  months: { month: number; events: { title: string; text?: string; image?: string; href?: string }[] }[];
+  /** The last card, e.g. { label: "Book en rundvisning", href: "#kontakt" } with a line above it. */
+  cta?: { title: string; label: string; href: string };
+  /** Seconds per month when it plays by itself. Default 4. */
+  seconds?: number;
+};
+
 export type PlaceCard = {
   ss: number[];
   title: string;
@@ -410,6 +465,10 @@ export type TourConfig = {
    * prototype panel), `ss` the scan points it's shown from.
    */
   info?: TourInfo[];
+  /** Virtual staging: videos, pictures, web pages, signs and the year wheel on surfaces in the tour (see StagingItem). */
+  staging?: StagingItem[];
+  /** The year wheel (see YearWheel) - opened by "#aarshjul", and on a screen as staging. */
+  yearWheel?: YearWheel;
   /**
    * Cards that come up when the visitor arrives at a scan point (MPSkins'
    * "sweep action" popups): one at a time, bottom-left, gone by themselves

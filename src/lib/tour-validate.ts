@@ -44,6 +44,25 @@ export function tourConfigProblem(config: unknown): string | null {
   if (c.languages !== undefined && (!arr(c.languages) || !c.languages.every(str))) return '"languages" skal være en liste af sprogkoder.';
   if (c.translations !== undefined && (!obj(c.translations) || !Object.values(c.translations).every((m) => obj(m) && Object.values(m as object).every(str)))) return '"translations" skal være sprog med tekst -> oversættelse.';
   if (c.embeds && (!obj(c.embeds) || (c.embeds.pages !== undefined && (!obj(c.embeds.pages) || !Object.values(c.embeds.pages).every(str))))) return '"embeds.pages" skal være steder med en adresse.';
+  const num = (v: unknown) => typeof v === "number" && Number.isFinite(v);
+  if (c.staging !== undefined) {
+    if (!arr(c.staging) || c.staging.length > 40) return "Virtual staging skal være en liste (højst 40).";
+    for (const it of c.staging) {
+      if (!obj(it) || !str(it.id) || !["video", "image", "iframe", "sign", "yearwheel"].includes(it.kind)) return "Et staging-element har en ukendt type.";
+      if (!arr(it.corners) || it.corners.length !== 4 || !it.corners.every((p) => obj(p) && num(p.x) && num(p.y) && num(p.z))) return "Et staging-element skal have fire hjørner.";
+      if (!arr(it.ss) || !it.ss.every((n) => Number.isInteger(n))) return "Et staging-element skal vises fra scanpunkter (tal).";
+      if (it.kind === "iframe" && !/^https:\/\//i.test(String(it.src ?? ""))) return "En hjemmeside i staging skal være et https-link.";
+      if ((it.kind === "video" || it.kind === "image") && !str(it.src)) return "En video eller et billede i staging mangler sin fil.";
+      if (it.action !== undefined && (!obj(it.action) || !str(it.action.label) || !str(it.action.href))) return "Knappen på et staging-element skal have tekst og link.";
+    }
+  }
+  if (c.yearWheel !== undefined) {
+    const w = c.yearWheel;
+    if (!obj(w) || !str(w.title) || !arr(w.months)) return "Årshjulet skal have en titel og en liste af måneder.";
+    if (!w.months.every((m) => obj(m) && Number.isInteger(m.month) && m.month >= 1 && m.month <= 12 && arr(m.events) && m.events.every((e) => obj(e) && str(e.title))))
+      return "Årshjulets måneder skal være 1-12, og hver begivenhed skal have en titel.";
+    if (w.cta !== undefined && (!obj(w.cta) || !str(w.cta.label) || !str(w.cta.href))) return "Årshjulets afslutning skal have knaptekst og link.";
+  }
   // Live data's pattern runs on outside pages: one that backtracks without end could hang the server.
   const live = (c as { live?: { pattern?: unknown } }).live;
   if (live && typeof live.pattern === "string" && riskyPattern(live.pattern)) return "Live data-mønsteret har en gentagelse inde i en gentagelse (fx (a+)+) - det kan låse serveren. Skriv det enklere.";

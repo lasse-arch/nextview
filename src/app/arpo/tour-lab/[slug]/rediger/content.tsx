@@ -39,7 +39,7 @@ async function savePhoto(slug: string, key: string, image: string): Promise<stri
 }
 
 /** A list of things that can be dragged into order, opened to edit and deleted - like the menu. */
-function Rows<T>({
+export function Rows<T>({
   items,
   onChange,
   icon,

@@ -32,6 +32,8 @@ import { ICONS } from "../tours/icons";
 import { SIMPLE_CSS, SimpleMenu, SimpleWelcome } from "./simple";
 import { BENTO_CSS, BentoMenu } from "./bento";
 import { INFO_CSS, InfoDots, usePlaceInfo } from "./info";
+import { STAGING_CSS, StagingLayer } from "./staging";
+import { YEARWHEEL_CSS, YearWheelPanel } from "./yearwheel";
 import { MAP_CSS, MapScene, type MapApi } from "./map";
 import { CARDS_CSS, NudgeCard, PlaceCard } from "./cards";
 import { MEASURES_CSS, MeasureShield } from "./measures";
@@ -545,6 +547,13 @@ function TourExperience({
     const open = () => setContactOpen(true);
     window.addEventListener("hv-kontakt", open);
     return () => window.removeEventListener("hv-kontakt", open);
+  }, []);
+  /** The year wheel ("#aarshjul", or its button) is open full screen. */
+  const [wheelOpen, setWheelOpen] = useState(false);
+  useEffect(() => {
+    const open = () => setWheelOpen(true);
+    window.addEventListener("hv-aarshjul", open);
+    return () => window.removeEventListener("hv-aarshjul", open);
   }, []);
   // A button or link to a place in the tour (written with @ in the editor): there, as if picked in the menu.
   const goToRef = useRef<(href: string, label: string) => void>(() => {});
@@ -2414,7 +2423,7 @@ function TourExperience({
       }>
       <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.font.replace(/ /g, "+")}:wght@400;600;700;800;900&display=swap`} />
       {T.fontHeading && <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.fontHeading.replace(/ /g, "+")}:wght@500;600&display=swap`} />}
-      <style>{CSS + CONTACT_CSS + STORIES_CSS + LIGHTBOX_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + ONBOARDING_CSS + MENU_HINT_CSS + INFO_CSS + MAP_CSS + ROUTE_CSS + MEASURES_CSS + CARDS_CSS + DAY_CSS + SIMPLE_CSS + BENTO_CSS + LOGO_RIGHT_CSS + LANG_CSS + WEATHER_CSS + COMMUTE_CSS + FEATURES_CSS + FINDER_CSS + (review ? FEEDBACK_CSS : "")}</style>
+      <style>{CSS + CONTACT_CSS + STORIES_CSS + LIGHTBOX_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + ONBOARDING_CSS + MENU_HINT_CSS + INFO_CSS + STAGING_CSS + (T.yearWheel ? YEARWHEEL_CSS : "") + MAP_CSS + ROUTE_CSS + MEASURES_CSS + CARDS_CSS + DAY_CSS + SIMPLE_CSS + BENTO_CSS + LOGO_RIGHT_CSS + LANG_CSS + WEATHER_CSS + COMMUTE_CSS + FEATURES_CSS + FINDER_CSS + (review ? FEEDBACK_CSS : "")}</style>
       {/* The tour's own design on top (written by Claude or by hand under Avanceret). */}
       {T.customCss && <style>{T.customCss.replace(/<\/?style/gi, "")}</style>}
 
@@ -3060,6 +3069,25 @@ function TourExperience({
           frame={iframe}
           onOpen={(i) => track("info_open", { title: i.title })}
           onLink={(label, href) => ctaClick(label, href, "info")}
+        />
+      )}
+      {phase === "tour" && T.staging && T.staging.length > 0 && (
+        <StagingLayer
+          sdk={sdk}
+          items={T.staging}
+          T={T}
+          currentSs={currentSs}
+          frame={iframe}
+          lang={lang}
+          onLink={(label, href) => (ctaClick(label, href, "staging"), openLink(T, href, label, popup))}
+        />
+      )}
+      {wheelOpen && T.yearWheel && (
+        <YearWheelPanel
+          wheel={T.yearWheel}
+          lang={lang}
+          onLink={(label, href) => (ctaClick(label, href, "aarshjul"), setWheelOpen(false), openLink(T, href, label, popup))}
+          onClose={() => setWheelOpen(false)}
         />
       )}
       {/* Find vej stays (the standard): also over a place card or "Din plads venter", and while "Du er fremme" shows - a new way can be found from there. */}

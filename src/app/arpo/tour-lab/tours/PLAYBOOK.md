@@ -113,6 +113,17 @@ Fx specialefterskoler (ADHD, autisme, nedsat kognitivt funktionsniveau):
 - **"Din plads venter"**: et kort efter ca. 90 sekunder med kundens vigtigste
   handling. Ét kort, aldrig mens menuen er åben.
 
+## Virtual staging og årshjul
+
+- **Virtual staging**: læg indhold på en rigtig flade i rummet - en velkomst
+  fra forstanderen som video på væggen i forhallen, skolens Instagram på et tv,
+  et skilt på en tavle. Brug det på 1-3 steder, hvor en skærm eller væg alligevel
+  trækker blikket - ikke overalt. Video kører uden lyd; giv den gerne en knap
+  (fx "Følg os" eller #kontakt).
+- **Årshjul** (#aarshjul): efterskolens år måned for måned - det, en ny elev
+  glæder sig til. 6-10 begivenheder med rigtige billeder er nok; slut med en
+  knap (Book et besøg). Kan åbnes fra menuen eller ligge på en flade.
+
 ## Links
 
 - Steder i touren vælges ved at stå der i forhåndsvisningen ("Tilføj det sted,

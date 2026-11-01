@@ -29,6 +29,7 @@ import { Choice, Field, FilesContext, Group, Icon, input, logoTone, outsideFiles
 import { fetchSiteFavicon, hostTourFiles } from "@/lib/actions/tour-files";
 import { AiMemoryPanel } from "./memory";
 import { WeatherEditor } from "./weather-editor";
+import { StagingEditor } from "./staging-editor";
 import { FinderEditor } from "./finder-editor";
 import { MapEditor } from "./map-editor";
 import { FeedbackPanel } from "./feedback-panel";
@@ -51,7 +52,7 @@ const FIND_ASIDE: [FindStepAside, string][] = [
 const zoomLabel = (z: number) => (Math.abs(z - 1) < 0.01 ? "normal" : z < 1 ? `zoomet ud (${Math.round(z * 100)} %)` : `zoomet ind (${Math.round(z * 100)} %)`);
 
 type Version = { id: string; note: string | null; by: string | null; at: string };
-type Tab = "layout" | "sprog" | "claude" | "live" | "scan" | "okonomi" | "resultater" | "del" | "tags" | "start" | "rundvisning" | "kort" | "kortet" | "feedback" | "generelt" | "design" | "menu" | "funktioner" | "links" | "avanceret" | "versioner";
+type Tab = "layout" | "sprog" | "claude" | "live" | "scan" | "okonomi" | "resultater" | "del" | "tags" | "staging" | "start" | "rundvisning" | "kort" | "kortet" | "feedback" | "generelt" | "design" | "menu" | "funktioner" | "links" | "avanceret" | "versioner";
 
 /** Claude's mark: a small sunburst. */
 const NO_TABS: Tab[] = [];
@@ -77,6 +78,7 @@ const TABS: [Tab, string, string, string?][] = [
   ["rundvisning", "Vis mig rundt", '<circle cx="12" cy="12" r="9"/><path d="M10 8.5v7l5.5-3.5z"/>'],
   ["kort", "Stedkort", '<rect x="4" y="5" width="16" height="14" rx="2"/><path d="M8 10h8M8 14h5"/>', "3 · Indhold"],
   ["tags", "Tags", '<path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z"/><circle cx="8" cy="8" r="1.5"/>'],
+  ["staging", "Virtual staging", '<rect x="3" y="5" width="18" height="12" rx="1.5"/><path d="M8 21h8M12 17v4M10 9l4 2-4 2z"/>'],
   ["live", "Live data", '<path d="M3 12h4l3-8 4 16 3-8h4"/>'],
   ["links", "Knapper og kontakt", '<path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/>'],
   ["funktioner", "Funktioner", '<path d="M12 3l2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 15.4 7.2 18l.9-5.4L4.2 8.7l5.4-.8z"/>', "4 · Indstillinger"],
@@ -902,6 +904,7 @@ export function TourEditor({
             )}
             {tab === "scan" && <ScanPointsEditor config={config} edit={edit} preview={preview} map={scanMap} mpskinsHidden={mpskinsHidden} expected={scanCount} />}
             {tab === "tags" && <TagsEditor config={config} edit={edit} slug={slug} preview={preview} />}
+            {tab === "staging" && <StagingEditor config={config} edit={edit} preview={preview} />}
             {tab === "live" && <LiveDataEditor config={config} edit={edit} slug={slug} preview={preview} />}
             {tab === "kortet" && (
               <>
