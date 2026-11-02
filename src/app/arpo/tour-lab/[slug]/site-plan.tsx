@@ -280,7 +280,7 @@ export const SITE_PLAN_CSS = `
 .pk-datoer button:disabled{opacity:.6}
 .pk-datoer p{flex-basis:100%;margin:0;font-size:12px;color:#3a3a3c}
 .pk-hoved{flex-basis:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:2px}
-.pk-skift.pk-skift-i{position:static;height:30px;box-shadow:none;background:#f2f2f7;font-size:13px;padding:0 12px 0 6px}
+.pk-datoer .pk-skift.pk-skift-i{position:static;height:auto;box-shadow:none;background:none;color:#1d2a30;font-size:14px;font-weight:800;padding:2px 0;gap:9px}
 .pk-datoer .pk-ryd{height:30px;padding:0 12px;background:#f2f2f7;color:#1d2a30;font-size:13px}
 .pk-kort .pk-gaa{background:#1d2a30}
 .pk-legend b{font-weight:900;margin-left:2px}
