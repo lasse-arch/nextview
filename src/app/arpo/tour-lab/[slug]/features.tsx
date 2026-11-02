@@ -478,37 +478,61 @@ function MoreBand({ items }: { items: string[] }) {
     const el = rul.current;
     if (!el) return;
     const still = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    // Stands still while a finger or the mouse is on it, while it glides on after a swipe, and a moment after - it
+    // never moves under the visitor's finger (that fight made it flicker on a phone).
     let held = 0;
+    let touching = false;
     let pos = el.scrollLeft;
+    let set = el.scrollLeft;
     let frame = 0;
     let last = performance.now();
     const hold = () => (held = performance.now() + 2500);
+    const down = () => {
+      touching = true;
+      hold();
+    };
+    const up = () => {
+      touching = false;
+      hold();
+    };
     const tick = (t: number) => {
       const dt = Math.min(64, t - last);
       last = t;
       const half = el.scrollWidth / 2;
-      if (half > el.clientWidth) {
-        if (!still && t > held) pos += dt * 0.035; // ~35 px a second - slow enough to read
-        else pos = el.scrollLeft;
-        // Past the first copy (by itself or by the visitor): back by one copy - the same view.
+      // Moved by something else than this (a swipe gliding on, the wheel): the visitor's, so wait.
+      if (Math.abs(el.scrollLeft - set) > 1) {
+        hold();
+        set = pos = el.scrollLeft;
+      }
+      if (half > el.clientWidth && !touching && t > held && !still) {
+        pos += dt * 0.035; // ~35 px a second - slow enough to read
+        // Past the first copy: back by one copy - the same view, so nobody sees it jump.
         if (pos >= half) pos -= half;
-        if (pos < 0) pos += half;
-        if (Math.abs(el.scrollLeft - pos) >= 0.5) el.scrollLeft = pos;
+        el.scrollLeft = pos;
+        set = el.scrollLeft;
+      } else if (!touching && t > held && half > el.clientWidth && (el.scrollLeft >= half || el.scrollLeft <= 0)) {
+        // Scrolled to either end by hand: to the same place in the other copy, while nobody is holding it.
+        el.scrollLeft = el.scrollLeft >= half ? el.scrollLeft - half : el.scrollLeft + half;
+        set = pos = el.scrollLeft;
       }
       frame = requestAnimationFrame(tick);
     };
     frame = requestAnimationFrame(tick);
     const opts = { passive: true } as const;
-    el.addEventListener("pointerdown", hold, opts);
+    el.addEventListener("pointerdown", down, opts);
+    el.addEventListener("touchstart", down, opts);
+    window.addEventListener("pointerup", up, opts);
+    window.addEventListener("touchend", up, opts);
+    window.addEventListener("touchcancel", up, opts);
     el.addEventListener("wheel", hold, opts);
-    el.addEventListener("touchstart", hold, opts);
-    el.addEventListener("touchmove", hold, opts);
     return () => {
       cancelAnimationFrame(frame);
-      el.removeEventListener("pointerdown", hold);
+      el.removeEventListener("pointerdown", down);
+      el.removeEventListener("touchstart", down);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("touchend", up);
+      window.removeEventListener("touchcancel", up);
       el.removeEventListener("wheel", hold);
-      el.removeEventListener("touchstart", hold);
-      el.removeEventListener("touchmove", hold);
     };
   }, []);
   return (
@@ -991,7 +1015,7 @@ export const FEATURES_CSS = `
 .ft-rul{display:contents}
 /* In the showreel: one band that runs by itself and can be swiped, scrolled or dragged. */
 .ft-reel-scene .ft-mere{display:block;padding:9px 0;min-height:0!important;height:auto;overflow:hidden;-webkit-mask-image:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent);mask-image:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent)}
-.ft-reel-scene .ft-rul{display:flex;overflow-x:auto;scrollbar-width:none;overscroll-behavior-x:contain;touch-action:pan-x;cursor:grab}
+.ft-reel-scene .ft-rul{display:flex;overflow-x:auto;scrollbar-width:none;overscroll-behavior-x:contain;touch-action:pan-x;cursor:grab;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 .ft-reel-scene .ft-rul::-webkit-scrollbar{display:none}
 .ft-reel-scene .ft-rul:active{cursor:grabbing}
 .ft-reel-scene .ft-rul span{display:inline-block!important;flex:none;max-width:none;margin-right:6px;animation:none;opacity:1;user-select:none}
