@@ -2294,6 +2294,11 @@ function TourExperience({
   /* ----- "Pladskort" on the 360° aerial photo (site-plan-360.tsx) ----- */
   const plan360On = sitePlan360Ready(T);
   const [plan360, setPlan360] = useState<SitePlanState>({ on: false, free: null, picked: null, stay: null });
+  /** The 3D tour isn't there yet (a slow line, a tap on Start before it's loaded): a picture of the place, not a black screen. */
+  const venter = Boolean(sdkKey && modelId && !sdk && phase === "tour" && !welcome && !cover && !intro);
+  /** The picture behind it: the tour's own (front page, film still, a place, a tile) - Matterport's thumbnail of the scan only as a last resort. */
+  const ventBillede =
+    T.cover?.image || T.intro?.poster || T.places?.find((p) => p.image)?.image || T.welcome?.tiles.find((t) => t.image)?.image || (T.map && !T.map.panorama ? T.map.image : undefined) || `https://my.matterport.com/api/v1/player/models/${modelId}/thumb?width=1600`;
   // "hv-luk-alt": everything open on top of the tour closes - the showcase's showreel moves from one feature to the next with it.
   useEffect(() => {
     const all = () => {
@@ -3352,18 +3357,16 @@ function TourExperience({
         />
       )}
       {/* The 3D tour isn't there yet (a slow line, a tap on Start before it's loaded): a picture of the place, not a black screen. */}
-      {sdkKey && modelId && !sdk && phase === "tour" && !welcome && !cover && !intro && (
-        <div className="hv-vent" aria-hidden style={{ "--vent": `url("${(T.cover?.image || T.intro?.poster || `https://my.matterport.com/api/v1/player/models/${modelId}/thumb?width=1600`).replace(/["\\\n]/g, encodeURIComponent)}")` } as React.CSSProperties}>
+      {venter && (
+        <div className="hv-vent" role="status" style={{ "--vent": `url("${ventBillede.replace(/["\\\n]/g, encodeURIComponent)}")` } as React.CSSProperties}>
           <TourLogo T={T} className={`hv-vent-logo ${T.logoOnLight ? "hv-vent-lys" : ""}`} alt="" />
-          {!holding && (
-            <span className="hv-vent-tekst">
-              <span className="hv-holder-spin" />
-              {tx("Gør touren klar …")}
-            </span>
-          )}
+          <span className="hv-vent-tekst">
+            <span className="hv-holder-spin" />
+            {tx("Gør touren klar …")}
+          </span>
         </div>
       )}
-      {holding && (
+      {holding && !venter && (
         <div className="hv-holder" role="status">
           <span className="hv-holder-spin" aria-hidden />
           {tx("Gør touren klar …")}
