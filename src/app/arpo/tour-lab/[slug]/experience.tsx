@@ -752,6 +752,19 @@ function TourExperience({
   const [dayAt, setDayAt] = useState<number | null>(null);
   /** Place cards closed for good (by index), and the "comes by itself" card. */
   const [closedCards, setClosedCards] = useState<number[]>([]);
+  // "hv-stedkort" (the showcase's "Stedkort"): the closed cards come back - and where the visitor stands has none, to the first one's room.
+  useEffect(() => {
+    const show = () => {
+      setClosedCards([]);
+      const cards = T.placeCards ?? [];
+      const here = currentSsRef.current;
+      if (!cards.length || (here != null && cards.some((c) => c.ss.includes(here)))) return;
+      const first = cards.find((c) => c.ss.length);
+      if (first) goToRef.current(placeHref(T, first.ss[0]), first.title);
+    };
+    window.addEventListener("hv-stedkort", show);
+    return () => window.removeEventListener("hv-stedkort", show);
+  }, [T]);
   const [nudgeOn, setNudgeOn] = useState(false);
   const [nudgeRound, setNudgeRound] = useState(0);
   /** "Find vej": the picker, and the walk in progress. */

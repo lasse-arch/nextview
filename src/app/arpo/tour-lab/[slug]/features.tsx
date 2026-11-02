@@ -144,6 +144,9 @@ function featuresOf(T: TourConfig, tr: (s: string, v?: Record<string, string | n
           </div>
         </div>
       ),
+      // In the tour itself: the cards back (also those closed), and to a room that has one.
+      action: () => fire("hv-stedkort"),
+      actionLabel: tr("Prøv det"),
     });
   if (T.commute)
     out.push({
