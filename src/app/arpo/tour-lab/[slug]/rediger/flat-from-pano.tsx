@@ -21,7 +21,7 @@ const rad = Math.PI / 180;
 /** Pixels of the 360° photo, to read from. */
 type Source = { data: Uint8ClampedArray; w: number; h: number };
 
-function loadSource(src: string, maxW: number): Promise<Source> {
+export function loadSource(src: string, maxW: number): Promise<Source> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.crossOrigin = "anonymous";
@@ -45,7 +45,7 @@ function loadSource(src: string, maxW: number): Promise<Source> {
 }
 
 /** Which way the flat photo's top faces (yaw, degrees), and how wide it is (degrees across, straight down). */
-type Shot = { heading: number; fov: number };
+export type Shot = { heading: number; fov: number };
 
 /** The flat photo's frame: forward (its top) and right, on the ground. */
 function frame(heading: number) {
@@ -54,7 +54,7 @@ function frame(heading: number) {
 }
 
 /** Draws the view straight down: for each pixel, the ray to the ground, read from the 360° photo (bilinear). */
-function render(src: Source, size: number, shot: Shot): ImageData {
+export function render(src: Source, size: number, shot: Shot): ImageData {
   const out = new ImageData(size, size);
   const k = Math.tan((shot.fov / 2) * rad);
   const { F, R } = frame(shot.heading);
@@ -90,6 +90,33 @@ function render(src: Source, size: number, shot: Shot): ImageData {
     }
   }
   return out;
+}
+
+/** A spot on the 360° photo on the flat photo (x, y in %), also outside it - null above the horizon. */
+export function flatOfSpot([x, y]: [number, number], shot: Shot): [number, number] | null {
+  const yaw = ((x / 100) * 360 - 180) * rad;
+  const pitch = (90 - (y / 100) * 180) * rad;
+  const d = [Math.cos(pitch) * Math.sin(yaw), Math.sin(pitch), Math.cos(pitch) * Math.cos(yaw)];
+  if (d[1] >= -0.01) return null;
+  const s = -1 / d[1];
+  const { F, R } = frame(shot.heading);
+  const k = Math.tan((shot.fov / 2) * rad);
+  const u = ((d[0] * R[0] + d[2] * R[2]) * s) / k;
+  const v = (-(d[0] * F[0] + d[2] * F[2]) * s) / k;
+  return [Math.round(((u + 1) / 2) * 1000) / 10, Math.round(((v + 1) / 2) * 1000) / 10];
+}
+
+/** A spot on the flat photo (x, y in %) back on the 360° photo. */
+export function spotOfFlat([x, y]: [number, number], shot: Shot): [number, number] {
+  const { F, R } = frame(shot.heading);
+  const k = Math.tan((shot.fov / 2) * rad);
+  const f = -((y / 50) - 1) * k;
+  const r = ((x / 50) - 1) * k;
+  const gx = f * F[0] + r * R[0];
+  const gz = f * F[2] + r * R[2];
+  const yaw = Math.atan2(gx, gz) / rad;
+  const pitch = Math.atan2(-1, Math.hypot(gx, gz)) / rad;
+  return [Math.round(((yaw + 180) / 360) * 10000) / 100, Math.round(((90 - pitch) / 180) * 10000) / 100];
 }
 
 /** A point on the 360° photo (x, y in % of it) on the flat photo (x, y in %) - null when it isn't on it (above the horizon, or outside). */
@@ -172,6 +199,9 @@ export function FlatFromPano({ config, edit }: { config: TourConfig; edit: Edit 
           spots[id] = [50, 50];
         }
         d.map = { ...m, image: url, w: size, h: size, panorama: undefined, spots, start: { x: 50, y: 50, zoom: 1 }, startMobile: undefined };
+        // A pladskort already laid on the 360° photo: its corners onto the flat photo too.
+        const ov = d.sitePlan?.overlay;
+        if (ov) ov.corners = ov.corners.map((c) => flatOfSpot(c, shot) ?? c) as typeof ov.corners;
       });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -180,8 +210,8 @@ export function FlatFromPano({ config, edit }: { config: TourConfig; edit: Edit 
   }
 
   return (
-    <Group title="Pladskort over luftfotoet">
-      <p className="text-[14px] leading-snug">Pladskortet skal ligge på et foto taget lige oppefra. Lav et ud af 360°-fotoet: det, dronen så lige nedad.</p>
+    <Group title="Eller: et fladt luftfoto ud af 360°-fotoet">
+      <p className="text-[14px] leading-snug">Vil I hellere starte på et fladt foto lige oppefra (med pladskortet på)? Lav et ud af 360°-fotoet: det, dronen så lige nedad.</p>
       <div className="relative mx-auto aspect-square w-full max-w-[320px] overflow-hidden rounded-xl bg-[#f2f2f7]">
         <canvas ref={canvas} className="h-full w-full" />
         {!preview && !error && <span className="absolute inset-0 flex items-center justify-center text-[13px] text-[#8e8e93]">Henter 360°-fotoet …</span>}

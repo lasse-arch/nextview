@@ -16,6 +16,8 @@ import type { AvailableUnit } from "@/lib/availability/boxdepotet";
 import { WeatherChip, WEATHER_CSS } from "./weather";
 import { CommuteSheet, COMMUTE_CSS } from "./commute";
 import { fitPano } from "../tours/pano-cover";
+import { SitePlan360Layer, sitePlan360Ready, SITE_PLAN_360_CSS } from "./site-plan-360";
+import { SITE_PLAN_CSS, SitePlanControls, type SitePlanState } from "./site-plan";
 import { FeatureTour, featuresSeen, FEATURES_CSS, type DemoContact } from "./features";
 import { FinderSheet, FINDER_CSS, WalkLines } from "./finder";
 import { apiUrl, isStaticTour } from "../tours/api";
@@ -35,7 +37,6 @@ import { BENTO_CSS, BentoMenu } from "./bento";
 import { INFO_CSS, InfoDots, usePlaceInfo } from "./info";
 import { STAGING_CSS, StagingLayer } from "./staging";
 import { IN_3D, useStaging3d } from "./staging-3d";
-import { SITE_PLAN_CSS } from "./site-plan";
 import { LINE_DAY_CSS, LineDayCard, LineDayEnd, LineDayPicker, lineDayStops, type LineDayRun } from "./line-day";
 import { YEARWHEEL_CSS, YearWheelPanel } from "./yearwheel";
 import { MAP_CSS, MapScene, type MapApi } from "./map";
@@ -2289,6 +2290,11 @@ function TourExperience({
     };
   }, [picking, sdk, room, hiddenSweeps]);
 
+  /* ----- "Pladskort" on the 360° aerial photo (site-plan-360.tsx) ----- */
+  const plan360On = sitePlan360Ready(T);
+  const [plan360, setPlan360] = useState<SitePlanState>({ on: false, free: null, picked: null, stay: null });
+  const droneViewer = useCallback(() => drone.current, []);
+
   /* ----- "Find vej" ----- */
   const DESTINATIONS = useMemo<Destination[]>(
     () =>
@@ -2506,7 +2512,7 @@ function TourExperience({
       }>
       <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.font.replace(/ /g, "+")}:wght@400;600;700;800;900&display=swap`} />
       {T.fontHeading && <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.fontHeading.replace(/ /g, "+")}:wght@500;600&display=swap`} />}
-      <style>{CSS + CONTACT_CSS + STORIES_CSS + LIGHTBOX_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + ONBOARDING_CSS + MENU_HINT_CSS + INFO_CSS + STAGING_CSS + (T.lineDays ? LINE_DAY_CSS : "") + (T.yearWheel ? YEARWHEEL_CSS : "") + MAP_CSS + (T.sitePlan?.overlay ? SITE_PLAN_CSS : "") + ROUTE_CSS + MEASURES_CSS + CARDS_CSS + DAY_CSS + SIMPLE_CSS + BENTO_CSS + LOGO_RIGHT_CSS + LANG_CSS + WEATHER_CSS + COMMUTE_CSS + FEATURES_CSS + FINDER_CSS + (review ? FEEDBACK_CSS : "")}</style>
+      <style>{CSS + CONTACT_CSS + STORIES_CSS + LIGHTBOX_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + ONBOARDING_CSS + MENU_HINT_CSS + INFO_CSS + STAGING_CSS + (T.lineDays ? LINE_DAY_CSS : "") + (T.yearWheel ? YEARWHEEL_CSS : "") + MAP_CSS + (T.sitePlan?.overlay ? SITE_PLAN_CSS + SITE_PLAN_360_CSS : "") + ROUTE_CSS + MEASURES_CSS + CARDS_CSS + DAY_CSS + SIMPLE_CSS + BENTO_CSS + LOGO_RIGHT_CSS + LANG_CSS + WEATHER_CSS + COMMUTE_CSS + FEATURES_CSS + FINDER_CSS + (review ? FEEDBACK_CSS : "")}</style>
       {/* The tour's own design on top (written by Claude or by hand under Avanceret). */}
       {T.customCss && <style>{T.customCss.replace(/<\/?style/gi, "")}</style>}
 
@@ -2550,7 +2556,15 @@ function TourExperience({
             onSiteBook={(label, href) => (ctaClick(label, href, "pladskort"), popup(href, label))}
           />
         ) : (
-          <div ref={droneEl} className="absolute inset-0" />
+          <>
+            <div ref={droneEl} className="absolute inset-0" />
+            {plan360On && (
+              <>
+                <SitePlan360Layer T={T} viewer={droneViewer} scene={droneEl} state={plan360} onPick={(u) => setPlan360((st) => ({ ...st, picked: u }))} />
+                <SitePlanControls T={T} state={plan360} setState={setPlan360} lang={lang} onBook={(label, href) => (ctaClick(label, href, "pladskort"), popup(href, label))} />
+              </>
+            )}
+          </>
         )}
 
         <div className={`hv-intro ${T.logoOnLight ? "" : "hv-intro-moerk"}`}>

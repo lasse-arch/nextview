@@ -5,6 +5,7 @@ import { fetchNextStayUnits } from "@/lib/actions/tour-sites";
 import type { SiteUnit, TourConfig } from "../../tours/types";
 import { quadSolve } from "../staging";
 import { Field, Group, input, Toggle, UploadButton } from "./ui";
+import { flatOfSpot, loadSource, render, spotOfFlat, type Shot } from "./flat-from-pano";
 
 /*
  * "Pladskort over luftfotoet" in Luftfoto og kort: the campsite's own site
@@ -72,10 +73,15 @@ function dragIn(box: HTMLDivElement | null, e: React.PointerEvent, onMove: (x: n
   target.addEventListener("pointercancel", up);
 }
 
+/** On a 360° photo the plan is placed on the view straight down (as wide as this) - its corners are kept as spots on the 360° photo. */
+const DOWN: Shot = { heading: 0, fov: 140 };
+
 export function SitePlanEditor({ config, edit, slug }: { config: TourConfig; edit: Edit; slug: string }) {
   const M = config.map!;
   const plan = config.sitePlan;
   const overlay = plan?.overlay;
+  /** Where a new plan's corners start: the middle of the picture (on a 360° photo: the middle of the ground straight down). */
+  const start = (): Corners => (M.panorama ? (START.map((c) => spotOfFlat(c, DOWN)) as Corners) : START);
 
   if (!plan)
     return (
@@ -84,7 +90,7 @@ export function SitePlanEditor({ config, edit, slug }: { config: TourConfig; edi
         <UploadButton
           accept="image/*"
           label="Upload pladskortet"
-          onDone={(url) => edit((d) => void (d.sitePlan = { image: url, label: "Se på pladskortet", overlay: { corners: START, opacity: 0.55 } }))}
+          onDone={(url) => edit((d) => void (d.sitePlan = { image: url, label: "Se på pladskortet", overlay: { corners: start(), opacity: 0.55 } }))}
           className="block w-full cursor-pointer rounded-xl bg-[#0071e3] py-2.5 text-center text-[15px] font-medium text-white"
         />
       </Group>
@@ -94,14 +100,18 @@ export function SitePlanEditor({ config, edit, slug }: { config: TourConfig; edi
     <Group title="Pladskort over luftfotoet">
       <Toggle
         on={Boolean(overlay)}
-        onChange={(on) => edit((d) => void (d.sitePlan!.overlay = on ? (d.sitePlan!.overlay ?? { corners: START, opacity: 0.55 }) : undefined))}
+        onChange={(on) => edit((d) => void (d.sitePlan!.overlay = on ? (d.sitePlan!.overlay ?? { corners: start(), opacity: 0.55 }) : undefined))}
         title="Vis pladskortet over luftfotoet"
-        hint="Gæsten får en kontakt, Pladskort, på luftfotoet. Virker bedst med et dronefoto taget lige oppefra."
+        hint={M.panorama ? "Gæsten får en kontakt, Pladskort, i 360°-luftfotoet - kortet ligger på jorden og bliver liggende, når man drejer." : "Gæsten får en kontakt, Pladskort, på luftfotoet. Virker bedst med et dronefoto taget lige oppefra."}
       />
       {overlay && (
         <>
           <p className={small}>Træk de fire hjørner, så pladskortet ligger præcis oven på luftfotoet - ret ind efter fx servicebygningen og vejene.</p>
-          <CornerPlacer M={M} image={plan.image} corners={overlay.corners} opacity={overlay.opacity ?? 0.55} onChange={(corners) => edit((d) => void (d.sitePlan!.overlay!.corners = corners))} />
+          {M.panorama ? (
+            <CornerPlacer360 pano={M.image} image={plan.image} corners={overlay.corners} opacity={overlay.opacity ?? 0.55} onChange={(corners) => edit((d) => void (d.sitePlan!.overlay!.corners = corners))} />
+          ) : (
+            <CornerPlacer M={M} image={plan.image} corners={overlay.corners} opacity={overlay.opacity ?? 0.55} onChange={(corners) => edit((d) => void (d.sitePlan!.overlay!.corners = corners))} />
+          )}
           <Field title={`Gennemsigtighed: ${Math.round((overlay.opacity ?? 0.55) * 100)} %`}>
             <input
               type="range"
@@ -163,6 +173,70 @@ function CornerPlacer({ M, image, corners, opacity, onChange }: { M: NonNullable
           }
         />
       ))}
+    </div>
+  );
+}
+
+/**
+ * The same on a 360° aerial photo: the ground straight down from the drone
+ * (worked out from the 360° photo), the plan bent onto it - straight down, a
+ * flat piece of ground is a plain picture of it, so the corners can be set
+ * like on a flat photo. They're saved as spots on the 360° photo.
+ */
+function CornerPlacer360({ pano, image, corners, opacity, onChange }: { pano: string; image: string; corners: Corners; opacity: number; onChange: (c: Corners) => void }) {
+  const box = useRef<HTMLDivElement>(null);
+  const canvas = useRef<HTMLCanvasElement>(null);
+  const w = useWidth(box);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    let dead = false;
+    loadSource(pano, 4096)
+      .then((src) => {
+        if (dead || !canvas.current) return;
+        const size = 900;
+        canvas.current.width = size;
+        canvas.current.height = size;
+        canvas.current.getContext("2d")!.putImageData(render(src, size, DOWN), 0, 0);
+      })
+      .catch((e: unknown) => !dead && setError(e instanceof Error ? e.message : String(e)));
+    return () => {
+      dead = true;
+    };
+  }, [pano]);
+  // Each corner straight down (a corner above the horizon can't be on the ground - it's put back in the middle).
+  const flat = corners.map((c, i) => flatOfSpot(c, DOWN) ?? START[i]) as Corners;
+  const c = w ? quadSolve(1000, 1000, flat.map(([x, y]) => ({ x: (x / 100) * w, y: (y / 100) * w }))) : null;
+  const matrix = c ? `matrix3d(${c[0]},${c[3]},0,${c[6]},${c[1]},${c[4]},0,${c[7]},0,0,1,0,${c[2]},${c[5]},0,1)` : undefined;
+  return (
+    <div className="space-y-1">
+      <div ref={box} className="relative aspect-square w-full touch-none select-none overflow-hidden rounded-xl bg-[#f2f2f7] ring-1 ring-black/[.06]">
+        <canvas ref={canvas} className="absolute inset-0 h-full w-full" />
+        {matrix && (
+          <div className="pointer-events-none absolute left-0 top-0" style={{ width: 1000, height: 1000, transformOrigin: "0 0", transform: matrix, opacity }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={image} alt="" draggable={false} className="block h-full w-full" />
+          </div>
+        )}
+        {flat.map(([x, y], i) => (
+          <button
+            key={i}
+            type="button"
+            title={CORNER_NAMES[i]}
+            aria-label={CORNER_NAMES[i]}
+            className="absolute h-6 w-6 -translate-x-1/2 -translate-y-1/2 cursor-move rounded-full border-2 border-white bg-[#0071e3] shadow-md"
+            style={{ left: `${x}%`, top: `${y}%` }}
+            onPointerDown={(e) =>
+              dragIn(box.current, e, (nx, ny) => {
+                const next = flat.map((p) => [...p]) as Corners;
+                next[i] = [nx, ny];
+                onChange(next.map((p) => spotOfFlat(p, DOWN)) as Corners);
+              })
+            }
+          />
+        ))}
+      </div>
+      <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">Sådan ser dronen jorden lige nedad. Læg kortet på her - i touren ligger det så på jorden i 360°-billedet, også når man drejer.</p>
+      {error && <p className="px-1 text-[12px] text-[#ff3b30]">{error}</p>}
     </div>
   );
 }

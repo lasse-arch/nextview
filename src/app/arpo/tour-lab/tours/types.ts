@@ -392,7 +392,9 @@ export type TourConfig = {
      * visitor. `corners` = where the plan's four corners land on the picture
      * (x, y in % of it; top left, top right, bottom right, bottom left), so it
      * can follow a photo that isn't quite straight down. `opacity` 0.2-1
-     * (default 0.55). Not on a 360° drone scene.
+     * (default 0.55). On a 360° start picture (a 360° map) the corners are
+     * spots on the 360° photo (x, y in % of it, like the points): the plan lies
+     * on the ground there and stays put while the visitor turns.
      */
     overlay?: { corners: [[number, number], [number, number], [number, number], [number, number]]; opacity?: number };
     /** The pitches and cabins on the plan (x, y in % of the plan picture) - lit green when free for the dates the visitor picks. `id` = the booking system's id. */

@@ -54,6 +54,9 @@ Ikke alle tours skal starte med et valg. Vælg ud fra, hvor folk kommer fra:
   forsiden i stedet for at spille den først - gæsten kan trykke med det samme,
   og touren henter imens. Kort og let (10-20 sek., 720p, 2-4 MB), en stående
   version til mobil, og et stillbillede fra filmen som foto.
+- **Pladskort på 360° luftfoto**: kortet kan ligge direkte på jorden i 360°-luftfotoet (hjørnerne
+  lægges på billedet set lige nedad) - eller lav et fladt luftfoto ud af 360°-fotoet
+  og start dér. Dronen skal have hængt højt nok til at se hele pladsen.
 - **180°-billeder**: marker billedet som 180° (ved billedet: "Billedet dækker") - så vises det
   til at kigge rundt i, så langt billedet går, overalt hvor det bruges.
 - **Fliser over film** (Start → Bag fliserne): vil vi have fliserne, men også
