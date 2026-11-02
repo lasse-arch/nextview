@@ -363,14 +363,36 @@ function featuresOf(T: TourConfig, tr: (s: string, v?: Record<string, string | n
         </div>
       ),
     });
+    // A picture of the place itself (Matterport's own of the scan as the last resort).
+    const bild =
+      T.cover?.image || T.places?.find((p) => p.image)?.image || T.welcome?.tiles.find((t) => t.image)?.image || (T.modelId ? `https://my.matterport.com/api/v1/player/models/${T.modelId}/thumb?width=800` : undefined);
     out.push({
       key: "overalt",
       title: "På mobil, computer og jeres hjemmeside",
       text: "Bygget til mobilen først - og lige så god på computeren og inde på jeres egen hjemmeside.",
       scene: (
-        <div className="ft-scene ft-overalt">
-          <i className="ft-mobil" />
-          <i className="ft-skaerm" />
+        // The same tour on a phone, a computer and the customer's own website - its own picture panning in each, as if looking round.
+        <div className="ft-scene ft-overalt" style={{ "--ft-bild": bild ? `url("${bild.replace(/"/g, "%22")}")` : undefined } as React.CSSProperties}>
+          <span className="ft-enhed" style={{ animationDelay: "0s" }}>
+            <i className="ft-tlf">
+              <em />
+            </i>
+            <small>Mobil</small>
+          </span>
+          <span className="ft-enhed" style={{ animationDelay: ".25s" }}>
+            <i className="ft-pc">
+              <em />
+            </i>
+            <small>Computer</small>
+          </span>
+          <span className="ft-enhed" style={{ animationDelay: ".5s" }}>
+            <i className="ft-web">
+              <b />
+              <u />
+              <em />
+            </i>
+            <small>Jeres hjemmeside</small>
+          </span>
         </div>
       ),
     });
@@ -921,13 +943,29 @@ export const FEATURES_CSS = `
 .ft-reel-vaek{display:none!important}
 .ft-reel-hvorfor{margin-top:8px!important;padding:8px 10px;border-radius:12px;background:rgba(255,255,255,.08);font-size:13px!important}
 .ft-reel-hvorfor b{display:inline!important;font-size:11px!important;letter-spacing:.08em;text-transform:uppercase;color:color-mix(in srgb,var(--c-accent) 70%,#fff);margin-right:4px}
-@media (max-width:760px){.ft-reel{width:calc(100% - 16px);max-height:55vh;overflow-y:auto;padding:10px 12px 9px;display:flex;flex-direction:column;min-height:min(240px,50vh)}.ft-reel-knapper{margin-top:auto!important;padding-top:9px}.ft-reel-scene{margin:6px 0 2px}.ft-reel-scene:not(:has(.ft-mere)){display:none}.ft-reel>b{font-size:16px}.ft-reel>span{font-size:13px}
+@media (max-width:760px){.ft-reel{width:calc(100% - 16px);max-height:55vh;overflow-y:auto;padding:10px 12px 9px;display:flex;flex-direction:column;min-height:min(240px,50vh)}.ft-reel-knapper{margin-top:auto!important;padding-top:9px}.ft-reel-scene{margin:6px 0 2px}.ft-reel-scene:not(:has(.ft-mere,.ft-overalt)){display:none}.ft-reel-scene .ft-overalt{padding:8px 6px 4px;gap:12px;zoom:.74}.ft-reel>b{font-size:16px}.ft-reel>span{font-size:13px}
 .ft-ark{padding:16px 16px 12px;max-height:calc(100% - 16px)}.ft-scene{height:110px}.ft-slide h2{font-size:19px;margin-top:12px}.ft-slide p{font-size:14px}.ft-hvorfor{margin-top:10px;padding:10px 12px;font-size:13px}.ft-reel-knapper button{white-space:nowrap;padding:8px 6px;font-size:12.5px}}
 .ft-reel-knapper button{flex:1;border:0;border-radius:999px;padding:8px 10px;background:rgba(255,255,255,.14);color:#fff;font:inherit;font-weight:700;font-size:13px;cursor:pointer}
 .ft-reel-knapper button:nth-child(2){background:var(--c-accent)}
-.ft-overalt{display:flex;align-items:flex-end;justify-content:center;gap:14px;padding:18px}
-.ft-mobil{width:44px;height:84px;border-radius:10px;border:4px solid #fff;background:linear-gradient(160deg,#9cc3e6,#6f9a5c);animation:ftStory 3s ease-in-out infinite}
-.ft-skaerm{width:150px;height:96px;border-radius:8px;border:5px solid #fff;background:linear-gradient(160deg,#9cc3e6,#6f9a5c);animation:ftStory 3s ease-in-out .4s infinite}
+.ft-overalt{display:flex;align-items:flex-end;justify-content:center;gap:16px;padding:16px 12px 10px}
+.ft-enhed{display:flex;flex-direction:column;align-items:center;gap:6px;opacity:0;animation:ftEnhed .55s cubic-bezier(.2,.8,.25,1.15) forwards}
+.ft-enhed small{font-size:10.5px;font-weight:700;letter-spacing:.03em;color:rgba(255,255,255,.85);white-space:nowrap}
+.ft-enhed i{position:relative;display:block;background:#fff;box-shadow:0 8px 20px rgba(0,0,0,.28)}
+/* The tour on each screen: its own picture, panning slowly - as if someone is looking round in it. */
+.ft-enhed em{position:absolute;display:block;background:var(--ft-bild,linear-gradient(110deg,#9cc3e6,#6f9a5c 55%,#c9b48a)) 0 50%/auto 100%,linear-gradient(110deg,#9cc3e6,#6f9a5c 55%,#c9b48a);background-size:auto 150%,100% 100%;animation:ftKig 14s ease-in-out infinite alternate}
+.ft-tlf{width:38px;height:70px;border-radius:9px}
+.ft-tlf em{inset:3px;border-radius:6px}
+.ft-tlf::after{content:"";position:absolute;top:5px;left:50%;translate:-50% 0;width:10px;height:3px;border-radius:2px;background:rgba(0,0,0,.35);z-index:1}
+.ft-pc{width:96px;height:60px;border-radius:5px}
+.ft-pc em{inset:4px;border-radius:2px;animation-delay:-4s}
+.ft-pc::after{content:"";position:absolute;left:-9px;right:-9px;bottom:-6px;height:6px;border-radius:0 0 6px 6px;background:#e6e9ec}
+.ft-web{width:104px;height:70px;border-radius:6px;overflow:hidden}
+.ft-web b{position:absolute;left:0;right:0;top:0;height:10px;background:#eef1f3;background-image:radial-gradient(circle,#ff6159 1.6px,transparent 2px),radial-gradient(circle,#ffbd2e 1.6px,transparent 2px),radial-gradient(circle,#28c840 1.6px,transparent 2px);background-size:8px 10px;background-repeat:no-repeat;background-position:3px 0,10px 0,17px 0}
+.ft-web u{position:absolute;left:6px;top:17px;width:30px;height:46px;background:linear-gradient(#d5dade 0 0) 0 0/100% 5px no-repeat,linear-gradient(#e6e9ec 0 0) 0 11px/80% 4px no-repeat,linear-gradient(#e6e9ec 0 0) 0 19px/90% 4px no-repeat,linear-gradient(#e6e9ec 0 0) 0 27px/70% 4px no-repeat,linear-gradient(var(--c-accent) 0 0) 0 38px/60% 7px no-repeat;border-radius:2px}
+.ft-web em{left:42px;right:6px;top:16px;bottom:6px;border-radius:3px;animation-delay:-8s}
+@keyframes ftEnhed{from{opacity:0;transform:translateY(10px) scale(.9)}to{opacity:1;transform:none}}
+@keyframes ftKig{from{background-position:0% 50%,0 0}to{background-position:100% 50%,0 0}}
+@media (prefers-reduced-motion:reduce){.ft-enhed{animation:none;opacity:1}.ft-enhed em{animation:none}}
 /* The showcase's own button to see the features again. */
 .ft-igen{position:absolute;left:0;top:50%;translate:0 -50%;z-index:30;display:flex;flex-direction:column;align-items:center;gap:6px;border:0;border-radius:14px 0 0 14px;padding:12px 6px 12px 7px;background:rgba(13,27,32,.86);color:#fff;font:inherit;font-weight:800;font-size:12.5px;letter-spacing:.04em;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,.3);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);writing-mode:vertical-rl;transform:rotate(180deg);animation:hvFade .4s ease}
 .ft-igen:hover{background:rgba(13,27,32,.95)}
