@@ -103,8 +103,8 @@ export function NotificationBell({ unreadCount, overdue = [] }: { unreadCount: n
             ) : (
               items.map((n) => (
                 <Link key={n.id} href={n.href} onClick={() => setOpen(false)} className={`flex gap-3 border-b border-slate-50 px-4 py-3 hover:bg-slate-50 ${n.unread ? "bg-blue-50/50" : ""}`}>
-                  <span className={`mt-0.5 flex h-7 w-7 flex-none items-center justify-center rounded-full text-[13px] ${n.kind === "approved" ? "bg-emerald-100 text-emerald-700" : n.kind === "demo" ? "bg-violet-100 text-violet-700" : "bg-amber-100 text-amber-700"}`}>
-                    {n.kind === "approved" ? "✓" : n.kind === "demo" ? "👀" : "✎"}
+                  <span className={`mt-0.5 flex h-7 w-7 flex-none items-center justify-center rounded-full text-[13px] ${n.kind === "approved" ? "bg-emerald-100 text-emerald-700" : n.kind === "demo" ? "bg-violet-100 text-violet-700" : n.kind === "mail" ? "bg-sky-100 text-sky-700" : "bg-amber-100 text-amber-700"}`}>
+                    {n.kind === "approved" ? "✓" : n.kind === "demo" ? "👀" : n.kind === "mail" ? "✉" : "✎"}
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block text-[13px] font-medium text-slate-900">

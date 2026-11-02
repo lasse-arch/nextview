@@ -10,7 +10,7 @@ import { prisma } from "@/lib/db";
 
 const MERGE_MS = 3 * 60 * 60 * 1000;
 
-export async function ringBell(n: { kind: "feedback" | "approved" | "demo"; title: string; text: string; href: string; tourSlug?: string; audience?: "admin" | "all" | `user:${string}` }) {
+export async function ringBell(n: { kind: "feedback" | "approved" | "demo" | "mail"; title: string; text: string; href: string; tourSlug?: string; audience?: "admin" | "all" | `user:${string}` }) {
   try {
     const text = n.text.replace(/\s+/g, " ").trim().slice(0, 240);
     const same = n.tourSlug

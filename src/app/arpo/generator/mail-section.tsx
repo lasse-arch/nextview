@@ -4,7 +4,8 @@ import { dealName } from "@/lib/labels";
 import { industryOf } from "@/lib/industries";
 import { onlineTours } from "@/lib/online-tours";
 import { getAppBaseUrl } from "@/lib/email-oauth";
-import { MailGenerator } from "../mailgenerator/mail-generator";
+import { MailGenerator, type MailSender } from "../mailgenerator/mail-generator";
+import { teamCan } from "@/lib/team-roles";
 
 
 /*
@@ -26,6 +27,22 @@ export async function MailSection({ user }: { user: NonNullable<Awaited<ReturnTy
   ]);
   const base = getAppBaseUrl();
   const sellerName = [user.name, user.lastName].filter(Boolean).join(" ");
+  const sign = (u: { name: string; lastName: string | null; phone: string | null }) =>
+    ["Med venlig hilsen", [u.name, u.lastName].filter(Boolean).join(" "), "Nextview360", u.phone ? `Tlf: ${u.phone}` : null].filter((l): l is string => Boolean(l));
+  // An admin can write and send in a colleague's name (from the colleague's own Gmail) - the others only as themselves.
+  const team = teamCan(user, "admin")
+    ? await prisma.user.findMany({
+        where: { disabledAt: null, id: { not: user.id } },
+        orderBy: { name: "asc" },
+        select: { id: true, name: true, lastName: true, phone: true, role: true, extraRoles: true, emailAccounts: { where: { provider: "GOOGLE" }, select: { id: true }, take: 1 } },
+      })
+    : [];
+  const senders: MailSender[] | undefined = team.length
+    ? [
+        { id: user.id, name: sellerName, signature: sign(user), gmail: true },
+        ...team.filter((u) => teamCan(u, "sales") || teamCan(u, "admin")).map((u) => ({ id: u.id, name: [u.name, u.lastName].filter(Boolean).join(" "), signature: sign(u), gmail: u.emailAccounts.length > 0 })),
+      ]
+    : undefined;
 
   return (
     <MailGenerator
@@ -39,7 +56,8 @@ export async function MailSection({ user }: { user: NonNullable<Awaited<ReturnTy
           industry: t.industry,
         }))
       )}
-      signature={["Med venlig hilsen", sellerName, "Nextview360", user.phone ? `Tlf: ${user.phone}` : null].filter((l): l is string => Boolean(l))}
+      signature={sign(user)}
+      senders={senders}
       learned={learned}
     />
   );

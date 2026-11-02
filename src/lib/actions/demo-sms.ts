@@ -127,11 +127,14 @@ export async function sendDemoSms(input: { tourSlug: string; phone: string; name
  * walk-through too and we see whether they look. Only tours the seller may
  * send; the others keep their own address.
  */
-export async function demoLinksForMail(slugs: string[], to: string): Promise<Record<string, string>> {
-  const user = await requireUser();
+export async function demoLinksForMail(slugs: string[], to: string, as?: string): Promise<Record<string, string>> {
+  const me = await requireUser();
+  // An admin writing in a colleague's name: the links are the colleague's (they hear when it's opened).
+  const other = typeof as === "string" && as && as !== me.id && teamCan(me, "admin") ? await prisma.user.findFirst({ where: { id: as, disabledAt: null } }) : null;
+  const user = other ?? me;
   const want = [...new Set((slugs ?? []).map(String))].slice(0, 3);
   if (!want.length) return {};
-  const tours = await prisma.tour.findMany({ where: { slug: { in: want }, ...sendable(user) }, select: { slug: true } });
+  const tours = await prisma.tour.findMany({ where: { slug: { in: want }, ...sendable(me) }, select: { slug: true } });
   const who = String(to ?? "").trim().slice(0, 80) || "Mail";
   const base = (process.env.APP_BASE_URL || "https://nextview360.dk").replace(/\/+$/, "");
   const out: Record<string, string> = {};

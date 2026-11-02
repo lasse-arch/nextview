@@ -17,7 +17,14 @@ const toNum = (v: string) => (v.trim() === "" ? null : Number(v.replace(/\./g, "
 /** Quick ways to make a draft over. */
 const REDO = ["Kortere", "Mere personlig", "Lidt mere formel", "Mere om touren"];
 
-export function MailGenerator({ deals, tours, signature, learned }: { deals: Deal[]; tours: Tour[]; signature: string[]; learned: number }) {
+/** For an admin: whom the mail can be from (themselves first) - written, signed and sent in that person's name. */
+export type MailSender = { id: string; name: string; signature: string[]; gmail: boolean };
+
+export function MailGenerator({ deals, tours, signature: mine, learned, senders }: { deals: Deal[]; tours: Tour[]; signature: string[]; learned: number; senders?: MailSender[] }) {
+  const [as, setAs] = useState(senders?.[0]?.id ?? "");
+  const sender = senders?.find((x) => x.id === as);
+  const signature = sender?.signature ?? mine;
+  const other = Boolean(senders?.length && as && as !== senders[0].id);
   const [kind, setKind] = useState<MailKind>("efter-moede");
   const [dealQuery, setDealQuery] = useState("");
   const [deal, setDeal] = useState<Deal | null>(null);
@@ -82,19 +89,19 @@ export function MailGenerator({ deals, tours, signature, learned }: { deals: Dea
     if (!asDemo) return {};
     const who = company.trim() || name.trim() || to.trim();
     const slugs = picked.map((k) => tours.find((t) => t.key === k)?.slug).filter((x): x is string => Boolean(x));
-    const missing = slugs.filter((sl) => !demoUrls[`${who}|${sl}`]);
-    const made = missing.length ? await demoLinksForMail(missing, who) : {};
+    const missing = slugs.filter((sl) => !demoUrls[`${who}|${sl}|${as}`]);
+    const made = missing.length ? await demoLinksForMail(missing, who, other ? as : undefined) : {};
     const next = { ...demoUrls };
-    for (const [sl, url] of Object.entries(made)) next[`${who}|${sl}`] = url;
+    for (const [sl, url] of Object.entries(made)) next[`${who}|${sl}|${as}`] = url;
     if (missing.length) setDemoUrls(next);
-    return Object.fromEntries(slugs.filter((sl) => next[`${who}|${sl}`]).map((sl) => [sl, next[`${who}|${sl}`]]));
+    return Object.fromEntries(slugs.filter((sl) => next[`${who}|${sl}|${as}`]).map((sl) => [sl, next[`${who}|${sl}|${as}`]]));
   }
 
   function write(ask?: string) {
     setMsg(null);
     start(async () => {
       const l = await links().catch(() => ({}));
-      const r = await draftSalesMail(data(l), ask && draft ? { subject: draft.subject, body: draft.body, ask } : undefined).catch(() => ({ ok: false as const, error: "Der skete en fejl - prøv igen." }));
+      const r = await draftSalesMail(data(l), ask && draft ? { subject: draft.subject, body: draft.body, ask } : undefined, other ? as : undefined).catch(() => ({ ok: false as const, error: "Der skete en fejl - prøv igen." }));
       if (r.ok) {
         setDraft({ id: r.id, subject: r.subject, body: r.body });
         setRedo("");
@@ -106,10 +113,10 @@ export function MailGenerator({ deals, tours, signature, learned }: { deals: Dea
 
   function send() {
     if (!draft) return;
-    if (!confirm(`Send mailen til ${recipient} fra din Gmail?`)) return;
+    if (!confirm(other ? `Send mailen til ${recipient} fra ${sender?.name}s Gmail, i ${sender?.name}s navn?` : `Send mailen til ${recipient} fra din Gmail?`)) return;
     setMsg(null);
     startSend(async () => {
-      const r = await sendSalesMail(draft.id, to, draft.subject, draft.body).catch(() => ({ ok: false as const, error: "Der skete en fejl - prøv igen." }));
+      const r = await sendSalesMail(draft.id, to, draft.subject, draft.body, other ? as : undefined).catch(() => ({ ok: false as const, error: "Der skete en fejl - prøv igen." }));
       setMsg(r.ok ? { ok: true, text: `Sendt til ${recipient}.${deal ? " Den ligger på dealen." : ""}` } : { ok: false, text: r.error });
     });
   }
@@ -138,6 +145,33 @@ export function MailGenerator({ deals, tours, signature, learned }: { deals: Dea
 
       <div className="mt-5 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
         <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          {senders && senders.length > 1 && (
+            <div>
+              <span className={label}>Afsender</span>
+              <select
+                className={`${input} mt-1`}
+                value={as}
+                onChange={(e) => {
+                  setAs(e.target.value);
+                  // A suggestion written in one name isn't sent in another's.
+                  setDraft(null);
+                }}
+              >
+                {senders.map((x, i) => (
+                  <option key={x.id} value={x.id}>
+                    {i === 0 ? `${x.name} (dig)` : `${x.name}${x.gmail ? "" : " - har ikke forbundet Gmail"}`}
+                  </option>
+                ))}
+              </select>
+              {other && (
+                <p className={`mt-1 text-xs ${sender?.gmail ? "text-slate-500" : "text-amber-700"}`}>
+                  {sender?.gmail
+                    ? `Skrives og sendes i ${sender.name}s navn, fra ${sender.name}s egen Gmail. Den ligger i ${sender.name}s Sendt, svaret kommer til ${sender.name}, og ${sender.name} får besked i Arpo.`
+                    : `${sender?.name} har ikke forbundet sin Gmail i Arpo - du kan skrive og kopiere mailen, men ikke sende den herfra.`}
+                </p>
+              )}
+            </div>
+          )}
           <div className="flex flex-wrap gap-1.5">
             {(Object.keys(MAIL_KINDS) as MailKind[]).map((k) => (
               <button key={k} type="button" onClick={() => setKind(k)} className={`rounded-full px-3 py-1.5 text-xs font-semibold ${kind === k ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200"}`}>

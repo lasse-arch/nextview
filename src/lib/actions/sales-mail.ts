@@ -9,7 +9,9 @@ import { getSettingValue } from "@/lib/integration-settings";
 import { claudeCostUsd } from "@/lib/claude-cost";
 import { sendGmailMessage } from "@/lib/gmail";
 import { logActivity } from "@/lib/activity";
-import { sendTemplatedEmailAction } from "@/lib/actions/deal-email";
+import { sendDealEmail } from "@/lib/deal-email-send";
+import { teamCan } from "@/lib/team-roles";
+import { ringBell } from "@/lib/team-notifications";
 import { EXAMPLE, MAIL_KINDS, STYLE, describeInput, fillMail, markBlocks, priceBlock, toursBlock, type SalesMailInput } from "@/lib/sales-mail";
 
 /*
@@ -24,6 +26,21 @@ import { EXAMPLE, MAIL_KINDS, STYLE, describeInput, fillMail, markBlocks, priceB
 const Draft = z.object({ subject: z.string(), body: z.string() });
 
 export type DraftResult = { ok: true; id: string; subject: string; body: string } | { ok: false; error: string };
+
+/**
+ * Who the mail is from: the person asking - or, for an admin, a colleague it
+ * is written and sent in the name of (their name and signature, their own
+ * Gmail). Anyone else asking for another name gets null.
+ */
+async function senderFor(user: Awaited<ReturnType<typeof requireUser>>, as: unknown) {
+  if (typeof as !== "string" || !as || as === user.id) return user;
+  if (!teamCan(user, "admin")) return null;
+  return prisma.user.findFirst({ where: { id: as, disabledAt: null } });
+}
+
+/** The colleague hears that a mail went out in their name - it lies in their own Sent, and the answer comes to them. */
+const toldColleague = (userId: string, by: string, subject: string) =>
+  ringBell({ kind: "mail", title: `${by} sendte en mail i dit navn`, text: `"${subject}" - fra din Gmail via mailgeneratoren. Svaret kommer til dig.`, href: "/arpo/generator", audience: `user:${userId}` });
 
 const cap = (s: unknown, n: number) => (typeof s === "string" ? s.slice(0, n) : "");
 const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v >= 0 && v < 100_000_000 ? Math.round(v) : null);
@@ -79,8 +96,11 @@ async function examples(userId: string, i: SalesMailInput) {
  * A draft - or, with `revise`, the current text made over as asked
  * ("kortere", "mere formel" …), with the price and links kept as they are.
  */
-export async function draftSalesMail(raw: SalesMailInput, revise?: { subject: string; body: string; ask: string }): Promise<DraftResult> {
-  const user = await requireUser();
+export async function draftSalesMail(raw: SalesMailInput, revise?: { subject: string; body: string; ask: string }, as?: string): Promise<DraftResult> {
+  const me = await requireUser();
+  // Written in the name of the one it's from (an admin's colleague, when chosen) - and learns from their mails.
+  const user = await senderFor(me, as);
+  if (!user) return { ok: false, error: "Kun en admin kan skrive i en andens navn." };
   const key = process.env.ANTHROPIC_API_KEY || (await getSettingValue("ANTHROPIC_API_KEY"));
   if (!key) return { ok: false, error: "nextviewAI er ikke sat op endnu - en admin indsætter nøglen i tour-editoren under fanen nextviewAI." };
   const i = clean(raw);
@@ -120,7 +140,7 @@ export async function draftSalesMail(raw: SalesMailInput, revise?: { subject: st
   }
   const u = r.usage;
   await prisma.tourAiUsage
-    .create({ data: { tourSlug: "_mailgenerator", userName: user.name, kind: "mailgenerator", inputTokens: u.input_tokens, outputTokens: u.output_tokens, cacheReadTokens: u.cache_read_input_tokens ?? 0, cacheWriteTokens: u.cache_creation_input_tokens ?? 0, costUsd: claudeCostUsd(u) } })
+    .create({ data: { tourSlug: "_mailgenerator", userName: me.name, kind: "mailgenerator", inputTokens: u.input_tokens, outputTokens: u.output_tokens, cacheReadTokens: u.cache_read_input_tokens ?? 0, cacheWriteTokens: u.cache_creation_input_tokens ?? 0, costUsd: claudeCostUsd(u) } })
     .catch(() => {});
   const out = r.parsed_output;
   if (!out) return { ok: false, error: "nextviewAI svarede ikke som forventet - prøv igen." };
@@ -160,25 +180,30 @@ const EMAIL_RE = /^[^\s@<>,;"]+@[^\s@<>,;"]+\.[^\s@<>,;"]+$/;
  * (to its contact, logged on the deal, follow-up task); without, to the
  * address typed in.
  */
-export async function sendSalesMail(id: string, to: string, subject: string, body: string): Promise<{ ok: true } | { ok: false; error: string }> {
+export async function sendSalesMail(id: string, to: string, subject: string, body: string, as?: string): Promise<{ ok: true } | { ok: false; error: string }> {
   const own = await ownDraft(id);
   if (!own) return { ok: false, error: "Mailen findes ikke." };
-  const { user, row } = own;
+  const { user: me, row } = own;
+  // An admin may send it in a colleague's name - from the colleague's own Gmail, and the log says who pressed send.
+  const user = await senderFor(me, as);
+  if (!user) return { ok: false, error: "Kun en admin kan sende i en andens navn." };
+  const onBehalf = user.id !== me.id;
   const s = cap(subject, 300).trim();
   const b = cap(body, 10_000).trim();
   if (!s || !b) return { ok: false, error: "Mailen mangler emne eller tekst." };
 
   if (row.dealId) {
-    const r = await sendTemplatedEmailAction(row.dealId, s, b);
+    const r = await sendDealEmail(user, row.dealId, s, b, [], [], onBehalf ? { id: me.id, name: me.name } : undefined);
     if (!r.ok) return r;
     await remember(id, s, b, "sendt");
+    if (onBehalf) await toldColleague(user.id, me.name, s);
     return { ok: true };
   }
 
   const address = to.trim();
   if (!EMAIL_RE.test(address)) return { ok: false, error: "Skriv en gyldig e-mail at sende til." };
   const account = await prisma.emailAccount.findFirst({ where: { userId: user.id, provider: "GOOGLE" } });
-  if (!account) return { ok: false, error: "Forbind din Gmail-konto under Indstillinger → E-mail for at kunne sende herfra." };
+  if (!account) return { ok: false, error: onBehalf ? `${user.name} har ikke forbundet sin Gmail i Arpo - det skal ${user.name} selv gøre under Indstillinger → E-mail.` : "Forbind din Gmail-konto under Indstillinger → E-mail for at kunne sende herfra." };
 
   const sellerName = [user.name, user.lastName].filter(Boolean).join(" ");
   const sig = [sellerName, "Nextview360", user.phone ? `Tlf: ${user.phone}` : null].filter((l): l is string => Boolean(l));
@@ -201,6 +226,8 @@ export async function sendSalesMail(id: string, to: string, subject: string, bod
     return { ok: false, error: err instanceof Error ? err.message : "Kunne ikke sende e-mailen." };
   }
   await remember(id, s, b, "sendt");
-  await logActivity({ type: "EMAIL_SENT", message: `${user.name} sendte en mail fra mailgeneratoren til ${(row.input as { company?: string; name?: string } | null)?.company || (row.input as { name?: string } | null)?.name || address}`, actorId: user.id });
+  const who = (row.input as { company?: string; name?: string } | null)?.company || (row.input as { name?: string } | null)?.name || address;
+  await logActivity({ type: "EMAIL_SENT", message: onBehalf ? `${me.name} sendte en mail fra mailgeneratoren til ${who} på vegne af ${user.name}` : `${user.name} sendte en mail fra mailgeneratoren til ${who}`, actorId: me.id });
+  if (onBehalf) await toldColleague(user.id, me.name, s);
   return { ok: true };
 }
