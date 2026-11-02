@@ -5,6 +5,9 @@ import { getGrowthDashboardData } from "@/lib/growth-dashboard-data";
 import { formatDKK, formatDate, stageLabels } from "@/lib/labels";
 import { NewCustomersChart } from "./new-customers-chart";
 import { CustomerStatTile } from "./customer-stat-tile";
+import { getDashboardData } from "@/lib/dashboard-data";
+import { StatTile as SaleTile } from "../stat-tile";
+import { SoldTotalReportButton } from "../sold-total-report-button";
 
 function StatTile({ label, value, sub, money }: { label: string; value: string; sub?: string; money?: boolean }) {
   return (
@@ -32,7 +35,10 @@ export default async function GrowthDashboardPage() {
   if (!user) redirect("/api/auth/session-ended?next=/arpo");
   if (user.role !== "ADMIN") redirect("/arpo");
 
-  const d = await getGrowthDashboardData();
+  // The sales figures from the front page (the whole company's - Vækst is admin only).
+  const [d, sales] = await Promise.all([getGrowthDashboardData(), getDashboardData(undefined)]);
+  const withFee = sales.soldBreakdown.filter((x) => x.establishmentFee > 0);
+  const establishmentAll = withFee.reduce((sum, x) => sum + x.establishmentFee, 0);
   const riskLabelFor = (days: number) => (days === 30 ? "< 30 dage" : days === 60 ? "< 60 dage" : "< 90 dage");
 
   return (
@@ -40,6 +46,40 @@ export default async function GrowthDashboardPage() {
       <div>
         <h1 className="text-2xl font-semibold text-slate-900">Vækst</h1>
         <p className="mt-1 text-sm text-slate-500">Måned-for-måned overblik over MRR, fastholdelse og kontraktværdi</p>
+      </div>
+
+      <div>
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Salg</h2>
+        <div className="mt-2 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <SaleTile
+            label="Solgt i alt"
+            value={formatDKK(sales.soldValue)}
+            sub={`MRR + etableringspris · ${sales.soldCount} kunder`}
+            money
+            badge={<SoldTotalReportButton total={sales.soldValue} breakdown={sales.soldBreakdown} />}
+          />
+          <SaleTile
+            label="Etablering i alt"
+            value={formatDKK(establishmentAll)}
+            sub={`${withFee.length} kunder`}
+            money
+            tooltipRows={withFee.map((x) => ({ label: x.name, value: formatDKK(x.establishmentFee) }))}
+          />
+          <SaleTile
+            label="Solgt denne måned"
+            value={formatDKK(sales.soldThisMonthValue)}
+            sub={`${sales.soldThisMonthCount} deals`}
+            money
+            tooltipRows={sales.soldThisMonthDeals.map((x) => ({ label: x.name, value: formatDKK(x.value) }))}
+          />
+          <SaleTile
+            label="Etablering solgt denne måned"
+            value={formatDKK(sales.establishmentFeeTotal)}
+            sub={`${sales.establishmentFeeCount} deals`}
+            money
+            tooltipRows={sales.establishmentFeeDeals.map((x) => ({ label: x.name, value: formatDKK(x.value) }))}
+          />
+        </div>
       </div>
 
       <div>
