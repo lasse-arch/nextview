@@ -15,11 +15,11 @@ import { connectSdk, showcaseUrl, uLinkTarget, type CameraPose, type MpSdk, type
 import type { AvailableUnit } from "@/lib/availability/boxdepotet";
 import { WeatherChip, WEATHER_CSS } from "./weather";
 import { CommuteSheet, COMMUTE_CSS } from "./commute";
-import { FeatureTour, featuresSeen, FEATURES_CSS } from "./features";
+import { FeatureTour, featuresSeen, FEATURES_CSS, type DemoContact } from "./features";
 import { FinderSheet, FINDER_CSS, WalkLines } from "./finder";
 import { apiUrl, isStaticTour } from "../tours/api";
 import type { DroneView, FindStepAside, GuideTurn, MenuEntry, TourConfig, TourPlace, TourPoint, WelcomeGo } from "../tours/types";
-import { CoverWelcome, DESIGNS_CSS, DockMenu, PickerMenu, WelcomeFilm } from "./designs";
+import { CoverWelcome, DESIGNS_CSS, DockMenu, PickerMenu, WelcomeFilm, welcomeFilmClass } from "./designs";
 import { GUIDE_CSS, GuidePlayer, guideStops } from "./guide";
 import { ONBOARDING_CSS, Onboarding } from "./onboarding";
 import { MENU_HINT_CSS, MenuHint } from "./menu-hint";
@@ -130,17 +130,28 @@ const eventLog: TrackedEvent[] = [];
 const logListeners = new Set<() => void>();
 
 /** The tour being measured (set when the tour mounts). */
-const tracking = { slug: "", session: "", off: false, inArpo: false, used: false, queue: [] as { name: string; label?: string; url?: string; value?: number }[], timer: 0, da: (s: string) => s };
+const tracking = { slug: "", session: "", demo: "", off: false, inArpo: false, used: false, queue: [] as { name: string; label?: string; url?: string; value?: number }[], timer: 0, da: (s: string) => s };
 
 /** Sends the waiting events to Arpo's own measurement (/api/tour-events) - also when the page is closed. */
 function flushEvents() {
   window.clearTimeout(tracking.timer);
   tracking.timer = 0;
   if (!tracking.queue.length || !tracking.slug) return;
-  const body = JSON.stringify({ tour: tracking.slug, session: tracking.session, device: matchMedia("(max-width: 760px)").matches ? "mobil" : "computer", events: tracking.queue.splice(0, 50) });
+  const device = matchMedia("(max-width: 760px)").matches ? "mobil" : "computer";
+  // A showcase to a new customer ("Fremvisning") is measured on its own - never in the tour's numbers.
+  const ref = (() => {
+    try {
+      return document.referrer ? new URL(document.referrer).hostname : undefined;
+    } catch {
+      return undefined;
+    }
+  })();
+  const [url, body] = tracking.demo
+    ? ["/api/tour-demo-events", JSON.stringify({ token: tracking.demo, session: tracking.session, device, ref, events: tracking.queue.splice(0, 50) })]
+    : [apiUrl("/api/tour-events"), JSON.stringify({ tour: tracking.slug, session: tracking.session, device, events: tracking.queue.splice(0, 50) })];
   // As plain text: from a published tour on another address that's a "simple" request a browser sends without asking first.
-  if (!navigator.sendBeacon?.(apiUrl("/api/tour-events"), new Blob([body], { type: "text/plain" }))) {
-    fetch(apiUrl("/api/tour-events"), { method: "POST", body, keepalive: true }).catch(() => {});
+  if (!navigator.sendBeacon?.(url, new Blob([body], { type: "text/plain" }))) {
+    fetch(url, { method: "POST", body, keepalive: true }).catch(() => {});
   }
 }
 
@@ -257,6 +268,12 @@ type ExperienceProps = {
   tools?: boolean;
   /** Kundegennemsyn: the review link's token - the tour gets "Giv feedback", and isn't counted as visits. */
   review?: string;
+  /**
+   * "Fremvisning" (/vis/<token>): shown to a new customer - the walk-through of
+   * the features opens every time and ends with who sent it; not counted as
+   * visits, the contact form doesn't send, Danish unless the link asks.
+   */
+  demo?: DemoContact;
   /** The language asked for in the link (?sprog=en) - see i18n.ts. */
   lang?: string;
   /** The visitor's country (from the request, e.g. "DE") - a guess at their language when the browser's isn't in the tour. */
@@ -306,7 +323,7 @@ export function Experience(props: ExperienceProps) {
   // the link's ?sprog=, else the one the visitor picked before, else their browser's (a Dane in Germany keeps Danish),
   // else their country's (from where they are), else English, else Danish.
   useEffect(() => {
-    if (inEditorPreview()) return;
+    if (inEditorPreview() || props.demo) return;
     const asked = new URLSearchParams(location.search).get("sprog");
     let picked: string | null = null;
     try {
@@ -383,6 +400,7 @@ function TourExperience({
   phone,
   tools = false,
   review,
+  demo,
   lang = "da",
   setLang,
   played = false,
@@ -409,6 +427,7 @@ function TourExperience({
     }
     tracking.slug = savedTour.slug;
     tracking.off = Boolean(review); // the customer's review isn't a visit
+    tracking.demo = demo?.token ?? ""; // a showcase to a new customer is counted on its own (flushEvents)
     // In a frame: on Arpo's own pages (a preview) - or on a site showing the tour ("Her er touren vist").
     const from = (() => {
       try {
@@ -599,8 +618,9 @@ function TourExperience({
   /** On the review link, the first time: "Det kan jeres tour" - the tour's smart features, each with a little animation. */
   const [featuresOpen, setFeaturesOpen] = useState(false);
   useEffect(() => {
-    if (!review) return;
-    const t = window.setTimeout(() => !featuresSeen(T.slug) && setFeaturesOpen(true), 900);
+    if (!review && !demo) return;
+    // The showcase opens with it every time; the customer's review the first time.
+    const t = window.setTimeout(() => (demo || !featuresSeen(T.slug)) && setFeaturesOpen(true), 900);
     return () => window.clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once, when the review link opens
   }, []);
@@ -2722,7 +2742,7 @@ function TourExperience({
 
       {welcome && T.welcome && T.design?.welcome === "simple" && <SimpleWelcome T={T} onChoose={chooseWelcome} />}
       {welcome && T.welcome && T.design?.welcome !== "simple" && (
-        <div className={`hv-wel ${T.welcome.video?.src ? "wel-med-film" : ""}`} role="dialog" aria-modal="true" aria-label={T.welcome.title}>
+        <div className={`hv-wel ${welcomeFilmClass(T.welcome.video)}`} role="dialog" aria-modal="true" aria-label={T.welcome.title}>
           {T.welcome.video?.src && <WelcomeFilm film={T.welcome.video} />}
           <div className="hv-wel-grid">
             <div className={`hv-wel-main ${T.logoOnLight ? "hv-light" : ""}`}>
@@ -3277,10 +3297,15 @@ function TourExperience({
           🚌 {T.commute.title || tx("Hvor langt har du til os?")}
         </button>
       )}
-      {featuresOpen && <FeatureTour T={T} onClose={() => setFeaturesOpen(false)} onEvent={(name, params) => track(name, params ?? {})} />}
+      {featuresOpen && <FeatureTour T={T} demo={demo} onClose={() => setFeaturesOpen(false)} onEvent={(name, params) => track(name, params ?? {})} />}
+      {demo && !featuresOpen && (
+        <button type="button" className="ft-igen" onClick={() => setFeaturesOpen(true)}>
+          <i aria-hidden /> Se funktionerne
+        </button>
+      )}
       {commuteOpen && T.commute && <CommuteSheet T={T} onClose={() => setCommuteOpen(false)} onEvent={(name, params) => track(name, params ?? {})} />}
       {contactOpen && T.contactForm && (
-        <ContactForm T={T} preview={inPreview} room={room} onClose={() => setContactOpen(false)} onSent={() => track("contact_form", { place: "form" })} />
+        <ContactForm T={T} preview={inPreview || Boolean(demo)} room={room} onClose={() => setContactOpen(false)} onSent={() => track("contact_form", { place: "form" })} />
       )}
       {T.onboarding && !helpDone && phase === "tour" && !cover && !welcome && !intro && sdk && guideAt == null && !menuOpen && !contactOpen && (
         <Onboarding

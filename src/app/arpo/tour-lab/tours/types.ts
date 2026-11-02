@@ -698,7 +698,17 @@ export type TourConfig = {
      * drone film) - muted, played over and over; `srcMobile` is a lighter
      * version for phones. Without it, the tiles lie over the tour.
      */
-    video?: { src: string; srcMobile?: string };
+    video?: {
+      src: string;
+      srcMobile?: string;
+      /** How big the tiles are over the film - "small" leaves the most film in view (few tiles: small/medium; many: medium/large). Default "medium". */
+      size?: "small" | "medium" | "large";
+      /** Where the tiles sit on the film, so they don't cover what matters in it. Default "bottom". */
+      place?: "bottom" | "center" | "top" | "bottom-left" | "bottom-right";
+      /** The same on phones (an upright screen - other parts of the film show): size default `size`, place default "bottom". */
+      sizeMobile?: "small" | "medium" | "large";
+      placeMobile?: "bottom" | "center" | "top";
+    };
   };
   /** "free": walk around as in Matterport. "points": only the menu and points move you. */
   navigation: "free" | "points";

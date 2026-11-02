@@ -3,7 +3,7 @@
 import { useT } from "../tours/i18n-react";
 import { isInTourHref, isPlaceHref, welcomeTiles } from "../tours/places";
 import type { TourConfig, WelcomeGo } from "../tours/types";
-import { WelcomeFilm } from "./designs";
+import { WelcomeFilm, welcomeFilmClass } from "./designs";
 
 /*
  * The "Helt enkel" design: for visitors who need it calm and plain (e.g. a
@@ -16,7 +16,7 @@ import { WelcomeFilm } from "./designs";
 export function SimpleWelcome({ T, onChoose }: { T: TourConfig; onChoose: (go: WelcomeGo | "skip", label: string) => void }) {
   const w = T.welcome!;
   return (
-    <div className={`sp-wel ${w.video?.src ? "wel-med-film" : ""}`} role="dialog" aria-modal="true" aria-label={w.title}>
+    <div className={`sp-wel ${welcomeFilmClass(w.video)}`} role="dialog" aria-modal="true" aria-label={w.title}>
       {w.video?.src && <WelcomeFilm film={w.video} />}
       <div className="sp-wel-card">
         {/* eslint-disable-next-line @next/next/no-img-element */}

@@ -1808,10 +1808,18 @@ function IntroFilm({ config, edit }: { config: TourConfig; edit: Edit }) {
 /** What the welcome tiles lie over: the tour itself, or a looping film (welcome.video). */
 function WelcomeFilmGroup({ welcome, edit }: { welcome: NonNullable<TourConfig["welcome"]>; edit: Edit }) {
   const v = welcome.video;
-  const set = (next: Partial<{ src: string; srcMobile?: string }>) =>
+  type Film = NonNullable<NonNullable<TourConfig["welcome"]>["video"]>;
+  const set = (next: Partial<Film>) =>
     edit((d) => {
       const merged = { src: "", ...d.welcome!.video, ...next };
-      d.welcome!.video = { src: merged.src, ...(merged.srcMobile ? { srcMobile: merged.srcMobile } : {}) };
+      d.welcome!.video = {
+        src: merged.src,
+        ...(merged.srcMobile ? { srcMobile: merged.srcMobile } : {}),
+        ...(merged.size && merged.size !== "medium" ? { size: merged.size } : {}),
+        ...(merged.place && merged.place !== "bottom" ? { place: merged.place } : {}),
+        ...(merged.sizeMobile ? { sizeMobile: merged.sizeMobile } : {}),
+        ...(merged.placeMobile && merged.placeMobile !== "bottom" ? { placeMobile: merged.placeMobile } : {}),
+      };
     });
   return (
     <Group title="Bag fliserne">
@@ -1839,6 +1847,54 @@ function WelcomeFilmGroup({ welcome, edit }: { welcome: NonNullable<TourConfig["
               <input className={input} placeholder="https://… eller upload" value={v.srcMobile ?? ""} onChange={(e) => set({ srcMobile: e.target.value.trim() || undefined })} />
               <UploadButton accept="video/mp4,video/webm" onDone={(url) => set({ srcMobile: url })} />
             </div>
+          </Field>
+          <p className="px-1 pt-1 text-[13px] font-semibold text-[#1d1d1f]">På computer</p>
+          <Field title="Fliserne over filmen" hint="Små lader mest af filmen ses - godt til 2-3 fliser. Med 5 eller flere er mellem eller store lettere at læse.">
+            <Choice
+              value={v.size ?? "medium"}
+              options={[
+                ["small", "Små"],
+                ["medium", "Mellem"],
+                ["large", "Store"],
+              ]}
+              onChange={(size) => set({ size })}
+            />
+          </Field>
+          <Field title="Placering" hint="Læg fliserne, hvor de ikke dækker det vigtigste i filmen.">
+            <Choice
+              value={v.place ?? "bottom"}
+              options={[
+                ["bottom", "Nederst"],
+                ["bottom-left", "Nede til venstre"],
+                ["bottom-right", "Nede til højre"],
+                ["center", "Midt"],
+                ["top", "Øverst"],
+              ]}
+              onChange={(place) => set({ place })}
+            />
+          </Field>
+          <p className="px-1 pt-1 text-[13px] font-semibold text-[#1d1d1f]">På mobil</p>
+          <Field title="Fliserne over filmen" hint="Mobilen står på højkant, så filmen viser noget andet - vælg for sig.">
+            <Choice
+              value={v.sizeMobile ?? v.size ?? "medium"}
+              options={[
+                ["small", "Små"],
+                ["medium", "Mellem"],
+                ["large", "Store"],
+              ]}
+              onChange={(sizeMobile) => set({ sizeMobile })}
+            />
+          </Field>
+          <Field title="Placering">
+            <Choice
+              value={v.placeMobile ?? "bottom"}
+              options={[
+                ["bottom", "Nederst"],
+                ["center", "Midt"],
+                ["top", "Øverst"],
+              ]}
+              onChange={(placeMobile) => set({ placeMobile })}
+            />
           </Field>
           {!v.src && <p className="px-1 text-[12px] text-[#ff9500]">Ingen film endnu - fliserne ligger over touren, til der er en.</p>}
         </>

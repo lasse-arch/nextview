@@ -9,6 +9,7 @@ import { suggestEmbedPages } from "@/lib/actions/tour-embeds";
 import { startPlaces } from "../../tours/places";
 import type { TourConfig } from "../../tours/types";
 import { Choice, Field, Group, input } from "./ui";
+import { createDemoLink, demoLinks, setDemoLinkOff, type DemoLinkInfo, type DemoVisit } from "@/lib/actions/tour-demo";
 import { CloudflarePublish } from "./cloudflare";
 
 /*
@@ -48,6 +49,7 @@ export function SharePanel({
   title,
   published: initial,
   onCloudflare,
+  canDemo,
   size,
   setSize,
 }: {
@@ -57,6 +59,8 @@ export function SharePanel({
   title: string;
   published: boolean;
   onCloudflare: boolean;
+  /** May make showcase links for new customers (sellers and admins). */
+  canDemo: boolean;
   size: EmbedSize;
   setSize: (s: EmbedSize) => void;
 }) {
@@ -107,6 +111,7 @@ export function SharePanel({
         )}
       </Group>
 
+      {canDemo && <DemoLinks slug={slug} />}
       <Group title="På kundens hjemmeside">
         <Field title="Størrelse" hint='Se den i forhåndsvisningen under "På hjemmeside" - på computer og mobil.'>
           <Choice
@@ -283,5 +288,129 @@ export function SitePreview({ config, size, width, children }: { config: TourCon
         </footer>
       </div>
     </div>
+  );
+}
+
+/**
+ * "Fremvisning til nye kunder": a secret, read-only link per new customer to
+ * show this tour - finished or not - at a meeting or in a mail. It opens with
+ * a walk through the tour's features and ends with the one who made it. Each
+ * link shows who looked: when, from where, how long, what they saw.
+ */
+function DemoLinks({ slug }: { slug: string }) {
+  const [links, setLinks] = useState<DemoLinkInfo[] | null>(null);
+  const [label, setLabel] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  const [copied, setCopied] = useState<string | null>(null);
+  const [open, setOpen] = useState<string | null>(null);
+  const reload = () => demoLinks(slug).then(setLinks).catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)));
+  useEffect(() => {
+    let off = false;
+    demoLinks(slug)
+      .then((l) => !off && setLinks(l))
+      .catch(() => {});
+    return () => {
+      off = true;
+    };
+  }, [slug]);
+  const urlOf = (token: string) => (typeof window === "undefined" ? "" : `${location.origin}/vis/${token}`);
+  const make = () =>
+    start(async () => {
+      setError(null);
+      const r = await createDemoLink(slug, label);
+      if (!r.ok) return setError(r.error);
+      setLabel("");
+      await reload();
+    });
+  return (
+    <Group title="Fremvisning til nye kunder">
+      <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">
+        Send touren til en ny kunde eller et møde - også før den er færdig. Den åbner med en gennemgang af funktionerne og slutter med dit navn, telefon og mail. Lav ét link pr. kunde, så kan du se, hvem der har kigget, hvornår, hvorfra og hvad de så. Det tæller ikke med i kundens tal, kontaktformularen sender ikke noget, og når du selv åbner linket, tæller det ikke.
+      </p>
+      <div className="flex gap-2">
+        <input className={`${input} text-[14px]`} placeholder="Hvem er det til? Fx Hotel Klitten - møde 4/11" value={label} maxLength={120} onChange={(e) => setLabel(e.target.value)} onKeyDown={(e) => e.key === "Enter" && label.trim() && make()} />
+        <button type="button" disabled={pending || !label.trim()} onClick={make} className="flex-none rounded-xl bg-[#0071e3] px-3 text-[14px] font-medium text-white disabled:opacity-40">
+          Lav link
+        </button>
+      </div>
+      {error && <p className="px-1 text-[12px] text-[#ff3b30]">{error}</p>}
+      {links?.map((l) => {
+        const url = urlOf(l.token);
+        const last = l.visits[0];
+        return (
+          <div key={l.id} className={`rounded-xl bg-white px-3 py-2.5 ring-1 ring-black/[.06] ${l.off ? "opacity-60" : ""}`}>
+            <div className="flex items-start justify-between gap-2">
+              <span className="min-w-0">
+                <span className="block truncate text-[14px] font-semibold text-[#1d1d1f]">{l.label}</span>
+                <span className="block text-[12px] text-[#8e8e93]">
+                  {l.off ? "Slået fra · " : ""}
+                  {l.visits.length ? `Set ${l.visits.length} gang${l.visits.length === 1 ? "" : "e"} · sidst ${when(last.start)}` : "Ikke åbnet endnu"}
+                  {l.by ? ` · lavet af ${l.by}` : ""}
+                </span>
+              </span>
+              <span className="flex flex-none gap-1.5">
+                {!l.off && (
+                  <button
+                    type="button"
+                    className="rounded-lg px-2 py-1 text-[13px] font-medium text-[#0071e3] hover:bg-black/[.04]"
+                    onClick={() => {
+                      navigator.clipboard?.writeText(url).catch(() => {});
+                      setCopied(l.id);
+                      setTimeout(() => setCopied(null), 1800);
+                    }}
+                  >
+                    {copied === l.id ? "Kopieret" : "Kopiér"}
+                  </button>
+                )}
+                {!l.off && (
+                  <a href={url} target="_blank" rel="noopener" className="rounded-lg px-2 py-1 text-[13px] font-medium text-[#0071e3] hover:bg-black/[.04]">
+                    Åbn
+                  </a>
+                )}
+                <button type="button" disabled={pending} className="rounded-lg px-2 py-1 text-[13px] font-medium text-[#8e8e93] hover:bg-black/[.04]" onClick={() => start(async () => (await setDemoLinkOff(slug, l.id, !l.off), await reload()))}>
+                  {l.off ? "Slå til" : "Slå fra"}
+                </button>
+              </span>
+            </div>
+            {l.visits.length > 0 && (
+              <button type="button" className="mt-1 text-[12px] font-medium text-[#0071e3]" onClick={() => setOpen(open === l.id ? null : l.id)}>
+                {open === l.id ? "Skjul besøgene" : "Se besøgene"}
+              </button>
+            )}
+            {open === l.id && (
+              <ul className="mt-2 space-y-2">
+                {l.visits.map((v) => (
+                  <Visit key={v.session} v={v} />
+                ))}
+              </ul>
+            )}
+          </div>
+        );
+      })}
+    </Group>
+  );
+}
+
+const when = (iso: string) => new Date(iso).toLocaleString("da-DK", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+const duration = (s: number) => (s < 60 ? `${Math.max(1, s)} sek.` : `${Math.round(s / 60)} min.`);
+
+function Visit({ v }: { v: DemoVisit }) {
+  return (
+    <li className="rounded-lg bg-[#f5f5f7] px-2.5 py-2 text-[12.5px] leading-snug text-[#1d1d1f]">
+      <span className="block font-medium">
+        {when(v.start)} · {duration(v.seconds)} · {v.device === "mobil" ? "mobil" : "computer"}
+        {v.where ? ` · ${v.where}` : ""}
+      </span>
+      {v.from && <span className="block text-[#6e6e73]">Kom fra {v.from}</span>}
+      {v.features && (
+        <span className="block text-[#6e6e73]">
+          Gennemgangen: {v.features.seen} af {v.features.of}
+          {v.tried.length ? ` · prøvede ${v.tried.join(", ")}` : ""}
+        </span>
+      )}
+      {v.seen.length > 0 && <span className="block text-[#6e6e73]">Så: {v.seen.slice(0, 12).join(" · ")}{v.seen.length > 12 ? ` + ${v.seen.length - 12} mere` : ""}</span>}
+      {v.contact && <span className="mt-0.5 block font-medium text-[#1f7a35]">✓ Trykkede for at kontakte jer</span>}
+    </li>
   );
 }

@@ -85,6 +85,7 @@ export default async function TourEditPage({ params, searchParams }: { params: P
       mpskinsHidden={cfg ? hiddenSweeps(cfg) : []}
       scanCount={cfg?.sweep?.length ?? null}
       reviewToken={tour.reviewToken && !teamCan(user, "numbers") ? await noteTokenOf(tour.slug) : tour.reviewToken}
+      canDemo={teamCan(user, "sales")}
       feedbackOpen={await prisma.tourFeedback.count({ where: { tourSlug: tour.slug, status: "open" } })}
       aiReady={Boolean(process.env.ANTHROPIC_API_KEY || (await getSettingValue("ANTHROPIC_API_KEY")))}
       assignment={{

@@ -55,3 +55,26 @@ export async function reviewTour(token: string) {
 export function tourChanged(...slugs: string[]) {
   for (const slug of slugs) revalidateTag(tag(slug), { expire: 0 });
 }
+
+/**
+ * "Fremvisning" (/vis/<token>): the tour as it is in Arpo right now, shown to
+ * a new customer, read through the same cache as the review link - and who
+ * made the link (their name, phone and e-mail end the walk-through). Null
+ * when the link is switched off or wrong.
+ */
+export async function demoTour(token: unknown) {
+  if (typeof token !== "string" || token.length < 12 || token.length > 64) return null;
+  const link = await prisma.tourDemoLink.findUnique({ where: { token }, select: { tourSlug: true, createdById: true, disabledAt: true } });
+  if (!link || link.disabledAt) return null;
+  const row = await prisma.tour.findUnique({ where: { slug: link.tourSlug }, select: { slug: true, config: true, published: true, reviewApprovedAt: true } });
+  if (!row) return null;
+  const setup = { ...(row.config as unknown as TourConfig), slug: row.slug };
+  const version = createHash("sha1").update(JSON.stringify(row.config)).digest("hex").slice(0, 16);
+  const [data, by] = await Promise.all([
+    unstable_cache(() => loadTour(setup), ["review-tour", row.slug, version], { tags: [tag(row.slug)], revalidate: 3600 })(),
+    prisma.user.findUnique({ where: { id: link.createdById }, select: { name: true, email: true, phone: true, disabledAt: true } }),
+  ]);
+  // Only a colleague still with us is named - otherwise just Nextview360.
+  const who = by && !by.disabledAt ? { name: by.name, email: by.email, phone: by.phone ?? undefined } : {};
+  return { data, contact: { token, ...who, finished: Boolean(row.published || row.reviewApprovedAt) } };
+}

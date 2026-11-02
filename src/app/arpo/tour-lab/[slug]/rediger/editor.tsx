@@ -165,6 +165,7 @@ export function TourEditor({
   mpskinsHidden,
   scanCount,
   reviewToken,
+  canDemo,
   feedbackOpen,
   assignment,
 }: {
@@ -191,6 +192,8 @@ export function TourEditor({
   scanCount: number | null;
   /** Kundegennemsyn's link token (null = off), and how much feedback is open. */
   reviewToken: string | null;
+  /** May make "Fremvisning til nye kunder" links (sellers and admins). */
+  canDemo: boolean;
   feedbackOpen: number;
   /** The tab to open on (?fane=…). */
   startTab?: string;
@@ -859,6 +862,7 @@ export function TourEditor({
                 title={config.title}
                 published={published}
                 onCloudflare={onCloudflare}
+                canDemo={canDemo}
                 size={embed}
                 setSize={(s) => {
                   setEmbed(s);

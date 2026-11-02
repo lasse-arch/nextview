@@ -13,6 +13,21 @@ import type { TourConfig } from "../tours/types";
  * away on this device.
  */
 
+/**
+ * "Fremvisning" (the showcase link /vis/<token>): the tour shown to a new
+ * customer. The walk-through then says what a Nextview360 tour does, not what
+ * we've built for them, opens every time, and ends with who to call.
+ */
+export type DemoContact = {
+  /** The link's own token - what happens on it is measured on its own (/api/tour-demo-events). */
+  token: string;
+  name?: string;
+  email?: string;
+  phone?: string;
+  /** The tour is out with its customer - otherwise the walk-through says it's still being made. */
+  finished?: boolean;
+};
+
 type Feature = { key: string; title: string; text: string; why?: string; scene: React.ReactNode; action?: () => void; actionLabel?: string; kicker?: string };
 
 const fire = (name: string, detail?: unknown) => window.dispatchEvent(detail === undefined ? new Event(name) : new CustomEvent(name, { detail }));
@@ -27,7 +42,7 @@ export function featuresSeen(slug: string): boolean {
 }
 
 /** The tour's smart features, in the order a visitor meets them. */
-function featuresOf(T: TourConfig, tr: (s: string, v?: Record<string, string | number>) => string): Feature[] {
+function featuresOf(T: TourConfig, tr: (s: string, v?: Record<string, string | number>) => string, demo?: DemoContact): Feature[] {
   const places = startPlaces(T).map((p) => p.name);
   const somewhere = places[Math.min(2, places.length - 1)] ?? tr("Spisesalen");
   const guides = shownGuides(T).filter((g) => guideStops(T, g.id).length);
@@ -176,6 +191,89 @@ function featuresOf(T: TourConfig, tr: (s: string, v?: Record<string, string | n
       action: () => fire("hv-find"),
       actionLabel: tr("Prøv det"),
     });
+  if (T.cover?.video?.src || T.welcome?.video?.src || T.intro)
+    out.push({
+      key: "film",
+      title: tr("Starter med film"),
+      text: tr("Touren åbner med en film af stedet - fx dronefilmen - så første indtryk er levende, mens touren gør sig klar."),
+      scene: (
+        <div className="ft-scene ft-film">
+          <i />
+          <span>▶</span>
+        </div>
+      ),
+    });
+  if (T.lineDays?.lines.length)
+    out.push({
+      key: "linjedag",
+      title: T.lineDays.title || tr("En dag på din linje"),
+      text: tr("Gæsten vælger en linje ({n} at vælge imellem) og følger en hel dag - hvor de er, hvem de møder, og hvad de laver.", { n: T.lineDays.lines.length }),
+      scene: (
+        <div className="ft-scene ft-dag">
+          {T.lineDays.lines.slice(0, 3).map((l, i) => (
+            <span key={l.id} style={{ animationDelay: `${i * 0.5}s` }}>
+              <b>{i + 1}</b> {l.name}
+            </span>
+          ))}
+        </div>
+      ),
+      action: () => fire("hv-linjedag"),
+      actionLabel: tr("Prøv det"),
+    });
+  if (T.yearWheel)
+    out.push({
+      key: "aarshjul",
+      title: tr("Årshjulet"),
+      text: tr("Hele året på ét hjul - drej det og se, hvad der sker måned for måned."),
+      scene: (
+        <div className="ft-scene ft-hjul">
+          <i />
+        </div>
+      ),
+      action: () => fire("hv-aarshjul"),
+      actionLabel: tr("Drej hjulet"),
+    });
+  if (T.sitePlan?.units?.length)
+    out.push({
+      key: "pladskort",
+      title: tr("Pladskort med ledige pladser"),
+      text: tr("Pladserne ligger på luftfotoet, og gæsten ser, hvad der er ledigt på de datoer, de vælger - og kan booke direkte i touren."),
+      scene: (
+        <div className="ft-scene ft-luft">
+          {[[24, 60], [40, 48], [58, 64], [74, 44]].map(([x, y], i) => (
+            <i key={i} className={`ft-pin ${i % 2 ? "ft-optaget" : ""}`} style={{ left: `${x}%`, top: `${y}%`, animationDelay: `${i * 0.35}s` }} />
+          ))}
+        </div>
+      ),
+    });
+  if (T.staging?.length)
+    out.push({
+      key: "staging",
+      title: tr("Skærme og billeder i rummene"),
+      text: tr("Film, billeder og skilte sat direkte på væggene i 3D - så rummene viser, hvordan de bruges, og knapper fører videre."),
+      scene: (
+        <div className="ft-scene ft-staging">
+          <i>▶</i>
+        </div>
+      ),
+    });
+  if (T.contactForm)
+    out.push({
+      key: "kontakt",
+      title: T.contactForm.title || tr("Skriv til os"),
+      text: tr("Gæsten skriver direkte fra touren, mens lysten er der - beskeden lander i jeres indbakke."),
+      scene: (
+        <div className="ft-scene ft-cards">
+          <div>
+            <b>{T.contactForm.title || tr("Skriv til os")}</b>
+            <span />
+            <span />
+          </div>
+        </div>
+      ),
+      action: () => fire("hv-kontakt"),
+      actionLabel: tr("Se formularen"),
+    });
   if ((T.languages ?? []).length)
     out.push({
       key: "sprog",
@@ -192,6 +290,40 @@ function featuresOf(T: TourConfig, tr: (s: string, v?: Record<string, string | n
     });
   // Why each one is there - what it does for them, not just what it is.
   for (const f of out) f.why = whyOf(f.key, tr);
+  if (demo) {
+    // To a new customer: what this tour does, then what comes with every tour - and who to call.
+    out.unshift({
+      key: "intro",
+      kicker: "Nextview360",
+      title: `Sådan arbejder touren for ${T.brand || T.title}`,
+      text: demo.finished
+        ? `Her kan I se en tour, vi har lavet for ${T.brand || T.title}. En virtuel tour er mere end 360°-billeder: hver funktion er med for at føre gæsterne et skridt videre - at forstå stedet, få lyst og tage kontakt. Gå funktionerne igennem, og prøv dem selv undervejs.`
+        : `Her kan I se en tour, vi er i gang med til ${T.brand || T.title}. Den er ikke afleveret endnu og ikke færdigtestet - den er her for at give jer en fornemmelse af, hvad vi laver. Hver funktion er med for at føre gæsterne et skridt videre: at forstå stedet, få lyst og tage kontakt. Gå funktionerne igennem, og prøv dem selv undervejs.`,
+      scene: (
+        <div className="ft-scene ft-intro">
+          {out.slice(0, 6).map((f, i) => (
+            <span key={f.key} style={{ animationDelay: `${0.15 + i * 0.12}s` }}>
+              {f.title}
+            </span>
+          ))}
+        </div>
+      ),
+    });
+    out.push({
+      key: "portal",
+      title: "Vi bliver ved med at gøre den bedre",
+      text: "Vi kan se, hvor gæsterne kigger, hvad de klikker på, og hvor mange der tager kontakt. Det bruger vi til løbende at rette touren til - så I får mere af det, der virker og skaffer henvendelser.",
+      why: "En tour er ikke færdig, når den er afleveret. Tallene viser, hvad jeres gæster faktisk bruger - og dér gør vi den stærkere.",
+      scene: (
+        <div className="ft-scene ft-portal">
+          {[38, 62, 48, 80, 70, 92].map((h, i) => (
+            <i key={i} style={{ height: `${h}%`, animationDelay: `${i * 0.12}s` }} />
+          ))}
+        </div>
+      ),
+    });
+    return out;
+  }
   if (!out.length) return out;
   // First: what we've made for them, and that everything in it is there for a reason.
   out.unshift({
@@ -229,9 +361,9 @@ function whyOf(key: string, tr: (s: string, v?: Record<string, string | number>)
   return why[key];
 }
 
-export function FeatureTour({ T, onClose, onEvent }: { T: TourConfig; onClose: () => void; onEvent: (name: string, params?: Record<string, string | number>) => void }) {
+export function FeatureTour({ T, onClose, onEvent, demo }: { T: TourConfig; onClose: () => void; onEvent: (name: string, params?: Record<string, string | number>) => void; demo?: DemoContact }) {
   const tr = useT();
-  const all = featuresOf(T, tr);
+  const all = featuresOf(T, tr, demo);
   const [at, setAt] = useState(0);
   const [never, setNever] = useState(false);
   if (!all.length) return null;
@@ -243,7 +375,7 @@ export function FeatureTour({ T, onClose, onEvent }: { T: TourConfig; onClose: (
       } catch {
         /* private window */
       }
-    onEvent("features_close", { seen: at + 1, of: all.length });
+    onEvent("features_close", { seen: at + 1, of: all.length, label: `${at + 1}/${all.length}` });
     onClose();
   };
   return (
@@ -253,7 +385,7 @@ export function FeatureTour({ T, onClose, onEvent }: { T: TourConfig; onClose: (
           ×
         </button>
         <p className="ft-kick">
-          {f.kicker ?? tr("Det kan jeres tour")} · {at + 1} / {all.length}
+          {f.kicker ?? (demo ? "Det kan touren" : tr("Det kan jeres tour"))} · {at + 1} / {all.length}
         </p>
         <div key={f.key} className="ft-slide">
           {f.scene}
@@ -270,7 +402,8 @@ export function FeatureTour({ T, onClose, onEvent }: { T: TourConfig; onClose: (
               </span>
             </div>
           )}
-          {at === all.length - 1 && <p className="ft-sidst">{tr("Er der noget, I vil have ændret? Tryk \"Giv feedback\" i touren, og skriv det dér, hvor I står.")}</p>}
+          {demo && at === all.length - 1 && <DemoContactCard demo={demo} onContact={(how) => onEvent("demo_contact", { label: how })} />}
+          {!demo && at === all.length - 1 && <p className="ft-sidst">{tr("Er der noget, I vil have ændret? Tryk \"Giv feedback\" i touren, og skriv det dér, hvor I står.")}</p>}
         </div>
         <div className="ft-dots" aria-hidden>
           {all.map((x, i) => (
@@ -283,7 +416,7 @@ export function FeatureTour({ T, onClose, onEvent }: { T: TourConfig; onClose: (
               type="button"
               className="ft-prov"
               onClick={() => {
-                onEvent("features_try", { feature: f.key });
+                onEvent("features_try", { feature: f.key, label: f.title });
                 close();
                 setTimeout(() => f.action!(), 250);
               }}
@@ -292,7 +425,14 @@ export function FeatureTour({ T, onClose, onEvent }: { T: TourConfig; onClose: (
             </button>
           )}
           {at < all.length - 1 ? (
-            <button type="button" className="ft-naeste" onClick={() => setAt(at + 1)}>
+            <button
+              type="button"
+              className="ft-naeste"
+              onClick={() => {
+                onEvent("features_step", { label: all[at + 1].title });
+                setAt(at + 1);
+              }}
+            >
               {tr("Næste")} →
             </button>
           ) : (
@@ -301,9 +441,34 @@ export function FeatureTour({ T, onClose, onEvent }: { T: TourConfig; onClose: (
             </button>
           )}
         </div>
-        <label className="ft-aldrig">
-          <input type="checkbox" checked={never} onChange={(e) => setNever(e.target.checked)} /> {tr("Vis ikke igen")}
-        </label>
+        {!demo && (
+          <label className="ft-aldrig">
+            <input type="checkbox" checked={never} onChange={(e) => setNever(e.target.checked)} /> {tr("Vis ikke igen")}
+          </label>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** The end of the showcase: who sent it, and the way to them. Always Nextview360's colours - it's us talking, not the tour. */
+function DemoContactCard({ demo, onContact }: { demo: DemoContact; onContact: (how: string) => void }) {
+  const tel = demo.phone?.replace(/[^\d+]/g, "");
+  return (
+    <div className="ft-demo-kontakt">
+      <b>Skal jeres sted vises sådan?</b>
+      <span>
+        {demo.name ? `${demo.name} fra Nextview360` : "Nextview360"} viser jer gerne, hvordan en tour vil se ud hos jer.
+      </span>
+      <div>
+        {tel && (
+          <a href={`tel:${tel}`} onClick={() => onContact("Ring")}>
+            📞 {demo.phone}
+          </a>
+        )}
+        <a onClick={() => onContact("Skriv")} href={demo.email ? `mailto:${demo.email}?subject=${encodeURIComponent("Virtuel tour")}` : "https://nextview360.dk/#kontakt"} target={demo.email ? undefined : "_blank"} rel="noopener">
+          {demo.email ? "Skriv til os" : "Kontakt os"}
+        </a>
       </div>
     </div>
   );
@@ -375,6 +540,28 @@ export const FEATURES_CSS = `
 .ft-dag{display:flex;flex-direction:column;justify-content:center;gap:7px;padding:14px 18px}
 .ft-dag span{background:#fff;border-radius:10px;padding:7px 11px;font-size:13px;color:#1d2a30;animation:ftUp 3s ease-in-out infinite both}
 .ft-dag b{color:var(--c-accent);margin-right:6px}
+.ft-optaget{background:#c9ced1!important}
+.ft-film{display:flex;align-items:center;justify-content:center;background:linear-gradient(120deg,#3c6e8f,#6f9a5c 60%,#c9a86a)!important}
+.ft-film i{position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.18),transparent);animation:ftSweep 3s linear infinite}
+@keyframes ftSweep{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
+.ft-film span{width:54px;height:54px;border-radius:50%;background:rgba(255,255,255,.92);display:flex;align-items:center;justify-content:center;padding-left:4px;color:var(--c-main);font-size:20px;animation:ftStory 2.6s ease-in-out infinite}
+.ft-hjul{display:flex;align-items:center;justify-content:center}
+.ft-hjul i{width:110px;height:110px;border-radius:50%;background:conic-gradient(var(--c-accent) 0 30deg,#fff 30deg 60deg,color-mix(in srgb,var(--c-accent) 55%,#fff) 60deg 90deg,#fff 90deg 120deg,var(--c-accent) 120deg 150deg,#fff 150deg 180deg,color-mix(in srgb,var(--c-accent) 55%,#fff) 180deg 210deg,#fff 210deg 240deg,var(--c-accent) 240deg 270deg,#fff 270deg 300deg,color-mix(in srgb,var(--c-accent) 55%,#fff) 300deg 330deg,#fff 330deg);box-shadow:0 0 0 6px rgba(255,255,255,.25);animation:ftSpin 8s linear infinite}
+@keyframes ftSpin{to{transform:rotate(360deg)}}
+.ft-staging{display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg,#d9d2c5,#bfb5a4)!important}
+.ft-staging i{width:46%;aspect-ratio:16/9;border-radius:6px;background:linear-gradient(135deg,var(--c-main),var(--c-accent));display:flex;align-items:center;justify-content:center;color:#fff;font-style:normal;font-size:20px;box-shadow:0 10px 24px rgba(0,0,0,.25);transform:perspective(300px) rotateY(-14deg);animation:ftStory 3s ease-in-out infinite}
+.ft-portal{display:flex;align-items:flex-end;gap:9px;padding:18px 22px 16px;background:linear-gradient(180deg,#f4f6f7,#e6ebed)!important}
+.ft-portal i{flex:1;border-radius:6px 6px 2px 2px;background:var(--c-accent);transform-origin:bottom;animation:ftGrow 2.8s ease-in-out infinite both}
+@keyframes ftGrow{0%{transform:scaleY(.15)}35%,85%{transform:none}100%{transform:scaleY(.15)}}
+.ft-demo-kontakt{margin:14px 2px 0;padding:14px;border-radius:16px;background:#0d1b20;color:#fff}
+.ft-demo-kontakt b{display:block;font-size:16px;margin-bottom:3px}
+.ft-demo-kontakt span{display:block;font-size:13.5px;line-height:1.45;color:rgba(255,255,255,.78)}
+.ft-demo-kontakt div{display:flex;flex-wrap:wrap;gap:8px;margin-top:11px}
+.ft-demo-kontakt a{flex:1;min-width:120px;text-align:center;white-space:nowrap;border-radius:999px;padding:10px 12px;background:#fff;color:#0d1b20;font-weight:800;font-size:14px;text-decoration:none}
+.ft-demo-kontakt a+a{background:rgba(255,255,255,.14);color:#fff}
+/* The showcase's own button to see the features again. */
+.ft-igen{position:absolute;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));translate:-50% 0;z-index:45;white-space:nowrap;display:flex;align-items:center;gap:7px;border:0;border-radius:999px;padding:10px 16px;background:rgba(13,27,32,.88);color:#fff;font:inherit;font-weight:800;font-size:14px;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,.3);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);animation:hvUp .4s ease}
+.ft-igen i{width:8px;height:8px;border-radius:50%;background:var(--c-accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--c-accent) 35%,transparent)}
 @media (prefers-reduced-motion:reduce){.ft-scene *{animation:none!important}.ft-intro span{opacity:1}}
 @media (max-height:500px) and (min-width:500px){.ft-ark{zoom:var(--ui-zoom,.72)}}
 `;

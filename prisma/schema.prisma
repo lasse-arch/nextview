@@ -1420,6 +1420,45 @@ model TourVersion {
 
 /// What happens in a tour (opened, menu clicks, booking clicks …) - Arpo's own
 /// measurement, so we can show each customer what their tour brings them.
+/// "Fremvisning": a secret, read-only link /vis/<token> that shows a tour - finished or not - to one new customer
+/// (`label` says who, e.g. "Hotel Klitten - møde 4/11"). It opens with a walk through the tour's features and ends
+/// with the one who made it. What happens on it is kept in TourDemoEvent - never in the tour's own numbers.
+model TourDemoLink {
+  id          String          @id @default(cuid())
+  tourSlug    String
+  token       String          @unique
+  label       String
+  createdById String
+  createdAt   DateTime        @default(now())
+  /// Switched off: the link is dead, what it saw is kept.
+  disabledAt  DateTime?
+  events      TourDemoEvent[]
+
+  @@index([tourSlug])
+}
+
+/// What a new customer did on a showcase link (as TourEvent), with where they were (from the request) and where they came from.
+model TourDemoEvent {
+  id        String       @id @default(cuid())
+  linkId    String
+  link      TourDemoLink @relation(fields: [linkId], references: [id], onDelete: Cascade)
+  /// One visit (a random id per browser tab).
+  session   String
+  name      String
+  label     String?
+  value     Int?
+  /// "mobil" or "computer".
+  device    String?
+  /// Town and country by the visitor's IP (Vercel's headers) - roughly where they were, never the IP itself.
+  city      String?
+  country   String?
+  /// The site the link was opened from, when the browser tells (e.g. mail.google.com) - host only.
+  referrer  String?
+  createdAt DateTime     @default(now())
+
+  @@index([linkId, createdAt])
+}
+
 model TourEvent {
   id        String   @id @default(cuid())
   tourSlug  String

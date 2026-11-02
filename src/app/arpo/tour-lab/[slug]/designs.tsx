@@ -54,6 +54,13 @@ const filmType = (src: string) => (/\.webm(\?|#|$)/i.test(src) ? "video/webm" : 
  * - it fades in once it plays; visitors saving data get no film (the dark
  * background shows instead), and motion turned off hides it (CSS).
  */
+/** The classes of tiles over a film: size and place on computers (wf-) and phones (wfm-). */
+export function welcomeFilmClass(v: NonNullable<TourConfig["welcome"]>["video"]): string {
+  if (!v?.src) return "";
+  const size = v.size ?? "medium";
+  return `wel-med-film wf-${size} wf-p-${v.place ?? "bottom"} wfm-${v.sizeMobile ?? size} wfm-p-${v.placeMobile ?? "bottom"}`;
+}
+
 export function WelcomeFilm({ film }: { film: { src: string; srcMobile?: string } }) {
   const [on, setOn] = useState(false);
   const [saveData] = useState(() => typeof navigator !== "undefined" && Boolean((navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData));
@@ -400,8 +407,32 @@ export const DESIGNS_CSS = `
 @media (prefers-reduced-motion:reduce){.dz-film{display:none}}
 /* ---- Tiles over a film (welcome.video): the film covers the tour, a dark veil keeps the text readable ---- */
 .wel-med-film{isolation:isolate;background:#0d1b20 !important;backdrop-filter:none !important;-webkit-backdrop-filter:none !important}
-.wel-med-film::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(180deg,rgba(8,14,17,.3),rgba(8,14,17,.55))}
+.wel-med-film::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(180deg,rgba(8,14,17,0) 30%,rgba(8,14,17,.6))}
 .wel-film{position:fixed}
+/* The tiles over a film: smaller than over the tour, where they don't cover what matters in it - size and place chosen per device in the editor. */
+.hv-wel.wel-med-film,.sp-wel.wel-med-film{align-items:flex-end;justify-content:center}
+@media (min-width:761px){
+  .hv-wel.wel-med-film,.sp-wel.wel-med-film{padding:24px 24px calc(28px + env(safe-area-inset-bottom,0px))}
+  .wf-p-top::before{background:linear-gradient(0deg,rgba(8,14,17,0) 30%,rgba(8,14,17,.6))!important}
+  .wf-p-center::before{background:rgba(8,14,17,.3)!important}
+  .hv-wel.wf-p-center,.sp-wel.wf-p-center{align-items:center}
+  .hv-wel.wf-p-top,.sp-wel.wf-p-top{align-items:flex-start;padding-top:calc(72px + env(safe-area-inset-top,0px))}
+  .hv-wel.wf-p-bottom-left,.sp-wel.wf-p-bottom-left{justify-content:flex-start}
+  .hv-wel.wf-p-bottom-right,.sp-wel.wf-p-bottom-right{justify-content:flex-end}
+  .wel-med-film .hv-wel-grid{max-width:820px}
+  .wf-p-bottom-left .hv-wel-grid,.wf-p-bottom-right .hv-wel-grid{max-width:700px}
+  .wf-small .hv-wel-grid{zoom:.6}.wf-medium .hv-wel-grid{zoom:.74}.wf-large .hv-wel-grid{zoom:.9}
+  .wf-small .sp-wel-card{zoom:.68}.wf-medium .sp-wel-card{zoom:.8}.wf-large .sp-wel-card{zoom:.92}
+}
+@media (max-width:760px){
+  .hv-wel.wel-med-film,.sp-wel.wel-med-film{padding:12px 12px calc(16px + env(safe-area-inset-bottom,0px))}
+  .wfm-p-top::before{background:linear-gradient(0deg,rgba(8,14,17,0) 30%,rgba(8,14,17,.6))!important}
+  .wfm-p-center::before{background:rgba(8,14,17,.3)!important}
+  .hv-wel.wfm-p-center,.sp-wel.wfm-p-center{align-items:center}
+  .hv-wel.wfm-p-top,.sp-wel.wfm-p-top{align-items:flex-start;padding-top:calc(64px + env(safe-area-inset-top,0px))}
+  .wfm-small .hv-wel-grid{zoom:.64}.wfm-medium .hv-wel-grid{zoom:.76}.wfm-large .hv-wel-grid{zoom:.88}
+  .wfm-small .sp-wel-card{zoom:.7}.wfm-medium .sp-wel-card{zoom:.8}.wfm-large .sp-wel-card{zoom:.9}
+}
 .dz-cover-text{max-width:520px;animation:hvUp .8s cubic-bezier(.2,.7,.2,1) both}
 .dz-cover-logo{width:150px;height:auto;margin-bottom:28px;filter:drop-shadow(0 4px 16px rgba(0,0,0,.5))}
 .dz-cover h1{margin:12px 0 14px;font-size:68px;line-height:.98;font-weight:500;letter-spacing:-.01em;color:#fff}
