@@ -1318,7 +1318,7 @@ function DroneLookEditor({ config, edit, panorama }: { config: TourConfig; edit:
   const [device, setDevice] = useState<Device>("mobile");
   const L = config.droneLook?.[device] ?? {};
   // What the tour does when nothing is set (the engine's own values).
-  const std: Required<Omit<DroneLook, "point">> = { down: -90, up: panorama ? 90 : 25, zoomIn: device === "mobile" ? 40 : 50, zoomOut: device === "mobile" ? 110 : 115 };
+  const std: Required<Omit<DroneLook, "point">> = { down: -90, up: panorama ? 90 : 25, zoomIn: device === "mobile" ? 22 : 30, zoomOut: device === "mobile" ? 110 : 115 };
   const set = (k: keyof DroneLook, v: DroneLook[keyof DroneLook] | undefined) =>
     edit((d) => {
       const next: DroneLook = { ...d.droneLook?.[device], [k]: v };

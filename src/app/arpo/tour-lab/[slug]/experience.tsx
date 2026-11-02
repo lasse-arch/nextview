@@ -1295,7 +1295,8 @@ function TourExperience({
         pitch: start.pitch,
         hfov: start.hfov,
         // The tour's own limits (Luftfoto og kort → Bevægelse), else as always.
-        minHfov: look.zoomIn ?? (mobile.current ? 40 : 50),
+        // Close enough in to read every name, also where points stand close together (their names give way to each other further out).
+        minHfov: look.zoomIn ?? (mobile.current ? 22 : 30),
         // On a tall phone screen, zooming out past the start makes the view taller than the picture lets it look down,
         // so pannellum tilts it up - and everything, points too, slides up and down. Out to the start, no further.
         maxHfov: look.zoomOut ?? (mobile.current ? Math.min(150, Math.max(start.hfov, 60)) : Math.max(115, start.hfov)),

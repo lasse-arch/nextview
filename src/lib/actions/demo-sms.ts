@@ -24,7 +24,7 @@ const PER_DAY = 40;
 
 const firstName = (name: string) => name.trim().split(/\s+/)[0] ?? "";
 
-export type DemoSmsSent = { id: string; at: string; to: string; tour: string; by: string; visits: number; lastSeen: string | null; where: string | null; /** Can be sent again: the number is kept, and the seller sent it (or is an admin). */ again: boolean; /** The seller sent it, or is an admin: may send it again or remove it. */ mine: boolean };
+export type DemoSmsSent = { id: string; at: string; to: string; tour: string; by: string; visits: number; /** Visits where they did something in the tour (not only opened the link). */ started: number; lastSeen: string | null; where: string | null; /** Can be sent again: the number is kept, and the seller sent it (or is an admin). */ again: boolean; /** The seller sent it, or is an admin: may send it again or remove it. */ mine: boolean };
 
 export type DemoSmsSetup = {
   tours: { slug: string; name: string }[];
@@ -34,6 +34,9 @@ export type DemoSmsSetup = {
   direct: boolean;
   sent: DemoSmsSent[];
 };
+
+/** What counts as starting the tour: doing something in it - into it, the menu, a guided tour, the walk-through, a point (opening the link alone isn't). */
+const STARTED = new Set(["tour_use", "tour_enter", "menu_click", "menu_open", "place_click", "drone_point_click", "guide_start", "welcome_choice", "route_start", "info_open", "features_reel", "contact_click"]);
 
 const COUNTRY: Record<string, string> = { DK: "Danmark", DE: "Tyskland", SE: "Sverige", NO: "Norge" };
 
@@ -49,7 +52,7 @@ export async function demoSmsSetup(): Promise<DemoSmsSetup> {
       where: { label: { endsWith: "(SMS)" } },
       orderBy: { createdAt: "desc" },
       take: 30,
-      select: { id: true, label: true, createdAt: true, tourSlug: true, createdById: true, smsTo: true, smsText: true, events: { select: { session: true, createdAt: true, city: true, country: true }, orderBy: { createdAt: "desc" } } },
+      select: { id: true, label: true, createdAt: true, tourSlug: true, createdById: true, smsTo: true, smsText: true, events: { select: { session: true, name: true, createdAt: true, city: true, country: true }, orderBy: { createdAt: "desc" } } },
     }),
   ]);
   const people = new Map((await prisma.user.findMany({ where: { id: { in: [...new Set(links.map((l) => l.createdById))] } }, select: { id: true, name: true } })).map((p) => [p.id, p.name]));
@@ -67,6 +70,7 @@ export async function demoSmsSetup(): Promise<DemoSmsSetup> {
         tour: names.get(l.tourSlug) ?? l.tourSlug,
         by: people.get(l.createdById) ?? "",
         visits: new Set(l.events.map((x) => x.session)).size,
+        started: new Set(l.events.filter((x) => STARTED.has(x.name)).map((x) => x.session)).size,
         lastSeen: e?.createdAt.toISOString() ?? null,
         where: e ? [e.city, e.country ? (COUNTRY[e.country] ?? e.country) : null].filter(Boolean).join(", ") || null : null,
         again: Boolean(l.smsTo && l.smsText) && (l.createdById === user.id || teamCan(user, "admin")),

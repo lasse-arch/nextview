@@ -295,6 +295,8 @@ export const ROUTE_CSS = `
 /* Find vej stays by default. On a phone, with a place card, "Din plads venter" or a route open, it moves up under the menu - out of their way.
    Per situation the editor can let it step aside instead (wayfinding.stepAside -> rt-vig-*). */
 @media (max-width:760px){.hv.hv-med-stedkort .rt-knap,.hv.hv-med-nudge .rt-knap,.hv.hv-routing .rt-knap{opacity:1;pointer-events:auto;top:calc(60px + env(safe-area-inset-top,0px));bottom:auto;left:auto;right:10px;translate:none;height:38px;padding:0 13px;font-size:13px}}
+/* … and below the live-data chip when the tour has one (it stands right there). */
+@media (max-width:760px){.hv:has(.hv-live-chip).hv-med-stedkort .rt-knap,.hv:has(.hv-live-chip).hv-med-nudge .rt-knap,.hv:has(.hv-live-chip).hv-routing .rt-knap{top:calc(108px + env(safe-area-inset-top,0px))}}
 .hv.rt-vig-cards.hv-med-stedkort .rt-knap,.hv.rt-vig-nudge.hv-med-nudge .rt-knap,.hv.rt-vig-stories:has(.hv-story-play) .rt-knap{display:none}
 /* Where the button stands - chosen per device in the editor. "Kun i menuen": the menu's Find vej button shows on that device only. */
 .hv-find-knap{display:none!important}
