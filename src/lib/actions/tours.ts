@@ -5,6 +5,7 @@ import { keepVoiceTexts, linkWelcomeTiles } from "@/app/arpo/tour-lab/tours/plac
 import { startStatsIfFirst } from "@/lib/tour-stats";
 import { tourChanged } from "@/lib/tour-cache";
 import { revalidatePath } from "next/cache";
+import { trashSteps } from "@/lib/tour-trash";
 import { Prisma } from "@prisma/client";
 import { requireTeam, requireTour } from "@/lib/auth";
 import { teamCan } from "@/lib/team-roles";
@@ -247,16 +248,14 @@ const KEEP_DELETED_DAYS = 30;
  */
 export async function deleteTour(slug: string, typedName: string): Promise<Result> {
   const user = await requireTeam("admin");
-  const tour = await prisma.tour.findUnique({ where: { slug }, include: { versions: true, publications: true } });
+  const tour = await prisma.tour.findUnique({ where: { slug }, select: { name: true, config: true, published: true, liveVersion: true } });
   if (!tour) return { ok: false, error: "Touren findes ikke." };
   const names = [tour.name, (tour.config as unknown as TourConfig).title].filter(Boolean).map((n) => n.trim().toLowerCase());
   if (!names.includes(typedName.trim().toLowerCase())) return { ok: false, error: "Skriv tourens navn præcis for at slette den." };
   if (tour.published || tour.liveVersion != null) return { ok: false, error: "Touren er udgivet. Tag den af nettet under Del og udgiv først - så forsvinder den ikke fra en kundes hjemmeside uden varsel." };
-  const { versions, publications, ...row } = tour;
-  await prisma.$transaction([
-    prisma.deletedTour.create({ data: { slug, name: tour.name, deletedByName: user.name, data: JSON.parse(JSON.stringify({ tour: row, versions, publications })) as Prisma.InputJsonValue } }),
-    prisma.tour.delete({ where: { id: tour.id } }),
-  ]);
+  const steps = await trashSteps(slug, user.name);
+  if (!steps) return { ok: false, error: "Touren findes ikke." };
+  await prisma.$transaction(steps);
   revalidatePath("/arpo/tour-lab");
   return { ok: true };
 }
@@ -266,8 +265,13 @@ export async function restoreTour(deletedId: string): Promise<Result<{ slug: str
   await requireTeam("admin");
   const d = await prisma.deletedTour.findUnique({ where: { id: deletedId } });
   if (!d || d.restoredAt) return { ok: false, error: "Touren er ikke i papirkurven." };
-  if (await prisma.tour.findUnique({ where: { slug: d.slug }, select: { id: true } })) return { ok: false, error: `Der findes allerede en tour med adressen "${d.slug}".` };
   const data = d.data as unknown as { tour: Prisma.TourUncheckedCreateInput; versions: Prisma.TourVersionUncheckedCreateInput[]; publications: Prisma.TourPublicationUncheckedCreateInput[] };
+  // Its address taken meanwhile (the tour was started over - the new one lives there): back beside it, as "<adresse>-tidligere".
+  let slug = d.slug;
+  for (let i = 1; await prisma.tour.findUnique({ where: { slug }, select: { id: true } }); i++) slug = `${d.slug}-tidligere${i > 1 ? `-${i}` : ""}`;
+  if (slug !== d.slug) {
+    data.tour = { ...data.tour, slug, config: { ...(data.tour.config as object), slug } as Prisma.InputJsonValue, shareToken: null, reviewToken: null, reviewNoteToken: null };
+  }
   // The customer may have been removed meanwhile - then the tour comes back without one.
   const dealId = data.tour.dealId && (await prisma.deal.findUnique({ where: { id: data.tour.dealId }, select: { id: true } })) ? data.tour.dealId : null;
   await prisma.$transaction([
@@ -278,7 +282,7 @@ export async function restoreTour(deletedId: string): Promise<Result<{ slug: str
     prisma.deletedTour.update({ where: { id: d.id }, data: { restoredAt: new Date() } }),
   ]);
   revalidatePath("/arpo/tour-lab");
-  return { ok: true, slug: d.slug };
+  return { ok: true, slug };
 }
 
 /** The papirkurv: tours deleted within the last 30 days (older ones are let go here). */

@@ -12,6 +12,8 @@ import type { Prisma } from "@prisma/client";
 import { requireNewTour, requireTeam, requireTour } from "@/lib/auth";
 import { teamCan } from "@/lib/team-roles";
 import { prisma } from "@/lib/db";
+import { trashSteps } from "@/lib/tour-trash";
+import { tourChanged } from "@/lib/tour-cache";
 import { getSettingValue, setSettingValue } from "@/lib/integration-settings";
 import { siteDigest, siteResearch } from "@/lib/site-digest";
 import { pageAsText, readUnits, type LiveUnit } from "@/lib/availability/live";
@@ -437,7 +439,26 @@ type NewTourInput = {
   droneImage?: string;
   /** The customer's existing tour on explore.nextview360.dk - converted: its content is copied over. */
   explore?: string;
+  /** "Start forfra": the tour (its address) this one replaces - built new for the same customer, the old one to the papirkurv. */
+  replaces?: string;
 };
+
+/**
+ * Who may make this new tour: for a customer (requireNewTour) - or, starting a
+ * tour over, whoever may work on that tour (its developer too). A tour that is
+ * out on the net is never started over: a customer's website may be showing it.
+ */
+async function newTourAccess(input: NewTourInput) {
+  if (!input.replaces) return { user: await requireNewTour(input.dealId), old: null };
+  const user = await requireTour(input.replaces);
+  const old = await prisma.tour.findUnique({
+    where: { slug: String(input.replaces) },
+    select: { slug: true, name: true, dealId: true, published: true, liveVersion: true, assignedToId: true, deadline: true, shareToken: true, reviewToken: true, reviewNoteToken: true, reviewEmail: true, reviewName: true },
+  });
+  if (!old) throw new Error("Touren findes ikke.");
+  if (old.published || old.liveVersion != null) throw new Error("Touren er udgivet - tag den af nettet under Del og udgiv, før den bygges forfra.");
+  return { user, old };
+}
 
 /** What the explore tour is, for nextviewAI - its own words, as data. */
 function exploreText(e: ExploreTour): string {
@@ -480,7 +501,8 @@ export async function planTourFromWebsite(
   previous?: TourPlanResult,
   corrections?: string
 ): Promise<{ ok: true; plan: TourPlanResult } | { ok: false; error: string }> {
-  const user = await requireNewTour(input.dealId);
+  const { user, old } = await newTourAccess(input);
+  if (old) input = { ...input, dealId: old.dealId ?? undefined };
   const key = await apiKey();
   if (!key) return { ok: false, error: "nextviewAI er ikke sat op endnu - indsæt en nøgle i en tours editor (fanen nextviewAI)." };
   const model = input.modelId ? await fetchModelInfo(input.modelId) : null;
@@ -574,7 +596,11 @@ ${research.text}
  * tour's features (its kind of menu, start and functions).
  */
 export async function createTourFromWebsite(input: NewTourInput & { plan?: TourPlanResult}): Promise<{ ok: true; slug: string; reply: string } | { ok: false; error: string }> {
-  const user = await requireNewTour(input.dealId);
+  const access = await newTourAccess(input).catch((err: unknown) => ({ error: err instanceof Error ? err.message : String(err) }));
+  if ("error" in access) return { ok: false, error: access.error };
+  const { user, old } = access;
+  // Started over: the same customer, whatever the form says.
+  if (old) input = { ...input, dealId: old.dealId ?? undefined };
   // A developer builds from a ready-made design - never from another customer's tour.
   if (!teamCan(user, "admin")) input = { ...input, base: undefined };
   const key = await apiKey();
@@ -599,8 +625,9 @@ export async function createTourFromWebsite(input: NewTourInput & { plan?: TourP
     : { text: "(Ingen hjemmeside angivet)", pdfs: [] as string[] };
   const site = research.text;
 
-  let slug = slugify(name) || "tour";
-  for (let i = 2; await prisma.tour.findUnique({ where: { slug }, select: { id: true } }); i++) slug = `${slugify(name)}-${i}`;
+  // Started over: the same address (links to it keep working) - the old tour leaves it only when the new one is built.
+  let slug = old?.slug ?? (slugify(name) || "tour");
+  if (!old) for (let i = 2; await prisma.tour.findUnique({ where: { slug }, select: { id: true } }); i++) slug = `${slugify(name)}-${i}`;
   let base: TourConfig = { ...neutral(source.config as unknown as TourConfig, { slug, title: name, tourPage: "" }), modelId: model.id };
   if (preset) base = { ...base, ...preset.apply(base) };
   const lay = layoutOf(input.layout);
@@ -703,9 +730,27 @@ Steder i touren skrives som https://my.matterport.com/show/?m=${model.id}&ss=<sc
   const config = hosted.config as unknown as Prisma.InputJsonValue;
   // The customer's tour was given to a developer: the new tour is theirs, with the same deadline.
   const given = input.dealId ? await prisma.deal.findUnique({ where: { id: input.dealId }, select: { tourAssigneeId: true, tourDeadline: true } }) : null;
-  await prisma.tour.create({
-    data: { slug, name, dealId: input.dealId || null, assignedToId: given?.tourAssigneeId ?? null, deadline: given?.tourDeadline ?? null, config, versions: { create: { config, note: explore ? `Konverteret fra explore (${explore.url}) af nextviewAI` : `Bygget af nextviewAI${input.website.trim() ? ` ud fra ${input.website.trim()}` : ""}`, createdByName: user.name } } },
-  });
+  const note = explore ? `Konverteret fra explore (${explore.url}) af nextviewAI` : `Bygget af nextviewAI${input.website.trim() ? ` ud fra ${input.website.trim()}` : ""}`;
+  if (old) {
+    // The old one to the papirkurv and the new one in its place, in one go - never neither, never both. The new keeps the
+    // old one's developer and deadline, and the customer's links (review, report) - but not an approval of the old tour.
+    const trash = await trashSteps(old.slug, user.name);
+    if (!trash) return { ok: false, error: "Den gamle tour findes ikke længere." };
+    await prisma.$transaction([
+      ...trash,
+      prisma.tour.create({
+        data: {
+          slug, name, dealId: old.dealId, assignedToId: old.assignedToId, deadline: old.deadline, config,
+          shareToken: old.shareToken, reviewToken: old.reviewToken, reviewNoteToken: old.reviewNoteToken, reviewEmail: old.reviewEmail, reviewName: old.reviewName,
+          versions: { create: { config, note: `Startet forfra (den gamle ligger i papirkurven) - ${note}`, createdByName: user.name } },
+        },
+      }),
+    ]);
+    tourChanged(slug);
+  } else
+    await prisma.tour.create({
+      data: { slug, name, dealId: input.dealId || null, assignedToId: given?.tourAssigneeId ?? null, deadline: given?.tourDeadline ?? null, config, versions: { create: { config, note, createdByName: user.name } } },
+    });
   revalidatePath("/arpo/tour-lab");
   const failed = hosted.failed.length ? `\n\nDisse filer kunne ikke hentes til os: ${hosted.failed.join("; ")}` : "";
   return { ok: true, slug, reply: result.reply + failed };
@@ -800,8 +845,12 @@ export async function searchTourCustomers(query: string): Promise<TourCustomer[]
 }
 
 /** The customer's Matterport tours (from the deal's MP-Space ids and product links), with name and photo from Matterport - or one pasted link/id. */
-export async function matterportModels(dealId: string | null, pasted?: string): Promise<ModelInfo[]> {
-  await requireNewTour(dealId);
+export async function matterportModels(dealId: string | null, pasted?: string, replaces?: string): Promise<ModelInfo[]> {
+  // Starting a tour over: its own customer's spaces.
+  if (replaces) {
+    await newTourAccess({ name: "", website: "", notes: "", replaces });
+    dealId = (await prisma.tour.findUnique({ where: { slug: replaces }, select: { dealId: true } }))?.dealId ?? null;
+  } else await requireNewTour(dealId);
   let text = pasted ?? "";
   if (dealId && !pasted) {
     const d = await prisma.deal.findUnique({ where: { id: dealId }, select: { mpSkinId: true, items: { select: { url: true } } } });

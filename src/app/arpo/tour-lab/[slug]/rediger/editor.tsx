@@ -20,6 +20,7 @@ import { ResultsPanel } from "./results";
 import { LayoutEditor } from "./layout-editor";
 import { ScanPointsEditor } from "./scanpoints";
 import { DeleteTour } from "./delete-tour";
+import { RestartTour } from "./restart-tour";
 import { LiveDataEditor } from "./live";
 import type { ScanMap } from "@/lib/matterport-graph";
 import { EconomyPanel, type TourEconomy } from "./economy";
@@ -1341,6 +1342,7 @@ export function TourEditor({
                     </button>
                   )}
                 </div>
+                <RestartTour slug={slug} name={config.title} published={published || onCloudflare} deal={deal} />
                 <DeleteTour slug={slug} name={config.title} published={published} />
               </>
             )}

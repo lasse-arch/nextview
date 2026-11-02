@@ -32,15 +32,16 @@ const STEPS = ["Kunde", "Matterport", "Branche", "Layout", "Indhold", "Plan"] as
 const thumb = (id: string) => `https://my.matterport.com/api/v1/player/models/${id}/thumb`;
 
 /** `forDeal`: opened from a customer under Tours (no button) - the customer is picked already, so it starts at the space. */
-export function NewTour({ tours, forDeal, onClose }: { tours: { slug: string; name: string }[]; forDeal?: TourCustomer; onClose?: () => void }) {
+/** `replaces`: "Start forfra" from the editor - the tour (its address) built anew; the old one goes to the papirkurv once the new is made. */
+export function NewTour({ tours, forDeal, onClose, replaces }: { tours: { slug: string; name: string }[]; forDeal?: TourCustomer; onClose?: () => void; replaces?: { slug: string; name: string } }) {
   const router = useRouter();
-  const [open, setOpenState] = useState(Boolean(forDeal));
+  const [open, setOpenState] = useState(Boolean(forDeal || replaces));
   const setOpen = (v: boolean) => {
     setOpenState(v);
     if (!v) onClose?.();
   };
-  const [step, setStep] = useState(forDeal ? 1 : 0);
-  const [who, setWho] = useState<Who | null>(forDeal ? { kind: "deal", deal: forDeal } : null);
+  const [step, setStep] = useState(forDeal || replaces ? 1 : 0);
+  const [who, setWho] = useState<Who | null>(forDeal ? { kind: "deal", deal: forDeal } : replaces ? { kind: "none" } : null);
   const [space, setSpace] = useState<Space | null>(null);
   const [branch, setBranch] = useState<Branch | null>(null);
   const [preset, setPresetId] = useState<DesignPreset["id"] | null>(null);
@@ -50,7 +51,7 @@ export function NewTour({ tours, forDeal, onClose }: { tours: { slug: string; na
     setPresetId(id);
     setLayout((l) => ({ logoSide: l?.logoSide ?? "left", menuHint: l?.menuHint ?? "mobile", ...PRESET_LAYOUT[id] }));
   };
-  const [name, setName] = useState(forDeal?.name ?? "");
+  const [name, setName] = useState(replaces?.name ?? forDeal?.name ?? "");
   const [website, setWebsite] = useState(forDeal?.website ?? "");
   const [focus, setFocus] = useState("");
   /** The branch and audience in the user's own words - told to nextviewAI as it is. */
@@ -99,6 +100,7 @@ export function NewTour({ tours, forDeal, onClose }: { tours: { slug: string; na
     notes,
     droneImage: drone ?? undefined,
     explore: explore || undefined,
+    replaces: replaces?.slug,
   });
 
   /** Asks for the plan (again, with the corrections, when there is one). */
@@ -127,7 +129,9 @@ export function NewTour({ tours, forDeal, onClose }: { tours: { slug: string; na
         try {
           sessionStorage.setItem(`tour-claude:${r.slug}`, String(r.reply));
         } catch {}
+      // Started over: the same address - loaded anew, so the editor shows the new tour (not the old one it had open).
       router.push(`/arpo/tour-lab/${r.slug}/rediger`);
+      if (replaces) router.refresh();
     });
   }
 
@@ -191,6 +195,7 @@ export function NewTour({ tours, forDeal, onClose }: { tours: { slug: string; na
               ) : step === 1 ? (
                 <SpaceStep
                   dealId={who?.kind === "deal" ? who.deal.id : null}
+                  replaces={replaces?.slug}
                   space={space}
                   explore={explore}
                   onExplore={(url, s) => {
@@ -481,12 +486,14 @@ function CustomerStep({ who, onPick, onCopy }: { who: Who | null; onPick: (w: Wh
 
 function SpaceStep({
   dealId,
+  replaces,
   space,
   onPick,
   explore,
   onExplore,
 }: {
   dealId: string | null;
+  replaces?: string;
   space: Space | null;
   onPick: (s: Space) => void;
   explore: string;
@@ -504,8 +511,8 @@ function SpaceStep({
 
   useEffect(() => {
     matterportConnected().then(setConnected).catch(() => setConnected(false));
-    if (dealId) matterportModels(dealId).then((m) => setCustomerSpaces(m.map((x) => ({ id: x.id, name: x.name })))).catch(() => {});
-  }, [dealId]);
+    if (dealId || replaces) matterportModels(dealId, undefined, replaces).then((m) => setCustomerSpaces(m.map((x) => ({ id: x.id, name: x.name })))).catch(() => {});
+  }, [dealId, replaces]);
   useEffect(() => {
     if (!connected) return;
     const t = setTimeout(
@@ -585,7 +592,7 @@ function SpaceStep({
                 className="flex-none rounded-xl bg-[#0071e3] px-3 text-[14px] font-medium text-white"
                 onClick={() =>
                   start(async () => {
-                    const [m] = await matterportModels(null, pasted);
+                    const [m] = await matterportModels(null, pasted, replaces);
                     if (!m) return setError("Kunne ikke finde den tour - er den offentlig?");
                     setError(null);
                     onPick({ id: m.id, name: m.name });
