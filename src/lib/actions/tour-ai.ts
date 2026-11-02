@@ -47,6 +47,24 @@ async function admin() {
   return user;
 }
 
+/**
+ * What went wrong with nextviewAI, in words the user can act on - and, for
+ * anything else, the service's own short reason (no keys or data in it), so a
+ * failure can be told apart instead of always "prøv igen".
+ */
+function aiFailure(err: unknown, where: string): string {
+  if (err instanceof Anthropic.AuthenticationError) return "nextviewAI-nøglen virker ikke længere.";
+  if (err instanceof Anthropic.RateLimitError) return "nextviewAI har travlt - prøv igen om lidt.";
+  console.error(where, err);
+  if (err instanceof Anthropic.APIError) {
+    if (err.status === 529 || (err.status ?? 0) >= 500) return "nextviewAI er overbelastet lige nu - prøv igen om et øjeblik.";
+    const reason = String((err.error as { error?: { message?: string } } | undefined)?.error?.message ?? err.message ?? "").replace(/\s+/g, " ").slice(0, 160);
+    return `nextviewAI afviste forespørgslen (${err.status ?? "fejl"}${reason ? `: ${reason}` : ""}).`;
+  }
+  if (err instanceof Anthropic.APIConnectionError) return "Kunne ikke få forbindelse til nextviewAI - prøv igen.";
+  return "Kunne ikke få fat i nextviewAI - prøv igen.";
+}
+
 async function apiKey() {
   return process.env.ANTHROPIC_API_KEY || (await getSettingValue("ANTHROPIC_API_KEY"));
 }
@@ -263,10 +281,9 @@ async function claudeEdits(key: string, who: { name: string; kind: string }, con
     if (response.stop_reason === "max_tokens") return { ok: false, error: "Ændringen blev for stor - prøv at dele den op." };
     parsed = response.parsed_output ?? null;
   } catch (err) {
-    if (err instanceof Anthropic.AuthenticationError) return { ok: false, error: "nextviewAI-nøglen virker ikke længere." };
-    if (err instanceof Anthropic.RateLimitError) return { ok: false, error: "nextviewAI har travlt - prøv igen om lidt." };
-    console.error("claudeEdits", err);
-    return { ok: false, error: "Kunne ikke få fat i nextviewAI - prøv igen." };
+    // A PDF it couldn't read (gone, too big, behind a login) fails the whole ask: once more without them.
+    if (pdfs.length && err instanceof Anthropic.BadRequestError) return claudeEdits(key, who, config, history, request, maxTokens, retry, [], images);
+    return { ok: false, error: aiFailure(err, "claudeEdits") };
   }
   if (!parsed) return { ok: false, error: "nextviewAI svarede ikke som forventet - prøv igen." };
 
@@ -512,9 +529,8 @@ ${exploreText(explore)}
 <hjemmeside>
 ${research.text}
 </hjemmeside>`;
-  let r;
-  try {
-    r = await new Anthropic({ apiKey: key }).messages.parse({
+  const ask = async (pdfs: string[]) =>
+    new Anthropic({ apiKey: key }).messages.parse({
       model: "claude-opus-5-5",
       max_tokens: 8000,
       system: [
@@ -524,16 +540,23 @@ ${research.text}
       messages: [
         {
           role: "user",
-          content: [...research.pdfs.map((url): Anthropic.DocumentBlockParam => ({ type: "document", source: { type: "url", url } })), ...imageBlocks(drone), { type: "text", text: request }],
+          content: [...pdfs.map((url): Anthropic.DocumentBlockParam => ({ type: "document", source: { type: "url", url } })), ...imageBlocks(drone), { type: "text", text: request }],
         },
       ],
       output_config: { effort: "low", format: zodOutputFormat(TourPlan) },
     });
+  let r;
+  try {
+    r = await ask(research.pdfs).catch((err: unknown) => {
+      // A PDF from the website it couldn't read (gone, too big, behind a login) fails the whole ask: once more without them.
+      if (research.pdfs.length && err instanceof Anthropic.BadRequestError) {
+        console.error("planTourFromWebsite: without the PDFs", err.message);
+        return ask([]);
+      }
+      throw err;
+    });
   } catch (err) {
-    if (err instanceof Anthropic.AuthenticationError) return { ok: false, error: "nextviewAI-nøglen virker ikke længere." };
-    if (err instanceof Anthropic.RateLimitError) return { ok: false, error: "nextviewAI har travlt - prøv igen om lidt." };
-    console.error("planTourFromWebsite", err);
-    return { ok: false, error: "Kunne ikke få fat i nextviewAI - prøv igen." };
+    return { ok: false, error: aiFailure(err, "planTourFromWebsite") };
   }
   const u = r.usage;
   await prisma.tourAiUsage
