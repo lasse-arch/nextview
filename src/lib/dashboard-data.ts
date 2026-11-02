@@ -41,7 +41,8 @@ export type SellerRow = {
 export type InvoiceStatusRow = { status: string; count: number };
 
 /** Pass an ownerId to scope the whole dashboard to one seller's own deals/commission (used for non-admins). */
-export async function getDashboardData(ownerId?: string) {
+/** `period`: the months "Solgt denne måned" / "Etablering solgt denne måned" cover (left out: this month) - e.g. chosen on Vækst. */
+export async function getDashboardData(ownerId?: string, period?: { from: Date; to: Date }) {
   const [deals, commissions, invoices] = await Promise.all([
     prisma.deal.findMany({ where: ownerId ? { ownerId } : {}, include: { owner: true } }),
     prisma.commission.findMany({ where: ownerId ? { sellerId: ownerId } : {}, include: { seller: true } }),
@@ -49,8 +50,8 @@ export async function getDashboardData(ownerId?: string) {
   ]);
 
   const now = new Date();
-  const monthStart = startOfMonth(now);
-  const monthEnd = endOfMonth(now);
+  const monthStart = startOfMonth(period?.from ?? now);
+  const monthEnd = endOfMonth(period?.to ?? now);
 
   // Full contract value: the monthly fee over its whole binding period, plus
   // the one-time establishment fee.

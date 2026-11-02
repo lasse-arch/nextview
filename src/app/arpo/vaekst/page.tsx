@@ -30,13 +30,37 @@ function Row({ label, value, strong, money }: { label: string; value: string; st
   );
 }
 
-export default async function GrowthDashboardPage() {
+const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
+const monthName = (ym: string) => new Date(`${ym}-15T12:00:00Z`).toLocaleDateString("da-DK", { month: "long", year: "numeric", timeZone: "UTC" });
+const ymOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+
+export default async function GrowthDashboardPage({ searchParams }: { searchParams: Promise<{ fra?: string; til?: string }> }) {
   const user = await getCurrentUser();
   if (!user) redirect("/api/auth/session-ended?next=/arpo");
   if (user.role !== "ADMIN") redirect("/arpo");
 
+  // The months the "i perioden" figures cover (?fra=YYYY-MM&til=YYYY-MM) - this month when none is chosen.
+  const q = await searchParams;
+  const now = new Date();
+  const thisMonth = ymOf(now);
+  let fra = q.fra && MONTH.test(q.fra) ? q.fra : thisMonth;
+  let til = q.til && MONTH.test(q.til) ? q.til : fra;
+  if (til < fra) [fra, til] = [til, fra];
+  const period = { from: new Date(`${fra}-01T12:00:00`), to: new Date(`${til}-01T12:00:00`) };
+  const periodLabel = fra === til ? monthName(fra) : `${monthName(fra)} – ${monthName(til)}`;
+  const shortcut = (back: number, span: number) => {
+    const a = new Date(now.getFullYear(), now.getMonth() - back - (span - 1), 1);
+    const b = new Date(now.getFullYear(), now.getMonth() - back, 1);
+    return `?fra=${ymOf(a)}&til=${ymOf(b)}`;
+  };
+  const shortcuts: [string, string][] = [
+    ["Denne måned", shortcut(0, 1)],
+    ["Sidste måned", shortcut(1, 1)],
+    ["Seneste 3 mdr.", shortcut(0, 3)],
+    ["I år", `?fra=${now.getFullYear()}-01&til=${thisMonth}`],
+  ];
   // The sales figures from the front page (the whole company's - Vækst is admin only).
-  const [d, sales] = await Promise.all([getGrowthDashboardData(), getDashboardData(undefined)]);
+  const [d, sales] = await Promise.all([getGrowthDashboardData(), getDashboardData(undefined, period)]);
   const withFee = sales.soldBreakdown.filter((x) => x.establishmentFee > 0);
   const establishmentAll = withFee.reduce((sum, x) => sum + x.establishmentFee, 0);
   const riskLabelFor = (days: number) => (days === 30 ? "< 30 dage" : days === 60 ? "< 60 dage" : "< 90 dage");
@@ -49,7 +73,31 @@ export default async function GrowthDashboardPage() {
       </div>
 
       <div>
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Salg</h2>
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Salg</h2>
+          <form className="flex flex-wrap items-center gap-2 text-sm" method="get">
+            {shortcuts.map(([label, href]) => (
+              <Link
+                key={label}
+                href={href}
+                className={`rounded-full px-3 py-1 text-xs font-medium ring-1 ring-inset ${href === `?fra=${fra}&til=${til}` ? "bg-slate-900 text-white ring-slate-900" : "bg-white text-slate-600 ring-slate-200 hover:bg-slate-50"}`}
+              >
+                {label}
+              </Link>
+            ))}
+            <label className="flex items-center gap-1 text-xs text-slate-500">
+              Fra
+              <input type="month" name="fra" defaultValue={fra} className="rounded-md border border-slate-200 px-2 py-1 text-xs text-slate-800" />
+            </label>
+            <label className="flex items-center gap-1 text-xs text-slate-500">
+              Til
+              <input type="month" name="til" defaultValue={til} className="rounded-md border border-slate-200 px-2 py-1 text-xs text-slate-800" />
+            </label>
+            <button type="submit" className="rounded-md bg-slate-900 px-3 py-1 text-xs font-medium text-white hover:bg-slate-800">
+              Vis
+            </button>
+          </form>
+        </div>
         <div className="mt-2 grid grid-cols-2 gap-3 lg:grid-cols-4">
           <SaleTile
             label="Solgt i alt"
@@ -66,14 +114,14 @@ export default async function GrowthDashboardPage() {
             tooltipRows={withFee.map((x) => ({ label: x.name, value: formatDKK(x.establishmentFee) }))}
           />
           <SaleTile
-            label="Solgt denne måned"
+            label={fra === thisMonth && til === thisMonth ? "Solgt denne måned" : `Solgt · ${periodLabel}`}
             value={formatDKK(sales.soldThisMonthValue)}
             sub={`${sales.soldThisMonthCount} deals`}
             money
             tooltipRows={sales.soldThisMonthDeals.map((x) => ({ label: x.name, value: formatDKK(x.value) }))}
           />
           <SaleTile
-            label="Etablering solgt denne måned"
+            label={fra === thisMonth && til === thisMonth ? "Etablering solgt denne måned" : `Etablering solgt · ${periodLabel}`}
             value={formatDKK(sales.establishmentFeeTotal)}
             sub={`${sales.establishmentFeeCount} deals`}
             money
