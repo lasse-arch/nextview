@@ -15,10 +15,11 @@ import { connectSdk, showcaseUrl, uLinkTarget, type CameraPose, type MpSdk, type
 import type { AvailableUnit } from "@/lib/availability/boxdepotet";
 import { WeatherChip, WEATHER_CSS } from "./weather";
 import { CommuteSheet, COMMUTE_CSS } from "./commute";
+import { fitPano } from "../tours/pano-cover";
 import { FeatureTour, featuresSeen, FEATURES_CSS, type DemoContact } from "./features";
 import { FinderSheet, FINDER_CSS, WalkLines } from "./finder";
 import { apiUrl, isStaticTour } from "../tours/api";
-import type { DroneView, FindStepAside, GuideTurn, MenuEntry, TourConfig, TourPlace, TourPoint, WelcomeGo } from "../tours/types";
+import type { DroneView, FindStepAside, GuideTurn, MenuEntry, PanoCover, TourConfig, TourPlace, TourPoint, WelcomeGo } from "../tours/types";
 import { CoverWelcome, DESIGNS_CSS, DockMenu, PickerMenu, WelcomeFilm, welcomeFilmClass } from "./designs";
 import { GUIDE_CSS, GuidePlayer, guideStops } from "./guide";
 import { ONBOARDING_CSS, Onboarding } from "./onboarding";
@@ -1128,7 +1129,7 @@ function TourExperience({
   /** A big flat picture (a drone photo in the menu or the guide): its 4096 px copy, when the tour has one. */
   const flatImage = (url: string) => T.panoCopies?.[url]?.phone ?? url;
   /** Is a picture a 360° one (2:1)? Read from its (small) copy - fetched ahead, so it's known at once. */
-  const isPanorama = (url: string) => pictureIsPanorama(flatImage(url));
+  const isPanorama = (url: string) => (T.imageView?.[url]?.cover ? Promise.resolve(true) : pictureIsPanorama(flatImage(url)));
   /** The 360° photos of the guide's stops from `from` on (the next two) - fetched ahead, so a stop opens at once instead of loading. */
   const prefetchGuidePanos = (from: number) => {
     for (const stop of GUIDE.slice(from, from + 2)) {
@@ -1228,7 +1229,7 @@ function TourExperience({
           });
         },
       }));
-      drone.current = window.pannellum.viewer(droneEl.current, {
+      drone.current = window.pannellum.viewer(droneEl.current, fitPano({
         // One uploaded 360° photo, or the drone's prepared tiles.
         ...(D.panorama
           ? { type: "equirectangular", panorama: dronePano }
@@ -1259,7 +1260,7 @@ function TourExperience({
         mouseZoom: true,
         keyboardZoom: false,
         hotSpots,
-      });
+      }, D.panorama ? T.imageView?.[D.panorama]?.cover : null));
       drone.current.on("zoomchange", (hfov) => setZoomed(Number(hfov) < 56));
       // Shown when the picture can be drawn: the one 360° photo, or the tiles' small first level (the sharp ones come after) - or after a while, whatever happens.
       const shown = () => setDroneLoaded(key);
@@ -2800,6 +2801,7 @@ function TourExperience({
           panos={T.panos}
           turn={guideAt != null ? (GUIDE[guideAt]?.turn ?? G?.turn ?? "as") : null}
           zoom={pano.panorama ? T.imageView?.[pano.panorama] : undefined}
+          cover={pano.panorama ? T.imageView?.[pano.panorama]?.cover : undefined}
           // A picture opened from the menu goes back to the menu - "Tilbage til luften" only when you came from the drone scene / map.
           backLabel={pano.id.startsWith("billede-") ? tx("Tilbage") : tx("Tilbage til luften")}
           onClose={() => {
@@ -3504,10 +3506,13 @@ function PanoView({
   panos,
   turn = null,
   zoom,
+  cover,
   backLabel,
   onClose,
 }: {
   name: string;
+  /** A picture that isn't a full 360° (e.g. 180°): how much it covers - the view is held inside it. */
+  cover?: PanoCover;
   backLabel: string;
   /** How zoomed it opens, per device (1 = normal: a computer a little out, a phone a little in). */
   zoom?: { desktop?: number; mobile?: number };
@@ -3542,7 +3547,7 @@ function PanoView({
     // The sharp copy already fetched (the guide gets its pictures ahead): open with that - no swap while it turns.
     const first = full && loadedPanos.has(full) ? full : (quick ?? full ?? image);
     const later = quick && full && full !== first ? full : null;
-    const options = (at: { yaw: number; pitch: number; hfov: number }, src?: string) => ({
+    const options = (at: { yaw: number; pitch: number; hfov: number }, src?: string) => fitPano({
       ...(src
         ? { type: "equirectangular", panorama: src }
         : {
@@ -3565,7 +3570,7 @@ function PanoView({
       yaw: at.yaw,
       pitch: at.pitch,
       ...(turnAtOpen && turnAtOpen !== "none" ? { autoRotate: turnAtOpen === "other" ? 2.5 : -2.5, autoRotateInactivityDelay: 4000 } : {}),
-    });
+    }, src ? cover : null);
     loadPannellum().then(() => {
       if (cancelled || !el.current || !window.pannellum) return;
       if (!image && !(dir && panos)) return;
@@ -3614,7 +3619,9 @@ function PanoView({
       sharpViewer?.destroy();
       sharpBox?.classList.remove("hv-pano-skarp-vist");
     };
-  }, [dir, image, quick, full, panos, startYaw, startPitch, turnAtOpen, zoom]);
+    // The cover by its numbers: the same one in a new object (a new render of the tour) mustn't start the picture over.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dir, image, quick, full, panos, startYaw, startPitch, turnAtOpen, zoom, cover?.h, cover?.v]);
   return (
     <div className="hv-pano">
       <div ref={el} className="absolute inset-0" />

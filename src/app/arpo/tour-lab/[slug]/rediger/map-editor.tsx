@@ -7,6 +7,7 @@ import { placeMapSpots } from "@/lib/actions/tour-ai";
 import { importMapPageAction } from "@/lib/actions/tour-files";
 import { ICONS, ICON_NAMES, guessIcon } from "../../tours/icons";
 import { PANO_HFOV, isPlaceHref, panoHfov, pointOfHref } from "../../tours/places";
+import { fitPano } from "../../tours/pano-cover";
 import "pannellum/build/pannellum.css";
 import type { DroneLook, TourConfig, TourPoint } from "../../tours/types";
 import { Choice, Field, FilesContext, Group, Icon, input, PanoZoom, Toggle, UploadButton, type PreviewApi } from "./ui";
@@ -626,7 +627,7 @@ function Pano360({
       if (!window.pannellum) await import("pannellum/build/pannellum.js");
       if (dead || !el.current || !window.pannellum) return;
       const s = (phone ? (M.startMobile ?? M.start) : M.start) ?? { x: 50, y: 50, zoom: 1 };
-      const v = window.pannellum.viewer(el.current, {
+      const v = window.pannellum.viewer(el.current, fitPano({
         type: "equirectangular",
         panorama: M.image,
         autoLoad: true,
@@ -636,7 +637,7 @@ function Pano360({
         minHfov: 25,
         maxHfov: 150,
         hotSpots: [], // addHotSpot needs the list to be there
-      }) as unknown as PanoViewer;
+      }, config.imageView?.[M.image]?.cover)) as unknown as PanoViewer;
       v.on("error", () => setError("360°-billedet kunne ikke vises - prøv Fladt."));
       // A click (not a drag to look around) on the picture itself puts down / moves a point.
       let down: { x: number; y: number } | null = null;

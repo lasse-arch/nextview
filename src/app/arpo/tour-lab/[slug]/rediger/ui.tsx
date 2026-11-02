@@ -4,7 +4,8 @@ import { createContext, useContext, useEffect, useRef, useState } from "react";
 import "pannellum/build/pannellum.css";
 import { registerTourFile, uploadTourFile } from "@/lib/actions/tour-files";
 import { IMAGE_HREF, PANO_HFOV, panoHfov } from "../../tours/places";
-import type { TourConfig } from "../../tours/types";
+import type { PanoCover, TourConfig } from "../../tours/types";
+import { fitPano } from "../../tours/pano-cover";
 
 /* The editor's building blocks - Apple-style fields, switches and groups. */
 
@@ -251,7 +252,7 @@ export function outsideFiles(c: TourConfig): string[] {
 /** A typed address with https:// in front when it has no scheme (links, # and mailto/tel are kept). */
 export const withProtocol = (url: string) => (/^(https?:|mailto:|tel:|#)/i.test(url.trim()) ? url.trim() : `https://${url.trim()}`);
 
-type PanoViewSetting = { desktop?: number; mobile?: number; yaw?: number; pitch?: number; phone?: "fit" | number };
+type PanoViewSetting = { desktop?: number; mobile?: number; yaw?: number; pitch?: number; phone?: "fit" | number; cover?: PanoCover };
 
 /**
  * How a 360° picture opens (shown only for a 2:1 picture): where it looks -
@@ -273,7 +274,9 @@ export function PanoZoom({
   preview?: PreviewApi;
   name?: string;
 }) {
-  const [is360, setIs360] = useState<boolean | null>(null);
+  /** The picture's width / height - a 2:1 picture is a full 360°; any other is flat unless marked as a 180° one (cover). */
+  const [ratio, setRatio] = useState<number | null>(null);
+  const is360 = ratio == null ? null : Math.abs(ratio - 2) < 0.05 || Boolean(value?.cover);
   const [note, setNote] = useState<{ text: string; error?: boolean } | null>(null);
   const [picking, setPicking] = useState(false);
   /** The device whose zoom is being set - its view shown in a small window while the slider moves. */
@@ -284,10 +287,12 @@ export function PanoZoom({
   const viewer = useRef<{ getYaw(): number; getPitch(): number; destroy(): void } | null>(null);
   useEffect(() => {
     const img = new Image();
-    img.onload = () => setIs360(Math.abs(img.naturalWidth / img.naturalHeight - 2) < 0.05);
-    img.onerror = () => setIs360(false);
+    img.onload = () => setRatio(img.naturalWidth / Math.max(1, img.naturalHeight));
+    img.onerror = () => setRatio(0);
     img.src = src;
   }, [src]);
+  /** A 180° picture: 180° across, and up/down as far as its shape says (a square one covers 180° both ways). */
+  const half = (): PanoCover => ({ h: 180, v: Math.min(180, Math.round(180 / Math.max(1, ratio ?? 2))) });
   // The small 360° view to turn to where it should start.
   useEffect(() => {
     if (!picking) return;
@@ -295,15 +300,21 @@ export function PanoZoom({
     (async () => {
       if (!window.pannellum) await import("pannellum/build/pannellum.js");
       if (dead || !box.current || !window.pannellum) return;
-      viewer.current = window.pannellum.viewer(box.current, {
-        type: "equirectangular",
-        panorama: src,
-        autoLoad: true,
-        showFullscreenCtrl: false,
-        hfov: 100,
-        yaw: value?.yaw ?? 0,
-        pitch: value?.pitch ?? -10,
-      }) as unknown as { getYaw(): number; getPitch(): number; destroy(): void };
+      viewer.current = window.pannellum.viewer(
+        box.current,
+        fitPano(
+          {
+            type: "equirectangular",
+            panorama: src,
+            autoLoad: true,
+            showFullscreenCtrl: false,
+            hfov: 100,
+            yaw: value?.yaw ?? 0,
+            pitch: value?.pitch ?? -10,
+          },
+          value?.cover
+        )
+      ) as unknown as { getYaw(): number; getPitch(): number; destroy(): void };
     })();
     return () => {
       dead = true;
@@ -338,6 +349,11 @@ export function PanoZoom({
             <span>Fyld</span>
           </div>
         )}
+        {ratio != null && ratio >= 0.9 && ratio <= 2.6 && (
+          <button type="button" className="text-[12px] font-medium text-[#0071e3]" onClick={() => put({ cover: half(), phone: undefined })}>
+            Det er et 180°-billede - vis det, så man kan kigge rundt
+          </button>
+        )}
         <p className="text-[11px] leading-snug text-[#8e8e93]">
           {phone === "fit" ? "Hele billedet midt på skærmen, med billedet sløret bag." : phone >= 1 ? "Billedet fylder hele skærmens højde - man trækker sidelæns for at se resten." : `Billedet fylder ${Math.round(phone * 100)} % af højden - man ser mere af det med det samme og trækker for resten.`} Den besøgende kan altid skifte.
         </p>
@@ -354,7 +370,30 @@ export function PanoZoom({
         e.stopPropagation();
       }}
     >
-      <p className="text-[12px] font-medium text-[#1d1d1f]" title="Gælder billedet overalt i touren - også hvis det bruges både i menuen og på luftfotoet">360°-visning <span className="font-normal text-[#8e8e93]">· gælder billedet overalt</span></p>
+      <p className="text-[12px] font-medium text-[#1d1d1f]" title="Gælder billedet overalt i touren - også hvis det bruges både i menuen og på luftfotoet">
+        {value?.cover ? `${value.cover.h}°-visning` : "360°-visning"} <span className="font-normal text-[#8e8e93]">· gælder billedet overalt</span>
+      </p>
+      <div className="flex items-center gap-2 text-[12px] text-[#6e6e73]">
+        <span className="flex-none">Billedet dækker</span>
+        <div className="flex-1">
+          <Choice
+            value={value?.cover ? "180" : "360"}
+            options={
+              ratio != null && Math.abs(ratio - 2) < 0.05
+                ? [
+                    ["360", "360° hele vejen"],
+                    ["180", "180°"],
+                  ]
+                : [
+                    ["360", "Fladt billede"],
+                    ["180", "180°"],
+                  ]
+            }
+            onChange={(v) => put({ cover: v === "180" ? half() : undefined })}
+          />
+        </div>
+      </div>
+      {value?.cover && <p className="text-[11px] leading-snug text-[#8e8e93]">Man kan dreje og kigge op og ned, så langt billedet går - aldrig ud over kanten. Det gælder overalt, hvor billedet bruges.</p>}
       {preview ? (
         <div className="space-y-1.5">
           <div className="flex gap-2">
@@ -460,7 +499,7 @@ export function PanoZoom({
               Skjul
             </button>
           </div>
-          <ZoomPeek src={src} yaw={value?.yaw ?? 0} pitch={value?.pitch ?? -10} hfov={panoHfov(look === "mobile", value?.[look] ?? 1)} phone={look === "mobile"} />
+          <ZoomPeek src={src} yaw={value?.yaw ?? 0} pitch={value?.pitch ?? -10} hfov={panoHfov(look === "mobile", value?.[look] ?? 1)} phone={look === "mobile"} cover={value?.cover} />
         </div>
       )}
       <p className="text-[11px] leading-snug text-[#8e8e93]">Zoom: standard er lidt zoomet ud på computer og lidt ind på mobil. Over 1× er tættere på.</p>
@@ -469,7 +508,7 @@ export function PanoZoom({
 }
 
 /** A small window with the picture as a device opens it - framed like its screen, zoomed as set, following the slider. */
-function ZoomPeek({ src, yaw, pitch, hfov, phone }: { src: string; yaw: number; pitch: number; hfov: number; phone: boolean }) {
+function ZoomPeek({ src, yaw, pitch, hfov, phone, cover }: { src: string; yaw: number; pitch: number; hfov: number; phone: boolean; cover?: PanoCover }) {
   const box = useRef<HTMLDivElement>(null);
   const viewer = useRef<{ setHfov(h: number, animated?: boolean): void; lookAt(p: number, y: number, h: number, animated?: boolean): void; destroy(): void } | null>(null);
   const latest = useRef({ yaw, pitch, hfov });
@@ -483,26 +522,33 @@ function ZoomPeek({ src, yaw, pitch, hfov, phone }: { src: string; yaw: number; 
       if (!window.pannellum) await import("pannellum/build/pannellum.js");
       if (dead || !box.current || !window.pannellum) return;
       const v = latest.current;
-      viewer.current = window.pannellum.viewer(box.current, {
-        type: "equirectangular",
-        panorama: src,
-        autoLoad: true,
-        showControls: false,
-        mouseZoom: false,
-        draggable: false,
-        minHfov: 20,
-        maxHfov: 150,
-        hfov: v.hfov,
-        yaw: v.yaw,
-        pitch: v.pitch,
-      }) as unknown as NonNullable<typeof viewer.current>;
+      viewer.current = window.pannellum.viewer(
+        box.current,
+        fitPano(
+          {
+            type: "equirectangular",
+            panorama: src,
+            autoLoad: true,
+            showControls: false,
+            mouseZoom: false,
+            draggable: false,
+            minHfov: 20,
+            maxHfov: 150,
+            hfov: v.hfov,
+            yaw: v.yaw,
+            pitch: v.pitch,
+          },
+          cover
+        )
+      ) as unknown as NonNullable<typeof viewer.current>;
     })();
     return () => {
       dead = true;
       viewer.current?.destroy();
       viewer.current = null;
     };
-  }, [src, phone]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- a new cover is a new picture to show
+  }, [src, phone, cover?.h, cover?.v]);
   return (
     <div className={`relative mx-auto overflow-hidden rounded-lg bg-black ring-1 ring-black/[.06] ${phone ? "aspect-[9/19.5] w-[45%]" : "aspect-[16/10] w-full"}`}>
       <div ref={box} className="absolute inset-0" />

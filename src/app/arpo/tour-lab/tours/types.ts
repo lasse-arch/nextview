@@ -126,6 +126,9 @@ export type StagingItem = {
  * "#aarshjul" and, as virtual staging (kind "yearwheel"), on a screen in the
  * tour. Ends with `cta` (e.g. book a visit).
  */
+/** How much of the sphere a picture covers, in degrees: across (h, up to 360) and up/down (v, up to 180) - e.g. a 180° photo. */
+export type PanoCover = { h: number; v: number };
+
 export type YearWheel = {
   /** The opening line, e.g. "Et år. Én årgang." */
   title: string;
@@ -301,7 +304,14 @@ export type TourConfig = {
    * closer) and where it looks (yaw/pitch, degrees).
    */
   /** `phone` (a flat picture on an upright phone): "fit" = the whole picture, or how much of the screen's height it fills (0.5-1; left out = 1, fills it - dragged sideways). */
-  imageView?: Record<string, { desktop?: number; mobile?: number; yaw?: number; pitch?: number; phone?: "fit" | number }>;
+  /**
+   * `cover`: a picture that isn't a full 360° - e.g. a 180° photo - with how
+   * many degrees it covers across (h) and up/down (v). Shown as a picture you
+   * look around in, only as far as it goes (no black beyond its edges) -
+   * wherever it's used (menu, points, the guide, the drone scene). Left out =
+   * a 2:1 picture is a full 360°, any other a flat photo.
+   */
+  imageView?: Record<string, { desktop?: number; mobile?: number; yaw?: number; pitch?: number; phone?: "fit" | number; cover?: PanoCover }>;
   /** The "Fliser" (bento) menu's tiles (design.menu "bento") - left out: made from the main action and the menu. */
   bento?: { tiles: BentoTile[] };
   /** Set by Arpo when the tour is saved: each 360° photo's smaller copies (by the photo's address). */
