@@ -32,6 +32,28 @@ export function tourConfigProblem(config: unknown): string | null {
   if (c.navigation !== "free" && c.navigation !== "points") return '"navigation" skal være "free" eller "points".';
   if (c.welcome && (!obj(c.welcome) || !arr(c.welcome.tiles) || !c.welcome.tiles.every((t) => obj(t) && str(t.title) && obj(t.go)))) return "Velkomstens fliser har en forkert form.";
   if (c.cover && (!obj(c.cover) || !["kicker", "title", "lead", "image", "enter", "placesTitle"].every((k) => str((c.cover as Record<string, unknown>)[k])))) return "Forsiden mangler tekster eller billede.";
+  const ld = c.lineDays;
+  if (ld !== undefined) {
+    const stopOk = (x: unknown) => {
+      const st = x as { id?: unknown; time?: unknown; title?: unknown; people?: unknown; tags?: unknown; href?: unknown };
+      return obj(x) && str(st.id) && str(st.time) && str(st.title) && (st.href === undefined || str(st.href)) &&
+        (st.people === undefined || (arr(st.people) && (st.people as unknown[]).length <= 4 && (st.people as unknown[]).every((p) => obj(p) && str((p as { image?: unknown }).image)))) &&
+        (st.tags === undefined || (arr(st.tags) && (st.tags as unknown[]).every(str)));
+    };
+    if (!obj(ld) || !str(ld.title) || !arr(ld.shared) || !arr(ld.lines)) return "En dag på linjen skal have en overskrift, fælles stop og linjer.";
+    if (!ld.shared.every(stopOk)) return "Et fælles stop mangler id, tidspunkt eller overskrift.";
+    const sharedIds = new Set(ld.shared.map((x) => x.id));
+    for (const l of ld.lines) {
+      if (!obj(l) || !str(l.id) || !str(l.name) || !arr(l.day)) return "En linje mangler id, navn eller sin dag.";
+      if (l.people !== undefined && (!arr(l.people) || l.people.length > 4 || !l.people.every((p) => obj(p) && str(p.image)))) return `${l.name}: højst 4 lærere, hver med et billede.`;
+      for (const d of l.day) {
+        if (typeof d === "string") {
+          if (!sharedIds.has(d)) return `${l.name}: dagen peger på et fælles stop, der ikke findes ("${d}").`;
+        } else if (!stopOk(d)) return `${l.name}: et stop mangler id, tidspunkt eller overskrift.`;
+      }
+    }
+    if (ld.visit !== undefined && (!obj(ld.visit) || !str(ld.visit.title) || !str(ld.visit.label) || !str(ld.visit.href))) return "Afslutningen skal have overskrift, knaptekst og link.";
+  }
   const sp = c.sitePlan;
   if (sp !== undefined) {
     const pct = (v: unknown) => typeof v === "number" && Number.isFinite(v) && v >= -50 && v <= 150;

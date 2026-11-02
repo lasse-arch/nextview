@@ -118,6 +118,16 @@ Fx specialefterskoler (ADHD, autisme, nedsat kognitivt funktionsniveau):
 - **"Din plads venter"**: et kort efter ca. 90 sekunder med kundens vigtigste
   handling. Ét kort, aldrig mens menuen er åben.
 
+## Efterskoler med linjer: "En dag på din linje"
+
+- Lad gæsten vælge linje og leve en skoledag: linjens egne steder (stalden
+  før morgenmaden) flettet sammen med skolens fælles (morgensamling,
+  spisesalen, værelset om aftenen). Fælles stop skrives én gang.
+- Brug rigtige tider fra skolens hjemmeside og rigtige lærerportrætter -
+  det er menneskene og det konkrete, der får tiøren til at falde.
+- Slut med en invitation (besøgsaften) og "Lidt af det hele" til dem i tvivl.
+  Åbnes med #linjedag fra en flise eller menuen.
+
 ## Campingpladser: pladskort over luftfotoet
 
 - Har pladsen et pladskort og et fladt dronefoto (taget lige oppefra), så læg

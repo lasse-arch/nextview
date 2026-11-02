@@ -152,6 +152,24 @@ export type PlaceCard = {
 };
 export type CardPerson = { name?: string; role?: string; image: string };
 
+/** One part of a day on a line ("En dag på din linje"): when, what, where in the tour - and who you're with there. */
+export type LineDayStop = {
+  /** Short and unique within the day, e.g. "morgenmad". */
+  id: string;
+  /** "07.25", "Før 7.25", "Eftermiddag". */
+  time: string;
+  /** Over the title, e.g. "Stalden på Gården" or "Actionhuset". */
+  place?: string;
+  title: string;
+  text?: string;
+  /** Where in the tour (a place link, as in the menu) - left out: the stop has no place, only its text. */
+  href?: string;
+  /** The people met there (up to 4): teachers, the rider, the kitchen. */
+  people?: CardPerson[];
+  /** Small facts as chips, e.g. "Fitness", "Lys ud kl. 23.00". */
+  tags?: string[];
+};
+
 /** What the Find vej button can step aside for: a place card, "Din plads venter", the stories playing, "Du er fremme". */
 export type FindStepAside = "cards" | "nudge" | "stories" | "arrived";
 export type DockIcon = "places" | "menu" | "book" | "order" | "map" | "phone" | "play";
@@ -496,6 +514,38 @@ export type TourConfig = {
    * and where - "Se stedet" shows it). For visitors who like to know what's
    * coming, e.g. a special efterskole. A step without href has no place.
    */
+  /**
+   * "En dag på din linje": the visitor picks a line and lives a school day -
+   * the line's own places and the school's shared ones woven together,
+   * each with its time, a few words and the people met there. `shared` =
+   * the stops every line has (written once); each line lists its day as ids
+   * of shared stops and its own stops. "Lidt af det hele" (`mix`) is the
+   * shared day with a short visit to every line (each line's `signature`
+   * stop, default its first own stop) after the shared stop `mix.after`.
+   * Opened by the link "#linjedag" (the picker) or "#linjedag:<line id>".
+   * `visit` = the ending's call to action (e.g. the next besøgsaften).
+   */
+  lineDays?: {
+    title: string;
+    lead?: string;
+    shared: LineDayStop[];
+    lines: {
+      id: string;
+      name: string;
+      /** "... der starter i stalden, før du har åbnet en bog." */
+      teaser?: string;
+      /** The line's teachers on the picker and its stops (up to 4). */
+      people?: CardPerson[];
+      /** The day in order: a shared stop's id, or a stop of the line's own. */
+      day: (string | LineDayStop)[];
+      /** The line's stop shown in "Lidt af det hele" - its id; left out = its first own stop. */
+      signature?: string;
+      /** The ending's line, e.g. "Linjen fylder 7 timer om ugen - resten af tiden er du sammen med hele skolen." */
+      outro?: string;
+    }[];
+    mix?: false | { title?: string; after?: string };
+    visit?: { title: string; text?: string; label: string; href: string };
+  };
   day?: { title: string; lead?: string; /** Its place in the menu, as a guided tour's. */ menu?: "bottom" | false; steps: { time: string; title: string; text?: string; href?: string }[] };
   /**
    * Info points: small pulsing dots on things in the room; a tap opens a card.

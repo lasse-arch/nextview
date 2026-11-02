@@ -237,6 +237,14 @@ function startsGuide(href: string): boolean {
   return true;
 }
 
+/** "#linjedag" / "#linjedag:<line id>": "En dag på din linje" - the picker, or that line's day (the engine listens for "hv-linjedag", detail = the id or null). */
+function startsLineDay(href: string): boolean {
+  const m = /^#linjedag(?::([\w-]+))?$/.exec(href);
+  if (!m) return false;
+  window.dispatchEvent(new CustomEvent("hv-linjedag", { detail: m[1] ?? null }));
+  return true;
+}
+
 /** A place in the tour itself (a scan point, a point on the aerial photo, a picture, the aerial photo): the tour goes there - "hv-gaa-til", detail { href, label }. */
 function goesInTour(href: string, label: string): boolean {
   if (!(isPlaceHref(href) || /^#(punkt:|billede:|luften$)/.test(href))) return false;
@@ -248,6 +256,7 @@ function goesInTour(href: string, label: string): boolean {
 export function openLink(T: TourConfig, href: string, label: string, popup: (href: string, label: string) => void) {
   if (IN_TOUR[href]) return void window.dispatchEvent(new Event(IN_TOUR[href]));
   if (startsGuide(href)) return;
+  if (startsLineDay(href)) return;
   if (goesInTour(href, label)) return;
   // Never a javascript:/data: link from the setup - it would run in the visitor's page.
   if (!safeHref(href)) return;
@@ -295,6 +304,10 @@ export function TourLink({
         if (guideOfHref(href) !== undefined) {
           e.preventDefault();
           startsGuide(href);
+          return;
+        }
+        if (startsLineDay(href)) {
+          e.preventDefault();
           return;
         }
         if (goesInTour(href, label)) {

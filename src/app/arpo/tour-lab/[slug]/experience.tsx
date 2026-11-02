@@ -34,6 +34,7 @@ import { BENTO_CSS, BentoMenu } from "./bento";
 import { INFO_CSS, InfoDots, usePlaceInfo } from "./info";
 import { STAGING_CSS, StagingLayer } from "./staging";
 import { SITE_PLAN_CSS } from "./site-plan";
+import { LINE_DAY_CSS, LineDayCard, LineDayEnd, LineDayPicker, lineDayStops, type LineDayRun } from "./line-day";
 import { YEARWHEEL_CSS, YearWheelPanel } from "./yearwheel";
 import { MAP_CSS, MapScene, type MapApi } from "./map";
 import { CARDS_CSS, NudgeCard, PlaceCard } from "./cards";
@@ -549,6 +550,21 @@ function TourExperience({
     window.addEventListener("hv-kontakt", open);
     return () => window.removeEventListener("hv-kontakt", open);
   }, []);
+  /** "En dag på din linje": the picker open, and the day running (line, stop, or the end). */
+  const [linePicker, setLinePicker] = useState(false);
+  const [lineRun, setLineRun] = useState<LineDayRun | null>(null);
+  useEffect(() => {
+    const open = (e: Event) => {
+      const id = (e as CustomEvent<string | null>).detail;
+      // The day takes over from the welcome / the front page.
+      setWelcome(false);
+      setCover(false);
+      if (id) setLineRun({ line: id, at: 0 });
+      else setLinePicker(true);
+    };
+    window.addEventListener("hv-linjedag", open);
+    return () => window.removeEventListener("hv-linjedag", open);
+  }, []);
   /** The year wheel ("#aarshjul", or its button) is open full screen. */
   const [wheelOpen, setWheelOpen] = useState(false);
   useEffect(() => {
@@ -1063,6 +1079,16 @@ function TourExperience({
     openFinderRef.current = () => openFinder("link");
     openDayRef.current = (from) => T.day && openDay(from);
   });
+  // "En dag på din linje": each stop with a place flies the tour there (as a menu item would).
+  const lineStops = lineRun && T.lineDays ? lineDayStops(T.lineDays, lineRun.line) : [];
+  const lineStopKey = lineRun && !lineRun.end ? `${lineRun.line}|${lineRun.at}` : null;
+  useEffect(() => {
+    if (!lineStopKey || !lineRun) return;
+    const s = lineStops[lineRun.at];
+    track("lineday_stop", { label: `${lineRun.line}: ${s?.title ?? ""}`, stop: lineRun.at + 1 });
+    if (s?.href) goToRef.current(s.href, s.title);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per stop
+  }, [lineStopKey]);
   /** "#punkt:<id>" → that point, if the setup has it. */
   const pointById = (href: string) => {
     const id = pointOfHref(href);
@@ -2407,7 +2433,7 @@ function TourExperience({
   return (
     <TourLang.Provider value={{ lang, t: tx }}>
     <LinkProvider T={T} popup={popup}>
-    <div className={`hv fixed inset-0 z-50 overflow-hidden bg-[#0d1b20] ${selected ? "hv-punkt" : ""} ${zoomed ? "hv-zoom" : ""} ${welcome ? "hv-welcome" : ""} ${phase === "tour" && T.stories?.mobile ? "hv-st-on-m" : ""} ${menuOpen ? "hv-menu-aaben" : ""} ${T.overviewUi?.box?.desktop === false ? "hv-boks-ud-d" : ""} ${T.overviewUi?.box?.mobile === false ? "hv-boks-ud-m" : ""} ${T.overviewUi?.filter?.desktop === false ? "hv-filter-ud-d" : ""} ${T.overviewUi?.filter?.mobile === false ? "hv-filter-ud-m" : ""} ${T.overviewUi?.names?.desktop ? `hv-navne-d-${T.overviewUi.names.desktop}` : ""} ${T.overviewUi?.names?.mobile ? `hv-navne-m-${T.overviewUi.names.mobile}` : ""} ${T.overviewUi?.filterColumns ? `hv-filter-kol hv-filter-kol-${T.overviewUi.filterColumns}` : T.overviewUi?.filterScroll ? "hv-filter-rul" : ""} ${langClasses} ${T.design?.menu === "dock" ? "hv-dock" : ""} ${T.logoSide === "right" ? "hv-logo-h" : ""} ${T.logoBg ? `hv-logobg-${T.logoBg}` : ""} ${T.logoBgTiles ?? T.logoBg ? `hv-tlogobg-${T.logoBgTiles ?? T.logoBg}` : ""} hv-tlogo-${T.logoAlignTiles ?? "midt"} ${guideAt != null || (dayAt != null && !dayOpen) ? "hv-guiding" : ""} ${route ? "hv-routing" : ""} ${phase === "tour" ? "hv-i-tour" : ""} ${T.wayfinding ? "hv-har-rute" : ""} ${findAside.map((a) => `rt-vig-${a}`).join(" ")} ${showCard != null ? "hv-med-stedkort" : ""} ${nudgeOn && T.nudge && phase === "tour" ? "hv-med-nudge" : ""} ${T.wayfinding?.button?.desktop ? `rt-d-${T.wayfinding.button.desktop}` : ""} ${T.wayfinding?.button?.mobile ? `rt-m-${T.wayfinding.button.mobile}` : ""} ${showCard != null || (nudgeOn && T.nudge && phase === "tour") ? "hv-med-kort" : ""} ${showMeasures && phase === "tour" ? "hv-maler" : ""} ${phase === "tour" && T.stories?.desktop ? "hv-st-on-d" : ""}`} style={
+    <div className={`hv fixed inset-0 z-50 overflow-hidden bg-[#0d1b20] ${selected ? "hv-punkt" : ""} ${zoomed ? "hv-zoom" : ""} ${welcome ? "hv-welcome" : ""} ${phase === "tour" && T.stories?.mobile ? "hv-st-on-m" : ""} ${menuOpen ? "hv-menu-aaben" : ""} ${T.overviewUi?.box?.desktop === false ? "hv-boks-ud-d" : ""} ${T.overviewUi?.box?.mobile === false ? "hv-boks-ud-m" : ""} ${T.overviewUi?.filter?.desktop === false ? "hv-filter-ud-d" : ""} ${T.overviewUi?.filter?.mobile === false ? "hv-filter-ud-m" : ""} ${T.overviewUi?.names?.desktop ? `hv-navne-d-${T.overviewUi.names.desktop}` : ""} ${T.overviewUi?.names?.mobile ? `hv-navne-m-${T.overviewUi.names.mobile}` : ""} ${T.overviewUi?.filterColumns ? `hv-filter-kol hv-filter-kol-${T.overviewUi.filterColumns}` : T.overviewUi?.filterScroll ? "hv-filter-rul" : ""} ${langClasses} ${T.design?.menu === "dock" ? "hv-dock" : ""} ${T.logoSide === "right" ? "hv-logo-h" : ""} ${T.logoBg ? `hv-logobg-${T.logoBg}` : ""} ${T.logoBgTiles ?? T.logoBg ? `hv-tlogobg-${T.logoBgTiles ?? T.logoBg}` : ""} hv-tlogo-${T.logoAlignTiles ?? "midt"} ${guideAt != null || (dayAt != null && !dayOpen) || (lineRun && !lineRun.end) ? "hv-guiding" : ""} ${route ? "hv-routing" : ""} ${phase === "tour" ? "hv-i-tour" : ""} ${T.wayfinding ? "hv-har-rute" : ""} ${findAside.map((a) => `rt-vig-${a}`).join(" ")} ${showCard != null ? "hv-med-stedkort" : ""} ${nudgeOn && T.nudge && phase === "tour" ? "hv-med-nudge" : ""} ${T.wayfinding?.button?.desktop ? `rt-d-${T.wayfinding.button.desktop}` : ""} ${T.wayfinding?.button?.mobile ? `rt-m-${T.wayfinding.button.mobile}` : ""} ${showCard != null || (nudgeOn && T.nudge && phase === "tour") ? "hv-med-kort" : ""} ${showMeasures && phase === "tour" ? "hv-maler" : ""} ${phase === "tour" && T.stories?.desktop ? "hv-st-on-d" : ""}`} style={
         {
           fontFamily: `'${T.font}', system-ui, sans-serif`,
           "--c-main": T.colors.main,
@@ -2424,7 +2450,7 @@ function TourExperience({
       }>
       <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.font.replace(/ /g, "+")}:wght@400;600;700;800;900&display=swap`} />
       {T.fontHeading && <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.fontHeading.replace(/ /g, "+")}:wght@500;600&display=swap`} />}
-      <style>{CSS + CONTACT_CSS + STORIES_CSS + LIGHTBOX_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + ONBOARDING_CSS + MENU_HINT_CSS + INFO_CSS + STAGING_CSS + (T.yearWheel ? YEARWHEEL_CSS : "") + MAP_CSS + (T.sitePlan?.overlay ? SITE_PLAN_CSS : "") + ROUTE_CSS + MEASURES_CSS + CARDS_CSS + DAY_CSS + SIMPLE_CSS + BENTO_CSS + LOGO_RIGHT_CSS + LANG_CSS + WEATHER_CSS + COMMUTE_CSS + FEATURES_CSS + FINDER_CSS + (review ? FEEDBACK_CSS : "")}</style>
+      <style>{CSS + CONTACT_CSS + STORIES_CSS + LIGHTBOX_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + ONBOARDING_CSS + MENU_HINT_CSS + INFO_CSS + STAGING_CSS + (T.lineDays ? LINE_DAY_CSS : "") + (T.yearWheel ? YEARWHEEL_CSS : "") + MAP_CSS + (T.sitePlan?.overlay ? SITE_PLAN_CSS : "") + ROUTE_CSS + MEASURES_CSS + CARDS_CSS + DAY_CSS + SIMPLE_CSS + BENTO_CSS + LOGO_RIGHT_CSS + LANG_CSS + WEATHER_CSS + COMMUTE_CSS + FEATURES_CSS + FINDER_CSS + (review ? FEEDBACK_CSS : "")}</style>
       {/* The tour's own design on top (written by Claude or by hand under Avanceret). */}
       {T.customCss && <style>{T.customCss.replace(/<\/?style/gi, "")}</style>}
 
@@ -3176,6 +3202,38 @@ function TourExperience({
             track("day_close", { stop: dayAt + 1 });
             setDayAt(null);
           }}
+        />
+      )}
+      {linePicker && T.lineDays && (
+        <LineDayPicker
+          L={T.lineDays}
+          onPick={(line) => {
+            track("lineday_start", { label: line });
+            setLinePicker(false);
+            setWelcome(false);
+            setCover(false);
+            setLineRun({ line, at: 0 });
+          }}
+          onClose={() => setLinePicker(false)}
+        />
+      )}
+      {lineRun && !lineRun.end && T.lineDays && (
+        <LineDayCard
+          L={T.lineDays}
+          stops={lineStops}
+          run={lineRun}
+          onGo={(at) => setLineRun((r) => (r ? (at === "end" ? { ...r, end: true } : { ...r, at }) : r))}
+          onClose={() => (track("lineday_close", { stop: lineRun.at + 1 }), setLineRun(null))}
+        />
+      )}
+      {lineRun?.end && T.lineDays && (
+        <LineDayEnd
+          L={T.lineDays}
+          stops={lineStops}
+          run={lineRun}
+          onPick={(line) => (track("lineday_start", { label: line }), setLineRun({ line, at: 0 }))}
+          onVisit={(label, href) => (ctaClick(label, href, "linjedag"), setLineRun(null), openLink(T, href, label, popup))}
+          onClose={() => setLineRun(null)}
         />
       )}
       {T.commute?.button && !welcome && !(cover && T.cover) && guideAt == null && !route && (

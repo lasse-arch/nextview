@@ -30,6 +30,18 @@ export const langName = (code: string) => LANGUAGES.find((l) => l.code === code)
 
 /** The engine's own words, as written in the code - `{x}` is filled in at runtime and must stay in a translation. */
 export const UI_STRINGS = [
+  "Med {navne}",
+  "I tvivl? Se lidt af det hele",
+  "Gå selv rundt",
+  "Lidt af det hele",
+  "En dag på {linje}",
+  "Dagen",
+  "Hele skolen",
+  "Din dag",
+  "Det var en dag på {linje}.",
+  "Det var en dag hos os.",
+  "Se en hel dag på din linje",
+  "Se en dag på en anden linje",
   "Pladskort",
   "Ankomst",
   "Afrejse",
