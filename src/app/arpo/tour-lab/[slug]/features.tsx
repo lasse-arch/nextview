@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useT } from "../tours/i18n-react";
 import { shownGuides, guideStops, startPlaces } from "../tours/places";
 import type { TourConfig } from "../tours/types";
@@ -497,10 +497,33 @@ export function FeatureTour({ T, onClose, onEvent, demo }: { T: TourConfig; onCl
     return () => window.clearTimeout(go);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- a new step
   }, [reel]);
+  // While the showreel plays, the tour (and whatever it opens - a form, Find vej, the day) moves up above the caption:
+  // the caption has its own room at the bottom and never covers what it explains.
+  const caption = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = caption.current;
+    const tour = el?.closest<HTMLElement>(".hv");
+    if (!el || !tour) return;
+    const fit = () => tour.style.setProperty("--ft-reel-h", `${Math.ceil(el.getBoundingClientRect().height) + 12}px`);
+    fit();
+    tour.classList.add("ft-reel-on");
+    const ro = new ResizeObserver(fit);
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+      tour.classList.remove("ft-reel-on");
+      tour.style.removeProperty("--ft-reel-h");
+    };
+  }, [step]);
+  // A new card starts at its top (a long one on a small phone was opened scrolled down).
+  const ark = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    ark.current?.scrollTo({ top: 0 });
+  }, [at]);
   if (!all.length) return null;
   if (step)
     return (
-      <div className="ft-reel" role="status">
+      <div className="ft-reel" role="status" ref={caption}>
         <p className="ft-kick">
           {demo ? "Det kan touren" : tr("Det kan jeres tour")} · {reel! + 1} / {steps.length}
         </p>
@@ -546,7 +569,7 @@ export function FeatureTour({ T, onClose, onEvent, demo }: { T: TourConfig; onCl
   };
   return (
     <div className="ft-bg" role="dialog" aria-modal="true" aria-label={tr("Det kan jeres tour")}>
-      <div className="ft-ark">
+      <div className="ft-ark" ref={ark}>
         <button type="button" className="ft-x" aria-label={tr("Luk")} onClick={close}>
           ×
         </button>
@@ -746,7 +769,8 @@ export const FEATURES_CSS = `
 .ft-reel-start{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;margin-top:14px;border:0;border-radius:14px;padding:13px 14px;background:linear-gradient(135deg,var(--c-main),color-mix(in srgb,var(--c-main) 55%,var(--c-accent)));color:#fff;font:inherit;font-weight:800;font-size:15px;cursor:pointer;box-shadow:0 8px 22px color-mix(in srgb,var(--c-main) 35%,transparent)}
 .ft-reel-start small{font-weight:600;opacity:.75}
 .ft-selv{display:block;width:100%;margin-top:8px;border:0;background:none;padding:6px;font:inherit;font-weight:700;font-size:14px;color:var(--c-main);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
-.ft-reel{position:absolute;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));translate:-50% 0;z-index:62;width:min(520px,calc(100% - 24px));padding:12px 14px 10px;border-radius:18px;background:rgba(13,27,32,.9);color:#fff;box-shadow:0 14px 40px rgba(0,0,0,.35);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);animation:hvUp .35s ease}
+.hv.ft-reel-on{bottom:var(--ft-reel-h,0px)!important;transition:bottom .25s ease}
+.ft-reel{position:fixed;left:50%;bottom:calc(8px + env(safe-area-inset-bottom,0px));translate:-50% 0;z-index:62;width:min(520px,calc(100% - 24px));padding:12px 14px 10px;border-radius:18px;background:rgba(13,27,32,.9);color:#fff;box-shadow:0 14px 40px rgba(0,0,0,.35);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);animation:hvUp .35s ease}
 .ft-reel .ft-kick{margin:6px 0 2px;color:color-mix(in srgb,var(--c-accent) 70%,#fff)}
 .ft-reel>b{display:block;font-size:17px;line-height:1.2}
 .ft-reel>span{display:block;margin-top:3px;font-size:13.5px;line-height:1.4;color:rgba(255,255,255,.82)}
@@ -759,7 +783,8 @@ export const FEATURES_CSS = `
 .ft-reel-scene .ft-intro{padding:12px}
 .ft-reel-hvorfor{margin-top:8px!important;padding:8px 10px;border-radius:12px;background:rgba(255,255,255,.08);font-size:13px!important}
 .ft-reel-hvorfor b{display:inline!important;font-size:11px!important;letter-spacing:.08em;text-transform:uppercase;color:color-mix(in srgb,var(--c-accent) 70%,#fff);margin-right:4px}
-@media (max-width:760px){.ft-reel{max-height:calc(100% - 90px);overflow-y:auto}.ft-reel-knapper button{white-space:nowrap;padding:8px 6px;font-size:12.5px}}
+@media (max-width:760px){.ft-reel{width:calc(100% - 16px);max-height:55vh;overflow-y:auto;padding:10px 12px 9px}.ft-reel>b{font-size:16px}.ft-reel>span{font-size:13px}
+.ft-ark{padding:16px 16px 12px;max-height:calc(100% - 16px)}.ft-scene{height:110px}.ft-slide h2{font-size:19px;margin-top:12px}.ft-slide p{font-size:14px}.ft-hvorfor{margin-top:10px;padding:10px 12px;font-size:13px}.ft-reel-knapper button{white-space:nowrap;padding:8px 6px;font-size:12.5px}}
 .ft-reel-knapper button{flex:1;border:0;border-radius:999px;padding:8px 10px;background:rgba(255,255,255,.14);color:#fff;font:inherit;font-weight:700;font-size:13px;cursor:pointer}
 .ft-reel-knapper button:nth-child(2){background:var(--c-accent)}
 .ft-overalt{display:flex;align-items:flex-end;justify-content:center;gap:14px;padding:18px}
