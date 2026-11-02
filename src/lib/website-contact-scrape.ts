@@ -2,7 +2,8 @@ import { fetchPageText } from "@/lib/url-lead-scan";
 
 export type ScrapedContactInfo = { name: string | null; phone: string | null; ownerName: string | null };
 
-const TEL_HREF_PATTERN = /href=["']tel:([+\d\s()-]{6,20})["']/i;
+// Spaces in a tel: link are sometimes written encoded ("tel:+45%204498%200065").
+const TEL_HREF_PATTERN = /href=["']tel:((?:[+\d\s()-]|%20){6,30})["']/i;
 const PHONE_CONTEXT_PATTERN =
   /(?:tlf\.?|telefon|ring (?:til )?os)[^\d]{0,15}((?:\+45\s?)?\d{2}[\s.]?\d{2}[\s.]?\d{2}[\s.]?\d{2})/i;
 // Deliberately NOT case-insensitive as a whole pattern - only the keyword
@@ -41,7 +42,7 @@ export async function scrapeBasicContactInfo(url: string): Promise<ScrapedContac
 
   const telMatch = page.html.match(TEL_HREF_PATTERN);
   const contextMatch = page.text.match(PHONE_CONTEXT_PATTERN);
-  const phone = (telMatch && cleanPhone(telMatch[1])) || (contextMatch && cleanPhone(contextMatch[1])) || null;
+  const phone = (telMatch && cleanPhone(telMatch[1].replace(/%20/g, " "))) || (contextMatch && cleanPhone(contextMatch[1])) || null;
 
   const ownerMatch = page.text.match(OWNER_PATTERN);
   const ownerCandidate = ownerMatch ? ownerMatch[1].trim() : null;

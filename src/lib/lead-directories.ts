@@ -1,4 +1,5 @@
 import "server-only";
+import { scrapeBasicContactInfo } from "@/lib/website-contact-scrape";
 
 /**
  * Directory pages that list many businesses at once - pasting such a link
@@ -12,6 +13,9 @@ import "server-only";
  *  - friskolerne.dk/om-os/friskolekort - every friskole on Friskolernes map
  *    (the school's address, phone, e-mail and website, the head teacher as
  *    the contact, and its size as a note).
+ *  - privateskoler.dk/skoler/ - every member school of Danmarks Private
+ *    Skoler (name, address, website); the phone number is fetched from each
+ *    school's own website (front page, else its contact page).
  */
 
 export type DirectoryLead = {
@@ -45,6 +49,7 @@ export async function expandDirectoryLink(url: string): Promise<DirectoryLead[] 
     return dkCampLeads(slug || null);
   }
   if (host === "friskolerne.dk" && /^\/om-os\/friskolekort\/?$/.test(parsed.pathname)) return friskoleLeads();
+  if (host === "privateskoler.dk" && /^\/skoler(\/(page\/\d+\/?)?)?$/.test(parsed.pathname)) return privateskoleLeads();
   return null;
 }
 
@@ -114,6 +119,59 @@ async function friskoleLeads(): Promise<DirectoryLead[]> {
   }
   if (!leads.length) throw new Error("Kunne ikke læse skolerne på friskolekortet - siden er måske lavet om.");
   return leads;
+}
+
+const PRIVATSKOLER = "https://privateskoler.dk";
+
+/**
+ * Danmarks Private Skoler's school list: one page with every member school
+ * (name, street, postcode and town, website). No phone numbers there - each
+ * school's own website is asked (its front page, then /kontakt), the same
+ * best-effort read as a pasted website link, through the safe fetch.
+ */
+async function privateskoleLeads(): Promise<DirectoryLead[]> {
+  const page = await fetch(`${PRIVATSKOLER}/skoler/`, { headers: { "User-Agent": USER_AGENT }, signal: AbortSignal.timeout(20_000) });
+  if (!page.ok) throw new Error(`privateskoler.dk svarede ${page.status} - kunne ikke hente skolelisten.`);
+  const html = await page.text();
+  const text = (v: string) => decodeEntities(v.replace(/<[^>]+>/g, "")).replace(/\s+/g, " ").trim();
+  const seen = new Set<string>();
+  const schools: { name: string; address: string | null; website: string | null }[] = [];
+  for (const m of html.matchAll(/<div class="skole-content-data">([\s\S]*?)<\/div>/g)) {
+    const block = m[1];
+    const name = text(/class="skoler_title">([\s\S]*?)<\/p>/.exec(block)?.[1] ?? "");
+    if (!name || seen.has(name.toLowerCase())) continue;
+    seen.add(name.toLowerCase());
+    const lines = [...block.matchAll(/class="skoler_txt">([\s\S]*?)<\/p>/g)].map((x) => text(x[1])).filter(Boolean);
+    const href = /class="skoler_link">[\s\S]*?href="([^"]+)"/.exec(block)?.[1];
+    const website = href && /^https?:\/\//i.test(decodeEntities(href)) ? decodeEntities(href) : null;
+    schools.push({ name: name.slice(0, 120), address: lines.join(", ").slice(0, 200) || null, website });
+  }
+  if (!schools.length) throw new Error("Kunne ikke læse skolerne på privateskoler.dk - siden er måske lavet om.");
+
+  // The phone lookups stop after 3 minutes, so the add stays well inside the server's limit - a school not reached keeps its website to look up.
+  const deadline = Date.now() + 180_000;
+  return mapWithConcurrency(schools, 10, async (school) => {
+    let phone: string | null = null;
+    if (school.website && Date.now() < deadline) {
+      phone = (await scrapeBasicContactInfo(school.website).catch(() => null))?.phone ?? null;
+      if (!phone && Date.now() < deadline) {
+        try {
+          phone = (await scrapeBasicContactInfo(new URL("/kontakt", school.website).toString()).catch(() => null))?.phone ?? null;
+        } catch {
+          // not a usable address
+        }
+      }
+    }
+    return {
+      companyName: school.name,
+      address: school.address,
+      contactPhone: phone,
+      contactEmail: null,
+      websiteUrl: school.website,
+      sourceUrl: `${PRIVATSKOLER}/skoler/#${encodeURIComponent(school.name)}`,
+      note: phone ? "Telefon fundet på skolens hjemmeside - tjek at det er skolens hovednummer." : school.website ? "Intet telefonnummer fundet på skolens hjemmeside." : null,
+    };
+  });
 }
 
 type DkCampItem = { url: string; title: string; address: string | null };
