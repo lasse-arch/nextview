@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { mouseScroll } from "./mouse-scroll";
 import { useT } from "../tours/i18n-react";
 import { shownGuides, guideStops, startPlaces } from "../tours/places";
 import type { TourConfig } from "../tours/types";
@@ -378,21 +379,7 @@ function featuresOf(T: TourConfig, tr: (s: string, v?: Record<string, string | n
         title: "Det kan vi også lave til jer",
         text: "Hver tour bygges til stedet - med det, der hjælper netop jeres gæster.",
         scene: (
-          <div className="ft-scene ft-intro ft-mere">
-            <div className="ft-loeb" style={{ animationDuration: `${more.length * 3.2}s` }}>
-            {more.map((t, i) => (
-              <span key={t} className={i >= 8 ? "ft-ekstra" : undefined} style={{ animationDelay: `${0.1 + Math.min(i, 8) * 0.1}s` }}>
-                {t}
-              </span>
-            ))}
-            {/* The same once more: in the showreel the names run round as a band, so all can be read. */}
-            {more.map((t) => (
-              <span key={`${t}-2`} className="ft-dub" aria-hidden>
-                {t}
-              </span>
-            ))}
-            </div>
-          </div>
+          <MoreBand items={more} />
         ),
       });
     out.push({
@@ -451,6 +438,83 @@ const CAN_ALSO: [string, string][] = [
   ["sprog", "Flere sprog"],
   ["stories", "Historier som på Instagram"],
 ];
+
+/**
+ * "Det kan vi også lave til jer": what else we make, in a new order each time.
+ * On the card, the first eight; in the showreel all of them, running round in
+ * one band (twice over, so the loop never jumps) - and the visitor can swipe,
+ * scroll or drag it faster; it runs on by itself a moment after.
+ */
+function MoreBand({ items }: { items: string[] }) {
+  const [order] = useState(() => {
+    const a = [...items];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  });
+  const rul = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = rul.current;
+    if (!el) return;
+    const still = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    let held = 0;
+    let pos = el.scrollLeft;
+    let frame = 0;
+    let last = performance.now();
+    const hold = () => (held = performance.now() + 2500);
+    const tick = (t: number) => {
+      const dt = Math.min(64, t - last);
+      last = t;
+      const half = el.scrollWidth / 2;
+      if (half > el.clientWidth) {
+        if (!still && t > held) pos += dt * 0.035; // ~35 px a second - slow enough to read
+        else pos = el.scrollLeft;
+        // Past the first copy (by itself or by the visitor): back by one copy - the same view.
+        if (pos >= half) pos -= half;
+        if (pos < 0) pos += half;
+        if (Math.abs(el.scrollLeft - pos) >= 0.5) el.scrollLeft = pos;
+      }
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    const opts = { passive: true } as const;
+    el.addEventListener("pointerdown", hold, opts);
+    el.addEventListener("wheel", hold, opts);
+    el.addEventListener("touchstart", hold, opts);
+    el.addEventListener("touchmove", hold, opts);
+    return () => {
+      cancelAnimationFrame(frame);
+      el.removeEventListener("pointerdown", hold);
+      el.removeEventListener("wheel", hold);
+      el.removeEventListener("touchstart", hold);
+      el.removeEventListener("touchmove", hold);
+    };
+  }, []);
+  return (
+    <div className="ft-scene ft-intro ft-mere">
+      <div
+        className="ft-rul"
+        ref={(el) => {
+          rul.current = el;
+          return mouseScroll(el);
+        }}
+      >
+        {order.map((t, i) => (
+          <span key={t} className={i >= 8 ? "ft-ekstra" : undefined} style={{ animationDelay: `${0.1 + Math.min(i, 8) * 0.1}s` }}>
+            {t}
+          </span>
+        ))}
+        {order.map((t) => (
+          <span key={`${t}-2`} className="ft-dub" aria-hidden>
+            {t}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 /** "Derfor er det med" - the reason behind each feature, in the customer's terms. */
 function whyOf(key: string, tr: (s: string, v?: Record<string, string | number>) => string): string | undefined {
@@ -844,13 +908,13 @@ export const FEATURES_CSS = `
 .ft-reel-scene .ft-scene{height:auto;min-height:90px;border-radius:12px}
 .ft-reel-scene .ft-intro{padding:12px}
 .ft-intro .ft-dub,.ft-intro .ft-ekstra{display:none}
-.ft-loeb{display:contents}
-/* In the showreel: every name, running round in one band (two copies, so the loop never jumps) - slow enough to read. */
+.ft-rul{display:contents}
+/* In the showreel: one band that runs by itself and can be swiped, scrolled or dragged. */
 .ft-reel-scene .ft-mere{display:block;padding:9px 0;min-height:0!important;height:auto;overflow:hidden;-webkit-mask-image:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent);mask-image:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent)}
-.ft-reel-scene .ft-loeb{display:flex;width:max-content;animation:ftLoeb 30s linear infinite}
-.ft-reel-scene .ft-loeb span{display:inline-block!important;flex:none;max-width:none;margin-right:6px;animation:none;opacity:1}
-@keyframes ftLoeb{from{transform:translateX(0)}to{transform:translateX(-50%)}}
-@media (prefers-reduced-motion:reduce){.ft-reel-scene .ft-loeb{animation:none;flex-wrap:wrap;width:auto}.ft-reel-scene .ft-dub{display:none!important}}
+.ft-reel-scene .ft-rul{display:flex;overflow-x:auto;scrollbar-width:none;overscroll-behavior-x:contain;touch-action:pan-x;cursor:grab}
+.ft-reel-scene .ft-rul::-webkit-scrollbar{display:none}
+.ft-reel-scene .ft-rul:active{cursor:grabbing}
+.ft-reel-scene .ft-rul span{display:inline-block!important;flex:none;max-width:none;margin-right:6px;animation:none;opacity:1;user-select:none}
 .ft-reel-vaek{display:none!important}
 .ft-reel-hvorfor{margin-top:8px!important;padding:8px 10px;border-radius:12px;background:rgba(255,255,255,.08);font-size:13px!important}
 .ft-reel-hvorfor b{display:inline!important;font-size:11px!important;letter-spacing:.08em;text-transform:uppercase;color:color-mix(in srgb,var(--c-accent) 70%,#fff);margin-right:4px}

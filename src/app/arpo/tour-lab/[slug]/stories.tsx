@@ -2,6 +2,7 @@
 
 import { useT } from "../tours/i18n-react";
 import { useEffect, useRef, useState } from "react";
+import { mouseScroll } from "./mouse-scroll";
 
 export type StoryRoom = { name: string; href: string; image?: string };
 
@@ -237,7 +238,7 @@ export function Stories({
               <span className="hv-st-pic">▶</span>
               <b>{tr("Afspil")}</b>
             </button>
-            <div className="hv-st-row">
+            <div className="hv-st-row" ref={mouseScroll}>
               {leading && (
                 <button
                   type="button"
@@ -324,6 +325,7 @@ export const STORIES_CSS = `
 .hv-st-lukket{background:none}
 .hv-st-row{display:flex;gap:9px;width:100%;overflow-x:auto;touch-action:pan-x;overscroll-behavior-x:contain;padding:4px 12px 2px;scroll-snap-type:x proximity;scrollbar-width:none}
 .hv-st-row::-webkit-scrollbar{display:none}
+@media (hover:hover) and (pointer:fine){.hv-st-row{cursor:grab;scroll-snap-type:none}.hv-st-row:active{cursor:grabbing}}
 .hv-st-card{flex:none;width:74px;display:flex;flex-direction:column;align-items:center;gap:5px;border:0;background:none;padding:0;cursor:pointer;scroll-snap-align:center;font-family:inherit;animation:hvUp .45s cubic-bezier(.2,.7,.2,1) both}
 .hv-st-pic{position:relative;width:74px;height:98px;border-radius:14px;padding:2.5px;background:linear-gradient(160deg,var(--c-accent),var(--c-main));display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:0 6px 16px rgba(0,0,0,.35);transition:transform .2s}
 .hv-st-pic img,.hv-st-pic em{width:100%;height:100%;border-radius:11.5px;object-fit:cover;border:2px solid rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:26px;font-style:normal;background:var(--c-main)}
