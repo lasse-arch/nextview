@@ -259,6 +259,8 @@ type ExperienceProps = {
   modelId: string | null;
   sweepBySs: Record<number, string>;
   hiddenSweeps: string[];
+  /** Every hidden scan point (MPSkins and Scanpunkter), the ones the menu links to too - for "Låst inde i rummene". */
+  hiddenAll?: string[];
   /** Room name -> picture URL for the story cards. */
   storyImages: Record<string, string>;
   /** The model's scan-point network, for "Find vej". */
@@ -396,7 +398,8 @@ function TourExperience({
   sdkKey,
   modelId,
   sweepBySs,
-  hiddenSweeps,
+  hiddenSweeps: hiddenOpen,
+  hiddenAll,
   storyImages,
   routeGraph,
   units: givenUnits,
@@ -412,6 +415,16 @@ function TourExperience({
   // "Direkte i touren" (design.welcome "none"): the welcome's tiles are kept in the setup, never shown.
   const T = useMemo(() => withoutDeadAerialLinks(asScene(localize(savedTour.design?.welcome === "none" ? { ...savedTour, welcome: undefined } : savedTour, lang))), [savedTour, lang]);
   const tx = useMemo(() => makeT(savedTour, lang), [savedTour, lang]);
+  // The scan points kept closed. "Låst inde i rummene": every hidden one - also those the menu links to (the rooms) - but the
+  // start, worked out from the setup itself, so the editor's preview locks as soon as it's switched on (before it's saved).
+  // Kept as a string first: the tour's connection depends on this list, and an edit elsewhere mustn't reconnect it.
+  const hiddenKey = useMemo(() => {
+    if (!savedTour.lockInHidden) return hiddenOpen.join(",");
+    const ss = uLinkTarget(savedTour.start)?.ss;
+    const start = ss != null ? sweepBySs[ss] : undefined;
+    return [...new Set([...(hiddenAll ?? hiddenOpen), ...savedTour.hiddenSweeps])].filter((s) => s && s !== start).join(",");
+  }, [savedTour.lockInHidden, savedTour.start, savedTour.hiddenSweeps, hiddenOpen, hiddenAll, sweepBySs]);
+  const hiddenSweeps = useMemo(() => (hiddenKey ? hiddenKey.split(",") : []), [hiddenKey]);
   const da = useMemo(() => danishOf(savedTour, lang), [savedTour, lang]);
   /** What the start ran with: only a change to how the tour starts runs it again (not a new language, nor an edit in the editor - a colour, a text). */
   const startRan = useRef<string | null>(null);

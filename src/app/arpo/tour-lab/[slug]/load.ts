@@ -66,15 +66,15 @@ export async function loadTour(setup: TourConfig) {
       })
       .filter((s): s is string => Boolean(s))
   );
-  // Hidden scan points the menu links to are opened - unless the tour locks visitors inside them ("Låst inde i rummene"):
-  // then they stay closed (the menu still takes you there - moveSweep opens them for the move) and only the start is opened.
-  const startSweep = sweepBySs[ssOf(tour.start) ?? -1];
-  const hidden = [...new Set([...(cfg ? hiddenSweeps(cfg) : []), ...tour.hiddenSweeps])].filter((s) => (tour.lockInHidden ? s !== startSweep : !linked.has(s)));
+  // Hidden scan points the menu links to are opened (hiddenSweeps) - all of them, as they are hidden, go along too
+  // (hiddenAll): a tour that locks visitors inside its rooms ("Låst inde i rummene") keeps those closed instead.
+  const hiddenAll = [...new Set([...(cfg ? hiddenSweeps(cfg) : []), ...tour.hiddenSweeps])];
+  const hidden = hiddenAll.filter((s) => !linked.has(s));
   const [units, routeGraph] = await Promise.all([
     tour.availability ? fetchBoxdepotetUnits(tour.availability.url) : Promise.resolve([]),
     tour.wayfinding && modelId ? fetchSweepGraph(modelId) : Promise.resolve(null),
   ]);
-  return { tour, sdkKey, modelId, sweepBySs, hiddenSweeps: hidden, storyImages: storyImageUrls, units, routeGraph };
+  return { tour, sdkKey, modelId, sweepBySs, hiddenSweeps: hidden, hiddenAll, storyImages: storyImageUrls, units, routeGraph };
 }
 
 /** Links set to open in a popup, whose site refuses to be shown inside ours, open in a new tab instead. */
