@@ -1004,6 +1004,78 @@ export async function placeMapSpots(
   return { ok: true, spots, note: out.note };
 }
 
+const PlanMatches = z.object({
+  pairs: z
+    .array(
+      z.object({
+        what: z.string().describe("Hvad stedet er, kort - fx 'svømmebassinets nordvestlige hjørne', 'krydset mellem hovedvejen og natursti'."),
+        plan: z.object({ x: z.number().describe("% af pladskortets bredde (0-100)"), y: z.number().describe("% af pladskortets højde (0-100)") }),
+        photo: z.object({ x: z.number().describe("% af luftfotoets bredde (0-100)"), y: z.number().describe("% af luftfotoets højde (0-100)") }),
+      })
+    )
+    .describe("6-12 steder, der ses tydeligt på begge billeder, spredt ud over hele pladsen (helst nær alle fire hjørner af pladsen)."),
+  note: z.string().describe("Kort besked til brugeren på dansk: hvad du har brugt til at lægge kortet, og om noget var usikkert."),
+});
+
+/**
+ * "nextviewAI lægger kortet på": the same spots on the site plan and on the
+ * drone photo (seen straight down) - roads crossing, the pool, buildings,
+ * hedges - from which the editor works out how the plan lies (a perspective
+ * fit through all of them, so no single guess decides it). Nothing is saved:
+ * the editor puts the corners in its draft, to be checked.
+ */
+export async function matchSitePlan(slug: string, photo: string, plan: string): Promise<{ ok: true; pairs: { what: string; plan: [number, number]; photo: [number, number] }[]; note: string } | { ok: false; error: string }> {
+  const user = await requireTour(slug);
+  const key = await apiKey();
+  if (!key) return { ok: false, error: "nextviewAI er ikke sat op endnu - indsæt en nøgle under fanen nextviewAI." };
+  // The photo: the editor's view straight down (a picture it drew), or the tour's own flat drone photo. The plan: the tour's own file.
+  const drawn = /^data:image\/jpeg;base64,([A-Za-z0-9+/=]+)$/.exec(photo);
+  const photoBytes = drawn ? (drawn[1].length < 8_000_000 ? Buffer.from(drawn[1], "base64") : null) : await ourTourImage(photo).catch(() => null);
+  const planBytes = await ourTourImage(plan).catch(() => null);
+  if (!photoBytes) return { ok: false, error: "Luftfotoet kunne ikke læses." };
+  if (!planBytes) return { ok: false, error: "Pladskortet kunne ikke læses - upload det med Skift pladskortet, så det ligger hos os." };
+  const fit = (b: Buffer) => sharp(b).resize({ width: 1400, height: 1400, fit: "inside" }).jpeg({ quality: 84 }).toBuffer();
+  let r;
+  try {
+    const [a, b] = await Promise.all([fit(photoBytes), fit(planBytes)]);
+    r = await new Anthropic({ apiKey: key }).messages.parse({
+      model: "claude-opus-5-5",
+      max_tokens: 6000,
+      system:
+        "Du lægger en campingplads' tegnede pladskort oven på et luftfoto af pladsen set lige oppefra. Find steder, der ses tydeligt på BEGGE billeder - vejkryds, svømmebassinet, bygningers hjørner, hække, stier, vejen langs pladsen - og giv deres position på hvert billede i procent af billedets bredde og højde. Pladskortet kan være drejet, spejlet eller tegnet ikke helt målfast i forhold til fotoet; brug derfor mange steder spredt over hele pladsen. Gæt ikke: brug kun steder, du er sikker på.",
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "Billede 1: luftfotoet set lige oppefra." },
+            { type: "image", source: { type: "base64", media_type: "image/jpeg", data: a.toString("base64") } },
+            { type: "text", text: "Billede 2: pladskortet." },
+            { type: "image", source: { type: "base64", media_type: "image/jpeg", data: b.toString("base64") } },
+            { type: "text", text: "Giv 6-12 steder, der ses på begge billeder, med position på pladskortet (plan) og på luftfotoet (photo)." },
+          ],
+        },
+      ],
+      output_config: { effort: "high", format: zodOutputFormat(PlanMatches) },
+    });
+  } catch (err) {
+    if (err instanceof Anthropic.AuthenticationError) return { ok: false, error: "nextviewAI-nøglen virker ikke længere." };
+    return { ok: false, error: `Kunne ikke få fat i nextviewAI (${err instanceof Error ? err.message : err}).` };
+  }
+  const u = r.usage;
+  await prisma.tourAiUsage
+    .create({ data: { tourSlug: slug, userName: user.name, kind: "pladskort", inputTokens: u.input_tokens, outputTokens: u.output_tokens, cacheReadTokens: u.cache_read_input_tokens ?? 0, cacheWriteTokens: u.cache_creation_input_tokens ?? 0, costUsd: claudeCostUsd(u) } })
+    .catch(() => {});
+  const out = r.parsed_output;
+  if (!out) return { ok: false, error: "nextviewAI svarede ikke som forventet - prøv igen." };
+  const ok = (v: number) => Number.isFinite(v) && v >= -5 && v <= 105;
+  const pairs = out.pairs
+    .filter((p) => ok(p.plan.x) && ok(p.plan.y) && ok(p.photo.x) && ok(p.photo.y))
+    .slice(0, 16)
+    .map((p) => ({ what: p.what.slice(0, 120), plan: [p.plan.x, p.plan.y] as [number, number], photo: [p.photo.x, p.photo.y] as [number, number] }));
+  if (pairs.length < 4) return { ok: false, error: `nextviewAI fandt kun ${pairs.length} steder, der ses på begge billeder - zoom, så hele pladsen ses tydeligt, og prøv igen. ${out.note}` };
+  return { ok: true, pairs, note: out.note };
+}
+
 /* ----- Design: nextviewAI picks a colour filter for the tour ----- */
 
 const FilterSuggestion = z.object({

@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { fetchNextStayUnits } from "@/lib/actions/tour-sites";
+import { matchSitePlan } from "@/lib/actions/tour-ai";
+import { fitPlan } from "./plan-fit";
 import type { SiteUnit, TourConfig } from "../../tours/types";
 import { quadSolve } from "../staging";
 import { Field, Group, input, Toggle, UploadButton } from "./ui";
@@ -109,9 +111,9 @@ export function SitePlanEditor({ config, edit, slug }: { config: TourConfig; edi
         <>
           <p className={small}>Træk de fire hjørner, så pladskortet ligger præcis oven på luftfotoet - ret ind efter fx servicebygningen og vejene.</p>
           {M.panorama ? (
-            <CornerPlacer360 pano={M.image} image={plan.image} corners={overlay.corners} opacity={overlay.opacity ?? 0.55} onChange={(corners) => edit((d) => void (d.sitePlan!.overlay!.corners = corners))} />
+            <CornerPlacer360 slug={slug} pano={M.image} image={plan.image} corners={overlay.corners} opacity={overlay.opacity ?? 0.55} onChange={(corners) => edit((d) => void (d.sitePlan!.overlay!.corners = corners))} />
           ) : (
-            <CornerPlacer M={M} image={plan.image} corners={overlay.corners} opacity={overlay.opacity ?? 0.55} onChange={(corners) => edit((d) => void (d.sitePlan!.overlay!.corners = corners))} />
+            <CornerPlacer slug={slug} M={M} image={plan.image} corners={overlay.corners} opacity={overlay.opacity ?? 0.55} onChange={(corners) => edit((d) => void (d.sitePlan!.overlay!.corners = corners))} />
           )}
           <Field title={`Gennemsigtighed: ${Math.round((overlay.opacity ?? 0.55) * 100)} %`}>
             <input
@@ -141,13 +143,14 @@ export function SitePlanEditor({ config, edit, slug }: { config: TourConfig; edi
 }
 
 /** The drone photo with the plan bent onto it, and its four corners to drag. */
-function CornerPlacer({ M, image, corners, opacity, onChange }: { M: NonNullable<TourConfig["map"]>; image: string; corners: Corners; opacity: number; onChange: (c: Corners) => void }) {
+function CornerPlacer({ slug, M, image, corners, opacity, onChange }: { slug: string; M: NonNullable<TourConfig["map"]>; image: string; corners: Corners; opacity: number; onChange: (c: Corners) => void }) {
   const box = useRef<HTMLDivElement>(null);
   const w = useWidth(box);
   const h = (w * M.h) / M.w;
   const c = w ? quadSolve(1000, 1000, corners.map(([x, y]) => ({ x: (x / 100) * w, y: (y / 100) * h }))) : null;
   const matrix = c ? `matrix3d(${c[0]},${c[3]},0,${c[6]},${c[1]},${c[4]},0,${c[7]},0,0,1,0,${c[2]},${c[5]},0,1)` : undefined;
   return (
+    <div className="space-y-2">
     <div ref={box} className="relative w-full touch-none select-none overflow-hidden rounded-xl ring-1 ring-black/[.06]" style={{ aspectRatio: `${M.w} / ${M.h}` }}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={M.image} alt="" draggable={false} className="absolute inset-0 h-full w-full" />
@@ -174,6 +177,8 @@ function CornerPlacer({ M, image, corners, opacity, onChange }: { M: NonNullable
           }
         />
       ))}
+    </div>
+      <AiPlace slug={slug} plan={image} photo={async () => M.image} onCorners={(c) => onChange(c)} />
     </div>
   );
 }
@@ -249,7 +254,7 @@ function fitView(ground: G[] | null): GroundView {
   return { cx, cz, k, heading: 0 };
 }
 
-function CornerPlacer360({ pano, image, corners, opacity, onChange }: { pano: string; image: string; corners: Corners; opacity: number; onChange: (c: Corners) => void }) {
+function CornerPlacer360({ slug, pano, image, corners, opacity, onChange }: { slug: string; pano: string; image: string; corners: Corners; opacity: number; onChange: (c: Corners) => void }) {
   const box = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const w = useWidth(box);
@@ -397,10 +402,58 @@ function CornerPlacer360({ pano, image, corners, opacity, onChange }: { pano: st
           Større
         </button>
       </div>
+      <AiPlace
+        slug={slug}
+        plan={image}
+        hint="Zoom og flyt billedet, så hele pladsen ses, før du trykker."
+        photo={async () => {
+          if (!src) throw new Error("360°-fotoet er ikke hentet endnu.");
+          const c = document.createElement("canvas");
+          c.width = 1400;
+          c.height = 1400;
+          c.getContext("2d")!.putImageData(renderGround(src, 1400, view), 0, 0);
+          return c.toDataURL("image/jpeg", 0.85);
+        }}
+        onCorners={(c) => save(c.map((p) => groundAt(view, p)))}
+      />
       <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">
         Sådan ser dronen jorden lige nedad. Træk i billedet for at flytte, rul eller + / − for at zoome. Læg pladskortet på: flyt det med den grønne prik, drej og skalér med knapperne, og ret de fire hjørner til sidst. I touren ligger det så på jorden i 360°-billedet.
       </p>
       {error && <p className="px-1 text-[12px] text-[#ff3b30]">{error}</p>}
+    </div>
+  );
+}
+
+/** "✦ nextviewAI lægger kortet på": finds the same spots on the plan and the photo, and lays the plan by them. */
+function AiPlace({ slug, plan, photo, onCorners, hint }: { slug: string; plan: string; photo: () => Promise<string>; onCorners: (c: Corners) => void; hint?: string }) {
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<{ text: string; error?: boolean } | null>(null);
+  async function run() {
+    setBusy(true);
+    setNote(null);
+    try {
+      const r = await matchSitePlan(slug, await photo(), plan);
+      if (!r.ok) throw new Error(r.error);
+      const f = fitPlan(r.pairs);
+      if (!f) throw new Error("Stederne nextviewAI fandt, passede ikke sammen - zoom, så pladsen ses tydeligere, og prøv igen.");
+      const at = ([x, y]: [number, number]): [number, number] => {
+        const d = f.h[6] * x + f.h[7] * y + 1;
+        return [Math.round(((f.h[0] * x + f.h[1] * y + f.h[2]) / d) * 100) / 100, Math.round(((f.h[3] * x + f.h[4] * y + f.h[5]) / d) * 100) / 100];
+      };
+      onCorners([at([0, 0]), at([100, 0]), at([100, 100]), at([0, 100])] as Corners);
+      setNote({ text: `Lagt på efter ${f.used} steder (afviger ca. ${f.err.toFixed(1)} % af billedet). ${r.note} Tjek det, og ret til med knapperne - Fortryd øverst, hvis det ikke blev godt.` });
+    } catch (err) {
+      setNote({ text: err instanceof Error ? err.message : String(err), error: true });
+    }
+    setBusy(false);
+  }
+  return (
+    <div className="space-y-1">
+      <button type="button" disabled={busy} onClick={run} className="w-full rounded-xl bg-[#af52de] py-2 text-[14px] font-medium text-white disabled:opacity-50">
+        {busy ? "nextviewAI kigger på billederne …" : "✦ nextviewAI lægger kortet på"}
+      </button>
+      {hint && !note && <p className="px-1 text-[12px] text-[#8e8e93]">{hint}</p>}
+      {note && <p className={`px-1 text-[12px] leading-snug ${note.error ? "text-[#ff3b30]" : "text-[#1d1d1f]"}`}>{note.text}</p>}
     </div>
   );
 }
