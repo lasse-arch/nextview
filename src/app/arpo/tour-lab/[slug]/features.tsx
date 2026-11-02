@@ -513,16 +513,34 @@ export function FeatureTour({ T, onClose, onEvent, demo }: { T: TourConfig; onCl
   const reelOn = reel != null && Boolean(step);
   /** Typing in what the tour opened (an address, a form): the phone's keyboard needs the room - the caption steps aside meanwhile. */
   const [typing, setTyping] = useState(false);
+  // Only once the keyboard is really up (the screen got lower) - not on the tap in the field itself: the page moving under
+  // the finger made that tap land on what's behind (and close it). And checked again each time the screen changes, so a
+  // field that disappears (closed) never leaves the caption away.
   useEffect(() => {
     if (!reelOn) return;
-    const field = (el: EventTarget | null) => el instanceof HTMLElement && el.matches("input, textarea, select") && !el.closest(".ft-reel");
-    const onIn = (e: FocusEvent) => field(e.target) && setTyping(true);
-    const onOut = () => window.setTimeout(() => setTyping(field(document.activeElement)), 50);
-    document.addEventListener("focusin", onIn);
-    document.addEventListener("focusout", onOut);
+    const field = (el: Element | null) => el instanceof HTMLElement && el.matches("input, textarea, select") && !el.closest(".ft-reel");
+    const vv = window.visualViewport;
+    let tall = Math.max(window.innerHeight, vv?.height ?? 0);
+    const check = () => {
+      const h = vv?.height ?? window.innerHeight;
+      tall = Math.max(tall, h);
+      setTyping(field(document.activeElement) && h < tall * 0.8);
+    };
+    let t = 0;
+    const later = () => {
+      window.clearTimeout(t);
+      t = window.setTimeout(check, 350);
+    };
+    vv?.addEventListener("resize", check);
+    window.addEventListener("resize", check);
+    document.addEventListener("focusin", later);
+    document.addEventListener("focusout", later);
     return () => {
-      document.removeEventListener("focusin", onIn);
-      document.removeEventListener("focusout", onOut);
+      window.clearTimeout(t);
+      vv?.removeEventListener("resize", check);
+      window.removeEventListener("resize", check);
+      document.removeEventListener("focusin", later);
+      document.removeEventListener("focusout", later);
     };
   }, [reelOn]);
   /** The visitor opened the tour's menu: the caption steps aside until it's closed again (the menu gets the whole screen). */
