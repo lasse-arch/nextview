@@ -5,7 +5,7 @@ import { OFFICE } from "@/lib/office";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { createCallList, addLeadsToCallList, deleteCallList, renameCallList, markVoicemail, scheduleCallBack } from "@/lib/actions/call-lists";
+import { createCallList, addLeadsToCallList, deleteCallList, renameCallList, markVoicemail, scheduleCallBack, deleteCallListLead } from "@/lib/actions/call-lists";
 import { markDealLost, setMeetingDateAndStage, sendCalendarInvite, renameDeal, updateDealPhone, updateDealWebsite } from "@/lib/actions/deals";
 import { addDealItem } from "@/lib/actions/deal-items";
 import { dealName, stageLabels, telHref } from "@/lib/labels";
@@ -301,7 +301,7 @@ function ListPicker({ lists, selectedListId }: { lists: CallListSummary[]; selec
   );
 }
 
-function QueueCard({ deal, users, currentUserId }: { deal: QueueDeal; users: Colleague[]; currentUserId: string }) {
+function QueueCard({ deal, users, currentUserId, isAdmin }: { deal: QueueDeal; users: Colleague[]; currentUserId: string; isAdmin?: boolean }) {
   const [busy, startTransition] = useTransition();
   const [bookingMeeting, setBookingMeeting] = useState(false);
   const [meetingDateInput, setMeetingDateInput] = useState("");
@@ -408,6 +408,17 @@ function QueueCard({ deal, users, currentUserId }: { deal: QueueDeal; users: Col
       } catch (err) {
         showToast(err instanceof Error ? err.message : "Kunne ikke gemme telefonsvar.");
       }
+    });
+  }
+
+  /** Admins: the lead shouldn't be on the list at all - deleted (can be put back under Slettede), not counted as lost. */
+  function deleteLead() {
+    if (!confirm(`Slet ${dealName(deal)} fra ringelisten? Den tæller ikke som tabt og kan sættes tilbage under Slettede.`)) return;
+    startTransition(async () => {
+      const r = await deleteCallListLead(deal.id);
+      if (!r.ok) return showToast(r.error);
+      showToast(`${dealName(deal)} er slettet`);
+      setGone(true);
     });
   }
 
@@ -696,6 +707,17 @@ function QueueCard({ deal, users, currentUserId }: { deal: QueueDeal; users: Col
             >
               ❌ Tabt
             </button>
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={deleteLead}
+                disabled={busy}
+                title="Fjern et lead, der ikke hører til (fejl, dublet) - tæller ikke som tabt. Kan sættes tilbage under Slettede."
+                className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+              >
+                🗑 Slet
+              </button>
+            )}
           </div>
         ) : null}
       </div>
@@ -872,12 +894,14 @@ export function RingelisteClient({
   deals,
   users,
   currentUserId,
+  isAdmin = false,
 }: {
   lists: CallListSummary[];
   selectedListId: string | null;
   deals: QueueDeal[];
   users: Colleague[];
   currentUserId: string;
+  isAdmin?: boolean;
 }) {
   const [search, setSearch] = useState("");
   /** Order and area: as the list (who's next), nearest the office first, or furthest - and one region/kommune. */
@@ -960,7 +984,7 @@ export function RingelisteClient({
         )}
         <ul className="mt-3 space-y-2.5">
           {visibleDeals.map((deal) => (
-            <QueueCard key={deal.id} deal={deal} users={users} currentUserId={currentUserId} />
+            <QueueCard key={deal.id} deal={deal} users={users} currentUserId={currentUserId} isAdmin={isAdmin} />
           ))}
           {selectedListId && deals.length === 0 && (
             <p className="text-sm text-slate-400">Ingen leads tilbage på denne liste - godt gået!</p>

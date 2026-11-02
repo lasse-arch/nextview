@@ -12,6 +12,7 @@ import { dealName, stageLabels } from "@/lib/labels";
 import { parseCallListText, guessNameFromUrl } from "@/lib/call-list-parser";
 import { scrapeBasicContactInfo } from "@/lib/website-contact-scrape";
 import { expandDirectoryLink, type DirectoryLead } from "@/lib/lead-directories";
+import { deleteDealArchived, hasSigned } from "@/lib/deal-archive";
 import type { ParsedCallListLine } from "@/lib/call-list-parser";
 
 const SOCIAL_LINK_PATTERN = /facebook\.com|instagram\.com|linkedin\.com/i;
@@ -297,5 +298,24 @@ export async function scheduleCallBack(
   revalidatePath("/arpo/ringeliste");
   revalidatePath("/arpo/opgaver");
   revalidatePath(`/arpo/deals/${dealId}`);
+  return { ok: true };
+}
+
+/**
+ * "Slet" on the ringeliste (admins only): a lead that shouldn't be there at
+ * all - added by mistake, a double, not a business - is deleted instead of
+ * marked Tabt, so it doesn't count as a lost sale. Kept under Slettede, so it
+ * can be put back. Only a lead on a ringeliste that hasn't signed anything.
+ */
+export async function deleteCallListLead(dealId: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const user = await requireUser();
+  if (user.role !== "ADMIN") return { ok: false, error: "Kun en admin kan slette leads fra ringelisten." };
+  const deal = await prisma.deal.findUnique({ where: { id: String(dealId) } });
+  if (!deal) return { ok: false, error: "Leadet findes ikke længere." };
+  if (!deal.callListId) return { ok: false, error: "Leadet er ikke på en ringeliste." };
+  if (hasSigned(deal)) return { ok: false, error: "Kunden har skrevet under og kan ikke slettes herfra." };
+  await deleteDealArchived(deal.id, user.name);
+  await logActivity({ type: "DEAL_UPDATED", message: `${user.name} slettede ${dealName(deal)} fra ringelisten (kan sættes tilbage under Slettede)`, actorId: user.id });
+  revalidatePath("/arpo/ringeliste");
   return { ok: true };
 }

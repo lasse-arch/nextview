@@ -70,6 +70,7 @@ export default async function RingelistePage({
         deals={deals.map((d) => ({ ...d, place: placeOf(d.address) }))}
         users={users}
         currentUserId={currentUser.id}
+        isAdmin={currentUser.role === "ADMIN"}
       />
     </div>
   );
