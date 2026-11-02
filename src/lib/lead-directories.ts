@@ -13,6 +13,12 @@ import { scrapeBasicContactInfo } from "@/lib/website-contact-scrape";
  *  - friskolerne.dk/om-os/friskolekort - every friskole on Friskolernes map
  *    (the school's address, phone, e-mail and website, the head teacher as
  *    the contact, and its size as a note).
+ *  - deg.dk/danmarkskort-over-medlemsskoler - every member school of
+ *    Danske Erhvervsskoler og -Gymnasier (the main departments; address,
+ *    phone, e-mail and website from the map's info box, the departments and
+ *    educations as a note).
+ *  - danskegymnasier.dk/find-gymnasier/ - every gymnasium on Danske
+ *    Gymnasier's map (address, phone, e-mail, website, the rektor as contact).
  *  - privateskoler.dk/skoler/ - every member school of Danmarks Private
  *    Skoler (name, address, website); the phone number is fetched from each
  *    school's own website (front page, else its contact page).
@@ -49,6 +55,8 @@ export async function expandDirectoryLink(url: string): Promise<DirectoryLead[] 
     return dkCampLeads(slug || null);
   }
   if (host === "friskolerne.dk" && /^\/om-os\/friskolekort\/?$/.test(parsed.pathname)) return friskoleLeads();
+  if (host === "deg.dk" && /^\/danmarkskort-over-medlemsskoler\/?$/.test(parsed.pathname)) return degLeads();
+  if (host === "danskegymnasier.dk" && /^\/find-gymnasier\/?$/.test(parsed.pathname)) return gymnasiumLeads();
   if (host === "privateskoler.dk" && /^\/skoler(\/(page\/\d+\/?)?)?$/.test(parsed.pathname)) return privateskoleLeads();
   return null;
 }
@@ -118,6 +126,135 @@ async function friskoleLeads(): Promise<DirectoryLead[]> {
     });
   }
   if (!leads.length) throw new Error("Kunne ikke læse skolerne på friskolekortet - siden er måske lavet om.");
+  return leads;
+}
+
+/** A piece of HTML as its lines of text (paragraphs, line breaks, blocks). */
+function htmlLines(h: string): string[] {
+  return decodeEntities(h.replace(/<(br|\/p|p|\/div|div|\/li|li|\/h\d|h\d|\/td|td|\/tr)[^>]*>/gi, "\n").replace(/<[^>]+>/g, " "))
+    .split("\n")
+    .map((l) => l.replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+}
+const danishPhone = (v: string | null | undefined) => {
+  const d = (v ?? "").replace(/[^\d]/g, "").replace(/^45(?=\d{8}$)/, "");
+  return d.length === 8 ? d.replace(/(\d{2})(?=\d)/g, "$1 ") : null;
+};
+const withScheme = (v: string | null | undefined) => (v ? (/^https?:\/\//i.test(v) ? v : `https://${v.replace(/^\/\//, "")}`) : null);
+
+const DEG = "https://deg.dk";
+
+/**
+ * Danske Erhvervsskoler og -Gymnasier's map: its schools are written into
+ * the page (name, place, which school a department belongs to); each main
+ * school's details come from the map's own info box (the same request a
+ * visitor's click makes), 8 at a time.
+ */
+async function degLeads(): Promise<DirectoryLead[]> {
+  const page = await fetch(`${DEG}/danmarkskort-over-medlemsskoler`, { headers: { "User-Agent": USER_AGENT }, signal: AbortSignal.timeout(20_000) });
+  if (!page.ok) throw new Error(`deg.dk svarede ${page.status} - kunne ikke hente skolekortet.`);
+  const html = await page.text();
+  const mapId = /"otMaps":\{"id":"(\d+)"/.exec(html)?.[1] ?? "3";
+  const at = html.indexOf('"markers":[');
+  if (at < 0) throw new Error("Kunne ikke læse skolerne på deg.dk - siden er måske lavet om.");
+  type Marker = { id?: string; title?: string; otmm_parent_memberschool?: string | null; otmm_hide_school?: string | null };
+  let markers: Marker[] = [];
+  try {
+    // The markers are a JSON array inside the page's settings - read up to its end.
+    let depth = 0;
+    let end = at + 10;
+    for (let i = at + 10, inStr = false; i < html.length; i++) {
+      const c = html[i];
+      if (inStr) {
+        if (c === "\\") i++;
+        else if (c === '"') inStr = false;
+      } else if (c === '"') inStr = true;
+      else if (c === "[" || c === "{") depth++;
+      else if (c === "]" || c === "}") {
+        depth--;
+        if (depth === 0) {
+          end = i + 1;
+          break;
+        }
+      }
+    }
+    markers = JSON.parse(html.slice(at + 10, end));
+  } catch {
+    throw new Error("Kunne ikke læse skolerne på deg.dk - siden er måske lavet om.");
+  }
+  // The member schools shown on the map, main departments only (a department is noted on its school).
+  const shown = markers.filter((m) => m.id && m.title && m.otmm_hide_school !== "1");
+  const main = shown.filter((m) => !m.otmm_parent_memberschool);
+  if (!main.length) throw new Error("Fandt ingen skoler på deg.dk.");
+  return mapWithConcurrency(main, 8, async (m) => {
+    const name = decodeEntities(m.title!).replace(/\s*\((?:Hovedafdeling)(?:\s*-\s*[^)]*)?\)\s*$/i, "").trim();
+    let address: string | null = null;
+    let phone: string | null = null;
+    let email: string | null = null;
+    let website: string | null = null;
+    let departments: string[] = [];
+    try {
+      const res = await fetch(`${DEG}/ot_maps/renderInfoBox?${new URLSearchParams({ ot_maps_id: mapId, node_id: m.id! })}`, { headers: { "User-Agent": USER_AGENT }, signal: AbortSignal.timeout(15_000) });
+      if (res.ok) {
+        const box = await res.text();
+        const lines = htmlLines(box);
+        const zip = lines.findIndex((l) => /^\d{4}\s+\S/.test(l));
+        if (zip > 0) address = `${lines[zip - 1]}, ${lines[zip]}`;
+        phone = danishPhone(lines.find((l) => /^\+?[\d\s]{8,14}$/.test(l)));
+        email = /href="mailto:([^"?]+)/i.exec(box)?.[1] ?? lines.find((l) => /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(l)) ?? null;
+        website = withScheme(/href="((?:https?:)?\/\/[^"]+|www\.[^"]+)"/i.exec(box.replace(/href="mailto:[^"]*"/gi, ""))?.[1] ?? lines.find((l) => /^[\w.-]+\.(dk|com|eu|net|org)\/?$/i.test(l)));
+        const sub = lines.findIndex((l) => /^Underafdeling/i.test(l));
+        if (sub >= 0) departments = lines.slice(sub + 1, sub + 21);
+      }
+    } catch {
+      // the lead is still made, with what the map had
+    }
+    return {
+      companyName: name.slice(0, 120),
+      address,
+      contactPhone: phone,
+      contactEmail: email ? decodeEntities(email) : null,
+      websiteUrl: website,
+      sourceUrl: `${DEG}/danmarkskort-over-medlemsskoler#${encodeURIComponent(name)}`,
+      note: departments.length ? `Afdelinger: ${departments.join("; ")}` : null,
+    };
+  });
+}
+
+const DANSKE_GYMNASIER = "https://danskegymnasier.dk";
+
+/** Danske Gymnasier's map: every school is a hidden block in the page with its rektor, address, phone, e-mail and website. */
+async function gymnasiumLeads(): Promise<DirectoryLead[]> {
+  const page = await fetch(`${DANSKE_GYMNASIER}/find-gymnasier/`, { headers: { "User-Agent": USER_AGENT }, signal: AbortSignal.timeout(20_000) });
+  if (!page.ok) throw new Error(`danskegymnasier.dk svarede ${page.status} - kunne ikke hente gymnasierne.`);
+  const html = await page.text();
+  const seen = new Set<string>();
+  const leads: DirectoryLead[] = [];
+  for (const m of html.matchAll(/class="wpv-addon-maps-marker [^"]*"[^>]*>([\s\S]*?)<\/div>/g)) {
+    const box = m[1];
+    const lines = htmlLines(box);
+    const name = (lines[0] ?? "").slice(0, 120);
+    if (!name || seen.has(name.toLowerCase())) continue;
+    seen.add(name.toLowerCase());
+    const flat = decodeEntities(box.replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ");
+    const rektor = lines.find((l) => /^Rektor\b/i.test(l))?.replace(/^Rektor\s+/i, "") ?? null;
+    const zip = lines.findIndex((l) => /^\d{4}\s+\S/.test(l));
+    const address = zip > 0 && !/^Rektor\b/i.test(lines[zip - 1]) ? `${lines[zip - 1]}, ${lines[zip]}` : zip >= 0 ? lines[zip] : null;
+    const phone = danishPhone(/Tlf\.?:?\s*((?:\+45\s?)?[\d\s]{8,11})/i.exec(flat)?.[1]);
+    const email = /href="mailto:([^"?]+)/i.exec(box)?.[1] ?? null;
+    const website = withScheme(/<a [^>]*href="(?!mailto:)([^"]+)"/i.exec(box)?.[1]);
+    leads.push({
+      companyName: name,
+      address,
+      contactName: rektor,
+      contactPhone: phone,
+      contactEmail: email ? decodeEntities(email) : null,
+      websiteUrl: website,
+      sourceUrl: `${DANSKE_GYMNASIER}/find-gymnasier/#${encodeURIComponent(name)}`,
+      note: rektor ? `Rektor: ${rektor}` : null,
+    });
+  }
+  if (!leads.length) throw new Error("Kunne ikke læse gymnasierne på danskegymnasier.dk - siden er måske lavet om.");
   return leads;
 }
 
@@ -229,7 +366,9 @@ function decodeEntities(s: string): string {
   return s
     .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCharCode(parseInt(h, 16)))
     .replace(/&#(\d+);/g, (_, d) => String.fromCharCode(Number(d)))
-    .replace(/&amp;/g, "&");
+    .replace(/&amp;/g, "&")
+    .replace(/&shy;|\u00ad/g, "")
+    .replace(/&nbsp;/g, " ");
 }
 
 /** "+45 2464 7841" → "24647841"; anything that isn't a Danish number is kept as written. */

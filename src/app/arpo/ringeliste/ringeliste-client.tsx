@@ -128,7 +128,7 @@ function QuickAdd({ selectedListId }: { selectedListId: string | null }) {
         value={text}
         onChange={(e) => setText(e.target.value)}
         rows={5}
-        placeholder={"Indsæt links eller navne - ét pr. linje\nhttps://datacvr.virk.dk/enhed/virksomhed/12345678\nhttps://www.facebook.com/eksempelvirksomhed\nhttps://eksempel.dk\nFirma ApS, Aalborg: 98 15 10 10\nhttps://www.dk-camp.dk/campingpladser/ (henter alle campingpladserne)\nhttps://www.friskolerne.dk/om-os/friskolekort (henter alle friskolerne med skoleleder)\nhttps://privateskoler.dk/skoler/ (henter alle privatskolerne)"}
+        placeholder={"Indsæt links eller navne - ét pr. linje\nhttps://datacvr.virk.dk/enhed/virksomhed/12345678\nhttps://www.facebook.com/eksempelvirksomhed\nhttps://eksempel.dk\nFirma ApS, Aalborg: 98 15 10 10\nhttps://www.dk-camp.dk/campingpladser/ (henter alle campingpladserne)\nhttps://www.friskolerne.dk/om-os/friskolekort (henter alle friskolerne med skoleleder)\nhttps://privateskoler.dk/skoler/ (henter alle privatskolerne)\nhttps://danskegymnasier.dk/find-gymnasier/ (henter alle gymnasierne med rektor)\nhttps://deg.dk/danmarkskort-over-medlemsskoler (henter alle erhvervsskolerne)"}
         className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
       />
       <div className="mt-2 flex flex-wrap items-center gap-2">
