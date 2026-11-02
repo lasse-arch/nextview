@@ -41,7 +41,6 @@ import { InactiveToggleButton } from "./inactive-toggle-button";
 import { PaymentMethodControl } from "./payment-method-control";
 import { BookMeetingButton } from "./book-meeting-button";
 import { BookFilmingButton } from "./book-filming-button";
-import { DemoSmsButton } from "@/components/demo-sms-button";
 import { FilmingTimeButton } from "./filming-time-button";
 import { WelcomeMailControl } from "./welcome-mail-control";
 import { TerminationSection } from "./termination-section";
@@ -214,9 +213,6 @@ export default async function DealDetailPage({
             crewOptions={users.map((u) => ({ id: u.id, name: u.name }))}
             defaultCrewIds={users.filter((u) => u.email === "lasse@nextview360.dk").map((u) => u.id)}
           />
-          {!["CONTRACT_SIGNED", "FILMED", "REVIEW", "LIVE"].includes(deal.stage) && (
-            <DemoSmsButton dealId={deal.id} className="rounded-lg border border-violet-200 bg-violet-50 px-4 py-2 text-[13px] font-semibold text-violet-700 shadow-sm hover:bg-violet-100" />
-          )}
           {["CONTRACT_SIGNED", "FILMED", "REVIEW", "LIVE"].includes(deal.stage) || deal.filmingAt ? (
             <FilmingTimeButton dealId={deal.id} minutes={filming.minutes} registered={filming.registered} plannedMinutes={deal.filmingDurationMinutes} />
           ) : null}

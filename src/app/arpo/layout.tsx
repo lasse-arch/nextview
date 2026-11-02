@@ -50,6 +50,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         { href: "/arpo/opgaver", label: "Opgaver", icon: "tasks" },
         { href: "/arpo/online-kunder", label: "Online kunder", icon: "tour" },
         { href: "/arpo/mailgenerator", label: "Mailgenerator", icon: "mail" },
+        { href: "/arpo/send-eksempel", label: "Send eksempel", icon: "chat" },
       ],
     },
     { section: "Kunder", items: [{ href: "/arpo/kunder", label: "Live kunder", icon: "users" }] },
