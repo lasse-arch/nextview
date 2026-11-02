@@ -63,6 +63,8 @@ export function tourConfigProblem(config: unknown): string | null {
       return "Pladskortet over luftfotoet skal have fire hjørner (x, y i %) og en gennemsigtighed mellem 0,2 og 1.";
     if (sp.units !== undefined && (!arr(sp.units) || sp.units.length > 1000 || !sp.units.every((u) => obj(u) && str(u.id) && str(u.name) && pct(u.x) && pct(u.y) && (u.tour === undefined || str(u.tour)) && (u.cat === undefined || str(u.cat)))))
       return "Pladserne på pladskortet skal have id, navn og placering (x, y i %).";
+    if (sp.unitCats !== undefined && (!obj(sp.unitCats) || !Object.values(sp.unitCats as Record<string, unknown>).every((v) => obj(v) && ["label", "color", "tour"].every((k) => (v as Record<string, unknown>)[k] === undefined || str((v as Record<string, unknown>)[k])))))
+      return "Pladskortets slags har en forkert form.";
     if (sp.nextStay !== undefined && (!obj(sp.nextStay) || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(sp.nextStay.tenantId)) || (sp.nextStay.book !== undefined && !/^https:\/\//i.test(String(sp.nextStay.book)))))
       return "Next-Stay skal have bookingens id (fra online.next-stay-booking.dk/search/…) og et https-link til Book.";
   }

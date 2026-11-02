@@ -150,7 +150,7 @@ export function MapEditor({ config, edit, focus, preview, slug }: { config: Tour
           />
         )}
       </Group>
-      {slug && <SitePlanEditor config={config} edit={edit} slug={slug} />}
+      {slug && <SitePlanEditor config={config} edit={edit} slug={slug} preview={preview} />}
       {M.panorama && slug && <FlatFromPano config={config} edit={edit} />}
       <OverviewUiToggles config={config} edit={edit} preview={preview} />
       {M.panorama && <DroneLookEditor config={config} edit={edit} panorama />}

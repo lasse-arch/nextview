@@ -4,11 +4,13 @@ import { useEffect, useRef, useState } from "react";
 import { fetchNextStayUnits } from "@/lib/actions/tour-sites";
 import { readPlanNumbers } from "@/lib/actions/tour-ai";
 import { placeByNumbers } from "./unit-place";
+import { unitCatKey, unitGroups } from "../../tours/site-units";
+import { PlacePicker } from "./content";
 import { matchSitePlan } from "@/lib/actions/tour-ai";
 import { fitPlan } from "./plan-fit";
 import type { SiteUnit, TourConfig } from "../../tours/types";
 import { quadSolve } from "../staging";
-import { Field, Group, input, Toggle, UploadButton } from "./ui";
+import { Field, Group, input, Toggle, UploadButton, type PreviewApi } from "./ui";
 import { loadSource, spotOfFlat, type Shot } from "./flat-from-pano";
 import { groundOf, spotOfGround } from "../site-plan-360";
 
@@ -81,7 +83,7 @@ function dragIn(box: HTMLDivElement | null, e: React.PointerEvent, onMove: (x: n
 /** On a 360° photo the plan is placed on the view straight down (as wide as this) - its corners are kept as spots on the 360° photo. */
 const DOWN: Shot = { heading: 0, fov: 140 };
 
-export function SitePlanEditor({ config, edit, slug }: { config: TourConfig; edit: Edit; slug: string }) {
+export function SitePlanEditor({ config, edit, slug, preview }: { config: TourConfig; edit: Edit; slug: string; preview?: PreviewApi }) {
   const M = config.map!;
   const plan = config.sitePlan;
   const overlay = plan?.overlay;
@@ -139,7 +141,7 @@ export function SitePlanEditor({ config, edit, slug }: { config: TourConfig; edi
       <Field title="Knappen på punkter" hint="Fx på en plads' kort: åbner pladskortet i fuld skærm.">
         <input className={input} value={plan.label} onChange={(e) => edit((d) => void (d.sitePlan!.label = e.target.value))} />
       </Field>
-      <NextStay config={config} edit={edit} slug={slug} />
+      <NextStay config={config} edit={edit} slug={slug} preview={preview} />
     </Group>
   );
 }
@@ -461,7 +463,7 @@ function AiPlace({ slug, plan, photo, onCorners, hint }: { slug: string; plan: s
 }
 
 /** Next-Stay: the booking's id, where Book goes, and the pitches fetched onto the plan. */
-function NextStay({ config, edit, slug }: { config: TourConfig; edit: Edit; slug: string }) {
+function NextStay({ config, edit, slug, preview }: { config: TourConfig; edit: Edit; slug: string; preview?: PreviewApi }) {
   const plan = config.sitePlan!;
   const ns = plan.nextStay;
   const [raw, setRaw] = useState(ns?.tenantId ?? "");
@@ -550,13 +552,68 @@ function NextStay({ config, edit, slug }: { config: TourConfig; edit: Edit; slug
           {busy ? "nextviewAI læser numrene …" : "✦ nextviewAI læser numrene og lægger prikkerne på plads"}
         </button>
       )}
-      {plan.units && plan.units.length > 0 && <UnitPlacer image={plan.image} units={plan.units} onChange={(units) => edit((d) => void (d.sitePlan!.units = units))} />}
+      {plan.units && plan.units.length > 0 && <UnitPlacer image={plan.image} units={plan.units} colors={new Map(unitGroups(plan).map((g) => [g.key, g.color]))} onChange={(units) => edit((d) => void (d.sitePlan!.units = units))} />}
+      {plan.units && plan.units.length > 0 && <UnitKinds config={config} edit={edit} preview={preview} />}
     </>
   );
 }
 
-/** The plan with every pitch and cabin as a dot - dragged where one doesn't sit right. */
-function UnitPlacer({ image, units, onChange }: { image: string; units: SiteUnit[]; onChange: (u: SiteUnit[]) => void }) {
+/**
+ * The units' kinds (the booking's categories): the name and colour each has on
+ * the tour (its dots and its chip in the filter), and a place in the tour to
+ * walk round in - for the kind, or for one cabin or room of it.
+ */
+function UnitKinds({ config, edit, preview }: { config: TourConfig; edit: Edit; preview?: PreviewApi }) {
+  const plan = config.sitePlan!;
+  const groups = unitGroups(plan);
+  const [one, setOne] = useState("");
+  const unit = plan.units?.find((u) => u.id === one);
+  const setCat = (key: string, v: { label?: string; color?: string; tour?: string }) =>
+    edit((d) => {
+      const all = { ...(d.sitePlan!.unitCats ?? {}) };
+      const next = { ...all[key], ...v };
+      for (const k of Object.keys(next) as (keyof typeof next)[]) if (!next[k]) delete next[k];
+      if (Object.keys(next).length) all[key] = next;
+      else delete all[key];
+      d.sitePlan!.unitCats = Object.keys(all).length ? all : undefined;
+    });
+  const place = (href: string, set: (h: string | undefined) => void) =>
+    preview ? (
+      <PlacePicker href={href} preview={preview} onChange={(h) => set(h || undefined)} />
+    ) : (
+      <input className={input} placeholder="Link til et sted i touren (Matterport)" value={href} onChange={(e) => set(e.target.value.trim() || undefined)} />
+    );
+  return (
+    <div className="space-y-2">
+      <p className={small}>Hver slags får sin farve på kortet og i filteret, når gæsten ser ledige. Giv dem et sted i touren, så kommer &quot;Gå rundt&quot; på deres kort.</p>
+      {groups.map((g) => (
+        <div key={g.key} className="space-y-1.5 rounded-xl bg-white p-2.5 ring-1 ring-black/[.06]">
+          <div className="flex items-center gap-2">
+            <input type="color" aria-label="Farve" value={g.color} onChange={(e) => setCat(g.key, { color: e.target.value })} className="h-8 w-8 flex-none cursor-pointer rounded-lg border-0 bg-transparent p-0" />
+            <input className={input} value={plan.unitCats?.[g.key]?.label ?? ""} placeholder={g.key} onChange={(e) => setCat(g.key, { label: e.target.value })} />
+            <span className="whitespace-nowrap text-[12px] text-[#8e8e93]">{plan.units!.filter((u) => unitCatKey(u) === g.key).length} stk.</span>
+          </div>
+          {place(g.tour ?? "", (h) => setCat(g.key, { tour: h }))}
+        </div>
+      ))}
+      <Field title="Et bestemt sted for én hytte eller ét værelse (valgfri)" hint="Fx når Hytte 14 er filmet for sig - ellers bruges slagens sted.">
+        <select className={input} value={one} onChange={(e) => setOne(e.target.value)}>
+          <option value="">Vælg …</option>
+          {plan.units!.map((u) => (
+            <option key={u.id} value={u.id}>
+              {u.name}
+              {u.tour ? " ✓" : ""}
+            </option>
+          ))}
+        </select>
+      </Field>
+      {unit && place(unit.tour ?? "", (h) => edit((d) => void (d.sitePlan!.units = d.sitePlan!.units!.map((u) => (u.id === unit.id ? { ...u, tour: h } : u)))))}
+    </div>
+  );
+}
+
+/** The plan with every pitch and cabin as a dot (in its kind's colour) - dragged where one doesn't sit right. */
+function UnitPlacer({ image, units, colors, onChange }: { image: string; units: SiteUnit[]; colors: Map<string, string>; onChange: (u: SiteUnit[]) => void }) {
   const box = useRef<HTMLDivElement>(null);
   const [hover, setHover] = useState<string | null>(null);
   return (
@@ -573,8 +630,8 @@ function UnitPlacer({ image, units, onChange }: { image: string; units: SiteUnit
             type="button"
             title={u.name}
             aria-label={u.name}
-            className={`absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 cursor-move rounded-full border border-white shadow ${u.kind === "hytte" ? "bg-[#ff9500]" : "bg-[#34c759]"}`}
-            style={{ left: `${u.x}%`, top: `${u.y}%` }}
+            className="absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 cursor-move rounded-full border border-white shadow"
+            style={{ left: `${u.x}%`, top: `${u.y}%`, background: colors.get(unitCatKey(u)) ?? "#34c759" }}
             onPointerEnter={() => setHover(u.name)}
             onPointerLeave={() => setHover(null)}
             onPointerDown={(e) => dragIn(box.current, e, (x, y) => onChange(units.map((v, k) => (k === i ? { ...v, x, y } : v))))}

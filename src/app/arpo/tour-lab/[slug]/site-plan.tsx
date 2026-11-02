@@ -5,6 +5,7 @@ import { useT } from "../tours/i18n-react";
 import { apiUrl } from "../tours/api";
 import { safeHref } from "../tours/safe";
 import type { SiteUnit, TourConfig } from "../tours/types";
+import { unitCatKey, unitGroups, unitTour } from "../tours/site-units";
 import { quadPoint, quadSolve } from "./staging";
 
 /*
@@ -24,7 +25,48 @@ export type SitePlanState = {
   free: Set<string> | null;
   picked: SiteUnit | null;
   stay: { from: string; to: string } | null;
+  /** The kinds the visitor switched off in the filter (sitePlan.unitCats keys). */
+  off?: string[];
 };
+
+/** The free units the visitor shows (their kind not switched off), each with its kind's colour. */
+export function shownUnits(T: TourConfig, state: SitePlanState): { u: SiteUnit; color: string }[] {
+  const plan = T.sitePlan;
+  if (!state.on || !state.free || !plan?.units) return [];
+  const colors = new Map(unitGroups(plan).map((g) => [g.key, g.color]));
+  return plan.units.filter((u) => state.free!.has(u.id) && !state.off?.includes(unitCatKey(u))).map((u) => ({ u, color: colors.get(unitCatKey(u)) ?? "#34c759" }));
+}
+
+/**
+ * The filter while the free units are shown: their kinds (pitches, cabins,
+ * rooms, the motel …) in their colours, with how many are free - in place of
+ * the drone points' categories (rendered inside .hv-filtre).
+ */
+export function SitePlanLegend({ T, state, setState }: { T: TourConfig; state: SitePlanState; setState: (fn: (s: SitePlanState) => SitePlanState) => void }) {
+  const plan = T.sitePlan;
+  if (!plan?.units || !state.free) return null;
+  const free = plan.units.filter((u) => state.free!.has(u.id));
+  return (
+    <div className="hv-chips pk-legend">
+      {unitGroups(plan)
+        .map((g) => ({ g, n: free.filter((u) => unitCatKey(u) === g.key).length }))
+        .filter((x) => x.n > 0)
+        .map(({ g, n }) => (
+          <button
+            key={g.key}
+            type="button"
+            className={state.off?.includes(g.key) ? "fra" : ""}
+            onClick={() => setState((s) => ({ ...s, picked: null, off: s.off?.includes(g.key) ? s.off.filter((k) => k !== g.key) : [...(s.off ?? []), g.key] }))}
+          >
+            <i style={{ background: g.color }} />
+            <span>
+              {g.label} <b>{n}</b>
+            </span>
+          </button>
+        ))}
+    </div>
+  );
+}
 
 export const sitePlanReady = (T: TourConfig) => Boolean(T.map && !T.map.panorama && T.sitePlan?.overlay?.corners?.length === 4);
 
@@ -57,18 +99,14 @@ export function SitePlanLayer({ T, scale, state, onPick }: { T: TourConfig; scal
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={plan.image} alt="" draggable={false} />
       </div>
-      {state.on &&
-        state.free &&
-        (plan.units ?? [])
-          .filter((u) => state.free!.has(u.id))
-          .map((u) => {
+      {shownUnits(T, state).map(({ u, color }) => {
             const p = geo.at(u);
             return (
               <button
                 key={u.id}
                 type="button"
                 className={`pk-unit ${state.picked?.id === u.id ? "valgt" : ""}`}
-                style={{ left: p.x, top: p.y, transform: `translate(-50%, -50%) scale(${1 / scale})` }}
+                style={{ left: p.x, top: p.y, transform: `translate(-50%, -50%) scale(${1 / scale})`, background: color }}
                 aria-label={u.name}
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={(e) => {
@@ -93,12 +131,15 @@ export function SitePlanControls({
   setState,
   lang = "da",
   onBook,
+  onWalk,
 }: {
   T: TourConfig;
   state: SitePlanState;
   setState: (fn: (s: SitePlanState) => SitePlanState) => void;
   lang?: string;
   onBook?: (label: string, href: string) => void;
+  /** "Gå rundt": into the tour, at the place inside the picked cabin or room. */
+  onWalk?: (href: string, label: string) => void;
 }) {
   const tr = useT();
   const plan = T.sitePlan!;
@@ -127,18 +168,39 @@ export function SitePlanControls({
 
   return (
     <>
-      <button
-        type="button"
-        className={`pk-skift ${state.on ? "til" : ""}`}
-        aria-pressed={state.on}
-        onPointerDown={(e) => e.stopPropagation()}
-        onClick={() => setState((s) => ({ ...s, on: !s.on, picked: null }))}
-      >
-        <i aria-hidden />
-        {tr("Pladskort")}
-      </button>
+      {/* Off: the switch alone. On (with live booking): the switch heads the dates' box - nothing stands on top of it. */}
+      {!(state.on && live) && (
+        <button
+          type="button"
+          className={`pk-skift ${state.on ? "til" : ""}`}
+          aria-pressed={state.on}
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={() => setState((s) => ({ ...s, on: !s.on, picked: null }))}
+        >
+          <i aria-hidden />
+          {tr("Pladskort")}
+        </button>
+      )}
       {state.on && live && (
         <div className="pk-datoer" onPointerDown={(e) => e.stopPropagation()}>
+          <div className="pk-hoved">
+            <button type="button" className="pk-skift pk-skift-i til" aria-pressed onClick={() => setState((s) => ({ ...s, on: false, picked: null }))}>
+              <i aria-hidden />
+              {tr("Pladskort")}
+            </button>
+            {state.free && (
+              <button
+                type="button"
+                className="pk-ryd"
+                onClick={() => {
+                  setNote(null);
+                  setState((s) => ({ ...s, free: null, picked: null, stay: null, off: [] }));
+                }}
+              >
+                {tr("Fjern ledige")} ×
+              </button>
+            )}
+          </div>
           <label>
             <span>{tr("Ankomst")}</span>
             <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
@@ -158,6 +220,21 @@ export function SitePlanControls({
           <span>
             <b>{tr("Ledig")}</b> · {state.picked.name} · {shortDay(state.stay.from, lang)}–{shortDay(state.stay.to, lang)}
           </span>
+          {(() => {
+            const walk = unitTour(plan, state.picked!);
+            return walk && onWalk ? (
+              <a
+                href={walk}
+                className="pk-gaa"
+                onClick={(e) => {
+                  e.preventDefault();
+                  onWalk(walk, state.picked!.name);
+                }}
+              >
+                {tr("Gå rundt")}
+              </a>
+            ) : null;
+          })()}
           {book && (
             <a
               href={book}
@@ -202,6 +279,13 @@ export const SITE_PLAN_CSS = `
 .pk-datoer button{height:34px;padding:0 14px;border:0;border-radius:9px;background:var(--c-accent);color:#fff;font:inherit;font-size:14px;font-weight:700;cursor:pointer}
 .pk-datoer button:disabled{opacity:.6}
 .pk-datoer p{flex-basis:100%;margin:0;font-size:12px;color:#3a3a3c}
+.pk-hoved{flex-basis:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:2px}
+.pk-skift.pk-skift-i{position:static;height:30px;box-shadow:none;background:#f2f2f7;font-size:13px;padding:0 12px 0 6px}
+.pk-datoer .pk-ryd{height:30px;padding:0 12px;background:#f2f2f7;color:#1d2a30;font-size:13px}
+.pk-kort .pk-gaa{background:#1d2a30}
+.pk-legend b{font-weight:900;margin-left:2px}
+/* Above the filter (its own height), never on top of it. */
+.hv:has(.pk-legend) .pk-datoer,.hv:has(.hv-filtre) .pk-datoer{bottom:calc(var(--filtre-h,56px) + 26px + env(safe-area-inset-bottom,0px))}
 .pk-kort{position:absolute;left:50%;bottom:calc(112px + env(safe-area-inset-bottom,0px));translate:-50% 0;z-index:7;display:flex;align-items:center;gap:10px;padding:8px 8px 8px 14px;border-radius:999px;background:#fff;color:#1d2a30;font-size:14px;box-shadow:0 8px 26px rgba(0,0,0,.25);white-space:nowrap;max-width:calc(100% - 24px)}
 .pk-kort b{color:#248a3d}
 .pk-kort span{overflow:hidden;text-overflow:ellipsis}

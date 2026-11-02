@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { SiteUnit, TourConfig } from "../tours/types";
-import type { SitePlanState } from "./site-plan";
+import { shownUnits, type SitePlanState } from "./site-plan";
 import { quadPoint, quadSolve } from "./staging";
 
 /*
@@ -95,7 +95,10 @@ export function SitePlan360Layer({
   const dots = useRef(new Map<string, HTMLButtonElement>());
   const corners = plan?.overlay?.corners;
   const toGround = useMemo(() => (corners ? planToGround(corners) : null), [corners]);
-  const free = useMemo(() => (plan?.units ?? []).filter((u) => state.free?.has(u.id)), [plan?.units, state.free]);
+  // The free ones the visitor shows (their kind not switched off), in their kind's colour.
+  const shown = useMemo(() => shownUnits(T, state), [T, state]);
+  const free = useMemo(() => shown.map((x) => x.u), [shown]);
+  const colorOf = useMemo(() => new Map(shown.map((x) => [x.u.id, x.color])), [shown]);
   const opacity = Math.min(1, Math.max(0.2, plan?.overlay?.opacity ?? 0.55));
   /** The viewer's picture layer (made when the viewer has loaded) - the plan is drawn there. */
   const [under, setUnder] = useState<HTMLElement | null>(null);
@@ -199,7 +202,7 @@ export function SitePlan360Layer({
             ref={(el) => void (el ? dots.current.set(u.id, el) : dots.current.delete(u.id))}
             type="button"
             className={`pk-unit pk360-unit ${state.picked?.id === u.id ? "valgt" : ""}`}
-            style={{ visibility: "hidden" }}
+            style={{ visibility: "hidden", background: colorOf.get(u.id) }}
             aria-label={u.name}
             onPointerDown={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}

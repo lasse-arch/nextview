@@ -18,7 +18,7 @@ import { WeatherChip, WEATHER_CSS } from "./weather";
 import { CommuteSheet, COMMUTE_CSS } from "./commute";
 import { fitPano } from "../tours/pano-cover";
 import { SitePlan360Layer, sitePlan360Ready, SITE_PLAN_360_CSS } from "./site-plan-360";
-import { SITE_PLAN_CSS, SitePlanControls, type SitePlanState } from "./site-plan";
+import { SITE_PLAN_CSS, SitePlanControls, SitePlanLegend, type SitePlanState } from "./site-plan";
 import { FeatureTour, featuresSeen, FEATURES_CSS, type DemoContact } from "./features";
 import { FinderSheet, FINDER_CSS, WalkLines } from "./finder";
 import { apiUrl, isStaticTour } from "../tours/api";
@@ -2682,7 +2682,17 @@ function TourExperience({
             {plan360On && (
               <>
                 <SitePlan360Layer T={T} viewer={droneViewer} scene={droneEl} state={plan360} onPick={(u) => setPlan360((st) => ({ ...st, picked: u }))} />
-                <SitePlanControls T={T} state={plan360} setState={setPlan360} lang={lang} onBook={(label, href) => (ctaClick(label, href, "pladskort"), popup(href, label))} />
+                <SitePlanControls
+                  T={T}
+                  state={plan360}
+                  setState={setPlan360}
+                  lang={lang}
+                  onBook={(label, href) => (ctaClick(label, href, "pladskort"), popup(href, label))}
+                  onWalk={(href, label) => {
+                    track("unit_walk", { label });
+                    goToRef.current(href, label);
+                  }}
+                />
               </>
             )}
           </>
@@ -2731,7 +2741,11 @@ function TourExperience({
         {selectedWalks.length ? <WalkLines from={selected!.id} walks={selectedWalks} names={pointNames} /> : null}
 
         <div className="hv-filtre" ref={filterEl}>
-          <div className="hv-filtre-t">{OV?.filterTitle}</div>
+          <div className="hv-filtre-t">{plan360.on && plan360.free ? tx("Ledige") : OV?.filterTitle}</div>
+          {/* The free units shown: their kinds (pitches, cabins, rooms …) in their colours - in place of the points' categories. */}
+          {plan360.on && plan360.free ? (
+            <SitePlanLegend T={T} state={plan360} setState={setPlan360} />
+          ) : (
           <div className="hv-chips">
             {Object.entries(T.categories).map(([k, c]) => (
               <button
@@ -2748,6 +2762,7 @@ function TourExperience({
               </button>
             ))}
           </div>
+          )}
         </div>
 
         {T.weather && phase === "drone" && (
