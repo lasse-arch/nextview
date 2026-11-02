@@ -55,7 +55,7 @@ export async function addLeadsToCallList(
   rawText: string,
   force = false
 ): Promise<
-  | { ok: true; created: number; moved: number; skipped: number; alreadyExisting: { name: string; stage: string }[] }
+  | { ok: true; created: number; moved: number; skipped: number; alreadyExisting: { id: string; name: string; stage: string }[] }
   | { ok: false; error: string }
 > {
   const user = await requireUser();
@@ -68,7 +68,7 @@ export async function addLeadsToCallList(
   let created = 0;
   let moved = 0;
   let skipped = 0;
-  const alreadyExisting: { name: string; stage: string }[] = [];
+  const alreadyExisting: { id: string; name: string; stage: string }[] = [];
 
   // A directory link (e.g. dk-camp.dk/campingpladser/) stands for every
   // business on it - each becomes its own lead, with the directory's
@@ -180,7 +180,7 @@ export async function addLeadsToCallList(
       // or duplicating it here without saying so could rip it out of wherever
       // someone is genuinely tracking it - flag it instead and let the
       // person decide.
-      alreadyExisting.push({ name: existingDeal.companyName, stage: stageLabels[existingDeal.stage] ?? existingDeal.stage });
+      alreadyExisting.push({ id: existingDeal.id, name: existingDeal.companyName, stage: stageLabels[existingDeal.stage] ?? existingDeal.stage });
       continue;
     }
 
@@ -318,4 +318,53 @@ export async function deleteCallListLead(dealId: string): Promise<{ ok: true } |
   await logActivity({ type: "DEAL_UPDATED", message: `${user.name} slettede ${dealName(deal)} fra ringelisten (kan sættes tilbage under Slettede)`, actorId: user.id });
   revalidatePath("/arpo/ringeliste");
   return { ok: true };
+}
+
+/**
+ * "Tilføj alligevel" after an add found deals that already existed: those
+ * very deals (not the whole paste again) are put on this ringeliste. A lead
+ * or a lost deal becomes a lead to call here (a lost one reopened, with a
+ * note); one further along (contacted, meeting booked, contract sent) keeps
+ * its stage and only joins the list, so nobody's work is undone; a customer
+ * who has signed is never touched.
+ */
+export async function moveExistingToCallList(
+  callListId: string,
+  dealIds: string[]
+): Promise<{ ok: true; onList: number; reopened: number; kept: { name: string; stage: string }[]; customers: string[] } | { ok: false; error: string }> {
+  const user = await requireUser();
+  const list = await prisma.callList.findUnique({ where: { id: String(callListId) } });
+  if (!list) return { ok: false, error: "Listen findes ikke længere." };
+  const ids = [...new Set((Array.isArray(dealIds) ? dealIds : []).map(String))].slice(0, 500);
+  const deals = await prisma.deal.findMany({ where: { id: { in: ids } } });
+  let onList = 0;
+  let reopened = 0;
+  const kept: { name: string; stage: string }[] = [];
+  const customers: string[] = [];
+  for (const deal of deals) {
+    if (hasSigned(deal) || ["CONTRACT_SIGNED", "FILMED", "REVIEW", "LIVE"].includes(deal.stage)) {
+      customers.push(dealName(deal));
+      continue;
+    }
+    if (deal.stage === "LEAD" || deal.stage === "LOST") {
+      await prisma.deal.update({ where: { id: deal.id }, data: { callListId: list.id, stage: "LEAD" } });
+      if (deal.stage === "LOST") {
+        reopened++;
+        await prisma.note.create({ data: { dealId: deal.id, authorId: user.id, body: `Genåbnet som lead på ringelisten ${list.name} (var Tabt).`, kind: "MANUAL" } });
+      }
+      onList++;
+    } else {
+      await prisma.deal.update({ where: { id: deal.id }, data: { callListId: list.id } });
+      kept.push({ name: dealName(deal), stage: stageLabels[deal.stage] ?? deal.stage });
+    }
+    await logActivity({
+      type: "DEAL_UPDATED",
+      message: `${user.name} flyttede ${dealName(deal)} til ${list.name}${deal.stage === "LOST" ? " (genåbnet)" : ""}`,
+      actorId: user.id,
+      dealId: deal.id,
+    });
+  }
+  revalidatePath("/arpo/ringeliste");
+  revalidatePath("/arpo/deals");
+  return { ok: true, onList, reopened, kept, customers };
 }

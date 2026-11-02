@@ -5,7 +5,7 @@ import { OFFICE } from "@/lib/office";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { createCallList, addLeadsToCallList, deleteCallList, renameCallList, markVoicemail, scheduleCallBack, deleteCallListLead } from "@/lib/actions/call-lists";
+import { createCallList, addLeadsToCallList, deleteCallList, renameCallList, markVoicemail, scheduleCallBack, deleteCallListLead, moveExistingToCallList } from "@/lib/actions/call-lists";
 import { markDealLost, setMeetingDateAndStage, sendCalendarInvite, renameDeal, updateDealPhone, updateDealWebsite } from "@/lib/actions/deals";
 import { addDealItem } from "@/lib/actions/deal-items";
 import { dealName, stageLabels, telHref } from "@/lib/labels";
@@ -53,7 +53,7 @@ function QuickAdd({ selectedListId }: { selectedListId: string | null }) {
   // can re-run the exact same paste with force=true - kept separate from the
   // (ephemeral, 3s) toast since the person needs time to actually read the
   // names and decide, not just a flash of text.
-  const [forcePrompt, setForcePrompt] = useState<{ listId: string; text: string; names: string[] } | null>(null);
+  const [forcePrompt, setForcePrompt] = useState<{ listId: string; text: string; names: string[]; ids: string[] } | null>(null);
   const router = useRouter();
   const showToast = useToast();
 
@@ -84,7 +84,7 @@ function QuickAdd({ selectedListId }: { selectedListId: string | null }) {
           .join(", ");
         const more = result.alreadyExisting.length > 3 ? ` +${result.alreadyExisting.length - 3} mere` : "";
         message += ` ⚠️ ${result.alreadyExisting.length} fandtes allerede som deal og blev IKKE flyttet hertil: ${names}${more}.`;
-        setForcePrompt({ listId, text, names: result.alreadyExisting.map((e) => e.name) });
+        setForcePrompt({ listId, text, names: result.alreadyExisting.map((e) => e.name), ids: result.alreadyExisting.map((e) => e.id) });
       } else {
         setForcePrompt(null);
         setText("");
@@ -97,14 +97,18 @@ function QuickAdd({ selectedListId }: { selectedListId: string | null }) {
 
   function forceAdd() {
     if (!forcePrompt) return;
-    const { listId, text: pendingText } = forcePrompt;
+    const { listId, ids } = forcePrompt;
     startTransition(async () => {
-      const result = await addLeadsToCallList(listId, pendingText, true);
+      // Only the deals that already existed - not the whole paste again (a directory would be fetched all over).
+      const result = await moveExistingToCallList(listId, ids);
       if (!result.ok) {
         showToast(result.error);
         return;
       }
-      showToast(`${result.moved} eksisterende deal${result.moved === 1 ? "" : "s"} flyttet hertil.`);
+      const parts = [`${result.onList} på listen${result.reopened ? ` (${result.reopened} genåbnet fra Tabt)` : ""}`];
+      if (result.kept.length) parts.push(`${result.kept.length} er længere i forløbet og beholder deres trin: ${result.kept.map((k) => `${k.name} (${k.stage})`).join(", ")}`);
+      if (result.customers.length) parts.push(`${result.customers.length} er kunder og blev ikke rørt: ${result.customers.join(", ")}`);
+      showToast(parts.join(". ") + ".");
       setForcePrompt(null);
       setText("");
       router.push(`/arpo/ringeliste?list=${listId}`);
