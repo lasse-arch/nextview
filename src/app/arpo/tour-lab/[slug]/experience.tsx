@@ -534,6 +534,8 @@ function TourExperience({
   /** "Kun punkter": no free walking - only the current scan point is enabled, the menu and points move you. */
   const [pointsOnly, setPointsOnly] = useState(T.navigation === "points");
   const pointsOnlyRef = useRef(pointsOnly);
+  /** "Låst inde i rummene": standing on a hidden scan point (reached from the menu), the visitor can't walk out - only the menu moves them. */
+  const lockedIn = useCallback((sid: string | null | undefined) => Boolean(T.lockInHidden && sid && hiddenSweeps.includes(sid)), [T.lockInHidden, hiddenSweeps]);
   /** The overview the tour starts on: the drone scene, or an interactive map on its own (its words fall back to sensible ones). */
   const OV = T.drone
     ? { intro: T.map?.intro ?? T.drone.intro, backLabel: T.map?.backLabel ?? T.drone.backLabel, filterTitle: T.map?.filterTitle ?? T.drone.filterTitle }
@@ -833,7 +835,7 @@ function TourExperience({
           allSweeps.current = Object.keys(c);
           sweepData.current = c;
           // The list can arrive after the visitor's first scan point - lock then, so nothing is left open.
-          if (firstData && pointsOnlyRef.current && currentSweep.current) lockTo(sdk, allSweeps.current, currentSweep.current);
+          if (firstData && (pointsOnlyRef.current || lockedIn(currentSweep.current)) && currentSweep.current) lockTo(sdk, allSweeps.current, currentSweep.current);
         },
       });
       setTourReadyMs(now() - started);
@@ -859,7 +861,7 @@ function TourExperience({
         // frame, where a phone's touch can't be seen): that's using the tour too. Not the tour's own moves (a menu place, the guide, Find vej).
         if (!first && s.sid !== currentSweep.current && now() - selfMoveAt.current > 2500 && guideAtRef.current == null) markUsed();
         currentSweep.current = s.sid;
-        if (first && pointsOnlyRef.current) lockTo(sdk, allSweeps.current, s.sid);
+        if (first && (pointsOnlyRef.current || lockedIn(s.sid))) lockTo(sdk, allSweeps.current, s.sid);
         const ss = ssBySweep[s.sid];
         currentSsRef.current = ss ?? null;
         setCurrentSs(ss ?? null);
@@ -892,12 +894,12 @@ function TourExperience({
       if (!sdkRef.current) return;
       const sdk = await sdkRef.current;
       if (only && currentSweep.current) await lockTo(sdk, allSweeps.current, currentSweep.current);
-      if (!only) {
+      if (!only && !lockedIn(currentSweep.current)) {
         const open = allSweeps.current.filter((id) => !hiddenSweeps.includes(id));
         if (open.length) await sdk.Sweep.enable(...open).catch((err) => console.warn("Sweep.enable", err));
       }
     },
-    [hiddenSweeps]
+    [hiddenSweeps, lockedIn]
   );
 
   /**
@@ -917,9 +919,12 @@ function TourExperience({
         return;
       }
       const locked = pointsOnlyRef.current;
+      // Locked inside a room: every other point is closed, so the one chosen in the menu is opened for the move.
+      const wasIn = lockedIn(from);
+      const goingIn = lockedIn(sweep);
       // A scan point switched off in Matterport itself (Find vej may pass it): opened for the move, closed again when left.
       if (sweepData.current[sweep]?.enabled === false && !hiddenSweeps.includes(sweep)) openedSweeps.current.add(sweep);
-      if (locked || hiddenSweeps.includes(sweep) || openedSweeps.current.has(sweep)) await sdk.Sweep.enable(sweep).catch(() => {});
+      if (locked || wasIn || hiddenSweeps.includes(sweep) || openedSweeps.current.has(sweep)) await sdk.Sweep.enable(sweep).catch(() => {});
       try {
         await sdk.Sweep.moveTo(sweep, opts);
       } catch (first) {
@@ -949,8 +954,16 @@ function TourExperience({
         openedSweeps.current.delete(from);
         await sdk.Sweep.disable(from).catch(() => {});
       }
+      if (!locked && goingIn) {
+        // Into a room: only its own point stays open.
+        await lockTo(sdk, allSweeps.current, sweep);
+      } else if (!locked && wasIn) {
+        // Out of the room again: free walking everywhere but the hidden points.
+        const open = allSweeps.current.filter((id) => !hiddenSweeps.includes(id));
+        if (open.length) await sdk.Sweep.enable(...open).catch(() => {});
+      }
     },
-    [hiddenSweeps]
+    [hiddenSweeps, lockedIn]
   );
 
   /**
@@ -2280,8 +2293,8 @@ function TourExperience({
     return () => {
       sub?.cancel();
       camSub.cancel();
-      // Walking again as before (still only by the points, when the tour is set to that).
-      if (!pointsOnlyRef.current) {
+      // Walking again as before (still only by the points, when the tour is set to that - or locked in a room).
+      if (!pointsOnlyRef.current && !lockedIn(currentSweep.current)) {
         const open = allSweeps.current.filter((id) => !hiddenSweeps.includes(id));
         if (open.length) sdk.Sweep.enable(...open).catch(() => {});
       }
@@ -2289,7 +2302,7 @@ function TourExperience({
       window.removeEventListener("keydown", onKey);
       doc?.removeEventListener("keydown", onKey);
     };
-  }, [picking, sdk, room, hiddenSweeps]);
+  }, [picking, sdk, room, hiddenSweeps, lockedIn]);
 
   /* ----- "Pladskort" on the 360° aerial photo (site-plan-360.tsx) ----- */
   const plan360On = sitePlan360Ready(T);

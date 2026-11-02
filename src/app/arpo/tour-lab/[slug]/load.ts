@@ -66,7 +66,10 @@ export async function loadTour(setup: TourConfig) {
       })
       .filter((s): s is string => Boolean(s))
   );
-  const hidden = [...new Set([...(cfg ? hiddenSweeps(cfg) : []), ...tour.hiddenSweeps])].filter((s) => !linked.has(s));
+  // Hidden scan points the menu links to are opened - unless the tour locks visitors inside them ("Låst inde i rummene"):
+  // then they stay closed (the menu still takes you there - moveSweep opens them for the move) and only the start is opened.
+  const startSweep = sweepBySs[ssOf(tour.start) ?? -1];
+  const hidden = [...new Set([...(cfg ? hiddenSweeps(cfg) : []), ...tour.hiddenSweeps])].filter((s) => (tour.lockInHidden ? s !== startSweep : !linked.has(s)));
   const [units, routeGraph] = await Promise.all([
     tour.availability ? fetchBoxdepotetUnits(tour.availability.url) : Promise.resolve([]),
     tour.wayfinding && modelId ? fetchSweepGraph(modelId) : Promise.resolve(null),

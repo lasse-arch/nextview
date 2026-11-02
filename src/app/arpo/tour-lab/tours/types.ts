@@ -729,6 +729,14 @@ export type TourConfig = {
   };
   /** "free": walk around as in Matterport. "points": only the menu and points move you. */
   navigation: "free" | "points";
+  /**
+   * "Låst inde i rummene" (with "free"): the hidden scan points (Scanpunkter,
+   * MPSkins) stay closed even where the menu links to them. A place in the
+   * menu takes the visitor in, and there they stay - no walking out to other
+   * points - until they choose something in the menu. Everywhere else they
+   * walk freely. (The start point is never locked.)
+   */
+  lockInHidden?: true;
   /** Scan points to hide (sweep ids) - set under Scanpunkter. */
   hiddenSweeps: string[];
   /** Is the menu open when the tour starts, per device. */

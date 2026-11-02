@@ -30,6 +30,7 @@ export function tourConfigProblem(config: unknown): string | null {
   if (!obj(c.menuOpenOnStart)) return 'Mangler "menuOpenOnStart".';
   if (!arr(c.hiddenSweeps) || !arr(c.points) || !obj(c.categories) || !obj(c.matterportParams)) return 'Mangler "hiddenSweeps", "points", "categories" eller "matterportParams".';
   if (c.navigation !== "free" && c.navigation !== "points") return '"navigation" skal være "free" eller "points".';
+  if (c.lockInHidden !== undefined && c.lockInHidden !== true) return '"lockInHidden" skal være true eller udeladt.';
   if (c.welcome && (!obj(c.welcome) || !arr(c.welcome.tiles) || !c.welcome.tiles.every((t) => obj(t) && str(t.title) && obj(t.go)))) return "Velkomstens fliser har en forkert form.";
   if (c.cover && (!obj(c.cover) || !["kicker", "title", "lead", "image", "enter", "placesTitle"].every((k) => str((c.cover as Record<string, unknown>)[k])))) return "Forsiden mangler tekster eller billede.";
   const ld = c.lineDays;

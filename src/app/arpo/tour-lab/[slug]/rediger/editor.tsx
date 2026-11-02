@@ -982,6 +982,14 @@ export function TourEditor({
                     onChange={(v) => edit((d) => void (d.navigation = v))}
                   />
                 </Field>
+                {config.navigation === "free" && (
+                  <Toggle
+                    on={Boolean(config.lockInHidden)}
+                    onChange={(on) => edit((d) => void (on ? (d.lockInHidden = true) : delete d.lockInHidden))}
+                    title="Låst inde i rummene"
+                    hint="På gangene går man frit. De skjulte scanpunkter (Scanpunkter) kommer man kun ind i via menuen - og dér bliver man, til man vælger noget i menuen."
+                  />
+                )}
                 <Field title="Skift mellem steder">
                   <Choice
                     value={config.jump ?? "fly"}

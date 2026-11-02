@@ -757,6 +757,7 @@ function neutral(c: TourConfig, fields: Pick<TourConfig, "slug" | "title" | "tou
     measure: c.measure,
     matterportUi: c.matterportUi,
     navigation: c.navigation,
+    lockInHidden: c.lockInHidden,
     menuOpenOnStart: c.menuOpenOnStart,
     stories: c.stories ? { mobile: c.stories.mobile, desktop: c.stories.desktop } : undefined,
     mobileZoomLock: c.mobileZoomLock,
