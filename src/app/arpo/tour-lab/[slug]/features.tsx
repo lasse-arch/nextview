@@ -362,7 +362,7 @@ function featuresOf(T: TourConfig, tr: (s: string, v?: Record<string, string | n
     out.push({
       key: "overalt",
       title: "På mobil, computer og jeres hjemmeside",
-      text: "Touren er bygget til mobilen først - hvor de fleste kigger - og ligger lige så godt på computeren og direkte inde på jeres egen hjemmeside, med et link til hvert sted i den.",
+      text: "Bygget til mobilen først - og lige så god på computeren og inde på jeres egen hjemmeside.",
       scene: (
         <div className="ft-scene ft-overalt">
           <i className="ft-mobil" />
@@ -376,7 +376,7 @@ function featuresOf(T: TourConfig, tr: (s: string, v?: Record<string, string | n
       out.push({
         key: "ogsaa",
         title: "Det kan vi også lave til jer",
-        text: "Touren her har ikke det hele med. Hver tour bygges til stedet - så den har det, der hjælper netop jeres gæster videre.",
+        text: "Hver tour bygges til stedet - med det, der hjælper netop jeres gæster.",
         scene: (
           <div className="ft-scene ft-intro">
             {more.slice(0, 8).map((t, i) => (
@@ -391,7 +391,7 @@ function featuresOf(T: TourConfig, tr: (s: string, v?: Record<string, string | n
       key: "portal",
       title: "Vi bliver ved med at gøre den bedre",
       text: "Vi kan se, hvor gæsterne kigger, hvad de klikker på, og hvor mange der tager kontakt. Det bruger vi til løbende at rette touren til - så I får mere af det, der virker og skaffer henvendelser.",
-      why: "En tour er ikke færdig, når den er afleveret. Tallene viser, hvad jeres gæster faktisk bruger - og dér gør vi den stærkere.",
+      why: "Tallene viser, hvad der virker - dér gør vi touren stærkere.",
       scene: (
         <div className="ft-scene ft-portal">
           {[38, 62, 48, 80, 70, 92].map((h, i) => (
@@ -446,21 +446,21 @@ const CAN_ALSO: [string, string][] = [
 
 /** "Derfor er det med" - the reason behind each feature, in the customer's terms. */
 function whyOf(key: string, tr: (s: string, v?: Record<string, string | number>) => string): string | undefined {
-  if (key.startsWith("guide-")) return tr("Mange klikker ikke selv rundt. Rundvisningen tager dem i hånden og viser det vigtigste i den rigtige rækkefølge - så de ser det, I er stolte af.");
+  if (key.startsWith("guide-")) return tr("Viser det vigtigste i den rigtige rækkefølge - også for dem, der ikke selv klikker rundt.");
   const why: Record<string, string> = {
-    luften: tr("Gæster vil først forstå, hvor alt ligger. Overblikket fra luften giver dem det på få sekunder - og gør det let at vælge, hvor de vil hen."),
-    stories: tr("Det korte format, folk kender fra Instagram: hurtigt at se, og de bliver hængende længere i jeres tour."),
-    findvej: tr("Find vej viser vejen fra der, hvor man står, til fx et lokale, man aldrig har været i - så nye elever, gæster eller kunder kender vejen i en stor bygning, før de kommer. Og ingen farer vild eller giver op i touren."),
-    live: tr("Når gæsterne kan se, hvad der er ledigt lige nu, er der kortere vej fra at kigge til at booke."),
-    cards: tr("Billeder fortæller ikke alt. Kortet giver de vigtigste fakta lige dér, hvor man står - og en vej videre til at booke eller spørge."),
-    vej: tr("Afstanden afgør tit, om man vælger jer. Her ser de selv, hvor tæt på de er - uden at skulle spørge."),
-    dag: tr("Det gør det nemt at forestille sig selv hos jer - og det er dét, der får folk til at tage næste skridt."),
-    finder: tr("I stedet for at lede selv får gæsten et svar, der passer til dem - færre spørgsmål til jer og hurtigere beslutninger."),
-    info: tr("Gæster har spørgsmål til det, de ser. Svaret står lige dér - så de ikke skal lede på hjemmesiden eller ringe."),
-    vejret: tr("Solskin på billedet og vejret lige nu gør stedet levende - og giver lyst til at komme."),
-    gaa: tr("Afstande er tit det, folk spørger om. Her ser de det med det samme."),
-    knapper: tr("Lysten er størst, mens man kigger. Én knap, der altid er der, gør det let at tage næste skridt."),
-    sprog: tr("Gæster fra udlandet får touren på deres eget sprog - så I når flere uden ekstra arbejde."),
+    luften: tr("På få sekunder ser gæsten, hvor alt ligger."),
+    stories: tr("Hurtigt at se - og gæsterne bliver længere."),
+    findvej: tr("Nye gæster kender vejen, før de kommer - ingen farer vild."),
+    live: tr("Kortere vej fra at kigge til at booke."),
+    cards: tr("De vigtigste fakta lige dér, hvor man står."),
+    vej: tr("Gæsten ser selv, hvor tæt på I er."),
+    dag: tr("Gør det let at forestille sig selv hos jer."),
+    finder: tr("Et svar, der passer - og færre spørgsmål til jer."),
+    info: tr("Svaret står lige dér - ingen grund til at ringe."),
+    vejret: tr("Gør stedet levende og giver lyst til at komme."),
+    gaa: tr("Afstanden med det samme - uden at spørge."),
+    knapper: tr("Næste skridt er altid ét tryk væk."),
+    sprog: tr("Når flere gæster - uden ekstra arbejde."),
   };
   return why[key];
 }
@@ -498,23 +498,33 @@ export function FeatureTour({ T, onClose, onEvent, demo }: { T: TourConfig; onCl
     // eslint-disable-next-line react-hooks/exhaustive-deps -- a new step
   }, [reel]);
   // While the showreel plays, the tour (and whatever it opens - a form, Find vej, the day) moves up above the caption:
-  // the caption has its own room at the bottom and never covers what it explains.
+  // the caption has its own room at the bottom and never covers what it explains. Resizing the tour makes Matterport
+  // redraw everything (heavy on a phone), so it's done once when the showreel starts - and after that only if a step's
+  // caption is taller than any before it, never back and forth on each Næste/Tilbage, and never animated.
   const caption = useRef<HTMLDivElement>(null);
+  const reelOn = reel != null && Boolean(step);
   useLayoutEffect(() => {
     const el = caption.current;
     const tour = el?.closest<HTMLElement>(".hv");
-    if (!el || !tour) return;
-    const fit = () => tour.style.setProperty("--ft-reel-h", `${Math.ceil(el.getBoundingClientRect().height) + 12}px`);
+    if (!reelOn || !el || !tour) return;
+    let h = 0;
+    const fit = () => {
+      const next = Math.ceil(el.getBoundingClientRect().height) + 12;
+      if (next <= h) return;
+      h = next;
+      tour.style.setProperty("--ft-reel-h", `${h}px`);
+    };
     fit();
-    tour.classList.add("ft-reel-on");
+    // A data mark, not a class: the tour sets its own className on every render and would drop a class added here.
+    tour.dataset.ftReel = "on";
     const ro = new ResizeObserver(fit);
     ro.observe(el);
     return () => {
       ro.disconnect();
-      tour.classList.remove("ft-reel-on");
+      delete tour.dataset.ftReel;
       tour.style.removeProperty("--ft-reel-h");
     };
-  }, [step]);
+  }, [reelOn]);
   // A new card starts at its top (a long one on a small phone was opened scrolled down).
   const ark = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -769,8 +779,8 @@ export const FEATURES_CSS = `
 .ft-reel-start{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;margin-top:14px;border:0;border-radius:14px;padding:13px 14px;background:linear-gradient(135deg,var(--c-main),color-mix(in srgb,var(--c-main) 55%,var(--c-accent)));color:#fff;font:inherit;font-weight:800;font-size:15px;cursor:pointer;box-shadow:0 8px 22px color-mix(in srgb,var(--c-main) 35%,transparent)}
 .ft-reel-start small{font-weight:600;opacity:.75}
 .ft-selv{display:block;width:100%;margin-top:8px;border:0;background:none;padding:6px;font:inherit;font-weight:700;font-size:14px;color:var(--c-main);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
-.hv.ft-reel-on{bottom:var(--ft-reel-h,0px)!important;transition:bottom .25s ease}
-.ft-reel{position:fixed;left:50%;bottom:calc(8px + env(safe-area-inset-bottom,0px));translate:-50% 0;z-index:62;width:min(520px,calc(100% - 24px));padding:12px 14px 10px;border-radius:18px;background:rgba(13,27,32,.9);color:#fff;box-shadow:0 14px 40px rgba(0,0,0,.35);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);animation:hvUp .35s ease}
+.hv[data-ft-reel]{bottom:var(--ft-reel-h,0px)!important}
+.ft-reel{position:fixed;left:50%;bottom:calc(8px + env(safe-area-inset-bottom,0px));translate:-50% 0;z-index:62;width:min(520px,calc(100% - 24px));padding:12px 14px 10px;border-radius:18px;background:rgb(13,27,32);color:#fff;box-shadow:0 14px 40px rgba(0,0,0,.35);animation:hvUp .35s ease}
 .ft-reel .ft-kick{margin:6px 0 2px;color:color-mix(in srgb,var(--c-accent) 70%,#fff)}
 .ft-reel>b{display:block;font-size:17px;line-height:1.2}
 .ft-reel>span{display:block;margin-top:3px;font-size:13.5px;line-height:1.4;color:rgba(255,255,255,.82)}
@@ -783,7 +793,7 @@ export const FEATURES_CSS = `
 .ft-reel-scene .ft-intro{padding:12px}
 .ft-reel-hvorfor{margin-top:8px!important;padding:8px 10px;border-radius:12px;background:rgba(255,255,255,.08);font-size:13px!important}
 .ft-reel-hvorfor b{display:inline!important;font-size:11px!important;letter-spacing:.08em;text-transform:uppercase;color:color-mix(in srgb,var(--c-accent) 70%,#fff);margin-right:4px}
-@media (max-width:760px){.ft-reel{width:calc(100% - 16px);max-height:55vh;overflow-y:auto;padding:10px 12px 9px}.ft-reel>b{font-size:16px}.ft-reel>span{font-size:13px}
+@media (max-width:760px){.ft-reel{width:calc(100% - 16px);max-height:55vh;overflow-y:auto;padding:10px 12px 9px;display:flex;flex-direction:column;min-height:min(322px,55vh)}.ft-reel-knapper{margin-top:auto!important;padding-top:9px}.ft-reel-scene{margin:6px 0 2px}.ft-reel-scene .ft-scene{height:84px;min-height:0;overflow:hidden}.ft-reel-scene .ft-intro{padding:8px;gap:5px}.ft-reel-scene .ft-intro span{font-size:11px;padding:4px 8px}.ft-reel>b{font-size:16px}.ft-reel>span{font-size:13px}
 .ft-ark{padding:16px 16px 12px;max-height:calc(100% - 16px)}.ft-scene{height:110px}.ft-slide h2{font-size:19px;margin-top:12px}.ft-slide p{font-size:14px}.ft-hvorfor{margin-top:10px;padding:10px 12px;font-size:13px}.ft-reel-knapper button{white-space:nowrap;padding:8px 6px;font-size:12.5px}}
 .ft-reel-knapper button{flex:1;border:0;border-radius:999px;padding:8px 10px;background:rgba(255,255,255,.14);color:#fff;font:inherit;font-weight:700;font-size:13px;cursor:pointer}
 .ft-reel-knapper button:nth-child(2){background:var(--c-accent)}
