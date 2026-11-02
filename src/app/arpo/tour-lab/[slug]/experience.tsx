@@ -2341,6 +2341,9 @@ function TourExperience({
   // "hv-luk-alt": everything open on top of the tour closes - the showcase's showreel moves from one feature to the next with it.
   useEffect(() => {
     const all = () => {
+      // The start's own screens too (the welcome's tiles, the front page): they'd stand in front of what the showreel shows.
+      setWelcome(false);
+      setCover(false);
       setFinderOpen(false);
       setMenuOpen(false);
       setPano(null);
