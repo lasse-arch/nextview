@@ -340,12 +340,14 @@ export function PickerMenu({
         ))}
       </div>
       {current && (
-        <div className="pk-row pk-items">
-          {current.items.map(([name, href]) => (
-            <button key={name} type="button" className={name === item ? "nu" : ""} onClick={() => pick(current.title, name, href)}>
-              {name}
-            </button>
-          ))}
+        <div className="pk-foot">
+          <div className="pk-row pk-items">
+            {current.items.map(([name, href]) => (
+              <button key={name} type="button" className={name === item ? "nu" : ""} onClick={() => pick(current.title, name, href)}>
+                {name}
+              </button>
+            ))}
+          </div>
           {cta && (
             <TourLink className="pk-cta" href={cta.href} label={cta.label} onClick={() => onCta(cta.label, cta.href)}>
               {cta.label}
@@ -365,6 +367,9 @@ export const DESIGNS_CSS = `
 .pk-row button{flex:none;border:0;border-radius:999px;padding:9px 16px;font:inherit;font-weight:700;font-size:14px;cursor:pointer;background:#eef1f2;color:var(--c-main);transition:background .15s,color .15s}
 .pk-groups button{font-size:16px;font-weight:800;padding:10px 18px}
 .pk-items{flex-wrap:wrap;max-width:720px}
+/* The kinds of room and the main button: one line on a computer (the button at the end). */
+.pk-foot{display:flex;align-items:center;gap:6px}
+.pk-foot .pk-items{flex:1;min-width:0}
 .pk-luk{position:absolute;top:-14px;right:14px;width:30px;height:30px;border:0;border-radius:50%;background:#fff;color:var(--c-main);font-size:14px;font-weight:800;cursor:pointer;box-shadow:0 3px 10px rgba(0,0,0,.25)}
 .pk-mini{position:absolute;left:50%;bottom:18px;translate:-50% 0;z-index:9;display:flex;align-items:center;gap:10px;border:0;border-radius:999px;padding:8px 8px 8px 18px;background:rgba(255,255,255,.95);color:var(--c-main);font:inherit;font-weight:800;font-size:15px;cursor:pointer;box-shadow:0 10px 30px rgba(0,0,0,.3);white-space:nowrap;animation:hvUp .35s ease both}
 .pk-mini-item{font-weight:600;color:#56636a}
@@ -390,6 +395,12 @@ export const DESIGNS_CSS = `
   .pk-groups button{font-size:15px;padding:9px 14px}
   .pk-row button{font-size:13px;padding:8px 13px}
   .pk-cta{margin-left:0}
+  /* On a phone: the kinds in one line to swipe (as the sizes), the main button on its own line underneath - never mixed up with a kind. */
+  .pk-foot{flex-direction:column;align-items:stretch;gap:8px}
+  .pk-items{flex-wrap:nowrap;max-width:none}
+  .pk-items button{white-space:nowrap}
+  .pk-items button.nu{background:color-mix(in srgb,var(--c-accent) 16%,#fff);color:var(--c-main);box-shadow:inset 0 0 0 2px var(--c-accent)}
+  .pk-foot .pk-cta{display:block;text-align:center;padding:11px 16px;font-size:15px}
   .pk-unit{grid-template-columns:auto 1fr auto;gap:4px 10px;font-size:13px}
   .pk-unit .pk-pris{grid-column:2}
   .pk-unit .pk-book{grid-column:3;grid-row:1 / span 2}
