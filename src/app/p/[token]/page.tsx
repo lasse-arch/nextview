@@ -9,7 +9,8 @@ import type { TourConfig } from "@/app/arpo/tour-lab/tours/types";
 import type { Viewport } from "next";
 
 /** The tour fills the whole phone screen, also behind the island (its buttons keep clear of it - safe-area insets). */
-export const viewport: Viewport = { viewportFit: "cover", themeColor: "#0d1b20" };
+// The tour is a full-screen app: pinching zooms its picture, never the page itself (a pinch on the drone picture made the whole page zoom).
+export const viewport: Viewport = { viewportFit: "cover", themeColor: "#0d1b20", width: "device-width", initialScale: 1, minimumScale: 1, maximumScale: 1, userScalable: false };
 
 /*
  * Kundegennemsyn: the tour as it is in Arpo right now (published or not) on a

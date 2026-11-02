@@ -1895,6 +1895,24 @@ function TourExperience({
       track("guide_leave", { stop: (guideAtRef.current ?? 0) + 1, stops: GUIDE.length, label: "Gik selv rundt", kind: "walk", guide: guideKey() });
     }
   }
+  // Never the page itself zooming: on an iPhone a pinch on the drone picture zoomed the whole page (Safari ignores the
+  // viewport's "no zoom"), leaving the tour stuck half-way. Its own pictures still zoom - pannellum and Matterport
+  // handle their pinch themselves; only the browser's page zoom (and a double-tap zoom) is stopped.
+  useEffect(() => {
+    const stop = (e: Event) => e.preventDefault();
+    const twoFingers = (e: TouchEvent) => {
+      if (e.touches.length > 1) e.preventDefault();
+    };
+    const opts = { passive: false } as const;
+    document.addEventListener("gesturestart", stop, opts);
+    document.addEventListener("gesturechange", stop, opts);
+    document.addEventListener("touchmove", twoFingers, opts);
+    return () => {
+      document.removeEventListener("gesturestart", stop);
+      document.removeEventListener("gesturechange", stop);
+      document.removeEventListener("touchmove", twoFingers);
+    };
+  }, []);
   /*
    * Fitted to the phone it's on: the screen's own size (a web page can't
    * know the model, but it knows the size) sets how big everything on top
@@ -3869,7 +3887,7 @@ const CSS = `
 @keyframes hvSpin{to{rotate:360deg}}
 /* A tour is touched, not read: no text selection or iOS copy menu from a long press (it can't be dismissed over the tour). Fields stay selectable. */
 /* clip, not just hidden: nothing (a scrollIntoView, a focused button) can scroll the tour itself sideways and show the hidden menu. */
-.hv{overflow:clip;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+.hv{overflow:clip;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
 .hv input,.hv textarea{-webkit-user-select:text;user-select:text}
 .hv *{box-sizing:border-box}
 .hv .pnlm-load-box{background:rgba(21,50,58,.9)!important;border-radius:12px!important;font-family:inherit!important}

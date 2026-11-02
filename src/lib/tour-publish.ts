@@ -119,7 +119,7 @@ export async function buildVersion(slug: string, origin: string) {
 
   const icon = ready.tour.favicon || ready.tour.logo || "";
   const page = `<!doctype html>
-<html lang="da"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="robots" content="noindex">
+<html lang="da"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><meta name="robots" content="noindex">
 <title>${esc(`${ready.tour.title} – virtuel tour`)}</title>${icon ? `<link rel="icon" href="${esc(icon)}">` : ""}
 <link rel="stylesheet" href="/_engine/${engine.version}/tour.css"><style>html,body{margin:0;height:100%;background:#0d1b20}</style></head>
 <body><div id="tour"></div><script>window.__TOUR_API__=${scriptJson(ARPO_ORIGIN())}</script><script id="tour-data" type="application/json">${scriptJson(ready)}</script><script type="module" src="/_engine/${engine.version}/tour.js"></script></body></html>`;
