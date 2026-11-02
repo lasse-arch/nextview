@@ -450,7 +450,7 @@ function whyOf(key: string, tr: (s: string, v?: Record<string, string | number>)
   const why: Record<string, string> = {
     luften: tr("Gæster vil først forstå, hvor alt ligger. Overblikket fra luften giver dem det på få sekunder - og gør det let at vælge, hvor de vil hen."),
     stories: tr("Det korte format, folk kender fra Instagram: hurtigt at se, og de bliver hængende længere i jeres tour."),
-    findvej: tr("På et stort sted er det let at fare vild i en 360°-tour. Find vej fører dem direkte hen til det, de leder efter - så de ikke giver op."),
+    findvej: tr("Find vej viser vejen fra der, hvor man står, til fx et lokale, man aldrig har været i - så nye elever, gæster eller kunder kender vejen i en stor bygning, før de kommer. Og ingen farer vild eller giver op i touren."),
     live: tr("Når gæsterne kan se, hvad der er ledigt lige nu, er der kortere vej fra at kigge til at booke."),
     cards: tr("Billeder fortæller ikke alt. Kortet giver de vigtigste fakta lige dér, hvor man står - og en vej videre til at booke eller spørge."),
     vej: tr("Afstanden afgør tit, om man vælger jer. Her ser de selv, hvor tæt på de er - uden at skulle spørge."),
