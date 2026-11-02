@@ -73,7 +73,13 @@ export function LiveDataEditor({ config, edit, slug, preview }: { config: TourCo
         <Field title="Hvad skal læses? (valgfrit)">
           <input className={input} value={what} onChange={(e) => setWhat(e.target.value)} placeholder="Fx ledige campingpladser med nummer, størrelse og pris" />
         </Field>
-        <button type="button" disabled={pending || !url.trim()} onClick={read} className="w-full rounded-xl bg-[#0071e3] py-2.5 text-[15px] font-medium text-white disabled:opacity-40">
+        {/next-stay/i.test(url) && (
+          // Next-Stay's booking page is drawn by JavaScript - nothing to read here. Its pitches come straight from its booking instead.
+          <p className="rounded-xl bg-[#0071e3]/5 px-3 py-2 text-[13px] leading-snug text-[#1d1d1f]">
+            Det er Next-Stay - dens side kan ikke læses her. Brug i stedet <b>Luftfoto og kort → Pladskort over luftfotoet → Ledige pladser live fra Next-Stay</b>: sæt linket ind dér og tryk Hent pladser, så kommer alle pladser og hytter som prikker på pladskortet og lyser grønt, når de er ledige.
+          </p>
+        )}
+        <button type="button" disabled={pending || !url.trim() || /next-stay/i.test(url)} onClick={read} className="w-full rounded-xl bg-[#0071e3] py-2.5 text-[15px] font-medium text-white disabled:opacity-40">
           {pending ? "nextviewAI læser siden…" : live ? "Læs siden igen med nextviewAI" : "Læs siden med nextviewAI"}
         </button>
         {error && <p className="px-1 text-[12px] text-[#ff3b30]">{error}</p>}
