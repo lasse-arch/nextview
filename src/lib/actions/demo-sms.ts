@@ -6,6 +6,7 @@ import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { logActivity } from "@/lib/activity";
 import { danishMobile, sendSms, smsReady } from "@/lib/sms";
+import { teamCan } from "@/lib/team-roles";
 
 /*
  * Salg → "Send eksempel": while talking to a new customer, a seller types
@@ -37,10 +38,13 @@ export type DemoSmsSetup = {
 const COUNTRY: Record<string, string> = { DK: "Danmark", DE: "Tyskland", SE: "Sverige", NO: "Norge" };
 
 /** What the page needs: the showcase tours, the text, and what's been sent lately (and opened). */
+/** Which tours a seller may send to new customers: an admin any, the others those chosen as examples (Kan sendes som eksempel) and those already out (published). */
+const sendable = (user: Parameters<typeof teamCan>[0]) => (teamCan(user, "admin") ? {} : { OR: [{ showcase: true }, { published: true }, { liveVersion: { not: null } }] });
+
 export async function demoSmsSetup(): Promise<DemoSmsSetup> {
   const user = await requireUser();
   const [tours, links] = await Promise.all([
-    prisma.tour.findMany({ where: { showcase: true }, select: { slug: true, name: true }, orderBy: { name: "asc" } }),
+    prisma.tour.findMany({ where: sendable(user), select: { slug: true, name: true }, orderBy: [{ showcase: "desc" }, { name: "asc" }] }),
     prisma.tourDemoLink.findMany({
       where: { label: { endsWith: "(SMS)" } },
       orderBy: { createdAt: "desc" },
@@ -78,7 +82,7 @@ export async function demoSmsSetup(): Promise<DemoSmsSetup> {
 export async function sendDemoSms(input: { tourSlug: string; phone: string; name: string; text: string; consent: boolean }): Promise<{ ok: true; sent: boolean; text: string; phone: string } | { ok: false; error: string }> {
   const user = await requireUser();
   if (input.consent !== true) return { ok: false, error: "Sæt hak, når kunden har sagt ja til at få en SMS." };
-  const tour = await prisma.tour.findFirst({ where: { slug: String(input.tourSlug), showcase: true }, select: { slug: true, name: true } });
+  const tour = await prisma.tour.findFirst({ where: { slug: String(input.tourSlug), ...sendable(user) }, select: { slug: true, name: true } });
   if (!tour) return { ok: false, error: "Vælg en af eksempel-tourene." };
   const phone = danishMobile(input.phone);
   if (!phone) return { ok: false, error: "Skriv et dansk mobilnummer (8 cifre)." };
@@ -105,6 +109,27 @@ export async function sendDemoSms(input: { tourSlug: string; phone: string; name
     sent = true;
   }
   await logActivity({ type: "DEMO_SMS", message: `${user.name} sendte et eksempel (${tour.name}) på SMS til ${who}`, actorId: user.id });
-  revalidatePath("/arpo/send-eksempel");
+  revalidatePath("/arpo/generator");
   return { ok: true, sent, text: message, phone: `+${phone}` };
+}
+
+/**
+ * The mail generator's tours as showcase links: one link per tour for this
+ * recipient (`to`, e.g. the company or the person), so they get the
+ * walk-through too and we see whether they look. Only tours the seller may
+ * send; the others keep their own address.
+ */
+export async function demoLinksForMail(slugs: string[], to: string): Promise<Record<string, string>> {
+  const user = await requireUser();
+  const want = [...new Set((slugs ?? []).map(String))].slice(0, 3);
+  if (!want.length) return {};
+  const tours = await prisma.tour.findMany({ where: { slug: { in: want }, ...sendable(user) }, select: { slug: true } });
+  const who = String(to ?? "").trim().slice(0, 80) || "Mail";
+  const base = (process.env.APP_BASE_URL || "https://nextview360.dk").replace(/\/+$/, "");
+  const out: Record<string, string> = {};
+  for (const t of tours) {
+    const link = await prisma.tourDemoLink.create({ data: { tourSlug: t.slug, token: randomBytes(15).toString("base64url"), label: `${who} (mail)`, createdById: user.id } });
+    out[t.slug] = `${base}/vis/${link.token}`;
+  }
+  return out;
 }

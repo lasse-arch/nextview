@@ -40,7 +40,7 @@ export function SendExample({ initial }: { initial: DemoSmsSetup }) {
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-slate-900">Send eksempel</h1>
+        <h1 className="text-2xl font-semibold text-slate-900">Send et eksempel på SMS</h1>
         <p className="mt-1 text-sm text-slate-500">Send en af vores tours på SMS, mens du snakker med kunden. De får deres eget link: touren åbner med en gennemgang af funktionerne og slutter med din kontakt - og du får besked, når de kigger.</p>
       </div>
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">

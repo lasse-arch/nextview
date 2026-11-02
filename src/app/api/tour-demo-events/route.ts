@@ -71,8 +71,8 @@ export async function POST(request: NextRequest) {
   const first = !(await prisma.tourDemoEvent.count({ where: { linkId: link.id, session } }));
   await prisma.tourDemoEvent.createMany({ data: events.map((e) => ({ ...e, linkId: link.id, session, device, city, country, referrer: ref })) });
   if (first) {
-    const name = link.deal ? link.deal.displayName || link.deal.companyName : link.label.replace(/ \(SMS\)$/, "");
-    const href = link.dealId ? `/arpo/deals/${link.dealId}` : link.label.endsWith("(SMS)") ? "/arpo/send-eksempel" : `/arpo/tour-lab/${link.tourSlug}/rediger?fane=del`;
+    const name = link.deal ? link.deal.displayName || link.deal.companyName : link.label.replace(/ \((SMS|mail)\)$/, "");
+    const href = link.dealId ? `/arpo/deals/${link.dealId}` : /\((SMS|mail)\)$/.test(link.label) ? `/arpo/generator${link.label.endsWith("(SMS)") ? "?fane=sms" : ""}` : `/arpo/tour-lab/${link.tourSlug}/rediger?fane=del`;
     await ringBell({ kind: "demo", title: `${name} kigger på jeres eksempel lige nu`, text: `De åbnede touren${city ? ` i ${city}` : ""} på ${device}. Et godt tidspunkt at ringe.`, href, tourSlug: `demo:${link.id}`, audience: `user:${link.createdById}` });
   }
   return new NextResponse(null, { status: 204 });

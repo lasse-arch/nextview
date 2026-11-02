@@ -64,7 +64,7 @@ const DEFAULT_POSTS: { title: string; body: string; minutesAgo: number; screensh
   {
     minutesAgo: 0,
     title: "Send et eksempel på SMS, mens du snakker med kunden - og se, når de kigger",
-    body: "Under Salg er der en ny side, Send eksempel. Skriv kundens navn og mobilnummer, vælg en af vores eksempel-tours, tjek teksten (du ser SMS'en, som kunden får), sæt hak i \"Kunden har sagt ja til at få en SMS\" og send. Kunden får sit eget link til touren: den åbner med en gennemgang af funktionerne - og \"Se det hele i aktion\", hvor touren selv viser dem - og slutter med dit navn, telefon og mail.\n\nNår kunden åbner linket, får du en notifikation i klokken med det samme (\"… kigger på jeres eksempel lige nu\") - et godt tidspunkt at ringe. Nederst på siden står alt, der er sendt, og om det er åbnet; hvad de så, står på touren under Del og udgiv → Fremvisning til nye kunder. Hvilke tours der kan sendes, vælges med \"Kan sendes som eksempel\" samme sted.\n\nIndtil SMS fra Arpo er sat op, åbner knappen SMS'en på din egen telefon med teksten udfyldt - linket spores på samme måde. Sikkerhed: kun teamet kan sende, kun til danske mobilnumre, kun når kunden har sagt ja, og højst 40 om dagen pr. sælger. Linket kan kun læse touren, kontaktformularen sender ikke noget, og jeres egne åbninger tæller ikke.",
+    body: "Under Salg hedder Mailgenerator nu Generator, med to faner: Mail og SMS. På SMS skriver du kundens navn og mobilnummer, vælg en af vores eksempel-tours, tjek teksten (du ser SMS'en, som kunden får), sæt hak i \"Kunden har sagt ja til at få en SMS\" og send. Kunden får sit eget link til touren: den åbner med en gennemgang af funktionerne - og \"Se det hele i aktion\", hvor touren selv viser dem - og slutter med dit navn, telefon og mail.\n\nNår kunden åbner linket, får du en notifikation i klokken med det samme (\"… kigger på jeres eksempel lige nu\") - et godt tidspunkt at ringe. Mailen kan også sende vores egne tours som fremvisningslinks (slået til som standard) - så får modtageren gennemgangen, og du får besked, når de kigger. Nederst på SMS-fanen står alt, der er sendt, og om det er åbnet; hvad de så, står på touren under Del og udgiv → Fremvisning til nye kunder. Admin kan sende alle tours; sælgere de udgivne og dem, der er slået til med \"Kan sendes som eksempel\" samme sted.\n\nIndtil SMS fra Arpo er sat op, åbner knappen SMS'en på din egen telefon med teksten udfyldt - linket spores på samme måde. Sikkerhed: kun teamet kan sende, kun til danske mobilnumre, kun når kunden har sagt ja, og højst 40 om dagen pr. sælger. Linket kan kun læse touren, kontaktformularen sender ikke noget, og jeres egne åbninger tæller ikke.",
     screenshotUrl: "/news/send-eksempel.png",
   },
   {
@@ -359,7 +359,7 @@ export async function ensureDefaultNewsPosts(adminUserId: string): Promise<void>
   // "Send eksempel" moved from the deal and the call list to its own page under Salg.
   {
     const moved = DEFAULT_POSTS.find((p) => p.title.startsWith("Send et eksempel på SMS"));
-    if (moved) await prisma.newsPost.updateMany({ where: { title: moved.title, body: { contains: "I ringelisten og på dealen" } }, data: { body: moved.body } });
+    if (moved) await prisma.newsPost.updateMany({ where: { title: moved.title, body: { not: moved.body } }, data: { body: moved.body } });
   }
 
   for (const post of DEFAULT_POSTS) {

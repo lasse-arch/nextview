@@ -1522,13 +1522,13 @@ const SectionNav = memo(function SectionNav({ tab, menu, feedbackOpen, unused, o
             <button
               type="button"
               onClick={() => onPick(t)}
+              title={unused.split(",").includes(t) ? `${text}: ikke i brug i touren endnu - åbn for at slå det til` : undefined}
               className={`flex items-center gap-2.5 rounded-[9px] px-2.5 py-[7px] text-left text-[14px] transition ${tab === t ? "bg-white font-medium shadow-[0_1px_3px_rgba(0,0,0,.08)]" : "text-[#1d1d1f]/80 hover:bg-black/[.04]"}`}
             >
               <span className={`flex h-7 w-7 items-center justify-center rounded-[7px] ${tab === t ? "bg-[#0071e3] text-white" : "bg-white text-[#6e6e73] ring-1 ring-black/[.06]"}`}>
                 <Icon d={icon} className="h-4 w-4" />
               </span>
-              <span className={unused.split(",").includes(t) && tab !== t ? "text-[#1d1d1f]/45" : ""}>{text}</span>
-              {unused.split(",").includes(t) && <span className="ml-auto text-[10.5px] text-[#8e8e93]">ikke i brug</span>}
+              <span className={unused.split(",").includes(t) && tab !== t ? "text-[#1d1d1f]/40" : ""}>{text}</span>
               {t === "feedback" && feedbackOpen > 0 && <span className="ml-auto rounded-full bg-[#ff9500] px-1.5 text-[11px] font-semibold text-white">{feedbackOpen}</span>}
             </button>
           </div>

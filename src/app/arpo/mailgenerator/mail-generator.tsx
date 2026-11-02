@@ -4,9 +4,11 @@ import { useMemo, useState, useTransition } from "react";
 import { INDUSTRIES } from "@/lib/industries";
 import { MAIL_KINDS, type MailKind, type SalesMailInput } from "@/lib/sales-mail";
 import { copiedSalesMail, draftSalesMail, sendSalesMail } from "@/lib/actions/sales-mail";
+import { demoLinksForMail } from "@/lib/actions/demo-sms";
 
 type Deal = { id: string; name: string; contact: string; email: string; industry: string };
-type Tour = { key: string; name: string; url: string; industry: string };
+/** `slug`: one of our own tours in Arpo - it can go out as a showcase link (walk-through + we see who looks). */
+type Tour = { key: string; name: string; url: string; industry: string; slug?: string };
 
 const input = "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-slate-500 focus:outline-none";
 const label = "block text-[11px] font-semibold uppercase tracking-wide text-slate-500";
@@ -30,6 +32,10 @@ export function MailGenerator({ deals, tours, signature, learned }: { deals: Dea
   const [delivery, setDelivery] = useState("");
   const [picked, setPicked] = useState<string[]>([]);
   const [tourQuery, setTourQuery] = useState("");
+  /** Our own tours go out as showcase links: the recipient's own, with the walk-through - and the seller hears when they look. */
+  const [asDemo, setAsDemo] = useState(true);
+  /** The showcase links made for this mail (tour + recipient), so a new suggestion doesn't make new ones. */
+  const [demoUrls, setDemoUrls] = useState<Record<string, string>>({});
 
   const [draft, setDraft] = useState<{ id: string; subject: string; body: string } | null>(null);
   const [redo, setRedo] = useState("");
@@ -56,7 +62,7 @@ export function MailGenerator({ deals, tours, signature, learned }: { deals: Dea
     return [...list].sort((a, b) => Number(b.industry === industry) - Number(a.industry === industry) || a.name.localeCompare(b.name, "da")).slice(0, q ? 30 : 12);
   }, [tours, tourQuery, industry]);
 
-  const data = (): SalesMailInput => ({
+  const data = (links: Record<string, string> = {}): SalesMailInput => ({
     kind,
     dealId: deal?.id ?? null,
     name,
@@ -68,13 +74,27 @@ export function MailGenerator({ deals, tours, signature, learned }: { deals: Dea
     price: withPrice
       ? { establishment: toNum(price.establishment), monthly: toNum(price.monthly), locations: toNum(price.locations), bindingMonths: toNum(price.bindingMonths), conditions: price.conditions }
       : null,
-    tours: picked.map((k) => tours.find((t) => t.key === k)!).filter(Boolean).map((t) => ({ name: t.name, url: t.url })),
+    tours: picked.map((k) => tours.find((t) => t.key === k)!).filter(Boolean).map((t) => ({ name: t.name, url: (t.slug && links[t.slug]) || t.url })),
   });
+
+  /** The showcase links for the picked tours of ours (made once per recipient and tour). */
+  async function links(): Promise<Record<string, string>> {
+    if (!asDemo) return {};
+    const who = company.trim() || name.trim() || to.trim();
+    const slugs = picked.map((k) => tours.find((t) => t.key === k)?.slug).filter((x): x is string => Boolean(x));
+    const missing = slugs.filter((sl) => !demoUrls[`${who}|${sl}`]);
+    const made = missing.length ? await demoLinksForMail(missing, who) : {};
+    const next = { ...demoUrls };
+    for (const [sl, url] of Object.entries(made)) next[`${who}|${sl}`] = url;
+    if (missing.length) setDemoUrls(next);
+    return Object.fromEntries(slugs.filter((sl) => next[`${who}|${sl}`]).map((sl) => [sl, next[`${who}|${sl}`]]));
+  }
 
   function write(ask?: string) {
     setMsg(null);
     start(async () => {
-      const r = await draftSalesMail(data(), ask && draft ? { subject: draft.subject, body: draft.body, ask } : undefined).catch(() => ({ ok: false as const, error: "Der skete en fejl - prøv igen." }));
+      const l = await links().catch(() => ({}));
+      const r = await draftSalesMail(data(l), ask && draft ? { subject: draft.subject, body: draft.body, ask } : undefined).catch(() => ({ ok: false as const, error: "Der skete en fejl - prøv igen." }));
       if (r.ok) {
         setDraft({ id: r.id, subject: r.subject, body: r.body });
         setRedo("");
@@ -227,6 +247,12 @@ export function MailGenerator({ deals, tours, signature, learned }: { deals: Dea
               })}
               {shown.length === 0 && <span className="text-xs text-slate-400">Ingen tours fundet.</span>}
             </div>
+            <label className="mt-2 flex items-start gap-2 text-xs text-slate-600">
+              <input type="checkbox" checked={asDemo} onChange={(e) => setAsDemo(e.target.checked)} className="mt-0.5 h-3.5 w-3.5" />
+              <span>
+                Send som fremvisningslink: modtageren får sit eget link med gennemgangen af funktionerne og din kontakt til sidst - og du får besked, når de kigger. <span className="text-slate-400">(Vores egne tours i Arpo.)</span>
+              </span>
+            </label>
           </div>
 
           <button type="button" disabled={busy} onClick={() => write()} className="w-full rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50">
