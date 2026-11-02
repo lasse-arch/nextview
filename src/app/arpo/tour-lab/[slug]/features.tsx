@@ -409,16 +409,10 @@ function featuresOf(T: TourConfig, tr: (s: string, v?: Record<string, string | n
       });
     out.push({
       key: "portal",
-      title: "Vi bliver ved med at gøre den bedre",
-      text: "Vi kan se, hvor gæsterne kigger, hvad de klikker på, og hvor mange der tager kontakt. Det bruger vi til løbende at rette touren til - så I får mere af det, der virker og skaffer henvendelser.",
+      title: "Jeres egen kundeportal",
+      text: "Her ser I, hvor mange der besøger touren, hvor længe de bliver, hvilke rum de kigger mest i, hvad de klikker på - og hvor mange der tager kontakt. Vi bruger tallene til løbende at gøre touren bedre, så I får mere af det, der virker.",
       why: "Tallene viser, hvad der virker - dér gør vi touren stærkere.",
-      scene: (
-        <div className="ft-scene ft-portal">
-          {[38, 62, 48, 80, 70, 92].map((h, i) => (
-            <i key={i} style={{ height: `${h}%`, animationDelay: `${i * 0.12}s` }} />
-          ))}
-        </div>
-      ),
+      scene: <PortalScene rooms={T.menu.flatMap((m) => ("items" in m ? m.items.map((i) => i[0]) : [m.title])).filter((n) => n && n.length <= 22)} />,
     });
     return out;
   }
@@ -534,6 +528,57 @@ function MoreBand({ items }: { items: string[] }) {
         {order.map((t) => (
           <span key={`${t}-2`} className="ft-dub" aria-hidden>
             {t}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The customer portal in miniature (example numbers): the figures count up,
+ * the most-seen rooms fill in - what a customer gets to see about their tour.
+ */
+function PortalScene({ rooms }: { rooms: string[] }) {
+  const names = [...rooms, "Indgangen", "Fællesrummet", "Udenfor"].filter((n, i, a) => a.indexOf(n) === i).slice(0, 3);
+  const [t, setT] = useState(0);
+  useEffect(() => {
+    // Without motion: straight to the numbers (the first frame).
+    const still = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    let frame = 0;
+    const start = still ? -1e9 : performance.now();
+    const tick = (now: number) => {
+      const k = Math.min(1, (now - start) / 1600);
+      setT(1 - (1 - k) ** 3);
+      if (k < 1) frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, []);
+  const n = (v: number) => Math.round(v * t).toLocaleString("da-DK");
+  const sek = Math.round(220 * t);
+  return (
+    <div className="ft-scene ft-portal">
+      <div className="ft-kpi">
+        <span>
+          <b>{n(1248)}</b>besøg
+        </span>
+        <span>
+          <b>
+            {Math.floor(sek / 60)}:{String(sek % 60).padStart(2, "0")}
+          </b>
+          min. i touren
+        </span>
+        <span>
+          <b>{n(27)}</b>henvendelser
+        </span>
+      </div>
+      <div className="ft-mest">
+        <small>Mest set · eksempel</small>
+        {names.map((name, i) => (
+          <span key={name}>
+            <em>{name}</em>
+            <i style={{ width: `${[86, 64, 41][i] * t}%` }} />
           </span>
         ))}
       </div>
@@ -834,8 +879,8 @@ function DemoContactCard({ demo, onContact }: { demo: DemoContact; onContact: (h
 export const FEATURES_CSS = `
 .ft-bg{position:absolute;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(8,14,18,.55);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);animation:hvFade .3s ease}
 .ft-ark{position:relative;width:min(460px,100%);max-height:calc(100% - 24px);overflow-y:auto;background:#fff;border-radius:26px;padding:22px 22px 16px;box-shadow:0 24px 60px rgba(0,0,0,.35);color:#1d2a30;animation:hvUp .4s cubic-bezier(.2,.7,.2,1)}
-.ft-x{position:absolute;right:14px;top:14px;width:34px;height:34px;border:0;border-radius:50%;background:#f2f2f2;font-size:20px;cursor:pointer;color:#1d2a30}
-.ft-kick{margin:0 44px 12px 2px;font-size:11.5px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--c-accent)}
+.ft-x{position:absolute;right:16px;top:16px;z-index:2;width:34px;height:34px;border:0;border-radius:50%;background:#f2f2f2;font-size:20px;cursor:pointer;color:#1d2a30}
+.ft-kick{display:flex;align-items:center;min-height:34px;margin:0 46px 10px 2px;font-size:11.5px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--c-accent)}
 .ft-slide{animation:ftIn .35s ease}
 @keyframes ftIn{from{opacity:0;transform:translateX(14px)}to{opacity:1;transform:none}}
 .ft-slide h2{margin:16px 2px 6px;font-size:22px;line-height:1.15;font-weight:900;color:var(--c-main)}
@@ -907,8 +952,16 @@ export const FEATURES_CSS = `
 @keyframes ftSpin{to{transform:rotate(360deg)}}
 .ft-staging{display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg,#d9d2c5,#bfb5a4)!important}
 .ft-staging i{width:46%;aspect-ratio:16/9;border-radius:6px;background:linear-gradient(135deg,var(--c-main),var(--c-accent));display:flex;align-items:center;justify-content:center;color:#fff;font-style:normal;font-size:20px;box-shadow:0 10px 24px rgba(0,0,0,.25);transform:perspective(300px) rotateY(-14deg);animation:ftStory 3s ease-in-out infinite}
-.ft-portal{display:flex;align-items:flex-end;gap:9px;padding:18px 22px 16px;background:linear-gradient(180deg,#f4f6f7,#e6ebed)!important}
-.ft-portal i{flex:1;border-radius:6px 6px 2px 2px;background:var(--c-accent);transform-origin:bottom;animation:ftGrow 2.8s ease-in-out infinite both}
+.ft-portal{display:flex;flex-direction:column;justify-content:center;gap:9px;padding:12px 14px;background:linear-gradient(180deg,#f4f6f7,#e6ebed)!important;color:#1d2a30}
+.ft-kpi{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+.ft-kpi span{display:flex;flex-direction:column;padding:6px 8px;border-radius:10px;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.06);font-size:10px;font-weight:600;color:#6b7780;line-height:1.2}
+.ft-kpi b{font-size:17px;font-weight:900;color:var(--c-main);font-variant-numeric:tabular-nums}
+.ft-mest{display:flex;flex-direction:column;gap:4px}
+.ft-mest small{font-size:9.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#6b7780}
+.ft-mest span{display:grid;grid-template-columns:86px 1fr;align-items:center;gap:8px}
+.ft-mest em{font-style:normal;font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ft-mest i{display:block;height:7px;border-radius:4px;background:var(--c-accent)}
+.ft-scene.ft-portal{height:auto!important;min-height:110px}
 @keyframes ftGrow{0%{transform:scaleY(.15)}35%,85%{transform:none}100%{transform:scaleY(.15)}}
 .ft-demo-kontakt{margin:14px 2px 0;padding:14px;border-radius:16px;background:#0d1b20;color:#fff}
 .ft-demo-kontakt b{display:block;font-size:16px;margin-bottom:3px}
