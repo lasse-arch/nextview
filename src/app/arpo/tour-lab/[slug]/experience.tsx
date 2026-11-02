@@ -3330,6 +3330,8 @@ function TourExperience({
             className={`hv-maal ${showMeasures ? "aktiv" : ""}`}
             onClick={() => {
               track("measures_toggle", { on: showMeasures ? 0 : 1 });
+              // On a phone the menu covers the room - out of the way, so the measurements can be seen.
+              if (!showMeasures && (phone || window.innerWidth <= 760)) setMenuOpen(false);
               setShowMeasures((v) => !v);
             }}
           >
