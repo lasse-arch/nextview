@@ -1,5 +1,6 @@
 "use client";
 
+import { TourLogo, TOUR_LOGO_CSS } from "./tour-logo";
 import { LANG_CSS, LangSwitch } from "./lang-switch";
 import { danishOf, LANGUAGES, localize, makeT, tourLanguages } from "../tours/i18n";
 import { TourLang, useT } from "../tours/i18n-react";
@@ -2512,7 +2513,7 @@ function TourExperience({
       }>
       <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.font.replace(/ /g, "+")}:wght@400;600;700;800;900&display=swap`} />
       {T.fontHeading && <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.fontHeading.replace(/ /g, "+")}:wght@500;600&display=swap`} />}
-      <style>{CSS + CONTACT_CSS + STORIES_CSS + LIGHTBOX_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + ONBOARDING_CSS + MENU_HINT_CSS + INFO_CSS + STAGING_CSS + (T.lineDays ? LINE_DAY_CSS : "") + (T.yearWheel ? YEARWHEEL_CSS : "") + MAP_CSS + (T.sitePlan?.overlay ? SITE_PLAN_CSS + SITE_PLAN_360_CSS : "") + ROUTE_CSS + MEASURES_CSS + CARDS_CSS + DAY_CSS + SIMPLE_CSS + BENTO_CSS + LOGO_RIGHT_CSS + LANG_CSS + WEATHER_CSS + COMMUTE_CSS + FEATURES_CSS + FINDER_CSS + (review ? FEEDBACK_CSS : "")}</style>
+      <style>{CSS + TOUR_LOGO_CSS + CONTACT_CSS + STORIES_CSS + LIGHTBOX_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + ONBOARDING_CSS + MENU_HINT_CSS + INFO_CSS + STAGING_CSS + (T.lineDays ? LINE_DAY_CSS : "") + (T.yearWheel ? YEARWHEEL_CSS : "") + MAP_CSS + (T.sitePlan?.overlay ? SITE_PLAN_CSS + SITE_PLAN_360_CSS : "") + ROUTE_CSS + MEASURES_CSS + CARDS_CSS + DAY_CSS + SIMPLE_CSS + BENTO_CSS + LOGO_RIGHT_CSS + LANG_CSS + WEATHER_CSS + COMMUTE_CSS + FEATURES_CSS + FINDER_CSS + (review ? FEEDBACK_CSS : "")}</style>
       {/* The tour's own design on top (written by Claude or by hand under Avanceret). */}
       {T.customCss && <style>{T.customCss.replace(/<\/?style/gi, "")}</style>}
 
@@ -2538,8 +2539,7 @@ function TourExperience({
       <div className={`absolute inset-0 transition-opacity duration-500 ${phase === "drone" ? "opacity-100" : "pointer-events-none opacity-0"} ${cover && T.cover ? "invisible" : ""} ${droneWaiting ? "hv-laster" : ""}`}>
         {droneWaiting && (
           <div className="hv-laster-tegn" aria-hidden>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={T.logo} alt="" />
+            <TourLogo T={T} alt="" />
           </div>
         )}
         {T.map ? (
@@ -2569,8 +2569,7 @@ function TourExperience({
 
         <div className={`hv-intro ${T.logoOnLight ? "" : "hv-intro-moerk"}`}>
           <div className="hv-intro-head" style={{ background: T.colors.main }}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={T.logo} alt={T.brand} />
+            <TourLogo T={T} />
             <div className="hv-sub">{T.subtitle}</div>
           </div>
           <div className="hv-intro-body">
@@ -2761,8 +2760,7 @@ function TourExperience({
           {T.welcome.video?.src && <WelcomeFilm film={T.welcome.video} />}
           <div className="hv-wel-grid">
             <div className={`hv-wel-main ${T.logoOnLight ? "hv-light" : ""}`}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={T.logo} alt={T.brand} />
+              <TourLogo T={T} />
               <div className="hv-wel-kick">{T.welcome.kicker}</div>
               <h1>{T.welcome.title}</h1>
               <p>{T.welcome.lead}</p>
@@ -2844,8 +2842,7 @@ function TourExperience({
       )}
 
       {/* Logo (MPSkins: left, 200px, 13px from the edges - or right, with the menu on the left). */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={T.logo} alt={T.brand} className={`hv-logo ${T.logoOnLight ? (T.logoCard === false ? "hv-logo-lys" : "hv-logo-kort") : ""} ${phase === "tour" && !(cover && T.cover) ? "" : "hidden"}`} />
+      <TourLogo T={T} className={`hv-logo ${T.logoOnLight ? (T.logoCard === false ? "hv-logo-lys" : "hv-logo-kort") : ""} ${phase === "tour" && !(cover && T.cover) ? "" : "hidden"}`} />
 
       {/* Inside the tour: back to the air, the room's name, the menu. */}
       {phase === "tour" && (
@@ -2930,8 +2927,7 @@ function TourExperience({
       {T.menuDim !== false && <button type="button" className="hv-menu-slor" aria-label={tx("Luk menuen")} tabIndex={menuOpen ? 0 : -1} onClick={() => setMenuOpen(false)} />}
       <nav className={`hv-menu ${menuOpen ? "aaben" : ""}`}>
         <div className={`hv-menu-head ${T.logoOnLight ? "hv-light" : ""}`} style={{ background: T.logoOnLight ? "#fff" : T.colors.main }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={T.logo} alt="" />
+          <TourLogo T={T} alt="" />
           {T.menuName !== false && (
             <>
               <div className="hv-menu-titel">{T.brand.toUpperCase()}</div>

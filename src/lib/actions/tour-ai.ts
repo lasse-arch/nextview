@@ -15,7 +15,7 @@ import { prisma } from "@/lib/db";
 import { getSettingValue, setSettingValue } from "@/lib/integration-settings";
 import { siteDigest, siteResearch } from "@/lib/site-digest";
 import { pageAsText, readUnits, type LiveUnit } from "@/lib/availability/live";
-import { hostFiles } from "@/lib/tour-files";
+import { hostFiles, hostNewFiles } from "@/lib/tour-files";
 import { claudeCostUsd } from "@/lib/claude-cost";
 import { withoutDeadAerialLinks } from "@/app/arpo/tour-lab/tours/places";
 import { BRANCHES, DESIGN_PRESETS, MENU_STYLES, START_STYLES, setLayout, type Branch, type DesignPreset, type NewTourLayout } from "@/app/arpo/tour-lab/tours/presets";
@@ -285,7 +285,11 @@ async function claudeEdits(key: string, who: { name: string; kind: string }, con
   }
   const remembered = await remember(config.slug, who.name, parsed.remember ?? []).catch((err: unknown) => (console.error("remember", err), []));
   const forgot = await forget(config.slug, parsed.forget ?? []).catch((err: unknown) => (console.error("forget", err), []));
-  return { ok: true, reply: parsed.reply, config: plainWordsInConfig({ ...(next as unknown as TourConfig), slug: config.slug }), changed: parsed.changes.length, remembered, forgot };
+  // Pictures it put in from another site: copied to us now - one that can't be fetched isn't left as a broken picture.
+  const hosted = await hostNewFiles(config.slug, config, { ...(next as unknown as TourConfig), slug: config.slug }).catch((err: unknown) => (console.error("hostNewFiles", err), null));
+  const edited = hosted?.config ?? ({ ...(next as unknown as TourConfig), slug: config.slug } as TourConfig);
+  const note = hosted?.failed.length ? `\n\n⚠️ ${hosted.failed.join("\n⚠️ ")}\nUpload filen selv (fx logoet under Design), så den ligger hos os.` : "";
+  return { ok: true, reply: parsed.reply + note, config: plainWordsInConfig(edited), changed: parsed.changes.length, remembered, forgot };
 }
 
 /** Screenshots sent with a request (data URLs from the editor, made small there) as image blocks - anything else is dropped. */

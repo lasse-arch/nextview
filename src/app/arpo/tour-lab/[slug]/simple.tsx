@@ -1,5 +1,6 @@
 "use client";
 
+import { TourLogo } from "./tour-logo";
 import { useT } from "../tours/i18n-react";
 import { isInTourHref, isPlaceHref, welcomeTiles } from "../tours/places";
 import type { TourConfig, WelcomeGo } from "../tours/types";
@@ -19,8 +20,7 @@ export function SimpleWelcome({ T, onChoose }: { T: TourConfig; onChoose: (go: W
     <div className={`sp-wel ${welcomeFilmClass(w.video)}`} role="dialog" aria-modal="true" aria-label={w.title}>
       {w.video?.src && <WelcomeFilm film={w.video} />}
       <div className="sp-wel-card">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={T.logo} alt={T.brand} className="sp-wel-logo" />
+        <TourLogo T={T} className="sp-wel-logo" />
         <h1>{w.title}</h1>
         {w.lead && <p>{w.lead}</p>}
         <div className="sp-list">
@@ -84,8 +84,7 @@ export function SimpleMenu({
       {open && (
         <div className="sp-menu" role="dialog" aria-modal="true" aria-label={tr("Menu")}>
           <div className="sp-menu-top">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={T.logo} alt={T.brand} />
+            <TourLogo T={T} />
             <button type="button" className="sp-luk" onClick={() => setOpen(false)}>
               Luk
             </button>

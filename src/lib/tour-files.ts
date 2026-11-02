@@ -120,3 +120,30 @@ export async function hostFiles(slug: string, config: TourConfig): Promise<{ con
   }
   return { config: next, copied, failed };
 }
+
+/**
+ * The files nextviewAI put into a setup in an edit (outside addresses that
+ * weren't there before): copied to us at once, so the tour doesn't hang on
+ * another site. One that can't be fetched isn't kept: the logo and favicon
+ * fall back to what they were, anything else is left for the user to fix -
+ * and `failed` says what, so nextviewAI's reply can tell.
+ */
+export async function hostNewFiles(slug: string, before: TourConfig, after: TourConfig): Promise<{ config: TourConfig; failed: string[] }> {
+  const known = new Set(fileSlots(structuredClone(before)).map((s) => s.get()).filter(isOutside));
+  const next = structuredClone(after);
+  const failed: string[] = [];
+  const slots = fileSlots(next);
+  for (const [i, slot] of slots.entries()) {
+    const src = slot.get();
+    if (!isOutside(src) || known.has(src)) continue;
+    try {
+      slot.set(await copyToTour(slug, src));
+    } catch (err) {
+      const what = i === 0 ? "Logoet" : i === 1 ? "Faviconet" : "Et billede";
+      failed.push(`${what} (${src}) kunne ikke hentes: ${err instanceof Error ? err.message : String(err)}`);
+      if (i === 0) next.logo = before.logo;
+      if (i === 1) next.favicon = before.favicon;
+    }
+  }
+  return { config: next, failed };
+}

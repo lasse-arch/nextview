@@ -1,5 +1,6 @@
 "use client";
 
+import { TourLogo } from "./tour-logo";
 import { useT } from "../tours/i18n-react";
 import { useState } from "react";
 import { TourLink } from "./links";
@@ -133,8 +134,7 @@ export function CoverWelcome({
         </video>
       )}
       <div className="dz-cover-text">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={T.logo} alt={T.brand} className="dz-cover-logo" />
+        <TourLogo T={T} className="dz-cover-logo" />
         <div className="dz-kicker">{C.kicker}</div>
         <h1>{C.title}</h1>
         <p>{C.lead}</p>

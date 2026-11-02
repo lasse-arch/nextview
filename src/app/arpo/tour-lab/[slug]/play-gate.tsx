@@ -1,5 +1,6 @@
 "use client";
 
+import { TourLogo } from "./tour-logo";
 import { useT } from "../tours/i18n-react";
 import type { TourConfig } from "../tours/types";
 import { welcomeTiles } from "../tours/places";
@@ -47,8 +48,7 @@ export function PlayGate({ T, isPreview, onPlay }: { T: TourConfig; /** Asked wh
       }
     >
       <span className="pg-tekst">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        {T.logo && <img src={T.logo} alt={T.brand} className="pg-logo" />}
+        <TourLogo T={T} className="pg-logo" />
         <span className="pg-titel">{title}</span>
         {lead && <span className="pg-lead">{lead}</span>}
       </span>

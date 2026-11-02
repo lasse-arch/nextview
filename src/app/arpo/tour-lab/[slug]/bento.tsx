@@ -1,5 +1,6 @@
 "use client";
 
+import { TourLogo } from "./tour-logo";
 import { useT } from "../tours/i18n-react";
 import { imageOfHref, isInTourHref, isPlaceHref } from "../tours/places";
 import type { BentoTile, TourConfig } from "../tours/types";
@@ -69,8 +70,7 @@ export function BentoMenu({
       </button>
       <div className={`bm ${open ? "vis" : ""}`} role="dialog" aria-modal="true" aria-label={tr("Menu")} aria-hidden={!open}>
         <div className="bm-head">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={T.logo} alt={T.brand} className={T.logoOnLight ? "bm-lys" : "bm-hvid"} />
+          <TourLogo T={T} className={T.logoOnLight ? "bm-lys" : "bm-hvid"} />
           <button type="button" className="bm-x" aria-label={tr("Luk")} onClick={() => setOpen(false)}>
             ×
           </button>
