@@ -2081,8 +2081,21 @@ function TourExperience({
     if (iframe.current) ro?.observe(iframe.current);
     const current = (sdk as unknown as { Sweep: { current: { subscribe(cb: () => void): { cancel(): void } } } }).Sweep.current;
     const sub = current.subscribe(() => setTimeout(apply, 300));
+    // Never further out than 70 % - the picture goes poor beyond that - or than the tour's own zoom when it's set lower
+    // (50 %, now and then). In they may zoom as they like.
+    const floor = () => {
+      const small = phone || window.innerWidth <= 760;
+      const z = small ? (zoomRef.current?.mobile ?? (lockRef.current ? 0.5 : null)) : (zoomRef.current?.desktop ?? null);
+      return Math.min(z ?? 1, 0.7);
+    };
+    const zoomObs = (sdk as unknown as { Camera: { zoom?: { subscribe(cb: (z: { level?: number }) => void): { cancel(): void } } } }).Camera.zoom;
+    const zoomSub = zoomObs?.subscribe((zl) => {
+      const f = floor();
+      if (alive && typeof zl?.level === "number" && zl.level < f - 0.01) sdk.Camera.zoomTo?.(f).catch(() => {});
+    });
     return () => {
       alive = false;
+      zoomSub?.cancel();
       window.clearTimeout(later);
       ro?.disconnect();
       window.removeEventListener("resize", apply);

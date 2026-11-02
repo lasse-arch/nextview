@@ -1003,7 +1003,7 @@ export function TourEditor({
                 </Field>
                 </Group>
                 <Group title="Zoom">
-                  <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">Hvor meget af rummet man ser. Telefonen står på højkant og viser mindre i bredden - zoom lidt ud dér, så man kan se rummet.</p>
+                  <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">Hvor meget af rummet man ser. Telefonen står på højkant og viser mindre i bredden - zoom lidt ud dér, så man kan se rummet. Gæsten kan aldrig selv zoome længere ud end 70 % (billedet bliver dårligt) - eller end det valgte her, når det er lavere.</p>
                   {(["desktop", "mobile"] as const).map((k) => {
                     const v = config.zoom?.[k] ?? (k === "mobile" && config.mobileZoomLock ? 0.5 : 1);
                     return (
