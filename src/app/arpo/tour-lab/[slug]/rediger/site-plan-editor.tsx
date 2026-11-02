@@ -8,6 +8,7 @@ import { unitCatKey, unitGroups } from "../../tours/site-units";
 import { PlacePicker } from "./content";
 import { matchSitePlan } from "@/lib/actions/tour-ai";
 import { fitPlan } from "./plan-fit";
+import { fitPins, groundToPlan, moveSide, sideMid, stretch, type Pin } from "./plan-adjust";
 import type { SiteUnit, TourConfig } from "../../tours/types";
 import { quadSolve } from "../staging";
 import { Field, Group, input, Toggle, UploadButton, type PreviewApi } from "./ui";
@@ -273,6 +274,9 @@ function CornerPlacer360({ slug, pano, image, corners, opacity, onChange }: { sl
   const ground = corners.map((c) => groundOf(c));
   const valid = ground.every(Boolean) ? (ground as G[]) : null;
   const [view, setView] = useState<GroundView>(() => fitView(valid));
+  /** "Nåle": spots on the plan dragged to where they are on the photo - the plan is laid by them. */
+  const [pinMode, setPinMode] = useState(false);
+  const [pins, setPins] = useState<Pin[]>([]);
   useEffect(() => {
     let dead = false;
     loadSource(pano, 6144)
@@ -321,6 +325,21 @@ function CornerPlacer360({ slug, pano, image, corners, opacity, onChange }: { sl
         // Drag the picture to move about; the wheel zooms.
         onPointerDown={(e) => {
           if (e.target !== e.currentTarget && e.target !== canvas.current) return;
+          // Pin mode: a press on the plan takes that spot of it - drag it to where it really is.
+          if (pinMode) {
+            const back = groundToPlan(g);
+            const r = box.current!.getBoundingClientRect();
+            const start = groundAt(view, [((e.clientX - r.left) / r.width) * 100, ((e.clientY - r.top) / r.height) * 100]);
+            const at = back?.(start);
+            if (!at || at[0] < -2 || at[0] > 102 || at[1] < -2 || at[1] > 102) return;
+            const base = pins;
+            dragIn(box.current, e, (x, y) => {
+              const next = [...base, { plan: at, at: groundAt(view, [x, y]) }];
+              setPins(next);
+              save(fitPins(g, next));
+            });
+            return;
+          }
           const v0 = view;
           let last: [number, number] | null = null;
           dragIn(box.current, e, (x, y) => {
@@ -358,6 +377,37 @@ function CornerPlacer360({ slug, pano, image, corners, opacity, onChange }: { sl
         >
           ✥
         </button>
+        {/* A side: pull it out or in (its two corners together). */}
+        {[0, 1, 2, 3].map((side) => {
+          const [x, y] = viewAt(view, sideMid(g, side));
+          return (
+            <button
+              key={`s${side}`}
+              type="button"
+              title={["Øverste kant", "Højre kant", "Nederste kant", "Venstre kant"][side]}
+              aria-label={["Øverste kant", "Højre kant", "Nederste kant", "Venstre kant"][side]}
+              className="absolute h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 cursor-move rounded-[4px] border-2 border-[#0071e3] bg-white shadow-md"
+              style={{ left: `${x}%`, top: `${y}%` }}
+              onPointerDown={(e) => {
+                const g0 = g;
+                let from: G | null = null;
+                dragIn(box.current, e, (nx, ny) => {
+                  const at = groundAt(view, [nx, ny]);
+                  from ??= at;
+                  save(moveSide(g0, side, { x: at.x - from.x, y: at.y - from.y }));
+                });
+              }}
+            />
+          );
+        })}
+        {pins.map((p, i) => {
+          const [x, y] = viewAt(view, p.at);
+          return (
+            <span key={`p${i}`} className="pointer-events-none absolute flex h-5 w-5 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-white bg-[#ff3b30] text-[10px] font-bold text-white shadow-md" style={{ left: `${x}%`, top: `${y}%` }}>
+              {i + 1}
+            </span>
+          );
+        })}
         {flat.map(([x, y], i) => (
           <button
             key={i}
@@ -412,6 +462,36 @@ function CornerPlacer360({ slug, pano, image, corners, opacity, onChange }: { sl
           Større
         </button>
       </div>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="w-24 text-[12px] text-[#6e6e73]">Stræk</span>
+        <button type="button" className={btn} onClick={() => save(stretch(g, 1.02, 1))} title="Bredere (langs kortets egen bredde)">
+          ↔ Bredere
+        </button>
+        <button type="button" className={btn} onClick={() => save(stretch(g, 1 / 1.02, 1))} title="Smallere">
+          Smallere
+        </button>
+        <button type="button" className={btn} onClick={() => save(stretch(g, 1, 1.02))} title="Højere (langs kortets egen højde)">
+          ↕ Højere
+        </button>
+        <button type="button" className={btn} onClick={() => save(stretch(g, 1, 1 / 1.02))} title="Lavere">
+          Lavere
+        </button>
+      </div>
+      <div className="space-y-1 rounded-xl bg-white p-2.5 ring-1 ring-black/[.06]">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <button type="button" className={`${btn} ${pinMode ? "!bg-[#ff3b30] !text-white" : ""}`} onClick={() => setPinMode((v) => !v)}>
+            📍 {pinMode ? "Sætter nåle - tryk for at stoppe" : "Sæt nåle"}
+          </button>
+          {pins.length > 0 && (
+            <button type="button" className={btn} onClick={() => setPins([])}>
+              Ryd nåle ({pins.length})
+            </button>
+          )}
+        </div>
+        <p className="text-[12px] leading-snug text-[#8e8e93]">
+          Tryk på et sted på pladskortet, du kan genkende - et vejkryds, et hjørne af en bygning - og træk det hen, hvor det rigtigt ligger på fotoet. 1 nål flytter kortet, 2 drejer og skalerer det også, 3 eller flere tilpasser det, så alle nåle passer. Sæt nålene langt fra hinanden.
+        </p>
+      </div>
       <AiPlace
         slug={slug}
         plan={image}
@@ -427,7 +507,7 @@ function CornerPlacer360({ slug, pano, image, corners, opacity, onChange }: { sl
         onCorners={(c) => save(c.map((p) => groundAt(view, p)))}
       />
       <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">
-        Sådan ser dronen jorden lige nedad. Træk i billedet for at flytte, rul eller + / − for at zoome. Læg pladskortet på: flyt det med den grønne prik, drej og skalér med knapperne, og ret de fire hjørner til sidst. I touren ligger det så på jorden i 360°-billedet.
+        Sådan ser dronen jorden lige nedad. Træk i billedet for at flytte, rul eller + / − for at zoome. Læg pladskortet på: flyt det med den grønne prik, drej, skalér og stræk med knapperne, træk en kant (de hvide firkanter) eller et hjørne - eller brug nåle. I touren ligger det så på jorden i 360°-billedet.
       </p>
       {error && <p className="px-1 text-[12px] text-[#ff3b30]">{error}</p>}
     </div>
