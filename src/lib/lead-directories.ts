@@ -1,5 +1,6 @@
 import "server-only";
 import { scrapeBasicContactInfo } from "@/lib/website-contact-scrape";
+import { fetchPageText } from "@/lib/url-lead-scan";
 
 /**
  * Directory pages that list many businesses at once - pasting such a link
@@ -19,6 +20,9 @@ import { scrapeBasicContactInfo } from "@/lib/website-contact-scrape";
  *    educations as a note).
  *  - danskegymnasier.dk/find-gymnasier/ - every gymnasium on Danske
  *    Gymnasier's map (address, phone, e-mail, website, the rektor as contact).
+ *  - fgu.dk/find-din-lokale-fgu-institution/ - the 27 FGU institutions
+ *    (name and website there; phone, e-mail and address read from each
+ *    institution's own website).
  *  - privateskoler.dk/skoler/ - every member school of Danmarks Private
  *    Skoler (name, address, website); the phone number is fetched from each
  *    school's own website (front page, else its contact page).
@@ -57,6 +61,7 @@ export async function expandDirectoryLink(url: string): Promise<DirectoryLead[] 
   if (host === "friskolerne.dk" && /^\/om-os\/friskolekort\/?$/.test(parsed.pathname)) return friskoleLeads();
   if (host === "deg.dk" && /^\/danmarkskort-over-medlemsskoler\/?$/.test(parsed.pathname)) return degLeads();
   if (host === "danskegymnasier.dk" && /^\/find-gymnasier\/?$/.test(parsed.pathname)) return gymnasiumLeads();
+  if (host === "fgu.dk" && /^\/find-din-lokale-fgu-institution\/?$/.test(parsed.pathname)) return fguLeads();
   if (host === "privateskoler.dk" && /^\/skoler(\/(page\/\d+\/?)?)?$/.test(parsed.pathname)) return privateskoleLeads();
   return null;
 }
@@ -256,6 +261,69 @@ async function gymnasiumLeads(): Promise<DirectoryLead[]> {
   }
   if (!leads.length) throw new Error("Kunne ikke læse gymnasierne på danskegymnasier.dk - siden er måske lavet om.");
   return leads;
+}
+
+const FGU = "https://fgu.dk";
+
+/**
+ * A Danish street address in a page's text ("Sohngårdsholmsvej 51, 9000
+ * Aalborg"): a street ending like a street (…vej, …gade, … allé …) and a
+ * number, then a postcode and a town - labels in front ("Hovedadresse",
+ * "Afdeling") left out.
+ */
+export function danishAddress(text: string): string | null {
+  const m =
+    /((?:[A-ZÆØÅ][\wæøåÆØÅ.'-]*\s+){0,3}?(?:[A-ZÆØÅa-zæøå][\wæøåÆØÅ.'-]*?\s?)?(?:[Vv]ej|[Gg]ade|[Aa]lle|[Aa]llé|[Bb]oulevard|[Pp]lads|[Ss]træde|[Tt]orv|[Vv]ænge|[Vv]ænget|[Hh]ave|[Bb]akke|[Bb]akken|[Pp]ark|[Pp]arken|[Cc]entret|[Ss]ti|[Tt]oft|[Tt]often|[Gg]ård|[Hh]olm|[Bb]ro|[Ee]ngen|[Mm]arken|[Ll]økke|[Ll]økken|[Vv]ang|[Dd]al|[Hh]øj)(?:en|et)?\s\d{1,4}\s?[A-Za-z]?)\b[,.]?\s+(?:\d{1,2}\.?\s*(?:[Ss]al|th|tv|mf)\.?,?\s+)?(?:[^\d\s]{1,12}\s+)?(\d{4})\s+([A-ZÆØÅ][a-zæøå]+(?:\s(?:[NSVØCK]|SV|SØ|NV|NØ)\b)?)/.exec(text);
+  if (!m) return null;
+  let street = m[1].trim();
+  for (let k = 0; k < 3; k++) street = street.replace(/^(?:hovedadresse[r]?|besøgsadresse[r]?|adresse[r]?|hovedafdeling(?:en)?|afdeling(?:en)?|kontakt|find)[:\s]+/i, "").trim();
+  return `${street}, ${m[2]} ${m[3]}`;
+}
+
+/** A website's own contact details: phone (tel: link or "Tlf."), e-mail (mailto) and a Danish address (street, postcode and town) - best effort, through the safe fetch. */
+async function siteContact(url: string): Promise<{ phone: string | null; email: string | null; address: string | null }> {
+  const page = await fetchPageText(url).catch(() => null);
+  if (!page?.ok) return { phone: null, email: null, address: null };
+  const tel = /href=["']tel:((?:[+\d\s()-]|%20){6,30})["']/i.exec(page.html)?.[1]?.replace(/%20/g, " ");
+  const ctx = /(?:tlf\.?|telefon)[^\d]{0,15}((?:\+45\s?)?\d{2}[\s.]?\d{2}[\s.]?\d{2}[\s.]?\d{2})/i.exec(page.text)?.[1];
+  const email = /href=["']mailto:([^"'?\s]+@[^"'?\s]+)/i.exec(page.html)?.[1] ?? null;
+  return { phone: danishPhone(tel) ?? danishPhone(ctx), email: email ? decodeEntities(email) : null, address: danishAddress(page.text) };
+}
+
+/** FGU Danmark's list of the FGU institutions: a button per institution, with its website - the details come from that site. */
+async function fguLeads(): Promise<DirectoryLead[]> {
+  const page = await fetch(`${FGU}/find-din-lokale-fgu-institution/`, { headers: { "User-Agent": USER_AGENT }, signal: AbortSignal.timeout(20_000) });
+  if (!page.ok) throw new Error(`fgu.dk svarede ${page.status} - kunne ikke hente FGU-institutionerne.`);
+  const html = await page.text();
+  const seen = new Set<string>();
+  const list: { name: string; website: string }[] = [];
+  for (const m of html.matchAll(/<a [^>]*href="(https?:\/\/[^"]+)"[^>]*>\s*(?:<[^>]+>\s*)*\d+\.\s*(FGU[^<]+)</g)) {
+    const name = decodeEntities(m[2]).replace(/\s+/g, " ").trim();
+    if (!name || seen.has(name.toLowerCase())) continue;
+    seen.add(name.toLowerCase());
+    list.push({ name: name.slice(0, 120), website: decodeEntities(m[1]) });
+  }
+  if (!list.length) throw new Error("Kunne ikke læse FGU-institutionerne på fgu.dk - siden er måske lavet om.");
+  const deadline = Date.now() + 180_000;
+  return mapWithConcurrency(list, 8, async (inst) => {
+    let c = { phone: null as string | null, email: null as string | null, address: null as string | null };
+    if (Date.now() < deadline) {
+      c = await siteContact(inst.website);
+      if ((!c.phone || !c.address) && Date.now() < deadline) {
+        const k = await siteContact(new URL("/kontakt", inst.website).toString());
+        c = { phone: c.phone ?? k.phone, email: c.email ?? k.email, address: c.address ?? k.address };
+      }
+    }
+    return {
+      companyName: inst.name,
+      address: c.address,
+      contactPhone: c.phone,
+      contactEmail: c.email,
+      websiteUrl: inst.website,
+      sourceUrl: `${FGU}/find-din-lokale-fgu-institution/#${encodeURIComponent(inst.name)}`,
+      note: "En FGU-institution har 1-4 skoler. Kontaktoplysninger fundet på institutionens hjemmeside - tjek dem.",
+    };
+  });
 }
 
 const PRIVATSKOLER = "https://privateskoler.dk";
