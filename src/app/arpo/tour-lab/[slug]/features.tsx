@@ -522,10 +522,10 @@ export function FeatureTour({ T, onClose, onEvent, demo }: { T: TourConfig; onCl
           <button
             type="button"
             onClick={() => {
+              // Straight into the tour, where they are now (what's open stays open) - not back to the walk-through's cards.
               onEvent("features_reel_stop", { label: `${reel! + 1}/${steps.length}` });
-              setReel(null);
               shown.current = null;
-              fire("hv-luk-alt");
+              onClose();
             }}
           >
             {tr("Udforsk selv")}
@@ -766,7 +766,8 @@ export const FEATURES_CSS = `
 .ft-mobil{width:44px;height:84px;border-radius:10px;border:4px solid #fff;background:linear-gradient(160deg,#9cc3e6,#6f9a5c);animation:ftStory 3s ease-in-out infinite}
 .ft-skaerm{width:150px;height:96px;border-radius:8px;border:5px solid #fff;background:linear-gradient(160deg,#9cc3e6,#6f9a5c);animation:ftStory 3s ease-in-out .4s infinite}
 /* The showcase's own button to see the features again. */
-.ft-igen{position:absolute;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));translate:-50% 0;z-index:45;white-space:nowrap;display:flex;align-items:center;gap:7px;border:0;border-radius:999px;padding:10px 16px;background:rgba(13,27,32,.88);color:#fff;font:inherit;font-weight:800;font-size:14px;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,.3);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);animation:hvUp .4s ease}
+.ft-igen{position:absolute;left:0;top:50%;translate:0 -50%;z-index:30;display:flex;flex-direction:column;align-items:center;gap:6px;border:0;border-radius:14px 0 0 14px;padding:12px 6px 12px 7px;background:rgba(13,27,32,.86);color:#fff;font:inherit;font-weight:800;font-size:12.5px;letter-spacing:.04em;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,.3);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);writing-mode:vertical-rl;transform:rotate(180deg);animation:hvFade .4s ease}
+.ft-igen:hover{background:rgba(13,27,32,.95)}
 .ft-igen i{width:8px;height:8px;border-radius:50%;background:var(--c-accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--c-accent) 35%,transparent)}
 @media (prefers-reduced-motion:reduce){.ft-scene *{animation:none!important}.ft-intro span{opacity:1}}
 @media (max-height:500px) and (min-width:500px){.ft-ark{zoom:var(--ui-zoom,.72)}}

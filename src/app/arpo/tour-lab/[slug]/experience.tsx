@@ -3337,7 +3337,8 @@ function TourExperience({
         </button>
       )}
       {featuresOpen && <FeatureTour T={T} demo={demo} onClose={() => setFeaturesOpen(false)} onEvent={(name, params) => track(name, params ?? {})} />}
-      {demo && !featuresOpen && (
+      {/* Out of the way of everything else: a tab on the left edge, gone while anything is open on top of the tour. */}
+      {demo && !featuresOpen && !welcome && !cover && !menuOpen && !contactOpen && !pano && !lightbox && !commuteOpen && !routeOpen && (
         <button type="button" className="ft-igen" onClick={() => setFeaturesOpen(true)}>
           <i aria-hidden /> Se funktionerne
         </button>

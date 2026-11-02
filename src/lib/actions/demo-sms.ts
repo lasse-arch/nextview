@@ -30,7 +30,7 @@ export type DemoSmsSetup = {
   tours: { slug: string; name: string }[];
   /** The text with the seller filled in - {navn} and {link} left for the send. */
   text: string;
-  /** Sent from Arpo (GatewayAPI is set up) - else it opens on the seller's own phone. */
+  /** Sent from Arpo (SureSMS is set up) - else it opens on the seller's own phone. */
   direct: boolean;
   sent: DemoSmsSent[];
 };
@@ -75,7 +75,7 @@ export async function demoSmsSetup(): Promise<DemoSmsSetup> {
 }
 
 /**
- * Makes the customer's own showcase link and sends it. Without GatewayAPI set
+ * Makes the customer's own showcase link and sends it. Without SureSMS set
  * up, the link is made all the same and the text comes back to be sent from
  * the seller's own phone.
  */
