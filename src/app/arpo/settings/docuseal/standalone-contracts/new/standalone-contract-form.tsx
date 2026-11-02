@@ -255,6 +255,21 @@ export function StandaloneContractForm() {
             </span>
           </span>
         </label>
+        <label className="col-span-2 flex items-start gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
+          <input
+            type="checkbox"
+            checked={products.referenceUse !== false}
+            onChange={(e) => setProducts((p) => ({ ...p, referenceUse: e.target.checked }))}
+            className="mt-0.5 h-4 w-4"
+          />
+          <span>
+            <span className="font-medium text-slate-800">Må bruges som reference (afsnit 7)</span>
+            <span className="block text-xs text-slate-500">
+              Vi må vise kundens tour, billeder, video, navn og logo i vores markedsføring og på vores hjemmeside. Slå
+              fra, hvis kunden ikke vil bruges som reference - så kommer afsnittet ikke med i kontrakten.
+            </span>
+          </span>
+        </label>
         <div className="col-span-2">
           <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Kontraktsprog</label>
           <div className="mt-1 flex rounded-md border border-slate-300 text-sm">

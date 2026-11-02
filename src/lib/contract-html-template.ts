@@ -65,6 +65,8 @@ type Labels = {
   section5Body: string;
   section6Title: string;
   section6Body: string;
+  section7Title: string;
+  section7Body: string;
   signaturesTitle: string;
   invoiceEmailLabel: string;
 };
@@ -171,6 +173,9 @@ const LABELS: Record<ContractLanguage, Labels> = {
     section6Title: "6) Ansvar",
     section6Body:
       "Leverandørens ansvar er begrænset til direkte tab forårsaget af grov uagtsomhed eller forsæt. Eventuel erstatning kan ikke overstige det samlede beløb, kunden har betalt inden for de seneste 12 måneder under denne aftale.",
+    section7Title: "7) Brug som reference",
+    section7Body:
+      "Kunden giver Nextview360 ret til at bruge den virtuelle tour, billeder og video fra optagelsen samt kundens navn og logo som reference i Nextview360's markedsføring – fx på Nextview360's hjemmeside, på sociale medier, i præsentationer og i salgsmateriale. Nextview360 præsenterer altid kunden på en ordentlig og flot måde, der afspejler kunden positivt. Retten gælder i aftalens løbetid og i op til 12 måneder efter dens ophør, og den er en undtagelse fra fortroligheden i afsnit 5. Statistik og andre oplysninger fra kundeportalen bruges ikke uden kundens skriftlige samtykke.",
     signaturesTitle: "Underskrifter",
     invoiceEmailLabel: "E-mail til fakturaer",
   },
@@ -275,6 +280,9 @@ const LABELS: Record<ContractLanguage, Labels> = {
     section6Title: "6) Liability",
     section6Body:
       "The Supplier's liability is limited to direct losses caused by gross negligence or intent. Any damages cannot exceed the total amount paid by the Customer within the preceding 12 months under this agreement.",
+    section7Title: "7) Use as a reference",
+    section7Body:
+      "The Customer grants Nextview360 the right to use the virtual tour, images and video from the shoot, and the Customer's name and logo as a reference in Nextview360's marketing – e.g. on Nextview360's website, on social media, in presentations and in sales material. Nextview360 will always present the Customer in a proper and attractive way that reflects well on the Customer. This right applies during the agreement and for up to 12 months after it ends, and is an exception to the confidentiality in section 5. Statistics and other information from the customer portal are not used without the Customer's written consent.",
     signaturesTitle: "Signatures",
     invoiceEmailLabel: "Email for invoices",
   },
@@ -528,7 +536,16 @@ export function buildContractHtml(data: ContractHtmlData, language: ContractLang
     <p class="section-title">${esc(t.section6Title)}</p>
     <p>${esc(t.section6Body)}</p>
   </div>
-
+${
+  data.referenceUse
+    ? `
+  <div class="section">
+    <p class="section-title">${esc(t.section7Title)}</p>
+    <p>${esc(t.section7Body)}</p>
+  </div>
+`
+    : ""
+}
   <hr class="rule">
 
   <p class="sig-title">${esc(t.signaturesTitle)}</p>

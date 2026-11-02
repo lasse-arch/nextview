@@ -75,6 +75,10 @@ export type ContractProducts = {
    * not on signing (see Deal.establishmentAwaitingApproval). Missing on
    * contracts made before this existed = on signing. */
   establishmentOnApproval?: boolean;
+  /** Section 7 "Brug som reference": Nextview360 may show the tour, logo etc.
+   * in its marketing. On unless switched off (false) - also on contracts
+   * saved before this existed. */
+  referenceUse?: boolean;
 };
 
 function splitZipCity(address: string | null): { street: string; zipCity: string } {
@@ -299,6 +303,8 @@ export type ContractHtmlData = {
   additionalTerms: string;
   /** The setup fee is invoiced on delivery + approval, not on signing. */
   establishmentOnApproval: boolean;
+  /** Section 7 "Brug som reference" is in the contract. */
+  referenceUse: boolean;
   bindingMonths: number;
   noticeMonths: number;
   /** How many of the 4 products are selected - drives singular/plural wording ("the service" vs "the services"). */
@@ -368,6 +374,7 @@ export function buildContractHtmlData(deal: DealForContract, products: ContractP
     priceTotal: formatDKK(computeMonthlyTotal(products)),
     additionalTerms: products.additionalTerms,
     establishmentOnApproval: Boolean(products.establishmentOnApproval),
+    referenceUse: products.referenceUse !== false,
     bindingMonths: products.bindingMonths,
     noticeMonths: products.noticeMonths,
     selectedCount,
