@@ -390,10 +390,11 @@ export function StartEditor({ config, edit, slug, preview }: Props) {
           </>
         )}
       </Group>
-      <IntroFilm config={config} edit={edit} />
+      {style !== "hero" && <IntroFilm config={config} edit={edit} />}
       <p className={small}>Hvordan touren starter (forside, velkomst, helt enkel eller direkte ind) vælges under Layout. Her er teksterne og billederne.</p>
 
-      {style === "cover" && cover && (
+      {style === "hero" && cover && <CoverFilm cover={cover} edit={edit} />}
+      {(style === "cover" || style === "hero") && cover && (
         <Group title="Forsiden">
           <Field title="Lille overskrift">
             <input className={input} value={cover.kicker} onChange={(e) => edit((d) => void (d.cover!.kicker = e.target.value))} />
@@ -407,6 +408,7 @@ export function StartEditor({ config, edit, slug, preview }: Props) {
           <Field title="Knappen ind i touren">
             <input className={input} value={cover.enter} onChange={(e) => edit((d) => void (d.cover!.enter = e.target.value))} />
           </Field>
+          {style === "hero" && <p className={small}>Fotoet vises, mens filmen henter - og i stedet for den, når gæsten har slået bevægelse fra eller sparer på data. Brug gerne filmens første billede.</p>}
           <PhotoPicker image={cover.image} slug={slug} photoKey="forside" preview={preview} onChange={(src) => edit((d) => void (d.cover!.image = src))} />
           <Field title="Overskrift over stederne">
             <input className={input} value={cover.placesTitle} onChange={(e) => edit((d) => void (d.cover!.placesTitle = e.target.value))} />
@@ -527,7 +529,7 @@ export function StartEditor({ config, edit, slug, preview }: Props) {
         </>
       )}
 
-      {(style === "cover" || style === "tiles" || style === "simple" || menuStyle === "dock" || (config.places?.length ?? 0) > 0) && (
+      {(style === "cover" || style === "hero" || style === "tiles" || style === "simple" || menuStyle === "dock" || (config.places?.length ?? 0) > 0) && (
       <Group title="Steder">
         <p className={small}>
           Hvert sted skrives én gang her - med navn, foto og sted i touren. Forsidens steder, barens &quot;Steder&quot; og velkomstfliserne (vælg &quot;Et af Stederne&quot; på flisen) henter herfra. Det er ikke menuen (den laves under Menu). Gå hen til et sted i forhåndsvisningen og tryk på knappen - så kommer både stedet og et foto med.
@@ -1790,6 +1792,34 @@ function IntroFilm({ config, edit }: { config: TourConfig; edit: Edit }) {
           </button>
         </>
       )}
+    </Group>
+  );
+}
+
+/** "Forside med film": the film behind the cover - one for computers, optionally an upright one for phones. */
+function CoverFilm({ cover, edit }: { cover: NonNullable<TourConfig["cover"]>; edit: Edit }) {
+  const v = cover.video ?? { src: "" };
+  const set = (next: Partial<typeof v>) =>
+    edit((d) => {
+      const merged = { ...v, ...next };
+      d.cover!.video = { src: merged.src, ...(merged.srcMobile ? { srcMobile: merged.srcMobile } : {}) };
+    });
+  return (
+    <Group title="Filmen bag forsiden">
+      <p className={small}>Kører uden lyd i ring bag navnet og knapperne - gæsten kan trykke med det samme, mens touren henter. Brug fx dronefilmen; 10-20 sekunder, 720p og 2-4 MB er nok.</p>
+      <Field title="Film" hint="mp4 (eller webm). Over 4 MB kræver Vercel Blob.">
+        <div className="flex gap-1.5">
+          <input className={input} placeholder="https://… eller upload" value={v.src} onChange={(e) => set({ src: e.target.value.trim() })} />
+          <UploadButton accept="video/mp4,video/webm" onDone={(url) => set({ src: url })} />
+        </div>
+      </Field>
+      <Field title="Egen film til mobil (valgfri)" hint="Stående format - ellers bruges filmen ovenfor.">
+        <div className="flex gap-1.5">
+          <input className={input} placeholder="https://… eller upload" value={v.srcMobile ?? ""} onChange={(e) => set({ srcMobile: e.target.value.trim() || undefined })} />
+          <UploadButton accept="video/mp4,video/webm" onDone={(url) => set({ srcMobile: url })} />
+        </div>
+      </Field>
+      {!v.src && <p className="px-1 text-[12px] text-[#ff9500]">Ingen film endnu - forsiden viser fotoet, til der er en.</p>}
     </Group>
   );
 }

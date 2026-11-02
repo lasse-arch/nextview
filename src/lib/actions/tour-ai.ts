@@ -154,6 +154,7 @@ Regler:
   - små prikker med info på ting i rummet → info (tags)
   - billeder af rummene i bunden → stories (stories.desktop / stories.mobile slår dem til - aldrig med CSS)
   - steder med foto at vælge imellem → places + design.welcome "cover" eller design.menu "dock"
+  - en dronefilm eller anden kort film, der skal køre i baggrunden af forsiden → design.welcome "cover" + cover.video ("Forside med film"; intro bruges så ikke)
   - størrelser/rum at skifte mellem → design.menu "picker"
   - ledige pladser/datoer/rum fra kundens side → live
   - et luftfoto/kort at starte på → drone eller map; knapper → cta, dock eller placeCards.buttons

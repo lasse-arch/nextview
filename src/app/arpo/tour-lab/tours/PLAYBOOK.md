@@ -50,6 +50,11 @@ Ikke alle tours skal starte med et valg. Vælg ud fra, hvor folk kommer fra:
 
 "Vis mig rundt" er et godt førstevalg for folk, der ikke ved, hvad de leder efter.
 
+- **Forside med film**: har vi en dronefilm, så lad den køre i baggrunden af
+  forsiden i stedet for at spille den først - gæsten kan trykke med det samme,
+  og touren henter imens. Kort og let (10-20 sek., 720p, 2-4 MB), en stående
+  version til mobil, og et stillbillede fra filmen som foto.
+
 ## Menu
 
 - Fast mønster: **Velkommen til [Kunde]** → evt. **[Kunde] fra luften** →

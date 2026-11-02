@@ -47,7 +47,9 @@ function PlaceCards({ places, current, onPick }: { places: TourPlace[]; current?
   );
 }
 
-/** The cover welcome: the place's own photo, its name, and where you'd like to sit. */
+const filmType = (src: string) => (/\.webm(\?|#|$)/i.test(src) ? "video/webm" : "video/mp4");
+
+/** The cover welcome: the place's own photo (or film), its name, and where you'd like to sit. */
 export function CoverWelcome({
   T,
   onEnter,
@@ -68,8 +70,32 @@ export function CoverWelcome({
 }) {
   const tr = useT();
   const C = T.cover!;
+  const [filmOn, setFilmOn] = useState(false);
+  const film = C.video?.src ? C.video : null;
+  // No film for visitors saving data - the photo instead (motion turned off is handled in the CSS).
+  const [saveData] = useState(() => typeof navigator !== "undefined" && Boolean((navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData));
   return (
-    <div className={`dz-cover ${instant ? "dz-cover-nu" : ""}`} style={{ "--cover": `url(${C.image})`, "--cover-m": `url(${C.imageMobile ?? C.image})` } as React.CSSProperties}>
+    <div className={`dz-cover ${instant ? "dz-cover-nu" : ""} ${film && !saveData ? "dz-cover-film" : ""}`} style={{ "--cover": `url(${C.image})`, "--cover-m": `url(${C.imageMobile ?? C.image})` } as React.CSSProperties}>
+      {film && !saveData && (
+        // Silent, looping, behind everything: it fades in over the photo once it actually plays.
+        <video
+          className={`dz-film ${filmOn ? "kører" : ""}`}
+          autoPlay
+          muted
+          loop
+          playsInline
+          preload="auto"
+          aria-hidden
+          onPlaying={() => setFilmOn(true)}
+          // It may already play before the page listens (autoplay starts while the page is still being set up).
+          ref={(v) => {
+            if (v && !v.paused && v.readyState > 2) queueMicrotask(() => setFilmOn(true));
+          }}
+        >
+          {film.srcMobile && <source src={film.srcMobile} media="(max-width: 760px)" type={filmType(film.srcMobile)} />}
+          <source src={film.src} type={filmType(film.src)} />
+        </video>
+      )}
       <div className="dz-cover-text">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={T.logo} alt={T.brand} className="dz-cover-logo" />
@@ -338,6 +364,11 @@ export const DESIGNS_CSS = `
 .dz-cover{position:absolute;inset:0;z-index:12;display:flex;flex-direction:column;justify-content:space-between;padding:calc(56px + env(safe-area-inset-top,0px)) 64px 40px;background:linear-gradient(100deg,rgba(12,9,6,.92) 0%,rgba(12,9,6,.72) 38%,rgba(12,9,6,.12) 70%),var(--cover) center/cover;color:#f6efe2;animation:hvFade .6s ease;overflow-y:auto}
 .dz-cover.ude{opacity:0;pointer-events:none;transition:opacity .6s}
 .dz-cover-nu{animation:none}
+.dz-cover-film{isolation:isolate}
+.dz-film{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:-2;opacity:0;transition:opacity .8s ease;pointer-events:none}
+.dz-film.kører{opacity:1}
+.dz-cover-film::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(100deg,rgba(12,9,6,.82) 0%,rgba(12,9,6,.55) 38%,rgba(12,9,6,.05) 70%),linear-gradient(180deg,rgba(12,9,6,0) 55%,rgba(12,9,6,.6))}
+@media (prefers-reduced-motion:reduce){.dz-film{display:none}}
 .dz-cover-text{max-width:520px;animation:hvUp .8s cubic-bezier(.2,.7,.2,1) both}
 .dz-cover-logo{width:150px;height:auto;margin-bottom:28px;filter:drop-shadow(0 4px 16px rgba(0,0,0,.5))}
 .dz-cover h1{margin:12px 0 14px;font-size:68px;line-height:.98;font-weight:500;letter-spacing:-.01em;color:#fff}
@@ -379,6 +410,7 @@ export const DESIGNS_CSS = `
 .hv-dock .hv-dev{bottom:auto;top:calc(12px + env(safe-area-inset-top,0px));right:12px}
 @media (max-width:760px){
   .dz-cover{padding:calc(28px + env(safe-area-inset-top,0px)) 20px calc(18px + env(safe-area-inset-bottom,0px));background:linear-gradient(rgba(12,9,6,.55),rgba(12,9,6,.86) 55%,rgba(12,9,6,.95)),var(--cover-m) center/cover}
+  .dz-cover-film::before{background:linear-gradient(rgba(12,9,6,.62),rgba(12,9,6,.25) 42%,rgba(12,9,6,.82) 70%,rgba(12,9,6,.94))}
   .dz-cover-logo{width:96px;margin-bottom:14px}
   .dz-cover h1{font-size:42px}
   .dz-cover p{font-size:15px;margin-bottom:18px}

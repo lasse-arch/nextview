@@ -411,7 +411,24 @@ export type TourConfig = {
   fontHeading?: string;
   /** Steder: real spots with a photo, written once - the cover's places, the dock's "Steder" and welcome tiles with `place`. */
   places?: TourPlace[];
-  cover?: { kicker: string; title: string; lead: string; image: string; imageMobile?: string; enter: string; placesTitle: string };
+  cover?: {
+    kicker: string;
+    title: string;
+    lead: string;
+    image: string;
+    imageMobile?: string;
+    enter: string;
+    placesTitle: string;
+    /**
+     * "Forside med film": a film (e.g. the drone flying in) runs silently in a
+     * loop behind the cover instead of the still photo - the photo is shown
+     * while it loads, and instead of it for visitors who have turned motion
+     * off or save data. `srcMobile`: an upright version for phones. Keep it
+     * short and small (720p, 2-4 MB, no sound). Set = the tour starts as
+     * "Forside med film"; the film before the tour (`intro`) isn't used then.
+     */
+    video?: { src: string; srcMobile?: string };
+  };
   dock?: { label: string; icon: DockIcon; go: "places" | "guide" | { href: string }; primary?: boolean }[];
   /**
    * "Vis mig rundt": the tour flies from stop to stop by itself with a short

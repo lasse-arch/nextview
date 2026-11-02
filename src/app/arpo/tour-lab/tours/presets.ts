@@ -150,10 +150,11 @@ export function currentPreset(T: TourConfig): DesignPreset["id"] | null {
  * The three layout steps - the same in "Ny tour" and the editor's Layout tab:
  * 1. how the tour starts, 2. the menu, 3. where things sit.
  */
-export type StartStyle = "none" | "tiles" | "simple" | "cover";
+export type StartStyle = "none" | "tiles" | "simple" | "cover" | "hero";
 export type MenuStyle = NonNullable<TourConfig["design"]>["menu"];
 
 export const START_STYLES: [StartStyle, string, string][] = [
+  ["hero", "Forside med film", "Dronefilmen kører i baggrunden bag navnet, en knap ind, Vis mig rundt og stederne - man kan trykke med det samme, mens touren henter."],
   ["cover", "Forside med foto", "Et stort foto af stedet med en knap ind og stederne at vælge imellem - premium, og fortsætter hjemmesidens fortælling."],
   ["tiles", "Fliser", "En kort velkomst med fliser til de vigtigste steder. Godt når der er få, tydelige valg."],
   ["simple", "Helt enkel", "Få store knapper under hinanden - intet andet. Til gæster, der skal have det helt roligt (fx specialskoler). Hold det til 2-3 knapper."],
@@ -168,8 +169,10 @@ export const MENU_STYLES: [MenuStyle, string, string][] = [
   ["picker", "Rumvælger", "Vælg størrelse og rum i bunden. Kun til få kunder (fx depotrum)."],
 ];
 
+const filmType = (src: string): "video/webm" | "video/mp4" => (/\.webm(\?|#|$)/i.test(src) ? "video/webm" : "video/mp4");
+
 /** How a tour starts now. */
-export const startStyleOf = (T: TourConfig): StartStyle => (T.design?.welcome === "cover" ? "cover" : T.design?.welcome === "none" ? "none" : T.welcome ? (T.design?.welcome === "simple" ? "simple" : "tiles") : "none");
+export const startStyleOf = (T: TourConfig): StartStyle => (T.design?.welcome === "cover" ? (T.cover?.video ? "hero" : "cover") : T.design?.welcome === "none" ? "none" : T.welcome ? (T.design?.welcome === "simple" ? "simple" : "tiles") : "none");
 
 /** Sets the start and the menu on a tour (changes `d`), filling in a welcome or a cover from the tour itself when it has none - never removing one already made. */
 export function setLayout(d: TourConfig, start: StartStyle, menu: MenuStyle): void {
@@ -180,7 +183,20 @@ export function setLayout(d: TourConfig, start: StartStyle, menu: MenuStyle): vo
     d.welcome ??= { kicker: d.brand, title: `Velkommen til ${d.brand}`, lead: "Tag en tur rundt - eller hop direkte derhen, du vil se.", tiles: [], skip: "Jeg kigger selv rundt" };
     d.design = { ...d.design, welcome: start, menu };
   } else {
-    d.cover ??= { kicker: d.subtitle ?? d.brand, title: `Velkommen til ${d.brand}`, lead: "Kig indenfor før du kommer.", image: d.places?.[0]?.image ?? d.logo, enter: "Træd indenfor", placesTitle: "Vælg hvor du vil starte" };
+    d.cover ??= { kicker: d.subtitle ?? d.brand, title: `Velkommen til ${d.brand}`, lead: "Kig indenfor før du kommer.", image: d.intro?.poster ?? d.places?.[0]?.image ?? d.logo, enter: "Træd indenfor", placesTitle: "Vælg hvor du vil starte" };
+    if (start === "hero" && !d.cover.video) {
+      // The film before the tour moves behind the cover (nothing is lost - back on "Forside med foto" it plays first again).
+      const src = d.intro?.sources.find((s) => !s.media)?.src ?? d.intro?.sources[0]?.src ?? "";
+      const srcMobile = d.intro?.sources.find((s) => s.media)?.src;
+      d.cover.video = { src, ...(srcMobile && srcMobile !== src ? { srcMobile } : {}) };
+      if (d.intro?.poster && d.cover.image === d.logo) d.cover.image = d.intro.poster;
+      d.intro = undefined;
+    } else if (start === "cover" && d.cover.video) {
+      const v = d.cover.video;
+      if (v.src && !d.intro)
+        d.intro = { sources: [...(v.srcMobile ? [{ src: v.srcMobile, type: filmType(v.srcMobile), media: "(max-width: 760px)" }] : []), { src: v.src, type: filmType(v.src) }], poster: d.cover.image };
+      delete d.cover.video;
+    }
     d.design = { ...d.design, welcome: "cover", menu };
   }
 }
