@@ -378,12 +378,20 @@ function featuresOf(T: TourConfig, tr: (s: string, v?: Record<string, string | n
         title: "Det kan vi også lave til jer",
         text: "Hver tour bygges til stedet - med det, der hjælper netop jeres gæster.",
         scene: (
-          <div className="ft-scene ft-intro">
-            {more.slice(0, 8).map((t, i) => (
-              <span key={t} style={{ animationDelay: `${0.1 + i * 0.1}s` }}>
+          <div className="ft-scene ft-intro ft-mere">
+            <div className="ft-loeb" style={{ animationDuration: `${more.length * 3.2}s` }}>
+            {more.map((t, i) => (
+              <span key={t} className={i >= 8 ? "ft-ekstra" : undefined} style={{ animationDelay: `${0.1 + Math.min(i, 8) * 0.1}s` }}>
                 {t}
               </span>
             ))}
+            {/* The same once more: in the showreel the names run round as a band, so all can be read. */}
+            {more.map((t) => (
+              <span key={`${t}-2`} className="ft-dub" aria-hidden>
+                {t}
+              </span>
+            ))}
+            </div>
           </div>
         ),
       });
@@ -503,10 +511,24 @@ export function FeatureTour({ T, onClose, onEvent, demo }: { T: TourConfig; onCl
   // caption is taller than any before it, never back and forth on each Næste/Tilbage, and never animated.
   const caption = useRef<HTMLDivElement>(null);
   const reelOn = reel != null && Boolean(step);
+  /** Typing in what the tour opened (an address, a form): the phone's keyboard needs the room - the caption steps aside meanwhile. */
+  const [typing, setTyping] = useState(false);
+  useEffect(() => {
+    if (!reelOn) return;
+    const field = (el: EventTarget | null) => el instanceof HTMLElement && el.matches("input, textarea, select") && !el.closest(".ft-reel");
+    const onIn = (e: FocusEvent) => field(e.target) && setTyping(true);
+    const onOut = () => window.setTimeout(() => setTyping(field(document.activeElement)), 50);
+    document.addEventListener("focusin", onIn);
+    document.addEventListener("focusout", onOut);
+    return () => {
+      document.removeEventListener("focusin", onIn);
+      document.removeEventListener("focusout", onOut);
+    };
+  }, [reelOn]);
   useLayoutEffect(() => {
     const el = caption.current;
     const tour = el?.closest<HTMLElement>(".hv");
-    if (!reelOn || !el || !tour) return;
+    if (!reelOn || typing || !el || !tour) return;
     let h = 0;
     const fit = () => {
       const next = Math.ceil(el.getBoundingClientRect().height) + 12;
@@ -524,7 +546,7 @@ export function FeatureTour({ T, onClose, onEvent, demo }: { T: TourConfig; onCl
       delete tour.dataset.ftReel;
       tour.style.removeProperty("--ft-reel-h");
     };
-  }, [reelOn]);
+  }, [reelOn, typing]);
   // A new card starts at its top (a long one on a small phone was opened scrolled down).
   const ark = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -533,7 +555,7 @@ export function FeatureTour({ T, onClose, onEvent, demo }: { T: TourConfig; onCl
   if (!all.length) return null;
   if (step)
     return (
-      <div className="ft-reel" role="status" ref={caption}>
+      <div className={`ft-reel ${typing ? "ft-reel-vaek" : ""}`} role="status" ref={caption}>
         <p className="ft-kick">
           {demo ? "Det kan touren" : tr("Det kan jeres tour")} · {reel! + 1} / {steps.length}
         </p>
@@ -791,9 +813,18 @@ export const FEATURES_CSS = `
 .ft-reel-scene{margin:8px 0 4px}
 .ft-reel-scene .ft-scene{height:auto;min-height:90px;border-radius:12px}
 .ft-reel-scene .ft-intro{padding:12px}
+.ft-intro .ft-dub,.ft-intro .ft-ekstra{display:none}
+.ft-loeb{display:contents}
+/* In the showreel: every name, running round in one band (two copies, so the loop never jumps) - slow enough to read. */
+.ft-reel-scene .ft-mere{display:block;padding:9px 0;min-height:0!important;height:auto;overflow:hidden;-webkit-mask-image:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent);mask-image:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent)}
+.ft-reel-scene .ft-loeb{display:flex;width:max-content;animation:ftLoeb 30s linear infinite}
+.ft-reel-scene .ft-loeb span{display:inline-block!important;flex:none;max-width:none;margin-right:6px;animation:none;opacity:1}
+@keyframes ftLoeb{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+@media (prefers-reduced-motion:reduce){.ft-reel-scene .ft-loeb{animation:none;flex-wrap:wrap;width:auto}.ft-reel-scene .ft-dub{display:none!important}}
+.ft-reel-vaek{display:none!important}
 .ft-reel-hvorfor{margin-top:8px!important;padding:8px 10px;border-radius:12px;background:rgba(255,255,255,.08);font-size:13px!important}
 .ft-reel-hvorfor b{display:inline!important;font-size:11px!important;letter-spacing:.08em;text-transform:uppercase;color:color-mix(in srgb,var(--c-accent) 70%,#fff);margin-right:4px}
-@media (max-width:760px){.ft-reel{width:calc(100% - 16px);max-height:55vh;overflow-y:auto;padding:10px 12px 9px;display:flex;flex-direction:column;min-height:min(322px,55vh)}.ft-reel-knapper{margin-top:auto!important;padding-top:9px}.ft-reel-scene{margin:6px 0 2px}.ft-reel-scene .ft-scene{height:84px;min-height:0;overflow:hidden}.ft-reel-scene .ft-intro{padding:8px;gap:5px}.ft-reel-scene .ft-intro span{font-size:11px;padding:4px 8px}.ft-reel>b{font-size:16px}.ft-reel>span{font-size:13px}
+@media (max-width:760px){.ft-reel{width:calc(100% - 16px);max-height:55vh;overflow-y:auto;padding:10px 12px 9px;display:flex;flex-direction:column;min-height:min(240px,50vh)}.ft-reel-knapper{margin-top:auto!important;padding-top:9px}.ft-reel-scene{margin:6px 0 2px}.ft-reel-scene:not(:has(.ft-mere)){display:none}.ft-reel>b{font-size:16px}.ft-reel>span{font-size:13px}
 .ft-ark{padding:16px 16px 12px;max-height:calc(100% - 16px)}.ft-scene{height:110px}.ft-slide h2{font-size:19px;margin-top:12px}.ft-slide p{font-size:14px}.ft-hvorfor{margin-top:10px;padding:10px 12px;font-size:13px}.ft-reel-knapper button{white-space:nowrap;padding:8px 6px;font-size:12.5px}}
 .ft-reel-knapper button{flex:1;border:0;border-radius:999px;padding:8px 10px;background:rgba(255,255,255,.14);color:#fff;font:inherit;font-weight:700;font-size:13px;cursor:pointer}
 .ft-reel-knapper button:nth-child(2){background:var(--c-accent)}
