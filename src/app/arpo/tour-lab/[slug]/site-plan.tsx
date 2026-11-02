@@ -168,27 +168,21 @@ export function SitePlanControls({
 
   return (
     <>
-      {/* Off: the switch alone. On (with live booking): the switch heads the dates' box - nothing stands on top of it. */}
-      {!(state.on && live) && (
-        <button
-          type="button"
-          className={`pk-skift ${state.on ? "til" : ""}`}
-          aria-pressed={state.on}
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={() => setState((s) => ({ ...s, on: !s.on, picked: null }))}
-        >
-          <i aria-hidden />
-          {tr("Pladskort")}
-        </button>
-      )}
+      {/* The switch stays where it is, on or off - the dates' box stands above it, never on it. */}
+      <button
+        type="button"
+        className={`pk-skift ${state.on ? "til" : ""}`}
+        aria-pressed={state.on}
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={() => setState((s) => ({ ...s, on: !s.on, picked: null }))}
+      >
+        <i aria-hidden />
+        {tr("Pladskort")}
+      </button>
       {state.on && live && (
         <div className="pk-datoer" onPointerDown={(e) => e.stopPropagation()}>
+          {state.free && (
           <div className="pk-hoved">
-            <button type="button" className="pk-skift pk-skift-i til" aria-pressed onClick={() => setState((s) => ({ ...s, on: false, picked: null }))}>
-              <i aria-hidden />
-              {tr("Pladskort")}
-            </button>
-            {state.free && (
               <button
                 type="button"
                 className="pk-ryd"
@@ -199,8 +193,8 @@ export function SitePlanControls({
               >
                 {tr("Fjern ledige")} ×
               </button>
-            )}
           </div>
+          )}
           <label>
             <span>{tr("Ankomst")}</span>
             <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
@@ -279,13 +273,12 @@ export const SITE_PLAN_CSS = `
 .pk-datoer button{height:34px;padding:0 14px;border:0;border-radius:9px;background:var(--c-accent);color:#fff;font:inherit;font-size:14px;font-weight:700;cursor:pointer}
 .pk-datoer button:disabled{opacity:.6}
 .pk-datoer p{flex-basis:100%;margin:0;font-size:12px;color:#3a3a3c}
-.pk-hoved{flex-basis:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:2px}
-.pk-datoer .pk-skift.pk-skift-i{position:static;height:auto;box-shadow:none;background:none;color:#1d2a30;font-size:14px;font-weight:800;padding:2px 0;gap:9px}
+.pk-hoved{flex-basis:100%;display:flex;justify-content:flex-end;margin-bottom:2px}
 .pk-datoer .pk-ryd{height:30px;padding:0 12px;background:#f2f2f7;color:#1d2a30;font-size:13px}
 .pk-kort .pk-gaa{background:#1d2a30}
 .pk-legend b{font-weight:900;margin-left:2px}
 /* Above the filter (its own height), never on top of it. */
-.hv:has(.pk-legend) .pk-datoer,.hv:has(.hv-filtre) .pk-datoer{bottom:calc(var(--filtre-h,56px) + 26px + env(safe-area-inset-bottom,0px))}
+.hv:has(.hv-filtre) .pk-datoer{bottom:calc(var(--filtre-h,56px) + 26px + env(safe-area-inset-bottom,0px))}
 .pk-kort{position:absolute;left:50%;bottom:calc(112px + env(safe-area-inset-bottom,0px));translate:-50% 0;z-index:7;display:flex;align-items:center;gap:10px;padding:8px 8px 8px 14px;border-radius:999px;background:#fff;color:#1d2a30;font-size:14px;box-shadow:0 8px 26px rgba(0,0,0,.25);white-space:nowrap;max-width:calc(100% - 24px)}
 .pk-kort b{color:#248a3d}
 .pk-kort span{overflow:hidden;text-overflow:ellipsis}
@@ -294,11 +287,12 @@ export const SITE_PLAN_CSS = `
 .hv-punkt .pk-skift,.hv-punkt .pk-datoer,.hv-punkt .pk-kort,.hv-welcome .pk-skift,.hv-welcome .pk-datoer,.hv-welcome .pk-kort{opacity:0;pointer-events:none}
 @media (max-width:760px){
   .pk-til .km-soeg{display:none}
-  .pk-skift{top:auto;right:auto;bottom:calc(118px + env(safe-area-inset-bottom,0px));left:10px;height:34px;font-size:13px}
-  .pk-til .pk-skift{bottom:calc(150px + env(safe-area-inset-bottom,0px))}
+  /* The switch in one place on a phone - just above the filter - and the dates' box above the switch. */
+  .pk-skift,.pk-til .pk-skift{top:auto;right:auto;bottom:calc(var(--filtre-h,56px) + 20px + env(safe-area-inset-bottom,0px));left:10px;height:34px;font-size:13px}
+  .hv:has(.hv-filtre) .pk-datoer,.pk-datoer{bottom:calc(var(--filtre-h,56px) + 62px + env(safe-area-inset-bottom,0px))}
   .pk-datoer{left:10px;right:10px;translate:none;max-width:none;bottom:calc(64px + env(safe-area-inset-bottom,0px));padding:8px;gap:6px}
   .pk-datoer label{flex:1 1 0;min-width:0}
   .pk-datoer input{width:100%;min-width:0;padding:0 4px;font-size:13px}
-  .pk-kort{bottom:calc(194px + env(safe-area-inset-bottom,0px));font-size:13px}
+  .pk-kort{bottom:calc(var(--filtre-h,56px) + 176px + env(safe-area-inset-bottom,0px));font-size:13px}
 }
 `;
