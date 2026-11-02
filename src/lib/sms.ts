@@ -10,7 +10,8 @@ import "server-only";
  * instead. Only Danish mobile numbers, one recipient per message.
  */
 
-const API = "https://api.suresms.com/Script/SendSMS.aspx";
+// developer.suresms.com/https: the HTTPS API (api.suresms.com is only their front page - it answers every send with 401).
+const API = "https://apiv2.suresms.com/Script/SendSMS.aspx";
 /** The sender shown on the customer's phone (at most 11 letters) - approved by SureSMS, or it answers 401. */
 const SENDER = "Nextview360";
 
@@ -43,8 +44,11 @@ export async function sendSms(to: string, message: string): Promise<{ ok: true; 
       signal: AbortSignal.timeout(15_000),
       redirect: "error",
     });
-    const body = (await res.text().catch(() => "")).replace(/\s+/g, " ").trim().slice(0, 200);
-    if (res.status === 401) return { ok: false, error: `SureSMS afviste afsenderen eller login (401)${body ? `: ${body}` : ""} - er afsendernavnet "${SENDER}" godkendt?` };
+    // Their answer as plain text (a 401 comes as a whole web page: its title is enough).
+    const raw = await res.text().catch(() => "");
+    const body = (raw.match(/<title>([^<]*)<\/title>/i)?.[1] ?? raw.replace(/<[^>]*>/g, " ")).replace(/\s+/g, " ").trim().slice(0, 160);
+    if (res.status === 401) return { ok: false, error: `SureSMS afviste (401): enten er API-nøglen forkert, eller afsendernavnet "${SENDER}" er ikke godkendt hos SureSMS endnu.` };
+    if (/don.t know you/i.test(body)) return { ok: false, error: "SureSMS kender ikke login/API-nøglen - tjek SURESMS_API_KEY i Vercel." };
     if (!res.ok) return { ok: false, error: `SureSMS svarede ${res.status}${body ? `: ${body}` : ""}.` };
     // A 200 can still carry an error in its text.
     if (/error|fejl|invalid|denied|not allowed/i.test(body)) return { ok: false, error: `SureSMS: ${body}` };
