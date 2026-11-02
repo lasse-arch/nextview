@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { fetchNextStayUnits } from "@/lib/actions/tour-sites";
-import { readPlanNumbers } from "@/lib/actions/tour-ai";
+import { clearPlanBackground, readPlanNumbers } from "@/lib/actions/tour-ai";
 import { placeByNumbers } from "./unit-place";
 import { unitCatKey, unitGroups } from "../../tours/site-units";
 import { PlacePicker } from "./content";
@@ -132,8 +132,14 @@ export function SitePlanEditor({ config, edit, slug, preview }: { config: TourCo
           </Field>
         </>
       )}
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <UploadButton accept="image/*" label="Skift pladskortet" onDone={(url) => edit((d) => void (d.sitePlan!.image = url))} />
+        <ClearBackground slug={slug} image={plan!.image} onDone={(url, old) => edit((d) => void ((d.sitePlan!.image = url), (d.sitePlan!.imageBefore = old)))} />
+        {plan!.imageBefore && (
+          <button type="button" className="text-[13px] text-[#0071e3] hover:underline" onClick={() => edit((d) => void ((d.sitePlan!.image = d.sitePlan!.imageBefore!), delete d.sitePlan!.imageBefore))}>
+            Tilbage til det gamle
+          </button>
+        )}
         <button type="button" className="text-[13px] text-[#ff3b30] hover:underline" onClick={() => confirm("Fjern pladskortet og pladserne?") && edit((d) => void (d.sitePlan = undefined))}>
           Fjern
         </button>
@@ -459,6 +465,33 @@ function AiPlace({ slug, plan, photo, onCorners, hint }: { slug: string; plan: s
       {hint && !note && <p className="px-1 text-[12px] text-[#8e8e93]">{hint}</p>}
       {note && <p className={`px-1 text-[12px] leading-snug ${note.error ? "text-[#ff3b30]" : "text-[#1d1d1f]"}`}>{note.text}</p>}
     </div>
+  );
+}
+
+/** "Gennemsigtig baggrund": the plan's drawn-in checks (or white) made clear, as a new file (the old one can be put back). */
+function ClearBackground({ slug, image, onDone }: { slug: string; image: string; onDone: (url: string, old: string) => void }) {
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<{ text: string; error?: boolean } | null>(null);
+  return (
+    <>
+      <button
+        type="button"
+        disabled={busy}
+        className="rounded-xl bg-white px-3 py-1.5 text-[13px] font-medium text-[#0071e3] ring-1 ring-black/[.06] hover:bg-[#0071e3]/5 disabled:opacity-50"
+        onClick={async () => {
+          setBusy(true);
+          setNote(null);
+          const r = await clearPlanBackground(slug, image).catch((err: unknown) => ({ ok: false as const, error: String(err) }));
+          setBusy(false);
+          if (!r.ok) return setNote({ text: r.error, error: true });
+          onDone(r.url, image);
+          setNote({ text: `Baggrunden er gjort gennemsigtig (${r.cleared} % af billedet) - husk at gemme.` });
+        }}
+      >
+        {busy ? "Gør gennemsigtig …" : "Gør baggrunden gennemsigtig"}
+      </button>
+      {note && <span className={`text-[12px] ${note.error ? "text-[#ff3b30]" : "text-[#34c759]"}`}>{note.text}</span>}
+    </>
   );
 }
 

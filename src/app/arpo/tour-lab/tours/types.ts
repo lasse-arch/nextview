@@ -413,6 +413,8 @@ export type TourConfig = {
     overlay?: { corners: [[number, number], [number, number], [number, number], [number, number]]; opacity?: number };
     /** The pitches and cabins on the plan (x, y in % of the plan picture) - lit green when free for the dates the visitor picks. `id` = the booking system's id. */
     units?: SiteUnit[];
+    /** The plan picture before its background was made see-through (Gør baggrunden gennemsigtig) - to go back to. */
+    imageBefore?: string;
     /** The units' kinds (the booking's categories): their name on the tour, colour and a place in the tour to walk round in. */
     unitCats?: Record<string, { label?: string; color?: string; tour?: string }>;
     /** Live availability from Next-Stay (the campsite's booking): `tenantId` from its booking address (online.next-stay-booking.dk/search/<tenantId>); `book` = where "Book" goes (default that booking page). */

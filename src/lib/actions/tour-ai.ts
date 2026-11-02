@@ -1149,6 +1149,44 @@ export async function matchSitePlan(slug: string, photo: string, plan: string): 
   return { ok: true, pairs, note: out.note };
 }
 
+/* ----- Pladskort: a see-through copy of the plan ----- */
+
+/**
+ * The plan's "transparent" background made truly see-through: plans often come
+ * as a picture with the grey-and-white checks of transparency drawn into it
+ * (or a white background) - laid over the drone photo they cover it. Every
+ * light grey or white pixel (no colour in it) becomes clear, softly at the
+ * edges; everything with colour or dark (roads, grass, numbers) stays. A new
+ * file - the old one is kept, so it can be put back.
+ */
+export async function clearPlanBackground(slug: string, plan: string): Promise<{ ok: true; url: string; cleared: number } | { ok: false; error: string }> {
+  await requireTour(slug);
+  const bytes = await ourTourImage(plan).catch(() => null);
+  if (!bytes) return { ok: false, error: "Pladskortet kunne ikke læses - upload det med Skift pladskortet, så det ligger hos os." };
+  const { data, info } = await sharp(bytes).rotate().ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  if (info.width * info.height > 40_000_000) return { ok: false, error: "Pladskortet er for stort til at gøre gennemsigtigt." };
+  let cleared = 0;
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i];
+    const g = data[i + 1];
+    const b = data[i + 2];
+    const lo = Math.min(r, g, b);
+    // Grey or white: no colour to speak of, and light. The lighter, the clearer (a soft edge, no jagged ring round the lines).
+    if (Math.max(r, g, b) - lo > 16 || lo < 170) continue;
+    const keep = lo >= 188 ? 0 : (188 - lo) / 18;
+    const alpha = Math.round(data[i + 3] * keep);
+    if (alpha < data[i + 3]) {
+      data[i + 3] = alpha;
+      cleared++;
+    }
+  }
+  const share = cleared / (info.width * info.height);
+  if (share < 0.02) return { ok: false, error: "Der var ingen grå eller hvid baggrund at gøre gennemsigtig." };
+  const png = await sharp(data, { raw: { width: info.width, height: info.height, channels: 4 } }).png({ compressionLevel: 9, palette: false }).toBuffer();
+  const url = await storeTourFile(slug, "pladskort-gennemsigtig", "image/png", png);
+  return { ok: true, url, cleared: Math.round(share * 100) };
+}
+
 /* ----- Pladskort: nextviewAI reads the numbers on the plan ----- */
 
 const PlanLabels = z.object({
