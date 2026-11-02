@@ -1149,6 +1149,87 @@ export async function matchSitePlan(slug: string, photo: string, plan: string): 
   return { ok: true, pairs, note: out.note };
 }
 
+/* ----- Pladskort: nextviewAI reads the numbers on the plan ----- */
+
+const PlanLabels = z.object({
+  labels: z
+    .array(
+      z.object({
+        text: z.string().describe("Nummeret eller navnet præcis som det står, fx '145', '106a', '14'"),
+        kind: z.enum(["plads", "hus", "andet"]).describe("plads = et nummer på en campingplads/parcel; hus = et nummer i/på et hus-, hytte- eller værelsesikon; andet = alt andet"),
+        x: z.number().describe("Midten af teksten i % af billedets bredde (0-100)"),
+        y: z.number().describe("Midten af teksten i % af billedets højde (0-100)"),
+      })
+    )
+    .describe("Alle numre på kortet - også de små"),
+});
+
+export type PlanLabel = { text: string; kind: "plads" | "hus" | "andet"; x: number; y: number };
+
+/**
+ * Every number printed on the tour's site plan (the pitches, the cabins in
+ * their little houses) and where it stands, in % of the plan - so the
+ * booking's units can be put on their own number (see the editor's
+ * Pladskort). Read in four overlapping parts, so the small numbers are big
+ * enough to read; only the tour's own uploaded plan.
+ */
+export async function readPlanNumbers(slug: string, plan: string): Promise<{ ok: true; labels: PlanLabel[] } | { ok: false; error: string }> {
+  const user = await requireTour(slug);
+  const key = await apiKey();
+  if (!key) return { ok: false, error: "nextviewAI er ikke sat op endnu - indsæt en nøgle under fanen nextviewAI." };
+  const bytes = await ourTourImage(plan).catch(() => null);
+  if (!bytes) return { ok: false, error: "Pladskortet kunne ikke læses - upload det med Skift pladskortet, så det ligger hos os." };
+  const big = await sharp(bytes).resize({ width: 2600, height: 2600, fit: "inside", withoutEnlargement: false }).toBuffer({ resolveWithObject: true });
+  const W = big.info.width;
+  const H = big.info.height;
+  // Four parts, each a bit more than a quarter (they overlap 8 %, so a number on a seam is whole in one of them).
+  const parts = [0, 1].flatMap((r) => [0, 1].map((c) => ({ x0: c ? 0.42 : 0, y0: r ? 0.42 : 0, x1: c ? 1 : 0.58, y1: r ? 1 : 0.58 })));
+  const client = new Anthropic({ apiKey: key });
+  const read = async (q: (typeof parts)[number]) => {
+    const left = Math.round(q.x0 * W);
+    const top = Math.round(q.y0 * H);
+    const width = Math.round((q.x1 - q.x0) * W);
+    const height = Math.round((q.y1 - q.y0) * H);
+    const tile = await sharp(big.data).extract({ left, top, width, height }).jpeg({ quality: 88 }).toBuffer();
+    const r = await client.messages.parse({
+      model: "claude-opus-5-5",
+      max_tokens: 12000,
+      system:
+        "Du læser et tegnet pladskort over en campingplads (eller et andet sted med nummererede pladser, hytter og værelser). Find ALLE numre, der står på kortet - også små numre på smalle parceller og numre inde i eller på små hus-ikoner - og giv midten af hvert nummer i procent af billedet. Skriv nummeret præcis som det står (med bogstav, fx 106a). Gæt ikke: kun numre, du kan læse.",
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "image", source: { type: "base64", media_type: "image/jpeg", data: tile.toString("base64") } },
+            { type: "text", text: "Giv alle numre på dette udsnit af pladskortet med deres position." },
+          ],
+        },
+      ],
+      output_config: { effort: "high", format: zodOutputFormat(PlanLabels) },
+    });
+    const u = r.usage;
+    await prisma.tourAiUsage
+      .create({ data: { tourSlug: slug, userName: user.name, kind: "pladskort-numre", inputTokens: u.input_tokens, outputTokens: u.output_tokens, cacheReadTokens: u.cache_read_input_tokens ?? 0, cacheWriteTokens: u.cache_creation_input_tokens ?? 0, costUsd: claudeCostUsd(u) } })
+      .catch(() => {});
+    // Back to % of the whole plan.
+    return (r.parsed_output?.labels ?? [])
+      .filter((l) => Number.isFinite(l.x) && Number.isFinite(l.y) && l.x >= 0 && l.x <= 100 && l.y >= 0 && l.y <= 100 && /\d/.test(l.text))
+      .map((l) => ({ text: l.text.trim().slice(0, 12).toLowerCase(), kind: l.kind, x: ((left + (l.x / 100) * width) / W) * 100, y: ((top + (l.y / 100) * height) / H) * 100 }));
+  };
+  let found: PlanLabel[][];
+  try {
+    found = await Promise.all(parts.map(read));
+  } catch (err) {
+    if (err instanceof Anthropic.AuthenticationError) return { ok: false, error: "nextviewAI-nøglen virker ikke længere." };
+    return { ok: false, error: `Kunne ikke få fat i nextviewAI (${err instanceof Error ? err.message : err}).` };
+  }
+  // A number read twice (in the overlap) counts once.
+  const labels: PlanLabel[] = [];
+  for (const l of found.flat()) if (!labels.some((m) => m.text === l.text && m.kind === l.kind && Math.hypot(m.x - l.x, m.y - l.y) < 2)) labels.push(l);
+  if (labels.length < 3) return { ok: false, error: "nextviewAI kunne ikke læse numre på pladskortet - er det et billede med tydelige numre?" };
+  return { ok: true, labels: labels.slice(0, 2000) };
+}
+
 /* ----- Design: nextviewAI picks a colour filter for the tour ----- */
 
 const FilterSuggestion = z.object({

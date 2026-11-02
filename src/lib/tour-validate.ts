@@ -61,7 +61,7 @@ export function tourConfigProblem(config: unknown): string | null {
     if (!obj(sp) || !str(sp.image) || !str(sp.label)) return "Pladskortet mangler billede eller knaptekst.";
     if (sp.overlay !== undefined && (!obj(sp.overlay) || !arr(sp.overlay.corners) || sp.overlay.corners.length !== 4 || !sp.overlay.corners.every((p) => arr(p) && p.length === 2 && pct(p[0]) && pct(p[1])) || (sp.overlay.opacity !== undefined && !(typeof sp.overlay.opacity === "number" && sp.overlay.opacity >= 0.2 && sp.overlay.opacity <= 1))))
       return "Pladskortet over luftfotoet skal have fire hjørner (x, y i %) og en gennemsigtighed mellem 0,2 og 1.";
-    if (sp.units !== undefined && (!arr(sp.units) || sp.units.length > 1000 || !sp.units.every((u) => obj(u) && str(u.id) && str(u.name) && pct(u.x) && pct(u.y))))
+    if (sp.units !== undefined && (!arr(sp.units) || sp.units.length > 1000 || !sp.units.every((u) => obj(u) && str(u.id) && str(u.name) && pct(u.x) && pct(u.y) && (u.tour === undefined || str(u.tour)) && (u.cat === undefined || str(u.cat)))))
       return "Pladserne på pladskortet skal have id, navn og placering (x, y i %).";
     if (sp.nextStay !== undefined && (!obj(sp.nextStay) || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(sp.nextStay.tenantId)) || (sp.nextStay.book !== undefined && !/^https:\/\//i.test(String(sp.nextStay.book)))))
       return "Next-Stay skal have bookingens id (fra online.next-stay-booking.dk/search/…) og et https-link til Book.";

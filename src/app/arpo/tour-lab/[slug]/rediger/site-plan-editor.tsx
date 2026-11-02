@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { fetchNextStayUnits } from "@/lib/actions/tour-sites";
+import { readPlanNumbers } from "@/lib/actions/tour-ai";
+import { placeByNumbers } from "./unit-place";
 import { matchSitePlan } from "@/lib/actions/tour-ai";
 import { fitPlan } from "./plan-fit";
 import type { SiteUnit, TourConfig } from "../../tours/types";
@@ -478,15 +480,46 @@ function NextStay({ config, edit, slug }: { config: TourConfig; edit: Edit; slug
       const { w, h } = await naturalSize(plan.image).catch(() => {
         throw new Error("Pladskort-billedet kan ikke hentes - upload det med Skift pladskortet først, så kan pladserne lægges på det.");
       });
-      const units: SiteUnit[] = r.units.map((u) => ({ id: u.id, name: u.name, x: Math.round((u.x / w) * 1000) / 10, y: Math.round((u.y / h) * 1000) / 10, kind: /plads/i.test(u.category) ? "plads" : "hytte" }));
+      // A first guess (Next-Stay's map pixels on ours) - the numbers on the plan put them right just after. What was set by hand
+      // on a unit (its place in the tour) stays.
+      const before = new Map((plan.units ?? []).map((u) => [u.id, u]));
+      const units: SiteUnit[] = r.units.map((u) => ({
+        ...before.get(u.id),
+        id: u.id,
+        name: u.name,
+        x: Math.min(100, Math.max(0, Math.round((u.x / w) * 1000) / 10)),
+        y: Math.min(100, Math.max(0, Math.round((u.y / h) * 1000) / 10)),
+        kind: /plads/i.test(u.category) ? "plads" : "hytte",
+        cat: u.category || undefined,
+        bx: u.x,
+        by: u.y,
+      }));
       edit((d) => {
         d.sitePlan!.nextStay = { ...d.sitePlan!.nextStay, tenantId };
         d.sitePlan!.units = units;
       });
-      const outside = units.filter((u) => u.x < 0 || u.x > 100 || u.y < 0 || u.y > 100).length;
-      setNote({ text: `${units.length} pladser og hytter hentet.${outside ? ` ${outside} ligger uden for pladskortet - pladskortet er nok ikke samme billede som Next-Stays; træk dem på plads.` : " Tjek, at prikkerne sidder rigtigt."}` });
+      setNote({ text: `${units.length} pladser og hytter hentet - nextviewAI læser numrene på pladskortet og lægger dem på plads …` });
+      await readNumbers(units);
     } catch (err) {
       setNote({ text: err instanceof Error ? err.message : String(err), error: true });
+    }
+    setBusy(false);
+  }
+
+  /** nextviewAI reads the numbers on the plan, and each unit is put on its own (the rest where the found ones say). */
+  async function readNumbers(list = plan.units ?? []) {
+    if (!list.length) return;
+    setBusy(true);
+    try {
+      const r = await readPlanNumbers(slug, plan.image);
+      if (!r.ok) throw new Error(r.error);
+      const placed = placeByNumbers(list, r.labels);
+      edit((d) => void (d.sitePlan!.units = placed.units));
+      setNote({
+        text: `${placed.byNumber} sat på deres nummer, ${placed.byFit} placeret ud fra de andre${placed.left ? `, ${placed.left} kunne ikke placeres - træk dem på plads` : ""}. Tjek kortet herunder.`,
+      });
+    } catch (err) {
+      setNote({ text: `${err instanceof Error ? err.message : String(err)} Prikkerne står, hvor Next-Stay har dem - træk dem på plads.`, error: true });
     }
     setBusy(false);
   }
@@ -511,6 +544,11 @@ function NextStay({ config, edit, slug }: { config: TourConfig; edit: Edit; slug
             onChange={(e) => edit((d) => void (d.sitePlan!.nextStay!.book = e.target.value.trim() || undefined))}
           />
         </Field>
+      )}
+      {plan.units && plan.units.length > 0 && (
+        <button type="button" disabled={busy} onClick={() => readNumbers()} className="w-full rounded-xl bg-white px-3 py-2 text-[14px] font-medium text-[#0071e3] ring-1 ring-black/[.06] hover:bg-[#0071e3]/5 disabled:opacity-50">
+          {busy ? "nextviewAI læser numrene …" : "✦ nextviewAI læser numrene og lægger prikkerne på plads"}
+        </button>
       )}
       {plan.units && plan.units.length > 0 && <UnitPlacer image={plan.image} units={plan.units} onChange={(units) => edit((d) => void (d.sitePlan!.units = units))} />}
     </>

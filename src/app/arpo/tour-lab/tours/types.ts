@@ -79,7 +79,21 @@ export type TourInfo = {
 
 /** A point in the tour's 3D room (Matterport's world coordinates, metres). */
 /** A pitch or cabin on the site plan. */
-export type SiteUnit = { id: string; name: string; x: number; y: number; kind?: "plads" | "hytte" };
+export type SiteUnit = {
+  id: string;
+  name: string;
+  /** On the plan picture, in %. */
+  x: number;
+  y: number;
+  kind?: "plads" | "hytte";
+  /** The booking's own category (fx "Campingplads", "Hytte 4 pers.", "Motelværelse") - its colour and filter on the tour. */
+  cat?: string;
+  /** Where the booking itself puts it (its own map's pixels) - kept so the dots can be fitted onto our plan again. */
+  bx?: number;
+  by?: number;
+  /** "Gå rundt": a place in the tour (a Matterport link) inside this cabin or room - else its category's. */
+  tour?: string;
+};
 
 export type Point3 = { x: number; y: number; z: number };
 
