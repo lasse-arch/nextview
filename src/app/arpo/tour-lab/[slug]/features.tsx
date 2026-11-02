@@ -748,17 +748,18 @@ export const FEATURES_CSS = `
 .ft-selv{display:block;width:100%;margin-top:8px;border:0;background:none;padding:6px;font:inherit;font-weight:700;font-size:14px;color:var(--c-main);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
 .ft-reel{position:absolute;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));translate:-50% 0;z-index:62;width:min(520px,calc(100% - 24px));padding:12px 14px 10px;border-radius:18px;background:rgba(13,27,32,.9);color:#fff;box-shadow:0 14px 40px rgba(0,0,0,.35);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);animation:hvUp .35s ease}
 .ft-reel .ft-kick{margin:6px 0 2px;color:color-mix(in srgb,var(--c-accent) 70%,#fff)}
-.ft-reel b{display:block;font-size:17px;line-height:1.2}
-.ft-reel span{display:block;margin-top:3px;font-size:13.5px;line-height:1.4;color:rgba(255,255,255,.82)}
+.ft-reel>b{display:block;font-size:17px;line-height:1.2}
+.ft-reel>span{display:block;margin-top:3px;font-size:13.5px;line-height:1.4;color:rgba(255,255,255,.82)}
 .ft-reel-bar{height:3px;border-radius:3px;background:rgba(255,255,255,.18);overflow:hidden}
 .ft-reel-bar i{display:block;height:100%;background:var(--c-accent);transform-origin:left;animation:ftBar linear forwards}
 .ft-reel-knapper{display:flex;gap:6px;margin-top:9px}
 .ft-reel-knapper button:disabled{opacity:.35}
 .ft-reel-scene{margin:8px 0 4px}
-.ft-reel-scene .ft-scene{height:96px;border-radius:12px}
+.ft-reel-scene .ft-scene{height:auto;min-height:90px;border-radius:12px}
+.ft-reel-scene .ft-intro{padding:12px}
 .ft-reel-hvorfor{margin-top:8px!important;padding:8px 10px;border-radius:12px;background:rgba(255,255,255,.08);font-size:13px!important}
 .ft-reel-hvorfor b{display:inline!important;font-size:11px!important;letter-spacing:.08em;text-transform:uppercase;color:color-mix(in srgb,var(--c-accent) 70%,#fff);margin-right:4px}
-@media (max-width:760px){.ft-reel{max-height:calc(100% - 90px);overflow-y:auto}}
+@media (max-width:760px){.ft-reel{max-height:calc(100% - 90px);overflow-y:auto}.ft-reel-knapper button{white-space:nowrap;padding:8px 6px;font-size:12.5px}}
 .ft-reel-knapper button{flex:1;border:0;border-radius:999px;padding:8px 10px;background:rgba(255,255,255,.14);color:#fff;font:inherit;font-weight:700;font-size:13px;cursor:pointer}
 .ft-reel-knapper button:nth-child(2){background:var(--c-accent)}
 .ft-overalt{display:flex;align-items:flex-end;justify-content:center;gap:14px;padding:18px}
