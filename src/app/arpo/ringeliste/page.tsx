@@ -47,6 +47,8 @@ export default async function RingelistePage({
           stage: true,
           lastVoicemailAt: true,
           ownerId: true,
+          // The latest note from a call, shown on the card.
+          notes: { where: { body: { startsWith: "Opkald: " } }, orderBy: { createdAt: "desc" }, take: 1, select: { body: true, createdAt: true, author: { select: { name: true } } } },
         },
       })
     : [];
@@ -67,7 +69,11 @@ export default async function RingelistePage({
         lists={lists.map((l) => ({ id: l.id, name: l.name, openCount: l._count.deals }))}
         selectedListId={selectedListId}
         // Each lead with where it is (distance from the office, region, kommune) - from the postcode in its address.
-        deals={deals.map((d) => ({ ...d, place: placeOf(d.address) }))}
+        deals={deals.map(({ notes, ...d }) => ({
+          ...d,
+          place: placeOf(d.address),
+          lastCallNote: notes[0] ? { body: notes[0].body.replace(/^Opkald: /, ""), at: notes[0].createdAt.toISOString(), by: notes[0].author.name } : null,
+        }))}
         users={users}
         currentUserId={currentUser.id}
         isAdmin={currentUser.role === "ADMIN"}

@@ -6,7 +6,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createCallList, addLeadsToCallList, deleteCallList, renameCallList, markVoicemail, scheduleCallBack, deleteCallListLead, moveExistingToCallList } from "@/lib/actions/call-lists";
-import { markDealLost, setMeetingDateAndStage, sendCalendarInvite, renameDeal, updateDealPhone, updateDealWebsite } from "@/lib/actions/deals";
+import { markDealLost, setMeetingDateAndStage, sendCalendarInvite, renameDeal, updateDealPhone, updateDealWebsite, addNote } from "@/lib/actions/deals";
 import { addDealItem } from "@/lib/actions/deal-items";
 import { dealName, stageLabels, telHref } from "@/lib/labels";
 import { useToast } from "@/components/toast";
@@ -33,6 +33,8 @@ type QueueDeal = {
   ownerId: string;
   /** Where the lead is - from the postcode in its address (null when there's none). */
   place: LeadPlace | null;
+  /** The latest note written while calling. */
+  lastCallNote?: { body: string; at: string; by: string } | null;
 };
 
 type Colleague = { id: string; name: string };
@@ -325,6 +327,10 @@ function QueueCard({ deal, users, currentUserId, isAdmin }: { deal: QueueDeal; u
   const [nameInput, setNameInput] = useState(dealName(deal));
   const [displayedName, setDisplayedName] = useState(dealName(deal));
   const [editingPhone, setEditingPhone] = useState(false);
+  /** The note box - opened by calling the number (or "Note"), so what's said is written down at once. */
+  const [noteOpen, setNoteOpen] = useState(false);
+  const [noteText, setNoteText] = useState("");
+  const [lastNote, setLastNote] = useState(deal.lastCallNote ?? null);
   const [phoneInput, setPhoneInput] = useState(deal.contactPhone ?? "");
   const [displayedPhone, setDisplayedPhone] = useState(deal.contactPhone);
   const [editingWebsite, setEditingWebsite] = useState(false);
@@ -412,6 +418,21 @@ function QueueCard({ deal, users, currentUserId, isAdmin }: { deal: QueueDeal; u
       } catch (err) {
         showToast(err instanceof Error ? err.message : "Kunne ikke gemme telefonsvar.");
       }
+    });
+  }
+
+  function saveNote() {
+    const body = noteText.trim();
+    if (!body) return;
+    startTransition(async () => {
+      const form = new FormData();
+      form.set("body", `Opkald: ${body}`);
+      const r = await addNote(deal.id, form);
+      if (!r.ok) return showToast(r.error);
+      setLastNote({ body, at: new Date().toISOString(), by: "dig" });
+      setNoteText("");
+      setNoteOpen(false);
+      showToast("Note gemt på dealen");
     });
   }
 
@@ -567,6 +588,8 @@ function QueueCard({ deal, users, currentUserId, isAdmin }: { deal: QueueDeal; u
               <span className="inline-flex items-center gap-1">
                 <a
                   href={telHref(displayedPhone)}
+                  // Calling opens the note box on the card, ready for what's said.
+                  onClick={() => setNoteOpen(true)}
                   title="Ring op fra din egen telefon"
                   className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/10 hover:bg-emerald-100"
                 >
@@ -705,6 +728,15 @@ function QueueCard({ deal, users, currentUserId, isAdmin }: { deal: QueueDeal; u
             </button>
             <button
               type="button"
+              onClick={() => setNoteOpen((o) => !o)}
+              disabled={busy}
+              title="Skriv en note fra samtalen - gemmes på dealen"
+              className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            >
+              📝 Note
+            </button>
+            <button
+              type="button"
               onClick={() => setAskingLostReason(true)}
               disabled={busy}
               className="rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-100 disabled:opacity-50"
@@ -725,6 +757,44 @@ function QueueCard({ deal, users, currentUserId, isAdmin }: { deal: QueueDeal; u
           </div>
         ) : null}
       </div>
+
+      {lastNote && !noteOpen && (
+        <p className="mt-2 rounded-md bg-slate-50 px-3 py-2 text-xs leading-snug text-slate-600">
+          <span className="font-medium text-slate-500">
+            Sidste note · {new Date(lastNote.at).toLocaleDateString("da-DK", { day: "numeric", month: "short" })} · {lastNote.by}:
+          </span>{" "}
+          <span className="whitespace-pre-line">{lastNote.body}</span>
+        </p>
+      )}
+
+      {noteOpen && (
+        <div className="mt-3 space-y-2 rounded-lg border border-slate-200 bg-slate-50/60 p-3">
+          <label className="block text-xs font-medium text-slate-600" htmlFor={`note-${deal.id}`}>
+            Note fra opkaldet
+          </label>
+          <textarea
+            id={`note-${deal.id}`}
+            autoFocus
+            rows={3}
+            value={noteText}
+            onChange={(e) => setNoteText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) saveNote();
+            }}
+            placeholder="Fx Talte med skolelederen - ring igen efter efterårsferien."
+            className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
+          />
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={saveNote} disabled={busy || !noteText.trim()} className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-50">
+              Gem note
+            </button>
+            <button type="button" onClick={() => setNoteOpen(false)} className="text-xs text-slate-500 hover:text-slate-700">
+              Luk
+            </button>
+            <span className="ml-auto text-[11px] text-slate-400">Gemmes på dealen · ⌘/Ctrl + Enter</span>
+          </div>
+        </div>
+      )}
 
       {askingLostReason && (
         <LostReasonDialog
