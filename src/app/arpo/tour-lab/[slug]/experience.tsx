@@ -33,6 +33,7 @@ import { SIMPLE_CSS, SimpleMenu, SimpleWelcome } from "./simple";
 import { BENTO_CSS, BentoMenu } from "./bento";
 import { INFO_CSS, InfoDots, usePlaceInfo } from "./info";
 import { STAGING_CSS, StagingLayer } from "./staging";
+import { IN_3D, useStaging3d } from "./staging-3d";
 import { SITE_PLAN_CSS } from "./site-plan";
 import { LINE_DAY_CSS, LineDayCard, LineDayEnd, LineDayPicker, lineDayStops, type LineDayRun } from "./line-day";
 import { YEARWHEEL_CSS, YearWheelPanel } from "./yearwheel";
@@ -565,6 +566,9 @@ function TourExperience({
     window.addEventListener("hv-linjedag", open);
     return () => window.removeEventListener("hv-linjedag", open);
   }, []);
+  // Virtual staging: pictures, videos and signs as real surfaces in Matterport's scene (web pages and the year wheel stay HTML on top).
+  // A tap: in the editor's preview, that surface opens in the editor; for visitors, its button.
+  const stagingTap = useRef<(id: string) => void>(() => {});
   /** The year wheel ("#aarshjul", or its button) is open full screen. */
   const [wheelOpen, setWheelOpen] = useState(false);
   useEffect(() => {
@@ -642,6 +646,7 @@ function TourExperience({
   const coverWaitingRef = useRef(false);
   /** The connected viewer, once it's playing (for the parts that follow the camera). */
   const [sdk, setSdk] = useState<MpSdk | null>(null);
+  const staging3d = useStaging3d(phase === "tour" ? sdk : null, T.staging ?? [], (id) => stagingTap.current(id));
   /** The scan point (ss) the visitor stands on. */
   const [currentSs, setCurrentSs] = useState<number | null>(null);
   const currentSsRef = useRef<number | null>(null);
@@ -2444,6 +2449,21 @@ function TourExperience({
   /** The button on Find vej's "Du er fremme": the tour's own choice (or none), else its main button. */
   const arriveCta = T.wayfinding?.arrive === false ? undefined : T.wayfinding?.arrive?.label && T.wayfinding.arrive.href ? T.wayfinding.arrive : T.cta.find((c) => c.primary);
   const ctaClick = (label: string, href: string, place: string) => track("cta_click", { label, link_url: href, place });
+  // A tap on a staging surface in the 3D scene: in the editor's preview it opens that surface there; for visitors, its button.
+  useEffect(() => {
+    stagingTap.current = (id) => {
+      const item = T.staging?.find((i) => i.id === id);
+      if (!item) return;
+      if (inPreview && window.parent !== window) {
+        window.parent.postMessage({ type: "tour-staging-pick", id }, location.origin);
+        return;
+      }
+      if (item.action?.href) {
+        ctaClick(item.action.label, item.action.href, "staging");
+        openLink(T, item.action.href, item.action.label, popup);
+      }
+    };
+  });
 
   return (
     <TourLang.Provider value={{ lang, t: tx }}>
@@ -3120,10 +3140,10 @@ function TourExperience({
           onLink={(label, href) => ctaClick(label, href, "info")}
         />
       )}
-      {phase === "tour" && T.staging && T.staging.length > 0 && (
+      {phase === "tour" && T.staging && T.staging.some((i) => !staging3d || !IN_3D.has(i.kind)) && (
         <StagingLayer
           sdk={sdk}
-          items={T.staging}
+          items={staging3d ? T.staging.filter((i) => !IN_3D.has(i.kind)) : T.staging}
           T={T}
           currentSs={currentSs}
           frame={iframe}

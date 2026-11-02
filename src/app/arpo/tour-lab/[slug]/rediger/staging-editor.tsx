@@ -6,6 +6,7 @@ import { Rows } from "./content";
 import { LinkInput } from "./links-open";
 import { Choice, Field, Group, Icon, input, UploadButton, ssOfHref, type PreviewApi } from "./ui";
 import { cornersOf, movePlace } from "../staging";
+import { IN_3D } from "../staging-3d";
 
 /*
  * Virtual staging: a video, a picture, a web page, a sign or the year wheel
@@ -147,7 +148,7 @@ function SizeControls({ item, set }: { item: StagingItem; set: (i: StagingItem) 
   );
 }
 
-export function StagingEditor({ config, edit, preview }: { config: TourConfig; edit: Edit; preview: PreviewApi }) {
+export function StagingEditor({ config, edit, preview, focus }: { config: TourConfig; edit: Edit; preview: PreviewApi; /** A surface tapped in the preview: opened here. */ focus?: { id: string; n: number } | null }) {
   const items = config.staging ?? [];
   const setItems = (next: StagingItem[]) => edit((d) => void (d.staging = next.length ? next : undefined));
   const [kind, setKind] = useState<Kind>("video");
@@ -188,6 +189,7 @@ export function StagingEditor({ config, edit, preview }: { config: TourConfig; e
           title={(i) => i.title ?? KIND_NAME[i.kind]}
           subtitle={(i) => [KIND_NAME[i.kind], i.action?.label, i.ss.length ? `ses fra punkt ${i.ss.join(", ")}` : "ses ikke nogen steder"].filter(Boolean).join(" · ")}
           empty="Intet på fladerne endnu."
+          openRequest={focus ? { index: items.findIndex((x) => x.id === focus.id), n: focus.n } : null}
           editor={(i, set) => (
             <>
               <Field title="Navn" hint="Kun til jer - ses ikke i touren.">
@@ -232,32 +234,36 @@ export function StagingEditor({ config, edit, preview }: { config: TourConfig; e
                   </div>
                 </Field>
               )}
+              {IN_3D.has(i.kind) ? (
+                <p className={small}>Ligger som en rigtig flade i rummet: ses fra alle punkter, hvor væggen kan ses - og aldrig gennem en væg. Tryk på den i forhåndsvisningen for at åbne den her.</p>
+              ) : (
               <Field title="Ses fra punkt" hint="Vises kun fra disse scanpunkter, så det aldrig ses gennem en væg.">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {i.ss.map((n) => (
-                    <span key={n} className="flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-[13px] ring-1 ring-black/[.06]">
-                      {n}
-                      <button type="button" className="text-[#c7c7cc] hover:text-[#ff3b30]" onClick={() => set({ ...i, ss: i.ss.filter((x) => x !== n) })} aria-label="Fjern">
-                        ×
-                      </button>
-                    </span>
-                  ))}
-                  <button
-                    type="button"
-                    disabled={ssBusy}
-                    className="rounded-full px-2.5 py-1 text-[13px] font-medium text-[#0071e3] hover:bg-[#0071e3]/10"
-                    onClick={async () => {
-                      setSsBusy(true);
-                      const r = await preview.view();
-                      setSsBusy(false);
-                      const ss = r.href ? ssOfHref(r.href) : null;
-                      if (ss && !i.ss.includes(ss)) set({ ...i, ss: [...i.ss, ss] });
-                    }}
-                  >
-                    + Punktet i forhåndsvisningen
-                  </button>
-                </div>
-              </Field>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {i.ss.map((n) => (
+                      <span key={n} className="flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-[13px] ring-1 ring-black/[.06]">
+                        {n}
+                        <button type="button" className="text-[#c7c7cc] hover:text-[#ff3b30]" onClick={() => set({ ...i, ss: i.ss.filter((x) => x !== n) })} aria-label="Fjern">
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                    <button
+                      type="button"
+                      disabled={ssBusy}
+                      className="rounded-full px-2.5 py-1 text-[13px] font-medium text-[#0071e3] hover:bg-[#0071e3]/10"
+                      onClick={async () => {
+                        setSsBusy(true);
+                        const r = await preview.view();
+                        setSsBusy(false);
+                        const ss = r.href ? ssOfHref(r.href) : null;
+                        if (ss && !i.ss.includes(ss)) set({ ...i, ss: [...i.ss, ss] });
+                      }}
+                    >
+                      + Punktet i forhåndsvisningen
+                    </button>
+                  </div>
+                </Field>
+              )}
               <SizeControls item={i} set={set} />
               <button
                 type="button"

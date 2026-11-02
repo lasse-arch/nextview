@@ -249,6 +249,7 @@ export function TourEditor({
   }
   const [dirty, setDirty] = useState(false);
   // A link straight to a tab (?fane=feedback - e.g. from the bell, when a customer has written).
+  const [stagingFocus, setStagingFocus] = useState<{ id: string; n: number } | null>(null);
   const [tab, setTab] = useState<Tab>(() => (startTab && TABS.some(([t]) => t === startTab) && (economy || startTab !== "okonomi") ? (startTab as Tab) : "claude"));
   /** On a phone one thing at a time: the sections, a section's settings, or the preview (on a computer all three side by side). */
   const [pane, setPane] = useState<"nav" | "settings" | "preview">(startTab ? "settings" : "nav");
@@ -348,6 +349,12 @@ export function TourEditor({
   }, [config]);
   useEffect(() => {
     function onMessage(e: MessageEvent) {
+      if (e.origin === location.origin && e.source === frame.current?.contentWindow && e.data?.type === "tour-staging-pick" && typeof e.data.id === "string") {
+        // A staging surface tapped in the preview: open it here, ready to resize and move.
+        setTab("staging");
+        setStagingFocus((f) => ({ id: e.data.id, n: (f?.n ?? 0) + 1 }));
+        return;
+      }
       if (e.origin === location.origin && e.source === frame.current?.contentWindow && e.data?.type === "tour-ready") {
         // While a design is hovered, the restarted preview gets the design to show - not the saved look back.
         frame.current?.contentWindow?.postMessage({ type: "tour-draft", config: hovered.current ?? latest.current }, location.origin);
@@ -912,7 +919,7 @@ export function TourEditor({
             )}
             {tab === "scan" && <ScanPointsEditor config={config} edit={edit} preview={preview} map={scanMap} mpskinsHidden={mpskinsHidden} expected={scanCount} />}
             {tab === "tags" && <TagsEditor config={config} edit={edit} slug={slug} preview={preview} />}
-            {tab === "staging" && <StagingEditor config={config} edit={edit} preview={preview} />}
+            {tab === "staging" && <StagingEditor config={config} edit={edit} preview={preview} focus={stagingFocus} />}
             {tab === "linjedag" && <LineDayEditor config={config} edit={edit} preview={preview} />}
             {tab === "live" && <LiveDataEditor config={config} edit={edit} slug={slug} preview={preview} />}
             {tab === "kortet" && (

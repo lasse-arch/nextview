@@ -47,7 +47,10 @@ export function Rows<T>({
   subtitle,
   editor,
   empty,
+  openRequest,
 }: {
+  /** Opens this row from outside (e.g. tapped in the preview) - `n` counts the asks, so the same row can be asked again. */
+  openRequest?: { index: number; n: number } | null;
   items: T[];
   onChange: (items: T[]) => void;
   icon: [string, string];
@@ -57,6 +60,11 @@ export function Rows<T>({
   empty: string;
 }) {
   const [open, setOpen] = useState<number | null>(null);
+  const [asked, setAsked] = useState(0);
+  if (openRequest && openRequest.n !== asked && openRequest.index >= 0) {
+    setAsked(openRequest.n);
+    setOpen(openRequest.index);
+  }
   const [drag, setDrag] = useState<number | null>(null);
   const [over, setOver] = useState<number | null>(null);
   /** A row moves only when picked up by its handle (⋮⋮) - dragging a slider or a 360° picture inside it never moves the row. */
