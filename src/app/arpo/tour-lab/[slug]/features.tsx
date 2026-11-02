@@ -692,7 +692,9 @@ export function FeatureTour({ T, onClose, onEvent, demo }: { T: TourConfig; onCl
   useLayoutEffect(() => {
     const el = caption.current;
     const tour = el?.closest<HTMLElement>(".hv");
-    if (!reelOn || aside || !el || !tour) return;
+    // Typing: only the caption steps aside - the tour keeps its size, as resizing it under the keyboard took the
+    // focus from the field (and closed the keyboard again). The menu gets the whole screen.
+    if (!reelOn || menuUp || !el || !tour) return;
     let h = 0;
     const fit = () => {
       const next = Math.ceil(el.getBoundingClientRect().height) + 12;
@@ -710,7 +712,7 @@ export function FeatureTour({ T, onClose, onEvent, demo }: { T: TourConfig; onCl
       delete tour.dataset.ftReel;
       tour.style.removeProperty("--ft-reel-h");
     };
-  }, [reelOn, aside]);
+  }, [reelOn, menuUp]);
   // A new card starts at its top (a long one on a small phone was opened scrolled down).
   const ark = useRef<HTMLDivElement>(null);
   useEffect(() => {
