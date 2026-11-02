@@ -2042,10 +2042,20 @@ function TourExperience({
     // Only once the tour is really showing - zooming while Matterport is still starting up can leave the view blank.
     sdk.App.state.waitUntil((st) => st.phase === sdk.App.Phase.PLAYING).then(apply, () => {});
     window.addEventListener("resize", apply);
+    // The tour's own frame changing size (the showcase's caption moves it up, a panel beside it): Matterport sets its
+    // zoom back then - put the chosen one back (a little after, once it has settled).
+    let later = 0;
+    const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => {
+      window.clearTimeout(later);
+      later = window.setTimeout(apply, 250);
+    });
+    if (iframe.current) ro?.observe(iframe.current);
     const current = (sdk as unknown as { Sweep: { current: { subscribe(cb: () => void): { cancel(): void } } } }).Sweep.current;
     const sub = current.subscribe(() => setTimeout(apply, 300));
     return () => {
       alive = false;
+      window.clearTimeout(later);
+      ro?.disconnect();
       window.removeEventListener("resize", apply);
       sub.cancel();
     };
