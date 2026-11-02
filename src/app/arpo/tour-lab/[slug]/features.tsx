@@ -29,7 +29,7 @@ export type DemoContact = {
   finished?: boolean;
 };
 
-type Feature = { key: string; title: string; text: string; why?: string; scene: React.ReactNode; action?: () => void; actionLabel?: string; kicker?: string };
+type Feature = { key: string; title: string; text: string; why?: string; /** In the showreel only: a line on how to use what is now open in the tour. */ hint?: string; scene: React.ReactNode; action?: () => void; actionLabel?: string; kicker?: string };
 
 const fire = (name: string, detail?: unknown) => window.dispatchEvent(detail === undefined ? new Event(name) : new CustomEvent(name, { detail }));
 const seenKey = (slug: string) => `hv-features-seen:${slug}`;
@@ -69,7 +69,9 @@ function featuresOf(T: TourConfig, tr: (s: string, v?: Record<string, string | n
     const n = guideStops(T, g.id).length;
     out.push({
       key: `guide-${g.id ?? "main"}`,
-      title: g.id == null ? tr("Vis mig rundt") : g.title,
+      // A named guided tour says it is one ("Linjefagene" alone read like a page, not a tour that runs).
+      title: g.id == null ? tr("Vis mig rundt") : tr("Vis mig rundt: {navn}", { navn: g.title }),
+      hint: tr("Rundvisningen kører ovenfor - tryk Næste dér for næste stop."),
       text: tr("En rundvisning af sig selv: touren går fra sted til sted ({n} stop) og fortæller undervejs - som en rundvisning med en medarbejder.", { n }),
       scene: (
         <div className="ft-scene ft-guide">
@@ -752,7 +754,8 @@ export function FeatureTour({ T, onClose, onEvent, demo }: { T: TourConfig; onCl
         {!step.action && <div className="ft-reel-scene">{step.scene}</div>}
         <b>{step.title}</b>
         <span>{step.text}</span>
-        {step.why && (
+        {step.hint && <span className="ft-reel-hint">☝︎ {step.hint}</span>}
+        {step.why && !step.hint && (
           <span className="ft-reel-hvorfor">
             <b>{tr("Derfor er det med")}</b> {step.why}
           </span>
@@ -1020,6 +1023,7 @@ export const FEATURES_CSS = `
 .ft-reel-scene .ft-rul:active{cursor:grabbing}
 .ft-reel-scene .ft-rul span{display:inline-block!important;flex:none;max-width:none;margin-right:6px;animation:none;opacity:1;user-select:none}
 .ft-reel-vaek{display:none!important}
+.ft-reel>.ft-reel-hint{margin-top:7px;padding:7px 10px;border-radius:10px;border:1px dashed color-mix(in srgb,var(--c-accent) 60%,transparent);color:#fff;font-size:12.5px;line-height:1.35}
 .ft-reel-hvorfor{margin-top:8px!important;padding:8px 10px;border-radius:12px;background:rgba(255,255,255,.08);font-size:13px!important}
 .ft-reel-hvorfor b{display:inline!important;font-size:11px!important;letter-spacing:.08em;text-transform:uppercase;color:color-mix(in srgb,var(--c-accent) 70%,#fff);margin-right:4px}
 @media (max-width:760px){.ft-reel{width:calc(100% - 16px);max-height:55vh;overflow-y:auto;padding:10px 12px 9px;display:flex;flex-direction:column;min-height:min(240px,50vh)}.ft-reel-knapper{margin-top:auto!important;padding-top:9px}.ft-reel-scene{margin:6px 0 2px}.ft-reel-scene:not(:has(.ft-mere,.ft-overalt)){display:none}.ft-reel-scene .ft-overalt{padding:8px 6px 4px;gap:12px;zoom:.74}.ft-reel>b{font-size:16px}.ft-reel>span{font-size:13px}
