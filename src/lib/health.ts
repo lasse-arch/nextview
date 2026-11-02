@@ -8,6 +8,7 @@ import { getSettingValue, isDineroTestMode } from "@/lib/integration-settings";
 import { getValidAccessToken } from "@/lib/google-calendar";
 import { WELCOME_MAIL_SENDER } from "@/lib/welcome-mail";
 import { cloudflareReady, PAGES_PROJECT } from "@/lib/tour-publish";
+import { smsReady } from "@/lib/sms";
 
 /*
  * Health (Arpo → Virksomheden → Health): is everything Arpo depends on
@@ -45,7 +46,7 @@ const ago = (d: Date) => {
 
 export async function healthChecks(): Promise<CheckGroup[]> {
   const site = (process.env.APP_BASE_URL || "https://nextview360.dk").replace(/\/+$/, "");
-  const [db, web, tours, explore, gmail, resend, dinero, docuseal, bs, backup, matterport, ai, gemini] = await Promise.all([
+  const [db, web, tours, explore, gmail, resend, dinero, docuseal, bs, backup, matterport, ai, gemini, sms] = await Promise.all([
     timed("Database", async () => {
       const t = Date.now();
       await prisma.$queryRawUnsafe("SELECT 1");
@@ -126,10 +127,14 @@ export async function healthChecks(): Promise<CheckGroup[]> {
       if (!res) return { status: "warn", detail: "Kunne ikke nå Google lige nu" };
       return res.ok ? { status: "ok", detail: fromEnv ? "Nøgle i Vercel virker" : "Nøgle virker" } : { status: "down", detail: `Google afviser nøglen (${res.status})` };
     }),
+    // Only whether the key is there - a real check would cost an SMS.
+    timed("SureSMS (Send eksempel på SMS)", async () =>
+      smsReady() ? { status: "ok", detail: "Nøglen er sat - SMS'er sendes fra Arpo" } : { status: "off", detail: "Ikke sat op - SMS'en åbnes på sælgerens telefon" }
+    ),
   ]);
   return [
     { title: "Drift", checks: [db, web, tours, explore, backup] },
-    { title: "Integrationer", checks: [gmail, resend, dinero, docuseal, bs, matterport, ai, gemini] },
+    { title: "Integrationer", checks: [gmail, resend, dinero, docuseal, bs, matterport, ai, gemini, sms] },
   ];
 }
 
