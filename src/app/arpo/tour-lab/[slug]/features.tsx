@@ -525,10 +525,22 @@ export function FeatureTour({ T, onClose, onEvent, demo }: { T: TourConfig; onCl
       document.removeEventListener("focusout", onOut);
     };
   }, [reelOn]);
+  /** The visitor opened the tour's menu: the caption steps aside until it's closed again (the menu gets the whole screen). */
+  const [menuUp, setMenuUp] = useState(false);
+  useEffect(() => {
+    const tour = caption.current?.closest<HTMLElement>(".hv");
+    if (!reelOn || !tour) return;
+    const look = () => setMenuUp(tour.classList.contains("hv-menu-aaben"));
+    look();
+    const mo = new MutationObserver(look);
+    mo.observe(tour, { attributes: true, attributeFilter: ["class"] });
+    return () => mo.disconnect();
+  }, [reelOn]);
+  const aside = typing || menuUp;
   useLayoutEffect(() => {
     const el = caption.current;
     const tour = el?.closest<HTMLElement>(".hv");
-    if (!reelOn || typing || !el || !tour) return;
+    if (!reelOn || aside || !el || !tour) return;
     let h = 0;
     const fit = () => {
       const next = Math.ceil(el.getBoundingClientRect().height) + 12;
@@ -546,7 +558,7 @@ export function FeatureTour({ T, onClose, onEvent, demo }: { T: TourConfig; onCl
       delete tour.dataset.ftReel;
       tour.style.removeProperty("--ft-reel-h");
     };
-  }, [reelOn, typing]);
+  }, [reelOn, aside]);
   // A new card starts at its top (a long one on a small phone was opened scrolled down).
   const ark = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -555,7 +567,7 @@ export function FeatureTour({ T, onClose, onEvent, demo }: { T: TourConfig; onCl
   if (!all.length) return null;
   if (step)
     return (
-      <div className={`ft-reel ${typing ? "ft-reel-vaek" : ""}`} role="status" ref={caption}>
+      <div className={`ft-reel ${aside ? "ft-reel-vaek" : ""}`} role="status" ref={caption}>
         <p className="ft-kick">
           {demo ? "Det kan touren" : tr("Det kan jeres tour")} · {reel! + 1} / {steps.length}
         </p>
