@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { demoSmsSetup, sendDemoSms, type DemoSmsSetup } from "@/lib/actions/demo-sms";
+import { demoSmsSetup, removeDemoSms, resendDemoSms, sendDemoSms, type DemoSmsSetup } from "@/lib/actions/demo-sms";
 
 const when = (iso: string) => new Date(iso).toLocaleString("da-DK", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
@@ -17,19 +17,40 @@ export function SendExample({ initial }: { initial: DemoSmsSetup }) {
   const first = name.trim().split(/\s+/)[0] ?? "";
   const preview = text.replaceAll("{navn}", first).replace(/^Hej \n/, "Hej\n").replaceAll("{link}", "nextview360.dk/vis/…");
 
+  /** Sent from Arpo - or, without SureSMS set up, opened on the seller's own phone (the link is tracked all the same). */
+  function done(r: { sent: boolean; text: string; phone: string }) {
+    if (r.sent) return setNote({ text: `Sendt til ${r.phone}. Du får besked i klokken, når de åbner touren.` });
+    navigator.clipboard?.writeText(r.text).catch(() => {});
+    window.location.assign(`sms:${r.phone}${/iPhone|iPad|Mac/i.test(navigator.userAgent) ? "&" : "?"}body=${encodeURIComponent(r.text)}`);
+    setNote({ text: "SMS'en er åbnet på din telefon (og kopieret) - tryk send dér. Du får besked i klokken, når de åbner touren." });
+  }
+
+  const [again, setAgain] = useState<string | null>(null);
+  async function sendAgain(id: string) {
+    setAgain(id);
+    setNote(null);
+    const r = await resendDemoSms(id).catch((err: unknown) => ({ ok: false as const, error: err instanceof Error ? err.message : String(err) }));
+    setAgain(null);
+    if (!r.ok) return setNote({ text: r.error, error: true });
+    done(r);
+  }
+
+  async function remove(id: string, to: string) {
+    if (!window.confirm(`Fjern SMS'en til ${to}? Linket holder op med at virke, og det de har set, slettes.`)) return;
+    setAgain(id);
+    const r = await removeDemoSms(id).catch(() => ({ ok: false }));
+    setAgain(null);
+    if (!r.ok) return setNote({ text: "Den kunne ikke fjernes.", error: true });
+    setSetup((x) => ({ ...x, sent: x.sent.filter((y) => y.id !== id) }));
+  }
+
   async function send() {
     setBusy(true);
     setNote(null);
     const r = await sendDemoSms({ tourSlug: tour, phone, name, text, consent }).catch((err: unknown) => ({ ok: false as const, error: err instanceof Error ? err.message : String(err) }));
     setBusy(false);
     if (!r.ok) return setNote({ text: r.error, error: true });
-    if (r.sent) setNote({ text: `Sendt til ${r.phone}. Du får besked i klokken, når de åbner touren.` });
-    else {
-      // Not set up to send from Arpo: the seller's own phone sends it (the link is made and tracked all the same).
-      navigator.clipboard?.writeText(r.text).catch(() => {});
-      window.location.href = `sms:${r.phone}${/iPhone|iPad|Mac/i.test(navigator.userAgent) ? "&" : "?"}body=${encodeURIComponent(r.text)}`;
-      setNote({ text: "SMS'en er åbnet på din telefon (og kopieret) - tryk send dér. Du får besked i klokken, når de åbner touren." });
-    }
+    done(r);
     setName("");
     setPhone("");
     setConsent(false);
@@ -105,6 +126,17 @@ export function SendExample({ initial }: { initial: DemoSmsSetup }) {
                     {s.by ? ` · ${s.by}` : ""}
                   </span>
                 </span>
+                <span className="flex items-center gap-2">
+                {s.again && (
+                  <button type="button" disabled={again != null} onClick={() => sendAgain(s.id)} className="rounded-full px-2.5 py-0.5 text-xs font-medium text-violet-700 ring-1 ring-inset ring-violet-200 hover:bg-violet-50 disabled:opacity-40">
+                    {again === s.id ? "Vent …" : "Send igen"}
+                  </button>
+                )}
+                {s.mine && (
+                  <button type="button" disabled={again != null} onClick={() => remove(s.id, s.to)} className="rounded-full px-2 py-0.5 text-xs font-medium text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-40" title="Fjern">
+                    Fjern
+                  </button>
+                )}
                 {s.visits ? (
                   <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/15">
                     Åbnet {s.visits} gang{s.visits === 1 ? "" : "e"}
@@ -114,6 +146,7 @@ export function SendExample({ initial }: { initial: DemoSmsSetup }) {
                 ) : (
                   <span className="text-xs text-slate-400">Ikke åbnet endnu</span>
                 )}
+                </span>
               </li>
             ))}
           </ul>

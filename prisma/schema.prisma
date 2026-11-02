@@ -1440,6 +1440,9 @@ model TourDemoLink {
   createdAt   DateTime        @default(now())
   /// Switched off: the link is dead, what it saw is kept.
   disabledAt  DateTime?
+  /// Sent on SMS: the number (+45...) and the text it went with - so it can be sent again.
+  smsTo       String?
+  smsText     String?
   events      TourDemoEvent[]
 
   @@index([tourSlug])

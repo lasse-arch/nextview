@@ -24,7 +24,7 @@ const PER_DAY = 40;
 
 const firstName = (name: string) => name.trim().split(/\s+/)[0] ?? "";
 
-export type DemoSmsSent = { id: string; at: string; to: string; tour: string; by: string; visits: number; lastSeen: string | null; where: string | null };
+export type DemoSmsSent = { id: string; at: string; to: string; tour: string; by: string; visits: number; lastSeen: string | null; where: string | null; /** Can be sent again: the number is kept, and the seller sent it (or is an admin). */ again: boolean; /** The seller sent it, or is an admin: may send it again or remove it. */ mine: boolean };
 
 export type DemoSmsSetup = {
   tours: { slug: string; name: string }[];
@@ -49,7 +49,7 @@ export async function demoSmsSetup(): Promise<DemoSmsSetup> {
       where: { label: { endsWith: "(SMS)" } },
       orderBy: { createdAt: "desc" },
       take: 30,
-      select: { id: true, label: true, createdAt: true, tourSlug: true, createdById: true, events: { select: { session: true, createdAt: true, city: true, country: true }, orderBy: { createdAt: "desc" } } },
+      select: { id: true, label: true, createdAt: true, tourSlug: true, createdById: true, smsTo: true, smsText: true, events: { select: { session: true, createdAt: true, city: true, country: true }, orderBy: { createdAt: "desc" } } },
     }),
   ]);
   const people = new Map((await prisma.user.findMany({ where: { id: { in: [...new Set(links.map((l) => l.createdById))] } }, select: { id: true, name: true } })).map((p) => [p.id, p.name]));
@@ -69,6 +69,8 @@ export async function demoSmsSetup(): Promise<DemoSmsSetup> {
         visits: new Set(l.events.map((x) => x.session)).size,
         lastSeen: e?.createdAt.toISOString() ?? null,
         where: e ? [e.city, e.country ? (COUNTRY[e.country] ?? e.country) : null].filter(Boolean).join(", ") || null : null,
+        again: Boolean(l.smsTo && l.smsText) && (l.createdById === user.id || teamCan(user, "admin")),
+        mine: l.createdById === user.id || teamCan(user, "admin"),
       };
     }),
   };
@@ -99,6 +101,8 @@ export async function sendDemoSms(input: { tourSlug: string; phone: string; name
   const link = await prisma.tourDemoLink.create({ data: { tourSlug: tour.slug, token: randomBytes(15).toString("base64url"), label: `${who} (SMS)`, createdById: user.id } });
   const url = `${(process.env.APP_BASE_URL || "https://nextview360.dk").replace(/\/+$/, "")}/vis/${link.token}`;
   const message = text.replaceAll("{navn}", firstName(name)).replace(/^Hej \n/, "Hej\n").replaceAll("{link}", url);
+  // Kept with the link, so it can be sent again (the same link - what they look at stays in one place).
+  await prisma.tourDemoLink.update({ where: { id: link.id }, data: { smsTo: `+${phone}`, smsText: message } });
   let sent = false;
   if (smsReady()) {
     const r = await sendSms(phone, message);
@@ -132,4 +136,38 @@ export async function demoLinksForMail(slugs: string[], to: string): Promise<Rec
     out[t.slug] = `${base}/vis/${link.token}`;
   }
   return out;
+}
+
+/**
+ * The same SMS once more (it did not arrive, or they asked for it again): the
+ * same link and text, to the same number. Only the seller who sent it, or an
+ * admin - and it counts in the day's limit like a new one.
+ */
+export async function resendDemoSms(linkId: string): Promise<{ ok: true; sent: boolean; text: string; phone: string } | { ok: false; error: string }> {
+  const user = await requireUser();
+  const link = await prisma.tourDemoLink.findUnique({ where: { id: String(linkId) }, select: { id: true, label: true, createdById: true, smsTo: true, smsText: true, disabledAt: true } });
+  if (!link || !link.label.endsWith("(SMS)") || (link.createdById !== user.id && !teamCan(user, "admin"))) return { ok: false, error: "Den SMS findes ikke." };
+  if (link.disabledAt) return { ok: false, error: "Linket er slået fra." };
+  if (!link.smsTo || !link.smsText) return { ok: false, error: "Nummeret er ikke gemt på den (sendt før Send igen fandtes) - send en ny." };
+  const today = new Date(new Date().setHours(0, 0, 0, 0));
+  const sentToday = await prisma.activityEvent.count({ where: { type: "DEMO_SMS", actorId: user.id, createdAt: { gte: today } } });
+  if (sentToday >= PER_DAY) return { ok: false, error: `Du har sendt ${PER_DAY} i dag - det er grænsen.` };
+  let sent = false;
+  if (smsReady()) {
+    const r = await sendSms(link.smsTo, link.smsText);
+    if (!r.ok) return { ok: false, error: r.error };
+    sent = true;
+  }
+  await logActivity({ type: "DEMO_SMS", message: `${user.name} sendte eksemplet igen på SMS til ${link.label.replace(/ \(SMS\)$/, "")}`, actorId: user.id });
+  return { ok: true, sent, text: link.smsText, phone: link.smsTo };
+}
+
+/** Taken off the list: the link stops working, and what was seen on it goes too. Only the seller who sent it, or an admin. */
+export async function removeDemoSms(linkId: string): Promise<{ ok: boolean }> {
+  const user = await requireUser();
+  const link = await prisma.tourDemoLink.findUnique({ where: { id: String(linkId) }, select: { id: true, label: true, createdById: true } });
+  if (!link || !link.label.endsWith("(SMS)") || (link.createdById !== user.id && !teamCan(user, "admin"))) return { ok: false };
+  await prisma.tourDemoLink.delete({ where: { id: link.id } });
+  revalidatePath("/arpo/generator");
+  return { ok: true };
 }
