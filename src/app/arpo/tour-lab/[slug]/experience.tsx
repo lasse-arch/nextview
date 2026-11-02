@@ -2294,6 +2294,28 @@ function TourExperience({
   /* ----- "Pladskort" on the 360° aerial photo (site-plan-360.tsx) ----- */
   const plan360On = sitePlan360Ready(T);
   const [plan360, setPlan360] = useState<SitePlanState>({ on: false, free: null, picked: null, stay: null });
+  // "hv-luk-alt": everything open on top of the tour closes - the showcase's showreel moves from one feature to the next with it.
+  useEffect(() => {
+    const all = () => {
+      setFinderOpen(false);
+      setMenuOpen(false);
+      setPano(null);
+      setContactOpen(false);
+      setWheelOpen(false);
+      setCommuteOpen(false);
+      setLightbox(null);
+      setDayOpen(false);
+      setRouteOpen(false);
+      setLiveOpen(false);
+      setLinePicker(false);
+      setLineRun(null);
+      setSelected(null);
+      closeGuideRef.current(false);
+      closeRouteRef.current();
+    };
+    window.addEventListener("hv-luk-alt", all);
+    return () => window.removeEventListener("hv-luk-alt", all);
+  }, []);
   const droneViewer = useCallback(() => drone.current, []);
 
   /* ----- "Find vej" ----- */

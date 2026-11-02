@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useT } from "../tours/i18n-react";
 import { shownGuides, guideStops, startPlaces } from "../tours/places";
 import type { TourConfig } from "../tours/types";
@@ -274,6 +274,56 @@ function featuresOf(T: TourConfig, tr: (s: string, v?: Record<string, string | n
       action: () => fire("hv-kontakt"),
       actionLabel: tr("Se formularen"),
     });
+  if (T.info?.length)
+    out.push({
+      key: "info",
+      title: tr("Punkter i rummene"),
+      text: tr("Små punkter i 360°-billedet med fakta, billeder, video eller priser lige dér, hvor tingen står ({n} i touren).", { n: T.info.length }),
+      scene: (
+        <div className="ft-scene ft-luft">
+          {[[30, 45], [62, 38], [48, 70]].map(([x, y], i) => (
+            <i key={i} className="ft-pin" style={{ left: `${x}%`, top: `${y}%`, animationDelay: `${i * 0.4}s` }} />
+          ))}
+        </div>
+      ),
+    });
+  if (T.weather)
+    out.push({
+      key: "vejret",
+      title: tr("Vejret lige nu"),
+      text: tr("Luftfotoet viser vejret i {sted} lige nu - og hvordan det plejer at være i den måned, gæsten kommer.", { sted: T.weather.place }),
+      scene: (
+        <div className="ft-scene ft-commute">
+          <span>☀️ 21°</span>
+          <span>🌤 juli</span>
+        </div>
+      ),
+      action: () => fire("hv-gaa-til", { href: "#luften", label: "" }),
+      actionLabel: tr("Se vejret"),
+    });
+  if (T.points?.some((p) => p.walks?.length))
+    out.push({
+      key: "gaa",
+      title: tr("Gåafstande"),
+      text: tr("Ved stederne står, hvor mange minutter der er at gå - fx fra pladsen til stranden eller fra værelset til spisesalen."),
+      scene: (
+        <div className="ft-scene ft-commute">
+          <span>🚶 3 min</span>
+          <span>🚶 7 min</span>
+        </div>
+      ),
+    });
+  if (T.cta?.length)
+    out.push({
+      key: "knapper",
+      title: tr("Book og kontakt - lige dér, man står"),
+      text: tr("Knappen \"{knap}\" følger med hele vejen gennem touren, så der aldrig er langt fra at kigge til at tage kontakt.", { knap: T.cta.find((c) => c.primary)?.label ?? T.cta[0].label }),
+      scene: (
+        <div className="ft-scene ft-live">
+          <span>{T.cta.find((c) => c.primary)?.label ?? T.cta[0].label} →</span>
+        </div>
+      ),
+    });
   if ((T.languages ?? []).length)
     out.push({
       key: "sprog",
@@ -310,6 +360,34 @@ function featuresOf(T: TourConfig, tr: (s: string, v?: Record<string, string | n
       ),
     });
     out.push({
+      key: "overalt",
+      title: "På mobil, computer og jeres hjemmeside",
+      text: "Touren er bygget til mobilen først - hvor de fleste kigger - og ligger lige så godt på computeren og direkte inde på jeres egen hjemmeside, med et link til hvert sted i den.",
+      scene: (
+        <div className="ft-scene ft-overalt">
+          <i className="ft-mobil" />
+          <i className="ft-skaerm" />
+        </div>
+      ),
+    });
+    const have = new Set(out.map((f) => f.key.replace(/^guide-.*/, "guide")));
+    const more = CAN_ALSO.filter(([k]) => !have.has(k)).map(([, t]) => t);
+    if (more.length)
+      out.push({
+        key: "ogsaa",
+        title: "Det kan vi også lave til jer",
+        text: "Touren her har ikke det hele med. Hver tour bygges til stedet - så den har det, der hjælper netop jeres gæster videre.",
+        scene: (
+          <div className="ft-scene ft-intro">
+            {more.slice(0, 8).map((t, i) => (
+              <span key={t} style={{ animationDelay: `${0.1 + i * 0.1}s` }}>
+                {t}
+              </span>
+            ))}
+          </div>
+        ),
+      });
+    out.push({
       key: "portal",
       title: "Vi bliver ved med at gøre den bedre",
       text: "Vi kan se, hvor gæsterne kigger, hvad de klikker på, og hvor mange der tager kontakt. Det bruger vi til løbende at rette touren til - så I får mere af det, der virker og skaffer henvendelser.",
@@ -344,6 +422,28 @@ function featuresOf(T: TourConfig, tr: (s: string, v?: Record<string, string | n
   return out;
 }
 
+/** Everything a tour can have - for the showcase's "Det kan vi også lave til jer" (those this tour hasn't got). */
+const CAN_ALSO: [string, string][] = [
+  ["luften", "Hele stedet fra luften i 360°"],
+  ["guide", "Rundvisning med stemme"],
+  ["findvej", "Find vej til rummene"],
+  ["live", "Ledige pladser live"],
+  ["pladskort", "Pladskort med booking"],
+  ["cards", "Stedkort"],
+  ["info", "Punkter med fakta og video"],
+  ["dag", "Sådan ser en dag ud"],
+  ["linjedag", "En dag på din linje"],
+  ["aarshjul", "Årshjul"],
+  ["finder", "Find din plads"],
+  ["vej", "Hvor langt har du til os?"],
+  ["staging", "Skærme og billeder i rummene"],
+  ["kontakt", "Skriv til os i touren"],
+  ["film", "Start med dronefilm"],
+  ["vejret", "Vejret lige nu"],
+  ["sprog", "Flere sprog"],
+  ["stories", "Historier som på Instagram"],
+];
+
 /** "Derfor er det med" - the reason behind each feature, in the customer's terms. */
 function whyOf(key: string, tr: (s: string, v?: Record<string, string | number>) => string): string | undefined {
   if (key.startsWith("guide-")) return tr("Mange klikker ikke selv rundt. Rundvisningen tager dem i hånden og viser det vigtigste i den rigtige rækkefølge - så de ser det, I er stolte af.");
@@ -356,6 +456,10 @@ function whyOf(key: string, tr: (s: string, v?: Record<string, string | number>)
     vej: tr("Afstanden afgør tit, om man vælger jer. Her ser de selv, hvor tæt på de er - uden at skulle spørge."),
     dag: tr("Det gør det nemt at forestille sig selv hos jer - og det er dét, der får folk til at tage næste skridt."),
     finder: tr("I stedet for at lede selv får gæsten et svar, der passer til dem - færre spørgsmål til jer og hurtigere beslutninger."),
+    info: tr("Gæster har spørgsmål til det, de ser. Svaret står lige dér - så de ikke skal lede på hjemmesiden eller ringe."),
+    vejret: tr("Solskin på billedet og vejret lige nu gør stedet levende - og giver lyst til at komme."),
+    gaa: tr("Afstande er tit det, folk spørger om. Her ser de det med det samme."),
+    knapper: tr("Lysten er størst, mens man kigger. Én knap, der altid er der, gør det let at tage næste skridt."),
     sprog: tr("Gæster fra udlandet får touren på deres eget sprog - så I når flere uden ekstra arbejde."),
   };
   return why[key];
@@ -366,7 +470,70 @@ export function FeatureTour({ T, onClose, onEvent, demo }: { T: TourConfig; onCl
   const all = featuresOf(T, tr, demo);
   const [at, setAt] = useState(0);
   const [never, setNever] = useState(false);
+  /** "Se det hele i aktion": the step of the showreel playing (the tour shows each feature itself), or null. */
+  const [reel, setReel] = useState<number | null>(null);
+  const [paused, setPaused] = useState(false);
+  const shown = useRef<number | null>(null);
+  const steps = all.filter((x) => x.action);
+  const step = reel != null ? steps[reel] : null;
+  /** On to the next feature - or, after the last, back to the walk-through's last card (in a showcase: who to call). */
+  const advance = (r: number) => {
+    if (r + 1 < steps.length) return setReel(r + 1);
+    fire("hv-luk-alt");
+    shown.current = null;
+    onEvent("features_reel_done", { label: `${steps.length}` });
+    setReel(null);
+    setAt(all.length - 1);
+  };
+  // Each step: everything else closed, the feature opened in the tour, then on by itself (longer for a guided tour or a route).
+  useEffect(() => {
+    if (!step || paused || reel == null) return;
+    // Opened once per step - not again when it plays on after a pause.
+    const first = shown.current !== reel;
+    shown.current = reel;
+    if (first) fire("hv-luk-alt");
+    const go = first ? window.setTimeout(() => step.action!(), 350) : 0;
+    const next = window.setTimeout(() => advance(reel), reelMs(step.key));
+    return () => {
+      window.clearTimeout(go);
+      window.clearTimeout(next);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- a new step, or play again after a pause
+  }, [reel, paused]);
   if (!all.length) return null;
+  if (step)
+    return (
+      <div className="ft-reel" role="status">
+        <div className="ft-reel-bar">
+          <i key={`${reel}-${paused}`} style={{ animationDuration: `${reelMs(step.key)}ms`, animationPlayState: paused ? "paused" : "running" }} />
+        </div>
+        <p className="ft-kick">
+          {demo ? "Det kan touren" : tr("Det kan jeres tour")} · {reel! + 1} / {steps.length}
+        </p>
+        <b>{step.title}</b>
+        <span>{step.text}</span>
+        <div className="ft-reel-knapper">
+          <button type="button" onClick={() => setPaused((p) => !p)}>
+            {paused ? "▶ Fortsæt" : "❚❚ Pause"}
+          </button>
+          <button type="button" onClick={() => (setPaused(false), advance(reel!))}>
+            {tr("Næste")} →
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              onEvent("features_reel_stop", { label: `${reel! + 1}/${steps.length}` });
+              setReel(null);
+              setPaused(false);
+              shown.current = null;
+              fire("hv-luk-alt");
+            }}
+          >
+            {tr("Luk")}
+          </button>
+        </div>
+      </div>
+    );
   const f = all[Math.min(at, all.length - 1)];
   const close = () => {
     if (never)
@@ -401,6 +568,18 @@ export function FeatureTour({ T, onClose, onEvent, demo }: { T: TourConfig; onCl
                 {f.why}
               </span>
             </div>
+          )}
+          {at === 0 && steps.length >= 2 && (
+            <button
+              type="button"
+              className="ft-reel-start"
+              onClick={() => {
+                onEvent("features_reel", { label: `${steps.length}` });
+                setReel(0);
+              }}
+            >
+              ▶ {demo ? "Se det hele i aktion" : tr("Se det hele i aktion")} <small>· {Math.round(steps.reduce((a, x) => a + reelMs(x.key), 0) / 1000)} sek.</small>
+            </button>
           )}
           {demo && at === all.length - 1 && <DemoContactCard demo={demo} onContact={(how) => onEvent("demo_contact", { label: how })} />}
           {!demo && at === all.length - 1 && <p className="ft-sidst">{tr("Er der noget, I vil have ændret? Tryk \"Giv feedback\" i touren, og skriv det dér, hvor I står.")}</p>}
@@ -450,6 +629,9 @@ export function FeatureTour({ T, onClose, onEvent, demo }: { T: TourConfig; onCl
     </div>
   );
 }
+
+/** How long the showreel stays on a feature: a guided tour or a route gets time to move. */
+const reelMs = (key: string) => (key.startsWith("guide-") ? 14000 : key === "findvej" ? 11000 : 7500);
 
 /** The end of the showcase: who sent it, and the way to them. Always Nextview360's colours - it's us talking, not the tour. */
 function DemoContactCard({ demo, onContact }: { demo: DemoContact; onContact: (how: string) => void }) {
@@ -559,6 +741,21 @@ export const FEATURES_CSS = `
 .ft-demo-kontakt div{display:flex;flex-wrap:wrap;gap:8px;margin-top:11px}
 .ft-demo-kontakt a{flex:1;min-width:120px;text-align:center;white-space:nowrap;border-radius:999px;padding:10px 12px;background:#fff;color:#0d1b20;font-weight:800;font-size:14px;text-decoration:none}
 .ft-demo-kontakt a+a{background:rgba(255,255,255,.14);color:#fff}
+/* "Se det hele i aktion": the tour plays its features, a caption at the bottom says what's shown. */
+.ft-reel-start{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;margin-top:14px;border:0;border-radius:14px;padding:13px 14px;background:linear-gradient(135deg,var(--c-main),color-mix(in srgb,var(--c-main) 55%,var(--c-accent)));color:#fff;font:inherit;font-weight:800;font-size:15px;cursor:pointer;box-shadow:0 8px 22px color-mix(in srgb,var(--c-main) 35%,transparent)}
+.ft-reel-start small{font-weight:600;opacity:.75}
+.ft-reel{position:absolute;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));translate:-50% 0;z-index:62;width:min(520px,calc(100% - 24px));padding:12px 14px 10px;border-radius:18px;background:rgba(13,27,32,.9);color:#fff;box-shadow:0 14px 40px rgba(0,0,0,.35);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);animation:hvUp .35s ease}
+.ft-reel .ft-kick{margin:6px 0 2px;color:color-mix(in srgb,var(--c-accent) 70%,#fff)}
+.ft-reel b{display:block;font-size:17px;line-height:1.2}
+.ft-reel span{display:block;margin-top:3px;font-size:13.5px;line-height:1.4;color:rgba(255,255,255,.82)}
+.ft-reel-bar{height:3px;border-radius:3px;background:rgba(255,255,255,.18);overflow:hidden}
+.ft-reel-bar i{display:block;height:100%;background:var(--c-accent);transform-origin:left;animation:ftBar linear forwards}
+.ft-reel-knapper{display:flex;gap:6px;margin-top:9px}
+.ft-reel-knapper button{flex:1;border:0;border-radius:999px;padding:8px 10px;background:rgba(255,255,255,.14);color:#fff;font:inherit;font-weight:700;font-size:13px;cursor:pointer}
+.ft-reel-knapper button:nth-child(2){background:var(--c-accent)}
+.ft-overalt{display:flex;align-items:flex-end;justify-content:center;gap:14px;padding:18px}
+.ft-mobil{width:44px;height:84px;border-radius:10px;border:4px solid #fff;background:linear-gradient(160deg,#9cc3e6,#6f9a5c);animation:ftStory 3s ease-in-out infinite}
+.ft-skaerm{width:150px;height:96px;border-radius:8px;border:5px solid #fff;background:linear-gradient(160deg,#9cc3e6,#6f9a5c);animation:ftStory 3s ease-in-out .4s infinite}
 /* The showcase's own button to see the features again. */
 .ft-igen{position:absolute;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));translate:-50% 0;z-index:45;white-space:nowrap;display:flex;align-items:center;gap:7px;border:0;border-radius:999px;padding:10px 16px;background:rgba(13,27,32,.88);color:#fff;font:inherit;font-weight:800;font-size:14px;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,.3);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);animation:hvUp .4s ease}
 .ft-igen i{width:8px;height:8px;border-radius:50%;background:var(--c-accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--c-accent) 35%,transparent)}
