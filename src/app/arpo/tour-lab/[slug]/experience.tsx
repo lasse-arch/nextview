@@ -3339,7 +3339,7 @@ function TourExperience({
       )}
       {commuteOpen && T.commute && <CommuteSheet T={T} onClose={() => setCommuteOpen(false)} onEvent={(name, params) => track(name, params ?? {})} />}
       {contactOpen && T.contactForm && (
-        <ContactForm T={T} preview={inPreview || Boolean(demo)} room={room} onClose={() => setContactOpen(false)} onSent={() => track("contact_form", { place: "form" })} />
+        <ContactForm T={T} preview={inPreview} showcase={Boolean(demo)} room={room} onClose={() => setContactOpen(false)} onSent={() => track("contact_form", { place: "form" })} />
       )}
       {T.onboarding && !helpDone && phase === "tour" && !cover && !welcome && !intro && sdk && guideAt == null && !menuOpen && !contactOpen && (
         <Onboarding
@@ -3350,6 +3350,18 @@ function TourExperience({
             doneHelp();
           }}
         />
+      )}
+      {/* The 3D tour isn't there yet (a slow line, a tap on Start before it's loaded): a picture of the place, not a black screen. */}
+      {sdkKey && modelId && !sdk && phase === "tour" && !welcome && !cover && !intro && (
+        <div className="hv-vent" aria-hidden style={{ "--vent": `url("${(T.cover?.image || T.intro?.poster || `https://my.matterport.com/api/v1/player/models/${modelId}/thumb?width=1600`).replace(/["\\\n]/g, encodeURIComponent)}")` } as React.CSSProperties}>
+          <TourLogo T={T} className={`hv-vent-logo ${T.logoOnLight ? "hv-vent-lys" : ""}`} alt="" />
+          {!holding && (
+            <span className="hv-vent-tekst">
+              <span className="hv-holder-spin" />
+              {tx("Gør touren klar …")}
+            </span>
+          )}
+        </div>
       )}
       {holding && (
         <div className="hv-holder" role="status">
@@ -3772,6 +3784,14 @@ function DevPanel({
 
 const CSS = `
 .hv-holder{position:absolute;left:50%;top:50%;translate:-50% -50%;z-index:35;display:flex;align-items:center;gap:10px;padding:12px 18px;border-radius:999px;background:rgba(10,18,20,.78);color:#fff;font-size:14.5px;font-weight:700;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:0 10px 30px rgba(0,0,0,.35);pointer-events:none;animation:hvFade .25s ease}
+.hv-vent{position:absolute;inset:0;z-index:34;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:#0d1b20;overflow:hidden;animation:hvFade .3s ease}
+.hv-vent::before{content:"";position:absolute;inset:-30px;background:var(--vent) center/cover;filter:blur(14px) brightness(.7);transform:scale(1.05);animation:hvVent 6s ease-in-out infinite alternate}
+@keyframes hvVent{from{transform:scale(1.05)}to{transform:scale(1.12)}}
+.hv-vent>*{position:relative}
+.hv-vent-logo{max-width:180px;max-height:70px;object-fit:contain;filter:drop-shadow(0 6px 18px rgba(0,0,0,.35));color:#fff}
+.hv-vent-lys{padding:10px 16px;border-radius:16px;background:rgba(255,255,255,.94);color:#1d2a30}
+.hv-vent-tekst{display:flex;align-items:center;gap:10px;padding:10px 16px;border-radius:999px;background:rgba(10,18,20,.6);color:#fff;font-size:14.5px;font-weight:700;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+@media (prefers-reduced-motion:reduce){.hv-vent::before{animation:none}}
 .hv-holder-spin{width:18px;height:18px;border-radius:50%;border:2.5px solid rgba(255,255,255,.3);border-top-color:#fff;animation:hvSpin .8s linear infinite}
 @keyframes hvSpin{to{rotate:360deg}}
 /* A tour is touched, not read: no text selection or iOS copy menu from a long press (it can't be dismissed over the tour). Fields stay selectable. */

@@ -24,10 +24,13 @@ const EMAIL = /^[^\s@<>",;?&]+@[^\s@<>",;?&]+\.[^\s@<>",;?&]+$/;
 export function ContactForm({
   T,
   preview,
+  showcase,
   onClose,
   onSent,
   room,
 }: {
+  /** "Fremvisning" (a new customer looking at a showcase): the form is shown as an example only - nothing can be filled in or sent. */
+  showcase?: boolean;
   T: TourConfig;
   /** Where the visitor stands - so the customer knows what they were looking at. */
   room?: string | null;
@@ -53,6 +56,7 @@ export function ContactForm({
 
   function next(e: React.FormEvent) {
     e.preventDefault();
+    if (showcase) return;
     setError(null);
     if (!v.name.trim() || !v.email.trim() || !v.message.trim()) return setError(tr("Udfyld navn, e-mail og besked."));
     if (!preview && !EMAIL.test(F.to)) return setError(tr("Formularen virker ikke lige nu."));
@@ -167,6 +171,8 @@ export function ContactForm({
           <>
             <h3>{F.title || tr("Skriv til os")}</h3>
             {F.lead && <p className="cf-lead">{F.lead}</p>}
+            {showcase && <p className="cf-eksempel">Eksempel: her skriver gæsterne direkte til jer fra touren, og beskeden lander i jeres indbakke. I fremvisningen kan den ikke udfyldes.</p>}
+            <fieldset disabled={showcase} className="cf-felter">
             <label>
               <span>{tr("Navn")}</span>
               <input value={v.name} onChange={set("name")} autoComplete="name" maxLength={100} required />
@@ -188,9 +194,10 @@ export function ContactForm({
             {/* Only robots fill this in (it can't be seen or reached). */}
             <input className="cf-faelde" tabIndex={-1} autoComplete="off" aria-hidden value={trap} onChange={(e) => setTrap(e.target.value)} name="website" />
             {error && <p className="cf-fejl">{error}</p>}
-            <button type="submit" className="hv-btn hv-primary cf-send" disabled={state === "sending"}>
+            <button type="submit" className="hv-btn hv-primary cf-send" disabled={state === "sending" || showcase}>
               {state === "sending" ? tr("Sender …") : tr("Send")}
             </button>
+            </fieldset>
           </>
         )}
       </form>
@@ -213,6 +220,10 @@ export const CONTACT_CSS = `
 .cf input:focus,.cf textarea:focus{border-bottom-color:var(--c-accent);background:#fff}
 .cf-fejl{margin:10px 0 0;font-size:13px;color:#c4271d}
 .cf-send{width:100%;justify-content:center;margin-top:16px}
+.cf-felter{display:contents;border:0;margin:0;padding:0}
+.cf-felter:disabled input,.cf-felter:disabled textarea{opacity:.55;cursor:not-allowed}
+.cf-felter:disabled .cf-send{opacity:.45;cursor:not-allowed}
+.cf-eksempel{margin:10px 0 4px;padding:9px 12px;border-radius:12px;background:color-mix(in srgb,var(--c-accent) 12%,#fff);color:#2b383e;font-size:13px;line-height:1.4}
 .cf-luk{position:absolute;top:12px;right:12px;width:32px;height:32px;border:0;border-radius:50%;background:#eef1f2;font-size:20px;line-height:1;cursor:pointer;color:#1d2a30}
 .cf-ways{display:flex;flex-direction:column;gap:8px;margin-top:6px}
 .cf-way{display:flex;align-items:center;justify-content:space-between;width:100%;box-sizing:border-box;padding:13px 16px;border:1px solid #e3e7e8;border-radius:12px;background:#fff;color:var(--c-main);font:inherit;font-size:15px;font-weight:700;text-decoration:none;cursor:pointer;transition:border-color .15s,background .15s}

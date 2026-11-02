@@ -188,6 +188,8 @@ export const UI_STRINGS = [
   "Det har vi bygget til {navn}",
   "Touren er mere end billeder. Hver funktion er med for at hjælpe jeres gæster et skridt videre: at forstå stedet, få lyst og tage kontakt. Her er, hvad den kan - og hvorfor vi har taget det med.",
   "Derfor er det med",
+  "Udforsk selv",
+  "Se det hele i aktion",
   "Starter med film",
   "Touren åbner med en film af stedet - fx dronefilmen - så første indtryk er levende, mens touren gør sig klar.",
   "En dag på din linje",

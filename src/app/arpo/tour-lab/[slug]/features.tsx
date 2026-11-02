@@ -472,9 +472,10 @@ export function FeatureTour({ T, onClose, onEvent, demo }: { T: TourConfig; onCl
   const [never, setNever] = useState(false);
   /** "Se det hele i aktion": the step of the showreel playing (the tour shows each feature itself), or null. */
   const [reel, setReel] = useState<number | null>(null);
-  const [paused, setPaused] = useState(false);
   const shown = useRef<number | null>(null);
-  const steps = all.filter((x) => x.action);
+  // Everything the cards say (not just what can be shown in the tour), in the same order - the intro left out, and in a
+  // showcase the last card too: that one (with who to call) comes as the walk-through's own card at the end.
+  const steps = all.slice(1, demo ? -1 : undefined);
   const step = reel != null ? steps[reel] : null;
   /** On to the next feature - or, after the last, back to the walk-through's last card (in a showcase: who to call). */
   const advance = (r: number) => {
@@ -485,38 +486,37 @@ export function FeatureTour({ T, onClose, onEvent, demo }: { T: TourConfig; onCl
     setReel(null);
     setAt(all.length - 1);
   };
-  // Each step: everything else closed, the feature opened in the tour, then on by itself (longer for a guided tour or a route).
+  // Each step: everything else closed, the feature opened in the tour - and it stays there until the visitor presses Næste
+  // (a guided tour goes from room to room by itself meanwhile; the showreel never moves on by itself).
   useEffect(() => {
-    if (!step || paused || reel == null) return;
-    // Opened once per step - not again when it plays on after a pause.
-    const first = shown.current !== reel;
+    if (!step || reel == null || shown.current === reel) return;
     shown.current = reel;
-    if (first) fire("hv-luk-alt");
-    const go = first ? window.setTimeout(() => step.action!(), 350) : 0;
-    const next = window.setTimeout(() => advance(reel), reelMs(step.key));
-    return () => {
-      window.clearTimeout(go);
-      window.clearTimeout(next);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- a new step, or play again after a pause
-  }, [reel, paused]);
+    fire("hv-luk-alt");
+    if (!step.action) return;
+    const go = window.setTimeout(() => step.action!(), 350);
+    return () => window.clearTimeout(go);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- a new step
+  }, [reel]);
   if (!all.length) return null;
   if (step)
     return (
       <div className="ft-reel" role="status">
-        <div className="ft-reel-bar">
-          <i key={`${reel}-${paused}`} style={{ animationDuration: `${reelMs(step.key)}ms`, animationPlayState: paused ? "paused" : "running" }} />
-        </div>
         <p className="ft-kick">
           {demo ? "Det kan touren" : tr("Det kan jeres tour")} · {reel! + 1} / {steps.length}
         </p>
+        {!step.action && <div className="ft-reel-scene">{step.scene}</div>}
         <b>{step.title}</b>
         <span>{step.text}</span>
+        {step.why && (
+          <span className="ft-reel-hvorfor">
+            <b>{tr("Derfor er det med")}</b> {step.why}
+          </span>
+        )}
         <div className="ft-reel-knapper">
-          <button type="button" onClick={() => setPaused((p) => !p)}>
-            {paused ? "▶ Fortsæt" : "❚❚ Pause"}
+          <button type="button" disabled={reel === 0} onClick={() => setReel(Math.max(0, reel! - 1))}>
+            ← {tr("Tilbage")}
           </button>
-          <button type="button" onClick={() => (setPaused(false), advance(reel!))}>
+          <button type="button" onClick={() => advance(reel!)}>
             {tr("Næste")} →
           </button>
           <button
@@ -524,12 +524,11 @@ export function FeatureTour({ T, onClose, onEvent, demo }: { T: TourConfig; onCl
             onClick={() => {
               onEvent("features_reel_stop", { label: `${reel! + 1}/${steps.length}` });
               setReel(null);
-              setPaused(false);
               shown.current = null;
               fire("hv-luk-alt");
             }}
           >
-            {tr("Luk")}
+            {tr("Udforsk selv")}
           </button>
         </div>
       </div>
@@ -569,7 +568,7 @@ export function FeatureTour({ T, onClose, onEvent, demo }: { T: TourConfig; onCl
               </span>
             </div>
           )}
-          {at === 0 && steps.length >= 2 && (
+          {at === 0 && steps.some((x) => x.action) && (
             <button
               type="button"
               className="ft-reel-start"
@@ -578,7 +577,12 @@ export function FeatureTour({ T, onClose, onEvent, demo }: { T: TourConfig; onCl
                 setReel(0);
               }}
             >
-              ▶ {demo ? "Se det hele i aktion" : tr("Se det hele i aktion")} <small>· {Math.round(steps.reduce((a, x) => a + reelMs(x.key), 0) / 1000)} sek.</small>
+              ▶ {demo ? "Se det hele i aktion" : tr("Se det hele i aktion")}
+            </button>
+          )}
+          {at === 0 && (
+            <button type="button" className="ft-selv" onClick={close}>
+              {tr("Udforsk selv")}
             </button>
           )}
           {demo && at === all.length - 1 && <DemoContactCard demo={demo} onContact={(how) => onEvent("demo_contact", { label: how })} />}
@@ -616,7 +620,7 @@ export function FeatureTour({ T, onClose, onEvent, demo }: { T: TourConfig; onCl
             </button>
           ) : (
             <button type="button" className="ft-naeste" onClick={close}>
-              {tr("Se touren")}
+              {demo ? tr("Udforsk selv") : tr("Se touren")}
             </button>
           )}
         </div>
@@ -629,9 +633,6 @@ export function FeatureTour({ T, onClose, onEvent, demo }: { T: TourConfig; onCl
     </div>
   );
 }
-
-/** How long the showreel stays on a feature: a guided tour or a route gets time to move. */
-const reelMs = (key: string) => (key.startsWith("guide-") ? 14000 : key === "findvej" ? 11000 : 7500);
 
 /** The end of the showcase: who sent it, and the way to them. Always Nextview360's colours - it's us talking, not the tour. */
 function DemoContactCard({ demo, onContact }: { demo: DemoContact; onContact: (how: string) => void }) {
@@ -744,6 +745,7 @@ export const FEATURES_CSS = `
 /* "Se det hele i aktion": the tour plays its features, a caption at the bottom says what's shown. */
 .ft-reel-start{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;margin-top:14px;border:0;border-radius:14px;padding:13px 14px;background:linear-gradient(135deg,var(--c-main),color-mix(in srgb,var(--c-main) 55%,var(--c-accent)));color:#fff;font:inherit;font-weight:800;font-size:15px;cursor:pointer;box-shadow:0 8px 22px color-mix(in srgb,var(--c-main) 35%,transparent)}
 .ft-reel-start small{font-weight:600;opacity:.75}
+.ft-selv{display:block;width:100%;margin-top:8px;border:0;background:none;padding:6px;font:inherit;font-weight:700;font-size:14px;color:var(--c-main);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
 .ft-reel{position:absolute;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));translate:-50% 0;z-index:62;width:min(520px,calc(100% - 24px));padding:12px 14px 10px;border-radius:18px;background:rgba(13,27,32,.9);color:#fff;box-shadow:0 14px 40px rgba(0,0,0,.35);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);animation:hvUp .35s ease}
 .ft-reel .ft-kick{margin:6px 0 2px;color:color-mix(in srgb,var(--c-accent) 70%,#fff)}
 .ft-reel b{display:block;font-size:17px;line-height:1.2}
@@ -751,6 +753,12 @@ export const FEATURES_CSS = `
 .ft-reel-bar{height:3px;border-radius:3px;background:rgba(255,255,255,.18);overflow:hidden}
 .ft-reel-bar i{display:block;height:100%;background:var(--c-accent);transform-origin:left;animation:ftBar linear forwards}
 .ft-reel-knapper{display:flex;gap:6px;margin-top:9px}
+.ft-reel-knapper button:disabled{opacity:.35}
+.ft-reel-scene{margin:8px 0 4px}
+.ft-reel-scene .ft-scene{height:96px;border-radius:12px}
+.ft-reel-hvorfor{margin-top:8px!important;padding:8px 10px;border-radius:12px;background:rgba(255,255,255,.08);font-size:13px!important}
+.ft-reel-hvorfor b{display:inline!important;font-size:11px!important;letter-spacing:.08em;text-transform:uppercase;color:color-mix(in srgb,var(--c-accent) 70%,#fff);margin-right:4px}
+@media (max-width:760px){.ft-reel{max-height:calc(100% - 90px);overflow-y:auto}}
 .ft-reel-knapper button{flex:1;border:0;border-radius:999px;padding:8px 10px;background:rgba(255,255,255,.14);color:#fff;font:inherit;font-weight:700;font-size:13px;cursor:pointer}
 .ft-reel-knapper button:nth-child(2){background:var(--c-accent)}
 .ft-overalt{display:flex;align-items:flex-end;justify-content:center;gap:14px;padding:18px}
