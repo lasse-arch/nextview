@@ -32,6 +32,17 @@ export function tourConfigProblem(config: unknown): string | null {
   if (c.navigation !== "free" && c.navigation !== "points") return '"navigation" skal være "free" eller "points".';
   if (c.welcome && (!obj(c.welcome) || !arr(c.welcome.tiles) || !c.welcome.tiles.every((t) => obj(t) && str(t.title) && obj(t.go)))) return "Velkomstens fliser har en forkert form.";
   if (c.cover && (!obj(c.cover) || !["kicker", "title", "lead", "image", "enter", "placesTitle"].every((k) => str((c.cover as Record<string, unknown>)[k])))) return "Forsiden mangler tekster eller billede.";
+  const sp = c.sitePlan;
+  if (sp !== undefined) {
+    const pct = (v: unknown) => typeof v === "number" && Number.isFinite(v) && v >= -50 && v <= 150;
+    if (!obj(sp) || !str(sp.image) || !str(sp.label)) return "Pladskortet mangler billede eller knaptekst.";
+    if (sp.overlay !== undefined && (!obj(sp.overlay) || !arr(sp.overlay.corners) || sp.overlay.corners.length !== 4 || !sp.overlay.corners.every((p) => arr(p) && p.length === 2 && pct(p[0]) && pct(p[1])) || (sp.overlay.opacity !== undefined && !(typeof sp.overlay.opacity === "number" && sp.overlay.opacity >= 0.2 && sp.overlay.opacity <= 1))))
+      return "Pladskortet over luftfotoet skal have fire hjørner (x, y i %) og en gennemsigtighed mellem 0,2 og 1.";
+    if (sp.units !== undefined && (!arr(sp.units) || sp.units.length > 1000 || !sp.units.every((u) => obj(u) && str(u.id) && str(u.name) && pct(u.x) && pct(u.y))))
+      return "Pladserne på pladskortet skal have id, navn og placering (x, y i %).";
+    if (sp.nextStay !== undefined && (!obj(sp.nextStay) || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(sp.nextStay.tenantId)) || (sp.nextStay.book !== undefined && !/^https:\/\//i.test(String(sp.nextStay.book)))))
+      return "Next-Stay skal have bookingens id (fra online.next-stay-booking.dk/search/…) og et https-link til Book.";
+  }
   if (c.cover?.video !== undefined && (!obj(c.cover.video) || !str(c.cover.video.src) || (c.cover.video.srcMobile !== undefined && !str(c.cover.video.srcMobile)))) return "Filmen bag forsiden har en forkert form.";
   if (c.places && (!arr(c.places) || !c.places.every((p) => obj(p) && str(p.name) && str(p.href) && str(p.image)))) return "Et sted mangler navn, link eller foto.";
   if (c.dock && (!arr(c.dock) || !c.dock.every((d) => obj(d) && str(d.label) && (str(d.go) || obj(d.go))))) return "Bunden (dock) har en forkert form.";

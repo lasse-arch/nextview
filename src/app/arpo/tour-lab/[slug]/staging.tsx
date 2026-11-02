@@ -34,6 +34,22 @@ export function baseSize(c: StagingItem["corners"]): { w: number; h: number } {
  * solved from the eight equations of the corners.
  */
 export function quadMatrix(w: number, h: number, p: { x: number; y: number }[]): string | null {
+  const c = quadSolve(w, h, p);
+  if (!c) return null;
+  const [a0, a1, a2, b0, b1, b2, c0, c1] = c;
+  // Column-major for CSS: x' = (a0 x + a1 y + a2) / (c0 x + c1 y + 1), y' likewise.
+  return `matrix3d(${a0},${b0},0,${c0},${a1},${b1},0,${c1},0,0,1,0,${a2},${b2},0,1)`;
+}
+
+/** Where the point x, y of the rectangle lands under the transform `quadSolve` found. */
+export function quadPoint(c: number[], x: number, y: number): { x: number; y: number } {
+  const [a0, a1, a2, b0, b1, b2, c0, c1] = c;
+  const d = c0 * x + c1 * y + 1;
+  return { x: (a0 * x + a1 * y + a2) / d, y: (b0 * x + b1 * y + b2) / d };
+}
+
+/** The eight numbers of the projective transform from the rectangle 0,0-w,h onto the four points. */
+export function quadSolve(w: number, h: number, p: { x: number; y: number }[]): number[] | null {
   const src = [
     [0, 0],
     [w, 0],
@@ -65,10 +81,8 @@ export function quadMatrix(w: number, h: number, p: { x: number; y: number }[]):
       b[r] -= f * b[c];
     }
   }
-  const [a0, a1, a2, b0, b1, b2, c0, c1] = b.map((v, i) => v / A[i][i]);
-  if (![a0, a1, a2, b0, b1, b2, c0, c1].every(Number.isFinite)) return null;
-  // Column-major for CSS: x' = (a0 x + a1 y + a2) / (c0 x + c1 y + 1), y' likewise.
-  return `matrix3d(${a0},${b0},0,${c0},${a1},${b1},0,${c1},0,0,1,0,${a2},${b2},0,1)`;
+  const out = b.map((v, i) => v / A[i][i]);
+  return out.every(Number.isFinite) ? out : null;
 }
 
 const VIDEO_TYPES = /\.(mp4|webm|mov|m4v)(\?|$)/i;

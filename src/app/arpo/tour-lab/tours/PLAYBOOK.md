@@ -118,6 +118,15 @@ Fx specialefterskoler (ADHD, autisme, nedsat kognitivt funktionsniveau):
 - **"Din plads venter"**: et kort efter ca. 90 sekunder med kundens vigtigste
   handling. Ét kort, aldrig mens menuen er åben.
 
+## Campingpladser: pladskort over luftfotoet
+
+- Har pladsen et pladskort og et fladt dronefoto (taget lige oppefra), så læg
+  pladskortet gennemsigtigt over luftfotoet (Luftfoto og kort → Pladskort over
+  luftfotoet), og ret de fire hjørner ind efter bygninger og veje.
+- Bruger de Next-Stay, så hent pladserne derfra: gæsten vælger datoer, og de
+  ledige pladser lyser grønt med "Book". Grønt kun, når pladskortet er slået
+  til - ellers er det rent luftfoto.
+
 ## Virtual staging og årshjul
 
 - **Virtual staging**: læg indhold på en rigtig flade i rummet - en velkomst

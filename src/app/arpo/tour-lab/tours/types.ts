@@ -78,6 +78,9 @@ export type TourInfo = {
 };
 
 /** A point in the tour's 3D room (Matterport's world coordinates, metres). */
+/** A pitch or cabin on the site plan. */
+export type SiteUnit = { id: string; name: string; x: number; y: number; kind?: "plads" | "hytte" };
+
 export type Point3 = { x: number; y: number; z: number };
 
 /**
@@ -345,7 +348,23 @@ export type TourConfig = {
    * from the menu ("#plan") and from points with a planBox, zoomed in on them.
    * `label`: the points' button, e.g. "Se på pladskortet".
    */
-  sitePlan?: { image: string; label: string };
+  sitePlan?: {
+    image: string;
+    label: string;
+    /**
+     * "Pladskort" over the flat start picture (`map`): the site plan laid
+     * see-through on top of the drone photo, switched on and off by the
+     * visitor. `corners` = where the plan's four corners land on the picture
+     * (x, y in % of it; top left, top right, bottom right, bottom left), so it
+     * can follow a photo that isn't quite straight down. `opacity` 0.2-1
+     * (default 0.55). Not on a 360° drone scene.
+     */
+    overlay?: { corners: [[number, number], [number, number], [number, number], [number, number]]; opacity?: number };
+    /** The pitches and cabins on the plan (x, y in % of the plan picture) - lit green when free for the dates the visitor picks. `id` = the booking system's id. */
+    units?: SiteUnit[];
+    /** Live availability from Next-Stay (the campsite's booking): `tenantId` from its booking address (online.next-stay-booking.dk/search/<tenantId>); `book` = where "Book" goes (default that booking page). */
+    nextStay?: { tenantId: string; book?: string };
+  };
   /** `walks: false`: its points' cards don't show walking times (e.g. Faciliteter - the pitches show the way to them instead). */
   categories: Record<string, { name: string; color: string; walks?: false }>;
   points: TourPoint[];

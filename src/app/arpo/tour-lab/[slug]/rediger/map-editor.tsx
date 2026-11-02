@@ -1,5 +1,6 @@
 "use client";
 
+import { SitePlanEditor } from "./site-plan-editor";
 import { LinkInput } from "./links-open";
 import { useContext, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { placeMapSpots } from "@/lib/actions/tour-ai";
@@ -64,7 +65,7 @@ function menuRooms(T: TourConfig): [string, string][] {
   return all.filter(([n], i) => all.findIndex(([x]) => x === n) === i);
 }
 
-export function MapEditor({ config, edit, focus, preview }: { config: TourConfig; edit: Edit; preview?: PreviewApi; /** A point to open straight away (from another tab, e.g. a guide stop) - with a counter, so the same point can be asked again. */ focus?: { id: string; n: number } | null }) {
+export function MapEditor({ config, edit, focus, preview, slug }: { config: TourConfig; edit: Edit; preview?: PreviewApi; slug?: string; /** A point to open straight away (from another tab, e.g. a guide stop) - with a counter, so the same point can be asked again. */ focus?: { id: string; n: number } | null }) {
   const M = config.map;
   const [open, setOpen] = useState(false);
   // Asked for a point from another tab: open the map on it (once per ask).
@@ -147,6 +148,7 @@ export function MapEditor({ config, edit, focus, preview }: { config: TourConfig
           />
         )}
       </Group>
+      {!M.panorama && slug && <SitePlanEditor config={config} edit={edit} slug={slug} />}
       <OverviewUiToggles config={config} edit={edit} preview={preview} />
       {M.panorama && <DroneLookEditor config={config} edit={edit} panorama />}
       <MapPageImport config={config} edit={edit} />

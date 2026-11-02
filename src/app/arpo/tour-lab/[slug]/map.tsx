@@ -3,6 +3,7 @@
 import { useT } from "../tours/i18n-react";
 import { useEffect, useImperativeHandle, useRef, useState } from "react";
 import type { TourConfig, TourPoint } from "../tours/types";
+import { SitePlanControls, SitePlanLayer, sitePlanReady, type SitePlanState } from "./site-plan";
 
 /*
  * A flat start picture instead of the 360° drone scene: an illustrated map,
@@ -29,7 +30,12 @@ export function MapScene({
   selectedId,
   onPoint,
   onZoomed,
+  lang,
+  onSiteBook,
 }: {
+  lang?: string;
+  /** "Book" on a free pitch of the pladskort (for the statistics). */
+  onSiteBook?: (label: string, href: string) => void;
   T: TourConfig;
   api: React.RefObject<MapApi | null>;
   icons: Record<string, string>;
@@ -45,6 +51,9 @@ export function MapScene({
   const [anim, setAnim] = useState(0);
   const [query, setQuery] = useState("");
   const dragged = useRef(false);
+  /** "Pladskort": the site plan over the picture, and the pitches free for the visitor's dates. */
+  const [plan, setPlan] = useState<SitePlanState>({ on: false, free: null, picked: null, stay: null });
+  const withPlan = sitePlanReady(T);
   const viewRef = useRef<View | null>(null);
   useEffect(() => {
     viewRef.current = view;
@@ -167,7 +176,7 @@ export function MapScene({
     : [];
 
   return (
-    <div ref={box} className="km" {...handlers} onPointerCancel={handlers.onPointerUp} style={{ touchAction: "none" }}>
+    <div ref={box} className={`km ${plan.on ? "pk-til" : ""}`} {...handlers} onPointerCancel={handlers.onPointerUp} style={{ touchAction: "none" }}>
       {view && (
         <div
           className="km-bild"
@@ -192,7 +201,8 @@ export function MapScene({
               console.info("Kortposition kopieret:", spot);
             }}
           />
-          {M.clouds !== false && <div className="km-skyer" />}
+          {M.clouds !== false && !plan.on && <div className="km-skyer" />}
+          {withPlan && <SitePlanLayer T={T} scale={view.s} state={plan} onPick={(u) => setPlan((st) => ({ ...st, picked: u }))} />}
           {T.points.map((p, i) => {
             const pos = M.spots[p.id];
             if (!pos) return null;
@@ -239,6 +249,7 @@ export function MapScene({
           </ul>
         )}
       </div>
+      {withPlan && <SitePlanControls T={T} state={plan} setState={setPlan} lang={lang} onBook={onSiteBook} />}
       <div className="km-zoom" onPointerDown={(e) => e.stopPropagation()}>
         <button type="button" aria-label={tr("Zoom ind")} onClick={() => view && zoomAt(box.current!.clientWidth / 2, box.current!.clientHeight / 2, view.s * 1.5)}>
           +
