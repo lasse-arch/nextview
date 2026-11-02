@@ -159,7 +159,18 @@ export function SitePlanControls({
             <b>{tr("Ledig")}</b> · {state.picked.name} · {shortDay(state.stay.from, lang)}–{shortDay(state.stay.to, lang)}
           </span>
           {book && (
-            <a href={book} target="_blank" rel="noopener" onClick={() => onBook?.(`${tr("Book")} ${state.picked!.name}`, book)}>
+            <a
+              href={book}
+              target="_blank"
+              rel="noopener"
+              onClick={(e) => {
+                // The tour opens the booking itself (inside the tour); without it, a new tab.
+                if (onBook) {
+                  e.preventDefault();
+                  onBook(`${tr("Book")} ${state.picked!.name}`, book);
+                }
+              }}
+            >
               {tr("Book")}
             </a>
           )}

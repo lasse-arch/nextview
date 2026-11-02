@@ -34,7 +34,7 @@ export function MapScene({
   onSiteBook,
 }: {
   lang?: string;
-  /** "Book" on a free pitch of the pladskort (for the statistics). */
+  /** "Book" on a free pitch of the pladskort: counted, and the booking opened inside the tour. */
   onSiteBook?: (label: string, href: string) => void;
   T: TourConfig;
   api: React.RefObject<MapApi | null>;

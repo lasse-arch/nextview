@@ -2464,7 +2464,8 @@ function TourExperience({
             onPoint={openPoint}
             onZoomed={setZoomed}
             lang={lang}
-            onSiteBook={(label, href) => ctaClick(label, href, "pladskort")}
+            // Next-Stay's booking may be shown inside other pages: it opens in the tour's own window, so the guest stays in the tour.
+            onSiteBook={(label, href) => (ctaClick(label, href, "pladskort"), popup(href, label))}
           />
         ) : (
           <div ref={droneEl} className="absolute inset-0" />
