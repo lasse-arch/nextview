@@ -95,6 +95,7 @@ export function fileSlots(c: TourConfig): Slot[] {
     { get: () => c.cover?.imageMobile, set: (v) => (c.cover!.imageMobile = v) },
     { get: () => c.intro?.poster, set: (v) => (c.intro!.poster = v) },
     { get: () => c.map?.image, set: (v) => (c.map!.image = v) },
+    { get: () => c.sitePlan?.image, set: (v) => (c.sitePlan!.image = v) },
   ];
   c.places?.forEach((p) => slots.push({ get: () => p.image, set: (v) => (p.image = v) }));
   c.intro?.sources.forEach((s) => slots.push({ get: () => s.src, set: (v) => (s.src = v) }));

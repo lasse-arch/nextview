@@ -258,7 +258,9 @@ function NextStay({ config, edit, slug }: { config: TourConfig; edit: Edit; slug
       const r = await fetchNextStayUnits(slug, tenantId);
       if (!r.ok) throw new Error(r.error);
       // Next-Stay places the units in pixels on its own site plan - as % of this plan (the same picture, or close to it; the dots can be dragged after).
-      const { w, h } = await naturalSize(plan.image);
+      const { w, h } = await naturalSize(plan.image).catch(() => {
+        throw new Error("Pladskort-billedet kan ikke hentes - upload det med Skift pladskortet først, så kan pladserne lægges på det.");
+      });
       const units: SiteUnit[] = r.units.map((u) => ({ id: u.id, name: u.name, x: Math.round((u.x / w) * 1000) / 10, y: Math.round((u.y / h) * 1000) / 10, kind: /plads/i.test(u.category) ? "plads" : "hytte" }));
       edit((d) => {
         d.sitePlan!.nextStay = { ...d.sitePlan!.nextStay, tenantId };
