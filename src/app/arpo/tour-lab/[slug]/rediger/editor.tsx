@@ -586,7 +586,7 @@ export function TourEditor({
       <SafeArea onUndo={() => { setConfig(initial); setDirty(false); }}>
       <div className="flex min-h-0 flex-1">
         {/* Sections */}
-        <SectionNav tab={tab} menu={config.menu} feedbackOpen={feedbackOpen} onPick={pickTab} className={pane === "nav" ? "flex" : "hidden md:flex"} hidden={economy ? NO_TABS : NUMBERS_TABS} />
+        <SectionNav tab={tab} menu={config.menu} feedbackOpen={feedbackOpen} unused={unusedTabs(config)} onPick={pickTab} className={pane === "nav" ? "flex" : "hidden md:flex"} hidden={economy ? NO_TABS : NUMBERS_TABS} />
 
         {/* Settings */}
         <div className={`${pane === "settings" ? "flex" : "hidden md:flex"} min-h-0 w-full flex-none flex-col md:w-[400px]`}>
@@ -1463,7 +1463,18 @@ type ChatMsg = { role: "user" | "assistant"; text: string; images?: string[]; er
 /** nextviewAI's memory under the chat - not drawn again while one types. */
 const MemoryPanel = memo(AiMemoryPanel);
 
-const SectionNav = memo(function SectionNav({ tab, menu, feedbackOpen, onPick, className, hidden }: { tab: Tab; menu: MenuEntry[]; feedbackOpen: number; onPick: (t: Tab) => void; className: string; hidden: Tab[] }) {
+/** The sections for something the tour hasn't got (yet) - "ikke i brug" in the list, so a removed feature doesn't look like it's still there. */
+function unusedTabs(c: TourConfig): string {
+  const off: Tab[] = [];
+  if (!c.lineDays?.lines.length) off.push("linjedag");
+  if (!c.staging?.length) off.push("staging");
+  if (!c.live) off.push("live");
+  if (!c.info?.length) off.push("tags");
+  if (!c.placeCards?.length) off.push("kort");
+  return off.join(",");
+}
+
+const SectionNav = memo(function SectionNav({ tab, menu, feedbackOpen, unused, onPick, className, hidden }: { tab: Tab; menu: MenuEntry[]; feedbackOpen: number; unused: string; onPick: (t: Tab) => void; className: string; hidden: Tab[] }) {
   const [search, setSearch] = useState("");
   const found = useMemo(() => searchTabs(search, menu).filter((f) => !hidden.includes(f.tab)), [search, menu, hidden]);
   return (
@@ -1516,7 +1527,8 @@ const SectionNav = memo(function SectionNav({ tab, menu, feedbackOpen, onPick, c
               <span className={`flex h-7 w-7 items-center justify-center rounded-[7px] ${tab === t ? "bg-[#0071e3] text-white" : "bg-white text-[#6e6e73] ring-1 ring-black/[.06]"}`}>
                 <Icon d={icon} className="h-4 w-4" />
               </span>
-              {text}
+              <span className={unused.split(",").includes(t) && tab !== t ? "text-[#1d1d1f]/45" : ""}>{text}</span>
+              {unused.split(",").includes(t) && <span className="ml-auto text-[10.5px] text-[#8e8e93]">ikke i brug</span>}
               {t === "feedback" && feedbackOpen > 0 && <span className="ml-auto rounded-full bg-[#ff9500] px-1.5 text-[11px] font-semibold text-white">{feedbackOpen}</span>}
             </button>
           </div>

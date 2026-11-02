@@ -181,14 +181,29 @@ export function guideStops(T: TourConfig, guideId: string | null = null): GuideS
  * template) are left out rather than shown as buttons that do nothing.
  */
 export function withoutDeadAerialLinks<T extends TourConfig>(c: T): T {
-  if (c.drone || c.map) return c;
-  const dead = (href: string) => isDroneHref(href) || href.startsWith("#punkt:");
-  const hasDead = c.menu.some((m) => ("items" in m ? m.items.some(([, h]) => dead(h)) : dead(m.href))) || Boolean(c.welcome?.tiles.some((t) => "drone" in t.go));
+  const guides = new Set((c.guides ?? []).map((g) => g.id));
+  // A link to something the tour hasn't got (any more) - shown nowhere, so nobody presses a button that does nothing.
+  const dead = (href: string) => {
+    const h = href.trim();
+    if (!c.drone && !c.map && (isDroneHref(h) || h.startsWith("#punkt:"))) return true;
+    if (h === "#linjedag" || h.startsWith("#linjedag:")) return !c.lineDays?.lines.length;
+    if (h === "#aarshjul") return !c.yearWheel;
+    if (h === "#dag") return !c.day;
+    if (h === "#vej") return !c.commute;
+    if (h === "#find") return !c.finder;
+    if (h === "#live") return !c.live;
+    if (h === "#rundvisning") return !c.guide?.stops.length && !guides.size;
+    if (h.startsWith("#rundvisning:")) return !guides.has(h.slice("#rundvisning:".length));
+    return false;
+  };
+  const deadTile = (t: NonNullable<TourConfig["welcome"]>["tiles"][number]) =>
+    ("drone" in t.go && !c.drone && !c.map) || ("href" in t.go && dead(t.go.href)) || ("day" in t.go && !c.day) || ("guide" in t.go && typeof t.go.guide === "string" && !guides.has(t.go.guide));
+  const hasDead = c.menu.some((m) => ("items" in m ? m.items.some(([, h]) => dead(h)) : dead(m.href))) || Boolean(c.welcome?.tiles.some(deadTile));
   if (!hasDead) return c;
   const menu = c.menu
     .map((m) => ("items" in m ? { ...m, items: m.items.filter(([, h]) => !dead(h)) } : m))
-    .filter((m) => ("items" in m ? true : !dead(m.href)));
-  return { ...c, menu, ...(c.welcome ? { welcome: { ...c.welcome, tiles: c.welcome.tiles.filter((t) => !("drone" in t.go)) } } : {}) };
+    .filter((m) => ("items" in m ? m.items.length > 0 : !dead(m.href)));
+  return { ...c, menu, ...(c.welcome ? { welcome: { ...c.welcome, tiles: c.welcome.tiles.filter((t) => !deadTile(t)) } } : {}) };
 }
 
 export type WelcomeTile = NonNullable<TourConfig["welcome"]>["tiles"][number];

@@ -71,6 +71,15 @@ export function tourConfigProblem(config: unknown): string | null {
   if (c.places && (!arr(c.places) || !c.places.every((p) => obj(p) && str(p.name) && str(p.href) && str(p.image)))) return "Et sted mangler navn, link eller foto.";
   if (c.dock && (!arr(c.dock) || !c.dock.every((d) => obj(d) && str(d.label) && (str(d.go) || obj(d.go))))) return "Bunden (dock) har en forkert form.";
   if (c.guide && (!obj(c.guide) || !arr(c.guide.stops))) return "Rundvisningen skal have en liste af stop.";
+  if (c.guides !== undefined) {
+    if (!arr(c.guides)) return "De ekstra rundvisninger skal være en liste.";
+    const ids = new Set<string>();
+    for (const g of c.guides) {
+      if (!obj(g) || !str(g.id) || !g.id.trim() || !str(g.title) || !arr(g.stops)) return "Hver ekstra rundvisning skal have id, navn og en liste af stop.";
+      if (ids.has(g.id)) return `To rundvisninger har samme id ("${g.id}").`;
+      ids.add(g.id);
+    }
+  }
   if (c.day && (!obj(c.day) || !arr(c.day.steps))) return "Dagen skal have en liste af tidspunkter.";
   if (c.placeCards && (!arr(c.placeCards) || !c.placeCards.every((p) => obj(p) && arr(p.ss) && str(p.title) && str(p.text)))) return "Et stedkort mangler punkt, overskrift eller tekst.";
   if (c.placeCards?.some((p) => p.people != null && (!arr(p.people) || p.people.length > 3 || !p.people.every((x) => obj(x) && str(x.image) && (x.name == null || str(x.name)) && (x.role == null || str(x.role))))))
