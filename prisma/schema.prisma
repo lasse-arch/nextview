@@ -665,6 +665,8 @@ model Deal {
   /// The customer's owners may invite their own people (Brugere on /kunde). Turned off per customer in Arpo.
   customersMayInvite Boolean @default(true)
   systemMails      SystemMail[]
+  /// Showcase tours sent to this customer (the SMS from Arpo) - and what they looked at.
+  demoLinks        TourDemoLink[]
 
   @@index([inLeadInbox, stage])
   @@index([tourAssigneeId])
@@ -1342,6 +1344,9 @@ model Tour {
   share            Json?
   /// The customer's own link to their report: /r/<shareToken>.
   shareToken       String?           @unique
+  /// "Kan sendes som eksempel": the sellers may send this tour to new customers (the SMS from Arpo) - off until chosen,
+  /// as it shows one customer's tour to others.
+  showcase         Boolean           @default(false)
   /// "Kundegennemsyn": the secret link /p/<reviewToken> where the customer
   /// looks around and leaves feedback in the tour. Null = switched off.
   reviewToken      String?           @unique
@@ -1429,12 +1434,16 @@ model TourDemoLink {
   token       String          @unique
   label       String
   createdById String
+  /// The deal it was sent to (the SMS from Arpo) - its visits show on the deal, and its seller hears when it's opened.
+  dealId      String?
+  deal        Deal?           @relation(fields: [dealId], references: [id], onDelete: SetNull)
   createdAt   DateTime        @default(now())
   /// Switched off: the link is dead, what it saw is kept.
   disabledAt  DateTime?
   events      TourDemoEvent[]
 
   @@index([tourSlug])
+  @@index([dealId])
 }
 
 /// What a new customer did on a showcase link (as TourEvent), with where they were (from the request) and where they came from.

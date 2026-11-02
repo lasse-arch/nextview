@@ -10,7 +10,7 @@ export type BellItem = { id: string; kind: string; title: string; text: string; 
 export async function openBell(): Promise<BellItem[]> {
   const user = await requireUser();
   const me = await prisma.user.findUnique({ where: { id: user.id }, select: { notificationsSeenAt: true } });
-  const rows = await prisma.teamNotification.findMany({ where: visibleTo(user.role), orderBy: { updatedAt: "desc" }, take: 30 });
+  const rows = await prisma.teamNotification.findMany({ where: visibleTo(user), orderBy: { updatedAt: "desc" }, take: 30 });
   await prisma.user.update({ where: { id: user.id }, data: { notificationsSeenAt: new Date() } });
   const seen = me?.notificationsSeenAt?.getTime() ?? 0;
   return rows.map((r) => ({ id: r.id, kind: r.kind, title: r.title, text: r.text, href: r.href.startsWith("/arpo") ? r.href : "/arpo", count: r.count, at: r.updatedAt.toISOString(), unread: r.updatedAt.getTime() > seen }));

@@ -8,8 +8,8 @@ import { EMBED_WORDS, TourEmbedList } from "@/components/tour-embed-list";
 import { suggestEmbedPages } from "@/lib/actions/tour-embeds";
 import { startPlaces } from "../../tours/places";
 import type { TourConfig } from "../../tours/types";
-import { Choice, Field, Group, input } from "./ui";
-import { createDemoLink, demoLinks, setDemoLinkOff, type DemoLinkInfo, type DemoVisit } from "@/lib/actions/tour-demo";
+import { Choice, Field, Group, input, Toggle } from "./ui";
+import { createDemoLink, deleteDemoLink, demoLinks, setDemoLinkOff, setTourShowcase, tourShowcase, type DemoLinkInfo, type DemoVisit } from "@/lib/actions/tour-demo";
 import { CloudflarePublish } from "./cloudflare";
 
 /*
@@ -305,8 +305,12 @@ function DemoLinks({ slug }: { slug: string }) {
   const [copied, setCopied] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
   const reload = () => demoLinks(slug).then(setLinks).catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)));
+  const [showcase, setShowcase] = useState<boolean | null>(null);
   useEffect(() => {
     let off = false;
+    tourShowcase(slug)
+      .then((v) => !off && setShowcase(v))
+      .catch(() => {});
     demoLinks(slug)
       .then((l) => !off && setLinks(l))
       .catch(() => {});
@@ -328,6 +332,17 @@ function DemoLinks({ slug }: { slug: string }) {
       <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">
         Send touren til en ny kunde eller et møde - også før den er færdig. Den åbner med en gennemgang af funktionerne og slutter med dit navn, telefon og mail. Lav ét link pr. kunde, så kan du se, hvem der har kigget, hvornår, hvorfra og hvad de så. Det tæller ikke med i kundens tal, kontaktformularen sender ikke noget, og når du selv åbner linket, tæller det ikke.
       </p>
+      {showcase !== null && (
+        <Toggle
+          on={showcase}
+          onChange={(on) => {
+            setShowcase(on);
+            setTourShowcase(slug, on).catch(() => setShowcase(!on));
+          }}
+          title="Kan sendes som eksempel"
+          hint={'Sælgerne kan sende touren på SMS fra ringelisten og dealen ("Send eksempel") - hver kunde får sit eget link her. Kun med kundens accept af at blive brugt som reference.'}
+        />
+      )}
       <div className="flex gap-2">
         <input className={`${input} text-[14px]`} placeholder="Hvem er det til? Fx Hotel Klitten - møde 4/11" value={label} maxLength={120} onChange={(e) => setLabel(e.target.value)} onKeyDown={(e) => e.key === "Enter" && label.trim() && make()} />
         <button type="button" disabled={pending || !label.trim()} onClick={make} className="flex-none rounded-xl bg-[#0071e3] px-3 text-[14px] font-medium text-white disabled:opacity-40">
@@ -370,6 +385,14 @@ function DemoLinks({ slug }: { slug: string }) {
                 )}
                 <button type="button" disabled={pending} className="rounded-lg px-2 py-1 text-[13px] font-medium text-[#8e8e93] hover:bg-black/[.04]" onClick={() => start(async () => (await setDemoLinkOff(slug, l.id, !l.off), await reload()))}>
                   {l.off ? "Slå til" : "Slå fra"}
+                </button>
+                <button
+                  type="button"
+                  disabled={pending}
+                  className="rounded-lg px-2 py-1 text-[13px] font-medium text-[#ff3b30] hover:bg-[#ff3b30]/5"
+                  onClick={() => confirm(`Slet linket til "${l.label}"? Det virker ikke længere, og besøgene på det slettes også.`) && start(async () => (await deleteDemoLink(slug, l.id), await reload()))}
+                >
+                  Slet
                 </button>
               </span>
             </div>

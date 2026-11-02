@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getTeamUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { ringBell } from "@/lib/team-notifications";
 
 /*
  * What a new customer does on a showcase link (/vis/<token>): the engine sends
@@ -49,7 +50,7 @@ export async function POST(request: NextRequest) {
   const token = text(body.token, 64);
   const session = text(body.session, 40);
   if (!token || !session || !Array.isArray(body.events)) return new NextResponse(null, { status: 400 });
-  const link = await prisma.tourDemoLink.findUnique({ where: { token }, select: { id: true, disabledAt: true } });
+  const link = await prisma.tourDemoLink.findUnique({ where: { token }, select: { id: true, disabledAt: true, tourSlug: true, createdById: true, dealId: true, deal: { select: { companyName: true, displayName: true } } } });
   if (!link || link.disabledAt) return new NextResponse(null, { status: 404 });
   // We looked at it ourselves (checking the link before sending it): not a visit.
   if (await getTeamUser().catch(() => null)) return new NextResponse(null, { status: 204 });
@@ -65,6 +66,13 @@ export async function POST(request: NextRequest) {
       value: typeof e?.value === "number" && Number.isInteger(e.value) && e.value >= 0 && e.value <= 3600 ? e.value : null,
     }))
     .filter((e): e is { name: string; label: string | null; value: number | null } => Boolean(e.name && /^[a-z_]+$/.test(e.name)));
-  if (events.length) await prisma.tourDemoEvent.createMany({ data: events.map((e) => ({ ...e, linkId: link.id, session, device, city, country, referrer: ref })) });
+  if (!events.length) return new NextResponse(null, { status: 204 });
+  // A new visit on a link sent to a customer: the seller who sent it hears at once (a good moment to call).
+  const first = link.dealId && link.deal && !(await prisma.tourDemoEvent.count({ where: { linkId: link.id, session } }));
+  await prisma.tourDemoEvent.createMany({ data: events.map((e) => ({ ...e, linkId: link.id, session, device, city, country, referrer: ref })) });
+  if (first) {
+    const name = link.deal!.displayName || link.deal!.companyName;
+    await ringBell({ kind: "demo", title: `${name} kigger på jeres eksempel lige nu`, text: `De åbnede touren${city ? ` i ${city}` : ""} på ${device}. Et godt tidspunkt at ringe.`, href: `/arpo/deals/${link.dealId}`, tourSlug: `demo:${link.id}`, audience: `user:${link.createdById}` });
+  }
   return new NextResponse(null, { status: 204 });
 }

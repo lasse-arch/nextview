@@ -5,6 +5,7 @@ import { OFFICE } from "@/lib/office";
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { DemoSmsButton } from "@/components/demo-sms-button";
 import { createCallList, addLeadsToCallList, deleteCallList, renameCallList, markVoicemail, scheduleCallBack, deleteCallListLead, moveExistingToCallList } from "@/lib/actions/call-lists";
 import { markDealLost, setMeetingDateAndStage, sendCalendarInvite, renameDeal, updateDealPhone, updateDealWebsite, addNote } from "@/lib/actions/deals";
 import { addDealItem } from "@/lib/actions/deal-items";
@@ -735,6 +736,7 @@ function QueueCard({ deal, users, currentUserId, isAdmin }: { deal: QueueDeal; u
             >
               🔁 Ring tilbage
             </button>
+            <DemoSmsButton dealId={deal.id} />
             <button
               type="button"
               onClick={() => setNoteOpen((o) => !o)}

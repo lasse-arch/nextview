@@ -10,7 +10,7 @@ import { prisma } from "@/lib/db";
 
 const MERGE_MS = 3 * 60 * 60 * 1000;
 
-export async function ringBell(n: { kind: "feedback" | "approved"; title: string; text: string; href: string; tourSlug?: string; audience?: "admin" | "all" }) {
+export async function ringBell(n: { kind: "feedback" | "approved" | "demo"; title: string; text: string; href: string; tourSlug?: string; audience?: "admin" | "all" | `user:${string}` }) {
   try {
     const text = n.text.replace(/\s+/g, " ").trim().slice(0, 240);
     const same = n.tourSlug
@@ -23,10 +23,10 @@ export async function ringBell(n: { kind: "feedback" | "approved"; title: string
   }
 }
 
-/** Notifications this user may see (admins: all; others: those for everyone). */
-export const visibleTo = (role: string) => (role === "ADMIN" ? {} : { audience: "all" });
+/** Notifications this user may see: admins those for admins and everyone, others those for everyone - and each their own ("user:<id>"). */
+export const visibleTo = (user: { id: string; role: string }) => ({ audience: { in: [...(user.role === "ADMIN" ? ["admin"] : []), "all", `user:${user.id}`] } });
 
 /** How many changed since the user last opened the bell. */
-export async function unreadNotifications(user: { role: string; notificationsSeenAt: Date | null }): Promise<number> {
-  return prisma.teamNotification.count({ where: { ...visibleTo(user.role), ...(user.notificationsSeenAt ? { updatedAt: { gt: user.notificationsSeenAt } } : {}) } });
+export async function unreadNotifications(user: { id: string; role: string; notificationsSeenAt: Date | null }): Promise<number> {
+  return prisma.teamNotification.count({ where: { ...visibleTo(user), ...(user.notificationsSeenAt ? { updatedAt: { gt: user.notificationsSeenAt } } : {}) } });
 }

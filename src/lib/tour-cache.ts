@@ -66,7 +66,7 @@ export async function demoTour(token: unknown) {
   if (typeof token !== "string" || token.length < 12 || token.length > 64) return null;
   const link = await prisma.tourDemoLink.findUnique({ where: { token }, select: { tourSlug: true, createdById: true, disabledAt: true } });
   if (!link || link.disabledAt) return null;
-  const row = await prisma.tour.findUnique({ where: { slug: link.tourSlug }, select: { slug: true, config: true, published: true, reviewApprovedAt: true } });
+  const row = await prisma.tour.findUnique({ where: { slug: link.tourSlug }, select: { slug: true, config: true, published: true, reviewApprovedAt: true, liveVersion: true } });
   if (!row) return null;
   const setup = { ...(row.config as unknown as TourConfig), slug: row.slug };
   const version = createHash("sha1").update(JSON.stringify(row.config)).digest("hex").slice(0, 16);
@@ -76,5 +76,5 @@ export async function demoTour(token: unknown) {
   ]);
   // Only a colleague still with us is named - otherwise just Nextview360.
   const who = by && !by.disabledAt ? { name: by.name, email: by.email, phone: by.phone ?? undefined } : {};
-  return { data, contact: { token, ...who, finished: Boolean(row.published || row.reviewApprovedAt) } };
+  return { data, contact: { token, ...who, finished: Boolean(row.published || row.reviewApprovedAt || row.liveVersion != null) } };
 }

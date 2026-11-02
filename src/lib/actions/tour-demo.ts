@@ -87,3 +87,20 @@ export async function setDemoLinkOff(slug: string, id: string, off: boolean): Pr
   await requireDemo(slug);
   await prisma.tourDemoLink.updateMany({ where: { id: String(id), tourSlug: String(slug) }, data: { disabledAt: off ? new Date() : null } });
 }
+
+/** "Kan sendes som eksempel": the sellers may send this tour to new customers on SMS. */
+export async function setTourShowcase(slug: string, on: boolean): Promise<void> {
+  await requireDemo(slug);
+  await prisma.tour.update({ where: { slug: String(slug) }, data: { showcase: Boolean(on) } });
+}
+
+export async function tourShowcase(slug: string): Promise<boolean> {
+  await requireDemo(slug);
+  return Boolean((await prisma.tour.findUnique({ where: { slug: String(slug) }, select: { showcase: true } }))?.showcase);
+}
+
+/** Deleted: the link stops working, and what was seen on it goes too. */
+export async function deleteDemoLink(slug: string, id: string): Promise<void> {
+  await requireDemo(slug);
+  await prisma.tourDemoLink.deleteMany({ where: { id: String(id), tourSlug: String(slug) } });
+}
