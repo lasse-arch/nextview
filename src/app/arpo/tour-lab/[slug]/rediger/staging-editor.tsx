@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { Point3, StagingItem, TourConfig, YearWheel } from "../../tours/types";
+import type { StagingItem, TourConfig, YearWheel } from "../../tours/types";
 import { Rows } from "./content";
 import { LinkInput } from "./links-open";
 import { Choice, Field, Group, Icon, input, UploadButton, ssOfHref, type PreviewApi } from "./ui";
@@ -25,7 +25,6 @@ const KINDS: [Kind, string][] = [
   ["yearwheel", "Årshjul"],
 ];
 const KIND_NAME = Object.fromEntries(KINDS) as Record<Kind, string>;
-const CORNER = ["øverste venstre", "øverste højre", "nederste højre", "nederste venstre"];
 const MONTHS = ["januar", "februar", "marts", "april", "maj", "juni", "juli", "august", "september", "oktober", "november", "december"];
 const small = "px-1 text-[12px] leading-snug text-[#8e8e93]";
 const textarea = `${input} min-h-[72px] resize-y leading-snug`;
@@ -84,7 +83,7 @@ function SizeControls({ item, set }: { item: StagingItem; set: (i: StagingItem) 
   const [locked, setLocked] = useState(true);
   const [fitting, setFitting] = useState(false);
   const p = item.place;
-  if (!p) return <p className={small}>Placeret med fire hjørner. Tryk "Placér igen" og klik midt på fladen, så kan størrelsen ændres med knapper.</p>;
+  if (!p) return <p className={small}>Placeret med fire hjørner. Tryk &quot;Placér igen&quot; og klik midt på fladen, så kan størrelsen ændres med knapper.</p>;
   const put = (next: Place) => set({ ...item, place: next, corners: cornersOf(next) });
   const resize = (w: number, h: number) => put({ ...p, w: Math.min(10, Math.max(0.1, round(w))), h: Math.min(10, Math.max(0.1, round(h))) });
   const width = (w: number) => resize(w, locked ? (w * p.h) / p.w : p.h);
