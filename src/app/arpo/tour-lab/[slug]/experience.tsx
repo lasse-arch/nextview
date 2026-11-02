@@ -2292,8 +2292,8 @@ function TourExperience({
   const DESTINATIONS = useMemo<Destination[]>(
     () =>
       T.menu.flatMap((m) =>
-        ("items" in m ? m.items.map(([name, href]) => ({ name, group: m.title, href })) : [{ name: m.title, href: m.href }]).filter((d) =>
-          isPlaceHref(d.href)
+        ("items" in m ? m.items.map(([name, href]) => ({ name, group: m.title, href })) : [{ name: m.title, href: m.href }]).filter(
+          (d) => isPlaceHref(d.href) && !T.wayfinding?.skip?.includes(d.href)
         )
       ),
     [T]

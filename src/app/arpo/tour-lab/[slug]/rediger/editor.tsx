@@ -1060,6 +1060,7 @@ export function TourEditor({
                   hint='En kort "Sådan går du rundt", når man trykker Træd indenfor: træk for at kigge, tryk på cirklerne for at gå, menuen for at hoppe - og Vis mig rundt, hvis touren har den. Vises én gang pr. besøgende (i forhåndsvisningen hver gang).'
                 />
                 <Toggle on={Boolean(config.wayfinding)} onChange={(on) => edit((d) => void (d.wayfinding = on ? d.wayfinding ?? {} : undefined))} title="Find vej" hint="Vælg et rum, og touren går vejen derhen fra der, man står." />
+                {config.wayfinding && <FindTargets config={config} edit={edit} />}
                 {config.wayfinding && (
                   <Field title='Knap på "Du er fremme"' hint="Kortet, når Find vej er nået frem. Linket kan også være #live (listen med ledige), #kontakt (formularen) eller #vej.">
                     <Choice<"main" | "own" | "none">
@@ -2723,5 +2724,42 @@ function SiteLookButton({ slug, config, edit }: { slug: string; config: TourConf
         {note?.text ?? "Farver og skrift fra kundens hjemmeside - så menu, historier, Afspil, knapper og kort har samme røde tråd som siden (bruger de blå knapper, bliver touren blå)."}
       </p>
     </div>
+  );
+}
+
+/** "Find vej": which of the menu's places it can find - all of them, unless taken off here (wayfinding.skip, by link). */
+function FindTargets({ config, edit }: { config: TourConfig; edit: (fn: (d: TourConfig) => void) => void }) {
+  const groups = config.menu
+    .map((m) => ({ title: "items" in m ? m.title : "", places: ("items" in m ? m.items : [[m.title, m.href] as [string, string]]).filter(([, href]) => isPlaceHref(href)) }))
+    .filter((g) => g.places.length);
+  const all = [...new Set(groups.flatMap((g) => g.places.map(([, href]) => href)))];
+  const skip = config.wayfinding?.skip ?? [];
+  const on = all.filter((h) => !skip.includes(h)).length;
+  const set = (next: string[]) => edit((d) => void (d.wayfinding = { ...d.wayfinding, skip: next.length ? next : undefined }));
+  if (!all.length) return null;
+  return (
+    <Field title="Find vej kan finde" hint={`${on} af ${all.length} steder fra menuen. Nye steder i menuen kommer med af sig selv - fjern fluebenet ved dem, Find vej ikke skal vise.`}>
+      <div className="flex gap-3 pb-1 text-[12px] font-medium text-[#0071e3]">
+        <button type="button" onClick={() => set([])}>
+          Vælg alle
+        </button>
+        <button type="button" onClick={() => set(all)}>
+          Fravælg alle
+        </button>
+      </div>
+      <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
+        {groups.map((g, i) => (
+          <div key={g.title + i}>
+            {g.title && <p className="text-[11px] font-semibold uppercase tracking-wide text-[#8e8e93]">{g.title}</p>}
+            {g.places.map(([name, href]) => (
+              <label key={href + name} className="flex items-center gap-2 py-0.5 text-[14px] text-[#1d1d1f]">
+                <input type="checkbox" checked={!skip.includes(href)} onChange={(e) => set(e.target.checked ? skip.filter((h) => h !== href) : [...skip, href])} />
+                {name}
+              </label>
+            ))}
+          </div>
+        ))}
+      </div>
+    </Field>
   );
 }
