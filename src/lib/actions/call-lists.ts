@@ -234,18 +234,18 @@ export async function deleteCallList(callListId: string): Promise<void> {
  * queue (see the ordering on /ringeliste). Can be pressed any number of
  * times; only the latest time is kept.
  */
-export async function markVoicemail(dealId: string): Promise<{ at: string }> {
+export async function markVoicemail(dealId: string): Promise<{ at: string; by: string; count: number }> {
   const user = await requireUser();
   const at = new Date();
-  const deal = await prisma.deal.update({ where: { id: dealId }, data: { lastVoicemailAt: at } });
+  const deal = await prisma.deal.update({ where: { id: dealId }, data: { lastVoicemailAt: at, lastVoicemailBy: user.name, voicemailCount: { increment: 1 } } });
   await logActivity({
     type: "DEAL_VOICEMAIL",
-    message: `${user.name} ringede til ${dealName(deal)} - telefonsvar`,
+    message: `${user.name} ringede til ${dealName(deal)} - telefonsvar (${deal.voicemailCount}. gang)`,
     actorId: user.id,
     dealId,
   });
   revalidatePath("/arpo/ringeliste");
-  return { at: at.toISOString() };
+  return { at: at.toISOString(), by: user.name, count: deal.voicemailCount };
 }
 
 /**

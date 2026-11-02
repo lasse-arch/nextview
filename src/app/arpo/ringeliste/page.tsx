@@ -46,6 +46,8 @@ export default async function RingelistePage({
           websiteUrl: true,
           stage: true,
           lastVoicemailAt: true,
+          lastVoicemailBy: true,
+          voicemailCount: true,
           ownerId: true,
           // The latest note from a call, shown on the card.
           notes: { where: { body: { startsWith: "Opkald: " } }, orderBy: { createdAt: "desc" }, take: 1, select: { body: true, createdAt: true, author: { select: { name: true } } } },

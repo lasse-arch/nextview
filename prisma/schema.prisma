@@ -498,6 +498,9 @@ model Deal {
   /// no answer). Puts it at the back of the call queue; pressing it again
   /// just moves the time (and the lead) on.
   lastVoicemailAt DateTime?
+  /// Who pressed "Telefonsvar" last (their name, shown on the card), and how many times in all - so a colleague doesn't call again at once.
+  lastVoicemailBy String?
+  voicemailCount  Int       @default(0)
 
   meetingDate            DateTime?
   /// Length of the booked meeting in minutes (30/45/60, chosen when the

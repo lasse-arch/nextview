@@ -2,7 +2,7 @@
 
 import type { LeadPlace } from "@/lib/lead-place";
 import { OFFICE } from "@/lib/office";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createCallList, addLeadsToCallList, deleteCallList, renameCallList, markVoicemail, scheduleCallBack, deleteCallListLead, moveExistingToCallList } from "@/lib/actions/call-lists";
@@ -30,6 +30,9 @@ type QueueDeal = {
   websiteUrl: string | null;
   stage: DealStage;
   lastVoicemailAt: Date | string | null;
+  /** Who pressed "Telefonsvar" last, and how many times in all. */
+  lastVoicemailBy?: string | null;
+  voicemailCount?: number;
   ownerId: string;
   /** Where the lead is - from the postcode in its address (null when there's none). */
   place: LeadPlace | null;
@@ -338,6 +341,8 @@ function QueueCard({ deal, users, currentUserId, isAdmin }: { deal: QueueDeal; u
   const [displayedWebsite, setDisplayedWebsite] = useState(deal.websiteUrl);
   const [addedProducts, setAddedProducts] = useState<string[]>([]);
   const [voicemailAt, setVoicemailAt] = useState(deal.lastVoicemailAt);
+  const [voicemailBy, setVoicemailBy] = useState(deal.lastVoicemailBy ?? null);
+  const [voicemailCount, setVoicemailCount] = useState(deal.voicemailCount ?? (deal.lastVoicemailAt ? 1 : 0));
   const router = useRouter();
   const showToast = useToast();
 
@@ -410,9 +415,11 @@ function QueueCard({ deal, users, currentUserId, isAdmin }: { deal: QueueDeal; u
   function voicemail() {
     startTransition(async () => {
       try {
-        const { at } = await markVoicemail(deal.id);
+        const { at, by, count } = await markVoicemail(deal.id);
         setVoicemailAt(at);
-        showToast("Telefonsvar noteret - rykket ned i listen");
+        setVoicemailBy(by);
+        setVoicemailCount(count);
+        showToast("Telefonsvar noteret - rykket ned i bunden, så ingen ringer igen lige med det samme");
         // Re-sorts the queue so the lead moves to the back.
         router.refresh();
       } catch (err) {
@@ -671,6 +678,8 @@ function QueueCard({ deal, users, currentUserId, isAdmin }: { deal: QueueDeal; u
             {voicemailAt && (
               <span className="ml-2 rounded-full bg-amber-50 px-2 py-0.5 normal-case tracking-normal text-amber-700 ring-1 ring-inset ring-amber-600/15">
                 📞 Telefonsvar {formatVoicemailTime(voicemailAt)}
+                {voicemailBy ? ` · ${voicemailBy}` : ""}
+                {voicemailCount > 1 ? ` · ${voicemailCount}. forsøg` : ""}
               </span>
             )}
           </p>
@@ -978,6 +987,16 @@ export function RingelisteClient({
   isAdmin?: boolean;
 }) {
   const [search, setSearch] = useState("");
+  // Colleagues calling the same list: every minute the list is fetched again (while the tab is open and nobody's typing),
+  // so a lead someone just got "Telefonsvar" from moves to the bottom here too.
+  const listRouter = useRouter();
+  useEffect(() => {
+    const t = window.setInterval(() => {
+      const typing = document.activeElement instanceof HTMLInputElement || document.activeElement instanceof HTMLTextAreaElement;
+      if (document.visibilityState === "visible" && !typing) listRouter.refresh();
+    }, 60_000);
+    return () => window.clearInterval(t);
+  }, [listRouter]);
   /** Order and area: as the list (who's next), nearest the office first, or furthest - and one region/kommune. */
   const [order, setOrder] = useState<"liste" | "naer" | "fjern">("liste");
   const [area, setArea] = useState("");
@@ -988,11 +1007,18 @@ export function RingelisteClient({
   // phone (ignoring spaces), e-mail, address, CVR and website.
   const query = search.trim().toLowerCase();
   const inArea = area ? deals.filter((d) => (area.startsWith("r:") ? d.place?.region === area.slice(2) : area === "ingen" ? !d.place : d.place?.kommune === area.slice(2))) : deals;
-  const ordered =
-    order === "liste"
-      ? inArea
-      : // Leads without a known place last, whichever way.
-        [...inArea].sort((a, b) => (a.place ? (b.place ? (order === "naer" ? a.place.km - b.place.km : b.place.km - a.place.km) : -1) : b.place ? 1 : 0));
+  // Called with no answer ("Telefonsvar") always at the bottom, longest ago first - whichever order is chosen -
+  // so nobody calls them again straight away. Those not tried yet come first, in the chosen order.
+  const tried = (d: QueueDeal) => (d.lastVoicemailAt ? new Date(d.lastVoicemailAt).getTime() : 0);
+  const byPlace = (a: QueueDeal, b: QueueDeal) =>
+    order === "liste" ? 0 : a.place ? (b.place ? (order === "naer" ? a.place.km - b.place.km : b.place.km - a.place.km) : -1) : b.place ? 1 : 0;
+  const ordered = [...inArea].sort((a, b) => {
+    const ta = tried(a);
+    const tb = tried(b);
+    if (!ta !== !tb) return ta ? 1 : -1;
+    if (ta && tb && ta !== tb) return ta - tb;
+    return byPlace(a, b);
+  });
   const visibleDeals = query
     ? ordered.filter((d) => {
         const haystack = [d.companyName, d.displayName, d.contactName, d.contactEmail, d.address, d.cvrNumber, d.websiteUrl]
@@ -1058,7 +1084,7 @@ export function RingelisteClient({
         )}
         <ul className="mt-3 space-y-2.5">
           {visibleDeals.map((deal) => (
-            <QueueCard key={deal.id} deal={deal} users={users} currentUserId={currentUserId} isAdmin={isAdmin} />
+            <QueueCard key={`${deal.id}-${String(deal.lastVoicemailAt ?? "")}`} deal={deal} users={users} currentUserId={currentUserId} isAdmin={isAdmin} />
           ))}
           {selectedListId && deals.length === 0 && (
             <p className="text-sm text-slate-400">Ingen leads tilbage på denne liste - godt gået!</p>
