@@ -59,6 +59,8 @@ type PannellumViewer = {
   getPitch(): number;
   getYaw(): number;
   destroy(): void;
+  /** Its frame changed size: draw again at the new size (else the points are placed for the old one and drift off). */
+  resize(): void;
   on(event: string, cb: (...a: unknown[]) => void): void;
 };
 type PannellumHotspot = {
@@ -1247,6 +1249,7 @@ function TourExperience({
     if (!D || T.map) return;
     let cancelled = false;
     let declutter = 0;
+    let sized: ResizeObserver | null = null;
     let shownTimer = 0;
     const key = droneKey;
     // The 360° photo's copy for this screen (made when the tour was saved), when there is one.
@@ -1312,11 +1315,18 @@ function TourExperience({
         if (!cancelled) shownTimer = window.setTimeout(shown, 350);
       });
       window.setTimeout(shown, 8_000);
+      // Pannellum only notices the window changing size - not its own frame (the showcase's caption moving the tour up,
+      // a panel beside it): told here, so the picture and its points are drawn for the size it really has.
+      if (droneEl.current && typeof ResizeObserver !== "undefined") {
+        sized = new ResizeObserver(() => drone.current?.resize());
+        sized.observe(droneEl.current);
+      }
       declutter = window.setInterval(() => declutterNames(selectedId.current), 120);
       track("drone_view");
     });
     return () => {
       cancelled = true;
+      sized?.disconnect();
       window.clearInterval(declutter);
       window.clearTimeout(shownTimer);
       drone.current?.destroy();
@@ -3642,6 +3652,12 @@ function PanoView({
   useEffect(() => {
     let viewer: PannellumViewer | null = null;
     let sharpViewer: PannellumViewer | null = null;
+    // Its frame changing size (not only the window): drawn again at the new size - see the drone scene.
+    const sized = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => {
+      viewer?.resize();
+      sharpViewer?.resize();
+    });
+    if (el.current) sized?.observe(el.current);
     let cancelled = false;
     const sharpBox = sharpEl.current;
     // The sharp copy already fetched (the guide gets its pictures ahead): open with that - no swap while it turns.
@@ -3714,6 +3730,7 @@ function PanoView({
     });
     return () => {
       cancelled = true;
+      sized?.disconnect();
       openPanoView = null;
       viewer?.destroy();
       sharpViewer?.destroy();
