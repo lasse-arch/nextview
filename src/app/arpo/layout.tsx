@@ -13,6 +13,7 @@ import { PresentationModeToggle } from "./presentation-mode-toggle";
 import { isPresentationMode } from "@/lib/presentation-mode";
 import { NewsBell } from "./news-bell";
 import { NotificationBell } from "./notification-bell";
+import { overdueTasksFor } from "@/lib/overdue-tasks";
 import { unreadNotifications } from "@/lib/team-notifications";
 import { getUnreadNewsCount } from "@/lib/actions/news";
 
@@ -24,7 +25,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const tours = teamCan(user, "tours");
   const filming = teamCan(user, "filming");
 
-  const [unreadNewsCount, unreadBell] = sales ? await Promise.all([getUnreadNewsCount(user.id, user.newsReadAt ?? null), unreadNotifications(user)]) : [0, 0];
+  const [unreadNewsCount, unreadBell, overdue] = sales
+    ? await Promise.all([getUnreadNewsCount(user.id, user.newsReadAt ?? null), unreadNotifications(user), overdueTasksFor(user.id)])
+    : [0, 0, []];
 
   // The menu in named parts - what a seller uses every day first, the company's own pages and money last.
   const admin = user.role === "ADMIN";
@@ -145,7 +148,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <div className="arpo-topbar flex items-center justify-end gap-2.5 px-4 pt-4 sm:px-6 md:px-10 md:pt-6">
             {sales && (
               <>
-                <NotificationBell unreadCount={unreadBell} />
+                <NotificationBell unreadCount={unreadBell} overdue={overdue} />
                 <NewsBell unreadCount={unreadNewsCount} />
                 <PresentationModeToggle enabled={presenting} />
                 <Link

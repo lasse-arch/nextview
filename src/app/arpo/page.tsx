@@ -20,6 +20,8 @@ import { getCommissionPeriodReminder } from "@/lib/commission-period-reminder-da
 import { CommissionPeriodReminderCard } from "./commission-period-reminder-card";
 import { getMeetingsBookedThisWeek } from "@/lib/meetings-booked-data";
 import { MeetingsBookedCard } from "./meetings-booked-card";
+import { overdueTasksFor } from "@/lib/overdue-tasks";
+import { OverdueTasksCard } from "./overdue-tasks-card";
 
 const FUNNEL_SHADES = [
   "bg-blue-200",
@@ -44,7 +46,7 @@ export default async function DashboardPage() {
   // stalled visitor-report queue (see resumeStalledReportQueue).
   after(() => resumeStalledReportQueue());
   const isAdmin = user?.role === "ADMIN";
-  const [data, goals, users, customerMapPoints, activity, lastActive, commissionPeriodReminder, meetingsBooked] = await Promise.all([
+  const [data, goals, users, customerMapPoints, activity, lastActive, commissionPeriodReminder, meetingsBooked, overdue] = await Promise.all([
     getDashboardData(isAdmin ? undefined : user?.id),
     user ? getGoalsForDashboard(user) : Promise.resolve([]),
     prisma.user.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
@@ -53,6 +55,7 @@ export default async function DashboardPage() {
     getUserLastActive(),
     user ? getCommissionPeriodReminder(user) : Promise.resolve(null),
     getMeetingsBookedThisWeek(),
+    user ? overdueTasksFor(user.id) : Promise.resolve([]),
   ]);
 
   const funnelMax = Math.max(1, ...data.funnel.map((f) => f.count));
@@ -74,6 +77,8 @@ export default async function DashboardPage() {
         <p className="text-sm italic leading-relaxed">&ldquo;{quote.text}&rdquo;</p>
         <p className="mt-1 text-xs text-slate-300">— {quote.author}</p>
       </div>
+
+      {overdue.length > 0 && <OverdueTasksCard tasks={overdue} />}
 
       {commissionPeriodReminder && <CommissionPeriodReminderCard reminder={commissionPeriodReminder} />}
 

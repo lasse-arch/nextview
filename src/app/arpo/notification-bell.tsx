@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { openBell, type BellItem } from "@/lib/actions/notifications";
+import type { OverdueTask } from "@/lib/overdue-tasks";
 
 /*
  * The bell by Nyheder: a customer's feedback on a tour in review, an
@@ -19,7 +20,10 @@ const ago = (iso: string) => {
   return new Date(iso).toLocaleDateString("da-DK", { day: "numeric", month: "short" });
 };
 
-export function NotificationBell({ unreadCount }: { unreadCount: number }) {
+const overdueText = (t: OverdueTask) => (t.days === 1 ? "Forfaldt i går" : `Forfaldt for ${t.days} dage siden`);
+
+/** `overdue`: your overdue tasks - at the top of the list and in the badge until they're done. */
+export function NotificationBell({ unreadCount, overdue = [] }: { unreadCount: number; overdue?: OverdueTask[] }) {
   const [open, setOpen] = useState(false);
   const [unread, setUnread] = useState(unreadCount);
   const [items, setItems] = useState<BellItem[] | null>(null);
@@ -57,9 +61,9 @@ export function NotificationBell({ unreadCount }: { unreadCount: number }) {
           <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
           <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
         </svg>
-        {unread > 0 && (
+        {unread + overdue.length > 0 && (
           <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold leading-none text-white">
-            {unread > 9 ? "9+" : unread}
+            {unread + overdue.length > 9 ? "9+" : unread + overdue.length}
           </span>
         )}
       </button>
@@ -70,10 +74,32 @@ export function NotificationBell({ unreadCount }: { unreadCount: number }) {
         >
           <div className="border-b border-slate-100 px-4 py-2.5 text-[13px] font-semibold text-slate-900">Notifikationer</div>
           <div className="max-h-[min(420px,70dvh)] overflow-y-auto">
+            {overdue.length > 0 && (
+              <div className="border-b border-red-100 bg-red-50/60">
+                <div className="px-4 pt-2.5 text-[11px] font-semibold uppercase tracking-wide text-red-700">Forfaldne opgaver · {overdue.length}</div>
+                {overdue.slice(0, 5).map((t) => (
+                  <Link key={t.id} href="/arpo/opgaver" onClick={() => setOpen(false)} className="flex gap-3 px-4 py-2.5 hover:bg-red-50">
+                    <span className="mt-0.5 flex h-7 w-7 flex-none items-center justify-center rounded-full bg-red-100 text-[13px] text-red-700">!</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[13px] font-medium text-slate-900">{t.title}</span>
+                      <span className="mt-0.5 block text-[12px] text-red-700">
+                        {overdueText(t)}
+                        {t.deal ? ` · ${t.deal}` : ""}
+                      </span>
+                    </span>
+                  </Link>
+                ))}
+                {overdue.length > 5 && (
+                  <Link href="/arpo/opgaver" onClick={() => setOpen(false)} className="block px-4 pb-2.5 text-[12px] font-medium text-red-700 hover:underline">
+                    og {overdue.length - 5} mere →
+                  </Link>
+                )}
+              </div>
+            )}
             {items == null ? (
               <p className="px-4 py-6 text-center text-[13px] text-slate-400">Henter …</p>
             ) : items.length === 0 ? (
-              <p className="px-4 py-6 text-center text-[13px] text-slate-400">Ingen notifikationer endnu. Her kommer fx feedback fra kunder på tours til gennemgang.</p>
+              overdue.length > 0 ? null : <p className="px-4 py-6 text-center text-[13px] text-slate-400">Ingen notifikationer endnu. Her kommer fx feedback fra kunder på tours til gennemgang.</p>
             ) : (
               items.map((n) => (
                 <Link key={n.id} href={n.href} onClick={() => setOpen(false)} className={`flex gap-3 border-b border-slate-50 px-4 py-3 hover:bg-slate-50 ${n.unread ? "bg-blue-50/50" : ""}`}>
