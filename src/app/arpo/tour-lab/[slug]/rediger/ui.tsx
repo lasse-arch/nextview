@@ -115,7 +115,7 @@ export type PreviewApi = {
   /** Visits every story room in the preview and saves its picture; `progress` hears "3/8: Spisesalen". */
   storyPictures: (progress: (text: string) => void) => Promise<{ done?: boolean; error?: string }>;
   /** Waits for a click in the preview: the spot in the room (for a tag), the scan point and the room. */
-  pick: () => Promise<{ position?: { x: number; y: number; z: number }; ss?: number | null; room?: string | null; error?: string }>;
+  pick: () => Promise<{ position?: { x: number; y: number; z: number }; normal?: { x: number; y: number; z: number }; ss?: number | null; room?: string | null; error?: string }>;
   go: (name: string, href: string) => void;
   /** Shows the menu as it looks now - past the front page / welcome (when a menu design is picked). */
   showMenu: () => void;

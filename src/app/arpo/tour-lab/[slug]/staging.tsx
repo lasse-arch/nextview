@@ -19,6 +19,57 @@ import { useT } from "../tours/i18n-react";
  * and only inside the tour. A video plays (silently) only while it's seen.
  */
 
+const cross = (a: Point3, b: Point3): Point3 => ({ x: a.y * b.z - a.z * b.y, y: a.z * b.x - a.x * b.z, z: a.x * b.y - a.y * b.x });
+const unit = (a: Point3): Point3 => {
+  const l = Math.hypot(a.x, a.y, a.z) || 1;
+  return { x: a.x / l, y: a.y / l, z: a.z / l };
+};
+const r3 = (n: number) => Math.round(n * 1000) / 1000;
+
+/** The surface's right and up, as seen standing in front of it (on a floor or ceiling: north is up). */
+export function surfaceAxes(normal: Point3): { right: Point3; up: Point3 } {
+  const n = unit(normal);
+  const forward = { x: -n.x, y: -n.y, z: -n.z };
+  const worldUp = Math.abs(n.y) > 0.9 ? { x: 0, y: 0, z: -1 } : { x: 0, y: 1, z: 0 };
+  const right = unit(cross(forward, worldUp));
+  const up = unit(cross(right, forward));
+  return { right, up };
+}
+
+/** The four corners (top left, top right, bottom right, bottom left) of a rectangle w x h metres centred on the surface. */
+export function cornersOf(place: NonNullable<StagingItem["place"]>): StagingItem["corners"] {
+  const { right, up } = surfaceAxes(place.normal);
+  // A hair in front of the surface, so it never sinks into it.
+  const c = { x: place.center.x + place.normal.x * 0.005, y: place.center.y + place.normal.y * 0.005, z: place.center.z + place.normal.z * 0.005 };
+  const at = (sx: number, sy: number): Point3 => ({
+    x: r3(c.x + right.x * sx * (place.w / 2) + up.x * sy * (place.h / 2)),
+    y: r3(c.y + right.y * sx * (place.w / 2) + up.y * sy * (place.h / 2)),
+    z: r3(c.z + right.z * sx * (place.w / 2) + up.z * sy * (place.h / 2)),
+  });
+  return [at(-1, 1), at(1, 1), at(1, -1), at(-1, -1)];
+}
+
+/** Moves a place along its surface (metres right and up). */
+export function movePlace(place: NonNullable<StagingItem["place"]>, dx: number, dy: number): NonNullable<StagingItem["place"]> {
+  const { right, up } = surfaceAxes(place.normal);
+  return { ...place, center: { x: r3(place.center.x + right.x * dx + up.x * dy), y: r3(place.center.y + right.y * dx + up.y * dy), z: r3(place.center.z + right.z * dx + up.z * dy) } };
+}
+
+/** A sane picture of the corners on the screen: a convex quad (no bow tie, nothing turned inside out) - else it isn't drawn at all. */
+export function saneQuad(p: { x: number; y: number }[]): boolean {
+  if (p.length !== 4 || !p.every((q) => Number.isFinite(q.x) && Number.isFinite(q.y))) return false;
+  let sign = 0;
+  for (let i = 0; i < 4; i++) {
+    const a = p[i], b = p[(i + 1) % 4], c = p[(i + 2) % 4];
+    const z = (b.x - a.x) * (c.y - b.y) - (b.y - a.y) * (c.x - b.x);
+    if (Math.abs(z) < 1e-6) return false;
+    const s = Math.sign(z);
+    if (sign && s !== sign) return false;
+    sign = s;
+  }
+  return true;
+}
+
 /** The size an item is laid out in before it's bent onto its corners: 1600 wide, the height from the surface's own proportions. */
 const BASE_W = 1600;
 const dist = (a: Point3, b: Point3) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
@@ -125,7 +176,7 @@ export function StagingLayer({
         const pts = inside ? item.corners.map((c) => conv.worldToScreen(c, pose, size)) : null;
         // Off to the side by far more than the screen = not in view (and keeps the numbers sane).
         const near = pts?.every((q) => Math.abs(q.x) < size.w * 4 && Math.abs(q.y) < size.h * 4);
-        const m = pts && near ? quadMatrix(sizes[n].w, sizes[n].h, pts) : null;
+        const m = pts && near && saneQuad(pts) ? quadMatrix(sizes[n].w, sizes[n].h, pts) : null;
         box.style.transform = m ?? "";
         box.dataset.ude = m ? "" : "1";
         return Boolean(m);

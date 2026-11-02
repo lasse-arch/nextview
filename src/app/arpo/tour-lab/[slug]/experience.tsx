@@ -2217,6 +2217,9 @@ function TourExperience({
   useEffect(() => {
     if (!picking || !sdk) return;
     let last: Vec3 | null = null;
+    /** The surface's direction at the spot (for virtual staging), turned towards the camera. */
+    let normal: Vec3 | null = null;
+    let cam: Vec3 | null = null;
     const doc = iframe.current?.contentDocument;
     const done = (msg: object) => {
       window.parent.postMessage({ type: "tour-pick", id: picking, ...msg }, location.origin);
@@ -2226,10 +2229,21 @@ function TourExperience({
       if (!last) return;
       e.preventDefault();
       e.stopPropagation();
-      done({ position: { x: +last.x.toFixed(2), y: +last.y.toFixed(2), z: +last.z.toFixed(2) }, ss: currentSsRef.current, room });
+      let n = normal;
+      if (n && cam && (last.x - cam.x) * n.x + (last.y - cam.y) * n.y + (last.z - cam.z) * n.z > 0) n = { x: -n.x, y: -n.y, z: -n.z };
+      done({
+        position: { x: +last.x.toFixed(3), y: +last.y.toFixed(3), z: +last.z.toFixed(3) },
+        normal: n ? { x: +n.x.toFixed(4), y: +n.y.toFixed(4), z: +n.z.toFixed(4) } : undefined,
+        ss: currentSsRef.current,
+        room,
+      });
     };
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && done({ error: "Annulleret." });
-    const sub = sdk.Pointer?.intersection.subscribe((hit) => (last = hit?.position ?? null));
+    const sub = sdk.Pointer?.intersection.subscribe((hit) => {
+      last = hit?.position ?? null;
+      normal = hit?.normal ?? null;
+    });
+    const camSub = sdk.Camera.pose.subscribe((pose) => (cam = pose.position));
     // The click that places the tag mustn't also walk to the nearest scan point: the other points are off meanwhile.
     if (currentSweep.current) lockTo(sdk, allSweeps.current, currentSweep.current);
     doc?.addEventListener("click", onClick, true);
@@ -2237,6 +2251,7 @@ function TourExperience({
     doc?.addEventListener("keydown", onKey);
     return () => {
       sub?.cancel();
+      camSub.cancel();
       // Walking again as before (still only by the points, when the tour is set to that).
       if (!pointsOnlyRef.current) {
         const open = allSweeps.current.filter((id) => !hiddenSweeps.includes(id));

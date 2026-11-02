@@ -5,6 +5,7 @@ import type { Point3, StagingItem, TourConfig, YearWheel } from "../../tours/typ
 import { Rows } from "./content";
 import { LinkInput } from "./links-open";
 import { Choice, Field, Group, Icon, input, UploadButton, ssOfHref, type PreviewApi } from "./ui";
+import { cornersOf, movePlace } from "../staging";
 
 /*
  * Virtual staging: a video, a picture, a web page, a sign or the year wheel
@@ -31,37 +32,127 @@ const textarea = `${input} min-h-[72px] resize-y leading-snug`;
 const primary = "flex w-full items-center justify-center gap-2 rounded-xl bg-[#0071e3] py-2.5 text-[15px] font-medium text-white hover:bg-[#0077ed] disabled:opacity-50";
 const linkBtn = "text-[13px] font-medium text-[#0071e3] disabled:opacity-50";
 
-/** Four clicks in the preview: the corners, clockwise from the top left. Null when cancelled. */
-function useCorners(preview: PreviewApi) {
-  const [step, setStep] = useState<number | null>(null);
+type Place = NonNullable<StagingItem["place"]>;
+/** A new surface's size (metres): about a TV, in the shape its kind usually has. */
+const START_SIZE: Record<Kind, [number, number]> = { video: [1.2, 0.675], iframe: [1.2, 0.675], yearwheel: [1.6, 0.9], image: [1.2, 0.8], sign: [1, 0.6] };
+
+/** One click in the preview, in the middle of the surface: where, and which way the surface faces. */
+function usePlacer(preview: PreviewApi) {
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  async function place(): Promise<{ corners: StagingItem["corners"]; ss: number | null } | null> {
+  async function place(size: [number, number]): Promise<{ place: Place; ss: number | null } | null> {
     setError(null);
-    const pts: Point3[] = [];
-    let ss: number | null = null;
-    for (let i = 0; i < 4; i++) {
-      setStep(i);
-      const r = await preview.pick();
-      if (r.error || !r.position) {
-        setStep(null);
-        if (r.error !== "Annulleret.") setError(r.error ?? "Intet punkt valgt.");
-        return null;
-      }
-      pts.push(r.position);
-      ss ??= r.ss ?? null;
+    setBusy(true);
+    const r = await preview.pick();
+    setBusy(false);
+    if (r.error || !r.position) {
+      if (r.error !== "Annulleret.") setError(r.error ?? "Intet punkt valgt.");
+      return null;
     }
-    setStep(null);
-    return { corners: pts as StagingItem["corners"], ss };
+    if (!r.normal) {
+      setError("Forhåndsvisningen sendte ikke fladens retning - genindlæs den, og prøv igen.");
+      return null;
+    }
+    return { place: { center: r.position, normal: r.normal, w: size[0], h: size[1] }, ss: r.ss ?? null };
   }
-  const status = step != null ? `Klik ${CORNER[step]} hjørne af fladen (${step + 1}/4) - Esc fortryder.` : null;
-  return { place, busy: step != null, status, error };
+  return { place, busy, status: busy ? "Klik midt på fladen i forhåndsvisningen (fx midt på tv'et) - Esc fortryder." : null, error };
+}
+
+/** The width/height of a picture or video, for "Tilpas højden". */
+function mediaRatio(kind: Kind, src: string): Promise<number | null> {
+  return new Promise((resolve) => {
+    if (kind === "image") {
+      const img = new Image();
+      img.onload = () => resolve(img.naturalWidth && img.naturalHeight ? img.naturalHeight / img.naturalWidth : null);
+      img.onerror = () => resolve(null);
+      img.src = src;
+    } else if (kind === "video") {
+      const v = document.createElement("video");
+      v.preload = "metadata";
+      v.onloadedmetadata = () => resolve(v.videoWidth && v.videoHeight ? v.videoHeight / v.videoWidth : null);
+      v.onerror = () => resolve(null);
+      v.src = src;
+    } else resolve(null);
+  });
+}
+
+const round = (n: number) => Math.round(n * 100) / 100;
+const stepBtn = "h-8 w-8 rounded-lg bg-white text-[16px] font-semibold text-[#0071e3] ring-1 ring-black/[.06] hover:bg-[#0071e3]/5 disabled:opacity-40";
+
+/** Size and position with buttons: width and height (aspect kept, unless unlocked) and 5 cm moves along the surface. */
+function SizeControls({ item, set }: { item: StagingItem; set: (i: StagingItem) => void }) {
+  const [locked, setLocked] = useState(true);
+  const [fitting, setFitting] = useState(false);
+  const p = item.place;
+  if (!p) return <p className={small}>Placeret med fire hjørner. Tryk "Placér igen" og klik midt på fladen, så kan størrelsen ændres med knapper.</p>;
+  const put = (next: Place) => set({ ...item, place: next, corners: cornersOf(next) });
+  const resize = (w: number, h: number) => put({ ...p, w: Math.min(10, Math.max(0.1, round(w))), h: Math.min(10, Math.max(0.1, round(h))) });
+  const width = (w: number) => resize(w, locked ? (w * p.h) / p.w : p.h);
+  const height = (h: number) => resize(locked ? (h * p.w) / p.h : p.w, h);
+  const row = (title: string, v: number, on: (v: number) => void) => (
+    <div className="flex items-center gap-1.5">
+      <span className="w-14 text-[13px] text-[#6e6e73]">{title}</span>
+      <button type="button" className={stepBtn} aria-label={`${title} mindre`} onClick={() => on(v - 0.05)}>
+        −
+      </button>
+      <span className="w-20 flex-none">
+        <input type="number" step={0.05} min={0.1} max={10} className={`${input} bg-white text-center`} value={v} onChange={(e) => Number(e.target.value) > 0 && on(Number(e.target.value))} />
+      </span>
+      <span className="text-[13px] text-[#8e8e93]">m</span>
+      <button type="button" className={stepBtn} aria-label={`${title} større`} onClick={() => on(v + 0.05)}>
+        +
+      </button>
+    </div>
+  );
+  const move = (dx: number, dy: number) => put(movePlace(p, dx, dy));
+  return (
+    <Field title="Størrelse og placering" hint="Ret størrelsen, til den dækker fladen - og skub den på plads 5 cm ad gangen.">
+      <div className="space-y-2">
+        {row("Bredde", p.w, width)}
+        {row("Højde", p.h, height)}
+        <label className="flex items-center gap-2 text-[13px] text-[#6e6e73]">
+          <input type="checkbox" checked={locked} onChange={(e) => setLocked(e.target.checked)} /> Lås forholdet mellem bredde og højde
+        </label>
+        {(item.kind === "image" || item.kind === "video") && item.src && (
+          <button
+            type="button"
+            disabled={fitting}
+            className={linkBtn}
+            onClick={async () => {
+              setFitting(true);
+              const ratio = await mediaRatio(item.kind, item.src!);
+              setFitting(false);
+              if (ratio) resize(p.w, p.w * ratio);
+            }}
+          >
+            {fitting ? "Måler…" : item.kind === "video" ? "Tilpas højden til videoen" : "Tilpas højden til billedet"}
+          </button>
+        )}
+        <div className="flex items-center gap-1.5">
+          <span className="w-14 text-[13px] text-[#6e6e73]">Flyt</span>
+          <button type="button" className={stepBtn} aria-label="Flyt til venstre" onClick={() => move(-0.05, 0)}>
+            ←
+          </button>
+          <button type="button" className={stepBtn} aria-label="Flyt op" onClick={() => move(0, 0.05)}>
+            ↑
+          </button>
+          <button type="button" className={stepBtn} aria-label="Flyt ned" onClick={() => move(0, -0.05)}>
+            ↓
+          </button>
+          <button type="button" className={stepBtn} aria-label="Flyt til højre" onClick={() => move(0.05, 0)}>
+            →
+          </button>
+        </div>
+      </div>
+    </Field>
+  );
 }
 
 export function StagingEditor({ config, edit, preview }: { config: TourConfig; edit: Edit; preview: PreviewApi }) {
   const items = config.staging ?? [];
   const setItems = (next: StagingItem[]) => edit((d) => void (d.staging = next.length ? next : undefined));
   const [kind, setKind] = useState<Kind>("video");
-  const corners = useCorners(preview);
+  const placer = usePlacer(preview);
   const [ssBusy, setSsBusy] = useState(false);
 
   return (
@@ -73,22 +164,22 @@ export function StagingEditor({ config, edit, preview }: { config: TourConfig; e
         <Choice value={kind} options={KINDS} onChange={setKind} />
         <button
           type="button"
-          disabled={corners.busy}
+          disabled={placer.busy}
           className={primary}
           onClick={async () => {
-            const at = await corners.place();
+            const at = await placer.place(START_SIZE[kind]);
             if (!at) return;
-            const item: StagingItem = { id: `vs-${Date.now().toString(36)}`, kind, title: `${KIND_NAME[kind]} ${items.length + 1}`, corners: at.corners, ss: at.ss ? [at.ss] : [] };
+            const item: StagingItem = { id: `vs-${Date.now().toString(36)}`, kind, title: `${KIND_NAME[kind]} ${items.length + 1}`, place: at.place, corners: cornersOf(at.place), ss: at.ss ? [at.ss] : [] };
             if (kind === "sign") item.text = "Velkommen";
             if (kind === "yearwheel" && !config.yearWheel) edit((d) => void (d.yearWheel = { title: "Et år. Én årgang.", months: [] }));
             setItems([...items, item]);
           }}
         >
           <Icon d='<path d="M4 4h16v16H4z"/><path d="M4 4l16 16"/>' className="h-4 w-4" />
-          {corners.busy ? "Klik i forhåndsvisningen…" : `Placér ${KIND_NAME[kind].toLowerCase()} på en flade`}
+          {placer.busy ? "Klik i forhåndsvisningen…" : `Placér ${KIND_NAME[kind].toLowerCase()} på en flade`}
         </button>
-        {corners.status && <p className={small}>{corners.status}</p>}
-        {corners.error && <p className="px-1 text-[12px] text-[#ff3b30]">{corners.error}</p>}
+        {placer.status && <p className={small}>{placer.status}</p>}
+        {placer.error && <p className="px-1 text-[12px] text-[#ff3b30]">{placer.error}</p>}
       </Group>
       <Group title="På fladerne">
         <Rows<StagingItem>
@@ -168,16 +259,17 @@ export function StagingEditor({ config, edit, preview }: { config: TourConfig; e
                   </button>
                 </div>
               </Field>
+              <SizeControls item={i} set={set} />
               <button
                 type="button"
-                disabled={corners.busy}
-                className={linkBtn}
+                disabled={placer.busy}
+                className={`${linkBtn} mr-4 block`}
                 onClick={async () => {
-                  const at = await corners.place();
-                  if (at) set({ ...i, corners: at.corners, ss: at.ss && !i.ss.includes(at.ss) ? [...i.ss, at.ss] : i.ss });
+                  const at = await placer.place(i.place ? [i.place.w, i.place.h] : START_SIZE[i.kind]);
+                  if (at) set({ ...i, place: at.place, corners: cornersOf(at.place), ss: at.ss && !i.ss.includes(at.ss) ? [...i.ss, at.ss] : i.ss });
                 }}
               >
-                {corners.busy ? "Klik i forhåndsvisningen…" : "Placér igen"}
+                {placer.busy ? "Klik i forhåndsvisningen…" : "Placér igen (ét klik midt på fladen)"}
               </button>
             </>
           )}

@@ -40,7 +40,7 @@ export type MpSdk = {
     worldToScreen(position: Vec3, pose: CameraPose, size: { w: number; h: number }): Vec3;
   };
   Pointer?: {
-    intersection: { subscribe(cb: (hit: { position: Vec3 } | null) => void): { cancel(): void } };
+    intersection: { subscribe(cb: (hit: { position: Vec3; normal?: Vec3 } | null) => void): { cancel(): void } };
   };
   Renderer: {
     /** The current view as an image (a data URL), without Matterport's own markers when told so. */

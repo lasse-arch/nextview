@@ -102,8 +102,15 @@ export type StagingItem = {
   src?: string;
   /** A sign's text (a line break = a new line). */
   text?: string;
-  /** Top left, top right, bottom right, bottom left. */
+  /** Top left, top right, bottom right, bottom left (made from `place` when it has one). */
   corners: [Point3, Point3, Point3, Point3];
+  /**
+   * Where it sits, as one click on the surface: its middle, the surface's
+   * direction (towards the room) and its size in metres. The editor makes
+   * the corners from it - always a true rectangle, resized and moved with
+   * buttons. Left out on items placed by their four corners.
+   */
+  place?: { center: Point3; normal: Point3; w: number; h: number };
   /** The scan points it is seen from. */
   ss: number[];
   /** A tap opens this - a page, or in the tour ("#rundvisning", "#kontakt", a place, "#aarshjul" …). Without one, a tap on a video turns its sound on. */

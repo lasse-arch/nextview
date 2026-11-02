@@ -409,7 +409,7 @@ export function TourEditor({
       view: () => ask<{ href?: string; room?: string | null }>("tour-view"),
       shot: () => ask<{ image?: string }>("tour-shot", 15000),
       storyPictures: (progress) => ask<{ done?: boolean }>("tour-stories", 10 * 60_000, progress),
-      pick: () => ask<{ position?: { x: number; y: number; z: number }; ss?: number | null; room?: string | null }>("tour-pick", 120000),
+      pick: () => ask<{ position?: { x: number; y: number; z: number }; normal?: { x: number; y: number; z: number }; ss?: number | null; room?: string | null }>("tour-pick", 120000),
       showMenu: () => frame.current?.contentWindow?.postMessage({ type: "tour-show-menu" }, location.origin),
       go: (name, href) => frame.current?.contentWindow?.postMessage({ type: "tour-go", name, href }, location.origin),
       device: () => deviceRef.current,

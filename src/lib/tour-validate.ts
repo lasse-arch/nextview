@@ -1,6 +1,6 @@
 import { riskyPattern } from "@/lib/availability/pattern-check";
 import { safeColor, UNSAFE_SCHEME } from "@/app/arpo/tour-lab/tours/safe";
-import type { TourConfig } from "@/app/arpo/tour-lab/tours/types";
+import type { Point3, TourConfig } from "@/app/arpo/tour-lab/tours/types";
 
 /*
  * Is a tour setup whole - every part the editor and the tour read has the
@@ -87,6 +87,11 @@ export function tourConfigProblem(config: unknown): string | null {
       if (!obj(it) || !str(it.id) || !["video", "image", "iframe", "sign", "yearwheel"].includes(it.kind)) return "Et staging-element har en ukendt type.";
       if (!arr(it.corners) || it.corners.length !== 4 || !it.corners.every((p) => obj(p) && num(p.x) && num(p.y) && num(p.z))) return "Et staging-element skal have fire hjørner.";
       if (!arr(it.ss) || !it.ss.every((n) => Number.isInteger(n))) return "Et staging-element skal vises fra scanpunkter (tal).";
+      if (it.place !== undefined) {
+        const p3 = (v: unknown) => obj(v) && num((v as Point3).x) && num((v as Point3).y) && num((v as Point3).z);
+        if (!obj(it.place) || !p3(it.place.center) || !p3(it.place.normal) || !num(it.place.w) || !num(it.place.h) || it.place.w <= 0 || it.place.h <= 0 || it.place.w > 20 || it.place.h > 20)
+          return "Et staging-element har en ugyldig placering eller størrelse.";
+      }
       if (it.kind === "iframe" && !/^https:\/\//i.test(String(it.src ?? ""))) return "En hjemmeside i staging skal være et https-link.";
       if ((it.kind === "video" || it.kind === "image") && !str(it.src)) return "En video eller et billede i staging mangler sin fil.";
       if (it.action !== undefined && (!obj(it.action) || !str(it.action.label) || !str(it.action.href))) return "Knappen på et staging-element skal have tekst og link.";
