@@ -1,6 +1,7 @@
 "use client";
 
 import { SitePlanEditor } from "./site-plan-editor";
+import { FlatFromPano } from "./flat-from-pano";
 import { LinkInput } from "./links-open";
 import { useContext, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { placeMapSpots } from "@/lib/actions/tour-ai";
@@ -150,6 +151,7 @@ export function MapEditor({ config, edit, focus, preview, slug }: { config: Tour
         )}
       </Group>
       {!M.panorama && slug && <SitePlanEditor config={config} edit={edit} slug={slug} />}
+      {M.panorama && slug && <FlatFromPano config={config} edit={edit} />}
       <OverviewUiToggles config={config} edit={edit} preview={preview} />
       {M.panorama && <DroneLookEditor config={config} edit={edit} panorama />}
       <MapPageImport config={config} edit={edit} />

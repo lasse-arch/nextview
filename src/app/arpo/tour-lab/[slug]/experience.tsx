@@ -1050,7 +1050,7 @@ function TourExperience({
   const openPoint = useCallback(
     (p: Point) => {
       setSelected(p);
-      track("drone_point_click", { point_name: p.name, category: T.categories[p.cat].name });
+      track("drone_point_click", { point_name: p.name, category: T.categories[p.cat]?.name });
       lookAtPoint(p, true);
       if (p.tour) prepare(p.tour);
     },
@@ -2637,8 +2637,8 @@ function TourExperience({
             ) : selected.images?.length ? (
               <PointPhotos key={selected.id} images={selected.images} name={selected.name} onOpen={(at) => setLightbox({ images: selected.images!, at, title: selected.name })} />
             ) : null}
-            <div className="hv-kat" style={{ color: T.categories[selected.cat].color }}>
-              {T.categories[selected.cat].name}
+            <div className="hv-kat" style={{ color: T.categories[selected.cat]?.color }}>
+              {T.categories[selected.cat]?.name}
             </div>
             {finderPick?.best === selected.id && <div className="hv-bedst">★ {tx("Bedst til jer")}</div>}
             {selected.kicker && <div className="hv-pkick">{selected.kicker}</div>}

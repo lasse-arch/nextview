@@ -218,7 +218,7 @@ export function MapScene({
                 }}
               >
                 <div className="hv-pkt">
-                  <span className="hv-ikon" style={{ background: T.categories[p.cat].color }}>
+                  <span className="hv-ikon" style={{ background: T.categories[p.cat]?.color }}>
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" dangerouslySetInnerHTML={{ __html: icons[p.icon] ?? "" }} />
                   </span>
                   <span className="hv-navn">{p.name}</span>
@@ -241,7 +241,7 @@ export function MapScene({
                     onPoint(p);
                   }}
                 >
-                  <i style={{ background: T.categories[p.cat].color }} />
+                  <i style={{ background: T.categories[p.cat]?.color }} />
                   {p.name}
                 </button>
               </li>
