@@ -156,6 +156,7 @@ Regler:
   - steder med foto at vælge imellem → places + design.welcome "cover" eller design.menu "dock"
   - en efterskole med linjefag → lineDays ("En dag på din linje": fælles stop + hver linjes egne, lærere med billeder), åbnes med #linjedag
   - en dronefilm eller anden kort film, der skal køre i baggrunden af forsiden → design.welcome "cover" + cover.video ("Forside med film"; intro bruges så ikke)
+  - fliserne skal ligge over en film i stedet for over touren → welcome.video { src, srcMobile? } (design.welcome "tiles" eller "simple")
   - størrelser/rum at skifte mellem → design.menu "picker"
   - ledige pladser/datoer/rum fra kundens side → live
   - et luftfoto/kort at starte på → drone eller map; knapper → cta, dock eller placeCards.buttons

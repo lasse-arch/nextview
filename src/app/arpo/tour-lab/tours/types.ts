@@ -693,6 +693,12 @@ export type TourConfig = {
      */
     tiles: { kicker: string; title: string; go: WelcomeGo; style: "dark" | "light" | "accent"; recommended?: boolean; image?: string; place?: string }[];
     skip: string;
+    /**
+     * A looping film behind the tiles instead of the tour itself (e.g. the
+     * drone film) - muted, played over and over; `srcMobile` is a lighter
+     * version for phones. Without it, the tiles lie over the tour.
+     */
+    video?: { src: string; srcMobile?: string };
   };
   /** "free": walk around as in Matterport. "points": only the menu and points move you. */
   navigation: "free" | "points";

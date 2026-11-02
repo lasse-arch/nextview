@@ -49,6 +49,35 @@ function PlaceCards({ places, current, onPick }: { places: TourPlace[]; current?
 
 const filmType = (src: string) => (/\.webm(\?|#|$)/i.test(src) ? "video/webm" : "video/mp4");
 
+/**
+ * A silent, looping film filling its box behind the welcome tiles (welcome.video)
+ * - it fades in once it plays; visitors saving data get no film (the dark
+ * background shows instead), and motion turned off hides it (CSS).
+ */
+export function WelcomeFilm({ film }: { film: { src: string; srcMobile?: string } }) {
+  const [on, setOn] = useState(false);
+  const [saveData] = useState(() => typeof navigator !== "undefined" && Boolean((navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData));
+  if (saveData) return null;
+  return (
+    <video
+      className={`dz-film wel-film ${on ? "kører" : ""}`}
+      autoPlay
+      muted
+      loop
+      playsInline
+      preload="auto"
+      aria-hidden
+      onPlaying={() => setOn(true)}
+      ref={(v) => {
+        if (v && !v.paused && v.readyState > 2) queueMicrotask(() => setOn(true));
+      }}
+    >
+      {film.srcMobile && <source src={film.srcMobile} media="(max-width: 760px)" type={filmType(film.srcMobile)} />}
+      <source src={film.src} type={filmType(film.src)} />
+    </video>
+  );
+}
+
 /** The cover welcome: the place's own photo (or film), its name, and where you'd like to sit. */
 export function CoverWelcome({
   T,
@@ -369,6 +398,10 @@ export const DESIGNS_CSS = `
 .dz-film.kører{opacity:1}
 .dz-cover-film::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(100deg,rgba(12,9,6,.82) 0%,rgba(12,9,6,.55) 38%,rgba(12,9,6,.05) 70%),linear-gradient(180deg,rgba(12,9,6,0) 55%,rgba(12,9,6,.6))}
 @media (prefers-reduced-motion:reduce){.dz-film{display:none}}
+/* ---- Tiles over a film (welcome.video): the film covers the tour, a dark veil keeps the text readable ---- */
+.wel-med-film{isolation:isolate;background:#0d1b20 !important;backdrop-filter:none !important;-webkit-backdrop-filter:none !important}
+.wel-med-film::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(180deg,rgba(8,14,17,.3),rgba(8,14,17,.55))}
+.wel-film{position:fixed}
 .dz-cover-text{max-width:520px;animation:hvUp .8s cubic-bezier(.2,.7,.2,1) both}
 .dz-cover-logo{width:150px;height:auto;margin-bottom:28px;filter:drop-shadow(0 4px 16px rgba(0,0,0,.5))}
 .dz-cover h1{margin:12px 0 14px;font-size:68px;line-height:.98;font-weight:500;letter-spacing:-.01em;color:#fff}

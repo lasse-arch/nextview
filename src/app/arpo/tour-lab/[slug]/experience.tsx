@@ -19,7 +19,7 @@ import { FeatureTour, featuresSeen, FEATURES_CSS } from "./features";
 import { FinderSheet, FINDER_CSS, WalkLines } from "./finder";
 import { apiUrl, isStaticTour } from "../tours/api";
 import type { DroneView, FindStepAside, GuideTurn, MenuEntry, TourConfig, TourPlace, TourPoint, WelcomeGo } from "../tours/types";
-import { CoverWelcome, DESIGNS_CSS, DockMenu, PickerMenu } from "./designs";
+import { CoverWelcome, DESIGNS_CSS, DockMenu, PickerMenu, WelcomeFilm } from "./designs";
 import { GUIDE_CSS, GuidePlayer, guideStops } from "./guide";
 import { ONBOARDING_CSS, Onboarding } from "./onboarding";
 import { MENU_HINT_CSS, MenuHint } from "./menu-hint";
@@ -2722,7 +2722,8 @@ function TourExperience({
 
       {welcome && T.welcome && T.design?.welcome === "simple" && <SimpleWelcome T={T} onChoose={chooseWelcome} />}
       {welcome && T.welcome && T.design?.welcome !== "simple" && (
-        <div className="hv-wel" role="dialog" aria-modal="true" aria-label={T.welcome.title}>
+        <div className={`hv-wel ${T.welcome.video?.src ? "wel-med-film" : ""}`} role="dialog" aria-modal="true" aria-label={T.welcome.title}>
+          {T.welcome.video?.src && <WelcomeFilm film={T.welcome.video} />}
           <div className="hv-wel-grid">
             <div className={`hv-wel-main ${T.logoOnLight ? "hv-light" : ""}`}>
               {/* eslint-disable-next-line @next/next/no-img-element */}

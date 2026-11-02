@@ -440,6 +440,7 @@ export function StartEditor({ config, edit, slug, preview }: Props) {
               <input className={input} value={welcome.skip} onChange={(e) => edit((d) => void (d.welcome!.skip = e.target.value))} />
             </Field>
           </Group>
+          <WelcomeFilmGroup welcome={welcome} edit={edit} />
           <Group title="Fliser">
             <Rows
               items={welcome.tiles}
@@ -1798,6 +1799,48 @@ function IntroFilm({ config, edit }: { config: TourConfig; edit: Edit }) {
           <button type="button" className="px-1 text-[13px] text-[#ff3b30]" onClick={() => edit((d) => void (d.intro = undefined))}>
             Fjern filmen
           </button>
+        </>
+      )}
+    </Group>
+  );
+}
+
+/** What the welcome tiles lie over: the tour itself, or a looping film (welcome.video). */
+function WelcomeFilmGroup({ welcome, edit }: { welcome: NonNullable<TourConfig["welcome"]>; edit: Edit }) {
+  const v = welcome.video;
+  const set = (next: Partial<{ src: string; srcMobile?: string }>) =>
+    edit((d) => {
+      const merged = { src: "", ...d.welcome!.video, ...next };
+      d.welcome!.video = { src: merged.src, ...(merged.srcMobile ? { srcMobile: merged.srcMobile } : {}) };
+    });
+  return (
+    <Group title="Bag fliserne">
+      <Field title="Fliserne ligger over">
+        <Choice
+          value={v ? "film" : "tour"}
+          options={[
+            ["tour", "Selve touren"],
+            ["film", "En film"],
+          ]}
+          onChange={(c) => edit((d) => void (c === "film" ? (d.welcome!.video = d.welcome!.video ?? { src: "" }) : delete d.welcome!.video))}
+        />
+      </Field>
+      {v && (
+        <>
+          <p className={small}>Filmen kører uden lyd i ring bag fliserne og dækker touren, til gæsten vælger. Brug fx dronefilmen; 10-20 sekunder, 720p og 2-4 MB er nok.</p>
+          <Field title="Film" hint="mp4 (eller webm). Over 4 MB kræver Vercel Blob.">
+            <div className="flex gap-1.5">
+              <input className={input} placeholder="https://… eller upload" value={v.src} onChange={(e) => set({ src: e.target.value.trim() })} />
+              <UploadButton accept="video/mp4,video/webm" onDone={(url) => set({ src: url })} />
+            </div>
+          </Field>
+          <Field title="Egen film til mobil (valgfri)" hint="Stående format - ellers bruges filmen ovenfor.">
+            <div className="flex gap-1.5">
+              <input className={input} placeholder="https://… eller upload" value={v.srcMobile ?? ""} onChange={(e) => set({ srcMobile: e.target.value.trim() || undefined })} />
+              <UploadButton accept="video/mp4,video/webm" onDone={(url) => set({ srcMobile: url })} />
+            </div>
+          </Field>
+          {!v.src && <p className="px-1 text-[12px] text-[#ff9500]">Ingen film endnu - fliserne ligger over touren, til der er en.</p>}
         </>
       )}
     </Group>

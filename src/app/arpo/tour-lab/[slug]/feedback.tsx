@@ -275,7 +275,7 @@ export function FeedbackLayer({
             {notes.map((n) => (
               <li key={n.id} className={n.status === "done" ? "done" : ""}>
                 {n.status === "done" && (
-                  <span className="fb-k fixed">Løst</span>
+                  <span className="fb-k fb-loest">✓ Løst</span>
                 )}
                 <p>{n.text}</p>
                 <small>
@@ -334,7 +334,7 @@ export const FEEDBACK_CSS = `
 .fb-panel small{display:flex;align-items:center;gap:8px;font-size:12px;color:#6e6e73}
 .fb-panel small button{margin-left:auto;border:0;background:none;color:#0071e3;font:inherit;font-weight:600;cursor:pointer}
 .fb-k{display:inline-block;margin-right:4px;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;background:#e8f0fe;color:#0058b0}
-.fb-k.fixed{background:#e3f5e8;color:#248a3d}
+.fb-k.fb-loest{display:inline-flex;align-items:center;gap:3px;margin:0 0 4px;background:#e3f5e8;color:#248a3d}
 .fb-empty{font-size:14px;color:#6e6e73}
 .fb-toast{position:absolute;left:50%;bottom:24px;translate:-50% 0;z-index:47;padding:10px 16px;border-radius:999px;background:#1d1d1f;color:#fff;font-weight:600;font-size:14px}
 .fb-bar .fb-fold{padding:8px 11px;background:none;color:#fff;opacity:.7;font-size:16px;line-height:1}
