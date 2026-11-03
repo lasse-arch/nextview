@@ -4275,6 +4275,13 @@ const CSS = `
   .hv-panel{top:auto;bottom:0;left:0;right:0;width:auto;max-height:62%;border-radius:18px 18px 0 0;padding-bottom:calc(18px + env(safe-area-inset-bottom,0px))}
   .hv-fotos{aspect-ratio:auto;height:min(44vw,200px);border-radius:18px 18px 0 0;margin-bottom:10px}
   .hv-pvideo{border-radius:18px 18px 0 0;margin-top:-14px;margin-bottom:10px}
+  /* Never a card you scroll: the photo / video at the top gives way (down to a strip), the rest always fits, the buttons stay at the bottom. */
+  .hv-panel{display:flex;flex-direction:column;overflow:hidden;max-height:min(72%,640px)}
+  .hv-panel>*{flex:none}
+  .hv-panel>.hv-fotos,.hv-panel>.hv-pvideo{flex:0 1 min(44vw,200px);height:auto;min-height:84px;aspect-ratio:auto}
+  .hv-panel .hv-pknapper{position:static;margin-top:auto}
+  .hv-ptip{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+  .hv-fakta{gap:6px 14px;padding-top:9px;margin-bottom:9px}
   /* A compact card: short text (tap for all), the chips in one row, the buttons always at the bottom. */
   .hv-panel{padding-top:14px}
   .hv-panel h2{font-size:21px;margin-bottom:5px}
