@@ -7,6 +7,7 @@ import { prisma } from "@/lib/db";
 import { logActivity } from "@/lib/activity";
 import { danishMobile, sendSms, smsReady } from "@/lib/sms";
 import { teamCan } from "@/lib/team-roles";
+import { sendableTours } from "@/lib/sendable-tours";
 
 /*
  * Salg → "Send eksempel": while talking to a new customer, a seller types
@@ -41,8 +42,8 @@ const STARTED = new Set(["tour_use", "tour_enter", "menu_click", "menu_open", "p
 const COUNTRY: Record<string, string> = { DK: "Danmark", DE: "Tyskland", SE: "Sverige", NO: "Norge" };
 
 /** What the page needs: the showcase tours, the text, and what's been sent lately (and opened). */
-/** Which tours a seller may send to new customers: an admin any, the others those chosen as examples (Kan sendes som eksempel) and those already out (published). */
-const sendable = (user: Parameters<typeof teamCan>[0]) => (teamCan(user, "admin") ? {} : { OR: [{ showcase: true }, { published: true }, { liveVersion: { not: null } }] });
+/** Which tours a seller may send (see sendableTours) - those in review too. */
+const sendable = sendableTours;
 
 export async function demoSmsSetup(): Promise<DemoSmsSetup> {
   const user = await requireUser();

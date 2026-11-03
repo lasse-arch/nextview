@@ -6,6 +6,7 @@ import { onlineTours } from "@/lib/online-tours";
 import { getAppBaseUrl } from "@/lib/email-oauth";
 import { MailGenerator, type MailSender } from "../mailgenerator/mail-generator";
 import { teamCan } from "@/lib/team-roles";
+import { sendableTours } from "@/lib/sendable-tours";
 
 
 /*
@@ -26,6 +27,9 @@ export async function MailSection({ user }: { user: NonNullable<Awaited<ReturnTy
     prisma.salesMail.count({ where: { finalAt: { not: null } } }),
   ]);
   const base = getAppBaseUrl();
+  // Our tours not out on the net yet that the seller may send all the same (in review; an admin any) - as showcase links only.
+  const online = new Set(tours.flatMap((t) => (t.ours ? t.variants.map((v) => v.key.replace(/^t:/, "")) : [])));
+  const notOut = (await prisma.tour.findMany({ where: { AND: [sendableTours(user), { published: false, liveVersion: null }] }, select: { slug: true, name: true, reviewSentAt: true, deal: { select: { industry: true, companyName: true, displayName: true } } }, orderBy: { name: "asc" } })).filter((t) => !online.has(t.slug));
   const sellerName = [user.name, user.lastName].filter(Boolean).join(" ");
   const sign = (u: { name: string; lastName: string | null; phone: string | null }) =>
     ["Med venlig hilsen", [u.name, u.lastName].filter(Boolean).join(" "), "Nextview360", u.phone ? `Tlf: ${u.phone}` : null].filter((l): l is string => Boolean(l));
@@ -47,7 +51,17 @@ export async function MailSection({ user }: { user: NonNullable<Awaited<ReturnTy
   return (
     <MailGenerator
       deals={deals.map((d) => ({ id: d.id, name: dealName(d), contact: d.contactName ?? "", email: d.contactEmail || d.invoiceEmail || "", industry: industryOf(dealName(d), d.industry) }))}
-      tours={tours.flatMap((t) =>
+      tours={[
+        ...notOut.map((t) => ({
+          key: `a:${t.slug}`,
+          name: `${t.name} · ${t.reviewSentAt ? "i gennemgang" : "ikke udgivet"}`,
+          url: "",
+          slug: t.slug,
+          demoOnly: true,
+          review: Boolean(t.reviewSentAt),
+          industry: industryOf(t.deal ? dealName(t.deal) : t.name, t.deal?.industry),
+        })),
+        ...tours.flatMap((t) =>
         (t.variants.length > 1 ? t.variants.map((v) => ({ key: v.key, name: `${t.customer} - ${v.label}`, url: v.url })) : [{ key: t.key, name: t.customer, url: t.url }]).map((x) => ({
           ...x,
           // Our own tours (Arpo): the key is the tour's address - it can go out as a showcase link.
@@ -55,7 +69,8 @@ export async function MailSection({ user }: { user: NonNullable<Awaited<ReturnTy
           url: x.url.startsWith("/") ? `${base}${x.url}` : x.url,
           industry: t.industry,
         }))
-      )}
+      ),
+      ]}
       signature={sign(user)}
       senders={senders}
       learned={learned}

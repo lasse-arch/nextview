@@ -8,7 +8,8 @@ import { demoLinksForMail } from "@/lib/actions/demo-sms";
 
 type Deal = { id: string; name: string; contact: string; email: string; industry: string };
 /** `slug`: one of our own tours in Arpo - it can go out as a showcase link (walk-through + we see who looks). */
-type Tour = { key: string; name: string; url: string; industry: string; slug?: string };
+/** `demoOnly`: one of ours not out on the net yet (in review) - it can only go out as a showcase link. */
+type Tour = { key: string; name: string; url: string; industry: string; slug?: string; demoOnly?: boolean; review?: boolean };
 
 const input = "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-slate-500 focus:outline-none";
 const label = "block text-[11px] font-semibold uppercase tracking-wide text-slate-500";
@@ -66,7 +67,8 @@ export function MailGenerator({ deals, tours, signature: mine, learned, senders 
   const shown = useMemo(() => {
     const q = tourQuery.trim().toLowerCase();
     const list = q ? tours.filter((t) => t.name.toLowerCase().includes(q)) : tours;
-    return [...list].sort((a, b) => Number(b.industry === industry) - Number(a.industry === industry) || a.name.localeCompare(b.name, "da")).slice(0, q ? 30 : 12);
+    // The ones in review first (just made - often the one to show), then the industry's, then the rest.
+    return [...list].sort((a, b) => Number(Boolean(b.review)) - Number(Boolean(a.review)) || Number(b.industry === industry) - Number(a.industry === industry) || a.name.localeCompare(b.name, "da")).slice(0, q ? 30 : 12);
   }, [tours, tourQuery, industry]);
 
   const data = (links: Record<string, string> = {}): SalesMailInput => ({
@@ -81,7 +83,8 @@ export function MailGenerator({ deals, tours, signature: mine, learned, senders 
     price: withPrice
       ? { establishment: toNum(price.establishment), monthly: toNum(price.monthly), locations: toNum(price.locations), bindingMonths: toNum(price.bindingMonths), conditions: price.conditions }
       : null,
-    tours: picked.map((k) => tours.find((t) => t.key === k)!).filter(Boolean).map((t) => ({ name: t.name, url: (t.slug && links[t.slug]) || t.url })),
+    // A tour not out yet goes only as a showcase link - without one it's left out.
+    tours: picked.map((k) => tours.find((t) => t.key === k)!).filter(Boolean).map((t) => ({ name: t.name.replace(/ · (i gennemgang|ikke udgivet)$/, ""), url: (t.slug && links[t.slug]) || t.url })).filter((t) => t.url),
   });
 
   /** The showcase links for the picked tours of ours (made once per recipient and tour). */
@@ -270,9 +273,9 @@ export function MailGenerator({ deals, tours, signature: mine, learned, senders 
                     key={t.key}
                     type="button"
                     aria-pressed={on}
-                    disabled={!on && picked.length >= 3}
+                    disabled={!on && (picked.length >= 3 || Boolean(t.demoOnly && !asDemo))}
                     onClick={() => setPicked(on ? picked.filter((k) => k !== t.key) : [...picked, t.key])}
-                    title={t.industry}
+                    title={t.demoOnly && !asDemo ? "Ikke ude endnu - kan kun sendes som fremvisningslink" : t.industry}
                     className={`rounded-full px-3 py-1 text-xs ${on ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200"} disabled:opacity-40`}
                   >
                     {t.name}
