@@ -272,8 +272,9 @@ export type TourConfig = {
   /** The same for the logo on the welcome tiles' box (left out: as logoBg). */
   logoBgTiles?: "none" | "light" | "main";
   /**
-   * The logo animates big in the middle of the screen when a welcome tile is
-   * tapped (about 1.5 s, while the tour moves on underneath - it never blocks):
+   * When a welcome tile is tapped: the screen goes black, the logo unfolds in
+   * the middle, and it all fades away into the tour where the tile leads (about
+   * 2.4 s - the tour gets there meanwhile, underneath; no clicks are caught):
    * "wings" = the logo's wing fans out feather by feather and the name slides
    * in (see logoAnimMark; without it its two halves fold out from the middle),
    * e.g. Skyum, "assemble" = it's put together from slices, "zoom" = it

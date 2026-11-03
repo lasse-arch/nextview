@@ -170,6 +170,13 @@ Fx specialefterskoler (ADHD, autisme, nedsat kognitivt funktionsniveau):
 - Farver fra hjemmesiden: `main` = den mørke/dominerende farve, `accent` =
   knapfarven, `accentDark` = en mørkere udgave af accent, `soft` = en lys
   baggrund. Sørg for god kontrast (hvid tekst på main, mørk tekst på soft).
+- Hjemmesiden har kun sort/grå/hvid + én brandfarve (fx Nymarksminde: rød på
+  sort)? Så brug IKKE sort/grå som `main` - touren bliver tung. Brandfarven
+  bliver `accent` (knapperne), og `main` bliver en dyb farve, der passer til
+  stedet og går med brandfarven: skovgrøn til dyrepark/bondegård/natur, dyb
+  havblå til strand og vand, varm mørkebrun til mad. `soft` varm og lys
+  (creme/hø/sand) frem for grå. Eksempel Nymarksminde: main #2e5233, accent
+  #d42826, accentDark #a81f1d, soft #fbf6ea, skrift Nunito, overskrifter Fredoka.
 - Skrift: hjemmesidens skrift, hvis den findes på Google Fonts - ellers en tæt
   på. Overskrifter må have deres egen skrift (fx en serif til restauranter).
 - Mørkt logo → sæt "logoOnLight", så det står på lys baggrund.

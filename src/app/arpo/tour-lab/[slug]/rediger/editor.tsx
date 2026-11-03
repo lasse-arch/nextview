@@ -816,7 +816,7 @@ export function TourEditor({
                     onChange={(v) => edit((d) => void (d.logoAlignTiles = v === "midt" ? undefined : v))}
                   />
                 </Field>
-                <Field title="Logoet animeres, når man trykker på en flise" hint="Logoet vises stort midt på skærmen et øjeblik (ca. 1,5 sek.), mens touren går videre. Vinger: vingen i logoet folder sig ud, og navnet glider ind. Samles: logoet sættes sammen af stykker. Zoom: det kommer i fokus.">
+                <Field title="Logoet animeres, når man trykker på en flise" hint="Skærmen går i sort, logoet folder sig ud i midten, og det hele fader ud - ind i touren, hvor flisen fører hen (ca. 2,4 sek.). Vinger: vingen i logoet folder sig ud, og navnet glider ind. Samles: logoet sættes sammen af stykker. Zoom: det kommer i fokus.">
                   <Choice<"off" | "wings" | "assemble" | "zoom">
                     value={config.logoAnim ?? "off"}
                     options={[
