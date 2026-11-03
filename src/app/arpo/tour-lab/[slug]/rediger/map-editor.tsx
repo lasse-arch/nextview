@@ -6,6 +6,7 @@ import { LinkInput } from "./links-open";
 import { useContext, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { placeMapSpots } from "@/lib/actions/tour-ai";
 import { importMapPageAction } from "@/lib/actions/tour-files";
+import { checkShopProduct } from "@/lib/actions/tour-shop";
 import { ICONS, ICON_NAMES, guessIcon } from "../../tours/icons";
 import { PANO_HFOV, isPlaceHref, panoHfov, pointOfHref } from "../../tours/places";
 import { fitPano } from "../../tours/pano-cover";
@@ -1114,6 +1115,7 @@ function PointPanel({
             onChange={(href) => setPoint((x) => void (x.button = href || x.button?.label ? { label: x.button?.label ?? "", href } : undefined))}
           />
         </Field>
+        <ShopField value={p.shop} onChange={(shop) => setPoint((x) => void (x.shop = shop))} />
       </Group>
       <Group title="Gåafstande">
         <p className="text-[12px] leading-snug text-[#8e8e93]">
@@ -1452,5 +1454,44 @@ function MapPageImport({ config, edit }: { config: TourConfig; edit: Edit }) {
       {busy && <p className="px-1 text-[12px] text-[#8e8e93]">Sætter luftfotoet sammen og kopierer filerne - det tager typisk ½-1 minut.</p>}
       {note && <p className={`px-1 text-[12px] leading-snug ${note.error ? "text-[#ff3b30]" : "text-[#34c759]"}`}>{note.text}</p>}
     </Group>
+  );
+}
+
+/** "Booking fra webshop" on a point: the product page whose free days and price the card's "Vælg datoer" shows. */
+function ShopField({ value, onChange }: { value?: TourPoint["shop"]; onChange: (v: TourPoint["shop"]) => void }) {
+  const { slug } = useContext(FilesContext);
+  const [note, setNote] = useState<{ text: string; error?: boolean } | null>(null);
+  const [busy, start] = useTransition();
+  return (
+    <Field title="Booking fra webshop (valgfri)" hint='Link til produktet i kundens webshop med en kalender (fx Bed and Breakfast). Kortet får "Vælg datoer": ledige dage, antal gæster, prisen - og Book, der åbner webshoppen.'>
+      <input
+        className={`${input} bg-white`}
+        placeholder="https://webshop.…/product/…"
+        value={value?.url ?? ""}
+        onChange={(e) => {
+          setNote(null);
+          onChange(e.target.value.trim() ? { ...value, url: e.target.value.trim() } : undefined);
+        }}
+      />
+      {value?.url && (
+        <>
+          <input className={`${input} mt-1.5 bg-white`} placeholder='Knappens tekst - tom: "Vælg datoer"' value={value.label ?? ""} onChange={(e) => onChange({ ...value, label: e.target.value || undefined })} />
+          <button
+            type="button"
+            disabled={busy}
+            className="mt-1.5 self-start rounded-lg px-2 py-1 text-[13px] font-medium text-[#0071e3] hover:bg-[#0071e3]/5"
+            onClick={() =>
+              start(async () => {
+                const r = await checkShopProduct(slug, value.url);
+                setNote(r.ok ? { text: r.text } : { text: r.error, error: true });
+              })
+            }
+          >
+            {busy ? "Tjekker…" : "Tjek hvad touren kan læse"}
+          </button>
+          {note && <p className={`text-[12px] leading-snug ${note.error ? "text-[#ff3b30]" : "text-[#1f7a35]"}`}>{note.text}</p>}
+        </>
+      )}
+    </Field>
   );
 }

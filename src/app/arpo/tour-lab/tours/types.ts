@@ -225,6 +225,14 @@ export type TourPoint = {
   images?: string[];
   /** A button on the point's card, e.g. "Book en komfortplads" (opens like any link out of the tour). */
   button?: { label: string; href: string };
+  /**
+   * Book from the customer's webshop: a product page with a date calendar (e.g.
+   * https://webshop.nymarksminde.dk/da/product/bed-and-breakfast). The card gets
+   * "Vælg datoer": the days that can be booked (the shop's own calendar, read
+   * every 10 minutes), guests, the shop's price for the stay - and Book, which
+   * opens the product in the shop. `label`: the button's words (default "Vælg datoer").
+   */
+  shop?: { url: string; label?: string };
   /** Where the point is on the tour's site plan (sitePlan), as fractions of the plan picture (x1, y1, x2, y2) - gives the card a button that shows the plan zoomed in on it. */
   planBox?: [number, number, number, number];
   text: string;
