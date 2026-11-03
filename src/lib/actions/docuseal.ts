@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { isDocuSealConfigured, createAndSendSubmission, cancelDocuSealSubmission, customerSigningLink, resendCustomerSigningMail } from "@/lib/docuseal";
 import { lookupCvrNumber } from "@/lib/cvr";
+import { syncContract } from "@/lib/contract-sync";
 import {
   buildContractHtmlData,
   computeMonthlyTotal,
@@ -287,6 +288,26 @@ export async function getCustomerSigningLink(dealId: string): Promise<{ ok: true
     return url ? { ok: true, url } : { ok: false, error: "DocuSeal gav ikke noget link til kunden." };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Linket kunne ikke hentes." };
+  }
+}
+
+/**
+ * "Tjek status hos DocuSeal": asks DocuSeal what has happened to the contract
+ * - if the customer signed but Arpo never heard (a lost webhook), it's marked
+ * signed now, with everything that comes with it.
+ */
+export async function checkContractStatus(dealId: string): Promise<{ ok: true; text: string } | { ok: false; error: string }> {
+  try {
+    const submissionId = await sentContractOf(dealId);
+    const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId }, select: { contractViewedAt: true } });
+    const r = await syncContract({ submissionId, viewedAt: deal.contractViewedAt });
+    revalidatePath(`/arpo/deals/${dealId}`);
+    return {
+      ok: true,
+      text: { signed: "Kunden har skrevet under - dealen er nu flyttet til underskrevet.", declined: "Kunden har afvist kontrakten.", viewed: "Kunden har åbnet kontrakten, men ikke skrevet under endnu.", unchanged: "Ikke underskrevet endnu - DocuSeal siger det samme som Arpo." }[r],
+    };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Status kunne ikke hentes." };
   }
 }
 

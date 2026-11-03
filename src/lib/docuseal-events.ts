@@ -1,0 +1,271 @@
+/*
+ * What a DocuSeal event does to a contract - a deal's or a standalone one:
+ * opened, signed (status, "Ydelser" lines, tasks, commission, the signed mail,
+ * Drive), declined, expired. Used by the webhook and by the status check that
+ * asks DocuSeal itself (contract-sync.ts) when a webhook never arrived.
+ */
+import { prisma } from "@/lib/db";
+import { downloadCompletedPdf } from "@/lib/docuseal";
+import { recalcCommission } from "@/lib/commission-service";
+import { sendContractSignedNotification } from "@/lib/notification-service";
+import {
+  contractProductsToDealItems,
+  type ContractProducts,
+} from "@/lib/contract-template-data";
+import {
+  archiveSignedContractToDrive,
+  findArchivingGoogleAccount,
+} from "@/lib/contract-drive-archive";
+import {
+  findOrCreateContractsFolder,
+  uploadPdfToDrive,
+} from "@/lib/google-drive";
+import { isIntegrationEnabled } from "@/lib/integration-settings";
+import {
+  createDeliveryTasksForSignedContract,
+  completeContractFollowUpTasks,
+} from "@/lib/task-automation";
+import { logActivity } from "@/lib/activity";
+import { dealName } from "@/lib/labels";
+import { INVOICE_EMAIL_FIELD } from "@/lib/contract-html-template";
+
+type DocuSealFieldValue = { field?: string; value?: unknown };
+
+export type DocuSealEvent = {
+  event_type?: string;
+  timestamp?: string;
+  data?: {
+    external_id?: string;
+    status?: string;
+    submission?: { id?: number };
+    submission_id?: number;
+    /** form.completed: what this submitter filled in. */
+    values?: DocuSealFieldValue[];
+    /** submission.completed: every submitter, with their values. */
+    submitters?: { external_id?: string; values?: DocuSealFieldValue[] }[];
+  };
+};
+
+/** The invoice e-mail the customer typed into the contract, if any. */
+function invoiceEmailFromPayload(payload: DocuSealEvent): string | null {
+  const values =
+    payload.data?.values ??
+    payload.data?.submitters?.find((s) => s.external_id === "customer")
+      ?.values ??
+    [];
+  const raw = values.find((v) => v.field === INVOICE_EMAIL_FIELD)?.value;
+  const email = typeof raw === "string" ? raw.trim().toLowerCase() : "";
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : null;
+}
+
+/**
+ * A standalone contract (see standalone-contracts.ts) has no Deal to attach
+ * ContractEvent history or run deal-only side effects (commission, "Ydelser"
+ * lines, the signed-notification email) to yet - those all happen once it's
+ * linked to one instead. This just keeps its own status/dates current and,
+ * once fully signed, files it into Drive under its company name.
+ */
+async function handleStandaloneEvent(
+  contract: {
+    id: string;
+    companyName: string;
+    displayName: string | null;
+    contractViewedAt: Date | null;
+    contractSignedAt: Date | null;
+    docusealSubmissionId: string | null;
+  },
+  type: string,
+  isCustomer: boolean,
+  changedAt: Date,
+) {
+  if (type === "form.viewed") {
+    if (isCustomer && !contract.contractViewedAt) {
+      await prisma.standaloneContract.update({
+        where: { id: contract.id },
+        data: { contractStatus: "VIEWED", contractViewedAt: changedAt },
+      });
+    }
+  } else if (
+    (type === "form.completed" && isCustomer) ||
+    type === "submission.completed"
+  ) {
+    if (!contract.contractSignedAt) {
+      await prisma.standaloneContract.update({
+        where: { id: contract.id },
+        data: { contractStatus: "SIGNED", contractSignedAt: changedAt },
+      });
+    }
+    if (type === "submission.completed") {
+      try {
+        if (
+          (await isIntegrationEnabled("GOOGLE_DRIVE")) &&
+          contract.docusealSubmissionId
+        ) {
+          const account = await findArchivingGoogleAccount();
+          if (account) {
+            const pdf = await downloadCompletedPdf(
+              contract.docusealSubmissionId,
+            );
+            const folderId = await findOrCreateContractsFolder(account);
+            const fileName = `${contract.displayName || contract.companyName} - underskrevet kontrakt.pdf`;
+            await uploadPdfToDrive(
+              account,
+              folderId,
+              fileName,
+              Buffer.from(pdf),
+            );
+          }
+        }
+      } catch (err) {
+        console.error(
+          `Google Drev-arkivering fejlede for standalone-kontrakt ${contract.id}:`,
+          err,
+        );
+      }
+    }
+  } else if (type === "form.declined") {
+    await prisma.standaloneContract.update({
+      where: { id: contract.id },
+      data: { contractStatus: "DECLINED" },
+    });
+  } else if (type === "submission.expired" || type === "submission.archived") {
+    await prisma.standaloneContract.update({
+      where: { id: contract.id },
+      data: { contractStatus: "VOIDED" },
+    });
+  }
+}
+
+export async function handleDocuSealEvent(
+  payload: DocuSealEvent,
+): Promise<void> {
+  const type = payload.event_type;
+  const submissionId =
+    payload.data?.submission?.id ?? payload.data?.submission_id;
+  if (!type || !submissionId) return;
+
+  const isCustomer = payload.data?.external_id === "customer";
+  const changedAt = payload.timestamp
+    ? new Date(payload.timestamp)
+    : new Date();
+
+  const deal = await prisma.deal.findUnique({
+    where: { docusealSubmissionId: String(submissionId) },
+  });
+  if (!deal) {
+    const standalone = await prisma.standaloneContract.findUnique({
+      where: { docusealSubmissionId: String(submissionId) },
+    });
+    if (standalone)
+      await handleStandaloneEvent(standalone, type, isCustomer, changedAt);
+    return;
+  }
+
+  function logEvent(eventType: string) {
+    return prisma.contractEvent.create({
+      data: { dealId: deal!.id, type: eventType, occurredAt: changedAt },
+    });
+  }
+
+  async function markSigned() {
+    const invoiceEmail = invoiceEmailFromPayload(payload);
+    if (invoiceEmail && invoiceEmail !== deal!.invoiceEmail) {
+      await prisma.deal.update({
+        where: { id: deal!.id },
+        data: { invoiceEmail },
+      });
+    }
+    if (deal!.contractSignedAt) return;
+    await prisma.deal.update({
+      where: { id: deal!.id },
+      data: {
+        contractStatus: "SIGNED",
+        contractSignedAt: changedAt,
+        soldAt: deal!.soldAt ?? changedAt,
+        stage: "CONTRACT_SIGNED",
+        inLeadInbox: false,
+      },
+    });
+    await logEvent("SIGNED");
+    await completeContractFollowUpTasks(deal!.id);
+    await logActivity({
+      type: "CONTRACT_SIGNED",
+      message: `${dealName(deal!)} underskrev kontrakten`,
+      dealId: deal!.id,
+    });
+
+    // Carry each product on the now-signed contract down into "Ydelser" as
+    // its own line - including ones given away for free - so once there are
+    // many customers, it's possible to see at a glance who has what.
+    if (deal!.contractProducts) {
+      const products = deal!.contractProducts as unknown as ContractProducts;
+      const items = contractProductsToDealItems(products);
+      if (items.length > 0) {
+        await prisma.dealItem.createMany({
+          data: items.map((item) => ({ ...item, dealId: deal!.id })),
+        });
+      }
+      await createDeliveryTasksForSignedContract(
+        deal!.id,
+        deal!.ownerId,
+        products,
+      );
+    }
+
+    await recalcCommission(deal!.id);
+    await sendContractSignedNotification(deal!.id);
+  }
+
+  if (type === "form.viewed") {
+    // Only the customer opening it is meaningful here - the director (the
+    // other submitter) may auto-preview it, which shouldn't count as "opened".
+    // Every open is logged (not just the first) so the hover box can show a
+    // history, e.g. the customer opening it several times before signing.
+    if (isCustomer) {
+      await logEvent("VIEWED");
+      if (!deal.contractViewedAt) {
+        await prisma.deal.update({
+          where: { id: deal.id },
+          data: { contractStatus: "VIEWED", contractViewedAt: changedAt },
+        });
+        // Only the first open, same as contractViewedAt itself - otherwise a
+        // customer opening it several times before signing would flood the
+        // dashboard feed with repeat entries.
+        await logActivity({
+          type: "CONTRACT_VIEWED",
+          message: `${dealName(deal)} åbnede kontrakten`,
+          dealId: deal.id,
+        });
+      }
+    }
+  } else if (type === "form.completed" && isCustomer) {
+    // The customer's own signature is what "underskrevet" should reflect,
+    // not submission.completed - which only fires once every submitter
+    // (including our own director) has signed, and could lag behind.
+    await markSigned();
+  } else if (type === "submission.completed") {
+    // Backstop in case form.completed's external_id was ever missing.
+    await markSigned();
+    // Only now (both submitters done) is the fully-signed PDF actually
+    // available to download - best-effort, must never fail the webhook.
+    try {
+      await archiveSignedContractToDrive(deal.id);
+    } catch (err) {
+      console.error(`Google Drev-arkivering fejlede for deal ${deal.id}:`, err);
+    }
+  } else if (type === "form.declined") {
+    await prisma.deal.update({
+      where: { id: deal.id },
+      data: { contractStatus: "DECLINED" },
+    });
+    await logEvent("DECLINED");
+  } else if (type === "submission.expired" || type === "submission.archived") {
+    await prisma.deal.update({
+      where: { id: deal.id },
+      data: { contractStatus: "VOIDED" },
+    });
+    await logEvent(type === "submission.expired" ? "EXPIRED" : "ARCHIVED");
+  }
+
+  return;
+}

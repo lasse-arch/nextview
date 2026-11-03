@@ -1,14 +1,17 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { getCustomerSigningLink, resendContractMail } from "@/lib/actions/docuseal";
+import { useRouter } from "next/navigation";
+import { checkContractStatus, getCustomerSigningLink, resendContractMail } from "@/lib/actions/docuseal";
 
 /**
  * When the customer can't use the button in DocuSeal's mail: copy their
  * signing link (to send by sms or a plain mail) - or have DocuSeal send the
- * mail again. The deal's seller and admins only.
+ * mail again, or ask DocuSeal whether it's been signed (when Arpo never
+ * heard). The deal's seller and admins only.
  */
 export function SigningLinkButtons({ dealId }: { dealId: string }) {
+  const router = useRouter();
   const [pending, start] = useTransition();
   const [note, setNote] = useState<{ text: string; error?: boolean } | null>(null);
   const button = "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50";
@@ -45,6 +48,20 @@ export function SigningLinkButtons({ dealId }: { dealId: string }) {
         }
       >
         Send kontraktmailen igen
+      </button>
+      <button
+        type="button"
+        disabled={pending}
+        className={button}
+        onClick={() =>
+          start(async () => {
+            const r = await checkContractStatus(dealId);
+            setNote(r.ok ? { text: r.text } : { text: r.error, error: true });
+            if (r.ok) router.refresh();
+          })
+        }
+      >
+        Tjek status hos DocuSeal
       </button>
       {note && <p className={`break-all text-xs ${note.error ? "text-red-600" : "text-slate-500"}`}>{note.text}</p>}
     </div>

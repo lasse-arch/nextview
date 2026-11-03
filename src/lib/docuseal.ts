@@ -82,7 +82,19 @@ type DocuSealSubmissionDetails = {
   status: string;
   combined_document_url: string | null;
   documents?: { name: string; url: string }[];
-  submitters?: { id?: number; role?: string; external_id?: string; embed_src?: string; status?: string; documents?: { name: string; url: string }[] }[];
+  submitters?: {
+    id?: number;
+    role?: string;
+    external_id?: string;
+    embed_src?: string;
+    status?: string;
+    opened_at?: string | null;
+    completed_at?: string | null;
+    declined_at?: string | null;
+    values?: { field?: string; value?: unknown }[];
+    documents?: { name: string; url: string }[];
+  }[];
+  completed_at?: string | null;
 };
 
 /** The customer's own signing page in DocuSeal (the same link as the button in DocuSeal's mail), or null when it isn't there. */
@@ -101,6 +113,26 @@ export async function resendCustomerSigningMail(submissionId: string): Promise<v
   if (!customer?.id) throw new Error("DocuSeal: kunden blev ikke fundet på kontrakten.");
   const res = await fetch(`${DOCUSEAL_API_BASE}/submitters/${customer.id}`, { method: "PUT", headers: headers(), body: JSON.stringify({ send_email: true }) });
   if (!res.ok) throw new Error(`DocuSeal: kunne ikke sende mailen igen (${res.status})`);
+}
+
+/**
+ * What DocuSeal itself says happened to a submission, as the events its
+ * webhook would have sent (in order) - so a lost webhook can be made up for.
+ */
+export async function submissionEvents(submissionId: string): Promise<{ event_type: string; timestamp: string; data: { submission_id: number; external_id?: string; values?: { field?: string; value?: unknown }[] } }[]> {
+  const s = await getSubmission(submissionId);
+  const id = Number(submissionId);
+  const customer = s.submitters?.find((x) => x.external_id === "customer");
+  const out: Awaited<ReturnType<typeof submissionEvents>> = [];
+  if (customer?.opened_at) out.push({ event_type: "form.viewed", timestamp: customer.opened_at, data: { submission_id: id, external_id: "customer" } });
+  if (customer?.declined_at) out.push({ event_type: "form.declined", timestamp: customer.declined_at, data: { submission_id: id, external_id: "customer" } });
+  if (customer?.completed_at) out.push({ event_type: "form.completed", timestamp: customer.completed_at, data: { submission_id: id, external_id: "customer", values: customer.values } });
+  const all = s.submitters ?? [];
+  if (s.status === "completed" || (all.length > 0 && all.every((x) => x.completed_at))) {
+    const at = s.completed_at ?? all.map((x) => x.completed_at ?? "").sort().at(-1) ?? new Date().toISOString();
+    out.push({ event_type: "submission.completed", timestamp: at, data: { submission_id: id } });
+  }
+  return out;
 }
 
 async function getSubmission(submissionId: string): Promise<DocuSealSubmissionDetails> {
