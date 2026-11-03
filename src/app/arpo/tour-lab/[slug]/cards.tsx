@@ -1,6 +1,6 @@
 "use client";
 
-import { useT } from "../tours/i18n-react";
+import { useLang, useT } from "../tours/i18n-react";
 import { useEffect, useRef, useState } from "react";
 import type { PlaceCard as Card, TourConfig } from "../tours/types";
 import { TourLink } from "./links";
@@ -16,9 +16,12 @@ export function PlaceCard({
   onClose,
   onRoom,
   onLink,
+  voice,
 }: {
   card: Card;
   size?: TourConfig["placeCardSize"];
+  /** "Få det læst op" (TourConfig.placeCardVoice) - its button's words, or undefined for none. */
+  voice?: string;
   onClose: (how: "timer" | "close" | "button") => void;
   onRoom: (name: string) => void;
   onLink: (label: string, href: string) => void;
@@ -43,6 +46,29 @@ export function PlaceCard({
     ro.observe(el);
     return () => ro.disconnect();
   }, [card.text, page]);
+  // Read aloud by the device's own voice, in the tour's language - stopped when the card goes.
+  const lang = useLang();
+  const [reading, setReading] = useState(false);
+  const canSpeak = typeof window !== "undefined" && "speechSynthesis" in window;
+  useEffect(() => () => void (canSpeak && window.speechSynthesis.cancel()), [canSpeak]);
+  function readAloud() {
+    if (!canSpeak) return;
+    const synth = window.speechSynthesis;
+    if (reading) {
+      synth.cancel();
+      return setReading(false);
+    }
+    setStopped(true); // the card stays while it's read
+    synth.cancel();
+    const u = new SpeechSynthesisUtterance([card.title, card.text, card.more?.text].filter(Boolean).join(". "));
+    u.lang = SPEECH_LANG[lang] ?? "da-DK";
+    const v = synth.getVoices().find((x) => x.lang.toLowerCase().startsWith(u.lang.slice(0, 2).toLowerCase()));
+    if (v) u.voice = v;
+    u.rate = 0.95;
+    u.onend = u.onerror = () => setReading(false);
+    synth.speak(u);
+    setReading(true);
+  }
   const seconds = card.seconds ?? 15;
   // At most three, and only those with a photo (name and role are optional).
   const people = (card.people ?? []).filter((p) => p.image).slice(0, 3);
@@ -57,6 +83,14 @@ export function PlaceCard({
       {page === 1 ? (
         <>
           <h3>{card.title}</h3>
+          {voice && canSpeak && (
+            <button type="button" className={`pc-laes ${reading ? "aktiv" : ""}`} onClick={readAloud}>
+              <svg viewBox="0 0 24 24" aria-hidden>
+                {reading ? <rect x="7" y="7" width="10" height="10" rx="1.5" /> : <path d="M4 9v6h4l5 4V5L8 9zM16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" />}
+              </svg>
+              {reading ? tr("Stop oplæsningen") : voice}
+            </button>
+          )}
           <p ref={textEl} className={open ? "" : "pc-klip"}>
             {card.text}
           </p>
@@ -137,7 +171,14 @@ export function NudgeCard({ T, onClose, onLink }: { T: TourConfig; onClose: () =
   );
 }
 
+/** The voice's language for the tour's language. */
+const SPEECH_LANG: Record<string, string> = { da: "da-DK", en: "en-GB", de: "de-DE", sv: "sv-SE", nb: "nb-NO", nl: "nl-NL", fr: "fr-FR", es: "es-ES", it: "it-IT", pl: "pl-PL", kl: "da-DK" };
+
 export const CARDS_CSS = `
+.pc-laes{display:inline-flex;align-items:center;gap:6px;margin:-2px 0 8px;padding:4px 10px 4px 8px;border:0;border-radius:999px;background:color-mix(in srgb,var(--c-accent) 12%,transparent);color:var(--c-main);font:inherit;font-size:12.5px;font-weight:700;cursor:pointer}
+.pc-laes svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.pc-laes.aktiv{background:var(--c-accent);color:#fff}
+.pc-laes.aktiv svg{fill:currentColor;stroke:none}
 .pc{position:absolute;left:24px;bottom:96px;z-index:7;width:min(380px,calc(100% - 24px));padding:18px 22px 18px;border-radius:14px;background:#fff;color:var(--c-main);box-shadow:0 10px 30px rgba(0,0,0,.2);overflow:hidden;animation:hvUp .4s cubic-bezier(.2,.7,.2,1) both}
 .pc-bar{position:absolute;left:0;right:0;top:0;height:3px;background:color-mix(in srgb,var(--c-accent) 18%,transparent)}
 .pc-bar i{display:block;height:100%;background:var(--c-accent);transform-origin:left;animation:pcTael linear forwards}

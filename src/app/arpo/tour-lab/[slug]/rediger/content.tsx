@@ -1427,6 +1427,17 @@ export function CardsEditor({ config, edit, preview, scanMap, mpskinsHidden }: O
             onChange={(v) => edit((d) => void (d.placeCardSize = v === "mellem" ? undefined : (v as "lille" | "stor")))}
           />
         </Field>
+        <Toggle
+          on={Boolean(config.placeCardVoice)}
+          onChange={(on) => edit((d) => void (d.placeCardVoice = on ? { ...d.placeCardVoice } : undefined))}
+          title="Få det læst op"
+          hint="En knap på stedkortene, der læser overskrift og tekst højt med telefonens egen stemme - på tourens sprog. Til gæster, der har svært ved at læse."
+        />
+        {config.placeCardVoice && (
+          <Field title="Knappens tekst">
+            <input className={input} placeholder="Svært ved at læse? Få det læst op" value={config.placeCardVoice.label ?? ""} onChange={(e) => edit((d) => void (d.placeCardVoice = { label: e.target.value || undefined }))} />
+          </Field>
+        )}
         <Field title="Placering" hint="Hvilken side kortet står i - nederst til venstre eller til højre. For computer og mobil hver for sig.">
           {(["desktop", "mobile"] as const).map((dev) => (
             <div key={dev} className="flex items-center gap-2">

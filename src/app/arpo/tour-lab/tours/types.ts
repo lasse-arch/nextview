@@ -616,6 +616,13 @@ export type TourConfig = {
   placeCards?: PlaceCard[];
   /** How big the place cards (and the card that comes by itself) are: "lille" (title, two lines, the buttons - for phones above all), "mellem" (the default), "stor". They scale with the screen either way (a small phone gets smaller ones). */
   placeCardSize?: "lille" | "mellem" | "stor";
+  /**
+   * "Få det læst op" on the place cards: the device reads the card's title and
+   * text aloud (its own voice, in the tour's language - free, nothing to make).
+   * For visitors who find reading hard. `label`: the button's words (default
+   * "Svært ved at læse? Få det læst op"). Left out: no button.
+   */
+  placeCardVoice?: { label?: string };
   /** Which side the place cards stand on, per device - left out: the left (bottom left corner). */
   placeCardSide?: { desktop?: "right"; mobile?: "right" };
   /** How big the card of "Vis mig rundt" is: "lille" (title, a few lines, the buttons), "mellem" (the default), "stor" (the whole width on a phone). Scales with the screen either way. */
