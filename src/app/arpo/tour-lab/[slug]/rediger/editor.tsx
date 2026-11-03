@@ -816,12 +816,17 @@ export function TourEditor({
                     onChange={(v) => edit((d) => void (d.logoAlignTiles = v === "midt" ? undefined : v))}
                   />
                 </Field>
-                <Toggle
-                  on={config.menuName !== false}
-                  onChange={(on) => edit((d) => void (d.menuName = on ? undefined : false))}
-                  title="Navn under logoet i menuen"
-                  hint="Fra: menuens top viser kun logoet - til et logo, der selv viser navnet (fx Skyum)."
-                />
+                <Field title="Under logoet i menuen" hint="Til et logo, der selv viser navnet (fx Skyum): kun undertitlen - eller kun logoet.">
+                  <Choice<"both" | "subtitle" | "none">
+                    value={config.menuName === false ? "none" : config.menuName === "subtitle" ? "subtitle" : "both"}
+                    options={[
+                      ["both", "Navn og undertitel"],
+                      ["subtitle", "Kun undertitel"],
+                      ["none", "Kun logoet"],
+                    ]}
+                    onChange={(v) => edit((d) => void (d.menuName = v === "both" ? undefined : v === "none" ? false : "subtitle"))}
+                  />
+                </Field>
                 <Toggle on={Boolean(config.logoOnLight)} onChange={(on) => edit((d) => void (d.logoOnLight = on))} title="Mørkt logo" hint="Et logo lavet til lys baggrund (bruges også i menuens top). Sættes af sig selv, når du uploader et logo." />
                 {config.logoOnLight && (
                   <Toggle

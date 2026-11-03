@@ -3110,7 +3110,7 @@ function TourExperience({
           <TourLogo T={T} alt="" />
           {T.menuName !== false && (
             <>
-              <div className="hv-menu-titel">{T.brand.toUpperCase()}</div>
+              {T.menuName !== "subtitle" && <div className="hv-menu-titel">{T.brand.toUpperCase()}</div>}
               {T.subtitle && <div className="hv-sub">{T.subtitle}</div>}
             </>
           )}
