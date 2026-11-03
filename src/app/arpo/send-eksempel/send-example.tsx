@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { DemoVisitsHover, visitTime } from "@/components/demo-visit";
 import { demoSmsSetup, removeDemoSms, resendDemoSms, sendDemoSms, type DemoSmsSetup } from "@/lib/actions/demo-sms";
 
 const when = (iso: string) => new Date(iso).toLocaleString("da-DK", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
@@ -138,11 +139,16 @@ export function SendExample({ initial }: { initial: DemoSmsSetup }) {
                   </button>
                 )}
                 {s.visits ? (
-                  <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/15">
-                    Åbnet {s.visits} gang{s.visits === 1 ? "" : "e"} · startet {s.started} gang{s.started === 1 ? "" : "e"}
-                    {s.lastSeen ? ` · sidst ${when(s.lastSeen)}` : ""}
-                    {s.where ? ` · ${s.where}` : ""}
-                  </span>
+                  <DemoVisitsHover
+                    links={[{ slug: s.slug, name: s.tour, visits: s.details }]}
+                    chip={
+                      <>
+                        Åbnet {s.visits} gang{s.visits === 1 ? "" : "e"} · startet {s.started} gang{s.started === 1 ? "" : "e"} · {visitTime(s.details.reduce((a, v) => a + v.seconds, 0))}
+                        {s.lastSeen ? ` · sidst ${when(s.lastSeen)}` : ""}
+                        {s.where ? ` · ${s.where}` : ""}
+                      </>
+                    }
+                  />
                 ) : (
                   <span className="text-xs text-slate-400">Ikke åbnet endnu</span>
                 )}
@@ -153,7 +159,7 @@ export function SendExample({ initial }: { initial: DemoSmsSetup }) {
         ) : (
           <p className="mt-2 text-sm text-slate-500">Ingen sendt endnu.</p>
         )}
-        <p className="mt-3 text-xs text-slate-400">Hvad de så (steder, gennemgang, hvor længe), står på touren under Del og udgiv → Fremvisning til nye kunder.</p>
+        <p className="mt-3 text-xs text-slate-400">Hold musen over &quot;Åbnet&quot; for at se, hvad de så, og hvor længe de var inde.</p>
       </div>
     </div>
   );

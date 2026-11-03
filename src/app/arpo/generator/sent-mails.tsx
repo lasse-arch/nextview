@@ -1,9 +1,8 @@
 import { prisma } from "@/lib/db";
 import { teamCan } from "@/lib/team-roles";
 import type { getCurrentUser } from "@/lib/auth";
-import Link from "next/link";
 import { demoVisits } from "@/lib/demo-visits";
-import { DemoVisitRow } from "@/components/demo-visit";
+import { DemoVisitsHover } from "@/components/demo-visit";
 
 /*
  * Generator → Mail → Sendt: the mails sent from here, newest first - whether
@@ -141,60 +140,15 @@ export async function SentMails({
                   )}
                   {m.demoTokens.length > 0 &&
                     (clicks ? (
-                      <span className="group relative">
-                        <span
-                          tabIndex={0}
-                          className="cursor-default rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/15 outline-none"
-                        >
-                          Link åbnet {clicks} gang{clicks === 1 ? "" : "e"}
-                          {lastClick ? ` · sidst ${when(lastClick)}` : ""}
-                        </span>
-                        {/* What they looked at - on hover (or focus, for keyboard and touch). The padding bridges the gap, so the mouse can move into it. */}
-                        <span className="invisible absolute right-0 top-full z-30 block w-[min(26rem,85vw)] pt-1.5 opacity-0 transition-opacity duration-150 group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100">
-                          <span className="block max-h-[28rem] space-y-3 overflow-y-auto rounded-xl border border-slate-200 bg-white p-3 text-left shadow-xl">
-                            {sent.map((l) => (
-                              <span key={l.slug} className="block">
-                                <span className="flex flex-wrap items-center justify-between gap-2">
-                                  <b className="text-[13px] font-semibold text-slate-900">
-                                    {l.name}
-                                  </b>
-                                  <span className="flex gap-3 text-xs font-medium">
-                                    <Link
-                                      href={`/arpo/tour-lab/${l.slug}/rediger?fane=del`}
-                                      className="text-[#0071e3] hover:underline"
-                                    >
-                                      Alle besøg →
-                                    </Link>
-                                    <Link
-                                      href={`/arpo/tour-lab/${l.slug}/rediger?fane=resultater`}
-                                      className="text-[#0071e3] hover:underline"
-                                    >
-                                      Tourens stats →
-                                    </Link>
-                                  </span>
-                                </span>
-                                {l.visits.length ? (
-                                  <ul className="mt-1.5 space-y-1.5">
-                                    {l.visits.slice(0, 5).map((v) => (
-                                      <DemoVisitRow key={v.session} v={v} />
-                                    ))}
-                                  </ul>
-                                ) : (
-                                  <span className="mt-1 block text-xs text-slate-400">
-                                    Ikke åbnet endnu.
-                                  </span>
-                                )}
-                                {l.visits.length > 5 && (
-                                  <span className="mt-1 block text-xs text-slate-400">
-                                    + {l.visits.length - 5} besøg mere under
-                                    Alle besøg.
-                                  </span>
-                                )}
-                              </span>
-                            ))}
-                          </span>
-                        </span>
-                      </span>
+                      <DemoVisitsHover
+                        links={sent}
+                        chip={
+                          <>
+                            Link åbnet {clicks} gang{clicks === 1 ? "" : "e"}
+                            {lastClick ? ` · sidst ${when(lastClick)}` : ""}
+                          </>
+                        }
+                      />
                     ) : (
                       <span className="text-xs text-slate-400">
                         Link ikke åbnet

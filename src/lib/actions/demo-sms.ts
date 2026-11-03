@@ -1,5 +1,6 @@
 "use server";
 
+import { demoVisits, type DemoVisit } from "@/lib/demo-visits";
 import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
@@ -25,7 +26,7 @@ const PER_DAY = 40;
 
 const firstName = (name: string) => name.trim().split(/\s+/)[0] ?? "";
 
-export type DemoSmsSent = { id: string; at: string; to: string; tour: string; by: string; visits: number; /** Visits where they did something in the tour (not only opened the link). */ started: number; lastSeen: string | null; where: string | null; /** Can be sent again: the number is kept, and the seller sent it (or is an admin). */ again: boolean; /** The seller sent it, or is an admin: may send it again or remove it. */ mine: boolean };
+export type DemoSmsSent = { id: string; at: string; to: string; tour: string; by: string; visits: number; /** Visits where they did something in the tour (not only opened the link). */ started: number; lastSeen: string | null; where: string | null; /** The tour, and the visits (newest first) - what they saw and for how long. */ slug: string; details: DemoVisit[]; /** Can be sent again: the number is kept, and the seller sent it (or is an admin). */ again: boolean; /** The seller sent it, or is an admin: may send it again or remove it. */ mine: boolean };
 
 export type DemoSmsSetup = {
   tours: { slug: string; name: string }[];
@@ -53,7 +54,7 @@ export async function demoSmsSetup(): Promise<DemoSmsSetup> {
       where: { label: { endsWith: "(SMS)" } },
       orderBy: { createdAt: "desc" },
       take: 30,
-      select: { id: true, label: true, createdAt: true, tourSlug: true, createdById: true, smsTo: true, smsText: true, events: { select: { session: true, name: true, createdAt: true, city: true, country: true }, orderBy: { createdAt: "desc" } } },
+      select: { id: true, label: true, createdAt: true, tourSlug: true, createdById: true, smsTo: true, smsText: true, events: { select: { session: true, name: true, label: true, device: true, referrer: true, createdAt: true, city: true, country: true }, orderBy: { createdAt: "desc" } } },
     }),
   ]);
   const people = new Map((await prisma.user.findMany({ where: { id: { in: [...new Set(links.map((l) => l.createdById))] } }, select: { id: true, name: true } })).map((p) => [p.id, p.name]));
@@ -69,6 +70,8 @@ export async function demoSmsSetup(): Promise<DemoSmsSetup> {
         at: l.createdAt.toISOString(),
         to: l.label.replace(/ \(SMS\)$/, ""),
         tour: names.get(l.tourSlug) ?? l.tourSlug,
+        slug: l.tourSlug,
+        details: demoVisits(l.events),
         by: people.get(l.createdById) ?? "",
         visits: new Set(l.events.map((x) => x.session)).size,
         started: new Set(l.events.filter((x) => STARTED.has(x.name)).map((x) => x.session)).size,
