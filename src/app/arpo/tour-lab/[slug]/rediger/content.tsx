@@ -1427,6 +1427,28 @@ export function CardsEditor({ config, edit, preview, scanMap, mpskinsHidden }: O
             onChange={(v) => edit((d) => void (d.placeCardSize = v === "mellem" ? undefined : (v as "lille" | "stor")))}
           />
         </Field>
+        <Field title="Placering" hint="Hvilken side kortet står i - nederst til venstre eller til højre. For computer og mobil hver for sig.">
+          {(["desktop", "mobile"] as const).map((dev) => (
+            <div key={dev} className="flex items-center gap-2">
+              <span className="w-16 text-[12px] text-[#6e6e73]">{dev === "desktop" ? "Computer" : "Mobil"}</span>
+              <div className="flex-1">
+                <Choice<"left" | "right">
+                  value={config.placeCardSide?.[dev] ?? "left"}
+                  options={[
+                    ["left", "Venstre"],
+                    ["right", "Højre"],
+                  ]}
+                  onChange={(v) =>
+                    edit((d) => {
+                      const side = { ...d.placeCardSide, [dev]: v === "right" ? ("right" as const) : undefined };
+                      d.placeCardSide = side.desktop || side.mobile ? side : undefined;
+                    })
+                  }
+                />
+              </div>
+            </div>
+          ))}
+        </Field>
         <Rows<PlaceCard>
           items={cards}
           onChange={(c) => edit((d) => void (d.placeCards = c.length ? c : undefined))}

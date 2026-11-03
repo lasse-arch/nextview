@@ -608,6 +608,8 @@ export type TourConfig = {
   placeCards?: PlaceCard[];
   /** How big the place cards (and the card that comes by itself) are: "lille" (title, two lines, the buttons - for phones above all), "mellem" (the default), "stor". They scale with the screen either way (a small phone gets smaller ones). */
   placeCardSize?: "lille" | "mellem" | "stor";
+  /** Which side the place cards stand on, per device - left out: the left (bottom left corner). */
+  placeCardSide?: { desktop?: "right"; mobile?: "right" };
   /** How big the card of "Vis mig rundt" is: "lille" (title, a few lines, the buttons), "mellem" (the default), "stor" (the whole width on a phone). Scales with the screen either way. */
   guideCardSize?: "lille" | "mellem" | "stor";
   /** Its size on a phone, when it should differ from guideCardSize (left out: the same). */

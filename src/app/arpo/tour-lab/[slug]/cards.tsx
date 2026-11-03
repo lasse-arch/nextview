@@ -158,6 +158,8 @@ export const CARDS_CSS = `
 .pc-primary:hover{background:var(--c-accent-dark);border-color:var(--c-accent-dark)}
 .pc-nudge{z-index:8}
 .hv-menu-aaben .pc,.hv-welcome .pc,.hv-guiding .pc,.hv-routing .pc{display:none}
+/* The cards on the right (placeCardSide), per device. */
+@media (min-width:761px) and (min-height:501px){.hv-pc-h-d .pc{left:auto;right:24px}}
 .pc-lille{width:min(320px,calc(100% - 24px));padding:14px 18px}
 .pc-lille h3{font-size:18px}.pc-lille p{font-size:14px}
 .pc-stor{width:min(440px,calc(100% - 24px))}
@@ -199,4 +201,5 @@ export const CARDS_CSS = `
   .pc-stor{width:min(42vw,340px)}.pc-lille{width:min(30vw,250px)}
 }
 @media (min-width:761px) and (min-height:501px){.pc p.pc-klip{display:block}}
+@media (max-width:760px),(max-height:500px) and (min-width:500px){.hv-pc-h-m .pc{left:auto;right:max(10px,env(safe-area-inset-right,0px))}}
 `;
