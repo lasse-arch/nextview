@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { grantCustomerAccess, resendCustomerLogin, revokeCustomerAccess, setCustomersMayInvite } from "@/lib/actions/customer-access";
+import { grantCustomerAccess, renameCustomerLogin, resendCustomerLogin, revokeCustomerAccess, setCustomersMayInvite } from "@/lib/actions/customer-access";
 import { ROLE_NAMES } from "@/lib/customer-roles";
 import type { CustomerRole } from "@prisma/client";
 import { useToast } from "@/components/toast";
@@ -35,6 +35,8 @@ export function CustomerAccessSection({
 }) {
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  /** The login whose name is being changed (in place, the e-mail stays). */
+  const [renaming, setRenaming] = useState<string | null>(null);
   const [email, setEmail] = useState(accounts.some((a) => a.email === defaultEmail?.toLowerCase()) ? "" : (defaultEmail ?? ""));
   const [name, setName] = useState(email ? (defaultName ?? "") : "");
   const showToast = useToast();
@@ -72,7 +74,36 @@ export function CustomerAccessSection({
           {accounts.map((a) => (
             <li key={a.id} className="flex items-center gap-3 px-3 py-2 text-sm">
               <div className="min-w-0 flex-1">
-                <p className="truncate font-medium text-slate-900">{a.name ? `${a.name} · ${a.email}` : a.email}</p>
+                {renaming === a.id ? (
+                  <form
+                    className="flex items-center gap-1.5"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      const value = new FormData(e.currentTarget).get("name") as string;
+                      start(async () => {
+                        const r = await renameCustomerLogin(dealId, a.id, value);
+                        showToast(r.ok ? "Navnet er ændret" : r.error);
+                        if (r.ok) setRenaming(null);
+                      });
+                    }}
+                  >
+                    <input name="name" autoFocus defaultValue={a.name ?? ""} placeholder="Navn" className="w-48 rounded-md border border-slate-300 px-2 py-1 text-sm" onKeyDown={(e) => e.key === "Escape" && setRenaming(null)} />
+                    <span className="truncate text-slate-500">· {a.email}</span>
+                    <button type="submit" disabled={pending} className="rounded-md bg-slate-900 px-2 py-1 text-xs font-medium text-white">
+                      Gem
+                    </button>
+                    <button type="button" onClick={() => setRenaming(null)} className="text-xs text-slate-500">
+                      Fortryd
+                    </button>
+                  </form>
+                ) : (
+                  <div className="flex min-w-0 items-baseline gap-2">
+                    <p className="truncate font-medium text-slate-900">{a.name ? `${a.name} · ${a.email}` : a.email}</p>
+                    <button type="button" onClick={() => setRenaming(a.id)} className="flex-none text-xs text-slate-500 hover:text-slate-900" title="Ret navn">
+                      ✎ Ret navn
+                    </button>
+                  </div>
+                )}
                 <p className="text-xs text-slate-500">
                   {[
                     `${ROLE_NAMES.da[a.role]}${a.role === "STAFF" && a.canApprove ? " (må godkende)" : ""}`,

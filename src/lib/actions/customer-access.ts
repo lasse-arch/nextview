@@ -61,6 +61,19 @@ export async function resendCustomerLogin(dealId: string, accountId: string): Pr
   return { ok: true };
 }
 
+/** A login's name changed (the e-mail stays) - for one with access to this deal. */
+export async function renameCustomerLogin(dealId: string, accountId: string, nameRaw: string): Promise<Result> {
+  const user = await requireAdmin();
+  const link = await prisma.customerAccountDeal.findUnique({ where: { accountId_dealId: { accountId, dealId } }, include: { account: { select: { email: true, name: true } } } });
+  if (!link) return { ok: false, error: "Den e-mail har ikke adgang til kunden." };
+  const name = String(nameRaw ?? "").trim().slice(0, 80) || null;
+  if (name === link.account.name) return { ok: true };
+  await prisma.customerAccount.update({ where: { id: accountId }, data: { name } });
+  await logActivity({ type: "DEAL_UPDATED", message: `Navnet på kundelogin ${link.account.email} ændret${name ? ` til ${name}` : ""}`, actorId: user.id, dealId });
+  revalidatePath(`/arpo/deals/${dealId}`);
+  return { ok: true };
+}
+
 /** Takes the access to this deal away; a login with no deals left is deleted (and is logged out at once). */
 export async function revokeCustomerAccess(dealId: string, accountId: string): Promise<Result> {
   const user = await requireAdmin();
