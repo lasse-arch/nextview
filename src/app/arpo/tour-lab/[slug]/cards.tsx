@@ -33,7 +33,13 @@ export function PlaceCard({
   useEffect(() => {
     const el = textEl.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => setClipped(el.scrollHeight > el.clientHeight + 1));
+    const ro = new ResizeObserver(() => {
+      // "Læs mere" only for more than a line and a half hidden - a few words more are simply shown.
+      const line = parseFloat(getComputedStyle(el).lineHeight) || 20;
+      const hidden = el.scrollHeight - el.clientHeight;
+      setClipped(hidden > line * 1.5);
+      if (hidden > 1 && hidden <= line * 1.5) setOpen(true);
+    });
     ro.observe(el);
     return () => ro.disconnect();
   }, [card.text, page]);
@@ -171,10 +177,12 @@ export const CARDS_CSS = `
   .pc p{font-size:clamp(12.5px,3.5vw,13.5px);line-height:1.45;margin-bottom:6px}
   .pc p.pc-klip{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
   .pc-mere-mobil{display:block;margin:-2px 0 4px;padding:4px 0;border:0;background:none;font:inherit;font-size:13px;font-weight:800;color:var(--c-accent);cursor:pointer}
-  .pc-folk{gap:8px;margin:2px 0 8px}
-  .pc-folk figure{flex-basis:76px}
-  .pc-folk img{width:38px;height:38px}
-  .pc-folk figure{gap:4px}
+  /* People in one low row: a small photo with the name and role beside it - not a tall column. */
+  .pc-folk{gap:10px;margin:2px 0 8px}
+  .pc-folk figure,.pc-folk-1 figure{flex:1 1 0;min-width:0;flex-direction:row;align-items:center;gap:7px;text-align:left}
+  .pc-folk img{width:30px;height:30px;flex:none}
+  .pc-folk figcaption{min-width:0}
+  .pc-folk span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .pc-folk-1 figure{gap:9px}
   .pc-folk b{font-size:11.5px}
   .pc-folk span{font-size:10.5px}
