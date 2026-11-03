@@ -120,6 +120,8 @@ export type PreviewApi = {
   go: (name: string, href: string) => void;
   /** Shows the menu as it looks now - past the front page / welcome (when a menu design is picked). */
   showMenu: () => void;
+  /** Plays the logo animation (logoAnim) in the preview, as it looks with the setup now. */
+  logoAnim: () => void;
   /** The 360° picture open in the preview: its direction, zoom (view width) and whether the preview is a phone. */
   /** The device the preview is set to (Computer / Mobil over it). */
   device: () => "computer" | "mobil";
@@ -152,15 +154,50 @@ export async function uploadToTour(slug: string, file: File, blob: boolean): Pro
   return r.url;
 }
 
-/** A button that picks a file and uploads it. */
+/** A button that picks a file and uploads it - or takes one dragged onto it (from the desktop or a folder). */
 export function UploadButton({ accept, onDone, label = "Upload", className }: { accept: string; onDone: (url: string) => void; label?: string; className?: string }) {
   const { slug, blob } = useContext(FilesContext);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [over, setOver] = useState(false);
+  /** Does the file match `accept` ("image/*", "video/mp4,video/webm", "image/jpeg,image/png" …)? */
+  const fits = (type: string) =>
+    accept.split(",").some((a) => {
+      const t = a.trim();
+      return t === "*" || t === type || (t.endsWith("/*") && type.startsWith(t.slice(0, -1)));
+    });
+  async function take(file: File | undefined) {
+    if (!file || busy) return;
+    if (!fits(file.type)) return setError(`Den slags fil kan ikke bruges her (${file.type || "ukendt"}).`);
+    setBusy(true);
+    setError(null);
+    try {
+      onDone(await uploadToTour(slug, file, blob));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+    setBusy(false);
+  }
   return (
-    <span className="inline-flex flex-col">
-      <label className={className ?? "cursor-pointer rounded-xl bg-white px-3 py-2 text-center text-[14px] font-medium text-[#0071e3] ring-1 ring-black/[.06] hover:bg-[#0071e3]/5"}>
-        {busy ? "Uploader…" : label}
+    <span
+      className="inline-flex flex-col"
+      onDragOver={(e) => {
+        if (![...e.dataTransfer.items].some((it) => it.kind === "file")) return;
+        e.preventDefault();
+        e.stopPropagation();
+        setOver(true);
+      }}
+      onDragLeave={() => setOver(false)}
+      onDrop={(e) => {
+        if (!e.dataTransfer.files.length) return;
+        e.preventDefault();
+        e.stopPropagation();
+        setOver(false);
+        void take(e.dataTransfer.files[0]);
+      }}
+    >
+      <label className={`${className ?? "cursor-pointer rounded-xl bg-white px-3 py-2 text-center text-[14px] font-medium text-[#0071e3] ring-1 ring-black/[.06] hover:bg-[#0071e3]/5"} ${over ? "!ring-2 !ring-[#0071e3] bg-[#0071e3]/10" : ""}`}>
+        {busy ? "Uploader…" : over ? "Slip for at uploade" : label}
         <input
           type="file"
           accept={accept}
@@ -169,15 +206,7 @@ export function UploadButton({ accept, onDone, label = "Upload", className }: { 
           onChange={async (e) => {
             const file = e.target.files?.[0];
             e.target.value = "";
-            if (!file) return;
-            setBusy(true);
-            setError(null);
-            try {
-              onDone(await uploadToTour(slug, file, blob));
-            } catch (err) {
-              setError(err instanceof Error ? err.message : String(err));
-            }
-            setBusy(false);
+            await take(file);
           }}
         />
       </label>

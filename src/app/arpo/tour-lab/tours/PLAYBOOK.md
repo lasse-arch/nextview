@@ -173,6 +173,11 @@ Fx specialefterskoler (ADHD, autisme, nedsat kognitivt funktionsniveau):
 - Skrift: hjemmesidens skrift, hvis den findes på Google Fonts - ellers en tæt
   på. Overskrifter må have deres egen skrift (fx en serif til restauranter).
 - Mørkt logo → sæt "logoOnLight", så det står på lys baggrund.
+- Logo-animation (`logoAnim`), når man trykker på en flise: kun når logoet er
+  stærkt og genkendeligt - et logo med en vinge eller et mærke (fx Skyum) får
+  "wings" med `logoAnimMark` (hvor vingen slutter, og hvor den folder fra);
+  ellers "zoom" (roligst) eller "assemble". Størrelse "m" som standard, "l"/"xl"
+  til et bredt logo. Hellere fra end en animation, der føles påklistret.
 
 ## Brancher
 

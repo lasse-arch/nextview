@@ -169,9 +169,23 @@ export function MapEditor({ config, edit, focus, preview, slug }: { config: Tour
         <Toggle
           on={Boolean(M.panorama)}
           onChange={(on) => edit((d) => void (d.map!.panorama = on || undefined))}
-          title="Det er et 360°-billede"
-          hint="Touren viser det som 360°, man kan kigge rundt i, med punkterne på - og du sætter punkterne i 360° under Redigér kortet. Slås til af sig selv, når billedet er 2:1."
+          title="Det er et 360°- eller 180°-billede"
+          hint="Touren viser det som et billede, man kan kigge rundt i, med punkterne på - og du sætter punkterne under Redigér kortet. Slås til af sig selv, når billedet er 2:1 (360°). Et 180°-billede: slå til, og vælg 180° herunder."
         />
+        {M.panorama && (
+          <PanoZoom
+            src={M.image}
+            value={config.imageView?.[M.image]}
+            onChange={(z) =>
+              edit((d) => {
+                const all = { ...d.imageView };
+                if (z) all[M.image] = z;
+                else delete all[M.image];
+                d.imageView = Object.keys(all).length ? all : undefined;
+              })
+            }
+          />
+        )}
         {error && <p className="text-[12px] text-[#ff3b30]">{error}</p>}
       </Group>
       {open && <MapCanvas config={config} edit={edit} onClose={() => setOpen(false)} startWith={focus?.id ?? null} />}

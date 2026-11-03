@@ -678,6 +678,8 @@ function TourExperience({
   };
   /** The welcome tiles - skipped when the link already says where to go. */
   const [welcome, setWelcome] = useState(false);
+  /** When the logo animation (logoAnim) started - null: not showing. */
+  const [logoAnimAt, setLogoAnimAt] = useState<number | null>(null);
   /** The tour opens on the cover welcome: it's there from the very first picture (no flash of the drone scene before it). */
   const startsCovered = T.design?.welcome === "cover" && Boolean(T.cover) && !T.intro && !played;
   const [cover, setCover] = useState(startsCovered);
@@ -1496,6 +1498,8 @@ function TourExperience({
     track("welcome_choice", { choice: label });
     setWelcome(false);
     if (go === "skip") return;
+    // The logo's own little moment as the tour moves on (set under Design → Logo).
+    if (T.logoAnim && T.logo && !matchMedia("(prefers-reduced-motion: reduce)").matches) setLogoAnimAt(Date.now());
     if (go === "last") {
       if (lastRoom) enterTour(lastRoom.href, "welcome", lastRoom.name);
       return;
@@ -2261,6 +2265,7 @@ function TourExperience({
         setWelcome(false);
         menuGo(e.data.name ?? "", "editor", e.data.href);
       }
+      if (e.data.type === "tour-logoanim") setLogoAnimAt(Date.now()); // "Afspil" in the editor
       if (e.data.type === "tour-peek") bridge.current.peek(); // e.g. the colour filter: show the 3D tour itself
       if (e.data.type === "tour-show-menu") {
         // A menu design picked in the editor: the menu as it looks now - not the front page again.
@@ -2894,6 +2899,7 @@ function TourExperience({
       )}
 
       {welcome && T.welcome && T.design?.welcome === "simple" && <SimpleWelcome T={T} onChoose={chooseWelcome} />}
+      {logoAnimAt != null && T.logoAnim && <LogoAnim key={logoAnimAt} logo={T.logo} kind={T.logoAnim} size={T.logoAnimSize} mark={T.logoAnimMark} light={Boolean(T.logoOnLight)} onDone={() => setLogoAnimAt(null)} />}
       {welcome && T.welcome && T.design?.welcome !== "simple" && (
         <div className={`hv-wel ${welcomeFilmClass(T.welcome.video)}`} role="dialog" aria-modal="true" aria-label={T.welcome.title}>
           {T.welcome.video?.src && <WelcomeFilm film={T.welcome.video} />}
@@ -3564,6 +3570,48 @@ function TourExperience({
   );
 }
 
+/** The logo big in the middle for a moment - see TourConfig.logoAnim. Never in the way: no clicks, gone in 1.6 s. */
+function LogoAnim({ logo, kind, size, mark, light, onDone }: { logo: string; kind: NonNullable<TourConfig["logoAnim"]>; size?: TourConfig["logoAnimSize"]; mark?: TourConfig["logoAnimMark"]; light: boolean; onDone: () => void }) {
+  // The logo's own shape (width / height), so the wing's feathers are cut as real wedges.
+  const [aspect, setAspect] = useState(3);
+  useEffect(() => {
+    const t = window.setTimeout(onDone, 1650);
+    return () => window.clearTimeout(t);
+  }, [onDone]);
+  const img = (k: string, style?: React.CSSProperties, cls = "") => (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img key={k} src={logo} alt="" className={`hv-la-del ${cls}`} style={style} draggable={false} onLoad={(e) => e.currentTarget.naturalHeight && setAspect(e.currentTarget.naturalWidth / e.currentTarget.naturalHeight)} />
+  );
+  let body: React.ReactNode;
+  if (kind === "wings" && mark) {
+    // Seven feathers: wedges around the point, from pointing down-left to up-right, each folding open a moment after the last.
+    const N = 7;
+    const wedges = Array.from({ length: N }, (_, i) => {
+      const a = (d: number) => (d * Math.PI) / 180;
+      const from = -200 + (190 * i) / N;
+      const to = -200 + (190 * (i + 1)) / N + 1.5;
+      const pts = [from, (from + to) / 2, to].map((d) => `${(mark.x + (400 * Math.cos(a(d))) / aspect).toFixed(1)}% ${(mark.y + 400 * Math.sin(a(d))).toFixed(1)}%`);
+      return `polygon(${mark.x}% ${mark.y}%, ${pts.join(", ")})`;
+    });
+    body = (
+      <>
+        <div className="hv-la-vinge" style={{ clipPath: `inset(0 ${100 - mark.end}% 0 0)` }}>
+          {wedges.map((w, i) => img(`w${i}`, { clipPath: w, transformOrigin: `${mark.x}% ${mark.y}%`, "--i": i } as React.CSSProperties, "hv-la-fjer"))}
+        </div>
+        {img("navn", { clipPath: `inset(0 0 0 ${mark.end}%)` }, "hv-la-navn")}
+      </>
+    );
+  } else {
+    const parts = kind === "wings" ? ["v", "h"] : kind === "assemble" ? ["0", "1", "2", "3", "4", "5"] : ["z"];
+    body = parts.map((k, i) => img(k, kind === "assemble" ? ({ "--i": i } as React.CSSProperties) : undefined, `hv-la-${k}`));
+  }
+  return (
+    <div className={`hv-logoanim hv-la-${kind} hv-la-${size ?? "m"} ${light ? "lys" : ""}`} aria-hidden>
+      <div className="hv-la-logo">{body}</div>
+    </div>
+  );
+}
+
 /**
  * A point's video at the top of its card: plays at once without sound, in a
  * loop (like a photo that moves) - a tap turns the sound on and starts it
@@ -4037,6 +4085,29 @@ const CSS = `
 .hv-panel h2{margin:2px 40px 8px 0;font-size:25px;line-height:1.1;font-weight:900;color:var(--c-main)}
 .hv-panel p{margin:0 0 12px;font-size:15px;line-height:1.5;color:#3d4a50}
 .hv-pchips{display:flex;flex-wrap:wrap;gap:5px}
+.hv-logoanim{position:absolute;inset:0;z-index:40;pointer-events:none;display:grid;place-items:center;background:radial-gradient(closest-side,rgba(10,14,18,.55),rgba(10,14,18,0));animation:hvLaBg 1.6s ease forwards}
+.hv-logoanim.lys{background:radial-gradient(closest-side,rgba(255,255,255,.8),rgba(255,255,255,0))}
+@keyframes hvLaBg{0%{opacity:0}15%{opacity:1}75%{opacity:1}100%{opacity:0}}
+.hv-la-logo{position:relative;width:min(56vw,300px);perspective:900px}
+.hv-la-s .hv-la-logo{width:min(38vw,180px)}.hv-la-l .hv-la-logo{width:min(72vw,440px)}.hv-la-xl .hv-la-logo{width:min(88vw,620px)}
+.hv-la-vinge{position:absolute;inset:0}
+.hv-la-vinge .hv-la-del{position:absolute;inset:0}
+.hv-la-fjer{opacity:0;animation:hvLaF 1.6s cubic-bezier(.2,.8,.2,1) forwards;animation-delay:calc(var(--i) * 45ms)}
+@keyframes hvLaF{0%{transform:rotate(calc(-40deg - var(--i) * 6deg));opacity:0}35%{transform:rotate(0);opacity:1}78%{transform:rotate(0);opacity:1}100%{transform:rotate(calc(-40deg - var(--i) * 6deg));opacity:0}}
+.hv-la-navn{opacity:0;animation:hvLaN 1.6s ease forwards}
+@keyframes hvLaN{0%,22%{transform:translateX(-24px);opacity:0}42%{transform:none;opacity:1}78%{transform:none;opacity:1}100%{transform:translateX(10px);opacity:0}}
+.hv-la-del{display:block;width:100%;height:auto;max-width:none;filter:drop-shadow(0 6px 22px rgba(0,0,0,.35))}
+.hv-la-del+.hv-la-del{position:absolute;inset:0}
+.hv-la-vinge+.hv-la-navn{position:relative;inset:auto}
+.hv-la-wings .hv-la-v{clip-path:inset(0 50% 0 0);transform-origin:50% 50%;animation:hvLaV 1.6s cubic-bezier(.2,.8,.2,1) forwards}
+.hv-la-wings .hv-la-h{clip-path:inset(0 0 0 50%);transform-origin:50% 50%;animation:hvLaH 1.6s cubic-bezier(.2,.8,.2,1) forwards}
+@keyframes hvLaV{0%{transform:rotateY(88deg);opacity:0}40%{transform:rotateY(0);opacity:1}70%{transform:rotateY(0);opacity:1}100%{transform:rotateY(80deg);opacity:0}}
+@keyframes hvLaH{0%{transform:rotateY(-88deg);opacity:0}40%{transform:rotateY(0);opacity:1}70%{transform:rotateY(0);opacity:1}100%{transform:rotateY(-80deg);opacity:0}}
+.hv-la-assemble .hv-la-del{clip-path:inset(0 calc((5 - var(--i)) * 100% / 6) 0 calc(var(--i) * 100% / 6));animation:hvLaS 1.6s cubic-bezier(.2,.8,.2,1) forwards;animation-delay:calc(var(--i) * 40ms)}
+.hv-la-assemble .hv-la-del:nth-child(odd){--dy:-46px}.hv-la-assemble .hv-la-del:nth-child(even){--dy:46px}
+@keyframes hvLaS{0%{transform:translateY(var(--dy));opacity:0}38%{transform:none;opacity:1}72%{transform:none;opacity:1}100%{transform:scale(1.06);opacity:0}}
+.hv-la-zoom .hv-la-z{animation:hvLaZ 1.6s cubic-bezier(.2,.8,.2,1) forwards}
+@keyframes hvLaZ{0%{transform:scale(.72);filter:blur(10px);opacity:0}38%{transform:scale(1);filter:blur(0) drop-shadow(0 6px 22px rgba(0,0,0,.35));opacity:1}72%{transform:scale(1);opacity:1}100%{transform:scale(1.08);opacity:0}}
 .hv-pvideo{position:relative;display:block;margin:-18px -18px 14px;aspect-ratio:16/9;background:#000;border-radius:16px 16px 0 0;overflow:hidden;cursor:pointer}.hv-pvideo video{display:block;width:100%;height:100%;max-width:none;object-fit:cover}.hv-pvideo-knap{position:absolute;right:10px;bottom:10px;background:rgba(0,0,0,.55);color:#fff;font-size:12px;font-weight:700;padding:5px 10px;border-radius:999px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);pointer-events:none}
 .hv-pkick{margin-top:6px;font-size:11.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#5e7d3a;color:color-mix(in srgb,var(--c-main) 70%,#5e7d3a)}
 .hv-fakta{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px;margin:0 0 12px;padding-top:12px;border-top:1px solid rgba(0,0,0,.08)}

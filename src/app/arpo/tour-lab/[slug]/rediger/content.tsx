@@ -1132,7 +1132,7 @@ function GuideSetupEditor({ config, edit, preview, onEditPoint }: Omit<Props, "s
                   <textarea className={`${textarea} bg-white`} value={s.short ?? ""} placeholder="Tom: teksten ovenfor vises" onChange={(e) => set({ ...s, short: e.target.value || undefined })} />
                 </Field>
                 {imageOfHref(s.href) ? (
-                  <StopPicture config={config} url={imageOfHref(s.href)!} onChange={(url) => set({ ...s, href: url ? IMAGE_HREF + url : "" })} />
+                  <StopPicture config={config} edit={edit} url={imageOfHref(s.href)!} onChange={(url) => set({ ...s, href: url ? IMAGE_HREF + url : "" })} />
                 ) : s.href ? (
                   <>
                     <PlacePicker href={s.href} name={s.title} preview={preview} onChange={(href) => set({ ...s, href })} />
@@ -1143,7 +1143,7 @@ function GuideSetupEditor({ config, edit, preview, onEditPoint }: Omit<Props, "s
                 ) : (
                   <PlacePicker href="" name={s.title} preview={preview} onChange={(href) => set({ ...s, href })} />
                 )}
-                {!imageOfHref(s.href) && <StopPicture config={config} url={null} onChange={(url) => url && set({ ...s, href: IMAGE_HREF + url })} />}
+                {!imageOfHref(s.href) && <StopPicture config={config} edit={edit} url={null} onChange={(url) => url && set({ ...s, href: IMAGE_HREF + url })} />}
                 {s.href && !imageOfHref(s.href) && (
                   <Field title="Drejning ved stoppet" hint="Hvilken vej og hvor hurtigt billedet drejer rundt, mens stoppet vises.">
                     <StopTurn turn={s.turn} speed={s.turnSpeed} mode={s.turnMode} still={(s.turn ?? config.guide?.turn) === "none"} turnOptions={turnOptions} speedOptions={speedOptions} onChange={(turn, turnSpeed, turnMode) => set({ ...s, turn, turnSpeed, turnMode })} />
@@ -1195,7 +1195,7 @@ function GuideSetupEditor({ config, edit, preview, onEditPoint }: Omit<Props, "s
  * A picture as a stop (e.g. a drone photo): one the menu already opens, or a
  * new upload. Shown full screen - a 2:1 one as 360°.
  */
-function StopPicture({ config, url, onChange }: { config: TourConfig; url: string | null; onChange: (url: string | null) => void }) {
+function StopPicture({ config, edit, url, onChange }: { config: TourConfig; edit: Props["edit"]; url: string | null; onChange: (url: string | null) => void }) {
   const known = [
     ...config.menu.flatMap((m): [string, string][] => ("items" in m ? m.items.map(([n, h]): [string, string] => [`${m.title}: ${n}`, h]) : [[m.title, m.href]])),
     ...(config.bento?.tiles.map((t): [string, string] => [`Flise: ${t.title.replace(/\n/g, " ")}`, t.href]) ?? []),
@@ -1205,7 +1205,7 @@ function StopPicture({ config, url, onChange }: { config: TourConfig; url: strin
   });
   const pictures = known.filter((p, i) => known.findIndex((q) => q.url === p.url) === i);
   return (
-    <Field title={url ? "Billede" : "Eller vis et billede (fx et dronefoto)"} hint={url ? "Vises i fuld skærm ved stoppet - et 2:1-billede som 360°. Hentes i baggrunden, før man når hertil." : undefined}>
+    <Field title={url ? "Billede" : "Eller vis et billede (fx et dronefoto)"} hint={url ? "Vises i fuld skærm ved stoppet - et 2:1-billede som 360°, og et 180°-billede som 180° (vælg det herunder). Hentes i baggrunden, før man når hertil." : undefined}>
       {url && (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={config.panoCopies?.[url]?.phone ?? url} alt="" className="mb-2 max-h-40 w-full rounded-lg object-cover" />
@@ -1229,6 +1229,21 @@ function StopPicture({ config, url, onChange }: { config: TourConfig; url: strin
           </button>
         )}
       </div>
+      {/* 360°, 180° or flat - and where it opens: as for the picture anywhere else (imageView). */}
+      {url && (
+        <PanoZoom
+          src={url}
+          value={config.imageView?.[url]}
+          onChange={(z) =>
+            edit((d) => {
+              const all = { ...d.imageView };
+              if (z) all[url] = z;
+              else delete all[url];
+              d.imageView = Object.keys(all).length ? all : undefined;
+            })
+          }
+        />
+      )}
     </Field>
   );
 }
