@@ -188,7 +188,12 @@ export function Stories({
               aria-label={tr("Næste")}
               onClick={() => next("tap")}
             >
-              ⏭
+              {/* Drawn, not the ⏭ character: Apple's devices show that as a blue emoji. */}
+              <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden fill="currentColor">
+                <path d="M4 5.5v13l9-6.5z" />
+                <path d="M12 5.5v13l9-6.5z" />
+                <rect x="19.5" y="5.5" width="2.5" height="13" rx="1" />
+              </svg>
             </button>
             <button
               type="button"
