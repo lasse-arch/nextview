@@ -499,9 +499,9 @@ function CornerPlacer360({ slug, pano, image, corners, opacity, onChange }: { sl
         photo={async () => {
           if (!src) throw new Error("360°-fotoet er ikke hentet endnu.");
           const c = document.createElement("canvas");
-          c.width = 1400;
-          c.height = 1400;
-          c.getContext("2d")!.putImageData(renderGround(src, 1400, view), 0, 0);
+          c.width = 2400;
+          c.height = 2400;
+          c.getContext("2d")!.putImageData(renderGround(src, 2400, view), 0, 0);
           return c.toDataURL("image/jpeg", 0.85);
         }}
         onCorners={(c) => save(c.map((p) => groundAt(view, p)))}

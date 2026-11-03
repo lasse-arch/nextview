@@ -13,6 +13,7 @@ import { requireNewTour, requireTeam, requireTour } from "@/lib/auth";
 import { teamCan } from "@/lib/team-roles";
 import { prisma } from "@/lib/db";
 import { trashSteps } from "@/lib/tour-trash";
+import { fitPlan } from "@/app/arpo/tour-lab/[slug]/rediger/plan-fit";
 import { tourChanged } from "@/lib/tour-cache";
 import { getSettingValue, setSettingValue } from "@/lib/integration-settings";
 import { siteDigest, siteResearch } from "@/lib/site-digest";
@@ -1086,7 +1087,7 @@ const PlanMatches = z.object({
         photo: z.object({ x: z.number().describe("% af luftfotoets bredde (0-100)"), y: z.number().describe("% af luftfotoets højde (0-100)") }),
       })
     )
-    .describe("6-12 steder, der ses tydeligt på begge billeder, spredt ud over hele pladsen (helst nær alle fire hjørner af pladsen)."),
+    .describe("Steder fra vejnettet (kryds, sving, vejender, hækkes hjørner), der ses tydeligt på begge billeder, spredt ud over hele billedet."),
   note: z.string().describe("Kort besked til brugeren på dansk: hvad du har brugt til at lægge kortet, og om noget var usikkert."),
 });
 
@@ -1107,15 +1108,15 @@ export async function matchSitePlan(slug: string, photo: string, plan: string): 
   const planBytes = await ourTourImage(plan).catch(() => null);
   if (!photoBytes) return { ok: false, error: "Luftfotoet kunne ikke læses." };
   if (!planBytes) return { ok: false, error: "Pladskortet kunne ikke læses - upload det med Skift pladskortet, så det ligger hos os." };
-  const fit = (b: Buffer) => sharp(b).resize({ width: 1400, height: 1400, fit: "inside" }).jpeg({ quality: 84 }).toBuffer();
-  let r;
-  try {
-    const [a, b] = await Promise.all([fit(photoBytes), fit(planBytes)]);
-    r = await new Anthropic({ apiKey: key }).messages.parse({
+  const client = new Anthropic({ apiKey: key });
+  const SYSTEM =
+    "Du lægger en campingplads' tegnede pladskort oven på et luftfoto af pladsen set lige oppefra - så præcist som muligt. Brug VEJNETTET: midten af vejkryds og T-kryds, hvor en vej slår et sving, hvor en vej ender, stier, kanten af en asfaltplads, hjørner af hække og læhegn, bassinets og faste bygningers hjørner. Brug ALDRIG campingvogne, telte, biler eller skygger - de flytter sig og står ikke på kortet. Giv positionen så nøjagtigt du kan: på midten af vejen, ikke dens kant. Pladskortet kan være drejet, spejlet eller tegnet ikke helt målfast; brug derfor mange steder spredt over hele pladsen. Gæt ikke: kun steder, du er sikker på ses på begge billeder.";
+  type Pair = { what: string; plan: [number, number]; photo: [number, number] };
+  const ask = async (a: Buffer, b: Buffer, text: string): Promise<{ pairs: Pair[]; note: string }> => {
+    const r = await client.messages.parse({
       model: "claude-opus-5-5",
-      max_tokens: 6000,
-      system:
-        "Du lægger en campingplads' tegnede pladskort oven på et luftfoto af pladsen set lige oppefra. Find steder, der ses tydeligt på BEGGE billeder - vejkryds, svømmebassinet, bygningers hjørner, hække, stier, vejen langs pladsen - og giv deres position på hvert billede i procent af billedets bredde og højde. Pladskortet kan være drejet, spejlet eller tegnet ikke helt målfast i forhold til fotoet; brug derfor mange steder spredt over hele pladsen. Gæt ikke: brug kun steder, du er sikker på.",
+      max_tokens: 8000,
+      system: SYSTEM,
       messages: [
         {
           role: "user",
@@ -1124,29 +1125,85 @@ export async function matchSitePlan(slug: string, photo: string, plan: string): 
             { type: "image", source: { type: "base64", media_type: "image/jpeg", data: a.toString("base64") } },
             { type: "text", text: "Billede 2: pladskortet." },
             { type: "image", source: { type: "base64", media_type: "image/jpeg", data: b.toString("base64") } },
-            { type: "text", text: "Giv 6-12 steder, der ses på begge billeder, med position på pladskortet (plan) og på luftfotoet (photo)." },
+            { type: "text", text },
           ],
         },
       ],
       output_config: { effort: "high", format: zodOutputFormat(PlanMatches) },
     });
+    const u = r.usage;
+    await prisma.tourAiUsage
+      .create({ data: { tourSlug: slug, userName: user.name, kind: "pladskort", inputTokens: u.input_tokens, outputTokens: u.output_tokens, cacheReadTokens: u.cache_read_input_tokens ?? 0, cacheWriteTokens: u.cache_creation_input_tokens ?? 0, costUsd: claudeCostUsd(u) } })
+      .catch(() => {});
+    const ok = (v: number) => Number.isFinite(v) && v >= -5 && v <= 105;
+    const out = r.parsed_output;
+    return {
+      pairs: (out?.pairs ?? []).filter((p) => ok(p.plan.x) && ok(p.plan.y) && ok(p.photo.x) && ok(p.photo.y)).map((p) => ({ what: p.what.slice(0, 120), plan: [p.plan.x, p.plan.y], photo: [p.photo.x, p.photo.y] })),
+      note: out?.note ?? "",
+    };
+  };
+  const big = async (bytes: Buffer, px: number) => {
+    const r = await sharp(bytes).rotate().resize({ width: px, height: px, fit: "inside" }).toBuffer({ resolveWithObject: true });
+    return { data: r.data, w: r.info.width, h: r.info.height };
+  };
+  let first: { pairs: Pair[]; note: string };
+  let all: Pair[];
+  try {
+    const [P, M] = await Promise.all([big(photoBytes, 2400), big(planBytes, 2400)]);
+    const jpg = (b: Buffer) => sharp(b).resize({ width: 1500, height: 1500, fit: "inside" }).jpeg({ quality: 86 }).toBuffer();
+    // 1. The whole place: roughly how the plan lies.
+    first = await ask(await jpg(P.data), await jpg(M.data), "Giv 12-20 steder fra vejnettet, der ses på begge billeder, med position på pladskortet (plan) og på luftfotoet (photo). Spred dem over hele pladsen, også ud mod alle fire hjørner.");
+    all = first.pairs;
+    const rough = all.length >= 4 ? fitPlan(all) : null;
+    // 2. Closer: each quarter of the plan, cut out with the piece of the photo it lies on (by the rough fit) - at full detail.
+    if (rough) {
+      const at = (x: number, y: number) => {
+        const h = rough.h;
+        const d = h[6] * x + h[7] * y + 1;
+        return [(h[0] * x + h[1] * y + h[2]) / d, (h[3] * x + h[4] * y + h[5]) / d];
+      };
+      const box = (x0: number, y0: number, x1: number, y1: number, w: number, hgt: number) => {
+        const L = Math.max(0, Math.floor((Math.min(x0, x1) / 100) * w));
+        const T = Math.max(0, Math.floor((Math.min(y0, y1) / 100) * hgt));
+        const R = Math.min(w, Math.ceil((Math.max(x0, x1) / 100) * w));
+        const B = Math.min(hgt, Math.ceil((Math.max(y0, y1) / 100) * hgt));
+        return R - L > 40 && B - T > 40 ? { left: L, top: T, width: R - L, height: B - T } : null;
+      };
+      const quarters = [
+        [0, 0, 55, 55],
+        [45, 0, 100, 55],
+        [0, 45, 55, 100],
+        [45, 45, 100, 100],
+      ];
+      const closer = await Promise.all(
+        quarters.map(async ([px0, py0, px1, py1]) => {
+          const corners = [at(px0, py0), at(px1, py0), at(px1, py1), at(px0, py1)];
+          const xs = corners.map((c) => c[0]);
+          const ys = corners.map((c) => c[1]);
+          // The photo piece with a margin (the rough fit may be some way off).
+          const pad = 8;
+          const pb = box(Math.min(...xs) - pad, Math.min(...ys) - pad, Math.max(...xs) + pad, Math.max(...ys) + pad, P.w, P.h);
+          const mb = box(px0, py0, px1, py1, M.w, M.h);
+          if (!pb || !mb) return [] as Pair[];
+          const [pc, mc] = await Promise.all([sharp(P.data).extract(pb).jpeg({ quality: 88 }).toBuffer(), sharp(M.data).extract(mb).jpeg({ quality: 88 }).toBuffer()]);
+          const got = await ask(pc, mc, "Det er et udsnit af luftfotoet og den tilsvarende del af pladskortet. Giv 8-14 steder fra vejnettet i udsnittet, så præcist som muligt, med position i % af hvert udsnit.").catch(() => ({ pairs: [] as Pair[], note: "" }));
+          // Back to % of the whole picture.
+          return got.pairs.map((q) => ({
+            what: q.what,
+            plan: [((mb.left + (q.plan[0] / 100) * mb.width) / M.w) * 100, ((mb.top + (q.plan[1] / 100) * mb.height) / M.h) * 100] as [number, number],
+            photo: [((pb.left + (q.photo[0] / 100) * pb.width) / P.w) * 100, ((pb.top + (q.photo[1] / 100) * pb.height) / P.h) * 100] as [number, number],
+          }));
+        })
+      );
+      all = [...all, ...closer.flat()];
+    }
   } catch (err) {
     if (err instanceof Anthropic.AuthenticationError) return { ok: false, error: "nextviewAI-nøglen virker ikke længere." };
     return { ok: false, error: `Kunne ikke få fat i nextviewAI (${err instanceof Error ? err.message : err}).` };
   }
-  const u = r.usage;
-  await prisma.tourAiUsage
-    .create({ data: { tourSlug: slug, userName: user.name, kind: "pladskort", inputTokens: u.input_tokens, outputTokens: u.output_tokens, cacheReadTokens: u.cache_read_input_tokens ?? 0, cacheWriteTokens: u.cache_creation_input_tokens ?? 0, costUsd: claudeCostUsd(u) } })
-    .catch(() => {});
-  const out = r.parsed_output;
-  if (!out) return { ok: false, error: "nextviewAI svarede ikke som forventet - prøv igen." };
-  const ok = (v: number) => Number.isFinite(v) && v >= -5 && v <= 105;
-  const pairs = out.pairs
-    .filter((p) => ok(p.plan.x) && ok(p.plan.y) && ok(p.photo.x) && ok(p.photo.y))
-    .slice(0, 16)
-    .map((p) => ({ what: p.what.slice(0, 120), plan: [p.plan.x, p.plan.y] as [number, number], photo: [p.photo.x, p.photo.y] as [number, number] }));
-  if (pairs.length < 4) return { ok: false, error: `nextviewAI fandt kun ${pairs.length} steder, der ses på begge billeder - zoom, så hele pladsen ses tydeligt, og prøv igen. ${out.note}` };
-  return { ok: true, pairs, note: out.note };
+  const pairs = all.slice(0, 80);
+  if (pairs.length < 4) return { ok: false, error: `nextviewAI fandt kun ${pairs.length} steder, der ses på begge billeder - zoom, så hele pladsen ses tydeligt, og prøv igen. ${first.note}` };
+  return { ok: true, pairs, note: first.note };
 }
 
 /* ----- Pladskort: a see-through copy of the plan ----- */

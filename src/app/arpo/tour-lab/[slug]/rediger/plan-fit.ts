@@ -44,13 +44,15 @@ export function fitPlan(pairs: { plan: [number, number]; photo: [number, number]
   let ps = pairs;
   let h = ps.length >= 4 ? solve(ps) : null;
   if (!h) return null;
-  // The ones far off (a wrong match) out, once - if enough are left.
-  const errs = ps.map((p) => miss(h!, p));
-  const median = [...errs].sort((a, b) => a - b)[Math.floor(errs.length / 2)];
-  const kept = ps.filter((_, i) => errs[i] <= Math.max(3, median * 2.5));
-  if (kept.length >= 4 && kept.length < ps.length) {
+  // The ones far off (a wrong match) out - again and again (up to three rounds), as long as enough are left.
+  for (let round = 0; round < 3; round++) {
+    const errs = ps.map((p) => miss(h!, p));
+    const median = [...errs].sort((a, b) => a - b)[Math.floor(errs.length / 2)];
+    const kept = ps.filter((_, i) => errs[i] <= Math.max(1.5, median * 2.5));
+    if (kept.length < 4 || kept.length === ps.length) break;
     const again = solve(kept);
-    if (again) [h, ps] = [again, kept];
+    if (!again) break;
+    [h, ps] = [again, kept];
   }
   const err = ps.reduce((a, p) => a + miss(h!, p), 0) / ps.length;
   return { h, err, used: ps.length };
