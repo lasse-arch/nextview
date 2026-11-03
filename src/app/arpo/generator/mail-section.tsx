@@ -4,7 +4,8 @@ import { dealName } from "@/lib/labels";
 import { industryOf } from "@/lib/industries";
 import { onlineTours } from "@/lib/online-tours";
 import { getAppBaseUrl } from "@/lib/email-oauth";
-import { MailGenerator, type MailSender } from "../mailgenerator/mail-generator";
+import type { MailSender } from "../mailgenerator/mail-generator";
+import { MailGeneratorClient } from "../mailgenerator/mail-generator-client";
 import { teamCan } from "@/lib/team-roles";
 import { sendableTours } from "@/lib/sendable-tours";
 
@@ -49,7 +50,7 @@ export async function MailSection({ user }: { user: NonNullable<Awaited<ReturnTy
     : undefined;
 
   return (
-    <MailGenerator
+    <MailGeneratorClient
       deals={deals.map((d) => ({ id: d.id, name: dealName(d), contact: d.contactName ?? "", email: d.contactEmail || d.invoiceEmail || "", industry: industryOf(dealName(d), d.industry) }))}
       tours={[
         ...notOut.map((t) => ({

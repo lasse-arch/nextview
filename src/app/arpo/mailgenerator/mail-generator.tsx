@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { INDUSTRIES } from "@/lib/industries";
 import { MAIL_KINDS, type MailKind, type SalesMailInput } from "@/lib/sales-mail";
 import { copiedSalesMail, draftSalesMail, sendSalesMail } from "@/lib/actions/sales-mail";
@@ -21,31 +21,103 @@ const REDO = ["Kortere", "Mere personlig", "Lidt mere formel", "Mere om touren"]
 /** For an admin: whom the mail can be from (themselves first) - written, signed and sent in that person's name. */
 export type MailSender = { id: string; name: string; signature: string[]; gmail: boolean };
 
+/*
+ * What's being written is kept in this browser (a week at most), so a reload
+ * or a closed tab doesn't lose it - the fields and the suggestion. Only here,
+ * on the seller's own computer; cleared when the mail is sent or started over.
+ */
+const KEEP = "mailgenerator:v1";
+type Kept = {
+  at: number;
+  as?: string;
+  kind?: MailKind;
+  dealQuery?: string;
+  name?: string;
+  company?: string;
+  industry?: string;
+  to?: string;
+  notes?: string;
+  colleagues?: string;
+  withPrice?: boolean;
+  price?: { establishment: string; monthly: string; locations: string; bindingMonths: string; conditions: string };
+  delivery?: string;
+  picked?: string[];
+  asDemo?: boolean;
+  demoUrls?: Record<string, string>;
+  draft?: { id: string; subject: string; body: string } | null;
+};
+function readKept(): Kept | null {
+  try {
+    const k = JSON.parse(localStorage.getItem(KEEP) ?? "null") as Kept | null;
+    return k && Date.now() - k.at < 7 * 86_400_000 ? k : null;
+  } catch {
+    return null;
+  }
+}
+
 export function MailGenerator({ deals, tours, signature: mine, learned, senders }: { deals: Deal[]; tours: Tour[]; signature: string[]; learned: number; senders?: MailSender[] }) {
-  const [as, setAs] = useState(senders?.[0]?.id ?? "");
+  // Read once, as the page opens (this component is only drawn in the browser - see MailGeneratorClient).
+  const [kept] = useState(readKept);
+  const [as, setAs] = useState(kept?.as && senders?.some((x) => x.id === kept.as) ? kept.as : (senders?.[0]?.id ?? ""));
   const sender = senders?.find((x) => x.id === as);
   const signature = sender?.signature ?? mine;
   const other = Boolean(senders?.length && as && as !== senders[0].id);
-  const [kind, setKind] = useState<MailKind>("efter-moede");
-  const [dealQuery, setDealQuery] = useState("");
-  const [deal, setDeal] = useState<Deal | null>(null);
-  const [name, setName] = useState("");
-  const [company, setCompany] = useState("");
-  const [industry, setIndustry] = useState("");
-  const [to, setTo] = useState("");
-  const [notes, setNotes] = useState("");
-  const [colleagues, setColleagues] = useState("");
-  const [withPrice, setWithPrice] = useState(false);
-  const [price, setPrice] = useState({ establishment: "", monthly: "", locations: "", bindingMonths: "", conditions: "" });
-  const [delivery, setDelivery] = useState("");
-  const [picked, setPicked] = useState<string[]>([]);
+  const [kind, setKind] = useState<MailKind>(kept?.kind ?? "efter-moede");
+  const [dealQuery, setDealQuery] = useState(kept?.dealQuery ?? "");
+  const [deal, setDeal] = useState<Deal | null>(() => deals.find((x) => x.name === kept?.dealQuery) ?? null);
+  const [name, setName] = useState(kept?.name ?? "");
+  const [company, setCompany] = useState(kept?.company ?? "");
+  const [industry, setIndustry] = useState(kept?.industry ?? "");
+  const [to, setTo] = useState(kept?.to ?? "");
+  const [notes, setNotes] = useState(kept?.notes ?? "");
+  const [colleagues, setColleagues] = useState(kept?.colleagues ?? "");
+  const [withPrice, setWithPrice] = useState(kept?.withPrice ?? false);
+  const [price, setPrice] = useState(kept?.price ?? { establishment: "", monthly: "", locations: "", bindingMonths: "", conditions: "" });
+  const [delivery, setDelivery] = useState(kept?.delivery ?? "");
+  const [picked, setPicked] = useState<string[]>(() => (kept?.picked ?? []).filter((k) => tours.some((t) => t.key === k)));
   const [tourQuery, setTourQuery] = useState("");
   /** Our own tours go out as showcase links: the recipient's own, with the walk-through - and the seller hears when they look. */
-  const [asDemo, setAsDemo] = useState(true);
+  const [asDemo, setAsDemo] = useState(kept?.asDemo ?? true);
   /** The showcase links made for this mail (tour + recipient), so a new suggestion doesn't make new ones. */
-  const [demoUrls, setDemoUrls] = useState<Record<string, string>>({});
+  const [demoUrls, setDemoUrls] = useState<Record<string, string>>(kept?.demoUrls ?? {});
 
-  const [draft, setDraft] = useState<{ id: string; subject: string; body: string } | null>(null);
+  const [draft, setDraft] = useState<{ id: string; subject: string; body: string } | null>(kept?.draft ?? null);
+  // Kept as it's written (a moment after the last key), so a reload brings it back.
+  const [cleared, setCleared] = useState(false);
+  useEffect(() => {
+    if (cleared) return;
+    const t = window.setTimeout(() => {
+      const empty = !notes.trim() && !draft && !name.trim() && !to.trim() && !company.trim();
+      try {
+        if (empty) localStorage.removeItem(KEEP);
+        else localStorage.setItem(KEEP, JSON.stringify({ at: Date.now(), as, kind, dealQuery, name, company, industry, to, notes, colleagues, withPrice, price, delivery, picked, asDemo, demoUrls, draft } satisfies Kept));
+      } catch {}
+    }, 400);
+    return () => window.clearTimeout(t);
+  }, [cleared, as, kind, dealQuery, name, company, industry, to, notes, colleagues, withPrice, price, delivery, picked, asDemo, demoUrls, draft]);
+  /** "Start forfra": everything empty, and nothing kept. */
+  function startOver() {
+    try {
+      localStorage.removeItem(KEEP);
+    } catch {}
+    setKind("efter-moede");
+    setDealQuery("");
+    setDeal(null);
+    setName("");
+    setCompany("");
+    setIndustry("");
+    setTo("");
+    setNotes("");
+    setColleagues("");
+    setWithPrice(false);
+    setPrice({ establishment: "", monthly: "", locations: "", bindingMonths: "", conditions: "" });
+    setDelivery("");
+    setPicked([]);
+    setDemoUrls({});
+    setDraft(null);
+    setMsg(null);
+    setCleared(false);
+  }
   const [redo, setRedo] = useState("");
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, start] = useTransition();
@@ -124,6 +196,13 @@ export function MailGenerator({ deals, tours, signature: mine, learned, senders 
     startSend(async () => {
       const r = await sendSalesMail(draft.id, to, draft.subject, draft.body, other ? as : undefined).catch(() => ({ ok: false as const, error: "Der skete en fejl - prøv igen." }));
       setMsg(r.ok ? { ok: true, text: `Sendt til ${recipient}.${deal ? " Den ligger på dealen." : ""}` } : { ok: false, text: r.error });
+      // Sent: not kept any longer (a reload starts empty).
+      if (r.ok) {
+        setCleared(true);
+        try {
+          localStorage.removeItem(KEEP);
+        } catch {}
+      }
     });
   }
 
@@ -298,6 +377,11 @@ export function MailGenerator({ deals, tours, signature: mine, learned, senders 
           <button type="button" disabled={busy} onClick={() => write()} className="w-full rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50">
             {busy && !draft ? "Skriver …" : draft ? "Skriv et nyt forslag" : "Skriv mail"}
           </button>
+          {(notes.trim() || draft || name.trim() || to.trim()) && (
+            <button type="button" onClick={() => confirm("Start forfra? Det, du har skrevet, fjernes.") && startOver()} className="w-full text-center text-xs text-slate-500 hover:text-slate-800 hover:underline">
+              Start forfra med en ny mail
+            </button>
+          )}
         </section>
 
         <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
