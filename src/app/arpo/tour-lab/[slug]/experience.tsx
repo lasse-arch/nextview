@@ -2636,7 +2636,7 @@ function TourExperience({
   return (
     <TourLang.Provider value={{ lang, t: tx }}>
     <LinkProvider T={T} popup={popup}>
-    <div className={`hv fixed inset-0 z-50 overflow-hidden bg-[#0d1b20] ${selected ? "hv-punkt" : ""} ${zoomed ? "hv-zoom" : ""} ${welcome ? "hv-welcome" : ""} ${phase === "tour" && T.stories?.mobile ? "hv-st-on-m" : ""} ${menuOpen ? "hv-menu-aaben" : ""} ${T.overviewUi?.box?.desktop === false ? "hv-boks-ud-d" : ""} ${T.overviewUi?.box?.mobile === false ? "hv-boks-ud-m" : ""} ${T.overviewUi?.titleMobile ? "hv-titel-m" : ""} ${T.overviewUi?.filter?.desktop === false ? "hv-filter-ud-d" : ""} ${T.overviewUi?.filter?.mobile === false ? "hv-filter-ud-m" : ""} ${T.overviewUi?.names?.desktop ? `hv-navne-d-${T.overviewUi.names.desktop}` : ""} ${T.overviewUi?.names?.mobile ? `hv-navne-m-${T.overviewUi.names.mobile}` : ""} ${T.overviewUi?.filterColumns ? `hv-filter-kol hv-filter-kol-${T.overviewUi.filterColumns}` : T.overviewUi?.filterScroll ? "hv-filter-rul" : ""} ${langClasses} ${T.design?.menu === "dock" ? "hv-dock" : ""} ${T.logoSide === "right" ? "hv-logo-h" : ""} ${T.logoBg ? `hv-logobg-${T.logoBg}` : ""} ${T.logoBgTiles ?? T.logoBg ? `hv-tlogobg-${T.logoBgTiles ?? T.logoBg}` : ""} hv-tlogo-${T.logoAlignTiles ?? "midt"} ${guideAt != null || (dayAt != null && !dayOpen) || (lineRun && !lineRun.end) ? "hv-guiding" : ""} ${route ? "hv-routing" : ""} ${phase === "tour" ? "hv-i-tour" : ""} ${T.wayfinding ? "hv-har-rute" : ""} ${findAside.map((a) => `rt-vig-${a}`).join(" ")} ${showCard != null ? "hv-med-stedkort" : ""} ${T.placeCardSide?.desktop === "right" ? "hv-pc-h-d" : ""} ${T.placeCardSide?.mobile === "right" ? "hv-pc-h-m" : ""} ${showCard != null && pano ? "hv-pano-kort" : ""} ${nudgeOn && T.nudge && phase === "tour" ? "hv-med-nudge" : ""} ${T.wayfinding?.button?.desktop ? `rt-d-${T.wayfinding.button.desktop}` : ""} ${T.wayfinding?.button?.mobile ? `rt-m-${T.wayfinding.button.mobile}` : ""} ${showCard != null || (nudgeOn && T.nudge && phase === "tour") ? "hv-med-kort" : ""} ${showMeasures && phase === "tour" ? "hv-maler" : ""} ${phase === "tour" && T.stories?.desktop ? "hv-st-on-d" : ""}`} style={
+    <div className={`hv fixed inset-0 z-50 overflow-hidden bg-[#0d1b20] ${selected ? "hv-punkt" : ""} ${zoomed ? "hv-zoom" : ""} ${welcome ? "hv-welcome" : ""} ${phase === "tour" && T.stories?.mobile ? "hv-st-on-m" : ""} ${menuOpen ? "hv-menu-aaben" : ""} ${T.overviewUi?.box?.desktop === false ? "hv-boks-ud-d" : ""} ${T.overviewUi?.box?.mobile === false ? "hv-boks-ud-m" : ""} ${T.overviewUi?.titleMobile ? "hv-titel-m" : ""} ${T.overviewUi?.boxStyle ? "hv-boks-logo" : ""} ${T.overviewUi?.filter?.desktop === false ? "hv-filter-ud-d" : ""} ${T.overviewUi?.filter?.mobile === false ? "hv-filter-ud-m" : ""} ${T.overviewUi?.names?.desktop ? `hv-navne-d-${T.overviewUi.names.desktop}` : ""} ${T.overviewUi?.names?.mobile ? `hv-navne-m-${T.overviewUi.names.mobile}` : ""} ${T.overviewUi?.filterColumns ? `hv-filter-kol hv-filter-kol-${T.overviewUi.filterColumns}` : T.overviewUi?.filterScroll ? "hv-filter-rul" : ""} ${langClasses} ${T.design?.menu === "dock" ? "hv-dock" : ""} ${T.logoSide === "right" ? "hv-logo-h" : ""} ${T.logoBg ? `hv-logobg-${T.logoBg}` : ""} ${T.logoBgTiles ?? T.logoBg ? `hv-tlogobg-${T.logoBgTiles ?? T.logoBg}` : ""} hv-tlogo-${T.logoAlignTiles ?? "midt"} ${guideAt != null || (dayAt != null && !dayOpen) || (lineRun && !lineRun.end) ? "hv-guiding" : ""} ${route ? "hv-routing" : ""} ${phase === "tour" ? "hv-i-tour" : ""} ${T.wayfinding ? "hv-har-rute" : ""} ${findAside.map((a) => `rt-vig-${a}`).join(" ")} ${showCard != null ? "hv-med-stedkort" : ""} ${T.placeCardSide?.desktop === "right" ? "hv-pc-h-d" : ""} ${T.placeCardSide?.mobile === "right" ? "hv-pc-h-m" : ""} ${showCard != null && pano ? "hv-pano-kort" : ""} ${nudgeOn && T.nudge && phase === "tour" ? "hv-med-nudge" : ""} ${T.wayfinding?.button?.desktop ? `rt-d-${T.wayfinding.button.desktop}` : ""} ${T.wayfinding?.button?.mobile ? `rt-m-${T.wayfinding.button.mobile}` : ""} ${showCard != null || (nudgeOn && T.nudge && phase === "tour") ? "hv-med-kort" : ""} ${showMeasures && phase === "tour" ? "hv-maler" : ""} ${phase === "tour" && T.stories?.desktop ? "hv-st-on-d" : ""}`} style={
         {
           fontFamily: `'${T.font}', system-ui, sans-serif`,
           "--c-main": T.colors.main,
@@ -3011,7 +3011,13 @@ function TourExperience({
       )}
 
       {/* Logo (MPSkins: left, 200px, 13px from the edges - or right, with the menu on the left). */}
-      <TourLogo T={T} className={`hv-logo ${T.logoOnLight ? (T.logoCard === false ? "hv-logo-lys" : "hv-logo-kort") : ""} ${phase === "tour" && !(cover && T.cover) ? "" : "hidden"}`} />
+      <TourLogo T={T} className={`hv-logo ${T.logoOnLight ? (T.logoCard === false ? "hv-logo-lys" : "hv-logo-kort") : ""} ${(phase === "tour" || (phase === "drone" && OV && T.overviewUi?.boxStyle)) && !(cover && T.cover) ? "" : "hidden"}`} />
+      {/* The drone scene / map "as in the tour": the logo - and, if chosen, the main button under it. */}
+      {phase === "drone" && OV && T.overviewUi?.boxStyle === "logo-cta" && T.cta[0] && !(cover && T.cover) && (
+        <TourLink className="hv-btn hv-primary hv-luft-cta" href={T.cta[0].href} label={T.cta[0].label} onClick={() => ctaClick(T.cta[0].label, T.cta[0].href, "luft_top")}>
+          {T.cta[0].label}
+        </TourLink>
+      )}
 
       {/* Inside the tour: back to the air, the room's name, the menu. */}
       {phase === "tour" && (
@@ -4267,6 +4273,11 @@ const CSS = `
 .hv-intro{transition:opacity .25s}
 /* Switched off in the editor (Luftfoto og kort → Over kortet), per device. */
 @media (min-width:761px){.hv-boks-ud-d .hv-intro,.hv-filter-ud-d .hv-filtre{display:none}}
+.hv-boks-logo .hv-intro{display:none}
+.hv-luft-cta{position:absolute;z-index:5;left:var(--logo-side,16px);top:calc(var(--logo-top,14px) + var(--logo-h,46px) + 12px + env(safe-area-inset-top,0px));width:auto;margin:0;padding:10px 20px;box-shadow:0 6px 18px rgba(0,0,0,.22)}
+.hv-logobg-light .hv-luft-cta,.hv-logobg-main .hv-luft-cta{top:calc(var(--logo-top,14px) + var(--logo-h,46px) + 18px + env(safe-area-inset-top,0px))}
+.hv-logo-h .hv-luft-cta{left:auto;right:var(--logo-side,16px)}
+.hv-welcome .hv-luft-cta,.hv-punkt .hv-luft-cta,.hv-menu-aaben .hv-luft-cta{opacity:0;pointer-events:none}
 @media (max-width:760px){.hv-boks-ud-m .hv-intro,.hv-filter-ud-m .hv-filtre{display:none}}
 /* The points' names (Luftfoto og kort → Over kortet), per device - after the defaults further down, so they win. */
 @media (max-width:760px){

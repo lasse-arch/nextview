@@ -827,6 +827,22 @@ function OverviewUiToggles({ config, edit, preview }: { config: TourConfig; edit
           ))}
         </tbody>
       </table>
+      <Field title="Øverst på luftfotoet" hint="Boks: logo, overskrift, tekst og knap. Som i touren: kun logoet, præcis som inde i 3D-touren - evt. med hovedknappen (fx Book nu) under.">
+        <Choice<"box" | "logo" | "logo-cta">
+          value={ui?.boxStyle ?? "box"}
+          options={[
+            ["box", "Boks"],
+            ["logo", "Kun logo"],
+            ["logo-cta", "Logo + knap"],
+          ]}
+          onChange={(v) =>
+            edit((d) => {
+              const rest = { ...d.overviewUi, boxStyle: v === "box" ? undefined : v };
+              d.overviewUi = Object.values(rest).some((x) => x !== undefined) ? rest : undefined;
+            })
+          }
+        />
+      </Field>
       <Toggle
         on={Boolean(ui?.titleMobile)}
         onChange={(on) =>

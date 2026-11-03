@@ -344,6 +344,8 @@ export type TourConfig = {
   overviewUi?: {
     box?: { desktop?: false; mobile?: false };
     filter?: { desktop?: false; mobile?: false };
+    /** The top of the drone scene / map: left out = the box (logo, title, text, main button); "logo" = only the logo, as in the 3D tour; "logo-cta" = the logo and the main button under it. */
+    boxStyle?: "logo" | "logo-cta";
     /** true: on a phone the top box shows the title beside the logo (only when there is room for it). Left out: the logo and the button only - the logo says the name. */
     titleMobile?: true;
     /** The points' names on the drone scene / map: always, only when zoomed in, or never (the open point's card has the name). Default: computer always, phone when zoomed in. */
