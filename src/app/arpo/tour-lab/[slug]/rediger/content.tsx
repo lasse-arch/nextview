@@ -1490,6 +1490,27 @@ export function CardsEditor({ config, edit, preview, scanMap, mpskinsHidden }: O
                   )}
                 </div>
               </Field>
+              {config.points.some((p) => p.panorama || p.pano) && (
+                <Field title="Vises i et punkts 360°-billede" hint="Punkter på luftfotoet med 360°-billede: kortet kommer frem, når gæsten åbner billedet - som når man går ind i et rum.">
+                  <div className="flex flex-wrap gap-x-3 gap-y-1.5">
+                    {config.points
+                      .filter((p) => p.panorama || p.pano)
+                      .map((p) => (
+                        <label key={p.id} className="flex items-center gap-1.5 text-[13px]">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(c.points?.includes(p.id))}
+                            onChange={(e) => {
+                              const next = e.target.checked ? [...(c.points ?? []), p.id] : (c.points ?? []).filter((x) => x !== p.id);
+                              set({ ...c, points: next.length ? next : undefined });
+                            }}
+                          />
+                          {p.name}
+                        </label>
+                      ))}
+                  </div>
+                </Field>
+              )}
               <CardPeople people={c.people ?? []} onChange={(people) => set({ ...c, people: people.length ? people : undefined })} />
               <details className="text-[13px]">
                 <summary className="cursor-pointer select-none text-[#0071e3]">&quot;Læs mere&quot;-side (valgfri)</summary>

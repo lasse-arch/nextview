@@ -160,7 +160,10 @@ export type YearWheel = {
 };
 
 export type PlaceCard = {
+  /** The scan points in the 3D tour where the card comes up. */
   ss: number[];
+  /** Points on the drone scene / map (their ids) whose 360° photo shows the card when it opens - like arriving in a room. */
+  points?: string[];
   title: string;
   text: string;
   more?: { label: string; text: string };
