@@ -723,7 +723,7 @@ export function FeatureTour({ T, onClose, onEvent, demo }: { T: TourConfig; onCl
     if (!reelOn || menuUp || !el || !tour) return;
     let h = 0;
     const fit = () => {
-      const next = Math.ceil(el.getBoundingClientRect().height) + 12;
+      const next = Math.ceil(el.getBoundingClientRect().height);
       if (next <= h) return;
       h = next;
       tour.style.setProperty("--ft-reel-h", `${h}px`);
@@ -1003,7 +1003,8 @@ export const FEATURES_CSS = `
 .ft-reel-start small{font-weight:600;opacity:.75}
 .ft-selv{display:block;width:100%;margin-top:8px;border:0;background:none;padding:6px;font:inherit;font-weight:700;font-size:14px;color:var(--c-main);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
 .hv[data-ft-reel]{bottom:var(--ft-reel-h,0px)!important}
-.ft-reel{position:fixed;left:50%;bottom:calc(8px + env(safe-area-inset-bottom,0px));translate:-50% 0;z-index:62;width:min(520px,calc(100% - 24px));padding:12px 14px 10px;border-radius:18px;background:rgb(13,27,32);color:#fff;box-shadow:0 14px 40px rgba(0,0,0,.35);animation:hvUp .35s ease}
+/* A bar the full width of the room under the tour (no white beside it on a tablet or computer), its contents kept to a readable width in the middle. */
+.ft-reel{position:fixed;left:0;right:0;bottom:0;z-index:62;padding:14px max(16px,calc((100% - 560px) / 2)) calc(12px + env(safe-area-inset-bottom,0px));border-radius:18px 18px 0 0;background:rgb(13,27,32);color:#fff;box-shadow:0 -8px 30px rgba(0,0,0,.25);animation:hvUp .35s ease}
 .ft-reel .ft-kick{margin:6px 0 2px;color:color-mix(in srgb,var(--c-accent) 70%,#fff)}
 .ft-reel>b{display:block;font-size:17px;line-height:1.2}
 .ft-reel>span{display:block;margin-top:3px;font-size:13.5px;line-height:1.4;color:rgba(255,255,255,.82)}
@@ -1026,7 +1027,7 @@ export const FEATURES_CSS = `
 .ft-reel>.ft-reel-hint{margin-top:7px;padding:7px 10px;border-radius:10px;border:1px dashed color-mix(in srgb,var(--c-accent) 60%,transparent);color:#fff;font-size:12.5px;line-height:1.35}
 .ft-reel-hvorfor{margin-top:8px!important;padding:8px 10px;border-radius:12px;background:rgba(255,255,255,.08);font-size:13px!important}
 .ft-reel-hvorfor b{display:inline!important;font-size:11px!important;letter-spacing:.08em;text-transform:uppercase;color:color-mix(in srgb,var(--c-accent) 70%,#fff);margin-right:4px}
-@media (max-width:760px){.ft-reel{width:calc(100% - 16px);max-height:55vh;overflow-y:auto;padding:10px 12px 9px;display:flex;flex-direction:column;min-height:min(240px,50vh)}.ft-reel-knapper{margin-top:auto!important;padding-top:9px}.ft-reel-scene{margin:6px 0 2px}.ft-reel-scene:not(:has(.ft-mere,.ft-overalt)){display:none}.ft-reel-scene .ft-overalt{padding:8px 6px 4px;gap:12px;zoom:.74}.ft-reel>b{font-size:16px}.ft-reel>span{font-size:13px}
+@media (max-width:760px){.ft-reel{max-height:55vh;overflow-y:auto;padding:10px 12px calc(9px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;min-height:min(240px,50vh)}.ft-reel-knapper{margin-top:auto!important;padding-top:9px}.ft-reel-scene{margin:6px 0 2px}.ft-reel-scene:not(:has(.ft-mere,.ft-overalt)){display:none}.ft-reel-scene .ft-overalt{padding:8px 6px 4px;gap:12px;zoom:.74}.ft-reel>b{font-size:16px}.ft-reel>span{font-size:13px}
 .ft-ark{padding:16px 16px 12px;max-height:calc(100% - 16px)}.ft-scene{height:110px}.ft-slide h2{font-size:19px;margin-top:12px}.ft-slide p{font-size:14px}.ft-hvorfor{margin-top:10px;padding:10px 12px;font-size:13px}.ft-reel-knapper button{white-space:nowrap;padding:8px 6px;font-size:12.5px}}
 .ft-reel-knapper button{flex:1;border:0;border-radius:999px;padding:8px 10px;background:rgba(255,255,255,.14);color:#fff;font:inherit;font-weight:700;font-size:13px;cursor:pointer}
 .ft-reel-knapper button:nth-child(2){background:var(--c-accent)}
