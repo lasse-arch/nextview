@@ -1432,7 +1432,7 @@ export function CardsEditor({ config, edit, preview, scanMap, mpskinsHidden }: O
           on={Boolean(config.placeCardVoice)}
           onChange={(on) => edit((d) => void (d.placeCardVoice = on ? { ...d.placeCardVoice } : undefined))}
           title="Få det læst op"
-          hint="En knap på stedkortene, der læser overskrift og tekst op med tourens stemme fra ElevenLabs. Til gæster, der har svært ved at læse."
+          hint="En knap på stedkortene, der læser op med tourens stemme fra ElevenLabs - gerne en længere tekst end kortets. Til gæster, der er ordblinde eller har svært ved at læse."
         />
         {config.placeCardVoice && <CardVoices config={config} edit={edit} />}
         {config.placeCardVoice && (
@@ -1491,6 +1491,11 @@ export function CardsEditor({ config, edit, preview, scanMap, mpskinsHidden }: O
               <Field title="Tekst" hint="Kort - 1-3 sætninger.">
                 <textarea className={`${textarea} bg-white`} value={c.text} onChange={(e) => set({ ...c, text: e.target.value })} />
               </Field>
+              {config.placeCardVoice && (
+                <Field title="Det, der læses op" hint="Længere end kortet og skrevet til at blive hørt - fx 4-8 korte sætninger. Tom: overskrift og tekst læses op.">
+                  <textarea className={`${textarea} bg-white`} rows={4} placeholder={`${c.title}. ${c.text}`} value={c.speech ?? ""} onChange={(e) => set({ ...c, speech: e.target.value || undefined })} />
+                </Field>
+              )}
               {config.placeCardVoice && (
                 <p className="px-1 text-[12px] text-[#8e8e93]">
                   {{ ok: "🔊 Har lyd", old: "🔊 Teksten er ændret - lav lyden igen (knappen øverst)", none: "Ingen lyd endnu - lav den med knappen øverst" }[cardVoiceState(c)]}

@@ -2,6 +2,7 @@
 
 import { useContext, useEffect, useRef, useState } from "react";
 import { makeStopVoice, voiceOptions } from "@/lib/actions/tour-voice";
+import { writeCardSpeeches } from "@/lib/actions/tour-cards";
 import type { Voice } from "@/lib/elevenlabs";
 import type { GuideSetup, TourConfig } from "../../tours/types";
 import { Field, FilesContext, Group } from "./ui";
@@ -183,9 +184,9 @@ export function StopVoice({ config, stop, set, upload }: { config: TourConfig; s
 }
 
 /** What a place card's voice reads: its title and text. */
-export const cardVoiceText = (c: { title: string; text: string }) => `${c.title}. ${c.text}`;
+export const cardVoiceText = (c: { title: string; text: string; speech?: string }) => c.speech?.trim() || `${c.title}. ${c.text}`;
 /** A place card's voice: none yet, made from older words (it won't play), or fine. */
-export const cardVoiceState = (c: { title: string; text: string; audio?: string; audioText?: string }): "none" | "old" | "ok" =>
+export const cardVoiceState = (c: { title: string; text: string; speech?: string; audio?: string; audioText?: string }): "none" | "old" | "ok" =>
   !c.audio ? "none" : c.audioText != null && !same(c.audioText, cardVoiceText(c)) ? "old" : "ok";
 
 /**
@@ -221,12 +222,41 @@ export function CardVoices({ config, edit }: { config: TourConfig; edit: Edit })
     }
     setMaking(null);
   }
-  if (!voice) return <p className={small}>Vælg først tourens stemme under Vis mig rundt → Stemme - stedkortene læses op med den samme.</p>;
+  const [writing, setWriting] = useState(false);
+  const noSpeech = cards.flatMap((c, i) => (c.text.trim() && !c.speech?.trim() ? [i] : []));
+  async function writeAll() {
+    setError(null);
+    setWriting(true);
+    const r = await writeCardSpeeches(slug, config, noSpeech).catch((err: unknown) => ({ ok: false as const, error: err instanceof Error ? err.message : String(err) }));
+    setWriting(false);
+    if (!r.ok) return setError(r.error);
+    edit((d) => {
+      for (const [i, speech] of Object.entries(r.speeches)) {
+        const x = d.placeCards?.[Number(i)];
+        if (x && !x.speech?.trim()) d.placeCards![Number(i)] = { ...x, speech };
+      }
+    });
+  }
+  const speechButton =
+    noSpeech.length > 0 ? (
+      <button type="button" disabled={writing || making != null} onClick={writeAll} className="w-full rounded-xl bg-[#d97757]/10 py-2 text-[14px] font-medium text-[#b4532f] hover:bg-[#d97757]/15 disabled:opacity-50">
+        {writing ? "nextviewAI skriver …" : `Skriv længere oplæsning til ${noSpeech.length} stedkort med nextviewAI`}
+      </button>
+    ) : null;
+  if (!voice)
+    return (
+      <div className="space-y-1.5">
+        <p className={small}>Vælg først tourens stemme under Vis mig rundt → Stemme - stedkortene læses op med den samme.</p>
+        {speechButton}
+      </div>
+    );
   return (
     <div className="space-y-1.5">
       <p className={small}>
         Læses op af {voice.name} (ElevenLabs). {cards.length - todo.length} af {cards.length} stedkort har lyd. Kun på dansk - på de andre sprog vises knappen ikke.
       </p>
+      <p className={small}>Oplæsningen må gerne være længere end kortets tekst - til gæster, der er ordblinde. Skriv den selv på hvert kort, eller lad nextviewAI skrive den, og lav så lyden.</p>
+      {speechButton}
       {todo.length > 0 && (
         <button type="button" disabled={making != null} onClick={makeAll} className="w-full rounded-xl bg-white py-2 text-[14px] font-medium text-[#0071e3] ring-1 ring-black/[.06] hover:bg-[#0071e3]/5 disabled:opacity-50">
           {making ? `Laver lyd … ${making.done}/${making.of}` : `Lav lyd til ${todo.length} stedkort`}

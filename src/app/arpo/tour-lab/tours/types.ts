@@ -162,9 +162,11 @@ export type YearWheel = {
 export type PlaceCard = {
   /** The scan points in the 3D tour where the card comes up. */
   ss: number[];
+  /** What "Få det læst op" reads - longer than the card and written to be heard (e.g. for visitors with dyslexia: 4-8 short sentences about the place). Left out: the title and text. */
+  speech?: string;
   /** The card read aloud by the tour's ElevenLabs voice (made in the editor) - played by "Få det læst op" (placeCardVoice). Danish only, like the guide's voices. */
   audio?: string;
-  /** What `audio` was read from ("<title>. <text>") - it only plays while the card still says that. */
+  /** What `audio` was read from (`speech`, else "<title>. <text>") - it only plays while the card still says that. */
   audioText?: string;
   /** Photos on the card, a small row under the text (a tap shows them big). */
   images?: string[];

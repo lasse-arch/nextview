@@ -53,7 +53,7 @@ export function PlaceCard({
     return () => ro.disconnect();
   }, [card.text, page]);
   // Read aloud: the card's own voice (ElevenLabs, made in the editor) - only while the card still says what it was read from.
-  const voiceText = `${card.title}. ${card.text}`;
+  const voiceText = card.speech?.trim() || `${card.title}. ${card.text}`;
   const audio = card.audio && (card.audioText == null || card.audioText.replace(/\s+/g, " ").trim() === voiceText.replace(/\s+/g, " ").trim()) ? card.audio : null;
   const player = useRef<HTMLAudioElement | null>(null);
   const [reading, setReading] = useState(false);
