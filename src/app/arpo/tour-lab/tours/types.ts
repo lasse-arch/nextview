@@ -168,6 +168,8 @@ export type PlaceCard = {
   audioText?: string;
   /** Photos on the card, a small row under the text (a tap shows them big). */
   images?: string[];
+  /** true: the card shows "Næste rundvisninger" (TourConfig.events) - the coming dates and the sign-up button. */
+  events?: true;
   /** Pictures (their addresses - e.g. a drone photo in the menu or a stop of "Vis mig rundt") the card belongs to: shown when the picture opens from the menu, and a guide stop at the picture shows the card's people. */
   pictures?: string[];
   /** Points on the drone scene / map (their ids) whose 360° photo shows the card when it opens - like arriving in a room. */
@@ -633,6 +635,16 @@ export type TourConfig = {
    * "Svært ved at læse? Få det læst op"). Left out: no button.
    */
   placeCardVoice?: { label?: string };
+  /**
+   * "Næste rundvisninger": the coming dates from a sign-up form (a Zenbi form,
+   * https://signup.zenbi.dk/form/<id> - read every 10 minutes, past dates left
+   * out) with a button to the form. Shown where chosen: on the welcome
+   * (`welcome`), in the menu (`menu`) and/or on place cards (placeCards[].events).
+   * `title` default "Næste rundvisninger", `button` default "Tilmeld", `field`:
+   * the form's date field when it isn't the one called "…dato…", `max`: how many
+   * dates (default 3).
+   */
+  events?: { source: string; title?: string; button?: string; field?: string; welcome?: boolean; menu?: boolean; max?: number };
   /** Which side the place cards stand on, per device - left out: the left (bottom left corner). */
   placeCardSide?: { desktop?: "right"; mobile?: "right" };
   /** How big the card of "Vis mig rundt" is: "lille" (title, a few lines, the buttons), "mellem" (the default), "stor" (the whole width on a phone). Scales with the screen either way. */

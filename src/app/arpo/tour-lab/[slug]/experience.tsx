@@ -32,6 +32,7 @@ import { FULLSCREEN_CSS, FullscreenOnUse } from "./fullscreen-on-use";
 import { CONTACT_CSS, CONTACT_HREF, ContactForm } from "./contact-form";
 import { DAY_CSS, DayBar, DaySheet } from "./day";
 import { SHOP_CSS, ShopSheet } from "./shop";
+import { EVENTS_CSS, EventsBlock, useTourEvents } from "./events";
 import { FEEDBACK_CSS, FeedbackLayer } from "./feedback";
 import { ICONS } from "../tours/icons";
 import { SIMPLE_CSS, SimpleMenu, SimpleWelcome } from "./simple";
@@ -681,6 +682,8 @@ function TourExperience({
   const [welcome, setWelcome] = useState(false);
   /** "Vælg datoer" on a point's card: the webshop booking sheet for that point (TourPoint.shop). */
   const [shopFor, setShopFor] = useState<Point | null>(null);
+  /** "Næste rundvisninger" (T.events): the coming dates, where the tour shows them. */
+  const events = useTourEvents(T);
   /** The tour opens on the cover welcome: it's there from the very first picture (no flash of the drone scene before it). */
   const startsCovered = T.design?.welcome === "cover" && Boolean(T.cover) && !T.intro && !played;
   const [cover, setCover] = useState(startsCovered);
@@ -2654,7 +2657,7 @@ function TourExperience({
       }>
       <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.font.replace(/ /g, "+")}:wght@400;600;700;800;900&display=swap`} />
       {T.fontHeading && <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.fontHeading.replace(/ /g, "+")}:wght@500;600&display=swap`} />}
-      <style>{CSS + TOUR_LOGO_CSS + CONTACT_CSS + STORIES_CSS + LIGHTBOX_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + ONBOARDING_CSS + MENU_HINT_CSS + INFO_CSS + STAGING_CSS + (T.lineDays ? LINE_DAY_CSS : "") + (T.yearWheel ? YEARWHEEL_CSS : "") + MAP_CSS + (T.sitePlan?.overlay ? SITE_PLAN_CSS + SITE_PLAN_360_CSS : "") + ROUTE_CSS + MEASURES_CSS + CARDS_CSS + DAY_CSS + (T.points.some((p) => p.shop) ? SHOP_CSS : "") + SIMPLE_CSS + BENTO_CSS + LOGO_RIGHT_CSS + LANG_CSS + WEATHER_CSS + COMMUTE_CSS + FEATURES_CSS + FINDER_CSS + (review ? FEEDBACK_CSS : "")}</style>
+      <style>{CSS + TOUR_LOGO_CSS + CONTACT_CSS + STORIES_CSS + LIGHTBOX_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + ONBOARDING_CSS + MENU_HINT_CSS + INFO_CSS + STAGING_CSS + (T.lineDays ? LINE_DAY_CSS : "") + (T.yearWheel ? YEARWHEEL_CSS : "") + MAP_CSS + (T.sitePlan?.overlay ? SITE_PLAN_CSS + SITE_PLAN_360_CSS : "") + ROUTE_CSS + MEASURES_CSS + CARDS_CSS + DAY_CSS + (T.events ? EVENTS_CSS : "") + (T.points.some((p) => p.shop) ? SHOP_CSS : "") + SIMPLE_CSS + BENTO_CSS + LOGO_RIGHT_CSS + LANG_CSS + WEATHER_CSS + COMMUTE_CSS + FEATURES_CSS + FINDER_CSS + (review ? FEEDBACK_CSS : "")}</style>
       {/* The tour's own design on top (written by Claude or by hand under Avanceret). */}
       {T.customCss && <style>{T.customCss.replace(/<\/?style/gi, "")}</style>}
 
@@ -2934,6 +2937,7 @@ function TourExperience({
               <div className="hv-wel-kick">{T.welcome.kicker}</div>
               <h1>{T.welcome.title}</h1>
               <p>{T.welcome.lead}</p>
+              {events && T.events?.welcome && <EventsBlock T={T} events={events} onSignUp={(label, href) => ctaClick(label, href, "welcome_events")} />}
               {GUIDES.length > 0 && !T.welcome.tiles.some((t) => "guide" in t.go) && (
                 <button type="button" className="hv-wel-guide" onClick={() => chooseWelcome({ guide: true }, "Vis mig rundt")}>
                   ▶ {tx("Vis mig rundt")}
@@ -3111,6 +3115,7 @@ function TourExperience({
             </>
           )}
         </div>
+        {events && T.events?.menu && <EventsBlock T={T} events={events} className="ev-menu" onSignUp={(label, href) => ctaClick(label, href, "menu_events")} />}
         {setLang && (T.design?.menu ?? "side") === "side" && tourLanguages(savedTour).length > 1 && (
           <div className="hv-menu-sprog" role="group" aria-label={tx("Sprog")}>
             {tourLanguages(savedTour).map((code) => {
@@ -3581,6 +3586,7 @@ function TourExperience({
           card={T.placeCards![showCard]}
           size={T.placeCardSize}
           onPhotos={(images, at) => setLightbox({ images, at, title: T.placeCards![showCard].title })}
+          extra={events && T.placeCards![showCard].events ? <EventsBlock T={T} events={events} onSignUp={(label, href) => ctaClick(label, href, "place_card_events")} /> : undefined}
           voice={T.placeCardVoice ? tx(T.placeCardVoice.label || "Svært ved at læse? Få det læst op") : undefined}
           onClose={(how) => {
             track("place_card_close", { title: T.placeCards![showCard].title, how });

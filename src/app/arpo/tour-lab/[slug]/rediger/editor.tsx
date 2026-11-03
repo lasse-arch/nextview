@@ -1,5 +1,6 @@
 "use client";
 
+import { EventsEditor } from "./events-editor";
 import { InsightsPanel } from "./insights";
 import { LanguagesPanel } from "./languages";
 import { tourUrl } from "@/lib/public-urls";
@@ -932,7 +933,12 @@ export function TourEditor({
             {tab === "tags" && <TagsEditor config={config} edit={edit} slug={slug} preview={preview} />}
             {tab === "staging" && <StagingEditor config={config} edit={edit} preview={preview} focus={stagingFocus} />}
             {tab === "linjedag" && <LineDayEditor config={config} edit={edit} preview={preview} />}
-            {tab === "live" && <LiveDataEditor config={config} edit={edit} slug={slug} preview={preview} />}
+            {tab === "live" && (
+              <>
+                <LiveDataEditor config={config} edit={edit} slug={slug} preview={preview} />
+                <EventsEditor config={config} edit={edit} slug={slug} />
+              </>
+            )}
             {tab === "kortet" && (
               <>
                 <MapEditor config={config} edit={edit} focus={pointFocus} preview={preview} slug={slug} />

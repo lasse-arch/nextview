@@ -18,8 +18,11 @@ export function PlaceCard({
   onLink,
   voice,
   onPhotos,
+  extra,
 }: {
   card: Card;
+  /** Something more on the card's first page, under the text (e.g. "Næste rundvisninger"). */
+  extra?: React.ReactNode;
   /** A tap on one of the card's photos: show them big, from that one. */
   onPhotos?: (images: string[], at: number) => void;
   size?: TourConfig["placeCardSize"];
@@ -97,6 +100,7 @@ export function PlaceCard({
               {tr("Læs mere")}
             </button>
           )}
+          {extra}
           {card.images?.length ? <CardPhotos images={card.images} onOpen={(at) => onPhotos?.(card.images!, at)} /> : null}
           {people.length > 0 && (
             <div className={`pc-folk pc-folk-${people.length}${people.some((p) => p.name?.trim() || p.role?.trim()) ? "" : " pc-folk-bare"}`}>
