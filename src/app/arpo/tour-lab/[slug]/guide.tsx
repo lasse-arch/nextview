@@ -145,6 +145,23 @@ export function GuidePlayer({
         <h3>{stop.title}</h3>
         {/* The card's own short text when it has one - the voice still reads `text`. */}
         {(stop.short || stop.text) && <p>{stop.short || stop.text}</p>}
+        {/* Who you meet here (the stop's own people, or the place card's at the same spot). */}
+        {(stop.people ?? []).filter((p) => p.image).length > 0 && (
+          <div className="gd-folk">
+            {stop.people!.filter((p) => p.image).slice(0, 3).map((p, i) => (
+              <figure key={i}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={p.image} alt="" loading="lazy" />
+                {(p.name?.trim() || p.role?.trim()) && (
+                  <figcaption>
+                    {p.name?.trim() && <b>{p.name}</b>}
+                    {p.role?.trim() && <span>{p.role}</span>}
+                  </figcaption>
+                )}
+              </figure>
+            ))}
+          </div>
+        )}
         {held && timed && <div className="gd-next">{tr("På pause - du kigger selv rundt")}</div>}
         {walkHint && !held && index < walkHintStops && (
           <div className="gd-selv">
@@ -252,6 +269,13 @@ export const GUIDE_CSS = `
 .gd-count{font-size:11px;font-weight:800;letter-spacing:.14em;color:var(--c-accent)}
 .gd-card h3{margin:4px 0 6px;font-family:var(--font-heading);font-size:24px;line-height:1.1;font-weight:800;color:var(--c-main)}
 .gd-card p{margin:0 0 14px;font-size:15px;line-height:1.5;color:#3d4a50}
+.gd-folk{display:flex;gap:12px;margin:-4px 0 14px}
+.gd-folk figure{margin:0;display:flex;align-items:center;gap:10px;min-width:0}
+.gd-folk img{flex:none;width:44px;height:44px;border-radius:50%;object-fit:cover;object-position:50% 20%;background:#eef2f2;box-shadow:0 0 0 2px #fff,0 0 0 3.5px color-mix(in srgb,var(--c-accent) 55%,transparent)}
+.gd-folk figcaption{display:flex;flex-direction:column;min-width:0;line-height:1.25}
+.gd-folk b{font-size:13px;font-weight:800;color:var(--c-main);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gd-folk span{font-size:12px;color:#5d7177;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gd-folk:has(figure+figure) figure{flex-direction:column;gap:5px;text-align:center;flex:0 1 84px}
 .gd-next{margin:-6px 0 12px;font-size:12.5px;font-weight:700;color:#7a8589}
 .gd-end{margin:-4px 0 12px}
 .gd-selv{display:flex;align-items:center;gap:8px;margin:-4px 0 12px;font-size:12.5px;line-height:1.35;font-weight:600;color:#56636a}
@@ -277,6 +301,8 @@ export const GUIDE_CSS = `
   .gd-card{left:10px;right:10px;width:auto;bottom:calc(10px + env(safe-area-inset-bottom,0px));padding:14px 16px 12px}
   .gd-card h3{font-size:20px}
   .gd-card p{font-size:14px;margin-bottom:10px}
+  .gd-folk{margin:-2px 0 10px}
+  .gd-folk img{width:38px;height:38px}
   .gd-mellem{right:auto;width:min(84vw,340px);padding:11px 14px 10px;border-radius:15px}
   .gd-mellem h3{font-size:clamp(16px,4.6vw,18px);margin:2px 0 4px}
   .gd-mellem p{font-size:clamp(12.5px,3.5vw,13.5px);line-height:1.45;margin-bottom:8px;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}

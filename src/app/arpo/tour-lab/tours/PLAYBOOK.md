@@ -78,6 +78,9 @@ Ikke alle tours skal starte med et valg. Vælg ud fra, hvor folk kommer fra:
 
 4-7 stop, der fortæller en historie og slutter der, hvor man skal handle.
 1-2 korte sætninger pr. stop. 6-10 sekunder pr. stop.
+Personer: et stop viser af sig selv personerne fra stedkortet samme sted (fx
+danselæreren i dansesalen). Et stop kan få sine egne (`people`) eller ingen
+(`people: []`). Brug det, hvor et ansigt sælger stedet - lærere, kokken.
 
 Med stemme (en lydfil pr. stop, `audio`): godt til skoler og steder, hvor en
 rolig fortæller sælger stemningen (fx Tolne Efterskole). Slå "Man trykker selv

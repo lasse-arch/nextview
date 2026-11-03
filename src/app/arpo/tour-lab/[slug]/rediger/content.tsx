@@ -3,7 +3,7 @@
 import { LinkInput } from "./links-open";
 import { StopVoice, VoiceGroup } from "./voice-editor";
 import { startStyleOf } from "../../tours/presets";
-import { guideExit, IMAGE_HREF, imageOfHref, isPlaceHref, PANO_HFOV, placeHref, startPlaces } from "../../tours/places";
+import { cardPeopleAt, guideExit, IMAGE_HREF, imageOfHref, isPlaceHref, PANO_HFOV, placeHref, startPlaces } from "../../tours/places";
 import { AiImageButton, AiImageList } from "./ai-image";
 import { writePlaceCards, type CardDraft } from "@/lib/actions/tour-cards";
 import { useEffect, useState } from "react";
@@ -1131,6 +1131,7 @@ function GuideSetupEditor({ config, edit, preview, onEditPoint }: Omit<Props, "s
                 <Field title="Kort tekst på skærmen (valgfri)" hint="Vises på kortet i stedet for teksten ovenfor - stemmen spiller videre som før. Fx korte, konkrete sætninger med én ting i hver.">
                   <textarea className={`${textarea} bg-white`} value={s.short ?? ""} placeholder="Tom: teksten ovenfor vises" onChange={(e) => set({ ...s, short: e.target.value || undefined })} />
                 </Field>
+                <StopPeople config={config} stop={s} onChange={(people) => set({ ...s, people })} />
                 {imageOfHref(s.href) ? (
                   <StopPicture config={config} edit={edit} url={imageOfHref(s.href)!} onChange={(url) => set({ ...s, href: url ? IMAGE_HREF + url : "" })} />
                 ) : s.href ? (
@@ -1317,10 +1318,10 @@ function DayEditor({ config, edit, preview }: Omit<Props, "slug">) {
 /* ------------------------------------------------------------------ */
 
 /** "Personer på kortet": up to three small photos with name and role, e.g. the kitchen staff. */
-function CardPeople({ people, onChange }: { people: CardPerson[]; onChange: (p: CardPerson[]) => void }) {
+function CardPeople({ people, onChange, title = "Personer på kortet", hint = "Op til 3 - fx køkkenpersonalet ved spisesalen. Små runde billeder under teksten - navn og rolle kan udelades." }: { people: CardPerson[]; onChange: (p: CardPerson[]) => void; title?: string; hint?: string }) {
   const setAt = (i: number, p: Partial<CardPerson>) => onChange(people.map((x, j) => (j === i ? { ...x, ...p } : x)));
   return (
-    <Field title="Personer på kortet" hint="Op til 3 - fx køkkenpersonalet ved spisesalen. Små runde billeder under teksten - navn og rolle kan udelades.">
+    <Field title={title} hint={hint}>
       <div className="flex flex-col gap-2">
         {people.map((p, i) => (
           <div key={i} className="flex items-center gap-2.5 rounded-xl bg-white p-2 ring-1 ring-black/[.06]">
@@ -1943,5 +1944,40 @@ function CoverFilm({ cover, edit }: { cover: NonNullable<TourConfig["cover"]>; e
       </Field>
       {!v.src && <p className="px-1 text-[12px] text-[#ff9500]">Ingen film endnu - forsiden viser fotoet, til der er en.</p>}
     </Group>
+  );
+}
+
+/**
+ * Who the visitor meets at a stop: by default the people on the place card
+ * where the stop stands (same scan point) - or the stop's own, or none.
+ */
+function StopPeople({ config, stop, onChange }: { config: TourConfig; stop: { href: string; people?: CardPerson[] }; onChange: (p: CardPerson[] | undefined) => void }) {
+  const fromCard = cardPeopleAt(config, stop.href);
+  // "Egne" chosen but nobody added yet: still "Egne" (an empty list alone would read as "Ingen").
+  const [ownPicked, setOwnPicked] = useState(false);
+  const mode = stop.people == null ? "card" : stop.people.length || ownPicked ? "own" : "none";
+  return (
+    <>
+      <Field title="Personer ved stoppet" hint="Små runde billeder med navn og rolle på rundvisningens kort - fx danselæreren i dansesalen.">
+        <Choice<"card" | "own" | "none">
+          value={mode}
+          options={[
+            ["card", "Fra stedkortet"],
+            ["own", "Egne"],
+            ["none", "Ingen"],
+          ]}
+          onChange={(v) => {
+            setOwnPicked(v === "own");
+            onChange(v === "card" ? undefined : v === "none" ? [] : stop.people?.length ? stop.people : (fromCard ?? []).map((p) => ({ ...p })));
+          }}
+        />
+        {mode === "card" && (
+          <p className="text-[12px] leading-snug text-[#8e8e93]">
+            {fromCard?.length ? `Viser ${fromCard.map((p) => p.name || "personen").join(", ")} fra stedkortet her.` : "Stedkortet her har ingen personer - vælg Egne for at tilføje nogen til stoppet."}
+          </p>
+        )}
+      </Field>
+      {mode === "own" && <CardPeople people={stop.people ?? []} title="Stoppets personer" hint="Op til 3. Navn og rolle kan udelades." onChange={(p) => onChange(p)} />}
+    </>
   );
 }

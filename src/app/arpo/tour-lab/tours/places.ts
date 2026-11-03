@@ -1,4 +1,4 @@
-import type { DroneView, GuideTurn, GuideTurnMode, GuideTurnSpeed, TourConfig } from "./types";
+import type { CardPerson, DroneView, GuideTurn, GuideTurnMode, GuideTurnSpeed, TourConfig } from "./types";
 
 /*
  * A spot in the tour is a link with the scan point (ss) and, if picked in
@@ -127,7 +127,7 @@ export function allGuides(T: TourConfig): { id: string | null; title: string; li
 /** The guided tours the visitor can find in the tour - all but those only a link starts (`linkOnly`). */
 export const shownGuides = (T: TourConfig) => allGuides(T).filter((g) => !g.linkOnly);
 
-export type GuideStop = { href: string; title: string; text: string; audio?: string; audioText?: string; short?: string; turn?: GuideTurn; turnSpeed?: GuideTurnSpeed; turnMode?: GuideTurnMode; button?: { label: string; href: string } };
+export type GuideStop = { href: string; title: string; text: string; audio?: string; audioText?: string; short?: string; turn?: GuideTurn; turnSpeed?: GuideTurnSpeed; turnMode?: GuideTurnMode; button?: { label: string; href: string }; people?: CardPerson[] };
 
 const sameWords = (a: string, b: string) => a.replace(/\s+/g, " ").trim() === b.replace(/\s+/g, " ").trim();
 /**
@@ -158,6 +158,14 @@ export function keepVoiceTexts<C extends TourConfig>(c: C): C {
   return { ...c, guide, ...(guides ? { guides } : {}) };
 }
 
+/** The people on the place card at a link's scan point (ss) - who the visitor meets there - or none. */
+export function cardPeopleAt(T: Pick<TourConfig, "placeCards">, href: string): CardPerson[] | undefined {
+  const ss = Number(new URLSearchParams(href.split("?")[1] ?? "").get("ss"));
+  if (!(ss > 0)) return undefined;
+  const people = T.placeCards?.find((c) => c.ss.includes(ss) && c.people?.length)?.people;
+  return people?.length ? people : undefined;
+}
+
 /** A guided tour's stops (the main one, or one of `guides` by id), with a drone point's name and text filled in where a stop borrows them - or one per menu place when it's made from the menu. */
 export function guideStops(T: TourConfig, guideId: string | null = null): GuideStop[] {
   const G = guideSetup(T, guideId);
@@ -168,7 +176,7 @@ export function guideStops(T: TourConfig, guideId: string | null = null): GuideS
       .map((p) => ({ href: p.href, title: p.name, text: p.group ?? "", turn: G.menuTurns?.[p.key] }));
   }
   return (G?.stops ?? []).flatMap((s) => {
-    if (!("point" in s)) return [s];
+    if (!("point" in s)) return [s.people ? s : { ...s, people: cardPeopleAt(T, s.href) }];
     const p = T.points.find((x) => x.id === s.point);
     // A point without a room is shown on the drone scene / map itself.
     return p ? [{ href: p.tour ?? `#punkt:${p.id}`, title: p.name, text: p.text, turn: s.turn, turnSpeed: s.turnSpeed, turnMode: s.turnMode }] : [];
