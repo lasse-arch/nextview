@@ -1007,7 +1007,7 @@ export const FEATURES_CSS = `
 .ft-selv{display:block;width:100%;margin-top:8px;border:0;background:none;padding:6px;font:inherit;font-weight:700;font-size:14px;color:var(--c-main);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
 .hv[data-ft-reel]{bottom:var(--ft-reel-h,0px)!important}
 /* A bar the full width of the room under the tour (no white beside it on a tablet or computer), its contents kept to a readable width in the middle. */
-.ft-reel{position:fixed;left:0;right:0;bottom:0;z-index:62;padding:14px max(16px,calc((100% - 560px) / 2)) calc(12px + env(safe-area-inset-bottom,0px));border-radius:18px 18px 0 0;background:rgb(13,27,32);color:#fff;box-shadow:0 -8px 30px rgba(0,0,0,.25);animation:hvUp .35s ease}
+.ft-reel{position:fixed;left:0;right:0;bottom:0;z-index:62;padding:14px max(16px,calc((100% - 560px) / 2)) calc(12px + env(safe-area-inset-bottom,0px));border-radius:0;background:rgb(13,27,32);color:#fff;box-shadow:0 -8px 30px rgba(0,0,0,.25);animation:hvUp .35s ease}
 .ft-reel .ft-kick{margin:6px 0 2px;color:color-mix(in srgb,var(--c-accent) 70%,#fff)}
 .ft-reel>b{display:block;font-size:17px;line-height:1.2}
 .ft-reel>span{display:block;margin-top:3px;font-size:13.5px;line-height:1.4;color:rgba(255,255,255,.82)}
