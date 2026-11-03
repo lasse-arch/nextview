@@ -1131,6 +1131,7 @@ function GuideSetupEditor({ config, edit, preview, onEditPoint }: Omit<Props, "s
                 <Field title="Kort tekst på skærmen (valgfri)" hint="Vises på kortet i stedet for teksten ovenfor - stemmen spiller videre som før. Fx korte, konkrete sætninger med én ting i hver.">
                   <textarea className={`${textarea} bg-white`} value={s.short ?? ""} placeholder="Tom: teksten ovenfor vises" onChange={(e) => set({ ...s, short: e.target.value || undefined })} />
                 </Field>
+                <CardImages images={s.images ?? []} hint="En lille række billeder på rundvisningens kort - et tryk viser dem stort. Fx holdet på banen ved et dronebillede." onChange={(images) => set({ ...s, images: images.length ? images : undefined })} />
                 <StopPeople config={config} stop={s} onChange={(people) => set({ ...s, people })} />
                 {imageOfHref(s.href) ? (
                   <StopPicture config={config} edit={edit} url={imageOfHref(s.href)!} onChange={(url) => set({ ...s, href: url ? IMAGE_HREF + url : "" })} />
@@ -1544,6 +1545,7 @@ export function CardsEditor({ config, edit, preview, scanMap, mpskinsHidden }: O
                   </div>
                 </Field>
               )}
+              <CardImages images={c.images ?? []} hint="En lille række billeder under teksten - et tryk viser dem stort." onChange={(images) => set({ ...c, images: images.length ? images : undefined })} />
               <CardPeople people={c.people ?? []} onChange={(people) => set({ ...c, people: people.length ? people : undefined })} />
               <details className="text-[13px]">
                 <summary className="cursor-pointer select-none text-[#0071e3]">&quot;Læs mere&quot;-side (valgfri)</summary>
@@ -2078,6 +2080,28 @@ function DayPoint({ config, href, onChange }: { config: TourConfig; href: string
           onChange={(v) => onChange(`#punkt:${id}${v === "360" ? "/360" : ""}`)}
         />
       )}
+    </Field>
+  );
+}
+
+/** Photos on a card (a place card or a stop of "Vis mig rundt"): a small row - added, removed, the first shown first. */
+function CardImages({ images, hint, onChange }: { images: string[]; hint: string; onChange: (images: string[]) => void }) {
+  return (
+    <Field title="Billeder (valgfri)" hint={hint}>
+      {images.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {images.map((src, i) => (
+            <span key={src + i} className="relative">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={src} alt="" className="h-14 w-20 rounded-lg object-cover ring-1 ring-black/[.06]" />
+              <button type="button" aria-label="Fjern billedet" onClick={() => onChange(images.filter((_, j) => j !== i))} className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-[#1d1d1f] text-[12px] leading-none text-white">
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+      <UploadButton accept="image/*" label={images.length ? "+ Tilføj et billede mere" : "+ Tilføj billede"} onDone={(url) => onChange([...images, url])} />
     </Field>
   );
 }

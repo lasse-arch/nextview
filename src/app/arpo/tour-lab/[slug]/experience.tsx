@@ -3542,6 +3542,7 @@ function TourExperience({
       )}
       {guideAt != null && GUIDE[guideAt] && (
         <GuidePlayer
+          onPhotos={(images, at) => setLightbox({ images, at, title: guideAt != null ? (GUIDE[guideAt]?.title ?? "") : "" })}
           stops={GUIDE}
           index={guideAt}
           size={T.guideCardSize}
@@ -3578,6 +3579,7 @@ function TourExperience({
           key={showCard}
           card={T.placeCards![showCard]}
           size={T.placeCardSize}
+          onPhotos={(images, at) => setLightbox({ images, at, title: T.placeCards![showCard].title })}
           voice={T.placeCardVoice ? tx(T.placeCardVoice.label || "Svært ved at læse? Få det læst op") : undefined}
           onClose={(how) => {
             track("place_card_close", { title: T.placeCards![showCard].title, how });

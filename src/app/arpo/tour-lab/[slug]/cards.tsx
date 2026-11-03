@@ -17,8 +17,11 @@ export function PlaceCard({
   onRoom,
   onLink,
   voice,
+  onPhotos,
 }: {
   card: Card;
+  /** A tap on one of the card's photos: show them big, from that one. */
+  onPhotos?: (images: string[], at: number) => void;
   size?: TourConfig["placeCardSize"];
   /** "Få det læst op" (TourConfig.placeCardVoice) - its button's words, or undefined for none. */
   voice?: string;
@@ -99,6 +102,7 @@ export function PlaceCard({
               {tr("Læs mere")}
             </button>
           )}
+          {card.images?.length ? <CardPhotos images={card.images} onOpen={(at) => onPhotos?.(card.images!, at)} /> : null}
           {people.length > 0 && (
             <div className={`pc-folk pc-folk-${people.length}${people.some((p) => p.name?.trim() || p.role?.trim()) ? "" : " pc-folk-bare"}`}>
               {people.map((p, i) => (
@@ -171,10 +175,29 @@ export function NudgeCard({ T, onClose, onLink }: { T: TourConfig; onClose: () =
   );
 }
 
+/** A card's photos: a small row of thumbnails (scrolls sideways when there are many) - a tap shows them big. */
+export function CardPhotos({ images, onOpen }: { images: string[]; onOpen: (at: number) => void }) {
+  return (
+    <div className="pc-fotos">
+      {images.map((src, i) => (
+        <button key={src + i} type="button" onClick={() => onOpen(i)}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={src} alt="" loading="lazy" draggable={false} />
+        </button>
+      ))}
+    </div>
+  );
+}
+
 /** The voice's language for the tour's language. */
 const SPEECH_LANG: Record<string, string> = { da: "da-DK", en: "en-GB", de: "de-DE", sv: "sv-SE", nb: "nb-NO", nl: "nl-NL", fr: "fr-FR", es: "es-ES", it: "it-IT", pl: "pl-PL", kl: "da-DK" };
 
 export const CARDS_CSS = `
+.pc-fotos{display:flex;gap:6px;margin:0 0 10px;overflow-x:auto;scrollbar-width:none}
+.pc-fotos::-webkit-scrollbar{display:none}
+.pc-fotos button{flex:none;width:76px;height:56px;padding:0;border:0;border-radius:9px;overflow:hidden;background:#eef2f2;cursor:zoom-in}
+.pc-fotos img{display:block;width:100%;height:100%;object-fit:cover}
+@media (max-width:760px){.pc-fotos button{width:60px;height:44px;border-radius:7px}.pc-fotos{margin-bottom:7px}}
 .pc-laes{display:inline-flex;align-items:center;gap:6px;margin:-2px 0 8px;padding:4px 10px 4px 8px;border:0;border-radius:999px;background:color-mix(in srgb,var(--c-accent) 12%,transparent);color:var(--c-main);font:inherit;font-size:12.5px;font-weight:700;cursor:pointer}
 .pc-laes svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .pc-laes.aktiv{background:var(--c-accent);color:#fff}

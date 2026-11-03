@@ -1,5 +1,7 @@
 "use client";
 
+import { CardPhotos } from "./cards";
+
 import { useT } from "../tours/i18n-react";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
@@ -30,7 +32,10 @@ export function GuidePlayer({
   onClose,
   onEvent,
   stopLabel,
+  onPhotos,
 }: {
+  /** A tap on one of the stop's photos: show them big, from that one. */
+  onPhotos?: (images: string[], at: number) => void;
   /** The stop button's words (default "Gå selv rundt"). */
   stopLabel?: string;
   stops: GuideStop[];
@@ -145,6 +150,7 @@ export function GuidePlayer({
         <h3>{stop.title}</h3>
         {/* The card's own short text when it has one - the voice still reads `text`. */}
         {(stop.short || stop.text) && <p>{stop.short || stop.text}</p>}
+        {stop.images?.length ? <CardPhotos images={stop.images} onOpen={(at) => onPhotos?.(stop.images!, at)} /> : null}
         {/* Who you meet here (the stop's own people, or the place card's at the same spot). */}
         {(stop.people ?? []).filter((p) => p.image).length > 0 && (
           <div className="gd-folk">
