@@ -2784,7 +2784,7 @@ function TourExperience({
               ×
             </button>
             {selected.video ? (
-              <video key={selected.id} className="hv-pvideo" src={selected.video.src} poster={selected.video.poster} controls playsInline preload="metadata" />
+              <PointVideo key={selected.id} video={selected.video} name={selected.name} />
             ) : selected.images?.length ? (
               <PointPhotos key={selected.id} images={selected.images} name={selected.name} onOpen={(at) => setLightbox({ images: selected.images!, at, title: selected.name })} />
             ) : null}
@@ -2838,7 +2838,8 @@ function TourExperience({
             ) : null}
             {selected.tip && <p className="hv-ptip">💡 {selected.tip}</p>}
             <div className="hv-pchips">
-              {selected.chips.map((c) => (
+              {/* A chip that only repeats a fact above (e.g. "Kl. 13.30" next to Afgang: Kl. 13.30) is left out. */}
+              {selected.chips.filter((c) => !selected.facts?.some(([, v]) => v.trim().toLowerCase() === c.trim().toLowerCase())).map((c) => (
                 <span key={c}>{c}</span>
               ))}
             </div>
@@ -3563,6 +3564,60 @@ function TourExperience({
   );
 }
 
+/**
+ * A point's video at the top of its card: plays at once without sound, in a
+ * loop (like a photo that moves) - a tap turns the sound on and starts it
+ * over, another tap pauses. No browser controls: they cover the picture.
+ */
+function PointVideo({ video, name }: { video: { src: string; poster?: string }; name: string }) {
+  const tr = useT();
+  const ref = useRef<HTMLVideoElement>(null);
+  const [sound, setSound] = useState(false);
+  const [paused, setPaused] = useState(false);
+  const [left, setLeft] = useState<number | null>(null);
+  return (
+    <div
+      className="hv-pvideo"
+      role="button"
+      aria-label={sound ? tr("Pause") : tr("Tryk for lyd")}
+      onClick={() => {
+        const v = ref.current;
+        if (!v) return;
+        if (!sound) {
+          v.muted = false;
+          v.currentTime = 0;
+          v.play().catch(() => {});
+          setSound(true);
+          setPaused(false);
+        } else if (v.paused) {
+          v.play().catch(() => {});
+          setPaused(false);
+        } else {
+          v.pause();
+          setPaused(true);
+        }
+      }}
+    >
+      <video
+        ref={ref}
+        src={video.src}
+        poster={video.poster}
+        autoPlay
+        muted
+        loop={!sound}
+        playsInline
+        preload="metadata"
+        aria-label={name}
+        onTimeUpdate={(e) => setLeft(Math.max(0, Math.round(e.currentTarget.duration - e.currentTarget.currentTime)) || null)}
+        onEnded={() => setPaused(true)}
+      />
+      <span className="hv-pvideo-knap">
+        {!sound ? `🔇 ${tr("Tryk for lyd")}` : paused ? `▶ ${tr("Afspil")}` : `❚❚${left != null ? ` ${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}` : ""}`}
+      </span>
+    </div>
+  );
+}
+
 /** A 360° photo at a point, full screen over the drone scene. */
 /** A point's photos at the top of its card - swiped or tapped through, with dots (cross-faded, no scroll box: a scrolling layer over the drone scene can blank it on phones). */
 function PointPhotos({ images, name, onOpen }: { images: string[]; name: string; onOpen: (at: number) => void }) {
@@ -3586,9 +3641,7 @@ function PointPhotos({ images, name, onOpen }: { images: string[]; name: string;
     >
       {images.map((src, i) => (
         <span key={src} className={`hv-foto ${i === at ? "on" : ""}`}>
-          {/* The whole photo, on a soft, blurred copy of itself - nothing cut off. */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={src} alt="" aria-hidden className="hv-foto-bag" loading={i === 0 ? "eager" : "lazy"} draggable={false} />
+          {/* The photo fills the top of the card (a tap on ⤢ shows all of it) - a small photo on a blurred copy of itself looked unfinished. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={src} alt={i === 0 ? name : ""} loading={i === 0 ? "eager" : "lazy"} draggable={false} />
         </span>
@@ -3984,7 +4037,7 @@ const CSS = `
 .hv-panel h2{margin:2px 40px 8px 0;font-size:25px;line-height:1.1;font-weight:900;color:var(--c-main)}
 .hv-panel p{margin:0 0 12px;font-size:15px;line-height:1.5;color:#3d4a50}
 .hv-pchips{display:flex;flex-wrap:wrap;gap:5px}
-.hv-pvideo{display:block;width:calc(100% + 36px);margin:-18px -18px 14px;aspect-ratio:16/9;background:#000;border-radius:16px 16px 0 0;object-fit:cover}
+.hv-pvideo{position:relative;display:block;margin:-18px -18px 14px;aspect-ratio:16/9;background:#000;border-radius:16px 16px 0 0;overflow:hidden;cursor:pointer}.hv-pvideo video{display:block;width:100%;height:100%;max-width:none;object-fit:cover}.hv-pvideo-knap{position:absolute;right:10px;bottom:10px;background:rgba(0,0,0,.55);color:#fff;font-size:12px;font-weight:700;padding:5px 10px;border-radius:999px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);pointer-events:none}
 .hv-pkick{margin-top:6px;font-size:11.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#5e7d3a;color:color-mix(in srgb,var(--c-main) 70%,#5e7d3a)}
 .hv-fakta{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px;margin:0 0 12px;padding-top:12px;border-top:1px solid rgba(0,0,0,.08)}
 .hv-fakta dt{font-size:12.5px;color:#6b7a80}
@@ -3993,8 +4046,7 @@ const CSS = `
 .hv-fotos{position:relative;margin:-18px -18px 14px;border-radius:16px 16px 0 0;overflow:hidden;background:#dfe5e7;aspect-ratio:16/10;cursor:pointer;user-select:none}
 .hv-foto{position:absolute;inset:0;opacity:0;transition:opacity .35s ease}
 .hv-foto.on{opacity:1}
-.hv-foto img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
-.hv-foto img.hv-foto-bag{object-fit:cover;filter:blur(18px) brightness(.85);transform:scale(1.15)}
+.hv-foto img{position:absolute;inset:0;width:100%;height:100%;max-width:none;object-fit:cover;object-position:center 40%}
 .hv-fotos-stor{position:absolute;right:10px;bottom:9px;padding:3px 8px;border-radius:999px;background:rgba(0,0,0,.5);color:#fff;font-size:11.5px;font-weight:700;pointer-events:none;backdrop-filter:blur(4px)}
 .hv-fotos-pil{position:absolute;top:50%;translate:0 -50%;width:30px;height:30px;border:0;border-radius:50%;background:rgba(255,255,255,.85);color:#1d2a30;font-size:20px;line-height:1;cursor:pointer;opacity:0;transition:opacity .2s}
 .hv-fotos:hover .hv-fotos-pil{opacity:1}
@@ -4216,6 +4268,7 @@ const CSS = `
   /* An open point: the panel takes the bottom, the bars step aside. */
   .hv-panel{top:auto;bottom:0;left:0;right:0;width:auto;max-height:62%;border-radius:18px 18px 0 0;padding-bottom:calc(18px + env(safe-area-inset-bottom,0px))}
   .hv-fotos{aspect-ratio:auto;height:min(44vw,200px);border-radius:18px 18px 0 0;margin-bottom:10px}
+  .hv-pvideo{border-radius:18px 18px 0 0;margin-top:-14px;margin-bottom:10px}
   /* A compact card: short text (tap for all), the chips in one row, the buttons always at the bottom. */
   .hv-panel{padding-top:14px}
   .hv-panel h2{font-size:21px;margin-bottom:5px}
