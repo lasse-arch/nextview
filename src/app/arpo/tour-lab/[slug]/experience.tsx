@@ -893,6 +893,8 @@ function TourExperience({
         const ss = ssBySweep[s.sid];
         currentSsRef.current = ss ?? null;
         setCurrentSs(ss ?? null);
+        // The editor's preview: the editor shows where it stands now (Scanpunkter: "Du er her").
+        if (window.parent !== window) window.parent.postMessage({ type: "tour-where", ss: ss ?? null }, location.origin);
         const name = ss != null ? roomNamesRef.current[ss] ?? null : null;
         // Time spent where the visitor just was (named rooms only).
         if (roomTimer.current?.name && roomTimer.current.name !== name) {

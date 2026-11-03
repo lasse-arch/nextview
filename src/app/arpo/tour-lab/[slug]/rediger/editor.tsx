@@ -341,6 +341,8 @@ export function TourEditor({
 
   /* Live preview: the tour in the iframe shows the draft as it's edited (see the bridge in experience.tsx). */
   const frame = useRef<HTMLIFrameElement>(null);
+  /** The scan point the preview stands on now. */
+  const [here, setHere] = useState<number | null>(null);
   const latest = useRef(config);
   /** A design hovered in the gallery (shown in the preview until the mouse leaves it). */
   const hovered = useRef<TourConfig | null>(null);
@@ -353,6 +355,11 @@ export function TourEditor({
   }, [config]);
   useEffect(() => {
     function onMessage(e: MessageEvent) {
+      // Where the preview stands now (a scan point) - Scanpunkter rings it.
+      if (e.origin === location.origin && e.source === frame.current?.contentWindow && e.data?.type === "tour-where") {
+        setHere(typeof e.data.ss === "number" ? e.data.ss : null);
+        return;
+      }
       if (e.origin === location.origin && e.source === frame.current?.contentWindow && e.data?.type === "tour-staging-pick" && typeof e.data.id === "string") {
         // A staging surface tapped in the preview: open it here, ready to resize and move.
         setTab("staging");
@@ -922,7 +929,7 @@ export function TourEditor({
               <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">Vis mig rundt, Sådan ser en dag ud og historierne kører af sig selv - der kører altid kun én ad gangen: starter man en, stopper de andre.</p>
               </>
             )}
-            {tab === "scan" && <ScanPointsEditor config={config} edit={edit} preview={preview} map={scanMap} mpskinsHidden={mpskinsHidden} expected={scanCount} />}
+            {tab === "scan" && <ScanPointsEditor config={config} edit={edit} preview={preview} map={scanMap} mpskinsHidden={mpskinsHidden} expected={scanCount} here={here} />}
             {tab === "tags" && <TagsEditor config={config} edit={edit} slug={slug} preview={preview} />}
             {tab === "staging" && <StagingEditor config={config} edit={edit} preview={preview} focus={stagingFocus} />}
             {tab === "linjedag" && <LineDayEditor config={config} edit={edit} preview={preview} />}

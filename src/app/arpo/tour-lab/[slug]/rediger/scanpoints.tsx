@@ -19,7 +19,7 @@ type Edit = (fn: (draft: TourConfig) => void) => void;
 const COLORS = { menu: "#34c759", card: "#5856d6", tag: "#ff9500", plain: "#8e8e93" };
 
 /** How the dots look: the border colour and whether it's hidden, selected or the start. */
-type DotLook = { border: string; color?: string; hidden?: boolean; selected?: boolean; start?: boolean };
+type DotLook = { border: string; color?: string; hidden?: boolean; selected?: boolean; start?: boolean; /** Where the preview stands now. */ here?: boolean };
 
 /**
  * A floor's plan with its scan points, as in MPSkins. Moving about: drag the
@@ -236,6 +236,12 @@ function PlanView({
                   }}
                 >
                   {p.ss}
+                  {l.here && (
+                    <>
+                      <span className="pointer-events-none absolute -inset-[7px] animate-pulse rounded-full border-[3px] border-[#ff3b30]" />
+                      <span className="pointer-events-none absolute bottom-full left-1/2 mb-2 -translate-x-1/2 whitespace-nowrap rounded-full bg-[#ff3b30] px-2 py-0.5 text-[11px] font-bold text-white shadow">Du er her</span>
+                    </>
+                  )}
                 </button>
               );
             })}
@@ -251,6 +257,14 @@ function PlanView({
             return (
               <g key={p.sid} onClick={() => onTap(p.ss)} className="cursor-pointer">
                 {l.start && <circle cx={p.x} cy={-p.y} r={r * 1.7} fill="none" stroke="#0071e3" strokeWidth={r * 0.35} />}
+                {l.here && (
+                  <>
+                    <circle cx={p.x} cy={-p.y} r={r * 2.1} fill="none" stroke="#ff3b30" strokeWidth={r * 0.4} className="animate-pulse" />
+                    <text x={p.x} y={-p.y - r * 2.6} textAnchor="middle" fontSize={r * 1.1} fontWeight={800} fill="#ff3b30" className="pointer-events-none select-none">
+                      Du er her
+                    </text>
+                  </>
+                )}
                 <circle cx={p.x} cy={-p.y} r={r} fill={on ? "#0071e3" : l.hidden ? "#fff" : l.border} stroke={l.selected ? "#1d1d1f" : l.hidden ? "#c7c7cc" : "#fff"} strokeWidth={r * 0.25} strokeDasharray={l.hidden ? `${r * 0.4} ${r * 0.3}` : undefined} />
                 <text x={p.x} y={-p.y + r * 0.35} textAnchor="middle" fontSize={r * 0.95} fontWeight={700} fill={l.hidden && !on ? "#8e8e93" : "#fff"} className="pointer-events-none select-none">
                   {p.ss}
@@ -355,6 +369,7 @@ export function ScanPointsEditor({
   map,
   mpskinsHidden,
   expected,
+  here = null,
 }: {
   config: TourConfig;
   edit: Edit;
@@ -363,6 +378,8 @@ export function ScanPointsEditor({
   mpskinsHidden: string[];
   /** How many scan points MPSkins knows of (when the tour has an MPSkins page). */
   expected: number | null;
+  /** The scan point the preview stands on now - ringed, "Du er her". */
+  here?: number | null;
 }) {
   const [floor, setFloor] = useState(0);
   /** Matterport's signed link to the plan ran out or failed - points are still shown, on a plain background. */
@@ -412,7 +429,7 @@ export function ScanPointsEditor({
       setZoom={setZoom}
       marked={marked}
       setMarked={setMarked}
-      look={(ss, sid) => ({ border: colorOf(ss), hidden: hidden.has(sid), selected: selected === ss, start: uses.get(ss)?.has("start") })}
+      look={(ss, sid) => ({ border: colorOf(ss), hidden: hidden.has(sid), selected: selected === ss, start: uses.get(ss)?.has("start"), here: here === ss })}
       onTap={(ss) => {
         setMarked(new Set());
         go(ss);
