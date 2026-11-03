@@ -428,7 +428,6 @@ export function TourEditor({
       storyPictures: (progress) => ask<{ done?: boolean }>("tour-stories", 10 * 60_000, progress),
       pick: () => ask<{ position?: { x: number; y: number; z: number }; normal?: { x: number; y: number; z: number }; ss?: number | null; room?: string | null }>("tour-pick", 120000),
       showMenu: () => frame.current?.contentWindow?.postMessage({ type: "tour-show-menu" }, location.origin),
-      logoAnim: () => frame.current?.contentWindow?.postMessage({ type: "tour-logoanim" }, location.origin),
       go: (name, href) => frame.current?.contentWindow?.postMessage({ type: "tour-go", name, href }, location.origin),
       device: () => deviceRef.current,
       panoView: () => ask<{ yaw?: number; pitch?: number; hfov?: number; phone?: boolean; image?: string }>("tour-pano-view"),
@@ -815,61 +814,6 @@ export function TourEditor({
                     ]}
                     onChange={(v) => edit((d) => void (d.logoAlignTiles = v === "midt" ? undefined : v))}
                   />
-                </Field>
-                <Field title="Logoet animeres, når man trykker på en flise" hint="Skærmen går i sort, logoet folder sig ud i midten, og det hele fader ud - ind i touren, hvor flisen fører hen (ca. 2,4 sek.). Vinger: vingen i logoet folder sig ud, og navnet glider ind. Samles: logoet sættes sammen af stykker. Zoom: det kommer i fokus.">
-                  <Choice<"off" | "wings" | "assemble" | "zoom">
-                    value={config.logoAnim ?? "off"}
-                    options={[
-                      ["off", "Fra"],
-                      ["wings", "Vinger"],
-                      ["assemble", "Samles"],
-                      ["zoom", "Zoom"],
-                    ]}
-                    onChange={(v) =>
-                      edit((d) => {
-                        d.logoAnim = v === "off" ? undefined : v;
-                        if (v !== "off") setTimeout(() => preview.logoAnim(), 400);
-                      })
-                    }
-                  />
-                  {config.logoAnim && (
-                    <>
-                      <Choice<"s" | "m" | "l" | "xl">
-                        value={config.logoAnimSize ?? "m"}
-                        options={[
-                          ["s", "Lille"],
-                          ["m", "Mellem"],
-                          ["l", "Stor"],
-                          ["xl", "XL"],
-                        ]}
-                        onChange={(v) =>
-                          edit((d) => {
-                            d.logoAnimSize = v === "m" ? undefined : v;
-                            setTimeout(() => preview.logoAnim(), 400);
-                          })
-                        }
-                      />
-                      <Choice<"black" | "transparent">
-                        value={config.logoAnimBg ?? "black"}
-                        options={[
-                          ["black", config.logoOnLight ? "Hvid skærm" : "Sort skærm"],
-                          ["transparent", "Gennemsigtig"],
-                        ]}
-                        onChange={(v) =>
-                          edit((d) => {
-                            d.logoAnimBg = v === "transparent" ? v : undefined;
-                            setTimeout(() => preview.logoAnim(), 400);
-                          })
-                        }
-                      />
-                      {config.logoAnim === "wings" && config.logo && (
-                        <LogoMarkPicker logo={config.logo} light={Boolean(config.logoOnLight)} mark={config.logoAnimMark} onChange={(m) => edit((d) => void (d.logoAnimMark = m))} />
-                      )}
-                      <button type="button" onClick={() => preview.logoAnim()} className="self-start rounded-lg px-2 py-1 text-[13px] font-medium text-[#0071e3] hover:bg-[#0071e3]/5">
-                        ▶ Afspil i forhåndsvisningen
-                      </button>
-                    </>
-                  )}
                 </Field>
                 <Toggle
                   on={config.menuName !== false}
@@ -2845,48 +2789,5 @@ function FindTargets({ config, edit }: { config: TourConfig; edit: (fn: (d: Tour
         ))}
       </div>
     </Field>
-  );
-}
-
-/**
- * Where the wing is in the logo, for the "Vinger" animation: a tap on the logo
- * sets the point the feathers fan out from, the slider where the wing ends and
- * the name begins. Off: the logo's two halves fold out instead.
- */
-function LogoMarkPicker({ logo, light, mark, onChange }: { logo: string; light: boolean; mark?: TourConfig["logoAnimMark"]; onChange: (m: TourConfig["logoAnimMark"]) => void }) {
-  const m = mark ?? { end: 38, x: 8, y: 78 };
-  return (
-    <div className="space-y-2">
-      <label className="flex items-center gap-2 text-[13px] text-[#1d1d1f]">
-        <input type="checkbox" checked={Boolean(mark)} onChange={(e) => onChange(e.target.checked ? m : undefined)} />
-        Logoet har en vinge (eller et mærke), der skal folde sig ud
-      </label>
-      {mark && (
-        <>
-          <div
-            className={`relative cursor-crosshair overflow-hidden rounded-lg p-3 ${light ? "bg-white ring-1 ring-black/10" : "bg-[#1d1d1f]"}`}
-            title="Tryk der, hvor vingen folder sig ud fra"
-          >
-            <div
-              className="relative"
-              onClick={(e) => {
-                const r = e.currentTarget.getBoundingClientRect();
-                onChange({ ...m, x: Math.round(((e.clientX - r.left) / r.width) * 100), y: Math.round(((e.clientY - r.top) / r.height) * 100) });
-              }}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={logo} alt="" className="block w-full" draggable={false} />
-              <span className="pointer-events-none absolute inset-y-0 border-l-2 border-dashed border-[#0071e3]" style={{ left: `${m.end}%` }} />
-              <span className="pointer-events-none absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-[#0071e3] shadow" style={{ left: `${m.x}%`, top: `${m.y}%` }} />
-            </div>
-          </div>
-          <label className="block text-[12px] text-[#6e6e73]">
-            Vingen slutter her (den blå streg) - navnet til højre glider ind bagefter
-            <input type="range" min={10} max={100} value={m.end} onChange={(e) => onChange({ ...m, end: Number(e.target.value) })} className="w-full" />
-          </label>
-          <p className="text-[12px] text-[#6e6e73]">Tryk på logoet der, hvor vingen folder sig ud fra (den blå prik).</p>
-        </>
-      )}
-    </div>
   );
 }

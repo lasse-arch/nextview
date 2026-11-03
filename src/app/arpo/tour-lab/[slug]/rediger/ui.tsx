@@ -120,8 +120,6 @@ export type PreviewApi = {
   go: (name: string, href: string) => void;
   /** Shows the menu as it looks now - past the front page / welcome (when a menu design is picked). */
   showMenu: () => void;
-  /** Plays the logo animation (logoAnim) in the preview, as it looks with the setup now. */
-  logoAnim: () => void;
   /** The 360° picture open in the preview: its direction, zoom (view width) and whether the preview is a phone. */
   /** The device the preview is set to (Computer / Mobil over it). */
   device: () => "computer" | "mobil";

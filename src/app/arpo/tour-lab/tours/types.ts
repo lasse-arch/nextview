@@ -271,28 +271,6 @@ export type TourConfig = {
   logoBg?: "none" | "light" | "main";
   /** The same for the logo on the welcome tiles' box (left out: as logoBg). */
   logoBgTiles?: "none" | "light" | "main";
-  /**
-   * When a welcome tile is tapped: the screen goes black, the logo unfolds in
-   * the middle, and it all fades away into the tour where the tile leads (about
-   * 2.4 s - the tour gets there meanwhile, underneath; no clicks are caught):
-   * "wings" = the logo's wing fans out feather by feather and the name slides
-   * in (see logoAnimMark; without it its two halves fold out from the middle),
-   * e.g. Skyum, "assemble" = it's put together from slices, "zoom" = it
-   * comes into focus. Left out = none. Not shown to visitors who have asked
-   * their device for reduced motion.
-   */
-  logoAnim?: "wings" | "assemble" | "zoom";
-  /** What's behind the logo animation: left out = the screen goes black (white behind a dark logo); "transparent" = the logo unfolds straight over the tour (a faint shade behind it, so it can be seen). */
-  logoAnimBg?: "transparent";
-  /** How big the logo animation is: "s" (small), "m" (medium - default), "l" (large), "xl". */
-  logoAnimSize?: "s" | "m" | "l" | "xl";
-  /**
-   * For "wings": where the logo's mark (the wing) is - it ends at `end` % of
-   * the logo's width (from the left), and fans out feather by feather around
-   * the point (`x`, `y`, % of the logo). The rest (the name) slides in after.
-   * Left out: the logo's two halves fold out from the middle instead.
-   */
-  logoAnimMark?: { end: number; x: number; y: number };
   /** Where the logo sits in the welcome tiles' box (left out: in the middle). */
   logoAlignTiles?: "left" | "right";
   /** Which top corner the logo sits in - the menu button takes the other one. Default "left". */
