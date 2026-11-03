@@ -585,7 +585,7 @@ export type TourConfig = {
     mix?: false | { title?: string; after?: string };
     visit?: { title: string; text?: string; label: string; href: string };
   };
-  day?: { title: string; lead?: string; /** Its place in the menu, as a guided tour's. */ menu?: "bottom" | false; steps: { time: string; title: string; text?: string; href?: string }[] };
+  day?: { title: string; lead?: string; /** Its place in the menu, as a guided tour's. */ menu?: "bottom" | false; steps: { time: string; title: string; text?: string; /** Where "Se stedet" goes: a place in the tour (a Matterport link), a point on the drone scene / map ("#punkt:<id>" - its card opens), or that point's 360° photo ("#punkt:<id>/360"). Left out: no place. */ href?: string }[] };
   /**
    * Info points: small pulsing dots on things in the room; a tap opens a card.
    * `position` is a spot in the 3D model (placed with "Placér infopunkt" in the

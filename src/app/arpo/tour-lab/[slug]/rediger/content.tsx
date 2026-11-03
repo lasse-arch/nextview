@@ -1277,7 +1277,7 @@ function DayEditor({ config, edit, preview }: Omit<Props, "slug">) {
         onChange={(steps) => edit((d) => void (d.day!.steps = steps))}
         icon={["bg-[#ff9500]", '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>']}
         title={(s) => `${s.time}  ${s.title}`}
-        subtitle={(s) => [s.href ? `Punkt ${ssOfHref(s.href) ?? "?"}` : "Intet sted", s.text].filter(Boolean).join(" · ")}
+        subtitle={(s) => [s.href?.startsWith("#punkt:") ? `${config.points.find((p) => `#punkt:${p.id}` === s.href!.replace(/\/360$/, ""))?.name ?? "Punkt"}${s.href.endsWith("/360") ? " · 360°" : " på luftfotoet"}` : s.href ? `Punkt ${ssOfHref(s.href) ?? "?"}` : "Intet sted", s.text].filter(Boolean).join(" · ")}
         empty="Ingen tidspunkter endnu."
         editor={(s, set) => (
           <>
@@ -1294,7 +1294,23 @@ function DayEditor({ config, edit, preview }: Omit<Props, "slug">) {
             <Field title="Tekst (valgfri)" hint="Én kort, konkret sætning.">
               <input className={`${input} bg-white`} value={s.text ?? ""} onChange={(e) => set({ ...s, text: e.target.value || undefined })} />
             </Field>
-            <PlacePicker href={s.href ?? ""} name={s.title} preview={preview} onChange={(href) => set({ ...s, href })} />
+            {(config.points?.length ?? 0) > 0 && (
+              <Field title="Hvor tidspunktet viser hen">
+                <Choice<"sted" | "punkt">
+                  value={s.href?.startsWith("#punkt:") ? "punkt" : "sted"}
+                  options={[
+                    ["sted", "Sted i touren"],
+                    ["punkt", "Punkt på luftfotoet"],
+                  ]}
+                  onChange={(v) => set({ ...s, href: v === "punkt" ? `#punkt:${config.points[0].id}` : undefined })}
+                />
+              </Field>
+            )}
+            {s.href?.startsWith("#punkt:") ? (
+              <DayPoint config={config} href={s.href} onChange={(href) => set({ ...s, href })} />
+            ) : (
+              <PlacePicker href={s.href ?? ""} name={s.title} preview={preview} onChange={(href) => set({ ...s, href })} />
+            )}
             {s.href && (
               <button type="button" className="text-[12px] text-[#8e8e93] hover:text-[#ff3b30]" onClick={() => set({ ...s, href: undefined })}>
                 Intet sted til dette tidspunkt
@@ -1979,5 +1995,35 @@ function StopPeople({ config, stop, onChange }: { config: TourConfig; stop: { hr
       </Field>
       {mode === "own" && <CardPeople people={stop.people ?? []} title="Stoppets personer" hint="Op til 3. Navn og rolle kan udelades." onChange={(p) => onChange(p)} />}
     </>
+  );
+}
+
+/** "Sådan ser en dag ud": a point on the drone scene / map - its card, or its 360° photo when it has one. */
+function DayPoint({ config, href, onChange }: { config: TourConfig; href: string; onChange: (href: string) => void }) {
+  const id = href.replace(/^#punkt:/, "").replace(/\/360$/, "");
+  const point = config.points.find((p) => p.id === id);
+  const has360 = Boolean(point && (point.panorama || point.pano));
+  const in360 = href.endsWith("/360") && has360;
+  return (
+    <Field title="Punkt" hint={has360 ? "Kortet: punktets kort med billeder og tekst. 360°: gæsten står direkte i punktets 360°-billede." : "Punktets kort med billeder og tekst åbner."}>
+      <select className={`${input} bg-white`} value={id} onChange={(e) => onChange(`#punkt:${e.target.value}${in360 ? "/360" : ""}`)}>
+        {config.points.map((p) => (
+          <option key={p.id} value={p.id}>
+            {p.name}
+            {p.panorama || p.pano ? " (360°)" : ""}
+          </option>
+        ))}
+      </select>
+      {has360 && (
+        <Choice<"kort" | "360">
+          value={in360 ? "360" : "kort"}
+          options={[
+            ["kort", "Punktets kort"],
+            ["360", "Se i 360°"],
+          ]}
+          onChange={(v) => onChange(`#punkt:${id}${v === "360" ? "/360" : ""}`)}
+        />
+      )}
+    </Field>
   );
 }

@@ -2116,9 +2116,21 @@ function TourExperience({
     setDayOpen(true);
   }
   function dayGo(i: number) {
-    if (!tourReady()) return void holdUntilReady(() => dayGo(i));
     const step = T.day?.steps[i];
     if (!step?.href) return;
+    // A point on the drone scene / map: its card - or straight into its 360° photo ("…/360"). No need to wait for the 3D tour.
+    const point = pointById(step.href.replace(/\/360$/, ""));
+    if (point) {
+      track("day_view", { label: `${step.time} ${step.title}`, stop: i + 1 });
+      setDayOpen(false);
+      setDayAt(null);
+      if (step.href.endsWith("/360") && hasPano(point)) {
+        setSelected(null);
+        return setPano(point);
+      }
+      return showPoint(point);
+    }
+    if (!tourReady()) return void holdUntilReady(() => dayGo(i));
     track("day_view", { label: `${step.time} ${step.title}`, stop: i + 1 });
     setDayOpen(false);
     setDayAt(i);

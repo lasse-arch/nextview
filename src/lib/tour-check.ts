@@ -121,7 +121,8 @@ export async function checkTour(c: TourConfig, opts: { ai?: boolean } = {}): Pro
     else if (places.length) add("ok", "Funktioner", `Alle ${places.length} steder i menu, velkomst, guide og kort findes i scanningen.`);
   }
   const points = links.filter((l) => pointOfHref(l.href));
-  const badPoints = points.filter((l) => !c.points.some((p) => p.id === pointOfHref(l.href)));
+  // "#punkt:<id>/360" (a day step into the point's 360° photo) is the same point.
+  const badPoints = points.filter((l) => !c.points.some((p) => p.id === pointOfHref(l.href)!.replace(/\/360$/, "")));
   for (const b of badPoints.slice(0, 5)) add("fejl", "Funktioner", `${b.where} peger på et punkt, der ikke findes længere.`);
   for (const g of c.guide?.stops ?? []) if ("point" in g && !c.points.some((p) => p.id === g.point)) add("fejl", "Funktioner", `"Vis mig rundt" har et stop ved et punkt, der ikke findes længere (${g.point}).`);
 
