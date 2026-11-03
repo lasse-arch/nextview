@@ -42,6 +42,15 @@ async function senderFor(user: Awaited<ReturnType<typeof requireUser>>, as: unkn
 const toldColleague = (userId: string, by: string, subject: string) =>
   ringBell({ kind: "mail", title: `${by} sendte en mail i dit navn`, text: `"${subject}" - fra din Gmail via mailgeneratoren. Svaret kommer til dig.`, href: "/arpo/generator", audience: `user:${userId}` });
 
+/** The addresses typed (comma, semicolon, space or new line between): the first is who it's to, the rest go on CC. */
+function addresses(raw: string): { ok: true; all: string[] } | { ok: false; error: string } {
+  const all = [...new Set(String(raw ?? "").split(/[\s,;]+/).map((a) => a.trim()).filter(Boolean))];
+  const bad = all.find((a) => !EMAIL_RE.test(a));
+  if (bad) return { ok: false, error: `"${bad.slice(0, 80)}" ligner ikke en e-mail.` };
+  if (all.length > 10) return { ok: false, error: "Højst 10 modtagere." };
+  return { ok: true, all };
+}
+
 const cap = (s: unknown, n: number) => (typeof s === "string" ? s.slice(0, n) : "");
 const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v >= 0 && v < 100_000_000 ? Math.round(v) : null);
 
@@ -195,11 +204,12 @@ export async function sendSalesMail(id: string, to: string, subject: string, bod
   if (row.dealId) {
     const deal = await prisma.deal.findUnique({ where: { id: row.dealId }, select: { contactEmail: true, invoiceEmail: true, ownerId: true } });
     if (!deal) return { ok: false, error: "Dealen findes ikke længere." };
-    const typed = to.trim();
-    if (typed && !EMAIL_RE.test(typed)) return { ok: false, error: "Skriv en gyldig e-mail at sende til." };
+    const list = addresses(to);
+    if (!list.ok) return list;
+    const [typed = "", ...cc] = list.all;
     const known = deal.contactEmail || deal.invoiceEmail;
     if (!typed && !known) return { ok: false, error: "Dealen har ingen e-mail - skriv den, du vil sende til." };
-    const r = await sendDealEmail(user, row.dealId, s, b, [], [], onBehalf ? { id: me.id, name: me.name } : undefined, typed && typed.toLowerCase() !== known?.toLowerCase() ? typed : undefined);
+    const r = await sendDealEmail(user, row.dealId, s, b, [], [], onBehalf ? { id: me.id, name: me.name } : undefined, typed && typed.toLowerCase() !== known?.toLowerCase() ? typed : undefined, cc);
     if (!r.ok) return r;
     // The deal had no contact e-mail: the one it was sent to is put on it - by someone who may work on the deal.
     if (typed && !deal.contactEmail && (teamCan(me, "admin") || deal.ownerId === me.id || deal.ownerId === user.id)) {
@@ -211,8 +221,10 @@ export async function sendSalesMail(id: string, to: string, subject: string, bod
     return { ok: true };
   }
 
-  const address = to.trim();
-  if (!EMAIL_RE.test(address)) return { ok: false, error: "Skriv en gyldig e-mail at sende til." };
+  const list = addresses(to);
+  if (!list.ok) return list;
+  const [address, ...cc] = list.all;
+  if (!address) return { ok: false, error: "Skriv en gyldig e-mail at sende til." };
   const account = await prisma.emailAccount.findFirst({ where: { userId: user.id, provider: "GOOGLE" } });
   if (!account) return { ok: false, error: onBehalf ? `${user.name} har ikke forbundet sin Gmail i Arpo - det skal ${user.name} selv gøre under Indstillinger → E-mail.` : "Forbind din Gmail-konto under Indstillinger → E-mail for at kunne sende herfra." };
 
@@ -228,6 +240,7 @@ export async function sendSalesMail(id: string, to: string, subject: string, bod
   try {
     await sendGmailMessage(account, {
       to: [address],
+      cc,
       subject: s,
       bodyText: `${b}\n\nMed venlig hilsen\n${sig.join("\n")}`,
       bodyHtml: `<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.5">${html}${signatureHtml}</div>`,
