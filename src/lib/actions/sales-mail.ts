@@ -193,8 +193,19 @@ export async function sendSalesMail(id: string, to: string, subject: string, bod
   if (!s || !b) return { ok: false, error: "Mailen mangler emne eller tekst." };
 
   if (row.dealId) {
-    const r = await sendDealEmail(user, row.dealId, s, b, [], [], onBehalf ? { id: me.id, name: me.name } : undefined);
+    const deal = await prisma.deal.findUnique({ where: { id: row.dealId }, select: { contactEmail: true, invoiceEmail: true, ownerId: true } });
+    if (!deal) return { ok: false, error: "Dealen findes ikke længere." };
+    const typed = to.trim();
+    if (typed && !EMAIL_RE.test(typed)) return { ok: false, error: "Skriv en gyldig e-mail at sende til." };
+    const known = deal.contactEmail || deal.invoiceEmail;
+    if (!typed && !known) return { ok: false, error: "Dealen har ingen e-mail - skriv den, du vil sende til." };
+    const r = await sendDealEmail(user, row.dealId, s, b, [], [], onBehalf ? { id: me.id, name: me.name } : undefined, typed && typed.toLowerCase() !== known?.toLowerCase() ? typed : undefined);
     if (!r.ok) return r;
+    // The deal had no contact e-mail: the one it was sent to is put on it - by someone who may work on the deal.
+    if (typed && !deal.contactEmail && (teamCan(me, "admin") || deal.ownerId === me.id || deal.ownerId === user.id)) {
+      await prisma.deal.update({ where: { id: row.dealId }, data: { contactEmail: typed } });
+      await logActivity({ type: "DEAL_UPDATED", message: `${me.name} tilføjede kontakt-e-mailen ${typed} (sendt fra mailgeneratoren)`, actorId: me.id, dealId: row.dealId }).catch(() => {});
+    }
     await remember(id, s, b, "sendt");
     if (onBehalf) await toldColleague(user.id, me.name, s);
     return { ok: true };

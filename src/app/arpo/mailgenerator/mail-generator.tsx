@@ -112,7 +112,7 @@ export function MailGenerator({ deals, tours, signature: mine, learned, senders 
     });
   }
 
-  const recipient = deal ? deal.email : to;
+  const recipient = to.trim();
 
   function send() {
     if (!draft) return;
@@ -211,12 +211,11 @@ export function MailGenerator({ deals, tours, signature: mine, learned, senders 
                 ))}
               </select>
             </div>
-            {!deal && (
-              <div>
-                <span className={label}>E-mail (hvis du vil sende herfra)</span>
-                <input type="email" className={`${input} mt-1`} placeholder="lene@firma.dk" value={to} onChange={(e) => setTo(e.target.value)} />
-              </div>
-            )}
+            <div>
+              <span className={label}>{deal ? "E-mail" : "E-mail (hvis du vil sende herfra)"}</span>
+              <input type="email" className={`${input} mt-1`} placeholder="lene@firma.dk" value={to} onChange={(e) => setTo(e.target.value)} />
+              {deal && !deal.email && <p className="mt-1 text-[11px] text-slate-500">Dealen har ingen e-mail - den du skriver, gemmes på dealen, når mailen er sendt.</p>}
+            </div>
           </div>
 
           <div>
@@ -326,7 +325,7 @@ export function MailGenerator({ deals, tours, signature: mine, learned, senders 
 
               <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
                 <button type="button" disabled={sending || !recipient} onClick={send} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-40">
-                  {sending ? "Sender …" : recipient ? `Send til ${recipient}` : deal ? "Dealen har ingen e-mail" : "Skriv en e-mail for at sende"}
+                  {sending ? "Sender …" : recipient ? `Send til ${recipient}` : "Skriv en e-mail for at sende"}
                 </button>
                 <button type="button" onClick={copy} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
                   Kopiér

@@ -79,7 +79,9 @@ export async function sendDealEmail(
   ccUserIds: string[] = [],
   files: File[] = [],
   /** Who pressed send, when it isn't the sender (an admin sending in a colleague's name) - named in the log. */
-  actor?: { id: string; name: string }
+  actor?: { id: string; name: string },
+  /** Another address than the deal's own (the mail generator: typed in - put on the deal after, when it had none). */
+  toOverride?: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {
 
   const totalBytes = files.reduce((sum, f) => sum + f.size, 0);
@@ -94,7 +96,7 @@ export async function sendDealEmail(
   }
 
   const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId } });
-  const recipient = deal.contactEmail || deal.invoiceEmail;
+  const recipient = toOverride || deal.contactEmail || deal.invoiceEmail;
   if (!recipient) return { ok: false, error: "Dealen har ingen kontakt-e-mail at sende til." };
 
   const ccUsers = ccUserIds.length > 0 ? await prisma.user.findMany({ where: { id: { in: ccUserIds } }, select: { email: true } }) : [];
