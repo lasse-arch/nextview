@@ -1443,6 +1443,8 @@ model TourDemoLink {
   /// Sent on SMS: the number (+45...) and the text it went with - so it can be sent again.
   smsTo       String?
   smsText     String?
+  /// Who it is, for our own use (e.g. "Skoleleder, Humlebakkeskolen") - never shown to the customer.
+  note        String?
   events      TourDemoEvent[]
 
   @@index([tourSlug])

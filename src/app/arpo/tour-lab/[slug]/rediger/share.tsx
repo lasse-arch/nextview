@@ -359,6 +359,7 @@ function DemoLinks({ slug }: { slug: string }) {
             <div className="flex items-start justify-between gap-2">
               <span className="min-w-0">
                 <span className="block truncate text-[14px] font-semibold text-[#1d1d1f]">{l.label}</span>
+                {l.note && <span className="block truncate text-[12px] text-[#6e6e73]">{l.note}</span>}
                 <span className="block text-[12px] text-[#8e8e93]">
                   {l.off ? "Slået fra · " : ""}
                   {l.visits.length ? `Set ${l.visits.length} gang${l.visits.length === 1 ? "" : "e"} · sidst ${when(last.start)}` : "Ikke åbnet endnu"}

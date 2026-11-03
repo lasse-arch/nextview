@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
   const token = text(body.token, 64);
   const session = text(body.session, 40);
   if (!token || !session || !Array.isArray(body.events)) return new NextResponse(null, { status: 400 });
-  const link = await prisma.tourDemoLink.findUnique({ where: { token }, select: { id: true, label: true, disabledAt: true, tourSlug: true, createdById: true, dealId: true, deal: { select: { companyName: true, displayName: true } } } });
+  const link = await prisma.tourDemoLink.findUnique({ where: { token }, select: { id: true, label: true, note: true, disabledAt: true, tourSlug: true, createdById: true, dealId: true, deal: { select: { companyName: true, displayName: true } } } });
   if (!link || link.disabledAt) return new NextResponse(null, { status: 404 });
   // We looked at it ourselves (checking the link before sending it): not a visit.
   if (await getTeamUser().catch(() => null)) return new NextResponse(null, { status: 204 });
@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
   const first = !(await prisma.tourDemoEvent.count({ where: { linkId: link.id, session } }));
   await prisma.tourDemoEvent.createMany({ data: events.map((e) => ({ ...e, linkId: link.id, session, device, city, country, referrer: ref })) });
   if (first) {
-    const name = link.deal ? link.deal.displayName || link.deal.companyName : link.label.replace(/ \((SMS|mail)\)$/, "");
+    const name = link.deal ? link.deal.displayName || link.deal.companyName : link.label.replace(/ \((SMS|mail)\)$/, "") + (link.note ? ` (${link.note})` : "");
     const href = link.dealId ? `/arpo/deals/${link.dealId}` : /\((SMS|mail)\)$/.test(link.label) ? `/arpo/generator${link.label.endsWith("(SMS)") ? "?fane=sms" : ""}` : `/arpo/tour-lab/${link.tourSlug}/rediger?fane=del`;
     await ringBell({ kind: "demo", title: `${name} kigger på jeres eksempel lige nu`, text: `De åbnede touren${city ? ` i ${city}` : ""} på ${device}. Et godt tidspunkt at ringe.`, href, tourSlug: `demo:${link.id}`, audience: `user:${link.createdById}` });
   }

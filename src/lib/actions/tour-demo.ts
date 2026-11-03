@@ -20,7 +20,7 @@ async function requireDemo(slug: string) {
   return user;
 }
 
-export type DemoLinkInfo = { id: string; label: string; token: string; createdAt: string; by: string | null; off: boolean; visits: DemoVisit[] };
+export type DemoLinkInfo = { id: string; label: string; note: string | null; token: string; createdAt: string; by: string | null; off: boolean; visits: DemoVisit[] };
 
 export async function demoLinks(slug: string): Promise<DemoLinkInfo[]> {
   await requireDemo(slug);
@@ -29,7 +29,7 @@ export async function demoLinks(slug: string): Promise<DemoLinkInfo[]> {
   const events = await prisma.tourDemoEvent.findMany({ where: { linkId: { in: links.map((l) => l.id) } }, orderBy: { createdAt: "asc" }, take: 20_000 });
   return links.map((l) => {
     const visits = demoVisits(events.filter((e) => e.linkId === l.id));
-    return { id: l.id, label: l.label, token: l.token, createdAt: l.createdAt.toISOString(), by: users.find((u) => u.id === l.createdById)?.name ?? null, off: Boolean(l.disabledAt), visits };
+    return { id: l.id, label: l.label, note: l.note, token: l.token, createdAt: l.createdAt.toISOString(), by: users.find((u) => u.id === l.createdById)?.name ?? null, off: Boolean(l.disabledAt), visits };
   });
 }
 

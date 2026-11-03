@@ -26,7 +26,7 @@ const PER_DAY = 40;
 
 const firstName = (name: string) => name.trim().split(/\s+/)[0] ?? "";
 
-export type DemoSmsSent = { id: string; at: string; to: string; tour: string; by: string; visits: number; /** Visits where they did something in the tour (not only opened the link). */ started: number; lastSeen: string | null; where: string | null; /** The tour, and the visits (newest first) - what they saw and for how long. */ slug: string; details: DemoVisit[]; /** Can be sent again: the number is kept, and the seller sent it (or is an admin). */ again: boolean; /** The seller sent it, or is an admin: may send it again or remove it. */ mine: boolean };
+export type DemoSmsSent = { id: string; at: string; to: string; /** Who it is, for our own use. */ note: string | null; tour: string; by: string; visits: number; /** Visits where they did something in the tour (not only opened the link). */ started: number; lastSeen: string | null; where: string | null; /** The tour, and the visits (newest first) - what they saw and for how long. */ slug: string; details: DemoVisit[]; /** Can be sent again: the number is kept, and the seller sent it (or is an admin). */ again: boolean; /** The seller sent it, or is an admin: may send it again or remove it. */ mine: boolean };
 
 export type DemoSmsSetup = {
   tours: { slug: string; name: string }[];
@@ -54,7 +54,7 @@ export async function demoSmsSetup(): Promise<DemoSmsSetup> {
       where: { label: { endsWith: "(SMS)" } },
       orderBy: { createdAt: "desc" },
       take: 30,
-      select: { id: true, label: true, createdAt: true, tourSlug: true, createdById: true, smsTo: true, smsText: true, events: { select: { session: true, name: true, label: true, device: true, referrer: true, createdAt: true, city: true, country: true }, orderBy: { createdAt: "desc" } } },
+      select: { id: true, label: true, note: true, createdAt: true, tourSlug: true, createdById: true, smsTo: true, smsText: true, events: { select: { session: true, name: true, label: true, device: true, referrer: true, createdAt: true, city: true, country: true }, orderBy: { createdAt: "desc" } } },
     }),
   ]);
   const people = new Map((await prisma.user.findMany({ where: { id: { in: [...new Set(links.map((l) => l.createdById))] } }, select: { id: true, name: true } })).map((p) => [p.id, p.name]));
@@ -69,6 +69,7 @@ export async function demoSmsSetup(): Promise<DemoSmsSetup> {
         id: l.id,
         at: l.createdAt.toISOString(),
         to: l.label.replace(/ \(SMS\)$/, ""),
+        note: l.note,
         tour: names.get(l.tourSlug) ?? l.tourSlug,
         slug: l.tourSlug,
         details: demoVisits(l.events),
@@ -89,7 +90,7 @@ export async function demoSmsSetup(): Promise<DemoSmsSetup> {
  * up, the link is made all the same and the text comes back to be sent from
  * the seller's own phone.
  */
-export async function sendDemoSms(input: { tourSlug: string; phone: string; name: string; text: string; consent: boolean }): Promise<{ ok: true; sent: boolean; text: string; phone: string } | { ok: false; error: string }> {
+export async function sendDemoSms(input: { tourSlug: string; phone: string; name: string; note?: string; text: string; consent: boolean }): Promise<{ ok: true; sent: boolean; text: string; phone: string } | { ok: false; error: string }> {
   const user = await requireUser();
   if (input.consent !== true) return { ok: false, error: "Sæt hak, når kunden har sagt ja til at få en SMS." };
   const tour = await prisma.tour.findFirst({ where: { slug: String(input.tourSlug), ...sendable(user) }, select: { slug: true, name: true } });
@@ -97,6 +98,7 @@ export async function sendDemoSms(input: { tourSlug: string; phone: string; name
   const phone = danishMobile(input.phone);
   if (!phone) return { ok: false, error: "Skriv et dansk mobilnummer (8 cifre)." };
   const name = String(input.name ?? "").trim().slice(0, 80);
+  const note = String(input.note ?? "").replace(/\s+/g, " ").trim().slice(0, 160) || null;
   const text = String(input.text ?? "").trim();
   if (!text.includes("{link}")) return { ok: false, error: "Teksten skal have {link} med - dér kommer linket til touren." };
   if (text.length > 600) return { ok: false, error: "Teksten er for lang (højst 600 tegn)." };
@@ -106,7 +108,7 @@ export async function sendDemoSms(input: { tourSlug: string; phone: string; name
 
   // The customer's own link: what they do on it is theirs, and the seller hears when they open it.
   const who = name || `+${phone}`;
-  const link = await prisma.tourDemoLink.create({ data: { tourSlug: tour.slug, token: randomBytes(15).toString("base64url"), label: `${who} (SMS)`, createdById: user.id } });
+  const link = await prisma.tourDemoLink.create({ data: { tourSlug: tour.slug, token: randomBytes(15).toString("base64url"), label: `${who} (SMS)`, note, createdById: user.id } });
   const url = `${(process.env.APP_BASE_URL || "https://nextview360.dk").replace(/\/+$/, "")}/vis/${link.token}`;
   const message = text.replaceAll("{navn}", firstName(name)).replace(/^Hej \n/, "Hej\n").replaceAll("{link}", url);
   // Kept with the link, so it can be sent again (the same link - what they look at stays in one place).
@@ -120,7 +122,7 @@ export async function sendDemoSms(input: { tourSlug: string; phone: string; name
     }
     sent = true;
   }
-  await logActivity({ type: "DEMO_SMS", message: `${user.name} sendte et eksempel (${tour.name}) på SMS til ${who}`, actorId: user.id });
+  await logActivity({ type: "DEMO_SMS", message: `${user.name} sendte et eksempel (${tour.name}) på SMS til ${who}${note ? ` (${note})` : ""}`, actorId: user.id });
   revalidatePath("/arpo/generator");
   return { ok: true, sent, text: message, phone: `+${phone}` };
 }

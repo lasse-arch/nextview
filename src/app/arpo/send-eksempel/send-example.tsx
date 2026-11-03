@@ -11,6 +11,7 @@ export function SendExample({ initial }: { initial: DemoSmsSetup }) {
   const [tour, setTour] = useState(initial.tours[0]?.slug ?? "");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [who, setWho] = useState("");
   const [text, setText] = useState(initial.text);
   const [consent, setConsent] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -48,12 +49,13 @@ export function SendExample({ initial }: { initial: DemoSmsSetup }) {
   async function send() {
     setBusy(true);
     setNote(null);
-    const r = await sendDemoSms({ tourSlug: tour, phone, name, text, consent }).catch((err: unknown) => ({ ok: false as const, error: err instanceof Error ? err.message : String(err) }));
+    const r = await sendDemoSms({ tourSlug: tour, phone, name, note: who, text, consent }).catch((err: unknown) => ({ ok: false as const, error: err instanceof Error ? err.message : String(err) }));
     setBusy(false);
     if (!r.ok) return setNote({ text: r.error, error: true });
     done(r);
     setName("");
     setPhone("");
+    setWho("");
     setConsent(false);
     setSetup(await demoSmsSetup().catch(() => setup));
   }
@@ -92,6 +94,10 @@ export function SendExample({ initial }: { initial: DemoSmsSetup }) {
             </label>
           </div>
           <label className="block text-xs font-medium text-slate-600">
+            Hvem er det? <span className="font-normal text-slate-400">· valgfrit, kun til internt brug - står ikke i SMS&apos;en</span>
+            <input value={who} onChange={(e) => setWho(e.target.value)} maxLength={160} placeholder="Fx Skoleleder, Humlebakkeskolen" className={field} />
+          </label>
+          <label className="block text-xs font-medium text-slate-600">
             Tekst <span className="font-normal text-slate-400">· {"{navn}"} bliver kundens fornavn, {"{link}"} linket til touren</span>
             <textarea value={text} onChange={(e) => setText(e.target.value)} rows={7} className={field} />
           </label>
@@ -121,6 +127,7 @@ export function SendExample({ initial }: { initial: DemoSmsSetup }) {
               <li key={s.id} className="flex flex-wrap items-baseline justify-between gap-2 py-2.5 text-sm">
                 <span className="min-w-0">
                   <b className="font-medium text-slate-900">{s.to}</b>
+                  {s.note && <span className="ml-1.5 rounded-md bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600">{s.note}</span>}
                   <span className="text-slate-500">
                     {" "}
                     · {s.tour} · {when(s.at)}
