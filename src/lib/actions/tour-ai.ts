@@ -525,6 +525,7 @@ export async function planTourFromWebsite(
   const request = `Brugeren vil have en ny tour til en kunde. Du skal IKKE bygge den endnu - fortæl først, hvad du vil bygge, så brugeren kan rette dig.
 
 Skriv planen i jeg-form til brugeren ("Jeg vil bygge …, jeg vælger … fordi …"), konkret for netop denne kunde, efter drejebogen:
+- Sådan sælger kunden sig selv: start med at finde ud af, hvordan kunden sælger sit produkt til sine egne kunder - deres 2-4 vigtigste salgsargumenter, hvem de taler til, og de ord, de selv bruger (fx "fællesskab", "frisk fra egen have", "ingen binding"). Resten af planen bygger på det: hvert valg nedenfor skal vise et af de argumenter frem i touren, med deres ord.
 - Hvem touren er til, og hvad den skal få dem til (hovedhandlingen).
 - Start og velkomst: hvilken start (forside, velkomst med fliser, helt enkel, luftfoto) og hvorfor.
 - Menuen: menutypen og de konkrete menupunkter i rækkefølge (med grupper), og hvorfor.
@@ -663,6 +664,7 @@ export async function createTourFromWebsite(input: NewTourInput & { plan?: TourP
     `Byg en ny tour til en ny kunde. Opsætningen ovenfor er en skabelon: funktionerne (bevægelse, skift, menutype osv.) er valgt med vilje, men alt kundeindhold er tomt og skal udfyldes.
 
 Udfyld ud fra kundens hjemmeside nedenfor, efter drejebogen:
+- Find først ud af, hvordan kunden sælger sig selv til sine egne kunder: deres vigtigste salgsargumenter, hvem de taler til, og de ord, de selv bruger. Byg så touren til at vise netop de argumenter frem - menupunkternes navne, velkomst, stedkort, historier, chips og "Din plads venter" skal sige det, kunden selv siger, og funktionerne vælges efter, hvad der beviser deres argumenter bedst (fx fællesskab → historier og "Sådan ser en dag ud"; faciliteter → stedkort i de rum; ledige pladser/priser → live data og booking). Nævn i reply kort, hvilke argumenter du har bygget touren op om.
 - brand, title, subtitle, logo (en logo-kandidat fra hjemmesiden; logoOnLight hvis logoet er mørkt), favicon (hjemmesidens favicon, gerne apple-touch-icon), colors og font/fontHeading så touren ligner hjemmesiden (rød tråd).
 - start: scanpunkt 1, medmindre brugeren har sagt andet (det rettes i editoren under Scanpunkter).
 - menu: kundens handlinger og grupper efter drejebogen. Rummene vælges bagefter i editoren ved at stå i dem - lav tomme grupper med gode navne, som brugeren fylder.

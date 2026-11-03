@@ -64,9 +64,9 @@ export async function findDeals(query: string): Promise<DealHit[]> {
 }
 
 /** A deal picked in the mail generator: who to write to there (name, e-mail) and its industry. */
-export async function dealForMail(id: string): Promise<{ id: string; name: string; contact: string; email: string; industry: string } | null> {
+export async function dealForMail(id: string): Promise<{ id: string; name: string; contact: string; email: string; industry: string; website: string } | null> {
   await requireTeam("sales");
-  const d = await prisma.deal.findUnique({ where: { id: String(id) }, select: { id: true, companyName: true, displayName: true, contactName: true, contactEmail: true, invoiceEmail: true, industry: true } });
+  const d = await prisma.deal.findUnique({ where: { id: String(id) }, select: { id: true, companyName: true, displayName: true, contactName: true, contactEmail: true, invoiceEmail: true, industry: true, websiteUrl: true } });
   if (!d) return null;
-  return { id: d.id, name: dealName(d), contact: d.contactName ?? "", email: d.contactEmail || d.invoiceEmail || "", industry: industryOf(dealName(d), d.industry) };
+  return { id: d.id, name: dealName(d), contact: d.contactName ?? "", email: d.contactEmail || d.invoiceEmail || "", industry: industryOf(dealName(d), d.industry), website: d.websiteUrl ?? "" };
 }

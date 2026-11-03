@@ -7,7 +7,7 @@ import { MAIL_KINDS, type MailKind, type SalesMailInput } from "@/lib/sales-mail
 import { copiedSalesMail, draftSalesMail, sendSalesMail } from "@/lib/actions/sales-mail";
 import { demoLinksForMail } from "@/lib/actions/demo-sms";
 
-type Deal = { id: string; name: string; contact: string; email: string; industry: string };
+type Deal = { id: string; name: string; contact: string; email: string; industry: string; website?: string };
 /** `slug`: one of our own tours in Arpo - it can go out as a showcase link (walk-through + we see who looks). */
 /** `demoOnly`: one of ours not out on the net yet (in review) - it can only go out as a showcase link. */
 type Tour = { key: string; name: string; url: string; industry: string; slug?: string; demoOnly?: boolean; review?: boolean };
@@ -36,6 +36,7 @@ type Kept = {
   name?: string;
   company?: string;
   industry?: string;
+  website?: string;
   to?: string;
   notes?: string;
   colleagues?: string;
@@ -69,6 +70,7 @@ export function MailGenerator({ deals, tours, signature: mine, learned, senders 
   const [name, setName] = useState(kept?.name ?? "");
   const [company, setCompany] = useState(kept?.company ?? "");
   const [industry, setIndustry] = useState(kept?.industry ?? "");
+  const [website, setWebsite] = useState(kept?.website ?? "");
   const [to, setTo] = useState(kept?.to ?? "");
   const [notes, setNotes] = useState(kept?.notes ?? "");
   const [colleagues, setColleagues] = useState(kept?.colleagues ?? "");
@@ -91,11 +93,11 @@ export function MailGenerator({ deals, tours, signature: mine, learned, senders 
       const empty = !notes.trim() && !draft && !name.trim() && !to.trim() && !company.trim();
       try {
         if (empty) localStorage.removeItem(KEEP);
-        else localStorage.setItem(KEEP, JSON.stringify({ at: Date.now(), as, kind, dealQuery, name, company, industry, to, notes, colleagues, withPrice, price, delivery, picked, asDemo, demoUrls, draft } satisfies Kept));
+        else localStorage.setItem(KEEP, JSON.stringify({ at: Date.now(), as, kind, dealQuery, name, company, industry, website, to, notes, colleagues, withPrice, price, delivery, picked, asDemo, demoUrls, draft } satisfies Kept));
       } catch {}
     }, 400);
     return () => window.clearTimeout(t);
-  }, [cleared, as, kind, dealQuery, name, company, industry, to, notes, colleagues, withPrice, price, delivery, picked, asDemo, demoUrls, draft]);
+  }, [cleared, as, kind, dealQuery, name, company, industry, website, to, notes, colleagues, withPrice, price, delivery, picked, asDemo, demoUrls, draft]);
   /** "Start forfra": everything empty, and nothing kept. */
   function startOver() {
     try {
@@ -107,6 +109,7 @@ export function MailGenerator({ deals, tours, signature: mine, learned, senders 
     setName("");
     setCompany("");
     setIndustry("");
+    setWebsite("");
     setTo("");
     setNotes("");
     setColleagues("");
@@ -141,6 +144,7 @@ export function MailGenerator({ deals, tours, signature: mine, learned, senders 
           setCompany(d.name);
           setIndustry(d.industry === "Andet" ? "" : d.industry);
           setTo(d.email);
+          setWebsite(d.website ?? "");
         })
         .catch(() => {});
       return;
@@ -170,6 +174,7 @@ export function MailGenerator({ deals, tours, signature: mine, learned, senders 
     name,
     company,
     industry,
+    website,
     notes,
     colleagues,
     delivery,
@@ -319,6 +324,11 @@ export function MailGenerator({ deals, tours, signature: mine, learned, senders 
               <input type="text" inputMode="email" className={`${input} mt-1`} placeholder="lene@firma.dk, kollega@firma.dk" value={to} onChange={(e) => setTo(e.target.value)} />
               {ccList.length > 0 && <p className="mt-1 text-[11px] text-slate-500">Til {recipient} - CC: {ccList.join(", ")}</p>}
               {deal && !deal.email && <p className="mt-1 text-[11px] text-slate-500">Dealen har ingen e-mail - den du skriver, gemmes på dealen, når mailen er sendt.</p>}
+            </div>
+            <div className="sm:col-span-2">
+              <span className={label}>Kundens hjemmeside (valgfri)</span>
+              <input type="text" inputMode="url" className={`${input} mt-1`} placeholder="firma.dk" value={website} onChange={(e) => setWebsite(e.target.value)} />
+              <p className="mt-1 text-[11px] text-slate-500">nextviewAI læser siden og sælger touren ind på kundens egen måde - med deres ord og det, de selv fremhæver.</p>
             </div>
           </div>
 
