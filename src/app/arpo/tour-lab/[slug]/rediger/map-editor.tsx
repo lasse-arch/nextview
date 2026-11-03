@@ -754,11 +754,13 @@ function PhoneChrome({ config }: { config: TourConfig }) {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             {config.logo && <img src={config.logo} alt="" className="h-[30px]" />}
           </div>
-          <div className="min-w-0 px-2.5 py-1.5">
-            <div className="truncate font-extrabold" style={{ color: config.colors.main }}>
-              {M.intro?.title ?? config.drone?.intro.title ?? config.brand}
+          {config.overviewUi?.titleMobile && (
+            <div className="min-w-0 px-2.5 py-1.5">
+              <div className="truncate font-extrabold" style={{ color: config.colors.main }}>
+                {M.intro?.title ?? config.drone?.intro.title ?? config.brand}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
       <div className="absolute right-2.5 top-2.5 rounded-full px-3.5 py-2 font-extrabold tracking-wider text-white shadow-lg" style={{ background: config.colors.main }}>
@@ -824,6 +826,17 @@ function OverviewUiToggles({ config, edit, preview }: { config: TourConfig; edit
           ))}
         </tbody>
       </table>
+      <Toggle
+        on={Boolean(ui?.titleMobile)}
+        onChange={(on) =>
+          edit((d) => {
+            const rest = { ...d.overviewUi, titleMobile: on ? (true as const) : undefined };
+            d.overviewUi = Object.values(rest).some((v) => v !== undefined) ? rest : undefined;
+          })
+        }
+        title="Overskrift ved logoet på mobil"
+        hint="Fra (standard): boksen øverst viser kun logoet og knappen på en telefon - logoet siger navnet. Til: overskriften står ved logoet, når der er plads til den."
+      />
       <Field title="Filteret på mobil" hint="Vis alle: alle kategorier i rækker, så man ser dem. Rul: én række, man skubber sidelæns. Skjul: intet filter.">
         <Choice
           value={ui?.filter?.mobile === false ? "skjul" : ui?.filterColumns ? String(ui.filterColumns) : ui?.filterScroll ? "rul" : "alle"}

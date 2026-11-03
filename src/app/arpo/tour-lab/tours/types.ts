@@ -282,6 +282,8 @@ export type TourConfig = {
    * their device for reduced motion.
    */
   logoAnim?: "wings" | "assemble" | "zoom";
+  /** What's behind the logo animation: left out = the screen goes black (white behind a dark logo); "transparent" = the logo unfolds straight over the tour (a faint shade behind it, so it can be seen). */
+  logoAnimBg?: "transparent";
   /** How big the logo animation is: "s" (small), "m" (medium - default), "l" (large), "xl". */
   logoAnimSize?: "s" | "m" | "l" | "xl";
   /**
@@ -353,6 +355,8 @@ export type TourConfig = {
   overviewUi?: {
     box?: { desktop?: false; mobile?: false };
     filter?: { desktop?: false; mobile?: false };
+    /** true: on a phone the top box shows the title beside the logo (only when there is room for it). Left out: the logo and the button only - the logo says the name. */
+    titleMobile?: true;
     /** The points' names on the drone scene / map: always, only when zoomed in, or never (the open point's card has the name). Default: computer always, phone when zoomed in. */
     names?: { desktop?: "always" | "zoom" | "never"; mobile?: "always" | "zoom" | "never" };
     /** The points' size (icon and name) on the drone scene / map, per device: 1 = normal. Default: computer 1, phone 0.85. */

@@ -2624,7 +2624,7 @@ function TourExperience({
   return (
     <TourLang.Provider value={{ lang, t: tx }}>
     <LinkProvider T={T} popup={popup}>
-    <div className={`hv fixed inset-0 z-50 overflow-hidden bg-[#0d1b20] ${selected ? "hv-punkt" : ""} ${zoomed ? "hv-zoom" : ""} ${welcome ? "hv-welcome" : ""} ${phase === "tour" && T.stories?.mobile ? "hv-st-on-m" : ""} ${menuOpen ? "hv-menu-aaben" : ""} ${T.overviewUi?.box?.desktop === false ? "hv-boks-ud-d" : ""} ${T.overviewUi?.box?.mobile === false ? "hv-boks-ud-m" : ""} ${T.overviewUi?.filter?.desktop === false ? "hv-filter-ud-d" : ""} ${T.overviewUi?.filter?.mobile === false ? "hv-filter-ud-m" : ""} ${T.overviewUi?.names?.desktop ? `hv-navne-d-${T.overviewUi.names.desktop}` : ""} ${T.overviewUi?.names?.mobile ? `hv-navne-m-${T.overviewUi.names.mobile}` : ""} ${T.overviewUi?.filterColumns ? `hv-filter-kol hv-filter-kol-${T.overviewUi.filterColumns}` : T.overviewUi?.filterScroll ? "hv-filter-rul" : ""} ${langClasses} ${T.design?.menu === "dock" ? "hv-dock" : ""} ${T.logoSide === "right" ? "hv-logo-h" : ""} ${T.logoBg ? `hv-logobg-${T.logoBg}` : ""} ${T.logoBgTiles ?? T.logoBg ? `hv-tlogobg-${T.logoBgTiles ?? T.logoBg}` : ""} hv-tlogo-${T.logoAlignTiles ?? "midt"} ${guideAt != null || (dayAt != null && !dayOpen) || (lineRun && !lineRun.end) ? "hv-guiding" : ""} ${route ? "hv-routing" : ""} ${phase === "tour" ? "hv-i-tour" : ""} ${T.wayfinding ? "hv-har-rute" : ""} ${findAside.map((a) => `rt-vig-${a}`).join(" ")} ${showCard != null ? "hv-med-stedkort" : ""} ${nudgeOn && T.nudge && phase === "tour" ? "hv-med-nudge" : ""} ${T.wayfinding?.button?.desktop ? `rt-d-${T.wayfinding.button.desktop}` : ""} ${T.wayfinding?.button?.mobile ? `rt-m-${T.wayfinding.button.mobile}` : ""} ${showCard != null || (nudgeOn && T.nudge && phase === "tour") ? "hv-med-kort" : ""} ${showMeasures && phase === "tour" ? "hv-maler" : ""} ${phase === "tour" && T.stories?.desktop ? "hv-st-on-d" : ""}`} style={
+    <div className={`hv fixed inset-0 z-50 overflow-hidden bg-[#0d1b20] ${selected ? "hv-punkt" : ""} ${zoomed ? "hv-zoom" : ""} ${welcome ? "hv-welcome" : ""} ${phase === "tour" && T.stories?.mobile ? "hv-st-on-m" : ""} ${menuOpen ? "hv-menu-aaben" : ""} ${T.overviewUi?.box?.desktop === false ? "hv-boks-ud-d" : ""} ${T.overviewUi?.box?.mobile === false ? "hv-boks-ud-m" : ""} ${T.overviewUi?.titleMobile ? "hv-titel-m" : ""} ${T.overviewUi?.filter?.desktop === false ? "hv-filter-ud-d" : ""} ${T.overviewUi?.filter?.mobile === false ? "hv-filter-ud-m" : ""} ${T.overviewUi?.names?.desktop ? `hv-navne-d-${T.overviewUi.names.desktop}` : ""} ${T.overviewUi?.names?.mobile ? `hv-navne-m-${T.overviewUi.names.mobile}` : ""} ${T.overviewUi?.filterColumns ? `hv-filter-kol hv-filter-kol-${T.overviewUi.filterColumns}` : T.overviewUi?.filterScroll ? "hv-filter-rul" : ""} ${langClasses} ${T.design?.menu === "dock" ? "hv-dock" : ""} ${T.logoSide === "right" ? "hv-logo-h" : ""} ${T.logoBg ? `hv-logobg-${T.logoBg}` : ""} ${T.logoBgTiles ?? T.logoBg ? `hv-tlogobg-${T.logoBgTiles ?? T.logoBg}` : ""} hv-tlogo-${T.logoAlignTiles ?? "midt"} ${guideAt != null || (dayAt != null && !dayOpen) || (lineRun && !lineRun.end) ? "hv-guiding" : ""} ${route ? "hv-routing" : ""} ${phase === "tour" ? "hv-i-tour" : ""} ${T.wayfinding ? "hv-har-rute" : ""} ${findAside.map((a) => `rt-vig-${a}`).join(" ")} ${showCard != null ? "hv-med-stedkort" : ""} ${nudgeOn && T.nudge && phase === "tour" ? "hv-med-nudge" : ""} ${T.wayfinding?.button?.desktop ? `rt-d-${T.wayfinding.button.desktop}` : ""} ${T.wayfinding?.button?.mobile ? `rt-m-${T.wayfinding.button.mobile}` : ""} ${showCard != null || (nudgeOn && T.nudge && phase === "tour") ? "hv-med-kort" : ""} ${showMeasures && phase === "tour" ? "hv-maler" : ""} ${phase === "tour" && T.stories?.desktop ? "hv-st-on-d" : ""}`} style={
         {
           fontFamily: `'${T.font}', system-ui, sans-serif`,
           "--c-main": T.colors.main,
@@ -2899,7 +2899,7 @@ function TourExperience({
       )}
 
       {welcome && T.welcome && T.design?.welcome === "simple" && <SimpleWelcome T={T} onChoose={chooseWelcome} />}
-      {logoAnimAt != null && T.logoAnim && <LogoAnim key={logoAnimAt} logo={T.logo} kind={T.logoAnim} size={T.logoAnimSize} mark={T.logoAnimMark} light={Boolean(T.logoOnLight)} onDone={() => setLogoAnimAt(null)} />}
+      {logoAnimAt != null && T.logoAnim && <LogoAnim key={logoAnimAt} logo={T.logo} kind={T.logoAnim} clear={T.logoAnimBg === "transparent"} size={T.logoAnimSize} mark={T.logoAnimMark} light={Boolean(T.logoOnLight)} onDone={() => setLogoAnimAt(null)} />}
       {welcome && T.welcome && T.design?.welcome !== "simple" && (
         <div className={`hv-wel ${welcomeFilmClass(T.welcome.video)}`} role="dialog" aria-modal="true" aria-label={T.welcome.title}>
           {T.welcome.video?.src && <WelcomeFilm film={T.welcome.video} />}
@@ -3575,7 +3575,7 @@ function TourExperience({
  * black, the logo unfolds in the middle, and it all fades away into the tour -
  * where the tour has meanwhile gone. 2.4 s, no clicks caught.
  */
-function LogoAnim({ logo, kind, size, mark, light, onDone }: { logo: string; kind: NonNullable<TourConfig["logoAnim"]>; size?: TourConfig["logoAnimSize"]; mark?: TourConfig["logoAnimMark"]; light: boolean; onDone: () => void }) {
+function LogoAnim({ logo, kind, clear, size, mark, light, onDone }: { logo: string; kind: NonNullable<TourConfig["logoAnim"]>; clear?: boolean; size?: TourConfig["logoAnimSize"]; mark?: TourConfig["logoAnimMark"]; light: boolean; onDone: () => void }) {
   // The logo's own shape (width / height), so the wing's feathers are cut as real wedges.
   const [aspect, setAspect] = useState(3);
   useEffect(() => {
@@ -3610,7 +3610,7 @@ function LogoAnim({ logo, kind, size, mark, light, onDone }: { logo: string; kin
     body = parts.map((k, i) => img(k, kind === "assemble" ? ({ "--i": i } as React.CSSProperties) : undefined, `hv-la-${k}`));
   }
   return (
-    <div className={`hv-logoanim hv-la-${kind} hv-la-${size ?? "m"} ${light ? "lys" : ""}`} aria-hidden>
+    <div className={`hv-logoanim hv-la-${kind} hv-la-${size ?? "m"} ${light ? "lys" : ""} ${clear ? "klar" : ""}`} aria-hidden>
       <div className="hv-la-logo">{body}</div>
     </div>
   );
@@ -4091,6 +4091,8 @@ const CSS = `
 .hv-pchips{display:flex;flex-wrap:wrap;gap:5px}
 .hv-logoanim{position:absolute;inset:0;z-index:40;pointer-events:none;display:grid;place-items:center;background:#000;animation:hvLaBg 2.4s ease forwards}
 .hv-logoanim.lys{background:#fff}
+.hv-logoanim.klar{background:radial-gradient(closest-side,rgba(0,0,0,.4),rgba(0,0,0,0))}
+.hv-logoanim.klar.lys{background:radial-gradient(closest-side,rgba(255,255,255,.7),rgba(255,255,255,0))}
 @keyframes hvLaBg{0%{opacity:0}12%{opacity:1}78%{opacity:1}100%{opacity:0}}
 .hv-la-logo{position:relative;width:min(56vw,300px);perspective:900px}
 .hv-la-s .hv-la-logo{width:min(38vw,180px)}.hv-la-l .hv-la-logo{width:min(72vw,440px)}.hv-la-xl .hv-la-logo{width:min(88vw,620px)}
@@ -4301,17 +4303,23 @@ const CSS = `
 @media (max-width:760px){
   /* Slim welcome bar instead of the big card, with room for the menu button. */
   .hv-intro{top:calc(10px + env(safe-area-inset-top,0px));left:10px;right:104px;width:auto;display:flex;align-items:center;border-radius:14px}
-  .hv-intro-head{padding:8px 10px;flex:none}
-  .hv-intro-head img{height:30px;margin:0}
+  .hv-intro-head{padding:8px 10px;flex:0 1 auto;min-width:0}
+  /* A wide logo may shrink a little, so the button keeps one line. */
+  .hv-intro-head img{height:auto;max-height:30px;max-width:100%;object-fit:contain;margin:0}
   /* One box on phones: the logo stands straight on it (no box of its own) - on the tour's colour when the logo is light. */
   .hv-intro-head{background:transparent!important}
   .hv-intro-moerk{background:var(--c-main)}
   .hv-intro-moerk .hv-intro-body h1{color:#fff}
   .hv-intro .hv-sub{display:none}
-  .hv-intro-body{padding:6px 10px;min-width:0;display:flex;flex-direction:column;gap:5px}
-  .hv-intro-body h1{font-size:13.5px;line-height:1.2;margin:0;overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;text-wrap:balance}
+  /* The logo and the button only (the logo says the name) - the title only when chosen (titleMobile) and there's room for it. */
+  .hv-intro{justify-content:space-between}
+  .hv-intro-body{padding:6px 10px;flex:none;display:flex;flex-direction:column;gap:5px}
+  .hv-intro-body h1{display:none;font-size:13.5px;line-height:1.2;margin:0;overflow:hidden;-webkit-box-orient:vertical;-webkit-line-clamp:2;text-wrap:balance}
+  .hv-titel-m .hv-intro-body{flex:1 1 120px;min-width:0;container-type:inline-size}
+  .hv-titel-m .hv-intro-body h1{display:-webkit-box}
+  @container (max-width:130px){.hv-titel-m .hv-intro-body h1{display:none}}
   .hv-intro-body p{display:none}
-  .hv-intro .hv-btn{padding:6px 10px;font-size:12.5px}
+  .hv-intro .hv-btn{padding:6px 10px;font-size:12.5px;white-space:nowrap}
   .hv-menuknap{top:calc(12px + env(safe-area-inset-top,0px));right:10px;padding:10px 16px;font-size:13px}
   /* Categories: one row you can swipe. */
   .hv-filtre{left:10px;right:10px;bottom:calc(10px + env(safe-area-inset-bottom,0px));max-width:none;padding:7px 8px}

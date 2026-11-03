@@ -849,6 +849,19 @@ export function TourEditor({
                           })
                         }
                       />
+                      <Choice<"black" | "transparent">
+                        value={config.logoAnimBg ?? "black"}
+                        options={[
+                          ["black", config.logoOnLight ? "Hvid skærm" : "Sort skærm"],
+                          ["transparent", "Gennemsigtig"],
+                        ]}
+                        onChange={(v) =>
+                          edit((d) => {
+                            d.logoAnimBg = v === "transparent" ? v : undefined;
+                            setTimeout(() => preview.logoAnim(), 400);
+                          })
+                        }
+                      />
                       {config.logoAnim === "wings" && config.logo && (
                         <LogoMarkPicker logo={config.logo} light={Boolean(config.logoOnLight)} mark={config.logoAnimMark} onChange={(m) => edit((d) => void (d.logoAnimMark = m))} />
                       )}
