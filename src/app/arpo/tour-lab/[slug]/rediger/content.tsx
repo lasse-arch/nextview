@@ -1,7 +1,7 @@
 "use client";
 
 import { LinkInput } from "./links-open";
-import { StopVoice, VoiceGroup } from "./voice-editor";
+import { CardVoices, cardVoiceState, StopVoice, VoiceGroup } from "./voice-editor";
 import { startStyleOf } from "../../tours/presets";
 import { cardPeopleAt, guideExit, IMAGE_HREF, imageOfHref, isPlaceHref, PANO_HFOV, placeHref, startPlaces } from "../../tours/places";
 import { AiImageButton, AiImageList } from "./ai-image";
@@ -1432,8 +1432,9 @@ export function CardsEditor({ config, edit, preview, scanMap, mpskinsHidden }: O
           on={Boolean(config.placeCardVoice)}
           onChange={(on) => edit((d) => void (d.placeCardVoice = on ? { ...d.placeCardVoice } : undefined))}
           title="Få det læst op"
-          hint="En knap på stedkortene, der læser overskrift og tekst højt med telefonens egen stemme - på tourens sprog. Til gæster, der har svært ved at læse."
+          hint="En knap på stedkortene, der læser overskrift og tekst op med tourens stemme fra ElevenLabs. Til gæster, der har svært ved at læse."
         />
+        {config.placeCardVoice && <CardVoices config={config} edit={edit} />}
         {config.placeCardVoice && (
           <Field title="Knappens tekst">
             <input className={input} placeholder="Svært ved at læse? Få det læst op" value={config.placeCardVoice.label ?? ""} onChange={(e) => edit((d) => void (d.placeCardVoice = { label: e.target.value || undefined }))} />
@@ -1490,6 +1491,11 @@ export function CardsEditor({ config, edit, preview, scanMap, mpskinsHidden }: O
               <Field title="Tekst" hint="Kort - 1-3 sætninger.">
                 <textarea className={`${textarea} bg-white`} value={c.text} onChange={(e) => set({ ...c, text: e.target.value })} />
               </Field>
+              {config.placeCardVoice && (
+                <p className="px-1 text-[12px] text-[#8e8e93]">
+                  {{ ok: "🔊 Har lyd", old: "🔊 Teksten er ændret - lav lyden igen (knappen øverst)", none: "Ingen lyd endnu - lav den med knappen øverst" }[cardVoiceState(c)]}
+                </p>
+              )}
               <Field title="Vises ved punkt">
                 <div className="flex flex-wrap items-center gap-1.5">
                   {c.ss.map((n) => (
@@ -1524,6 +1530,7 @@ export function CardsEditor({ config, edit, preview, scanMap, mpskinsHidden }: O
                   )}
                 </div>
               </Field>
+              <CardPictures config={config} value={c.pictures} onChange={(pictures) => set({ ...c, pictures })} />
               {config.points.some((p) => p.panorama || p.pano) && (
                 <Field title="Vises i et punkts 360°-billede" hint="Punkter på luftfotoet med 360°-billede: kortet kommer frem, når gæsten åbner billedet - som når man går ind i et rum.">
                   <div className="flex flex-wrap gap-x-3 gap-y-1.5">
@@ -2102,6 +2109,53 @@ function CardImages({ images, hint, onChange }: { images: string[]; hint: string
         </div>
       )}
       <UploadButton accept="image/*" label={images.length ? "+ Tilføj et billede mere" : "+ Tilføj billede"} onDone={(url) => onChange([...images, url])} />
+    </Field>
+  );
+}
+
+/** The pictures in the tour (menu, tiles, "Vis mig rundt"), by where they're used - each once. */
+function tourPictures(config: TourConfig): { url: string; label: string }[] {
+  const out: { url: string; label: string }[] = [];
+  const add = (href: string, label: string) => {
+    const url = imageOfHref(href);
+    if (url && !out.some((p) => p.url === url)) out.push({ url, label });
+  };
+  for (const m of config.menu) {
+    if ("items" in m) m.items.forEach(([n, h]) => add(h, `${m.title}: ${n}`));
+    else add(m.href, m.title);
+  }
+  for (const t of config.bento?.tiles ?? []) add(t.href, `Flise: ${t.title.replace(/\n/g, " ")}`);
+  for (const g of [config.guide, ...(config.guides ?? [])]) for (const st of g?.stops ?? []) if ("href" in st) add(st.href, `Vis mig rundt: ${st.title}`);
+  return out;
+}
+
+/**
+ * A place card on a picture (e.g. the drone photo of the football pitch): shown
+ * when the picture opens from the menu - and "Vis mig rundt" shows the card's
+ * people (e.g. the teachers) at a stop with the picture.
+ */
+function CardPictures({ config, value, onChange }: { config: TourConfig; value?: string[]; onChange: (v: string[] | undefined) => void }) {
+  const pictures = tourPictures(config);
+  if (!pictures.length) return null;
+  return (
+    <Field title="Vises ved billede" hint='Fx dronebilledet af fodboldbanen: kortet kommer frem, når billedet åbnes fra menuen - og "Vis mig rundt" viser kortets personer (fx lærerne) ved billedet.'>
+      <div className="flex flex-col gap-1.5">
+        {pictures.map((p) => (
+          <label key={p.url} className="flex items-center gap-2 text-[13px]">
+            <input
+              type="checkbox"
+              checked={Boolean(value?.includes(p.url))}
+              onChange={(e) => {
+                const next = e.target.checked ? [...(value ?? []), p.url] : (value ?? []).filter((x) => x !== p.url);
+                onChange(next.length ? next : undefined);
+              }}
+            />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={p.url} alt="" className="h-7 w-10 rounded object-cover ring-1 ring-black/[.06]" />
+            <span className="min-w-0 truncate">{p.label}</span>
+          </label>
+        ))}
+      </div>
     </Field>
   );
 }

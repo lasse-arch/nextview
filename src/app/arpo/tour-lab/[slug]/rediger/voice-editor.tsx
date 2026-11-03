@@ -181,3 +181,58 @@ export function StopVoice({ config, stop, set, upload }: { config: TourConfig; s
     </Field>
   );
 }
+
+/** What a place card's voice reads: its title and text. */
+export const cardVoiceText = (c: { title: string; text: string }) => `${c.title}. ${c.text}`;
+/** A place card's voice: none yet, made from older words (it won't play), or fine. */
+export const cardVoiceState = (c: { title: string; text: string; audio?: string; audioText?: string }): "none" | "old" | "ok" =>
+  !c.audio ? "none" : c.audioText != null && !same(c.audioText, cardVoiceText(c)) ? "old" : "ok";
+
+/**
+ * "Få det læst op" on the place cards: the tour's ElevenLabs voice (the same
+ * as in Vis mig rundt) reads each card - made here for all cards missing one
+ * or whose text changed, kept with the tour's files.
+ */
+export function CardVoices({ config, edit }: { config: TourConfig; edit: Edit }) {
+  const { slug } = useContext(FilesContext);
+  const [making, setMaking] = useState<{ done: number; of: number } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const cards = config.placeCards ?? [];
+  const todo = cards.flatMap((c, i) => (c.text.trim() && cardVoiceState(c) !== "ok" ? [i] : []));
+  const voice = config.voice;
+  async function makeAll() {
+    if (!voice) return;
+    setError(null);
+    setMaking({ done: 0, of: todo.length });
+    for (const [n, i] of todo.entries()) {
+      const c = cards[i];
+      const text = cardVoiceText(c);
+      const r = await makeStopVoice(slug, voice.id, `stedkort ${c.title}`, text);
+      if (!r.ok) {
+        setError(`${c.title}: ${r.error}`);
+        break;
+      }
+      // Only if the card still says what was read.
+      edit((d) => {
+        const x = d.placeCards?.[i];
+        if (x && same(cardVoiceText(x), text)) d.placeCards![i] = { ...x, audio: r.url, audioText: text };
+      });
+      setMaking({ done: n + 1, of: todo.length });
+    }
+    setMaking(null);
+  }
+  if (!voice) return <p className={small}>Vælg først tourens stemme under Vis mig rundt → Stemme - stedkortene læses op med den samme.</p>;
+  return (
+    <div className="space-y-1.5">
+      <p className={small}>
+        Læses op af {voice.name} (ElevenLabs). {cards.length - todo.length} af {cards.length} stedkort har lyd. Kun på dansk - på de andre sprog vises knappen ikke.
+      </p>
+      {todo.length > 0 && (
+        <button type="button" disabled={making != null} onClick={makeAll} className="w-full rounded-xl bg-white py-2 text-[14px] font-medium text-[#0071e3] ring-1 ring-black/[.06] hover:bg-[#0071e3]/5 disabled:opacity-50">
+          {making ? `Laver lyd … ${making.done}/${making.of}` : `Lav lyd til ${todo.length} stedkort`}
+        </button>
+      )}
+      {error && <p className="px-1 text-[12px] leading-snug text-[#ff3b30]">{error}</p>}
+    </div>
+  );
+}

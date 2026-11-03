@@ -2551,7 +2551,8 @@ function TourExperience({
   /* ----- Place cards and the card that comes by itself ----- */
   const cardIndex = T.placeCards && currentSs != null ? T.placeCards.findIndex((c, i) => c.ss.includes(currentSs) && !closedCards.includes(i)) : -1;
   // In a drone point's 360° photo: only that point's card (placeCards[].points) - never the 3D tour's.
-  const panoCardIndex = T.placeCards && pano ? T.placeCards.findIndex((c, i) => c.points?.includes(pano.id) && !closedCards.includes(i)) : -1;
+  const panoCardIndex =
+    T.placeCards && pano ? T.placeCards.findIndex((c, i) => (c.points?.includes(pano.id) || Boolean(pano.panorama && pano.id.startsWith("billede-") && c.pictures?.includes(pano.panorama))) && !closedCards.includes(i)) : -1;
   const showCard = pano ? (panoCardIndex >= 0 ? panoCardIndex : null) : phase === "tour" && !cover && cardIndex >= 0 ? cardIndex : null;
   useEffect(() => {
     if (showCard != null) track("place_card_view", { title: T.placeCards![showCard].title });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useLang, useT } from "../tours/i18n-react";
+import { useT } from "../tours/i18n-react";
 import { useEffect, useRef, useState } from "react";
 import type { PlaceCard as Card, TourConfig } from "../tours/types";
 import { TourLink } from "./links";
@@ -49,28 +49,23 @@ export function PlaceCard({
     ro.observe(el);
     return () => ro.disconnect();
   }, [card.text, page]);
-  // Read aloud by the device's own voice, in the tour's language - stopped when the card goes.
-  const lang = useLang();
+  // Read aloud: the card's own voice (ElevenLabs, made in the editor) - only while the card still says what it was read from.
+  const voiceText = `${card.title}. ${card.text}`;
+  const audio = card.audio && (card.audioText == null || card.audioText.replace(/\s+/g, " ").trim() === voiceText.replace(/\s+/g, " ").trim()) ? card.audio : null;
+  const player = useRef<HTMLAudioElement | null>(null);
   const [reading, setReading] = useState(false);
-  const canSpeak = typeof window !== "undefined" && "speechSynthesis" in window;
-  useEffect(() => () => void (canSpeak && window.speechSynthesis.cancel()), [canSpeak]);
+  useEffect(() => () => player.current?.pause(), []);
   function readAloud() {
-    if (!canSpeak) return;
-    const synth = window.speechSynthesis;
+    if (!audio) return;
     if (reading) {
-      synth.cancel();
+      player.current?.pause();
       return setReading(false);
     }
     setStopped(true); // the card stays while it's read
-    synth.cancel();
-    const u = new SpeechSynthesisUtterance([card.title, card.text, card.more?.text].filter(Boolean).join(". "));
-    u.lang = SPEECH_LANG[lang] ?? "da-DK";
-    const v = synth.getVoices().find((x) => x.lang.toLowerCase().startsWith(u.lang.slice(0, 2).toLowerCase()));
-    if (v) u.voice = v;
-    u.rate = 0.95;
-    u.onend = u.onerror = () => setReading(false);
-    synth.speak(u);
-    setReading(true);
+    player.current ??= new Audio(audio);
+    player.current.currentTime = 0;
+    player.current.onended = () => setReading(false);
+    player.current.play().then(() => setReading(true), () => setReading(false));
   }
   const seconds = card.seconds ?? 15;
   // At most three, and only those with a photo (name and role are optional).
@@ -86,7 +81,7 @@ export function PlaceCard({
       {page === 1 ? (
         <>
           <h3>{card.title}</h3>
-          {voice && canSpeak && (
+          {voice && audio && (
             <button type="button" className={`pc-laes ${reading ? "aktiv" : ""}`} onClick={readAloud}>
               <svg viewBox="0 0 24 24" aria-hidden>
                 {reading ? <rect x="7" y="7" width="10" height="10" rx="1.5" /> : <path d="M4 9v6h4l5 4V5L8 9zM16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" />}
@@ -188,9 +183,6 @@ export function CardPhotos({ images, onOpen }: { images: string[]; onOpen: (at: 
     </div>
   );
 }
-
-/** The voice's language for the tour's language. */
-const SPEECH_LANG: Record<string, string> = { da: "da-DK", en: "en-GB", de: "de-DE", sv: "sv-SE", nb: "nb-NO", nl: "nl-NL", fr: "fr-FR", es: "es-ES", it: "it-IT", pl: "pl-PL", kl: "da-DK" };
 
 export const CARDS_CSS = `
 .pc-fotos{display:flex;gap:6px;margin:0 0 10px;overflow-x:auto;scrollbar-width:none}

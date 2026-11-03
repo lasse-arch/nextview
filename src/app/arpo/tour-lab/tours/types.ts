@@ -162,8 +162,14 @@ export type YearWheel = {
 export type PlaceCard = {
   /** The scan points in the 3D tour where the card comes up. */
   ss: number[];
+  /** The card read aloud by the tour's ElevenLabs voice (made in the editor) - played by "Få det læst op" (placeCardVoice). Danish only, like the guide's voices. */
+  audio?: string;
+  /** What `audio` was read from ("<title>. <text>") - it only plays while the card still says that. */
+  audioText?: string;
   /** Photos on the card, a small row under the text (a tap shows them big). */
   images?: string[];
+  /** Pictures (their addresses - e.g. a drone photo in the menu or a stop of "Vis mig rundt") the card belongs to: shown when the picture opens from the menu, and a guide stop at the picture shows the card's people. */
+  pictures?: string[];
   /** Points on the drone scene / map (their ids) whose 360° photo shows the card when it opens - like arriving in a room. */
   points?: string[];
   title: string;
@@ -621,8 +627,8 @@ export type TourConfig = {
   /** How big the place cards (and the card that comes by itself) are: "lille" (title, two lines, the buttons - for phones above all), "mellem" (the default), "stor". They scale with the screen either way (a small phone gets smaller ones). */
   placeCardSize?: "lille" | "mellem" | "stor";
   /**
-   * "Få det læst op" on the place cards: the device reads the card's title and
-   * text aloud (its own voice, in the tour's language - free, nothing to make).
+   * "Få det læst op" on the place cards: plays the card's voice (made with the
+   * tour's ElevenLabs voice, placeCards[].audio) - on cards that have one.
    * For visitors who find reading hard. `label`: the button's words (default
    * "Svært ved at læse? Få det læst op"). Left out: no button.
    */

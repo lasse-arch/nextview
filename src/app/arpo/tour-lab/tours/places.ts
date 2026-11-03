@@ -158,8 +158,14 @@ export function keepVoiceTexts<C extends TourConfig>(c: C): C {
   return { ...c, guide, ...(guides ? { guides } : {}) };
 }
 
-/** The people on the place card at a link's scan point (ss) - who the visitor meets there - or none. */
+/** The people on the place card at a link's scan point (ss), or the card a picture belongs to - who the visitor meets there - or none. */
 export function cardPeopleAt(T: Pick<TourConfig, "placeCards">, href: string): CardPerson[] | undefined {
+  // A picture (e.g. a drone photo): the card that belongs to it.
+  const picture = imageOfHref(href);
+  if (picture) {
+    const people = T.placeCards?.find((c) => c.pictures?.includes(picture) && c.people?.length)?.people;
+    return people?.length ? people : undefined;
+  }
   const ss = Number(new URLSearchParams(href.split("?")[1] ?? "").get("ss"));
   if (!(ss > 0)) return undefined;
   const people = T.placeCards?.find((c) => c.ss.includes(ss) && c.people?.length)?.people;
