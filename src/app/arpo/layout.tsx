@@ -13,6 +13,7 @@ import { PresentationModeToggle } from "./presentation-mode-toggle";
 import { isPresentationMode } from "@/lib/presentation-mode";
 import { NewsBell } from "./news-bell";
 import { NotificationBell } from "./notification-bell";
+import { DealJump } from "./deal-jump";
 import { overdueTasksFor } from "@/lib/overdue-tasks";
 import { unreadNotifications } from "@/lib/team-notifications";
 import { getUnreadNewsCount } from "@/lib/actions/news";
@@ -148,6 +149,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <div className="arpo-topbar flex items-center justify-end gap-2.5 px-4 pt-4 sm:px-6 md:px-10 md:pt-6">
             {sales && (
               <>
+                <DealJump />
                 <NotificationBell unreadCount={unreadBell} overdue={overdue} />
                 <NewsBell unreadCount={unreadNewsCount} />
                 <PresentationModeToggle enabled={presenting} />
