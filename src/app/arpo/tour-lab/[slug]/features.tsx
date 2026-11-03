@@ -727,6 +727,8 @@ export function FeatureTour({ T, onClose, onEvent, demo }: { T: TourConfig; onCl
       if (next <= h) return;
       h = next;
       tour.style.setProperty("--ft-reel-h", `${h}px`);
+      // The caption keeps that height too - a shorter step (going back) fills the whole room under the tour, no white above it.
+      el.style.minHeight = `${h}px`;
     };
     fit();
     // A data mark, not a class: the tour sets its own className on every render and would drop a class added here.
@@ -736,6 +738,7 @@ export function FeatureTour({ T, onClose, onEvent, demo }: { T: TourConfig; onCl
     return () => {
       ro.disconnect();
       delete tour.dataset.ftReel;
+      el.style.minHeight = "";
       tour.style.removeProperty("--ft-reel-h");
     };
   }, [reelOn, menuUp]);
