@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { demoSmsSetup } from "@/lib/actions/demo-sms";
 import { SendExample } from "../send-eksempel/send-example";
 import { MailSection } from "./mail-section";
+import { SentMails } from "./sent-mails";
 
 export const metadata = { title: "Generator" };
 
@@ -28,7 +29,14 @@ export default async function GeneratorPage({ searchParams }: { searchParams: Pr
           💬 SMS
         </Link>
       </div>
-      {sms ? <SendExample initial={await demoSmsSetup()} /> : <MailSection user={user} />}
+      {sms ? (
+        <SendExample initial={await demoSmsSetup()} />
+      ) : (
+        <>
+          <MailSection user={user} />
+          <SentMails user={user} />
+        </>
+      )}
     </div>
   );
 }

@@ -83,7 +83,9 @@ export async function sendDealEmail(
   /** Another address than the deal's own (the mail generator: typed in - put on the deal after, when it had none). */
   toOverride?: string,
   /** More addresses on CC (the mail generator: the ones typed after the first). */
-  extraCc: string[] = []
+  extraCc: string[] = [],
+  /** The tracking pixel's id to use (the mail generator keeps the same on its own record). */
+  trackingIdGiven?: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {
 
   const totalBytes = files.reduce((sum, f) => sum + f.size, 0);
@@ -152,7 +154,7 @@ export async function sendDealEmail(
 
   const plainTextBody = looksLikeHtml(body) ? body.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ") : body;
   const plainText = `${plainTextBody.trim()}${signatureText}`;
-  const trackingId = crypto.randomUUID();
+  const trackingId = trackingIdGiven ?? crypto.randomUUID();
   const pixel = `<img src="${getAppBaseUrl()}/api/track/email-open/${trackingId}" width="1" height="1" style="display:none" alt="" />`;
   const bodyForHtml = looksLikeHtml(body) ? body : plainTextToHtml(body);
   const bodyHtml = `${bodyForHtml}${signatureHtml}${pixel}`;

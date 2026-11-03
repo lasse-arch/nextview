@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { dealForMail, findDeals, type DealHit } from "@/lib/actions/deal-search";
 import { INDUSTRIES } from "@/lib/industries";
 import { MAIL_KINDS, type MailKind, type SalesMailInput } from "@/lib/sales-mail";
 import { copiedSalesMail, draftSalesMail, sendSalesMail } from "@/lib/actions/sales-mail";
@@ -123,16 +124,36 @@ export function MailGenerator({ deals, tours, signature: mine, learned, senders 
   const [busy, start] = useTransition();
   const [sending, startSend] = useTransition();
 
+  /** The deals found for what's typed - searched among all of them on the server (not only the latest few hundred). */
+  const [found, setFound] = useState<DealHit[]>([]);
+  const askedDeal = useRef(0);
   function pickDeal(value: string) {
     setDealQuery(value);
-    const d = deals.find((x) => x.name === value) ?? null;
-    setDeal(d);
-    if (d) {
-      if (d.contact) setName(d.contact);
-      setCompany(d.name);
-      setIndustry(d.industry === "Andet" ? "" : d.industry);
-      setTo(d.email);
+    const hit = found.find((x) => x.name === value);
+    const known = deals.find((x) => x.name === value) ?? null;
+    if (hit || known) {
+      const id = hit?.id ?? known!.id;
+      dealForMail(id)
+        .then((d) => {
+          if (!d) return;
+          setDeal(d);
+          if (d.contact) setName(d.contact);
+          setCompany(d.name);
+          setIndustry(d.industry === "Andet" ? "" : d.industry);
+          setTo(d.email);
+        })
+        .catch(() => {});
+      return;
     }
+    setDeal(null);
+    const n = ++askedDeal.current;
+    if (value.trim().length < 2) return setFound([]);
+    window.setTimeout(() => {
+      if (n !== askedDeal.current) return;
+      findDeals(value)
+        .then((r) => n === askedDeal.current && setFound(r))
+        .catch(() => {});
+    }, 200);
   }
 
   // The tours for the industry first, then the rest; the search looks at the names.
@@ -269,7 +290,7 @@ export function MailGenerator({ deals, tours, signature: mine, learned, senders 
             <span className={label}>Deal (valgfri)</span>
             <input list="mg-deals" className={`${input} mt-1`} placeholder="Søg en deal - eller lad den være tom" value={dealQuery} onChange={(e) => pickDeal(e.target.value)} />
             <datalist id="mg-deals">
-              {deals.map((d) => (
+              {(found.length ? found : deals.slice(0, 50)).map((d) => (
                 <option key={d.id} value={d.name} />
               ))}
             </datalist>

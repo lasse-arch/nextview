@@ -1816,6 +1816,15 @@ model SalesMail {
   finalHow     String?
   finalAt      DateTime?
   createdAt    DateTime  @default(now())
+  /// Sent from here: to whom (and on CC), and its tracking pixel - opened when the recipient's mail shows pictures.
+  sentTo       String?
+  sentCc       String?
+  trackingId   String?   @unique
+  openedAt     DateTime?
+  lastOpenedAt DateTime?
+  openCount    Int       @default(0)
+  /// The showcase links (/vis/<token>) in it - their visits say whether the link was clicked.
+  demoTokens   String[]  @default([])
 
   @@index([userId, finalAt])
   @@index([finalAt])

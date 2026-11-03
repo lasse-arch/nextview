@@ -1,5 +1,6 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
@@ -9,6 +10,7 @@ import { getSettingValue } from "@/lib/integration-settings";
 import { claudeCostUsd } from "@/lib/claude-cost";
 import { sendGmailMessage } from "@/lib/gmail";
 import { logActivity } from "@/lib/activity";
+import { getAppBaseUrl } from "@/lib/email-oauth";
 import { sendDealEmail } from "@/lib/deal-email-send";
 import { teamCan } from "@/lib/team-roles";
 import { ringBell } from "@/lib/team-notifications";
@@ -36,6 +38,12 @@ async function senderFor(user: Awaited<ReturnType<typeof requireUser>>, as: unkn
   if (typeof as !== "string" || !as || as === user.id) return user;
   if (!teamCan(user, "admin")) return null;
   return prisma.user.findFirst({ where: { id: as, disabledAt: null } });
+}
+
+/** Kept with the mail: to whom, its tracking pixel, and the showcase links in it (their visits = the link was clicked). */
+async function keepSent(id: string, to: string, cc: string[], trackingId: string, body: string) {
+  const demoTokens = [...new Set([...body.matchAll(/\/vis\/([A-Za-z0-9_-]{12,64})/g)].map((m) => m[1]))].slice(0, 10);
+  await prisma.salesMail.update({ where: { id }, data: { sentTo: to.slice(0, 200), sentCc: cc.join(", ").slice(0, 500) || null, trackingId, demoTokens } }).catch(() => {});
 }
 
 /** The colleague hears that a mail went out in their name - it lies in their own Sent, and the answer comes to them. */
@@ -209,8 +217,10 @@ export async function sendSalesMail(id: string, to: string, subject: string, bod
     const [typed = "", ...cc] = list.all;
     const known = deal.contactEmail || deal.invoiceEmail;
     if (!typed && !known) return { ok: false, error: "Dealen har ingen e-mail - skriv den, du vil sende til." };
-    const r = await sendDealEmail(user, row.dealId, s, b, [], [], onBehalf ? { id: me.id, name: me.name } : undefined, typed && typed.toLowerCase() !== known?.toLowerCase() ? typed : undefined, cc);
+    const trackingId = randomUUID();
+    const r = await sendDealEmail(user, row.dealId, s, b, [], [], onBehalf ? { id: me.id, name: me.name } : undefined, typed && typed.toLowerCase() !== known?.toLowerCase() ? typed : undefined, cc, trackingId);
     if (!r.ok) return r;
+    await keepSent(id, typed || known || "", cc, trackingId, b);
     // The deal had no contact e-mail: the one it was sent to is put on it - by someone who may work on the deal.
     if (typed && !deal.contactEmail && (teamCan(me, "admin") || deal.ownerId === me.id || deal.ownerId === user.id)) {
       await prisma.deal.update({ where: { id: row.dealId }, data: { contactEmail: typed } });
@@ -237,19 +247,23 @@ export async function sendSalesMail(id: string, to: string, subject: string, bod
     .map((p) => `<p>${p.replace(/\n/g, "<br>")}</p>`)
     .join("");
   const signatureHtml = `<p>Med venlig hilsen<br><b>${esc(sellerName)}</b>${sig.slice(1).map((l) => `<br>${esc(l)}`).join("")}</p>`;
+  // Its tracking pixel - opened when the recipient's mail shows pictures (see Sendt in the generator).
+  const trackingId = randomUUID();
+  const pixel = `<img src="${getAppBaseUrl()}/api/track/email-open/${trackingId}" width="1" height="1" style="display:none" alt="" />`;
   try {
     await sendGmailMessage(account, {
       to: [address],
       cc,
       subject: s,
       bodyText: `${b}\n\nMed venlig hilsen\n${sig.join("\n")}`,
-      bodyHtml: `<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.5">${html}${signatureHtml}</div>`,
+      bodyHtml: `<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.5">${html}${signatureHtml}${pixel}</div>`,
       fromName: sellerName,
     });
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Kunne ikke sende e-mailen." };
   }
   await remember(id, s, b, "sendt");
+  await keepSent(id, address, cc, trackingId, b);
   const who = (row.input as { company?: string; name?: string } | null)?.company || (row.input as { name?: string } | null)?.name || address;
   await logActivity({ type: "EMAIL_SENT", message: onBehalf ? `${me.name} sendte en mail fra mailgeneratoren til ${who} på vegne af ${user.name}` : `${user.name} sendte en mail fra mailgeneratoren til ${who}`, actorId: me.id });
   if (onBehalf) await toldColleague(user.id, me.name, s);

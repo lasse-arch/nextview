@@ -3,6 +3,7 @@
 import { requireTeam } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { dealName, stageLabels } from "@/lib/labels";
+import { industryOf } from "@/lib/industries";
 
 export type DealHit = { id: string; name: string; sub: string; stage: string };
 
@@ -60,4 +61,12 @@ export async function findDeals(query: string): Promise<DealHit[]> {
     sub: [d.contactName, d.address?.split(",").pop()?.trim()].filter(Boolean).join(" · "),
     stage: stageLabels[d.stage] ?? d.stage,
   }));
+}
+
+/** A deal picked in the mail generator: who to write to there (name, e-mail) and its industry. */
+export async function dealForMail(id: string): Promise<{ id: string; name: string; contact: string; email: string; industry: string } | null> {
+  await requireTeam("sales");
+  const d = await prisma.deal.findUnique({ where: { id: String(id) }, select: { id: true, companyName: true, displayName: true, contactName: true, contactEmail: true, invoiceEmail: true, industry: true } });
+  if (!d) return null;
+  return { id: d.id, name: dealName(d), contact: d.contactName ?? "", email: d.contactEmail || d.invoiceEmail || "", industry: industryOf(dealName(d), d.industry) };
 }

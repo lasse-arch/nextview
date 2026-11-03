@@ -49,6 +49,12 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
         });
       }
     }
+    // A mail from the mail generator (with or without a deal) - its own record, for Sendt there.
+    const sales = await prisma.salesMail.findUnique({ where: { trackingId }, select: { id: true, openedAt: true } });
+    if (sales) {
+      const now = new Date();
+      await prisma.salesMail.update({ where: { id: sales.id }, data: { openedAt: sales.openedAt ?? now, lastOpenedAt: now, openCount: { increment: 1 } } });
+    }
   } catch (err) {
     console.error("Kunne ikke registrere e-mail-åbning", err);
   }
