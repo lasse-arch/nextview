@@ -1011,16 +1011,16 @@ export function TourEditor({
                 </Field>
                 </Group>
                 <Group title="Zoom">
-                  <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">Hvor meget af rummet man ser. Telefonen står på højkant og viser mindre i bredden - zoom lidt ud dér, så man kan se rummet. Gæsten kan aldrig selv zoome længere ud end 70 % (billedet bliver dårligt) - eller end det valgte her, når det er lavere.</p>
+                  <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">Hvor meget af rummet man ser. Telefonen står på højkant og viser mindre i bredden - zoom lidt ud dér, så man kan se rummet. Mindst 70 % - længere ud bliver billedet dårligt, og gæsten kan heller ikke selv zoome længere ud. En iPad på højkant bruger mobilens zoom.</p>
                   {(["desktop", "mobile"] as const).map((k) => {
-                    const v = config.zoom?.[k] ?? (k === "mobile" && config.mobileZoomLock ? 0.5 : 1);
+                    const v = Math.max(0.7, config.zoom?.[k] ?? (k === "mobile" && config.mobileZoomLock ? 0.7 : 1));
                     return (
                       <Field key={k} title={`${k === "desktop" ? "Computer" : "Mobil"}: ${zoomLabel(v)}`}>
                         <div className="flex items-center gap-2 text-[12px] text-[#8e8e93]">
                           <span>Ud</span>
                           <input
                             type="range"
-                            min={0.5}
+                            min={0.7}
                             max={2}
                             step={0.05}
                             className="flex-1 accent-[#0071e3]"

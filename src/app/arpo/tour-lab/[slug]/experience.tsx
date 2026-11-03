@@ -2061,8 +2061,8 @@ function TourExperience({
     let alive = true;
     const apply = () => {
       if (!alive) return;
-      const small = phone || window.innerWidth <= 760;
-      const z = small ? (zoomRef.current?.mobile ?? (lockRef.current ? 0.5 : null)) : (zoomRef.current?.desktop ?? null);
+      const small = phone || window.innerWidth <= 760 || (window.innerHeight > window.innerWidth && window.innerWidth <= 1100);
+      const z = clampZoom(small ? (zoomRef.current?.mobile ?? (lockRef.current ? MIN_ZOOM : null)) : (zoomRef.current?.desktop ?? null));
       // No zoom chosen: leave Matterport alone (and put back the normal view if one was set before).
       if (z == null && !zoomSet.current) return;
       zoomSet.current = z != null;
@@ -2086,9 +2086,9 @@ function TourExperience({
     // Never further out than 70 % - the picture goes poor beyond that - or than the tour's own zoom when it's set lower
     // (50 %, now and then). In they may zoom as they like.
     const floor = () => {
-      const small = phone || window.innerWidth <= 760;
-      const z = small ? (zoomRef.current?.mobile ?? (lockRef.current ? 0.5 : null)) : (zoomRef.current?.desktop ?? null);
-      return Math.min(z ?? 1, 0.7);
+      const small = phone || window.innerWidth <= 760 || (window.innerHeight > window.innerWidth && window.innerWidth <= 1100);
+      const z = clampZoom(small ? (zoomRef.current?.mobile ?? (lockRef.current ? MIN_ZOOM : null)) : (zoomRef.current?.desktop ?? null));
+      return Math.min(z ?? 1, MIN_ZOOM);
     };
     const zoomObs = (sdk as unknown as { Camera: { zoom?: { subscribe(cb: (z: { level?: number }) => void): { cancel(): void } } } }).Camera.zoom;
     const zoomSub = zoomObs?.subscribe((zl) => {
@@ -3813,6 +3813,10 @@ async function disableSweeps(sdk: MpSdk, ids: string[]) {
     await sdk.Sweep.disable(...batch).catch(() => Promise.all(batch.map((id) => sdk.Sweep.disable(id).catch(() => {}))));
   }
 }
+
+/** Never further out than 70 %: beyond it the picture goes poor (a setting saved lower, from before, counts as 70 %). */
+const MIN_ZOOM = 0.7;
+const clampZoom = (z: number | null | undefined) => (z == null ? null : Math.max(MIN_ZOOM, z));
 
 /** "Kun punkter": only the scan point the visitor stands on stays open. */
 function lockTo(sdk: MpSdk, all: string[], keep: string) {
