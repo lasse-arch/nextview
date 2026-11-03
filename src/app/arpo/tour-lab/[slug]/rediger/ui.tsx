@@ -376,7 +376,8 @@ export function PanoZoom({
             <span>Fyld</span>
           </div>
         )}
-        {ratio != null && ratio >= 0.9 && ratio <= 2.6 && (
+        {/* Any picture at least as wide as high: a 180° photo straight from a phone is often 3-6 times wider than high. */}
+        {ratio != null && ratio >= 0.9 && (
           <button type="button" className="text-[12px] font-medium text-[#0071e3]" onClick={() => put({ cover: half(), phone: undefined })}>
             Det er et 180°-billede - vis det, så man kan kigge rundt
           </button>

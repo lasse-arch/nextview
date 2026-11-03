@@ -3834,7 +3834,7 @@ function PanoView({
       yaw: at.yaw,
       pitch: at.pitch,
       ...(turnAtOpen && turnAtOpen !== "none" ? { autoRotate: turnAtOpen === "other" ? 2.5 : -2.5, autoRotateInactivityDelay: 4000 } : {}),
-    }, src ? cover : null);
+    }, src ? cover : null, el.current ? el.current.clientWidth / Math.max(1, el.current.clientHeight) : undefined);
     loadPannellum().then(() => {
       if (cancelled || !el.current || !window.pannellum) return;
       if (!image && !(dir && panos)) return;
