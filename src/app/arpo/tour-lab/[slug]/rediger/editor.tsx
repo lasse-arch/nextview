@@ -42,11 +42,10 @@ import { matchTargets, mentionAt, MentionList, tourTargets, type Target } from "
 import { deleteStoryImages } from "@/lib/actions/tour-lab";
 import { suggestSiteLook } from "@/lib/actions/tour-ai";
 
-/** The situations Find vej can step aside for (wayfinding.stepAside). None = it always stays. */
+/** The situations Find vej can step aside for (wayfinding.stepAside). None = it always stays - but never over a story playing (always hidden then). */
 const FIND_ASIDE: [FindStepAside, string][] = [
   ["cards", "stedkort"],
   ["nudge", "\"Din plads venter\""],
-  ["stories", "historierne"],
   ["arrived", "\"Du er fremme\""],
 ];
 
@@ -1132,8 +1131,8 @@ export function TourEditor({
                     hint={(() => {
                       const vig = config.wayfinding.always === false ? FIND_ASIDE.map(([k]) => k) : (config.wayfinding.stepAside ?? []);
                       return vig.length
-                        ? `Knappen gemmer sig, mens ${FIND_ASIDE.filter(([k]) => vig.includes(k)).map(([, l]) => l).join(", ")} vises - ellers står den der.`
-                        : "Intet valgt: knappen står der altid. På en telefon rykker den op under menuen, så den ikke ligger oven i et kort.";
+                        ? `Knappen gemmer sig, mens ${FIND_ASIDE.filter(([k]) => vig.includes(k)).map(([, l]) => l).join(", ")} vises - ellers står den der. Mens en historie afspilles, er den altid væk.`
+                        : "Intet valgt: knappen står der altid - undtagen mens en historie afspilles. På en telefon rykker den op under menuen, så den ikke ligger oven i et kort.";
                     })()}
                   >
                     <div className="flex flex-wrap gap-x-4 gap-y-1.5">
