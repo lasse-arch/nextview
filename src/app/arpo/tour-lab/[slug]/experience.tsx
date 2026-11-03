@@ -1313,7 +1313,7 @@ function TourExperience({
         mouseZoom: true,
         keyboardZoom: false,
         hotSpots,
-      }, D.panorama ? T.imageView?.[D.panorama]?.cover : null));
+      }, D.panorama ? T.imageView?.[D.panorama]?.cover : null, droneEl.current.clientWidth / Math.max(1, droneEl.current.clientHeight)));
       drone.current.on("zoomchange", (hfov) => setZoomed(Number(hfov) < 56));
       // Shown when the picture can be drawn: the one 360° photo, or the tiles' small first level (the sharp ones come after) - or after a while, whatever happens.
       const shown = () => setDroneLoaded(key);
@@ -4222,6 +4222,10 @@ const CSS = `
 .hv-menu-cta{padding:14px 22px 24px;display:flex;flex-direction:column;gap:8px}
 .hv-pano{position:absolute;inset:0;z-index:15;background:#0d1b20;animation:hvFade .4s ease}
 .hv-pano-kort .pc{z-index:16}
+/* In a picture the card sits in the corner, just above "Tilbage" - not floating in the middle of the view. */
+/* (Stronger than the stories' lift of the card - their row isn't shown over a picture.) */
+@media (min-width:761px) and (min-height:501px){.hv.hv-pano-kort .pc{bottom:84px}}
+@media (max-width:760px){.hv.hv-pano-kort .pc{bottom:calc(74px + env(safe-area-inset-bottom,0px))}}
 /* The sharp copy waits unseen over the small one until it has drawn, then fades in. */
 .hv-pano-skarp{opacity:0;pointer-events:none;transition:opacity .35s ease}
 .hv-pano-skarp.hv-pano-skarp-vist{opacity:1;pointer-events:auto}
