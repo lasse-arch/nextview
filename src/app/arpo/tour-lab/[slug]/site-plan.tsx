@@ -181,83 +181,90 @@ export function SitePlanControls({
         <i aria-hidden />
         {tr("Pladskort")}
       </button>
-      {state.on && live && folded && (
-        <button type="button" className="pk-datoer-aaben" onPointerDown={(e) => e.stopPropagation()} onClick={() => setFolded(false)}>
-          📅 {state.stay ? `${shortDay(state.stay.from, lang)}–${shortDay(state.stay.to, lang)}` : tr("Vælg datoer")}
-        </button>
-      )}
-      {state.on && live && !folded && (
-        <div className="pk-datoer" onPointerDown={(e) => e.stopPropagation()}>
-          <button type="button" className="pk-fold" aria-label={tr("Skjul")} onClick={() => setFolded(true)}>
-            ×
-          </button>
-          {state.free && (
-          <div className="pk-hoved">
-              <button
-                type="button"
-                className="pk-ryd"
-                onClick={() => {
-                  setNote(null);
-                  setState((s) => ({ ...s, free: null, picked: null, stay: null, off: [] }));
-                }}
-              >
-                {tr("Fjern ledige")} ×
+      {/* The picked place's card, then the dates' box (or its button): one stack at the bottom - the card always just above the box, never on it. */}
+      {state.on && (state.picked || live) && (
+        <div className="pk-bund">
+          {state.on && state.picked && state.stay && (
+            <div className="pk-kort" onPointerDown={(e) => e.stopPropagation()}>
+              <span>
+                <b>{tr("Ledig")}</b> · {state.picked.name} · {shortDay(state.stay.from, lang)}–{shortDay(state.stay.to, lang)}
+              </span>
+              {(() => {
+                const walk = unitTour(plan, state.picked!);
+                return walk && onWalk ? (
+                  <a
+                    href={walk}
+                    className="pk-gaa"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      onWalk(walk, state.picked!.name);
+                    }}
+                  >
+                    {tr("Gå rundt")}
+                  </a>
+                ) : null;
+              })()}
+              {book && (
+                <a
+                  href={book}
+                  target="_blank"
+                  rel="noopener"
+                  onClick={(e) => {
+                    // The tour opens the booking itself (inside the tour); without it, a new tab.
+                    if (onBook) {
+                      e.preventDefault();
+                      onBook(`${tr("Book")} ${state.picked!.name}`, book);
+                    }
+                  }}
+                >
+                  {tr("Book")}
+                </a>
+              )}
+              <button type="button" aria-label={tr("Luk")} onClick={() => setState((s) => ({ ...s, picked: null }))}>
+                ×
               </button>
-          </div>
+            </div>
           )}
-          <label>
-            <span>{tr("Ankomst")}</span>
-            <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
-          </label>
-          <label>
-            <span>{tr("Afrejse")}</span>
-            <input type="date" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} />
-          </label>
-          <button type="button" onClick={look} disabled={busy}>
-            {busy ? tr("Henter …") : tr("Vis ledige")}
-          </button>
-          {(busy || note) && <p aria-live="polite">{busy ? tr("Henter ledige pladser …") : note}</p>}
-        </div>
-      )}
-      {state.on && state.picked && state.stay && (
-        <div className="pk-kort" onPointerDown={(e) => e.stopPropagation()}>
-          <span>
-            <b>{tr("Ledig")}</b> · {state.picked.name} · {shortDay(state.stay.from, lang)}–{shortDay(state.stay.to, lang)}
-          </span>
-          {(() => {
-            const walk = unitTour(plan, state.picked!);
-            return walk && onWalk ? (
-              <a
-                href={walk}
-                className="pk-gaa"
-                onClick={(e) => {
-                  e.preventDefault();
-                  onWalk(walk, state.picked!.name);
-                }}
-              >
-                {tr("Gå rundt")}
-              </a>
-            ) : null;
-          })()}
-          {book && (
-            <a
-              href={book}
-              target="_blank"
-              rel="noopener"
-              onClick={(e) => {
-                // The tour opens the booking itself (inside the tour); without it, a new tab.
-                if (onBook) {
-                  e.preventDefault();
-                  onBook(`${tr("Book")} ${state.picked!.name}`, book);
-                }
-              }}
-            >
-              {tr("Book")}
-            </a>
+          {state.on && live && folded && (
+            <button type="button" className="pk-datoer-aaben" onPointerDown={(e) => e.stopPropagation()} onClick={() => setFolded(false)}>
+              📅 {state.stay ? `${shortDay(state.stay.from, lang)}–${shortDay(state.stay.to, lang)}` : tr("Vælg datoer")}
+            </button>
           )}
-          <button type="button" aria-label={tr("Luk")} onClick={() => setState((s) => ({ ...s, picked: null }))}>
-            ×
-          </button>
+          {state.on && live && !folded && (
+            <div className="pk-datoer" onPointerDown={(e) => e.stopPropagation()}>
+              <button type="button" className="pk-fold" aria-label={tr("Skjul")} onClick={() => setFolded(true)}>
+                ×
+              </button>
+              <label>
+                <span>{tr("Ankomst")}</span>
+                <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+              </label>
+              <label>
+                <span>{tr("Afrejse")}</span>
+                <input type="date" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} />
+              </label>
+              <button type="button" onClick={look} disabled={busy}>
+                {busy ? tr("Henter …") : tr("Vis ledige")}
+              </button>
+              {(busy || note || state.free) && (
+                <p aria-live="polite">
+                  <span>{busy ? tr("Henter ledige pladser …") : note}</span>
+                  {state.free && !busy && (
+                    <button
+                      type="button"
+                      className="pk-ryd"
+                      onClick={() => {
+                        setNote(null);
+                        setState((s) => ({ ...s, free: null, picked: null, stay: null, off: [] }));
+                      }}
+                    >
+                      {tr("Fjern ledige")} ×
+                    </button>
+                  )}
+                </p>
+              )}
+            </div>
+          )}
         </div>
       )}
     </>
@@ -277,38 +284,41 @@ export const SITE_PLAN_CSS = `
 .pk-skift i::after{content:"";position:absolute;left:2px;top:2px;width:14px;height:14px;border-radius:50%;background:#fff;transition:transform .2s}
 .pk-skift.til i{background:#34c759}
 .pk-skift.til i::after{transform:translateX(12px)}
-.pk-datoer{position:absolute;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));translate:-50% 0;z-index:6;display:flex;flex-wrap:wrap;align-items:flex-end;gap:8px;padding:10px 12px;border-radius:16px;background:rgba(255,255,255,.96);box-shadow:0 8px 26px rgba(0,0,0,.22);max-width:calc(100% - 24px)}
+.pk-bund{position:absolute;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));translate:-50% 0;z-index:7;display:flex;flex-direction:column;align-items:center;gap:8px;max-width:calc(100% - 24px);pointer-events:none}
+.pk-bund>*{pointer-events:auto}
+.hv:has(.hv-filtre) .pk-bund{bottom:calc(var(--filtre-h,56px) + 26px + env(safe-area-inset-bottom,0px))}
+.pk-datoer{position:relative;display:flex;flex-wrap:wrap;align-items:flex-end;gap:8px;padding:10px 12px;border-radius:16px;background:rgba(255,255,255,.96);box-shadow:0 8px 26px rgba(0,0,0,.22);max-width:100%}
 .pk-datoer label{display:flex;flex-direction:column;gap:2px;font-size:11px;font-weight:700;color:#6e6e73;text-transform:uppercase;letter-spacing:.04em}
 .pk-datoer input{height:34px;border:1px solid #e5e5ea;border-radius:9px;padding:0 8px;font:inherit;font-size:14px;color:#1d2a30;background:#fff}
 .pk-datoer button{height:34px;padding:0 14px;border:0;border-radius:9px;background:var(--c-accent);color:#fff;font:inherit;font-size:14px;font-weight:700;cursor:pointer}
 .pk-datoer button:disabled{opacity:.6}
-.pk-datoer p{flex-basis:100%;margin:0;font-size:12px;color:#3a3a3c}
-.pk-hoved{flex-basis:100%;display:flex;justify-content:flex-start;margin-bottom:2px;padding-right:30px}
+.pk-datoer p{flex-basis:100%;margin:0;display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;color:#3a3a3c}
 
 .pk-datoer .pk-fold{position:absolute;top:6px;right:6px;width:26px;height:26px;padding:0;border-radius:50%;background:#f2f2f7;color:#6e6e73;font-size:17px;line-height:26px}
-.pk-datoer:not(:has(.pk-hoved)){padding-right:40px}
-.pk-datoer-aaben{position:absolute;left:50%;translate:-50% 0;bottom:calc(20px + env(safe-area-inset-bottom,0px));z-index:6;height:36px;padding:0 14px;border:0;border-radius:999px;background:rgba(255,255,255,.96);color:#1d2a30;font:inherit;font-size:14px;font-weight:700;box-shadow:0 6px 18px rgba(0,0,0,.22);cursor:pointer}
-.hv:has(.hv-filtre) .pk-datoer-aaben{bottom:calc(var(--filtre-h,56px) + 26px + env(safe-area-inset-bottom,0px))}
-.pk-datoer .pk-ryd{height:30px;padding:0 12px;background:#f2f2f7;color:#1d2a30;font-size:13px}
+.pk-datoer{padding-right:40px}
+.pk-datoer-aaben{height:36px;padding:0 14px;border:0;border-radius:999px;background:rgba(255,255,255,.96);color:#1d2a30;font:inherit;font-size:14px;font-weight:700;box-shadow:0 6px 18px rgba(0,0,0,.22);cursor:pointer}
+.pk-datoer .pk-ryd{flex:none;height:28px;padding:0 12px;background:#f2f2f7;color:#1d2a30;font-size:12.5px}
 .pk-kort .pk-gaa{background:#1d2a30}
 .pk-legend b{font-weight:900;margin-left:2px}
-/* Above the filter (its own height), never on top of it. */
-.hv:has(.hv-filtre) .pk-datoer{bottom:calc(var(--filtre-h,56px) + 26px + env(safe-area-inset-bottom,0px))}
-.pk-kort{position:absolute;left:50%;bottom:calc(112px + env(safe-area-inset-bottom,0px));translate:-50% 0;z-index:7;display:flex;align-items:center;gap:10px;padding:8px 8px 8px 14px;border-radius:999px;background:#fff;color:#1d2a30;font-size:14px;box-shadow:0 8px 26px rgba(0,0,0,.25);white-space:nowrap;max-width:calc(100% - 24px)}
+.pk-kort{display:flex;align-items:center;gap:10px;padding:8px 8px 8px 14px;border-radius:999px;background:#fff;color:#1d2a30;font-size:14px;box-shadow:0 8px 26px rgba(0,0,0,.25);white-space:nowrap;max-width:100%}
 .pk-kort b{color:#248a3d}
 .pk-kort span{overflow:hidden;text-overflow:ellipsis}
 .pk-kort a{padding:7px 14px;border-radius:999px;background:var(--c-accent);color:#fff;font-weight:700;text-decoration:none}
 .pk-kort button{width:28px;height:28px;border:0;border-radius:50%;background:#f2f2f7;color:#6e6e73;font-size:18px;line-height:1;cursor:pointer}
-.hv-punkt .pk-skift,.hv-punkt .pk-datoer,.hv-punkt .pk-kort,.hv-welcome .pk-skift,.hv-welcome .pk-datoer,.hv-welcome .pk-kort{opacity:0;pointer-events:none}
+.hv-punkt .pk-skift,.hv-punkt .pk-bund,.hv-welcome .pk-skift,.hv-welcome .pk-bund{opacity:0;pointer-events:none}
+.hv-punkt .pk-bund>*,.hv-welcome .pk-bund>*{pointer-events:none}
 @media (max-width:760px){
   .pk-til .km-soeg{display:none}
   /* The switch in one place on a phone - just above the filter - and the dates' box above the switch. */
   .pk-skift,.pk-til .pk-skift{top:auto;right:auto;bottom:calc(var(--filtre-h,56px) + 20px + env(safe-area-inset-bottom,0px));left:10px;height:34px;font-size:13px}
-  .hv:has(.hv-filtre) .pk-datoer,.pk-datoer{bottom:calc(var(--filtre-h,56px) + 62px + env(safe-area-inset-bottom,0px))}
-  .hv:has(.hv-filtre) .pk-datoer-aaben,.pk-datoer-aaben{left:auto;right:10px;translate:none;height:34px;font-size:13px;bottom:calc(var(--filtre-h,56px) + 20px + env(safe-area-inset-bottom,0px))}
-  .pk-datoer{left:10px;right:10px;translate:none;max-width:none;bottom:calc(64px + env(safe-area-inset-bottom,0px));padding:8px;gap:6px}
+  /* The stack: the dates' box over the switch; folded, its button beside the switch (right) - the card above either. */
+  .pk-bund,.hv:has(.hv-filtre) .pk-bund{left:10px;right:10px;translate:none;max-width:none;align-items:stretch;bottom:calc(var(--filtre-h,56px) + 62px + env(safe-area-inset-bottom,0px))}
+  .pk-bund:has(.pk-datoer-aaben),.hv:has(.hv-filtre) .pk-bund:has(.pk-datoer-aaben),.pk-bund:not(:has(.pk-datoer,.pk-datoer-aaben)){bottom:calc(var(--filtre-h,56px) + 20px + env(safe-area-inset-bottom,0px))}
+  .pk-datoer-aaben{align-self:flex-end;height:34px;font-size:13px}
+  .pk-kort{align-self:center}
+  .pk-datoer{padding:8px 40px 8px 8px;gap:6px}
   .pk-datoer label{flex:1 1 0;min-width:0}
   .pk-datoer input{width:100%;min-width:0;padding:0 4px;font-size:13px}
-  .pk-kort{bottom:calc(var(--filtre-h,56px) + 176px + env(safe-area-inset-bottom,0px));font-size:13px}
+  .pk-kort{font-size:13px}
 }
 `;
