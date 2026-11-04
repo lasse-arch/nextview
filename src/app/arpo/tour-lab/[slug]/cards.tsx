@@ -232,7 +232,8 @@ export const CARDS_CSS = `
 .pc-stor h3{font-size:23px}.pc-stor p{font-size:16px}
 /* Phones: sized by the screen (an iPhone mini gets a smaller card than a Pro Max), never more than a third of the height. */
 @media (max-width:760px){
-  .pc{left:10px;bottom:calc(76px + env(safe-area-inset-bottom,0px));width:min(78vw,300px);padding:clamp(10px,3vw,13px) clamp(12px,3.6vw,16px);max-height:34dvh;overflow-y:auto;border-radius:12px}
+  .pc{left:10px;bottom:calc(76px + env(safe-area-inset-bottom,0px));width:min(78vw,300px);padding:clamp(10px,3vw,13px) clamp(12px,3.6vw,16px);max-height:calc(100dvh - 170px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));overflow-y:auto;overscroll-behavior:contain;border-radius:12px}
+  /* As high as its contents (the text is cut to a few lines, Læs mere shows the rest) - it only scrolls if it would reach the top bar. */
   .pc h3{font-size:clamp(15px,4.3vw,17px);margin-bottom:5px}
   .pc p{font-size:clamp(12.5px,3.5vw,13.5px);line-height:1.45;margin-bottom:6px}
   .pc p.pc-klip{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
@@ -248,11 +249,11 @@ export const CARDS_CSS = `
   .pc-folk span{font-size:10.5px}
   .pc-btn{font-size:12.5px;padding:5px 11px;border-width:1.5px}
   .pc-luk{top:7px;right:7px;width:26px;height:26px;line-height:26px;font-size:16px}
-  .pc-lille{width:min(66vw,250px);max-height:26dvh}
+  .pc-lille{width:min(66vw,250px)}
   .pc-lille h3{font-size:clamp(14px,3.9vw,15.5px)}
   .pc-lille p{font-size:clamp(12px,3.3vw,13px)}
   .pc-lille p.pc-klip{-webkit-line-clamp:2}
-  .pc-stor{width:min(88vw,340px);max-height:42dvh}
+  .pc-stor{width:min(88vw,340px)}
   .pc-stor p.pc-klip{-webkit-line-clamp:4}
 }
 /* A phone on its side: low and wide - the card to the left, small, never higher than the screen. */
