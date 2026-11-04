@@ -9,7 +9,7 @@ import { escapeHtml, safeColor } from "../tours/safe";
 import { shownGuides, cssFilter, droneViewsOfHref, formatPhone, GUIDE_HREF, guideOfHref, guideSetup, isDroneHref, guideExit, imageOfHref, isInTourHref, isPlaceHref, placeHref, panoHfov, placeSlug, pointOfHref, startPlaces, welcomeTiles, withoutDeadAerialLinks } from "../tours/places";
 import type { LiveUnit } from "@/lib/availability/live";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { flushSync } from "react-dom";
+import { createPortal, flushSync } from "react-dom";
 import { useRouter } from "next/navigation";
 import { saveTourStoryImage, storyImagesSaved } from "@/lib/actions/tour-lab";
 import { connectSdk, showcaseUrl, uLinkTarget, type CameraPose, type MpSdk, type Rotation, type SweepInfo, type Vec3 } from "../matterport";
@@ -3635,46 +3635,87 @@ function PointVideo({ video, name }: { video: { src: string; poster?: string }; 
   const [sound, setSound] = useState(false);
   const [paused, setPaused] = useState(false);
   const [left, setLeft] = useState<number | null>(null);
+  /** Full screen: the same film, big, with sound and the player's own controls - from where it had got to. */
+  const [full, setFull] = useState<number | null>(null);
   return (
-    <div
-      className="hv-pvideo"
-      role="button"
-      aria-label={sound ? tr("Pause") : tr("Tryk for lyd")}
-      onClick={() => {
-        const v = ref.current;
-        if (!v) return;
-        if (!sound) {
-          v.muted = false;
-          v.currentTime = 0;
-          v.play().catch(() => {});
-          setSound(true);
-          setPaused(false);
-        } else if (v.paused) {
-          v.play().catch(() => {});
-          setPaused(false);
-        } else {
-          v.pause();
-          setPaused(true);
-        }
-      }}
-    >
-      <video
-        ref={ref}
-        src={video.src}
-        poster={video.poster}
-        autoPlay
-        muted
-        loop={!sound}
-        playsInline
-        preload="metadata"
-        aria-label={name}
-        onTimeUpdate={(e) => setLeft(Math.max(0, Math.round(e.currentTarget.duration - e.currentTarget.currentTime)) || null)}
-        onEnded={() => setPaused(true)}
-      />
-      <span className="hv-pvideo-knap">
-        {!sound ? `🔇 ${tr("Tryk for lyd")}` : paused ? `▶ ${tr("Afspil")}` : `❚❚${left != null ? ` ${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}` : ""}`}
-      </span>
-    </div>
+    <>
+      <div
+        className="hv-pvideo"
+        role="button"
+        aria-label={sound ? tr("Pause") : tr("Tryk for lyd")}
+        onClick={() => {
+          const v = ref.current;
+          if (!v) return;
+          if (!sound) {
+            v.muted = false;
+            v.currentTime = 0;
+            v.play().catch(() => {});
+            setSound(true);
+            setPaused(false);
+          } else if (v.paused) {
+            v.play().catch(() => {});
+            setPaused(false);
+          } else {
+            v.pause();
+            setPaused(true);
+          }
+        }}
+      >
+        <video
+          ref={ref}
+          src={video.src}
+          poster={video.poster}
+          autoPlay
+          muted
+          loop={!sound}
+          playsInline
+          preload="metadata"
+          aria-label={name}
+          onTimeUpdate={(e) => setLeft(Math.max(0, Math.round(e.currentTarget.duration - e.currentTarget.currentTime)) || null)}
+          onEnded={() => setPaused(true)}
+        />
+        <button
+          type="button"
+          className="hv-pvideo-fuld"
+          aria-label={tr("Fuld skærm")}
+          onClick={(e) => {
+            e.stopPropagation();
+            const v = ref.current;
+            // From the start when it was only playing silently in a loop, else from where they are.
+            setFull(v && sound ? v.currentTime : 0);
+            v?.pause();
+            setPaused(true);
+          }}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden>
+            <path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" />
+          </svg>
+        </button>
+        <span className="hv-pvideo-knap">
+          {!sound ? `🔇 ${tr("Tryk for lyd")}` : paused ? `▶ ${tr("Afspil")}` : `❚❚${left != null ? ` ${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}` : ""}`}
+        </span>
+      </div>
+      {full != null &&
+        createPortal(
+          <div className="hv-videofuld" role="dialog" aria-label={name} onClick={() => setFull(null)}>
+            <video
+              src={video.src}
+              poster={video.poster}
+              autoPlay
+              controls
+              playsInline
+              onClick={(e) => e.stopPropagation()}
+              onLoadedMetadata={(e) => {
+                if (full > 0) e.currentTarget.currentTime = full;
+              }}
+            />
+            <button type="button" className="hv-videofuld-luk" aria-label={tr("Luk")} onClick={() => setFull(null)}>
+              ×
+            </button>
+          </div>,
+          document.body
+        )}
+    </>
   );
 }
 
@@ -4097,7 +4138,12 @@ const CSS = `
 .hv-panel h2{margin:2px 40px 8px 0;font-size:25px;line-height:1.1;font-weight:900;color:var(--c-main)}
 .hv-panel p{margin:0 0 12px;font-size:15px;line-height:1.5;color:#3d4a50}
 .hv-pchips{display:flex;flex-wrap:wrap;gap:5px}
-.hv-pvideo{position:relative;display:block;margin:-18px -18px 14px;aspect-ratio:16/9;background:#000;border-radius:16px 16px 0 0;overflow:hidden;cursor:pointer}.hv-pvideo video{display:block;width:100%;height:100%;max-width:none;object-fit:cover}.hv-pvideo-knap{position:absolute;right:10px;bottom:10px;background:rgba(0,0,0,.55);color:#fff;font-size:12px;font-weight:700;padding:5px 10px;border-radius:999px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);pointer-events:none}
+.hv-pvideo{position:relative;display:block;margin:-18px -18px 14px;aspect-ratio:16/9;background:#000;border-radius:16px 16px 0 0;overflow:hidden;cursor:pointer}.hv-pvideo video{display:block;width:100%;height:100%;max-width:none;object-fit:cover}.hv-pvideo-fuld{position:absolute;left:10px;bottom:10px;width:32px;height:32px;display:grid;place-items:center;padding:0;border:0;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;cursor:pointer;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.hv-pvideo-fuld svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.hv-videofuld{position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;background:#000;animation:hvFade .2s ease}
+.hv-videofuld video{width:100%;height:100%;max-height:100dvh;object-fit:contain;background:#000}
+.hv-videofuld-luk{position:absolute;top:calc(14px + env(safe-area-inset-top,0px));right:14px;width:40px;height:40px;border:0;border-radius:50%;background:rgba(255,255,255,.92);color:#1d2a30;font-size:24px;line-height:1;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.4)}
+.hv-pvideo-knap{position:absolute;right:10px;bottom:10px;background:rgba(0,0,0,.55);color:#fff;font-size:12px;font-weight:700;padding:5px 10px;border-radius:999px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);pointer-events:none}
 .hv-pkick{margin-top:6px;font-size:11.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#5e7d3a;color:color-mix(in srgb,var(--c-main) 70%,#5e7d3a)}
 .hv-fakta{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px;margin:0 0 12px;padding-top:12px;border-top:1px solid rgba(0,0,0,.08)}
 .hv-fakta dt{font-size:12.5px;color:#6b7a80}
