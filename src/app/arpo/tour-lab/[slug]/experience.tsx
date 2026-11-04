@@ -3637,6 +3637,8 @@ function PointVideo({ video, name }: { video: { src: string; poster?: string }; 
   const [left, setLeft] = useState<number | null>(null);
   /** Full screen: the same film, big, with sound and the player's own controls - from where it had got to. */
   const [full, setFull] = useState<number | null>(null);
+  /** Sound switched off again (after "Tryk for lyd") - the film plays on, silently. */
+  const [muted, setMuted] = useState(false);
   return (
     <>
       <div
@@ -3691,6 +3693,25 @@ function PointVideo({ video, name }: { video: { src: string; poster?: string }; 
             <path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" />
           </svg>
         </button>
+        {sound && (
+          <button
+            type="button"
+            className="hv-pvideo-fuld hv-pvideo-lyd"
+            aria-label={muted ? tr("Tænd for lyden") : tr("Sluk for lyden")}
+            onClick={(e) => {
+              e.stopPropagation();
+              const v = ref.current;
+              if (!v) return;
+              v.muted = !muted;
+              setMuted(!muted);
+            }}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden>
+              <path d="M4 9v6h4l5 4V5L8 9z" />
+              {muted ? <path d="M16 9l5 6M21 9l-5 6" /> : <path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" />}
+            </svg>
+          </button>
+        )}
         <span className="hv-pvideo-knap">
           {!sound ? `🔇 ${tr("Tryk for lyd")}` : paused ? `▶ ${tr("Afspil")}` : `❚❚${left != null ? ` ${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}` : ""}`}
         </span>
@@ -4139,6 +4160,7 @@ const CSS = `
 .hv-panel p{margin:0 0 12px;font-size:15px;line-height:1.5;color:#3d4a50}
 .hv-pchips{display:flex;flex-wrap:wrap;gap:5px}
 .hv-pvideo{position:relative;display:block;margin:-18px -18px 14px;aspect-ratio:16/9;background:#000;border-radius:16px 16px 0 0;overflow:hidden;cursor:pointer}.hv-pvideo video{display:block;width:100%;height:100%;max-width:none;object-fit:cover}.hv-pvideo-fuld{position:absolute;left:10px;bottom:10px;width:32px;height:32px;display:grid;place-items:center;padding:0;border:0;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;cursor:pointer;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.hv-pvideo-lyd{left:48px}
 .hv-pvideo-fuld svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
 .hv-videofuld{position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;background:#000;animation:hvFade .2s ease}
 .hv-videofuld video{width:100%;height:100%;max-height:100dvh;object-fit:contain;background:#000}
