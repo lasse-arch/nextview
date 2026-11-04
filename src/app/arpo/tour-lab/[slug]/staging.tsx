@@ -8,6 +8,7 @@ import { videoEmbed } from "./info";
 import { safeHref } from "../tours/safe";
 import { YearWheelView } from "./yearwheel";
 import { useT } from "../tours/i18n-react";
+import { stagingVideo } from "./staging-3d";
 
 /*
  * Virtual staging: videos, pictures, web pages, signs and the year wheel put
@@ -213,6 +214,80 @@ export function StagingLayer({
   );
 }
 
+/**
+ * "Tryk for lyd" under a film on a 3D surface (staging-3d.ts): the film plays
+ * silently on the wall - this button, following it as the visitor turns,
+ * turns its sound on and off. Shown from the surface's own scan points, while
+ * the film is in view. Films with a button of their own (a link) get none.
+ */
+export function StagingSound({ sdk, items, currentSs, frame }: { sdk: MpSdk | null; items: StagingItem[]; currentSs: number | null; frame: React.RefObject<HTMLIFrameElement | null> }) {
+  const tr = useT();
+  const films = items.filter((i) => i.kind === "video" && i.src && !i.action?.href && currentSs != null && i.ss.includes(currentSs) && i.corners?.length === 4);
+  const els = useRef<(HTMLButtonElement | null)[]>([]);
+  const [, setTick] = useState(0);
+  const key = films.map((f) => f.id).join(",");
+  useEffect(() => {
+    if (!sdk?.Conversion || !films.length) return;
+    const conv = sdk.Conversion;
+    const sub = sdk.Camera.pose.subscribe((pose) => {
+      const el = frame.current;
+      if (!el) return;
+      const size = { w: el.clientWidth, h: el.clientHeight };
+      films.forEach((f, n) => {
+        const b = els.current[n];
+        if (!b) return;
+        // Just under the bottom edge's middle.
+        const c = f.corners;
+        const at = { x: (c[2].x + c[3].x) / 2, y: (c[2].y + c[3].y) / 2, z: (c[2].z + c[3].z) / 2 };
+        const seen = pose.mode.includes("inside") && inFront(pose, at);
+        const q = seen ? conv.worldToScreen(at, pose, size) : null;
+        const ok = q && q.x > 0 && q.x < size.w && q.y > 0 && q.y < size.h - 30;
+        b.style.transform = ok ? `translate(${q!.x}px, ${q!.y + 8}px) translateX(-50%)` : "";
+        b.dataset.ude = ok ? "" : "1";
+      });
+    });
+    // The film's own sound turned on or off (a tap on the wall does that too): the button says so.
+    const vs = films.map((f) => stagingVideo(f.id)).filter((v): v is HTMLVideoElement => Boolean(v));
+    const changed = () => setTick((t) => t + 1);
+    vs.forEach((v) => v.addEventListener("volumechange", changed));
+    return () => {
+      sub.cancel();
+      vs.forEach((v) => v.removeEventListener("volumechange", changed));
+    };
+    // `films` is named by `key`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sdk, key, frame]);
+  if (!films.length) return null;
+  return (
+    <div className="vs-lag">
+      {films.map((f, n) => {
+        const v = stagingVideo(f.id);
+        const on = Boolean(v && !v.muted);
+        return (
+          <button
+            key={f.id}
+            ref={(el) => {
+              els.current[n] = el;
+            }}
+            type="button"
+            data-ude="1"
+            className="vs-lydknap"
+            onClick={() => {
+              const film = stagingVideo(f.id);
+              if (!film) return;
+              film.muted = !film.muted;
+              void film.play().catch(() => {});
+              setTick((t) => t + 1);
+            }}
+          >
+            {on ? `🔊 ${tr("Slå lyd fra")}` : `🔇 ${tr("Tryk for lyd")}`}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function StagedContent({ item, T, lang, seen, onLink }: { item: StagingItem; T: TourConfig; lang?: string; seen: boolean; onLink: (label: string, href: string) => void }) {
   const tr = useT();
   const video = useRef<HTMLVideoElement>(null);
@@ -298,6 +373,8 @@ export const STAGING_CSS = `
 .vs-video,.vs-iframe,.vs-yearwheel,.vs-klik{pointer-events:auto;cursor:pointer}
 .vs-image:not(.vs-klik),.vs-sign:not(.vs-klik){pointer-events:none}
 .vs-tom{width:100%;height:100%;background:#111}
+.vs-lydknap{position:absolute;left:0;top:0;pointer-events:auto;display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border:0;border-radius:999px;background:rgba(0,0,0,.62);color:#fff;font:inherit;font-size:13px;font-weight:700;white-space:nowrap;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.3);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+.vs-lydknap[data-ude="1"]{visibility:hidden}
 .vs-lyd{position:absolute;left:24px;bottom:24px;padding:14px 26px;border-radius:999px;background:rgba(0,0,0,.6);color:#fff;font-size:34px;font-weight:700;pointer-events:none}
 .vs-knap{position:absolute;right:28px;bottom:28px;padding:18px 34px;border-radius:999px;background:var(--c-accent);color:#fff;font-size:40px;font-weight:800;box-shadow:0 8px 30px rgba(0,0,0,.35);pointer-events:none}
 .vs-skilt{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6%;box-sizing:border-box;background:#fff;color:var(--c-main);text-align:center}

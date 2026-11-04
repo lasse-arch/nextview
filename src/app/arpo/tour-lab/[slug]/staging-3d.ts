@@ -28,6 +28,10 @@ type SceneNode = { addComponent(name: string, inputs?: Record<string, unknown>):
 
 export const IN_3D = new Set<StagingItem["kind"]>(["image", "video", "sign"]);
 
+/** The films playing on the 3D surfaces, by item - so a "Tryk for lyd" button laid over the tour can turn their sound on. */
+const playing = new Map<string, HTMLVideoElement>();
+export const stagingVideo = (id: string) => playing.get(id) ?? null;
+
 /** Where a surface sits: from its one-click place, or worked out from its four corners. */
 export function surfaceOf(item: StagingItem): { center: Point3; normal: Point3; w: number; h: number } | null {
   if (item.place) return item.place;
@@ -144,6 +148,7 @@ function factory() {
         }, { once: true });
         void v.play().catch(() => {});
         this.video = v;
+        playing.set(item.id, v);
         done(new THREE.VideoTexture(v));
       } else if (item.kind === "sign") {
         done(new THREE.CanvasTexture(signCanvas(item.text ?? "", s.w, s.h)));
@@ -152,6 +157,7 @@ function factory() {
     };
     /** The picture or film on the plane (the plane itself stays). */
     this.dropContent = function () {
+      for (const [id, v] of playing) if (v === this.video) playing.delete(id);
       this.video?.pause();
       this.video?.removeAttribute("src");
       this.video = undefined;

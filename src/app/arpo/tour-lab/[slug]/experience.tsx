@@ -39,7 +39,7 @@ import { ICONS } from "../tours/icons";
 import { SIMPLE_CSS, SimpleMenu, SimpleWelcome } from "./simple";
 import { BENTO_CSS, BentoMenu } from "./bento";
 import { INFO_CSS, InfoDots, usePlaceInfo } from "./info";
-import { STAGING_CSS, StagingLayer } from "./staging";
+import { STAGING_CSS, StagingLayer, StagingSound } from "./staging";
 import { IN_3D, useStaging3d } from "./staging-3d";
 import { LINE_DAY_CSS, LineDayCard, LineDayEnd, LineDayPicker, lineDayStops, type LineDayRun } from "./line-day";
 import { YEARWHEEL_CSS, YearWheelPanel } from "./yearwheel";
@@ -3401,6 +3401,7 @@ function TourExperience({
           onLink={(label, href) => (ctaClick(label, href, "staging"), openLink(T, href, label, popup))}
         />
       )}
+      {phase === "tour" && staging3d && T.staging?.some((i) => i.kind === "video") && <StagingSound sdk={sdk} items={T.staging} currentSs={currentSs} frame={iframe} />}
       {wheelOpen && T.yearWheel && (
         <YearWheelPanel
           wheel={T.yearWheel}
