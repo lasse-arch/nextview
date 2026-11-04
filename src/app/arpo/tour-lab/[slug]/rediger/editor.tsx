@@ -608,7 +608,8 @@ export function TourEditor({
               Se touren
             </button>
           </div>
-          {tab === "claude" ? (
+          {/* Always there, only hidden on the other tabs: what's being written (and an answer on its way) isn't lost when you look elsewhere. */}
+          <div className={tab === "claude" ? "contents" : "hidden"}>
             <ClaudePanel
               ask={aiAsk}
               config={config}
@@ -621,7 +622,8 @@ export function TourEditor({
                 setMsg(null);
               }}
             />
-          ) : (
+          </div>
+          {tab === "claude" ? null : (
           <div className="flex-1 space-y-5 overflow-y-auto px-2 pb-28 pt-3">
             {tab === "generelt" && (
               <>
