@@ -1,6 +1,7 @@
 "use client";
 
 import { CardPhotos } from "./cards";
+import { PointVideo } from "./point-video";
 
 import { useT } from "../tours/i18n-react";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
@@ -104,7 +105,8 @@ export function GuidePlayer({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [index, muted]);
-  const timed = !manual && !voice;
+  // A stop with a film waits for Næste - it mustn't be cut off by the timer.
+  const timed = !manual && !voice && !stop.video;
   // How long they stay at each stop (for Resultater) - when they go on, close it or leave the page.
   useEffect(() => {
     const at = Date.now();
@@ -144,6 +146,11 @@ export function GuidePlayer({
         ))}
       </div>
       <div className={`gd-card gd-${phone && sizeMobile ? sizeMobile : size}`} key={index}>
+        {stop.video?.src && (
+          <div className="gd-video">
+            <PointVideo key={stop.video.src} video={stop.video} name={stop.title} />
+          </div>
+        )}
         <div className="gd-count">
           {index + 1} / {stops.length}
         </div>
@@ -274,6 +281,8 @@ export const GUIDE_CSS = `
 .gd-card{position:absolute;left:24px;bottom:24px;width:min(400px,calc(100% - 48px));padding:18px 20px 14px;border-radius:18px;background:rgba(255,255,255,.96);color:#1d2a30;box-shadow:0 16px 44px rgba(0,0,0,.32);animation:hvUp .45s cubic-bezier(.2,.7,.2,1) both}
 .gd-count{font-size:11px;font-weight:800;letter-spacing:.14em;color:var(--c-accent)}
 .gd-card h3{margin:4px 0 6px;font-family:var(--font-heading);font-size:24px;line-height:1.1;font-weight:800;color:var(--c-main)}
+.gd-video{margin:-4px -4px 12px}
+.gd-video .hv-pvideo{margin:0;border-radius:12px}
 .gd-card p{margin:0 0 14px;font-size:15px;line-height:1.5;color:#3d4a50}
 .gd-folk{display:flex;gap:12px;margin:-4px 0 14px}
 .gd-folk figure{margin:0;display:flex;align-items:center;gap:10px;min-width:0}

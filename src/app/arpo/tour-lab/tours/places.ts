@@ -127,7 +127,7 @@ export function allGuides(T: TourConfig): { id: string | null; title: string; li
 /** The guided tours the visitor can find in the tour - all but those only a link starts (`linkOnly`). */
 export const shownGuides = (T: TourConfig) => allGuides(T).filter((g) => !g.linkOnly);
 
-export type GuideStop = { href: string; title: string; text: string; audio?: string; audioText?: string; short?: string; turn?: GuideTurn; turnSpeed?: GuideTurnSpeed; turnMode?: GuideTurnMode; button?: { label: string; href: string }; people?: CardPerson[]; images?: string[] };
+export type GuideStop = { href: string; title: string; text: string; audio?: string; audioText?: string; short?: string; turn?: GuideTurn; turnSpeed?: GuideTurnSpeed; turnMode?: GuideTurnMode; button?: { label: string; href: string }; people?: CardPerson[]; images?: string[]; video?: { src: string; poster?: string } };
 
 const sameWords = (a: string, b: string) => a.replace(/\s+/g, " ").trim() === b.replace(/\s+/g, " ").trim();
 /**
@@ -185,7 +185,7 @@ export function guideStops(T: TourConfig, guideId: string | null = null): GuideS
     if (!("point" in s)) return [s.people ? s : { ...s, people: cardPeopleAt(T, s.href) }];
     const p = T.points.find((x) => x.id === s.point);
     // A point without a room is shown on the drone scene / map itself.
-    return p ? [{ href: p.tour ?? `#punkt:${p.id}`, title: p.name, text: p.text, turn: s.turn, turnSpeed: s.turnSpeed, turnMode: s.turnMode }] : [];
+    return p ? [{ href: p.tour ?? `#punkt:${p.id}`, title: p.name, text: p.text, turn: s.turn, turnSpeed: s.turnSpeed, turnMode: s.turnMode, ...(p.video?.src ? { video: p.video } : {}) }] : [];
   });
 }
 
