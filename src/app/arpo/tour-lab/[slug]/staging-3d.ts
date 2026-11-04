@@ -78,6 +78,7 @@ function factory() {
     onEvent(type: string): void;
     onDestroy(): void;
     build(): void;
+    dropContent(): void;
     dispose(): void;
   }) {
     this.inputs = { item: null, onClick: null };
@@ -87,29 +88,46 @@ function factory() {
       const item = this.inputs.item;
       const s = item && surfaceOf(item);
       if (!item || !s) return;
+      // One plane for the item's whole life: Matterport keeps drawing the object it was handed first (objectRoot), so a
+      // new picture (e.g. uploaded after the surface was placed) goes onto the same plane - a new plane wouldn't show.
+      if (!this.mesh) {
+        const geo = new THREE.PlaneGeometry(1, 1);
+        // Transparent: a PNG sign (white letters, nothing around them) shows just its letters on the wall - not a black box.
+        const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.FrontSide, transparent: true, alphaTest: 0.02, toneMapped: false });
+        this.mesh = new THREE.Mesh(geo, mat);
+        this.outputs.objectRoot = this.mesh;
+        this.outputs.collider = this.mesh;
+      }
+      const mesh = this.mesh;
+      const mat = mesh.material as Obj3;
       const key = JSON.stringify([item.kind, item.src, item.text, item.fit]);
       // Only the place or size changed: move the plane, keep its picture (no flicker).
-      if (this.mesh && this.built === key) {
-        place(THREE, this.mesh, s, this.texture, item);
+      if (this.built === key) {
+        place(THREE, mesh, s, this.texture, item);
         return;
       }
-      this.dispose();
       this.built = key;
-      const geo = new THREE.PlaneGeometry(1, 1);
-      const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.FrontSide, transparent: false, toneMapped: false });
-      const mesh = new THREE.Mesh(geo, mat);
-      this.mesh = mesh;
+      this.dropContent();
+      // Until the picture is there: nothing (not a white box).
+      mat.map = null;
+      mat.visible = item.kind === "sign";
+      mat.needsUpdate = true;
       const done = (tex: Obj3) => {
+        // A newer picture was asked for meanwhile: this one is not used.
+        if (this.built !== key) return void tex.dispose();
         tex.colorSpace = THREE.SRGBColorSpace;
         this.texture = tex;
         mat.map = tex;
+        mat.visible = true;
         mat.needsUpdate = true;
-        place(THREE, mesh, s, tex, item);
+        const now = this.inputs.item;
+        const at = now && surfaceOf(now);
+        if (now && at) place(THREE, mesh, at, tex, now);
       };
       if (item.kind === "image" && item.src) {
         const loader = new THREE.TextureLoader();
         loader.setCrossOrigin("anonymous");
-        loader.load(item.src, done);
+        loader.load(item.src, done, undefined, () => console.warn("Virtual staging: billedet kunne ikke hentes", item.src));
       } else if (item.kind === "video" && item.src) {
         const v = document.createElement("video");
         v.crossOrigin = "anonymous";
@@ -119,7 +137,11 @@ function factory() {
         v.playsInline = true;
         v.setAttribute("playsinline", "");
         v.preload = "auto";
-        v.addEventListener("loadedmetadata", () => place(THREE, mesh, s, this.texture, item), { once: true });
+        v.addEventListener("loadedmetadata", () => {
+          const now = this.inputs.item;
+          const at = now && surfaceOf(now);
+          if (now && at) place(THREE, mesh, at, this.texture, now);
+        }, { once: true });
         void v.play().catch(() => {});
         this.video = v;
         done(new THREE.VideoTexture(v));
@@ -127,18 +149,21 @@ function factory() {
         done(new THREE.CanvasTexture(signCanvas(item.text ?? "", s.w, s.h)));
       }
       place(THREE, mesh, s, this.texture, item);
-      this.outputs.objectRoot = mesh;
-      this.outputs.collider = mesh;
     };
-    this.dispose = function () {
+    /** The picture or film on the plane (the plane itself stays). */
+    this.dropContent = function () {
       this.video?.pause();
       this.video?.removeAttribute("src");
       this.video = undefined;
       this.texture?.dispose();
       this.texture = undefined;
+    };
+    this.dispose = function () {
+      this.dropContent();
       if (this.mesh) {
         this.mesh.geometry.dispose();
         (this.mesh.material as Obj3).dispose();
+        this.mesh = undefined;
       }
     };
     this.onInit = function () {

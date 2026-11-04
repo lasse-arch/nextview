@@ -303,4 +303,5 @@ export const STAGING_CSS = `
 .vs-skilt{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6%;box-sizing:border-box;background:#fff;color:var(--c-main);text-align:center}
 .vs-skilt p{margin:0;font-family:var(--font-heading);font-size:120px;font-weight:800;line-height:1.08;white-space:pre-line}
 .vs-sign{background:#fff}
+.vs-image{background:transparent}
 `;
