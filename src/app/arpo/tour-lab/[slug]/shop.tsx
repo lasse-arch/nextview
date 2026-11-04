@@ -87,7 +87,9 @@ export function ShopSheet({ slug, point, title, url, onBook, onClose }: { slug: 
     const first = new Date(Date.UTC(month.y, month.m, 1));
     const lead = (first.getUTCDay() + 6) % 7; // Monday first
     const days = new Date(Date.UTC(month.y, month.m + 1, 0)).getUTCDate();
-    return [...Array(lead).fill(null), ...Array.from({ length: days }, (_, i) => iso(month.y, month.m, i + 1))] as (string | null)[];
+    const all = [...Array(lead).fill(null), ...Array.from({ length: days }, (_, i) => iso(month.y, month.m, i + 1))] as (string | null)[];
+    // Always six weeks: the calendar keeps its height from month to month (no jumping up and down).
+    return [...all, ...Array(42 - all.length).fill(null)] as (string | null)[];
   }, [month]);
   const monthName = month ? new Date(Date.UTC(month.y, month.m, 1)).toLocaleDateString("da-DK", { month: "long", year: "numeric", timeZone: "UTC" }) : "";
   const shift = (d: number) => setMonth((x) => (x ? { y: x.y + Math.floor((x.m + d) / 12), m: (((x.m + d) % 12) + 12) % 12 } : x));
@@ -233,6 +235,7 @@ export const SHOP_CSS = `
 .sh-month button:disabled{opacity:.3;cursor:default}
 .sh-days{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;text-align:center}
 .sh-days i{font-style:normal;font-size:11px;font-weight:700;color:#8a979c;padding:2px 0}
+.sh-days span{height:36px}
 .sh-days button{height:36px;border:0;border-radius:9px;background:none;font:inherit;font-size:14px;font-weight:600;color:#1d2a30;cursor:pointer}
 .sh-days button:disabled{color:#c3cbce;text-decoration:line-through;cursor:default}
 .sh-days button:not(:disabled):hover{background:rgba(0,0,0,.05)}
