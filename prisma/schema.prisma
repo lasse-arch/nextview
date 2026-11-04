@@ -1363,6 +1363,9 @@ model Tour {
   /// knows the place, while the director signed the contract. Reminders and "rettelser lavet" go there too.
   reviewEmail      String?
   reviewName       String?
+  /// A second person who gets the review mails and the customer page too (e.g. the director and the head of house).
+  reviewEmail2     String?
+  reviewName2      String?
   /// The last "Tjek touren" before review: { at, items, ai, done } - shown again when the editor is opened, its suggestions can be run again.
   reviewCheck      Json?
   dealId           String?

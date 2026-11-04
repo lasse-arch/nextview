@@ -2,7 +2,7 @@
 
 import { reviewUrl } from "@/lib/public-urls";
 import { useEffect, useState, useTransition } from "react";
-import { setReviewRecipient, checkTourForReview, lastTourCheck, setTourCheckDone, type SavedCheck, deleteFeedback, reviewStatus, sendFixesDone, sendForReview, setFeedbackStatus, setTourApproved, setTourReview, tourFeedback, type Feedback, type ReviewStatus } from "@/lib/actions/tour-feedback";
+import { setReviewRecipient, setReviewRecipient2, checkTourForReview, lastTourCheck, setTourCheckDone, type SavedCheck, deleteFeedback, reviewStatus, sendFixesDone, sendForReview, setFeedbackStatus, setTourApproved, setTourReview, tourFeedback, type Feedback, type ReviewStatus } from "@/lib/actions/tour-feedback";
 import { askClaudeForTour, type AiEditResult } from "@/lib/actions/tour-ai";
 import { addManualTimeEntry, filmingTimeForm } from "@/lib/actions/time-entries";
 import type { TourConfig } from "../../tours/types";
@@ -117,6 +117,7 @@ export function FeedbackPanel({
   }
   /** Someone else than the deal's contact (the director signed, the head of house shows the place): e-mail and name. */
   const [who, setWho] = useState<{ email: string; name: string } | null>(null);
+  const [who2, setWho2] = useState<{ email: string; name: string } | null>(null);
   function send(reminder: boolean) {
     setCheck(null);
     setNote(null);
@@ -230,6 +231,68 @@ export function FeedbackPanel({
                   </button>
                 </div>
                 <p className="text-[11px] leading-snug text-[#8e8e93]">Fx den der kender stedet, når direktøren har skrevet under. Mailen om gennemgang, påmindelser og &quot;rettelser lavet&quot; går hertil, og kundesiden åbnes for denne e-mail, når der sendes. Tom e-mail = kontakten på dealen.</p>
+              </div>
+            )}
+            {status.to2 && !who2 && (
+              <div className="mt-2 flex items-start justify-between gap-2 border-t border-black/[.06] pt-2">
+                <div className="min-w-0 text-[13px] leading-snug">
+                  <span className="block text-[12px] font-medium text-[#6e6e73]">Og til</span>
+                  <span className="block truncate text-[#1d1d1f]">{`${status.to2Name ? `${status.to2Name} · ` : ""}${status.to2}`}</span>
+                </div>
+                <div className="flex shrink-0 gap-3">
+                  <button type="button" className="text-[13px] font-medium text-[#0071e3]" onClick={() => setWho2({ email: status.to2 ?? "", name: status.to2Name ?? "" })}>
+                    Skift
+                  </button>
+                  <button
+                    type="button"
+                    disabled={pending}
+                    className="text-[13px] font-medium text-[#c4314b] disabled:opacity-50"
+                    onClick={() =>
+                      start(async () => {
+                        const r = await setReviewRecipient2(slug, "", "");
+                        if (!r.ok) return setNote({ text: r.error, error: true });
+                        setNote({ text: "Fjernet - mailene går kun til den første." });
+                        await reloadStatus();
+                      })
+                    }
+                  >
+                    Fjern
+                  </button>
+                </div>
+              </div>
+            )}
+            {!status.to2 && !who2 && status.to && (
+              <button type="button" className="mt-1.5 text-[13px] font-medium text-[#0071e3]" onClick={() => setWho2({ email: "", name: "" })}>
+                + Send også til en mere
+              </button>
+            )}
+            {who2 && (
+              <div className="mt-2 space-y-1.5 border-t border-black/[.06] pt-2">
+                <span className="block text-[12px] font-medium text-[#6e6e73]">Også til</span>
+                <input className={input} type="email" placeholder="E-mail" value={who2.email} onChange={(e) => setWho2({ ...who2, email: e.target.value })} />
+                <input className={input} placeholder="Navn (Hej …)" value={who2.name} onChange={(e) => setWho2({ ...who2, name: e.target.value })} />
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={pending || !who2.email.trim()}
+                    className="rounded-lg bg-[#0071e3] px-3 py-1.5 text-[13px] font-medium text-white disabled:opacity-50"
+                    onClick={() =>
+                      start(async () => {
+                        const r = await setReviewRecipient2(slug, who2.email, who2.name);
+                        if (!r.ok) return setNote({ text: r.error, error: true });
+                        setWho2(null);
+                        setNote({ text: "Gemt - mailene går til begge." });
+                        await reloadStatus();
+                      })
+                    }
+                  >
+                    Gem
+                  </button>
+                  <button type="button" className="text-[13px] font-medium text-[#0071e3]" onClick={() => setWho2(null)}>
+                    Fortryd
+                  </button>
+                </div>
+                <p className="text-[11px] leading-snug text-[#8e8e93]">Fx forstanderen og direktøren. Begge får mailen om gennemgang, påmindelser og &quot;rettelser lavet&quot; hver for sig, og begge kan se, skrive rettelser og godkende.</p>
               </div>
             )}
           </div>

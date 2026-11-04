@@ -188,7 +188,7 @@ ${fixes.length ? `<p style="margin-bottom:4px"><b>${esc(t.fixedTitle)}</b></p><u
 export async function sendFixesDoneMail(slug: string, actor: { id: string; name: string }, manual = false): Promise<string | null> {
   const tour = await prisma.tour.findUnique({
     where: { slug },
-    select: { reviewToken: true, reviewSentAt: true, reviewApprovedAt: true, reviewEmail: true, reviewName: true, deal: { select: { id: true, companyName: true, displayName: true, contactName: true, contactEmail: true, contractProducts: true } } },
+    select: { reviewToken: true, reviewSentAt: true, reviewApprovedAt: true, reviewEmail: true, reviewName: true, reviewEmail2: true, reviewName2: true, deal: { select: { id: true, companyName: true, displayName: true, contactName: true, contactEmail: true, contractProducts: true } } },
   });
   const deal = tour?.deal;
   const who = tour && deal ? reviewRecipient(tour, deal) : null;
@@ -211,13 +211,17 @@ export async function sendFixesDoneMail(slug: string, actor: { id: string; name:
   const canSend = Boolean(sender) || resendReady();
   const dev = !canSend && process.env.NODE_ENV !== "production";
   if (!canSend && !dev) throw new Error(`Ingen mail-afsender: sæt RESEND_API_KEY i Vercel, eller forbind Gmail for ${WELCOME_MAIL_SENDER} under Indstillinger → E-mail.`);
-  const mail = buildFixesDoneMail({
-    contactName: who.name,
-    customerName: dealName(deal),
-    reviewLink: `${getAppBaseUrl()}/p/${tour.reviewToken}`,
-    fixes: fixes.map((f) => f.text),
-    language: parseContractProducts(deal.contractProducts)?.language === "en" ? "en" : "da",
-  });
+  // The second person gets it too (their own greeting).
+  const second = tour.reviewEmail2 && normalizeEmail(tour.reviewEmail2) !== normalizeEmail(to) && EMAIL.test(tour.reviewEmail2) ? { email: normalizeEmail(tour.reviewEmail2), name: tour.reviewName2 } : null;
+  const mailFor = (name: string | null | undefined) =>
+    buildFixesDoneMail({
+      contactName: name ?? null,
+      customerName: dealName(deal),
+      reviewLink: `${getAppBaseUrl()}/p/${tour.reviewToken}`,
+      fixes: fixes.map((f) => f.text),
+      language: parseContractProducts(deal.contractProducts)?.language === "en" ? "en" : "da",
+    });
+  const mail = mailFor(who.name);
   // Marked as told first: two quick presses mustn't send it twice (a failed send puts them back).
   const ids = fixes.map((f) => f.id);
   const claimed = await prisma.tourFeedback.updateMany({ where: { id: { in: ids }, ...(manual ? {} : { reportedAt: null }) }, data: { reportedAt: new Date() } });
@@ -235,8 +239,18 @@ export async function sendFixesDoneMail(slug: string, actor: { id: string; name:
     console.log(`[rettelser lavet] Mail til ${to}: ${mail.subject}\n${mail.bodyText}`);
   }
   await prisma.systemMail.create({ data: { dealId: deal.id, kind: "review_fixed", to, subject: mail.subject } }).catch(() => {});
+  if (second) {
+    const m2 = mailFor(second.name);
+    try {
+      if (canSend) await sendSystemMail(sender, { to: [second.email], subject: m2.subject, bodyText: m2.bodyText, bodyHtml: m2.bodyHtml, fromName: "Nextview360", fromAddress: LOGIN_MAIL_FROM, replyTo: LOGIN_MAIL_FROM });
+      else console.log(`[rettelser lavet] Mail til ${second.email}: ${m2.subject}`);
+      await prisma.systemMail.create({ data: { dealId: deal.id, kind: "review_fixed", to: second.email, subject: m2.subject } }).catch(() => {});
+    } catch (err) {
+      await prisma.systemMail.create({ data: { dealId: deal.id, kind: "review_fixed", to: second.email, subject: m2.subject, error: (err instanceof Error ? err.message : String(err)).slice(0, 300) } }).catch(() => {});
+    }
+  }
   await logActivity({ type: "DEAL_UPDATED", message: `Rettelser lavet - mail sendt til ${to}: ${dealName(deal)}`, actorId: actor.id, dealId: deal.id });
-  return to;
+  return second ? `${to} og ${second.email}` : to;
 }
 
 /**
@@ -255,7 +269,7 @@ export async function sendReviewMail(
 ): Promise<{ to: string; token: string }> {
   const tour = await prisma.tour.findUnique({
     where: { slug },
-    select: { slug: true, reviewToken: true, reviewApprovedAt: true, reviewEmail: true, reviewName: true, deal: { select: { id: true, companyName: true, displayName: true, contactName: true, contactEmail: true, contractProducts: true, filmingActualMinutes: true, branches: { select: { id: true } } } } },
+    select: { slug: true, reviewToken: true, reviewApprovedAt: true, reviewEmail: true, reviewName: true, reviewEmail2: true, reviewName2: true, deal: { select: { id: true, companyName: true, displayName: true, contactName: true, contactEmail: true, contractProducts: true, filmingActualMinutes: true, branches: { select: { id: true } } } } },
   });
   const deal = tour?.deal;
   if (!tour || !deal) throw new Error("Touren er ikke koblet til en kunde i Arpo.");
@@ -277,42 +291,56 @@ export async function sendReviewMail(
   if (!canSend && !dev) throw new Error(`Ingen mail-afsender: sæt RESEND_API_KEY i Vercel, eller forbind Gmail for ${WELCOME_MAIL_SENDER} under Indstillinger → E-mail.`);
   const token = tour.reviewToken ?? randomBytes(12).toString("base64url");
 
-  // Their customer page: the contact e-mail gets access to this deal (and its locations) - only the deal's own contact.
-  const existing = await prisma.customerAccount.findUnique({ where: { email: to }, select: { id: true, deals: { where: { dealId: deal.id }, select: { dealId: true } } } });
-  const account =
-    existing ??
-    (await prisma.customerAccount.create({ data: { email: to, name: who.name?.trim() || null, invitedByName: actor.name }, select: { id: true, deals: { select: { dealId: true } } } }));
-  const newAccess = !account.deals.length;
-  // The deal's own contact is the owner (contract, users); anyone else we send it to may look, write notes and approve - never more.
-  const isContact = normalizeEmail(to) === normalizeEmail(deal.contactEmail ?? "");
-  const access = isContact ? { role: "OWNER" as const, canApprove: true } : { role: "STAFF" as const, canApprove: true };
-  for (const id of [deal.id, ...deal.branches.map((b) => b.id)]) {
-    await prisma.customerAccountDeal.upsert({ where: { accountId_dealId: { accountId: account.id, dealId: id } }, create: { accountId: account.id, dealId: id, ...access }, update: {} });
-  }
-  const portal = { link: await welcomeLoginLink(account.id), days: WELCOME_DAYS };
-
-  const mail = buildReviewMail({
-    contactName: who.name,
-    customerName: dealName(deal),
-    reviewLink: `${getAppBaseUrl()}/p/${token}`,
-    portal,
-    reminder,
-    language: parseContractProducts(deal.contractProducts)?.language === "en" ? "en" : "da",
-  });
-  const kind = reminder ? "review_reminder" : "review";
-  if (canSend) {
-    try {
-      await sendSystemMail(sender, { to: [to], subject: mail.subject, bodyText: mail.bodyText, bodyHtml: mail.bodyHtml, fromName: "Nextview360", fromAddress: LOGIN_MAIL_FROM, replyTo: LOGIN_MAIL_FROM });
-    } catch (err) {
-      await prisma.systemMail.create({ data: { dealId: deal.id, accountId: account.id, kind, to, subject: mail.subject, error: (err instanceof Error ? err.message : String(err)).slice(0, 300) } }).catch(() => {});
-      throw err;
+  /** One person: their customer page opened for this deal, and the mail - the same for the second recipient. */
+  const deliver = async (to: string, name: string | null | undefined): Promise<boolean> => {
+    const who = { email: to, name };
+    // Their customer page: the contact e-mail gets access to this deal (and its locations) - only the deal's own contact.
+    const existing = await prisma.customerAccount.findUnique({ where: { email: to }, select: { id: true, deals: { where: { dealId: deal.id }, select: { dealId: true } } } });
+    const account =
+      existing ??
+      (await prisma.customerAccount.create({ data: { email: to, name: who.name?.trim() || null, invitedByName: actor.name }, select: { id: true, deals: { select: { dealId: true } } } }));
+    const newAccess = !account.deals.length;
+    // The deal's own contact is the owner (contract, users); anyone else we send it to may look, write notes and approve - never more.
+    const isContact = normalizeEmail(to) === normalizeEmail(deal.contactEmail ?? "");
+    const access = isContact ? { role: "OWNER" as const, canApprove: true } : { role: "STAFF" as const, canApprove: true };
+    for (const id of [deal.id, ...deal.branches.map((b) => b.id)]) {
+      await prisma.customerAccountDeal.upsert({ where: { accountId_dealId: { accountId: account.id, dealId: id } }, create: { accountId: account.id, dealId: id, ...access }, update: {} });
     }
-  } else {
-    // On a developer's machine there's no Gmail to send from - the links go to the server log instead.
-    console.log(`[gennemgang] Mail til ${to}: ${mail.subject}\n${mail.bodyText}`);
-  }
-  await prisma.systemMail.create({ data: { dealId: deal.id, accountId: account.id, kind, to, subject: mail.subject } }).catch(() => {});
-  if (newAccess) await prisma.note.create({ data: { dealId: deal.id, authorId: actor.id, kind: "MANUAL", body: `Kundesiden åbnet for ${to} med mailen om gennemgang af touren.` } }).catch(() => {});
+    const portal = { link: await welcomeLoginLink(account.id), days: WELCOME_DAYS };
+
+    const mail = buildReviewMail({
+      contactName: who.name ?? null,
+      customerName: dealName(deal),
+      reviewLink: `${getAppBaseUrl()}/p/${token}`,
+      portal,
+      reminder,
+      language: parseContractProducts(deal.contractProducts)?.language === "en" ? "en" : "da",
+    });
+    const kind = reminder ? "review_reminder" : "review";
+    if (canSend) {
+      try {
+        await sendSystemMail(sender, { to: [to], subject: mail.subject, bodyText: mail.bodyText, bodyHtml: mail.bodyHtml, fromName: "Nextview360", fromAddress: LOGIN_MAIL_FROM, replyTo: LOGIN_MAIL_FROM });
+      } catch (err) {
+        await prisma.systemMail.create({ data: { dealId: deal.id, accountId: account.id, kind, to, subject: mail.subject, error: (err instanceof Error ? err.message : String(err)).slice(0, 300) } }).catch(() => {});
+        throw err;
+      }
+    } else {
+      // On a developer's machine there's no Gmail to send from - the links go to the server log instead.
+      console.log(`[gennemgang] Mail til ${to}: ${mail.subject}\n${mail.bodyText}`);
+    }
+    await prisma.systemMail.create({ data: { dealId: deal.id, accountId: account.id, kind, to, subject: mail.subject } }).catch(() => {});
+    if (newAccess) await prisma.note.create({ data: { dealId: deal.id, authorId: actor.id, kind: "MANUAL", body: `Kundesiden åbnet for ${to} med mailen om gennemgang af touren.` } }).catch(() => {});
+    return newAccess;
+  };
+  const newAccess = await deliver(who.email, who.name);
+  // The second person (e.g. the director and the head of house): the same mail and page - never a failure for the first.
+  const second = tour.reviewEmail2 && normalizeEmail(tour.reviewEmail2) !== normalizeEmail(to) && EMAIL.test(tour.reviewEmail2) ? tour.reviewEmail2 : null;
+  const sent2 = second
+    ? await deliver(normalizeEmail(second), tour.reviewName2).then(
+        () => true,
+        (err) => (console.error("gennemgang til modtager 2", err), false),
+      )
+    : false;
   const now = new Date();
   await prisma.tour.update({
     where: { slug },
@@ -327,7 +355,7 @@ export async function sendReviewMail(
       await logActivity({ type: "DEAL_STAGE_REVIEW", message: `${dealName(deal)} er til gennemgang inden live`, actorId: actor.id, dealId: deal.id });
     }
   }
-  return { to, token };
+  return { to: sent2 && second ? `${to} og ${normalizeEmail(second)}` : to, token };
 }
 
 /**

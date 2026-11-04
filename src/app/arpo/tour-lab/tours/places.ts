@@ -184,8 +184,12 @@ export function guideStops(T: TourConfig, guideId: string | null = null): GuideS
   return (G?.stops ?? []).flatMap((s) => {
     if (!("point" in s)) return [s.people ? s : { ...s, people: cardPeopleAt(T, s.href) }];
     const p = T.points.find((x) => x.id === s.point);
-    // A point without a room is shown on the drone scene / map itself.
-    return p ? [{ href: p.tour ?? `#punkt:${p.id}`, title: p.name, text: p.text, turn: s.turn, turnSpeed: s.turnSpeed, turnMode: s.turnMode, ...(p.video?.src ? { video: p.video } : {}) }] : [];
+    // A point without a room is shown on the drone scene / map itself - with its card's photos and film on the guide's card
+    // (e.g. the playground's pictures), as its own card would show them.
+    const images = (p?.images ?? []).filter((x) => typeof x === "string" && x);
+    return p
+      ? [{ href: p.tour ?? `#punkt:${p.id}`, title: p.name, text: p.text, turn: s.turn, turnSpeed: s.turnSpeed, turnMode: s.turnMode, ...(p.video?.src ? { video: p.video } : {}), ...(images.length ? { images } : {}) }]
+      : [];
   });
 }
 

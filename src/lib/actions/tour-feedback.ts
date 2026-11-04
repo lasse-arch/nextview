@@ -33,8 +33,8 @@ export async function setTourReview(slug: string, on: boolean): Promise<{ token:
 async function sameRecipient(slug: string, email: string): Promise<boolean> {
   const e = String(email ?? "").trim().toLowerCase();
   if (!e) return true; // empty = back to the deal's contact
-  const t = await prisma.tour.findUnique({ where: { slug }, select: { reviewEmail: true, deal: { select: { contactEmail: true } } } });
-  return [t?.reviewEmail, t?.deal?.contactEmail].some((x) => x && x.trim().toLowerCase() === e);
+  const t = await prisma.tour.findUnique({ where: { slug }, select: { reviewEmail: true, reviewEmail2: true, deal: { select: { contactEmail: true } } } });
+  return [t?.reviewEmail, t?.reviewEmail2, t?.deal?.contactEmail].some((x) => x && x.trim().toLowerCase() === e);
 }
 
 /**
@@ -112,19 +112,24 @@ export type ReviewStatus = {
   approvedAt: string | null;
   approvedBy: string | null;
   open: number;
+  /** A second person who gets the same mails (and the customer page). */
+  to2: string | null;
+  to2Name: string | null;
 };
 
 export async function reviewStatus(slug: string): Promise<ReviewStatus> {
   await requireTour(slug);
   const t = await prisma.tour.findUnique({
     where: { slug },
-    select: { reviewSentAt: true, reviewRemindedAt: true, reviewReminders: true, reviewApprovedAt: true, reviewApprovedBy: true, reviewEmail: true, reviewName: true, deal: { select: { id: true, contactEmail: true, contactName: true, filmingActualMinutes: true } } },
+    select: { reviewSentAt: true, reviewRemindedAt: true, reviewReminders: true, reviewApprovedAt: true, reviewApprovedBy: true, reviewEmail: true, reviewName: true, reviewEmail2: true, reviewName2: true, deal: { select: { id: true, contactEmail: true, contactName: true, filmingActualMinutes: true } } },
   });
   const open = await prisma.tourFeedback.count({ where: { tourSlug: slug, status: "open" } });
   const who = t?.deal ? reviewRecipient(t, t.deal) : null;
   return {
     to: who?.email ?? null,
     toName: who?.name ?? null,
+    to2: t?.reviewEmail2 ?? null,
+    to2Name: t?.reviewName2 ?? null,
     contact: t?.deal?.contactEmail ?? null,
     dealId: t?.deal?.id ?? null,
     filmingMissing: t?.deal ? (await filmingTime(t.deal)).minutes == null : false,
@@ -204,5 +209,22 @@ export async function setReviewRecipient(slug: string, email: string, name: stri
   const tour = await prisma.tour.findUnique({ where: { slug }, select: { id: true } });
   if (!tour) return { ok: false, error: "Touren findes ikke." };
   await prisma.tour.update({ where: { slug }, data: e ? { reviewEmail: e.slice(0, 200), reviewName: name.trim().slice(0, 120) || null } : { reviewEmail: null, reviewName: null } });
+  return { ok: true };
+}
+
+/**
+ * "Send også til en mere": a second person who gets the review mails and the
+ * customer page too (e.g. the head and the director). Chosen by admins and
+ * sellers only, like the first. An empty e-mail removes them.
+ */
+export async function setReviewRecipient2(slug: string, email: string, name: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const user = await requireTour(slug);
+  if (!teamCan(user, "numbers")) return { ok: false, error: "Kun en admin eller sælger kan vælge, hvem gennemgangen sendes til." };
+  const e = String(email ?? "").trim().toLowerCase();
+  if (e && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return { ok: false, error: "Skriv en gyldig e-mail." };
+  const tour = await prisma.tour.findUnique({ where: { slug }, select: { id: true } });
+  if (!tour) return { ok: false, error: "Touren findes ikke." };
+  await prisma.tour.update({ where: { slug }, data: e ? { reviewEmail2: e.slice(0, 200), reviewName2: String(name ?? "").trim().slice(0, 120) || null } : { reviewEmail2: null, reviewName2: null } });
+  revalidatePath(`/arpo/tour-lab/${slug}/rediger`);
   return { ok: true };
 }
