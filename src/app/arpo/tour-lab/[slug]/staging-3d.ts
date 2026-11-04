@@ -237,7 +237,9 @@ export function useStaging3d(sdk: MpSdk | null, items: StagingItem[], onClick: (
     (async () => {
       if (!registered.has(scene)) {
         registered.add(scene);
-        await scene.register("nv.staging", factory()).catch(() => {});
+        // Matterport calls the factory as a plain function (no `new`) for each surface: it must hand back a new component.
+        const Plane = factory() as unknown as new () => object;
+        await scene.register("nv.staging", () => new Plane()).catch((err: unknown) => console.warn("Virtual staging: kunne ikke registreres", err));
       }
       const want = items.filter((i) => IN_3D.has(i.kind) && surfaceOf(i));
       const ids = new Set(want.map((i) => i.id));
@@ -259,7 +261,7 @@ export function useStaging3d(sdk: MpSdk | null, items: StagingItem[], onClick: (
         obj.start();
         objects.current.set(item.id, { obj, comp });
       }
-    })().catch(() => {});
+    })().catch((err: unknown) => console.warn("Virtual staging: fladerne kunne ikke laves", err));
     return () => {
       alive = false;
     };
