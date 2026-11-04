@@ -189,7 +189,7 @@ export function MapEditor({ config, edit, focus, preview, slug }: { config: Tour
         )}
         {error && <p className="text-[12px] text-[#ff3b30]">{error}</p>}
       </Group>
-      {open && <MapCanvas config={config} edit={edit} onClose={() => setOpen(false)} startWith={focus?.id ?? null} />}
+      {open && <MapCanvas config={config} edit={edit} preview={preview} onClose={() => setOpen(false)} startWith={focus?.id ?? null} />}
     </>
   );
 }
@@ -197,7 +197,7 @@ export function MapEditor({ config, edit, focus, preview, slug }: { config: Tour
 /* ------------------------------------------------------------------ */
 
 /** The big canvas: the map, the points on it, and the selected point's settings beside it. */
-function MapCanvas({ config, edit, onClose, startWith }: { config: TourConfig; edit: Edit; onClose: () => void; startWith: string | null }) {
+function MapCanvas({ config, edit, preview, onClose, startWith }: { config: TourConfig; edit: Edit; preview?: PreviewApi; onClose: () => void; startWith: string | null }) {
   const M = config.map as Map;
   const [zoom, setZoom] = useState(1);
   const [selected, setSelected] = useState<string | null>(startWith && config.points.some((p) => p.id === startWith) ? startWith : null);
@@ -491,7 +491,7 @@ function MapCanvas({ config, edit, onClose, startWith }: { config: TourConfig; e
         {/* Beside the map: the point, or the map's points and categories */}
         <aside className="w-[340px] flex-none space-y-4 overflow-y-auto border-l border-black/[.06] p-4">
           {point ? (
-            <PointPanel config={config} point={point} rooms={rooms} setPoint={setPoint} setImageZoom={(src, z) =>
+            <PointPanel preview={preview} config={config} point={point} rooms={rooms} setPoint={setPoint} setImageZoom={(src, z) =>
                     edit((d) => {
                       const all = { ...d.imageView };
                       if (z) all[src] = z;
@@ -944,8 +944,11 @@ function PointPanel({
   onDone,
   setWalk,
   edit,
+  preview,
 }: {
   edit: Edit;
+  /** The editor's preview: "Gå ind" can be the spot it stands in. */
+  preview?: PreviewApi;
   config: TourConfig;
   point: TourPoint;
   setWalk: (to: string, minutes: number | null) => void;
@@ -1060,16 +1063,17 @@ function PointPanel({
             <UploadButton accept="video/mp4,video/webm" label="Upload video" onDone={(src) => setPoint((x) => void (x.video = { src }))} />
           )}
         </Field>
-        <Field title='"Gå ind" fører til' hint="Et rum fra menuen.">
+        <Field title='"Gå ind" fører til' hint="Et rum fra menuen - eller det sted og den retning, forhåndsvisningen står i.">
           <select className={`${input} bg-white`} value={p.tour ?? ""} onChange={(e) => setPoint((x) => void (x.tour = e.target.value || null))}>
             <option value="">Ingen - kun teksten</option>
-            {p.tour && !rooms.some(([, h]) => h === p.tour) && <option value={p.tour}>(eget sted)</option>}
+            {p.tour && !rooms.some(([, h]) => h === p.tour) && <option value={p.tour}>Stedet fra forhåndsvisningen{ssOf(p.tour) ? ` (punkt ${ssOf(p.tour)})` : ""}</option>}
             {rooms.map(([name, href]) => (
               <option key={href} value={href}>
                 {name}
               </option>
             ))}
           </select>
+          {preview && <PreviewSpotButton preview={preview} onPick={(href) => setPoint((x) => void (x.tour = href))} />}
         </Field>
         <Field title="Billeder" hint="Vises øverst på kortet, man bladrer med et tryk. Fx kundens sommerbilleder af en pool, der er lukket på dronebilledet.">
           {(p.images ?? []).length > 0 && (
@@ -1509,5 +1513,41 @@ function ShopField({ value, onChange }: { value?: TourPoint["shop"]; onChange: (
         </>
       )}
     </Field>
+  );
+}
+
+/** The scan point number (ss) of a place link. */
+const ssOf = (href: string) => Number(new URLSearchParams(href.split("?")[1] ?? "").get("ss")) || null;
+
+/**
+ * "Brug stedet i forhåndsvisningen": the spot and view the editor's preview
+ * stands in. The map window covers the preview - close it, walk there in the
+ * preview, open the point again and press.
+ */
+function PreviewSpotButton({ preview, onPick }: { preview: PreviewApi; onPick: (href: string) => void }) {
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<{ text: string; error?: boolean } | null>(null);
+  return (
+    <div className="mt-1.5 space-y-1">
+      <button
+        type="button"
+        disabled={busy}
+        className="flex w-full items-center justify-center gap-1.5 rounded-[10px] bg-white py-2 text-[13px] font-medium text-[#0071e3] ring-1 ring-black/[.06] hover:bg-[#0071e3]/5 disabled:opacity-50"
+        onClick={async () => {
+          setBusy(true);
+          setNote(null);
+          const r = await preview.view();
+          setBusy(false);
+          if (r.error || !r.href) return setNote({ text: r.error ?? "Forhåndsvisningen svarede ikke.", error: true });
+          onPick(r.href);
+          setNote({ text: `Valgt: ${r.room ?? "stedet"}${ssOf(r.href) ? ` (punkt ${ssOf(r.href)})` : ""} - med den retning, forhåndsvisningen kigger.` });
+        }}
+      >
+        {busy ? "Henter…" : "Brug stedet i forhåndsvisningen"}
+      </button>
+      <p className={`text-[11.5px] leading-snug ${note?.error ? "text-[#ff3b30]" : "text-[#8e8e93]"}`}>
+        {note?.text ?? "Luk kortet, gå hen til stedet i forhåndsvisningen og drej, så det ser rigtigt ud - åbn så punktet igen og tryk her."}
+      </p>
+    </div>
   );
 }
