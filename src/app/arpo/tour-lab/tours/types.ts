@@ -832,6 +832,18 @@ export type TourConfig = {
   langSwitch?: { desktop?: "top" | "corner" | "menu" | "hidden"; mobile?: "top" | "corner" | "menu" | "hidden" };
   /** Per language: Danish text -> the same text in that language (the setup's texts and the engine's words). Made by nextviewAI, editable under Sprog. A text without one shows in Danish. */
   translations?: Record<string, Record<string, string>>;
+  /**
+   * Per language: a link's own address in that language - the Danish address
+   * (as written in the setup) -> the address in that language, e.g.
+   * { en: { "https://nymarksminde.dk/bondegaardsferie/": "https://nymarksminde.dk/en/bondegaardsferie-english/" } }.
+   * Every link in the tour (buttons, menu, cards, guide stops …) is swapped
+   * when the tour is shown in that language; a link without one stays Danish.
+   * A key ending in "*" is a beginning shared by many links, and its value's
+   * "*" takes the rest: { "https://shop.dk/*": "https://shop.dk/en/*" }. The
+   * exact address wins over such a rule. Edited under Sprog → "Links pr. sprog".
+   * Only real addresses of the customer's own pages - never guessed.
+   */
+  linkTranslations?: Record<string, Record<string, string>>;
   menu: MenuEntry[];
   /**
    * "Historier": the rooms as Instagram-style story cards along the bottom,

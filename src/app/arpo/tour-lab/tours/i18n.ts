@@ -331,6 +331,45 @@ export function plainWordsInConfig(config: TourConfig): TourConfig {
   return walk(config) as TourConfig;
 }
 
+/** Keys whose value is a link a visitor follows - swapped for the language's own address (linkTranslations). */
+const LINK_KEYS = new Set(["href", "url", "link"]);
+const isWebLink = (s: string) => /^https?:\/\//i.test(s.trim());
+/** The same address with or without a trailing "/" (and in any case on the host). */
+const sameLink = (s: string) => s.trim().replace(/\/+(?=$|[?#])/, "").replace(/^https?:\/\/[^/?#]+/i, (h) => h.toLowerCase());
+
+/** A link as it is in `lang`: its own address there (exact, or by a "…*" rule), else the Danish one. */
+export function linkIn(config: TourConfig, lang: string, href: string): string {
+  const map = config.linkTranslations?.[lang];
+  if (lang === "da" || !map || !isWebLink(href)) return href;
+  const want = sameLink(href);
+  let rule: [string, string] | null = null;
+  for (const [da, x] of Object.entries(map)) {
+    if (!x?.trim()) continue;
+    if (da.endsWith("*")) {
+      const start = da.slice(0, -1);
+      if (href.trim().startsWith(start) && (!rule || start.length > rule[0].length)) rule = [start, x];
+    } else if (sameLink(da) === want) return x.trim();
+  }
+  if (!rule) return href;
+  const rest = href.trim().slice(rule[0].length);
+  return rule[1].includes("*") ? rule[1].trim().replace("*", rest) : rule[1].trim();
+}
+
+/** Every web link a visitor can follow in a setup (to give each its address per language), in the order they come. */
+export function tourWebLinks(config: TourConfig): string[] {
+  const out = new Set<string>();
+  const walk = (v: unknown, key?: string) => {
+    if (key === "translations" || key === "linkTranslations" || key === "customCss") return;
+    if (typeof v === "string") {
+      // A link field - or a web address anywhere else that isn't a picture, film or sound (e.g. a menu item's [name, href]).
+      if (isWebLink(v) && ((key && LINK_KEYS.has(key)) || (!(key && SKIP.has(key)) && !/\.(jpe?g|png|webp|avif|gif|svg|mp4|webm|mov|mp3|m4a|wav)(\?|$)/i.test(v.trim())))) out.add(v.trim());
+    } else if (Array.isArray(v)) v.forEach((x) => walk(x));
+    else if (v && typeof v === "object") for (const [k, x] of Object.entries(v)) walk(x, k);
+  };
+  walk(config);
+  return [...out];
+}
+
 /** The languages a setup can be shown in (Danish first). */
 export const tourLanguages = (config: TourConfig): string[] => ["da", ...(config.languages ?? []).filter((l) => l !== "da")];
 
@@ -341,12 +380,18 @@ export const tourLanguages = (config: TourConfig): string[] => ["da", ...(config
  */
 export function localize(config: TourConfig, lang: string): TourConfig {
   const dict = config.translations?.[lang];
-  if (lang === "da" || !dict) return config;
-  const tr = (s: string) => dict[s.trim()] || s;
+  const links = config.linkTranslations?.[lang];
+  if (lang === "da" || (!dict && !links)) return config;
+  const tr = (s: string) => dict?.[s.trim()] || s;
+  // A link's own address in this language (exact or by a "…*" rule) - also a menu item's [name, href].
+  const ln = (s: string) => (links ? linkIn(config, lang, s) : s);
   // Parts without anything to translate are kept as the same objects, so nothing that depends on them starts over.
   const walk = (v: unknown, key?: string): unknown => {
     if (key === "audio") return undefined;
+    if (key === "linkTranslations" || key === "translations") return v;
+    if (key && LINK_KEYS.has(key) && typeof v === "string") return ln(v);
     if (key && SKIP.has(key)) return v;
+    if (typeof v === "string" && isWebLink(v)) return ln(v);
     if (typeof v === "string") return isText(v) ? tr(v) : v;
     if (Array.isArray(v)) {
       const out = v.map((x) => walk(x));

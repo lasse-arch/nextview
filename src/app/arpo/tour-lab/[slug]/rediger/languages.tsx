@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { translateTour } from "@/lib/actions/tour-translate";
-import { LANGUAGES, langName, tourLanguages, translatableTexts } from "../../tours/i18n";
+import { LANGUAGES, langName, linkIn, tourLanguages, tourWebLinks, translatableTexts } from "../../tours/i18n";
 import type { TourConfig } from "../../tours/types";
 import { Choice, Group, input } from "./ui";
 
@@ -23,6 +23,7 @@ export function LanguagesPanel({ slug, config, edit, showIn }: { slug: string; c
   const [pending, start] = useTransition();
   const missing = (lang: string) => texts.filter((t) => !config.translations?.[lang]?.[t]?.trim()).length;
   const lang = langs.includes(shown) ? shown : langs[0];
+  const links = useMemo(() => tourWebLinks(config), [config]);
 
   function toggle(code: string, on: boolean) {
     edit((d) => {
@@ -102,6 +103,8 @@ export function LanguagesPanel({ slug, config, edit, showIn }: { slug: string; c
         </Group>
       )}
 
+      {lang && links.length > 0 && <LinksPerLanguage config={config} edit={edit} langs={langs} lang={lang} setLang={setShown} links={links} />}
+
       {lang && (
         <Group title="Teksterne">
           {langs.length > 1 && <Choice value={lang} options={langs.map((l): [string, string] => [l, langName(l)])} onChange={setShown} />}
@@ -137,5 +140,86 @@ export function LanguagesPanel({ slug, config, edit, showIn }: { slug: string; c
         </Group>
       )}
     </>
+  );
+}
+
+/**
+ * "Links pr. sprog": every web link in the tour, with its own address in each
+ * language (e.g. the English page of the farm holiday) - left empty, the
+ * Danish page opens. A rule ("starter med … → …") covers many links at once.
+ */
+function LinksPerLanguage({ config, edit, langs, lang, setLang, links }: { config: TourConfig; edit: (fn: (d: TourConfig) => void) => void; langs: string[]; lang: string; setLang: (l: string) => void; links: string[] }) {
+  const map = config.linkTranslations?.[lang] ?? {};
+  const rules = Object.entries(map).filter(([k]) => k.endsWith("*"));
+  const [rule, setRule] = useState({ from: "", to: "" });
+  const set = (da: string, value: string) =>
+    edit((d) => {
+      const next = { ...(d.linkTranslations?.[lang] ?? {}) };
+      if (value.trim()) next[da] = value.trim();
+      else delete next[da];
+      const all = { ...(d.linkTranslations ?? {}), [lang]: next };
+      if (!Object.keys(next).length) delete all[lang];
+      d.linkTranslations = Object.keys(all).length ? all : undefined;
+    });
+  const valid = (u: string) => /^https?:\/\/[^\s]+$/i.test(u.trim());
+  const done = links.filter((l) => linkIn(config, lang, l) !== l).length;
+  return (
+    <Group title="Links pr. sprog">
+      <p className="text-[13px] leading-snug text-[#6e6e73]">
+        Knapper og links fører til de danske sider. Skriv adressen på samme side i {langName(lang)}-udgaven ud for hvert link, så åbner touren den, når den vises på det sprog. Tomt felt = den danske side.
+      </p>
+      {langs.length > 1 && <Choice value={lang} options={langs.map((l): [string, string] => [l, langName(l)])} onChange={setLang} />}
+      <p className="text-[12px] text-[#8e8e93]">
+        {done} af {links.length} links har deres egen adresse ({langName(lang)}).
+      </p>
+      <ul className="space-y-2">
+        {links.map((l) => {
+          const own = map[l] ?? "";
+          const byRule = !own && linkIn(config, lang, l) !== l ? linkIn(config, lang, l) : null;
+          return (
+            <li key={l} className="rounded-xl bg-white p-2.5 ring-1 ring-black/[.06]">
+              <a href={l} target="_blank" rel="noreferrer noopener" className="mb-1 block truncate text-[12px] leading-snug text-[#8e8e93] hover:text-[#0071e3]" title={l}>
+                {l}
+              </a>
+              <input
+                className={`${input} ${own && !valid(own) ? "ring-1 ring-[#ff3b30]" : ""}`}
+                type="url"
+                placeholder={byRule ? `Via regel: ${byRule}` : "Samme side på dette sprog (https://…)"}
+                value={own}
+                onChange={(e) => set(l, e.target.value)}
+              />
+              {own && !valid(own) && <p className="mt-1 text-[11px] text-[#ff3b30]">Skal være en hel adresse, der starter med https://</p>}
+            </li>
+          );
+        })}
+      </ul>
+      <div className="space-y-1.5 rounded-xl bg-[#f2f2f7] p-2.5">
+        <p className="text-[12px] font-medium text-[#6e6e73]">Regel for mange links på én gang</p>
+        {rules.map(([from, to]) => (
+          <div key={from} className="flex items-center gap-2 text-[12px] text-[#1d1d1f]">
+            <span className="min-w-0 flex-1 truncate" title={`${from} → ${to}`}>
+              {from} → {to}
+            </span>
+            <button type="button" className="text-[12px] font-medium text-[#c4314b]" onClick={() => set(from, "")}>
+              Fjern
+            </button>
+          </div>
+        ))}
+        <input className={input} placeholder="Starter med, fx https://webshop.dk/" value={rule.from} onChange={(e) => setRule({ ...rule, from: e.target.value })} />
+        <input className={input} placeholder="Bliver til, fx https://webshop.dk/en/" value={rule.to} onChange={(e) => setRule({ ...rule, to: e.target.value })} />
+        <button
+          type="button"
+          disabled={!valid(rule.from) || !valid(rule.to)}
+          className="rounded-lg bg-[#0071e3] px-3 py-1.5 text-[13px] font-medium text-white disabled:opacity-40"
+          onClick={() => {
+            set(`${rule.from.trim().replace(/\*$/, "")}*`, `${rule.to.trim().replace(/\*$/, "")}*`);
+            setRule({ from: "", to: "" });
+          }}
+        >
+          Tilføj regel
+        </button>
+        <p className="text-[11px] leading-snug text-[#8e8e93]">Resten af adressen bliver hængende: med reglen ovenfor bliver …/produkt/42 til …/en/produkt/42. En adresse skrevet ud for et link vinder over reglen.</p>
+      </div>
+    </Group>
   );
 }
