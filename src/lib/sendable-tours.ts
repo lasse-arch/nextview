@@ -4,10 +4,10 @@ import { teamCan } from "@/lib/team-roles";
 
 /**
  * Which of our tours a seller may send to new customers (as a showcase link -
- * the mail generator and the SMS): an admin any; the others the ones chosen
- * as examples (Kan sendes som eksempel), the ones out on the net, and the ones
- * sent to their customer for review (i gennemgang).
+ * the mail generator and the SMS): all of them, for sellers and admins. A tour
+ * that isn't finished (not published, approved or live) opens its showcase
+ * with "a tour we're still working on" (features.tsx, demoTour's `finished`).
  */
 export function sendableTours(user: Parameters<typeof teamCan>[0]): Prisma.TourWhereInput {
-  return teamCan(user, "admin") ? {} : { OR: [{ showcase: true }, { published: true }, { liveVersion: { not: null } }, { reviewSentAt: { not: null } }] };
+  return teamCan(user, "admin") || teamCan(user, "sales") ? {} : { id: "__ingen__" };
 }

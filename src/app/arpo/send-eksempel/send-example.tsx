@@ -76,9 +76,13 @@ export function SendExample({ initial }: { initial: DemoSmsSetup }) {
                 {setup.tours.map((t) => (
                   <option key={t.slug} value={t.slug}>
                     {t.name}
+                    {t.wip ? " · ikke færdig" : ""}
                   </option>
                 ))}
               </select>
+              {setup.tours.find((t) => t.slug === tour)?.wip && (
+                <span className="mt-1 block font-normal text-amber-700">Touren er ikke færdig: kunden ser først, at det er en tour, vi stadig arbejder på.</span>
+              )}
             </label>
           ) : (
             <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">Ingen tours kan sendes endnu. Slå &quot;Kan sendes som eksempel&quot; til under Del og udgiv på en tour.</p>

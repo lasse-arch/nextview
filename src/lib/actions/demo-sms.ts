@@ -29,7 +29,8 @@ const firstName = (name: string) => name.trim().split(/\s+/)[0] ?? "";
 export type DemoSmsSent = { id: string; at: string; to: string; /** Who it is, for our own use. */ note: string | null; tour: string; by: string; visits: number; /** Visits where they did something in the tour (not only opened the link). */ started: number; lastSeen: string | null; where: string | null; /** The tour, and the visits (newest first) - what they saw and for how long. */ slug: string; details: DemoVisit[]; /** Can be sent again: the number is kept, and the seller sent it (or is an admin). */ again: boolean; /** The seller sent it, or is an admin: may send it again or remove it. */ mine: boolean };
 
 export type DemoSmsSetup = {
-  tours: { slug: string; name: string }[];
+  /** `wip`: not finished yet - its showcase says we are still working on it. */
+  tours: { slug: string; name: string; wip?: boolean }[];
   /** The text with the seller filled in - {navn} and {link} left for the send. */
   text: string;
   /** Sent from Arpo (SureSMS is set up) - else it opens on the seller's own phone. */
@@ -43,13 +44,13 @@ const STARTED = new Set(["tour_use", "tour_enter", "menu_click", "menu_open", "p
 const COUNTRY: Record<string, string> = { DK: "Danmark", DE: "Tyskland", SE: "Sverige", NO: "Norge" };
 
 /** What the page needs: the showcase tours, the text, and what's been sent lately (and opened). */
-/** Which tours a seller may send (see sendableTours) - those in review too. */
+/** Which tours a seller may send (see sendableTours) - all of them; an unfinished one shows "vi arbejder stadig på den". */
 const sendable = sendableTours;
 
 export async function demoSmsSetup(): Promise<DemoSmsSetup> {
   const user = await requireUser();
   const [tours, links] = await Promise.all([
-    prisma.tour.findMany({ where: sendable(user), select: { slug: true, name: true }, orderBy: [{ showcase: "desc" }, { name: "asc" }] }),
+    prisma.tour.findMany({ where: sendable(user), select: { slug: true, name: true, published: true, liveVersion: true, reviewApprovedAt: true }, orderBy: [{ showcase: "desc" }, { name: "asc" }] }),
     prisma.tourDemoLink.findMany({
       where: { label: { endsWith: "(SMS)" } },
       orderBy: { createdAt: "desc" },
@@ -60,7 +61,7 @@ export async function demoSmsSetup(): Promise<DemoSmsSetup> {
   const people = new Map((await prisma.user.findMany({ where: { id: { in: [...new Set(links.map((l) => l.createdById))] } }, select: { id: true, name: true } })).map((p) => [p.id, p.name]));
   const names = new Map((await prisma.tour.findMany({ where: { slug: { in: [...new Set(links.map((l) => l.tourSlug))] } }, select: { slug: true, name: true } })).map((t) => [t.slug, t.name]));
   return {
-    tours,
+    tours: tours.map((t) => ({ slug: t.slug, name: t.name, ...(t.published || t.liveVersion != null || t.reviewApprovedAt ? {} : { wip: true }) })),
     text: TEMPLATE.replace("{sælger}", user.name).replace("{tlf}", user.phone ?? ""),
     direct: smsReady(),
     sent: links.map((l) => {
