@@ -1,6 +1,7 @@
 "use server";
 
 import { deleteDealArchived, hasSigned, SIGNED_NO_DELETE } from "@/lib/deal-archive";
+import { noteNewOwner } from "@/lib/deal-owner";
 import { releaseEstablishmentOnLive } from "@/lib/establishment-approval";
 import { sendWelcomeMailOnLive } from "@/lib/welcome-mail";
 import { createDuplicateDealRecord } from "@/lib/deal-duplicate";
@@ -435,7 +436,12 @@ export async function updateDealStage(dealId: string, newStage: DealStage) {
  * booket" prompts for the meeting date right there, instead of requiring a
  * trip to the full edit form first (which updateDealStage otherwise demands).
  */
-export async function setMeetingDateAndStage(dealId: string, meetingDateIso: string) {
+export async function setMeetingDateAndStage(
+  dealId: string,
+  meetingDateIso: string,
+  /** Booked from the ringeliste: whoever booked the meeting takes the lead over (not whoever put it on the list). */
+  fromCallList = false
+) {
   const user = await requireUser();
 
   const meetingDate = parseMeetingDate(meetingDateIso);
@@ -444,10 +450,13 @@ export async function setMeetingDateAndStage(dealId: string, meetingDateIso: str
   const existing = await prisma.deal.findUniqueOrThrow({ where: { id: dealId } });
   const wasAlreadyBooked = existing.stage === "MEETING_BOOKED";
 
+  // Only a lead that is on a ringeliste - the deal page and the board keep the owner as it is.
+  const takeOver = fromCallList === true && Boolean(existing.callListId) && existing.ownerId !== user.id;
   const deal = await prisma.deal.update({
     where: { id: dealId },
-    data: { stage: "MEETING_BOOKED", meetingDate, inLeadInbox: false },
+    data: { stage: "MEETING_BOOKED", meetingDate, inLeadInbox: false, ...(takeOver ? { ownerId: user.id } : {}) },
   });
+  if (takeOver) await noteNewOwner(dealId, existing.ownerId, user, "bookede mødet fra ringelisten");
 
   // Only the actual booking is activity-worthy - this action is also used to
   // reschedule a meeting that's already booked (e.g. re-opening "Book møde"
@@ -969,3 +978,4 @@ export async function setFilmingActual(dealId: string, hours: number): Promise<{
   revalidatePath(`/arpo/deals/${dealId}`);
   return { ok: true };
 }
+

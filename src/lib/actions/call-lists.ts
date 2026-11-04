@@ -2,6 +2,7 @@
 import { defaultListName } from "@/lib/call-list-service";
 import { revalidatePath } from "next/cache";
 import { updateDealStage } from "@/lib/actions/deals";
+import { noteNewOwner } from "@/lib/deal-owner";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { lookupCvrNumber } from "@/lib/cvr";
@@ -287,6 +288,11 @@ export async function scheduleCallBack(
   await prisma.note.create({
     data: { dealId, authorId: user.id, body: `Ring tilbage ${when} kl. ${time}: ${text}`, kind: "MANUAL" },
   });
+  // The one who talked to them and calls back takes the lead over (not whoever put it on the list).
+  if (deal.callListId && deal.ownerId !== user.id) {
+    await prisma.deal.update({ where: { id: dealId }, data: { ownerId: user.id } });
+    await noteNewOwner(dealId, deal.ownerId, user, "ringer tilbage fra ringelisten");
+  }
   if (deal.stage === "LEAD") await updateDealStage(dealId, "CONTACTED");
   await logActivity({
     type: "DEAL_CALLBACK",

@@ -485,7 +485,7 @@ function QueueCard({ deal, users, currentUserId, isAdmin }: { deal: QueueDeal; u
     }
     startTransition(async () => {
       try {
-        await setMeetingDateAndStage(deal.id, meetingDateInput);
+        await setMeetingDateAndStage(deal.id, meetingDateInput, true);
         if (sendInvite) {
           const result = await sendCalendarInvite(
             deal.id,
