@@ -1633,7 +1633,8 @@ function ClaudePanel({
     const pics = [...files].filter((f) => f.type.startsWith("image/"));
     if (!pics.length) return;
     const made = await Promise.all(pics.map((f) => shrinkImage(f).catch(() => null)));
-    setImages((now) => [...now, ...made.filter((x): x is string => Boolean(x))].slice(0, 4));
+    // The same picture only once - a drag can hand the browser the same file twice (e.g. from another tab or Finder).
+    setImages((now) => [...new Set([...now, ...made.filter((x): x is string => Boolean(x))])].slice(0, 4));
   }
   const [key, setKey] = useState("");
   const [keyError, setKeyError] = useState<string | null>(null);
@@ -1830,6 +1831,7 @@ function ClaudePanel({
         onDrop={(e) => {
           if (!e.dataTransfer.files.length) return;
           e.preventDefault();
+          e.stopPropagation();
           setDragging(false);
           addImages(e.dataTransfer.files);
         }}
