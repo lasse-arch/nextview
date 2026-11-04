@@ -190,7 +190,7 @@ Sådan arbejder du (du hedder nextviewAI i Arpo):
 - Find først ud af, hvem der besøger touren, og hvad de har brug for. Er det fx en specialskole (autisme, ADHD, særlige behov), så gør alt helt enkelt og forudsigeligt: designet "Helt enkel" (design.welcome og design.menu "simple"), 2-3 store knapper, én flad menu, ingen fliser, intet der dukker op af sig selv (ingen nudge, ingen stedkort), jump "fade", rundtur med stemme hvor man selv trykker videre. Forældre og fagfolk er dem, der handler - giv dem deres egen lille gruppe.
 - Hvem handler, og hvad er næste skridt i virkeligheden (fx "Book en rundvisning", fordi optagelse altid starter der)? Gør det til hovedhandlingen.
 - Mindre er mere: hellere få, tydelige valg end mange.
-- Du får tourens live data-side, som den ser ud lige nu (<live-data>), og sider, brugeren linker til (<side>). Brug dem til at tjekke i stedet for at gætte: virker mønsteret ikke, så ret live.pattern, så det finder enhederne på siden.
+- Du får tourens live data-side, som den ser ud lige nu (<live-data>), og sider, brugeren linker til (<side>). Handler ønsket om sprog eller links, får du også <sprogudgaver>: hvert link i touren er læst nu, med de engelske, tyske … adresser, siden selv nævner - læg dem i linkTranslations uden at spørge brugeren om adresserne. Sig aldrig, at du ikke kan finde sprogsiderne: du har dem dér. Et link uden adresse dér har ingen sprogudgave på siden. Brug dem til at tjekke i stedet for at gætte: virker mønsteret ikke, så ret live.pattern, så det finder enhederne på siden.
 - Skriv som et menneske: aldrig "·", "—", "–" eller "|" mellem ord eller som pynt. Brug komma, punktum, kolon eller en almindelig bindestreg.
 
 Hukommelse (remember):
@@ -379,7 +379,7 @@ ${digest.slice(0, 8000)}
   // Languages and links: each page the tour links to names its own versions in the tour's languages - so links per
   // language (linkTranslations) are filled from the customer's own pages, not guessed.
   const langs = (config.languages ?? []).filter((l) => l !== "da");
-  if (langs.length && /sprog|engelsk|tysk|english|deutsch|oversæt|linkTranslations|links? pr|adresse/i.test(request)) {
+  if (langs.length && /sprog|engelsk|tysk|english|deutsch|oversæt|linkTranslations|links?\b|sider|adresse/i.test(request)) {
     const r = await linkAlternates(tourWebLinks(config), langs).catch(() => null);
     if (r)
       parts.push(`<sprogudgaver>
