@@ -1,10 +1,10 @@
 "use server";
 
 import { demoVisits, type DemoVisit } from "@/lib/demo-visits";
-import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { niceDemoToken } from "@/lib/demo-token";
 import { logActivity } from "@/lib/activity";
 import { danishMobile, sendSms, smsReady } from "@/lib/sms";
 import { teamCan } from "@/lib/team-roles";
@@ -109,7 +109,7 @@ export async function sendDemoSms(input: { tourSlug: string; phone: string; name
 
   // The customer's own link: what they do on it is theirs, and the seller hears when they open it.
   const who = name || `+${phone}`;
-  const link = await prisma.tourDemoLink.create({ data: { tourSlug: tour.slug, token: randomBytes(15).toString("base64url"), label: `${who} (SMS)`, note, createdById: user.id } });
+  const link = await prisma.tourDemoLink.create({ data: { tourSlug: tour.slug, token: niceDemoToken(tour.slug), label: `${who} (SMS)`, note, createdById: user.id } });
   const url = `${(process.env.APP_BASE_URL || "https://nextview360.dk").replace(/\/+$/, "")}/vis/${link.token}`;
   const message = text.replaceAll("{navn}", firstName(name)).replace(/^Hej \n/, "Hej\n").replaceAll("{link}", url);
   // Kept with the link, so it can be sent again (the same link - what they look at stays in one place).
@@ -146,7 +146,7 @@ export async function demoLinksForMail(slugs: string[], to: string, as?: string)
   const base = (process.env.APP_BASE_URL || "https://nextview360.dk").replace(/\/+$/, "");
   const out: Record<string, string> = {};
   for (const t of tours) {
-    const link = await prisma.tourDemoLink.create({ data: { tourSlug: t.slug, token: randomBytes(15).toString("base64url"), label: `${who} (mail)`, createdById: user.id } });
+    const link = await prisma.tourDemoLink.create({ data: { tourSlug: t.slug, token: niceDemoToken(t.slug), label: `${who} (mail)`, createdById: user.id } });
     out[t.slug] = `${base}/vis/${link.token}`;
   }
   return out;

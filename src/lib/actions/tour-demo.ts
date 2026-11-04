@@ -1,8 +1,8 @@
 "use server";
 
-import { randomBytes } from "node:crypto";
 import { requireTour } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { niceDemoToken } from "@/lib/demo-token";
 import { teamCan } from "@/lib/team-roles";
 import { demoVisits, type DemoVisit } from "@/lib/demo-visits";
 
@@ -38,7 +38,7 @@ export async function createDemoLink(slug: string, label: string): Promise<{ ok:
   const name = String(label ?? "").trim().slice(0, 120);
   if (!name) return { ok: false, error: "Skriv hvem linket er til - fx kundens navn og mødet." };
   if (!(await prisma.tour.count({ where: { slug: String(slug) } }))) return { ok: false, error: "Touren findes ikke." };
-  await prisma.tourDemoLink.create({ data: { tourSlug: String(slug), token: randomBytes(15).toString("base64url"), label: name, createdById: user.id } });
+  await prisma.tourDemoLink.create({ data: { tourSlug: String(slug), token: niceDemoToken(String(slug)), label: name, createdById: user.id } });
   return { ok: true };
 }
 
