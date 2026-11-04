@@ -223,8 +223,8 @@ export function ShopSheet({ slug, point, title, url, onBook, onClose }: { slug: 
 }
 
 export const SHOP_CSS = `
-.sh{position:absolute;inset:0;z-index:36;display:flex;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.35);animation:hvFade .2s ease}
-.sh-sheet{width:min(420px,100%);max-height:92%;overflow-y:auto;margin:0 0 16px;padding:16px 18px 18px;border-radius:18px;background:var(--c-soft,#fff);color:#1d2a30;box-shadow:0 18px 50px rgba(0,0,0,.35);animation:hvUp .3s cubic-bezier(.2,.7,.2,1) both}
+.sh{position:absolute;inset:0;z-index:36;overscroll-behavior:contain;touch-action:pan-y;display:flex;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.35);animation:hvFade .2s ease}
+.sh-sheet{width:min(420px,100%);max-height:92%;overflow-y:auto;overscroll-behavior:contain;margin:0 0 calc(16px + env(safe-area-inset-bottom,0px));padding:16px 18px 18px;border-radius:18px;background:var(--c-soft,#fff);color:#1d2a30;box-shadow:0 18px 50px rgba(0,0,0,.35);animation:hvUp .3s cubic-bezier(.2,.7,.2,1) both}
 .sh-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
 .sh-head b{display:block;font-size:19px;font-weight:900;color:var(--c-main)}
 .sh-head small{display:block;margin-top:2px;font-size:13px;color:#5d6b72}

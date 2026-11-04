@@ -4014,6 +4014,8 @@ const CSS = `
 @keyframes hvSpin{to{rotate:360deg}}
 /* A tour is touched, not read: no text selection or iOS copy menu from a long press (it can't be dismissed over the tour). Fields stay selectable. */
 /* clip, not just hidden: nothing (a scrollIntoView, a focused button) can scroll the tour itself sideways and show the hidden menu. */
+/* The page under the tour never scrolls: on a phone a scroll (e.g. dragging in a sheet past its end) makes Safari's bars shrink and grow, and the whole tour jumps with them. */
+html:has(.hv.fixed),html:has(.hv.fixed) body{overflow:hidden;overscroll-behavior:none}
 .hv{overflow:clip;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
 .hv input,.hv textarea{-webkit-user-select:text;user-select:text}
 .hv *{box-sizing:border-box}
