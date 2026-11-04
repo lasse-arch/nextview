@@ -8,6 +8,7 @@ import type { MailSender } from "../mailgenerator/mail-generator";
 import { MailGeneratorClient } from "../mailgenerator/mail-generator-client";
 import { teamCan } from "@/lib/team-roles";
 import { sendableTours } from "@/lib/sendable-tours";
+import { gmailSignature, signatureLines } from "@/lib/gmail";
 
 
 /*
@@ -32,8 +33,17 @@ export async function MailSection({ user }: { user: NonNullable<Awaited<ReturnTy
   const online = new Set(tours.flatMap((t) => (t.ours ? t.variants.map((v) => v.key.replace(/^t:/, "")) : [])));
   const notOut = (await prisma.tour.findMany({ where: { AND: [sendableTours(user), { published: false, liveVersion: null }] }, select: { slug: true, name: true, reviewSentAt: true, deal: { select: { industry: true, companyName: true, displayName: true } } }, orderBy: { name: "asc" } })).filter((t) => !online.has(t.slug));
   const sellerName = [user.name, user.lastName].filter(Boolean).join(" ");
-  const sign = (u: { name: string; lastName: string | null; phone: string | null }) =>
-    ["Med venlig hilsen", [u.name, u.lastName].filter(Boolean).join(" "), "Nextview360", u.phone ? `Tlf: ${u.phone}` : null].filter((l): l is string => Boolean(l));
+  // As the mail will end: the sender's own Gmail signature when they have one (see mailSignOff), else the short one.
+  const gmailSigs = new Map<string, string[]>();
+  const accounts = await prisma.emailAccount.findMany({ where: { provider: "GOOGLE", ...(teamCan(user, "admin") ? {} : { userId: user.id }) } });
+  await Promise.all(
+    accounts.map(async (a) => {
+      const html = await gmailSignature(a).catch(() => null);
+      if (html && !gmailSigs.has(a.userId)) gmailSigs.set(a.userId, [...(/hilsen|regards/i.test(html) ? [] : ["Med venlig hilsen"]), ...signatureLines(html)]);
+    })
+  );
+  const sign = (u: { id: string; name: string; lastName: string | null; phone: string | null }) =>
+    gmailSigs.get(u.id) ?? ["Med venlig hilsen", [u.name, u.lastName].filter(Boolean).join(" "), "Nextview360", u.phone ? `Tlf: ${u.phone}` : null].filter((l): l is string => Boolean(l));
   // An admin can write and send in a colleague's name (from the colleague's own Gmail) - the others only as themselves.
   const team = teamCan(user, "admin")
     ? await prisma.user.findMany({

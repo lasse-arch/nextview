@@ -115,3 +115,61 @@ export async function sendGmailMessage(
   const result: { id: string } = await res.json();
   return { id: result.id };
 }
+
+/*
+ * The sender's own Gmail signature (Gmail → Indstillinger → Signatur), as Gmail
+ * keeps it - Gmail only adds it to mails written in Gmail itself, not to mails
+ * sent through its API, so Arpo puts it in. Read with the access Arpo already
+ * has (gmail.readonly); kept 10 minutes per account. null: none set (or Gmail
+ * didn't answer) - Arpo's own short sign-off is used then.
+ */
+const signatures = new Map<string, { at: number; html: string | null }>();
+
+export async function gmailSignature(account: EmailAccount): Promise<string | null> {
+  const hit = signatures.get(account.id);
+  if (hit && Date.now() - hit.at < 10 * 60_000) return hit.html;
+  let html: string | null = null;
+  try {
+    const token = await getValidAccessToken(account);
+    const res = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/settings/sendAs", { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(8000) });
+    if (res.ok) {
+      const data = (await res.json()) as { sendAs?: { sendAsEmail?: string; isDefault?: boolean; isPrimary?: boolean; signature?: string }[] };
+      const list = data.sendAs ?? [];
+      const own = list.find((s) => s.sendAsEmail?.toLowerCase() === account.email.toLowerCase()) ?? list.find((s) => s.isDefault) ?? list.find((s) => s.isPrimary);
+      html = own?.signature?.trim() || null;
+    }
+  } catch {
+    html = null;
+  }
+  if (signatures.size > 100) signatures.clear();
+  signatures.set(account.id, { at: Date.now(), html });
+  return html;
+}
+
+/** A Gmail signature as plain lines (for the text version of a mail and the generator's preview). */
+export function signatureLines(html: string): string[] {
+  return html
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/?(p|div|tr|li|h\d|table)\b[^>]*>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .split("\n")
+    .map((l) => l.replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+}
+
+/** The sign-off for a mail from Arpo: the sender's Gmail signature when they have one (with "Med venlig hilsen" above it, unless it says so itself), else `fallback`. */
+export async function mailSignOff(account: EmailAccount, fallback: { html: string; text: string }): Promise<{ html: string; text: string }> {
+  const sig = await gmailSignature(account);
+  if (!sig) return fallback;
+  const greet = /hilsen|regards/i.test(sig) ? "" : "Med venlig hilsen";
+  return {
+    html: `${greet ? `<p>${greet}</p>` : ""}<div>${sig}</div>`,
+    text: `\n\n${[greet, ...signatureLines(sig)].filter(Boolean).join("\n")}`,
+  };
+}

@@ -8,7 +8,7 @@ import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getSettingValue } from "@/lib/integration-settings";
 import { claudeCostUsd } from "@/lib/claude-cost";
-import { sendGmailMessage } from "@/lib/gmail";
+import { mailSignOff, sendGmailMessage } from "@/lib/gmail";
 import { logActivity } from "@/lib/activity";
 import { getAppBaseUrl } from "@/lib/email-oauth";
 import { sendDealEmail } from "@/lib/deal-email-send";
@@ -259,13 +259,15 @@ export async function sendSalesMail(id: string, to: string, subject: string, bod
   // Its tracking pixel - opened when the recipient's mail shows pictures (see Sendt in the generator).
   const trackingId = randomUUID();
   const pixel = `<img src="${getAppBaseUrl()}/api/track/email-open/${trackingId}" width="1" height="1" style="display:none" alt="" />`;
+  // The sender's own Gmail signature (logo, title …) when they have one - else Arpo's short one.
+  const signOff = await mailSignOff(account, { html: signatureHtml, text: `\n\nMed venlig hilsen\n${sig.join("\n")}` });
   try {
     await sendGmailMessage(account, {
       to: [address],
       cc,
       subject: s,
-      bodyText: `${b}\n\nMed venlig hilsen\n${sig.join("\n")}`,
-      bodyHtml: `<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.5">${html}${signatureHtml}${pixel}</div>`,
+      bodyText: `${b}${signOff.text}`,
+      bodyHtml: `<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.5">${html}${signOff.html}${pixel}</div>`,
       fromName: sellerName,
     });
   } catch (err) {

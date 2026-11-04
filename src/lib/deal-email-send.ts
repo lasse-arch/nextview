@@ -2,7 +2,7 @@ import "server-only";
 import crypto from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
-import { sendGmailMessage } from "@/lib/gmail";
+import { mailSignOff, sendGmailMessage } from "@/lib/gmail";
 import { getAppBaseUrl } from "@/lib/email-oauth";
 import { resolveTemplatePlaceholders, usesBetalingsservicePlaceholders } from "@/lib/email-templates";
 import { ensureBsCustomerNumber, getBsSettings, resolveBsPayer } from "@/lib/betalingsservice/service";
@@ -144,13 +144,18 @@ export async function sendDealEmail(
   const signatureLines = [sellerName, "Nextview360", user.phone ? `Tlf: ${user.phone}` : null].filter(
     (line): line is string => Boolean(line)
   );
-  const signatureText = alreadyHasSignature ? "" : `\n\nMed venlig hilsen\n${signatureLines.join("\n")}`;
-  const signatureHtml = alreadyHasSignature
-    ? ""
-    : `<p>Med venlig hilsen<br><b>${sellerName}</b>${signatureLines
-        .slice(1)
-        .map((line) => `<br>${line}`)
-        .join("")}</p>`;
+  // The sender's own Gmail signature when they have one - else the short Nextview360 one.
+  const signOff = alreadyHasSignature
+    ? { text: "", html: "" }
+    : await mailSignOff(account, {
+        text: `\n\nMed venlig hilsen\n${signatureLines.join("\n")}`,
+        html: `<p>Med venlig hilsen<br><b>${sellerName}</b>${signatureLines
+          .slice(1)
+          .map((line) => `<br>${line}`)
+          .join("")}</p>`,
+      });
+  const signatureText = signOff.text;
+  const signatureHtml = signOff.html;
 
   const plainTextBody = looksLikeHtml(body) ? body.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ") : body;
   const plainText = `${plainTextBody.trim()}${signatureText}`;
