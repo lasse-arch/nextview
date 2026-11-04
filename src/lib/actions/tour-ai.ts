@@ -389,7 +389,18 @@ export async function askClaudeForTour(config: TourConfig, history: ChatTurn[], 
   const key = await apiKey();
   if (!key) return { ok: false, error: "nextviewAI er ikke sat op endnu - indsæt en nøgle." };
   try {
-    const seen = images.length ? `\n\n(Brugeren har sendt ${images.length === 1 ? "et billede" : `${images.length} billeder`} med - typisk et skærmbillede af forhåndsvisningen eller kundens hjemmeside. Brug ${images.length === 1 ? "det" : "dem"} til at forstå, hvad de ser og mener.)` : "";
+    // Each picture is also kept with the tour's files, so it has an address the tour can show - nextviewAI may put it on a card, a point, a tile …
+    const kept = await Promise.all(
+      images.slice(0, 4).map(async (url, i) => {
+        const m = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/.exec(url);
+        if (!m || m[2].length > 12_000_000) return null;
+        return storeTourFile(config.slug, `chat-billede-${Date.now()}-${i + 1}`, m[1], Buffer.from(m[2], "base64")).catch(() => null);
+      })
+    );
+    const addresses = kept.map((u, i) => (u ? `Billede ${i + 1}: ${u}` : null)).filter(Boolean);
+    const seen = images.length
+      ? `\n\n(Brugeren har sendt ${images.length === 1 ? "et billede" : `${images.length} billeder`} med - i rækkefølge. Er det et skærmbillede (af forhåndsvisningen, kundens hjemmeside), så brug det til at forstå, hvad de mener. Er det et foto, de vil have i touren, så brug adressen herunder direkte i opsætningen (fx images på et punkt eller stedkort, et personbillede, en flise) - billedet er allerede gemt hos os.${addresses.length ? `\n${addresses.join("\n")}` : ""})`
+      : "";
     const web = await webContext(config, request).catch(() => "");
     return await claudeEdits(key, { name: user.name, kind: "ændring" }, config, history, `Ønske: ${request}${seen}${web}`, 16000, true, [], images);
   } catch (err) {
