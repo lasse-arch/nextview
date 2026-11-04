@@ -1021,7 +1021,9 @@ function TourExperience({
       const sweep = target ? sweepForSs(target.ss) : null;
       if (!sdkRef.current || !sweep) return false;
       const sdk = await sdkRef.current;
-      if (transition === "fly" && T.jump === "fade") {
+      // This place's own move (jumpFor, set on the menu item), else the tour's.
+      const jump = T.jumpFor?.[href] ?? T.jump;
+      if (transition === "fly" && jump === "fade") {
         // A real cross-fade instead of Matterport's fade to black: a picture of the view on top,
         // the new room underneath at once, then the picture fades away - like stepping to the next scan.
         const shot = crossfade.current;
@@ -1053,8 +1055,8 @@ function TourExperience({
       } else {
         await moveSweep(sdk, sweep, {
           rotation: target?.rotation,
-          transition: transition === "instant" || T.jump === "instant" ? sdk.Sweep.Transition.INSTANT : sdk.Sweep.Transition.FLY,
-          transitionTime: transition === "instant" || T.jump === "instant" ? undefined : T.flyMs,
+          transition: transition === "instant" || jump === "instant" ? sdk.Sweep.Transition.INSTANT : sdk.Sweep.Transition.FLY,
+          transitionTime: transition === "instant" || jump === "instant" ? undefined : T.flyMs,
         });
       }
       return true;

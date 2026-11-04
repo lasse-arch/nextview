@@ -961,6 +961,15 @@ export function TourEditor({
               <>
                 <MenuEditor
                   menu={config.menu}
+                  jumpFor={{ own: config.jumpFor, tour: config.jump }}
+                  onJump={(href, j) =>
+                    edit((d) => {
+                      const all = { ...d.jumpFor };
+                      if (j) all[href] = j;
+                      else delete all[href];
+                      d.jumpFor = Object.keys(all).length ? all : undefined;
+                    })
+                  }
                   preview={preview}
                   overview={Boolean(config.drone || config.map)}
                   onChange={(menu) => edit((d) => void (d.menu = menu))}
@@ -2295,7 +2304,12 @@ function MenuEditor({
   overview = false,
   imageView,
   onImageView,
+  jumpFor,
+  onJump,
 }: {
+  /** Each place's own move (by its link) - and the tour's default for the label. */
+  jumpFor?: { own?: TourConfig["jumpFor"]; tour?: TourConfig["jump"] };
+  onJump?: (href: string, jump: "fly" | "fade" | "instant" | undefined) => void;
   menu: MenuEntry[];
   onChange: (m: MenuEntry[]) => void;
   preview: PreviewApi;
@@ -2483,6 +2497,21 @@ function MenuEditor({
                       {it.href ? "Brug det udsyn, forhåndsvisningen viser nu" : "Brug det sted, forhåndsvisningen viser"}
                     </button>
                     <p className="text-[12px] leading-snug text-[#8e8e93]">Gå hen og drej, så det ser rigtigt ud i forhåndsvisningen til højre - tryk så her. Den retning, du kigger, kommer med.</p>
+                    {it.href && onJump && (
+                      <div className="space-y-1 pt-1">
+                        <p className="text-[12px] font-medium text-[#1d1d1f]">Skiftet hertil</p>
+                        <Choice<"tour" | "fly" | "fade" | "instant">
+                          value={jumpFor?.own?.[it.href] ?? "tour"}
+                          options={[
+                            ["tour", `Som touren (${{ fly: "flyv", fade: "fade", instant: "spring" }[jumpFor?.tour ?? "fly"]})`],
+                            ["fly", "Flyv"],
+                            ["fade", "Fade"],
+                            ["instant", "Spring"],
+                          ]}
+                          onChange={(v) => onJump(it.href!, v === "tour" ? undefined : v)}
+                        />
+                      </div>
+                    )}
                     <details className="text-[12px] text-[#8e8e93]">
                       <summary className="cursor-pointer select-none">Indsæt link i stedet</summary>
                       <input className={`${input} mt-1.5 bg-white text-[13px]`} value={it.href} placeholder="U-link fra Matterport eller MPSkins-link" onChange={(e) => set(a, { href: e.target.value })} />

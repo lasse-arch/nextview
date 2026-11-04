@@ -483,6 +483,8 @@ export type TourConfig = {
    * the old view (a touch slower to start).
    */
   jump?: "fly" | "fade" | "instant";
+  /** The move to single places, set apart from `jump` (by the place's link, as in the menu) - e.g. one menu item that cuts straight there instead of flying. */
+  jumpFor?: Record<string, "fly" | "fade" | "instant">;
   /**
    * Matterport's measurements shown over the tour (its measuring mode, with all
    * its buttons hidden and clicks caught, so visitors see the measurements but
