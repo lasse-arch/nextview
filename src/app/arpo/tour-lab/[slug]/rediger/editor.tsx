@@ -1107,8 +1107,7 @@ export function TourEditor({
                   hint='En kort "Sådan går du rundt", når man trykker Træd indenfor: træk for at kigge, tryk på cirklerne for at gå, menuen for at hoppe - og Vis mig rundt, hvis touren har den. Vises én gang pr. besøgende (i forhåndsvisningen hver gang).'
                 />
                 <Toggle on={Boolean(config.wayfinding)} onChange={(on) => edit((d) => void (d.wayfinding = on ? d.wayfinding ?? {} : undefined))} title="Find vej" hint="Vælg et rum, og touren går vejen derhen fra der, man står." />
-                {config.wayfinding && <FindTargets config={config} edit={edit} />}
-                {config.wayfinding && <FindExtra config={config} edit={edit} preview={preview} />}
+                {config.wayfinding && <FindTargets config={config} edit={edit} preview={preview} />}
                 {config.wayfinding && (
                   <Field title='Knap på "Du er fremme"' hint="Kortet, når Find vej er nået frem. Linket kan også være #live (listen med ledige), #kontakt (formularen) eller #vej.">
                     <Choice<"main" | "own" | "none">
@@ -2816,106 +2815,189 @@ function SiteLookButton({ slug, config, edit }: { slug: string; config: TourConf
   );
 }
 
-const move = <T,>(list: T[], from: number, to: number): T[] => {
-  if (to < 0 || to >= list.length) return list;
-  const next = [...list];
-  const [x] = next.splice(from, 1);
-  next.splice(to, 0, x);
-  return next;
-};
-/** By group, then by the first number in the name (1-34 before 35-67 before 301-332), then by name. */
+/** By category, then by the first number in the name (1-34 before 35-67 before 301-332), then by name. */
 const sortByNumber = <T extends { name: string; group?: string }>(list: T[]): T[] => {
   const first = (s: string) => Number(s.match(/\d+/)?.[0] ?? Infinity);
   const groups = [...new Set(list.map((x) => x.group ?? ""))];
   return [...list].sort((a, b) => groups.indexOf(a.group ?? "") - groups.indexOf(b.group ?? "") || first(a.name) - first(b.name) || a.name.localeCompare(b.name, "da"));
 };
+/** A category name as compared: case and spaces aside (as the tour does). */
+const groupKey = (s: string | undefined) => (s ?? "").trim().toLowerCase().replace(/\s+/g, " ");
 
-/** "Find vej" - places of its own, not in the menu (e.g. the toilets, a row of storage rooms): a name and a scan point. */
-function FindExtra({ config, edit, preview }: { config: TourConfig; edit: (fn: (d: TourConfig) => void) => void; preview: PreviewApi }) {
+type FindExtraPlace = NonNullable<NonNullable<TourConfig["wayfinding"]>["extra"]>[number];
+
+/**
+ * "Find vej kan finde": the menu's places, by category, each with a tick - and
+ * under each category the places of its own that Find vej can find too
+ * (wayfinding.extra, e.g. Pigefløj under "Dit hjem på Skyum"), added right
+ * there with "+ Tilføj sted her". Places without a category stand last, under
+ * Andre steder.
+ */
+function FindTargets({ config, edit, preview }: { config: TourConfig; edit: (fn: (d: TourConfig) => void) => void; preview: PreviewApi }) {
+  const menuGroups = config.menu.map((m) => ({ title: "items" in m ? m.title : "", places: ("items" in m ? m.items : [[m.title, m.href] as [string, string]]).filter(([, href]) => isPlaceHref(href)) }));
+  const all = [...new Set(menuGroups.flatMap((g) => g.places.map(([, href]) => href)))];
+  const skip = config.wayfinding?.skip ?? [];
+  const on = all.filter((h) => !skip.includes(h)).length;
+  const setSkip = (next: string[]) => edit((d) => void (d.wayfinding = { ...d.wayfinding, skip: next.length ? next : undefined }));
   const extra = config.wayfinding?.extra ?? [];
-  const setAll = (next: NonNullable<NonNullable<TourConfig["wayfinding"]>["extra"]>) => edit((d) => void (d.wayfinding = { ...d.wayfinding, extra: next.length ? next : undefined }));
-  const set = (i: number, patch: Partial<(typeof extra)[number]>) => setAll(extra.map((x, j) => (j === i ? { ...x, ...patch } : x)));
+  const setAll = (next: FindExtraPlace[]) => edit((d) => void (d.wayfinding = { ...d.wayfinding, extra: next.length ? next : undefined }));
+  const set = (i: number, patch: Partial<FindExtraPlace>) => setAll(extra.map((x, j) => (j === i ? { ...x, ...patch } : x)));
+
+  // The sections: the menu's categories (in menu order, the places without one first), then categories only its own
+  // places have, then Andre steder.
+  const titled = [...new Set(menuGroups.map((g) => g.title).filter(Boolean))];
+  const own = [...new Set(extra.map((x) => x.group?.trim() ?? "").filter((g) => g && !titled.some((t) => groupKey(t) === groupKey(g))))];
+  const sections = [
+    ...(menuGroups.some((g) => !g.title && g.places.length) ? [{ key: "_menu", title: "", menu: menuGroups.filter((g) => !g.title).flatMap((g) => g.places) }] : []),
+    ...titled.map((t) => ({ key: t, title: t, menu: menuGroups.filter((g) => g.title === t).flatMap((g) => g.places) })),
+    ...own.map((t) => ({ key: t, title: t, menu: [] as [string, string][] })),
+    { key: "_andre", title: "Andre steder", menu: [] as [string, string][] },
+  ];
+  const sectionOf = (x: FindExtraPlace) => {
+    const g = groupKey(x.group);
+    if (!g) return "_andre";
+    return titled.find((t) => groupKey(t) === g) ?? own.find((t) => groupKey(t) === g) ?? "_andre";
+  };
+  // Up or down among the places of the same section.
+  const step = (i: number, by: -1 | 1) => {
+    const sec = sectionOf(extra[i]);
+    let j = i + by;
+    while (j >= 0 && j < extra.length && sectionOf(extra[j]) !== sec) j += by;
+    if (j < 0 || j >= extra.length) return;
+    const next = [...extra];
+    [next[i], next[j]] = [next[j], next[i]];
+    setAll(next);
+  };
+  const categories = [...titled, ...own];
+
   return (
-    <Field title="Andre steder Find vej kan finde" hint="Steder, der ikke står i menuen - fx toiletterne eller depotrum 601-727. Giv stedet et navn, og vælg punktet: gå derhen i forhåndsvisningen og tryk Brug udsynet, eller skriv @ i feltet. Vælg en af menuens kategorier, så står stedet sammen med den i Find vej - ellers under Andre steder.">
-      <div className="space-y-2">
-        {extra.map((x, i) => (
-          <div key={i} className="space-y-1.5 rounded-xl bg-white p-2.5 ring-1 ring-black/[.06]">
-            <div className="flex gap-1.5">
-              <input className={`${input} bg-white`} placeholder="Navn, fx Toiletter" value={x.name} onChange={(e) => set(i, { name: e.target.value })} />
-              <input className={`${input} w-2/5 bg-white`} list="find-grupper" placeholder="Kategori (valgfri)" value={x.group ?? ""} onChange={(e) => set(i, { group: e.target.value || undefined })} />
-            </div>
-            <LinkInput className="bg-white" value={x.href} onChange={(href) => set(i, { href })} placeholder="Punktet i touren" />
-            {x.href && !isPlaceHref(x.href) && <p className="text-[11px] text-[#ff3b30]">Skal være et punkt i touren - brug knappen herunder eller @.</p>}
-            <div className="flex items-center justify-between gap-2 text-[13px]">
-              <ViewFromPreview preview={preview} onPick={(href) => set(i, { href })} />
-              <div className="flex items-center gap-3">
-                <button type="button" aria-label="Flyt op" disabled={i === 0} className="font-medium text-[#0071e3] disabled:opacity-30" onClick={() => setAll(move(extra, i, i - 1))}>
-                  ↑
-                </button>
-                <button type="button" aria-label="Flyt ned" disabled={i === extra.length - 1} className="font-medium text-[#0071e3] disabled:opacity-30" onClick={() => setAll(move(extra, i, i + 1))}>
-                  ↓
-                </button>
-                <button type="button" className="font-medium text-[#ff3b30]" onClick={() => setAll(extra.filter((_, j) => j !== i))}>
-                  Slet
-                </button>
-              </div>
-            </div>
-          </div>
-        ))}
-        {/* The menu's own groups: a place put in one is listed with that group's places in Find vej. */}
-        <datalist id="find-grupper">
-          {config.menu.filter((m) => "items" in m).map((m) => (
-            <option key={m.title} value={m.title} />
-          ))}
-        </datalist>
-        <div className="flex flex-wrap gap-x-4 gap-y-1">
-          <button type="button" className="text-[13px] font-medium text-[#0071e3]" onClick={() => setAll([...extra, { name: "", href: "" }])}>
-            + Tilføj et sted
+    <Field
+      title="Find vej kan finde"
+      hint={`${on} af ${all.length} steder fra menuen${extra.length ? ` og ${extra.length} egne` : ""}. Nye steder i menuen kommer med af sig selv - fjern fluebenet ved dem, Find vej ikke skal vise. "+ Tilføj sted her" giver en kategori et sted, der ikke står i menuen (fx en gang eller toiletterne).`}
+    >
+      {all.length > 0 && (
+        <div className="flex gap-3 pb-1 text-[12px] font-medium text-[#0071e3]">
+          <button type="button" onClick={() => setSkip([])}>
+            Vælg alle
+          </button>
+          <button type="button" onClick={() => setSkip(all)}>
+            Fravælg alle
           </button>
           {extra.length > 1 && (
-            <button type="button" className="text-[13px] font-medium text-[#0071e3]" onClick={() => setAll(sortByNumber(extra))}>
-              Sortér efter nummer
+            <button type="button" className="ml-auto" onClick={() => setAll(sortByNumber(extra))}>
+              Sortér egne efter nummer
             </button>
           )}
         </div>
+      )}
+      <div className="space-y-3">
+        {sections.map((sec) => {
+          const mine = extra.map((x, i) => ({ x, i })).filter(({ x }) => sectionOf(x) === sec.key);
+          if (sec.key === "_menu" && !mine.length && !sec.menu.length) return null;
+          return (
+            <div key={sec.key}>
+              {sec.title && <p className="text-[11px] font-semibold uppercase tracking-wide text-[#8e8e93]">{sec.title}</p>}
+              {sec.menu.map(([name, href]) => (
+                <label key={href + name} className="flex items-center gap-2 py-0.5 text-[14px] text-[#1d1d1f]">
+                  <input type="checkbox" checked={!skip.includes(href)} onChange={(e) => setSkip(e.target.checked ? skip.filter((h) => h !== href) : [...skip, href])} />
+                  {name}
+                </label>
+              ))}
+              {mine.map(({ x, i }) => (
+                <FindExtraRow
+                  key={i}
+                  place={x}
+                  categories={categories}
+                  category={sec.key === "_andre" ? "" : sec.key}
+                  preview={preview}
+                  onChange={(patch) => set(i, patch)}
+                  onUp={() => step(i, -1)}
+                  onDown={() => step(i, 1)}
+                  onDelete={() => setAll(extra.filter((_, j) => j !== i))}
+                />
+              ))}
+              {sec.key !== "_menu" && (
+                <button type="button" className="mt-0.5 text-[13px] font-medium text-[#0071e3]" onClick={() => setAll([...extra, { name: "", href: "", ...(sec.key === "_andre" ? {} : { group: sec.title }) }])}>
+                  + Tilføj sted her
+                </button>
+              )}
+            </div>
+          );
+        })}
       </div>
     </Field>
   );
 }
 
-/** "Find vej": which of the menu's places it can find - all of them, unless taken off here (wayfinding.skip, by link). */
-function FindTargets({ config, edit }: { config: TourConfig; edit: (fn: (d: TourConfig) => void) => void }) {
-  const groups = config.menu
-    .map((m) => ({ title: "items" in m ? m.title : "", places: ("items" in m ? m.items : [[m.title, m.href] as [string, string]]).filter(([, href]) => isPlaceHref(href)) }))
-    .filter((g) => g.places.length);
-  const all = [...new Set(groups.flatMap((g) => g.places.map(([, href]) => href)))];
-  const skip = config.wayfinding?.skip ?? [];
-  const on = all.filter((h) => !skip.includes(h)).length;
-  const set = (next: string[]) => edit((d) => void (d.wayfinding = { ...d.wayfinding, skip: next.length ? next : undefined }));
-  if (!all.length) return null;
+/** One of Find vej's own places: its name, its point, its category - and up, down, delete. */
+function FindExtraRow({
+  place,
+  categories,
+  category,
+  preview,
+  onChange,
+  onUp,
+  onDown,
+  onDelete,
+}: {
+  place: FindExtraPlace;
+  categories: string[];
+  category: string;
+  preview: PreviewApi;
+  onChange: (patch: Partial<FindExtraPlace>) => void;
+  onUp: () => void;
+  onDown: () => void;
+  onDelete: () => void;
+}) {
+  const [open, setOpen] = useState(!place.href);
   return (
-    <Field title="Find vej kan finde" hint={`${on} af ${all.length} steder fra menuen. Nye steder i menuen kommer med af sig selv - fjern fluebenet ved dem, Find vej ikke skal vise.`}>
-      <div className="flex gap-3 pb-1 text-[12px] font-medium text-[#0071e3]">
-        <button type="button" onClick={() => set([])}>
-          Vælg alle
+    <div className="my-1 rounded-xl bg-white p-2 ring-1 ring-black/[.06]">
+      <div className="flex items-center gap-1.5">
+        <input className={`${input} bg-white`} placeholder="Navn, fx Pigefløj" value={place.name} onChange={(e) => onChange({ name: e.target.value })} />
+        <button type="button" aria-label="Flyt op" className="px-1 text-[14px] font-medium text-[#0071e3]" onClick={onUp}>
+          ↑
         </button>
-        <button type="button" onClick={() => set(all)}>
-          Fravælg alle
+        <button type="button" aria-label="Flyt ned" className="px-1 text-[14px] font-medium text-[#0071e3]" onClick={onDown}>
+          ↓
+        </button>
+        <button type="button" aria-label="Slet" className="px-1 text-[16px] text-[#c7c7cc] hover:text-[#ff3b30]" onClick={onDelete}>
+          ×
         </button>
       </div>
-      <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
-        {groups.map((g, i) => (
-          <div key={g.title + i}>
-            {g.title && <p className="text-[11px] font-semibold uppercase tracking-wide text-[#8e8e93]">{g.title}</p>}
-            {g.places.map(([name, href]) => (
-              <label key={href + name} className="flex items-center gap-2 py-0.5 text-[14px] text-[#1d1d1f]">
-                <input type="checkbox" checked={!skip.includes(href)} onChange={(e) => set(e.target.checked ? skip.filter((h) => h !== href) : [...skip, href])} />
-                {name}
-              </label>
-            ))}
+      <div className="mt-1 flex items-center justify-between gap-2 text-[12px]">
+        <span className={isPlaceHref(place.href) ? "text-[#34a853]" : "text-[#ff9500]"}>{isPlaceHref(place.href) ? "✓ Punkt valgt" : "Intet punkt endnu"}</span>
+        <button type="button" className="font-medium text-[#0071e3]" onClick={() => setOpen((o) => !o)}>
+          {open ? "Luk" : "Punkt og kategori"}
+        </button>
+      </div>
+      {open && (
+        <div className="mt-1.5 space-y-1.5">
+          <LinkInput className="bg-white" value={place.href} onChange={(href) => onChange({ href })} placeholder="Punktet i touren" />
+          <div className="text-[13px]">
+            <ViewFromPreview preview={preview} onPick={(href) => onChange({ href })} />
           </div>
-        ))}
-      </div>
-    </Field>
+          <label className="flex items-center gap-2 text-[12px] text-[#6e6e73]">
+            Kategori
+            <select
+              className={`${input} bg-white`}
+              value={category}
+              onChange={(e) => {
+                if (e.target.value !== "_ny") return onChange({ group: e.target.value || undefined });
+                const name = prompt("Navn på den nye kategori")?.trim();
+                if (name) onChange({ group: name });
+              }}
+            >
+              {categories.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+              <option value="">Andre steder</option>
+              <option value="_ny">Ny kategori …</option>
+            </select>
+          </label>
+        </div>
+      )}
+    </div>
   );
 }
