@@ -1,6 +1,6 @@
 "use client";
 
-import { EventsEditor } from "./events-editor";
+import { EventsEditor, ShopTourEditor } from "./events-editor";
 import { InsightsPanel } from "./insights";
 import { LanguagesPanel } from "./languages";
 import { tourUrl } from "@/lib/public-urls";
@@ -944,6 +944,7 @@ export function TourEditor({
             {tab === "live" && (
               <>
                 <LiveDataEditor config={config} edit={edit} slug={slug} preview={preview} />
+                <ShopTourEditor config={config} edit={edit} slug={slug} />
                 <EventsEditor config={config} edit={edit} slug={slug} />
               </>
             )}

@@ -206,6 +206,7 @@ export function withoutDeadAerialLinks<T extends TourConfig>(c: T): T {
     if (h === "#vej") return !c.commute;
     if (h === "#find") return !c.finder;
     if (h === "#live") return !c.live;
+    if (h === "#book") return !c.shop?.url;
     if (h === "#rundvisning") return !c.guide?.stops.length && !guides.size;
     if (h.startsWith("#rundvisning:")) return !guides.has(h.slice("#rundvisning:".length));
     return false;

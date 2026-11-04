@@ -193,8 +193,8 @@ export const SHOP_CSS = `
 .sh-days button{height:36px;border:0;border-radius:9px;background:none;font:inherit;font-size:14px;font-weight:600;color:#1d2a30;cursor:pointer}
 .sh-days button:disabled{color:#c3cbce;text-decoration:line-through;cursor:default}
 .sh-days button:not(:disabled):hover{background:rgba(0,0,0,.05)}
-.sh-days button.imellem{background:color-mix(in srgb,var(--c-accent) 16%,transparent)}
-.sh-days button.valgt{background:var(--c-accent);color:#fff}
+.sh-days button.imellem,.sh-days button.imellem:hover{background:color-mix(in srgb,var(--c-accent) 16%,transparent)}
+.sh-days button.valgt,.sh-days button.valgt:hover{background:var(--c-accent);color:#fff}
 .sh-hint{margin:8px 0 0;font-size:13px;color:#5d6b72;text-align:center}
 .sh-guests{margin-top:12px;border-top:1px solid rgba(0,0,0,.08)}
 .sh-guests>div{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid rgba(0,0,0,.06);font-size:14px}

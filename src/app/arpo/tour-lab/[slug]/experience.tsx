@@ -681,7 +681,17 @@ function TourExperience({
   /** The welcome tiles - skipped when the link already says where to go. */
   const [welcome, setWelcome] = useState(false);
   /** "Vælg datoer" on a point's card: the webshop booking sheet for that point (TourPoint.shop). */
-  const [shopFor, setShopFor] = useState<Point | null>(null);
+  const [shopFor, setShopFor] = useState<{ id: string; name: string; url: string } | null>(null);
+  // Any link "#book" (the tour's button, a menu item, a tile …) opens the tour's own "Book ophold".
+  useEffect(() => {
+    const open = () => {
+      if (!T.shop?.url) return;
+      setMenuOpen(false);
+      setShopFor({ id: "_tour", name: T.shop.title || T.brand, url: T.shop.url });
+    };
+    window.addEventListener("hv-book", open);
+    return () => window.removeEventListener("hv-book", open);
+  }, [T.shop, T.brand]);
   /** "Næste rundvisninger" (T.events): the coming dates, where the tour shows them. */
   const events = useTourEvents(T);
   /** The tour opens on the cover welcome: it's there from the very first picture (no flash of the drone scene before it). */
@@ -2659,7 +2669,7 @@ function TourExperience({
       }>
       <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.font.replace(/ /g, "+")}:wght@400;600;700;800;900&display=swap`} />
       {T.fontHeading && <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.fontHeading.replace(/ /g, "+")}:wght@500;600&display=swap`} />}
-      <style>{CSS + TOUR_LOGO_CSS + CONTACT_CSS + STORIES_CSS + LIGHTBOX_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + ONBOARDING_CSS + MENU_HINT_CSS + INFO_CSS + STAGING_CSS + (T.lineDays ? LINE_DAY_CSS : "") + (T.yearWheel ? YEARWHEEL_CSS : "") + MAP_CSS + (T.sitePlan?.overlay ? SITE_PLAN_CSS + SITE_PLAN_360_CSS : "") + ROUTE_CSS + MEASURES_CSS + CARDS_CSS + DAY_CSS + (T.events ? EVENTS_CSS : "") + (T.points.some((p) => p.shop) ? SHOP_CSS : "") + SIMPLE_CSS + BENTO_CSS + LOGO_RIGHT_CSS + LANG_CSS + WEATHER_CSS + COMMUTE_CSS + FEATURES_CSS + FINDER_CSS + (review ? FEEDBACK_CSS : "")}</style>
+      <style>{CSS + TOUR_LOGO_CSS + CONTACT_CSS + STORIES_CSS + LIGHTBOX_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + ONBOARDING_CSS + MENU_HINT_CSS + INFO_CSS + STAGING_CSS + (T.lineDays ? LINE_DAY_CSS : "") + (T.yearWheel ? YEARWHEEL_CSS : "") + MAP_CSS + (T.sitePlan?.overlay ? SITE_PLAN_CSS + SITE_PLAN_360_CSS : "") + ROUTE_CSS + MEASURES_CSS + CARDS_CSS + DAY_CSS + (T.events ? EVENTS_CSS : "") + (T.shop || T.points.some((p) => p.shop) ? SHOP_CSS : "") + SIMPLE_CSS + BENTO_CSS + LOGO_RIGHT_CSS + LANG_CSS + WEATHER_CSS + COMMUTE_CSS + FEATURES_CSS + FINDER_CSS + (review ? FEEDBACK_CSS : "")}</style>
       {/* The tour's own design on top (written by Claude or by hand under Avanceret). */}
       {T.customCss && <style>{T.customCss.replace(/<\/?style/gi, "")}</style>}
 
@@ -2874,7 +2884,7 @@ function TourExperience({
                 className="hv-btn hv-primary hv-wide"
                 onClick={() => {
                   track("shop_open", { point_name: selected.name });
-                  setShopFor(selected);
+                  setShopFor({ id: selected.id, name: selected.name, url: selected.shop!.url });
                 }}
               >
                 {selected.shop.label ? tx(selected.shop.label) : tx("Vælg datoer")}
@@ -3444,12 +3454,12 @@ function TourExperience({
           onGo={(href) => menuGo(room ?? "", "feedback", href)}
         />
       )}
-      {shopFor?.shop?.url && (
+      {shopFor && (
         <ShopSheet
           slug={savedTour.slug}
           point={shopFor.id}
           title={shopFor.name}
-          url={shopFor.shop.url}
+          url={shopFor.url}
           onBook={(label, href) => {
             setShopFor(null);
             ctaClick(`${label} ${shopFor.name}`, href, "shop");

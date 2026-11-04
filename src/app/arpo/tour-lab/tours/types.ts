@@ -640,6 +640,14 @@ export type TourConfig = {
    */
   placeCardVoice?: { label?: string };
   /**
+   * "Book ophold" for the whole tour: the customer's webshop product with a
+   * date calendar (as TourPoint.shop). Any link "#book" - the tour's button, a
+   * menu item, a tile, a card's button - opens its booking sheet: free days,
+   * guests, the shop's price, and Book into the shop. `title`: the sheet's
+   * heading (default: the product's name).
+   */
+  shop?: { url: string; title?: string };
+  /**
    * "Næste rundvisninger": the coming dates from a sign-up form (a Zenbi form,
    * https://signup.zenbi.dk/form/<id> - read every 10 minutes, past dates left
    * out) with a button to the form. Shown where chosen: on the welcome

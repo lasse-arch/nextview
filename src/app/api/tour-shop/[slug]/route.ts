@@ -34,7 +34,9 @@ async function shopOf(slug: string, point: string): Promise<{ url: string; team:
   if (!tour) return null;
   const team = !tour.published ? Boolean(await teamSeesTour(slug)) : false;
   if (!tour.published && !team) return null;
-  const url = (tour.config as unknown as TourConfig).points?.find((p) => p.id === point)?.shop?.url;
+  const c = tour.config as unknown as TourConfig;
+  // "_tour": the tour's own "Book ophold" (TourConfig.shop) - else a point's.
+  const url = point === "_tour" ? c.shop?.url : c.points?.find((p) => p.id === point)?.shop?.url;
   return url ? { url, team } : null;
 }
 

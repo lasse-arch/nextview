@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { checkTourDates } from "@/lib/actions/tour-dates";
+import { checkShopProduct } from "@/lib/actions/tour-shop";
 import type { TourConfig } from "../../tours/types";
 import { Field, Group, input, Toggle } from "./ui";
 
@@ -72,6 +73,79 @@ export function EventsEditor({ config, edit, slug }: { config: TourConfig; edit:
             <summary className="cursor-pointer select-none">Formularens datofelt hedder noget andet</summary>
             <input className={`${input} mt-1.5`} placeholder='Feltets navn - tom: det, der hedder "…dato…"' value={ev.field ?? ""} onChange={(e) => set({ field: e.target.value || undefined })} />
           </details>
+        </>
+      )}
+    </Group>
+  );
+}
+
+/** "Book ophold": the tour's own webshop booking (TourConfig.shop) - a "#book" button wherever it's wanted. */
+export function ShopTourEditor({ config, edit, slug }: { config: TourConfig; edit: Edit; slug: string }) {
+  const shop = config.shop;
+  const [note, setNote] = useState<{ text: string; error?: boolean } | null>(null);
+  const [busy, start] = useTransition();
+  const cta = config.cta.find((c) => c.href === "#book");
+  const inMenu = config.menu.find((m): m is { title: string; href: string } => "href" in m && m.href === "#book");
+  const label = cta?.label ?? inMenu?.title ?? "Book ophold";
+  const setLabel = (l: string) =>
+    edit((d) => {
+      d.cta = d.cta.map((c) => (c.href === "#book" ? { ...c, label: l } : c));
+      d.menu = d.menu.map((m) => ("href" in m && m.href === "#book" ? { ...m, title: l } : m));
+    });
+  return (
+    <Group title="Book ophold (kalender fra webshop)">
+      <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">
+        En knap med jeres egen tekst, der åbner en kalender: ledige dage fra kundens webshop, antal gæster og prisen - og Book, der åbner webshoppen. Knappen kan stå som tourens hovedknap, i menuen - og alle steder, et link kan stå (fliser, stedkort): linket er <code>#book</code>.
+      </p>
+      <Field title="Link til produktet i webshoppen" hint="Et produkt med en kalender, fx Bed and Breakfast.">
+        <input
+          className={input}
+          placeholder="https://webshop.…/product/…"
+          value={shop?.url ?? ""}
+          onChange={(e) => {
+            setNote(null);
+            const url = e.target.value.trim();
+            edit((d) => void (d.shop = url ? { ...d.shop, url } : undefined));
+          }}
+        />
+      </Field>
+      {shop?.url && (
+        <>
+          <button
+            type="button"
+            disabled={busy}
+            className="self-start rounded-lg px-2 py-1 text-[13px] font-medium text-[#0071e3] hover:bg-[#0071e3]/5"
+            onClick={() => start(async () => setNote(((r) => (r.ok ? { text: r.text } : { text: r.error, error: true }))(await checkShopProduct(slug, shop.url))))}
+          >
+            {busy ? "Tjekker…" : "Tjek hvad touren kan læse"}
+          </button>
+          {note && <p className={`px-1 text-[12px] leading-snug ${note.error ? "text-[#ff3b30]" : "text-[#1f7a35]"}`}>{note.text}</p>}
+          <Field title="Knappens tekst">
+            <input className={input} value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Book ophold" />
+          </Field>
+          <Field title="Overskrift i kalenderen" hint="Tom: produktets navn.">
+            <input className={input} value={shop.title ?? ""} onChange={(e) => edit((d) => void (d.shop = { ...d.shop!, title: e.target.value || undefined }))} />
+          </Field>
+          <Toggle
+            on={Boolean(cta)}
+            onChange={(on) =>
+              edit((d) => {
+                if (on) d.cta = [{ label, href: "#book", primary: true }, ...d.cta.map((c) => ({ ...c, primary: false }))];
+                else {
+                  d.cta = d.cta.filter((c) => c.href !== "#book");
+                  if (d.cta.length && !d.cta.some((c) => c.primary)) d.cta[0] = { ...d.cta[0], primary: true };
+                }
+              })
+            }
+            title="Tourens hovedknap"
+            hint="Står i boksen øverst, i menuen og på kortene, hvor tourens hovedknap står."
+          />
+          <Toggle
+            on={Boolean(inMenu)}
+            onChange={(on) => edit((d) => void (d.menu = on ? [...d.menu, { title: label, href: "#book" }] : d.menu.filter((m) => !("href" in m && m.href === "#book"))))}
+            title="I menuen"
+            hint="Som et menupunkt nederst - kan flyttes under Menu."
+          />
         </>
       )}
     </Group>
