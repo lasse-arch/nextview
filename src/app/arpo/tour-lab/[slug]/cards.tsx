@@ -85,11 +85,11 @@ export function PlaceCard({
         <>
           <h3>{card.title}</h3>
           {voice && audio && (
-            <button type="button" className={`pc-laes ${reading ? "aktiv" : ""}`} onClick={readAloud}>
+            <button type="button" className={`pc-laes ${reading ? "aktiv" : ""}`} onClick={readAloud} aria-label={reading ? tr("Stop oplæsningen") : voice} title={reading ? tr("Stop oplæsningen") : voice}>
               <svg viewBox="0 0 24 24" aria-hidden>
                 {reading ? <rect x="7" y="7" width="10" height="10" rx="1.5" /> : <path d="M4 9v6h4l5 4V5L8 9zM16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" />}
               </svg>
-              {reading ? tr("Stop oplæsningen") : voice}
+              <span className="pc-laes-tekst">{reading ? tr("Stop oplæsningen") : voice}</span>
             </button>
           )}
           <p ref={textEl} className={open ? "" : "pc-klip"}>
@@ -249,6 +249,11 @@ export const CARDS_CSS = `
   .pc-folk span{font-size:10.5px}
   .pc-btn{font-size:12.5px;padding:5px 11px;border-width:1.5px}
   .pc-luk{top:7px;right:7px;width:26px;height:26px;line-height:26px;font-size:16px}
+  /* Read aloud: a round speaker beside the × - not a whole line of words above the text. */
+  .pc .pc-laes{position:absolute;top:7px;right:38px;width:26px;height:26px;margin:0;padding:0;justify-content:center;border-radius:50%}
+  .pc .pc-laes svg{width:15px;height:15px}
+  .pc .pc-laes-tekst{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+  .pc:has(.pc-laes) h3{margin-right:62px}
   .pc-lille{width:min(66vw,250px)}
   .pc-lille h3{font-size:clamp(14px,3.9vw,15.5px)}
   .pc-lille p{font-size:clamp(12px,3.3vw,13px)}
