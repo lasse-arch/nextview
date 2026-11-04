@@ -264,6 +264,8 @@ export type TourPoint = {
 };
 
 /** A menu item: a spot in the tour, "#luften" (back to the drone scene / map), "#punkt:<point id>" (a point on the drone scene / map, its card open), "#plan" (the site plan full screen), or a page out of the tour. */
+export type InUseItem = { id: string; kind: "video" | "image"; src: string; title?: string; ss: number[] };
+
 export type MenuEntry = { title: string; href: string } | { title: string; items: [string, string][] };
 
 export type TourConfig = {
@@ -621,6 +623,15 @@ export type TourConfig = {
   info?: TourInfo[];
   /** Virtual staging: videos, pictures, web pages, signs and the year wheel on surfaces in the tour (see StagingItem). */
   staging?: StagingItem[];
+  /**
+   * "Se det i brug": a short film (silent, looping) or a photo of a place in
+   * use - the football team on the pitch, morning song in the hall - that
+   * slides up in a small box when the visitor stands at one of its scan points
+   * (`ss`), the first time in a visit. A tap shows it big (a film with sound).
+   * Small on a phone (a thumbnail under the menu button). `title`: shown with
+   * it ("Fodbold i hallen") - left out: "Se det i brug".
+   */
+  inUse?: InUseItem[];
   /** The year wheel (see YearWheel) - opened by "#aarshjul", and on a screen as staging. */
   yearWheel?: YearWheel;
   /**

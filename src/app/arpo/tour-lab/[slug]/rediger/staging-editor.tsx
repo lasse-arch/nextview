@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { StagingItem, TourConfig, YearWheel } from "../../tours/types";
+import type { InUseItem, StagingItem, TourConfig, YearWheel } from "../../tours/types";
 import { Rows } from "./content";
 import { LinkInput } from "./links-open";
 import { Choice, Field, Group, Icon, input, UploadButton, ssOfHref, type PreviewApi } from "./ui";
@@ -280,6 +280,7 @@ export function StagingEditor({ config, edit, preview, focus }: { config: TourCo
           )}
         />
       </Group>
+      <InUseEditor config={config} edit={edit} preview={preview} />
       <YearWheelEditor config={config} edit={edit} preview={preview} />
     </>
   );
@@ -411,6 +412,93 @@ function YearWheelEditor({ config, edit, preview }: { config: TourConfig; edit: 
           )}
         </div>
       </Field>
+    </Group>
+  );
+}
+
+/**
+ * "Se det i brug" (TourConfig.inUse): a short film or a photo of a place in
+ * use, sliding up in a small box when the visitor stands at its points.
+ */
+function InUseEditor({ config, edit, preview }: { config: TourConfig; edit: Edit; preview: PreviewApi }) {
+  const items = config.inUse ?? [];
+  const setItems = (next: InUseItem[]) => edit((d) => void (d.inUse = next.length ? next : undefined));
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+  /** Where the preview stands now - the new one (or the open one) is shown from there. */
+  const here = async (): Promise<number | null> => {
+    setBusy(true);
+    setNote(null);
+    const r = await preview.view();
+    setBusy(false);
+    const ss = r.href ? ssOfHref(r.href) : null;
+    if (!ss) setNote(r.error ?? "Gå ind i touren i forhåndsvisningen og stil dig i rummet først.");
+    return ss;
+  };
+  return (
+    <Group title="Se det i brug">
+      <p className={small}>
+        En kort film (uden lyd, kører i ring) eller et billede af stedet i brug - fx fodboldholdet på banen. Den glider op i en lille boks, når man står i rummet, første gang i et besøg. Et tryk viser den stor (filmen med lyd). På telefon er boksen lille, under menuknappen.
+      </p>
+      <Rows<InUseItem>
+        items={items}
+        onChange={setItems}
+        icon={["bg-[#ff9500]", '<path d="M4 6h11v12H4z"/><path d="M15 10l5-3v10l-5-3"/>']}
+        title={(i) => i.title || (i.kind === "video" ? "Film" : "Billede")}
+        subtitle={(i) => [i.kind === "video" ? "Film" : "Billede", i.src ? null : "mangler fil", i.ss.length ? `vises ved punkt ${i.ss.join(", ")}` : "vises ingen steder"].filter(Boolean).join(" · ")}
+        empty="Ingen endnu."
+        editor={(i, set) => (
+          <>
+            <Field title="Hvad">
+              <Choice value={i.kind} options={[["video", "Film"], ["image", "Billede"]]} onChange={(kind) => set({ ...i, kind })} />
+            </Field>
+            <Field title={i.kind === "video" ? "Filmen" : "Billedet"} hint={i.kind === "video" ? "Upload en mp4 (gerne kort, 5-15 sek.), eller et https-link til en mp4-fil." : "Upload, eller et https-link."}>
+              <div className="flex gap-1.5">
+                <input className={`${input} bg-white`} placeholder="https://…" value={i.src} onChange={(e) => set({ ...i, src: e.target.value.trim() })} />
+                <UploadButton accept={i.kind === "video" ? "video/mp4,video/webm" : "image/*"} onDone={(url) => set({ ...i, src: url })} />
+              </div>
+            </Field>
+            <Field title="Tekst (valgfri)" hint='Står med i boksen, fx "Fodbold i hallen". Tom: "Se det i brug".'>
+              <input className={`${input} bg-white`} value={i.title ?? ""} onChange={(e) => set({ ...i, title: e.target.value || undefined })} />
+            </Field>
+            <Field title="Vises ved punkt" hint="De scanpunkter i rummet, hvor boksen kommer frem.">
+              <div className="flex flex-wrap items-center gap-1.5">
+                {i.ss.map((n) => (
+                  <span key={n} className="flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-[13px] ring-1 ring-black/[.06]">
+                    {n}
+                    <button type="button" className="text-[#c7c7cc] hover:text-[#ff3b30]" onClick={() => set({ ...i, ss: i.ss.filter((x) => x !== n) })} aria-label="Fjern">
+                      ×
+                    </button>
+                  </span>
+                ))}
+                <button
+                  type="button"
+                  disabled={busy}
+                  className="rounded-full px-2.5 py-1 text-[13px] font-medium text-[#0071e3] hover:bg-[#0071e3]/10 disabled:opacity-50"
+                  onClick={async () => {
+                    const ss = await here();
+                    if (ss && !i.ss.includes(ss)) set({ ...i, ss: [...i.ss, ss] });
+                  }}
+                >
+                  + Punktet i forhåndsvisningen
+                </button>
+              </div>
+            </Field>
+          </>
+        )}
+      />
+      <button
+        type="button"
+        disabled={busy}
+        className={linkBtn}
+        onClick={async () => {
+          const ss = await here();
+          setItems([...items, { id: `iu-${Date.now().toString(36)}`, kind: "video", src: "", ss: ss ? [ss] : [] }]);
+        }}
+      >
+        {busy ? "Henter punktet …" : "+ Tilføj ved punktet i forhåndsvisningen"}
+      </button>
+      {note && <p className="px-1 text-[12px] text-[#ff9500]">{note}</p>}
     </Group>
   );
 }
