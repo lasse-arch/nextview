@@ -2816,6 +2816,20 @@ function SiteLookButton({ slug, config, edit }: { slug: string; config: TourConf
   );
 }
 
+const move = <T,>(list: T[], from: number, to: number): T[] => {
+  if (to < 0 || to >= list.length) return list;
+  const next = [...list];
+  const [x] = next.splice(from, 1);
+  next.splice(to, 0, x);
+  return next;
+};
+/** By group, then by the first number in the name (1-34 before 35-67 before 301-332), then by name. */
+const sortByNumber = <T extends { name: string; group?: string }>(list: T[]): T[] => {
+  const first = (s: string) => Number(s.match(/\d+/)?.[0] ?? Infinity);
+  const groups = [...new Set(list.map((x) => x.group ?? ""))];
+  return [...list].sort((a, b) => groups.indexOf(a.group ?? "") - groups.indexOf(b.group ?? "") || first(a.name) - first(b.name) || a.name.localeCompare(b.name, "da"));
+};
+
 /** "Find vej" - places of its own, not in the menu (e.g. the toilets, a row of storage rooms): a name and a scan point. */
 function FindExtra({ config, edit, preview }: { config: TourConfig; edit: (fn: (d: TourConfig) => void) => void; preview: PreviewApi }) {
   const extra = config.wayfinding?.extra ?? [];
@@ -2832,17 +2846,32 @@ function FindExtra({ config, edit, preview }: { config: TourConfig; edit: (fn: (
             </div>
             <LinkInput className="bg-white" value={x.href} onChange={(href) => set(i, { href })} placeholder="Punktet i touren" />
             {x.href && !isPlaceHref(x.href) && <p className="text-[11px] text-[#ff3b30]">Skal være et punkt i touren - brug knappen herunder eller @.</p>}
-            <div className="flex items-center justify-between text-[13px]">
+            <div className="flex items-center justify-between gap-2 text-[13px]">
               <ViewFromPreview preview={preview} onPick={(href) => set(i, { href })} />
-              <button type="button" className="font-medium text-[#ff3b30]" onClick={() => setAll(extra.filter((_, j) => j !== i))}>
-                Slet
-              </button>
+              <div className="flex items-center gap-3">
+                <button type="button" aria-label="Flyt op" disabled={i === 0} className="font-medium text-[#0071e3] disabled:opacity-30" onClick={() => setAll(move(extra, i, i - 1))}>
+                  ↑
+                </button>
+                <button type="button" aria-label="Flyt ned" disabled={i === extra.length - 1} className="font-medium text-[#0071e3] disabled:opacity-30" onClick={() => setAll(move(extra, i, i + 1))}>
+                  ↓
+                </button>
+                <button type="button" className="font-medium text-[#ff3b30]" onClick={() => setAll(extra.filter((_, j) => j !== i))}>
+                  Slet
+                </button>
+              </div>
             </div>
           </div>
         ))}
-        <button type="button" className="text-[13px] font-medium text-[#0071e3]" onClick={() => setAll([...extra, { name: "", href: "" }])}>
-          + Tilføj et sted
-        </button>
+        <div className="flex flex-wrap gap-x-4 gap-y-1">
+          <button type="button" className="text-[13px] font-medium text-[#0071e3]" onClick={() => setAll([...extra, { name: "", href: "" }])}>
+            + Tilføj et sted
+          </button>
+          {extra.length > 1 && (
+            <button type="button" className="text-[13px] font-medium text-[#0071e3]" onClick={() => setAll(sortByNumber(extra))}>
+              Sortér efter nummer
+            </button>
+          )}
+        </div>
       </div>
     </Field>
   );

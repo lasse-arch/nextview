@@ -149,6 +149,17 @@ export function RouteLine({ sdk, points, frame }: { sdk: MpSdk | null; points: V
   );
 }
 
+/** A place's name covers a number: "10-20" (or 10–20) has 15 in it, and "15" or "Rum 15" is 15. */
+export function coversNumber(name: string, n: number): boolean {
+  const text = name.replace(/(\d)\s*[-–—]\s*(\d)/g, "$1-$2");
+  for (const m of text.matchAll(/(\d+)(?:-(\d+))?/g)) {
+    const a = Number(m[1]);
+    const b = m[2] != null ? Number(m[2]) : a;
+    if (n >= Math.min(a, b) && n <= Math.max(a, b)) return true;
+  }
+  return false;
+}
+
 /** "Find vej": pick where to go - a room from the menu, or a box number - and the tour walks you there. */
 export function RouteSheet({
   destinations,
@@ -166,7 +177,11 @@ export function RouteSheet({
   const query = q.trim().toLowerCase();
   const box = query.replace(/^(box|boks|rum|nr\.?)\s*/, "");
   const boxHit = boxes && box && boxes[box] ? [{ name: `Box ${box}`, group: "Boks", href: boxes[box] }] : [];
-  const list = [...boxHit, ...destinations.filter((d) => !query || `${d.group ?? ""} ${d.name}`.toLowerCase().includes(query))];
+  // A number (e.g. 15): the places whose numbers cover it - "10-20", "1-34 & 180-188", "15" - not every name with "15" in it.
+  const n = /^\d{1,6}$/.test(box) ? Number(box) : null;
+  const covering = n != null ? destinations.filter((d) => coversNumber(d.name, n)) : [];
+  const list = [...boxHit, ...(covering.length ? covering : destinations.filter((d) => !query || `${d.group ?? ""} ${d.name}`.toLowerCase().includes(query)))];
+  const numbered = Boolean(boxes) || destinations.some((d) => /\d/.test(d.name));
   const groups = [...new Set(list.map((d) => d.group ?? ""))];
   return (
     <div className="rt-sheet">
@@ -178,7 +193,7 @@ export function RouteSheet({
       </div>
       <p className="rt-lead">{tr("Vælg hvor du skal hen - så går touren vejen derhen fra der, hvor du står.")}</p>
       {/* Focused at once only with a mouse: on a phone the keyboard would cover the list - it comes when they tap the field. */}
-      <input ref={(el) => void (el && matchMedia("(pointer: fine)").matches && !el.dataset.focused && ((el.dataset.focused = "1"), el.focus()))} value={q} onChange={(e) => setQ(e.target.value)} placeholder={boxes ? tr("Søg rum eller boksnummer…") : tr("Søg…")} />
+      <input ref={(el) => void (el && matchMedia("(pointer: fine)").matches && !el.dataset.focused && ((el.dataset.focused = "1"), el.focus()))} value={q} onChange={(e) => setQ(e.target.value)} placeholder={numbered ? tr("Søg rum eller boksnummer…") : tr("Søg…")} />
       <div className="rt-list">
         {groups.map((g) => (
           <div key={g}>
@@ -192,7 +207,7 @@ export function RouteSheet({
               ))}
           </div>
         ))}
-        {!list.length && <p className="rt-none">{boxes ? tr("Ingen fundet - prøv et boksnummer, fx 160.") : tr("Ingen fundet.")}</p>}
+        {!list.length && <p className="rt-none">{numbered ? tr("Ingen fundet - prøv et boksnummer, fx 160.") : tr("Ingen fundet.")}</p>}
       </div>
     </div>
   );
