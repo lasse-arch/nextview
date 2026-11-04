@@ -4078,7 +4078,8 @@ const CSS = `
 .hv-pvideo-lyd{left:48px}
 .hv-pvideo-fuld svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
 .hv-videofuld{position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;background:#000;animation:hvFade .2s ease}
-.hv-videofuld video{width:100%;height:100%;max-height:100dvh;object-fit:contain;background:#000}
+/* The film starts below the close button: the player's own buttons (full screen, sound) sit at its top and mustn't be under the ×. */
+.hv-videofuld video{position:absolute;left:0;right:0;top:calc(66px + env(safe-area-inset-top,0px));bottom:env(safe-area-inset-bottom,0px);width:100%;height:calc(100% - 66px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));object-fit:contain;background:#000}
 .hv-videofuld-luk{position:absolute;top:calc(14px + env(safe-area-inset-top,0px));right:14px;width:40px;height:40px;border:0;border-radius:50%;background:rgba(255,255,255,.92);color:#1d2a30;font-size:24px;line-height:1;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.4)}
 .hv-pvideo-knap{position:absolute;right:10px;bottom:10px;background:rgba(0,0,0,.55);color:#fff;font-size:12px;font-weight:700;padding:5px 10px;border-radius:999px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);pointer-events:none}
 .hv-pkick{margin-top:6px;font-size:11.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#5e7d3a;color:color-mix(in srgb,var(--c-main) 70%,#5e7d3a)}
