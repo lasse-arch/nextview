@@ -694,7 +694,8 @@ export type TourConfig = {
    * every place in the menu can be found unless left out here, so new menu
    * places come with by themselves.
    */
-  wayfinding?: { skip?: string[]; boxes?: Record<string, string>; button?: { desktop?: FindButtonPlace; mobile?: FindButtonPlace }; arrive?: { label: string; href: string } | false; always?: boolean; stepAside?: FindStepAside[]; arriveHide?: number };
+  /** `extra`: places Find vej can find that aren't in the menu (e.g. "Toiletter", "Depotrum 601-727") - a name, the link to the scan point (with its view), and an optional group to list it under (left out: "Andre steder"). */
+  wayfinding?: { skip?: string[]; extra?: { name: string; href: string; group?: string }[]; boxes?: Record<string, string>; button?: { desktop?: FindButtonPlace; mobile?: FindButtonPlace }; arrive?: { label: string; href: string } | false; always?: boolean; stepAside?: FindStepAside[]; arriveHide?: number };
   /**
    * "Find din plads": a few questions on the drone scene/map (who are you,
    * what do you sleep in, what matters most); each answer points at the

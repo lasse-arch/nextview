@@ -2470,8 +2470,13 @@ function TourExperience({
         ("items" in m ? m.items.map(([name, href]) => ({ name, group: m.title, href })) : [{ name: m.title, href: m.href }]).filter(
           (d) => isPlaceHref(d.href) && !T.wayfinding?.skip?.includes(d.href)
         )
+      ).concat(
+        // Places of its own, not in the menu (e.g. the toilets).
+        (T.wayfinding?.extra ?? [])
+          .filter((d) => d.name?.trim() && isPlaceHref(d.href))
+          .map((d) => ({ name: d.name.trim(), group: d.group?.trim() || tx("Andre steder"), href: d.href }))
       ),
-    [T]
+    [T, tx]
   );
   /** Which way to face going from one scan point to the next (the viewer looks down -z; yaw turns left). */
   function heading(a: string, b: string): number | null {

@@ -16,7 +16,7 @@ import { askClaudeForTour, saveAnthropicKey, suggestTourFilter, type ChatTurn } 
 import type { FindStepAside, MenuEntry, TourConfig } from "../../tours/types";
 import type { TourStats } from "@/lib/tour-stats";
 import type { ReportShare } from "@/lib/tour-share";
-import { CardsEditor, DroneViewPicker, GuideEditor, StartEditor, TagsEditor } from "./content";
+import { CardsEditor, DroneViewPicker, GuideEditor, StartEditor, TagsEditor, ViewFromPreview } from "./content";
 import { ResultsPanel } from "./results";
 import { LayoutEditor } from "./layout-editor";
 import { ScanPointsEditor } from "./scanpoints";
@@ -1108,6 +1108,7 @@ export function TourEditor({
                 />
                 <Toggle on={Boolean(config.wayfinding)} onChange={(on) => edit((d) => void (d.wayfinding = on ? d.wayfinding ?? {} : undefined))} title="Find vej" hint="Vælg et rum, og touren går vejen derhen fra der, man står." />
                 {config.wayfinding && <FindTargets config={config} edit={edit} />}
+                {config.wayfinding && <FindExtra config={config} edit={edit} preview={preview} />}
                 {config.wayfinding && (
                   <Field title='Knap på "Du er fremme"' hint="Kortet, når Find vej er nået frem. Linket kan også være #live (listen med ledige), #kontakt (formularen) eller #vej.">
                     <Choice<"main" | "own" | "none">
@@ -2812,6 +2813,38 @@ function SiteLookButton({ slug, config, edit }: { slug: string; config: TourConf
         {note?.text ?? "Farver og skrift fra kundens hjemmeside - så menu, historier, Afspil, knapper og kort har samme røde tråd som siden (bruger de blå knapper, bliver touren blå)."}
       </p>
     </div>
+  );
+}
+
+/** "Find vej" - places of its own, not in the menu (e.g. the toilets, a row of storage rooms): a name and a scan point. */
+function FindExtra({ config, edit, preview }: { config: TourConfig; edit: (fn: (d: TourConfig) => void) => void; preview: PreviewApi }) {
+  const extra = config.wayfinding?.extra ?? [];
+  const setAll = (next: NonNullable<NonNullable<TourConfig["wayfinding"]>["extra"]>) => edit((d) => void (d.wayfinding = { ...d.wayfinding, extra: next.length ? next : undefined }));
+  const set = (i: number, patch: Partial<(typeof extra)[number]>) => setAll(extra.map((x, j) => (j === i ? { ...x, ...patch } : x)));
+  return (
+    <Field title="Andre steder Find vej kan finde" hint="Steder, der ikke står i menuen - fx toiletterne eller depotrum 601-727. Giv stedet et navn, og vælg punktet: gå derhen i forhåndsvisningen og tryk Brug udsynet, eller skriv @ i feltet.">
+      <div className="space-y-2">
+        {extra.map((x, i) => (
+          <div key={i} className="space-y-1.5 rounded-xl bg-white p-2.5 ring-1 ring-black/[.06]">
+            <div className="flex gap-1.5">
+              <input className={`${input} bg-white`} placeholder="Navn, fx Toiletter" value={x.name} onChange={(e) => set(i, { name: e.target.value })} />
+              <input className={`${input} w-2/5 bg-white`} placeholder="Gruppe (valgfri)" value={x.group ?? ""} onChange={(e) => set(i, { group: e.target.value || undefined })} />
+            </div>
+            <LinkInput className="bg-white" value={x.href} onChange={(href) => set(i, { href })} placeholder="Punktet i touren" />
+            {x.href && !isPlaceHref(x.href) && <p className="text-[11px] text-[#ff3b30]">Skal være et punkt i touren - brug knappen herunder eller @.</p>}
+            <div className="flex items-center justify-between text-[13px]">
+              <ViewFromPreview preview={preview} onPick={(href) => set(i, { href })} />
+              <button type="button" className="font-medium text-[#ff3b30]" onClick={() => setAll(extra.filter((_, j) => j !== i))}>
+                Slet
+              </button>
+            </div>
+          </div>
+        ))}
+        <button type="button" className="text-[13px] font-medium text-[#0071e3]" onClick={() => setAll([...extra, { name: "", href: "" }])}>
+          + Tilføj et sted
+        </button>
+      </div>
+    </Field>
   );
 }
 

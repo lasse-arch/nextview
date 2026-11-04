@@ -2200,7 +2200,7 @@ function CardPictures({ config, value, onChange }: { config: TourConfig; value?:
 }
 
 /** "Brug udsynet i forhåndsvisningen": the spot and the exact way the preview looks right now. */
-function ViewFromPreview({ preview, onPick }: { preview: PreviewApi; onPick: (href: string) => void }) {
+export function ViewFromPreview({ preview, onPick }: { preview: PreviewApi; onPick: (href: string) => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   return (
