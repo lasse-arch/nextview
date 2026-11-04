@@ -611,6 +611,7 @@ export function TourEditor({
           {/* Always there, only hidden on the other tabs: what's being written (and an answer on its way) isn't lost when you look elsewhere. */}
           <div className={tab === "claude" ? "contents" : "hidden"}>
             <ClaudePanel
+              preview={preview}
               ask={aiAsk}
               config={config}
               chat={chat}
@@ -1613,7 +1614,10 @@ function ClaudePanel({
   setChat,
   ready: initiallyReady,
   onApply,
+  preview,
 }: {
+  /** The preview: where it stands is sent along with each message ("som er i forhåndsvisningen nu"). */
+  preview?: PreviewApi;
   /** A request from elsewhere in the editor (a suggestion from Resultater) - sent as if typed. */
   ask?: { request: string; at: number } | null;
   config: TourConfig;
@@ -1669,7 +1673,10 @@ function ClaudePanel({
     start(async () => {
       // "@Name" in the message: nextviewAI is told exactly which place, point or feature it means (and its link).
       const named = tourTargets(config).filter((t) => ask.includes(`@${t.label}`));
-      const sent = named.length ? `${ask}\n\n(@-henvisninger: ${named.map((t) => `@${t.label} = ${t.kind.toLowerCase()} med linket ${t.href}`).join("; ")})` : ask;
+      // Where the preview stands right now (place + the way it looks) - so "det, der er i forhåndsvisningen nu" means something. A short wait at most.
+      const here = preview ? await Promise.race([preview.view().catch(() => null), new Promise<null>((r) => setTimeout(() => r(null), 2500))]) : null;
+      const at = here?.href ? `\n\n(Forhåndsvisningen står lige nu her: ${here.room ? `"${here.room}", ` : ""}linket ${here.href} - med den retning, den kigger. Siger brugeren "her", "det jeg ser" eller "som i forhåndsvisningen", er det dette sted.)` : "";
+      const sent = (named.length ? `${ask}\n\n(@-henvisninger: ${named.map((t) => `@${t.label} = ${t.kind.toLowerCase()} med linket ${t.href}`).join("; ")})` : ask) + at;
       const r = await askClaudeForTour(config, history, sent, pics).catch((err: unknown) => ({ ok: false as const, error: `Kunne ikke nå nextviewAI (${err instanceof Error ? err.message : err}) - prøv igen.` }));
       if (!r.ok) {
         // A revoked/changed key: ask for the new one right here.
