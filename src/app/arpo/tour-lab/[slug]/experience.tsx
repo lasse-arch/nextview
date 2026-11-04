@@ -325,6 +325,17 @@ export function Experience(props: ExperienceProps) {
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
   }, [props.tour]);
+  // iPad: Safari's toolbar floats over a page that fills the whole screen (viewport-fit=cover) - and the tour's top (the
+  // logo, Menu, the guide's bars) went under it, the safe area doesn't count it. So on an iPad the page starts below the
+  // toolbar; phones keep cover (around the island, where the safe area is counted).
+  useEffect(() => {
+    const ipad = /iPad/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+    const meta = document.querySelector<HTMLMetaElement>('meta[name="viewport"]');
+    if (!ipad || !meta || !/viewport-fit=cover/.test(meta.content)) return;
+    const before = meta.content;
+    meta.content = before.replace(/,?\s*viewport-fit=cover/, "");
+    return () => void (meta.content = before);
+  }, []);
   const T = draft ?? props.tour;
   // The language: the link's (?sprog=), else the visitor's own when the tour has it, else Danish. The editor's preview is told by the editor.
   const langs = tourLanguages(T);
