@@ -18,6 +18,7 @@ type Product = { name: string; dates: string[]; basePrice: number | null; guests
 const pad = (n: number) => String(n).padStart(2, "0");
 const iso = (y: number, m: number, d: number) => `${y}-${pad(m + 1)}-${pad(d)}`;
 const nightsBetween = (a: string, b: string) => Math.round((Date.parse(`${b}T12:00:00Z`) - Date.parse(`${a}T12:00:00Z`)) / 86_400_000);
+const weekday = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString("da-DK", { weekday: "long", timeZone: "UTC" }).replace(/^./, (c) => c.toUpperCase());
 const shortDay = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString("da-DK", { day: "numeric", month: "short", timeZone: "UTC" });
 const money = (n: number) => `${new Intl.NumberFormat("da-DK", { maximumFractionDigits: 0 }).format(n)} kr.`;
 
@@ -134,7 +135,7 @@ export function ShopSheet({ slug, point, title, url, onBook, onClose }: { slug: 
                     key={d}
                     type="button"
                     disabled={!free.has(d) && !weeksOn(d).length}
-                    className={`${d === from || d === to ? "valgt" : ""} ${from && to && d > from && d < to ? "imellem" : ""} ${!free.has(d) && weeksOn(d).length ? "uge" : ""} ${weekAt && weeksOn(weekAt)[0] && weeksOn(d)[0]?.from === weeksOn(weekAt)[0].from ? "uge-valgt" : ""}`}
+                    className={`${d === from || d === to ? "valgt" : ""} ${from && to && d > from && d < to ? "imellem" : ""} ${!free.has(d) && weeksOn(d).length ? "uge" : ""} ${weekAt && weeksOn(weekAt)[0] && d >= weeksOn(weekAt)[0].from && d <= weeksOn(weekAt)[0].to ? (d === weeksOn(weekAt)[0].from || d === weeksOn(weekAt)[0].to ? "uge-valgt uge-ende" : "uge-valgt") : ""}`}
                     onClick={() => {
                       if (!free.has(d) && weeksOn(d).length) {
                         setFrom(null);
@@ -161,7 +162,7 @@ export function ShopSheet({ slug, point, title, url, onBook, onClose }: { slug: 
             {weekAt && weeksOn(weekAt).length > 0 ? (
               <div className="sh-uger">
                 <b>
-                  {tr("Uge {n}", { n: String(weeksOn(weekAt)[0].week) })} · {shortDay(weeksOn(weekAt)[0].from)} - {shortDay(weeksOn(weekAt)[0].to)}
+                  {tr("Uge {n}", { n: String(weeksOn(weekAt)[0].week) })} · {weekday(weeksOn(weekAt)[0].from)} {shortDay(weeksOn(weekAt)[0].from)} - {weekday(weeksOn(weekAt)[0].to)} {shortDay(weeksOn(weekAt)[0].to)}
                 </b>
                 {weeksOn(weekAt).map((w) => (
                   <div key={w.url}>
@@ -243,6 +244,7 @@ export const SHOP_CSS = `
 .sh-days button.valgt,.sh-days button.valgt:hover{background:var(--c-accent);color:#fff}
 .sh-days button.uge{color:#1d2a30;text-decoration:none;background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--c-accent) 14%,transparent) 0 4px,transparent 4px 8px)}
 .sh-days button.uge-valgt,.sh-days button.uge-valgt:hover{background:color-mix(in srgb,var(--c-accent) 30%,transparent)}
+.sh-days button.uge-ende,.sh-days button.uge-ende:hover{background:var(--c-accent);color:#fff}
 .sh-ugeinfo{display:flex;align-items:center;justify-content:center;gap:6px;margin:8px 0 0;font-size:12px;color:#5d6b72}
 .sh-ugeinfo i{width:16px;height:12px;border-radius:3px;background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--c-accent) 30%,transparent) 0 3px,transparent 3px 6px)}
 .sh-uger{margin-top:12px;padding-top:10px;border-top:1px solid rgba(0,0,0,.08)}
