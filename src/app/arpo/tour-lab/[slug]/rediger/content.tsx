@@ -1176,6 +1176,23 @@ function GuideSetupEditor({ config, edit, preview, onEditPoint }: Omit<Props, "s
                   />
                   <LinkInput className="mt-1.5 bg-white" value={s.button?.href ?? ""} onChange={(href) => set({ ...s, button: href || s.button?.label ? { label: s.button?.label ?? "", href } : undefined })} />
                 </Field>
+                {s.button2 ? (
+                  <Field title="Knap nummer 2">
+                    <div className="flex gap-1.5">
+                      <input className={`${input} bg-white`} placeholder="Tekst på knappen" value={s.button2.label} onChange={(e) => set({ ...s, button2: { label: e.target.value, href: s.button2?.href ?? "" } })} />
+                      <button type="button" className="px-1 text-[#c7c7cc] hover:text-[#ff3b30]" aria-label="Fjern knappen" onClick={() => set({ ...s, button2: undefined })}>
+                        ×
+                      </button>
+                    </div>
+                    <LinkInput className="mt-1.5 bg-white" value={s.button2.href} onChange={(href) => set({ ...s, button2: { label: s.button2?.label ?? "", href } })} />
+                  </Field>
+                ) : (
+                  s.button?.label && (
+                    <button type="button" className="px-1 text-left text-[13px] font-medium text-[#0071e3]" onClick={() => set({ ...s, button2: { label: "", href: "" } })}>
+                      + Knap mere
+                    </button>
+                  )
+                )}
                 <StopVoice
                   config={config}
                   stop={s}

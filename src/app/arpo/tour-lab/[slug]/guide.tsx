@@ -185,15 +185,19 @@ export function GuidePlayer({
             {tr("Træk i billedet for at se dig omkring, og tryk for at gå - guiden venter på dig.")}
           </div>
         )}
-        {stop.button?.label && stop.button.href ? (
-          // The stop's own button - on the last stop it takes the place of the tour's main one.
-          <div className="gd-end">
-            <TourLink href={stop.button.href} label={stop.button.label} className="hv-btn hv-primary" onClick={() => onEvent("cta_click", { label: stop.button!.label, link_url: stop.button!.href, place: "guide_stop" })}>
-              {stop.button.label}
-            </TourLink>
+        {(stop.button?.label && stop.button.href) || (stop.button2?.label && stop.button2.href) ? (
+          // The stop's own buttons - on the last stop they take the place of the tour's main one.
+          <div className="gd-end gd-knapper">
+            {[stop.button, stop.button2].map((b, i) =>
+              b?.label && b.href ? (
+                <TourLink key={i} href={b.href} label={b.label} className={`hv-btn ${i === 0 ? "hv-primary" : "hv-secondary"}`} onClick={() => onEvent("cta_click", { label: b.label, link_url: b.href, place: "guide_stop" })}>
+                  {b.label}
+                </TourLink>
+              ) : null
+            )}
           </div>
         ) : null}
-        {index < stops.length - 1 ? <div className="gd-next">{tr("Næste: {sted}", { sted: stops[index + 1].title })}</div> : !stop.button?.label && end && <div className="gd-end">{end}</div>}
+        {index < stops.length - 1 ? <div className="gd-next">{tr("Næste: {sted}", { sted: stops[index + 1].title })}</div> : !stop.button?.label && !stop.button2?.label && end && <div className="gd-end">{end}</div>}
         <div className="gd-ctrl">
           <button type="button" aria-label={tr("Forrige")} disabled={index === 0} onClick={() => step(index - 1, "back")}>
             ‹
@@ -281,6 +285,8 @@ export const GUIDE_CSS = `
 .gd-card{position:absolute;left:24px;bottom:24px;width:min(400px,calc(100% - 48px));padding:18px 20px 14px;border-radius:18px;background:rgba(255,255,255,.96);color:#1d2a30;box-shadow:0 16px 44px rgba(0,0,0,.32);animation:hvUp .45s cubic-bezier(.2,.7,.2,1) both}
 .gd-count{font-size:11px;font-weight:800;letter-spacing:.14em;color:var(--c-accent)}
 .gd-card h3{margin:4px 0 6px;font-family:var(--font-heading);font-size:24px;line-height:1.1;font-weight:800;color:var(--c-main)}
+.gd-knapper{display:flex;flex-wrap:wrap;gap:8px}
+.gd-knapper .hv-btn{margin:0}
 .gd-video{margin:-4px -4px 12px}
 .gd-video .hv-pvideo{margin:0;border-radius:12px}
 .gd-card p{margin:0 0 14px;font-size:15px;line-height:1.5;color:#3d4a50}

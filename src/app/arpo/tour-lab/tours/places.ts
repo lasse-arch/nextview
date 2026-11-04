@@ -127,7 +127,7 @@ export function allGuides(T: TourConfig): { id: string | null; title: string; li
 /** The guided tours the visitor can find in the tour - all but those only a link starts (`linkOnly`). */
 export const shownGuides = (T: TourConfig) => allGuides(T).filter((g) => !g.linkOnly);
 
-export type GuideStop = { href: string; title: string; text: string; audio?: string; audioText?: string; short?: string; turn?: GuideTurn; turnSpeed?: GuideTurnSpeed; turnMode?: GuideTurnMode; button?: { label: string; href: string }; people?: CardPerson[]; images?: string[]; video?: { src: string; poster?: string } };
+export type GuideStop = { href: string; title: string; text: string; audio?: string; audioText?: string; short?: string; turn?: GuideTurn; turnSpeed?: GuideTurnSpeed; turnMode?: GuideTurnMode; button?: { label: string; href: string }; button2?: { label: string; href: string }; people?: CardPerson[]; images?: string[]; video?: { src: string; poster?: string } };
 
 const sameWords = (a: string, b: string) => a.replace(/\s+/g, " ").trim() === b.replace(/\s+/g, " ").trim();
 /**
