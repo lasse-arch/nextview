@@ -115,13 +115,16 @@ export function ShopTourEditor({ config, edit, slug }: { config: TourConfig; edi
             type="button"
             disabled={busy}
             className="self-start rounded-lg px-2 py-1 text-[13px] font-medium text-[#0071e3] hover:bg-[#0071e3]/5"
-            onClick={() => start(async () => setNote(((r) => (r.ok ? { text: r.text } : { text: r.error, error: true }))(await checkShopProduct(slug, shop.url))))}
+            onClick={() => start(async () => setNote(((r) => (r.ok ? { text: r.text } : { text: r.error, error: true }))(await checkShopProduct(slug, shop.url, shop.weeks))))}
           >
             {busy ? "Tjekker…" : "Tjek hvad touren kan læse"}
           </button>
           {note && <p className={`px-1 text-[12px] leading-snug ${note.error ? "text-[#ff3b30]" : "text-[#1f7a35]"}`}>{note.text}</p>}
           <Field title="Knappens tekst">
             <input className={input} value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Book ophold" />
+          </Field>
+          <Field title="Hele uger (valgfri)" hint='Fx siden med Bondegårdsferie: de grå dage i kalenderen, som kan bookes som en hel uge, får et mønster - et tryk viser ugens muligheder, pris og Book.'>
+            <input className={input} placeholder="https://webshop.…/page/bondegaardsferie" value={shop.weeks ?? ""} onChange={(e) => edit((d) => void (d.shop = { ...d.shop!, weeks: e.target.value.trim() || undefined }))} />
           </Field>
           <Field title="Overskrift i kalenderen" hint="Tom: produktets navn.">
             <input className={input} value={shop.title ?? ""} onChange={(e) => edit((d) => void (d.shop = { ...d.shop!, title: e.target.value || undefined }))} />

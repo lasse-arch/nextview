@@ -3,7 +3,7 @@ import { teamSeesTour } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { tourCors } from "@/lib/tour-cors";
 import { stayProblem } from "@/lib/availability/next-stay";
-import { nightsOf, readShopProduct, shopPrice } from "@/lib/availability/webshop";
+import { nightsOf, readShopProduct, readShopWeeks, shopPrice } from "@/lib/availability/webshop";
 import type { TourConfig } from "@/app/arpo/tour-lab/tours/types";
 
 /*
@@ -29,15 +29,15 @@ function tooMany(request: Request): boolean {
 }
 
 /** The point's shop address - only from the tour itself. */
-async function shopOf(slug: string, point: string): Promise<{ url: string; team: boolean } | null> {
+async function shopOf(slug: string, point: string): Promise<{ url: string; weeks?: string; team: boolean } | null> {
   const tour = await prisma.tour.findUnique({ where: { slug: String(slug) }, select: { config: true, published: true } });
   if (!tour) return null;
   const team = !tour.published ? Boolean(await teamSeesTour(slug)) : false;
   if (!tour.published && !team) return null;
   const c = tour.config as unknown as TourConfig;
   // "_tour": the tour's own "Book ophold" (TourConfig.shop) - else a point's.
-  const url = point === "_tour" ? c.shop?.url : c.points?.find((p) => p.id === point)?.shop?.url;
-  return url ? { url, team } : null;
+  const shop = point === "_tour" ? c.shop : c.points?.find((p) => p.id === point)?.shop;
+  return shop?.url ? { url: shop.url, weeks: shop.weeks, team } : null;
 }
 
 export async function OPTIONS(request: Request) {
@@ -50,9 +50,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
   const shop = await shopOf((await params).slug, point);
   if (!shop) return NextResponse.json({ error: "Ikke fundet." }, { status: 404, headers: tourCors(request) });
   try {
-    const p = await readShopProduct(shop.url);
+    const [p, weeks] = await Promise.all([readShopProduct(shop.url), shop.weeks ? readShopWeeks(shop.weeks).catch(() => []) : Promise.resolve([])]);
+    const today = new Date().toISOString().slice(0, 10);
     return NextResponse.json(
-      { name: p.name, dates: p.dates, basePrice: p.basePrice, guests: p.guests },
+      { name: p.name, dates: p.dates, basePrice: p.basePrice, guests: p.guests, weeks: weeks.filter((w) => w.to >= today) },
       { headers: tourCors(request, { "Cache-Control": shop.team ? "private, no-store" : "public, s-maxage=300, stale-while-revalidate=600" }) }
     );
   } catch {

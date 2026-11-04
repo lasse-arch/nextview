@@ -119,3 +119,75 @@ export async function shopPrice(raw: string, product: ShopProduct, from: string,
   const data = JSON.parse((await readLimited(res, 20_000)).toString("utf8") || "{}") as { error?: boolean; priceInclVat?: unknown };
   return !data.error && typeof data.priceInclVat === "number" && Number.isFinite(data.priceInclVat) ? data.priceInclVat : null;
 }
+
+/*
+ * Whole weeks sold as their own products (e.g. Nymarksminde's "Bondegårdsferie":
+ * a page linking to "Ferie - Standard lejlighed - Uge 27", "… - Camping - Uge
+ * 28" …): each week's options, its days, price and whether it's still in
+ * stock - so the days the calendar can't be booked by the night can be booked
+ * as a week. Read from the page and its products, cached 10 minutes; only
+ * products on the page's own site.
+ */
+export type ShopWeek = { url: string; name: string; week: number; from: string; to: string; price: number | null; available: boolean };
+
+const weekCache = new Map<string, { at: number; weeks: ShopWeek[] }>();
+const MONTHS_DA = ["januar", "februar", "marts", "april", "maj", "juni", "juli", "august", "september", "oktober", "november", "december"];
+const month = (m: string) => MONTHS_DA.findIndex((x) => x.startsWith(m.toLowerCase().replace(/\.$/, "").slice(0, 3)));
+
+/** "(3. juli - 10. juli)" in a year → the days, YYYY-MM-DD. */
+function period(textOf: string, year: number): { from: string; to: string } | null {
+  const m = textOf.match(/\((\d{1,2})\.\s*([a-zæøå]+)\.?\s*-\s*(\d{1,2})\.\s*([a-zæøå]+)\.?\)/i);
+  if (!m) return null;
+  const a = month(m[2]);
+  const b = month(m[4]);
+  if (a < 0 || b < 0) return null;
+  const iso = (y: number, mo: number, d: number) => new Date(Date.UTC(y, mo, d)).toISOString().slice(0, 10);
+  return { from: iso(year, a, Number(m[1])), to: iso(b < a ? year + 1 : year, b, Number(m[3])) };
+}
+
+async function readWeek(url: URL): Promise<ShopWeek | null> {
+  const res = await safeFetch(url, { headers: { "User-Agent": UA, Accept: "text/html" }, signal: AbortSignal.timeout(12_000) });
+  if (!res.ok) return null;
+  const html = (await readLimited(res, 3_000_000)).toString("utf8");
+  const plain = text(html.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi, ""));
+  const title = text(html.match(/<title>([^<]*)<\/title>/i)?.[1] ?? "");
+  const wk = title.match(/uge\s*(\d{1,2})/i) ?? plain.match(/uge\s*(\d{1,2})\s+(\d{4})/i);
+  const year = Number(plain.match(/uge\s*\d{1,2}\s+(\d{4})/i)?.[1] ?? new Date().getUTCFullYear());
+  const days = period(plain, year);
+  if (!wk || !days) return null;
+  // "Sommerferie - Standard lejlighed - Uge 27" → "Standard lejlighed".
+  const parts = title.split(/\s+-\s+/).map((p) => p.trim()).filter((p) => p && !/^uge\s*\d+/i.test(p));
+  const name = (parts.length > 1 ? parts.slice(1) : parts).join(" - ").slice(0, 60) || "Uge";
+  const stock = html.match(/"availability":\s*"https?:\/\/schema\.org\/(\w+)"/)?.[1];
+  return { url: url.toString(), name, week: Number(wk[1]), ...days, price: kr(plain.match(/Grundpris\s*([\d.,]+)\s*DKK/i)?.[1]), available: !stock || /InStock|LimitedAvailability|PreOrder/i.test(stock) };
+}
+
+export async function readShopWeeks(raw: string): Promise<ShopWeek[]> {
+  const page = shopUrl(raw);
+  if (!page) throw new Error("Adressen skal være et https-link til siden med ugerne.");
+  const key = page.toString();
+  const hit = weekCache.get(key);
+  if (hit && Date.now() - hit.at < TEN_MINUTES) return hit.weeks;
+  const res = await safeFetch(page, { headers: { "User-Agent": UA, Accept: "text/html" }, signal: AbortSignal.timeout(12_000) });
+  if (!res.ok) throw new Error(`Webshoppen svarede ${res.status}.`);
+  const html = (await readLimited(res, 3_000_000)).toString("utf8");
+  const links = [
+    ...new Set(
+      [...html.matchAll(/href="([^"]*\/product\/[^"#?]*uge[^"#?]*)"/gi)]
+        .map((m) => {
+          try {
+            const u = new URL(m[1], page);
+            return u.hostname === page.hostname && u.protocol === "https:" ? u.toString() : null;
+          } catch {
+            return null;
+          }
+        })
+        .filter((x): x is string => Boolean(x))
+    ),
+  ].slice(0, 40);
+  const weeks = (await Promise.all(links.map((l) => readWeek(new URL(l)).catch(() => null)))).filter((w): w is ShopWeek => Boolean(w));
+  weeks.sort((a, b) => a.from.localeCompare(b.from) || a.name.localeCompare(b.name, "da"));
+  if (weekCache.size > 100) weekCache.clear();
+  weekCache.set(key, { at: Date.now(), weeks });
+  return weeks;
+}

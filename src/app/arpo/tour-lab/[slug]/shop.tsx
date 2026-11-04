@@ -12,11 +12,13 @@ import { useT } from "../tours/i18n-react";
  * and pays there - nothing is put in a basket from here).
  */
 
-type Product = { name: string; dates: string[]; basePrice: number | null; guests: { id: string; label: string; price: number | null; max: number }[] };
+type Week = { url: string; name: string; week: number; from: string; to: string; price: number | null; available: boolean };
+type Product = { name: string; dates: string[]; basePrice: number | null; guests: { id: string; label: string; price: number | null; max: number }[]; weeks?: Week[] };
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const iso = (y: number, m: number, d: number) => `${y}-${pad(m + 1)}-${pad(d)}`;
 const nightsBetween = (a: string, b: string) => Math.round((Date.parse(`${b}T12:00:00Z`) - Date.parse(`${a}T12:00:00Z`)) / 86_400_000);
+const shortDay = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString("da-DK", { day: "numeric", month: "short", timeZone: "UTC" });
 const money = (n: number) => `${new Intl.NumberFormat("da-DK", { maximumFractionDigits: 0 }).format(n)} kr.`;
 
 export function ShopSheet({ slug, point, title, url, onBook, onClose }: { slug: string; point: string; title: string; url: string; onBook: (label: string, href: string) => void; onClose: () => void }) {
@@ -50,6 +52,10 @@ export function ShopSheet({ slug, point, title, url, onBook, onClose }: { slug: 
   }, [slug, point, tr]);
 
   const free = useMemo(() => new Set(product?.dates ?? []), [product]);
+  /** The whole weeks (e.g. bondegårdsferie) covering a day the calendar can't book by the night. */
+  const weeksOn = (d: string) => (product?.weeks ?? []).filter((w) => d >= w.from && d < w.to);
+  /** A week picked on a grey day: its options (standard, stor, camping …). */
+  const [weekAt, setWeekAt] = useState<string | null>(null);
 
   // The shop's price for the stay, once both days and the guests are set.
   useEffect(() => {
@@ -125,9 +131,18 @@ export function ShopSheet({ slug, point, title, url, onBook, onClose }: { slug: 
                   <button
                     key={d}
                     type="button"
-                    disabled={!free.has(d)}
-                    className={`${d === from || d === to ? "valgt" : ""} ${from && to && d > from && d < to ? "imellem" : ""}`}
-                    onClick={() => pick(d)}
+                    disabled={!free.has(d) && !weeksOn(d).length}
+                    className={`${d === from || d === to ? "valgt" : ""} ${from && to && d > from && d < to ? "imellem" : ""} ${!free.has(d) && weeksOn(d).length ? "uge" : ""} ${weekAt && weeksOn(weekAt)[0] && weeksOn(d)[0]?.from === weeksOn(weekAt)[0].from ? "uge-valgt" : ""}`}
+                    onClick={() => {
+                      if (!free.has(d) && weeksOn(d).length) {
+                        setFrom(null);
+                        setTo(null);
+                        setQuote(null);
+                        return setWeekAt(d);
+                      }
+                      setWeekAt(null);
+                      pick(d);
+                    }}
                   >
                     {Number(d.slice(8))}
                   </button>
@@ -136,8 +151,36 @@ export function ShopSheet({ slug, point, title, url, onBook, onClose }: { slug: 
                 )
               )}
             </div>
-            <p className="sh-hint">{!from ? tr("Vælg ankomst") : !to ? tr("Vælg afrejse") : `${tr("{n} nætter", { n: String(nights) })}`}</p>
-            {product.guests.length > 0 && (
+            {product.weeks?.length ? (
+              <p className="sh-ugeinfo">
+                <i aria-hidden /> {tr("Kun hele uger - tryk på ugen")}
+              </p>
+            ) : null}
+            {weekAt && weeksOn(weekAt).length > 0 ? (
+              <div className="sh-uger">
+                <b>
+                  {tr("Uge {n}", { n: String(weeksOn(weekAt)[0].week) })} · {shortDay(weeksOn(weekAt)[0].from)} - {shortDay(weeksOn(weekAt)[0].to)}
+                </b>
+                {weeksOn(weekAt).map((w) => (
+                  <div key={w.url}>
+                    <span>
+                      {w.name}
+                      {w.price != null && <small>{money(w.price)}</small>}
+                    </span>
+                    {w.available ? (
+                      <button type="button" className="hv-btn hv-primary" onClick={() => onBook(`${tr("Book")} ${w.name}`, w.url)}>
+                        {tr("Book")}
+                      </button>
+                    ) : (
+                      <em>{tr("Udsolgt")}</em>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="sh-hint">{!from ? tr("Vælg ankomst") : !to ? tr("Vælg afrejse") : `${tr("{n} nætter", { n: String(nights) })}`}</p>
+            )}
+            {!weekAt && product.guests.length > 0 && (
               <div className="sh-guests">
                 {product.guests.map((g) => (
                   <div key={g.id}>
@@ -155,7 +198,7 @@ export function ShopSheet({ slug, point, title, url, onBook, onClose }: { slug: 
                 ))}
               </div>
             )}
-            <div className="sh-foot">
+            {!weekAt && <div className="sh-foot">
               <span>
                 {quote === "busy"
                   ? tr("Henter pris …")
@@ -168,7 +211,7 @@ export function ShopSheet({ slug, point, title, url, onBook, onClose }: { slug: 
               <button type="button" className="hv-btn hv-primary" onClick={() => onBook(tr("Book"), url)}>
                 {tr("Book")}
               </button>
-            </div>
+            </div>}
           </>
         )}
       </div>
@@ -195,6 +238,16 @@ export const SHOP_CSS = `
 .sh-days button:not(:disabled):hover{background:rgba(0,0,0,.05)}
 .sh-days button.imellem,.sh-days button.imellem:hover{background:color-mix(in srgb,var(--c-accent) 16%,transparent)}
 .sh-days button.valgt,.sh-days button.valgt:hover{background:var(--c-accent);color:#fff}
+.sh-days button.uge{color:#1d2a30;text-decoration:none;background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--c-accent) 14%,transparent) 0 4px,transparent 4px 8px)}
+.sh-days button.uge-valgt,.sh-days button.uge-valgt:hover{background:color-mix(in srgb,var(--c-accent) 30%,transparent)}
+.sh-ugeinfo{display:flex;align-items:center;justify-content:center;gap:6px;margin:8px 0 0;font-size:12px;color:#5d6b72}
+.sh-ugeinfo i{width:16px;height:12px;border-radius:3px;background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--c-accent) 30%,transparent) 0 3px,transparent 3px 6px)}
+.sh-uger{margin-top:12px;padding-top:10px;border-top:1px solid rgba(0,0,0,.08)}
+.sh-uger>b{display:block;margin-bottom:6px;font-size:14px;color:var(--c-main)}
+.sh-uger>div{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid rgba(0,0,0,.06);font-size:14px;font-weight:600}
+.sh-uger small{display:block;font-weight:500;color:#5d6b72;font-size:12.5px}
+.sh-uger .hv-btn{flex:none;margin:0;padding:7px 18px;font-size:13.5px}
+.sh-uger em{font-style:normal;font-size:13px;color:#b42318;font-weight:700}
 .sh-hint{margin:8px 0 0;font-size:13px;color:#5d6b72;text-align:center}
 .sh-guests{margin-top:12px;border-top:1px solid rgba(0,0,0,.08)}
 .sh-guests>div{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid rgba(0,0,0,.06);font-size:14px}

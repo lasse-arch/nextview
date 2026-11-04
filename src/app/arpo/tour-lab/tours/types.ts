@@ -244,7 +244,7 @@ export type TourPoint = {
    * every 10 minutes), guests, the shop's price for the stay - and Book, which
    * opens the product in the shop. `label`: the button's words (default "Vælg datoer").
    */
-  shop?: { url: string; label?: string };
+  shop?: { url: string; label?: string; weeks?: string };
   /** Where the point is on the tour's site plan (sitePlan), as fractions of the plan picture (x1, y1, x2, y2) - gives the card a button that shows the plan zoomed in on it. */
   planBox?: [number, number, number, number];
   text: string;
@@ -646,7 +646,7 @@ export type TourConfig = {
    * guests, the shop's price, and Book into the shop. `title`: the sheet's
    * heading (default: the product's name).
    */
-  shop?: { url: string; title?: string };
+  shop?: { url: string; title?: string; /** A page linking to whole weeks sold as their own products (e.g. Bondegårdsferie): the days the calendar can't book by the night can be booked as that week. */ weeks?: string };
   /**
    * "Næste rundvisninger": the coming dates from a sign-up form (a Zenbi form,
    * https://signup.zenbi.dk/form/<id> - read every 10 minutes, past dates left

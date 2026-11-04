@@ -1519,13 +1519,14 @@ function ShopField({ value, onChange }: { value?: TourPoint["shop"]; onChange: (
       {value?.url && (
         <>
           <input className={`${input} mt-1.5 bg-white`} placeholder='Knappens tekst - tom: "Vælg datoer"' value={value.label ?? ""} onChange={(e) => onChange({ ...value, label: e.target.value || undefined })} />
+          <input className={`${input} mt-1.5 bg-white`} placeholder="Hele uger (valgfri) - fx siden med Bondegårdsferie" value={value.weeks ?? ""} onChange={(e) => onChange({ ...value, weeks: e.target.value.trim() || undefined })} />
           <button
             type="button"
             disabled={busy}
             className="mt-1.5 self-start rounded-lg px-2 py-1 text-[13px] font-medium text-[#0071e3] hover:bg-[#0071e3]/5"
             onClick={() =>
               start(async () => {
-                const r = await checkShopProduct(slug, value.url);
+                const r = await checkShopProduct(slug, value.url, value.weeks);
                 setNote(r.ok ? { text: r.text } : { text: r.error, error: true });
               })
             }
