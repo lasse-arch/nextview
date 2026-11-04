@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { translateTour } from "@/lib/actions/tour-translate";
+import { findLinkTranslations } from "@/lib/actions/tour-links";
 import { LANGUAGES, langName, linkIn, tourLanguages, tourWebLinks, translatableTexts } from "../../tours/i18n";
 import type { TourConfig } from "../../tours/types";
 import { Choice, Group, input } from "./ui";
@@ -103,7 +104,7 @@ export function LanguagesPanel({ slug, config, edit, showIn }: { slug: string; c
         </Group>
       )}
 
-      {lang && links.length > 0 && <LinksPerLanguage config={config} edit={edit} langs={langs} lang={lang} setLang={setShown} links={links} />}
+      {lang && links.length > 0 && <LinksPerLanguage slug={slug} config={config} edit={edit} langs={langs} lang={lang} setLang={setShown} links={links} />}
 
       {lang && (
         <Group title="Teksterne">
@@ -148,10 +149,42 @@ export function LanguagesPanel({ slug, config, edit, showIn }: { slug: string; c
  * language (e.g. the English page of the farm holiday) - left empty, the
  * Danish page opens. A rule ("starter med … → …") covers many links at once.
  */
-function LinksPerLanguage({ config, edit, langs, lang, setLang, links }: { config: TourConfig; edit: (fn: (d: TourConfig) => void) => void; langs: string[]; lang: string; setLang: (l: string) => void; links: string[] }) {
+function LinksPerLanguage({ slug, config, edit, langs, lang, setLang, links }: { slug: string; config: TourConfig; edit: (fn: (d: TourConfig) => void) => void; langs: string[]; lang: string; setLang: (l: string) => void; links: string[] }) {
   const map = config.linkTranslations?.[lang] ?? {};
   const rules = Object.entries(map).filter(([k]) => k.endsWith("*"));
   const [rule, setRule] = useState({ from: "", to: "" });
+  const [finding, startFind] = useTransition();
+  const [found, setFound] = useState<string | null>(null);
+  /** Each linked page is read, and its own language versions (hreflang) fill the empty fields - nothing typed is overwritten. */
+  const find = () =>
+    startFind(async () => {
+      setFound(null);
+      const r = await findLinkTranslations(slug, links, langs);
+      if (!r.ok) return setFound(r.error);
+      let n = 0;
+      const per: string[] = [];
+      edit((d) => {
+        const all = { ...(d.linkTranslations ?? {}) };
+        for (const [l, map] of Object.entries(r.found)) {
+          const next = { ...(all[l] ?? {}) };
+          let k = 0;
+          for (const [da, x] of Object.entries(map))
+            if (!next[da]?.trim()) {
+              next[da] = x;
+              k++;
+            }
+          if (Object.keys(next).length) all[l] = next;
+          n += k;
+          if (k) per.push(`${langName(l)} ${k}`);
+        }
+        d.linkTranslations = Object.keys(all).length ? all : undefined;
+      });
+      setFound(
+        n
+          ? `Fandt ${n} adresser (${per.join(", ")}) på ${r.read} sider. Tjek dem, og tryk Gem.`
+          : `Ingen nye adresser fundet på ${r.read} sider${r.failed ? ` (${r.failed} kunne ikke læses)` : ""} - siderne siger ikke selv, hvor sprogudgaverne ligger. Skriv dem ind herunder.`
+      );
+    });
   const set = (da: string, value: string) =>
     edit((d) => {
       const next = { ...(d.linkTranslations?.[lang] ?? {}) };
@@ -168,6 +201,11 @@ function LinksPerLanguage({ config, edit, langs, lang, setLang, links }: { confi
       <p className="text-[13px] leading-snug text-[#6e6e73]">
         Knapper og links fører til de danske sider. Skriv adressen på samme side i {langName(lang)}-udgaven ud for hvert link, så åbner touren den, når den vises på det sprog. Tomt felt = den danske side.
       </p>
+      <button type="button" disabled={finding} onClick={find} className="self-start rounded-xl bg-[#0071e3] px-4 py-2 text-[14px] font-medium text-white disabled:opacity-50">
+        {finding ? "Leder på hjemmesiden …" : "Find dem på hjemmesiden"}
+      </button>
+      <p className="text-[12px] leading-snug text-[#8e8e93]">Læser hver side, touren linker til, og tager de sprogudgaver, siden selv nævner. Felter, du har skrevet i, bliver ikke rørt.</p>
+      {found && <p className="text-[13px] text-[#1d1d1f]">{found}</p>}
       {langs.length > 1 && <Choice value={lang} options={langs.map((l): [string, string] => [l, langName(l)])} onChange={setLang} />}
       <p className="text-[12px] text-[#8e8e93]">
         {done} af {links.length} links har deres egen adresse ({langName(lang)}).
