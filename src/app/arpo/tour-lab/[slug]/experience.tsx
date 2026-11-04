@@ -4381,6 +4381,18 @@ const CSS = `
   .hv-menu > *,.hv-wel > *,.dz-cover > *{zoom:var(--ui-zoom,1)}
   .gd-card{max-height:calc((100dvh - 120px) / var(--ui-zoom,1));overflow-y:auto}
 }
+/*
+ * iPad and other touch tablets (wider than a phone, but a finger - not a mouse): the bottom row keeps clear of the home
+ * bar (safe area), and what is pressed is at least finger-sized.
+ */
+@media (min-width:761px){
+  .hv-filtre,.hv-luften,.hv-room,.hv-pano-luk,.pc,.dz-dock,.dz-sheet,.dz-here,.pk,.pk-mini,.dy-bar,.ld-card,.km-zoom,.vs-lyd,.vs-knap,.hv-film button,.fb-toast{margin-bottom:env(safe-area-inset-bottom,0px)}
+}
+@media (min-width:761px) and (hover:none) and (pointer:coarse){
+  .hv-btn{min-height:44px}
+  .hv-chips button,.hv-chips a{min-height:38px}
+  .hv-luften,.hv-pano-luk{min-height:44px}
+}
 `;
 
 /* The logo in the right corner: the menu button, its panel and what sits under it change to the left. */

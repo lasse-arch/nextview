@@ -341,6 +341,16 @@ export const GUIDE_CSS = `
   .gd-lille .gd-stop-tekst{display:none}.gd-lille .gd-stop-x{display:inline}
   .gd-mellem .gd-stop,.gd-lille .gd-stop{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:46%;font-size:12px}
 }
+/* iPad and other touch tablets: a little bigger card, finger-sized buttons, and "Gå selv rundt" never cut off. */
+@media (min-width:761px){.gd-card{margin-bottom:env(safe-area-inset-bottom,0px)}}
+@media (min-width:761px) and (hover:none) and (pointer:coarse){
+  .gd-card{width:min(440px,calc(100% - 48px))}
+  .gd-stor{width:min(500px,calc(100% - 48px))}
+  .gd-ctrl{gap:8px}
+  .gd-ctrl button{height:44px;min-width:44px}
+  .gd-ctrl .gd-stop{flex:none;padding:0 6px}
+  .gd-card p{font-size:16px}
+}
 @media (min-width:761px){
   .gd-lille{width:min(320px,calc(100% - 48px));padding:14px 16px 12px}.gd-lille h3{font-size:20px}.gd-lille p{font-size:14px}
   .gd-stor{width:min(460px,calc(100% - 48px))}.gd-stor h3{font-size:26px}.gd-stor p{font-size:16px}
