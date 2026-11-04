@@ -3593,7 +3593,8 @@ function TourExperience({
           manual={G?.manual}
           voiceDelay={T.voiceDelay}
           held={guideHeld}
-          walkHint={phase === "tour"}
+          // The hint to walk and look around is for the 3D tour - not over a picture (a 180°/360° photo), where it only fills the card.
+          walkHint={phase === "tour" && !pano && !guideImage}
           walkHintStops={G?.walkHint === "all" ? Infinity : G?.walkHint === "none" ? 0 : (G?.walkHint ?? 2)}
           onResume={() => {
             // Fortsæt: back to the stop the card shows, if the visitor walked off - card and view always agree.
@@ -3837,8 +3838,21 @@ function PanoView({
       if (cancelled || !el.current || !window.pannellum) return;
       if (!image && !(dir && panos)) return;
       const hfov = window.innerWidth <= 760 ? panoHfov(true, zoom?.mobile) : panoHfov(false, zoom?.desktop);
-      const v = window.pannellum.viewer(el.current, options({ yaw: startYaw ?? 0, pitch: startPitch ?? -10, hfov }, first));
+      // Hidden until it has drawn the picture at its size: before that Pannellum can show it squeezed for a moment.
+      const box = el.current;
+      box.style.opacity = "0";
+      const v = window.pannellum.viewer(box, options({ yaw: startYaw ?? 0, pitch: startPitch ?? -10, hfov }, first));
       viewer = v;
+      const reveal = () => {
+        if (cancelled || box.style.opacity === "1") return;
+        v.resize();
+        box.style.transition = "opacity .3s ease";
+        box.style.opacity = "1";
+      };
+      v.on("load", reveal);
+      // A picture already fetched can be drawn before the line above - and never later than this, whatever happens.
+      if ((v as unknown as { isLoaded?: () => boolean }).isLoaded?.()) reveal();
+      setTimeout(reveal, 2500);
       openPanoView = () => ({ yaw: v.getYaw(), pitch: v.getPitch(), hfov: v.getHfov(), image });
       if (!later) return;
       // The sharp copy: fetched meanwhile, then a second viewer over the first - same view - shown once it has drawn, and the small one let go.
