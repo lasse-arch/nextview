@@ -4249,7 +4249,10 @@ const CSS = `
 .hv-signatur:hover{color:#1d2a30}
 .hv-luften{position:absolute;left:16px;bottom:20px;z-index:6;display:flex;align-items:center;gap:8px;background:var(--c-main);color:#fff;border:0;border-radius:999px;padding:11px 18px;font:800 14px inherit;font-family:inherit;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.3)}
 .hv-luften svg{width:18px;height:18px}
-.hv-room{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);z-index:6;background:rgba(255,255,255,.95);color:var(--c-main);border-radius:999px;padding:8px 16px;font-weight:800;font-size:14px;box-shadow:0 4px 14px rgba(0,0,0,.25)}
+.hv-room{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);z-index:6;background:rgba(255,255,255,.95);color:var(--c-main);border-radius:999px;padding:8px 16px;font-weight:800;font-size:14px;line-height:1.25;box-shadow:0 4px 14px rgba(0,0,0,.25);width:max-content;max-width:min(560px,calc(100% - 32px));text-align:center;text-wrap:balance}
+/* A long name: two even, centred lines in a rounded box - not a stretched pill with a ragged edge. (One line: still a pill.) */
+.hv-room{border-radius:18px}
+@media (max-width:760px){.hv-room{max-width:min(230px,calc(100% - 140px));font-size:13px;padding:7px 14px;border-radius:16px}}
 .hv-menuknap{position:absolute;top:calc(14px + env(safe-area-inset-top,0px));right:14px;z-index:9;background:var(--c-main);color:#fff;border:0;border-radius:999px;padding:9px 18px;font-weight:800;font-size:14px;font-family:inherit;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.3)}
 .hv-menu{position:absolute;top:0;right:0;bottom:0;z-index:8;width:320px;max-width:100%;background:rgba(255,255,255,.98);overflow-y:auto;transform:translateX(105%);transition:transform .3s ease;box-shadow:-10px 0 30px rgba(0,0,0,.25)}
 .hv-menu.aaben{transform:none}
