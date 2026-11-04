@@ -164,7 +164,7 @@ export function FeedbackPanel({
             <button
               type="button"
               disabled={pending || checking || !(status?.to || who?.email.trim()) || Boolean(status?.filmingMissing)}
-              onClick={() => confirm(`Send touren til gennemgang uden tjek - til ${who?.email.trim() || status?.to}?`) && send(false)}
+              onClick={() => confirm(`Send touren til gennemgang uden tjek - til ${[who?.email.trim() || status?.to, status?.to2].filter(Boolean).join(" og ")}?`) && send(false)}
               className="w-full rounded-xl bg-white py-2 text-[14px] font-medium text-[#0071e3] ring-1 ring-black/[.08] disabled:opacity-40"
             >
               {pending ? "Sender …" : status?.approvedAt ? "Send til ny gennemgang" : "Send til gennemgang"}
