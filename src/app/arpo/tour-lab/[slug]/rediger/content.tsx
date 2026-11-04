@@ -235,7 +235,10 @@ function ButtonsEditor({
   rooms,
   allowRoom,
   scan,
+  preview,
 }: {
+  /** The preview: "Vis" flies it to the spot, and the exact way it looks can be taken from it. */
+  preview?: PreviewApi;
   buttons: CardButton[];
   onChange: (b: CardButton[]) => void;
   rooms: string[];
@@ -270,15 +273,28 @@ function ButtonsEditor({
               />
             )}
             {"room" in b && isPlaceHref(b.room) ? (
-              <div className="flex items-center justify-between gap-2 px-1 text-[13px]">
-                <span className="text-[#1d1d1f]">Scanpunkt {ssOfHref(b.room) ?? "?"}</span>
-                <button
-                  type="button"
-                  className="font-medium text-[#0071e3]"
-                  onClick={() => scan?.pick(b.label, ssOfHref(b.room), (ss) => onChange(buttons.map((x, j) => (j === i ? { label: x.label, room: scan.href(ss) } : x))))}
-                >
-                  Vælg på kortet
-                </button>
+              <div className="space-y-1 px-1 text-[13px]">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[#1d1d1f]">
+                    Scanpunkt {ssOfHref(b.room) ?? "?"}
+                    <span className="text-[#8e8e93]">{/[?&](rot|sr)=/.test(b.room) ? " · med valgt retning" : " · standardretning"}</span>
+                  </span>
+                  <span className="flex gap-3">
+                    {preview && (
+                      <button type="button" className="font-medium text-[#0071e3]" title="Flyv forhåndsvisningen derhen - så ser du, hvor den kigger" onClick={() => preview.go(b.label, b.room)}>
+                        Vis
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="font-medium text-[#0071e3]"
+                      onClick={() => scan?.pick(b.label, ssOfHref(b.room), (ss) => onChange(buttons.map((x, j) => (j === i ? { label: x.label, room: scan.href(ss) } : x))))}
+                    >
+                      Vælg på kortet
+                    </button>
+                  </span>
+                </div>
+                {preview && <ViewFromPreview preview={preview} onPick={(href) => onChange(buttons.map((x, j) => (j === i ? { label: x.label, room: href } : x)))} />}
               </div>
             ) : "room" in b ? (
               <select className={input} value={b.room} onChange={(e) => onChange(buttons.map((x, j) => (j === i ? { label: x.label, room: e.target.value } : x)))}>
@@ -1567,6 +1583,7 @@ export function CardsEditor({ config, edit, preview, scanMap, mpskinsHidden }: O
                 </div>
               </details>
               <ButtonsEditor
+                preview={preview}
                 buttons={c.buttons ?? []}
                 rooms={rooms}
                 allowRoom
@@ -1648,7 +1665,7 @@ export function CardsEditor({ config, edit, preview, scanMap, mpskinsHidden }: O
               title="Brug tourens hovedknapper"
               hint="Knapperne fra Knapper og kontakt - retter du dem dér, følger kortet med. Fra: kortet får sine egne knapper."
             />
-            {nudge.buttons.length > 0 && <ButtonsEditor
+            {nudge.buttons.length > 0 && <ButtonsEditor preview={preview}
               buttons={nudge.buttons}
               rooms={rooms}
               allowRoom={false}
@@ -2162,5 +2179,31 @@ function CardPictures({ config, value, onChange }: { config: TourConfig; value?:
         ))}
       </div>
     </Field>
+  );
+}
+
+/** "Brug udsynet i forhåndsvisningen": the spot and the exact way the preview looks right now. */
+function ViewFromPreview({ preview, onPick }: { preview: PreviewApi; onPick: (href: string) => void }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <div>
+      <button
+        type="button"
+        disabled={busy}
+        className="font-medium text-[#0071e3] disabled:opacity-50"
+        onClick={async () => {
+          setBusy(true);
+          setError(null);
+          const r = await preview.view();
+          setBusy(false);
+          if (r.error || !r.href) return setError(r.error ?? "Forhåndsvisningen svarede ikke.");
+          onPick(r.href);
+        }}
+      >
+        {busy ? "Henter…" : "Brug udsynet i forhåndsvisningen"}
+      </button>
+      {error && <p className="text-[12px] text-[#ff3b30]">{error}</p>}
+    </div>
   );
 }
