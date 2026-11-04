@@ -1522,9 +1522,41 @@ function unusedTabs(c: TourConfig): string {
   return off.join(",");
 }
 
+/** "+ N ikke i brug" folded out or not - kept on this computer. */
+const navOffSubscribe = (cb: () => void) => {
+  window.addEventListener("editor-nav-off", cb);
+  return () => window.removeEventListener("editor-nav-off", cb);
+};
+const navOffRead = () => {
+  try {
+    return localStorage.getItem("editor-nav-off") === "1";
+  } catch {
+    return false;
+  }
+};
+
 const SectionNav = memo(function SectionNav({ tab, menu, feedbackOpen, unused, onPick, className, hidden }: { tab: Tab; menu: MenuEntry[]; feedbackOpen: number; unused: string; onPick: (t: Tab) => void; className: string; hidden: Tab[] }) {
   const [search, setSearch] = useState("");
   const found = useMemo(() => searchTabs(search, menu).filter((f) => !hidden.includes(f.tab)), [search, menu, hidden]);
+  // The sections as headed in TABS (the first, nextviewAI, without a heading) - the order stays as it is.
+  const sections = useMemo(() => {
+    const out: { heading: string; tabs: (typeof TABS)[number][] }[] = [];
+    for (const row of TABS.filter(([t]) => !hidden.includes(t))) {
+      if (row[3] || !out.length) out.push({ heading: row[3] ?? "", tabs: [] });
+      out[out.length - 1].tabs.push(row);
+    }
+    return out;
+  }, [hidden]);
+  const offList = unused.split(",").filter(Boolean);
+  // Features not in use fold away into one quiet line per section; "Mere" folds away too - remembered on this computer.
+  const showOff = useSyncExternalStore(navOffSubscribe, navOffRead, () => false);
+  const toggleOff = () => {
+    try {
+      localStorage.setItem("editor-nav-off", showOff ? "0" : "1");
+    } catch {}
+    window.dispatchEvent(new Event("editor-nav-off"));
+  };
+  const [openMore, setOpenMore] = useState(false);
   return (
     <nav className={`${className} min-h-0 w-full flex-none flex-col md:w-[210px] gap-0.5 overflow-y-auto overscroll-contain p-3`}>
       <div className="relative mb-1.5">
@@ -1564,23 +1596,50 @@ const SectionNav = memo(function SectionNav({ tab, menu, feedbackOpen, unused, o
           <p className="px-2.5 py-2 text-[12px] text-[#8e8e93]">Intet fundet - prøv et andet ord, eller spørg nextviewAI.</p>
         ))}
       {!search.trim() &&
-        TABS.filter(([t]) => !hidden.includes(t)).map(([t, text, icon, heading]) => (
-          <div key={t} className="contents">
-            {heading && <div className="mt-4 px-2.5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-[#8e8e93]">{heading}</div>}
-            <button
-              type="button"
-              onClick={() => onPick(t)}
-              title={unused.split(",").includes(t) ? `${text}: ikke i brug i touren endnu - åbn for at slå det til` : undefined}
-              className={`flex items-center gap-2.5 rounded-[9px] px-2.5 py-[7px] text-left text-[14px] transition ${tab === t ? "bg-white font-medium shadow-[0_1px_3px_rgba(0,0,0,.08)]" : "text-[#1d1d1f]/80 hover:bg-black/[.04]"}`}
-            >
-              <span className={`flex h-7 w-7 items-center justify-center rounded-[7px] ${tab === t ? "bg-[#0071e3] text-white" : "bg-white text-[#6e6e73] ring-1 ring-black/[.06]"}`}>
-                <Icon d={icon} className="h-4 w-4" />
-              </span>
-              <span className={unused.split(",").includes(t) && tab !== t ? "text-[#1d1d1f]/40" : ""}>{text}</span>
-              {t === "feedback" && feedbackOpen > 0 && <span className="ml-auto rounded-full bg-[#ff9500] px-1.5 text-[11px] font-semibold text-white">{feedbackOpen}</span>}
-            </button>
-          </div>
-        ))}
+        sections.map((sec) => {
+          const off = sec.tabs.filter(([t]) => offList.includes(t) && t !== tab);
+          const on = sec.tabs.filter((x) => !off.includes(x));
+          const more = sec.heading === "Mere";
+          const folded = more ? !openMore && !sec.tabs.some(([t]) => t === tab) : !showOff;
+          return (
+            <div key={sec.heading || "top"} className="contents">
+              {sec.heading &&
+                (more ? (
+                  <button type="button" onClick={() => setOpenMore((o) => !o)} className="mt-3 flex items-center justify-between px-2.5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-[#8e8e93] hover:text-[#6e6e73]">
+                    {sec.heading}
+                    <span className={`text-[10px] transition ${folded ? "" : "rotate-180"}`} aria-hidden>
+                      ▾
+                    </span>
+                  </button>
+                ) : (
+                  <div className="mt-3 px-2.5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-[#8e8e93]">{sec.heading}</div>
+                ))}
+              {(more && folded ? [] : more ? sec.tabs : folded ? on : sec.tabs).map(([t, text, icon]) => {
+                const unusedTab = offList.includes(t);
+                return (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => onPick(t)}
+                    title={unusedTab ? `${text}: ikke i brug i touren endnu - åbn for at slå det til` : undefined}
+                    className={`group flex items-center gap-2.5 rounded-[9px] px-2 py-[5px] text-left text-[14px] transition ${tab === t ? "bg-white font-medium text-[#1d1d1f] shadow-[0_1px_3px_rgba(0,0,0,.08)]" : "text-[#1d1d1f]/80 hover:bg-black/[.04]"}`}
+                  >
+                    <span className={`flex h-[26px] w-[26px] flex-none items-center justify-center rounded-[7px] transition ${tab === t ? "bg-[#0071e3] text-white" : unusedTab ? "bg-transparent text-[#aeaeb2] ring-1 ring-black/[.05]" : "bg-white text-[#6e6e73] ring-1 ring-black/[.06] group-hover:text-[#1d1d1f]"}`}>
+                      <Icon d={icon} className="h-[15px] w-[15px]" />
+                    </span>
+                    <span className={`min-w-0 truncate ${unusedTab && tab !== t ? "text-[#1d1d1f]/40" : ""}`}>{text}</span>
+                    {t === "feedback" && feedbackOpen > 0 && <span className="ml-auto rounded-full bg-[#ff9500] px-1.5 text-[11px] font-semibold text-white">{feedbackOpen}</span>}
+                  </button>
+                );
+              })}
+              {!more && off.length > 0 && (
+                <button type="button" onClick={toggleOff} title={showOff ? undefined : off.map(([, text]) => text).join(", ")} className="px-2.5 py-[3px] text-left text-[12px] text-[#8e8e93] hover:text-[#0071e3]">
+                  {showOff ? "Skjul dem, der ikke er i brug" : `+ ${off.length} ikke i brug`}
+                </button>
+              )}
+            </div>
+          );
+        })}
     </nav>
   );
 });
