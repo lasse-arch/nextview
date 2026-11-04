@@ -38,7 +38,12 @@ export function FeedbackPanel({
   preview,
   config,
   onApply,
+  dirty = false,
+  onSave,
 }: {
+  /** The editor has changes not saved yet - the check and the mail use the saved tour, so they save first. */
+  dirty?: boolean;
+  onSave?: () => Promise<boolean>;
   slug: string;
   token: string | null;
   preview: PreviewApi;
@@ -101,6 +106,8 @@ export function FeedbackPanel({
   async function runCheck() {
     setNote(null);
     setChecking(true);
+    // What's checked is the saved tour: changes made by hand are saved first.
+    if (dirty && onSave && !(await onSave())) return setChecking(false);
     const r = await checkTourForReview(slug).catch((err: unknown) => ({ ok: false as const, error: err instanceof Error ? err.message : String(err) }));
     setChecking(false);
     if (!r.ok) return setNote({ text: r.error, error: true });
@@ -114,6 +121,8 @@ export function FeedbackPanel({
     setCheck(null);
     setNote(null);
     start(async () => {
+      // The customer sees the saved tour: changes made by hand are saved first.
+      if (dirty && onSave && !(await onSave())) return setNote({ text: "Touren kunne ikke gemmes - mailen er ikke sendt.", error: true });
       const r = await sendForReview(slug, reminder, who ?? undefined);
       if (r.ok) setWho(null);
       if (!r.ok) return setNote({ text: r.error, error: true });
@@ -245,6 +254,8 @@ export function FeedbackPanel({
             sendLabel={status?.sentAt && !status.approvedAt ? "Send påmindelse" : status?.approvedAt ? "Send til ny gennemgang" : "Send til gennemgang"}
             onSend={() => send(Boolean(status?.sentAt && !status.approvedAt))}
             onAgain={() => void runCheck()}
+            checking={checking}
+            dirty={dirty}
             config={config}
             onApply={onApply}
             onDone={(done) => {
@@ -449,7 +460,12 @@ function CheckResult({
   config,
   onApply,
   onDone,
+  checking = false,
+  dirty = false,
 }: {
+  checking?: boolean;
+  /** Changes not saved yet: the buttons save first (and say so). */
+  dirty?: boolean;
   config: TourConfig;
   onApply: (c: TourConfig) => void;
   /** The suggestions ticked off - kept on the tour. */
@@ -488,14 +504,14 @@ function CheckResult({
       })}
       {check.ai != null && <AiNotes key={check.at} notes={check.ai} initialDone={check.done} onDone={onDone} config={config} onApply={onApply} />}
       <div className="flex gap-2 pt-1">
-        <button type="button" disabled={pending} onClick={onSend} className={`flex-1 whitespace-nowrap rounded-xl py-2.5 text-[14px] font-semibold text-white disabled:opacity-40 ${errors ? "bg-[#ff3b30]" : "bg-[#0071e3]"}`}>
-          {errors ? `${sendLabel} alligevel` : sendLabel}
+        <button type="button" disabled={pending || checking} onClick={onSend} className={`flex-1 whitespace-nowrap rounded-xl py-2.5 text-[14px] font-semibold text-white disabled:opacity-40 ${errors ? "bg-[#ff3b30]" : "bg-[#0071e3]"}`}>
+          {pending ? "Sender …" : `${dirty ? "Gem og " + sendLabel.charAt(0).toLowerCase() + sendLabel.slice(1) : sendLabel}${errors ? " alligevel" : ""}`}
         </button>
-        <button type="button" onClick={onAgain} className="whitespace-nowrap rounded-xl bg-white px-4 py-2 text-[14px] font-medium text-[#0071e3] ring-1 ring-black/[.08]">
-          Tjek igen
+        <button type="button" disabled={checking || pending} onClick={onAgain} className="whitespace-nowrap rounded-xl bg-white px-4 py-2 text-[14px] font-medium text-[#0071e3] ring-1 ring-black/[.08] disabled:opacity-50">
+          {checking ? "Tjekker …" : dirty ? "Gem og tjek igen" : "Tjek igen"}
         </button>
       </div>
-      <p className="text-[11px] leading-snug text-[#8e8e93]">Tjekket ser på den gemte tour. Gem først, hvis du har rettet noget.</p>
+      <p className="text-[11px] leading-snug text-[#8e8e93]">{dirty ? "Du har ændringer, der ikke er gemt - knapperne gemmer touren først, så tjekket og kunden ser den, som den er nu." : "Tjekket ser på den gemte tour."}</p>
     </div>
   );
 }

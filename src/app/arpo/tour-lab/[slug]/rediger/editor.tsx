@@ -468,22 +468,28 @@ export function TourEditor({
     setMsg(null);
   }
 
+  /** Saves the tour as it is in the editor now - true when it went well (else the error is shown). */
+  async function saveNow(): Promise<boolean> {
+    const r = await saveTour(slug, config, note);
+    if (!r.ok) {
+      setMsg({ ok: false, text: r.error });
+      return false;
+    }
+    setDirty(false);
+    setNote("");
+    // Saved for real - the draft is in the tour now (the server cleared its copy).
+    try {
+      localStorage.removeItem(localKey);
+    } catch {}
+    setAutosavedAt(null);
+    setMsg({ ok: true, text: "Gemt" });
+    setTimeout(() => setMsg(null), 2500);
+    setPreviewKey((k) => k + 1);
+    router.refresh();
+    return true;
+  }
   function save() {
-    start(async () => {
-      const r = await saveTour(slug, config, note);
-      if (!r.ok) return setMsg({ ok: false, text: r.error });
-      setDirty(false);
-      setNote("");
-      // Saved for real - the draft is in the tour now (the server cleared its copy).
-      try {
-        localStorage.removeItem(localKey);
-      } catch {}
-      setAutosavedAt(null);
-      setMsg({ ok: true, text: "Gemt" });
-      setTimeout(() => setMsg(null), 2500);
-      setPreviewKey((k) => k + 1);
-      router.refresh();
-    });
+    start(async () => void (await saveNow()));
   }
 
   const linkCtx = { config, edit };
@@ -859,6 +865,8 @@ export function TourEditor({
             {tab === "okonomi" && economy && <EconomyPanel economy={economy} />}
             {tab === "feedback" && (
               <FeedbackPanel
+                dirty={dirty}
+                onSave={saveNow}
                 slug={slug}
                 token={reviewToken}
                 preview={preview}
