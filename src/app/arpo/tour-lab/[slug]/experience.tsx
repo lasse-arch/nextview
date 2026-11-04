@@ -2474,7 +2474,12 @@ function TourExperience({
         // Places of its own, not in the menu (e.g. the toilets).
         (T.wayfinding?.extra ?? [])
           .filter((d) => d.name?.trim() && isPlaceHref(d.href))
-          .map((d) => ({ name: d.name.trim(), group: d.group?.trim() || tx("Andre steder"), href: d.href }))
+          // In a menu group of the same name (case and spaces aside) it goes in with that group's places.
+          .map((d) => {
+            const g = d.group?.trim();
+            const menuGroup = g ? T.menu.find((m) => "items" in m && m.title.trim().toLowerCase().replace(/\s+/g, " ") === g.toLowerCase().replace(/\s+/g, " "))?.title : undefined;
+            return { name: d.name.trim(), group: menuGroup ?? (g || tx("Andre steder")), href: d.href };
+          })
       ),
     [T, tx]
   );

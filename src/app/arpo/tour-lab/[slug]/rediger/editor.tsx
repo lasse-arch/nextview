@@ -2836,13 +2836,13 @@ function FindExtra({ config, edit, preview }: { config: TourConfig; edit: (fn: (
   const setAll = (next: NonNullable<NonNullable<TourConfig["wayfinding"]>["extra"]>) => edit((d) => void (d.wayfinding = { ...d.wayfinding, extra: next.length ? next : undefined }));
   const set = (i: number, patch: Partial<(typeof extra)[number]>) => setAll(extra.map((x, j) => (j === i ? { ...x, ...patch } : x)));
   return (
-    <Field title="Andre steder Find vej kan finde" hint="Steder, der ikke står i menuen - fx toiletterne eller depotrum 601-727. Giv stedet et navn, og vælg punktet: gå derhen i forhåndsvisningen og tryk Brug udsynet, eller skriv @ i feltet.">
+    <Field title="Andre steder Find vej kan finde" hint="Steder, der ikke står i menuen - fx toiletterne eller depotrum 601-727. Giv stedet et navn, og vælg punktet: gå derhen i forhåndsvisningen og tryk Brug udsynet, eller skriv @ i feltet. Vælg en af menuens kategorier, så står stedet sammen med den i Find vej - ellers under Andre steder.">
       <div className="space-y-2">
         {extra.map((x, i) => (
           <div key={i} className="space-y-1.5 rounded-xl bg-white p-2.5 ring-1 ring-black/[.06]">
             <div className="flex gap-1.5">
               <input className={`${input} bg-white`} placeholder="Navn, fx Toiletter" value={x.name} onChange={(e) => set(i, { name: e.target.value })} />
-              <input className={`${input} w-2/5 bg-white`} placeholder="Gruppe (valgfri)" value={x.group ?? ""} onChange={(e) => set(i, { group: e.target.value || undefined })} />
+              <input className={`${input} w-2/5 bg-white`} list="find-grupper" placeholder="Kategori (valgfri)" value={x.group ?? ""} onChange={(e) => set(i, { group: e.target.value || undefined })} />
             </div>
             <LinkInput className="bg-white" value={x.href} onChange={(href) => set(i, { href })} placeholder="Punktet i touren" />
             {x.href && !isPlaceHref(x.href) && <p className="text-[11px] text-[#ff3b30]">Skal være et punkt i touren - brug knappen herunder eller @.</p>}
@@ -2862,6 +2862,12 @@ function FindExtra({ config, edit, preview }: { config: TourConfig; edit: (fn: (
             </div>
           </div>
         ))}
+        {/* The menu's own groups: a place put in one is listed with that group's places in Find vej. */}
+        <datalist id="find-grupper">
+          {config.menu.filter((m) => "items" in m).map((m) => (
+            <option key={m.title} value={m.title} />
+          ))}
+        </datalist>
         <div className="flex flex-wrap gap-x-4 gap-y-1">
           <button type="button" className="text-[13px] font-medium text-[#0071e3]" onClick={() => setAll([...extra, { name: "", href: "" }])}>
             + Tilføj et sted
