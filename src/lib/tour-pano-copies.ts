@@ -25,11 +25,16 @@ const SOURCE = (size: Size, url: string) => `pano-${SIZES[size]}:${url}`;
  * photo shown full screen gets the same copies, so it opens at once).
  */
 export function tourPanoramas(c: TourConfig): string[] {
-  const hrefs = [
-    ...c.menu.flatMap((m) => ("items" in m ? m.items.map(([, h]) => h) : [m.href])),
-    ...(c.bento?.tiles.map((t) => t.href) ?? []),
-    ...(c.guide?.stops.map((s) => ("href" in s ? s.href : "")) ?? []),
-  ];
+  // Every link in the setup that opens a picture - the menu, tiles, every guided tour's stops, a day's steps, buttons …
+  const hrefs: string[] = [];
+  const walk = (v: unknown, key?: string) => {
+    if (key === "panoCopies" || key === "translations" || key === "linkTranslations") return;
+    if (typeof v === "string") {
+      if (key === "href" || key === "room" || v.startsWith("#billede")) hrefs.push(v);
+    } else if (Array.isArray(v)) v.forEach((x) => walk(x));
+    else if (v && typeof v === "object") for (const [k, x] of Object.entries(v)) walk(x, k);
+  };
+  walk(c);
   const pictures = hrefs.map((h) => (h ? imageOfHref(h) : null));
   const urls = [...c.points.map((p) => p.panorama), c.drone?.panorama, c.map?.panorama ? c.map.image : undefined, ...pictures];
   return [...new Set(urls.filter((u): u is string => Boolean(u)))];
