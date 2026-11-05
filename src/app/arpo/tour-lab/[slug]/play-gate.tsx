@@ -1,5 +1,6 @@
 "use client";
 
+import { fontHrefs } from "../tours/fonts";
 import { TourLogo } from "./tour-logo";
 import { useT } from "../tours/i18n-react";
 import type { TourConfig } from "../tours/types";
@@ -61,7 +62,9 @@ export function PlayGate({ T, isPreview, onPlay }: { T: TourConfig; /** Asked wh
         {T.cover?.enter || tr("Gå ind i touren")}
       </span>
       <style>{PLAY_CSS}</style>
-      <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.font.replace(/ /g, "+")}:wght@400;700;800&display=swap`} />
+      {fontHrefs(T.font, [400, 700, 800]).map((href) => (
+        <link key={href} rel="stylesheet" href={href} />
+      ))}
     </button>
   );
 }

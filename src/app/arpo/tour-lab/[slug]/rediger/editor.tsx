@@ -32,6 +32,7 @@ import { fetchSiteFavicon, hostTourFiles } from "@/lib/actions/tour-files";
 import { AiMemoryPanel } from "./memory";
 import { WeatherEditor } from "./weather-editor";
 import { StagingEditor } from "./staging-editor";
+import { CLOUDFLARE_TOUR_ORIGIN } from "@/lib/public-urls";
 import { LineDayEditor } from "./line-day-editor";
 import { FinderEditor } from "./finder-editor";
 import { MapEditor } from "./map-editor";
@@ -567,6 +568,18 @@ export function TourEditor({
           ) : (
             <a href={`/arpo/tour-lab/${slug}`} target="_blank" rel="noopener" className="rounded-full bg-[#f2f2f7] px-3.5 py-1.5 text-[13px] font-medium hover:bg-[#e9e9eb]">
               Åbn tour ↗
+            </a>
+          )}
+          {onCloudflare && (
+            // The published version (tour.nextview360.dk) - the one customers' websites show, which may be older than this.
+            <a
+              href={`${CLOUDFLARE_TOUR_ORIGIN}/${slug}`}
+              target="_blank"
+              rel="noopener"
+              title="Den udgivne version på tour.nextview360.dk - den, kundens hjemmeside viser. Ændringer kommer først med, når du udgiver igen."
+              className="hidden rounded-full bg-[#f2f2f7] px-3.5 py-1.5 text-[13px] font-medium hover:bg-[#e9e9eb] md:inline-block"
+            >
+              Cloudflare-version (udgivet) ↗
             </a>
           )}
         </div>

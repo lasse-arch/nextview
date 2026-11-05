@@ -17,6 +17,7 @@ import type { AvailableUnit } from "@/lib/availability/boxdepotet";
 import { WeatherChip, WEATHER_CSS } from "./weather";
 import { CommuteSheet, COMMUTE_CSS } from "./commute";
 import { fitPano } from "../tours/pano-cover";
+import { fontHrefs } from "../tours/fonts";
 import { SitePlan360Layer, sitePlan360Ready, SITE_PLAN_360_CSS } from "./site-plan-360";
 import { SITE_PLAN_CSS, SitePlanControls, SitePlanLegend, type SitePlanState } from "./site-plan";
 import { FeatureTour, featuresSeen, FEATURES_CSS, type DemoContact } from "./features";
@@ -2684,7 +2685,7 @@ function TourExperience({
           "--c-accent": T.colors.accent,
           "--c-accent-dark": T.colors.accentDark,
           "--c-soft": T.colors.soft,
-          "--font-heading": `'${T.fontHeading ?? T.font}', serif`,
+          "--font-heading": `'${T.fontHeading ?? T.font}', '${T.font}', sans-serif`,
           "--logo-h": `${T.logoSize ?? 46}px`,
           "--pkt-d": T.overviewUi?.pointSize?.desktop ?? 1,
           "--pkt-m": T.overviewUi?.pointSize?.mobile ?? 0.85,
@@ -2692,8 +2693,9 @@ function TourExperience({
           ...(T.logoOffset?.side != null && { "--logo-side": `${T.logoOffset.side}px` }),
         } as React.CSSProperties
       }>
-      <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.font.replace(/ /g, "+")}:wght@400;600;700;800;900&display=swap`} />
-      {T.fontHeading && <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${T.fontHeading.replace(/ /g, "+")}:wght@500;600&display=swap`} />}
+      {[...fontHrefs(T.font, [400, 600, 700, 800, 900]), ...(T.fontHeading ? fontHrefs(T.fontHeading, [500, 600]) : [])].map((href) => (
+        <link key={href} rel="stylesheet" href={href} />
+      ))}
       <style>{CSS + TOUR_LOGO_CSS + CONTACT_CSS + STORIES_CSS + LIGHTBOX_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + ONBOARDING_CSS + MENU_HINT_CSS + INFO_CSS + STAGING_CSS + (T.inUse?.length ? IN_USE_CSS : "") + (T.lineDays ? LINE_DAY_CSS : "") + (T.yearWheel ? YEARWHEEL_CSS : "") + MAP_CSS + (T.sitePlan?.overlay ? SITE_PLAN_CSS + SITE_PLAN_360_CSS : "") + ROUTE_CSS + MEASURES_CSS + CARDS_CSS + DAY_CSS + (T.events ? EVENTS_CSS : "") + (T.shop || T.points.some((p) => p.shop) ? SHOP_CSS : "") + SIMPLE_CSS + BENTO_CSS + LOGO_RIGHT_CSS + LANG_CSS + WEATHER_CSS + COMMUTE_CSS + FEATURES_CSS + FINDER_CSS + (review ? FEEDBACK_CSS : "")}</style>
       {/* The tour's own design on top (written by Claude or by hand under Avanceret). */}
       {T.customCss && <style>{T.customCss.replace(/<\/?style/gi, "")}</style>}

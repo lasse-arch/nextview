@@ -112,7 +112,7 @@ export function CoverWelcome({
   // No film for visitors saving data - the photo instead (motion turned off is handled in the CSS).
   const [saveData] = useState(() => typeof navigator !== "undefined" && Boolean((navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData));
   return (
-    <div className={`dz-cover ${instant ? "dz-cover-nu" : ""} ${film && !saveData ? "dz-cover-film" : ""}`} style={{ "--cover": `url(${C.image})`, "--cover-m": `url(${C.imageMobile ?? C.image})` } as React.CSSProperties}>
+    <div className={`dz-cover ${instant ? "dz-cover-nu" : ""} ${film && !saveData ? "dz-cover-film" : ""} ${T.places?.length ? "" : "dz-cover-ene"}`} style={{ "--cover": `url(${C.image})`, "--cover-m": `url(${C.imageMobile ?? C.image})` } as React.CSSProperties}>
       {film && !saveData && (
         // Silent, looping, behind everything: it fades in over the photo once it actually plays.
         <video
@@ -416,6 +416,21 @@ export const DESIGNS_CSS = `
 .dz-film.kører{opacity:1}
 .dz-cover-film::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(100deg,rgba(12,9,6,.82) 0%,rgba(12,9,6,.55) 38%,rgba(12,9,6,.05) 70%),linear-gradient(180deg,rgba(12,9,6,0) 55%,rgba(12,9,6,.6))}
 @media (prefers-reduced-motion:reduce){.dz-film{display:none}}
+/* A low frame (the tour in a box on a website, ~420 px): smaller, the text cut short - the buttons always in view. */
+@media (max-width:760px) and (max-height:600px){
+  .dz-cover{padding:16px 16px 14px;overflow-y:auto}
+  .dz-cover-logo{width:64px;margin-bottom:8px}
+  .dz-cover h1{font-size:clamp(22px,7.5vw,30px);margin:6px 0 8px}
+  .dz-cover p{font-size:13.5px;line-height:1.45;margin-bottom:12px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .dz-cover-actions{gap:7px}
+  .dz-btn{padding:10px 16px;font-size:14px}
+}
+@media (max-width:760px) and (max-height:460px){
+  .dz-cover-logo{width:52px;margin-bottom:4px}
+  .dz-cover p{-webkit-line-clamp:2}
+  /* Only the main ways in - the tour's own buttons are in its menu too. */
+  .dz-cover-actions>.dz-line:nth-child(n+3){display:none}
+}
 /* ---- Tiles over a film (welcome.video): the film covers the tour, a dark veil keeps the text readable ---- */
 .wel-med-film{isolation:isolate;background:#0d1b20 !important;backdrop-filter:none !important;-webkit-backdrop-filter:none !important}
 .wel-med-film::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(180deg,rgba(8,14,17,0) 30%,rgba(8,14,17,.6))}
@@ -493,6 +508,8 @@ export const DESIGNS_CSS = `
   .dz-btn{justify-content:center;padding:13px 18px}
   .dz-cover-places{align-self:stretch;margin:22px -20px 0}
   .dz-cover-places .dz-kicker{padding:0 20px}
+  /* No place cards under it: the text sits at the bottom of the picture (as on a cover) - not at the top with an empty half below. */
+  .dz-cover-ene{justify-content:flex-end}
   .dz-places{padding:4px 20px 6px}
   .dz-place{width:150px;height:112px}
   .dz-dock{left:8px;right:8px;bottom:calc(8px + env(safe-area-inset-bottom,0px));translate:none;justify-content:space-between}
