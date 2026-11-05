@@ -111,6 +111,8 @@ const FINDS: Partial<Record<Tab, string[]>> = {
   kortet: ["Interaktivt kort", "Luftfoto", "Dronebillede", "360°-kort", "Punkter på kortet", "Kategorier", "Skyer", "Boksen øverst", "Filteret", "Luftfotoets første udsnit|startudsnit", "Ikoner", "Vejret|vejr|temperatur|dmi|sol", "Find din plads|finder|spørgsmål|guide til plads", "Gåafstande|gåafstand|minutter|afstand", "Bevægelse på luftfotoet|kig ned|kig op|zoom ved punkt", "Hent fra en kortside|lovable|importer kort"],
   scan: ["Scanpunkter", "Skjul scanpunkter", "Personer i scans"],
   tags: ["Tags", "Infotags", "Hotspots", "Pris", "Video"],
+  staging: ["Årshjul|aarshjul|kalender|begivenheder|året", "Video på en flade|tv|skærm|storskærm|film på væggen", "Billede på en flade|plakat|maleri|foto på væggen", "Hjemmeside på en flade|instagram|facebook|some|webside", "Skilt|velkomstskilt|tekst på væggen", "Se det i brug|film i rummet|video i rummet|levende|i brug", "Tryk for lyd|lyd på video"],
+  linjedag: ["En dag på linjen|linjefag|linjer|dagen på linjen|skema"],
   live: ["Live data", "Ledige pladser", "Ledige rum", "Book-knap", "Hent nye data"],
   kort: ["Stedkort", "Kort ved punkt", "Din plads venter", "Kort efter et stykke tid", "Knap til scanpunkt|opdækket|skjult scan"],
   links: ["Knapper", "Book", "Kontakt", "Telefon", "E-mail", "Adresse", "Sociale medier", "Kontaktformular", "Skriv til os", "Åbning", "Popup", "Ny fane", "Kort-link"],
@@ -135,6 +137,8 @@ function searchTabs(q: string, menu: MenuEntry[]): { tab: Tab; label: string; se
     for (const f of FINDS[t] ?? []) {
       const [label, ...also] = f.split("|");
       if (label !== title && [label, ...also].some(hit)) out.push({ tab: t, label, section: title });
+      // Other words for the section itself ("linjefag" for En dag på linjen): the section, once.
+      else if (label === title && !hit(title) && also.some(hit)) out.push({ tab: t, label: title, section: "" });
     }
   }
   for (const m of menu) {
