@@ -338,6 +338,30 @@ export function Experience(props: ExperienceProps) {
     meta.content = before.replace(/,?\s*viewport-fit=cover/, "");
     return () => void (meta.content = before);
   }, []);
+  // On a phone the page under the tour mustn't move when a finger drags it (Safari and Chrome on iPhone scroll the page
+  // anyway, overflow hidden or not - the tour slides up and a dark band shows below). A drag that isn't in something that
+  // scrolls itself (the menu, a card, a list) is stopped - only where the tour is the whole page: in a frame on someone's
+  // website the drag must still scroll their page.
+  useEffect(() => {
+    if (window.top !== window) return;
+    const scrolls = (el: Element | null) => {
+      for (let x = el; x && x !== document.body; x = x.parentElement) {
+        const st = getComputedStyle(x);
+        if (/(auto|scroll)/.test(st.overflowY) && x.scrollHeight > x.clientHeight + 1) return true;
+        if (/(auto|scroll)/.test(st.overflowX) && x.scrollWidth > x.clientWidth + 1) return true;
+      }
+      return false;
+    };
+    const stop = (e: TouchEvent) => {
+      if (e.touches.length > 1 || !e.cancelable) return;
+      const el = e.target instanceof Element ? e.target : null;
+      // Sliders and fields keep their own drag.
+      if (el?.closest("input, textarea, select")) return;
+      if (!scrolls(el)) e.preventDefault();
+    };
+    document.addEventListener("touchmove", stop, { passive: false });
+    return () => document.removeEventListener("touchmove", stop);
+  }, []);
   const T = draft ?? props.tour;
   // The language: the link's (?sprog=), else the visitor's own when the tour has it, else Danish. The editor's preview is told by the editor.
   const langs = tourLanguages(T);
