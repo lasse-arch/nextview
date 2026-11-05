@@ -2,7 +2,7 @@
 
 import { reviewUrl } from "@/lib/public-urls";
 import { useEffect, useState, useTransition } from "react";
-import { setReviewRecipient, setReviewRecipient2, checkTourForReview, lastTourCheck, setTourCheckDone, type SavedCheck, deleteFeedback, reviewStatus, sendFixesDone, sendForReview, setFeedbackStatus, setTourApproved, setTourReview, tourFeedback, type Feedback, type ReviewStatus } from "@/lib/actions/tour-feedback";
+import { setReviewRecipient, setReviewRecipient2, checkTourForReview, lastTourCheck, setTourCheckDone, type SavedCheck, deleteFeedback, reviewStatus, sendFixesDone, sendForReview, setFeedbackAnswer, setFeedbackStatus, setTourApproved, setTourReview, tourFeedback, type Feedback, type ReviewStatus } from "@/lib/actions/tour-feedback";
 import { askClaudeForTour, type AiEditResult } from "@/lib/actions/tour-ai";
 import { addManualTimeEntry, filmingTimeForm } from "@/lib/actions/time-entries";
 import type { TourConfig } from "../../tours/types";
@@ -64,9 +64,12 @@ export function FeedbackPanel({
   /** After "✓ Løst" on the last open one: the "Jeres rettelser er lavet" mail went out (or didn't). */
   const [doneNote, setDoneNote] = useState<{ text: string; error?: boolean } | null>(null);
   const reload = () => tourFeedback(slug).then(setItems);
-  async function markDone(id: string, status: "open" | "done") {
+  /** "✓ Løst" pressed: what was done is written here (or left out) before it's marked. Also used to change the comment afterwards. */
+  const [solving, setSolving] = useState<{ id: string; text: string; edit?: boolean } | null>(null);
+  async function markDone(id: string, status: "open" | "done", answer?: { text: string; by?: "ai" }) {
     setDoneNote(null);
-    const r = await setFeedbackStatus(id, status);
+    setSolving(null);
+    const r = await setFeedbackStatus(id, status, answer);
     if (r.mailedTo) setDoneNote({ text: `Alle rettelser er løst - kunden har fået en mail (${r.mailedTo}) med linket til at se touren og godkende.` });
     else if (r.mailError) setDoneNote({ text: `Alle rettelser er løst, men mailen til kunden kunne ikke sendes: ${r.mailError}`, error: true });
     await reload();
@@ -402,7 +405,7 @@ export function FeedbackPanel({
         {items && shown.length === 0 && <p className="text-[13px] text-[#8e8e93]">{filter === "open" ? "Intet åbent. Send linket til kunden for at få feedback." : "Intet her."}</p>}
         <ul className="space-y-3">
           {shown.map((f) => (
-            <li key={f.id} className={`overflow-hidden rounded-xl bg-white ring-1 ring-black/[.06] ${f.status === "done" ? "opacity-60" : ""}`}>
+            <li key={f.id} className={`overflow-hidden rounded-xl bg-white ring-1 ring-black/[.06] ${f.status === "done" ? "opacity-80" : ""}`}>
               {f.image && (
                 <button type="button" className="block w-full" onClick={() => setBig(f.image)}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -416,6 +419,56 @@ export function FeedbackPanel({
                 </div>
                 <p className="whitespace-pre-wrap text-[14px] leading-snug">{f.text}</p>
                 {f.device && <p className="truncate text-[11px] text-[#c7c7cc]" title={f.device}>{f.device}</p>}
+                {f.answer && solving?.id !== f.id && (
+                  <div className="rounded-lg bg-[#34c759]/[.08] px-2.5 py-2">
+                    <p className="text-[11px] font-semibold text-[#1d7a35]">Det har vi gjort</p>
+                    <p className="whitespace-pre-wrap text-[13px] leading-snug text-[#1d1d1f]">{f.answer}</p>
+                    <p className="mt-0.5 flex gap-2 text-[11px] text-[#8e8e93]">
+                      {[f.answerBy, f.answeredAt && when(f.answeredAt)].filter(Boolean).join(" · ")}
+                      <button type="button" className="font-medium text-[#0071e3]" onClick={() => setSolving({ id: f.id, text: f.answer ?? "", edit: true })}>
+                        Ret
+                      </button>
+                    </p>
+                  </div>
+                )}
+                {!f.answer && f.status === "done" && solving?.id !== f.id && (
+                  <button type="button" className="text-[12px] font-medium text-[#0071e3]" onClick={() => setSolving({ id: f.id, text: "", edit: true })}>
+                    + Skriv, hvad I har gjort
+                  </button>
+                )}
+                {solving?.id === f.id && (
+                  <div className="space-y-1.5 rounded-lg bg-[#f2f2f7] p-2.5">
+                    <textarea
+                      autoFocus
+                      rows={3}
+                      className={`${input} resize-y bg-white text-[13px]`}
+                      placeholder="Hvad har I gjort? Fx: Fodboldbanen er lagt ind på luftfotoet med trænerens kort. (valgfri)"
+                      value={solving.text}
+                      onChange={(e) => setSolving({ ...solving, text: e.target.value })}
+                    />
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={pending}
+                        className="rounded-full bg-[#34c759] px-3 py-1 text-[12px] font-semibold text-white disabled:opacity-50"
+                        onClick={() =>
+                          start(async () => {
+                            if (solving.edit) {
+                              await setFeedbackAnswer(f.id, solving.text);
+                              setSolving(null);
+                              await reload();
+                            } else await markDone(f.id, "done", solving.text.trim() ? { text: solving.text } : undefined);
+                          })
+                        }
+                      >
+                        {solving.edit ? "Gem" : solving.text.trim() ? "✓ Løst - gem kommentaren" : "✓ Løst uden kommentar"}
+                      </button>
+                      <button type="button" className="text-[12px] font-medium text-[#0071e3]" onClick={() => setSolving(null)}>
+                        Fortryd
+                      </button>
+                    </div>
+                  </div>
+                )}
                 {ai?.id === f.id && (
                   <div className="space-y-2 rounded-lg bg-[#d97757]/[.07] p-2.5">
                     {ai.busy ? (
@@ -431,8 +484,10 @@ export function FeedbackPanel({
                               onClick={() => {
                                 if (!ai.result?.ok) return;
                                 onApply(ai.result.config);
+                                const said = ai.result.reply;
                                 setAi(null);
-                                start(() => markDone(f.id, "done"));
+                                // nextviewAI's own words on what it changed - kept as the comment (can be changed after).
+                                start(() => markDone(f.id, "done", { text: said, by: "ai" }));
                               }}
                             >
                               Godkend - lav ændringen ({ai.result.changed})
@@ -476,9 +531,7 @@ export function FeedbackPanel({
                     type="button"
                     disabled={pending}
                     className="rounded-full bg-[#f2f2f7] px-3 py-1 text-[12px] font-medium"
-                    onClick={() =>
-                      start(() => markDone(f.id, f.status === "done" ? "open" : "done"))
-                    }
+                    onClick={() => (f.status === "done" ? start(() => markDone(f.id, "open")) : setSolving({ id: f.id, text: "" }))}
                   >
                     {f.status === "done" ? "Genåbn" : "✓ Løst"}
                   </button>

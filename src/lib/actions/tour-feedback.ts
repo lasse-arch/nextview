@@ -46,12 +46,12 @@ async function teamReviewLink(user: { role: Role; extraRoles: Role[] }, slug: st
   return teamCan(user, "numbers") ? full : ((await noteTokenOf(slug)) ?? "");
 }
 
-export type Feedback = { id: string; kind: string; text: string; author: string | null; href: string | null; ss: number | null; room: string | null; topic: string | null; image: string | null; device: string | null; status: string; at: string };
+export type Feedback = { id: string; kind: string; text: string; author: string | null; href: string | null; ss: number | null; room: string | null; topic: string | null; image: string | null; device: string | null; status: string; at: string; answer: string | null; answerBy: string | null; answeredAt: string | null };
 
 export async function tourFeedback(slug: string): Promise<Feedback[]> {
   await requireTour(slug);
   const rows = await prisma.tourFeedback.findMany({ where: { tourSlug: slug }, orderBy: { createdAt: "desc" }, take: 300 });
-  return rows.map((r) => ({ id: r.id, kind: r.kind, text: r.text, author: r.author, href: r.href, ss: r.ss, room: r.room, topic: r.topic, image: r.image, device: r.device, status: r.status, at: r.createdAt.toISOString() }));
+  return rows.map((r) => ({ id: r.id, kind: r.kind, text: r.text, author: r.author, href: r.href, ss: r.ss, room: r.room, topic: r.topic, image: r.image, device: r.device, status: r.status, at: r.createdAt.toISOString(), answer: r.answer, answerBy: r.answerBy, answeredAt: r.answeredAt?.toISOString() ?? null }));
 }
 
 /**
@@ -59,12 +59,22 @@ export async function tourFeedback(slug: string): Promise<Feedback[]> {
  * customer "Jeres rettelser er lavet" - returns who got it, or why it failed
  * (the correction is marked either way).
  */
-export async function setFeedbackStatus(id: string, status: "open" | "done"): Promise<{ mailedTo?: string; mailError?: string }> {
+export async function setFeedbackStatus(
+  id: string,
+  status: "open" | "done",
+  /** What was done about it - written by the team, or nextviewAI's own words when its change was approved. */
+  answer?: { text: string; by?: "ai" }
+): Promise<{ mailedTo?: string; mailError?: string }> {
   const user = await requireTeam("tours");
   const fb = await prisma.tourFeedback.findUnique({ where: { id }, select: { tourSlug: true } });
   if (!fb) throw new Error("Findes ikke.");
   await requireTour(fb.tourSlug);
-  const row = await prisma.tourFeedback.update({ where: { id }, data: { status }, select: { tourSlug: true } });
+  const text = String(answer?.text ?? "").trim().slice(0, 1000);
+  const row = await prisma.tourFeedback.update({
+    where: { id },
+    data: { status, ...(text ? { answer: text, answerBy: answer?.by === "ai" ? `nextviewAI (godkendt af ${user.name})` : user.name, answeredAt: new Date() } : {}) },
+    select: { tourSlug: true },
+  });
   if (status !== "done") return {};
   try {
     const to = await sendFixesDoneMail(row.tourSlug, { id: user.id, name: user.name });
@@ -72,6 +82,16 @@ export async function setFeedbackStatus(id: string, status: "open" | "done"): Pr
   } catch (err) {
     return { mailError: err instanceof Error ? err.message : String(err) };
   }
+}
+
+/** The comment on what was done - written or changed afterwards (empty removes it). */
+export async function setFeedbackAnswer(id: string, text: string): Promise<void> {
+  const user = await requireTeam("tours");
+  const fb = await prisma.tourFeedback.findUnique({ where: { id }, select: { tourSlug: true } });
+  if (!fb) throw new Error("Findes ikke.");
+  await requireTour(fb.tourSlug);
+  const t = String(text ?? "").trim().slice(0, 1000);
+  await prisma.tourFeedback.update({ where: { id }, data: t ? { answer: t, answerBy: user.name, answeredAt: new Date() } : { answer: null, answerBy: null, answeredAt: null } });
 }
 
 /** "Send 'Jeres rettelser er lavet' nu": the same mail, by hand. */
