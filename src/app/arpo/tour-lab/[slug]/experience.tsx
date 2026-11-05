@@ -4252,6 +4252,9 @@ html:has(.hv.fixed),html:has(.hv.fixed) body{overflow:hidden;overscroll-behavior
 .hv-pano-skarp{opacity:0;pointer-events:none;transition:opacity .35s ease}
 .hv-pano-skarp.hv-pano-skarp-vist{opacity:1;pointer-events:auto}
 @keyframes hvFade{from{opacity:0}to{opacity:1}}
+/* The menu button comes in a moment after the page, with the rest - not alone on an empty screen before the welcome is there.
+   "backwards": only before it starts, so it never overrides where the button is hidden on purpose. */
+.hv-menuknap{animation:hvFade .5s ease .35s backwards}
 .hv-pano-titel{position:absolute;top:calc(16px + env(safe-area-inset-top,0px));left:16px;z-index:2;background:rgba(21,50,58,.9);color:#fff;font-weight:800;font-size:16px;padding:8px 16px;border-radius:999px}
 .hv-pano-luk{position:absolute;left:16px;bottom:20px;z-index:2;background:var(--c-main);color:#fff;border:0;border-radius:999px;padding:11px 18px;font-weight:800;font-size:14px;font-family:inherit;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.3)}
 .hv-wel{position:absolute;inset:0;z-index:12;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(13,27,32,.38);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);animation:hvFade .45s ease}
