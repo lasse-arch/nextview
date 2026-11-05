@@ -1052,6 +1052,8 @@ a.mq-card:hover .mq-img img { transform: scale(1.04); }
 .sw-hero > img:first-child { display: block; width: 100%; aspect-ratio: 16 / 10; object-fit: cover; border-radius: 16px; box-shadow: 0 34px 80px -34px rgba(18,29,59,.55); }
 .sw-hero-phone { position: absolute; right: -10px; bottom: 0; width: 34%; max-width: 230px; border-radius: 26px; border: 7px solid #0f1830; background: #0f1830; box-shadow: 0 30px 60px -20px rgba(18,29,59,.6); }
 .sw-shots { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; }
+/* An odd number of shots: the last one takes the whole row, no empty spot beside it. */
+.sw-shots figure:last-child:nth-child(odd) { grid-column: 1 / -1; }
 .sw-shots figure { margin: 0; background: #fff; border: 1px solid var(--line); border-radius: 16px; overflow: hidden; }
 .sw-shots img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; }
 .sw-shots figcaption { padding: 16px 20px 20px; font-size: 15px; color: var(--ink-2); }
