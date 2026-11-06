@@ -296,7 +296,10 @@ export const GUIDE_CSS = `
 .gd-folk figcaption{display:flex;flex-direction:column;min-width:0;line-height:1.25}
 .gd-folk b{font-size:13px;font-weight:800;color:var(--c-main);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .gd-folk span{font-size:12px;color:#5d7177;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.gd-folk:has(figure+figure) figure{flex-direction:column;gap:5px;text-align:center;flex:0 1 84px}
+.gd-folk:has(figure+figure) figure{flex-direction:column;gap:5px;text-align:center;flex:1 1 0;max-width:150px}
+/* Two or three people: each its share of the width, and a long name on two lines - never over the next one's. */
+.gd-folk:has(figure+figure) figcaption{width:100%;align-items:center}
+.gd-folk:has(figure+figure) b,.gd-folk:has(figure+figure) span{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow-wrap:anywhere}
 .gd-next{margin:-6px 0 12px;font-size:12.5px;font-weight:700;color:#7a8589}
 .gd-end{margin:-4px 0 12px}
 .gd-selv{display:flex;align-items:center;gap:8px;margin:-4px 0 12px;font-size:12.5px;line-height:1.35;font-weight:600;color:#56636a}
@@ -324,6 +327,15 @@ export const GUIDE_CSS = `
   .gd-card p{font-size:14px;margin-bottom:10px}
   .gd-folk{margin:-2px 0 10px}
   .gd-folk img{width:38px;height:38px}
+  /* People in one low row on a phone: a small photo with the name and role beside it (as on the place cards). */
+  .gd-folk{gap:10px}
+  .gd-folk figure,.gd-folk:has(figure+figure) figure{flex:1 1 0;max-width:none;min-width:0;flex-direction:row;align-items:center;gap:8px;text-align:left}
+  .gd-folk:has(figure+figure) img{width:34px;height:34px}
+  .gd-folk:has(figure+figure) figcaption{align-items:flex-start}
+  .gd-folk:has(figure+figure) b{font-size:12px;line-height:1.2}
+  .gd-folk:has(figure+figure) span{font-size:11px;line-height:1.2;-webkit-line-clamp:1}
+  /* A card with people on it is full: the hint to drag and walk goes (it's on the first stops only anyway). */
+  .gd-card:has(.gd-folk) .gd-selv{display:none}
   .gd-mellem{right:auto;width:min(84vw,340px);padding:11px 14px 10px;border-radius:15px}
   .gd-mellem h3{font-size:clamp(16px,4.6vw,18px);margin:2px 0 4px}
   .gd-mellem p{font-size:clamp(12.5px,3.5vw,13.5px);line-height:1.45;margin-bottom:8px;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
