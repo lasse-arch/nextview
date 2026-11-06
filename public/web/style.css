@@ -253,6 +253,8 @@ h3 { font-size: 22px; letter-spacing: -0.015em; line-height: 1.2; font-weight: 7
 .plan .p { font-size: 34px; font-weight: 800; color: var(--ink); letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
 .plan .p small { font-size: 15px; font-weight: 600; color: var(--muted); letter-spacing: 0; }
 @media (max-width: 900px) { .pricing { grid-template-columns: 1fr; } }
+.pricing.two { grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: 860px; margin-inline: auto; }
+@media (max-width: 900px) { .pricing.two { grid-template-columns: 1fr; } }
 .facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
 .facts div { padding: 20px 22px; border-right: 1px solid var(--line); }
 .facts div:last-child { border-right: 0; }

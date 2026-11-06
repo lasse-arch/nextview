@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
+import { customerBandHtml, siteCustomers } from "@/lib/site-customers";
 
 /*
  * The new nextview360.dk site, still in the works (its pages in site-web/,
@@ -21,5 +22,7 @@ export async function betaPage(name: string, request: Request): Promise<Response
   if (!/^[a-z0-9-]+\.html$/.test(name)) return new NextResponse("Siden findes ikke.", { status: 404 });
   const html = await readFile(path.join(process.cwd(), "site-web", name), "utf8").catch(() => null);
   if (html == null) return new NextResponse("Siden findes ikke.", { status: 404 });
-  return new NextResponse(html, { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "private, no-store" } });
+  // The customer band on the front page: filled from the customers who are online now.
+  const page = html.includes("<!--kunder-->") ? html.replace("<!--kunder-->", customerBandHtml(await siteCustomers().catch(() => []))) : html;
+  return new NextResponse(page, { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "private, no-store" } });
 }
