@@ -4,9 +4,11 @@ import { useState } from "react";
 import type { InUseItem, StagingItem, TourConfig, YearWheel } from "../../tours/types";
 import { Rows } from "./content";
 import { LinkInput } from "./links-open";
-import { Choice, Field, Group, Icon, input, UploadButton, ssOfHref, type PreviewApi } from "./ui";
+import { Choice, Field, Group, Icon, input, UploadButton, ssOfHref, withProtocol, type PreviewApi } from "./ui";
 import { cornersOf, movePlace } from "../staging";
 import { IN_3D } from "../staging-3d";
+import { socialLinks, type SocialKind } from "../../tours/social";
+import { socialSign } from "../../tours/social-sign";
 
 /*
  * Virtual staging: a video, a picture, a web page, a sign or the year wheel
@@ -181,6 +183,19 @@ export function StagingEditor({ config, edit, preview, focus }: { config: TourCo
           <Icon d='<path d="M4 4h16v16H4z"/><path d="M4 4l16 16"/>' className="h-4 w-4" />
           {placer.busy ? "Klik i forhåndsvisningen…" : `Placér ${KIND_NAME[kind].toLowerCase()} på en flade`}
         </button>
+        <SocialSigns
+          config={config}
+          busy={placer.busy}
+          onPick={async (kind, name, href) => {
+            const at = await placer.place([0.6, 0.6]);
+            if (!at) return;
+            const link = withProtocol(href);
+            setItems([
+              ...items,
+              { id: `vs-${Date.now().toString(36)}`, kind: "image", title: `${name}-skilt`, src: socialSign(kind, link), fit: "contain", action: { label: `Følg os på ${name}`, href: link }, place: at.place, corners: cornersOf(at.place), ss: at.ss ? [at.ss] : [] },
+            ]);
+          }}
+        />
         {placer.status && <p className={small}>{placer.status}</p>}
         {placer.error && <p className="px-1 text-[12px] text-[#ff3b30]">{placer.error}</p>}
       </Group>
@@ -540,5 +555,41 @@ function TreasureFields({ item, set }: { item: StagingItem; set: (next: StagingI
         </div>
       </Field>
     </>
+  );
+}
+
+/**
+ * "Følg os"-skilte: one button per social account the tour has (Knapper og
+ * kontakt) - pressed, the next click in the preview puts that site's sign
+ * there (made in the engine: its colours, icon and the account), and a tap on
+ * it in the tour opens the account in a new tab.
+ */
+function SocialSigns({ config, busy, onPick }: { config: TourConfig; busy: boolean; onPick: (kind: SocialKind, name: string, href: string) => void }) {
+  const links = socialLinks(config.contact);
+  return (
+    <div className="space-y-1.5 pt-1">
+      <p className="text-[13px] font-medium text-[#1d1d1f]">Sociale medier på væggen</p>
+      {links.length ? (
+        <>
+          <div className="flex flex-wrap gap-1.5">
+            {links.map((l) => (
+              <button
+                key={l.kind}
+                type="button"
+                disabled={busy}
+                onClick={() => onPick(l.kind, l.name, l.href)}
+                className="flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-[13px] font-medium text-[#1d1d1f] ring-1 ring-black/[.08] hover:bg-[#f5f5f7] disabled:opacity-50"
+              >
+                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor" aria-hidden dangerouslySetInnerHTML={{ __html: l.icon }} />
+                {l.name}
+              </button>
+            ))}
+          </div>
+          <p className={small}>Tryk på et af dem, og klik så på en væg, en skærm eller en tavle i forhåndsvisningen. Skiltet laves af sig selv (&quot;Følg os på …&quot; med jeres konto), og et tryk på det åbner siden i en ny fane.</p>
+        </>
+      ) : (
+        <p className={small}>Touren har ingen sociale medier endnu - tilføj dem under Knapper og kontakt, så kommer de her.</p>
+      )}
+    </div>
   );
 }
