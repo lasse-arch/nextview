@@ -873,6 +873,25 @@ function TourExperience({
   };
   /** The intro film: playing, fading out into the tour, or gone. */
   const [intro, setIntro] = useState<"play" | "fade" | null>(T.intro ? "play" : null);
+  /** The intro film's player - started once (not on every redraw: a start cut short by the next one read as "blocked" and skipped the film). */
+  const introVideo = useRef<HTMLVideoElement | null>(null);
+  /** The phone didn't let the film start by itself (iPhone on power saving): a play button instead of skipping it. */
+  const [introTap, setIntroTap] = useState(false);
+  useEffect(() => {
+    if (intro !== "play") return;
+    const v = introVideo.current;
+    if (!v) return;
+    v.play().catch((err: unknown) => {
+      const name = err instanceof DOMException ? err.name : "";
+      // Interrupted by a new load (the sources settling): it starts by itself when ready.
+      if (name === "AbortError") return;
+      // Not let start by itself - unless it plays all the same (autoplay can win the race): a play button.
+      if (name === "NotAllowedError") return void setTimeout(() => v.paused && !v.ended && setIntroTap(true), 300);
+      endIntro("blocked", 0);
+    });
+    // Once, when the film is there.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [intro === "play"]);
   const [lastRoom, setLastRoom] = useState<{ name: string; href: string } | null>(null);
   const [, rerender] = useState(0);
   const mobile = useRef(false);
@@ -3335,17 +3354,30 @@ function TourExperience({
             preload="auto"
             poster={T.intro.poster}
             onPlay={() => track("intro_start")}
+            onPlaying={() => setIntroTap(false)}
             onEnded={(e) => endIntro("ended", e.currentTarget.currentTime)}
-            ref={(v) => {
-              v?.play().catch(() => endIntro("blocked", 0));
-            }}
+            ref={introVideo}
           >
             {T.intro.sources.map((v, i) => (
               // The last source failing means none could play: straight into the tour.
               <source key={v.src} src={v.src} type={v.type} media={v.media} onError={i === T.intro!.sources.length - 1 ? () => endIntro("blocked", 0) : undefined} />
             ))}
           </video>
-          <button type="button" onClick={(e) => endIntro("skip", (e.currentTarget.previousElementSibling as HTMLVideoElement).currentTime)}>
+          {introTap && (
+            // The phone wouldn't start it by itself (power saving): one tap starts it.
+            <button
+              type="button"
+              className="hv-film-play"
+              aria-label={tx("Afspil")}
+              onClick={() => {
+                const v = introVideo.current;
+                if (v) void v.play().catch(() => endIntro("blocked", 0));
+              }}
+            >
+              ▶
+            </button>
+          )}
+          <button type="button" onClick={() => endIntro("skip", introVideo.current?.currentTime ?? 0)}>
             {tx("Spring over")}
           </button>
         </div>
@@ -4303,6 +4335,7 @@ html:has(.hv.fixed),html:has(.hv.fixed) body{overflow:hidden;overscroll-behavior
   .hv-film video{position:absolute;top:50%;left:50%;width:190%;max-width:none;height:auto;transform:translate(-50%,-50%)}
   .hv-film video{-webkit-mask-image:linear-gradient(transparent,#000 12%,#000 88%,transparent);mask-image:linear-gradient(transparent,#000 12%,#000 88%,transparent)}
 }
+.hv-film .hv-film-play{position:absolute;left:50%;top:50%;right:auto;bottom:auto;translate:-50% -50%;width:84px;height:84px;padding:0 0 0 6px;border-radius:50%;border:0;background:rgba(255,255,255,.92);color:#111;font-size:30px;box-shadow:0 10px 30px rgba(0,0,0,.35);cursor:pointer}
 .hv-film button{position:absolute;right:20px;bottom:24px;border:1px solid rgba(255,255,255,.5);background:rgba(0,0,0,.35);color:#fff;border-radius:999px;padding:9px 18px;font:inherit;font-weight:700;font-size:13px;letter-spacing:.06em;cursor:pointer;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
 .hv-wel-main.hv-light img{width:auto;height:64px;max-width:200px;object-fit:contain;object-position:left;padding:0;background:none;border-radius:0}
 .hv-wel-main img{box-sizing:border-box;height:56px;width:auto;min-width:56px;max-width:220px;object-fit:contain;background:var(--c-main);border-radius:12px;padding:8px;margin-bottom:18px}
