@@ -1,5 +1,6 @@
 "use server";
 
+import { formatPhone } from "@/app/arpo/tour-lab/tours/places";
 import { demoVisits, type DemoVisit } from "@/lib/demo-visits";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
@@ -26,7 +27,7 @@ const PER_DAY = 40;
 
 const firstName = (name: string) => name.trim().split(/\s+/)[0] ?? "";
 
-export type DemoSmsSent = { id: string; at: string; to: string; /** Who it is, for our own use. */ note: string | null; tour: string; by: string; visits: number; /** Visits where they did something in the tour (not only opened the link). */ started: number; lastSeen: string | null; where: string | null; /** The tour, and the visits (newest first) - what they saw and for how long. */ slug: string; details: DemoVisit[]; /** Can be sent again: the number is kept, and the seller sent it (or is an admin). */ again: boolean; /** The seller sent it, or is an admin: may send it again or remove it. */ mine: boolean };
+export type DemoSmsSent = { id: string; at: string; to: string; /** The number it went to - in full for the one who sent it (and admins), the last four digits for the rest. */ phone: string | null; /** Who it is, for our own use. */ note: string | null; tour: string; by: string; visits: number; /** Visits where they did something in the tour (not only opened the link). */ started: number; lastSeen: string | null; where: string | null; /** The tour, and the visits (newest first) - what they saw and for how long. */ slug: string; details: DemoVisit[]; /** Can be sent again: the number is kept, and the seller sent it (or is an admin). */ again: boolean; /** The seller sent it, or is an admin: may send it again or remove it. */ mine: boolean };
 
 export type DemoSmsSetup = {
   /** `wip`: not finished yet - its showcase says we are still working on it. */
@@ -70,6 +71,7 @@ export async function demoSmsSetup(): Promise<DemoSmsSetup> {
         id: l.id,
         at: l.createdAt.toISOString(),
         to: l.label.replace(/ \(SMS\)$/, ""),
+        phone: l.smsTo ? (l.createdById === user.id || teamCan(user, "admin") ? formatPhone(l.smsTo) : `•• •• ${l.smsTo.replace(/\D/g, "").slice(-4).replace(/(\d{2})(\d{2})/, "$1 $2")}`) : null,
         note: l.note,
         tour: names.get(l.tourSlug) ?? l.tourSlug,
         slug: l.tourSlug,

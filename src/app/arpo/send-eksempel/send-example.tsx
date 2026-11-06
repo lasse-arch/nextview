@@ -131,6 +131,7 @@ export function SendExample({ initial }: { initial: DemoSmsSetup }) {
               <li key={s.id} className="flex flex-wrap items-baseline justify-between gap-2 py-2.5 text-sm">
                 <span className="min-w-0">
                   <b className="font-medium text-slate-900">{s.to}</b>
+                  {s.phone && <span className="ml-1.5 whitespace-nowrap tabular-nums text-slate-500">{s.phone}</span>}
                   {s.note && <span className="ml-1.5 rounded-md bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600">{s.note}</span>}
                   <span className="text-slate-500">
                     {" "}
