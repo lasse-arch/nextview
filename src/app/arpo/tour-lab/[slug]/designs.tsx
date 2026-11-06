@@ -2,7 +2,7 @@
 
 import { TourLogo } from "./tour-logo";
 import { useT } from "../tours/i18n-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { TourLink } from "./links";
 import type { AvailableUnit } from "@/lib/availability/boxdepotet";
 import type { DockIcon, TourConfig, TourPlace } from "../tours/types";
@@ -62,9 +62,49 @@ export function welcomeFilmClass(v: NonNullable<TourConfig["welcome"]>["video"])
   return `wel-med-film wf-${size} wf-p-${v.place ?? "bottom"} wfm-${v.sizeMobile ?? size} wfm-p-${v.placeMobile ?? "bottom"}`;
 }
 
+/**
+ * A silent background film that really starts: on an iPhone a film may only
+ * start by itself when it is muted from the very start - and React sets
+ * "muted" only after the page has loaded, so autoPlay alone worked now and
+ * then. So it's muted here and started by hand - again when it's ready, and
+ * when the visitor comes back to the page. Still not let start (power
+ * saving): the photo behind it stays.
+ */
+function useSilentAutoplay(onPlaying: () => void) {
+  const ref = useRef<HTMLVideoElement | null>(null);
+  const playing = useRef(onPlaying);
+  useEffect(() => {
+    playing.current = onPlaying;
+  });
+  useEffect(() => {
+    const v = ref.current;
+    if (!v) return;
+    // Already playing before the page listened (autoplay can start while the page is still being set up).
+    if (!v.paused && v.readyState > 2) playing.current();
+    v.muted = true;
+    v.defaultMuted = true;
+    v.setAttribute("muted", "");
+    v.setAttribute("playsinline", "");
+    const go = () => {
+      if (v.paused && document.visibilityState === "visible") void v.play().catch(() => {});
+    };
+    go();
+    v.addEventListener("canplay", go);
+    v.addEventListener("loadeddata", go);
+    document.addEventListener("visibilitychange", go);
+    return () => {
+      v.removeEventListener("canplay", go);
+      v.removeEventListener("loadeddata", go);
+      document.removeEventListener("visibilitychange", go);
+    };
+  }, []);
+  return ref;
+}
+
 export function WelcomeFilm({ film }: { film: { src: string; srcMobile?: string } }) {
   const [on, setOn] = useState(false);
   const [saveData] = useState(() => typeof navigator !== "undefined" && Boolean((navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData));
+  const video = useSilentAutoplay(() => setOn(true));
   if (saveData) return null;
   return (
     <video
@@ -76,9 +116,7 @@ export function WelcomeFilm({ film }: { film: { src: string; srcMobile?: string 
       preload="auto"
       aria-hidden
       onPlaying={() => setOn(true)}
-      ref={(v) => {
-        if (v && !v.paused && v.readyState > 2) queueMicrotask(() => setOn(true));
-      }}
+      ref={video}
     >
       {film.srcMobile && <source src={film.srcMobile} media="(max-width: 760px)" type={filmType(film.srcMobile)} />}
       <source src={film.src} type={filmType(film.src)} />
@@ -108,6 +146,7 @@ export function CoverWelcome({
   const tr = useT();
   const C = T.cover!;
   const [filmOn, setFilmOn] = useState(false);
+  const filmRef = useSilentAutoplay(() => setFilmOn(true));
   const film = C.video?.src ? C.video : null;
   // No film for visitors saving data - the photo instead (motion turned off is handled in the CSS).
   const [saveData] = useState(() => typeof navigator !== "undefined" && Boolean((navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData));
@@ -124,10 +163,7 @@ export function CoverWelcome({
           preload="auto"
           aria-hidden
           onPlaying={() => setFilmOn(true)}
-          // It may already play before the page listens (autoplay starts while the page is still being set up).
-          ref={(v) => {
-            if (v && !v.paused && v.readyState > 2) queueMicrotask(() => setFilmOn(true));
-          }}
+          ref={filmRef}
         >
           {film.srcMobile && <source src={film.srcMobile} media="(max-width: 760px)" type={filmType(film.srcMobile)} />}
           <source src={film.src} type={filmType(film.src)} />
