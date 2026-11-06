@@ -670,6 +670,7 @@ model Deal {
 
   @@index([inLeadInbox, stage])
   @@index([tourAssigneeId])
+  siteLogo                SiteLogo?
 }
 
 /// How many "mandetimer" (man-hours) the team has spent on a customer, one
@@ -1881,4 +1882,21 @@ model TourContestEntry {
 
   @@unique([tourSlug, itemId, email])
   @@index([tourSlug, itemId])
+}
+
+/// The customer's logo on the website's customer band ("Steder, der allerede
+/// viser sig frem"), read from their public tour on explore - checked again
+/// once a month. `tone`: "dark" (dark logo, transparent), "light" (light logo,
+/// transparent) or "box" (a logo with its own background).
+model SiteLogo {
+  dealId    String   @id
+  deal      Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  /// The tour page it was read from.
+  source    String
+  /// Null: the tour has no logo we can use.
+  url       String?
+  tone      String?
+  /// Of the picture itself (small, raw) - the same logo on several tours is shown once.
+  hash      String?
+  checkedAt DateTime @default(now())
 }

@@ -3,7 +3,7 @@
   var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   // Hero-filmen kører uden lyd i baggrunden. "Slå lyd til" starter den forfra med lyd.
-  var hero = document.querySelector('.fh'), v = hero && hero.querySelector('video'), sb = hero && hero.querySelector('.fh-sound');
+  var hero = document.querySelector('.hf'), v = hero && hero.querySelector('video'), sb = hero && hero.querySelector('.fh-sound');
   if (v && sb) {
     var lbl = sb.querySelector('.fh-lbl');
     var big = window.matchMedia('(min-width: 761px)').matches;
@@ -12,7 +12,6 @@
     var set = function (on) {
       sb.setAttribute('aria-pressed', on ? 'true' : 'false');
       lbl.textContent = on ? 'Slå lyd fra' : 'Slå lyd til';
-      hero.classList.toggle('sound', on);
     };
     sb.addEventListener('click', function () {
       var on = sb.getAttribute('aria-pressed') !== 'true';
@@ -29,6 +28,17 @@
     v.addEventListener('loadedmetadata', function () { if (v.muted && v.currentTime < BG_FROM) v.currentTime = BG_FROM; });
     v.addEventListener('timeupdate', function () { if (v.muted && (v.currentTime < BG_FROM || v.currentTime > BG_TO)) v.currentTime = BG_FROM; });
     v.addEventListener('ended', function () { v.muted = true; v.loop = true; v.currentTime = BG_FROM; v.play(); set(false); });
+  }
+
+  // De flyvende kort i hero følger musen en smule.
+  var band = document.querySelector('.hx-band');
+  if (band && !reduce && window.matchMedia('(pointer: fine)').matches) {
+    band.addEventListener('pointermove', function (e) {
+      var r = band.getBoundingClientRect();
+      band.style.setProperty('--mx', ((e.clientX - r.left) / r.width - .5).toFixed(3));
+      band.style.setProperty('--my', ((e.clientY - r.top) / r.height - .5).toFixed(3));
+    });
+    band.addEventListener('pointerleave', function () { band.style.setProperty('--mx', 0); band.style.setProperty('--my', 0); });
   }
 
   // Branchefanerne: skifter selv hvert 9. sekund, indtil man selv vælger (eller holder musen over).
