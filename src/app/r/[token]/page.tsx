@@ -7,7 +7,7 @@ import { tourStats } from "@/lib/tour-stats";
 import { shareOf } from "@/lib/tour-share";
 import { CustomerReport } from "@/app/arpo/tour-lab/[slug]/rediger/customer-report";
 import type { TourConfig } from "@/app/arpo/tour-lab/tours/types";
-import { startPlaces } from "@/app/arpo/tour-lab/tours/places";
+import { startTargets } from "@/app/arpo/tour-lab/tours/places";
 import { PortalEmbeds } from "./embeds";
 
 /*
@@ -43,7 +43,7 @@ export default async function CustomerReportPage({ params }: { params: Promise<{
             title={config.title}
             size={config.embeds?.size}
             whole={config.embeds?.pages?._hele ?? null}
-            places={startPlaces(config).map((p) => ({ key: p.key, name: p.name, group: p.group, page: config.embeds?.pages?.[p.key] ?? null }))}
+            places={startTargets(config).map((p) => ({ key: p.key, name: p.name, group: p.group, page: config.embeds?.pages?.[p.key] ?? null }))}
           />
         )}
         <p className="text-center text-[12px] text-[#8e8e93]">Målt af Nextview360 · tallene opdateres løbende</p>

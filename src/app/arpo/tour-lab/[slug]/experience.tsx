@@ -6,7 +6,7 @@ import { danishOf, LANGUAGES, localize, makeT, tourLanguages } from "../tours/i1
 import { TourLang, useT } from "../tours/i18n-react";
 import { socialLinks } from "../tours/social";
 import { escapeHtml, safeColor } from "../tours/safe";
-import { shownGuides, cssFilter, droneViewsOfHref, formatPhone, GUIDE_HREF, guideOfHref, guideSetup, isDroneHref, guideExit, imageOfHref, isInTourHref, isPlaceHref, placeHref, panoHfov, placeSlug, pointOfHref, startPlaces, welcomeTiles, withoutDeadAerialLinks } from "../tours/places";
+import { shownGuides, cssFilter, droneViewsOfHref, formatPhone, GUIDE_HREF, guideOfHref, guideSetup, isDroneHref, guideExit, imageOfHref, isInTourHref, isPlaceHref, placeHref, panoHfov, placeSlug, pointOfHref, startPlaces, startTargets, welcomeTiles, withoutDeadAerialLinks } from "../tours/places";
 import type { LiveUnit } from "@/lib/availability/live";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { flushSync } from "react-dom";
@@ -1522,6 +1522,16 @@ function TourExperience({
         if (hit) {
           track("start_link", { kind: "rum", target: hit.name });
           enterRef.current(hit.href, "link", hit.name);
+          return;
+        }
+        // The rest a link may start in (startTargets): the aerial photo, a point on it, a picture from the menu - or a "Vis mig rundt".
+        const daTargets = startTargets(savedTour);
+        const t = daTargets.findIndex((p) => p.key === rum);
+        const target = t >= 0 ? startTargets(T)[t] : undefined;
+        if (target) {
+          track("start_link", { kind: target.href === "#rundvisning" ? "rundvisning" : "rum", target: target.name });
+          if (target.href === "#rundvisning") return void startGuideRef.current("link", target.guide ?? null);
+          window.dispatchEvent(new CustomEvent("hv-gaa-til", { detail: { href: target.href, label: target.name } }));
           return;
         }
       }

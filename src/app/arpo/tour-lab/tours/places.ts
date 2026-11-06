@@ -77,6 +77,40 @@ export function startPlaces(T: Pick<TourConfig, "menu">): StartPlace[] {
 }
 
 /**
+ * Everything a tour can be started in from a link (`?rum=<key>`), for the
+ * customer page's codes and links: the places in the menu (startPlaces, same
+ * keys), the rest of the menu that opens something in the tour (a point on
+ * the aerial photo, a picture, the aerial photo itself), the aerial photo /
+ * map when the tour has one, and each "Vis mig rundt" (`guide`: its id, null
+ * for the main one).
+ */
+export function startTargets(T: TourConfig): (StartPlace & { guide?: string | null })[] {
+  const places = startPlaces(T);
+  const out: (StartPlace & { guide?: string | null })[] = [];
+  const taken = new Set(places.map((p) => p.key));
+  const unique = (base: string) => {
+    let k = base || "sted";
+    for (let n = 2; taken.has(k); n++) k = `${base}-${n}`;
+    taken.add(k);
+    return k;
+  };
+  const inside = (href: string) => /^#(punkt:|billede:|luften$)/.test(href);
+  for (const m of T.menu) {
+    const items = "items" in m ? m.items.map(([name, href]) => ({ name, group: m.title as string | null, href })) : [{ name: m.title, group: null, href: m.href }];
+    // In the menu's order: its places (as startPlaces keys them) and what else it opens in the tour.
+    for (const it of items) {
+      if (isPlaceHref(it.href)) {
+        const p = places.find((x) => x.href === it.href && x.name === it.name && !out.includes(x));
+        if (p) out.push(p);
+      } else if (inside(it.href)) out.push({ ...it, key: unique(placeSlug(it.name)) });
+    }
+  }
+  if ((T.drone || T.map) && !out.some((p) => p.href === "#luften")) out.push({ key: unique("luftfoto"), name: T.drone ? "Luftfotoet" : "Kortet", group: null, href: "#luften" });
+  for (const g of allGuides(T)) out.push({ key: unique(g.id == null ? "vis-mig-rundt" : `vis-mig-rundt--${placeSlug(g.id)}`), name: g.title, group: "Vis mig rundt", href: "#rundvisning", guide: g.id });
+  return out;
+}
+
+/**
  * A Danish phone number written the usual way: "+45 75 17 38 33" (or
  * "75 17 38 33" without the country code). Anything that isn't a Danish
  * 8-digit number is left as it is.

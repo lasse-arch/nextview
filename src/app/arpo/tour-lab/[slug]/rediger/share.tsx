@@ -6,7 +6,7 @@ import { setTourPublished, tourEmbedsOf } from "@/lib/actions/tours";
 import type { TourEmbed } from "@/lib/tour-embeds";
 import { EMBED_WORDS, TourEmbedList } from "@/components/tour-embed-list";
 import { suggestEmbedPages } from "@/lib/actions/tour-embeds";
-import { startPlaces } from "../../tours/places";
+import { startTargets } from "../../tours/places";
 import type { TourConfig } from "../../tours/types";
 import { Choice, Field, Group, input, Toggle } from "./ui";
 import { createDemoLink, deleteDemoLink, demoLinks, setDemoLinkOff, setTourShowcase, tourShowcase, type DemoLinkInfo } from "@/lib/actions/tour-demo";
@@ -190,7 +190,7 @@ function ShownGroup({ slug }: { slug: string }) {
 }
 
 function PagesGroup({ config, edit, slug, title, size, published, url }: { config: TourConfig; edit: (fn: (d: TourConfig) => void) => void; slug: string; title: string; size: EmbedSize; published: boolean; url: string }) {
-  const places = startPlaces(config);
+  const places = startTargets(config);
   const pages = config.embeds?.pages ?? {};
   const [site, setSite] = useState(guessSite(config));
   const [msg, setMsg] = useState<string | null>(null);

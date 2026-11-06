@@ -13,7 +13,7 @@ import { mergeShare, mergeStats } from "@/lib/merge-stats";
 import { parseContractProducts } from "@/lib/contract-template-data";
 import { CustomerReport } from "@/app/arpo/tour-lab/[slug]/rediger/customer-report";
 import type { TourConfig } from "@/app/arpo/tour-lab/tours/types";
-import { startPlaces } from "@/app/arpo/tour-lab/tours/places";
+import { startTargets } from "@/app/arpo/tour-lab/tours/places";
 import { PortalEmbeds } from "@/app/r/[token]/embeds";
 import { PHONE, WELCOME_MAIL_SENDER } from "@/lib/welcome-mail";
 import { LangToggle, LocationSwitcher, ReviewLauncher, TourThumb, ApproveTour, ReportMailChoice, PortalPeriod } from "./portal-ui";
@@ -466,7 +466,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
               )}
               {embedTours.length > 0 && (
                 <SitePlacement
-                  tours={embedTours.map((x) => ({ slug: x.slug, title: x.config.title || x.name, url: x.url, places: startPlaces(x.config).map((p) => ({ key: p.key, name: p.name })) }))}
+                  tours={embedTours.map((x) => ({ slug: x.slug, title: x.config.title || x.name, url: x.url, places: startTargets(x.config).map((p) => ({ key: p.key, name: p.name })) }))}
                   site={scope.find((d) => d.websiteUrl)?.websiteUrl ?? ""}
                   lang={lang}
                 />
@@ -479,7 +479,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
                     title={x.config.title}
                     size={x.config.embeds?.size}
                     whole={x.config.embeds?.pages?._hele ?? null}
-                    places={startPlaces(x.config).map((p) => ({ key: p.key, name: p.name, group: p.group, page: x.config.embeds?.pages?.[p.key] ?? null }))}
+                    places={startTargets(x.config).map((p) => ({ key: p.key, name: p.name, group: p.group, page: x.config.embeds?.pages?.[p.key] ?? null }))}
                     lang={lang}
                     heading={false}
                   />
@@ -587,7 +587,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
                   <p className="mb-4 mt-1 text-[14px] leading-snug text-[#6e6e73]">{t.use.linksLead}</p>
                   <TourShare
                     tours={[
-                      ...embedTours.map((x) => ({ key: x.slug, title: x.config.title || x.name, url: x.url, size: x.config.embeds?.size, places: startPlaces(x.config).map((p) => ({ key: p.key, name: p.name, group: p.group })) })),
+                      ...embedTours.map((x) => ({ key: x.slug, title: x.config.title || x.name, url: x.url, size: x.config.embeds?.size, places: startTargets(x.config).map((p) => ({ key: p.key, name: p.name, group: p.group })) })),
                       ...embedOlder.map((x) => ({ key: x.id, title: x.name, url: x.url, places: [] })),
                     ]}
                     words={t.use.builder}

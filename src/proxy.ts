@@ -116,8 +116,11 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  if (hasSession && pathname === "/login") {
-    return NextResponse.redirect(new URL("/", request.url));
+  // Logged in already: on to their own page - /arpo sends a customer on to /kunde and a dead session to "log in again"
+  // ("/" is the website, which isn't where anyone logging in wants to land). With an error to show (a used or expired
+  // login link) the login page stays, so they can get a new one.
+  if (hasSession && pathname === "/login" && !request.nextUrl.searchParams.has("error")) {
+    return NextResponse.redirect(new URL("/arpo", request.url));
   }
 
   // Arpo by role: a filmer or developer only gets their own part - checked here for every request, page or in-app navigation.
