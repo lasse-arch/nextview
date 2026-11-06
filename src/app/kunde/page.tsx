@@ -14,6 +14,8 @@ import { parseContractProducts } from "@/lib/contract-template-data";
 import { CustomerReport } from "@/app/arpo/tour-lab/[slug]/rediger/customer-report";
 import type { TourConfig } from "@/app/arpo/tour-lab/tours/types";
 import { startTargets } from "@/app/arpo/tour-lab/tours/places";
+import { contestChests, deleteOldContestEntries } from "@/lib/tour-contest";
+import { ContestPanel } from "./contest-panel";
 import { PortalEmbeds } from "@/app/r/[token]/embeds";
 import { PHONE, WELCOME_MAIL_SENDER } from "@/lib/welcome-mail";
 import { LangToggle, LocationSwitcher, ReviewLauncher, TourThumb, ApproveTour, ReportMailChoice, PortalPeriod } from "./portal-ui";
@@ -42,7 +44,7 @@ import { portalUsers } from "@/lib/portal-users";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Jeres side - Nextview360", robots: { index: false, follow: false } };
 
-const PAGES = ["hjem", "tal", "hjemmeside", "tips", "rettelser", "kontrakt", "brugere", "hjaelp"] as const;
+const PAGES = ["hjem", "tal", "hjemmeside", "tips", "rettelser", "kontrakt", "brugere", "lodtraekning", "hjaelp"] as const;
 type Page = (typeof PAGES)[number];
 
 /**
@@ -119,9 +121,9 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
     return Boolean(a && roleCan(a, perm));
   };
   const PAGE_PERM: Partial<Record<Page, CustomerPerm>> = { tal: "stats", hjemmeside: "embed", tips: "embed", rettelser: "review", kontrakt: "contract", brugere: "users" };
-  const pageOk = (p: Page) => !PAGE_PERM[p] || deals.some((d) => canOn(d.id, PAGE_PERM[p]!));
-  const asked: Page = (PAGES as readonly string[]).includes(sp.side ?? "") ? (sp.side as Page) : "hjem";
-  const page: Page = pageOk(asked) ? asked : "hjem";
+  // "Lodtrækning": only when one of their tours has a treasure chest with a draw (set below, once the tours are known).
+  let hasContest = false;
+  const pageOk = (p: Page) => (p === "lodtraekning" ? hasContest : !PAGE_PERM[p] || deals.some((d) => canOn(d.id, PAGE_PERM[p]!)));
   const scope = sted ? deals.filter((d) => d.id === sted) : deals;
   const root = deals.find((d) => !d.parentDealId || !deals.some((x) => x.id === d.parentDealId)) ?? deals[0];
   const company = root ? dealName(root) : (who.name ?? "Nextview360");
@@ -143,6 +145,11 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
     d.tours.map((x) => ({ ...x, dealId: d.id, location: many ? dealName(d) : null, config: x.config as unknown as TourConfig, share: shareOf(x.share), url: tourUrl(x.slug, origin, x.liveVersion != null) }))
   );
   const reviewTours = allTours.filter((x) => canOn(x.dealId, "review"));
+  // The treasure chests' draws they may see: the list (owners, staff) - or the number only (numbers only).
+  const contestTours = allTours.flatMap((x) => (canOn(x.dealId, "entries") || canOn(x.dealId, "stats") ? contestChests(x.config).map((c) => ({ tour: x, chest: c, list: canOn(x.dealId, "entries") })) : []));
+  hasContest = contestTours.length > 0;
+  const asked: Page = (PAGES as readonly string[]).includes(sp.side ?? "") ? (sp.side as Page) : "hjem";
+  const page: Page = pageOk(asked) ? asked : "hjem";
   // Out: the ones they may see (numbers or the website codes), and those split by what they may do with them.
   const tours = allTours.filter((x) => x.published && (canOn(x.dealId, "stats") || canOn(x.dealId, "embed")));
   const statTours = tours.filter((x) => canOn(x.dealId, "stats"));
@@ -177,6 +184,29 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
   const stats: TourStats[] = needStats ? await Promise.all(statTours.map((x) => tourStats(x.slug, { from: period.from, to: period.to }))) : [];
   const together = needStats ? mergeStats(stats) : null;
   const togetherShare = mergeShare(statTours.map((x) => x.share));
+  // "Lodtrækning": each chest's entries (the list only for those who may see it - else the number).
+  if (page === "lodtraekning") await deleteOldContestEntries().catch(() => 0);
+  const contests =
+    page === "lodtraekning"
+      ? await Promise.all(
+          contestTours.map(async ({ tour: x, chest, list }) => {
+            const where = { tourSlug: x.slug, itemId: chest.id };
+            const rows = list ? await prisma.tourContestEntry.findMany({ where, orderBy: { createdAt: "desc" }, take: 5000 }) : null;
+            const count = rows ? rows.filter((r) => !r.test).length : await prisma.tourContestEntry.count({ where: { ...where, test: false } });
+            return {
+              key: `${x.slug}:${chest.id}`,
+              slug: x.slug,
+              itemId: chest.id,
+              tour: x.config.title || x.name,
+              prize: chest.contest.prize,
+              ends: chest.contest.ends,
+              keepDays: chest.contest.keepDays ?? 30,
+              count,
+              entries: rows ? rows.map((r) => ({ id: r.id, name: r.name, email: r.email, phone: r.phone, grade: r.grade, infoOk: r.infoOk, test: r.test, winner: Boolean(r.winnerAt), at: r.createdAt.toISOString() })) : null,
+            };
+          })
+        )
+      : [];
   const users = page === "brugere" ? await portalUsers(deals.filter((d) => canOn(d.id, "users")).map((d) => d.id)) : null;
   const first = who.name?.split(" ")[0];
 
@@ -188,6 +218,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
     ["rettelser", t.nav.rettelser, <path key="i" d="M4 14.5V16h1.5l8.6-8.6-1.5-1.5L4 14.5Zm10.2-10.2 1.5 1.5M4 3.5h6m-6 3h3" strokeLinecap="round" strokeLinejoin="round" />],
     ["kontrakt", t.nav.kontrakt, <path key="i" d="M6 3h6l4 4v10H6V3Zm6 0v4h4M8.5 11h5m-5 3h5" strokeLinejoin="round" />],
     ["brugere", t.nav.brugere, <path key="i" d="M7.5 9.5a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm-5 7.5c.4-2.9 2.5-4.5 5-4.5s4.6 1.6 5 4.5M13 3.7a3 3 0 0 1 0 5.6m1.8 3.4c1.5.6 2.5 2 2.7 4.3" strokeLinecap="round" />],
+    ["lodtraekning", t.nav.lodtraekning, <path key="i" d="M3.5 8.5h13v8a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1v-8Zm0 0 1.5-4h10l1.5 4M3.5 11.5h13M9 10v3h2v-3" strokeLinejoin="round" />],
     ["hjaelp", t.nav.hjaelp, <path key="i" d="M10 17.5a7.5 7.5 0 1 0 0-15 7.5 7.5 0 0 0 0 15Zm-2.2-9.6a2.3 2.3 0 0 1 4.4 1c0 1.5-2.2 1.9-2.2 3.3m0 2.3h.01" strokeLinecap="round" />],
   ];
   const shownNav = nav.filter(([p]) => pageOk(p));
@@ -640,6 +671,10 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
             </>
           )}
 
+          {page === "lodtraekning" &&
+            contests.map((c) => (
+              <ContestPanel key={c.key} slug={c.slug} itemId={c.itemId} tour={c.tour} prize={c.prize} ends={c.ends} keepDays={c.keepDays} count={c.count} entries={c.entries} lang={lang} />
+            ))}
           {page === "brugere" && users && (
             <PortalUsers
               users={users.users.map((u) => ({

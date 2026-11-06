@@ -5,7 +5,7 @@ export type Lang = "da" | "en";
 export const TEXT = {
   da: {
     title: "Jeres side - Nextview360",
-    nav: { hjem: "Hjem", tal: "Statistik", hjemmeside: "På hjemmesiden", tips: "Brug touren", rettelser: "Rettelser", kontrakt: "Kontrakt", brugere: "Brugere", hjaelp: "Hjælp" },
+    nav: { hjem: "Hjem", tal: "Statistik", hjemmeside: "På hjemmesiden", tips: "Brug touren", rettelser: "Rettelser", kontrakt: "Kontrakt", brugere: "Brugere", lodtraekning: "Lodtrækning", hjaelp: "Hjælp" },
     allLocations: "Alle afdelinger",
     seen: (d: string) => `Sidst logget ind ${d}`,
     notSeen: "Har ikke logget ind endnu",
@@ -139,7 +139,7 @@ export const TEXT = {
   },
   en: {
     title: "Your page - Nextview360",
-    nav: { hjem: "Home", tal: "Statistics", hjemmeside: "On your website", tips: "Use the tour", rettelser: "Changes", kontrakt: "Contract", brugere: "Users", hjaelp: "Help" },
+    nav: { hjem: "Home", tal: "Statistics", hjemmeside: "On your website", tips: "Use the tour", rettelser: "Changes", kontrakt: "Contract", brugere: "Users", lodtraekning: "Prize draw", hjaelp: "Help" },
     allLocations: "All locations",
     seen: (d: string) => `Last logged in ${d}`,
     notSeen: "Hasn't logged in yet",

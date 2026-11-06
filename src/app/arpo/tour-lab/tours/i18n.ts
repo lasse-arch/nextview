@@ -30,6 +30,22 @@ export const langName = (code: string) => LANGUAGES.find((l) => l.code === code)
 
 /** The engine's own words, as written in the code - `{x}` is filled in at runtime and must stay in a translation. */
 export const UI_STRINGS = [
+  "Du fandt skatten! 🎉",
+  "Skriv dig op og vær med i lodtrækningen om {præmie} til {skole}. Vinderen trækkes {dato}.",
+  "en startpakke",
+  "Klassetrin (valgfrit)",
+  "9. klasse",
+  "10. klasse",
+  "Jeg er indforstået med, at {skole} gemmer mine oplysninger til lodtrækningen og kontakter vinderen. Oplysningerne slettes, når vinderen er fundet.",
+  "Skolen må gerne sende mig information om at gå på {skole}.",
+  "Vær med i lodtrækningen",
+  "Du er med!",
+  "Vi trækker en vinder {dato} og kontakter vedkommende direkte.",
+  "Du er allerede med i lodtrækningen 👍",
+  "Gå videre i touren",
+  "Sæt flueben ved, at oplysningerne må gemmes til lodtrækningen.",
+  "Det kunne ikke sendes lige nu - prøv igen om lidt.",
+  "Skattekiste",
   "Andre steder",
   "Se det i brug",
   "Kun hele uger - tryk på ugen",

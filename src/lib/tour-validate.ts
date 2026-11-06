@@ -98,7 +98,7 @@ export function tourConfigProblem(config: unknown): string | null {
   if (c.staging !== undefined) {
     if (!arr(c.staging) || c.staging.length > 40) return "Virtual staging skal være en liste (højst 40).";
     for (const it of c.staging) {
-      if (!obj(it) || !str(it.id) || !["video", "image", "iframe", "sign", "yearwheel"].includes(it.kind)) return "Et staging-element har en ukendt type.";
+      if (!obj(it) || !str(it.id) || !["video", "image", "iframe", "sign", "yearwheel", "treasure"].includes(it.kind)) return "Et staging-element har en ukendt type.";
       if (!arr(it.corners) || it.corners.length !== 4 || !it.corners.every((p) => obj(p) && num(p.x) && num(p.y) && num(p.z))) return "Et staging-element skal have fire hjørner.";
       if (!arr(it.ss) || !it.ss.every((n) => Number.isInteger(n))) return "Et staging-element skal vises fra scanpunkter (tal).";
       if (it.place !== undefined) {
@@ -108,6 +108,8 @@ export function tourConfigProblem(config: unknown): string | null {
       }
       if (it.kind === "iframe" && !/^https:\/\//i.test(String(it.src ?? ""))) return "En hjemmeside i staging skal være et https-link.";
       if ((it.kind === "video" || it.kind === "image") && !str(it.src)) return "En video eller et billede i staging mangler sin fil.";
+      if (it.contest !== undefined && (!obj(it.contest) || typeof it.contest.prize !== "string" || it.contest.prize.length > 80 || (it.contest.ends !== "" && !/^\d{4}-\d{2}-\d{2}$/.test(String(it.contest.ends))) || (it.contest.keepDays !== undefined && !(Number.isInteger(it.contest.keepDays) && it.contest.keepDays >= 1 && it.contest.keepDays <= 365))))
+        return "En skattekistes lodtrækning er ugyldig (præmie, dato eller dage).";
       if (it.action !== undefined && (!obj(it.action) || !str(it.action.label) || !str(it.action.href))) return "Knappen på et staging-element skal have tekst og link.";
     }
   }

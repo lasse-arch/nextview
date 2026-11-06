@@ -108,8 +108,8 @@ export type Point3 = { x: number; y: number; z: number };
  */
 export type StagingItem = {
   id: string;
-  /** What it shows. "yearwheel" = the tour's `yearWheel`, playing by itself and clickable. */
-  kind: "video" | "image" | "iframe" | "sign" | "yearwheel";
+  /** What it shows. "yearwheel" = the tour's `yearWheel`, playing by itself and clickable. "treasure" = a treasure chest (Skattejagt): found and tapped, it opens the `contest` draw. */
+  kind: "video" | "image" | "iframe" | "sign" | "yearwheel" | "treasure";
   /** Its name in the editor (and for screen readers). */
   title?: string;
   /** The file (video: MP4, image) or the page (iframe: https only - a YouTube/Vimeo link plays its video). */
@@ -131,6 +131,14 @@ export type StagingItem = {
   action?: { label: string; href: string };
   /** How a picture or video fills the surface: "cover" (fills it, may crop - default) or "contain" (all of it, may leave edges). */
   fit?: "cover" | "contain";
+  /**
+   * A treasure chest's draw ("Skattejagt"): `prize` (e.g. "en startpakke"),
+   * the day the winner is drawn (`ends`, YYYY-MM-DD - after it the chest is
+   * gone), and how many days after the draw the list is deleted (`keepDays`,
+   * default 30). The entries are kept in Arpo and seen by the customer on
+   * their page. `src` may be their own picture of a chest (else ours).
+   */
+  contest?: { prize: string; ends: string; keepDays?: number };
 };
 
 /**

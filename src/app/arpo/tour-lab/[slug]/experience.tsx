@@ -23,7 +23,7 @@ import { SITE_PLAN_CSS, SitePlanControls, SitePlanLegend, type SitePlanState } f
 import { FeatureTour, featuresSeen, FEATURES_CSS, type DemoContact } from "./features";
 import { FinderSheet, FINDER_CSS, WalkLines } from "./finder";
 import { apiUrl, isStaticTour } from "../tours/api";
-import type { DroneView, FindStepAside, GuideTurn, MenuEntry, PanoCover, TourConfig, TourPlace, TourPoint, WelcomeGo } from "../tours/types";
+import type { DroneView, FindStepAside, GuideTurn, MenuEntry, PanoCover, StagingItem, TourConfig, TourPlace, TourPoint, WelcomeGo } from "../tours/types";
 import { CoverWelcome, DESIGNS_CSS, DockMenu, PickerMenu, WelcomeFilm, welcomeFilmClass } from "./designs";
 import { GUIDE_CSS, GuidePlayer, guideStops } from "./guide";
 import { ONBOARDING_CSS, Onboarding } from "./onboarding";
@@ -42,6 +42,7 @@ import { BENTO_CSS, BentoMenu } from "./bento";
 import { INFO_CSS, InfoDots, usePlaceInfo } from "./info";
 import { STAGING_CSS, StagingLayer, StagingSound } from "./staging";
 import { IN_USE_CSS, InUseBox } from "./in-use";
+import { CONTEST_CSS, ContestBox } from "./treasure";
 import { IN_3D, useStaging3d } from "./staging-3d";
 import { LINE_DAY_CSS, LineDayCard, LineDayEnd, LineDayPicker, lineDayStops, type LineDayRun } from "./line-day";
 import { YEARWHEEL_CSS, YearWheelPanel } from "./yearwheel";
@@ -740,7 +741,24 @@ function TourExperience({
   const coverWaitingRef = useRef(false);
   /** The connected viewer, once it's playing (for the parts that follow the camera). */
   const [sdk, setSdk] = useState<MpSdk | null>(null);
-  const staging3d = useStaging3d(phase === "tour" ? sdk : null, T.staging ?? [], (id) => stagingTap.current(id));
+  // The surfaces shown: a treasure chest only while its draw is open (after the closing day it's gone by itself).
+  const [todayDk] = useState(() => new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Copenhagen" }));
+  const stagingNow = useMemo(() => (T.staging ?? []).filter((i) => i.kind !== "treasure" || (i.contest?.ends ? todayDk <= i.contest.ends : true)), [T.staging, todayDk]);
+  const staging3d = useStaging3d(phase === "tour" ? sdk : null, stagingNow, (id) => stagingTap.current(id));
+  /** "Skattejagt": the chest found and tapped - its draw is open. */
+  const [contest, setContest] = useState<StagingItem | null>(null);
+  useEffect(() => {
+    const open = (e: Event) => {
+      const id = (e as CustomEvent<string>).detail;
+      const item = stagingNow.find((i) => i.id === id && i.kind === "treasure");
+      if (item?.contest?.ends) {
+        setContest(item);
+        track("contest_open", { item: item.title ?? item.id });
+      }
+    };
+    window.addEventListener("hv-skat", open);
+    return () => window.removeEventListener("hv-skat", open);
+  }, [stagingNow]);
   /** The scan point (ss) the visitor stands on. */
   const [currentSs, setCurrentSs] = useState<number | null>(null);
   const currentSsRef = useRef<number | null>(null);
@@ -2717,6 +2735,8 @@ function TourExperience({
     stagingTap.current = (id) => {
       const item = T.staging?.find((i) => i.id === id);
       if (!item) return;
+      // A treasure chest opens its draw - also in the editor's preview, so it can be tried there.
+      if (item.kind === "treasure") window.dispatchEvent(new CustomEvent("hv-skat", { detail: id }));
       if (inPreview && window.parent !== window) {
         window.parent.postMessage({ type: "tour-staging-pick", id }, location.origin);
         return;
@@ -2749,7 +2769,7 @@ function TourExperience({
       {[...fontHrefs(T.font, [400, 600, 700, 800, 900]), ...(T.fontHeading ? fontHrefs(T.fontHeading, [500, 600]) : [])].map((href) => (
         <link key={href} rel="stylesheet" href={href} />
       ))}
-      <style>{CSS + TOUR_LOGO_CSS + CONTACT_CSS + STORIES_CSS + LIGHTBOX_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + ONBOARDING_CSS + MENU_HINT_CSS + INFO_CSS + STAGING_CSS + (T.inUse?.length ? IN_USE_CSS : "") + (T.lineDays ? LINE_DAY_CSS : "") + (T.yearWheel ? YEARWHEEL_CSS : "") + MAP_CSS + (T.sitePlan?.overlay ? SITE_PLAN_CSS + SITE_PLAN_360_CSS : "") + ROUTE_CSS + MEASURES_CSS + CARDS_CSS + DAY_CSS + (T.events ? EVENTS_CSS : "") + (T.shop || T.points.some((p) => p.shop) ? SHOP_CSS : "") + SIMPLE_CSS + BENTO_CSS + LOGO_RIGHT_CSS + LANG_CSS + WEATHER_CSS + COMMUTE_CSS + FEATURES_CSS + FINDER_CSS + (review ? FEEDBACK_CSS : "")}</style>
+      <style>{CSS + TOUR_LOGO_CSS + CONTACT_CSS + STORIES_CSS + LIGHTBOX_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + ONBOARDING_CSS + MENU_HINT_CSS + INFO_CSS + STAGING_CSS + (T.staging?.some((i) => i.kind === "treasure") ? CONTEST_CSS : "") + (T.inUse?.length ? IN_USE_CSS : "") + (T.lineDays ? LINE_DAY_CSS : "") + (T.yearWheel ? YEARWHEEL_CSS : "") + MAP_CSS + (T.sitePlan?.overlay ? SITE_PLAN_CSS + SITE_PLAN_360_CSS : "") + ROUTE_CSS + MEASURES_CSS + CARDS_CSS + DAY_CSS + (T.events ? EVENTS_CSS : "") + (T.shop || T.points.some((p) => p.shop) ? SHOP_CSS : "") + SIMPLE_CSS + BENTO_CSS + LOGO_RIGHT_CSS + LANG_CSS + WEATHER_CSS + COMMUTE_CSS + FEATURES_CSS + FINDER_CSS + (review ? FEEDBACK_CSS : "")}</style>
       {/* The tour's own design on top (written by Claude or by hand under Avanceret). */}
       {T.customCss && <style>{T.customCss.replace(/<\/?style/gi, "")}</style>}
 
@@ -3459,10 +3479,10 @@ function TourExperience({
           onLink={(label, href) => ctaClick(label, href, "info")}
         />
       )}
-      {phase === "tour" && T.staging && T.staging.some((i) => !staging3d || !IN_3D.has(i.kind)) && (
+      {phase === "tour" && stagingNow.some((i) => !staging3d || !IN_3D.has(i.kind)) && (
         <StagingLayer
           sdk={sdk}
-          items={staging3d ? T.staging.filter((i) => !IN_3D.has(i.kind)) : T.staging}
+          items={staging3d ? stagingNow.filter((i) => !IN_3D.has(i.kind)) : stagingNow}
           T={T}
           currentSs={currentSs}
           frame={iframe}
@@ -3470,7 +3490,8 @@ function TourExperience({
           onLink={(label, href) => (ctaClick(label, href, "staging"), openLink(T, href, label, popup))}
         />
       )}
-      {phase === "tour" && staging3d && T.staging?.some((i) => i.kind === "video") && <StagingSound sdk={sdk} items={T.staging} currentSs={currentSs} frame={iframe} />}
+      {phase === "tour" && staging3d && stagingNow.some((i) => i.kind === "video") && <StagingSound sdk={sdk} items={stagingNow} currentSs={currentSs} frame={iframe} />}
+      {contest?.contest && <ContestBox T={T} slug={savedTour.slug} item={contest} lang={lang} onClose={() => setContest(null)} onEvent={(name, params) => track(name, params ?? {})} />}
       {phase === "tour" && T.inUse?.length ? (
         <InUseBox
           items={T.inUse}

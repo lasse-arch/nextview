@@ -24,6 +24,7 @@ const KINDS: [Kind, string][] = [
   ["iframe", "Hjemmeside"],
   ["sign", "Skilt"],
   ["yearwheel", "Årshjul"],
+  ["treasure", "Skattekiste"],
 ];
 const KIND_NAME = Object.fromEntries(KINDS) as Record<Kind, string>;
 const MONTHS = ["januar", "februar", "marts", "april", "maj", "juni", "juli", "august", "september", "oktober", "november", "december"];
@@ -34,7 +35,7 @@ const linkBtn = "text-[13px] font-medium text-[#0071e3] disabled:opacity-50";
 
 type Place = NonNullable<StagingItem["place"]>;
 /** A new surface's size (metres): about a TV, in the shape its kind usually has. */
-const START_SIZE: Record<Kind, [number, number]> = { video: [1.2, 0.675], iframe: [1.2, 0.675], yearwheel: [1.6, 0.9], image: [1.2, 0.8], sign: [1, 0.6] };
+const START_SIZE: Record<Kind, [number, number]> = { video: [1.2, 0.675], iframe: [1.2, 0.675], yearwheel: [1.6, 0.9], image: [1.2, 0.8], sign: [1, 0.6], treasure: [0.6, 0.5] };
 
 /** One click in the preview, in the middle of the surface: where, and which way the surface faces. */
 function usePlacer(preview: PreviewApi) {
@@ -171,6 +172,8 @@ export function StagingEditor({ config, edit, preview, focus }: { config: TourCo
             if (!at) return;
             const item: StagingItem = { id: `vs-${Date.now().toString(36)}`, kind, title: `${KIND_NAME[kind]} ${items.length + 1}`, place: at.place, corners: cornersOf(at.place), ss: at.ss ? [at.ss] : [] };
             if (kind === "sign") item.text = "Velkommen";
+            // A new chest's draw: a starter pack, drawn in a month (both changed below).
+            if (kind === "treasure") item.contest = { prize: "en startpakke", ends: new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10) };
             if (kind === "yearwheel" && !config.yearWheel) edit((d) => void (d.yearWheel = { title: "Et år. Én årgang.", months: [] }));
             setItems([...items, item]);
           }}
@@ -214,6 +217,7 @@ export function StagingEditor({ config, edit, preview, focus }: { config: TourCo
                 </Field>
               )}
               {i.kind === "yearwheel" && <p className={small}>Viser årshjulet herunder - interaktivt, lige på fladen.</p>}
+              {i.kind === "treasure" && <TreasureFields item={i} set={set} />}
               {(i.kind === "video" || i.kind === "image") && (
                 <Field title="Udfyld fladen">
                   <Choice
@@ -226,7 +230,7 @@ export function StagingEditor({ config, edit, preview, focus }: { config: TourCo
                   />
                 </Field>
               )}
-              {i.kind !== "iframe" && i.kind !== "yearwheel" && (
+              {i.kind !== "iframe" && i.kind !== "yearwheel" && i.kind !== "treasure" && (
                 <Field title="Knap (valgfri)" hint="Et tryk på fladen åbner linket - fx jeres Instagram, en tilmelding eller #kontakt.">
                   <div className="flex gap-1.5">
                     <input className={`${input} w-2/5 bg-white`} placeholder="Fx Følg os" value={i.action?.label ?? ""} onChange={(e) => set({ ...i, action: e.target.value || i.action?.href ? { label: e.target.value, href: i.action?.href ?? "" } : undefined })} />
@@ -500,5 +504,41 @@ function InUseEditor({ config, edit, preview }: { config: TourConfig; edit: Edit
       </button>
       {note && <p className="px-1 text-[12px] text-[#ff9500]">{note}</p>}
     </Group>
+  );
+}
+
+/**
+ * "Skattekiste": its draw - the prize, the day the winner is drawn (after it
+ * the chest is gone), how long the list is kept after the draw - and its own
+ * picture, if the school has one (else ours). The visitor's box and its texts
+ * are the engine's (treasure.tsx); the list is on the customer's page.
+ */
+function TreasureFields({ item, set }: { item: StagingItem; set: (next: StagingItem) => void }) {
+  // A chest made before it had a draw: the closing day is set when picked (until then: none - the chest stays).
+  const c = item.contest ?? { prize: "en startpakke", ends: "" };
+  const put = (patch: Partial<NonNullable<StagingItem["contest"]>>) => set({ ...item, contest: { ...c, ...patch } });
+  return (
+    <>
+      <p className={small}>
+        Når man finder kisten og trykker på den, kommer en boks frem, hvor man skriver navn, e-mail, telefon og (valgfrit) klassetrin og er med i lodtrækningen. Skolen ser listen på sin kundeside under &quot;Lodtrækning&quot; og trækker vinderen dér.
+      </p>
+      <Field title="Præmie" hint='Står i boksen: "… lodtrækningen om [præmie] til [skolen]".'>
+        <input className={`${input} bg-white`} value={c.prize} maxLength={80} onChange={(e) => put({ prize: e.target.value })} />
+      </Field>
+      <div className="grid grid-cols-2 gap-2">
+        <Field title="Vinderen trækkes" hint="Kisten forsvinder dagen efter.">
+          <input type="date" className={`${input} bg-white`} value={c.ends} onChange={(e) => e.target.value && put({ ends: e.target.value })} />
+        </Field>
+        <Field title="Slet listen efter" hint="Dage efter trækningen.">
+          <input type="number" min={1} max={365} className={`${input} bg-white`} value={c.keepDays ?? 30} onChange={(e) => put({ keepDays: Math.max(1, Math.min(365, Number(e.target.value) || 30)) })} />
+        </Field>
+      </div>
+      <Field title="Eget billede af en kiste (valgfrit)" hint="Gerne en PNG uden baggrund. Tom: vores skattekiste.">
+        <div className="flex gap-1.5">
+          <input className={`${input} bg-white`} placeholder="Vores kiste" value={item.src ?? ""} onChange={(e) => set({ ...item, src: e.target.value || undefined })} />
+          <UploadButton accept="image/png,image/webp,image/svg+xml,image/jpeg" onDone={(url) => set({ ...item, src: url })} />
+        </div>
+      </Field>
+    </>
   );
 }

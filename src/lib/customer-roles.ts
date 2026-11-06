@@ -18,13 +18,15 @@ export type CustomerPerm =
   /** The contract. */
   | "contract"
   /** Inviting and removing users. */
-  | "users";
+  | "users"
+  /** "Skattejagt": the list of those who entered a draw (personal data) - drawing the winner, exporting, deleting. */
+  | "entries";
 
 export type DealAccess = { dealId: string; role: CustomerRole; canApprove: boolean };
 
 const PERMS: Record<CustomerRole, CustomerPerm[]> = {
-  OWNER: ["stats", "embed", "review", "approve", "contract", "users"],
-  STAFF: ["stats", "embed", "review"],
+  OWNER: ["stats", "embed", "review", "approve", "contract", "users", "entries"],
+  STAFF: ["stats", "embed", "review", "entries"],
   DEVELOPER: ["embed"],
   VIEWER: ["stats"],
 };
@@ -62,6 +64,7 @@ export function roleScope(role: CustomerRole, canApprove: boolean, lang: "da" | 
     approve: "godkendelse af ændringer i touren",
     contract: "kontrakten",
     users: "brugerne (invitere og fjerne)",
+    entries: "listen over deltagere i en skattejagt",
   };
   const en = {
     stats: "your tours and statistics",
@@ -70,6 +73,7 @@ export function roleScope(role: CustomerRole, canApprove: boolean, lang: "da" | 
     approve: "approving changes to the tour",
     contract: "the contract",
     users: "the users (invite and remove)",
+    entries: "the list of treasure hunt entries",
   };
   const words = lang === "en" ? en : da;
   const all: CustomerPerm[] = ["stats", "embed", "review", "approve", "contract", "users"];

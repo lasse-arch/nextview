@@ -9,6 +9,7 @@ import { safeHref } from "../tours/safe";
 import { YearWheelView } from "./yearwheel";
 import { useT } from "../tours/i18n-react";
 import { stagingVideo } from "./staging-3d";
+import { CHEST_IMAGE } from "./treasure";
 
 /*
  * Virtual staging: videos, pictures, web pages, signs and the year wheel put
@@ -202,7 +203,7 @@ export function StagingLayer({
             ref={(el) => {
               els.current[n] = el;
             }}
-            className={`vs-item vs-${item.kind} ${item.action ? "vs-klik" : ""}`}
+            className={`vs-item vs-${item.kind} ${item.action || item.kind === "treasure" ? "vs-klik" : ""}`}
             data-ude="1"
             style={{ width: sizes[n].w, height: sizes[n].h }}
           >
@@ -322,6 +323,11 @@ function StagedContent({ item, T, lang, seen, onLink }: { item: StagingItem; T: 
         {click && <span className="vs-knap">{action!.label} →</span>}
       </>
     );
+  if (item.kind === "treasure")
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={item.src || CHEST_IMAGE} alt={tr("Skattekiste")} style={{ objectFit: "contain" }} onClick={() => window.dispatchEvent(new CustomEvent("hv-skat", { detail: item.id }))} />
+    );
   if (item.kind === "image" && item.src)
     return (
       <>
@@ -380,5 +386,6 @@ export const STAGING_CSS = `
 .vs-skilt{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6%;box-sizing:border-box;background:#fff;color:var(--c-main);text-align:center}
 .vs-skilt p{margin:0;font-family:var(--font-heading);font-size:120px;font-weight:800;line-height:1.08;white-space:pre-line}
 .vs-sign{background:#fff}
+.vs-treasure{background:transparent}
 .vs-image{background:transparent}
 `;

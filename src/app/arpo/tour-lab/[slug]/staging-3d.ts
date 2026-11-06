@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import type { MpSdk } from "../matterport";
 import type { Point3, StagingItem } from "../tours/types";
+import { CHEST_IMAGE } from "./treasure";
 
 /*
  * Virtual staging as real surfaces in Matterport's own 3D scene (its Scene
@@ -26,7 +27,7 @@ type Scene = {
 type SceneObject = { addNode(): SceneNode; start(): void; stop(): void };
 type SceneNode = { addComponent(name: string, inputs?: Record<string, unknown>): { inputs: Record<string, unknown> } };
 
-export const IN_3D = new Set<StagingItem["kind"]>(["image", "video", "sign"]);
+export const IN_3D = new Set<StagingItem["kind"]>(["image", "video", "sign", "treasure"]);
 
 /** The films playing on the 3D surfaces, by item - so a "Tryk for lyd" button laid over the tour can turn their sound on. */
 const playing = new Map<string, HTMLVideoElement>();
@@ -128,10 +129,12 @@ function factory() {
         const at = now && surfaceOf(now);
         if (now && at) place(THREE, mesh, at, tex, now);
       };
-      if (item.kind === "image" && item.src) {
+      if ((item.kind === "image" && item.src) || item.kind === "treasure") {
+        // A treasure chest: the school's own picture of one, or ours (drawn in the engine).
+        const src = item.src || (item.kind === "treasure" ? CHEST_IMAGE : "");
         const loader = new THREE.TextureLoader();
         loader.setCrossOrigin("anonymous");
-        loader.load(item.src, done, undefined, () => console.warn("Virtual staging: billedet kunne ikke hentes", item.src));
+        loader.load(src, done, undefined, () => console.warn("Virtual staging: billedet kunne ikke hentes", item.src));
       } else if (item.kind === "video" && item.src) {
         const v = document.createElement("video");
         v.crossOrigin = "anonymous";
@@ -207,7 +210,8 @@ function place(THREE: Three, mesh: Obj3, s: { center: Point3; normal: Point3; w:
     const pa = s.w / s.h;
     tex.repeat.set(1, 1);
     tex.offset.set(0, 0);
-    if (item.fit === "contain") {
+    // A chest is always whole (never cropped).
+    if (item.fit === "contain" || item.kind === "treasure") {
       if (ta > pa) h = s.w / ta;
       else w = s.h * ta;
     } else if (ta > pa) {
