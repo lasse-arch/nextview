@@ -43,3 +43,29 @@ export function socialSign(kind: SocialKind, href: string, text = "Følg os"): s
   // "#" must be written %23 in a data address (url(#g) above already is).
   return `data:image/svg+xml,${encodeURIComponent(svg).replace(/%2523/g, "%23")}`;
 }
+
+/**
+ * The sign as a PNG file (in the browser), for uploading to the tour: a tour
+ * only takes pictures as files or PNG/JPEG/WebP - never an SVG address, as
+ * an SVG can carry script.
+ */
+export async function socialSignPng(kind: SocialKind, href: string, text = "Følg os"): Promise<File> {
+  return svgToPng(socialSign(kind, href, text), `${kind}-skilt.png`);
+}
+
+/** An SVG data address drawn onto a 600 × 600 canvas, as a PNG file. */
+export async function svgToPng(svgAddress: string, name: string): Promise<File> {
+  const img = new Image();
+  await new Promise<void>((resolve, reject) => {
+    img.onload = () => resolve();
+    img.onerror = () => reject(new Error("Skiltet kunne ikke tegnes."));
+    img.src = svgAddress;
+  });
+  const canvas = document.createElement("canvas");
+  canvas.width = 600;
+  canvas.height = 600;
+  canvas.getContext("2d")!.drawImage(img, 0, 0, 600, 600);
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+  if (!blob) throw new Error("Skiltet kunne ikke laves som billede.");
+  return new File([blob], name, { type: "image/png" });
+}

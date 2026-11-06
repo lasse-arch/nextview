@@ -1,14 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useContext, useState } from "react";
 import type { InUseItem, StagingItem, TourConfig, YearWheel } from "../../tours/types";
 import { Rows } from "./content";
 import { LinkInput } from "./links-open";
-import { Choice, Field, Group, Icon, input, UploadButton, ssOfHref, withProtocol, type PreviewApi } from "./ui";
+import { Choice, Field, FilesContext, Group, Icon, input, UploadButton, ssOfHref, uploadToTour, withProtocol, type PreviewApi } from "./ui";
 import { cornersOf, movePlace } from "../staging";
 import { IN_3D } from "../staging-3d";
 import { socialLinks, type SocialKind } from "../../tours/social";
-import { socialSign } from "../../tours/social-sign";
+import { socialSignPng, svgToPng } from "../../tours/social-sign";
 
 /*
  * Virtual staging: a video, a picture, a web page, a sign or the year wheel
@@ -157,6 +157,9 @@ export function StagingEditor({ config, edit, preview, focus }: { config: TourCo
   const [kind, setKind] = useState<Kind>("video");
   const placer = usePlacer(preview);
   const [ssBusy, setSsBusy] = useState(false);
+  const files = useContext(FilesContext);
+  const [signBusy, setSignBusy] = useState(false);
+  const [signError, setSignError] = useState<string | null>(null);
 
   return (
     <>
@@ -185,19 +188,29 @@ export function StagingEditor({ config, edit, preview, focus }: { config: TourCo
         </button>
         <SocialSigns
           config={config}
-          busy={placer.busy}
+          busy={placer.busy || signBusy}
           onPick={async (kind, name, href) => {
             const at = await placer.place([0.6, 0.6]);
             if (!at) return;
             const link = withProtocol(href);
+            // The sign is drawn here and uploaded as a PNG - like a picture you upload yourself.
+            setSignBusy(true);
+            setSignError(null);
+            const src = await socialSignPng(kind, link)
+              .then((file) => uploadToTour(files.slug, file, files.blob))
+              .catch((e: unknown) => void setSignError(e instanceof Error ? e.message : String(e)));
+            setSignBusy(false);
+            if (!src) return;
             setItems([
               ...items,
-              { id: `vs-${Date.now().toString(36)}`, kind: "image", title: `${name}-skilt`, src: socialSign(kind, link), fit: "contain", action: { label: `Følg os på ${name}`, href: link }, place: at.place, corners: cornersOf(at.place), ss: at.ss ? [at.ss] : [] },
+              { id: `vs-${Date.now().toString(36)}`, kind: "image", title: `${name}-skilt`, src, fit: "contain", action: { label: `Følg os på ${name}`, href: link }, place: at.place, corners: cornersOf(at.place), ss: at.ss ? [at.ss] : [] },
             ]);
           }}
         />
         {placer.status && <p className={small}>{placer.status}</p>}
+        {signBusy && <p className={small}>Laver skiltet…</p>}
         {placer.error && <p className="px-1 text-[12px] text-[#ff3b30]">{placer.error}</p>}
+        {signError && <p className="px-1 text-[12px] text-[#ff3b30]">{signError}</p>}
       </Group>
       <Group title="På fladerne">
         <Rows<StagingItem>
@@ -219,6 +232,7 @@ export function StagingEditor({ config, edit, preview, focus }: { config: TourCo
                     <input className={`${input} bg-white`} placeholder="https://…" value={i.src ?? ""} onChange={(e) => set({ ...i, src: e.target.value || undefined })} />
                     <UploadButton accept={i.kind === "video" ? "video/mp4,video/webm" : "image/*"} onDone={(url) => set({ ...i, src: url })} />
                   </div>
+                  {i.kind === "image" && i.src?.startsWith("data:image/svg+xml") && <SvgToFile src={i.src} onDone={(url) => set({ ...i, src: url })} />}
                 </Field>
               )}
               {i.kind === "iframe" && (
@@ -564,6 +578,36 @@ function TreasureFields({ item, set }: { item: StagingItem; set: (next: StagingI
  * there (made in the engine: its colours, icon and the account), and a tap on
  * it in the tour opens the account in a new tab.
  */
+/** An older "Følg os"-skilt, saved as an SVG address (which a tour can't be saved with): made into a PNG file with one tap. */
+function SvgToFile({ src, onDone }: { src: string; onDone: (url: string) => void }) {
+  const files = useContext(FilesContext);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <div className="mt-1.5 space-y-1">
+      <p className="text-[12px] text-[#ff3b30]">Skiltet er gemt på en måde, touren ikke kan bruge. Tryk her, så laves det om til et billede.</p>
+      <button
+        type="button"
+        disabled={busy}
+        className="rounded-lg bg-[#0071e3] px-3 py-1.5 text-[13px] font-medium text-white disabled:opacity-50"
+        onClick={async () => {
+          setBusy(true);
+          setError(null);
+          try {
+            onDone(await uploadToTour(files.slug, await svgToPng(src, "skilt.png"), files.blob));
+          } catch (e) {
+            setError(e instanceof Error ? e.message : String(e));
+          }
+          setBusy(false);
+        }}
+      >
+        {busy ? "Laver billedet…" : "Lav skiltet om til et billede"}
+      </button>
+      {error && <p className="text-[12px] text-[#ff3b30]">{error}</p>}
+    </div>
+  );
+}
+
 function SocialSigns({ config, busy, onPick }: { config: TourConfig; busy: boolean; onPick: (kind: SocialKind, name: string, href: string) => void }) {
   const links = socialLinks(config.contact);
   return (
