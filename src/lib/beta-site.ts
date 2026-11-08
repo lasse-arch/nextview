@@ -1,6 +1,7 @@
 import "server-only";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { cookies } from "next/headers";
 import { NextResponse, after } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { customerBandHtml, refreshSiteLogos, siteCustomers } from "@/lib/site-customers";
@@ -15,9 +16,16 @@ import { customerBandHtml, refreshSiteLogos, siteCustomers } from "@/lib/site-cu
 export async function betaPage(name: string, request: Request): Promise<Response> {
   const user = await getCurrentUser();
   if (!user) {
-    const login = new URL("/login", request.url);
-    login.searchParams.set("next", `/web/${name}`);
-    return NextResponse.redirect(login);
+    const next = `/web/${/^[a-z0-9-]+\.html$/.test(name) ? name : "index.html"}`;
+    // A login cookie that no longer counts (expired, a password session once Google is required, a customer's):
+    // cleared first - else the login page sends it straight on to /arpo, and the way back here is lost.
+    const dead = (await cookies()).has("nv360_session");
+    const to = dead ? new URL("/api/auth/session-ended", request.url) : new URL("/login", request.url);
+    to.searchParams.set("next", next);
+    // Never kept by the browser: once logged in, the same address must show the page, not this detour again.
+    const res = NextResponse.redirect(to);
+    res.headers.set("Cache-Control", "private, no-store");
+    return res;
   }
   if (!/^[a-z0-9-]+\.html$/.test(name)) return new NextResponse("Siden findes ikke.", { status: 404 });
   const html = await readFile(path.join(process.cwd(), "site-web", name), "utf8").catch(() => null);

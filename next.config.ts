@@ -51,9 +51,15 @@ const nextConfig: NextConfig = {
       {
         // The website's and the tours' own pictures, styles and scripts: kept by the browser for a while instead of
         // asked for again on every visit (a changed file still shows within the hour, and at once on a hard reload).
-        source: "/:dir(site|web|tours)/:path*",
+        source: "/:dir(site|tours)/:path*",
         headers: [{ key: "Cache-Control", value: "public, max-age=3600, stale-while-revalidate=604800" }],
       },
+      // The new site's files only - never its pages (/web/<page>.html): those are for the team, sent "private, no-store"
+      // by lib/beta-site.ts, and a kept copy of the way to the login would send them on to Arpo for an hour.
+      ...["/web/:dir(img|video)/:path*", "/web/:file([a-z0-9-]+\\.(?:css|js))"].map((source) => ({
+        source,
+        headers: [{ key: "Cache-Control", value: "public, max-age=3600, stale-while-revalidate=604800" }],
+      })),
       {
         // Published tours are made to be embedded on customers' websites.
         source: "/t/:slug",
