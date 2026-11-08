@@ -120,6 +120,17 @@ export async function proxy(request: NextRequest) {
   // ("/" is the website, which isn't where anyone logging in wants to land). With an error to show (a used or expired
   // login link) the login page stays, so they can get a new one.
   if (hasSession && pathname === "/login" && !request.nextUrl.searchParams.has("error")) {
+    // On the way to the new site (/web/…): back there - with an address the browser has never kept, as some still
+    // hold an old "/web/… → log in" for an hour. A cookie that no longer counts is caught there (beta-site.ts) and
+    // ends on the login page with an error, so this can't go round in circles.
+    const next = request.nextUrl.searchParams.get("next") ?? "";
+    if (/^\/web\/[a-z0-9-]+\.html$/.test(next)) {
+      const to = new URL(next, request.url);
+      to.searchParams.set("v", Date.now().toString(36));
+      const res = NextResponse.redirect(to);
+      res.headers.set("Cache-Control", "private, no-store");
+      return res;
+    }
     return NextResponse.redirect(new URL("/arpo", request.url));
   }
 
