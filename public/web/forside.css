@@ -217,7 +217,7 @@
 .hx-band { position: relative; background: var(--navy); color: #fff; border-radius: 22px; overflow: hidden; isolation: isolate; padding-bottom: clamp(150px, 16vw, 230px); --mx: 0; --my: 0; }
 .hx-copy { position: relative; z-index: 2; text-align: center; max-width: 980px; padding-block: clamp(96px, 12vw, 172px) 0; }
 .hx-copy .eyebrow { color: #AEB8D3; }
-.hx-copy h1 { color: #fff; margin-top: 16px; font-size: clamp(44px, 6.8vw, 96px); line-height: 1.02; }
+.hx-copy h1 { color: #fff; margin-top: 0; font-size: clamp(44px, 6.8vw, 96px); line-height: 1.02; }
 .hx-copy h1 em { font-style: normal; color: #AEC6FF; }
 .hx-copy .lead { color: rgba(255,255,255,.86); margin: 24px auto 0; max-width: 44ch; }
 .hx-copy .btn-row { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-top: 34px; }
