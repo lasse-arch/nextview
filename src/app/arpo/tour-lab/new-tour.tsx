@@ -14,9 +14,10 @@ import {
   searchTourCustomers,
   type TourCustomer,
 } from "@/lib/actions/tour-ai";
-import { createTour } from "@/lib/actions/tours";
+import { createTour, setStartVideo } from "@/lib/actions/tours";
+import { uploadsToBlob } from "@/lib/actions/tour-files";
 import type { AccountModel } from "@/lib/matterport-graph";
-import { Field, input } from "./[slug]/rediger/ui";
+import { Field, input, uploadToTour } from "./[slug]/rediger/ui";
 import { BRANCHES, DESIGN_PRESETS, FOCUS, MENU_STYLES, PRESET_LAYOUT, START_STYLES, type Branch, type DesignPreset, type NewTourLayout } from "./tours/presets";
 
 /*
@@ -59,6 +60,9 @@ export function NewTour({ tours, forDeal, onClose, replaces }: { tours: { slug: 
   const [notes, setNotes] = useState("");
   /** A drone photo the tour starts on - nextviewAI places the points on it. Made smaller in the browser first. */
   const [drone, setDrone] = useState<string | null>(null);
+  /** "Forside med film": the drone film behind the front page - uploaded to the tour once it is built. */
+  const [droneVideo, setDroneVideo] = useState<File | null>(null);
+  const [videoNote, setVideoNote] = useState<string | null>(null);
   const [copyOf, setCopyOf] = useState<string | null>(null);
   /** The customer's existing explore tour, converted: its menu, tiles and start are copied over. */
   const [explore, setExplore] = useState("");
@@ -80,6 +84,8 @@ export function NewTour({ tours, forDeal, onClose, replaces }: { tours: { slug: 
     setFocus("");
     setNotes("");
     setDrone(null);
+    setDroneVideo(null);
+    setVideoNote(null);
     setCopyOf(null);
     setExplore("");
     setPlan(null);
@@ -125,6 +131,17 @@ export function NewTour({ tours, forDeal, onClose, replaces }: { tours: { slug: 
         ? await createTour(name, copyOf)
         : await createTourFromWebsite({ ...aiInput(), plan: plan ?? undefined }).catch((err: unknown) => ({ ok: false as const, error: `Noget gik galt (${err instanceof Error ? err.message : err}) - prøv igen.` }));
       if (!r.ok) return setError(r.error);
+      // The drone film: up to the new tour, and in as the front page's film. If it fails, the tour is there all the same - the film can be put in under Start.
+      if (droneVideo && layout?.start === "hero") {
+        setVideoNote("Uploader dronevideoen …");
+        try {
+          const url = await uploadToTour(r.slug, droneVideo, await uploadsToBlob(r.slug));
+          const v = await setStartVideo(r.slug, url);
+          if (!v.ok) throw new Error(v.error);
+        } catch (err) {
+          alert(`Touren er bygget, men dronevideoen kom ikke med (${err instanceof Error ? err.message : err}). Læg den ind under Start → Forsiden.`);
+        }
+      }
       if ("reply" in r)
         try {
           sessionStorage.setItem(`tour-claude:${r.slug}`, String(r.reply));
@@ -306,6 +323,25 @@ export function NewTour({ tours, forDeal, onClose, replaces }: { tours: { slug: 
                       </div>
                       <input className={input} value={focus} onChange={(e) => setFocus(e.target.value)} placeholder="Fx Book bord" />
                     </Field>
+                    {layout?.start === "hero" && (
+                      <Field title="Dronevideo til forsiden (valgfrit)" hint="Kører uden lyd i baggrunden bag navnet på forsiden (Forside med film). Uploades til touren, når den er bygget - en kort mp4 på 10-30 sekunder er bedst.">
+                        {droneVideo ? (
+                          <div className="flex items-center gap-3 text-[13px]">
+                            <span className="truncate">🎬 {droneVideo.name} ({Math.round(droneVideo.size / 1_000_000)} MB)</span>
+                            <button type="button" onClick={() => setDroneVideo(null)} className="text-[#ff3b30] hover:underline">
+                              Fjern
+                            </button>
+                          </div>
+                        ) : (
+                          <input
+                            type="file"
+                            accept="video/mp4,video/webm"
+                            onChange={(e) => setDroneVideo(e.target.files?.[0] ?? null)}
+                            className="block w-full text-[13px] file:mr-3 file:rounded-full file:border-0 file:bg-[#0071e3]/10 file:px-3 file:py-1.5 file:text-[13px] file:font-medium file:text-[#0071e3]"
+                          />
+                        )}
+                      </Field>
+                    )}
                     <Field title="Dronebillede til start (valgfrit)" hint="Touren starter på billedet, og nextviewAI sætter punkterne på stederne, den kan se - du kan flytte dem bagefter under Interaktivt kort.">
                       {drone ? (
                         <div className="flex items-center gap-3">
@@ -363,7 +399,7 @@ export function NewTour({ tours, forDeal, onClose, replaces }: { tours: { slug: 
                 </button>
               ) : (
                 <button type="button" disabled={pending || !name.trim()} onClick={build} className="rounded-xl bg-[#0071e3] px-5 py-2.5 text-[15px] font-medium text-white disabled:opacity-40">
-                  {pending ? "Bygger…" : "Byg touren efter planen"}
+                  {pending ? videoNote ?? "Bygger…" : "Byg touren efter planen"}
                 </button>
               )}
             </div>

@@ -333,3 +333,21 @@ export async function tourEmbedsOf(slug: string): Promise<TourEmbed[]> {
   await requireTour(slug);
   return tourEmbeds([slug]);
 }
+
+/**
+ * Ny tour: the drone film picked in the wizard, uploaded to the tour just
+ * built - laid in as the film behind the front page ("Forside med film"),
+ * or as the film before the tour on any other start. A new version.
+ */
+export async function setStartVideo(slug: string, url: string): Promise<Result> {
+  await requireTour(slug);
+  // Only a file uploaded to this tour: our own file address or Vercel Blob.
+  if (typeof url !== "string" || !(/^\/api\/tour-files\/[\w-]+$/.test(url) || /^https:\/\/[\w.-]+\.blob\.vercel-storage\.com\/[^\s"'<>]+$/.test(url))) return { ok: false, error: "Ukendt filadresse." };
+  const row = await prisma.tour.findUnique({ where: { slug }, select: { config: true } });
+  if (!row) return { ok: false, error: "Touren findes ikke." };
+  const config = structuredClone(row.config) as unknown as TourConfig;
+  const type = /\.webm(\?|$)/i.test(url) ? "video/webm" : "video/mp4";
+  if (config.design?.welcome === "cover" && config.cover) config.cover = { ...config.cover, video: { src: url } };
+  else config.intro = { ...config.intro, sources: [{ src: url, type }] };
+  return saveTour(slug, config, "Dronevideo fra Ny tour");
+}

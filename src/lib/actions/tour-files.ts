@@ -3,7 +3,7 @@
 import { readLimited, safeFetch } from "@/lib/safe-fetch";
 import { requireTour } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { copyToTour, DB_MAX, hostFiles, storeTourFile } from "@/lib/tour-files";
+import { blobReady, copyToTour, DB_MAX, hostFiles, storeTourFile } from "@/lib/tour-files";
 import type { TourConfig } from "@/app/arpo/tour-lab/tours/types";
 
 
@@ -24,6 +24,12 @@ export async function uploadTourFile(slug: string, form: FormData): Promise<{ ok
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
+}
+
+/** Whether a tour's uploads go straight to Vercel Blob (big files, videos) - else via Arpo, up to 4 MB. */
+export async function uploadsToBlob(slug: string): Promise<boolean> {
+  await requireTour(slug);
+  return blobReady();
 }
 
 /** Records a file the editor uploaded straight to Vercel Blob. */
