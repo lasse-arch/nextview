@@ -34,6 +34,7 @@ import { WeatherEditor } from "./weather-editor";
 import { StagingEditor } from "./staging-editor";
 import { CLOUDFLARE_TOUR_ORIGIN } from "@/lib/public-urls";
 import { LineDayEditor } from "./line-day-editor";
+import { ScheduleEditor } from "./schedule-editor";
 import { FinderEditor } from "./finder-editor";
 import { MapEditor } from "./map-editor";
 import { FeedbackPanel } from "./feedback-panel";
@@ -55,7 +56,7 @@ const FIND_ASIDE: [FindStepAside, string][] = [
 const zoomLabel = (z: number) => (Math.abs(z - 1) < 0.01 ? "normal" : z < 1 ? `zoomet ud (${Math.round(z * 100)} %)` : `zoomet ind (${Math.round(z * 100)} %)`);
 
 type Version = { id: string; note: string | null; by: string | null; at: string };
-type Tab = "layout" | "sprog" | "claude" | "live" | "scan" | "okonomi" | "resultater" | "del" | "tags" | "staging" | "linjedag" | "start" | "rundvisning" | "kort" | "kortet" | "feedback" | "generelt" | "design" | "menu" | "funktioner" | "links" | "avanceret" | "versioner";
+type Tab = "layout" | "sprog" | "claude" | "live" | "scan" | "okonomi" | "resultater" | "del" | "tags" | "staging" | "linjedag" | "skema" | "start" | "rundvisning" | "kort" | "kortet" | "feedback" | "generelt" | "design" | "menu" | "funktioner" | "links" | "avanceret" | "versioner";
 
 /** Claude's mark: a small sunburst. */
 const NO_TABS: Tab[] = [];
@@ -82,6 +83,7 @@ const TABS: [Tab, string, string, string?][] = [
   ["kort", "Stedkort", '<rect x="4" y="5" width="16" height="14" rx="2"/><path d="M8 10h8M8 14h5"/>', "3 · Indhold"],
   ["tags", "Tags", '<path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z"/><circle cx="8" cy="8" r="1.5"/>'],
   ["linjedag", "En dag på linjen", '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/><path d="M4 4l3 3"/>'],
+  ["skema", "Byg dit skema", '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M9 9v12M15 9v12M8 2v4M16 2v4"/>'],
   ["staging", "Virtual staging", '<rect x="3" y="5" width="18" height="12" rx="1.5"/><path d="M8 21h8M12 17v4M10 9l4 2-4 2z"/>'],
   ["live", "Live data", '<path d="M3 12h4l3-8 4 16 3-8h4"/>'],
   ["links", "Knapper og kontakt", '<path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/>'],
@@ -113,7 +115,8 @@ const FINDS: Partial<Record<Tab, string[]>> = {
   scan: ["Scanpunkter", "Skjul scanpunkter", "Personer i scans"],
   tags: ["Tags", "Infotags", "Hotspots", "Pris", "Video"],
   staging: ["Årshjul|aarshjul|kalender|begivenheder|året", "Video på en flade|tv|skærm|storskærm|film på væggen", "Billede på en flade|plakat|maleri|foto på væggen", "Hjemmeside på en flade|instagram|facebook|some|webside", "Skilt|velkomstskilt|tekst på væggen", "Se det i brug|film i rummet|video i rummet|levende|i brug", "Tryk for lyd|lyd på video"],
-  linjedag: ["En dag på linjen|linjefag|linjer|dagen på linjen|skema"],
+  linjedag: ["En dag på linjen|linjefag|linjer|dagen på linjen"],
+  skema: ["Byg dit skema|skema|ugeskema|fag|valgfag|hovedfag|sidefag|fagblok|perioder|timer"],
   live: ["Live data", "Ledige pladser", "Ledige rum", "Book-knap", "Hent nye data"],
   kort: ["Stedkort", "Kort ved punkt", "Din plads venter", "Kort efter et stykke tid", "Knap til scanpunkt|opdækket|skjult scan"],
   links: ["Knapper", "Book", "Kontakt", "Telefon", "E-mail", "Adresse", "Sociale medier", "Kontaktformular", "Skriv til os", "Åbning", "Popup", "Ny fane", "Kort-link"],
@@ -966,6 +969,7 @@ export function TourEditor({
             {tab === "tags" && <TagsEditor config={config} edit={edit} slug={slug} preview={preview} />}
             {tab === "staging" && <StagingEditor config={config} edit={edit} preview={preview} focus={stagingFocus} />}
             {tab === "linjedag" && <LineDayEditor config={config} edit={edit} preview={preview} />}
+            {tab === "skema" && <ScheduleEditor config={config} edit={edit} preview={preview} />}
             {tab === "live" && (
               <>
                 <LiveDataEditor config={config} edit={edit} slug={slug} preview={preview} />
@@ -1532,6 +1536,7 @@ const MemoryPanel = memo(AiMemoryPanel);
 function unusedTabs(c: TourConfig): string {
   const off: Tab[] = [];
   if (!c.lineDays?.lines.length) off.push("linjedag");
+  if (!c.schedule) off.push("skema");
   if (!c.staging?.length) off.push("staging");
   if (!c.live) off.push("live");
   if (!c.info?.length) off.push("tags");

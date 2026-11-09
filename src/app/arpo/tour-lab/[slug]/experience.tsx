@@ -46,6 +46,7 @@ import { CONTEST_CSS, ContestBox } from "./treasure";
 import { IN_3D, useStaging3d } from "./staging-3d";
 import { LINE_DAY_CSS, LineDayCard, LineDayEnd, LineDayPicker, lineDayStops, type LineDayRun } from "./line-day";
 import { YEARWHEEL_CSS, YearWheelPanel } from "./yearwheel";
+import { SCHEDULE_CSS, ScheduleSheet } from "./schedule";
 import { MAP_CSS, MapScene, type MapApi } from "./map";
 import { CARDS_CSS, NudgeCard, PlaceCard } from "./cards";
 import { MEASURES_CSS, MeasureShield } from "./measures";
@@ -655,6 +656,14 @@ function TourExperience({
     const open = () => setWheelOpen(true);
     window.addEventListener("hv-aarshjul", open);
     return () => window.removeEventListener("hv-aarshjul", open);
+  }, []);
+  /** "Byg dit skema" ("#skema", or its button in the menu) is open. */
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const openScheduleRef = useRef<(from: string) => void>(() => {});
+  useEffect(() => {
+    const open = () => openScheduleRef.current("link");
+    window.addEventListener("hv-skema", open);
+    return () => window.removeEventListener("hv-skema", open);
   }, []);
   // A button or link to a place in the tour (written with @ in the editor): there, as if picked in the menu.
   const goToRef = useRef<(href: string, label: string) => void>(() => {});
@@ -2210,6 +2219,20 @@ function TourExperience({
     };
   }, [sdk, phone, zoomKey]);
 
+  /* ----- "Byg dit skema" ----- */
+  function openSchedule(from: string) {
+    if (!T.schedule) return;
+    track("schedule_open", { from });
+    setMenuOpen(false);
+    setWelcome(false);
+    setCover(false);
+    setGuideAt(null);
+    setScheduleOpen(true);
+  }
+  useEffect(() => {
+    openScheduleRef.current = openSchedule;
+  });
+
   /* ----- "Sådan ser en dag ud" ----- */
   function openDay(from: string) {
     if (!T.day) return;
@@ -2712,6 +2735,15 @@ function TourExperience({
             </span>
           </button>
         )}
+        {T.schedule && here(T.schedule.menu) && (
+          <button type="button" className="hv-day-knap" onClick={() => openSchedule("menu")}>
+            ▦
+            <span>
+              {T.schedule.title}
+              <small>{tx("Vælg dine fag, og se din uge")}</small>
+            </span>
+          </button>
+        )}
         {T.day && here(T.day.menu) && (
           <button type="button" className="hv-day-knap" onClick={() => openDay("menu")}>
             ◷
@@ -2766,10 +2798,10 @@ function TourExperience({
           ...(T.logoOffset?.side != null && { "--logo-side": `${T.logoOffset.side}px` }),
         } as React.CSSProperties
       }>
-      {[...fontHrefs(T.font, [400, 600, 700, 800, 900]), ...(T.fontHeading ? fontHrefs(T.fontHeading, [500, 600]) : [])].map((href) => (
+      {[...new Set([...fontHrefs(T.font, [400, 600, 700, 800, 900]), ...(T.fontHeading ? fontHrefs(T.fontHeading, [500, 600]) : [])])].map((href) => (
         <link key={href} rel="stylesheet" href={href} />
       ))}
-      <style>{CSS + TOUR_LOGO_CSS + CONTACT_CSS + STORIES_CSS + LIGHTBOX_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + ONBOARDING_CSS + MENU_HINT_CSS + INFO_CSS + STAGING_CSS + (T.staging?.some((i) => i.kind === "treasure") ? CONTEST_CSS : "") + (T.inUse?.length ? IN_USE_CSS : "") + (T.lineDays ? LINE_DAY_CSS : "") + (T.yearWheel ? YEARWHEEL_CSS : "") + MAP_CSS + (T.sitePlan?.overlay ? SITE_PLAN_CSS + SITE_PLAN_360_CSS : "") + ROUTE_CSS + MEASURES_CSS + CARDS_CSS + DAY_CSS + (T.events ? EVENTS_CSS : "") + (T.shop || T.points.some((p) => p.shop) ? SHOP_CSS : "") + SIMPLE_CSS + BENTO_CSS + LOGO_RIGHT_CSS + LANG_CSS + WEATHER_CSS + COMMUTE_CSS + FEATURES_CSS + FINDER_CSS + (review ? FEEDBACK_CSS : "")}</style>
+      <style>{CSS + TOUR_LOGO_CSS + CONTACT_CSS + STORIES_CSS + LIGHTBOX_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + ONBOARDING_CSS + MENU_HINT_CSS + INFO_CSS + STAGING_CSS + (T.staging?.some((i) => i.kind === "treasure") ? CONTEST_CSS : "") + (T.inUse?.length ? IN_USE_CSS : "") + (T.lineDays ? LINE_DAY_CSS : "") + (T.yearWheel ? YEARWHEEL_CSS : "") + (T.schedule ? SCHEDULE_CSS : "") + MAP_CSS + (T.sitePlan?.overlay ? SITE_PLAN_CSS + SITE_PLAN_360_CSS : "") + ROUTE_CSS + MEASURES_CSS + CARDS_CSS + DAY_CSS + (T.events ? EVENTS_CSS : "") + (T.shop || T.points.some((p) => p.shop) ? SHOP_CSS : "") + SIMPLE_CSS + BENTO_CSS + LOGO_RIGHT_CSS + LANG_CSS + WEATHER_CSS + COMMUTE_CSS + FEATURES_CSS + FINDER_CSS + (review ? FEEDBACK_CSS : "")}</style>
       {/* The tour's own design on top (written by Claude or by hand under Avanceret). */}
       {T.customCss && <style>{T.customCss.replace(/<\/?style/gi, "")}</style>}
 
@@ -3502,6 +3534,20 @@ function TourExperience({
           onShown={(item) => track("in_use_shown", { title: item.title ?? "", kind: item.kind })}
         />
       ) : null}
+      {scheduleOpen && T.schedule && (
+        <ScheduleSheet
+          S={T.schedule}
+          slug={T.slug}
+          onSee={(href, label) => {
+            setScheduleOpen(false);
+            goToRef.current(href, label);
+          }}
+          onImages={(images, at, title) => setLightbox({ images, at, title })}
+          onVisit={(label, href) => (ctaClick(label, href, "skema"), setScheduleOpen(false), openLink(T, href, label, popup))}
+          onTrack={(event, data) => track(event, data)}
+          onClose={() => setScheduleOpen(false)}
+        />
+      )}
       {wheelOpen && T.yearWheel && (
         <YearWheelPanel
           wheel={T.yearWheel}

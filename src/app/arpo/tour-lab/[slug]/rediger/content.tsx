@@ -1825,7 +1825,7 @@ export function TagsEditor({ config, edit, slug, preview }: Props) {
 }
 
 /** Where a guided tour's (or the day's) button is in the menu: at the top, at the bottom, or not there. */
-function MenuPlace({ value, onChange, link }: { value: "bottom" | false | undefined; onChange: (v: "bottom" | false | undefined) => void; link: string }) {
+export function MenuPlace({ value, onChange, link }: { value: "bottom" | false | undefined; onChange: (v: "bottom" | false | undefined) => void; link: string }) {
   return (
     <Field title="Knappen i menuen" hint={value === false ? `Ikke i menuen - start den fra en flise, et punkt eller en knap med linket ${link}.` : "Øverst (over menupunkterne) eller nederst (under dem)."}>
       <Choice
@@ -2108,7 +2108,7 @@ function StopPeople({ config, stop, onChange }: { config: TourConfig; stop: { hr
 }
 
 /** "Sådan ser en dag ud": a point on the drone scene / map - its card, or its 360° photo when it has one. */
-function DayPoint({ config, href, onChange }: { config: TourConfig; href: string; onChange: (href: string) => void }) {
+export function DayPoint({ config, href, onChange }: { config: TourConfig; href: string; onChange: (href: string) => void }) {
   const id = href.replace(/^#punkt:/, "").replace(/\/360$/, "");
   const point = config.points.find((p) => p.id === id);
   const has360 = Boolean(point && (point.panorama || point.pano));
@@ -2138,7 +2138,7 @@ function DayPoint({ config, href, onChange }: { config: TourConfig; href: string
 }
 
 /** Photos on a card (a place card or a stop of "Vis mig rundt"): a small row - added, removed, the first shown first. */
-function CardImages({ images, hint, onChange }: { images: string[]; hint: string; onChange: (images: string[]) => void }) {
+export function CardImages({ images, hint, onChange }: { images: string[]; hint: string; onChange: (images: string[]) => void }) {
   return (
     <Field title="Billeder (valgfri)" hint={hint}>
       {images.length > 0 && (

@@ -113,6 +113,31 @@ export function tourConfigProblem(config: unknown): string | null {
       if (it.action !== undefined && (!obj(it.action) || !str(it.action.label) || !str(it.action.href))) return "Knappen på et staging-element skal have tekst og link.";
     }
   }
+  const sk = c.schedule;
+  if (sk !== undefined) {
+    if (!obj(sk) || !str(sk.title) || !arr(sk.days) || !arr(sk.blocks) || !arr(sk.slots)) return "Skemaet skal have en overskrift, dage, fagblokke og timer.";
+    if (!sk.days.length || sk.days.length > 7 || !sk.days.every(str)) return "Skemaet skal have 1-7 dage.";
+    if (sk.periods !== undefined && (!arr(sk.periods) || sk.periods.length > 6 || !sk.periods.every((p) => obj(p) && str(p.id) && str(p.name)))) return "Skemaets perioder skal have id og navn (højst 6).";
+    if (sk.daily !== undefined && (!arr(sk.daily) || sk.daily.length > 12 || !sk.daily.every((d) => obj(d) && str(d.time) && str(d.title)))) return "Skemaets faste punkter hver dag skal have tid og titel (højst 12).";
+    if (sk.blocks.length > 20 || sk.slots.length > 150) return "Skemaet har for mange fagblokke (højst 20) eller timer (højst 150).";
+    const periodOk = (v: unknown) => v === undefined || (arr(v) && v.every(str));
+    for (const b of sk.blocks) {
+      if (!obj(b) || !str(b.id) || !str(b.name) || !arr(b.subjects) || b.subjects.length > 30) return "En fagblok mangler id, navn eller sine fag (højst 30).";
+      for (const x of b.subjects) {
+        if (!obj(x) || !str(x.id) || !str(x.name)) return `${b.name}: et fag mangler id eller navn.`;
+        if (x.images !== undefined && (!arr(x.images) || x.images.length > 12 || !x.images.every(str))) return `${x.name}: højst 12 billeder.`;
+        if (x.people !== undefined && (!arr(x.people) || x.people.length > 4 || !x.people.every((p) => obj(p) && str(p.image)))) return `${x.name}: højst 4 lærere, hver med et billede.`;
+        if ((x.href !== undefined && !str(x.href)) || (x.video !== undefined && !str(x.video)) || !periodOk(x.periods)) return `${x.name}: sted, film eller perioder har en forkert form.`;
+      }
+    }
+    const blockIds = new Set(sk.blocks.map((b) => b.id));
+    for (const t of sk.slots) {
+      if (!obj(t) || !Number.isInteger(t.day) || t.day < 0 || t.day >= sk.days.length || !str(t.from)) return "En time i skemaet mangler dag eller tidspunkt.";
+      if (t.block !== undefined ? !blockIds.has(t.block) : !str(t.title)) return "En time i skemaet skal være en fagblok, der findes, eller have en titel.";
+      if (!periodOk(t.periods) || (t.href !== undefined && !str(t.href))) return "En time i skemaet har forkerte perioder eller sted.";
+    }
+    if (sk.visit !== undefined && (!obj(sk.visit) || !str(sk.visit.label) || !str(sk.visit.href))) return "Skemaets knap skal have tekst og link.";
+  }
   if (c.yearWheel !== undefined) {
     const w = c.yearWheel;
     if (!obj(w) || !str(w.title) || !arr(w.months)) return "Årshjulet skal have en titel og en liste af måneder.";

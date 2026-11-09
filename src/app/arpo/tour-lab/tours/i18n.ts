@@ -279,6 +279,15 @@ export const UI_STRINGS = [
   "Se hvilken bus eller hvilket tog du skal tage - Google Maps finder den bedste rejse.",
   "Se rejsen med bus og tog",
   "Tiderne er cirka. Din adresse gemmes ikke.",
+  "Vælg fag",
+  "Skift",
+  "Ryd skema",
+  "{n} af {m} fag valgt",
+  "Læs mere",
+  "Valgt",
+  "Vælg {fag}",
+  "Dit skema er klar.",
+  "Vælg dine fag, og se din uge",
 ] as const;
 
 /** Keys whose values are never words to translate (links, ids, files, layout, code). */
@@ -458,6 +467,7 @@ const BUILT_IN: Record<string, Record<string, string>> = {
     "Præsenteret af": "Presented by", "Spring over": "Skip", "Tilbage til 360°-billedet": "Back to the 360° view", "Tilbage til luften": "Back to the aerial view",
     "Tryk på et sted for at se mere - eller gå direkte ind.": "Tap a place to see more - or go straight in.", Pause: "Pause", Fortsæt: "Continue", Næste: "Next", Forrige: "Previous",
     "Zoom ind": "Zoom in", "Zoom ud": "Zoom out", "Skjul rumvælgeren": "Hide the room picker",
+    "Vælg fag": "Choose a subject", Skift: "Change", "Ryd skema": "Clear timetable", "{n} af {m} fag valgt": "{n} of {m} subjects chosen", Valgt: "Chosen", "Vælg {fag}": "Choose {fag}", "Dit skema er klar.": "Your timetable is ready.", "Vælg dine fag, og se din uge": "Choose your subjects and see your week",
   },
   de: {
     "Andre steder": "Weitere Orte",

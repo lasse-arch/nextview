@@ -199,6 +199,54 @@ export type PlaceCard = {
 };
 export type CardPerson = { name?: string; role?: string; image: string };
 
+/**
+ * A subject in "Byg dit skema" - shown the best way there is: a place in the
+ * tour when it is scanned, else its photos or a short film, else just its
+ * text (a subject never needs a scan).
+ */
+export type ScheduleSubject = {
+  /** Short and unique within the schedule, e.g. "klatring". */
+  id: string;
+  name: string;
+  /** A few sentences: what you do in it. */
+  text?: string;
+  /** Where it happens: a place in the tour, a point on the drone scene / map ("#punkt:<id>", "#punkt:<id>/360") - "Se stedet". Left out: not in the tour. */
+  href?: string;
+  /** Photos of it (e.g. the climbing wall, not scanned) - on its card, full screen on a tap. */
+  images?: string[];
+  /** A short film on its card: an mp4 (our own file) or a YouTube/Vimeo link. */
+  video?: string;
+  /** The teachers (up to 4). */
+  people?: CardPerson[];
+  /** Only in these periods (their ids) - left out: every period. */
+  periods?: string[];
+};
+/** A choice block: "Hovedfag A" - one subject is chosen in it (per period). */
+export type ScheduleBlock = {
+  id: string;
+  /** "Hovedfag A", "Valgfag 2". */
+  name: string;
+  /** When, in words: "Mandag og onsdag formiddag". */
+  when?: string;
+  subjects: ScheduleSubject[];
+};
+/** A slot in the week: a choice block's lesson, or something fixed (Morgensamling, Højskoleaften …). */
+export type ScheduleSlot = {
+  /** Which day (0 = the first in `days`). */
+  day: number;
+  /** "9.15" - also the order within the day. */
+  from: string;
+  to?: string;
+  /** A choice block's lesson (its id) - the chosen subject shows here. Left out: a fixed slot with `title`. */
+  block?: string;
+  title?: string;
+  text?: string;
+  /** A fixed slot's place (as a subject's `href`). */
+  href?: string;
+  /** Only in these periods - left out: every period. */
+  periods?: string[];
+};
+
 /** One part of a day on a line ("En dag på din linje"): when, what, where in the tour - and who you're with there. */
 export type LineDayStop = {
   /** Short and unique within the day, e.g. "morgenmad". */
@@ -621,6 +669,31 @@ export type TourConfig = {
     }[];
     mix?: false | { title?: string; after?: string };
     visit?: { title: string; text?: string; label: string; href: string };
+  };
+  /**
+   * "Byg dit skema": the visitor picks a subject in each choice block (per
+   * period) and sees their week at once - the fixed parts of the day too.
+   * Each subject opens a card with its text and the best way to see it: its
+   * place in the tour ("Se stedet"), else its photos or film. Opened by the
+   * link "#skema" (and its button in the menu). Choices are kept in the
+   * visitor's browser for the visit. `visit` = the call to action at the end.
+   */
+  schedule?: {
+    title: string;
+    lead?: string;
+    /** Its button in the menu: top (default), "bottom", or false = not in the menu (start it with "#skema"). */
+    menu?: "bottom" | false;
+    /** The days across, e.g. Mandag … Fredag. */
+    days: string[];
+    /** "1. periode", "2. periode" - left out: one period. */
+    periods?: { id: string; name: string }[];
+    /** Every day, at the top of each day ("7.45 Morgenmad", "12.00 Frokost"). */
+    daily?: { time: string; title: string }[];
+    blocks: ScheduleBlock[];
+    slots: ScheduleSlot[];
+    /** Under the week, e.g. "Skemaet er vejledende." */
+    note?: string;
+    visit?: { label: string; href: string };
   };
   day?: { title: string; lead?: string; /** Its place in the menu, as a guided tour's. */ menu?: "bottom" | false; steps: { time: string; title: string; text?: string; /** Where "Se stedet" goes: a place in the tour (a Matterport link), a point on the drone scene / map ("#punkt:<id>" - its card opens), or that point's 360° photo ("#punkt:<id>/360"). Left out: no place. */ href?: string }[] };
   /**

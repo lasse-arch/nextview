@@ -140,6 +140,17 @@ Fx specialefterskoler (ADHD, autisme, nedsat kognitivt funktionsniveau):
 - Slut med en invitation (besøgsaften) og "Lidt af det hele" til dem i tvivl.
   Åbnes med #linjedag fra en flise eller menuen.
 
+## Højskoler og skoler med valgfag: "Byg dit skema"
+
+- Har skolen fagblokke (hovedfag, sidefag, valgfag), så lad gæsten bygge sin
+  uge (`schedule`, #skema): ét fag pr. blok, pr. periode, med de faste ting
+  (morgensamling, frokost, højskoleaften). Brug skolens rigtige fag, tider og
+  tekster fra deres skema-side.
+- Et fag behøver ikke være scannet. Giv det det bedste, der findes: et sted i
+  touren ("Se stedet"), et punkt på luftfotoet, ellers fotos eller en kort
+  film fra skolens fagside eller Instagram - og kun tekst, hvis der intet er.
+- Slut med "Book en rundvisning" eller "Tilmeld dig".
+
 ## Campingpladser: pladskort over luftfotoet
 
 - Har pladsen et pladskort og et fladt dronefoto (taget lige oppefra), så læg

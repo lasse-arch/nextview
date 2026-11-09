@@ -241,6 +241,7 @@ export function withoutDeadAerialLinks<T extends TourConfig>(c: T): T {
     if (h === "#linjedag" || h.startsWith("#linjedag:")) return !c.lineDays?.lines.length;
     if (h === "#aarshjul") return !c.yearWheel;
     if (h === "#dag") return !c.day;
+    if (h === "#skema") return !c.schedule;
     if (h === "#vej") return !c.commute;
     if (h === "#find") return !c.finder;
     if (h === "#live") return !c.live;

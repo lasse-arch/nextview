@@ -39,6 +39,7 @@ export function tourTargets(T: TourConfig): Target[] {
   if (T.contactForm) add("Kontaktformular", "Funktion", "#kontakt");
   if (T.commute) add(T.commute.title || "Vej til stedet", "Funktion", "#vej");
   if (T.day) add(T.day.title || "Sådan ser en dag ud", "Funktion", "#dag");
+  if (T.schedule) add(T.schedule.title || "Byg dit skema", "Funktion", "#skema");
   if (T.wayfinding) add("Find vej", "Funktion", "#findvej");
   for (const c of T.cta) if (/^https?:\/\//.test(c.href)) add(c.label, "Knap", c.href);
   // Same name twice (two "Dronefoto"s): the name gets where it is, so "@Name" still means one of them.
