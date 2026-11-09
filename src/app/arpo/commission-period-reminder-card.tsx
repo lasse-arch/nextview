@@ -1,5 +1,6 @@
 import { formatDKK } from "@/lib/labels";
 import type { CommissionPeriodReminder } from "@/lib/commission-period-reminder-data";
+import { CommissionReminderClose } from "./commission-reminder-close";
 
 const DATE_FORMAT = new Intl.DateTimeFormat("da-DK", { day: "numeric", month: "long" });
 
@@ -9,7 +10,10 @@ export function CommissionPeriodReminderCard({ reminder }: { reminder: Commissio
 
   return (
     <div className="rounded-xl border border-amber-200 bg-amber-50 p-5 shadow-sm">
-      <h2 className="text-sm font-semibold text-amber-900">Husk faktura for din provisionsperiode</h2>
+      <div className="flex items-start justify-between gap-3">
+        <h2 className="text-sm font-semibold text-amber-900">Husk faktura for din provisionsperiode</h2>
+        <CommissionReminderClose periodStart={reminder.periodStart} />
+      </div>
       <p className="mt-1 text-sm text-amber-800">
         Din nuværende periode er <span className="font-medium">{DATE_FORMAT.format(start)}</span> til{" "}
         <span className="font-medium">{DATE_FORMAT.format(end)}</span>. Send en faktura for provisionen i

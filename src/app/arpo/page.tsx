@@ -80,7 +80,7 @@ export default async function DashboardPage() {
 
       {overdue.length > 0 && <OverdueTasksCard tasks={overdue} />}
 
-      {commissionPeriodReminder && <CommissionPeriodReminderCard reminder={commissionPeriodReminder} />}
+      {commissionPeriodReminder && user?.commissionReminderHiddenFor !== commissionPeriodReminder.periodStart && <CommissionPeriodReminderCard reminder={commissionPeriodReminder} />}
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <StatTile

@@ -332,6 +332,8 @@ model User {
   bsReturnImports     BsReturnImport[]     @relation("BsReturnImportCreatedBy")
   timeEntries         TimeEntry[]
   timeEntriesCreated  TimeEntry[]          @relation("TimeEntryCreatedBy")
+  /// "Husk faktura for din provisionsperiode" closed for the period starting then (ISO) - shown again next period.
+  commissionReminderHiddenFor String?
 }
 
 /// One entry per notable thing that happened in the CRM (deal created,
