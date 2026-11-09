@@ -8,14 +8,35 @@ import "server-only";
  */
 export type SweepGraph = Record<string, { n: string[]; p: [number, number, number] }>;
 
+/*
+ * Only answers that worked are kept (in this server's memory) - never "not
+ * found / not public": a model made public a minute later must work at once,
+ * not after Next's fetch cache has run out (it kept the miss for an hour).
+ */
+const kept = new Map<string, { at: number; value: unknown }>();
+async function remember<T>(key: string, ttlMs: number, get: () => Promise<T | null>): Promise<T | null> {
+  const hit = kept.get(key);
+  if (hit && Date.now() - hit.at < ttlMs) return hit.value as T;
+  const value = await get();
+  if (value != null) {
+    if (kept.size > 500) kept.delete(kept.keys().next().value!);
+    kept.set(key, { at: Date.now(), value });
+  }
+  return value;
+}
+
 export async function fetchSweepGraph(modelId: string): Promise<SweepGraph | null> {
+  return remember(`graph:${modelId}`, 86_400_000, () => sweepGraph(modelId));
+}
+
+async function sweepGraph(modelId: string): Promise<SweepGraph | null> {
   try {
     const res = await fetch("https://my.matterport.com/api/mp/models/graph", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ query: `{ model(id: ${JSON.stringify(modelId)}) { locations { id neighbors position { x y z } } } }` }),
       signal: AbortSignal.timeout(10_000),
-      next: { revalidate: 86400 },
+      cache: "no-store",
     });
     if (!res.ok) return null;
     const data = (await res.json()) as {
@@ -34,19 +55,25 @@ export async function fetchSweepGraph(modelId: string): Promise<SweepGraph | nul
 
 /** A model's scan points by number (ss, from 1 - Matterport's own index + 1, the same numbers MPSkins and U-links use) -> sweep id. */
 export async function fetchSweepIndex(modelId: string): Promise<Record<number, string>> {
+  return (await remember(`index:${modelId}`, 3_600_000, () => sweepIndex(modelId))) ?? {};
+}
+
+async function sweepIndex(modelId: string): Promise<Record<number, string> | null> {
   try {
     const res = await fetch("https://my.matterport.com/api/mp/models/graph", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ query: `{ model(id: ${JSON.stringify(modelId)}) { locations { id index } } }` }),
       signal: AbortSignal.timeout(10_000),
-      next: { revalidate: 3600 },
+      cache: "no-store",
     });
-    if (!res.ok) return {};
+    if (!res.ok) return null;
     const data = (await res.json()) as { data?: { model?: { locations?: { id: string; index: number }[] } } };
-    return Object.fromEntries((data.data?.model?.locations ?? []).map((l) => [l.index + 1, l.id]));
+    const locations = data.data?.model?.locations;
+    if (!locations?.length) return null;
+    return Object.fromEntries(locations.map((l) => [l.index + 1, l.id]));
   } catch {
-    return {};
+    return null;
   }
 }
 
@@ -55,8 +82,12 @@ export type ModelInfo = { id: string; name: string; address: string; image: stri
 /** A model's name, address and photos (the hero photo first), from Matterport's public player data. Null if it isn't public or doesn't exist. */
 export async function fetchModelInfo(modelId: string): Promise<ModelInfo | null> {
   if (!/^[a-zA-Z0-9]{11}$/.test(modelId)) return null;
+  return remember(`info:${modelId}`, 3_600_000, () => modelInfo(modelId));
+}
+
+async function modelInfo(modelId: string): Promise<ModelInfo | null> {
   try {
-    const res = await fetch(`https://my.matterport.com/api/player/models/${modelId}/`, { signal: AbortSignal.timeout(10_000), next: { revalidate: 3600 } });
+    const res = await fetch(`https://my.matterport.com/api/player/models/${modelId}/`, { signal: AbortSignal.timeout(10_000), cache: "no-store" });
     if (!res.ok) return null;
     const d = (await res.json()) as {
       name?: string;
