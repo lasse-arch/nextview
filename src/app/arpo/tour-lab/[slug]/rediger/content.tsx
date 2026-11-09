@@ -2098,7 +2098,30 @@ function CoverFilm({ cover, edit }: { cover: NonNullable<TourConfig["cover"]>; e
         </div>
       </Field>
       {!v.src && <p className="px-1 text-[12px] text-[#ff9500]">Ingen film endnu - forsiden viser fotoet, til der er en.</p>}
+      {v.src && <FilmWeight src={v.src} />}
+      {v.srcMobile && <FilmWeight src={v.srcMobile} />}
     </Group>
+  );
+}
+
+/** A film behind the cover that is too heavy plays in fits on a slow line - and seems to stop before its end. Said here, with what to do. */
+function FilmWeight({ src }: { src: string }) {
+  const [mb, setMb] = useState<number | null>(null);
+  useEffect(() => {
+    let live = true;
+    fetch(src, { method: "HEAD" })
+      .then((r) => Number(r.headers.get("content-length") ?? 0) / 1_000_000)
+      .then((n) => live && setMb(n || null))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [src]);
+  if (!mb || mb <= 12) return null;
+  return (
+    <p className="px-1 text-[12px] leading-snug text-[#ff9500]">
+      Filmen fylder {Math.round(mb)} MB - den kan fryse undervejs for gæster med en langsom forbindelse (særligt på mobil), så det ser ud, som om den stopper. Brug en udgave i 720p på under ca. 10 MB.
+    </p>
   );
 }
 
