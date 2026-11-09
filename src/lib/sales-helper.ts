@@ -8,8 +8,10 @@ import { onlineTours } from "@/lib/online-tours";
  * Generator → Spørg: what nextviewAI knows when a seller asks about the
  * system, the tour or how to meet an objection - our own words only: the new
  * site's pages (what we sell, prices, FAQ), the tour drejebog, every
- * /nyheder post (what Arpo and the tour can do), the customers who are
- * online (examples by industry) and the team's own saved answers.
+ * /nyheder post (what Arpo and the tour can do), the seller handbook
+ * (lib/sales-handbook.md: how a tour is made, Matterport, the customer
+ * portal, the sale in Arpo), the customer portal's own words, the customers
+ * who are online (examples by industry) and the team's own saved answers.
  */
 
 export const SALES_KINDS = { spoergsmaal: "Spørgsmål", indvending: "Indvending" } as const;
@@ -68,18 +70,29 @@ async function customers(): Promise<string> {
   return tours.map((t) => `- ${t.customer} (${t.industry}${t.city ? `, ${t.city}` : ""}): ${t.url}`).join("\n");
 }
 
+/** The customer portal's Danish words (src/app/kunde/text.ts, the "da" part). */
+async function portalWords(): Promise<string> {
+  const src = await readFile(path.join(process.cwd(), "src/app/kunde/text.ts"), "utf8").catch(() => "");
+  const da = src.match(/\n\s*da: \{([\s\S]*?)\n\s*en: \{/)?.[1] ?? "";
+  return da.slice(0, 14_000);
+}
+
 let cache: { at: number; text: string } | null = null;
 
 /** Everything nextviewAI may answer from (but the team's own answers) - put together at most every 10 minutes. */
 export async function helperKnowledge(): Promise<string> {
   if (cache && Date.now() - cache.at < 10 * 60_000) return cache.text;
-  const [site, playbook, news, online] = await Promise.all([
+  const [handbook, portal, site, playbook, news, online] = await Promise.all([
+    readFile(path.join(process.cwd(), "src/lib/sales-handbook.md"), "utf8").catch(() => ""),
+    portalWords(),
     sitePages(),
     readFile(path.join(process.cwd(), "src/app/arpo/tour-lab/tours/PLAYBOOK.md"), "utf8").catch(() => ""),
     newsPosts(),
     customers(),
   ]);
   const text = [
+    handbook && `<saelger-haandbog>\n${handbook.slice(0, 20_000)}\n</saelger-haandbog>`,
+    portal && `<kundeportalens-tekster>\nDe ord, kunden ser i kundeportalen (/kunde), som de står i koden:\n${portal}\n</kundeportalens-tekster>`,
     `<hjemmesiden>\nDet nye nextview360.dk - hvad vi sælger, priser og svar på kundernes spørgsmål:\n${site}\n</hjemmesiden>`,
     playbook && `<tour-drejebog>\nSådan bygger vi en god tour:\n${playbook.slice(0, 20_000)}\n</tour-drejebog>`,
     news && `<nyheder>\nHvad der er bygget i Arpo og touren (nyeste først):\n${news}</nyheder>`,

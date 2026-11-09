@@ -10,7 +10,17 @@ import type { SalesKind } from "@/lib/sales-helper";
  * team's FAQ (which nextviewAI then answers from first).
  */
 
-const QUESTIONS = ["Hvad koster en tour?", "Hvad er \"Vis mig rundt\"?", "Hvordan virker Find vej?", "Hvad ser kunden i kundeportalen?", "Hvilke kunder kan jeg vise en efterskole?", "Hvordan sender jeg et eksempel på SMS?"];
+const QUESTIONS = [
+  "Hvad koster en tour?",
+  "Hvad er \"Vis mig rundt\"?",
+  "Hvordan virker Find vej?",
+  "Hvordan bliver en tour til - fra scanning til live?",
+  "Hvorfor ser man ikke Matterports logo i vores tours?",
+  "Hvad ser kunden i kundeportalen?",
+  "Hvilke roller kan kunden give i kundeportalen?",
+  "Hvilke kunder kan jeg vise en efterskole?",
+  "Hvordan sender jeg et eksempel på SMS?",
+];
 const OBJECTIONS = ["Det er for dyrt", "Vi har allerede billeder på hjemmesiden", "36 måneders binding er for lang tid", "Vi skal lige tænke over det", "Vores kunder kommer alligevel forbi", "Vi har ikke tid til det lige nu"];
 const KIND_NAME: Record<SalesKind, string> = { spoergsmaal: "Spørgsmål", indvending: "Indvending" };
 
@@ -118,7 +128,7 @@ export function AskSection({ faq }: { faq: SavedAnswer[] }) {
       <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <div>
           <h2 className="text-lg font-semibold text-slate-900">Spørg nextviewAI</h2>
-          <p className="mt-0.5 text-sm text-slate-500">Om systemet, touren, funktioner og priser - eller hvordan du møder en indvending. Svarer ud fra vores egen hjemmeside, tour-drejebogen, /nyheder, de kunder der er online og teamets gemte svar.</p>
+          <p className="mt-0.5 text-sm text-slate-500">Om touren og funktionerne, Matterport, kundeportalen, Arpo og priser - eller hvordan du møder en indvending. Svarer ud fra sælger-håndbogen, vores egen hjemmeside, tour-drejebogen, /nyheder, de kunder der er online og teamets gemte svar.</p>
         </div>
 
         {turns.length === 0 && (
@@ -238,6 +248,7 @@ function Faq({ faq }: { faq: SavedAnswer[] }) {
   const [kind, setKind] = useState<SalesKind | "alle">("alle");
   const [q, setQ] = useState("");
   const [editing, setEditing] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [, start] = useTransition();
   const shown = useMemo(() => {
@@ -250,8 +261,15 @@ function Faq({ faq }: { faq: SavedAnswer[] }) {
     <section className="space-y-3 self-start rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
       <div>
         <h2 className="text-lg font-semibold text-slate-900">Teamets FAQ</h2>
-        <p className="mt-0.5 text-sm text-slate-500">Svar, teamet har gemt. nextviewAI bruger dem først.</p>
+        <p className="mt-0.5 text-sm text-slate-500">Svar, teamet har gemt. nextviewAI bruger dem først - skriv også selv det ind, kun I ved (fx om kameraet eller scanningen).</p>
       </div>
+      {adding ? (
+        <SaveForm initial={{ kind: "spoergsmaal", question: "", answer: "" }} onDone={() => setAdding(false)} onCancel={() => setAdding(false)} />
+      ) : (
+        <button type="button" onClick={() => setAdding(true)} className="rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:border-slate-400 hover:bg-slate-50">
+          + Tilføj svar
+        </button>
+      )}
       <div className="flex flex-wrap items-center gap-2">
         <div className="inline-flex rounded-lg bg-slate-100 p-0.5">
           <button type="button" className={tab(kind === "alle")} onClick={() => setKind("alle")}>
