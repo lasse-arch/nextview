@@ -4456,8 +4456,8 @@ html:has(.hv.fixed),html:has(.hv.fixed) body{overflow:hidden;overscroll-behavior
   /* Slim welcome bar instead of the big card, with room for the menu button. */
   .hv-intro{top:calc(10px + env(safe-area-inset-top,0px));left:10px;right:104px;width:auto;display:flex;align-items:center;border-radius:14px}
   .hv-intro-head{padding:8px 10px;flex:0 1 auto;min-width:0}
-  /* A wide logo may shrink a little, so the button keeps one line. */
-  .hv-intro-head img{height:auto;max-height:30px;max-width:100%;object-fit:contain;margin:0}
+  /* A fixed height (an SVG logo with no size of its own was 0 x 0 with height:auto); a wide logo may shrink a little - kept in proportion - so the button keeps one line. */
+  .hv-intro-head img{height:30px;width:auto;max-width:100%;object-fit:contain;object-position:left center;margin:0}
   /* One box on phones: the logo stands straight on it (no box of its own) - on the tour's colour when the logo is light. */
   .hv-intro-head{background:transparent!important}
   .hv-intro-moerk{background:var(--c-main)}
