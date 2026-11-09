@@ -148,7 +148,7 @@ export function Rows<T>({
 }
 
 /** Where something leads in the tour: picked by standing there in the preview. */
-export function PlacePicker({ href, onChange, preview, name }: { href: string; onChange: (href: string, room: string | null) => void; preview: PreviewApi; name?: string }) {
+export function PlacePicker({ href, onChange, preview, name, onClear }: { href: string; onChange: (href: string, room: string | null) => void; preview: PreviewApi; name?: string; /** Given: a place can be taken off again ("Fjern stedet"). */ onClear?: () => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const ss = ssOfHref(href);
@@ -177,7 +177,14 @@ export function PlacePicker({ href, onChange, preview, name }: { href: string; o
           </button>
         )}
       </div>
-      <p className={small}>{ss ? `Punkt ${ss} i touren.` : "Gå derhen i forhåndsvisningen og drej, så det ser rigtigt ud - tryk så her."}</p>
+      <p className={small}>
+        {ss ? `Punkt ${ss} i touren.` : "Gå derhen i forhåndsvisningen og drej, så det ser rigtigt ud - tryk så her."}
+        {ss && onClear && (
+          <button type="button" className="ml-2 font-medium text-[#ff3b30] hover:underline" onClick={onClear}>
+            × Fjern stedet
+          </button>
+        )}
+      </p>
       {error && <p className="px-1 text-[12px] text-[#ff3b30]">{error}</p>}
     </Field>
   );
@@ -1343,11 +1350,11 @@ function DayEditor({ config, edit, preview }: Omit<Props, "slug">) {
             {s.href?.startsWith("#punkt:") ? (
               <DayPoint config={config} href={s.href} onChange={(href) => set({ ...s, href })} />
             ) : (
-              <PlacePicker href={s.href ?? ""} name={s.title} preview={preview} onChange={(href) => set({ ...s, href })} />
+              <PlacePicker href={s.href ?? ""} name={s.title} preview={preview} onChange={(href) => set({ ...s, href })} onClear={() => set({ ...s, href: undefined })} />
             )}
-            {s.href && (
-              <button type="button" className="text-[12px] text-[#8e8e93] hover:text-[#ff3b30]" onClick={() => set({ ...s, href: undefined })}>
-                Intet sted til dette tidspunkt
+            {s.href?.startsWith("#punkt:") && (
+              <button type="button" className="px-1 text-[12px] font-medium text-[#ff3b30] hover:underline" onClick={() => set({ ...s, href: undefined })}>
+                × Fjern stedet
               </button>
             )}
           </>
