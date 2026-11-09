@@ -19,6 +19,8 @@ const nextConfig: NextConfig = {
     "/api/kunde/**": ["./node_modules/@sparticuz/chromium/bin/**/*"],
     // The new site's pages, only shown to the team (see lib/beta-site.ts).
     "/web/*": ["./site-web/*.html"],
+    // Generator → Spørg reads the site's pages and the tour drejebog (see lib/sales-helper.ts).
+    "/arpo/generator": ["./site-web/*.html", "./src/app/arpo/tour-lab/tours/PLAYBOOK.md"],
   },
   // Basic hardening on every response: no framing of Arpo by other sites
   // (clickjacking), no MIME sniffing, no full URLs leaked to other sites,

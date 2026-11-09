@@ -1900,3 +1900,20 @@ model SiteLogo {
   hash      String?
   checkedAt DateTime @default(now())
 }
+
+/// Salg → Generator → Spørg: an answer the team keeps (a question about Arpo
+/// or the tour, or how to meet an objection) - shown as the FAQ, and given to
+/// nextviewAI as the team's own answers, which come first.
+model SalesAnswer {
+  id            String   @id @default(cuid())
+  /// "spoergsmaal" or "indvending".
+  kind          String
+  question      String
+  answer        String
+  createdById   String?
+  createdByName String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([kind])
+}
