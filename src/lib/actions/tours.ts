@@ -339,15 +339,16 @@ export async function tourEmbedsOf(slug: string): Promise<TourEmbed[]> {
  * built - laid in as the film behind the front page ("Forside med film"),
  * or as the film before the tour on any other start. A new version.
  */
-export async function setStartVideo(slug: string, url: string): Promise<Result> {
+export async function setStartVideo(slug: string, url: string, poster?: string): Promise<Result> {
   await requireTour(slug);
-  // Only a file uploaded to this tour: our own file address or Vercel Blob.
-  if (typeof url !== "string" || !(/^\/api\/tour-files\/[\w-]+$/.test(url) || /^https:\/\/[\w.-]+\.blob\.vercel-storage\.com\/[^\s"'<>]+$/.test(url))) return { ok: false, error: "Ukendt filadresse." };
+  // Only files uploaded to this tour: our own file address or Vercel Blob.
+  const ours = (u: unknown) => typeof u === "string" && (/^\/api\/tour-files\/[\w-]+$/.test(u) || /^https:\/\/[\w.-]+\.blob\.vercel-storage\.com\/[^\s"'<>]+$/.test(u));
+  if (!ours(url) || (poster !== undefined && !ours(poster))) return { ok: false, error: "Ukendt filadresse." };
   const row = await prisma.tour.findUnique({ where: { slug }, select: { config: true } });
   if (!row) return { ok: false, error: "Touren findes ikke." };
   const config = structuredClone(row.config) as unknown as TourConfig;
   const type = /\.webm(\?|$)/i.test(url) ? "video/webm" : "video/mp4";
-  if (config.design?.welcome === "cover" && config.cover) config.cover = { ...config.cover, video: { src: url } };
-  else config.intro = { ...config.intro, sources: [{ src: url, type }] };
+  if (config.design?.welcome === "cover" && config.cover) config.cover = { ...config.cover, video: { src: url }, ...(poster ? { image: poster } : {}) };
+  else config.intro = { ...config.intro, sources: [{ src: url, type }], ...(poster ? { poster } : {}) };
   return saveTour(slug, config, "Dronevideo fra Ny tour");
 }

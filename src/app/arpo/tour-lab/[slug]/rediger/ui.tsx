@@ -583,3 +583,39 @@ function ZoomPeek({ src, yaw, pitch, hfov, phone, cover }: { src: string; yaw: n
     </div>
   );
 }
+
+/**
+ * A film's first picture (a moment in, so it isn't black), as a JPEG file -
+ * from a file just picked or a film's address (our own files and Vercel Blob
+ * allow it). Used as the photo shown while the film loads.
+ */
+export async function firstFrame(film: File | string, name = "forside.jpg"): Promise<File> {
+  const v = document.createElement("video");
+  const local = typeof film !== "string" ? URL.createObjectURL(film) : null;
+  v.muted = true;
+  v.playsInline = true;
+  v.preload = "auto";
+  if (!local) v.crossOrigin = "anonymous";
+  v.src = local ?? (film as string);
+  try {
+    await new Promise<void>((resolve, reject) => {
+      v.onloadedmetadata = () => resolve();
+      v.onerror = () => reject(new Error("Filmen kunne ikke åbnes."));
+    });
+    await new Promise<void>((resolve, reject) => {
+      v.onseeked = () => resolve();
+      v.onerror = () => reject(new Error("Filmen kunne ikke åbnes."));
+      v.currentTime = Math.min(0.5, (v.duration || 1) / 2);
+    });
+    const scale = Math.min(1, 1920 / (v.videoWidth || 1920));
+    const c = document.createElement("canvas");
+    c.width = Math.round((v.videoWidth || 1280) * scale);
+    c.height = Math.round((v.videoHeight || 720) * scale);
+    c.getContext("2d")!.drawImage(v, 0, 0, c.width, c.height);
+    const blob = await new Promise<Blob | null>((resolve) => c.toBlob(resolve, "image/jpeg", 0.85));
+    if (!blob) throw new Error("Billedet kunne ikke laves.");
+    return new File([blob], name, { type: "image/jpeg" });
+  } finally {
+    if (local) URL.revokeObjectURL(local);
+  }
+}

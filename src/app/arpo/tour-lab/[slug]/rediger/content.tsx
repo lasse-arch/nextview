@@ -6,14 +6,14 @@ import { startStyleOf } from "../../tours/presets";
 import { cardPeopleAt, guideExit, IMAGE_HREF, imageOfHref, isPlaceHref, PANO_HFOV, placeHref, startPlaces } from "../../tours/places";
 import { AiImageButton, AiImageList } from "./ai-image";
 import { writePlaceCards, type CardDraft } from "@/lib/actions/tour-cards";
-import { useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import { tourUrl } from "@/lib/public-urls";
 import { saveTourStoryImage } from "@/lib/actions/tour-lab";
 import type { CardPerson, DroneView, GuideTurn, GuideTurnMode, GuideTurnSpeed, PlaceCard, TourConfig, TourInfo, TourPlace, WelcomeGo } from "../../tours/types";
 import type { DroneViews } from "../../tours/places";
 import type { ScanMap } from "@/lib/matterport-graph";
 import { ScanPointPicker } from "./scanpoints";
-import { Choice, Field, GearButton, Group, Icon, input, PanoZoom, Toggle, UploadButton, ssOfHref, type PreviewApi } from "./ui";
+import { Choice, Field, FilesContext, firstFrame, GearButton, Group, Icon, input, PanoZoom, Toggle, UploadButton, ssOfHref, uploadToTour, type PreviewApi } from "./ui";
 
 /*
  * The editors for a tour's content - the start, its places, "Vis mig rundt"
@@ -187,6 +187,35 @@ export function PlacePicker({ href, onChange, preview, name, onClear }: { href: 
       </p>
       {error && <p className="px-1 text-[12px] text-[#ff3b30]">{error}</p>}
     </Field>
+  );
+}
+
+/** "Brug filmens første billede": the film's first picture, uploaded to the tour, as the photo. */
+function FilmFrameButton({ src, onDone }: { src: string; onDone: (src: string) => void }) {
+  const files = useContext(FilesContext);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <div className="px-1">
+      <button
+        type="button"
+        disabled={busy}
+        className="text-[13px] font-medium text-[#0071e3] disabled:opacity-50"
+        onClick={async () => {
+          setBusy(true);
+          setError(null);
+          try {
+            onDone(await uploadToTour(files.slug, await firstFrame(src), files.blob));
+          } catch (err) {
+            setError(err instanceof Error ? err.message : String(err));
+          }
+          setBusy(false);
+        }}
+      >
+        {busy ? "Henter billedet …" : "Brug filmens første billede"}
+      </button>
+      {error && <p className="text-[12px] text-[#ff3b30]">{error}</p>}
+    </div>
   );
 }
 
@@ -441,6 +470,7 @@ export function StartEditor({ config, edit, slug, preview }: Props) {
           </Field>
           {style === "hero" && <p className={small}>Fotoet vises, mens filmen henter - og i stedet for den, når gæsten har slået bevægelse fra eller sparer på data. Brug gerne filmens første billede.</p>}
           <PhotoPicker image={cover.image} slug={slug} photoKey="forside" preview={preview} onChange={(src) => edit((d) => void (d.cover!.image = src))} />
+          {style === "hero" && cover.video?.src && <FilmFrameButton src={cover.video.src} onDone={(src) => edit((d) => void (d.cover!.image = src))} />}
           <Field title="Overskrift over stederne">
             <input className={input} value={cover.placesTitle} onChange={(e) => edit((d) => void (d.cover!.placesTitle = e.target.value))} />
           </Field>

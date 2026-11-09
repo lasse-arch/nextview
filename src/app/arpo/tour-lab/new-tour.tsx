@@ -17,7 +17,7 @@ import {
 import { createTour, setStartVideo } from "@/lib/actions/tours";
 import { uploadsToBlob } from "@/lib/actions/tour-files";
 import type { AccountModel } from "@/lib/matterport-graph";
-import { Field, input, uploadToTour } from "./[slug]/rediger/ui";
+import { Field, firstFrame, input, uploadToTour } from "./[slug]/rediger/ui";
 import { BRANCHES, DESIGN_PRESETS, FOCUS, MENU_STYLES, PRESET_LAYOUT, START_STYLES, type Branch, type DesignPreset, type NewTourLayout } from "./tours/presets";
 
 /*
@@ -135,8 +135,13 @@ export function NewTour({ tours, forDeal, onClose, replaces }: { tours: { slug: 
       if (droneVideo && layout?.start === "hero") {
         setVideoNote("Uploader dronevideoen …");
         try {
-          const url = await uploadToTour(r.slug, droneVideo, await uploadsToBlob(r.slug));
-          const v = await setStartVideo(r.slug, url);
+          const blob = await uploadsToBlob(r.slug);
+          const url = await uploadToTour(r.slug, droneVideo, blob);
+          // Its first picture as the front page's photo (shown while the film loads) - not a must.
+          const poster = await firstFrame(droneVideo)
+            .then((f) => uploadToTour(r.slug, f, blob))
+            .catch(() => undefined);
+          const v = await setStartVideo(r.slug, url, poster);
           if (!v.ok) throw new Error(v.error);
         } catch (err) {
           alert(`Touren er bygget, men dronevideoen kom ikke med (${err instanceof Error ? err.message : err}). Læg den ind under Start → Forsiden.`);
