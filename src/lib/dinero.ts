@@ -179,11 +179,21 @@ async function createContact(accessToken: string, input: DineroContactInput): Pr
  */
 async function updateContact(accessToken: string, contactGuid: string, input: DineroContactInput): Promise<void> {
   const orgId = process.env.DINERO_ORGANIZATION_ID!;
+  const body = contactBody(input);
+  // Nothing changed: the contact is left alone. Settings only made in Dinero's own screen - the e-invoice receiver
+  // type an EAN contact gets when it is saved there (not in Dinero's API) - are then never at risk of being reset.
+  const now = await dineroFetch(`${DINERO_API_BASE}/${orgId}/contacts/${contactGuid}`, { headers: { Authorization: `Bearer ${accessToken}` } }).catch(() => null);
+  if (now?.ok) {
+    const cur = (await now.json().catch(() => null)) as Record<string, unknown> | null;
+    const same = (a: unknown, b: unknown) => String(a ?? "").trim().toLowerCase() === String(b ?? "").trim().toLowerCase();
+    const keys = ["Name", "VatNumber", "Email", "Phone", "Street", "ZipCode", "City", "EanNumber", "AttPerson"] as const;
+    if (cur && keys.every((k) => same(cur[k], body[k]))) return;
+  }
 
   const res = await dineroFetch(`${DINERO_API_BASE}/${orgId}/contacts/${contactGuid}`, {
     method: "PUT",
     headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-    body: JSON.stringify(contactBody(input)),
+    body: JSON.stringify(body),
   });
 
   if (!res.ok) throw new Error(`Dinero: kunne ikke opdatere kontakt (${res.status}): ${await res.text()}`);
@@ -534,6 +544,12 @@ async function sendEInvoice(accessToken: string, invoiceGuid: string, eanNumber:
     if (res.ok) return;
     lastError = `${res.status}: ${await res.text()}`;
     if (res.status !== 400) break;
+  }
+  // The contact has the EAN but no e-invoice receiver type - set in Dinero's own screen (not in its API).
+  if (lastError.includes("receiverCanNotReceiveEReminder")) {
+    throw new Error(
+      `Kontakten i Dinero har EAN ${eanNumber}, men ingen e-faktura-modtagertype. Åbn kontakten i Dinero, redigér den, så modtagertypen (EAN) er valgt, og gem - send så fakturaen som e-faktura i Dinero. Så går det normalt af sig selv næste gang.`
+    );
   }
   // Dinero answers 404 (code 40) once the invoice is found but it can't
   // send it - the EAN isn't registered in NemHandel, or the customer's (or
