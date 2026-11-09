@@ -13,6 +13,10 @@ import { ToursList, type TourRow } from "./tours-list";
 import { DetachAll } from "./detach-all";
 import { Papirkurv } from "./papirkurv";
 import { deletedTours } from "@/lib/actions/tours";
+import { headers } from "next/headers";
+import { arpoOrigin, cloudflareReady, engineStatus } from "@/lib/tour-publish";
+import { ENGINE_CHANGES } from "./tours/engine-changes";
+import { EngineUpdates } from "./engine-updates";
 import type { TourConfig } from "./tours/types";
 
 
@@ -37,6 +41,9 @@ export default async function TourLabPage() {
   const user = await getTeamUser();
   if (!user || !teamCan(user, "tours")) redirect("/arpo");
   const isAdmin = teamCan(user, "admin");
+  // Which published tours run an older engine (Tour-motoren) - admins only.
+  const h = await headers();
+  const engine = isAdmin ? await engineStatus(arpoOrigin(`${h.get("x-forwarded-proto") ?? "http"}://${h.get("host")}`)).catch(() => null) : null;
   // Developers see only the tours given to them - and none of the admin's tools (new tours, the bin, customers without a tour).
   const [tours, sdkKey, results, deleted, waiting] = await Promise.all([
     listTours(toursOf(user)),
@@ -125,6 +132,8 @@ export default async function TourLabPage() {
       </div>
 
       {isAdmin && mpskinsLeft > 0 && <DetachAll count={mpskinsLeft} />}
+
+      {isAdmin && <EngineUpdates changes={ENGINE_CHANGES} tours={engine?.tours ?? []} ready={cloudflareReady()} />}
 
       <ToursList rows={[...rows, ...notStarted]} tours={tours.map((t) => ({ slug: t.slug, name: t.name }))} portal={!teamCan(user, "sales")} developers={isAdmin ? developers : undefined} />
 

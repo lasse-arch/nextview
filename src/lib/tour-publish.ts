@@ -78,11 +78,12 @@ const scriptJson = (v: unknown) => JSON.stringify(v).replace(/</g, "\\u003c").re
  * and the pictures from). Returns the files, the content of what was made
  * here, and the pictures that couldn't be read (left pointing at Arpo).
  */
-export async function buildVersion(slug: string, origin: string) {
+export async function buildVersion(slug: string, origin: string, config?: unknown) {
   const tour = await prisma.tour.findUnique({ where: { slug }, select: { slug: true, config: true } });
   if (!tour) throw new Error("Touren findes ikke.");
   const engine = (await (await own(origin, "/tour-engine/manifest.json")).json()) as EngineManifest;
-  const data = await loadTour(tour.config as unknown as TourConfig);
+  // `config`: a given setup (the one already live, when only the engine is new) - else the tour as it is now.
+  const data = await loadTour((config ?? tour.config) as unknown as TourConfig);
 
   const files: Files = {};
   const contents = new Map<string, Buffer>();
@@ -298,4 +299,73 @@ export async function setLiveVersion(slug: string, version: number | null, origi
     await prisma.tour.update({ where: { slug }, data: { liveVersion: tour.liveVersion } });
     throw err;
   }
+}
+
+/* ---------- The engine on every live tour ---------- */
+
+/** The setup a live version was published with: the tour's own when unchanged since, else the saved version that matches it. */
+async function liveConfigOf(tour: { id: string; config: unknown }, hash: string | null): Promise<unknown | null> {
+  if (!hash) return null;
+  if (configHash(tour.config) === hash) return tour.config;
+  const versions = await prisma.tourVersion.findMany({ where: { tourId: tour.id }, orderBy: { createdAt: "desc" }, take: 300, select: { config: true } });
+  return versions.find((v) => configHash(v.config) === hash)?.config ?? null;
+}
+
+export type EngineTour = { slug: string; name: string; version: number; engine: string; at: string; upToDate: boolean };
+
+/** Every live tour and whether it runs the engine Arpo would publish with now. */
+export async function engineStatus(origin: string): Promise<{ engine: string | null; tours: EngineTour[] }> {
+  const engine = await currentEngine(origin);
+  const tours = await prisma.tour.findMany({ where: { liveVersion: { not: null } }, orderBy: { name: "asc" }, select: { id: true, slug: true, name: true, liveVersion: true } });
+  const pubs = tours.length ? await prisma.tourPublication.findMany({ where: { OR: tours.map((t) => ({ tourId: t.id, version: t.liveVersion! })) }, select: { tourId: true, version: true, engine: true, createdAt: true } }) : [];
+  return {
+    engine,
+    tours: tours.flatMap((t) => {
+      const p = pubs.find((x) => x.tourId === t.id);
+      return p ? [{ slug: t.slug, name: t.name, version: p.version, engine: p.engine, at: p.createdAt.toISOString(), upToDate: Boolean(engine) && p.engine === engine }] : [];
+    }),
+  };
+}
+
+/**
+ * "Opdater alle udgivne tours": every live tour on an older engine is built
+ * again with the engine of now and exactly the setup it has out there (not
+ * the editor's newer, maybe unapproved changes) - one new version each, all
+ * put out in one deployment. If that fails, every tour stays on what it had.
+ */
+export async function republishAll(who: string, origin: string): Promise<{ engine: string; updated: string[]; skipped: { slug: string; why: string }[] }> {
+  const engine = await currentEngine(origin);
+  if (!engine) throw new Error("Kunne ikke læse tour-motorens version.");
+  const tours = await prisma.tour.findMany({ where: { liveVersion: { not: null } }, select: { id: true, slug: true, config: true, liveVersion: true } });
+  const fresh = new Map<string, Buffer>();
+  const done: { id: string; slug: string; before: number }[] = [];
+  const skipped: { slug: string; why: string }[] = [];
+  try {
+    for (const t of tours) {
+      const pub = await prisma.tourPublication.findUnique({ where: { tourId_version: { tourId: t.id, version: t.liveVersion! } }, select: { engine: true, configHash: true } });
+      if (!pub || pub.engine === engine) continue;
+      const config = await liveConfigOf(t, pub.configHash);
+      if (!config) {
+        skipped.push({ slug: t.slug, why: "Den udgivne opsætning findes ikke længere blandt versionerne - udgiv touren selv." });
+        continue;
+      }
+      const built = await buildVersion(t.slug, origin, config).catch((err: unknown) => {
+        skipped.push({ slug: t.slug, why: err instanceof Error ? err.message : String(err) });
+        return null;
+      });
+      if (!built) continue;
+      const last = await prisma.tourPublication.findFirst({ where: { tourId: t.id }, orderBy: { version: "desc" }, select: { version: true } });
+      const version = (last?.version ?? 0) + 1;
+      await prisma.tourPublication.create({ data: { tourId: t.id, version, slug: t.slug, files: built.files, engine: built.engine, configHash: pub.configHash, note: `Ny tour-motor - samme indhold som version ${t.liveVersion}`, createdByName: who } });
+      await prisma.tour.update({ where: { id: t.id }, data: { liveVersion: version } });
+      done.push({ id: t.id, slug: t.slug, before: t.liveVersion! });
+      for (const [h, b] of built.contents) fresh.set(h, b);
+    }
+    if (done.length) await deploy(fresh, origin);
+  } catch (err) {
+    // Not out there after all: every tour back on the version it had.
+    for (const d of done) await prisma.tour.update({ where: { id: d.id }, data: { liveVersion: d.before } }).catch(() => {});
+    throw err;
+  }
+  return { engine, updated: done.map((d) => d.slug), skipped };
 }

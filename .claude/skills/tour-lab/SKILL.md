@@ -68,6 +68,9 @@ One engine, one JSON setup per tour, kept in the database and edited in Arpo.
 3. Give it a proper editor (`content.tsx` or a tab in `editor.tsx`) using the
    `ui.tsx` pieces - only the JSON under "Avanceret" is not good enough.
 4. If it changes how a good tour is made, add a line to `PLAYBOOK.md`.
+5. Any change to the engine itself (what visitors see, how the tour runs, security, speed) gets a line at the top of
+   `tours/engine-changes.ts` - Tours → "Tour-motoren" shows it, and "Opdater alle udgivne tours" puts the new engine
+   on every published tour (same content) in one go.
 
 ## Checking your work
 

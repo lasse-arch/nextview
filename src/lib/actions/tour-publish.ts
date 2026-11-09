@@ -2,14 +2,14 @@
 
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
-import { requireTour } from "@/lib/auth";
+import { requireTeam, requireTour } from "@/lib/auth";
 import { teamCan } from "@/lib/team-roles";
 import { prisma } from "@/lib/db";
 import { normalizeEmail } from "@/lib/customer-login";
 import { setFilmingActual, updateDealStage } from "@/lib/actions/deals";
 import { tourChanged } from "@/lib/tour-cache";
 import { configHash, currentEngine } from "@/lib/tour-publish";
-import { arpoOrigin, cloudflareReady, PAGES_PROJECT, publishTour, setLiveVersion } from "@/lib/tour-publish";
+import { arpoOrigin, cloudflareReady, PAGES_PROJECT, publishTour, republishAll, setLiveVersion } from "@/lib/tour-publish";
 import { filmingTime } from "@/lib/filming-time";
 
 /* "Udgiv på tour.nextview360.dk" in the tour editor - admins only. */
@@ -139,6 +139,21 @@ export async function goLive(slug: string, filmingHours: number | null): Promise
     revalidatePath(`/arpo/tour-lab/${slug}/rediger`);
     revalidatePath(`/arpo/deals/${deal.id}`);
     return { ok: true, value: { mail: after?.welcomeMailSentAt ? email : null, version } };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/** "Opdater alle udgivne tours" (Tours → Tour-motoren): the engine of now on every live tour, same content - admins only. */
+export async function republishAllTours(): Promise<Result<{ updated: string[]; skipped: { slug: string; why: string }[] }>> {
+  try {
+    const user = await requireTeam("tours");
+    if (!teamCan(user, "admin")) throw new Error("Kun en admin kan udgive alle tours igen.");
+    if (!cloudflareReady()) throw new Error("Cloudflare er ikke sat op.");
+    const r = await republishAll(user.name, await origin());
+    for (const slug of r.updated) tourChanged(slug);
+    revalidatePath("/arpo/tour-lab");
+    return { ok: true, value: { updated: r.updated, skipped: r.skipped } };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
