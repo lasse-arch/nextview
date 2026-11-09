@@ -533,7 +533,7 @@ export async function planTourFromWebsite(
   const preset = DESIGN_PRESETS.find((p) => p.id === input.preset);
   const branch = BRANCHES.find(([b]) => b === input.branch)?.[1];
   const research = input.website.trim()
-    ? await siteResearch(input.website).catch((err: unknown) => ({ text: `(Hjemmesiden kunne ikke hentes: ${err instanceof Error ? err.message : err})`, pdfs: [] as string[] }))
+    ? await siteResearch(input.website, linksIn(`${input.notes ?? ""} ${input.about ?? ""}`)).catch((err: unknown) => ({ text: `(Hjemmesiden kunne ikke hentes: ${err instanceof Error ? err.message : err})`, pdfs: [] as string[] }))
     : { text: "(Ingen hjemmeside angivet)", pdfs: [] as string[] };
   let drone: string[] = [];
   if (input.droneImage) {
@@ -614,6 +614,11 @@ ${research.text}
   return { ok: true, plan: r.parsed_output };
 }
 
+/** The web addresses someone wrote (e.g. in "Ønsker til nextviewAI") - with or without https://. */
+function linksIn(text: string): string[] {
+  return [...text.matchAll(/(?:https?:\/\/|www\.)[^\s<>"')]+/gi)].map((m) => (m[0].startsWith("http") ? m[0] : `https://${m[0]}`).replace(/[.,;:!?]+$/, ""));
+}
+
 /**
  * A new tour built by Claude from the customer's website and the existing
  * Matterport space: the website gives the look, the words and the actions
@@ -646,7 +651,7 @@ export async function createTourFromWebsite(input: NewTourInput & { plan?: TourP
 
   // Read like a person would: the front page and the pages and PDFs behind it (cached for a week).
   const research = input.website.trim()
-    ? await siteResearch(input.website).catch((err: unknown) => ({ text: `(Hjemmesiden kunne ikke hentes: ${err instanceof Error ? err.message : err})`, pdfs: [] as string[] }))
+    ? await siteResearch(input.website, linksIn(`${input.notes ?? ""} ${input.about ?? ""}`)).catch((err: unknown) => ({ text: `(Hjemmesiden kunne ikke hentes: ${err instanceof Error ? err.message : err})`, pdfs: [] as string[] }))
     : { text: "(Ingen hjemmeside angivet)", pdfs: [] as string[] };
   const site = research.text;
 

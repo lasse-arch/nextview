@@ -67,6 +67,7 @@ const USEFUL = [
   /hverdag|dagen|dagsrytme|skema|program|åbningstid|aabningstid/i,
   /bo\b|bolig|værelse|vaerelse|sådan-bor|saadan-bor|overnat|hytte|plads/i,
   /optag|bliv-elev|ansøg|ansog|book|booking|medlem|tilmeld/i,
+  /ansatte|medarbejder|personale|lærer|laerer|undervisere|holdet|team|staff/i,
   /om-os|om-skolen|om-|about|hvem/i,
   /særlig|saerlig|behov|støtte|stoette|handicap|kørestol|koerestol|tilgængelig/i,
   /forældre|foraeldre|fagfolk|kommune/i,
@@ -89,9 +90,25 @@ function pageText(html: string): string {
  * PDFs worth reading (schedules, price lists, menus) that the model reads
  * itself. Everything is cached for a week.
  */
-export async function siteResearch(address: string): Promise<{ text: string; pdfs: string[] }> {
+export async function siteResearch(address: string, also: string[] = []): Promise<{ text: string; pdfs: string[] }> {
   const base = publicUrl(address);
-  const json = await cached(`research:${base}`, async () => {
+  // Pages on the customer's own site that the user pointed at (e.g. in the wishes) - always read, first.
+  const asked = [
+    ...new Set(
+      also
+        .map((a) => {
+          try {
+            const u = new URL(a);
+            u.hash = "";
+            return u.hostname.replace(/^www\./, "") === base.hostname.replace(/^www\./, "") && /^https?:$/.test(u.protocol) ? u.toString() : null;
+          } catch {
+            return null;
+          }
+        })
+        .filter((u): u is string => Boolean(u)),
+    ),
+  ].slice(0, 4);
+  const json = await cached(`research2:${base}${asked.length ? `|${asked.join("|")}` : ""}`, async () => {
     const front = await digest(address);
     const html = await fetchText(base, 1_500_000);
     const links = [...html.matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi)]
@@ -111,10 +128,13 @@ export async function siteResearch(address: string): Promise<{ text: string; pdf
       const i = USEFUL.findIndex((re) => re.test(hay));
       return i < 0 ? 99 : i;
     };
-    const pages = [...new Map(own.filter((l) => !/\.(pdf|jpe?g|png|gif|webp|zip|docx?)$/i.test(l.url.pathname) && l.url.pathname.replace(/\/$/, "") !== base.pathname.replace(/\/$/, "")).map((l) => [l.url.toString(), l])).values()]
-      .filter((l) => score(l) < 99)
-      .sort((a, b) => score(a) - score(b))
-      .slice(0, 10);
+    const found = [...new Map(own.filter((l) => !/\.(pdf|jpe?g|png|gif|webp|zip|docx?)$/i.test(l.url.pathname) && l.url.pathname.replace(/\/$/, "") !== base.pathname.replace(/\/$/, "")).map((l) => [l.url.toString(), l])).values()]
+      .filter((l) => score(l) < 99 && !asked.includes(l.url.toString()))
+      .sort((a, b) => score(a) - score(b));
+    // At most two pages per kind of link first (so twelve subject pages don't crowd out the staff page), then the rest.
+    const perKind = new Map<number, number>();
+    const spread = [...found.filter((l) => (perKind.set(score(l), (perKind.get(score(l)) ?? 0) + 1).get(score(l)) ?? 0) <= 2), ...found];
+    const pages = [...asked.map((u) => ({ url: new URL(u), text: "(peget på af brugeren)" })), ...[...new Map(spread.map((l) => [l.url.toString(), l])).values()]].slice(0, 14);
     const htmls = await Promise.all(pages.map((l) => fetchText(l.url, 1_000_000).catch(() => "")));
     const read = pages.map((l, i) => {
       const text = pageText(htmls[i]);
