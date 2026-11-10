@@ -3,6 +3,8 @@
 import { useState } from "react";
 import type { CardPerson, LineDayStop, TourConfig } from "../../tours/types";
 import { Rows } from "./content";
+import { menuRooms } from "./map-editor";
+import { isPlaceHref } from "../../tours/places";
 import { LinkInput } from "./links-open";
 import { Choice, Field, Group, input, Toggle, UploadButton, type PreviewApi } from "./ui";
 
@@ -126,7 +128,7 @@ export function LineDayEditor({ config, edit, preview }: { config: TourConfig; e
           title={(l) => l.name}
           subtitle={(l) => [`${l.day.length} stop`, l.people?.length ? `${l.people.length} lærere` : null].filter(Boolean).join(" · ")}
           empty="Ingen linjer endnu."
-          editor={(line, put) => <LineEditor line={line} L={L} onChange={put} preview={preview} sharedName={sharedName} />}
+          editor={(line, put) => <LineEditor line={line} L={L} config={config} onChange={put} preview={preview} sharedName={sharedName} />}
         />
         <button
           type="button"
@@ -266,8 +268,16 @@ function People({ people, onChange, hint, title = "Personer her (valgfri)" }: { 
 }
 
 /** A line: its name and teachers, and its day - shared stops and its own, in order. */
-function LineEditor({ line, L, onChange, preview, sharedName }: { line: Line; L: L; onChange: (l: Line) => void; preview: PreviewApi; sharedName: (id: string) => LineDayStop | undefined }) {
+function LineEditor({ line, L, config, onChange, preview, sharedName }: { line: Line; L: L; config: TourConfig; onChange: (l: Line) => void; preview: PreviewApi; sharedName: (id: string) => LineDayStop | undefined }) {
   const [open, setOpen] = useState<number | null>(null);
+  // The tour's places not yet in this line's day - one at a time, or a whole menu group at once (e.g. all the line's simulators).
+  const inDay = new Set(line.day.map((d) => (typeof d === "string" ? sharedName(d)?.href : d.href)).filter(Boolean));
+  const free = menuRooms(config).filter(([, h]) => !inDay.has(h));
+  const groups = config.menu
+    .filter((m): m is Extract<typeof m, { items: [string, string][] }> => "items" in m)
+    .map((m) => ({ title: m.title, rooms: m.items.filter(([, h]) => isPlaceHref(h) && !inDay.has(h)) }))
+    .filter((g) => g.rooms.length > 1);
+  const addRooms = (rooms: [string, string][]) => onChange({ ...line, day: [...line.day, ...rooms.map(([name, href]): LineDayStop => ({ id: newId(name), time: "", place: name, title: name, href }))] });
   const move = (i: number, by: number) => {
     const day = [...line.day];
     const j = i + by;
@@ -339,6 +349,35 @@ function LineEditor({ line, L, onChange, preview, sharedName }: { line: Line; L:
               </option>
             ))}
           </select>
+          {free.length > 0 && (
+            <select
+              className="rounded-lg bg-white px-2 py-1 text-[13px] text-[#0071e3] ring-1 ring-black/[.06]"
+              value=""
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v.startsWith("gruppe:")) addRooms(groups.find((g) => g.title === v.slice(7))?.rooms ?? []);
+                else if (v) addRooms(free.filter(([, h]) => h === v).slice(0, 1));
+              }}
+            >
+              <option value="">+ Sted fra touren …</option>
+              {groups.length > 0 && (
+                <optgroup label="Hele menugruppen">
+                  {groups.map((g) => (
+                    <option key={g.title} value={`gruppe:${g.title}`}>
+                      {g.title} ({g.rooms.length} steder)
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              <optgroup label="Ét sted">
+                {free.map(([name, href]) => (
+                  <option key={href} value={href}>
+                    {name}
+                  </option>
+                ))}
+              </optgroup>
+            </select>
+          )}
         </div>
       </Field>
       {own.length > 1 && L.mix !== false && (

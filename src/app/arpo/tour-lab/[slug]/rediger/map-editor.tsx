@@ -63,7 +63,7 @@ function imageSize(src: string): Promise<{ w: number; h: number }> {
 }
 
 /** The menu's rooms (name + place in the tour). */
-function menuRooms(T: TourConfig): [string, string][] {
+export function menuRooms(T: TourConfig): [string, string][] {
   const all = T.menu.flatMap((m) => ("items" in m ? m.items : [[m.title, m.href] as [string, string]])).filter(([, h]) => isPlaceHref(h));
   return all.filter(([n], i) => all.findIndex(([x]) => x === n) === i);
 }
