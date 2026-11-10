@@ -183,12 +183,17 @@ export function ContractBuilderForm({
           onChange={(bindingMonths) => setProducts((p) => ({ ...p, bindingMonths }))}
           min={1}
         />
-        <NumberField
-          label="Opsigelsesvarsel (måneder)"
-          value={products.noticeMonths}
-          onChange={(noticeMonths) => setProducts((p) => ({ ...p, noticeMonths }))}
-          min={1}
-        />
+        {/* Not renewed automatically: the contract has no notice period - so neither has the form. */}
+        {products.autoRenew !== false ? (
+          <NumberField
+            label="Opsigelsesvarsel (måneder)"
+            value={products.noticeMonths}
+            onChange={(noticeMonths) => setProducts((p) => ({ ...p, noticeMonths }))}
+            min={1}
+          />
+        ) : (
+          <p className="self-end pb-2 text-xs text-slate-500">Intet opsigelsesvarsel - aftalen ophører ved bindingsperiodens udløb.</p>
+        )}
         <div className="col-span-2">
           <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Yderligere betingelser (fritekst, valgfri)</label>
           <textarea
