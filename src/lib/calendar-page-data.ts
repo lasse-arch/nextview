@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { listCalendarEvents, type GoogleCalendarEvent } from "@/lib/google-calendar";
+import { getCalendarEventState, listCalendarEvents, type GoogleCalendarEvent } from "@/lib/google-calendar";
 import { dealName } from "@/lib/labels";
 
 const CPH_TZ = "Europe/Copenhagen";
@@ -111,6 +111,79 @@ function ownerNameOf(account: { user: { name: string; lastName: string | null } 
   return [account.user.name, account.user.lastName].filter(Boolean).join(" ");
 }
 
+/** A real instant as Copenhagen wall-clock digits stored as UTC - how a deal's meetingDate is kept (see calendar-service.ts). */
+function wallClock(instant: Date): Date {
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: CPH_TZ, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(instant);
+  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? 0);
+  return new Date(Date.UTC(get("year"), get("month") - 1, get("day"), get("hour") % 24, get("minute")));
+}
+
+/** Event ids looked up lately - so a page shown again doesn't ask Google once more for each meeting. */
+const checkedAt = new Map<string, number>();
+const RECHECK_MS = 5 * 60_000;
+
+type SyncDeal = { id: string; meetingDate: Date | null; meetingDurationMinutes: number; googleCalendarEventId: string | null; ownerId: string };
+type GoogleAccount = Parameters<typeof listCalendarEvents>[0] & { userId: string };
+
+/**
+ * The invitations Arpo sent for coming meetings, checked against Google
+ * Calendar: one deleted there (cancelled by its organizer) is taken off the
+ * deal - with a note saying so - and one moved there gets its new time.
+ * Only when Google says so for certain: a calendar that can't be asked, or
+ * an event no calendar knows (e.g. its organizer disconnected Google),
+ * leaves the meeting as it is. Returns the deals still booked, as they are now.
+ */
+async function syncWithGoogle<D extends SyncDeal>(deals: D[], accounts: GoogleAccount[]): Promise<D[]> {
+  if (!accounts.length) return deals;
+  const soon = Date.now() - 864e5;
+  const toCheck = deals.filter((d) => d.googleCalendarEventId && d.meetingDate && d.meetingDate.getTime() >= soon && Date.now() - (checkedAt.get(d.googleCalendarEventId) ?? 0) > RECHECK_MS).slice(0, 40);
+  const gone = new Set<string>();
+  const moved = new Map<string, { at: Date; minutes: number }>();
+  await Promise.all(
+    toCheck.map(async (d) => {
+      const id = d.googleCalendarEventId!;
+      // The owner's calendar first (it's usually theirs), then the others' - the organizer's copy says best whether it still stands.
+      const order = [...accounts.filter((a) => a.userId === d.ownerId), ...accounts.filter((a) => a.userId !== d.ownerId)];
+      let cancelled = false;
+      let failed = false;
+      for (const account of order) {
+        try {
+          const st = await getCalendarEventState(account, id);
+          if (st.state === "alive") {
+            if (!st.isAllDay) {
+              const at = wallClock(new Date(st.startIso));
+              const minutes = Math.max(5, Math.round((new Date(st.endIso).getTime() - new Date(st.startIso).getTime()) / 60_000));
+              if (Math.abs(at.getTime() - d.meetingDate!.getTime()) > 60_000 || minutes !== d.meetingDurationMinutes) moved.set(d.id, { at, minutes });
+            }
+            checkedAt.set(id, Date.now());
+            return;
+          }
+          if (st.state === "cancelled") cancelled = true;
+        } catch {
+          failed = true;
+        }
+      }
+      if (cancelled && !failed) gone.add(d.id);
+      if (!failed) checkedAt.set(id, Date.now());
+    }),
+  );
+  for (const d of deals) {
+    if (gone.has(d.id)) {
+      const when = `${d.meetingDate!.getUTCDate()}/${d.meetingDate!.getUTCMonth() + 1} kl. ${String(d.meetingDate!.getUTCHours()).padStart(2, "0")}:${String(d.meetingDate!.getUTCMinutes()).padStart(2, "0")}`;
+      await prisma
+        .$transaction([
+          prisma.deal.update({ where: { id: d.id }, data: { meetingDate: null, googleCalendarEventId: null } }),
+          prisma.note.create({ data: { dealId: d.id, authorId: d.ownerId, body: `Mødet ${when} blev slettet i Google Kalender og er derfor fjernet fra Arpo.` } }),
+        ])
+        .catch((err) => console.error("Kunne ikke fjerne aflyst møde", d.id, err));
+    } else if (moved.has(d.id)) {
+      const m = moved.get(d.id)!;
+      await prisma.deal.update({ where: { id: d.id }, data: { meetingDate: m.at, meetingDurationMinutes: m.minutes } }).catch((err) => console.error("Kunne ikke flytte møde", d.id, err));
+    }
+  }
+  return deals.filter((d) => !gone.has(d.id)).map((d) => (moved.has(d.id) ? { ...d, meetingDate: moved.get(d.id)!.at, meetingDurationMinutes: moved.get(d.id)!.minutes } : d));
+}
+
 /**
  * All CRM-booked meetings in [rangeStart, rangeEnd) plus any Google Calendar
  * events in that same window not already represented by a CRM deal (matched
@@ -120,7 +193,11 @@ function ownerNameOf(account: { user: { name: string; lastName: string | null } 
  * the same way everywhere it's counted at all.
  */
 async function fetchMergedMeetings(rangeStart: Date, rangeEnd: Date): Promise<CalendarMeeting[]> {
-  const deals = await prisma.deal.findMany({
+  const accounts = await prisma.emailAccount.findMany({
+    where: { provider: "GOOGLE" },
+    include: { user: { select: { name: true, lastName: true } } },
+  });
+  const found = await prisma.deal.findMany({
     where: { meetingDate: { gte: rangeStart, lt: rangeEnd } },
     select: {
       id: true,
@@ -134,6 +211,8 @@ async function fetchMergedMeetings(rangeStart: Date, rangeEnd: Date): Promise<Ca
     },
     orderBy: { meetingDate: "asc" },
   });
+  // Deleted or moved in Google Calendar: so here too. A moved meeting may now be outside the range.
+  const deals = (await syncWithGoogle(found, accounts)).filter((d) => d.meetingDate && d.meetingDate >= rangeStart && d.meetingDate < rangeEnd);
 
   const crmMeetings: CalendarMeeting[] = deals.map((d) => ({
     id: `deal-${d.id}`,
@@ -151,11 +230,6 @@ async function fetchMergedMeetings(rangeStart: Date, rangeEnd: Date): Promise<Ca
   }));
 
   const knownGoogleEventIds = new Set(deals.map((d) => d.googleCalendarEventId).filter((id): id is string => Boolean(id)));
-
-  const accounts = await prisma.emailAccount.findMany({
-    where: { provider: "GOOGLE" },
-    include: { user: { select: { name: true, lastName: true } } },
-  });
 
   // Resolve organizer/attendee emails back to a seller's display name -
   // needed because Google gives every attendee's own calendar an identical

@@ -222,3 +222,22 @@ export async function listCalendarEvents(
       eventType: e.eventType ?? null,
     }));
 }
+
+export type CalendarEventState = { state: "alive"; startIso: string; endIso: string; isAllDay: boolean } | { state: "cancelled" } | { state: "missing" };
+
+/** One event as this account's calendar has it now: there (and when), cancelled (deleted by its organizer), or not on this calendar. Throws when Google can't be asked. */
+export async function getCalendarEventState(account: EmailAccount, eventId: string): Promise<CalendarEventState> {
+  const accessToken = await getValidAccessToken(account);
+  const res = await fetch(`${CALENDAR_API_BASE}/calendars/primary/events/${encodeURIComponent(eventId)}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    signal: AbortSignal.timeout(8000),
+  });
+  if (res.status === 410) return { state: "cancelled" };
+  if (res.status === 404) return { state: "missing" };
+  if (!res.ok) throw new Error(`Google Kalender-fejl (${res.status})`);
+  const e = (await res.json()) as { status?: string; start?: { date?: string; dateTime?: string }; end?: { date?: string; dateTime?: string } };
+  if (e.status === "cancelled") return { state: "cancelled" };
+  const startIso = e.start?.dateTime ?? e.start?.date;
+  if (!startIso) return { state: "missing" };
+  return { state: "alive", startIso, endIso: e.end?.dateTime ?? e.end?.date ?? startIso, isAllDay: !e.start?.dateTime };
+}
