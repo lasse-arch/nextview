@@ -96,6 +96,8 @@ export function GuidePlayer({
     if (!manual) a.onended = () => step(index + 1, "auto");
     // After the tour's chosen pause (seconds), so the visitor sees the place first.
     const start = setTimeout(() => {
+      // The films in Virtual staging go quiet while the guide speaks.
+      window.dispatchEvent(new Event("hv-voice"));
       a.play().catch(() => {});
       onEvent("guide_audio", { stop: index + 1, title: stop.title });
     }, Math.max(0, voiceDelay) * 1000);

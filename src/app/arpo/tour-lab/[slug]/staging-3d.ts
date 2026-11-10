@@ -207,7 +207,11 @@ function factory() {
     this.onEvent = function (type: string) {
       if (type !== "INTERACTION.CLICK" || !this.inputs.item) return;
       // A video without a button: a tap turns its sound on and off.
-      if (this.video && !this.inputs.item.action) this.video.muted = !this.video.muted;
+      if (this.video && !this.inputs.item.action) {
+        this.video.muted = !this.video.muted;
+        // Sound on: a voice reading aloud stops (never two at once).
+        if (!this.video.muted) window.dispatchEvent(new Event("hv-film-sound"));
+      }
       this.inputs.onClick?.(this.inputs.item.id);
     };
     this.onDestroy = function () {

@@ -290,6 +290,8 @@ export function StagingSound({ sdk, items, currentSs, frame }: { sdk: MpSdk | nu
       if (document.visibilityState === "hidden") muteAll();
     };
     document.addEventListener("visibilitychange", hidden);
+    // A voice starts (a place card read aloud, the guide speaking): the films' sound goes, at once.
+    window.addEventListener("hv-voice", muteAll);
     // The film's own sound turned on or off (a tap on the wall does that too): the button says so.
     const vs = films.map((f) => stagingVideo(f.id)).filter((v): v is HTMLVideoElement => Boolean(v));
     const changed = () => setTick((t) => t + 1);
@@ -298,6 +300,7 @@ export function StagingSound({ sdk, items, currentSs, frame }: { sdk: MpSdk | nu
       sub.cancel();
       away.forEach((t) => clearTimeout(t));
       document.removeEventListener("visibilitychange", hidden);
+      window.removeEventListener("hv-voice", muteAll);
       muteAll();
       vs.forEach((v) => v.removeEventListener("volumechange", changed));
     };
@@ -323,6 +326,7 @@ export function StagingSound({ sdk, items, currentSs, frame }: { sdk: MpSdk | nu
               const film = stagingVideo(f.id);
               if (!film) return;
               film.muted = !film.muted;
+              if (!film.muted) window.dispatchEvent(new Event("hv-film-sound"));
               void film.play().catch(() => {});
               setTick((t) => t + 1);
             }}

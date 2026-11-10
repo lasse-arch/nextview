@@ -59,6 +59,16 @@ export function PlaceCard({
   const player = useRef<HTMLAudioElement | null>(null);
   const [reading, setReading] = useState(false);
   useEffect(() => () => player.current?.pause(), []);
+  // A film's sound turned on in Virtual staging: the reading stops - never two voices at once.
+  useEffect(() => {
+    const stop = () => {
+      if (!player.current || player.current.paused) return;
+      player.current.pause();
+      setReading(false);
+    };
+    window.addEventListener("hv-film-sound", stop);
+    return () => window.removeEventListener("hv-film-sound", stop);
+  }, []);
   function readAloud() {
     if (!audio) return;
     if (reading) {
@@ -69,6 +79,8 @@ export function PlaceCard({
     player.current ??= new Audio(audio);
     player.current.currentTime = 0;
     player.current.onended = () => setReading(false);
+    // The films in Virtual staging go quiet while it's read.
+    window.dispatchEvent(new Event("hv-voice"));
     player.current.play().then(() => setReading(true), () => setReading(false));
   }
   const seconds = card.seconds ?? 15;
