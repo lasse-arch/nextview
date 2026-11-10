@@ -125,6 +125,12 @@ export type StagingItem = {
    * buttons. Left out on items placed by their four corners.
    */
   place?: { center: Point3; normal: Point3; w: number; h: number };
+  /**
+   * Stands up in the room (e.g. a big screen in the middle of a hall) instead of lying on its surface: place.center
+   * is the spot on the floor; the plane stands upright on it, `lift` metres above the floor (left out: on it), and
+   * always turns to face the visitor. 3D kinds only (image, video, sign).
+   */
+  stand?: { lift?: number };
   /** The scan points it is seen from. */
   ss: number[];
   /** A tap opens this - a page, or in the tour ("#rundvisning", "#kontakt", a place, "#aarshjul" …). Without one, a tap on a video turns its sound on. */

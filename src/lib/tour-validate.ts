@@ -111,6 +111,7 @@ export function tourConfigProblem(config: unknown): string | null {
       if (it.contest !== undefined && (!obj(it.contest) || typeof it.contest.prize !== "string" || it.contest.prize.length > 80 || (it.contest.ends !== "" && !/^\d{4}-\d{2}-\d{2}$/.test(String(it.contest.ends))) || (it.contest.keepDays !== undefined && !(Number.isInteger(it.contest.keepDays) && it.contest.keepDays >= 1 && it.contest.keepDays <= 365))))
         return "En skattekistes lodtrækning er ugyldig (præmie, dato eller dage).";
       if (it.action !== undefined && (!obj(it.action) || !str(it.action.label) || !str(it.action.href))) return "Knappen på et staging-element skal have tekst og link.";
+      if (it.stand !== undefined && (!obj(it.stand) || (it.stand.lift !== undefined && !(num(it.stand.lift) && it.stand.lift >= 0 && it.stand.lift <= 10)))) return "\"Stil op i rummet\" har en ugyldig højde over gulvet (0-10 m).";
     }
   }
   const sk = c.schedule;

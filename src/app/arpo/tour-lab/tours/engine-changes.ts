@@ -9,6 +9,7 @@
 export type EngineChange = { date: string; kind: "ny" | "sikkerhed" | "hastighed" | "rettelse"; text: string };
 
 export const ENGINE_CHANGES: EngineChange[] = [
+  { date: "2026-11-10", kind: "ny", text: "Virtual staging: en video, et billede eller et skilt kan stå op midt i rummet (fx en hal) og vender altid mod gæsten." },
   { date: "2026-11-10", kind: "rettelse", text: "Historier: Pause, Videre og luk står fast i højre side - de flytter sig ikke efter, hvor langt rummets navn er." },
   { date: "2026-11-10", kind: "ny", text: "Historier kan starte skjult (foldet sammen) - gæsten åbner dem selv med knappen." },
   { date: "2026-11-10", kind: "ny", text: "Knapperne får selv mørk tekst på en lys knapfarve (fx guld), så hjemmesidens egen farve kan bruges, som den er." },

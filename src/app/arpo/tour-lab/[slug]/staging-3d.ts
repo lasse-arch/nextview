@@ -73,12 +73,13 @@ function factory() {
     inputs: { item: StagingItem | null; onClick: ((id: string) => void) | null };
     outputs: { objectRoot: unknown; collider: unknown };
     events: Record<string, boolean>;
-    context: { three: Three };
+    context: { three: Three; camera?: Obj3 };
     mesh?: Obj3;
     video?: HTMLVideoElement;
     texture?: Obj3;
     built?: string;
     onInit(): void;
+    onTick(): void;
     onInputsUpdated(): void;
     onEvent(type: string): void;
     onDestroy(): void;
@@ -178,6 +179,16 @@ function factory() {
     this.onInit = function () {
       this.build();
     };
+    // Standing up in the room: turned to face the visitor every frame (around the upright axis only - it never tips).
+    this.onTick = function () {
+      const cam = this.context.camera;
+      if (!this.mesh || !this.inputs.item?.stand || !cam?.position) return;
+      const THREE = this.context.three;
+      const target = new THREE.Vector3(cam.position.x, this.mesh.position.y, cam.position.z);
+      if (target.distanceTo(this.mesh.position) < 0.05) return;
+      this.mesh.up.set(0, 1, 0);
+      this.mesh.lookAt(target);
+    };
     this.onInputsUpdated = function () {
       this.build();
     };
@@ -223,6 +234,12 @@ function place(THREE: Three, mesh: Obj3, s: { center: Point3; normal: Point3; w:
     }
   }
   mesh.scale.set(w, h, 1);
+  // Standing up: upright on the spot on the floor, its bottom `lift` above it (turned to the visitor in onTick).
+  if (item.stand) {
+    mesh.position.set(s.center.x, s.center.y + (item.stand.lift ?? 0) + h / 2, s.center.z);
+    mesh.up.set(0, 1, 0);
+    mesh.lookAt(mesh.position.clone().add(new THREE.Vector3(0, 0, 1)));
+  }
 }
 
 const registered = new WeakSet<object>();

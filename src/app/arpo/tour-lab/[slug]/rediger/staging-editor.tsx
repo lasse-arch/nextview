@@ -4,7 +4,7 @@ import { useContext, useState } from "react";
 import type { InUseItem, StagingItem, TourConfig, YearWheel } from "../../tours/types";
 import { Rows } from "./content";
 import { LinkInput } from "./links-open";
-import { Choice, Field, FilesContext, Group, Icon, input, UploadButton, ssOfHref, uploadToTour, withProtocol, type PreviewApi } from "./ui";
+import { Choice, Field, FilesContext, Group, Icon, input, Toggle, UploadButton, ssOfHref, uploadToTour, withProtocol, type PreviewApi } from "./ui";
 import { cornersOf, movePlace } from "../staging";
 import { IN_3D } from "../staging-3d";
 import { socialLinks, type SocialKind } from "../../tours/social";
@@ -82,6 +82,9 @@ function mediaRatio(kind: Kind, src: string): Promise<number | null> {
 const round = (n: number) => Math.round(n * 100) / 100;
 const stepBtn = "h-8 w-8 rounded-lg bg-white text-[16px] font-semibold text-[#0071e3] ring-1 ring-black/[.06] hover:bg-[#0071e3]/5 disabled:opacity-40";
 
+/** A place clicked on a floor (its surface faces up). */
+const onFloor = (p: Place) => p.normal.y > 0.8;
+
 /** Size and position with buttons: width and height (aspect kept, unless unlocked) and 5 cm moves along the surface. */
 function SizeControls({ item, set }: { item: StagingItem; set: (i: StagingItem) => void }) {
   const [locked, setLocked] = useState(true);
@@ -108,9 +111,38 @@ function SizeControls({ item, set }: { item: StagingItem; set: (i: StagingItem) 
     </div>
   );
   const move = (dx: number, dy: number) => put(movePlace(p, dx, dy));
+  const canStand = IN_3D.has(item.kind) && item.kind !== "treasure" && onFloor(p);
+  const lift = item.stand?.lift ?? 0;
+  const setLift = (v: number) => set({ ...item, stand: { ...item.stand, lift: Math.min(10, Math.max(0, round(v))) || undefined } });
   return (
-    <Field title="Størrelse og placering" hint="Ret størrelsen, til den dækker fladen - og skub den på plads 5 cm ad gangen.">
+    <Field
+      title="Størrelse og placering"
+      hint={item.stand ? "Står op på det punkt på gulvet, du klikkede på, og vender altid mod den besøgende. Flyt-knapperne flytter den hen over gulvet." : "Ret størrelsen, til den dækker fladen - og skub den på plads 5 cm ad gangen."}
+    >
       <div className="space-y-2">
+        {canStand && (
+          <Toggle
+            on={Boolean(item.stand)}
+            onChange={(on) => set({ ...item, stand: on ? {} : undefined })}
+            title="Stil op i rummet"
+            hint={'Fx en stor skærm midt i hallen - den står lodret og vender mod gæsten fra alle punkter. Fra: den ligger fladt på gulvet.'}
+          />
+        )}
+        {item.stand && (
+          <div className="flex items-center gap-1.5">
+            <span className="w-14 text-[13px] text-[#6e6e73]">Over gulv</span>
+            <button type="button" className={stepBtn} aria-label="Lavere" onClick={() => setLift(lift - 0.1)}>
+              −
+            </button>
+            <span className="w-20 flex-none">
+              <input type="number" step={0.1} min={0} max={10} className={`${input} bg-white text-center`} value={lift} onChange={(e) => setLift(Number(e.target.value) || 0)} />
+            </span>
+            <span className="text-[13px] text-[#8e8e93]">m</span>
+            <button type="button" className={stepBtn} aria-label="Højere" onClick={() => setLift(lift + 0.1)}>
+              +
+            </button>
+          </div>
+        )}
         {row("Bredde", p.w, width)}
         {row("Højde", p.h, height)}
         <label className="flex items-center gap-2 text-[13px] text-[#6e6e73]">
@@ -176,6 +208,12 @@ export function StagingEditor({ config, edit, preview, focus }: { config: TourCo
             const at = await placer.place(START_SIZE[kind]);
             if (!at) return;
             const item: StagingItem = { id: `vs-${Date.now().toString(36)}`, kind, title: `${KIND_NAME[kind]} ${items.length + 1}`, place: at.place, corners: cornersOf(at.place), ss: at.ss ? [at.ss] : [] };
+            // Clicked on the floor (e.g. the middle of a hall): it stands up there and faces the visitor - rarely meant to lie flat.
+            if (IN_3D.has(kind) && kind !== "treasure" && onFloor(at.place)) {
+              item.stand = {};
+              item.place = { ...at.place, w: kind === "sign" ? 1.2 : 3, h: kind === "sign" ? 0.7 : 1.7 };
+              item.corners = cornersOf(item.place);
+            }
             if (kind === "sign") item.text = "Velkommen";
             // A new chest's draw: a starter pack, drawn in a month (both changed below).
             if (kind === "treasure") item.contest = { prize: "en startpakke", ends: new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10) };
