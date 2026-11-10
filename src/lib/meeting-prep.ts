@@ -46,8 +46,13 @@ Skriv briefen på dansk, i du-form til sælgeren, konkret og kort - noget man ka
 (navn, rolle, og hvad der optager dem - skriv "Ikke fundet" hvis du ikke ved det)
 ## Det har de gang i
 (nyt fra artikler og deres opslag på sociale medier, med måned/år og hvor det stod - og hvad du kan bruge det til i mødet)
+## Sådan åbner du
+(gør mødet let at komme i gang med - alt skrevet ordret, så sælgeren kan sige det, i anførselstegn:
+- 2-3 konkrete åbnere til de første minutter, hver bygget på noget bestemt, du fandt (et opslag, en artikel, noget nyt på stedet, noget fra vores mails) - nævn tingen præcist, fx navnet på arrangementet eller måneden. Aldrig en generisk åbner som "Hvordan går det?".
+- 3-4 lette isbryder-spørgsmål ("tiøre-spørgsmål"), der får dem til at fortælle om stedet og sig selv - nemme at svare på, nysgerrige, og med en kort note om, hvad du lytter efter i svaret.
+- 1 overgang fra småsnak til mødet, ordret, fx "Det er faktisk lige præcis derfor, jeg gerne ville vise jer …")
 ## Vinklen
-(den ene vinkel, du skal sælge ind på, og hvorfor lige den passer til dem - 2-4 punkter. Slut med en åbningssætning, sælgeren kan sige, i anførselstegn)
+(den ene vinkel, du skal sælge ind på, og hvorfor lige den passer til dem - 2-4 punkter)
 ## Det skal du vise
 (3-5 funktioner fra <viden>, der giver mening for netop dem - for hver: hvad den gør for dem, og hvordan du siger det, gerne en sætning i anførselstegn)
 ## Kunder du kan nævne
@@ -58,6 +63,8 @@ Skriv briefen på dansk, i du-form til sælgeren, konkret og kort - noget man ka
 (de 3-5 indvendinger, de mest sandsynligt kommer med - for hver: "**Indvendingen**" og så et kort svar, sælgeren kan sige)
 ## Plan for mødet
 (mødets forløb i 4-6 punkter med minutter, og det næste skridt, du skal bede om til sidst)
+
+Vær konkret hele vejen: hellere navne, tal, datoer og ordrette sætninger end gode råd. Skriv "Sig: …" eller sætningen i anførselstegn, hvor sælgeren skal sige noget. Hvert punkt skal kunne bruges i netop dette møde - ikke i et hvilket som helst møde.
 
 Ingen andre overskrifter, ingen tabeller, ingen links eller URL'er i teksten (kilderne vises for sig), ingen lange tankestreger. Fremhæv kun få ord med **fed**.`;
 

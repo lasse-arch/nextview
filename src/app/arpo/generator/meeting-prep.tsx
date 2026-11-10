@@ -16,6 +16,7 @@ const ICON: Record<string, string> = {
   "Kort om kunden": "🏫",
   "Hvem du mødes med": "🤝",
   "Det har de gang i": "📰",
+  "Sådan åbner du": "👋",
   Vinklen: "🎯",
   "Det skal du vise": "✨",
   "Kunder du kan nævne": "⭐",
@@ -26,7 +27,7 @@ const ICON: Record<string, string> = {
 
 /** "I dag", "I morgen" … - `today` is the day in Copenhagen, from the server. */
 /** The sections that get the whole width (the others go two by two). */
-const WIDE = new Set(["Det har de gang i", "Vinklen", "Det skal du vise", "Indvendinger og svar", "Plan for mødet"]);
+const WIDE = new Set(["Det har de gang i", "Sådan åbner du", "Vinklen", "Det skal du vise", "Indvendinger og svar", "Plan for mødet"]);
 
 const dayName = (dayKey: string, today: string) => {
   const d = new Date(`${dayKey}T12:00:00Z`);
