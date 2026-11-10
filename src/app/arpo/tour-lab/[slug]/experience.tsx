@@ -2464,7 +2464,8 @@ function TourExperience({
         });
         const ss = Object.entries(sweepBySs).find(([, id]) => id === pose.sweep)?.[0];
         if (!ss) return reply({ type: "tour-view", id: e.data.id, error: "Gå ind i touren først (forbi velkomsten)." });
-        reply({ type: "tour-view", id: e.data.id, href: placeHref(savedTour, ss, pose.rotation), room });
+        // Also where the camera stands (the editor moves a standing screen left/right/away as seen from here).
+        reply({ type: "tour-view", id: e.data.id, href: placeHref(savedTour, ss, pose.rotation), room, position: pose.position });
       }
     }
     window.addEventListener("message", onMessage);

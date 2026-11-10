@@ -80,6 +80,7 @@ function factory() {
     built?: string;
     onInit(): void;
     onTick(): void;
+    face(): void;
     onInputsUpdated(): void;
     onEvent(type: string): void;
     onDestroy(): void;
@@ -106,6 +107,14 @@ function factory() {
       }
       const mesh = this.mesh;
       const mat = mesh.material as Obj3;
+      // A standing screen is drawn on both sides (so it never vanishes, even for a moment before it has turned).
+      if (item.stand) standing.add(this);
+      else standing.delete(this);
+      const side = item.stand ? THREE.DoubleSide : THREE.FrontSide;
+      if (mat.side !== side) {
+        mat.side = side;
+        mat.needsUpdate = true;
+      }
       const key = JSON.stringify([item.kind, item.src, item.text, item.fit]);
       // Only the place or size changed: move the plane, keep its picture (no flicker).
       if (this.built === key) {
@@ -179,15 +188,18 @@ function factory() {
     this.onInit = function () {
       this.build();
     };
-    // Standing up in the room: turned to face the visitor every frame (around the upright axis only - it never tips).
-    this.onTick = function () {
-      const cam = this.context.camera;
-      if (!this.mesh || !this.inputs.item?.stand || !cam?.position) return;
+    // Standing up in the room: turned to face the visitor (around the upright axis only - it never tips).
+    this.face = function () {
+      const cam = cameraAt ?? this.context.camera?.position;
+      if (!this.mesh || !this.inputs.item?.stand || !cam) return;
       const THREE = this.context.three;
-      const target = new THREE.Vector3(cam.position.x, this.mesh.position.y, cam.position.z);
+      const target = new THREE.Vector3(cam.x, this.mesh.position.y, cam.z);
       if (target.distanceTo(this.mesh.position) < 0.05) return;
       this.mesh.up.set(0, 1, 0);
       this.mesh.lookAt(target);
+    };
+    this.onTick = function () {
+      this.face();
     };
     this.onInputsUpdated = function () {
       this.build();
@@ -199,6 +211,7 @@ function factory() {
       this.inputs.onClick?.(this.inputs.item.id);
     };
     this.onDestroy = function () {
+      standing.delete(this);
       this.dispose();
     };
   };
@@ -238,11 +251,17 @@ function place(THREE: Three, mesh: Obj3, s: { center: Point3; normal: Point3; w:
   if (item.stand) {
     mesh.position.set(s.center.x, s.center.y + (item.stand.lift ?? 0) + h / 2, s.center.z);
     mesh.up.set(0, 1, 0);
-    mesh.lookAt(mesh.position.clone().add(new THREE.Vector3(0, 0, 1)));
+    const cam = cameraAt ?? { x: s.center.x, y: 0, z: s.center.z + 1 };
+    mesh.lookAt(new THREE.Vector3(cam.x, mesh.position.y, cam.z));
   }
 }
 
 const registered = new WeakSet<object>();
+
+/** Where the camera stands now (from the SDK's own pose) - the standing surfaces turn to it. */
+let cameraAt: Point3 | null = null;
+/** The standing surfaces' components, to turn when the camera moves. */
+const standing = new Set<{ face(): void }>();
 
 /**
  * Keeps the 3D surfaces in Matterport's scene in step with the setup: one
@@ -295,6 +314,15 @@ export function useStaging3d(sdk: MpSdk | null, items: StagingItem[], onClick: (
     // `key` stands for the items.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scene, key]);
+  // The camera, from the SDK's own pose: every standing surface turns to it as the visitor moves.
+  useEffect(() => {
+    if (!sdk?.Camera?.pose) return;
+    const sub = sdk.Camera.pose.subscribe((pose) => {
+      cameraAt = pose.position;
+      for (const c of standing) c.face();
+    });
+    return () => sub.cancel();
+  }, [sdk]);
   // Everything goes when the tour does.
   useEffect(() => {
     const map = objects.current;

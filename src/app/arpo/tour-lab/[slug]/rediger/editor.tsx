@@ -432,7 +432,7 @@ export function TourEditor({
         frame.current?.contentWindow?.postMessage({ type, id }, location.origin);
       });
     return {
-      view: () => ask<{ href?: string; room?: string | null }>("tour-view"),
+      view: () => ask<{ href?: string; room?: string | null; position?: { x: number; y: number; z: number } }>("tour-view"),
       shot: () => ask<{ image?: string }>("tour-shot", 15000),
       storyPictures: (progress) => ask<{ done?: boolean }>("tour-stories", 10 * 60_000, progress),
       pick: () => ask<{ position?: { x: number; y: number; z: number }; normal?: { x: number; y: number; z: number }; ss?: number | null; room?: string | null }>("tour-pick", 120000),

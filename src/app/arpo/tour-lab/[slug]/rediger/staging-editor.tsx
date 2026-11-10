@@ -86,7 +86,7 @@ const stepBtn = "h-8 w-8 rounded-lg bg-white text-[16px] font-semibold text-[#00
 const onFloor = (p: Place) => p.normal.y > 0.8;
 
 /** Size and position with buttons: width and height (aspect kept, unless unlocked) and 5 cm moves along the surface. */
-function SizeControls({ item, set }: { item: StagingItem; set: (i: StagingItem) => void }) {
+function SizeControls({ item, set, preview }: { item: StagingItem; set: (i: StagingItem) => void; preview: PreviewApi }) {
   const [locked, setLocked] = useState(true);
   const [fitting, setFitting] = useState(false);
   const p = item.place;
@@ -110,14 +110,30 @@ function SizeControls({ item, set }: { item: StagingItem; set: (i: StagingItem) 
       </button>
     </div>
   );
-  const move = (dx: number, dy: number) => put(movePlace(p, dx, dy));
+  const move = async (dx: number, dy: number) => {
+    if (!item.stand) return put(movePlace(p, dx, dy));
+    // Standing up: as seen from where the preview stands - ← → to the side, ↑ further away, ↓ closer (25 cm at a time).
+    const cam = (await preview.view().catch(() => null))?.position;
+    let fx = 0;
+    let fz = -1;
+    if (cam) {
+      fx = p.center.x - cam.x;
+      fz = p.center.z - cam.z;
+      const l = Math.hypot(fx, fz) || 1;
+      fx /= l;
+      fz /= l;
+    }
+    const side = Math.sign(dx) * 0.25;
+    const away = Math.sign(dy) * 0.25;
+    put({ ...p, center: { x: round(p.center.x - fz * side + fx * away), y: p.center.y, z: round(p.center.z + fx * side + fz * away) } });
+  };
   const canStand = IN_3D.has(item.kind) && item.kind !== "treasure" && onFloor(p);
   const lift = item.stand?.lift ?? 0;
   const setLift = (v: number) => set({ ...item, stand: { ...item.stand, lift: Math.min(10, Math.max(0, round(v))) || undefined } });
   return (
     <Field
       title="Størrelse og placering"
-      hint={item.stand ? "Står op på det punkt på gulvet, du klikkede på, og vender altid mod den besøgende. Flyt-knapperne flytter den hen over gulvet." : "Ret størrelsen, til den dækker fladen - og skub den på plads 5 cm ad gangen."}
+      hint={item.stand ? "Står op på det punkt på gulvet, du klikkede på, og vender altid mod den besøgende. Pilene flytter den set derfra, hvor forhåndsvisningen står: ← → til siden, ↑ længere væk, ↓ tættere på (25 cm ad gangen)." : "Ret størrelsen, til den dækker fladen - og skub den på plads 5 cm ad gangen."}
     >
       <div className="space-y-2">
         {canStand && (
@@ -165,16 +181,16 @@ function SizeControls({ item, set }: { item: StagingItem; set: (i: StagingItem) 
         )}
         <div className="flex items-center gap-1.5">
           <span className="w-14 text-[13px] text-[#6e6e73]">Flyt</span>
-          <button type="button" className={stepBtn} aria-label="Flyt til venstre" onClick={() => move(-0.05, 0)}>
+          <button type="button" className={stepBtn} aria-label="Flyt til venstre" onClick={() => void move(-0.05, 0)}>
             ←
           </button>
-          <button type="button" className={stepBtn} aria-label="Flyt op" onClick={() => move(0, 0.05)}>
+          <button type="button" className={stepBtn} aria-label={item.stand ? "Længere væk" : "Flyt op"} title={item.stand ? "Længere væk" : undefined} onClick={() => void move(0, 0.05)}>
             ↑
           </button>
-          <button type="button" className={stepBtn} aria-label="Flyt ned" onClick={() => move(0, -0.05)}>
+          <button type="button" className={stepBtn} aria-label={item.stand ? "Tættere på" : "Flyt ned"} title={item.stand ? "Tættere på" : undefined} onClick={() => void move(0, -0.05)}>
             ↓
           </button>
-          <button type="button" className={stepBtn} aria-label="Flyt til højre" onClick={() => move(0.05, 0)}>
+          <button type="button" className={stepBtn} aria-label="Flyt til højre" onClick={() => void move(0.05, 0)}>
             →
           </button>
         </div>
@@ -335,7 +351,7 @@ export function StagingEditor({ config, edit, preview, focus }: { config: TourCo
                   </div>
                 </Field>
               )}
-              <SizeControls item={i} set={set} />
+              <SizeControls item={i} set={set} preview={preview} />
               <button
                 type="button"
                 disabled={placer.busy}

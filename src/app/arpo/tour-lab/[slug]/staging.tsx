@@ -237,9 +237,9 @@ export function StagingSound({ sdk, items, currentSs, frame }: { sdk: MpSdk | nu
       films.forEach((f, n) => {
         const b = els.current[n];
         if (!b) return;
-        // Just under the bottom edge's middle.
+        // Just under the bottom edge's middle - for a screen standing up in the room, under the screen itself (its corners lie on the floor).
         const c = f.corners;
-        const at = { x: (c[2].x + c[3].x) / 2, y: (c[2].y + c[3].y) / 2, z: (c[2].z + c[3].z) / 2 };
+        const at = f.stand && f.place ? { x: f.place.center.x, y: f.place.center.y + (f.stand.lift ?? 0), z: f.place.center.z } : { x: (c[2].x + c[3].x) / 2, y: (c[2].y + c[3].y) / 2, z: (c[2].z + c[3].z) / 2 };
         const seen = pose.mode.includes("inside") && inFront(pose, at);
         const q = seen ? conv.worldToScreen(at, pose, size) : null;
         const ok = q && q.x > 0 && q.x < size.w && q.y > 0 && q.y < size.h - 30;

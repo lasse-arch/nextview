@@ -111,7 +111,7 @@ export function Choice<T extends string>({ value, options, onChange }: { value: 
 
 /** The live preview, as the editors use it: where it stands, a photo of what it shows, and showing a place. */
 export type PreviewApi = {
-  view: () => Promise<{ href?: string; room?: string | null; error?: string }>;
+  view: () => Promise<{ href?: string; room?: string | null; position?: { x: number; y: number; z: number }; error?: string }>;
   shot: () => Promise<{ image?: string; error?: string }>;
   /** Visits every story room in the preview and saves its picture; `progress` hears "3/8: Spisesalen". */
   storyPictures: (progress: (text: string) => void) => Promise<{ done?: boolean; error?: string }>;
