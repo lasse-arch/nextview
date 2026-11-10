@@ -46,8 +46,9 @@ export function PlaceCard({
       // "Læs mere" only for more than a line and a half hidden - a few words more are simply shown.
       const line = parseFloat(getComputedStyle(el).lineHeight) || 20;
       const hidden = el.scrollHeight - el.clientHeight;
-      setClipped(hidden > line * 1.5);
-      if (hidden > 1 && hidden <= line * 1.5) setOpen(true);
+      // Only a sliver missing (under half a line): shown whole - else "Læs mere" (a phone shows 2 lines first).
+      setClipped(hidden > line * 0.5);
+      if (hidden > 1 && hidden <= line * 0.5) setOpen(true);
     });
     ro.observe(el);
     return () => ro.disconnect();
@@ -232,22 +233,23 @@ export const CARDS_CSS = `
 .pc-stor h3{font-size:23px}.pc-stor p{font-size:16px}
 /* Phones: sized by the screen (an iPhone mini gets a smaller card than a Pro Max), never more than a third of the height. */
 @media (max-width:760px){
-  .pc{left:10px;bottom:calc(76px + env(safe-area-inset-bottom,0px));width:min(78vw,300px);padding:clamp(10px,3vw,13px) clamp(12px,3.6vw,16px);max-height:calc(100dvh - 170px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));overflow-y:auto;overscroll-behavior:contain;border-radius:12px}
+  .pc{left:10px;bottom:calc(76px + env(safe-area-inset-bottom,0px));width:min(76vw,290px);padding:clamp(10px,3vw,13px) clamp(12px,3.6vw,16px);max-height:calc(100dvh - 170px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));overflow-y:auto;overscroll-behavior:contain;border-radius:12px}
   /* As high as its contents (the text is cut to a few lines, Læs mere shows the rest) - it only scrolls if it would reach the top bar. */
-  .pc h3{font-size:clamp(15px,4.3vw,17px);margin-bottom:5px}
-  .pc p{font-size:clamp(12.5px,3.5vw,13.5px);line-height:1.45;margin-bottom:6px}
-  .pc p.pc-klip{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+  .pc h3{font-size:clamp(14.5px,4vw,16px);margin-bottom:4px}
+  .pc p{font-size:clamp(12px,3.3vw,13px);line-height:1.42;margin-bottom:6px}
+  .pc p.pc-klip{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
   .pc-mere-mobil{display:block;margin:-2px 0 4px;padding:4px 0;border:0;background:none;font:inherit;font-size:13px;font-weight:800;color:var(--c-accent);cursor:pointer}
   /* People in one low row: a small photo with the name and role beside it - not a tall column. */
   .pc-folk{gap:10px;margin:2px 0 8px}
   .pc-folk figure,.pc-folk-1 figure{flex:1 1 0;min-width:0;flex-direction:row;align-items:center;gap:7px;text-align:left}
-  .pc-folk img{width:30px;height:30px;flex:none}
+  .pc-folk img{width:28px;height:28px;flex:none}
   .pc-folk figcaption{min-width:0}
   .pc-folk span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .pc-folk-1 figure{gap:9px}
   .pc-folk b{font-size:11.5px}
   .pc-folk span{font-size:10.5px}
-  .pc-btn{font-size:12.5px;padding:5px 11px;border-width:1.5px}
+  .pc-btns{gap:5px}
+  .pc-btn{font-size:12px;padding:4px 10px;border-width:1.5px}
   .pc-luk{top:7px;right:7px;width:26px;height:26px;line-height:26px;font-size:16px}
   /* Read aloud: a round speaker beside the × - not a whole line of words above the text. */
   .pc .pc-laes{position:absolute;top:7px;right:38px;width:26px;height:26px;margin:0;padding:0;justify-content:center;border-radius:50%}
@@ -259,7 +261,7 @@ export const CARDS_CSS = `
   .pc-lille p{font-size:clamp(12px,3.3vw,13px)}
   .pc-lille p.pc-klip{-webkit-line-clamp:2}
   .pc-stor{width:min(88vw,340px)}
-  .pc-stor p.pc-klip{-webkit-line-clamp:4}
+  .pc-stor p.pc-klip{-webkit-line-clamp:3}
 }
 /* A phone on its side: low and wide - the card to the left, small, never higher than the screen. */
 @media (max-height:500px) and (min-width:500px){
