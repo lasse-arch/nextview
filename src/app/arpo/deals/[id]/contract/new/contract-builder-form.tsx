@@ -109,6 +109,7 @@ export function ContractBuilderForm({
           setError(result.error);
           return;
         }
+        if (result.warning) alert(result.warning);
         router.push(`/arpo/deals/${dealId}`);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Der opstod en fejl.");
@@ -214,6 +215,56 @@ export function ContractBuilderForm({
             </span>
           </span>
         </label>
+        <label className="col-span-2 flex items-start gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
+          <input
+            type="checkbox"
+            checked={products.autoRenew !== false}
+            onChange={(e) => setProducts((p) => ({ ...p, autoRenew: e.target.checked }))}
+            className="mt-0.5 h-4 w-4"
+          />
+          <span>
+            <span className="font-medium text-slate-800">Forlænges automatisk</span>
+            <span className="block text-xs text-slate-500">
+              Aftalen fortsætter med en ny periode, til den bliver opsagt. Slå fra, hvis aftalen skal ophøre, når
+              bindingsperioden er slut - så står det i kontrakten (uden opsigelsesvarsel), Arpo stopper faktureringen ved
+              udløb, og sælgeren får en opgave 3 måneder før om at tale med kunden om at forlænge.
+            </span>
+          </span>
+        </label>
+        <div className="col-span-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
+          <label className="flex items-start gap-2">
+            <input
+              type="checkbox"
+              checked={Boolean(products.reviewer)}
+              onChange={(e) => setProducts((p) => ({ ...p, reviewer: e.target.checked ? { name: "", email: "" } : null }))}
+              className="mt-0.5 h-4 w-4"
+            />
+            <span>
+              <span className="font-medium text-slate-800">Send også til gennemsyn</span>
+              <span className="block text-xs text-slate-500">
+                En person mere får kontrakten som PDF i en mail fra din Gmail (kontaktpersonen på CC), så I begge kan
+                læse den. Kun kontaktpersonen skriver under.
+              </span>
+            </span>
+          </label>
+          {products.reviewer && (
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <input
+                value={products.reviewer.name}
+                onChange={(e) => setProducts((p) => ({ ...p, reviewer: { name: e.target.value, email: p.reviewer?.email ?? "" } }))}
+                placeholder="Navn"
+                className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+              />
+              <input
+                type="email"
+                value={products.reviewer.email}
+                onChange={(e) => setProducts((p) => ({ ...p, reviewer: { name: p.reviewer?.name ?? "", email: e.target.value } }))}
+                placeholder="E-mail"
+                className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+              />
+            </div>
+          )}
+        </div>
         <label className="col-span-2 flex items-start gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
           <input
             type="checkbox"

@@ -79,6 +79,11 @@ export type ContractProducts = {
    * in its marketing. On unless switched off (false) - also on contracts
    * saved before this existed. */
   referenceUse?: boolean;
+  /** Section 3: the agreement renews itself after the binding period (on, as before) - or, false, ends there
+   * (Deal.autoRenew, lib/fixed-term.ts). Missing on contracts made before this existed = renews. */
+  autoRenew?: boolean;
+  /** One more person who gets the contract to read (a PDF from the seller's Gmail) - only the contact person signs. */
+  reviewer?: { name: string; email: string } | null;
 };
 
 function splitZipCity(address: string | null): { street: string; zipCity: string } {
@@ -305,6 +310,8 @@ export type ContractHtmlData = {
   establishmentOnApproval: boolean;
   /** Section 7 "Brug som reference" is in the contract. */
   referenceUse: boolean;
+  /** Section 3 says the agreement renews itself (else: it ends with the binding period). */
+  autoRenew: boolean;
   bindingMonths: number;
   noticeMonths: number;
   /** How many of the 4 products are selected - drives singular/plural wording ("the service" vs "the services"). */
@@ -375,6 +382,7 @@ export function buildContractHtmlData(deal: DealForContract, products: ContractP
     additionalTerms: products.additionalTerms,
     establishmentOnApproval: Boolean(products.establishmentOnApproval),
     referenceUse: products.referenceUse !== false,
+    autoRenew: products.autoRenew !== false,
     bindingMonths: products.bindingMonths,
     noticeMonths: products.noticeMonths,
     selectedCount,

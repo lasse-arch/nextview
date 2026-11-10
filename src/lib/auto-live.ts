@@ -2,6 +2,7 @@ import "server-only";
 import { startStatsIfFirst } from "@/lib/tour-stats";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
+import { syncFixedTermEnd } from "@/lib/fixed-term";
 import { logActivity } from "@/lib/activity";
 import { normalizeEmail } from "@/lib/customer-login";
 import { releaseEstablishmentOnLive } from "@/lib/establishment-approval";
@@ -86,6 +87,7 @@ export async function goLiveAfterApproval(slug: string): Promise<void> {
   await releaseEstablishmentOnLive(deal.id, previous, "LIVE", deal.ownerId);
   await recalcCommission(deal.id).catch(() => {});
   await sendWelcomeMailOnLive(deal.id, previous, "LIVE", deal.ownerId);
+  await syncFixedTermEnd(deal.id).catch(() => {});
   await prisma.note.create({ data: { dealId: deal.id, authorId: deal.ownerId, kind: "MANUAL", body: `Godkendt af kunden: touren er udgivet, kunden er sat live, og der er givet login til kundesiden for ${email}.` } }).catch(() => {});
   await ringBell({ kind: "approved", title: `Live: ${name}`, text: "Kunden godkendte touren - den er udgivet, kunden er sat live, og velkomstmailen er sendt.", href: `/arpo/deals/${deal.id}`, tourSlug: slug }).catch(() => {});
   revalidatePath(`/arpo/deals/${deal.id}`);

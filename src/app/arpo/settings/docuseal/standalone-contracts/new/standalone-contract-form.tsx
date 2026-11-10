@@ -258,6 +258,18 @@ export function StandaloneContractForm() {
         <label className="col-span-2 flex items-start gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
           <input
             type="checkbox"
+            checked={products.autoRenew !== false}
+            onChange={(e) => setProducts((p) => ({ ...p, autoRenew: e.target.checked }))}
+            className="mt-0.5 h-4 w-4"
+          />
+          <span>
+            <span className="font-medium text-slate-800">Forlænges automatisk</span>
+            <span className="block text-xs text-slate-500">Slå fra, hvis aftalen skal ophøre, når bindingsperioden er slut - så står det i kontrakten (uden opsigelsesvarsel).</span>
+          </span>
+        </label>
+        <label className="col-span-2 flex items-start gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
+          <input
+            type="checkbox"
             checked={products.referenceUse !== false}
             onChange={(e) => setProducts((p) => ({ ...p, referenceUse: e.target.checked }))}
             className="mt-0.5 h-4 w-4"

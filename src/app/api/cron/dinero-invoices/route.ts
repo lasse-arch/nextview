@@ -2,6 +2,7 @@ import { cronAuthorized } from "@/lib/cron-auth";
 import { NextResponse, type NextRequest } from "next/server";
 import { runQuarterlyInvoiceGeneration, runAutoChurn, checkAllPendingPayments } from "@/lib/invoice-service";
 import { isIntegrationEnabled } from "@/lib/integration-settings";
+import { syncAllFixedTermEnds } from "@/lib/fixed-term";
 
 export async function GET(request: NextRequest) {
 
@@ -19,8 +20,10 @@ export async function GET(request: NextRequest) {
 
   // Bill any final due period up to a deal's contract end date before
   // churning it, so churn never pre-empts the last invoice.
+  // Contracts that end with their binding period: their end dates first, so no invoice goes past it.
+  const fixedTerms = await syncAllFixedTermEnds().catch(() => 0);
   const summary = await runQuarterlyInvoiceGeneration();
   const churn = await runAutoChurn();
   const payments = await checkAllPendingPayments();
-  return NextResponse.json({ ...summary, ...churn, payments });
+  return NextResponse.json({ ...summary, ...churn, payments, fixedTerms });
 }

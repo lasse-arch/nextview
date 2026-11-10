@@ -56,6 +56,8 @@ type Labels = {
   additionalTermsTitle: string;
   section3Title: string;
   section3Body: string;
+  /** Section 3 when the agreement does not renew itself. */
+  section3BodyFixed: string;
   bindingLabel: string;
   noticeLabel: string;
   monthsSuffix: string;
@@ -158,6 +160,8 @@ const LABELS: Record<ContractLanguage, Labels> = {
     section3Title: "3) Løbetid og opsigelse",
     section3Body:
       "Aftalen træder i kraft ved underskrift af begge parter. Bindingsperioden starter, når det/de valgte produkt(er) er leveret til kunden. Aftalen forlænges automatisk med en periode af samme længde som bindingsperioden, medmindre den opsiges skriftligt med det opsigelsesvarsel, der står herunder, til udgangen af den løbende periode.",
+    section3BodyFixed:
+      "Aftalen træder i kraft ved underskrift af begge parter. Bindingsperioden starter, når det/de valgte produkt(er) er leveret til kunden. Aftalen forlænges ikke automatisk: den ophører ved bindingsperiodens udløb, medmindre parterne skriftligt aftaler at forlænge den. Det er derfor ikke nødvendigt at opsige aftalen.",
     bindingLabel: "Bindingsperiode",
     noticeLabel: "Opsigelsesvarsel",
     monthsSuffix: "måneder",
@@ -265,6 +269,8 @@ const LABELS: Record<ContractLanguage, Labels> = {
     section3Title: "3) Term and Termination",
     section3Body:
       "This agreement takes effect once signed by both parties. The binding period begins once the selected product(s) have been delivered to the Customer. The agreement is automatically renewed for a period of the same length as the binding period, unless it is terminated in writing with the notice period stated below, effective at the end of the current period.",
+    section3BodyFixed:
+      "This agreement takes effect once signed by both parties. The binding period begins once the selected product(s) have been delivered to the Customer. The agreement is not renewed automatically: it ends when the binding period expires, unless the parties agree in writing to extend it. Notice of termination is therefore not required.",
     bindingLabel: "Binding period",
     noticeLabel: "Notice period",
     monthsSuffix: "months",
@@ -517,9 +523,9 @@ export function buildContractHtml(data: ContractHtmlData, language: ContractLang
 
   <div class="section">
     <p class="section-title">${esc(t.section3Title)}</p>
-    <p>${esc(t.section3Body)}</p>
+    <p>${esc(data.autoRenew ? t.section3Body : t.section3BodyFixed)}</p>
     ${fieldRow(t.bindingLabel, `${data.bindingMonths} ${t.monthsSuffix}`)}
-    ${fieldRow(t.noticeLabel, `${data.noticeMonths} ${t.monthsSuffix}`)}
+    ${data.autoRenew ? fieldRow(t.noticeLabel, `${data.noticeMonths} ${t.monthsSuffix}`) : ""}
   </div>
 
   <div class="section">

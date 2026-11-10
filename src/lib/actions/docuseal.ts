@@ -21,6 +21,8 @@ import { completeContractFollowUpTasks, createContractFollowUpTask } from "@/lib
 import { logActivity } from "@/lib/activity";
 import { dealName, totalContractValue } from "@/lib/labels";
 import { contactNameProblem } from "@/lib/contact-name";
+import { sendDealEmail } from "@/lib/deal-email-send";
+import { syncFixedTermEnd } from "@/lib/fixed-term";
 
 /**
  * Pre-flight check before opening the contract-builder page: the master
@@ -59,7 +61,7 @@ export async function checkDealReadyForContract(
 export async function buildAndSendContract(
   dealId: string,
   products: ContractProducts
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<{ ok: true; warning?: string } | { ok: false; error: string }> {
   try {
     const sender = await requireUser();
 
@@ -92,6 +94,13 @@ export async function buildAndSendContract(
     }
     if (!products.noticeMonths || products.noticeMonths <= 0) {
       throw new Error("Angiv et gyldigt opsigelsesvarsel.");
+    }
+    // The one who reads it too (only the contact person signs).
+    const reviewer = products.reviewer ? { name: products.reviewer.name.trim().slice(0, 120), email: products.reviewer.email.trim().toLowerCase().slice(0, 200) } : null;
+    if (reviewer) {
+      if (!reviewer.name) throw new Error("Skriv navnet på den, der skal have kontrakten til gennemsyn.");
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(reviewer.email)) throw new Error("E-mailen til gennemsyn ligner ikke en e-mail.");
+      if (reviewer.email === deal.contactEmail.trim().toLowerCase()) throw new Error("Den, der skal have kontrakten til gennemsyn, er kontaktpersonen selv - vælg en anden.");
     }
 
     if (deal.docusealSubmissionId && deal.contractStatus !== "NONE") {
@@ -145,6 +154,7 @@ export async function buildAndSendContract(
         noticePeriodMonths: products.noticeMonths,
         additionalTerms: products.additionalTerms || null,
         establishmentAwaitingApproval: Boolean(products.establishmentOnApproval),
+        autoRenew: products.autoRenew !== false,
         soldProduct: selectedKeys.map((key) => PRODUCT_LABELS[key]).join(", "),
         contractProducts: products,
       },
@@ -152,6 +162,23 @@ export async function buildAndSendContract(
 
     await prisma.contractEvent.create({ data: { dealId, type: "SENT", occurredAt: new Date() } });
     await createContractFollowUpTask(dealId, deal.ownerId, sender.id);
+    // Ends with the binding period (not renewed): its end date and the seller's reminder, once billing has started.
+    await syncFixedTermEnd(dealId).catch(() => {});
+
+    // The reader: the contract as a PDF from the sender's own Gmail, the contact person on CC.
+    let warning: string | undefined;
+    if (reviewer) {
+      const company = deal.displayName || deal.companyName;
+      const first = reviewer.name.split(/\s+/)[0];
+      const en = products.language === "en";
+      const subject = en ? `Contract for review: Nextview360 x ${company}` : `Kontrakt til gennemsyn: Nextview360 x ${company}`;
+      const body = en
+        ? `Hi ${first}\n\n${deal.contactName} has received the agreement between ${company} and Nextview360 for signing. You're getting it here to read, so you can both go through it - you don't need to sign it yourself.\n\nThe agreement is attached as a PDF. If you have any questions, just reply to this email${sender.phone ? ` or call me on ${sender.phone}` : ""}.`
+        : `Hej ${first}\n\n${deal.contactName} har fået aftalen mellem ${company} og Nextview360 tilsendt til underskrift. Du får den her til gennemsyn, så I begge kan læse den - du skal ikke selv skrive under.\n\nAftalen er vedhæftet som PDF. Har du spørgsmål, så svar bare på denne mail${sender.phone ? ` eller ring til mig på ${sender.phone}` : ""}.`;
+      const pdf = new File([new Uint8Array(pdfBuffer)], `${documentName}.pdf`, { type: "application/pdf" });
+      const sent = await sendDealEmail(sender, dealId, subject, body, [], [pdf], undefined, reviewer.email, [deal.contactEmail], undefined, { followUpTask: false, lang: en ? "en" : "da" }).catch((err: unknown) => ({ ok: false as const, error: err instanceof Error ? err.message : String(err) }));
+      if (!sent.ok) warning = `Kontrakten er sendt til underskrift, men mailen til ${reviewer.name} kom ikke af sted: ${sent.error}`;
+    }
     await logActivity({
       type: "CONTRACT_SENT",
       message: `${sender.name} sendte en kontrakt til ${dealName(deal)}. ${contractSummary(products)}`,
@@ -161,7 +188,7 @@ export async function buildAndSendContract(
 
     revalidatePath(`/arpo/deals/${dealId}`);
     revalidatePath("/arpo/opgaver");
-    return { ok: true };
+    return { ok: true, warning };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Der opstod en fejl ved afsendelse af kontrakten." };
   }

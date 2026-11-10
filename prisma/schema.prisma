@@ -514,6 +514,9 @@ model Deal {
 
   soldProduct   String?
   bindingMonths Int?
+  /// The contract renews itself after the binding period (as most do) - or, when false ("Forlænges automatisk" off
+  /// on the contract), ends there: contractEndDate is then the binding period's end (lib/fixed-term.ts).
+  autoRenew     Boolean @default(true)
   saleAmount    Int?
   soldAt        DateTime?
   filmedAt      DateTime?

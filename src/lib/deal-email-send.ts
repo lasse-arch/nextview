@@ -85,7 +85,9 @@ export async function sendDealEmail(
   /** More addresses on CC (the mail generator: the ones typed after the first). */
   extraCc: string[] = [],
   /** The tracking pixel's id to use (the mail generator keeps the same on its own record). */
-  trackingIdGiven?: string
+  trackingIdGiven?: string,
+  /** followUpTask: false = no "follow up" task (a mail that isn't a question, e.g. the contract to read); lang: the sign-off's language. */
+  opts: { followUpTask?: boolean; lang?: "da" | "en" } = {}
 ): Promise<{ ok: true } | { ok: false; error: string }> {
 
   const totalBytes = files.reduce((sum, f) => sum + f.size, 0);
@@ -139,7 +141,8 @@ export async function sendDealEmail(
   // one stacked under it. Format matches the normal Nextview360 sign-off
   // (bold name, "Nextview360", phone line) already used on visitor-stats
   // report emails.
-  const alreadyHasSignature = /med venlig hilsen/i.test(body);
+  const alreadyHasSignature = /med venlig hilsen|best regards|kind regards/i.test(body);
+  const regards = opts.lang === "en" ? "Best regards" : "Med venlig hilsen";
   const sellerName = [user.name, user.lastName].filter(Boolean).join(" ");
   const signatureLines = [sellerName, "Nextview360", user.phone ? `Tlf: ${user.phone}` : null].filter(
     (line): line is string => Boolean(line)
@@ -148,8 +151,8 @@ export async function sendDealEmail(
   const signOff = alreadyHasSignature
     ? { text: "", html: "" }
     : await mailSignOff(account, {
-        text: `\n\nMed venlig hilsen\n${signatureLines.join("\n")}`,
-        html: `<p>Med venlig hilsen<br><b>${sellerName}</b>${signatureLines
+        text: `\n\n${regards}\n${signatureLines.join("\n")}`,
+        html: `<p>${regards}<br><b>${sellerName}</b>${signatureLines
           .slice(1)
           .map((line) => `<br>${line}`)
           .join("")}</p>`,
@@ -210,7 +213,7 @@ export async function sendDealEmail(
     await logEmailTimeEntry(dealId, user.id);
   }
 
-  await createEmailFollowUpTask(dealId, user.id, subject);
+  if (opts.followUpTask !== false) await createEmailFollowUpTask(dealId, user.id, subject);
 
   await logActivity({
     type: "EMAIL_SENT",

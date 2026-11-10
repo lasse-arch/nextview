@@ -10,6 +10,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { addMonths } from "date-fns";
 import { prisma } from "@/lib/db";
+import { syncFixedTermEnd } from "@/lib/fixed-term";
 import { normalizeEanNumber } from "@/lib/ean";
 import { requireUser } from "@/lib/auth";
 import { recalcCommission } from "@/lib/commission-service";
@@ -305,6 +306,7 @@ async function updateDealInner(
       ...stageDateUpdates,
     },
   });
+  await syncFixedTermEnd(dealId).catch(() => {});
 
   // A manually-corrected sold product/price (via "Ret manuelt") should also
   // show up in "Ydelser" below, not just the auto-fill from the contract
@@ -425,6 +427,8 @@ export async function updateDealStage(dealId: string, newStage: DealStage) {
   }
   await releaseEstablishmentOnLive(dealId, existing.stage, newStage, user.id);
   await sendWelcomeMailOnLive(dealId, existing.stage, newStage, user.id);
+  // A contract that isn't renewed: its end date once billing has started (lib/fixed-term.ts).
+  await syncFixedTermEnd(dealId).catch(() => {});
 
   revalidatePath("/arpo/deals");
   revalidatePath(`/arpo/deals/${dealId}`);

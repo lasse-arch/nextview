@@ -63,6 +63,12 @@ export async function getUnreadNewsCount(userId: string, newsReadAt: Date | null
 const DEFAULT_POSTS: { title: string; body: string; minutesAgo: number; screenshotUrl: string }[] = [
   {
     minutesAgo: 0,
+    title: "Kontrakten: vælg om aftalen forlænges automatisk - og send den til en mere til gennemsyn",
+    body: "Når du laver kontrakten på en deal, er der to nye valg.\n\n\"Forlænges automatisk\" er slået til som altid. Slår du det fra, står der i kontrakten, at aftalen ophører ved bindingsperiodens udløb (uden opsigelsesvarsel). Arpo sætter så aftalens ophør til bindingsperiodens slut, når kunden er gået live, stopper faktureringen dér, og du får en opgave 3 måneder før: \"Aftalen med … udløber … - tal med dem om at forlænge.\"\n\n\"Send også til gennemsyn\": skriv navn og e-mail på en person mere - fx en kollega eller chef hos kunden. De får kontrakten som PDF i en mail fra din egen Gmail med kontaktpersonen på CC, så I begge kan læse den. Det er stadig kun kontaktpersonen, der skriver under i DocuSeal.",
+    screenshotUrl: "/news/kontrakt-forlaengelse.png",
+  },
+  {
+    minutesAgo: 0,
     title: "Spørg nextviewAI: svar på spørgsmål om systemet - og hjælp til indvendinger",
     body: "Under Salg → Generator er der en ny fane: Spørg. Her kan nye og erfarne sælgere spørge nextviewAI om alt fra \"Hvad koster en tour?\" og \"Hvordan virker Find vej?\" til \"Hvilke kunder kan jeg vise en efterskole?\" - og få hjælp, når kunden siger \"Det er for dyrt\", \"Vi har allerede billeder\" eller \"Vi skal lige tænke over det\". Ved en indvending får du et forslag til, hvad du kan sige: anerkend, et spørgsmål der finder den egentlige grund, svaret med funktioner og en kunde i samme branche, og næste skridt.\n\nnextviewAI svarer kun ud fra vores egne ord: det nye nextview360.dk (funktioner, priser og FAQ), tour-drejebogen, alle indlæg her på Nyheder, de kunder der er online, og teamets egne svar. Ved den ikke noget, siger den det - den opfinder ikke priser, tal eller kunder.\n\nEr et svar godt, så tryk \"Gem i FAQ\" - du kan rette det, før du gemmer. Teamets FAQ står ved siden af (spørgsmål og indvendinger, med søgning), og nextviewAI bruger de gemte svar først næste gang. Den, der har gemt et svar, eller en admin, kan rette og slette det.\n\nSikkerhed: kun teamet kan bruge fanen, højst 60 spørgsmål i timen pr. sælger, og af kundedata får nextviewAI kun navn, branche, by og tour-link på de kunder, der er online (plus det, du selv skriver i spørgsmålet).",
     screenshotUrl: "/news/salgshjaelp.png",
