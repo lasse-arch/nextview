@@ -1943,3 +1943,23 @@ model MeetingBrief {
   @@index([meetingKey])
   @@index([createdAt])
 }
+
+/// Where a tour visit came from - roughly (the visitor's town, from the
+/// network, rounded to about 10 km; never the IP), once per visit - for the
+/// map of Denmark in the tour's statistics.
+model TourVisitPlace {
+  id        String   @id @default(cuid())
+  tourSlug  String
+  session   String
+  /// ISO country code, e.g. "DK".
+  country   String?
+  /// The country's region code - in Denmark 81 Nordjylland, 82 Midtjylland, 83 Syddanmark, 84 Hovedstaden, 85 Sjælland.
+  region    String?
+  city      String?
+  lat       Float?
+  lng       Float?
+  createdAt DateTime @default(now())
+
+  @@unique([tourSlug, session])
+  @@index([tourSlug, createdAt])
+}

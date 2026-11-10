@@ -22,6 +22,28 @@ export const ACTION = `(name IN ('cta_click', 'live_book', 'contact_form') OR (n
 export const SHOWN = `(NOT bool_or(name = 'tour_embed') OR bool_or(name IN ('tour_seen', 'tour_use')))`;
 const ENGAGED = `(bool_or(name = 'tour_use') OR (NOT bool_or(name = 'tour_embed') AND bool_or(name IN ('menu_click','place_click','room_view','guide_start','welcome_choice','route_start','info_open','place_card_view'))))`;
 
+/** Denmark's five regions, by their code (ISO 3166-2:DK), north to south-east. */
+export const DK_REGIONS: [code: string, name: string][] = [
+  ["81", "Nordjylland"],
+  ["82", "Midtjylland"],
+  ["83", "Syddanmark"],
+  ["85", "Sjælland"],
+  ["84", "Hovedstaden"],
+];
+
+export type VisitGeo = {
+  /** Visits whose place is known. */
+  located: number;
+  /** Each Danish region (all five, also at 0) - and how many visits from there. */
+  regions: { code: string; label: string; count: number }[];
+  /** Visits from Denmark whose region isn't known. */
+  denmarkElse: number;
+  /** Other countries, most first. */
+  abroad: { label: string; count: number }[];
+  /** Danish towns (rounded to ~10 km) for the dots on the map. */
+  points: { lat: number; lng: number; city: string | null; count: number }[];
+};
+
 export type TourStats = {
   days: number;
   /** The chosen period ("YYYY-MM-DD", both included) - null for "the last `days` days". */
@@ -44,6 +66,8 @@ export type TourStats = {
   menu: { opened: number; groups: { label: string; count: number }[] };
   /** Where visitors went around inside: the rooms they came to (however they got there). */
   rooms: { label: string; count: number }[];
+  /** Where in Denmark (and the world) the visits came from - counted since it began being kept. */
+  geo: VisitGeo;
   /** Where they stayed longest: the typical (median) seconds in each room, and in how many visits. */
   roomTime: { label: string; seconds: number; count: number }[];
   /** What they opened along the way: points on the aerial photo, info points, place cards, 360° photos. */
@@ -192,6 +216,7 @@ export async function tourStats(slug: string, range: number | StatsRange = 30): 
     ),
   ]);
   const s = sessions[0];
+  const geo = await visitGeo(slug, since, until);
   const visits = Number(s?.visits ?? 0);
   const byDay = new Map(perDay.map((d) => [d.day.toISOString().slice(0, 10), d]));
   return {
@@ -221,6 +246,7 @@ export async function tourStats(slug: string, range: number | StatsRange = 30): 
     },
     menu: { opened: Number(menuOpened[0]?.n ?? 0), groups: menuGroups },
     rooms,
+    geo,
     roomTime: roomTime.map((r) => ({ label: r.label, seconds: Math.round(r.seconds), count: Number(r.count) })),
     opened,
     guide: {
@@ -231,6 +257,58 @@ export async function tourStats(slug: string, range: number | StatsRange = 30): 
       byGuide: byGuide.length > 1 ? byGuide.map((r) => ({ guide: r.guide, started: Number(r.started), completed: Number(r.completed) })) : undefined,
       stops: guideStopRows.length ? guideStopRows.map((r) => ({ title: r.title, seen: Number(r.seen), medianSeconds: Math.round(Number(r.median ?? 0)), voice: Number(r.voice) })) : undefined,
     },
+  };
+}
+
+/** Where the visits shown in the period came from (TourVisitPlace, kept since the map began). */
+async function visitGeo(slug: string, since: Date, until: Date): Promise<VisitGeo> {
+  const rows = await prisma.$queryRawUnsafe<{ country: string | null; region: string | null; city: string | null; lat: number | null; lng: number | null; count: bigint }[]>(
+    `WITH s AS (SELECT session FROM "TourEvent" WHERE "tourSlug" = $1 AND "createdAt" >= $2 AND "createdAt" < $3 GROUP BY session HAVING ${SHOWN})
+     SELECT p.country, p.region, p.city, p.lat, p.lng, count(*) AS count
+     FROM "TourVisitPlace" p JOIN s ON s.session = p.session WHERE p."tourSlug" = $1
+     GROUP BY 1, 2, 3, 4, 5 ORDER BY count DESC LIMIT 3000`,
+    slug,
+    since,
+    until,
+  );
+  const byRegion = new Map<string, number>();
+  const byCountry = new Map<string, number>();
+  const points = new Map<string, { lat: number; lng: number; city: string | null; count: number }>();
+  let located = 0;
+  let denmarkElse = 0;
+  for (const r of rows) {
+    const n = Number(r.count);
+    located += n;
+    if (r.country === "DK") {
+      const code = (r.region ?? "").replace(/^DK-/, "");
+      if (DK_REGIONS.some(([c]) => c === code)) byRegion.set(code, (byRegion.get(code) ?? 0) + n);
+      else denmarkElse += n;
+      // Only dots that fall on Denmark (Bornholm included).
+      if (r.lat != null && r.lng != null && r.lat > 54.4 && r.lat < 57.9 && r.lng > 7.8 && r.lng < 15.3) {
+        const key = `${r.lat},${r.lng}`;
+        const p = points.get(key) ?? { lat: r.lat, lng: r.lng, city: r.city, count: 0 };
+        p.count += n;
+        points.set(key, p);
+      }
+    } else {
+      const c = r.country ?? "?";
+      byCountry.set(c, (byCountry.get(c) ?? 0) + n);
+    }
+  }
+  const names = new Intl.DisplayNames(["da"], { type: "region" });
+  const countryName = (c: string) => {
+    try {
+      return c === "?" ? "Ukendt land" : (names.of(c) ?? c);
+    } catch {
+      return c;
+    }
+  };
+  return {
+    located,
+    regions: DK_REGIONS.map(([code, label]) => ({ code, label, count: byRegion.get(code) ?? 0 })),
+    denmarkElse,
+    abroad: [...byCountry].sort((a, b) => b[1] - a[1]).map(([c, count]) => ({ label: countryName(c), count })),
+    points: [...points.values()].sort((a, b) => b.count - a.count).slice(0, 400),
   };
 }
 

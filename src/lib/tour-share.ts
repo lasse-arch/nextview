@@ -26,9 +26,11 @@ export type ReportShare = {
   roomTime: boolean;
   /** What they opened: points on the aerial photo, info points, place cards, 360° photos. */
   opened: boolean;
+  /** Where the visits came from: the map of Denmark, by region. */
+  geo: boolean;
 };
 
-export const DEFAULT_SHARE: ReportShare = { days: 30, visits: true, engaged: true, duration: true, leads: "auto", actions: "auto", perDay: true, places: true, sources: false, live: true, rooms: true, roomTime: true, opened: true };
+export const DEFAULT_SHARE: ReportShare = { days: 30, visits: true, engaged: true, duration: true, leads: "auto", actions: "auto", perDay: true, places: true, sources: false, live: true, rooms: true, roomTime: true, opened: true, geo: true };
 
 export const shareOf = (raw: unknown): ReportShare => ({ ...DEFAULT_SHARE, ...(raw && typeof raw === "object" ? (raw as Partial<ReportShare>) : {}) });
 

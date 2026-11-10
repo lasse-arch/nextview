@@ -13,6 +13,25 @@ const sumRows = (lists: { label: string; count: number }[][]) => {
   return [...m].map(([label, count]) => ({ label, count })).sort((a, b) => b.count - a.count);
 };
 
+function mergeGeo(all: (TourStats["geo"] | undefined)[]): TourStats["geo"] {
+  const gs = all.filter((g): g is TourStats["geo"] => Boolean(g));
+  const points = new Map<string, { lat: number; lng: number; city: string | null; count: number }>();
+  for (const g of gs)
+    for (const p of g.points) {
+      const k = `${p.lat},${p.lng}`;
+      const x = points.get(k) ?? { ...p, count: 0 };
+      x.count += p.count;
+      points.set(k, x);
+    }
+  return {
+    located: gs.reduce((n, g) => n + g.located, 0),
+    regions: (gs[0]?.regions ?? []).map((r) => ({ ...r, count: gs.reduce((n, g) => n + (g.regions.find((x) => x.code === r.code)?.count ?? 0), 0) })),
+    denmarkElse: gs.reduce((n, g) => n + g.denmarkElse, 0),
+    abroad: sumRows(gs.map((g) => g.abroad)),
+    points: [...points.values()].sort((a, b) => b.count - a.count).slice(0, 400),
+  };
+}
+
 export function mergeStats(all: TourStats[]): TourStats | null {
   if (!all.length) return null;
   if (all.length === 1) return all[0];
@@ -46,6 +65,7 @@ export function mergeStats(all: TourStats[]): TourStats | null {
     },
     menu: { opened: all.reduce((n, s) => n + s.menu.opened, 0), groups: sumRows(all.map((s) => s.menu.groups)) },
     rooms: sumRows(all.map((s) => s.rooms)).slice(0, 10),
+    geo: mergeGeo(all.map((s) => s.geo)),
     // Rooms with the same name in several tours: the typical time weighted by how many visits it's from.
     roomTime: [...all.flatMap((s) => s.roomTime).reduce((m, r) => {
       const x = m.get(r.label) ?? { secs: 0, count: 0 };
@@ -69,7 +89,7 @@ export function mergeStats(all: TourStats[]): TourStats | null {
 export function mergeShare(all: ReportShare[]): ReportShare | null {
   if (!all.length) return null;
   const when = (k: "leads" | "actions"): ShareWhen => (all.some((s) => s[k] === "off") ? "off" : all.every((s) => s[k] === "on") ? "on" : "auto");
-  const every = (k: "visits" | "engaged" | "duration" | "perDay" | "places" | "sources" | "live" | "rooms" | "roomTime" | "opened") => all.every((s) => s[k]);
+  const every = (k: "visits" | "engaged" | "duration" | "perDay" | "places" | "sources" | "live" | "rooms" | "roomTime" | "opened" | "geo") => all.every((s) => s[k]);
   return {
     days: all.every((s) => s.days === 90) ? 90 : 30,
     visits: every("visits"),
@@ -84,5 +104,6 @@ export function mergeShare(all: ReportShare[]): ReportShare | null {
     rooms: every("rooms"),
     roomTime: every("roomTime"),
     opened: every("opened"),
+    geo: every("geo"),
   };
 }

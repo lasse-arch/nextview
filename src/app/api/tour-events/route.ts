@@ -17,6 +17,27 @@ async function tourExists(slug: string) {
   return known.slugs.has(slug);
 }
 
+/** A geo header from the network (Vercel's, or Cloudflare's when it's in front) - short, decoded. */
+function geo(request: NextRequest, ...names: string[]): string | null {
+  for (const name of names) {
+    const v = request.headers.get(name);
+    if (!v) continue;
+    try {
+      return decodeURIComponent(v).slice(0, 80);
+    } catch {
+      return v.slice(0, 80);
+    }
+  }
+  return null;
+}
+/** A coordinate rounded to 0.1° (about 10 km) - the town, never the address. */
+const coarse = (v: string | null, max: number) => {
+  const n = v == null ? NaN : Number(v);
+  return Number.isFinite(n) && Math.abs(n) <= max ? Math.round(n * 10) / 10 : null;
+};
+/** Visits whose place is already kept (this instance) - so each visit is written once. */
+const placed = new Set<string>();
+
 const text = (v: unknown, max: number) => (typeof v === "string" && v.trim() ? v.trim().slice(0, max) : null);
 
 export async function POST(request: NextRequest) {
@@ -43,5 +64,19 @@ export async function POST(request: NextRequest) {
     }))
     .filter((e): e is { name: string; label: string | null; url: string | null; value: number | null } => Boolean(e.name && /^[a-z_]+$/.test(e.name)));
   if (events.length) await prisma.tourEvent.createMany({ data: events.map((e) => ({ ...e, tourSlug: tour, session, device })) });
+  // Where the visit came from, roughly: the town from the network (about 10 km), once per visit - for the map in the statistics. No IP is kept.
+  const visit = `${tour}|${session}`;
+  if (events.length && !placed.has(visit)) {
+    if (placed.size > 50_000) placed.clear();
+    placed.add(visit);
+    const place = {
+      country: geo(request, "x-vercel-ip-country", "cf-ipcountry")?.slice(0, 2).toUpperCase() ?? null,
+      region: geo(request, "x-vercel-ip-country-region", "cf-region-code")?.slice(0, 8) ?? null,
+      city: geo(request, "x-vercel-ip-city", "cf-ipcity"),
+      lat: coarse(geo(request, "x-vercel-ip-latitude", "cf-iplatitude"), 90),
+      lng: coarse(geo(request, "x-vercel-ip-longitude", "cf-iplongitude"), 180),
+    };
+    if (place.country || place.lat != null) await prisma.tourVisitPlace.createMany({ data: [{ tourSlug: tour, session, ...place }], skipDuplicates: true }).catch(() => {});
+  }
   return new NextResponse(null, { status: 204 });
 }
