@@ -387,6 +387,8 @@ export const STORIES_CSS = `
   .hv-stories.hv-st-d{transition:left .3s ease}
   .hv-st-d~.hv-room,.hv-st-on-d .hv-room,.hv-st-on-d .hv-luften{display:none}
   .hv-st-on-d .pc{bottom:calc(var(--st-h,148px) + 8px)}
-  .hv-story-play.hv-st-d{left:50%;right:auto;width:min(620px,100vw);transform:translateX(-50%)}
+  /* Computer: the dark fade goes the whole width (no hard edges) - only the bars and the head keep to the middle. */
+.hv-story-play.hv-st-d{align-items:center}
+.hv-story-play.hv-st-d>*{width:min(620px,100%)}
 }
 `;
