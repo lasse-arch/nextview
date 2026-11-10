@@ -39,6 +39,9 @@ function visibleTrigger(): HTMLElement | null {
   return null;
 }
 
+/** Something is already showing the visitor round (stories playing, a guided tour, Find vej, "Sådan ser en dag ud") - then the menu isn't pointed out. */
+const busy = () => Boolean(document.querySelector(".hv-story-play, .hv.hv-guiding, .hv.hv-routing"));
+
 export function MenuHint({ slug, again }: { slug: string; again: boolean }) {
   const tr = useT();
   const [spot, setSpot] = useState<Spot | null>(null);
@@ -52,7 +55,14 @@ export function MenuHint({ slug, again }: { slug: string; again: boolean }) {
     let hide: ReturnType<typeof setTimeout> | undefined;
     let watch: ReturnType<typeof setInterval> | undefined;
     // A moment after stepping in, so it isn't lost among everything else appearing.
+    // Only for one who goes round by themselves: if they've already picked something (a story, a guided tour …), never this visit.
     const show = setTimeout(() => {
+      if (busy()) {
+        try {
+          sessionStorage.setItem(key, "1");
+        } catch {}
+        return;
+      }
       const el = visibleTrigger();
       if (!el) return;
       const r = el.getBoundingClientRect();
@@ -64,7 +74,7 @@ export function MenuHint({ slug, again }: { slug: string; again: boolean }) {
       // The visitor may move on meanwhile (a tap inside the 3D tour never reaches this page): gone the moment the button
       // can't be seen any more, and following it if it moves.
       watch = setInterval(() => {
-        const now = visibleTrigger();
+        const now = busy() ? null : visibleTrigger();
         if (!now) return setGone(true);
         const n = now.getBoundingClientRect();
         setSpot((s) => (s && Math.abs(s.x - n.left) < 1 && Math.abs(s.y - n.top) < 1 && Math.abs(s.w - n.width) < 1 ? s : { x: n.left, y: n.top, w: n.width, h: n.height }));
