@@ -1922,3 +1922,24 @@ model SalesAnswer {
 
   @@index([kind])
 }
+
+/// Generator → Spørg → "Gør mig klar til møde": what nextviewAI found before a
+/// meeting (the customer, who we meet, what they post, the angle, questions,
+/// objections) - kept so the seller and colleagues can open it again.
+model MeetingBrief {
+  id            String    @id @default(cuid())
+  /// The calendar meeting it was made for: "deal-<id>" or "google-<event id>".
+  meetingKey    String
+  dealId        String?
+  title         String
+  meetingAt     DateTime?
+  body          String
+  /// [{ url, title }] - the pages nextviewAI read on the web.
+  sources       Json      @default("[]")
+  createdById   String?
+  createdByName String?
+  createdAt     DateTime  @default(now())
+
+  @@index([meetingKey])
+  @@index([createdAt])
+}

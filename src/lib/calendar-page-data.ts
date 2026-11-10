@@ -98,6 +98,8 @@ export type CalendarMeeting = {
    * ownerName) - shown as a hover tooltip rather than a separate card, since
    * Google gives every attendee's calendar its own copy of the same event. */
   invitedNames?: string[];
+  /** Google only: the invited guests who aren't one of us (the customer) - used to find the deal behind a meeting booked straight in Google Calendar. */
+  guestEmails?: string[];
 };
 
 /** Internal team things and filming jobs show on the grid but aren't meetings. */
@@ -208,6 +210,7 @@ async function fetchMergedMeetings(rangeStart: Date, rangeEnd: Date): Promise<Ca
           isFilming,
           source: "google" as const,
           ...(invitedNames.length > 0 ? { invitedNames: [...new Set(invitedNames)] } : {}),
+          guestEmails: [...new Set(event.attendeeEmails.map((e) => e.toLowerCase()).filter((e) => !userByEmail.has(e)))],
         };
 
         if (event.isAllDay) {
@@ -243,6 +246,17 @@ async function fetchMergedMeetings(rangeStart: Date, rangeEnd: Date): Promise<Ca
     if (a.hour !== b.hour) return a.hour - b.hour;
     return a.minute - b.minute;
   });
+}
+
+/**
+ * The customer meetings from yesterday through the next `days` days - CRM and
+ * Google Calendar, internal things and filming left out - for "Gør mig klar
+ * til møde" (Generator → Spørg).
+ */
+export async function getUpcomingMeetings(days = 14): Promise<CalendarMeeting[]> {
+  const now = new Date();
+  const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  return (await fetchMergedMeetings(addUtcDays(today, -1), addUtcDays(today, days + 1))).filter(countsAsMeeting);
 }
 
 export type CalendarWeek = {

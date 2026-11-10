@@ -7,8 +7,12 @@ import { MailSection } from "./mail-section";
 import { SentMails } from "./sent-mails";
 import { AskSection } from "./ask-section";
 import { listSalesAnswers } from "@/lib/actions/sales-helper";
+import { prepMeetings, recentMeetingBriefs } from "@/lib/actions/meeting-prep";
+import { MeetingPrep } from "./meeting-prep";
 
 export const metadata = { title: "Generator" };
+// "Gør mig klar til møde" researches the web for a minute or two in a server action on this page.
+export const maxDuration = 300;
 
 /*
  * Salg → Generator: a mail (nextviewAI writes it the way we write, with price
@@ -16,7 +20,9 @@ export const metadata = { title: "Generator" };
  * new customer. Each showcase link is the recipient's own, so we see if and
  * when they look, and the seller hears it at once. "Spørg": nextviewAI
  * answers questions about the system and helps with objections, and the
- * team's good answers are kept as a FAQ (src/lib/actions/sales-helper.ts).
+ * team's good answers are kept as a FAQ (src/lib/actions/sales-helper.ts),
+ * and "Gør mig klar til møde" prepares a meeting from the calendar
+ * (src/lib/meeting-prep.ts).
  */
 export default async function GeneratorPage({ searchParams }: { searchParams: Promise<{ fane?: string }> }) {
   const user = await getCurrentUser();
@@ -39,7 +45,10 @@ export default async function GeneratorPage({ searchParams }: { searchParams: Pr
         </Link>
       </div>
       {spoerg ? (
-        <AskSection faq={await listSalesAnswers()} />
+        <>
+          <MeetingPrep meetings={await prepMeetings()} recent={await recentMeetingBriefs()} today={new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Copenhagen" }).format(new Date())} />
+          <AskSection faq={await listSalesAnswers()} />
+        </>
       ) : sms ? (
         <SendExample initial={await demoSmsSetup()} />
       ) : (

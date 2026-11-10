@@ -32,7 +32,7 @@ function inline(text: string): ReactNode[] {
 }
 
 /** nextviewAI's answer: short paragraphs and "- " points. */
-function Answer({ text }: { text: string }) {
+export function Answer({ text }: { text: string }) {
   const blocks: ReactNode[] = [];
   let list: string[] = [];
   const flush = () => {
