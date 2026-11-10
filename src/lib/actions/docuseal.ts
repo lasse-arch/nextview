@@ -165,7 +165,7 @@ export async function buildAndSendContract(
     // Ends with the binding period (not renewed): its end date and the seller's reminder, once billing has started.
     await syncFixedTermEnd(dealId).catch(() => {});
 
-    // The reader: the contract as a PDF from the sender's own Gmail, the contact person on CC.
+    // The reader: the contract as a PDF from the sender's own Gmail - to them alone (the mail says who signs it).
     let warning: string | undefined;
     if (reviewer) {
       const company = deal.displayName || deal.companyName;
@@ -176,7 +176,7 @@ export async function buildAndSendContract(
         ? `Hi ${first}\n\n${deal.contactName} has received the agreement between ${company} and Nextview360 for signing. You're getting it here to read, so you can both go through it - you don't need to sign it yourself.\n\nThe agreement is attached as a PDF. If you have any questions, just reply to this email${sender.phone ? ` or call me on ${sender.phone}` : ""}.`
         : `Hej ${first}\n\n${deal.contactName} har fået aftalen mellem ${company} og Nextview360 tilsendt til underskrift. Du får den her til gennemsyn, så I begge kan læse den - du skal ikke selv skrive under.\n\nAftalen er vedhæftet som PDF. Har du spørgsmål, så svar bare på denne mail${sender.phone ? ` eller ring til mig på ${sender.phone}` : ""}.`;
       const pdf = new File([new Uint8Array(pdfBuffer)], `${documentName}.pdf`, { type: "application/pdf" });
-      const sent = await sendDealEmail(sender, dealId, subject, body, [], [pdf], undefined, reviewer.email, [deal.contactEmail], undefined, { followUpTask: false, lang: en ? "en" : "da" }).catch((err: unknown) => ({ ok: false as const, error: err instanceof Error ? err.message : String(err) }));
+      const sent = await sendDealEmail(sender, dealId, subject, body, [], [pdf], undefined, reviewer.email, [], undefined, { followUpTask: false, lang: en ? "en" : "da" }).catch((err: unknown) => ({ ok: false as const, error: err instanceof Error ? err.message : String(err) }));
       if (!sent.ok) warning = `Kontrakten er sendt til underskrift, men mailen til ${reviewer.name} kom ikke af sted: ${sent.error}`;
     }
     await logActivity({

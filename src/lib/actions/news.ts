@@ -64,7 +64,7 @@ const DEFAULT_POSTS: { title: string; body: string; minutesAgo: number; screensh
   {
     minutesAgo: 0,
     title: "Kontrakten: vælg om aftalen forlænges automatisk - og send den til en mere til gennemsyn",
-    body: "Når du laver kontrakten på en deal, er der to nye valg.\n\n\"Forlænges automatisk\" er slået til som altid. Slår du det fra, står der i kontrakten, at aftalen ophører ved bindingsperiodens udløb (uden opsigelsesvarsel). Arpo sætter så aftalens ophør til bindingsperiodens slut, når kunden er gået live, stopper faktureringen dér, og du får en opgave 3 måneder før: \"Aftalen med … udløber … - tal med dem om at forlænge.\"\n\n\"Send også til gennemsyn\": skriv navn og e-mail på en person mere - fx en kollega eller chef hos kunden. De får kontrakten som PDF i en mail fra din egen Gmail med kontaktpersonen på CC, så I begge kan læse den. Det er stadig kun kontaktpersonen, der skriver under i DocuSeal.",
+    body: "Når du laver kontrakten på en deal, er der to nye valg.\n\n\"Forlænges automatisk\" er slået til som altid. Slår du det fra, står der i kontrakten, at aftalen ophører ved bindingsperiodens udløb (uden opsigelsesvarsel). Arpo sætter så aftalens ophør til bindingsperiodens slut, når kunden er gået live, stopper faktureringen dér, og du får en opgave 3 måneder før: \"Aftalen med … udløber … - tal med dem om at forlænge.\"\n\n\"Send også til gennemsyn\": skriv navn og e-mail på en person mere - fx en kollega eller chef hos kunden. De får kontrakten som PDF til gennemlæsning i en mail fra din egen Gmail, med besked om, at kontrakten til underskrift er sendt til kontaktpersonen. Det er stadig kun kontaktpersonen, der skriver under i DocuSeal.",
     screenshotUrl: "/news/kontrakt-forlaengelse.png",
   },
   {

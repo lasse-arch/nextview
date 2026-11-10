@@ -247,8 +247,8 @@ export function ContractBuilderForm({
             <span>
               <span className="font-medium text-slate-800">Send også til gennemsyn</span>
               <span className="block text-xs text-slate-500">
-                En person mere får kontrakten som PDF i en mail fra din Gmail (kontaktpersonen på CC), så I begge kan
-                læse den. Kun kontaktpersonen skriver under.
+                En person mere får kontrakten som PDF i en mail fra din Gmail til gennemlæsning - med besked om, at
+                kontrakten til underskrift er sendt til kontaktpersonen. Kun kontaktpersonen skriver under.
               </span>
             </span>
           </label>
