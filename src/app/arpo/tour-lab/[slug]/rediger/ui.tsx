@@ -152,8 +152,33 @@ export async function uploadToTour(slug: string, file: File, blob: boolean): Pro
   return r.url;
 }
 
+/**
+ * A photo made light before it goes up: at most `max` px on its longest side,
+ * as a JPEG of good quality - a phone's 5 MB picture becomes ~250 KB and loads
+ * at once in the tour. GIFs, SVGs and small files are left as they are.
+ */
+export async function shrinkPhoto(file: File, max = 1600): Promise<File> {
+  if (!/^image\/(jpeg|png|webp|heic|heif)$/i.test(file.type) || typeof createImageBitmap === "undefined") return file;
+  try {
+    const bmp = await createImageBitmap(file);
+    const k = Math.min(1, max / Math.max(bmp.width, bmp.height));
+    if (k === 1 && file.size < 450_000) return file;
+    const c = document.createElement("canvas");
+    c.width = Math.round(bmp.width * k);
+    c.height = Math.round(bmp.height * k);
+    const g = c.getContext("2d")!;
+    g.imageSmoothingQuality = "high";
+    g.drawImage(bmp, 0, 0, c.width, c.height);
+    const out = await new Promise<Blob | null>((r) => c.toBlob(r, "image/jpeg", 0.84));
+    if (!out || out.size >= file.size) return file;
+    return new File([out], file.name.replace(/\.[a-z0-9]+$/i, "") + ".jpg", { type: "image/jpeg" });
+  } catch {
+    return file;
+  }
+}
+
 /** A button that picks a file and uploads it - or takes one dragged onto it (from the desktop or a folder). */
-export function UploadButton({ accept, onDone, label = "Upload", className }: { accept: string; onDone: (url: string) => void; label?: string; className?: string }) {
+export function UploadButton({ accept, onDone, label = "Upload", className, shrink }: { accept: string; onDone: (url: string) => void; label?: string; className?: string; /** Photos made light first (longest side in px) - see shrinkPhoto. */ shrink?: number }) {
   const { slug, blob } = useContext(FilesContext);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -170,7 +195,7 @@ export function UploadButton({ accept, onDone, label = "Upload", className }: { 
     setBusy(true);
     setError(null);
     try {
-      onDone(await uploadToTour(slug, file, blob));
+      onDone(await uploadToTour(slug, shrink ? await shrinkPhoto(file, shrink) : file, blob));
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }

@@ -9,6 +9,8 @@
 export type EngineChange = { date: string; kind: "ny" | "sikkerhed" | "hastighed" | "rettelse"; text: string };
 
 export const ENGINE_CHANGES: EngineChange[] = [
+  { date: "2026-11-10", kind: "ny", text: "\"Sådan ser en dag ud\": 1-3 billeder øverst på et stop (man bladrer i dem) - et stop kan være billeder alene. Billederne toner ind, når de er hentet, og de næste stops hentes i forvejen." },
+  { date: "2026-11-10", kind: "ny", text: "\"Sådan ser en dag ud\": linjens rejser og oplevelser vises, når dagen er slut - \"Det venter dig også\"." },
   { date: "2026-11-10", kind: "rettelse", text: "Sprog i menuen: altid på én række (på telefon med flere end tre sprog: flag og DA, EN, DE, NL), og det valgte sprog kan altid læses." },
   { date: "2026-11-10", kind: "rettelse", text: "Dronebilledet på telefon: man kan trække og knibe-zoome, også når fingeren starter på et punkt - kun et rigtigt tryk åbner punktet." },
   { date: "2026-11-10", kind: "rettelse", text: "Kortet på telefon: søgefeltet står over kategori-knapperne - også når de fylder flere rækker." },

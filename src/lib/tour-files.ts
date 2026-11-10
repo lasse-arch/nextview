@@ -101,6 +101,13 @@ export function fileSlots(c: TourConfig): Slot[] {
   c.intro?.sources.forEach((s) => slots.push({ get: () => s.src, set: (v) => (s.src = v) }));
   c.info?.forEach((i) => slots.push({ get: () => i.image, set: (v) => (i.image = v) }));
   c.guide?.stops.forEach((s) => "audio" in s && slots.push({ get: () => s.audio, set: (v) => (s.audio = v) }));
+  // "Sådan ser en dag ud": the stops' photos and the lines' trips.
+  const stopImages = (s: { images?: string[] }) => s.images?.forEach((_, i) => slots.push({ get: () => s.images![i], set: (v) => (s.images![i] = v) }));
+  c.lineDays?.shared.forEach(stopImages);
+  c.lineDays?.lines.forEach((l) => {
+    l.day.forEach((d) => typeof d !== "string" && stopImages(d));
+    l.trips?.forEach((t) => slots.push({ get: () => t.image, set: (v) => (t.image = v) }));
+  });
   return slots;
 }
 

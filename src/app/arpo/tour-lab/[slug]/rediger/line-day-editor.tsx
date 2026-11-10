@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import type { CardPerson, LineDayStop, TourConfig } from "../../tours/types";
-import { Rows } from "./content";
+import type { CardPerson, LineDayStop, LineTrip, TourConfig } from "../../tours/types";
+import { CardImages, Rows } from "./content";
 import { menuRooms } from "./map-editor";
 import { isPlaceHref } from "../../tours/places";
 import { LinkInput } from "./links-open";
@@ -228,6 +228,13 @@ function StopEditor({ stop, onChange, preview, peopleHint }: { stop: LineDayStop
           </button>
         </div>
       </Field>
+      <CardImages
+        images={stop.images ?? []}
+        max={3}
+        shrink={1600}
+        hint="1-3 billeder øverst på kortet - man bladrer i dem. Godt til det, der ikke er scannet (fx fiskeri i åen): så kan stoppet være billeder alene, uden et sted i touren. Billederne gøres lette, før de uploades."
+        onChange={(images) => onChange({ ...stop, images: images.length ? images : undefined })}
+      />
       <Field title="Små fakta (valgfri)" hint="Adskilt med komma, fx Fitness, Minibiograf.">
         <input
           className={`${input} bg-white`}
@@ -395,6 +402,47 @@ function LineEditor({ line, L, config, onChange, preview, sharedName }: { line: 
       <Field title="Afslutning (valgfri)" hint='Fx "Linjen fylder 7 timer om ugen - resten af tiden er du sammen med hele skolen."'>
         <input className={`${input} bg-white`} value={line.outro ?? ""} onChange={(e) => onChange({ ...line, outro: e.target.value || undefined })} />
       </Field>
+      <TripsEditor trips={line.trips ?? []} onChange={(trips) => onChange({ ...line, trips: trips.length ? trips : undefined })} />
     </>
+  );
+}
+
+/** "Linjens rejser": the trips shown when the line's day ends ("Det venter dig også") - up to 6. */
+function TripsEditor({ trips, onChange }: { trips: LineTrip[]; onChange: (t: LineTrip[]) => void }) {
+  const put = (i: number, t: Partial<LineTrip>) => onChange(trips.map((x, k) => (k === i ? { ...x, ...t } : x)));
+  return (
+    <Field title="Linjens rejser (valgfri)" hint='Vises, når dagen er slut, under "Det venter dig også" - fx "Uge 44 · Gåsejagt i Vadehavet". Højst 6.'>
+      <div className="space-y-2">
+        {trips.map((t, i) => (
+          <div key={i} className="space-y-1.5 rounded-xl bg-white p-2.5 ring-1 ring-black/[.05]">
+            <div className="flex gap-1.5">
+              <input className={`${input} w-28 flex-none bg-white`} placeholder="Uge 44" value={t.when ?? ""} onChange={(e) => put(i, { when: e.target.value || undefined })} />
+              <input className={`${input} bg-white`} placeholder="Gåsejagt i Vadehavet" value={t.title} onChange={(e) => put(i, { title: e.target.value })} />
+              <button type="button" aria-label="Fjern rejsen" className="px-1 text-[#c7c7cc] hover:text-[#ff3b30]" onClick={() => onChange(trips.filter((_, k) => k !== i))}>
+                ×
+              </button>
+            </div>
+            <textarea className={textarea} placeholder="Et par ord om turen (valgfri)" value={t.text ?? ""} onChange={(e) => put(i, { text: e.target.value || undefined })} />
+            <div className="flex items-center gap-2">
+              {t.image && (
+                <>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={t.image} alt="" className="h-12 w-16 rounded-lg object-cover ring-1 ring-black/[.06]" />
+                  <button type="button" className={linkBtn} onClick={() => put(i, { image: undefined })}>
+                    Fjern billedet
+                  </button>
+                </>
+              )}
+              {!t.image && <UploadButton accept="image/*" shrink={1400} label="+ Billede" onDone={(image) => put(i, { image })} />}
+            </div>
+          </div>
+        ))}
+        {trips.length < 6 && (
+          <button type="button" className={linkBtn} onClick={() => onChange([...trips, { title: "" }])}>
+            + Rejse eller oplevelse
+          </button>
+        )}
+      </div>
+    </Field>
   );
 }

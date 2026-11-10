@@ -2192,7 +2192,7 @@ export function DayPoint({ config, href, onChange }: { config: TourConfig; href:
 }
 
 /** Photos on a card (a place card or a stop of "Vis mig rundt"): a small row - added, removed, the first shown first. */
-export function CardImages({ images, hint, onChange }: { images: string[]; hint: string; onChange: (images: string[]) => void }) {
+export function CardImages({ images, hint, onChange, max, shrink }: { images: string[]; hint: string; onChange: (images: string[]) => void; /** At most this many. */ max?: number; /** Photos made light before upload (longest side, px). */ shrink?: number }) {
   return (
     <Field title="Billeder (valgfri)" hint={hint}>
       {images.length > 0 && (
@@ -2208,7 +2208,7 @@ export function CardImages({ images, hint, onChange }: { images: string[]; hint:
           ))}
         </div>
       )}
-      <UploadButton accept="image/*" label={images.length ? "+ Tilføj et billede mere" : "+ Tilføj billede"} onDone={(url) => onChange([...images, url])} />
+      {(max == null || images.length < max) && <UploadButton accept="image/*" shrink={shrink} label={images.length ? "+ Tilføj et billede mere" : "+ Tilføj billede"} onDone={(url) => onChange([...images, url])} />}
     </Field>
   );
 }

@@ -269,6 +269,17 @@ export type LineDayStop = {
   people?: CardPerson[];
   /** Small facts as chips, e.g. "Fitness", "Lys ud kl. 23.00". */
   tags?: string[];
+  /** 1-3 photos at the top of the stop's card, swiped through - e.g. for a line without scans of its own (fishing in the river, a hunt): the stop can be photos only, with no place in the tour. */
+  images?: string[];
+};
+
+/** A trip or experience of a line ("Gåsejagt i Vadehavet"), shown when its day ends ("Det venter dig også"). */
+export type LineTrip = {
+  title: string;
+  /** When, e.g. "Uge 44" or "Hvert forår". */
+  when?: string;
+  text?: string;
+  image?: string;
 };
 
 /** What the Find vej button can step aside for: a place card, "Din plads venter", the stories playing, "Du er fremme". */
@@ -674,6 +685,8 @@ export type TourConfig = {
       signature?: string;
       /** The ending's line, e.g. "Linjen fylder 7 timer om ugen - resten af tiden er du sammen med hele skolen." */
       outro?: string;
+      /** The line's trips and experiences in the year, shown at the end of its day - up to 6. */
+      trips?: LineTrip[];
     }[];
     mix?: false | { title?: string; after?: string };
     visit?: { title: string; text?: string; label: string; href: string };

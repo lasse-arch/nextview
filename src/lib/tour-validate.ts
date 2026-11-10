@@ -36,10 +36,11 @@ export function tourConfigProblem(config: unknown): string | null {
   const ld = c.lineDays;
   if (ld !== undefined) {
     const stopOk = (x: unknown) => {
-      const st = x as { id?: unknown; time?: unknown; title?: unknown; people?: unknown; tags?: unknown; href?: unknown };
+      const st = x as { id?: unknown; time?: unknown; title?: unknown; people?: unknown; tags?: unknown; href?: unknown; images?: unknown };
       return obj(x) && str(st.id) && str(st.time) && str(st.title) && (st.href === undefined || str(st.href)) &&
         (st.people === undefined || (arr(st.people) && (st.people as unknown[]).length <= 4 && (st.people as unknown[]).every((p) => obj(p) && str((p as { image?: unknown }).image)))) &&
-        (st.tags === undefined || (arr(st.tags) && (st.tags as unknown[]).every(str)));
+        (st.tags === undefined || (arr(st.tags) && (st.tags as unknown[]).every(str))) &&
+        (st.images === undefined || (arr(st.images) && (st.images as unknown[]).length <= 3 && (st.images as unknown[]).every((u) => str(u) && /^(https?:\/\/|\/)/.test(u as string))));
     };
     if (!obj(ld) || !str(ld.title) || !arr(ld.shared) || !arr(ld.lines)) return "En dag på linjen skal have en overskrift, fælles stop og linjer.";
     if (!ld.shared.every(stopOk)) return "Et fælles stop mangler id, tidspunkt eller overskrift.";
@@ -47,6 +48,7 @@ export function tourConfigProblem(config: unknown): string | null {
     for (const l of ld.lines) {
       if (!obj(l) || !str(l.id) || !str(l.name) || !arr(l.day)) return "En linje mangler id, navn eller sin dag.";
       if (l.people !== undefined && (!arr(l.people) || l.people.length > 4 || !l.people.every((p) => obj(p) && str(p.image)))) return `${l.name}: højst 4 lærere, hver med et billede.`;
+      if (l.trips !== undefined && (!arr(l.trips) || l.trips.length > 6 || !l.trips.every((t) => obj(t) && str(t.title) && (t.image === undefined || (str(t.image) && /^(https?:\/\/|\/)/.test(t.image)))))) return `${l.name}: højst 6 rejser, hver med en titel.`;
       for (const d of l.day) {
         if (typeof d === "string") {
           if (!sharedIds.has(d)) return `${l.name}: dagen peger på et fælles stop, der ikke findes ("${d}").`;
