@@ -108,7 +108,9 @@ export function LineDayCard({ L, stops, run, onGo, onClose }: { L: L; stops: Sho
   const next = stops[run.at + 1];
   // The same people as on a stop before (most often the line's teachers): only their faces and names on one line - the whole list is shown where they're met first.
   const who = (x?: ShownStop) => (x?.people ?? []).map((p) => p.image).join("|");
-  const metBefore = Boolean(who(s)) && stops.slice(0, run.at).some((x) => who(x) === who(s));
+  const metBefore = L.people === "faces" || (Boolean(who(s)) && stops.slice(0, run.at).some((x) => who(x) === who(s)));
+  // "Kun én": just the first person, in full.
+  const people = L.people === "one" ? s.people?.slice(0, 1) : s.people;
   const title = run.line === MIX ? (L.mix && L.mix.title) || tr("Lidt af det hele") : tr("En dag på {linje}", { linje: L.lines.find((l) => l.id === run.line)?.name ?? "" });
   return (
     <div className="ld-card" key={s.id + run.at}>
@@ -139,14 +141,14 @@ export function LineDayCard({ L, stops, run, onGo, onClose }: { L: L; stops: Sho
           ))}
         </div>
       ) : null}
-      {s.people?.length && metBefore ? (
+      {people?.length && metBefore && L.people !== "one" ? (
         <div className="ld-people-kort">
-          <Faces people={s.people} size={28} />
-          <small>{tr("Med {navne}", { navne: names(s.people) })}</small>
+          <Faces people={people} size={28} />
+          <small>{tr("Med {navne}", { navne: names(people) })}</small>
         </div>
-      ) : s.people?.length ? (
+      ) : people?.length ? (
         <div className="ld-people">
-          {s.people.slice(0, 4).map((p, i) => (
+          {people.slice(0, 4).map((p, i) => (
             <span key={p.image + i}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={p.image} alt="" loading="lazy" />

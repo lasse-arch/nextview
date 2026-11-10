@@ -4,7 +4,7 @@ import { useState } from "react";
 import type { CardPerson, LineDayStop, TourConfig } from "../../tours/types";
 import { Rows } from "./content";
 import { LinkInput } from "./links-open";
-import { Field, Group, input, Toggle, UploadButton, type PreviewApi } from "./ui";
+import { Choice, Field, Group, input, Toggle, UploadButton, type PreviewApi } from "./ui";
 
 /*
  * "En dag på din linje" in the editor: the shared stops (written once and
@@ -88,6 +88,17 @@ export function LineDayEditor({ config, edit, preview }: { config: TourConfig; e
         </Field>
         <Field title="Undertekst">
           <input className={`${input} bg-white`} value={L.lead ?? ""} onChange={(e) => set((l) => void (l.lead = e.target.value || undefined))} />
+        </Field>
+        <Field title="Lærerne på kortet" hint="Hvor meget personerne fylder, mens dagen kører. Alle: hele listen, hvor man møder dem første gang - derefter små ansigter. Kun én: kun den første lærer, med navn og rolle. Kun ansigter: altid små ansigter og fornavnene.">
+          <Choice
+            value={L.people ?? "all"}
+            options={[
+              ["all", "Alle"],
+              ["one", "Kun én"],
+              ["faces", "Kun ansigter"],
+            ]}
+            onChange={(v) => set((l) => void (l.people = v === "all" ? undefined : (v as "one" | "faces")))}
+          />
         </Field>
       </Group>
 

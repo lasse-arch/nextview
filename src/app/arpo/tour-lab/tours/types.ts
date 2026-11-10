@@ -677,6 +677,8 @@ export type TourConfig = {
     }[];
     mix?: false | { title?: string; after?: string };
     visit?: { title: string; text?: string; label: string; href: string };
+    /** The people on the day's card: "all" (default - the whole list where they're met first, then small faces), "one" (only the first, with name and role), "faces" (always only small faces and the first names). */
+    people?: "all" | "one" | "faces";
   };
   /**
    * "Byg dit skema": the visitor picks a subject in each choice block (per
