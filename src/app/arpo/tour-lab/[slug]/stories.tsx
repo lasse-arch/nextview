@@ -428,7 +428,8 @@ export const STORIES_CSS = `
 .hv-st-extra svg{width:28px;height:28px}
 .hv-story-play{position:absolute;top:0;left:0;right:0;z-index:8;display:none;flex-direction:column;gap:8px;padding:8px 10px 26px;background:linear-gradient(rgba(0,0,0,.5),rgba(0,0,0,0));color:#fff;pointer-events:none}
 .hv-story-play>*{pointer-events:auto}
-.hv-story-bars{display:flex;gap:3px}
+/* The bars keep clear of the menu button in the corner, like the head under them. */
+.hv-story-bars{display:flex;gap:3px;width:calc(100% - 100px)}
 .hv-story-bars span{flex:1;height:3px;border-radius:2px;background:rgba(255,255,255,.35);overflow:hidden}
 .hv-story-bars span.done{background:#fff}
 .hv-story-bars i{display:block;height:100%;background:#fff;transform-origin:left;animation:hvStory linear forwards}
