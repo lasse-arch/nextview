@@ -277,7 +277,7 @@ export function RouteStatus({
 }
 
 export const ROUTE_CSS = `
-.rt-knap{position:absolute;top:calc(14px + env(safe-area-inset-top,0px));left:50%;translate:-50% 0;z-index:7;display:flex;align-items:center;gap:8px;border:0;border-radius:999px;padding:10px 18px;background:var(--c-accent);color:#fff;font:inherit;font-weight:800;font-size:14px;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.25)}
+.rt-knap{position:absolute;top:calc(14px + env(safe-area-inset-top,0px));left:50%;translate:-50% 0;z-index:7;display:flex;align-items:center;gap:8px;border:0;border-radius:999px;padding:10px 18px;background:var(--c-accent);color:var(--c-on-accent,#fff);font:inherit;font-weight:800;font-size:14px;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.25)}
 .rt-knap svg{width:18px;height:18px}
 .rt-sheet{position:absolute;top:calc(66px + env(safe-area-inset-top,0px));left:50%;translate:-50% 0;z-index:12;width:min(420px,calc(100% - 24px));max-height:calc(100% - 90px);display:flex;flex-direction:column;background:#fff;color:#1d2a30;border-radius:18px;box-shadow:0 16px 44px rgba(0,0,0,.35);padding:16px 16px 10px;animation:hvUp .3s cubic-bezier(.2,.7,.2,1) both}
 .rt-head{display:flex;justify-content:space-between;align-items:center}
@@ -299,12 +299,12 @@ export const ROUTE_CSS = `
 .rt-bar i{display:block;height:100%;background:var(--c-accent);transition:width .5s ease}
 .rt-btns{display:flex;gap:8px;justify-content:flex-end}
 .rt-btns button,.rt-cta{border:0;border-radius:999px;padding:9px 16px;font:inherit;font-weight:800;font-size:14px;cursor:pointer;background:#eef1f2;color:#1d2a30;text-decoration:none}
-.rt-cta{background:var(--c-accent);color:#fff;margin-right:auto}
+.rt-cta{background:var(--c-accent);color:var(--c-on-accent,#fff);margin-right:auto}
 .rt-status.fremme{border:2px solid var(--c-accent)}
 
 .rt-x{position:absolute;top:8px;right:8px;width:28px;height:28px;border:0;border-radius:50%;background:#eef1f2;color:#1d2a30;font-size:17px;line-height:28px;cursor:pointer}
 .rt-kick{padding-right:30px}
-.rt-btns .rt-fortsaet{background:var(--c-accent);color:#fff}
+.rt-btns .rt-fortsaet{background:var(--c-accent);color:var(--c-on-accent,#fff)}
 .hv-routing .hv-room,.hv-routing .hv-stories{display:none}
 .hv-guiding .rt-knap{display:none}
 /* Find vej stays by default. On a phone, with a place card, "Din plads venter" or a route open, it moves up under the menu - out of their way.

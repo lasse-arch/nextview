@@ -181,12 +181,16 @@ Fx specialefterskoler (ADHD, autisme, nedsat kognitivt funktionsniveau):
 
 ## Design
 
-- Farver fra hjemmesiden: `main` = den mørke/dominerende farve, `accent` =
-  knapfarven, `accentDark` = en mørkere udgave af accent, `soft` = en lys
-  baggrund. Sørg for god kontrast (hvid tekst på main, mørk tekst på soft).
+- Farver fra hjemmesiden - præcis sidens egne (Arpo måler dem på den viste
+  side: knapper, top, bund, overskrifter, flader og logoets egne farver):
+  `main` = den mørke/dominerende farve, `accent` = knapfarven, som den er -
+  også en lys knap (guld, gul): touren skriver selv mørk tekst på den -
+  `accentDark` = en mørkere udgave af accent, `soft` = en lys baggrund.
+  Opfind ikke nye farver, når siden eller logoet har dem.
 - Hjemmesiden har kun sort/grå/hvid + én brandfarve (fx Nymarksminde: rød på
   sort)? Så brug IKKE sort/grå som `main` - touren bliver tung. Brandfarven
-  bliver `accent` (knapperne), og `main` bliver en dyb farve, der passer til
+  bliver `accent` (knapperne), og `main` bliver logoets mørkeste farve - har
+  logoet heller ingen, så en dyb farve, der passer til
   stedet og går med brandfarven: skovgrøn til dyrepark/bondegård/natur, dyb
   havblå til strand og vand, varm mørkebrun til mad. `soft` varm og lys
   (creme/hø/sand) frem for grå. Eksempel Nymarksminde: main #2e5233, accent

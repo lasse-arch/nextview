@@ -218,7 +218,7 @@ export const YEARWHEEL_CSS = `
 .yw-intro{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-end;gap:18px;padding:6%;background:var(--c-main) center/cover no-repeat;color:#fff}
 .yw-intro h2,.yw-cta h2{margin:0;font-family:var(--font-heading);font-size:clamp(28px,5.4vw,64px);font-weight:800;line-height:1.02;max-width:12em;white-space:pre-line}
 .yw-start{align-self:flex-start;border:0;border-radius:999px;padding:12px 22px;background:#fff;color:var(--c-main);font:inherit;font-weight:800;font-size:16px;cursor:pointer}
-.yw-cta{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:6%;text-align:center;background:var(--c-accent);color:#fff}
+.yw-cta{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:6%;text-align:center;background:var(--c-accent);color:var(--c-on-accent,#fff)}
 .yw-cta button{border:0;border-radius:999px;padding:13px 24px;background:#fff;color:var(--c-accent);font:inherit;font-weight:800;font-size:17px;cursor:pointer}
 .yw-cta .yw-igen{background:none;color:#fff;font-weight:700;font-size:14px;opacity:.85}
 .yw-main{position:absolute;inset:0;display:grid;grid-template-columns:44% 1fr;align-items:center;gap:3%;padding:3% 4%}

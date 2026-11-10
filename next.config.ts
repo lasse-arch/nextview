@@ -14,7 +14,8 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     "/*": ["./public/logo.png", "./node_modules/@sparticuz/chromium/bin/**/*"],
     // The tour editor's Claude reads the tour setup's documented types (see tour-ai.ts).
-    "/arpo/tour-lab/**": ["./src/app/arpo/tour-lab/tours/types.ts", "./src/app/arpo/tour-lab/tours/PLAYBOOK.md"],
+    // ... and "Brug hjemmesidens farver" opens the customer's site in headless Chromium to measure its colours (lib/site-look.ts).
+    "/arpo/tour-lab/**": ["./src/app/arpo/tour-lab/tours/types.ts", "./src/app/arpo/tour-lab/tours/PLAYBOOK.md", "./node_modules/@sparticuz/chromium/bin/**/*"],
     // "Hvor skal touren sidde?" on the customer page opens their website in headless Chromium (see lib/site-placement.ts).
     "/api/kunde/**": ["./node_modules/@sparticuz/chromium/bin/**/*"],
     // The new site's pages, only shown to the team (see lib/beta-site.ts).

@@ -164,14 +164,14 @@ export const FINDER_CSS = `
 .hv-gaa button{display:flex;align-items:center;gap:5px;padding:5px 10px;border:0;border-radius:999px;background:#eef2f3;color:#1d2a30;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer}
 .hv-gaa button:hover{background:#e1e8ea}
 .hv-gaa svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.hv-bedst{display:inline-flex;align-items:center;gap:6px;margin-bottom:6px;padding:4px 10px;border-radius:999px;background:var(--c-accent);color:#fff;font-size:12px;font-weight:800}
+.hv-bedst{display:inline-flex;align-items:center;gap:6px;margin-bottom:6px;padding:4px 10px;border-radius:999px;background:var(--c-accent);color:var(--c-on-accent,#fff);font-size:12px;font-weight:800}
 .hv-andre{margin:-2px 0 12px;font-size:13px;color:#5c6b72}
 .hv-andre button{border:0;background:none;padding:0;color:var(--c-main);font:inherit;font-weight:700;text-decoration:underline;cursor:pointer}
 .hv-intro .hv-find{margin-top:8px;width:100%}
 .hv-find-m{display:none}
 @media (max-width:760px){
   .hv-intro .hv-find{display:none}
-  .hv-find-m{position:absolute;left:10px;bottom:calc(var(--filtre-h, 50px) + 18px + env(safe-area-inset-bottom,0px));z-index:6;display:flex;align-items:center;gap:7px;height:36px;padding:0 14px 0 11px;border:0;border-radius:999px;background:var(--c-accent);color:#fff;font:inherit;font-size:13.5px;font-weight:800;box-shadow:0 6px 20px rgba(0,0,0,.25);cursor:pointer}
+  .hv-find-m{position:absolute;left:10px;bottom:calc(var(--filtre-h, 50px) + 18px + env(safe-area-inset-bottom,0px));z-index:6;display:flex;align-items:center;gap:7px;height:36px;padding:0 14px 0 11px;border:0;border-radius:999px;background:var(--c-accent);color:var(--c-on-accent,#fff);font:inherit;font-size:13.5px;font-weight:800;box-shadow:0 6px 20px rgba(0,0,0,.25);cursor:pointer}
   .hv-find-m svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round}
   .hv-filter-ud-m .hv-find-m{bottom:calc(10px + env(safe-area-inset-bottom,0px))}
   /* Inside the tour "Tilbage til luften" has the bottom left - Find vej goes to the right, never on top of it. */

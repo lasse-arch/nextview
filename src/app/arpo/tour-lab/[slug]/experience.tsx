@@ -1,5 +1,6 @@
 "use client";
 
+import { textOn } from "../tours/contrast";
 import { TourLogo, TOUR_LOGO_CSS } from "./tour-logo";
 import { LANG_CSS, Flag, LangSwitch } from "./lang-switch";
 import { danishOf, LANGUAGES, localize, makeT, tourLanguages } from "../tours/i18n";
@@ -2788,6 +2789,8 @@ function TourExperience({
           fontFamily: `'${T.font}', system-ui, sans-serif`,
           "--c-main": T.colors.main,
           "--c-accent": T.colors.accent,
+          // The text on the tour's buttons: white, or dark on a light button colour (a gold like the site's) - so the site's own colour can be used as it is.
+          "--c-on-accent": textOn(T.colors.accent, T.colors.main),
           "--c-accent-dark": T.colors.accentDark,
           "--c-soft": T.colors.soft,
           "--font-heading": `'${T.fontHeading ?? T.font}', '${T.font}', sans-serif`,
@@ -4226,7 +4229,7 @@ html:has(.hv.fixed),html:has(.hv.fixed) body{overflow:hidden;overscroll-behavior
 .hv-intro-body h1{margin:0 0 4px;font-size:19px;font-weight:900;color:var(--c-main)}
 .hv-intro-body p{margin:0 0 12px;font-size:14px;line-height:1.45;color:#5c6b72}
 .hv-btn{display:flex;align-items:center;justify-content:center;padding:11px 16px;border-radius:999px;text-decoration:none;font-weight:800;font-size:15px;border:0;cursor:pointer;font-family:inherit}
-.hv-primary{background:var(--c-accent);color:#fff}.hv-primary:hover{background:var(--c-accent-dark)}
+.hv-primary{background:var(--c-accent);color:var(--c-on-accent,#fff)}.hv-primary:hover{background:var(--c-accent-dark)}
 .hv-secondary{background:#fff;color:var(--c-main);border:2px solid var(--c-main)}
 .hv-wide{width:100%;margin-top:12px}
 .hv-filtre{position:absolute;left:16px;bottom:16px;z-index:5;background:#fff;border-radius:14px;padding:10px 12px;box-shadow:0 8px 24px rgba(0,0,0,.25);max-width:calc(100% - 32px)}
@@ -4288,7 +4291,7 @@ html:has(.hv.fixed),html:has(.hv.fixed) body{overflow:hidden;overscroll-behavior
 .hv-ledig{margin-left:7px;padding:1px 7px;border-radius:999px;background:#34c75922;color:#1f8a3a;font-size:11px;font-weight:700;vertical-align:1px}
 .hv-live-knap{display:flex;align-items:center;gap:8px}
 .hv-live-knap i,.hv-live-chip i{width:8px;height:8px;border-radius:50%;background:#34c759;box-shadow:0 0 0 3px #34c75944;animation:hvLive 1.6s ease-in-out infinite}
-.hv-live-knap span{margin-left:auto;padding:1px 8px;border-radius:999px;background:var(--c-accent);color:#fff;font-size:12px}
+.hv-live-knap span{margin-left:auto;padding:1px 8px;border-radius:999px;background:var(--c-accent);color:var(--c-on-accent,#fff);font-size:12px}
 @keyframes hvLive{50%{box-shadow:0 0 0 6px #34c75911}}
 .hv-live-chip{position:absolute;top:calc(74px + env(safe-area-inset-top,0px));right:16px;z-index:6;display:flex;align-items:center;gap:8px;padding:8px 14px;border:0;border-radius:999px;background:rgba(255,255,255,.95);color:#1d2a30;font:700 13px inherit;font-family:inherit;box-shadow:0 6px 18px rgba(0,0,0,.2);cursor:pointer}
 .hv-live{position:absolute;inset:0;z-index:35;display:flex;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.35);animation:hvFade .2s ease}
@@ -4418,11 +4421,11 @@ html:has(.hv.fixed),html:has(.hv.fixed) body{overflow:hidden;overscroll-behavior
 .hv-tile small{padding-right:30px;font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;opacity:.75;margin-bottom:4px}
 .hv-tile b{font-size:24px;line-height:1.05;font-weight:900}
 .hv-tile em+.hv-tile-plus+small{margin-top:10px}
-.hv-tile em{align-self:flex-start;margin:-4px 0 auto -4px;font-style:normal;font-size:10.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;padding:3px 9px;border-radius:999px;background:var(--c-accent);color:#fff}
+.hv-tile em{align-self:flex-start;margin:-4px 0 auto -4px;font-style:normal;font-size:10.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;padding:3px 9px;border-radius:999px;background:var(--c-accent);color:var(--c-on-accent,#fff)}
 .hv-tile-plus{position:absolute;top:14px;right:14px;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px}
 .hv-tile-light{background:#fff;color:var(--c-main)}.hv-tile-light .hv-tile-plus{background:var(--c-main);color:#fff}
 .hv-tile-dark{background:var(--c-main);color:#fff}.hv-tile-dark .hv-tile-plus{background:#fff;color:var(--c-main)}
-.hv-tile-accent{background:var(--c-accent);color:#fff}.hv-tile-accent em{background:rgba(255,255,255,.24)}.hv-tile-accent .hv-tile-plus{background:#fff;color:var(--c-accent)}
+.hv-tile-accent{background:var(--c-accent);color:var(--c-on-accent,#fff)}.hv-tile-accent em{background:rgba(255,255,255,.24)}.hv-tile-accent .hv-tile-plus{background:#fff;color:var(--c-accent)}
 .hv-tile-foto{background-size:cover;background-position:center;color:#fff;text-shadow:0 1px 8px rgba(0,0,0,.35)}.hv-tile-foto small{opacity:.9}.hv-tile-foto .hv-tile-plus{background:#fff;color:var(--c-main);text-shadow:none}
 .hv-tile-last{background:#e7eef0;color:var(--c-main)}.hv-tile-last .hv-tile-plus{background:var(--c-main);color:#fff}
 .hv-wel-x{position:absolute;top:calc(16px + env(safe-area-inset-top,0px));right:16px;width:44px;height:44px;border-radius:12px;border:0;background:rgba(255,255,255,.92);font-size:24px;cursor:pointer;color:var(--c-main)}

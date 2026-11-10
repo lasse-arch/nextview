@@ -382,7 +382,7 @@ export const STAGING_CSS = `
 .vs-lydknap{position:absolute;left:0;top:0;pointer-events:auto;display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border:0;border-radius:999px;background:rgba(0,0,0,.62);color:#fff;font:inherit;font-size:13px;font-weight:700;white-space:nowrap;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.3);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
 .vs-lydknap[data-ude="1"]{visibility:hidden}
 .vs-lyd{position:absolute;left:24px;bottom:24px;padding:14px 26px;border-radius:999px;background:rgba(0,0,0,.6);color:#fff;font-size:34px;font-weight:700;pointer-events:none}
-.vs-knap{position:absolute;right:28px;bottom:28px;padding:18px 34px;border-radius:999px;background:var(--c-accent);color:#fff;font-size:40px;font-weight:800;box-shadow:0 8px 30px rgba(0,0,0,.35);pointer-events:none}
+.vs-knap{position:absolute;right:28px;bottom:28px;padding:18px 34px;border-radius:999px;background:var(--c-accent);color:var(--c-on-accent,#fff);font-size:40px;font-weight:800;box-shadow:0 8px 30px rgba(0,0,0,.35);pointer-events:none}
 .vs-skilt{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6%;box-sizing:border-box;background:#fff;color:var(--c-main);text-align:center}
 .vs-skilt p{margin:0;font-family:var(--font-heading);font-size:120px;font-weight:800;line-height:1.08;white-space:pre-line}
 .vs-sign{background:#fff}

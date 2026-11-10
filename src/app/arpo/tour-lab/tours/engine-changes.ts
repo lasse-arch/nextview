@@ -9,6 +9,7 @@
 export type EngineChange = { date: string; kind: "ny" | "sikkerhed" | "hastighed" | "rettelse"; text: string };
 
 export const ENGINE_CHANGES: EngineChange[] = [
+  { date: "2026-11-10", kind: "ny", text: "Knapperne får selv mørk tekst på en lys knapfarve (fx guld), så hjemmesidens egen farve kan bruges, som den er." },
   { date: "2026-11-10", kind: "rettelse", text: "Historier: rene ikoner på Pause og Videre, og den mørke toning øverst har ikke længere skarpe kanter." },
   { date: "2026-11-09", kind: "rettelse", text: "Mobil: logoet i boksen øverst over luftfotoet forsvandt, når det var en SVG." },
   { date: "2026-11-09", kind: "ny", text: "Byg dit skema: vælg fag i hver fagblok og se din uge (#skema)." },

@@ -314,7 +314,7 @@ export const GUIDE_CSS = `
 .gd-ctrl .gd-pause.paa{background:var(--c-main);color:#fff;letter-spacing:0}
 .gd-ctrl .gd-stop{margin-left:auto;flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;background:none;font-size:13px;font-weight:700;color:#56636a;padding:0 4px}
 .gd-stop-x{display:none}
-.hv-guide-knap{display:flex;align-items:center;gap:10px;width:calc(100% - 44px);margin:14px 22px 4px;padding:12px 16px;border:0;border-radius:14px;background:var(--c-accent);color:#fff;font:inherit;font-weight:800;font-size:15px;cursor:pointer;text-align:left}
+.hv-guide-knap{display:flex;align-items:center;gap:10px;width:calc(100% - 44px);margin:14px 22px 4px;padding:12px 16px;border:0;border-radius:14px;background:var(--c-accent);color:var(--c-on-accent,#fff);font:inherit;font-weight:800;font-size:15px;cursor:pointer;text-align:left}
 .hv-guide-knap small{display:block;font-weight:600;font-size:12px;opacity:.85}
 .hv-wel-guide{display:inline-flex;align-items:center;gap:8px;align-self:flex-start;margin-top:14px;border:0;border-radius:999px;background:var(--c-main);color:#fff;padding:11px 18px;font:inherit;font-weight:800;font-size:14px;cursor:pointer}
 .hv-guiding .hv-room,.hv-guiding .hv-stories,.hv-guiding .hv-luften,.hv-guiding .dz-dock,.hv-guiding .dz-here,.hv-guiding .hv-intro,.hv-guiding .hv-filtre{display:none}

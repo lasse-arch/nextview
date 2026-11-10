@@ -409,8 +409,8 @@ export const DESIGNS_CSS = `
 .pk-luk{position:absolute;top:-14px;right:14px;width:30px;height:30px;border:0;border-radius:50%;background:#fff;color:var(--c-main);font-size:14px;font-weight:800;cursor:pointer;box-shadow:0 3px 10px rgba(0,0,0,.25)}
 .pk-mini{position:absolute;left:50%;bottom:18px;translate:-50% 0;z-index:9;display:flex;align-items:center;gap:10px;border:0;border-radius:999px;padding:8px 8px 8px 18px;background:rgba(255,255,255,.95);color:var(--c-main);font:inherit;font-weight:800;font-size:15px;cursor:pointer;box-shadow:0 10px 30px rgba(0,0,0,.3);white-space:nowrap;animation:hvUp .35s ease both}
 .pk-mini-item{font-weight:600;color:#56636a}
-.pk-mini b{padding:8px 14px;border-radius:999px;background:var(--c-accent);color:#fff;font-size:13px}
-.pk-badge{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;margin-left:7px;padding:0 6px;border-radius:999px;background:var(--c-accent);color:#fff;font-size:11px;font-weight:800;vertical-align:2px}
+.pk-mini b{padding:8px 14px;border-radius:999px;background:var(--c-accent);color:var(--c-on-accent,#fff);font-size:13px}
+.pk-badge{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;margin-left:7px;padding:0 6px;border-radius:999px;background:var(--c-accent);color:var(--c-on-accent,#fff);font-size:11px;font-weight:800;vertical-align:2px}
 .pk-groups button.nu .pk-badge{background:#fff;color:var(--c-main)}
 .pk-badge.tom{background:#c9cfd2}
 .pk-ledige{display:flex;align-items:center;justify-content:space-between;gap:10px;border:0;border-radius:12px;padding:10px 14px;background:color-mix(in srgb,var(--c-accent) 12%,#fff);color:var(--c-accent-dark);font:inherit;font-weight:800;font-size:14px;cursor:pointer;text-align:left}
@@ -420,10 +420,10 @@ export const DESIGNS_CSS = `
 .pk-unit b{color:var(--c-main);font-size:15px}
 .pk-unit .nu{color:var(--c-accent-dark);font-weight:800}
 .pk-pris{font-weight:800;color:var(--c-main);white-space:nowrap}
-.pk-book{border-radius:999px;padding:7px 14px;background:var(--c-accent);color:#fff;font-weight:800;font-size:13px;text-decoration:none}
+.pk-book{border-radius:999px;padding:7px 14px;background:var(--c-accent);color:var(--c-on-accent,#fff);font-weight:800;font-size:13px;text-decoration:none}
 .pk-row button.nu{background:var(--c-main);color:#fff}
-.pk-items button.nu{background:var(--c-accent);color:#fff}
-.pk-cta{flex:none;margin-left:auto;border-radius:999px;padding:9px 16px;background:var(--c-accent);color:#fff;font-weight:800;font-size:14px;text-decoration:none;white-space:nowrap}
+.pk-items button.nu{background:var(--c-accent);color:var(--c-on-accent,#fff)}
+.pk-cta{flex:none;margin-left:auto;border-radius:999px;padding:9px 16px;background:var(--c-accent);color:var(--c-on-accent,#fff);font-weight:800;font-size:14px;text-decoration:none;white-space:nowrap}
 .hv:has(.pk) .hv-room,.hv:has(.pk-mini) .hv-room{display:none} /* the picker already shows where you are */
 @media (max-width:760px){
   .pk{left:8px;right:8px;translate:none;max-width:none;bottom:calc(8px + env(safe-area-inset-bottom,0px));border-radius:18px;padding:8px}

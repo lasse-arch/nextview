@@ -1,5 +1,6 @@
 "use client";
 
+import { textOn } from "../tours/contrast";
 import { fontHrefs } from "../tours/fonts";
 import { TourLogo } from "./tour-logo";
 import { useT } from "../tours/i18n-react";
@@ -44,6 +45,7 @@ export function PlayGate({ T, isPreview, onPlay }: { T: TourConfig; /** Asked wh
           "--pg-bg": image ? `url(${image})` : "none",
           "--c-main": T.colors.main,
           "--c-accent": T.colors.accent,
+          "--c-on-accent": textOn(T.colors.accent, T.colors.main),
           fontFamily: `'${T.font}', system-ui, sans-serif`,
         } as React.CSSProperties
       }

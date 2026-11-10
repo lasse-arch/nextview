@@ -196,7 +196,7 @@ export const CARDS_CSS = `
 @media (max-width:760px){.pc-fotos button{width:60px;height:44px;border-radius:7px}.pc-fotos{margin-bottom:7px}}
 .pc-laes{display:inline-flex;align-items:center;gap:6px;margin:-2px 0 8px;padding:4px 10px 4px 8px;border:0;border-radius:999px;background:color-mix(in srgb,var(--c-accent) 12%,transparent);color:var(--c-main);font:inherit;font-size:12.5px;font-weight:700;cursor:pointer}
 .pc-laes svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.pc-laes.aktiv{background:var(--c-accent);color:#fff}
+.pc-laes.aktiv{background:var(--c-accent);color:var(--c-on-accent,#fff)}
 .pc-laes.aktiv svg{fill:currentColor;stroke:none}
 .pc{position:absolute;left:24px;bottom:96px;z-index:7;width:min(380px,calc(100% - 24px));padding:18px 22px 18px;border-radius:14px;background:#fff;color:var(--c-main);box-shadow:0 10px 30px rgba(0,0,0,.2);overflow:hidden;animation:hvUp .4s cubic-bezier(.2,.7,.2,1) both}
 .pc-bar{position:absolute;left:0;right:0;top:0;height:3px;background:color-mix(in srgb,var(--c-accent) 18%,transparent)}
@@ -220,7 +220,7 @@ export const CARDS_CSS = `
 .pc-btns{display:flex;flex-wrap:wrap;gap:6px}
 .pc-btn{display:inline-block;border:2px solid var(--c-main);background:#fff;color:var(--c-main);border-radius:999px;padding:7px 14px;font:inherit;font-size:14px;font-weight:800;cursor:pointer;text-decoration:none}
 .pc-btn:hover{background:var(--c-main);color:#fff}
-.pc-primary{background:var(--c-accent);border-color:var(--c-accent);color:#fff}
+.pc-primary{background:var(--c-accent);border-color:var(--c-accent);color:var(--c-on-accent,#fff)}
 .pc-primary:hover{background:var(--c-accent-dark);border-color:var(--c-accent-dark)}
 .pc-nudge{z-index:8}
 .hv-menu-aaben .pc,.hv-welcome .pc,.hv-guiding .pc,.hv-routing .pc{display:none}

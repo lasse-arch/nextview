@@ -244,7 +244,7 @@ export const LINE_DAY_CSS = `
 .ld-dots button.nu{background:var(--c-accent)}
 .ld-when{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px}
 .ld-when time{font-weight:800;font-size:15px;font-variant-numeric:tabular-nums;color:var(--c-accent)}
-.ld-badge{padding:2px 9px;border-radius:999px;background:var(--c-accent);color:#fff;font-size:11.5px;font-weight:800}
+.ld-badge{padding:2px 9px;border-radius:999px;background:var(--c-accent);color:var(--c-on-accent,#fff);font-size:11.5px;font-weight:800}
 .ld-badge.faelles{background:var(--c-main)}
 .ld-place{font-size:12.5px;font-weight:700;color:#6b7a80}
 .ld-card h3{margin:8px 0 4px;font-family:var(--font-heading);font-size:22px;line-height:1.15;color:var(--c-main)}
@@ -259,7 +259,7 @@ export const LINE_DAY_CSS = `
 .ld-nav{display:flex;gap:8px;margin-top:14px}
 .ld-nav button{border:0;border-radius:12px;font:inherit;font-weight:800;cursor:pointer}
 .ld-back{width:42px;background:#f1f2f3;color:#56636a;font-size:20px}
-.ld-next{flex:1;min-width:0;padding:11px 14px;background:var(--c-accent);color:#fff;font-size:14.5px;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ld-next{flex:1;min-width:0;padding:11px 14px;background:var(--c-accent);color:var(--c-on-accent,#fff);font-size:14.5px;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ld-end{width:min(860px,100%)}
 .ld-end-grid{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:28px}
 .ld-sum{margin:0;padding:0;list-style:none;border-right:1px solid #eee;padding-right:20px}
@@ -270,7 +270,7 @@ export const LINE_DAY_CSS = `
 .ld-visit{margin:4px 0 20px;padding:16px;border-radius:16px;background:var(--c-soft)}
 .ld-visit b{display:block;font-size:17px;color:var(--c-main)}
 .ld-visit p{margin:4px 0 12px;font-size:14px;line-height:1.45;color:#3d4a50}
-.ld-visit button{padding:11px 18px;border:0;border-radius:999px;background:var(--c-accent);color:#fff;font:inherit;font-weight:800;cursor:pointer}
+.ld-visit button{padding:11px 18px;border:0;border-radius:999px;background:var(--c-accent);color:var(--c-on-accent,#fff);font:inherit;font-weight:800;cursor:pointer}
 .ld-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
 .ld-chips button{padding:9px 14px;border:1px solid #e3e1dc;border-radius:999px;background:#fff;font:inherit;font-size:14px;font-weight:700;color:var(--c-main);cursor:pointer}
 .ld-chips button:hover{border-color:var(--c-accent)}

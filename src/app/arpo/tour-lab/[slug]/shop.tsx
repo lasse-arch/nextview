@@ -241,10 +241,10 @@ export const SHOP_CSS = `
 .sh-days button:disabled{color:#c3cbce;text-decoration:line-through;cursor:default}
 .sh-days button:not(:disabled):hover{background:rgba(0,0,0,.05)}
 .sh-days button.imellem,.sh-days button.imellem:hover{background:color-mix(in srgb,var(--c-accent) 16%,transparent)}
-.sh-days button.valgt,.sh-days button.valgt:hover{background:var(--c-accent);color:#fff}
+.sh-days button.valgt,.sh-days button.valgt:hover{background:var(--c-accent);color:var(--c-on-accent,#fff)}
 .sh-days button.uge{color:#1d2a30;text-decoration:none;background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--c-accent) 14%,transparent) 0 4px,transparent 4px 8px)}
 .sh-days button.uge-valgt,.sh-days button.uge-valgt:hover{background:color-mix(in srgb,var(--c-accent) 30%,transparent)}
-.sh-days button.uge-ende,.sh-days button.uge-ende:hover{background:var(--c-accent);color:#fff}
+.sh-days button.uge-ende,.sh-days button.uge-ende:hover{background:var(--c-accent);color:var(--c-on-accent,#fff)}
 .sh-ugeinfo{display:flex;align-items:center;justify-content:center;gap:6px;margin:8px 0 0;font-size:12px;color:#5d6b72}
 .sh-ugeinfo i{width:16px;height:12px;border-radius:3px;background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--c-accent) 30%,transparent) 0 3px,transparent 3px 6px)}
 .sh-uger{margin-top:12px;padding-top:10px;border-top:1px solid rgba(0,0,0,.08)}

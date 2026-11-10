@@ -109,7 +109,7 @@ const HIDE_CONSENT = `(() => {
   document.body.style.setProperty("overflow", "auto", "important");
 })()`;
 
-async function open(browser: Browser, url: string, phone: boolean): Promise<Page> {
+export async function openPublicPage(browser: Browser, url: string, phone: boolean): Promise<Page> {
   const page = await browser.newPage();
   await page.setViewport(phone ? { ...PHONE, deviceScaleFactor: 2, isMobile: true, hasTouch: true } : { ...DESKTOP, deviceScaleFactor: 1 });
   if (phone) await page.setUserAgent(UA_PHONE);
@@ -185,7 +185,7 @@ const OUTLINE = `(() => {
 })()`;
 
 async function readPage(browser: Browser, url: string): Promise<Read> {
-  const page = await open(browser, url, false);
+  const page = await openPublicPage(browser, url, false);
   try {
     const r = (await page.evaluate(OUTLINE)) as Omit<Read, "url">;
     return { ...r, url: page.url() };
@@ -348,7 +348,7 @@ function boxCss(size: PlacementSize): string {
 
 /** Put the tour in after the chosen part and photograph the screen there. */
 async function shoot(browser: Browser, s: Suggestion, html: string, phone: boolean): Promise<string> {
-  const page = await open(browser, s.page, phone);
+  const page = await openPublicPage(browser, s.page, phone);
   try {
     await page.evaluate(
       `((path, at, html) => {

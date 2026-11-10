@@ -140,9 +140,9 @@ export const BENTO_CSS = `
 .bm-tile b{display:block;font-size:clamp(14px,11cqw,26px);line-height:1.05;font-weight:300;text-transform:uppercase;letter-spacing:.01em;overflow-wrap:break-word}
 .bm-tile b span{display:block}
 .bm-tile i{position:absolute;top:14px;right:14px;width:22px;height:22px;border-radius:50%;background:#1b2526;color:#eeeeea;font-style:normal;font-size:15px;line-height:22px;text-align:center}
-.bm-tile em{position:absolute;top:14px;left:14px;padding:3px 9px;border-radius:999px;background:var(--c-accent);color:#fff;font-style:normal;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
-.bm-accent{background:var(--c-accent);color:#fff}.bm-accent i{background:#fff;color:var(--c-accent)}
-.bm-dark{background:#0d141e;color:#fff;border:1px solid rgba(255,255,255,.12)}.bm-dark i{background:var(--c-accent);color:#fff}
+.bm-tile em{position:absolute;top:14px;left:14px;padding:3px 9px;border-radius:999px;background:var(--c-accent);color:var(--c-on-accent,#fff);font-style:normal;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.bm-accent{background:var(--c-accent);color:var(--c-on-accent,#fff)}.bm-accent i{background:#fff;color:var(--c-accent)}
+.bm-dark{background:#0d141e;color:#fff;border:1px solid rgba(255,255,255,.12)}.bm-dark i{background:var(--c-accent);color:var(--c-on-accent,#fff)}
 .bm-tall{grid-row:span 2}.bm-wide{grid-column:span 2}
 .bm-sub{max-width:880px;margin:30px auto 0;padding:0 22px calc(40px + env(safe-area-inset-bottom,0px));color:#fff}
 .bm-sub h4{margin:0 0 12px;font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;opacity:.6}

@@ -922,7 +922,7 @@ export const FEATURES_CSS = `
 .ft-dots i.on{width:22px;background:var(--c-accent)}
 .ft-knapper{display:flex;gap:8px}
 .ft-knapper button{flex:1;border:0;border-radius:999px;padding:12px 14px;font:inherit;font-weight:800;font-size:15px;cursor:pointer}
-.ft-prov{background:var(--c-accent);color:#fff}
+.ft-prov{background:var(--c-accent);color:var(--c-on-accent,#fff)}
 .ft-naeste{background:#eef1f2;color:#1d2a30}
 .ft-hvorfor{display:flex;gap:11px;align-items:flex-start;margin:14px 2px 0;padding:12px 14px;border-radius:16px;background:color-mix(in srgb,var(--c-accent) 9%,#fff);border:1px solid color-mix(in srgb,var(--c-accent) 22%,transparent);font-size:14px;line-height:1.45;color:#2b383e}
 .ft-hvorfor svg{flex:none;width:22px;height:22px;margin-top:1px;fill:none;stroke:var(--c-accent);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}

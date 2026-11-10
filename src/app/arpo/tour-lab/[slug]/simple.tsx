@@ -126,7 +126,7 @@ export const SIMPLE_CSS = `
 .sp-list{display:flex;flex-direction:column;gap:10px}
 .sp-btn{position:relative;display:flex;align-items:center;justify-content:center;gap:8px;min-height:58px;padding:14px 20px;border:2px solid #e3e6e8;border-radius:18px;background:#fff;color:var(--c-main);font:inherit;font-weight:800;font-size:18px;cursor:pointer;text-align:center}
 .sp-btn:active{transform:scale(.98)}
-.sp-main{border-color:var(--c-accent);background:var(--c-accent);color:#fff}
+.sp-main{border-color:var(--c-accent);background:var(--c-accent);color:var(--c-on-accent,#fff)}
 .sp-quiet{min-height:48px;border-color:transparent;background:none;color:#56636a;font-weight:700;font-size:16px}
 .sp-out span{font-size:15px;opacity:.6}
 .sp-here{border-color:var(--c-main)}

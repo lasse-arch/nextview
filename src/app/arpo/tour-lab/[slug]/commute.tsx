@@ -182,7 +182,7 @@ export const COMMUTE_CSS = `
 .vt-bus{margin-top:12px;border-radius:14px;background:color-mix(in srgb,var(--c-accent) 8%,#fff);border:1px solid color-mix(in srgb,var(--c-accent) 25%,#fff);padding:12px 13px}
 .vt-bus-h{font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--c-accent)}
 .vt-bus p{margin:4px 0 10px;font-size:14px;line-height:1.4;color:#33474d}
-.vt-knap{display:block;text-align:center;border-radius:999px;background:var(--c-accent);color:#fff;font-weight:800;padding:11px;font-size:15px;text-decoration:none}
+.vt-knap{display:block;text-align:center;border-radius:999px;background:var(--c-accent);color:var(--c-on-accent,#fff);font-weight:800;padding:11px;font-size:15px;text-decoration:none}
 .vt-kort{display:block;width:100%;height:340px;border:0;border-radius:12px;background:#eee}
 .vt-ny{display:block;margin-top:8px;text-align:center;font-size:12.5px;font-weight:700;color:var(--c-main);text-decoration:none;opacity:.75}
 .vt-ark button.vt-knap{width:100%;border:0;cursor:pointer;font:inherit;font-weight:800}

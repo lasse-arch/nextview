@@ -290,7 +290,7 @@ export const SITE_PLAN_CSS = `
 .pk-datoer{position:relative;display:flex;flex-wrap:wrap;align-items:flex-end;gap:8px;padding:10px 12px;border-radius:16px;background:rgba(255,255,255,.96);box-shadow:0 8px 26px rgba(0,0,0,.22);max-width:100%}
 .pk-datoer label{display:flex;flex-direction:column;gap:2px;font-size:11px;font-weight:700;color:#6e6e73;text-transform:uppercase;letter-spacing:.04em}
 .pk-datoer input{height:34px;border:1px solid #e5e5ea;border-radius:9px;padding:0 8px;font:inherit;font-size:14px;color:#1d2a30;background:#fff}
-.pk-datoer button{height:34px;padding:0 14px;border:0;border-radius:9px;background:var(--c-accent);color:#fff;font:inherit;font-size:14px;font-weight:700;cursor:pointer}
+.pk-datoer button{height:34px;padding:0 14px;border:0;border-radius:9px;background:var(--c-accent);color:var(--c-on-accent,#fff);font:inherit;font-size:14px;font-weight:700;cursor:pointer}
 .pk-datoer button:disabled{opacity:.6}
 .pk-datoer p{flex-basis:100%;margin:0;display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;color:#3a3a3c}
 
@@ -303,7 +303,7 @@ export const SITE_PLAN_CSS = `
 .pk-kort{display:flex;align-items:center;gap:10px;padding:8px 8px 8px 14px;border-radius:999px;background:#fff;color:#1d2a30;font-size:14px;box-shadow:0 8px 26px rgba(0,0,0,.25);white-space:nowrap;max-width:100%}
 .pk-kort b{color:#248a3d}
 .pk-kort span{overflow:hidden;text-overflow:ellipsis}
-.pk-kort a{padding:7px 14px;border-radius:999px;background:var(--c-accent);color:#fff;font-weight:700;text-decoration:none}
+.pk-kort a{padding:7px 14px;border-radius:999px;background:var(--c-accent);color:var(--c-on-accent,#fff);font-weight:700;text-decoration:none}
 .pk-kort button{width:28px;height:28px;border:0;border-radius:50%;background:#f2f2f7;color:#6e6e73;font-size:18px;line-height:1;cursor:pointer}
 .hv-punkt .pk-skift,.hv-punkt .pk-bund,.hv-welcome .pk-skift,.hv-welcome .pk-bund{opacity:0;pointer-events:none}
 .hv-punkt .pk-bund>*,.hv-welcome .pk-bund>*{pointer-events:none}

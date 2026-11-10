@@ -1,5 +1,6 @@
 "use client";
 
+import { textOn } from "../tours/contrast";
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import type { StagingItem, TourConfig } from "../tours/types";
@@ -82,7 +83,7 @@ export function ContestBox({ T, slug, item, lang, onClose, onEvent }: { T: TourC
       aria-modal="true"
       aria-label={tr("Du fandt skatten! 🎉")}
       onClick={onClose}
-      style={{ "--c-main": T.colors.main, "--c-accent": T.colors.accent, "--font-heading": `'${T.fontHeading ?? T.font}', '${T.font}', sans-serif`, fontFamily: `'${T.font}', sans-serif` } as React.CSSProperties}
+      style={{ "--c-main": T.colors.main, "--c-accent": T.colors.accent, "--c-on-accent": textOn(T.colors.accent, T.colors.main), "--font-heading": `'${T.fontHeading ?? T.font}', '${T.font}', sans-serif`, fontFamily: `'${T.font}', sans-serif` } as React.CSSProperties}
     >
       <div className="sk-box" onClick={(e) => e.stopPropagation()}>
         <button type="button" className="sk-luk" aria-label={tr("Luk")} onClick={onClose}>
@@ -171,7 +172,7 @@ export const CONTEST_CSS = `
 .sk-box .sk-flueben span{margin:0;font-size:12.5px;font-weight:500;line-height:1.4;color:#3d4a50}
 .sk-skjult{position:absolute!important;left:-9999px!important;width:1px!important;height:1px!important;opacity:0}
 .sk-fejl{color:#c4314b!important;font-weight:600}
-.sk-knap{display:block;width:100%;margin-top:6px;padding:13px 16px;border:0;border-radius:999px;background:var(--c-accent);color:#fff;font:inherit;font-weight:800;font-size:15px;cursor:pointer}
+.sk-knap{display:block;width:100%;margin-top:6px;padding:13px 16px;border:0;border-radius:999px;background:var(--c-accent);color:var(--c-on-accent,#fff);font:inherit;font-weight:800;font-size:15px;cursor:pointer}
 .sk-knap:disabled{opacity:.6}
 .sk-luk{position:absolute;top:10px;right:10px;width:32px;height:32px;border:0;border-radius:50%;background:#f1f4f4;color:#1d2a30;font-size:20px;line-height:1;cursor:pointer}
 `;

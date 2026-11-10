@@ -162,7 +162,7 @@ export const INFO_CSS = `
 .ip-card h3{margin:0 30px 6px 0;font-family:var(--font-heading);font-size:22px;font-weight:800;color:var(--c-main)}
 .ip-card p{margin:0 0 14px;font-size:15px;line-height:1.5;color:#3d4a50}
 .ip-luk{position:absolute;top:10px;right:10px;width:32px;height:32px;border:0;border-radius:50%;background:#f1f2f3;font-size:20px;cursor:pointer}
-.ip-link{display:inline-block;padding:10px 16px;border-radius:999px;background:var(--c-accent);color:#fff;font-weight:800;font-size:14px;text-decoration:none}
+.ip-link{display:inline-block;padding:10px 16px;border-radius:999px;background:var(--c-accent);color:var(--c-on-accent,#fff);font-weight:800;font-size:14px;text-decoration:none}
 @media (max-width:760px){
   .ip-card{top:auto;bottom:0;right:0;left:0;width:auto;translate:none;border-radius:18px 18px 0 0;padding-bottom:calc(18px + env(safe-area-inset-bottom,0px))}
 }
