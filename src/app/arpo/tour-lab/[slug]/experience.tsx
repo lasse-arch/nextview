@@ -1375,6 +1375,7 @@ function TourExperience({
     let cancelled = false;
     let declutter = 0;
     let sized: ResizeObserver | null = null;
+    let untouch: (() => void) | null = null;
     let shownTimer = 0;
     const key = droneKey;
     // The 360° photo's copy for this screen (made when the tour was saved), when there is one.
@@ -1454,10 +1455,49 @@ function TourExperience({
         sized.observe(droneEl.current);
       }
       declutter = window.setInterval(() => declutterNames(selectedId.current), 120);
+      // Touch screens: the points let every touch through to the picture (so a pinch or a drag that starts on a point
+      // still zooms and turns it) - a real tap is found here instead: one finger, hardly moved, quickly up, on a point.
+      const box = droneEl.current;
+      if (box && window.matchMedia("(pointer: coarse)").matches) {
+        const fingers = new Map<number, { x: number; y: number; t: number }>();
+        let many = false;
+        const down = (e: PointerEvent) => {
+          fingers.set(e.pointerId, { x: e.clientX, y: e.clientY, t: performance.now() });
+          if (fingers.size > 1) many = true;
+        };
+        const up = (e: PointerEvent) => {
+          const f = fingers.get(e.pointerId);
+          fingers.delete(e.pointerId);
+          const tap = f && !many && Math.hypot(e.clientX - f.x, e.clientY - f.y) < 10 && performance.now() - f.t < 600;
+          if (!fingers.size) many = false;
+          if (!tap) return;
+          // The point under the finger (a little room around it) - the nearest, if two are close.
+          let best: { el: HTMLElement; d: number } | null = null;
+          for (const el of box.querySelectorAll<HTMLElement>(".hv-hs[data-punkt]:not(.hv-skjult)")) {
+            if (el.style.visibility === "hidden") continue;
+            const r = el.getBoundingClientRect();
+            if (!r.width || e.clientX < r.left - 8 || e.clientX > r.right + 8 || e.clientY < r.top - 8 || e.clientY > r.bottom + 8) continue;
+            const d = Math.hypot(e.clientX - (r.left + r.width / 2), e.clientY - (r.top + r.height / 2));
+            if (!best || d < best.d) best = { el, d };
+          }
+          const point = best && T.points.find((x) => x.id === best.el.dataset.punkt);
+          if (point) openPointRef.current(point);
+        };
+        const cancel = (e: PointerEvent) => void fingers.delete(e.pointerId);
+        box.addEventListener("pointerdown", down, true);
+        box.addEventListener("pointerup", up, true);
+        box.addEventListener("pointercancel", cancel, true);
+        untouch = () => {
+          box.removeEventListener("pointerdown", down, true);
+          box.removeEventListener("pointerup", up, true);
+          box.removeEventListener("pointercancel", cancel, true);
+        };
+      }
       track("drone_view");
     });
     return () => {
       cancelled = true;
+      untouch?.();
       sized?.disconnect();
       window.clearInterval(declutter);
       window.clearTimeout(shownTimer);
@@ -4225,6 +4265,8 @@ html:has(.hv.fixed),html:has(.hv.fixed) body{overflow:hidden;overscroll-behavior
 .hv-pano .pnlm-lmsg{display:none}
 .hv-hs.hv-skjult{display:none!important}
 .hv-hs.hv-aktiv{z-index:9}
+/* Touch screens: a touch on a point goes through to the picture (pinch and drag work everywhere) - the tap is found by the drone scene itself. */
+@media (pointer:coarse){.pnlm-hotspot-base.hv-hs{pointer-events:none}}
 @media (hover:hover){.hv-hs:hover{z-index:9}}
 .hv-hs.hv-aktiv .hv-ikon{transform:scale(1.18);box-shadow:0 0 0 4px rgba(255,255,255,.55),0 3px 10px rgba(0,0,0,.35)}
 /* The icon's centre is the place it marks, so it stays put at every zoom; the name hangs below it. */
