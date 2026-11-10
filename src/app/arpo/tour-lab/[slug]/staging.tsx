@@ -223,8 +223,13 @@ export function StagingLayer({
  */
 export function StagingSound({ sdk, items, currentSs, frame }: { sdk: MpSdk | null; items: StagingItem[]; currentSs: number | null; frame: React.RefObject<HTMLIFrameElement | null> }) {
   const tr = useT();
-  const films = items.filter((i) => i.kind === "video" && i.src && !i.action?.href && currentSs != null && i.ss.includes(currentSs) && i.corners?.length === 4);
+  // In 3D a film is seen from every scan point near it (not only the ones it was placed from) - so its button is too.
+  const films = items.filter((i) => i.kind === "video" && i.src && !i.action?.href && i.corners?.length === 4);
   const els = useRef<(HTMLButtonElement | null)[]>([]);
+  const ssNow = useRef(currentSs);
+  useEffect(() => {
+    ssNow.current = currentSs;
+  }, [currentSs]);
   const [, setTick] = useState(0);
   const key = films.map((f) => f.id).join(",");
   useEffect(() => {
@@ -240,7 +245,10 @@ export function StagingSound({ sdk, items, currentSs, frame }: { sdk: MpSdk | nu
         // Just under the bottom edge's middle - for a screen standing up in the room, under the screen itself (its corners lie on the floor).
         const c = f.corners;
         const at = f.stand && f.place ? { x: f.place.center.x, y: f.place.center.y + (f.stand.lift ?? 0), z: f.place.center.z } : { x: (c[2].x + c[3].x) / 2, y: (c[2].y + c[3].y) / 2, z: (c[2].z + c[3].z) / 2 };
-        const seen = pose.mode.includes("inside") && inFront(pose, at);
+        // Near enough to see it: one of its own scan points, or within 15 m (further off, or in another room, it's left out).
+        const p = pose.position;
+        const near = (ssNow.current != null && f.ss.includes(ssNow.current)) || Math.hypot(p.x - at.x, p.y - at.y, p.z - at.z) < 15;
+        const seen = near && pose.mode.includes("inside") && inFront(pose, at);
         const q = seen ? conv.worldToScreen(at, pose, size) : null;
         const ok = q && q.x > 0 && q.x < size.w && q.y > 0 && q.y < size.h - 30;
         b.style.transform = ok ? `translate(${q!.x}px, ${q!.y + 8}px) translateX(-50%)` : "";

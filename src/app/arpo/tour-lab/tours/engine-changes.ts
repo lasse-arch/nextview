@@ -9,6 +9,7 @@
 export type EngineChange = { date: string; kind: "ny" | "sikkerhed" | "hastighed" | "rettelse"; text: string };
 
 export const ENGINE_CHANGES: EngineChange[] = [
+  { date: "2026-11-10", kind: "rettelse", text: "Virtual staging: \"Tryk for lyd\" / \"Slå lyd fra\" under en film bliver der også fra scanpunkterne ved siden af (inden for 15 m) - ikke kun fra det første." },
   { date: "2026-11-10", kind: "rettelse", text: "Stående skærme i Virtual staging drejer nu mod gæsten, forsvinder ikke ved skift af scanpunkt, og \"Tryk for lyd\" sidder under skærmen." },
   { date: "2026-11-10", kind: "rettelse", text: "Stedkort på telefon: mindre - 2 linjer tekst og \"Læs mere\", lidt mindre skrift, og knapperne side om side." },
   { date: "2026-11-10", kind: "ny", text: "Virtual staging: en video, et billede eller et skilt kan stå op midt i rummet (fx en hal) og vender altid mod gæsten." },
