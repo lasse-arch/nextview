@@ -7,6 +7,7 @@ import { prisma } from "@/lib/db";
 // page's own response but is still bounded by its maxDuration.
 export const maxDuration = 300;
 import { getCurrentUser } from "@/lib/auth";
+import { teamCan } from "@/lib/team-roles";
 import { bsPayerOf } from "@/lib/betalingsservice/service";
 import Link from "next/link";
 import { findPossibleDuplicates } from "@/lib/duplicates";
@@ -767,6 +768,19 @@ export default async function DealDetailPage({
               isChurned={Boolean(deal.churnedAt)}
               isAdmin
             />
+          )}
+
+          {/* Sellers: the customer page as the customer's staff see it (tours, numbers, codes) - the logins are the admin's. */}
+          {currentUser?.role !== "ADMIN" && currentUser && teamCan(currentUser, "sales") && (
+            <section className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-6 py-4 shadow-sm">
+              <div>
+                <h2 className="text-sm font-semibold text-slate-900">Kundesiden</h2>
+                <p className="mt-0.5 text-xs text-slate-500">Se, hvad kunden ser: tours, tal og koderne til hjemmesiden.</p>
+              </div>
+              <a href={`/kunde?som=${deal.id}`} target="_blank" rel="noopener" className="shrink-0 text-xs font-medium text-[#0071e3] hover:underline">
+                Se som kunde ↗
+              </a>
+            </section>
           )}
 
           {currentUser?.role === "ADMIN" && (

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { teamCan } from "@/lib/team-roles";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { dealName, formatDKK, invoiceQuarterShortLabel } from "@/lib/labels";
@@ -177,7 +178,7 @@ export default async function CustomerOverviewPage({ params }: { params: Promise
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            {isAdmin && (
+            {(isAdmin || teamCan(user, "sales")) && (
               <a href={`/kunde?som=${deal.id}`} target="_blank" rel="noopener" className="rounded-lg bg-[#0071e3] px-3.5 py-2 text-sm font-semibold text-white hover:bg-[#0077ed]">
                 Se kundesiden som kunde ↗
               </a>
