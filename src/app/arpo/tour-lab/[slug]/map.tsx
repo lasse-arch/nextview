@@ -143,6 +143,30 @@ export function MapScene({
     const k = s / v.s;
     go({ s, x: cx - (cx - v.x) * k, y: cy - (cy - v.y) * k }, 0);
   }
+  // The category filters at the bottom can wrap onto more rows: their real height, so the search (on a phone) stands just above them.
+  useEffect(() => {
+    const root = box.current?.closest<HTMLElement>(".hv");
+    if (!root || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver((entries) => root.style.setProperty("--filtre-h", `${Math.round(entries[0].target.getBoundingClientRect().height)}px`));
+    let seen: Element | null = null;
+    // The filters may come a moment later (after the welcome): looked for until they're there, and again if they're drawn anew.
+    const find = () => {
+      const f = root.querySelector(".hv-filtre");
+      if (f && f !== seen) {
+        if (seen) ro.unobserve(seen);
+        ro.observe(f);
+        seen = f;
+      }
+    };
+    find();
+    const t = setInterval(find, 1000);
+    return () => {
+      clearInterval(t);
+      ro.disconnect();
+      root.style.removeProperty("--filtre-h");
+    };
+  }, []);
+
   /** Where the finger (or mouse) went down - a move of more than a few pixels is a drag, not a tap on a point. */
   const downAt = useRef<{ x: number; y: number } | null>(null);
   const handlers = {
@@ -302,7 +326,7 @@ export const MAP_CSS = `
 .km-zoom button+button{border-top:1px solid #e5e8ea}
 .hv-punkt .km-soeg,.hv-welcome .km-soeg,.hv-welcome .km-zoom{opacity:0;pointer-events:none}
 @media (max-width:760px){
-  .km-soeg{top:auto;bottom:calc(64px + env(safe-area-inset-bottom,0px));left:10px;right:10px;translate:none;width:auto}
+  .km-soeg{top:auto;bottom:calc(var(--filtre-h,44px) + 20px + env(safe-area-inset-bottom,0px));left:10px;right:10px;translate:none;width:auto}
   .km-soeg ul{position:absolute;bottom:100%;left:0;right:0;margin:0 0 6px}
   .km-zoom{display:none}
 }

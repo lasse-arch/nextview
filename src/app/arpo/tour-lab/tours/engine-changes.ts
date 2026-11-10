@@ -9,6 +9,7 @@
 export type EngineChange = { date: string; kind: "ny" | "sikkerhed" | "hastighed" | "rettelse"; text: string };
 
 export const ENGINE_CHANGES: EngineChange[] = [
+  { date: "2026-11-10", kind: "rettelse", text: "Kortet på telefon: søgefeltet står over kategori-knapperne - også når de fylder flere rækker." },
   { date: "2026-11-10", kind: "rettelse", text: "Luftfotoet på telefon: rammer fingeren et punkt, mens man trækker rundt, åbner punktet ikke længere - og punktet bliver ikke hængende forstørret." },
   { date: "2026-11-10", kind: "rettelse", text: "Luftfotoet: lukker man et punkts kort med ✕, zoomer det ud igen til der, hvor man stod, før punktet blev åbnet." },
   { date: "2026-11-10", kind: "ny", text: "\"Sådan ser en dag ud\": vælg hvor meget lærerne fylder på kortet - Alle, Kun én eller Kun ansigter." },
