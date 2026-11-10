@@ -3028,7 +3028,7 @@ function TourExperience({
             )}
             {selected.tour ? (
               <button type="button" className="hv-btn hv-primary hv-wide" disabled={entering} onClick={() => enterTour(selected.tour!, "drone", selected.name)}>
-                {entering ? tx("Går ind…") : tx("Gå ind i rummet")}
+                {entering ? tx("Går ind…") : tx(selected.enterLabel?.trim() || "Gå ind i rummet")}
               </button>
             ) : (
               hasPano(selected) && (

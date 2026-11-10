@@ -285,6 +285,8 @@ export type TourPoint = {
   pitch: number;
   /** Where "Gå ind i rummet" lands (a link to a spot in the tour), if anywhere. */
   tour: string | null;
+  /** The words on that button for this point - e.g. "Gå derhen" or "Se stedet" for a place outdoors (Vandland, Minigolf); left out = "Gå ind i rummet". */
+  enterLabel?: string;
   /** A 360° photo at the point (folder under panos.basePath). */
   pano?: string;
   /** Where the 360° photo opens, in degrees (default: straight ahead, a little down). */

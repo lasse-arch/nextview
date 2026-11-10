@@ -12,7 +12,7 @@ import { PANO_HFOV, isPlaceHref, panoHfov, pointOfHref } from "../../tours/place
 import { fitPano } from "../../tours/pano-cover";
 import "pannellum/build/pannellum.css";
 import type { DroneLook, TourConfig, TourPoint } from "../../tours/types";
-import { Choice, Field, FilesContext, Group, Icon, input, PanoZoom, Toggle, UploadButton, type PreviewApi } from "./ui";
+import { Choice, EnterLabelField, Field, FilesContext, Group, Icon, input, PanoZoom, Toggle, UploadButton, type PreviewApi } from "./ui";
 import { AiImageButton, AiImageList } from "./ai-image";
 
 /*
@@ -1095,6 +1095,11 @@ function PointPanel({
                   Vis
                 </button>
               )}
+            </div>
+          )}
+          {p.tour && (
+            <div className="mt-3">
+              <EnterLabelField value={p.enterLabel} onChange={(v) => setPoint((x) => void (x.enterLabel = v))} />
             </div>
           )}
         </Field>

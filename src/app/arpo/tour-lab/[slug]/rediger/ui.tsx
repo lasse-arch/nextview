@@ -619,3 +619,23 @@ export async function firstFrame(film: File | string, name = "forside.jpg"): Pro
     if (local) URL.revokeObjectURL(local);
   }
 }
+
+/** The words on a point's "Gå ind i rummet" button - its own for a place outdoors ("Gå derhen", "Se stedet"). */
+const ENTER_WORDS = ["Gå ind i rummet", "Gå derhen", "Se stedet", "Gå ind", "Kig indenfor"];
+export function EnterLabelField({ value, onChange }: { value: string | undefined; onChange: (v: string | undefined) => void }) {
+  const now = value?.trim() || ENTER_WORDS[0];
+  return (
+    <div className="space-y-1.5">
+      <div className="px-1 text-[12px] font-medium text-[#6e6e73]">Knappens tekst</div>
+      <input className={input} value={value ?? ""} placeholder={ENTER_WORDS[0]} maxLength={40} onChange={(e) => onChange(e.target.value.trim() ? e.target.value : undefined)} />
+      <div className="flex flex-wrap gap-1.5">
+        {ENTER_WORDS.map((w) => (
+          <button key={w} type="button" onClick={() => onChange(w === ENTER_WORDS[0] ? undefined : w)} className={`rounded-full px-2.5 py-1 text-[12px] font-medium ring-1 ${now === w ? "bg-[#0071e3] text-white ring-[#0071e3]" : "bg-white text-[#1d1d1f] ring-black/[.08] hover:bg-[#f2f2f7]"}`}>
+            {w}
+          </button>
+        ))}
+      </div>
+      <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">Fx &quot;Gå derhen&quot; ved et udested som Vandland eller Minigolf. Oversættes med touren.</p>
+    </div>
+  );
+}

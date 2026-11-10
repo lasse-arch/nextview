@@ -13,7 +13,7 @@ import type { CardPerson, DroneView, GuideTurn, GuideTurnMode, GuideTurnSpeed, P
 import type { DroneViews } from "../../tours/places";
 import type { ScanMap } from "@/lib/matterport-graph";
 import { ScanPointPicker } from "./scanpoints";
-import { Choice, Field, FilesContext, firstFrame, GearButton, Group, Icon, input, PanoZoom, Toggle, UploadButton, ssOfHref, uploadToTour, type PreviewApi } from "./ui";
+import { Choice, EnterLabelField, Field, FilesContext, firstFrame, GearButton, Group, Icon, input, PanoZoom, Toggle, UploadButton, ssOfHref, uploadToTour, type PreviewApi } from "./ui";
 
 /*
  * The editors for a tour's content - the start, its places, "Vis mig rundt"
@@ -804,6 +804,7 @@ function PointStop({ config, id, edit, onEdit, preview }: { config: TourConfig; 
             </button>
           )}
         </p>
+        {p.tour && <EnterLabelField value={p.enterLabel} onChange={(v) => setPoint((x) => void (x.enterLabel = v))} />}
       </div>
       <Field title="Billeder på punktets kort" hint="Det første vises først. Tryk × for at fjerne et.">
         {images.length > 0 && (

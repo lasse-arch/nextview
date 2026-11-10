@@ -9,6 +9,7 @@
 export type EngineChange = { date: string; kind: "ny" | "sikkerhed" | "hastighed" | "rettelse"; text: string };
 
 export const ENGINE_CHANGES: EngineChange[] = [
+  { date: "2026-11-10", kind: "ny", text: "Hvert punkt kan have sin egen tekst på \"Gå ind i rummet\"-knappen - fx \"Gå derhen\" ved et udested som Vandland eller Minigolf." },
   { date: "2026-11-10", kind: "rettelse", text: "Virtual staging: filmens lyd slukker, når et stedkort læses op eller rundvisningens stemme taler - og tænder man filmens lyd, stopper oplæsningen. Aldrig to lyde på én gang." },
   { date: "2026-11-10", kind: "rettelse", text: "Historier: når rækken åbnes igen (▴ eller \"Historier ▾\"), står den ved det sted, man er - ikke ved starten." },
   { date: "2026-11-10", kind: "rettelse", text: "Historier på telefon: linjerne øverst går ikke længere ind under MENU-knappen." },
