@@ -75,7 +75,8 @@ export function Stories({
           (row.clientWidth - card.clientWidth) / 2,
         behavior: "smooth",
       });
-  }, [current]);
+    // Also when the row opens again after the small player (folded away, it couldn't scroll) - or after "Historier ▾".
+  }, [current, mini, collapsed]);
 
   // Something else wants the visitor's attention (e.g. writing feedback): the story waits.
   useEffect(() => {

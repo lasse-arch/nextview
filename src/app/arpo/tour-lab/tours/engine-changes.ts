@@ -9,6 +9,7 @@
 export type EngineChange = { date: string; kind: "ny" | "sikkerhed" | "hastighed" | "rettelse"; text: string };
 
 export const ENGINE_CHANGES: EngineChange[] = [
+  { date: "2026-11-10", kind: "rettelse", text: "Historier: når rækken åbnes igen (▴ eller \"Historier ▾\"), står den ved det sted, man er - ikke ved starten." },
   { date: "2026-11-10", kind: "rettelse", text: "Historier på telefon: linjerne øverst går ikke længere ind under MENU-knappen." },
   { date: "2026-11-10", kind: "rettelse", text: "\"Her er menuen\" vises kun for den, der går selv rundt - ikke mens historierne spiller, under en rundvisning, Find vej eller \"Sådan ser en dag ud\"." },
   { date: "2026-11-10", kind: "ny", text: "Historier på telefon: når man trykker på en historie (eller Afspil), folder rækken sig sammen til en lille afspiller i bunden - billede med tiden rundt om, navnet, Pause, Videre og ▴ for hele rækken." },
