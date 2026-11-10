@@ -948,7 +948,8 @@ export type TourConfig = {
    * sideways (default on both) - false on a device = every card shown,
    * wrapped onto more rows.
    */
-  stories?: { mobile: boolean; desktop: boolean; rooms?: string[]; scroll?: { mobile?: false; desktop?: false } };
+  /** `closed`: the row starts folded in - just its "Historier ▴" button, opened by the visitor. */
+  stories?: { mobile: boolean; desktop: boolean; rooms?: string[]; scroll?: { mobile?: false; desktop?: false }; closed?: true };
   /** Matterport URL parameters for the viewer. */
   matterportParams: Record<string, string>;
   /** How long a fly to a spot takes (ms). */

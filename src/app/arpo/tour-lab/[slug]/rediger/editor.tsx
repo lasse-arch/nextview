@@ -110,7 +110,7 @@ const FINDS: Partial<Record<Tab, string[]>> = {
   layout: ["Sådan starter touren|når touren åbner|velkomst|forside|direkte|skabelon|design|tema|preset", "Menuens udseende|menu-design|sidemenu|dock|bar i bunden|rumvælger|fliser", "Menu åben på computer", "Menu åben på mobil", "Dæmp touren bag menuen", "Placering|computer|mobil", "Logoet sidder til|logo venstre|logo højre", "Vis hvor menuen er|pil til menuen|menu-pil", "Skift sprog|sprogknap", "Knapper på touren|find vej-knappen|vej til stedet-knappen|svævende knapper"],
   start: ["Hvor touren starter|startpunkt|startposition|start-link|start her", "Forsiden", "Velkomsten", "Fliser", "Kort film før touren", "Intro-video", "Steder med foto", "Træd indenfor"],
   menu: ["Menupunkter", "Grupper", "Tilføj det sted, du ser", "Billede i menuen", "360°-billede", "Webside", "Luftfotoet", "Scanpunkter i menuen"],
-  rundvisning: ["Historier|stories", "Scroll i historierne", "Tag billeder til historierne|fjern billederne", "Sådan ser en dag ud|dagen|program", "Vis mig rundt", "Guide", "Guidet tur", "Stop", "Drejning", "Sekunder ved hvert stop", "Stemme|lyd|elevenlabs|speak|oplæsning", "Lav den ud fra menuen", "Knappen i menuen|øverst|nederst|ikke i menuen", "Egen knap på stop"],
+  rundvisning: ["Historier|stories", "Start skjult|historier skjult|fold sammen", "Scroll i historierne", "Tag billeder til historierne|fjern billederne", "Sådan ser en dag ud|dagen|program", "Vis mig rundt", "Guide", "Guidet tur", "Stop", "Drejning", "Sekunder ved hvert stop", "Stemme|lyd|elevenlabs|speak|oplæsning", "Lav den ud fra menuen", "Knappen i menuen|øverst|nederst|ikke i menuen", "Egen knap på stop"],
   kortet: ["Interaktivt kort", "Luftfoto", "Dronebillede", "360°-kort", "Punkter på kortet", "Kategorier", "Skyer", "Boksen øverst", "Filteret", "Luftfotoets første udsnit|startudsnit", "Ikoner", "Vejret|vejr|temperatur|dmi|sol", "Find din plads|finder|spørgsmål|guide til plads", "Gåafstande|gåafstand|minutter|afstand", "Bevægelse på luftfotoet|kig ned|kig op|zoom ved punkt", "Hent fra en kortside|lovable|importer kort"],
   scan: ["Scanpunkter", "Skjul scanpunkter", "Personer i scans"],
   tags: ["Tags", "Infotags", "Hotspots", "Pris", "Video"],
@@ -932,15 +932,23 @@ export function TourEditor({
                 <Group title="Historier - rummene som kort, der kører af sig selv">
                 <Toggle
                   on={Boolean(config.stories?.mobile)}
-                  onChange={(on) => edit((d) => void (d.stories = { mobile: on, desktop: d.stories?.desktop ?? false, rooms: d.stories?.rooms, scroll: d.stories?.scroll }))}
+                  onChange={(on) => edit((d) => void (d.stories = { ...d.stories, mobile: on, desktop: d.stories?.desktop ?? false }))}
                   title="Historier på mobil"
                   hint="Rummene som kort nederst, som Instagram-stories."
                 />
                 <Toggle
                   on={Boolean(config.stories?.desktop)}
-                  onChange={(on) => edit((d) => void (d.stories = { mobile: d.stories?.mobile ?? false, desktop: on, rooms: d.stories?.rooms, scroll: d.stories?.scroll }))}
+                  onChange={(on) => edit((d) => void (d.stories = { ...d.stories, mobile: d.stories?.mobile ?? false, desktop: on }))}
                   title="Historier på computer"
                 />
+                {(config.stories?.mobile || config.stories?.desktop) && (
+                  <Toggle
+                    on={config.stories?.closed === true}
+                    onChange={(on) => edit((d) => void (d.stories = { ...d.stories!, closed: on ? true : undefined }))}
+                    title="Start skjult"
+                    hint="Touren starter med historierne foldet sammen - kun knappen &quot;Historier&quot; står der, og gæsten åbner dem selv."
+                  />
+                )}
                 {(config.stories?.mobile || config.stories?.desktop) && <StoryPictures slug={slug} preview={preview} />}
                 {(config.stories?.mobile || config.stories?.desktop) && (
                   <Field title="Scroll sidelæns i historierne" hint="Fra: alle historierne vises på én gang, fordelt på flere rækker.">

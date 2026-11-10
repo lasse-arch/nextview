@@ -25,7 +25,7 @@ export function Stories({
 }: {
   rooms: StoryRoom[];
   current: string | null;
-  devices: { mobile: boolean; desktop: boolean; scroll?: { mobile?: false; desktop?: false } };
+  devices: { mobile: boolean; desktop: boolean; scroll?: { mobile?: false; desktop?: false }; closed?: true };
   /** An extra first card, e.g. "Fra luften" back to the drone scene. */
   leading?: { label: string; onClick: () => void };
   onGo: (room: StoryRoom) => unknown;
@@ -35,7 +35,8 @@ export function Stories({
   const [seen, setSeen] = useState<string[]>([]);
   const [playing, setPlaying] = useState<number | null>(null);
   const [paused, setPaused] = useState(false);
-  const [collapsed, setCollapsed] = useState(false);
+  // Folded in from the start when the tour says so ("Start skjult") - the visitor opens it with its button.
+  const [collapsed, setCollapsed] = useState(devices.closed === true);
   /** On the way to the story's room: its time doesn't run until the tour stands there (a slow room still gets its full time). */
   const [arriving, setArriving] = useState(false);
   const cards = useRef<Record<string, HTMLButtonElement | null>>({});
