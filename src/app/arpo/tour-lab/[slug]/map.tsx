@@ -18,9 +18,14 @@ export type MapApi = {
   focus(id: string, zoom?: number, ms?: number): Promise<void>;
   /** Back to the start view. */
   reset(ms?: number): void;
+  /** Where the map stands now - to come back to (e.g. when a point's card is closed). */
+  view(): MapView | null;
+  /** Back to a view from view(). */
+  restore(v: MapView, ms?: number): void;
 };
 
 type View = { s: number; x: number; y: number };
+export type MapView = View;
 
 export function MapScene({
   T,
@@ -121,6 +126,12 @@ export function MapScene({
     },
     reset(ms = 1200) {
       go(startView(), ms);
+    },
+    view() {
+      return viewRef.current ? { ...viewRef.current } : null;
+    },
+    restore(v, ms = 700) {
+      go(v, ms);
     },
   }));
 

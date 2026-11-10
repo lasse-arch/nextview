@@ -48,7 +48,7 @@ import { IN_3D, useStaging3d } from "./staging-3d";
 import { LINE_DAY_CSS, LineDayCard, LineDayEnd, LineDayPicker, lineDayStops, type LineDayRun } from "./line-day";
 import { YEARWHEEL_CSS, YearWheelPanel } from "./yearwheel";
 import { SCHEDULE_CSS, ScheduleSheet } from "./schedule";
-import { MAP_CSS, MapScene, type MapApi } from "./map";
+import { MAP_CSS, MapScene, type MapApi, type MapView } from "./map";
 import { CARDS_CSS, NudgeCard, PlaceCard } from "./cards";
 import { MEASURES_CSS, MeasureShield } from "./measures";
 import { ROUTE_CSS, RouteLine, RouteSheet, RouteStatus, flightMs, routeNetwork, shortestPath, straighten, type Destination, type RouteGraph } from "./wayfinding";
@@ -1195,8 +1195,15 @@ function TourExperience({
     },
     [T]
   );
+  /** Where the aerial photo stood before a point's card opened (and zoomed in) - ✕ goes back there. */
+  const pointFrom = useRef<{ drone?: { pitch: number; yaw: number; hfov: number }; map?: MapView | null } | null>(null);
   const openPoint = useCallback(
     (p: Point) => {
+      // The first point opened (not one opened from another's card): remember the view to come back to.
+      if (!pointFrom.current) {
+        const v = drone.current;
+        pointFrom.current = { drone: v ? { pitch: v.getPitch(), yaw: v.getYaw(), hfov: v.getHfov() } : undefined, map: T.map ? mapApi.current?.view() : null };
+      }
       setSelected(p);
       track("drone_point_click", { point_name: p.name, category: T.categories[p.cat]?.name });
       lookAtPoint(p, true);
@@ -1204,6 +1211,19 @@ function TourExperience({
     },
     [prepare, T, lookAtPoint]
   );
+  /** ✕ on a point's card: closed, and the aerial photo back where it stood before it zoomed in. */
+  function closePoint() {
+    const from = pointFrom.current;
+    pointFrom.current = null;
+    setSelected(null);
+    if (!from || phase !== "drone") return;
+    if (from.drone) drone.current?.lookAt(from.drone.pitch, from.drone.yaw, from.drone.hfov, 700);
+    if (from.map) mapApi.current?.restore(from.map, 700);
+  }
+  // The card closed any other way (into the tour, the menu, a guided tour …): nothing to go back to.
+  useEffect(() => {
+    if (!selected) pointFrom.current = null;
+  }, [selected]);
   /** A point on the drone scene / map, its card open - from wherever the visitor is. */
   function showPoint(p: Point) {
     setMenuOpen(false);
@@ -2949,7 +2969,7 @@ function TourExperience({
 
         {selected && (
           <aside className="hv-panel">
-            <button type="button" className="hv-luk" aria-label={tx("Luk")} onClick={() => setSelected(null)}>
+            <button type="button" className="hv-luk" aria-label={tx("Luk")} onClick={closePoint}>
               ×
             </button>
             {selected.video ? (
