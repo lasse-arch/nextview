@@ -106,6 +106,9 @@ export function LineDayCard({ L, stops, run, onGo, onClose }: { L: L; stops: Sho
   const s = stops[run.at];
   if (!s) return null;
   const next = stops[run.at + 1];
+  // The same people as on a stop before (most often the line's teachers): only their faces and names on one line - the whole list is shown where they're met first.
+  const who = (x?: ShownStop) => (x?.people ?? []).map((p) => p.image).join("|");
+  const metBefore = Boolean(who(s)) && stops.slice(0, run.at).some((x) => who(x) === who(s));
   const title = run.line === MIX ? (L.mix && L.mix.title) || tr("Lidt af det hele") : tr("En dag på {linje}", { linje: L.lines.find((l) => l.id === run.line)?.name ?? "" });
   return (
     <div className="ld-card" key={s.id + run.at}>
@@ -136,7 +139,12 @@ export function LineDayCard({ L, stops, run, onGo, onClose }: { L: L; stops: Sho
           ))}
         </div>
       ) : null}
-      {s.people?.length ? (
+      {s.people?.length && metBefore ? (
+        <div className="ld-people-kort">
+          <Faces people={s.people} size={28} />
+          <small>{tr("Med {navne}", { navne: names(s.people) })}</small>
+        </div>
+      ) : s.people?.length ? (
         <div className="ld-people">
           {s.people.slice(0, 4).map((p, i) => (
             <span key={p.image + i}>
@@ -234,7 +242,8 @@ export const LINE_DAY_CSS = `
 .ld-faces img+img{margin-left:-10px}
 .ld-or{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:16px}
 .ld-or button{border:0;background:none;padding:6px 0;font:inherit;font-size:14px;font-weight:700;color:var(--c-accent);cursor:pointer}
-.ld-card{position:absolute;left:16px;bottom:16px;z-index:30;width:min(400px,calc(100% - 32px));max-height:calc(100% - 120px);overflow-y:auto;padding:16px 18px;border-radius:20px;background:rgba(255,255,255,.98);color:#1d2a30;box-shadow:0 16px 44px rgba(0,0,0,.32);animation:hvUp .35s cubic-bezier(.2,.7,.2,1) both}
+/* The card never scrolls: the text is cut short instead (the whole text is in the day's summary). */
+.ld-card{position:absolute;left:16px;bottom:16px;z-index:30;width:min(400px,calc(100% - 32px));max-height:calc(100% - 120px);overflow:hidden;padding:16px 18px;border-radius:20px;background:rgba(255,255,255,.98);color:#1d2a30;box-shadow:0 16px 44px rgba(0,0,0,.32);animation:hvUp .35s cubic-bezier(.2,.7,.2,1) both}
 .ld-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .ld-kicker{display:block;font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#8a969b}
 .ld-dots{display:flex;gap:4px;margin:10px 0 12px;padding:0;list-style:none}
@@ -252,6 +261,8 @@ export const LINE_DAY_CSS = `
 .ld-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
 .ld-tags span{padding:4px 10px;border-radius:999px;background:var(--c-soft);font-size:12.5px;font-weight:700;color:var(--c-main)}
 .ld-people{display:flex;flex-wrap:wrap;gap:10px 14px;margin-top:12px}
+.ld-people-kort{display:flex;align-items:center;gap:8px;margin-top:10px;min-width:0}
+.ld-people-kort small{min-width:0;font-size:12.5px;font-weight:700;color:#56636a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ld-people>span{display:flex;align-items:center;gap:8px;min-width:0}
 .ld-people img{width:42px;height:42px;border-radius:50%;object-fit:cover;flex:none}
 .ld-people b{display:block;font-size:13.5px}
@@ -279,10 +290,15 @@ export const LINE_DAY_CSS = `
   .ld-pick{border-radius:22px 22px 0 0;padding:22px 18px calc(18px + env(safe-area-inset-bottom,0px));max-height:90%}
   .ld-pick h2{font-size:26px}
   .ld-lines{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .ld-card{left:10px;right:10px;width:auto;bottom:calc(10px + env(safe-area-inset-bottom,0px));max-height:52%;padding:14px}
-  .ld-card h3{font-size:19px}
-  .ld-card p{font-size:14px}
-  .ld-people img{width:36px;height:36px}
+  .ld-card{left:10px;right:10px;width:auto;bottom:calc(10px + env(safe-area-inset-bottom,0px));max-height:58%;padding:14px}
+  .ld-card h3{font-size:19px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+  .ld-card p{font-size:14px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+  /* On the phone the people take less room: smaller faces, close together. */
+  .ld-people{display:grid;grid-template-columns:minmax(0,1fr);gap:6px;margin-top:10px}
+  .ld-people img{width:30px;height:30px}
+  .ld-people b{font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ld-people small{font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ld-people>span>span{min-width:0}
   .ld-end-grid{grid-template-columns:1fr;gap:16px}
   .ld-sum{border-right:0;padding-right:0;order:2}
 }
