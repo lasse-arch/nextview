@@ -221,6 +221,23 @@ export function StagingLayer({
  * turns its sound on and off. Shown from the surface's own scan points, while
  * the film is in view. Films with a button of their own (a link) get none.
  */
+/** The film's sound faded out over a moment and then turned off (the volume back to full for next time). */
+function fadeOut(v: HTMLVideoElement) {
+  if (v.muted || v.dataset.fader) return;
+  v.dataset.fader = "1";
+  const from = v.volume;
+  const t0 = performance.now();
+  const step = () => {
+    const k = Math.min(1, (performance.now() - t0) / 900);
+    v.volume = Math.max(0, from * (1 - k));
+    if (k < 1 && !v.muted) return void requestAnimationFrame(step);
+    v.muted = true;
+    v.volume = from || 1;
+    delete v.dataset.fader;
+  };
+  requestAnimationFrame(step);
+}
+
 export function StagingSound({ sdk, items, currentSs, frame }: { sdk: MpSdk | null; items: StagingItem[]; currentSs: number | null; frame: React.RefObject<HTMLIFrameElement | null> }) {
   const tr = useT();
   // In 3D a film is seen from every scan point near it (not only the ones it was placed from) - so its button is too.
@@ -235,6 +252,8 @@ export function StagingSound({ sdk, items, currentSs, frame }: { sdk: MpSdk | nu
   useEffect(() => {
     if (!sdk?.Conversion || !films.length) return;
     const conv = sdk.Conversion;
+    // A film with its sound on, that the visitor has left (out of view, or more than 15 m away) for a moment: the sound goes off by itself - and stays off when they come back.
+    const away = new Map<string, ReturnType<typeof setTimeout>>();
     const sub = sdk.Camera.pose.subscribe((pose) => {
       const el = frame.current;
       if (!el) return;
@@ -253,14 +272,33 @@ export function StagingSound({ sdk, items, currentSs, frame }: { sdk: MpSdk | nu
         const ok = q && q.x > 0 && q.x < size.w && q.y > 0 && q.y < size.h - 30;
         b.style.transform = ok ? `translate(${q!.x}px, ${q!.y + 8}px) translateX(-50%)` : "";
         b.dataset.ude = ok ? "" : "1";
+        const v = stagingVideo(f.id);
+        const audible = q && q.x > -size.w * 0.25 && q.x < size.w * 1.25 && q.y > -size.h * 0.25 && q.y < size.h * 1.25;
+        if (audible || !v || v.muted) {
+          clearTimeout(away.get(f.id));
+          away.delete(f.id);
+        } else if (!away.has(f.id)) away.set(f.id, setTimeout(() => (away.delete(f.id), fadeOut(v)), 1200));
       });
     });
+    // The tour put away (another app, the phone locked) or left: no sound goes on playing.
+    const muteAll = () =>
+      films.forEach((f) => {
+        const v = stagingVideo(f.id);
+        if (v) v.muted = true;
+      });
+    const hidden = () => {
+      if (document.visibilityState === "hidden") muteAll();
+    };
+    document.addEventListener("visibilitychange", hidden);
     // The film's own sound turned on or off (a tap on the wall does that too): the button says so.
     const vs = films.map((f) => stagingVideo(f.id)).filter((v): v is HTMLVideoElement => Boolean(v));
     const changed = () => setTick((t) => t + 1);
     vs.forEach((v) => v.addEventListener("volumechange", changed));
     return () => {
       sub.cancel();
+      away.forEach((t) => clearTimeout(t));
+      document.removeEventListener("visibilitychange", hidden);
+      muteAll();
       vs.forEach((v) => v.removeEventListener("volumechange", changed));
     };
     // `films` is named by `key`.

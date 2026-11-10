@@ -37,6 +37,8 @@ export function Stories({
   const [paused, setPaused] = useState(false);
   // Folded in from the start when the tour says so ("Start skjult") - the visitor opens it with its button.
   const [collapsed, setCollapsed] = useState(devices.closed === true);
+  /** Phone: once a story is picked (or they play), the row folds into a small player - the place card gets the room. ▴ opens it again. */
+  const [mini, setMini] = useState(false);
   /** On the way to the story's room: its time doesn't run until the tour stands there (a slow room still gets its full time). */
   const [arriving, setArriving] = useState(false);
   const cards = useRef<Record<string, HTMLButtonElement | null>>({});
@@ -147,11 +149,14 @@ export function Stories({
   }, []);
 
   const visible = `${devices.mobile ? "hv-st-m" : ""} ${devices.desktop ? "hv-st-d" : ""}`;
+  /** The room the small player shows: the story playing, or else the room the visitor is in. */
+  const now = playing != null ? rooms[playing] : rooms.find((r) => r.name === current);
+  const folded = mini && !collapsed && Boolean(now);
 
   return (
     <>
       {playing != null && (
-        <div className={`hv-story-play ${visible}`}>
+        <div className={`hv-story-play ${visible} ${folded ? "hv-st-mini-on" : ""}`}>
           <div className="hv-story-bars">
             {rooms.map((r, i) => (
               <span key={r.name} className={i < playing ? "done" : ""}>
@@ -224,8 +229,70 @@ export function Stories({
 
       <div
         ref={row}
-        className={`hv-stories ${visible} ${collapsed ? "hv-st-lukket" : ""} ${devices.scroll?.mobile === false ? "hv-st-wrap-m" : ""} ${devices.scroll?.desktop === false ? "hv-st-wrap-d" : ""}`}
+        className={`hv-stories ${visible} ${collapsed ? "hv-st-lukket" : ""} ${folded ? "hv-st-mini-on" : ""} ${devices.scroll?.mobile === false ? "hv-st-wrap-m" : ""} ${devices.scroll?.desktop === false ? "hv-st-wrap-d" : ""}`}
       >
+        {folded && now && (
+          <div className="hv-st-mini">
+            <span className="hv-st-mini-pic">
+              {now.image ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={now.image} alt="" />
+              ) : (
+                <em>{now.name.slice(0, 1)}</em>
+              )}
+              {playing != null && (
+                <svg viewBox="0 0 40 40" aria-hidden>
+                  <circle cx="20" cy="20" r="18" pathLength={100} className="bg" />
+                  <circle
+                    key={playing}
+                    cx="20"
+                    cy="20"
+                    r="18"
+                    pathLength={100}
+                    className="fg"
+                    style={{ animationDuration: `${STORY_MS}ms`, animationPlayState: paused || arriving ? "paused" : "running" }}
+                  />
+                </svg>
+              )}
+            </span>
+            <b>{now.name}</b>
+            {playing != null && (
+              <>
+                <button type="button" aria-label={paused ? tr("Fortsæt") : tr("Pause")} onClick={() => setPaused((p) => !p)}>
+                  {paused ? (
+                    <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden fill="currentColor">
+                      <path d="M7 4.5v15l12.5-7.5z" />
+                    </svg>
+                  ) : (
+                    <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden fill="currentColor">
+                      <rect x="6" y="5" width="4" height="14" rx="1" />
+                      <rect x="14" y="5" width="4" height="14" rx="1" />
+                    </svg>
+                  )}
+                </button>
+                <button type="button" aria-label={tr("Næste")} onClick={() => next("tap")}>
+                  <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden fill="currentColor">
+                    <path d="M5.5 5v14l10.5-7z" />
+                    <rect x="16.5" y="5" width="3" height="14" rx="1" />
+                  </svg>
+                </button>
+              </>
+            )}
+            <button
+              type="button"
+              aria-label={tr("Historier")}
+              className="hv-st-mini-open"
+              onClick={() => {
+                onEvent("stories_toggle", { open: 1, from: "mini" });
+                setMini(false);
+              }}
+            >
+              <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M6 15l6-6 6 6" />
+              </svg>
+            </button>
+          </div>
+        )}
         <button
           type="button"
           className="hv-st-toggle"
@@ -247,6 +314,7 @@ export function Stories({
                   rooms.findIndex((r) => !seen.includes(r.name)),
                 );
                 onEvent("story_play", { from: rooms[start].name });
+                setMini(true);
                 play(start);
               }}
             >
@@ -290,6 +358,7 @@ export function Stories({
                       seen: seen.includes(r.name) ? 1 : 0,
                     });
                     if (playing != null) setPlaying(i);
+                    setMini(true);
                     onGo(r);
                   }}
                 >
@@ -382,6 +451,25 @@ export const STORIES_CSS = `
   .hv-st-on-m .hv-logo{transition:opacity .2s}
   .hv-st-on-m:has(.hv-story-play) .hv-logo{opacity:0}
 }
+/* The small player (phone only): the picked story in a pill - its picture with the time running round it, the name, pause, next and ▴ for the whole row. */
+.hv-st-mini{display:none}
+@media (max-width:760px){
+  .hv-stories.hv-st-mini-on{background:none}
+  .hv-st-mini-on>.hv-st-toggle,.hv-st-mini-on>.hv-st-strip{display:none}
+  .hv-st-mini{display:flex;align-items:center;gap:8px;margin:0 0 2px 12px;max-width:calc(100% - 24px);padding:5px 6px 5px 5px;border-radius:999px;background:rgba(0,0,0,.55);color:#fff;box-shadow:0 6px 18px rgba(0,0,0,.3);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);animation:hvUp .3s cubic-bezier(.2,.7,.2,1) both}
+  .hv-st-mini-pic{position:relative;flex:none;width:36px;height:36px;display:grid;place-items:center}
+  .hv-st-mini-pic img,.hv-st-mini-pic em{width:30px;height:30px;border-radius:50%;object-fit:cover;display:grid;place-items:center;font-style:normal;font-weight:800;font-size:13px;background:var(--c-main)}
+  .hv-st-mini-pic svg{position:absolute;inset:0;width:36px;height:36px;transform:rotate(-90deg)}
+  .hv-st-mini-pic circle{fill:none;stroke-width:3}
+  .hv-st-mini-pic .bg{stroke:rgba(255,255,255,.3)}
+  .hv-st-mini-pic .fg{stroke:#fff;stroke-dasharray:100;stroke-dashoffset:100;stroke-linecap:round;animation:hvStoryRing linear forwards}
+  .hv-st-mini b{min-width:0;flex:0 1 auto;font-size:13px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .hv-st-mini button{flex:none;display:grid;place-items:center;width:30px;height:30px;padding:0;border:0;border-radius:50%;background:rgba(255,255,255,.16);color:#fff;cursor:pointer}
+  .hv-st-mini .hv-st-mini-open{background:rgba(255,255,255,.28)}
+  /* Pause and next are in the small player - the top keeps the bars, the name and ✕. */
+  .hv-story-play.hv-st-mini-on .hv-story-head button:not(:last-child){display:none}
+}
+@keyframes hvStoryRing{from{stroke-dashoffset:100}to{stroke-dashoffset:0}}
 /* No sideways scroll on this device: every story shown, wrapped onto more rows. */
 @media (max-width:760px){
   .hv-st-wrap-m .hv-st-row{flex-wrap:wrap;overflow:visible;justify-content:center;row-gap:8px;-webkit-mask-image:none;mask-image:none}

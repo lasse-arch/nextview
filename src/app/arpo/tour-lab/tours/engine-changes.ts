@@ -9,6 +9,8 @@
 export type EngineChange = { date: string; kind: "ny" | "sikkerhed" | "hastighed" | "rettelse"; text: string };
 
 export const ENGINE_CHANGES: EngineChange[] = [
+  { date: "2026-11-10", kind: "ny", text: "Historier på telefon: når man trykker på en historie (eller Afspil), folder rækken sig sammen til en lille afspiller i bunden - billede med tiden rundt om, navnet, Pause, Videre og ▴ for hele rækken." },
+  { date: "2026-11-10", kind: "rettelse", text: "Virtual staging: har man tændt lyden på en film og går væk fra den (eller vender sig væk), toner lyden selv ud og slukker - og forbliver slukket. Også når touren lægges væk på telefonen." },
   { date: "2026-11-10", kind: "rettelse", text: "Virtual staging: \"Tryk for lyd\" / \"Slå lyd fra\" under en film bliver der også fra scanpunkterne ved siden af (inden for 15 m) - ikke kun fra det første." },
   { date: "2026-11-10", kind: "rettelse", text: "Stående skærme i Virtual staging drejer nu mod gæsten, forsvinder ikke ved skift af scanpunkt, og \"Tryk for lyd\" sidder under skærmen." },
   { date: "2026-11-10", kind: "rettelse", text: "Stedkort på telefon: mindre - 2 linjer tekst og \"Læs mere\", lidt mindre skrift, og knapperne side om side." },
