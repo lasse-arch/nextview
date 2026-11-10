@@ -364,10 +364,11 @@ export const STORIES_CSS = `
 .hv-story-bars span.done{background:#fff}
 .hv-story-bars i{display:block;height:100%;background:#fff;transform-origin:left;animation:hvStory linear forwards}
 @keyframes hvStory{from{transform:scaleX(0)}to{transform:scaleX(1)}}
-.hv-story-head{display:flex;align-items:center;gap:8px;max-width:calc(100% - 100px)}
-.hv-story-head img{width:30px;height:30px;border-radius:50%;object-fit:cover;border:2px solid #fff}
-.hv-story-head b{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:0 1px 4px rgba(0,0,0,.6)}
-.hv-story-head span{font-size:12px;opacity:.8}
+/* The buttons keep their place whatever the room's name: the name takes the room left (shortened with …), the count has a fixed width. */
+.hv-story-head{display:flex;align-items:center;gap:8px;width:calc(100% - 100px)}
+.hv-story-head img{flex:none;width:30px;height:30px;border-radius:50%;object-fit:cover;border:2px solid #fff}
+.hv-story-head b{flex:1;min-width:0;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:0 1px 4px rgba(0,0,0,.6)}
+.hv-story-head span{flex:none;min-width:38px;text-align:right;font-size:12px;opacity:.8;font-variant-numeric:tabular-nums}
 .hv-story-head button{display:grid;place-items:center;padding:0;border:0;background:rgba(0,0,0,.4);color:#fff;width:30px;height:30px;border-radius:50%;font-size:12px;line-height:1;cursor:pointer;flex:none}
 @media (max-width:760px){
   .hv-stories.hv-st-m,.hv-story-play.hv-st-m{display:flex}
@@ -400,5 +401,6 @@ export const STORIES_CSS = `
   /* Computer: the dark fade goes the whole width (no hard edges) - only the bars and the head keep to the middle. */
 .hv-story-play.hv-st-d{align-items:center}
 .hv-story-play.hv-st-d>*{width:min(620px,100%)}
+.hv-story-play.hv-st-d .hv-story-head{width:min(620px,100%)}
 }
 `;

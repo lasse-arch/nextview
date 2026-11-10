@@ -9,6 +9,7 @@
 export type EngineChange = { date: string; kind: "ny" | "sikkerhed" | "hastighed" | "rettelse"; text: string };
 
 export const ENGINE_CHANGES: EngineChange[] = [
+  { date: "2026-11-10", kind: "rettelse", text: "Historier: Pause, Videre og luk står fast i højre side - de flytter sig ikke efter, hvor langt rummets navn er." },
   { date: "2026-11-10", kind: "ny", text: "Historier kan starte skjult (foldet sammen) - gæsten åbner dem selv med knappen." },
   { date: "2026-11-10", kind: "ny", text: "Knapperne får selv mørk tekst på en lys knapfarve (fx guld), så hjemmesidens egen farve kan bruges, som den er." },
   { date: "2026-11-10", kind: "rettelse", text: "Historier: rene ikoner på Pause og Videre, og den mørke toning øverst har ikke længere skarpe kanter." },
