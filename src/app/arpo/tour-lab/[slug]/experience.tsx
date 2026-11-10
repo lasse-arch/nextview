@@ -1392,8 +1392,14 @@ function TourExperience({
         createTooltipFunc: (el) => {
           el.dataset.punkt = p.id;
           el.innerHTML = `<div class="hv-pkt"><span class="hv-ikon" style="background:${safeColor(T.categories[p.cat]?.color)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">${ICONS[p.icon] ?? ICONS.skov}</svg></span><span class="hv-navn">${escapeHtml(p.name)}</span></div>`;
+          // A tap opens the point - a drag that began or ended on it (the visitor looking around) doesn't.
+          let down: { x: number; y: number } | null = null;
+          el.addEventListener("pointerdown", (e) => void (down = { x: e.clientX, y: e.clientY }));
           el.addEventListener("click", (e) => {
             e.stopPropagation();
+            const moved = down ? Math.hypot(e.clientX - down.x, e.clientY - down.y) : 0;
+            down = null;
+            if (moved > 10) return;
             openPoint(p);
           });
         },
@@ -4218,7 +4224,8 @@ html:has(.hv.fixed),html:has(.hv.fixed) body{overflow:hidden;overscroll-behavior
 .hv-pano .pnlm-lbar-fill{background:#fff!important;border-radius:2px}
 .hv-pano .pnlm-lmsg{display:none}
 .hv-hs.hv-skjult{display:none!important}
-.hv-hs:hover,.hv-hs.hv-aktiv{z-index:9}
+.hv-hs.hv-aktiv{z-index:9}
+@media (hover:hover){.hv-hs:hover{z-index:9}}
 .hv-hs.hv-aktiv .hv-ikon{transform:scale(1.18);box-shadow:0 0 0 4px rgba(255,255,255,.55),0 3px 10px rgba(0,0,0,.35)}
 /* The icon's centre is the place it marks, so it stays put at every zoom; the name hangs below it. */
 .hv-pkt{position:relative;transform:translate(-50%,-50%) scale(var(--pkt-d,1));cursor:pointer;pointer-events:none}
@@ -4226,7 +4233,7 @@ html:has(.hv.fixed),html:has(.hv.fixed) body{overflow:hidden;overscroll-behavior
 .hv-ikon{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;border:3px solid #fff;box-shadow:0 3px 10px rgba(0,0,0,.35);transition:transform .15s}
 .hv-ikon svg{width:17px;height:17px}
 .hv-navn{position:absolute;top:100%;left:50%;transform:translateX(-50%);margin-top:4px;background:#fff;border-radius:999px;padding:2px 10px;font-size:12.5px;font-weight:800;white-space:nowrap;color:#1d2a30;box-shadow:0 2px 8px rgba(0,0,0,.25)}
-.hv-pkt:hover .hv-ikon{transform:scale(1.12)}
+@media (hover:hover){.hv-pkt:hover .hv-ikon{transform:scale(1.12)}}
 /* A name that would cover another point steps aside until its icon is hovered. */
 /* While the drone picture loads: its points and boxes wait (nothing floats on black), the logo breathes in the middle - then all fade in together. */
 .hv-intro,.hv-filtre,.pnlm-hotspot-base,.vj-chip,.hv-find-m{transition:opacity .5s ease}
@@ -4235,7 +4242,7 @@ html:has(.hv.fixed),html:has(.hv.fixed) body{overflow:hidden;overscroll-behavior
 .hv-laster-tegn img{max-width:180px;max-height:70px;opacity:.85;animation:hvAande 1.8s ease-in-out infinite}
 @keyframes hvAande{0%,100%{opacity:.35;transform:scale(.97)}50%{opacity:.9;transform:scale(1)}}
 .hv-navn.hv-gemt{visibility:hidden;pointer-events:none}
-.hv-pkt:hover .hv-navn.hv-gemt{visibility:visible}
+@media (hover:hover){.hv-pkt:hover .hv-navn.hv-gemt{visibility:visible}}
 @media (min-width:761px){
   .hv-navne-d-zoom .hv-navn{display:none}
   .hv-navne-d-zoom.hv-zoom .hv-navn,.hv-navne-d-zoom .hv-hs.hv-aktiv .hv-navn{display:block}

@@ -143,9 +143,12 @@ export function MapScene({
     const k = s / v.s;
     go({ s, x: cx - (cx - v.x) * k, y: cy - (cy - v.y) * k }, 0);
   }
+  /** Where the finger (or mouse) went down - a move of more than a few pixels is a drag, not a tap on a point. */
+  const downAt = useRef<{ x: number; y: number } | null>(null);
   const handlers = {
     onPointerDown(e: React.PointerEvent) {
       pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pointers.current.size === 1) downAt.current = { x: e.clientX, y: e.clientY };
       dragged.current = false;
       if (pointers.current.size === 2) {
         const [a, b] = [...pointers.current.values()];
@@ -165,7 +168,9 @@ export function MapScene({
       }
       const dx = e.clientX - last.x;
       const dy = e.clientY - last.y;
-      if (Math.abs(dx) + Math.abs(dy) > 2) dragged.current = true;
+      // A finger always shakes a little: only a real move (8 px from where it went down) is a drag.
+      const from = downAt.current;
+      if (!dragged.current && from && Math.hypot(e.clientX - from.x, e.clientY - from.y) > 8) dragged.current = true;
       if (dragged.current) {
         (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
         go({ ...viewRef.current, x: viewRef.current.x + dx, y: viewRef.current.y + dy }, 0);
