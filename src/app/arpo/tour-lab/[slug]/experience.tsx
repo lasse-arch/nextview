@@ -2858,6 +2858,7 @@ function TourExperience({
           "--c-accent": T.colors.accent,
           // The text on the tour's buttons: white, or dark on a light button colour (a gold like the site's) - so the site's own colour can be used as it is.
           "--c-on-accent": textOn(T.colors.accent, T.colors.main),
+          "--c-on-main": textOn(T.colors.main, "#1d2a30"),
           "--c-accent-dark": T.colors.accentDark,
           "--c-soft": T.colors.soft,
           "--font-heading": `'${T.fontHeading ?? T.font}', '${T.font}', sans-serif`,
@@ -3331,13 +3332,14 @@ function TourExperience({
         </div>
         {events && T.events?.menu && <EventsBlock T={T} events={events} className="ev-menu" onSignUp={(label, href) => ctaClick(label, href, "menu_events")} />}
         {setLang && (T.design?.menu ?? "side") === "side" && tourLanguages(savedTour).length > 1 && (
-          <div className="hv-menu-sprog" role="group" aria-label={tx("Sprog")}>
+          <div className={`hv-menu-sprog ${tourLanguages(savedTour).length > 3 ? "hv-sprog-mange" : ""}`} role="group" aria-label={tx("Sprog")}>
             {tourLanguages(savedTour).map((code) => {
               const l = LANGUAGES.find((x) => x.code === code);
               return (
                 <button key={code} type="button" aria-pressed={code === lang} onClick={() => (track("language", { label: code }), setLang(code))}>
                   <Flag code={code} />
-                  {l?.name ?? code}
+                  <span className="ls-navn">{l?.name ?? code}</span>
+                  <span className="ls-kode">{code.toUpperCase()}</span>
                 </button>
               );
             })}

@@ -109,9 +109,15 @@ export const LANG_CSS = `
 .ls-list button:hover,.ls-list button[aria-selected=true]{background:#f1f3f4}
 .hv:has(.fb-bar) .ls{top:64px}
 /* Where the language button stands is set per device (langSwitch): top, corner (by the menu button), menu (in the side menu) or hidden. */
-.hv-menu-sprog{display:none;flex-wrap:wrap;gap:6px;padding:12px 16px 4px}
-.hv-menu-sprog button{display:flex;align-items:center;gap:6px;height:34px;padding:0 12px;border:1px solid rgba(0,0,0,.1);border-radius:999px;background:#fff;color:#1d2a30;font:inherit;font-size:13px;font-weight:600;cursor:pointer}
-.hv-menu-sprog button[aria-pressed=true]{background:var(--c-main);border-color:var(--c-main);color:#fff}
+/* One row, always: every language shares it (on a phone with more than three, the flag and the code - DA, EN, DE, NL). */
+.hv-menu-sprog{display:none;flex-wrap:nowrap;gap:6px;padding:12px 16px 4px}
+.hv-menu-sprog button{flex:1 1 0;min-width:0;display:flex;align-items:center;justify-content:center;gap:6px;height:34px;padding:0 10px;border:1px solid rgba(0,0,0,.1);border-radius:999px;background:#fff;color:#1d2a30;font:inherit;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
+.hv-menu-sprog button>span{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.hv-menu-sprog .ls-kode{display:none;font-weight:800;letter-spacing:.04em}
+/* The chosen one always readable - also when the tour's own style colours the menu's buttons. */
+.hv .hv-menu-sprog button[aria-pressed=true]{background:var(--c-main)!important;border-color:var(--c-main)!important;color:var(--c-on-main,#fff)!important}
+.hv .hv-menu-sprog button[aria-pressed=true] span{color:inherit!important}
+@media (max-width:760px){.hv-sprog-mange .ls-navn{display:none}.hv-sprog-mange .ls-kode{display:inline}}
 @media (min-width:761px){
   .hv-sprog-d-hidden .ls,.hv-sprog-d-menu:not(.hv-welcome) .ls{display:none}
   .hv-sprog-d-menu .hv-menu-sprog{display:flex}
