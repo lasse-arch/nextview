@@ -181,7 +181,16 @@ export function Stories({
               aria-label={paused ? tr("Fortsæt") : tr("Pause")}
               onClick={() => setPaused((p) => !p)}
             >
-              {paused ? "▶" : "❚❚"}
+              {paused ? (
+                <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden fill="currentColor">
+                  <path d="M7 4.5v15l12.5-7.5z" />
+                </svg>
+              ) : (
+                <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden fill="currentColor">
+                  <rect x="6" y="5" width="4" height="14" rx="1" />
+                  <rect x="14" y="5" width="4" height="14" rx="1" />
+                </svg>
+              )}
             </button>
             <button
               type="button"
@@ -189,10 +198,10 @@ export function Stories({
               onClick={() => next("tap")}
             >
               {/* Drawn, not the ⏭ character: Apple's devices show that as a blue emoji. */}
+              {/* One triangle and a bar, apart - "next" as on every player. */}
               <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden fill="currentColor">
-                <path d="M4 5.5v13l9-6.5z" />
-                <path d="M12 5.5v13l9-6.5z" />
-                <rect x="19.5" y="5.5" width="2.5" height="13" rx="1" />
+                <path d="M5.5 5v14l10.5-7z" />
+                <rect x="16.5" y="5" width="3" height="14" rx="1" />
               </svg>
             </button>
             <button
@@ -358,7 +367,7 @@ export const STORIES_CSS = `
 .hv-story-head img{width:30px;height:30px;border-radius:50%;object-fit:cover;border:2px solid #fff}
 .hv-story-head b{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:0 1px 4px rgba(0,0,0,.6)}
 .hv-story-head span{font-size:12px;opacity:.8}
-.hv-story-head button{border:0;background:rgba(0,0,0,.4);color:#fff;width:30px;height:30px;border-radius:50%;font-size:12px;cursor:pointer;flex:none}
+.hv-story-head button{display:grid;place-items:center;padding:0;border:0;background:rgba(0,0,0,.4);color:#fff;width:30px;height:30px;border-radius:50%;font-size:12px;line-height:1;cursor:pointer;flex:none}
 @media (max-width:760px){
   .hv-stories.hv-st-m,.hv-story-play.hv-st-m{display:flex}
   .hv-st-m~.hv-room,.hv-st-on-m .hv-room,.hv-st-on-m .hv-luften{display:none}
