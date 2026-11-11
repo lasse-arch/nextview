@@ -19,7 +19,7 @@ import type { ReportShare } from "@/lib/tour-share";
 import { CardsEditor, DroneViewPicker, GuideEditor, StartEditor, TagsEditor, ViewFromPreview } from "./content";
 import { ResultsPanel } from "./results";
 import { LayoutEditor } from "./layout-editor";
-import { ScanPointsEditor } from "./scanpoints";
+import { ScanPointsEditor, ScanRoomsEditor } from "./scanpoints";
 import { DeleteTour } from "./delete-tour";
 import { RestartTour } from "./restart-tour";
 import { LiveDataEditor } from "./live";
@@ -1081,6 +1081,7 @@ export function TourEditor({
                     hint="På gangene går man frit. De skjulte scanpunkter (Scanpunkter) kommer man kun ind i via menuen - og dér bliver man, til man vælger noget i menuen."
                   />
                 )}
+                {config.navigation === "free" && <ScanRoomsEditor config={config} edit={edit} map={scanMap} mpskinsHidden={mpskinsHidden} />}
                 <Field title="Skift mellem steder">
                   <Choice
                     value={config.jump ?? "fly"}

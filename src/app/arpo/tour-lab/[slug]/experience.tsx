@@ -594,6 +594,34 @@ function TourExperience({
   const pointsOnlyRef = useRef(pointsOnly);
   /** "Låst inde i rummene": standing on a hidden scan point (reached from the menu), the visitor can't walk out - only the menu moves them. */
   const lockedIn = useCallback((sid: string | null | undefined) => Boolean(T.lockInHidden && sid && hiddenSweeps.includes(sid)), [T.lockInHidden, hiddenSweeps]);
+  /** "Rum" (TourConfig.scanRooms): each room's scan points, as Matterport's sweep ids. */
+  const roomGroups = useMemo(() => (T.scanRooms ?? []).map((r) => r.ss.map((ss) => sweepBySs[ss]).filter((x): x is string => Boolean(x))).filter((g) => g.length > 0), [T.scanRooms, sweepBySs]);
+  /** The room the visitor is shut in now (its sweep ids) - null: walking freely. */
+  const roomLock = useRef<string[] | null>(null);
+  const roomRefs = useRef({ roomGroups, hiddenSweeps, lockedIn });
+  useEffect(() => {
+    roomRefs.current = { roomGroups, hiddenSweeps, lockedIn };
+  }, [roomGroups, hiddenSweeps, lockedIn]);
+  /**
+   * Standing on a scan point of a room: only that room's points are on (Matterport can't jump to the nearest scan far
+   * away). Off it again: free walking as before (the hidden ones closed). `force`: done again even if it's the same room.
+   */
+  const applyRoom = useCallback((sdk: MpSdk, sid: string | null, force = false) => {
+    if (pointsOnlyRef.current || !sid) return;
+    const { roomGroups: groups, hiddenSweeps: hidden, lockedIn: locked } = roomRefs.current;
+    const g = groups.find((x) => x.includes(sid)) ?? null;
+    if (g) {
+      if (g === roomLock.current && !force) return;
+      roomLock.current = g;
+      if (allSweeps.current.length) void Promise.all([sdk.Sweep.enable(...g).catch(() => {}), disableSweeps(sdk, allSweeps.current.filter((id) => !g.includes(id)))]);
+    } else if (roomLock.current) {
+      roomLock.current = null;
+      if (!locked(sid)) {
+        const open = allSweeps.current.filter((id) => !hidden.includes(id));
+        if (open.length) sdk.Sweep.enable(...open).catch(() => {});
+      }
+    }
+  }, []);
   /** The overview the tour starts on: the drone scene, or an interactive map on its own (its words fall back to sensible ones). */
   const OV = T.drone
     ? { intro: T.map?.intro ?? T.drone.intro, backLabel: T.map?.backLabel ?? T.drone.backLabel, filterTitle: T.map?.filterTitle ?? T.drone.filterTitle }
@@ -965,6 +993,8 @@ function TourExperience({
           sweepData.current = c;
           // The list can arrive after the visitor's first scan point - lock then, so nothing is left open.
           if (firstData && (pointsOnlyRef.current || lockedIn(currentSweep.current)) && currentSweep.current) lockTo(sdk, allSweeps.current, currentSweep.current);
+          // ... and shut in its room (the first scan point came before the list).
+          if (firstData) applyRoom(sdk, currentSweep.current, true);
         },
       });
       setTourReadyMs(now() - started);
@@ -991,6 +1021,8 @@ function TourExperience({
         if (!first && s.sid !== currentSweep.current && now() - selfMoveAt.current > 2500 && guideAtRef.current == null) markUsed();
         currentSweep.current = s.sid;
         if (first && (pointsOnlyRef.current || lockedIn(s.sid))) lockTo(sdk, allSweeps.current, s.sid);
+        // "Rum": into a room - only its own points; out of it - free again.
+        applyRoom(sdk, s.sid);
         const ss = ssBySweep[s.sid];
         currentSsRef.current = ss ?? null;
         setCurrentSs(ss ?? null);
@@ -1025,12 +1057,13 @@ function TourExperience({
       if (!sdkRef.current) return;
       const sdk = await sdkRef.current;
       if (only && currentSweep.current) await lockTo(sdk, allSweeps.current, currentSweep.current);
-      if (!only && !lockedIn(currentSweep.current)) {
+      if (!only && roomRefs.current.roomGroups.some((g) => currentSweep.current && g.includes(currentSweep.current))) applyRoom(sdk, currentSweep.current, true);
+      else if (!only && !lockedIn(currentSweep.current)) {
         const open = allSweeps.current.filter((id) => !hiddenSweeps.includes(id));
         if (open.length) await sdk.Sweep.enable(...open).catch((err) => console.warn("Sweep.enable", err));
       }
     },
-    [hiddenSweeps, lockedIn]
+    [hiddenSweeps, lockedIn, applyRoom]
   );
 
   /**
@@ -1055,7 +1088,8 @@ function TourExperience({
       const goingIn = lockedIn(sweep);
       // A scan point switched off in Matterport itself (Find vej may pass it): opened for the move, closed again when left.
       if (sweepData.current[sweep]?.enabled === false && !hiddenSweeps.includes(sweep)) openedSweeps.current.add(sweep);
-      if (locked || wasIn || hiddenSweeps.includes(sweep) || openedSweeps.current.has(sweep)) await sdk.Sweep.enable(sweep).catch(() => {});
+      // Shut in a room ("Rum"): every other point is off - the one asked for is opened for the move.
+      if (locked || wasIn || roomLock.current || hiddenSweeps.includes(sweep) || openedSweeps.current.has(sweep)) await sdk.Sweep.enable(sweep).catch(() => {});
       try {
         await sdk.Sweep.moveTo(sweep, opts);
       } catch (first) {
@@ -2586,7 +2620,8 @@ function TourExperience({
       sub?.cancel();
       camSub.cancel();
       // Walking again as before (still only by the points, when the tour is set to that - or locked in a room).
-      if (!pointsOnlyRef.current && !lockedIn(currentSweep.current)) {
+      if (roomLock.current) applyRoom(sdk, currentSweep.current, true);
+      else if (!pointsOnlyRef.current && !lockedIn(currentSweep.current)) {
         const open = allSweeps.current.filter((id) => !hiddenSweeps.includes(id));
         if (open.length) sdk.Sweep.enable(...open).catch(() => {});
       }
@@ -2594,7 +2629,7 @@ function TourExperience({
       window.removeEventListener("keydown", onKey);
       doc?.removeEventListener("keydown", onKey);
     };
-  }, [picking, sdk, room, hiddenSweeps, lockedIn]);
+  }, [picking, sdk, room, hiddenSweeps, lockedIn, applyRoom]);
 
   /* ----- "Pladskort" on the 360° aerial photo (site-plan-360.tsx) ----- */
   const plan360On = sitePlan360Ready(T);

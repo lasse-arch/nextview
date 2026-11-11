@@ -928,6 +928,14 @@ export type TourConfig = {
    * walk freely. (The start point is never locked.)
    */
   lockInHidden?: true;
+  /**
+   * "Rum": scan points that belong together (a holiday home, a classroom).
+   * Standing on one of them, the visitor can only walk between that room's
+   * own points - every other point is off, so Matterport never jumps to the
+   * nearest scan far away. The menu, a guided tour and Find vej still take
+   * them out; standing on a point in no room, they walk freely again.
+   */
+  scanRooms?: { name: string; ss: number[] }[];
   /** Scan points to hide (sweep ids) - set under Scanpunkter. */
   hiddenSweeps: string[];
   /** Is the menu open when the tour starts, per device. */

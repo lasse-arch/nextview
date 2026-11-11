@@ -663,3 +663,67 @@ export function ScanPointsEditor({
     </>
   );
 }
+
+/**
+ * "Rum" (TourConfig.scanRooms): scan points that belong together - standing on
+ * one of them, the visitor only walks between the room's own points (no jump
+ * to the nearest scan far away). Each room: a name and its points, picked on
+ * the plan.
+ */
+export function ScanRoomsEditor({ config, edit, map, mpskinsHidden }: { config: TourConfig; edit: (fn: (d: TourConfig) => void) => void; map: ScanMap | null; mpskinsHidden: string[] }) {
+  const rooms = config.scanRooms ?? [];
+  const [picking, setPicking] = useState<number | null>(null);
+  const put = (fn: (r: NonNullable<TourConfig["scanRooms"]>) => void) =>
+    edit((d) => {
+      const r = d.scanRooms ?? [];
+      fn(r);
+      const kept = r.filter((x) => x.name.trim() || x.ss.length);
+      if (kept.length) d.scanRooms = r;
+      else delete d.scanRooms;
+    });
+  // A point in two rooms: the first room wins - said, so it can be fixed.
+  const twice = [...new Set(rooms.flatMap((r, i) => r.ss.filter((ss) => rooms.some((o, j) => j < i && o.ss.includes(ss)))))];
+  return (
+    <div className="space-y-2 rounded-xl bg-white p-3 ring-1 ring-black/[.05]">
+      <div>
+        <p className="text-[14px] font-medium">Rum - gå kun mellem rummets egne scanpunkter</p>
+        <p className="text-[12px] leading-snug text-[#8e8e93]">Står man i et rum, er alle andre scanpunkter slået fra - så Matterport aldrig flyver hen til et scan langt væk. Menuen, Vis mig rundt og Find vej fører stadig videre. Uden for rummene går man frit.</p>
+      </div>
+      {picking != null && map && rooms[picking] && (
+        <ScanPointPicker
+          map={map}
+          config={config}
+          mpskinsHidden={mpskinsHidden}
+          title={`Scanpunkter i ${rooms[picking].name || "rummet"}`}
+          value={rooms[picking].ss}
+          onClose={() => setPicking(null)}
+          onDone={(ss) => {
+            const i = picking;
+            put((r) => void (r[i] = { ...r[i], ss }));
+            setPicking(null);
+          }}
+        />
+      )}
+      {rooms.map((r, i) => (
+        <div key={i} className="flex items-center gap-1.5">
+          <input
+            className="min-w-0 flex-1 rounded-lg bg-[#f2f2f7] px-2.5 py-1.5 text-[13px]"
+            placeholder="Fx Feriehus 30 m²"
+            value={r.name}
+            onChange={(e) => put((x) => void (x[i] = { ...x[i], name: e.target.value }))}
+          />
+          <button type="button" disabled={!map} onClick={() => setPicking(i)} className="flex-none rounded-lg bg-[#0071e3]/10 px-2.5 py-1.5 text-[13px] font-medium text-[#0071e3] disabled:opacity-40" title={map ? undefined : "Planen over scanpunkterne er ikke hentet"}>
+            {r.ss.length ? `${r.ss.length} punkter` : "Vælg punkter"}
+          </button>
+          <button type="button" aria-label="Fjern rummet" onClick={() => put((x) => void x.splice(i, 1))} className="px-1 text-[#c7c7cc] hover:text-[#ff3b30]">
+            ×
+          </button>
+        </div>
+      ))}
+      {twice.length > 0 && <p className="text-[12px] text-[#ff9500]">Scanpunkt {twice.join(", ")} er i flere rum - det første rum gælder.</p>}
+      <button type="button" onClick={() => put((r) => void r.push({ name: "", ss: [] }))} className="text-[13px] font-medium text-[#0071e3]">
+        + Rum
+      </button>
+    </div>
+  );
+}
