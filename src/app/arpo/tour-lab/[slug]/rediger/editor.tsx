@@ -32,6 +32,7 @@ import { fetchSiteFavicon, hostTourFiles } from "@/lib/actions/tour-files";
 import { AiMemoryPanel } from "./memory";
 import { WeatherEditor } from "./weather-editor";
 import { StagingEditor } from "./staging-editor";
+import { publishNow } from "@/lib/actions/tour-publish";
 import { CLOUDFLARE_TOUR_ORIGIN } from "@/lib/public-urls";
 import { LineDayEditor } from "./line-day-editor";
 import { ScheduleEditor } from "./schedule-editor";
@@ -499,6 +500,17 @@ export function TourEditor({
   function save() {
     start(async () => void (await saveNow()));
   }
+  /** "Gem og udgiv": saved (if anything changed), then out on tour.nextview360.dk as a new version - what the customer's website shows. */
+  function saveAndPublish() {
+    if (!confirm("Gem og udgiv touren på tour.nextview360.dk?\n\nKundens hjemmeside viser den nye version med det samme.")) return;
+    start(async () => {
+      const said = note.trim();
+      if (dirty && !(await saveNow())) return;
+      const r = await publishNow(slug, said || "Gemt og udgivet fra editoren");
+      setMsg(r.ok ? { ok: true, text: `Udgivet - version ${r.value.version} er live` } : { ok: false, text: r.error });
+      if (r.ok) setTimeout(() => setMsg(null), 4000);
+    });
+  }
 
   const linkCtx = { config, edit };
   /** A new logo: is it dark or light? Then it gets the background it can be seen on (Baggrund bag logoet → Automatisk). */
@@ -572,6 +584,17 @@ export function TourEditor({
             <a href={`/arpo/tour-lab/${slug}`} target="_blank" rel="noopener" className="rounded-full bg-[#f2f2f7] px-3.5 py-1.5 text-[13px] font-medium hover:bg-[#e9e9eb]">
               Åbn tour ↗
             </a>
+          )}
+          {onCloudflare && (
+            <button
+              type="button"
+              onClick={saveAndPublish}
+              disabled={pending}
+              title="Gem ændringerne og læg touren ud på tour.nextview360.dk - den version, kundens hjemmeside viser"
+              className="rounded-full bg-[#1d1d1f] px-3.5 py-1.5 text-[13px] font-semibold text-white hover:bg-black disabled:opacity-50"
+            >
+              {pending ? "Arbejder…" : dirty ? "Gem og udgiv" : "Udgiv"}
+            </button>
           )}
           {onCloudflare && (
             // The published version (tour.nextview360.dk) - the one customers' websites show, which may be older than this.
