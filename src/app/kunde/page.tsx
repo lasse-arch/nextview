@@ -26,6 +26,7 @@ import { tourEmbeds } from "@/lib/tour-embeds";
 import { EMBED_WORDS, TourEmbedList } from "@/components/tour-embed-list";
 import { TEXT, type Lang } from "./text";
 import { roleCan, type CustomerPerm, type DealAccess } from "@/lib/customer-roles";
+import { EXAMPLE_ID, exampleDeals, exampleStats, exampleTour } from "@/lib/portal-example";
 import { PortalUsers } from "./portal-users";
 import { portalUsers } from "@/lib/portal-users";
 
@@ -52,7 +53,13 @@ type Page = (typeof PAGES)[number];
  * kunde" from a deal in Arpo (?som=<dealId>): exactly what that customer
  * sees (the deal and its locations, as access is given), with a bar saying so.
  */
-async function viewer(som: string | undefined): Promise<{ dealIds: string[]; access: DealAccess[]; name: string | null; accountId: string | null; preview: { dealId: string } | null } | null> {
+async function viewer(som: string | undefined): Promise<{ dealIds: string[]; access: DealAccess[]; name: string | null; accountId: string | null; preview: { dealId: string } | null; example?: true } | null> {
+  // "Eksempel på kundeportalen" (Generator): the team only - a showcase tour with made-up numbers, nobody's real data.
+  if (som === EXAMPLE_ID) {
+    const user = await getTeamUser();
+    if (!user || !(teamCan(user, "sales") || teamCan(user, "admin"))) redirect("/arpo");
+    return { dealIds: [], access: [{ dealId: EXAMPLE_ID, role: "STAFF", canApprove: false }], name: "Mette", accountId: null, preview: { dealId: EXAMPLE_ID }, example: true };
+  }
   const account = await getCurrentCustomer();
   if (account) {
     // "Sidst set" in Arpo's customer overview - at most one write every 10 minutes.
@@ -74,12 +81,14 @@ async function viewer(som: string | undefined): Promise<{ dealIds: string[]; acc
 
 const fmtDate = (d: Date, lang: Lang) => d.toLocaleDateString(lang === "en" ? "en-GB" : "da-DK", { day: "numeric", month: "short", year: "numeric" });
 
-export default async function CustomerPage({ searchParams }: { searchParams: Promise<{ som?: string; sted?: string; side?: string; fra?: string; til?: string; periode?: string }> }) {
+export default async function CustomerPage({ searchParams }: { searchParams: Promise<{ som?: string; sted?: string; side?: string; fra?: string; til?: string; periode?: string; tour?: string }> }) {
   const sp = await searchParams;
   const who = await viewer(sp.som);
   if (!who) redirect("/arpo");
+  const example = who.example ? await exampleTour(sp.tour) : null;
+  if (who.example && !example) redirect("/arpo/generator?fane=kundeportal");
 
-  const deals = await prisma.deal.findMany({
+  const dealsQuery = () => prisma.deal.findMany({
     where: { id: { in: who.dealIds } },
     orderBy: { companyName: "asc" },
     select: {
@@ -105,6 +114,9 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
       },
     },
   });
+  type PortalDeals = Awaited<ReturnType<typeof dealsQuery>>;
+  // The example: one made-up customer with the showcase tour - no real deal is read.
+  const deals: PortalDeals = example ? (exampleDeals(example) as unknown as PortalDeals) : await dealsQuery();
 
   // Language: what they picked (a cookie), else the language of their contract.
   const picked = (await cookies()).get("nv360_lang")?.value;
@@ -123,13 +135,16 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
   const PAGE_PERM: Partial<Record<Page, CustomerPerm>> = { tal: "stats", hjemmeside: "embed", tips: "embed", rettelser: "review", kontrakt: "contract", brugere: "users" };
   // "Lodtrækning": only when one of their tours has a treasure chest with a draw (set below, once the tours are known).
   let hasContest = false;
-  const pageOk = (p: Page) => (p === "lodtraekning" ? hasContest : !PAGE_PERM[p] || deals.some((d) => canOn(d.id, PAGE_PERM[p]!)));
+  // The example shows what's the same for every customer - never corrections, contract, users or draws (they'd be someone's).
+  const EXAMPLE_PAGES: Page[] = ["hjem", "tal", "hjemmeside", "tips", "hjaelp"];
+  const pageOk = (p: Page) => (example && !EXAMPLE_PAGES.includes(p) ? false : p === "lodtraekning" ? hasContest : !PAGE_PERM[p] || deals.some((d) => canOn(d.id, PAGE_PERM[p]!)));
   const scope = sted ? deals.filter((d) => d.id === sted) : deals;
   const root = deals.find((d) => !d.parentDealId || !deals.some((x) => x.id === d.parentDealId)) ?? deals[0];
   const company = root ? dealName(root) : (who.name ?? "Nextview360");
   const href = (o: { side?: Page; sted?: string | null }) => {
     const q = new URLSearchParams();
     if (who.preview) q.set("som", who.preview.dealId);
+    if (example) q.set("tour", example.slug);
     const s = o.sted === undefined ? sted : o.sted;
     if (s) q.set("sted", s);
     const p = o.side ?? page;
@@ -144,9 +159,9 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
   const allTours = scope.flatMap((d) =>
     d.tours.map((x) => ({ ...x, dealId: d.id, location: many ? dealName(d) : null, config: x.config as unknown as TourConfig, share: shareOf(x.share), url: tourUrl(x.slug, origin, x.liveVersion != null) }))
   );
-  const reviewTours = allTours.filter((x) => canOn(x.dealId, "review"));
+  const reviewTours = example ? [] : allTours.filter((x) => canOn(x.dealId, "review"));
   // The treasure chests' draws they may see: the list (owners, staff) - or the number only (numbers only).
-  const contestTours = allTours.flatMap((x) => (canOn(x.dealId, "entries") || canOn(x.dealId, "stats") ? contestChests(x.config).map((c) => ({ tour: x, chest: c, list: canOn(x.dealId, "entries") })) : []));
+  const contestTours = example ? [] : allTours.flatMap((x) => (canOn(x.dealId, "entries") || canOn(x.dealId, "stats") ? contestChests(x.config).map((c) => ({ tour: x, chest: c, list: canOn(x.dealId, "entries") })) : []));
   hasContest = contestTours.length > 0;
   const asked: Page = (PAGES as readonly string[]).includes(sp.side ?? "") ? (sp.side as Page) : "hjem";
   const page: Page = pageOk(asked) ? asked : "hjem";
@@ -170,7 +185,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
   const seesStats = scope.some((d) => canOn(d.id, "stats"));
   const needStats = seesStats && (page === "hjem" || page === "tal");
   // "Her er touren vist": the pages showing their tours (only their own tours - the list above is theirs).
-  const embeds = page === "hjemmeside" ? await tourEmbeds(embedTours.map((x) => x.slug)) : [];
+  const embeds = page === "hjemmeside" && !example ? await tourEmbeds(embedTours.map((x) => x.slug)) : [];
   const feedback =
     page === "rettelser" && reviewTours.length
       ? await prisma.tourFeedback.findMany({ where: { tourSlug: { in: reviewTours.map((x) => x.slug) } }, orderBy: { createdAt: "desc" }, take: 100, select: { id: true, tourSlug: true, kind: true, text: true, room: true, author: true, status: true, createdAt: true } })
@@ -181,7 +196,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
   const period: Period = ownPeriod
     ? { preset: (["idag", "igaar", "7", "30", "uge", "maaned", "aar"].includes(sp.periode ?? "") ? sp.periode : "egen") as Period["preset"], from: sp.fra!, to: sp.til! }
     : { preset: "7", from: addDays(today, -6), to: today };
-  const stats: TourStats[] = needStats ? await Promise.all(statTours.map((x) => tourStats(x.slug, { from: period.from, to: period.to }))) : [];
+  const stats: TourStats[] = !needStats ? [] : example ? statTours.map((x) => exampleStats(x.slug, x.config, period.from, period.to)) : await Promise.all(statTours.map((x) => tourStats(x.slug, { from: period.from, to: period.to })));
   const together = needStats ? mergeStats(stats) : null;
   const togetherShare = mergeShare(statTours.map((x) => x.share));
   // "Lodtrækning": each chest's entries (the list only for those who may see it - else the number).
@@ -228,8 +243,8 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
     <div lang={lang} className="min-h-screen bg-[#f3f3f5] text-[#1d1d1f]" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", system-ui, sans-serif' }}>
       {who.preview && (
         <div className="sticky top-0 z-30 flex items-center justify-center gap-3 bg-[#1d1d1f] px-4 py-2.5 text-[13px] text-white">
-          <span>{t.preview}</span>
-          <a href={`/arpo/kunder/${who.preview.dealId}`} className="rounded-full bg-white/15 px-3 py-1 font-semibold hover:bg-white/25">
+          <span>{example ? (lang === "en" ? "Example of the customer portal - the numbers are made up." : "Eksempel på kundeportalen - tallene er opdigtede.") : t.preview}</span>
+          <a href={example ? "/arpo/generator?fane=kundeportal" : `/arpo/kunder/${who.preview.dealId}`} className="rounded-full bg-white/15 px-3 py-1 font-semibold hover:bg-white/25">
             {t.backToArpo}
           </a>
         </div>

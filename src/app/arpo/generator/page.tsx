@@ -9,6 +9,8 @@ import { AskSection } from "./ask-section";
 import { listSalesAnswers } from "@/lib/actions/sales-helper";
 import { prepMeetings, recentMeetingBriefs } from "@/lib/actions/meeting-prep";
 import { MeetingPrep } from "./meeting-prep";
+import { PortalExample } from "./portal-example";
+import { exampleTours } from "@/lib/portal-example";
 
 export const metadata = { title: "Generator" };
 // "Gør mig klar til møde" researches the web for a minute or two in a server action on this page.
@@ -30,11 +32,12 @@ export default async function GeneratorPage({ searchParams }: { searchParams: Pr
   const fane = (await searchParams).fane;
   const sms = fane === "sms";
   const spoerg = fane === "spoerg";
+  const portal = fane === "kundeportal";
   const tab = (on: boolean) => `rounded-lg px-4 py-1.5 text-sm font-medium transition ${on ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800"}`;
   return (
     <div className="space-y-5">
       <div className="inline-flex rounded-xl bg-slate-100 p-1">
-        <Link href="/arpo/generator" className={tab(!sms && !spoerg)}>
+        <Link href="/arpo/generator" className={tab(!sms && !spoerg && !portal)}>
           ✉️ Mail
         </Link>
         <Link href="/arpo/generator?fane=sms" className={tab(sms)}>
@@ -43,8 +46,13 @@ export default async function GeneratorPage({ searchParams }: { searchParams: Pr
         <Link href="/arpo/generator?fane=spoerg" className={tab(spoerg)}>
           💡 Spørg
         </Link>
+        <Link href="/arpo/generator?fane=kundeportal" className={tab(portal)}>
+          🖥️ Kundeportal
+        </Link>
       </div>
-      {spoerg ? (
+      {portal ? (
+        <PortalExample tours={await exampleTours()} />
+      ) : spoerg ? (
         <>
           <MeetingPrep meetings={await prepMeetings()} recent={await recentMeetingBriefs()} today={new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Copenhagen" }).format(new Date())} />
           <AskSection faq={await listSalesAnswers()} />
