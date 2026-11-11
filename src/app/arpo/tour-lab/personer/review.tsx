@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
-import { checkScansForPeople, decideScan, peopleFindings, peoplePlan, type ScanFinding, type ScanPlan } from "@/lib/actions/tour-people";
+import { checkScansForPeople, decideScan, peopleFindings, peoplePlan, recheckTour, type ScanFinding, type ScanPlan } from "@/lib/actions/tour-people";
 
 /*
  * "Personer i scans": nextviewAI goes through every tour's scan points and
@@ -60,7 +60,7 @@ export function PeopleReview({ initial }: { initial: ScanFinding[] }) {
           </Link>
           <h1 className="text-[28px] font-semibold tracking-tight text-[#1d1d1f]">Personer i scans</h1>
           <p className="max-w-2xl text-[14px] text-[#6e6e73]">
-            nextviewAI ser alle scanpunkter igennem og finder dem, hvor der er mennesker med. Se hvert enkelt og vælg, om det skal skjules i touren. Kun nye scans bliver tjekket næste gang.
+            nextviewAI ser alle scanpunkter igennem og finder dem, hvor der er mennesker med. Se hvert enkelt og vælg, om det skal skjules i touren. Kun nye scans bliver tjekket næste gang - &quot;Tjek igen&quot; ser hele touren igennem på ny, og får touren en ny Matterport-model, tjekkes den forfra.
           </p>
         </div>
         {running ? (
@@ -90,9 +90,31 @@ export function PeopleReview({ initial }: { initial: ScanFinding[] }) {
                     <div className="h-full bg-[#34c759]" style={{ width: `${p.total ? (Math.min(checked, p.total) / p.total) * 100 : 0}%` }} />
                   </div>
                   <span className={`w-20 text-right text-[12px] font-medium ${p.found ? "text-[#ff9500]" : "text-[#8e8e93]"}`}>{p.found ? `${p.found} fund` : "-"}</span>
-                  <button type="button" disabled={!!running || !p.todo.length} onClick={() => run([p])} className="w-16 rounded-full bg-[#f2f2f7] py-1 text-[12px] font-medium disabled:opacity-30">
-                    Tjek
-                  </button>
+                  {p.todo.length || !p.total ? (
+                    <button type="button" disabled={!!running || !p.todo.length} onClick={() => run([p])} className="w-20 rounded-full bg-[#f2f2f7] py-1 text-[12px] font-medium disabled:opacity-30">
+                      Tjek
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={!!running}
+                      title="Tjek alle scans i touren igen - det, der er skjult eller beholdt, står ved magt"
+                      onClick={async () => {
+                        if (!confirm(`Tjek alle ${p.total} scans i ${p.name} igen?`)) return;
+                        const r = await recheckTour(p.slug);
+                        if (!r.ok) return setError(r.error);
+                        const fresh = (await peoplePlan(p.slug))[0];
+                        if (fresh) {
+                          setPlans((all) => (all ?? []).map((x) => (x.slug === p.slug ? fresh : x)));
+                          setProgress((pr) => ({ ...pr, [p.slug]: 0 }));
+                          await run([fresh]);
+                        }
+                      }}
+                      className="w-20 rounded-full bg-[#f2f2f7] py-1 text-[12px] font-medium disabled:opacity-30"
+                    >
+                      Tjek igen
+                    </button>
+                  )}
                 </>
               )}
             </div>

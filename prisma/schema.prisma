@@ -1576,6 +1576,8 @@ model TourScanCheck {
   id        String   @id @default(cuid())
   tourSlug  String
   sweepId   String
+  /// The Matterport model the scan was checked in - a tour given a new model starts over (its scans are new).
+  modelId   String?
   ss        Int
   status    String
   /// The wall (1-4) the person is on, and what nextviewAI saw.

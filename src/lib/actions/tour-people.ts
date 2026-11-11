@@ -44,6 +44,9 @@ export async function peoplePlan(slug?: string): Promise<ScanPlan[]> {
       try {
         const m = await modelOf(t.slug);
         if (!m) return { slug: t.slug, name: t.name, total: 0, todo: [], found: 0, error: "Ingen Matterport-model" };
+        // Checks from another Matterport model (the tour was given a new one) are of other scans: gone, so it's checked anew.
+        // (Checks from before the model was kept have none: stale too once the tour has its own Matterport ID in the setup.)
+        await prisma.tourScanCheck.deleteMany({ where: { tourSlug: t.slug, OR: [{ modelId: { not: m.modelId } }, ...(m.config.modelId ? [{ modelId: null }] : [])] } });
         const [scans, checks] = await Promise.all([fetchScanImages(m.modelId), prisma.tourScanCheck.findMany({ where: { tourSlug: t.slug }, select: { sweepId: true, status: true } })]);
         const done = new Set(checks.map((c) => c.sweepId));
         return { slug: t.slug, name: t.name, total: scans.length, todo: scans.filter((s) => !done.has(s.sweepId)).map((s) => s.sweepId), found: checks.filter((c) => c.status === "person").length };
@@ -109,6 +112,13 @@ async function ask<T extends z.ZodTypeAny>(client: Anthropic, slug: string, by: 
   return (response.parsed_output as z.infer<T> | null) ?? null;
 }
 
+/** "Tjek igen": the tour's scans are checked once more - what was hidden or kept stays decided. */
+export async function recheckTour(slug: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireTour(slug);
+  await prisma.tourScanCheck.deleteMany({ where: { tourSlug: slug, status: { in: ["clear", "person"] } } });
+  return { ok: true };
+}
+
 /** Checks some of a tour's scans (the client sends them a dozen at a time, so it never runs too long). */
 export async function checkScansForPeople(slug: string, sweepIds: string[]): Promise<{ ok: true; checked: number; found: number } | { ok: false; error: string }> {
   const user = await requireTour(slug);
@@ -120,7 +130,7 @@ export async function checkScansForPeople(slug: string, sweepIds: string[]): Pro
   const wanted = all.filter((s) => sweepIds.includes(s.sweepId)).slice(0, 12);
   if (!wanted.length) return { ok: true, checked: 0, found: 0 };
   // Scans already checked on another tour of the same Matterport model (e.g. two tours of one scanning): reuse what was seen there.
-  const known = await prisma.tourScanCheck.findMany({ where: { sweepId: { in: wanted.map((s) => s.sweepId) }, NOT: { tourSlug: slug } } });
+  const known = await prisma.tourScanCheck.findMany({ where: { sweepId: { in: wanted.map((s) => s.sweepId) }, modelId: m.modelId, NOT: { tourSlug: slug } } });
   let reused = 0;
   for (const s of wanted) {
     const k = known.find((x) => x.sweepId === s.sweepId);
@@ -128,7 +138,7 @@ export async function checkScansForPeople(slug: string, sweepIds: string[]): Pro
     const saw = k.status === "clear" ? "clear" : "person";
     await prisma.tourScanCheck.upsert({
       where: { tourSlug_sweepId: { tourSlug: slug, sweepId: s.sweepId } },
-      create: { tourSlug: slug, sweepId: s.sweepId, ss: s.ss, status: saw, face: k.face, note: k.note },
+      create: { tourSlug: slug, sweepId: s.sweepId, modelId: m.modelId, ss: s.ss, status: saw, face: k.face, note: k.note },
       update: {},
     });
     if (saw === "person") reused++;
@@ -152,7 +162,7 @@ export async function checkScansForPeople(slug: string, sweepIds: string[]): Pro
       if (hit) found++;
       const existing = await prisma.tourScanCheck.findUnique({ where: { tourSlug_sweepId: { tourSlug: slug, sweepId: s.sweepId } }, select: { status: true } });
       if (existing && (existing.status === "hidden" || existing.status === "kept")) continue; // a decision stands
-      const data = { ss: s.ss, status: hit ? "person" : "clear", face: hit ? Math.min(4, Math.max(1, hit.wall)) : null, note: hit?.note || null, checkedAt: new Date() };
+      const data = { modelId: m.modelId, ss: s.ss, status: hit ? "person" : "clear", face: hit ? Math.min(4, Math.max(1, hit.wall)) : null, note: hit?.note || null, checkedAt: new Date() };
       await prisma.tourScanCheck.upsert({ where: { tourSlug_sweepId: { tourSlug: slug, sweepId: s.sweepId } }, create: { tourSlug: slug, sweepId: s.sweepId, ...data }, update: data });
     }
     return { ok: true, checked: wanted.length, found: found + reused };
