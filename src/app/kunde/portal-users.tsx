@@ -120,6 +120,8 @@ export function PortalUsers({
   meId,
   mayInvite,
   preview,
+  som,
+  admin = false,
   lang,
 }: {
   users: PortalUserRow[];
@@ -127,6 +129,10 @@ export function PortalUsers({
   meId: string | null;
   mayInvite: boolean;
   preview: boolean;
+  /** An admin on "Se som kunde": invites and removes for the customer (checked again on the server). */
+  som?: string;
+  /** ...and may remove anyone, also the access Nextview gave. */
+  admin?: boolean;
   lang: Lang;
 }) {
   const w = W[lang];
@@ -169,7 +175,7 @@ export function PortalUsers({
       dealIds: picked,
       expiresDays: days,
       canApprove,
-    }).catch(() => ({
+    }, som).catch(() => ({
       ok: false as const,
       error: "Der skete en fejl - prøv igen.",
     }));
@@ -183,7 +189,7 @@ export function PortalUsers({
 
   async function remove(u: PortalUserRow) {
     if (preview || !confirm(w.removeConfirm(u.email))) return;
-    const r = await portalRemoveUser(u.id).catch(() => ({
+    const r = await portalRemoveUser(u.id, som).catch(() => ({
       ok: false as const,
       error: "Der skete en fejl - prøv igen.",
     }));
@@ -240,7 +246,7 @@ export function PortalUsers({
                   {ROLE_NAMES[lang][u.role]}
                   {u.role === "STAFF" && u.canApprove ? " ✓" : ""}
                 </span>
-                {u.id !== meId && !u.fromNextview && !preview && (
+                {u.id !== meId && (!u.fromNextview || admin) && !preview && (
                   <button
                     type="button"
                     onClick={() => remove(u)}

@@ -70,7 +70,8 @@ export async function portalUsers(dealIds: string[]): Promise<{ users: PortalUse
   return { users: [...byAccount.values()], mayInvite: deals.some((d) => d.customersMayInvite), deals: deals.map((d) => ({ id: d.id, name: dealName(d) })) };
 }
 
-type Actor = { id: string; email: string; name: string | null; deals: DealAccess[] };
+/** `admin`: one of us on the customer's page (lib/portal-admin.ts) - not bound by "Kunden må selv invitere", the access counts as given by Nextview, and they may remove anyone. */
+type Actor = { id: string; email: string; name: string | null; deals: DealAccess[]; admin?: true };
 type Result = { ok: true; warning?: string } | { ok: false; error: string };
 
 export type InviteInput = { email: string; name: string; role: CustomerRole; dealIds: string[]; expiresDays: number | null; canApprove: boolean };
@@ -90,7 +91,7 @@ export async function inviteUser(actor: Actor, input: InviteInput): Promise<Resu
     if (!mine || !roleCan(mine, "users") || ROLE_RANK[input.role] > ROLE_RANK[mine.role]) return { ok: false, error: "Du kan ikke give adgang til den afdeling." };
   }
   const deals = await prisma.deal.findMany({ where: { id: { in: dealIds } }, select: { id: true, companyName: true, displayName: true, parentDealId: true, customersMayInvite: true } });
-  if (deals.length !== dealIds.length || deals.some((d) => !d.customersMayInvite)) return { ok: false, error: "Det er slået fra at invitere her - skriv til os, så hjælper vi." };
+  if (deals.length !== dealIds.length || (!actor.admin && deals.some((d) => !d.customersMayInvite))) return { ok: false, error: "Det er slået fra at invitere her - skriv til os, så hjælper vi." };
 
   // Limits: logins per customer, invites per hour.
   const family = actor.deals.filter((d) => roleCan(d, "users")).map((d) => d.dealId);
@@ -98,7 +99,7 @@ export async function inviteUser(actor: Actor, input: InviteInput): Promise<Resu
   const accounts = new Set(current.map((c) => c.accountId));
   const existing = await prisma.customerAccount.findUnique({ where: { email }, select: { id: true } });
   if (!(existing && accounts.has(existing.id)) && accounts.size >= MAX_USERS) return { ok: false, error: `I kan højst have ${MAX_USERS} brugere. Fjern en, før I inviterer en ny.` };
-  const lastHour = await prisma.customerAccountDeal.count({ where: { invitedById: actor.id, createdAt: { gte: new Date(Date.now() - 3600_000) } } });
+  const lastHour = actor.admin ? 0 : await prisma.customerAccountDeal.count({ where: { invitedById: actor.id, createdAt: { gte: new Date(Date.now() - 3600_000) } } });
   if (lastHour >= MAX_INVITES_HOUR) return { ok: false, error: "I har sendt mange invitationer lige nu - prøv igen om en time." };
 
   if (existing) {
@@ -115,8 +116,8 @@ export async function inviteUser(actor: Actor, input: InviteInput): Promise<Resu
     // An old link that ran out is renewed rather than added twice.
     await prisma.customerAccountDeal.upsert({
       where: { accountId_dealId: { accountId: account.id, dealId } },
-      create: { accountId: account.id, dealId, role: input.role, canApprove, expiresAt, invitedById: actor.id },
-      update: { role: input.role, canApprove, expiresAt, invitedById: actor.id, createdAt: new Date() },
+      create: { accountId: account.id, dealId, role: input.role, canApprove, expiresAt, invitedById: actor.admin ? null : actor.id },
+      update: { role: input.role, canApprove, expiresAt, invitedById: actor.admin ? null : actor.id, createdAt: new Date() },
     });
   }
 
@@ -137,7 +138,7 @@ export async function removeUser(actor: Actor, accountId: string): Promise<Resul
   const mine = actor.deals.filter((d) => roleCan(d, "users")).map((d) => d.dealId);
   const links = await prisma.customerAccountDeal.findMany({ where: { accountId, dealId: { in: mine } }, include: { account: { select: { email: true } } } });
   if (!links.length) return { ok: false, error: "Brugeren findes ikke." };
-  if (links.some((l) => l.role === "OWNER" && !l.invitedById)) return { ok: false, error: "Den adgang er givet af Nextview360 - skriv til os, hvis den skal fjernes." };
+  if (!actor.admin && links.some((l) => l.role === "OWNER" && !l.invitedById)) return { ok: false, error: "Den adgang er givet af Nextview360 - skriv til os, hvis den skal fjernes." };
   await prisma.customerAccountDeal.deleteMany({ where: { accountId, dealId: { in: links.map((l) => l.dealId) } } });
   // A login with nothing left is deleted - and is logged out at once.
   if ((await prisma.customerAccountDeal.count({ where: { accountId } })) === 0) await prisma.customerAccount.delete({ where: { id: accountId } }).catch(() => {});

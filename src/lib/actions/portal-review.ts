@@ -3,6 +3,7 @@
 import { noteTokenOf } from "@/lib/review-tokens";
 import { randomBytes } from "node:crypto";
 import { getCurrentCustomer, getCurrentUser } from "@/lib/auth";
+import { adminPreview } from "@/lib/portal-admin";
 import { prisma } from "@/lib/db";
 import { approveTour } from "@/lib/tour-review";
 import { revalidatePath } from "next/cache";
@@ -30,13 +31,21 @@ export async function portalReview(slug: string): Promise<{ ok: true; token: str
 }
 
 /**
- * "Godkend touren" on the customer's page: only the customer themselves, for
- * a tour on one of their own deals - an admin looking as the customer can't
- * approve in their name (we approve in the editor instead).
+ * "Godkend touren" on the customer's page: the customer themselves, for a
+ * tour on one of their own deals - or an admin on "Se som kunde" (`som`, only
+ * without a customer session), approving in our own name.
  */
-export async function portalApprove(slug: string): Promise<{ ok: true } | { ok: false; error: string }> {
+export async function portalApprove(slug: string, som?: string): Promise<{ ok: true } | { ok: false; error: string }> {
   const customer = await getCurrentCustomer();
-  if (!customer) return { ok: false, error: "Kun kunden selv kan godkende her - godkend i tour-editoren i stedet." };
+  if (!customer) {
+    const admin = await adminPreview(som);
+    if (!admin) return { ok: false, error: "Kun kunden selv kan godkende her - godkend i tour-editoren i stedet." };
+    const tour = await prisma.tour.findUnique({ where: { slug }, select: { dealId: true } });
+    if (!tour?.dealId || !admin.dealIds.includes(tour.dealId)) return { ok: false, error: "Touren findes ikke." };
+    await approveTour(slug, { name: admin.user.name, customer: false, actorId: admin.user.id });
+    revalidatePath("/kunde");
+    return { ok: true };
+  }
   const tour = await prisma.tour.findUnique({ where: { slug }, select: { dealId: true, published: true, reviewSentAt: true } });
   if (!tour?.dealId || !customer.deals.some((d) => d.dealId === tour.dealId) || !(tour.published || tour.reviewSentAt)) return { ok: false, error: "Touren findes ikke." };
   if (!can(customer, tour.dealId, "approve")) return { ok: false, error: "Din rolle kan ikke godkende touren - spørg en ejer hos jer." };

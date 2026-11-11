@@ -53,7 +53,7 @@ type Page = (typeof PAGES)[number];
  * kunde" from a deal in Arpo (?som=<dealId>): exactly what that customer
  * sees (the deal and its locations, as access is given), with a bar saying so.
  */
-async function viewer(som: string | undefined): Promise<{ dealIds: string[]; access: DealAccess[]; name: string | null; accountId: string | null; preview: { dealId: string } | null; example?: true } | null> {
+async function viewer(som: string | undefined): Promise<{ dealIds: string[]; access: DealAccess[]; name: string | null; accountId: string | null; preview: { dealId: string } | null; example?: true; /** An admin on "Se som kunde": may do everything the owner may (lib/portal-admin.ts). */ admin?: boolean } | null> {
   // "Eksempel på kundeportalen" (Generator): the team only - a showcase tour with made-up numbers, nobody's real data.
   if (som === EXAMPLE_ID) {
     const user = await getTeamUser();
@@ -76,7 +76,7 @@ async function viewer(som: string | undefined): Promise<{ dealIds: string[]; acc
   if (!deal) redirect("/arpo");
   // As the customer's owner sees it (the team's own look at everything).
   const dealIds = [deal.id, ...deal.branches.map((b) => b.id)];
-  return { dealIds, access: dealIds.map((dealId) => ({ dealId, role: asOwner ? ("OWNER" as const) : ("STAFF" as const), canApprove: asOwner })), name: deal.customerAccounts[0]?.account.name ?? deal.contactName, accountId: null, preview: { dealId: deal.id } };
+  return { dealIds, access: dealIds.map((dealId) => ({ dealId, role: asOwner ? ("OWNER" as const) : ("STAFF" as const), canApprove: asOwner })), name: deal.customerAccounts[0]?.account.name ?? deal.contactName, accountId: null, preview: { dealId: deal.id }, admin: asOwner };
 }
 
 const fmtDate = (d: Date, lang: Lang) => d.toLocaleDateString(lang === "en" ? "en-GB" : "da-DK", { day: "numeric", month: "short", year: "numeric" });
@@ -86,6 +86,10 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
   const who = await viewer(sp.som);
   if (!who) redirect("/arpo");
   const example = who.example ? await exampleTour(sp.tour) : null;
+  // An admin on "Se som kunde" acts as the owner: invites, the statistics mail, approving - the actions check it again on the server.
+  const adminActs = Boolean(who.preview && who.admin && !example);
+  const som = adminActs ? who.preview!.dealId : undefined;
+  const readOnly = Boolean(who.preview) && !adminActs;
   if (who.example && !example) redirect("/arpo/generator?fane=kundeportal");
 
   const dealsQuery = () => prisma.deal.findMany({
@@ -243,7 +247,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
     <div lang={lang} className="min-h-screen bg-[#f3f3f5] text-[#1d1d1f]" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", system-ui, sans-serif' }}>
       {who.preview && (
         <div className="sticky top-0 z-30 flex items-center justify-center gap-3 bg-[#1d1d1f] px-4 py-2.5 text-[13px] text-white">
-          <span>{example ? (lang === "en" ? "Example of the customer portal - the numbers are made up." : "Eksempel på kundeportalen - tallene er opdigtede.") : t.preview}</span>
+          <span>{example ? (lang === "en" ? "Example of the customer portal - the numbers are made up." : "Eksempel på kundeportalen - tallene er opdigtede.") : adminActs ? (lang === "en" ? "You're seeing the page as the customer - as admin you can do everything the owner can." : "Du ser siden som kunden - som admin kan du gøre alt, ejeren kan.") : t.preview}</span>
           <a href={example ? "/arpo/generator?fane=kundeportal" : `/arpo/kunder/${who.preview.dealId}`} className="rounded-full bg-white/15 px-3 py-1 font-semibold hover:bg-white/25">
             {t.backToArpo}
           </a>
@@ -312,7 +316,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
                     {!x.reviewApprovedAt && (
                       <div className="mt-5 flex flex-wrap items-center gap-3 [&_button]:!rounded-full">
                         <ReviewLauncher slug={x.slug} title={x.config.title || x.name} words={{ open: t.fix.open, opening: t.fix.opening, hint: t.fix.windowHint, close: t.fix.close }} />
-                        {canOn(x.dealId, "approve") && <ApproveTour slug={x.slug} approved={null} preview={Boolean(who.preview)} words={{ approve: t.fix.approve, confirm: t.fix.approveConfirm, confirmTitle: t.fix.approveTitle, yes: t.fix.approveYes, no: t.fix.approveNo, approved: t.fix.approved, previewOnly: t.fix.previewOnly }} />}
+                        {canOn(x.dealId, "approve") && <ApproveTour slug={x.slug} approved={null} preview={readOnly} som={som} words={{ approve: t.fix.approve, confirm: t.fix.approveConfirm, confirmTitle: t.fix.approveTitle, yes: t.fix.approveYes, no: t.fix.approveNo, approved: t.fix.approved, previewOnly: t.fix.previewOnly }} />}
                         <a href={href({ side: "rettelser" })} className="text-[14px] font-semibold text-white/85 underline-offset-4 hover:underline">
                           {t.review.fixes} →
                         </a>
@@ -450,7 +454,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
                 <section className={card}>
                   <h2 className="text-[18px] font-bold tracking-tight">{t.reportMail.title}</h2>
                   <p className="mb-3 mt-0.5 text-[14px] text-[#6e6e73]">{t.reportMail.lead}</p>
-                  <ReportMailChoice current={root.reportInterval ?? "OFF"} disabled={Boolean(who.preview)} words={{ options: t.reportMail.options, saved: t.reportMail.saved }} />
+                  <ReportMailChoice current={root.reportInterval ?? "OFF"} disabled={readOnly} som={som} words={{ options: t.reportMail.options, saved: t.reportMail.saved }} />
                   <p className="text-[13px] text-[#6e6e73]">
                     {[
                       root.reportInterval && (root.invoiceEmail || root.contactEmail) && t.reportMail.to(root.invoiceEmail || root.contactEmail!),
@@ -571,7 +575,8 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
                           <ApproveTour
                             slug={x.slug}
                             approved={x.reviewApprovedAt ? fmtDate(x.reviewApprovedAt, lang) : null}
-                            preview={Boolean(who.preview)}
+                            preview={readOnly}
+                            som={som}
                             words={{ approve: t.fix.approve, confirm: t.fix.approveConfirm, confirmTitle: t.fix.approveTitle, yes: t.fix.approveYes, no: t.fix.approveNo, approved: t.fix.approved, previewOnly: t.fix.previewOnly }}
                           />
                         )}
@@ -706,8 +711,10 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
               }))}
               deals={users.deals}
               meId={who.accountId}
-              mayInvite={users.mayInvite}
-              preview={Boolean(who.preview)}
+              mayInvite={users.mayInvite || adminActs}
+              preview={readOnly}
+              som={som}
+              admin={adminActs}
               lang={lang}
             />
           )}

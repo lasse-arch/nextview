@@ -137,11 +137,14 @@ export function ApproveTour({
   slug,
   approved,
   preview,
+  som,
   words,
 }: {
   slug: string;
   approved: string | null;
   preview: boolean;
+  /** An admin on "Se som kunde": approves for the customer (checked again on the server). */
+  som?: string;
   words: { approve: string; confirm: string; confirmTitle: string; yes: string; no: string; approved: string; previewOnly: string };
 }) {
   const router = useRouter();
@@ -163,7 +166,7 @@ export function ApproveTour({
   async function approve() {
     setBusy(true);
     setError(null);
-    const r = await portalApprove(slug);
+    const r = await portalApprove(slug, som);
     setBusy(false);
     if (!r.ok) return setError(r.error);
     setAsking(false);
@@ -262,11 +265,14 @@ export function ReviewLauncher({ slug, title, words }: { slug: string; title: st
 export function ReportMailChoice({
   current,
   disabled,
+  som,
   words,
 }: {
   current: PortalReportChoice;
-  /** The team's "Se som kunde" - shown, not changed (that's done on the deal). */
+  /** The team's "Se som kunde" (not an admin) - shown, not changed. */
   disabled?: boolean;
+  /** An admin on "Se som kunde": changes it for the customer. */
+  som?: string;
   words: { options: Record<PortalReportChoice, string>; saved: string };
 }) {
   const router = useRouter();
@@ -277,7 +283,7 @@ export function ReportMailChoice({
     const before = chosen;
     setChosen(c);
     setState("saving");
-    const r = await setMyReportInterval(c).catch(() => ({ ok: false as const, error: "Der skete en fejl - prøv igen." }));
+    const r = await setMyReportInterval(c, som).catch(() => ({ ok: false as const, error: "Der skete en fejl - prøv igen." }));
     if (r.ok) {
       setState("saved");
       router.refresh();

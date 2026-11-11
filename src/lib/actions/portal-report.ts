@@ -8,6 +8,7 @@ import { prisma } from "@/lib/db";
 import { REPORT_INTERVAL_MONTHS } from "@/lib/customer-report-service";
 import { logActivity } from "@/lib/activity";
 import { dealName } from "@/lib/labels";
+import { adminPreview } from "@/lib/portal-admin";
 
 const CHOICES = ["MONTHLY", "BIMONTHLY", "QUARTERLY", "OFF"] as const;
 export type PortalReportChoice = (typeof CHOICES)[number];
@@ -21,8 +22,11 @@ const SAID: Record<PortalReportChoice, string> = { MONTHLY: "hver måned", BIMON
  * it on the deal in Arpo (updateReportIntervalAction). A new interval starts
  * counting from today, as when the team changes it.
  */
-export async function setMyReportInterval(choice: PortalReportChoice): Promise<{ ok: true } | { ok: false; error: string }> {
-  const account = await getCurrentCustomer();
+export async function setMyReportInterval(choice: PortalReportChoice, som?: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const customer = await getCurrentCustomer();
+  // An admin on "Se som kunde" (only without a customer session) chooses for that customer and its locations.
+  const admin = customer ? null : await adminPreview(som);
+  const account = customer ?? (admin ? { deals: admin.dealIds.map((dealId) => ({ dealId, role: "OWNER" as const })) } : null);
   if (!account) return { ok: false, error: "Log ind igen." };
   if (!CHOICES.includes(choice)) return { ok: false, error: "Ugyldigt valg." };
   const interval: ReportInterval | null = choice === "OFF" ? null : choice;
@@ -45,7 +49,7 @@ export async function setMyReportInterval(choice: PortalReportChoice): Promise<{
     )
   );
   const root = deals.find((d) => !d.parentDealId || !deals.some((x) => x.id === d.parentDealId)) ?? deals[0];
-  await logActivity({ type: "CUSTOMER_REPORT_INTERVAL", message: `${dealName(root)} valgte selv statistik på mail: ${SAID[choice]}`, dealId: root.id });
+  await logActivity({ type: "CUSTOMER_REPORT_INTERVAL", message: admin ? `${admin.user.name} satte statistik på mail for ${dealName(root)}: ${SAID[choice]}` : `${dealName(root)} valgte selv statistik på mail: ${SAID[choice]}`, actorId: admin?.user.id, dealId: root.id });
   revalidatePath("/kunde");
   for (const d of changed) revalidatePath(`/arpo/deals/${d.id}`);
   return { ok: true };
