@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { dealName, formatDKK, invoiceQuarterShortLabel } from "@/lib/labels";
 import { tourStats } from "@/lib/tour-stats";
+import { tourEmbeds } from "@/lib/tour-embeds";
 import { CLOUDFLARE_TOUR_ORIGIN } from "@/lib/public-urls";
 import { CustomerAccessSection } from "../../deals/[id]/customer-access-section";
 import { customerCards, forPicker } from "@/lib/customer-cards";
@@ -92,6 +93,18 @@ export default async function CustomerOverviewPage({ params }: { params: Promise
   ]);
   const picker = forPicker(await customerCards());
   const stats = await Promise.all(tours.map((t) => tourStats(t.slug, 30).catch(() => null)));
+  // "Virtuel tour" as its own page on their site: where the tours are shown now (the last 90 days), and whether one of those is such a page.
+  const outTours = tours.filter((t) => t.published || t.liveVersion != null);
+  const embeds = outTours.length ? await tourEmbeds(outTours.map((t) => t.slug)).catch(() => []) : [];
+  const pathOf = (u: string) => {
+    try {
+      return new URL(u, "https://x.dk").pathname;
+    } catch {
+      return "";
+    }
+  };
+  const tourPage = embeds.find((e) => e.url && /virtu|rundvisning|360|tour/i.test(pathOf(e.url)));
+  const site = deal.websiteUrl ? (/^https?:/.test(deal.websiteUrl) ? deal.websiteUrl : `https://${deal.websiteUrl}`).replace(/\/+$/, "") : null;
   // Messages visitors wrote with the tours' contact form ("Skriv til os").
   const messages = tours.length ? await prisma.tourMessage.findMany({ where: { tourSlug: { in: tours.map((t) => t.slug) } }, orderBy: { createdAt: "desc" }, take: 100 }) : [];
 
@@ -314,6 +327,43 @@ export default async function CustomerOverviewPage({ params }: { params: Promise
               </ul>
             )}
           </Card>
+
+          {outTours.length > 0 && (
+            <Card title="Underside til touren">
+              {tourPage ? (
+                <p className="text-sm text-slate-700">
+                  ✓ Touren har sin egen side:{" "}
+                  <a href={tourPage.url!} target="_blank" rel="noopener" className="break-all text-[#0071e3]">
+                    {tourPage.url!.replace(/^https?:\/\//, "")}
+                  </a>
+                </p>
+              ) : (
+                <div className="space-y-2 text-sm text-slate-700">
+                  <p>
+                    <b>Anbefal kunden at lave en underside, der hedder &quot;Virtuel tour&quot;</b>
+                    {site ? (
+                      <>
+                        {" "}- fx <span className="font-medium">{site.replace(/^https?:\/\//, "")}/virtuel-tour</span>
+                      </>
+                    ) : null}
+                    , med touren i fuld bredde og et punkt i menuen.
+                  </p>
+                  <p className="text-slate-500">Så finder gæsterne og Google den, når de søger &quot;virtuel tour&quot; og kundens navn, og kunden får et fast link at dele på Facebook, Instagram og i nyhedsbreve. Koden til siden står i kundeportalen under &quot;På hjemmesiden&quot;.</p>
+                  {embeds.length > 0 ? (
+                    <p className="text-xs text-slate-500">
+                      Touren er vist her de sidste 90 dage:{" "}
+                      {embeds
+                        .slice(0, 3)
+                        .map((e) => (e.url ?? e.host).replace(/^https?:\/\//, ""))
+                        .join(", ")}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-slate-500">Touren er ikke set på kundens hjemmeside de sidste 90 dage.</p>
+                  )}
+                </div>
+              )}
+            </Card>
+          )}
 
           {billing && (
           <Card title="Fakturaer">
