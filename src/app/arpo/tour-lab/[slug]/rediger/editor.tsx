@@ -414,7 +414,7 @@ export function TourEditor({
   }, [dirty]);
   const preview = useMemo<PreviewApi>(() => {
     /** Asks the preview something and waits for its answer (or gives up after a while). */
-    const ask = <T extends object>(type: string, wait = 5000, progress?: (text: string) => void) =>
+    const ask = <T extends object>(type: string, wait = 5000, progress?: (text: string) => void, extra?: object) =>
       new Promise<T & { error?: string }>((resolve) => {
         const id = Math.random().toString(36).slice(2);
         const done = (r: T & { error?: string }) => {
@@ -429,12 +429,12 @@ export function TourEditor({
         };
         const timer = setTimeout(() => done({ error: "Forhåndsvisningen svarede ikke - er touren indlæst?" } as T & { error?: string }), wait);
         window.addEventListener("message", onMessage);
-        frame.current?.contentWindow?.postMessage({ type, id }, location.origin);
+        frame.current?.contentWindow?.postMessage({ type, id, ...extra }, location.origin);
       });
     return {
       view: () => ask<{ href?: string; room?: string | null; position?: { x: number; y: number; z: number } }>("tour-view"),
       shot: () => ask<{ image?: string }>("tour-shot", 15000),
-      storyPictures: (progress) => ask<{ done?: boolean }>("tour-stories", 10 * 60_000, progress),
+      storyPictures: (progress, which = "missing") => ask<{ done?: boolean; taken?: number }>("tour-stories", 10 * 60_000, progress, { which }),
       pick: () => ask<{ position?: { x: number; y: number; z: number }; normal?: { x: number; y: number; z: number }; ss?: number | null; room?: string | null }>("tour-pick", 120000),
       showMenu: () => frame.current?.contentWindow?.postMessage({ type: "tour-show-menu" }, location.origin),
       go: (name, href) => frame.current?.contentWindow?.postMessage({ type: "tour-go", name, href }, location.origin),
@@ -949,7 +949,7 @@ export function TourEditor({
                     hint="Touren starter med historierne foldet sammen - kun knappen &quot;Historier&quot; står der, og gæsten åbner dem selv."
                   />
                 )}
-                {(config.stories?.mobile || config.stories?.desktop) && <StoryPictures slug={slug} preview={preview} />}
+                {(config.stories?.mobile || config.stories?.desktop) && <StoryPictures slug={slug} preview={preview} rooms={storyRoomNames(config)} />}
                 {(config.stories?.mobile || config.stories?.desktop) && (
                   <Field title="Scroll sidelæns i historierne" hint="Fra: alle historierne vises på én gang, fordelt på flere rækker.">
                     <Choice
@@ -2821,26 +2821,57 @@ function MatterportParams({ config, edit }: { config: TourConfig; edit: (fn: (d:
   );
 }
 
-/** "Tag billeder til historierne": the preview visits every story room and keeps a picture of it (gemt med det samme). */
-function StoryPictures({ slug, preview }: { slug: string; preview: PreviewApi }) {
+/** The story rooms by name, as the tour picks them (the menu's places, or the chosen ones) - for "Tag billede af ét rum". */
+function storyRoomNames(config: TourConfig): string[] {
+  const all = config.menu.flatMap((m) => ("items" in m ? m.items : [[m.title, m.href] as [string, string]])).filter(([, href]) => isPlaceHref(href));
+  const names = [...new Set(all.map(([n]) => n))];
+  return config.stories?.rooms ? config.stories.rooms.filter((r) => names.includes(r)) : names;
+}
+
+/** "Tag billeder til historierne": the preview visits the story rooms and keeps a picture of each (gemt med det samme) - only those without one, one chosen room, or all again. */
+function StoryPictures({ slug, preview, rooms }: { slug: string; preview: PreviewApi; rooms: string[] }) {
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<{ text: string; error?: boolean } | null>(null);
+  const take = async (which: string, start: string) => {
+    setBusy(true);
+    setNote({ text: start });
+    const r = await preview.storyPictures((text) => setNote({ text }), which);
+    setBusy(false);
+    setNote(r.error ? { text: r.error, error: true } : { text: r.taken === 0 ? "Alle historier har allerede et billede - tag ét rum igen nedenfor." : "Billederne er taget og gemt - de ses på historierne nu." });
+  };
   return (
     <div className="space-y-1">
       <button
         type="button"
         disabled={busy}
-        onClick={async () => {
-          setBusy(true);
-          setNote({ text: "Går rundt i touren …" });
-          const r = await preview.storyPictures((text) => setNote({ text }));
-          setBusy(false);
-          setNote(r.error ? { text: r.error, error: true } : { text: "Billederne er taget og gemt - de ses på historierne nu." });
-        }}
+        onClick={() => take("missing", "Går til de rum, der mangler et billede …")}
         className="w-full rounded-xl bg-white py-2 text-[14px] font-medium text-[#0071e3] ring-1 ring-black/[.06] hover:bg-[#0071e3]/5 disabled:opacity-50"
       >
-        {busy ? "Tager billeder …" : "📷 Tag billeder til historierne fra touren"}
+        {busy ? "Tager billeder …" : "📷 Tag billeder af historier uden billede"}
       </button>
+      <div className="flex gap-1.5">
+        <select
+          className={`${input} bg-white`}
+          value=""
+          disabled={busy}
+          onChange={(e) => e.target.value && take(`room:${e.target.value}`, `Går til ${e.target.value} …`)}
+        >
+          <option value="">Tag billede igen af ét rum …</option>
+          {rooms.map((r) => (
+            <option key={r} value={r}>
+              {r}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => confirm(`Tag nye billeder af alle ${rooms.length} historier?`) && take("all", "Går rundt i hele touren …")}
+          className="flex-none rounded-xl bg-white px-3 text-[13px] font-medium text-[#0071e3] ring-1 ring-black/[.06] hover:bg-[#0071e3]/5 disabled:opacity-50"
+        >
+          Alle igen
+        </button>
+      </div>
       <button
         type="button"
         disabled={busy}

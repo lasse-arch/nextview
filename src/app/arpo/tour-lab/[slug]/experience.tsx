@@ -1791,12 +1791,15 @@ function TourExperience({
 
   /** Prototype tool: visits every story room and takes its picture from the tour itself. */
   const router = useRouter();
-  async function captureStories(progress: (text: string) => void) {
+  /** `which`: "missing" - only the rooms without a picture yet (a new place), "all", or "room:<name>" - just that one. Returns how many were taken. */
+  async function captureStories(progress: (text: string) => void, which = "all"): Promise<number> {
     if (!sdkRef.current) throw new Error("Touren er ikke klar.");
+    const list = which === "missing" ? storyRooms.filter((r) => !r.image) : which.startsWith("room:") ? storyRooms.filter((r) => r.name === which.slice(5)) : storyRooms;
+    if (!list.length) return 0;
     const sdk = await sdkRef.current;
     setPhase("tour");
-    for (const [i, r] of storyRooms.entries()) {
-      progress(`${i + 1}/${storyRooms.length}: ${r.name}`);
+    for (const [i, r] of list.entries()) {
+      progress(`${i + 1}/${list.length}: ${r.name}`);
       if (!(await flyTo(r.href, "instant"))) continue;
       await new Promise((res) => setTimeout(res, 2500)); // let the room's sharp textures load
       const shot = await sdk.Renderer.takeScreenShot({ width: 600, height: 800 }, { mattertags: false, sweeps: false, views: false, measurements: false });
@@ -1804,8 +1807,9 @@ function TourExperience({
       if (!saved.ok) throw new Error(saved.error);
     }
     await storyImagesSaved(T.slug);
-    progress(`Færdig - ${storyRooms.length} billeder.`);
+    progress(`Færdig - ${list.length} ${list.length === 1 ? "billede" : "billeder"}.`);
     router.refresh();
+    return list.length;
   }
 
   /** A place from the cover or the dock: into the tour, right there. */
@@ -2488,8 +2492,8 @@ function TourExperience({
         setCover(false);
         setWelcome(false);
         try {
-          await capture((text) => reply({ type: "tour-stories-progress", id: e.data.id, text }));
-          reply({ type: "tour-stories", id: e.data.id, done: true });
+          const taken = await capture((text) => reply({ type: "tour-stories-progress", id: e.data.id, text }), typeof e.data.which === "string" ? e.data.which : "missing");
+          reply({ type: "tour-stories", id: e.data.id, done: true, taken });
         } catch (err) {
           reply({ type: "tour-stories", id: e.data.id, error: err instanceof Error ? err.message : "Kunne ikke tage billederne." });
         }
@@ -4174,7 +4178,7 @@ function DevPanel({
 }: {
   onCopyView: () => Promise<string>;
   place?: { placing: boolean; setPlacing: (on: boolean) => void; result: string | null };
-  onCaptureStories?: (progress: (text: string) => void) => Promise<void>;
+  onCaptureStories?: (progress: (text: string) => void) => Promise<unknown>;
   storyCount: number;
   tourError: string | null;
   sdkKey: string | null;
