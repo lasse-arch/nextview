@@ -1,12 +1,23 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { grantCustomerAccess, renameCustomerLogin, resendCustomerLogin, revokeCustomerAccess, setCustomersMayInvite } from "@/lib/actions/customer-access";
+import { grantCustomerAccess, renameCustomerLogin, resendCustomerLogin, revokeCustomerAccess, setCustomerLoginRole, setCustomersMayInvite } from "@/lib/actions/customer-access";
 import { ROLE_NAMES } from "@/lib/customer-roles";
 import type { CustomerRole } from "@prisma/client";
 import { useToast } from "@/components/toast";
 
 type Access = { id: string; email: string; name: string | null; lastLoginAt: Date | null; invitedByName: string | null; role: CustomerRole; canApprove: boolean; expiresAt: Date | null; byCustomer: boolean };
+
+/** The role choices, as one value: a Medarbejder who may approve is its own choice. */
+const CHOICES: [string, string][] = [
+  ["OWNER", ROLE_NAMES.da.OWNER],
+  ["STAFF", ROLE_NAMES.da.STAFF],
+  ["STAFF+", `${ROLE_NAMES.da.STAFF} (må godkende)`],
+  ["DEVELOPER", ROLE_NAMES.da.DEVELOPER],
+  ["VIEWER", ROLE_NAMES.da.VIEWER],
+];
+const choiceOf = (role: CustomerRole, canApprove: boolean) => (role === "STAFF" && canApprove ? "STAFF+" : role);
+const accessOf = (choice: string) => ({ role: (choice === "STAFF+" ? "STAFF" : choice) as CustomerRole, canApprove: choice === "STAFF+" });
 
 const day = (d: Date) => new Date(d).toLocaleDateString("da-DK", { day: "numeric", month: "short" });
 
@@ -39,6 +50,7 @@ export function CustomerAccessSection({
   const [renaming, setRenaming] = useState<string | null>(null);
   const [email, setEmail] = useState(accounts.some((a) => a.email === defaultEmail?.toLowerCase()) ? "" : (defaultEmail ?? ""));
   const [name, setName] = useState(email ? (defaultName ?? "") : "");
+  const [choice, setChoice] = useState("OWNER");
   const showToast = useToast();
 
   return (
@@ -104,9 +116,27 @@ export function CustomerAccessSection({
                     </button>
                   </div>
                 )}
-                <p className="text-xs text-slate-500">
+                <p className="flex flex-wrap items-center gap-x-1.5 text-xs text-slate-500">
+                  <select
+                    aria-label={`Rolle for ${a.email}`}
+                    value={choiceOf(a.role, a.canApprove)}
+                    disabled={pending}
+                    onChange={(e) => {
+                      const next = accessOf(e.target.value);
+                      start(async () => {
+                        const r = await setCustomerLoginRole(dealId, a.id, next.role, next.canApprove);
+                        showToast(r.ok ? `${a.email} er nu ${e.target.selectedOptions[0]?.text ?? ROLE_NAMES.da[next.role]}` : r.error);
+                      });
+                    }}
+                    className="rounded border border-slate-200 bg-white px-1 py-0.5 text-xs font-medium text-slate-700"
+                  >
+                    {CHOICES.map(([v, label]) => (
+                      <option key={v} value={v}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
                   {[
-                    `${ROLE_NAMES.da[a.role]}${a.role === "STAFF" && a.canApprove ? " (må godkende)" : ""}`,
                     when(a.lastLoginAt),
                     a.expiresAt && (new Date(a.expiresAt) < new Date() ? `Udløbet ${day(a.expiresAt)}` : `Stopper ${day(a.expiresAt)}`),
                     a.byCustomer && a.invitedByName && `Inviteret af ${a.invitedByName} (kunden)`,
@@ -153,11 +183,12 @@ export function CustomerAccessSection({
           e.preventDefault();
           setError(null);
           start(async () => {
-            const r = await grantCustomerAccess(dealId, email, name);
+            const r = await grantCustomerAccess(dealId, email, name, accessOf(choice).role, accessOf(choice).canApprove);
             if (!r.ok) return setError(r.error);
             showToast(`Adgang givet - login-link sendt til ${email}`);
             setEmail("");
             setName("");
+            setChoice("OWNER");
           });
         }}
       >
@@ -168,6 +199,16 @@ export function CustomerAccessSection({
         <div className="min-w-[140px] flex-1">
           <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Navn</label>
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Valgfrit" className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm" />
+        </div>
+        <div>
+          <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Rolle</label>
+          <select value={choice} onChange={(e) => setChoice(e.target.value)} className="mt-1 rounded-md border border-slate-300 bg-white px-2 py-2 text-sm">
+            {CHOICES.map(([v, label]) => (
+              <option key={v} value={v}>
+                {label}
+              </option>
+            ))}
+          </select>
         </div>
         <button type="submit" disabled={pending || !email} className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50">
           {pending ? "Sender…" : "Giv adgang og send mail"}
