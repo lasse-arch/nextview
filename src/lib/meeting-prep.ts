@@ -1,8 +1,6 @@
 import "server-only";
-import Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "@/lib/db";
-import { getSettingValue } from "@/lib/integration-settings";
-import { claudeCostUsd } from "@/lib/claude-cost";
+import { apiKey, writeWebBrief, type BriefResult } from "@/lib/web-brief";
 import { dealName, stageLabels } from "@/lib/labels";
 import { siteResearch } from "@/lib/site-digest";
 import { helperKnowledge, teamAnswers } from "@/lib/sales-helper";
@@ -20,8 +18,7 @@ import type { CalendarMeeting } from "@/lib/calendar-page-data";
  * never instructions. People are only looked up professionally.
  */
 
-export type BriefSource = { url: string; title: string };
-export type BriefResult = { ok: true; body: string; sources: BriefSource[] } | { ok: false; error: string };
+export type { BriefSource, BriefResult } from "@/lib/web-brief";
 
 const RULES = `Du er nextviewAI, Nextview360's sælger-hjælp i Arpo (vores CRM). En sælger skal til møde med en mulig kunde og beder dig gøre dem klar.
 
@@ -135,23 +132,9 @@ async function whatWeKnow(m: CalendarMeeting, dealId: string | null): Promise<{ 
   return { meeting, customer, website: d.websiteUrl || contactSite || (guestSite ? `https://${guestSite}` : null), title: `${dealName(d)} - ${when(m)}` };
 }
 
-/** The pages it read on the web: the ones it cited first, then what it fetched. */
-function sourcesOf(blocks: Anthropic.ContentBlock[]): BriefSource[] {
-  const cited = new Map<string, string>();
-  const read = new Map<string, string>();
-  for (const b of blocks) {
-    if (b.type === "text") for (const c of b.citations ?? []) if ("url" in c && c.url) cited.set(c.url, ("title" in c && c.title) || c.url);
-    if (b.type === "web_fetch_tool_result" && "url" in b.content && typeof b.content.url === "string") read.set(b.content.url, b.content.url);
-    if (b.type === "web_search_tool_result" && Array.isArray(b.content)) for (const r of b.content) if (r.type === "web_search_result" && !read.has(r.url)) read.set(r.url, r.title || r.url);
-  }
-  const all = [...cited, ...[...read].filter(([u]) => !cited.has(u))].filter(([u]) => /^https?:\/\//i.test(u));
-  return all.slice(0, 14).map(([url, title]) => ({ url, title: title.slice(0, 160) }));
-}
-
 /** The brief for a meeting. `wish`: what the seller wants to know or bring. */
 export async function writeMeetingBrief(who: { name: string }, m: CalendarMeeting, dealId: string | null, wish: string): Promise<BriefResult> {
-  const key = process.env.ANTHROPIC_API_KEY || (await getSettingValue("ANTHROPIC_API_KEY"));
-  if (!key) return { ok: false, error: "nextviewAI er ikke sat op endnu - en admin indsætter nøglen i tour-editoren under fanen nextviewAI." };
+  if (!(await apiKey())) return { ok: false, error: "nextviewAI er ikke sat op endnu - en admin indsætter nøglen i tour-editoren under fanen nextviewAI." };
   const known = await whatWeKnow(m, dealId);
   const site = known.website ? await siteResearch(known.website).catch(() => null) : null;
   const [knowledge, answers] = await Promise.all([helperKnowledge(), teamAnswers()]);
@@ -166,70 +149,16 @@ export async function writeMeetingBrief(who: { name: string }, m: CalendarMeetin
     .filter(Boolean)
     .join("\n\n");
 
-  const client = new Anthropic({ apiKey: key });
-  const messages: Anthropic.MessageParam[] = [{ role: "user", content: text }];
-  const content: Anthropic.ContentBlock[] = [];
-  let usage = { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 };
-  let searches = 0;
-  let stop: Anthropic.StopReason | null = null;
-  try {
-    // A long search turn can pause; it is sent back so the server goes on (a few times at most).
-    for (let round = 0; round < 4; round++) {
-      const r = await client.messages
-        .stream(
-          {
-            model: "claude-opus-5-5",
-            max_tokens: 16000,
-            thinking: { type: "adaptive" },
-            output_config: { effort: "medium" },
-            system: [
-              { type: "text", text: `${RULES}\n\n<viden>\n${knowledge}\n</viden>`, cache_control: { type: "ephemeral" } },
-              { type: "text", text: answers ? `<teamets-svar>\n${answers}</teamets-svar>` : "Teamet har ikke gemt egne svar endnu." },
-            ],
-            tools: [
-              { type: "web_search_20260209", name: "web_search", max_uses: 12, user_location: { type: "approximate", country: "DK", timezone: "Europe/Copenhagen" } },
-              { type: "web_fetch_20260209", name: "web_fetch", max_uses: 7, max_content_tokens: 12000 },
-            ],
-            messages,
-          },
-          { signal: AbortSignal.timeout(250_000) },
-        )
-        .finalMessage();
-      const u = r.usage;
-      usage = {
-        input_tokens: usage.input_tokens + u.input_tokens,
-        output_tokens: usage.output_tokens + u.output_tokens,
-        cache_read_input_tokens: usage.cache_read_input_tokens + (u.cache_read_input_tokens ?? 0),
-        cache_creation_input_tokens: usage.cache_creation_input_tokens + (u.cache_creation_input_tokens ?? 0),
-      };
-      searches += u.server_tool_use?.web_search_requests ?? 0;
-      content.push(...r.content);
-      stop = r.stop_reason;
-      if (stop !== "pause_turn") break;
-      messages.push({ role: "assistant", content: r.content });
-    }
-  } catch (err) {
-    if (err instanceof Anthropic.AuthenticationError) return { ok: false, error: "nextviewAI-nøglen virker ikke længere." };
-    return { ok: false, error: `Kunne ikke få fat i nextviewAI (${err instanceof Error ? err.message : err}).` };
-  } finally {
-    // Web searches cost $10 per 1,000 on top of the tokens.
-    await prisma.tourAiUsage
-      .create({ data: { tourSlug: "_moedeforberedelse", userName: who.name, kind: "moedeforberedelse", inputTokens: usage.input_tokens, outputTokens: usage.output_tokens, cacheReadTokens: usage.cache_read_input_tokens, cacheWriteTokens: usage.cache_creation_input_tokens, costUsd: claudeCostUsd(usage) + searches * 0.01 } })
-      .catch(() => {});
-  }
-  if (stop === "refusal") return { ok: false, error: "nextviewAI ville ikke lave den forberedelse." };
-  // The brief is the text after the last search - what came before is "now I'll look at …".
-  const lastTool = content.findLastIndex((b) => b.type !== "text" && b.type !== "thinking" && b.type !== "redacted_thinking");
-  const textOf = (blocks: Anthropic.ContentBlock[]) =>
-    blocks
-      .filter((b) => b.type === "text")
-      .map((b) => b.text)
-      .join("")
-      .trim();
-  const after = textOf(content.slice(lastTool + 1));
-  const body = after.includes("## ") ? after : textOf(content);
-  const start = body.indexOf("## ");
-  const brief = (start > 0 ? body.slice(start) : body).trim();
-  if (!brief) return { ok: false, error: stop === "max_tokens" ? "Forberedelsen blev for lang - prøv igen." : "nextviewAI svarede ikke - prøv igen." };
-  return { ok: true, body: brief, sources: sourcesOf(content) };
+  return writeWebBrief({
+    who,
+    kind: "moedeforberedelse",
+    system: `${RULES}\n\n<viden>\n${knowledge}\n</viden>`,
+    systemTail: answers ? `<teamets-svar>\n${answers}</teamets-svar>` : "Teamet har ikke gemt egne svar endnu.",
+    text,
+    searches: 12,
+    fetches: 7,
+    effort: "medium",
+    maxTokens: 16000,
+    timeoutMs: 250_000,
+  });
 }

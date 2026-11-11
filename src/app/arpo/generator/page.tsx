@@ -10,6 +10,7 @@ import { listSalesAnswers } from "@/lib/actions/sales-helper";
 import { prepMeetings, recentMeetingBriefs } from "@/lib/actions/meeting-prep";
 import { MeetingPrep } from "./meeting-prep";
 import { PortalExample } from "./portal-example";
+import { CallPrep } from "./call-prep";
 import { ProposalSection } from "./proposal-section";
 import { listProposals } from "@/lib/actions/tour-proposal";
 import { exampleTours } from "@/lib/portal-example";
@@ -35,11 +36,12 @@ export default async function GeneratorPage({ searchParams }: { searchParams: Pr
   const sms = fane === "sms";
   const spoerg = fane === "spoerg";
   const portal = fane === "kundeportal";
+  const opkald = fane === "opkald";
   const tab = (on: boolean) => `rounded-lg px-4 py-1.5 text-sm font-medium transition ${on ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800"}`;
   return (
     <div className="space-y-5">
       <div className="inline-flex rounded-xl bg-slate-100 p-1">
-        <Link href="/arpo/generator" className={tab(!sms && !spoerg && !portal)}>
+        <Link href="/arpo/generator" className={tab(!sms && !spoerg && !portal && !opkald)}>
           ✉️ Mail
         </Link>
         <Link href="/arpo/generator?fane=sms" className={tab(sms)}>
@@ -48,11 +50,16 @@ export default async function GeneratorPage({ searchParams }: { searchParams: Pr
         <Link href="/arpo/generator?fane=spoerg" className={tab(spoerg)}>
           💡 Spørg
         </Link>
+        <Link href="/arpo/generator?fane=opkald" className={tab(opkald)}>
+          📞 Første opkald
+        </Link>
         <Link href="/arpo/generator?fane=kundeportal" className={tab(portal)}>
           🖥️ Kundeportal
         </Link>
       </div>
-      {portal ? (
+      {opkald ? (
+        <CallPrep />
+      ) : portal ? (
         <PortalExample tours={await exampleTours()} />
       ) : spoerg ? (
         <>
