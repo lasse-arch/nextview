@@ -54,7 +54,7 @@ export function BookMeetingButton({
         await setMeetingDateAndStage(dealId, iso);
 
         if (sendInvite) {
-          const result = await sendCalendarInvite(dealId, selectedColleagues, iso, undefined, duration, undefined, false, online);
+          const result = await sendCalendarInvite(dealId, selectedColleagues, iso, undefined, duration, undefined, online);
           showToast(result.synced ? "Møde booket og kalenderinvitation sendt." : `Møde booket. ${result.reason ?? "Kalenderinvitation kunne ikke sendes."}`);
         } else {
           showToast("Møde booket");

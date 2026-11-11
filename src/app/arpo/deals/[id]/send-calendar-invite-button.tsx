@@ -117,7 +117,7 @@ export function SendCalendarInviteButton({
     const dateInput = rootRef.current?.closest("form")?.querySelector<HTMLInputElement>('input[name="meetingDate"]');
     startTransition(async () => {
       try {
-        const result = await sendCalendarInvite(dealId, selected, dateInput?.value || undefined, customBody, duration, undefined, false, online);
+        const result = await sendCalendarInvite(dealId, selected, dateInput?.value || undefined, customBody, duration, undefined, online);
         showToast(result.synced ? "Kalenderinvitation sendt." : result.reason ?? "Kunne ikke sende invitationen.");
         if (result.synced) setOpen(false);
       } catch (err) {

@@ -494,7 +494,6 @@ function QueueCard({ deal, users, currentUserId, isAdmin }: { deal: QueueDeal; u
             undefined,
             duration,
             inviteEmail,
-            true,
             online
           );
           showToast(

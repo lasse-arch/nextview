@@ -60,14 +60,9 @@ export async function syncDealMeetingToCalendar(
   const account = await prisma.emailAccount.findUnique({
     where: { userId_provider: { userId: organizer.id, provider: "GOOGLE" } },
   });
+  // The invitation always comes from one of us - the one who books - never from someone else's calendar in their place.
   if (!account) {
-    return {
-      synced: false,
-      reason:
-        organizer.id === deal.ownerId
-          ? "Ejeren har ikke forbundet Google under Indstillinger → E-mail."
-          : "Du har ikke forbundet Google under Indstillinger → E-mail.",
-    };
+    return { synced: false, reason: "Du har ikke forbundet din Google-konto under Indstillinger → E-mail - så kan invitationen ikke sendes fra dig. Mødet er booket." };
   }
 
   if (durationMinutes && durationMinutes !== deal.meetingDurationMinutes) {
@@ -99,9 +94,8 @@ export async function syncDealMeetingToCalendar(
 
   try {
     const eventId = await upsertCalendarEvent(account, {
-      // An event lives in its organizer's calendar - one made from the
-      // owner's can't be updated from someone else's, so that's a new one.
-      eventId: organizer.id === deal.ownerId ? deal.googleCalendarEventId : null,
+      // An event lives in its organizer's calendar - updated only from there; from someone else's it's a new one.
+      eventId: organizer.id === (deal.meetingInviterId ?? deal.ownerId) ? deal.googleCalendarEventId : null,
       summary: `${dealName(deal)} x Nextview360`,
       description,
       startIso: toWallClockDateTime(start),
@@ -112,8 +106,8 @@ export async function syncDealMeetingToCalendar(
       online: isOnline,
     });
 
-    if (eventId !== deal.googleCalendarEventId) {
-      await prisma.deal.update({ where: { id: deal.id }, data: { googleCalendarEventId: eventId } });
+    if (eventId !== deal.googleCalendarEventId || organizer.id !== deal.meetingInviterId) {
+      await prisma.deal.update({ where: { id: deal.id }, data: { googleCalendarEventId: eventId, meetingInviterId: organizer.id } });
     }
 
     return { synced: true };

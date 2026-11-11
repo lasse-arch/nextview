@@ -497,9 +497,6 @@ export async function sendCalendarInvite(
   customBody?: string,
   durationMinutes?: number,
   contactEmail?: string,
-  /** Send it from the logged-in user's calendar instead of the deal owner's
-   * - the ringeliste, where whoever books the meeting is the one inviting. */
-  fromCurrentUser = false,
   /** An online meeting (Google Meet in the invitation) - in person by default. */
   online?: boolean
 ): Promise<CalendarSyncResult> {
@@ -535,7 +532,8 @@ export async function sendCalendarInvite(
     extraUsers.map((u) => u.email),
     resolvedCustomBody,
     durationMinutes,
-    fromCurrentUser ? user.id : undefined,
+    // Whoever books the meeting is the one inviting - also when someone else made the call list or owns the deal.
+    user.id,
     online
   );
   revalidatePath(`/arpo/deals/${dealId}`);
