@@ -51,7 +51,7 @@ import { SCHEDULE_CSS, ScheduleSheet } from "./schedule";
 import { MAP_CSS, MapScene, type MapApi, type MapView } from "./map";
 import { CARDS_CSS, NudgeCard, PlaceCard } from "./cards";
 import { MEASURES_CSS, MeasureShield } from "./measures";
-import { ROUTE_CSS, RouteLine, RouteSheet, RouteStatus, flightMs, routeNetwork, shortestPath, straighten, type Destination, type RouteGraph } from "./wayfinding";
+import { ROUTE_CSS, RouteLine, RouteSheet, RouteStatus, flightMs, routeNetwork, shortestPath, straighten, withoutSweeps, type Destination, type RouteGraph } from "./wayfinding";
 import { LINKS_CSS, LinkPopup, LinkProvider, TourLink, openLink, popupSize, prefetchFrames, prefetchLinks, siteOf, type LinkPopupState } from "./links";
 import { Stories, STORIES_CSS, storyJpeg, type StoryRoom } from "./stories";
 import { LIGHTBOX_CSS, Lightbox, type LightboxState } from "./lightbox";
@@ -2681,9 +2681,13 @@ function TourExperience({
     const target = uLinkTarget(dest.href);
     const goal = target ? sweepForSs(target.ss) : null;
     const from = currentSweep.current;
-    // Every scan point - also the hidden ones - so the way goes through the rooms, not through a wall.
-    const net = sdk ? routeNetwork(routeGraph, sweepData.current) : null;
-    const path = net && goal && from ? shortestPath(net, from, goal) : null;
+    // The way goes over the scan points the visitor may see - the hidden ones are left out. Only if there's no other
+    // way at all (a hidden point is the one door between two rooms) is the whole network used.
+    const all = sdk ? routeNetwork(routeGraph, sweepData.current) : null;
+    const open = all && goal && from ? withoutSweeps(all, new Set(hiddenSweeps), [from, goal]) : null;
+    const openPath = open && goal && from ? shortestPath(open, from, goal) : null;
+    const net = openPath ? open : all;
+    const path = openPath ?? (net && goal && from ? shortestPath(net, from, goal) : null);
     const flights = path && net ? straighten(net, path) : null;
     track("route_start", { destination: dest.name, group: dest.group ?? "", flights: flights ? flights.length - 1 : 0 });
     if (!sdk || !net || !flights || flights.length < 2) {

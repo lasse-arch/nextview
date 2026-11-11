@@ -32,6 +32,14 @@ export function routeNetwork(server: RouteGraph | null, sweeps: Record<string, {
   return out;
 }
 
+/** The network without some scan points (the hidden ones) - except `keep` (where the walk starts and ends). */
+export function withoutSweeps(graph: RouteGraph, drop: Set<string>, keep: string[]): RouteGraph {
+  const out: RouteGraph = {};
+  const gone = (id: string) => drop.has(id) && !keep.includes(id);
+  for (const [id, node] of Object.entries(graph)) if (!gone(id)) out[id] = { ...node, n: node.n.filter((nb) => !gone(nb)) };
+  return out;
+}
+
 /** The walk between two scan points (Dijkstra over the model's scan-point network, in short steps). */
 export function shortestPath(graph: RouteGraph, from: string, to: string): string[] | null {
   if (!graph[from] || !graph[to]) return null;

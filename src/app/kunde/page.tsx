@@ -449,7 +449,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
               {root && (accessOf.get(root.id)?.role === "OWNER" || accessOf.get(root.id)?.role === "STAFF") && (statTours.length > 0 || statOlder.length > 0) && (
                 <section className={card}>
                   <h2 className="text-[18px] font-bold tracking-tight">{t.reportMail.title}</h2>
-                  <p className="mb-3 mt-0.5 text-[14px] text-[#6e6e73]">{who.preview ? t.reportMail.preview : t.reportMail.lead}</p>
+                  <p className="mb-3 mt-0.5 text-[14px] text-[#6e6e73]">{t.reportMail.lead}</p>
                   <ReportMailChoice current={root.reportInterval ?? "OFF"} disabled={Boolean(who.preview)} words={{ options: t.reportMail.options, saved: t.reportMail.saved }} />
                   <p className="text-[13px] text-[#6e6e73]">
                     {[
