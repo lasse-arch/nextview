@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { deleteTestModeDraft, TEST_DRAFT_PREFIX } from "@/lib/dinero";
+import { creditInvoiceInDinero, deleteTestModeDraft, TEST_DRAFT_PREFIX } from "@/lib/dinero";
+import { formatDKK } from "@/lib/labels";
 import {
   runQuarterlyInvoiceGeneration,
   runAutoChurn,
@@ -206,4 +207,73 @@ export async function clearTestInvoices(): Promise<{ deleted: number; deletedInD
   revalidatePath("/arpo/settings/dinero");
   revalidatePath("/arpo/deals");
   return { deleted: count, deletedInDinero, keptBooked };
+}
+
+/**
+ * "Kreditér" (admin): a credit note for a sent invoice, made, booked and sent
+ * in Dinero (lib/dinero.ts creditInvoiceInDinero) - all of it or part of it
+ * (excl. VAT), with a reason. Kept on the invoice and as a note on the deal;
+ * an invoice credited in full is no longer owed (not chased, never collected
+ * through Betalingsservice). One credit note per invoice from here - more
+ * than that is done in Dinero.
+ */
+export async function creditInvoiceAction(
+  invoiceId: string,
+  input: { amount: number | null; reason: string; bsOk?: boolean }
+): Promise<{ ok: true; number: string | null; sendError: string | null } | { ok: false; error: string; needsBsOk?: true }> {
+  const user = await requireUser();
+  if (user.role !== "ADMIN") return { ok: false, error: "Kun admin kan kreditere fakturaer." };
+  const reason = typeof input.reason === "string" ? input.reason.trim().slice(0, 200) : "";
+  if (!reason) return { ok: false, error: "Skriv kort, hvorfor der krediteres - det står på kreditnotaen." };
+
+  const inv = await prisma.invoice.findUnique({
+    where: { id: String(invoiceId) },
+    include: { bsCollection: { select: { status: true } }, deal: { select: { id: true, dineroContactGuid: true, invoiceEmail: true, contactEmail: true, eanNumber: true } } },
+  });
+  if (!inv) return { ok: false, error: "Fakturaen findes ikke længere." };
+  if (!inv.dineroInvoiceGuid || inv.dineroInvoiceGuid.startsWith(TEST_DRAFT_PREFIX)) return { ok: false, error: "Fakturaen er ikke lavet i Dinero, så den kan ikke krediteres herfra." };
+  if (!inv.sentAt) return { ok: false, error: "Fakturaen er ikke bogført og sendt endnu - slet kladden i stedet for at kreditere." };
+  if (inv.creditNoteGuid) return { ok: false, error: `Der er allerede lavet en kreditnota${inv.creditNoteNumber ? ` (nr. ${inv.creditNoteNumber})` : ""} for fakturaen - lav flere i Dinero.` };
+  const shared = await prisma.invoice.count({ where: { dineroInvoiceGuid: inv.dineroInvoiceGuid, NOT: { id: inv.id } } });
+  if (shared) return { ok: false, error: "Det er en samlet faktura for flere afdelinger - krediter den i Dinero." };
+
+  const amount = input.amount == null ? null : Math.round(Number(input.amount));
+  if (amount != null && (!Number.isFinite(amount) || amount <= 0 || amount > inv.amount)) return { ok: false, error: `Beløbet skal være mellem 1 og ${formatDKK(inv.amount)} (ekskl. moms).` };
+  const full = amount == null || amount === inv.amount;
+
+  // Betalingsservice: in a file already, the money is (or will be) drawn - it has to be paid back by hand.
+  if (inv.collectViaBs && inv.bsCollectionId && !input.bsOk)
+    return { ok: false, needsBsOk: true, error: `Fakturaen er allerede sendt til opkrævning i Betalingsservice${inv.bsCollection?.status === "PAID" ? " og betalt" : ""}. Kreditnotaen stopper ikke trækket - pengene skal betales tilbage til kunden manuelt.` };
+  if (inv.collectViaBs && !inv.bsCollectionId && !full) return { ok: false, error: "En Betalingsservice-faktura kan kun krediteres helt herfra (ellers trækkes hele beløbet stadig). Krediter hele fakturaen, og lav en ny med det rigtige beløb." };
+
+  let r;
+  try {
+    r = await creditInvoiceInDinero({
+      invoiceGuid: inv.dineroInvoiceGuid,
+      amount: full ? null : amount,
+      reason,
+      contactGuid: inv.deal.dineroContactGuid,
+      receiverEmail: inv.deal.invoiceEmail || inv.deal.contactEmail,
+      eanNumber: inv.deal.eanNumber,
+    });
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+  const credited = full ? inv.amount : amount!;
+  await prisma.invoice.update({
+    where: { id: inv.id },
+    data: { creditNoteGuid: r.guid, creditNoteNumber: r.number, creditedAmount: credited, creditReason: reason, creditedAt: new Date(), creditedFull: full },
+  });
+  await prisma.note
+    .create({
+      data: {
+        dealId: inv.deal.id,
+        authorId: user.id,
+        body: `Kreditnota${r.number ? ` nr. ${r.number}` : ""}: ${formatDKK(credited)} ekskl. moms krediteret${full ? " (hele fakturaen)" : ""} på faktura${inv.dineroInvoiceNumber ? ` nr. ${inv.dineroInvoiceNumber}` : ""}. Årsag: ${reason}${inv.collectViaBs && inv.bsCollectionId ? " - beløbet er sendt til Betalingsservice og skal betales tilbage manuelt." : ""}${r.sendError ? ` (${r.sendError})` : ""}`,
+      },
+    })
+    .catch(() => {});
+  revalidatePath(`/arpo/deals/${inv.deal.id}`);
+  revalidatePath(`/arpo/kunder/${inv.deal.id}`);
+  return { ok: true, number: r.number, sendError: r.sendError };
 }

@@ -191,6 +191,8 @@ export async function listPendingBsCollections(now = new Date()): Promise<Pendin
       collectViaBs: true,
       bsCollectionId: null,
       paidAt: null,
+      // Credited in full ("Kreditér"): not owed - never drawn.
+      creditedFull: false,
       status: "DRAFT_CREATED",
       dineroInvoiceGuid: { not: null },
       // Test drafts from Dinero's Testtilstand are never collected.

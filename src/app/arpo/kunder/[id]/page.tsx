@@ -111,10 +111,11 @@ export default async function CustomerOverviewPage({ params }: { params: Promise
   // Money: what's been sent, paid, and still out.
   const sent = invoices.filter((i) => i.sentAt || i.status === "SENT_MANUALLY");
   const paid = sent.filter((i) => i.paidAt);
-  const open = sent.filter((i) => !i.paidAt && i.status !== "IMPORTED");
+  // Credited in full: not owed any more; credited in part: only the rest is.
+  const open = sent.filter((i) => !i.paidAt && i.status !== "IMPORTED" && !i.creditedFull);
   const overdue = open.filter((i) => i.dueDate && i.dueDate < new Date());
   const next = invoices.filter((i) => i.status === "PENDING" && i.scheduledDate >= new Date()).sort((a, b) => a.scheduledDate.getTime() - b.scheduledDate.getTime())[0];
-  const sum = (xs: typeof invoices) => xs.reduce((n, i) => n + i.amount, 0);
+  const sum = (xs: typeof invoices) => xs.reduce((n, i) => n + i.amount - (i.paidAt ? 0 : (i.creditedAmount ?? 0)), 0);
 
   // Everything that happened, newest first.
   const events: Event[] = [];
@@ -382,8 +383,10 @@ export default async function CustomerOverviewPage({ params }: { params: Promise
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {invoices.slice(0, 24).map((i) => {
-                      const late = !i.paidAt && i.dueDate && i.dueDate < new Date() && (i.sentAt || i.status === "SENT_MANUALLY");
-                      const [label, cls] = i.paidAt
+                      const late = !i.paidAt && !i.creditedFull && i.dueDate && i.dueDate < new Date() && (i.sentAt || i.status === "SENT_MANUALLY");
+                      const [label, cls] = i.creditedFull
+                        ? [`Krediteret${i.creditNoteNumber ? ` (nr. ${i.creditNoteNumber})` : ""}`, "bg-violet-50 text-violet-700"]
+                        : i.paidAt
                         ? [`Betalt ${d(i.paidAt)}`, "bg-[#34c759]/12 text-[#1d7a33]"]
                         : late
                           ? [`Forfalden ${d(i.dueDate)}`, "bg-[#ff3b30]/10 text-[#c4271d]"]

@@ -1263,7 +1263,7 @@ export async function checkAllPendingPayments(): Promise<{ checked: number; paid
   if (!(await isDineroConfigured())) return { checked: 0, paid: 0 };
 
   const invoices = await prisma.invoice.findMany({
-    where: { paidAt: null, dineroInvoiceGuid: { not: null }, status: { in: ["DRAFT_CREATED", "SENT_MANUALLY"] } },
+    where: { paidAt: null, creditedFull: false, dineroInvoiceGuid: { not: null }, status: { in: ["DRAFT_CREATED", "SENT_MANUALLY"] } },
     select: { id: true },
   });
 

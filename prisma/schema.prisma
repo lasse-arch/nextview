@@ -250,6 +250,16 @@ model Invoice {
   bsPaymentRegisteredAt DateTime?
   bsPaymentError        String?
 
+  /// "Kreditér": a credit note made for this invoice in Dinero (from Arpo) - its number,
+  /// the amount credited (excl. VAT, like `amount`), why, and whether all of it was credited
+  /// (then it's no longer owed: not chased, not collected through Betalingsservice).
+  creditNoteGuid   String?
+  creditNoteNumber String?
+  creditedAmount   Int?
+  creditReason     String?
+  creditedAt       DateTime?
+  creditedFull     Boolean   @default(false)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

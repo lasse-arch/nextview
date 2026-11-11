@@ -910,3 +910,90 @@ export async function listInvoiceTemplates(): Promise<{ id: string; name: string
   const data = (await res.json()) as { Id: string; Name: string; IsDefault?: boolean }[];
   return data.map((t) => ({ id: t.Id, name: t.Name, isDefault: Boolean(t.IsDefault) }));
 }
+
+/**
+ * "Kreditér": a credit note for a booked invoice in Dinero - all of it
+ * (POST .../invoices/{guid}/generate-creditnote, Dinero copies the invoice's
+ * lines) or part of it (POST .../sales/creditnotes with CreditNoteFor = the
+ * invoice and one line of `amount`, excl. VAT like our invoices). Booked, and
+ * sent the way the invoice was: as an e-credit note to an EAN customer, else
+ * by e-mail with Dinero's own standard text and the PDF attached - so no new
+ * mail text of ours. A credit note that couldn't be sent stays booked in
+ * Dinero; `sendError` says so.
+ */
+export async function creditInvoiceInDinero(params: {
+  invoiceGuid: string;
+  /** Excl. VAT. Null: the whole invoice. */
+  amount: number | null;
+  reason: string;
+  contactGuid: string | null;
+  receiverEmail: string | null;
+  eanNumber: string | null;
+}): Promise<{ guid: string; number: string | null; sendError: string | null }> {
+  const accessToken = await getAccessToken();
+  const orgId = process.env.DINERO_ORGANIZATION_ID!;
+  const headers = { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" };
+
+  let created: { Guid: string; TimeStamp?: string | null };
+  if (params.amount == null) {
+    const inv = await dineroFetch(`${DINERO_API_BASE}/${orgId}/invoices/${params.invoiceGuid}`, { headers });
+    if (!inv.ok) throw new Error(`Dinero: kunne ikke hente fakturaen (${inv.status}): ${await inv.text()}`);
+    const ts = ((await inv.json()) as { TimeStamp?: string }).TimeStamp ?? null;
+    const res = await dineroFetch(`${DINERO_API_BASE}/${orgId}/invoices/${params.invoiceGuid}/generate-creditnote`, { method: "POST", headers, body: JSON.stringify({ Timestamp: ts }) });
+    if (!res.ok) throw new Error(`Dinero: kunne ikke oprette kreditnotaen (${res.status}): ${await res.text()}`);
+    created = (await res.json()) as typeof created;
+  } else {
+    const res = await dineroFetch(`${DINERO_API_BASE}/${orgId}/sales/creditnotes`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        CreditNoteFor: params.invoiceGuid,
+        ContactGuid: params.contactGuid,
+        Comment: params.reason,
+        ProductLines: [{ Description: params.reason || "Kreditering", Quantity: 1, Unit: "parts", Discount: 0, BaseAmountValue: params.amount, AccountNumber: Number(process.env.DINERO_SALES_ACCOUNT_NUMBER) }],
+      }),
+    });
+    if (!res.ok) throw new Error(`Dinero: kunne ikke oprette kreditnotaen (${res.status}): ${await res.text()}`);
+    created = (await res.json()) as typeof created;
+  }
+
+  // Booked - with the newest Timestamp (fetched if the create didn't give one).
+  let ts = created.TimeStamp ?? null;
+  if (!ts) {
+    const got = await dineroFetch(`${DINERO_API_BASE}/${orgId}/sales/creditnotes/${created.Guid}`, { headers });
+    if (got.ok) ts = ((await got.json()) as { TimeStamp?: string }).TimeStamp ?? null;
+  }
+  if (!ts) throw new Error(`Dinero: kreditnotaen er oprettet som kladde, men kunne ikke bogføres (ingen Timestamp) - bogfør den i Dinero.`);
+  const book = await dineroFetch(`${DINERO_API_BASE}/${orgId}/sales/creditnotes/${created.Guid}/book`, { method: "POST", headers, body: JSON.stringify({ Timestamp: ts }) });
+  if (!book.ok) throw new Error(`Dinero: kreditnotaen er oprettet som kladde, men kunne ikke bogføres (${book.status}): ${await book.text()} - bogfør den i Dinero.`);
+  const booked = (await book.json()) as { Number?: number | string | null; TimeStamp?: string };
+  const number = booked.Number != null ? String(booked.Number) : null;
+
+  let sendError: string | null = null;
+  try {
+    if (params.eanNumber) {
+      let last = "";
+      let sent = false;
+      for (const paymentMean of ["FIK", "Domestic"]) {
+        const res = await dineroFetch(`https://api.dinero.dk/v3/${orgId}/sales/creditnotes/${created.Guid}/e-creditNote`, { method: "POST", headers, body: JSON.stringify({ PaymentMeanEnum: paymentMean }) });
+        if (res.ok) {
+          sent = true;
+          break;
+        }
+        last = `${res.status}: ${await res.text()}`;
+        if (res.status !== 400) break;
+      }
+      if (!sent) sendError = `Kreditnotaen er bogført, men kunne ikke sendes som e-kreditnota til EAN ${params.eanNumber} (${last.slice(0, 200)}) - send den fra Dinero.`;
+    } else if (params.receiverEmail) {
+      const res = await dineroFetch(`${DINERO_API_BASE}/${orgId}/sales/creditnotes/${created.Guid}/email`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ Timestamp: booked.TimeStamp ?? null, Receiver: params.receiverEmail, AddVoucherAsPdfAttachment: true, ShouldAddTrustPilotEmailAsBcc: false }),
+      });
+      if (!res.ok) sendError = `Kreditnotaen er bogført, men kunne ikke sendes (${res.status}) - send den fra Dinero.`;
+    } else sendError = "Kreditnotaen er bogført, men kunden har ingen mail - send den fra Dinero.";
+  } catch (err) {
+    sendError = `Kreditnotaen er bogført, men kunne ikke sendes (${err instanceof Error ? err.message : err}) - send den fra Dinero.`;
+  }
+  return { guid: created.Guid, number, sendError };
+}

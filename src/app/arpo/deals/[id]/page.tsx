@@ -68,6 +68,7 @@ import { InvoiceLabelTooltip } from "./invoice-label-tooltip";
 import { MarkSentManuallyButton } from "./mark-sent-manually-button";
 import { MarkPeriodSentManuallyButton } from "./mark-period-sent-manually-button";
 import { CheckPaymentButton } from "./check-payment-button";
+import { CreditInvoiceButton } from "./credit-invoice-button";
 import { MarkInvoicePaidButton } from "./mark-invoice-paid-button";
 import { CustomerReportSection } from "./customer-report-section";
 import { DeleteInvoiceButton } from "@/components/delete-invoice-button";
@@ -708,12 +709,18 @@ export default async function DealDetailPage({
                           {BS_PILL_LABEL[inv.bsCollection?.status ?? "NONE"]}
                         </span>
                       )}
+                      {inv.creditedAt && (
+                        <span className="shrink-0 whitespace-nowrap rounded-full bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-700" title={inv.creditReason ?? undefined}>
+                          {inv.creditedFull ? "Krediteret" : `Krediteret ${formatDKK(inv.creditedAmount ?? 0)}`}
+                          {inv.creditNoteNumber ? ` · kreditnota ${inv.creditNoteNumber}` : ""}
+                        </span>
+                      )}
                       {inv.paidAt && (
                         <span className="shrink-0 whitespace-nowrap rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800">
                           Betalt {formatDate(inv.paidAt)}
                         </span>
                       )}
-                      {!inv.paidAt && inv.status === "DRAFT_CREATED" && inv.quarterIndex >= 1 && (
+                      {!inv.paidAt && !inv.creditedFull && inv.status === "DRAFT_CREATED" && inv.quarterIndex >= 1 && (
                         // Netto+8 is set so it lands on the period's start date (see
                         // draftInvoiceLine in invoice-service.ts) - dueDate is stored
                         // since that change, scheduledDate covers older rows.
@@ -726,6 +733,9 @@ export default async function DealDetailPage({
                       )}
                       {currentUser?.role === "ADMIN" && <MarkInvoicePaidButton invoiceId={inv.id} paid={Boolean(inv.paidAt)} />}
                       {currentUser?.role === "ADMIN" && <DeleteInvoiceButton invoiceId={inv.id} />}
+                      {currentUser?.role === "ADMIN" && inv.sentAt && inv.dineroInvoiceGuid && !inv.dineroInvoiceGuid.startsWith("TEST-") && !inv.creditNoteGuid && (
+                        <CreditInvoiceButton invoiceId={inv.id} amount={inv.amount} number={inv.dineroInvoiceNumber} />
+                      )}
                     </div>
                     {inv.failureReason && (
                       <p className={inv.status === "FAILED" ? "text-xs text-red-600" : "text-xs text-amber-600"}>

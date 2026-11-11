@@ -61,6 +61,8 @@ export async function getGrowthDashboardData() {
         quarterIndex: true,
         dineroInvoiceNumber: true,
         dueDate: true,
+        creditedFull: true,
+        creditedAmount: true,
       },
     }),
   ]);
@@ -216,7 +218,7 @@ export async function getGrowthDashboardData() {
   // (pre-CRM, handled by the old system) row isn't money we're owed on a
   // real issued invoice, so those are excluded from the sum.
   const outstandingInvoices = invoices.filter(
-    (inv) => !inv.paidAt && (inv.status === "DRAFT_CREATED" || inv.status === "SENT_MANUALLY")
+    (inv) => !inv.paidAt && !inv.creditedFull && (inv.status === "DRAFT_CREATED" || inv.status === "SENT_MANUALLY")
   );
 
   // Etablering vi mangler at modtage: for every still-active deal with a
@@ -238,7 +240,7 @@ export async function getGrowthDashboardData() {
       missingEstablishmentTotal += d.establishmentFee;
       missingEstablishmentCount++;
       missingEstablishment.push({ key: d.id, id: d.id, name: dealName(d), stage: d.stage, note: "Ikke faktureret", amount: d.establishmentFee });
-    } else if (!inv.paidAt && (inv.status === "DRAFT_CREATED" || inv.status === "SENT_MANUALLY")) {
+    } else if (!inv.paidAt && !inv.creditedFull && (inv.status === "DRAFT_CREATED" || inv.status === "SENT_MANUALLY")) {
       missingEstablishmentTotal += inv.amount;
       missingEstablishmentCount++;
       missingEstablishment.push({ key: d.id, id: d.id, name: dealName(d), stage: d.stage, note: invoiceNote(inv, now), amount: inv.amount });
@@ -268,7 +270,8 @@ export async function getGrowthDashboardData() {
     outstanding,
     missingEstablishment,
     outstandingCount: outstandingInvoices.length,
-    outstandingTotal: outstandingInvoices.reduce((sum, inv) => sum + inv.amount, 0),
+    // A part credited ("Kreditér") isn't owed.
+    outstandingTotal: outstandingInvoices.reduce((sum, inv) => sum + inv.amount - (inv.creditedAmount ?? 0), 0),
     missingEstablishmentCount,
     missingEstablishmentTotal,
   };
