@@ -121,11 +121,51 @@ export function CloudflarePublish({ slug }: { slug: string }) {
 }
 
 /**
+ * "Udgiv uden gennemgang" under Gennemgang hos kunden: the tour out without sending it to the customer first -
+ * for a customer not live yet the same last step as below (out, Live, welcome mail), else just a new version.
+ */
+export function PublishWithoutReview({ slug }: { slug: string }) {
+  const [open, setOpen] = useState(false);
+  const [state, setState] = useState<PublishState | null>(null);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [pending, start] = useTransition();
+  const load = () => publishState(slug).then(setState).catch(() => {});
+  if (!open)
+    return (
+      <button type="button" onClick={() => (setOpen(true), load())} className="px-1 text-left text-[13px] font-medium text-[#0071e3] hover:underline">
+        Udgiv uden gennemgang …
+      </button>
+    );
+  if (!state) return <p className="px-1 text-[13px] text-[#8e8e93]">Henter …</p>;
+  if (state.deal && !state.deal.liveAt) return <GoLive slug={slug} deal={state.deal} onDone={load} />;
+  return (
+    <div className="space-y-2 rounded-xl bg-[#0071e3]/[.06] p-3">
+      <p className="text-[13px] leading-snug">{state.deal ? `${state.deal.name} er allerede live - touren udgives som en ny version. Kunden får ingen mail.` : "Touren er ikke koblet til en kunde - den udgives, uden at nogen får en mail."}</p>
+      <button
+        type="button"
+        disabled={pending}
+        onClick={() =>
+          start(async () => {
+            setMsg(null);
+            const r = await publishNow(slug, "Udgivet uden gennemgang", true);
+            setMsg(r.ok ? { ok: true, text: `Version ${r.value.version} er udgivet.` } : { ok: false, text: r.error });
+          })
+        }
+        className="w-full rounded-xl bg-[#0071e3] py-2.5 text-[15px] font-semibold text-white disabled:opacity-50"
+      >
+        {pending ? "Udgiver …" : "Udgiv touren nu"}
+      </button>
+      {msg && <p className={`px-1 text-[13px] ${msg.ok ? "text-[#248a3d]" : "text-[#ff3b30]"}`}>{msg.text}</p>}
+    </div>
+  );
+}
+
+/**
  * "Udgiv touren endelig og gør kunden live": the last step, in one press -
  * the tour out, the customer Live in Arpo with access to their customer page,
  * and the welcome mail. Asks for the filming time first if it's missing.
  */
-function GoLive({ slug, deal, onDone }: { slug: string; deal: GoLiveState; onDone: () => void }) {
+export function GoLive({ slug, deal, onDone }: { slug: string; deal: GoLiveState; onDone: () => void }) {
   const [hours, setHours] = useState("");
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [pending, start] = useTransition();

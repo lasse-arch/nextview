@@ -8,6 +8,7 @@ import { addManualTimeEntry, filmingTimeForm } from "@/lib/actions/time-entries"
 import type { TourConfig } from "../../tours/types";
 import type { AiNote } from "@/lib/tour-check";
 import { Choice, Group, input, Toggle, type PreviewApi } from "./ui";
+import { PublishWithoutReview } from "./cloudflare";
 
 const TOPIC_NAMES: Record<string, string> = { menu: "Menuen", funktioner: "Funktioner", design: "Design", andet: "Andet" };
 
@@ -194,6 +195,7 @@ export function FeedbackPanel({
             </button>
           )}
         </div>
+        {!status?.approvedAt && <PublishWithoutReview slug={slug} />}
         {status && (
           <div className="rounded-xl bg-[#f2f2f7] px-3 py-2.5">
             <div className="flex items-start justify-between gap-2">
