@@ -810,7 +810,8 @@ export type TourConfig = {
    * places come with by themselves.
    */
   /** `extra`: places Find vej can find that aren't in the menu (e.g. "Toiletter", "Depotrum 601-727") - a name, the link to the scan point (with its view), and an optional group to list it under (left out: "Andre steder"). */
-  wayfinding?: { skip?: string[]; extra?: { name: string; href: string; group?: string }[]; boxes?: Record<string, string>; button?: { desktop?: FindButtonPlace; mobile?: FindButtonPlace }; arrive?: { label: string; href: string } | false; always?: boolean; stepAside?: FindStepAside[]; arriveHide?: number };
+  /** "Find vej". `lead`: the sentence under its heading, `search`: the words in its search field - the tour's own (e.g. "Tast depotrumsnummer eller vælg fx Ankomstområde"); left out = the engine's. */
+  wayfinding?: { lead?: string; search?: string; skip?: string[]; extra?: { name: string; href: string; group?: string }[]; boxes?: Record<string, string>; button?: { desktop?: FindButtonPlace; mobile?: FindButtonPlace }; arrive?: { label: string; href: string } | false; always?: boolean; stepAside?: FindStepAside[]; arriveHide?: number };
   /**
    * "Find din plads": a few questions on the drone scene/map (who are you,
    * what do you sleep in, what matters most); each answer points at the

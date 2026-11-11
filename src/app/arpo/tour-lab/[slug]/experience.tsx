@@ -3667,7 +3667,7 @@ function TourExperience({
         </>
       )}
       {routeLine.length > 1 && phase === "tour" && <RouteLine sdk={sdk} points={routeLine} frame={iframe} />}
-      {routeOpen && <RouteSheet destinations={DESTINATIONS} boxes={T.wayfinding?.boxes} onGo={walkTo} onClose={() => setRouteOpen(false)} />}
+      {routeOpen && <RouteSheet destinations={DESTINATIONS} boxes={T.wayfinding?.boxes} lead={T.wayfinding?.lead} search={T.wayfinding?.search} onGo={walkTo} onClose={() => setRouteOpen(false)} />}
       {route && (
         <RouteStatus
           dest={route.dest}

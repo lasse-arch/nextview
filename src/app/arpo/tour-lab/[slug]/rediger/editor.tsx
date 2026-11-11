@@ -1136,6 +1136,12 @@ export function TourEditor({
                   hint='En kort "Sådan går du rundt", når man trykker Træd indenfor: træk for at kigge, tryk på cirklerne for at gå, menuen for at hoppe - og Vis mig rundt, hvis touren har den. Vises én gang pr. besøgende (i forhåndsvisningen hver gang).'
                 />
                 <Toggle on={Boolean(config.wayfinding)} onChange={(on) => edit((d) => void (d.wayfinding = on ? d.wayfinding ?? {} : undefined))} title="Find vej" hint="Vælg et rum, og touren går vejen derhen fra der, man står." />
+                {config.wayfinding && (
+                  <Field title="Teksten i Find vej" hint="Linjen under overskriften og teksten i søgefeltet - tomme = standardteksten. Oversættes med touren.">
+                    <input className={input} placeholder="Vælg hvor du skal hen - så går touren vejen derhen fra der, hvor du står." value={config.wayfinding.lead ?? ""} onChange={(e) => edit((d) => void (d.wayfinding = { ...d.wayfinding, lead: e.target.value || undefined }))} />
+                    <input className={`${input} mt-1.5`} placeholder={config.wayfinding.boxes ? "Søg rum eller boksnummer…" : "Søg…"} value={config.wayfinding.search ?? ""} onChange={(e) => edit((d) => void (d.wayfinding = { ...d.wayfinding, search: e.target.value || undefined }))} />
+                  </Field>
+                )}
                 {config.wayfinding && <FindTargets config={config} edit={edit} preview={preview} />}
                 {config.wayfinding && (
                   <Field title='Knap på "Du er fremme"' hint="Kortet, når Find vej er nået frem. Linket kan også være #live (listen med ledige), #kontakt (formularen) eller #vej.">

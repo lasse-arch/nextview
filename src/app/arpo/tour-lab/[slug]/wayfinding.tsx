@@ -172,11 +172,16 @@ export function coversNumber(name: string, n: number): boolean {
 export function RouteSheet({
   destinations,
   boxes,
+  lead,
+  search,
   onGo,
   onClose,
 }: {
   destinations: Destination[];
   boxes?: Record<string, string>;
+  /** The tour's own words (TourConfig.wayfinding.lead / .search) - else the engine's. */
+  lead?: string;
+  search?: string;
   onGo: (d: Destination) => void;
   onClose: () => void;
 }) {
@@ -199,9 +204,9 @@ export function RouteSheet({
           ×
         </button>
       </div>
-      <p className="rt-lead">{tr("Vælg hvor du skal hen - så går touren vejen derhen fra der, hvor du står.")}</p>
+      <p className="rt-lead">{lead?.trim() ? tr(lead.trim()) : tr("Vælg hvor du skal hen - så går touren vejen derhen fra der, hvor du står.")}</p>
       {/* Focused at once only with a mouse: on a phone the keyboard would cover the list - it comes when they tap the field. */}
-      <input ref={(el) => void (el && matchMedia("(pointer: fine)").matches && !el.dataset.focused && ((el.dataset.focused = "1"), el.focus()))} value={q} onChange={(e) => setQ(e.target.value)} placeholder={numbered ? tr("Søg rum eller boksnummer…") : tr("Søg…")} />
+      <input ref={(el) => void (el && matchMedia("(pointer: fine)").matches && !el.dataset.focused && ((el.dataset.focused = "1"), el.focus()))} value={q} onChange={(e) => setQ(e.target.value)} placeholder={search?.trim() ? tr(search.trim()) : numbered ? tr("Søg rum eller boksnummer…") : tr("Søg…")} />
       <div className="rt-list">
         {groups.map((g) => (
           <div key={g}>

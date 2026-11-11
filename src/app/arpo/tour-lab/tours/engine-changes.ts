@@ -9,6 +9,7 @@
 export type EngineChange = { date: string; kind: "ny" | "sikkerhed" | "hastighed" | "rettelse"; text: string };
 
 export const ENGINE_CHANGES: EngineChange[] = [
+  { date: "2026-11-11", kind: "ny", text: "Find vej: touren kan have sin egen tekst under overskriften og i søgefeltet (fx \"Tast depotrumsnummer eller vælg fx Ankomstområde\")." },
   { date: "2026-11-11", kind: "rettelse", text: "Find vej går ikke længere over skjulte scanpunkter - kun hvis der slet ingen anden vej er." },
   { date: "2026-11-10", kind: "ny", text: "\"Sådan ser en dag ud\": 1-3 billeder øverst på et stop (man bladrer i dem) - et stop kan være billeder alene. Billederne toner ind, når de er hentet, og de næste stops hentes i forvejen." },
   { date: "2026-11-10", kind: "ny", text: "\"Sådan ser en dag ud\": linjens rejser og oplevelser vises, når dagen er slut - \"Det venter dig også\"." },
