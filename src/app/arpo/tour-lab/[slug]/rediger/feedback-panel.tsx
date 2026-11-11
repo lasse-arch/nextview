@@ -85,7 +85,7 @@ export function FeedbackPanel({
     };
   }, [slug]);
 
-  const url = token && typeof window !== "undefined" ? reviewUrl(token, location.origin) : null;
+  const url = token && typeof window !== "undefined" ? reviewUrl(token, location.origin, slug) : null;
   const shown = (items ?? []).filter((f) => filter === "all" || f.status === filter);
   const open = (items ?? []).filter((f) => f.status === "open").length;
   /** "Tjek touren": run before the first review mail - and on its own. */

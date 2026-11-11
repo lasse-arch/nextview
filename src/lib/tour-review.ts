@@ -6,6 +6,7 @@ import { randomBytes } from "node:crypto";
 import { prisma } from "@/lib/db";
 import { resendReady, sendSystemMail } from "@/lib/system-mail";
 import { getAppBaseUrl } from "@/lib/email-oauth";
+import { reviewUrl } from "@/lib/public-urls";
 import { dealName } from "@/lib/labels";
 import { logActivity } from "@/lib/activity";
 import { LOGIN_MAIL_FROM, normalizeEmail, welcomeLoginLink, WELCOME_DAYS } from "@/lib/customer-login";
@@ -217,7 +218,7 @@ export async function sendFixesDoneMail(slug: string, actor: { id: string; name:
     buildFixesDoneMail({
       contactName: name ?? null,
       customerName: dealName(deal),
-      reviewLink: `${getAppBaseUrl()}/p/${tour.reviewToken}`,
+      reviewLink: reviewUrl(tour.reviewToken!, getAppBaseUrl(), slug),
       fixes: fixes.map((f) => f.text),
       language: parseContractProducts(deal.contractProducts)?.language === "en" ? "en" : "da",
     });
@@ -311,7 +312,7 @@ export async function sendReviewMail(
     const mail = buildReviewMail({
       contactName: who.name ?? null,
       customerName: dealName(deal),
-      reviewLink: `${getAppBaseUrl()}/p/${token}`,
+      reviewLink: reviewUrl(token, getAppBaseUrl(), slug),
       portal,
       reminder,
       language: parseContractProducts(deal.contractProducts)?.language === "en" ? "en" : "da",

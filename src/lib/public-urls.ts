@@ -22,6 +22,7 @@ export const CLOUDFLARE_TOUR_ORIGIN = trim(process.env.NEXT_PUBLIC_CLOUDFLARE_TO
 export const tourUrl = (slug: string, origin: string, onCloudflare = false) =>
   onCloudflare ? `${CLOUDFLARE_TOUR_ORIGIN}/${slug}` : TOUR_ORIGIN ? `${TOUR_ORIGIN}/${slug}` : `${origin}/t/${slug}`;
 /** Kundegennemsyn (the review link) - always on Arpo itself: it saves the customer's notes there. */
-export const reviewUrl = (token: string, origin: string) => `${origin}/p/${token}`;
+/** The review link: the tour's name, then the secret part (/p/<slug>/<token>) - long, as it can approve the tour (live and billed). */
+export const reviewUrl = (token: string, origin: string, slug?: string) => (slug ? `${origin}/p/${slug}/${token}` : `${origin}/p/${token}`);
 /** The customer portal. */
 export const portalUrl = (token: string, origin: string) => (PORTAL_ORIGIN ? `${PORTAL_ORIGIN}/${token}` : `${origin}/r/${token}`);
