@@ -10,6 +10,8 @@ import { listSalesAnswers } from "@/lib/actions/sales-helper";
 import { prepMeetings, recentMeetingBriefs } from "@/lib/actions/meeting-prep";
 import { MeetingPrep } from "./meeting-prep";
 import { PortalExample } from "./portal-example";
+import { ProposalSection } from "./proposal-section";
+import { listProposals } from "@/lib/actions/tour-proposal";
 import { exampleTours } from "@/lib/portal-example";
 
 export const metadata = { title: "Generator" };
@@ -61,6 +63,7 @@ export default async function GeneratorPage({ searchParams }: { searchParams: Pr
         <SendExample initial={await demoSmsSetup()} />
       ) : (
         <>
+          <ProposalSection recent={await listProposals()} />
           <MailSection user={user} />
           <SentMails user={user} />
         </>

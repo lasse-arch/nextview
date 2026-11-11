@@ -1963,3 +1963,23 @@ model TourVisitPlace {
   @@unique([tourSlug, session])
   @@index([tourSlug, createdAt])
 }
+
+/// Generator → "Få et oplæg til touren": nextviewAI's proposal for a
+/// customer's tour (start, menu, features and how they're used, what we film,
+/// the look in the customer's own colours) - shown in Arpo and, read-only, on
+/// its own link (/oplaeg/<token>) that can be sent to the customer.
+model TourProposal {
+  id            String   @id @default(cuid())
+  /// The link's secret part (/oplaeg/<token>) - long and random.
+  token         String   @unique
+  website       String
+  customer      String
+  dealId        String?
+  /// The proposal itself (lib/tour-proposal.ts → Proposal).
+  data          Json
+  createdById   String?
+  createdByName String?
+  createdAt     DateTime @default(now())
+
+  @@index([createdAt])
+}

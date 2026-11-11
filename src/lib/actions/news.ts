@@ -63,6 +63,12 @@ export async function getUnreadNewsCount(userId: string, newsReadAt: Date | null
 const DEFAULT_POSTS: { title: string; body: string; minutesAgo: number; screenshotUrl: string }[] = [
   {
     minutesAgo: 0,
+    title: "Generator: få et oplæg til kundens tour - og vis kundeportalen som eksempel",
+    body: "Under Salg → Generator → Mail er der nu \"Få et oplæg til touren\". Skriv kundens hjemmeside (og evt. noter fra samtalen), og nextviewAI laver en idé til deres tour på cirka et minut: et billede af velkomsten på en telefon i kundens egne farver og logo, med deres egne steder på fliserne - og idéen i få sætninger med de tre funktioner, der giver mest mening for dem. Du får et link, kunden kan åbne (det kan kun læses), og en mail at sende det med. Oplæggene gemmes under \"Teamets oplæg\", og den, der lavede et, kan slette det igen - så virker linket ikke længere.\n\nPå den nye fane Kundeportal kan du vise, hvordan kundeportalen ser ud: med en af vores eksempel-tours og opdigtede tal - forside, statistik, koden til hjemmesiden og tips. Godt til mødet eller en skærmdeling.\n\nSikkerhed: kun teamet kan lave oplæg (højst 10 i timen pr. sælger) og se eksempel-portalen. Oplæggets link er langt og tilfældigt, kan kun læses og findes ikke af søgemaskiner. Eksempel-portalen læser ingen rigtig kundes tal, kontrakt, brugere, rettelser eller lodtrækninger.",
+    screenshotUrl: "/news/tour-oplaeg.png",
+  },
+  {
+    minutesAgo: 0,
     title: "Danmarkskort i statistikken: se hvor i landet de besøgende kommer fra",
     body: "Under Resultater på hver tour er der nu et Danmarkskort: en prik for hver by, besøgene kom fra (jo større, jo flere), og hvor stor en del der kom fra hver region - fx 33 % fra Nordjylland og 18 % fra Syddanmark - plus Udlandet med landene.\n\nKortet kommer også med i kundens rapport og i kundeportalen (slå \"Danmarkskort\" fra under Kundens rapport, hvis det ikke skal deles). Det fyldes fra i dag, efterhånden som touren får besøg.\n\nStedet er groft: byen ud fra den besøgendes netværk, rundet af til ca. 10 km. Vi gemmer aldrig IP-adressen eller en adresse, og kun ét sted pr. besøg.",
     screenshotUrl: "/news/danmarkskort.png",

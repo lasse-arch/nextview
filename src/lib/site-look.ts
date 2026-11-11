@@ -19,6 +19,8 @@ export type MeasuredLook = {
   text: string;
   /** The top of the front page as it looks (JPEG), for nextviewAI to see. */
   shot: Buffer | null;
+  /** The logo's address (a picture near the top called "logo"), if one was found. */
+  logo: string | null;
 };
 
 /* Run in the page as plain text: what is shown, and in which colours. */
@@ -112,7 +114,7 @@ export async function measureSiteLook(site: string): Promise<MeasuredLook> {
       `- Logoets egne farver: ${list(logo)}`,
       `- Skrift: brødtekst ${m.fontBody || "-"}, overskrifter ${m.fontHeading || "-"}`,
     ].join("\n");
-    return { text, shot };
+    return { text, shot, logo: /^https:\/\//i.test(m.logo) ? m.logo.slice(0, 1000) : null };
   } finally {
     await browser.close().catch(() => {});
   }
