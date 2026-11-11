@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { customerCards, forPicker, type CustomerCard } from "@/lib/customer-cards";
+import { customerCards, type CustomerCard } from "@/lib/customer-cards";
 import { DealItemPill } from "./deal-item-pill";
-import { CustomerPicker, Thumb } from "./customer-picker";
+import { Thumb } from "./customer-picker";
+import { ListSearch } from "./list-search";
 
 export const metadata = { title: "Kunder" };
 
@@ -27,13 +28,17 @@ function liveLastMonth(cards: CustomerCard[]): number {
   return cards.filter((c) => c.state === "live" && c.liveAt && new Date(c.liveAt).getTime() > month).length;
 }
 
-export default async function CustomersPage({ searchParams }: { searchParams: Promise<{ vis?: string }> }) {
-  const { vis } = await searchParams;
+export default async function CustomersPage({ searchParams }: { searchParams: Promise<{ vis?: string; q?: string }> }) {
+  const { vis, q: asked } = await searchParams;
+  const q = (asked ?? "").slice(0, 100);
+  const words = q.toLowerCase().split(/\s+/).filter(Boolean);
   const tab = TABS.find((t) => t.key === vis)?.key ?? "live";
   const all = await customerCards();
   const shown = all.filter((c) => c.state === tab);
   const count = (s: CustomerCard["state"]) => all.filter((c) => c.state === s).length;
   const fresh = liveLastMonth(all);
+  /** What a row is found by: name, address, industry and products. */
+  const searchText = (c: CustomerCard) => [c.name, c.address, c.industry, ...c.products.map((p) => p.productType)].filter(Boolean).join(" ").toLowerCase();
 
   return (
     <div className="space-y-6">
@@ -45,7 +50,12 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
         </p>
       </div>
 
-      <CustomerPicker customers={forPicker(all)} variant="hero" />
+      <ListSearch
+        listId="kundeliste"
+        initial={q}
+        initialShown={words.length ? shown.filter((c) => words.every((w) => searchText(c).includes(w))).length : null}
+        others={TABS.filter((t) => t.key !== tab).map((t) => ({ key: t.key, label: t.label, href: t.key === "live" ? "/arpo/kunder" : `/arpo/kunder?vis=${t.key}`, texts: all.filter((c) => c.state === t.key).map(searchText) }))}
+      />
 
       <div className="flex gap-1 border-b border-slate-200">
         {TABS.map((t) => (
@@ -59,9 +69,9 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
         ))}
       </div>
 
-      <ul className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/80">
+      <ul id="kundeliste" className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/80">
         {shown.map((c) => (
-          <li key={c.id} className="group relative flex flex-col gap-3 border-b border-slate-100 px-4 py-3.5 transition last:border-0 hover:bg-slate-50/70 sm:flex-row sm:items-center">
+          <li key={c.id} data-q={searchText(c)} hidden={words.length > 0 && !words.every((w) => searchText(c).includes(w))} className="group relative flex flex-col gap-3 border-b border-slate-100 px-4 py-3.5 transition last:border-0 hover:bg-slate-50/70 sm:flex-row sm:items-center">
             <Link href={`/arpo/kunder/${c.id}`} className="flex min-w-0 flex-1 items-center gap-4">
               <Thumb src={c.thumb} name={c.name} size="lg" />
               <span className="min-w-0">
@@ -84,6 +94,9 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
           </li>
         ))}
         {shown.length === 0 && <li className="px-5 py-10 text-center text-sm text-slate-400">Ingen kunder her.</li>}
+        <li data-tom hidden={!(words.length > 0 && shown.length > 0 && !shown.some((c) => words.every((w) => searchText(c).includes(w))))} className="px-5 py-10 text-center text-sm text-slate-400">
+          Ingen kunder her matcher søgningen.
+        </li>
       </ul>
     </div>
   );
