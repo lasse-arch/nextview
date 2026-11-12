@@ -1,3 +1,4 @@
+import { ipOf, isTeamNetwork } from "@/lib/team-network";
 import { NextResponse, type NextRequest } from "next/server";
 import { getTeamUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
@@ -53,7 +54,7 @@ export async function POST(request: NextRequest) {
   const link = await prisma.tourDemoLink.findUnique({ where: { token }, select: { id: true, label: true, note: true, disabledAt: true, tourSlug: true, createdById: true, dealId: true, deal: { select: { companyName: true, displayName: true } } } });
   if (!link || link.disabledAt) return new NextResponse(null, { status: 404 });
   // We looked at it ourselves (checking the link before sending it): not a visit.
-  if (await getTeamUser().catch(() => null)) return new NextResponse(null, { status: 204 });
+  if ((await getTeamUser().catch(() => null)) || (await isTeamNetwork(ipOf(request.headers)))) return new NextResponse(null, { status: 204 });
   const device = body.device === "mobil" ? "mobil" : "computer";
   const ref = typeof body.ref === "string" && /^[a-z0-9.-]{1,100}$/i.test(body.ref) ? body.ref.toLowerCase() : null;
   const city = header(request, "x-vercel-ip-city");

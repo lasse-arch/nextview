@@ -17,11 +17,19 @@ import { DealJump } from "./deal-jump";
 import { overdueTasksFor } from "@/lib/overdue-tasks";
 import { unreadNotifications } from "@/lib/team-notifications";
 import { getUnreadNewsCount } from "@/lib/actions/news";
+import { after } from "next/server";
+import { headers } from "next/headers";
+import { ipOf, rememberTeamNetwork } from "@/lib/team-network";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   // Every team member gets the frame; what's in the menu follows their role (src/lib/team-roles.ts), and each page checks again.
   const [user, presenting] = await Promise.all([getTeamUser(), isPresentationMode()]);
   if (!user) redirect((await getCurrentCustomer()) ? "/kunde" : "/api/auth/session-ended?next=/arpo");
+  // The network the team is on: tour visits from it are ours, not the customers' guests (lib/team-network.ts).
+  // From a computer only - a phone on the mobile network shares its address with many others (real guests among them).
+  const h = await headers();
+  const ip = ipOf(h);
+  if (!/Mobile|Android|iPhone|iPad/i.test(h.get("user-agent") ?? "")) after(() => rememberTeamNetwork(ip));
   const sales = teamCan(user, "sales");
   const tours = teamCan(user, "tours");
   const filming = teamCan(user, "filming");

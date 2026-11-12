@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
+import { ipOf, isTeamNetwork } from "@/lib/team-network";
 
 /*
  * Arpo's own measurement of the tours: the engine (experience.tsx) sends what
@@ -52,6 +53,8 @@ export async function POST(request: NextRequest) {
   const tour = text(body.tour, 80);
   const session = text(body.session, 40);
   if (!tour || !session || !Array.isArray(body.events) || !(await tourExists(tour))) return new NextResponse(null, { status: 400 });
+  // From one of the team's own networks: our own look, not a guest - not counted (visits, the map).
+  if (await isTeamNetwork(ipOf(request.headers))) return new NextResponse(null, { status: 204 });
   const device = body.device === "mobil" ? "mobil" : "computer";
   const events = body.events
     .slice(0, 50)

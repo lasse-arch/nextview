@@ -1997,3 +1997,13 @@ model TourProposal {
 
   @@index([createdAt])
 }
+
+/// The networks the team uses Arpo from (only a keyed hash of the address,
+/// never the address itself) - a tour visit from one of them is ours, not a
+/// customer's guest, and isn't counted. Forgotten after 60 days unseen.
+model TeamNetwork {
+  hash     String   @id
+  lastSeen DateTime @default(now())
+
+  @@index([lastSeen])
+}
