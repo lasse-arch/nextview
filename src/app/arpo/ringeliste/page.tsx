@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { RingelisteClient } from "./ringeliste-client";
@@ -18,6 +19,8 @@ export default async function RingelistePage({
 }) {
   const { list: listParam } = await searchParams;
   const currentUser = await requireUser();
+  // "Kort" (one card per lead) or "Sheet" (a spreadsheet) - as it was left on this computer.
+  const view = (await cookies()).get("ringeliste-vis")?.value === "sheet" ? "sheet" : "kort";
 
   const lists = await prisma.callList.findMany({
     orderBy: { createdAt: "desc" },
@@ -58,8 +61,8 @@ export default async function RingelistePage({
   const users = await prisma.user.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } });
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
-      <div>
+    <div className={`mx-auto space-y-6 ${view === "sheet" ? "max-w-[1600px]" : "max-w-3xl"}`}>
+      <div className="max-w-3xl">
         <h1 className="text-2xl font-semibold text-slate-900">Ringeliste</h1>
         <p className="mt-1 text-sm text-slate-500">
           Indsæt links (CVR-opslag, Facebook-sider, hjemmesider, ...) én pr. linje - de bliver til rigtige leads du
@@ -79,6 +82,7 @@ export default async function RingelistePage({
         users={users}
         currentUserId={currentUser.id}
         isAdmin={currentUser.role === "ADMIN"}
+        view={view}
       />
     </div>
   );

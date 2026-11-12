@@ -374,3 +374,19 @@ export async function moveExistingToCallList(
   revalidatePath("/arpo/deals");
   return { ok: true, onList, reopened, kept, customers };
 }
+
+/**
+ * Ringeliste "Sheet": one cell - the contact's name or e-mail - typed straight
+ * into the sheet. Empty clears it. Only for leads that are on a call list.
+ */
+export async function updateLeadCell(dealId: string, field: "contactName" | "contactEmail", value: string): Promise<{ ok: true; value: string | null } | { ok: false; error: string }> {
+  await requireUser();
+  if (field !== "contactName" && field !== "contactEmail") return { ok: false, error: "Den kolonne kan ikke rettes her." };
+  const v = (typeof value === "string" ? value : "").trim().replace(/\s+/g, " ").slice(0, 200);
+  if (field === "contactEmail" && v && !/^[^\s@<>,;"]+@[^\s@<>,;"]+\.[^\s@<>,;"]+$/.test(v)) return { ok: false, error: "Det ligner ikke en e-mail." };
+  const deal = await prisma.deal.findUnique({ where: { id: String(dealId) }, select: { callListId: true } });
+  if (!deal?.callListId) return { ok: false, error: "Leadet er ikke på en ringeliste." };
+  await prisma.deal.update({ where: { id: String(dealId) }, data: { [field]: v || null } });
+  revalidatePath("/arpo/ringeliste");
+  return { ok: true, value: v || null };
+}

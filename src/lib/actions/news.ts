@@ -63,6 +63,12 @@ export async function getUnreadNewsCount(userId: string, newsReadAt: Date | null
 const DEFAULT_POSTS: { title: string; body: string; minutesAgo: number; screenshotUrl: string }[] = [
   {
     minutesAgo: 0,
+    title: "Ringelisten som regneark: \"Sheet\"-visning med noter",
+    body: "På Ringelisten kan du nu skifte mellem \"Kort\" og \"Sheet\". Sheet viser hele listen som et regneark: én række pr. lead med firma, kontakt, telefon, e-mail, hjemmeside, område, adresse, telefonsvar, seneste note og CVR.\n\nKlik på en celle og skriv - Enter gemmer og går ned, Tab går til højre, piletasterne flytter, og Esc fortryder. I kolonnen \"Seneste note\" skriver du en ny note fra opkaldet direkte i cellen, og den gemmes på dealen. Linjen øverst viser hele indholdet af den valgte celle, så en lang note kan læses.\n\n\"Telefonsvar\" sidder på hver række, og \"Mere\" åbner leadets kort under rækken med Book møde, Ring tilbage, Tabt og produkter. Arpo husker på din computer, hvilken visning du sidst brugte.",
+    screenshotUrl: "/news/ringeliste-sheet.png",
+  },
+  {
+    minutesAgo: 0,
     title: "Generator: få et oplæg til kundens tour - og vis kundeportalen som eksempel",
     body: "Under Salg → Generator → Mail er der nu \"Få et oplæg til touren\". Skriv kundens hjemmeside (og evt. noter fra samtalen), og nextviewAI laver en idé til deres tour på cirka et minut: et billede af velkomsten på en telefon i kundens egne farver og logo, med deres egne steder på fliserne - og idéen i få sætninger med de tre funktioner, der giver mest mening for dem. Du får et link, kunden kan åbne (det kan kun læses), og en mail at sende det med. Oplæggene gemmes under \"Teamets oplæg\", og den, der lavede et, kan slette det igen - så virker linket ikke længere.\n\nPå den nye fane Kundeportal kan du vise, hvordan kundeportalen ser ud: med en af vores eksempel-tours og opdigtede tal - forside, statistik, koden til hjemmesiden og tips. Godt til mødet eller en skærmdeling.\n\nSikkerhed: kun teamet kan lave oplæg (højst 10 i timen pr. sælger) og se eksempel-portalen. Oplæggets link er langt og tilfældigt, kan kun læses og findes ikke af søgemaskiner. Eksempel-portalen læser ingen rigtig kundes tal, kontrakt, brugere, rettelser eller lodtrækninger.",
     screenshotUrl: "/news/tour-oplaeg.png",

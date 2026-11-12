@@ -12,6 +12,7 @@ import { dealName, stageLabels, telHref } from "@/lib/labels";
 import { useToast } from "@/components/toast";
 import { LostReasonDialog } from "@/components/lost-reason-dialog";
 import type { DealStage } from "@prisma/client";
+import { SheetView } from "./sheet-view";
 
 // Same 4 fixed products as the deal-page's own quick-add (deal-items-section.tsx)
 // - kept in sync there since there's no shared source of truth for it yet.
@@ -977,7 +978,9 @@ export function RingelisteClient({
   users,
   currentUserId,
   isAdmin = false,
+  view = "kort",
 }: {
+  view?: "kort" | "sheet";
   lists: CallListSummary[];
   selectedListId: string | null;
   deals: QueueDeal[];
@@ -1032,9 +1035,10 @@ export function RingelisteClient({
 
   return (
     <div className="space-y-6">
-      <QuickAdd selectedListId={selectedListId} />
-
-      <ListPicker lists={lists} selectedListId={selectedListId} />
+      <div className="max-w-3xl space-y-6">
+        <QuickAdd selectedListId={selectedListId} />
+        <ListPicker lists={lists} selectedListId={selectedListId} />
+      </div>
 
       <section>
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1053,6 +1057,25 @@ export function RingelisteClient({
             />
           )}
         </div>
+        {selectedListId && deals.length > 0 && (
+          <div className="mt-2 inline-flex rounded-md border border-slate-300 p-0.5 text-xs font-medium" role="group" aria-label="Visning">
+            {(["kort", "sheet"] as const).map((v) => (
+              <button
+                key={v}
+                type="button"
+                aria-pressed={view === v}
+                onClick={() => {
+                  // Remembered on this computer (a year), so the list opens the way it was left.
+                  document.cookie = `ringeliste-vis=${v}; path=/arpo; max-age=31536000; samesite=lax`;
+                  listRouter.refresh();
+                }}
+                className={`rounded px-2.5 py-1 ${view === v ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-100"}`}
+              >
+                {v === "kort" ? "Kort" : "Sheet"}
+              </button>
+            ))}
+          </div>
+        )}
         {selectedListId && deals.some((d) => d.place) && (
           <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
             <select value={order} onChange={(e) => setOrder(e.target.value as typeof order)} className="rounded-md border border-slate-300 px-2 py-1.5" aria-label="Rækkefølge">
@@ -1081,8 +1104,17 @@ export function RingelisteClient({
             <span className="text-xs text-slate-400">Afstand i luftlinje fra {OFFICE.address}</span>
           </div>
         )}
+        {view === "sheet" && (
+          <SheetView
+            deals={visibleDeals}
+            renderCard={(id) => {
+              const deal = visibleDeals.find((d) => d.id === id);
+              return deal ? <QueueCard key={`${deal.id}-${String(deal.lastVoicemailAt ?? "")}`} deal={deal} users={users} currentUserId={currentUserId} isAdmin={isAdmin} /> : null;
+            }}
+          />
+        )}
         <ul className="mt-3 space-y-2.5">
-          {visibleDeals.map((deal) => (
+          {view === "kort" && visibleDeals.map((deal) => (
             <QueueCard key={`${deal.id}-${String(deal.lastVoicemailAt ?? "")}`} deal={deal} users={users} currentUserId={currentUserId} isAdmin={isAdmin} />
           ))}
           {selectedListId && deals.length === 0 && (
