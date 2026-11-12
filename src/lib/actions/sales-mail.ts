@@ -187,15 +187,21 @@ async function ownDraft(id: string) {
 }
 
 /** Kept as the seller left it - "kopieret" (they send it themselves) or "sendt". */
-async function remember(id: string, subject: string, body: string, how: "sendt" | "kopieret") {
-  await prisma.salesMail.update({ where: { id }, data: { finalSubject: cap(subject, 300), finalBody: cap(body, 10_000), finalHow: how, finalAt: new Date() } });
+/** `from`: the one it went out as - the suggestion may have been written before the admin switched sender, and it's learned from in the sender's name. */
+async function remember(id: string, subject: string, body: string, how: "sendt" | "kopieret", from?: { id: string; name: string }) {
+  await prisma.salesMail.update({
+    where: { id },
+    data: { finalSubject: cap(subject, 300), finalBody: cap(body, 10_000), finalHow: how, finalAt: new Date(), ...(from ? { userId: from.id, userName: from.name } : {}) },
+  });
 }
 
 /** "Kopiér": the seller sends it from their own mail program - kept all the same, so it's learned from. */
-export async function copiedSalesMail(id: string, subject: string, body: string): Promise<{ ok: boolean }> {
+export async function copiedSalesMail(id: string, subject: string, body: string, as?: string): Promise<{ ok: boolean }> {
   const own = await ownDraft(id);
   if (!own) return { ok: false };
-  await remember(id, subject, body, "kopieret");
+  const from = await senderFor(own.user, as);
+  if (!from) return { ok: false };
+  await remember(id, subject, body, "kopieret", from);
   return { ok: true };
 }
 
@@ -235,7 +241,7 @@ export async function sendSalesMail(id: string, to: string, subject: string, bod
       await prisma.deal.update({ where: { id: row.dealId }, data: { contactEmail: typed } });
       await logActivity({ type: "DEAL_UPDATED", message: `${me.name} tilføjede kontakt-e-mailen ${typed} (sendt fra mailgeneratoren)`, actorId: me.id, dealId: row.dealId }).catch(() => {});
     }
-    await remember(id, s, b, "sendt");
+    await remember(id, s, b, "sendt", user);
     if (onBehalf) await toldColleague(user.id, me.name, s);
     return { ok: true };
   }
@@ -273,7 +279,7 @@ export async function sendSalesMail(id: string, to: string, subject: string, bod
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Kunne ikke sende e-mailen." };
   }
-  await remember(id, s, b, "sendt");
+  await remember(id, s, b, "sendt", user);
   await keepSent(id, address, cc, trackingId, b);
   const who = (row.input as { company?: string; name?: string } | null)?.company || (row.input as { name?: string } | null)?.name || address;
   await logActivity({ type: "EMAIL_SENT", message: onBehalf ? `${me.name} sendte en mail fra mailgeneratoren til ${who} på vegne af ${user.name}` : `${user.name} sendte en mail fra mailgeneratoren til ${who}`, actorId: me.id });

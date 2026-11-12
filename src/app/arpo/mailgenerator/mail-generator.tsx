@@ -236,7 +236,7 @@ export function MailGenerator({ deals, tours, signature: mine, learned, senders 
     if (!draft) return;
     await navigator.clipboard.writeText(`${draft.body}\n\n${signature.join("\n")}`);
     setMsg({ ok: true, text: "Kopieret - sæt den ind i din mail." });
-    copiedSalesMail(draft.id, draft.subject, draft.body).catch(() => {});
+    copiedSalesMail(draft.id, draft.subject, draft.body, other ? as : undefined).catch(() => {});
   }
 
   const priceField = (key: keyof typeof price, title: string, placeholder: string) => (
@@ -262,11 +262,8 @@ export function MailGenerator({ deals, tours, signature: mine, learned, senders 
               <select
                 className={`${input} mt-1`}
                 value={as}
-                onChange={(e) => {
-                  setAs(e.target.value);
-                  // A suggestion written in one name isn't sent in another's.
-                  setDraft(null);
-                }}
+                // The suggestion stays - only the signature below it changes, and it's sent (and learned from) in the new name.
+                onChange={(e) => setAs(e.target.value)}
               >
                 {senders.map((x, i) => (
                   <option key={x.id} value={x.id}>
