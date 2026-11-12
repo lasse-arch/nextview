@@ -8,13 +8,17 @@ import { useT } from "../tours/i18n-react";
  * pulsing ring point out where the menu is - whatever menu the tour has and
  * wherever it sits (the Menu button, the dock, the room picker…). It goes by
  * itself after a few seconds or at the first touch, and is shown once per
- * visit (every time in the editor's preview, to try it).
+ * visit - in the editor's preview once each time the preview loads, to try it
+ * (never again when the menu is closed or something else comes and goes).
  */
 
 /** The things that open the menu, in every menu design. */
 const TRIGGERS = [".hv-menuknap", ".bm-knap", ".sp-menuknap", ".dz-dock", ".pk-mini"];
 
 type Spot = { x: number; y: number; w: number; h: number };
+
+/** Tours whose hint has been shown since this page loaded - it's mounted afresh each time the tour is free again. */
+const shownThisLoad = new Set<string>();
 
 /** The menu's button as it is on screen now - only when it can really be seen (not hidden, faded or covered by a picture, the drone scene …). */
 function visibleTrigger(): HTMLElement | null {
@@ -49,6 +53,7 @@ export function MenuHint({ slug, again }: { slug: string; again: boolean }) {
 
   useEffect(() => {
     const key = `hv-menu-hint:${slug}`;
+    if (shownThisLoad.has(slug)) return;
     try {
       if (!again && sessionStorage.getItem(key)) return;
     } catch {}
@@ -58,6 +63,7 @@ export function MenuHint({ slug, again }: { slug: string; again: boolean }) {
     // Only for one who goes round by themselves: if they've already picked something (a story, a guided tour …), never this visit.
     const show = setTimeout(() => {
       if (busy()) {
+        shownThisLoad.add(slug);
         try {
           sessionStorage.setItem(key, "1");
         } catch {}
@@ -67,6 +73,7 @@ export function MenuHint({ slug, again }: { slug: string; again: boolean }) {
       if (!el) return;
       const r = el.getBoundingClientRect();
       setSpot({ x: r.left, y: r.top, w: r.width, h: r.height });
+      shownThisLoad.add(slug);
       try {
         sessionStorage.setItem(key, "1");
       } catch {}
