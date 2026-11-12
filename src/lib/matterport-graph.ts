@@ -6,7 +6,7 @@ import "server-only";
  * model data - what the viewer itself uses - so a route can be found from
  * wherever the visitor stands to any room.
  */
-export type SweepGraph = Record<string, { n: string[]; p: [number, number, number] }>;
+export type SweepGraph = Record<string, { n: string[]; p: [number, number, number]; /** Matterport's room. */ r?: string }>;
 
 /*
  * Only answers that worked are kept (in this server's memory) - never "not
@@ -34,18 +34,18 @@ async function sweepGraph(modelId: string): Promise<SweepGraph | null> {
     const res = await fetch("https://my.matterport.com/api/mp/models/graph", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ query: `{ model(id: ${JSON.stringify(modelId)}) { locations { id neighbors position { x y z } } } }` }),
+      body: JSON.stringify({ query: `{ model(id: ${JSON.stringify(modelId)}) { locations { id neighbors position { x y z } room { id } } } }` }),
       signal: AbortSignal.timeout(10_000),
       cache: "no-store",
     });
     if (!res.ok) return null;
     const data = (await res.json()) as {
-      data?: { model?: { locations?: { id: string; neighbors: string[]; position: { x: number; y: number; z: number } }[] } };
+      data?: { model?: { locations?: { id: string; neighbors: string[]; position: { x: number; y: number; z: number }; room?: { id?: string } | null }[] } };
     };
     const locations = data.data?.model?.locations;
     if (!locations?.length) return null;
     return Object.fromEntries(
-      locations.map((l) => [l.id, { n: l.neighbors, p: [+l.position.x.toFixed(2), +l.position.y.toFixed(2), +l.position.z.toFixed(2)] as [number, number, number] }])
+      locations.map((l) => [l.id, { n: l.neighbors, p: [+l.position.x.toFixed(2), +l.position.y.toFixed(2), +l.position.z.toFixed(2)] as [number, number, number], ...(l.room?.id ? { r: l.room.id } : {}) }])
     );
   } catch {
     return null;

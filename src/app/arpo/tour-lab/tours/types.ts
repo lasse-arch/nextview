@@ -942,6 +942,8 @@ export type TourConfig = {
   menuOpenOnStart: { desktop: boolean; mobile: boolean };
   /** The tour dims behind an open menu, and a tap on it closes the menu - false: no dimming. */
   menuDim?: false;
+  /** A small full-screen button in the top right corner, left of the menu button (where the browser can do full screen - not an iPhone) - false: none. */
+  fullscreenButton?: false;
   /**
    * More languages than Danish ("en", "de" … - see LANGUAGES in i18n.ts): the
    * visitor gets a language button, and a link can pick one with ?sprog=en.

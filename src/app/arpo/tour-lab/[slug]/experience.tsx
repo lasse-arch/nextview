@@ -30,7 +30,7 @@ import { GUIDE_CSS, GuidePlayer, guideStops } from "./guide";
 import { ONBOARDING_CSS, Onboarding } from "./onboarding";
 import { MENU_HINT_CSS, MenuHint } from "./menu-hint";
 import { PlayGate } from "./play-gate";
-import { FULLSCREEN_CSS, FullscreenOnUse } from "./fullscreen-on-use";
+import { FULLSCREEN_BUTTON_CSS, FULLSCREEN_CSS, FullscreenButton, FullscreenOnUse } from "./fullscreen-on-use";
 import { CONTACT_CSS, CONTACT_HREF, ContactForm } from "./contact-form";
 import { DAY_CSS, DayBar, DaySheet } from "./day";
 import { SHOP_CSS, ShopSheet } from "./shop";
@@ -2915,7 +2915,7 @@ function TourExperience({
       {[...new Set([...fontHrefs(T.font, [400, 600, 700, 800, 900]), ...(T.fontHeading ? fontHrefs(T.fontHeading, [500, 600]) : [])])].map((href) => (
         <link key={href} rel="stylesheet" href={href} />
       ))}
-      <style>{CSS + TOUR_LOGO_CSS + CONTACT_CSS + STORIES_CSS + LIGHTBOX_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + ONBOARDING_CSS + MENU_HINT_CSS + INFO_CSS + STAGING_CSS + (T.staging?.some((i) => i.kind === "treasure") ? CONTEST_CSS : "") + (T.inUse?.length ? IN_USE_CSS : "") + (T.lineDays ? LINE_DAY_CSS : "") + (T.yearWheel ? YEARWHEEL_CSS : "") + (T.schedule ? SCHEDULE_CSS : "") + MAP_CSS + (T.sitePlan?.overlay ? SITE_PLAN_CSS + SITE_PLAN_360_CSS : "") + ROUTE_CSS + MEASURES_CSS + CARDS_CSS + DAY_CSS + (T.events ? EVENTS_CSS : "") + (T.shop || T.points.some((p) => p.shop) ? SHOP_CSS : "") + SIMPLE_CSS + BENTO_CSS + LOGO_RIGHT_CSS + LANG_CSS + WEATHER_CSS + COMMUTE_CSS + FEATURES_CSS + FINDER_CSS + (review ? FEEDBACK_CSS : "")}</style>
+      <style>{CSS + TOUR_LOGO_CSS + CONTACT_CSS + STORIES_CSS + LIGHTBOX_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + ONBOARDING_CSS + MENU_HINT_CSS + INFO_CSS + STAGING_CSS + (T.staging?.some((i) => i.kind === "treasure") ? CONTEST_CSS : "") + (T.inUse?.length ? IN_USE_CSS : "") + (T.lineDays ? LINE_DAY_CSS : "") + (T.yearWheel ? YEARWHEEL_CSS : "") + (T.schedule ? SCHEDULE_CSS : "") + MAP_CSS + (T.sitePlan?.overlay ? SITE_PLAN_CSS + SITE_PLAN_360_CSS : "") + ROUTE_CSS + MEASURES_CSS + CARDS_CSS + DAY_CSS + (T.events ? EVENTS_CSS : "") + (T.shop || T.points.some((p) => p.shop) ? SHOP_CSS : "") + SIMPLE_CSS + BENTO_CSS + LOGO_RIGHT_CSS + LANG_CSS + WEATHER_CSS + COMMUTE_CSS + FEATURES_CSS + FINDER_CSS + FULLSCREEN_BUTTON_CSS + (review ? FEEDBACK_CSS : "")}</style>
       {/* The tour's own design on top (written by Claude or by hand under Avanceret). */}
       {T.customCss && <style>{T.customCss.replace(/<\/?style/gi, "")}</style>}
 
@@ -3799,6 +3799,8 @@ function TourExperience({
           onClose={() => setLineRun(null)}
         />
       )}
+      {/* Full screen, in the top right corner by the menu button - only while the tour itself is up (not the welcome, a cover or an open menu). */}
+      {T.fullscreenButton !== false && !welcome && !(cover && T.cover) && !menuOpen && <FullscreenButton onToggle={(on) => track("fullscreen", { on: on ? 1 : 0 })} />}
       {T.commute?.button && !welcome && !(cover && T.cover) && guideAt == null && !route && (
         <button type="button" className={`vt-tur-knap vt-tur-knap-${T.commute.button}`} onClick={() => (track("commute_open", { from: "button" }), setCommuteOpen(true))}>
           🚌 {T.commute.title || tx("Hvor langt har du til os?")}

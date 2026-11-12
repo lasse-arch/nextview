@@ -6,7 +6,7 @@ import type { MpSdk, Vec3 } from "../matterport";
 import { useT } from "../tours/i18n-react";
 import { inFront } from "./info";
 
-export type RouteGraph = Record<string, { n: string[]; p: [number, number, number] }>;
+export type RouteGraph = Record<string, { n: string[]; p: [number, number, number]; /** Matterport's room. */ r?: string }>;
 export type Destination = { name: string; group?: string; href: string };
 
 /**
@@ -17,11 +17,12 @@ export type Destination = { name: string; group?: string; href: string };
  * jump that can cut through a wall. In the viewer's coordinates (heights as
  * the third number), where the viewer knows the point.
  */
-export function routeNetwork(server: RouteGraph | null, sweeps: Record<string, { position?: { x: number; y: number; z: number }; neighbors?: string[] }>): RouteGraph | null {
+export function routeNetwork(server: RouteGraph | null, sweeps: Record<string, { position?: { x: number; y: number; z: number }; neighbors?: string[]; roomInfo?: { id?: string } }>): RouteGraph | null {
   const out: RouteGraph = {};
   for (const [id, s] of Object.entries(sweeps)) {
     if (!s.position) continue;
-    out[id] = { n: [...new Set([...(s.neighbors ?? []), ...(server?.[id]?.n ?? [])])], p: [s.position.x, s.position.z, s.position.y] };
+    const r = server?.[id]?.r ?? s.roomInfo?.id;
+    out[id] = { n: [...new Set([...(s.neighbors ?? []), ...(server?.[id]?.n ?? [])])], p: [s.position.x, s.position.z, s.position.y], ...(r ? { r } : {}) };
   }
   if (!Object.keys(out).length) return server;
   // Neighbours both ways, and only points we know where are.
@@ -55,7 +56,11 @@ export function shortestPath(graph: RouteGraph, from: string, to: string): strin
     for (const nb of graph[cur].n) {
       if (!graph[nb]) continue;
       // Long jumps cost extra (distance^1.6): the route takes the short steps you'd walk, not a 25 m leap.
-      const alt = dist[cur] + d(cur, nb) ** 1.6;
+      // A long jump into another room is almost always one seen through a window (Matterport counts it as a neighbour),
+      // not a door - a door is a few steps. So it's taken only when there's no other way at all (e.g. Skyum: the dining
+      // hall to the football pitch went 34 m straight through the wall).
+      const intoOtherRoom = graph[cur].r && graph[nb].r && graph[cur].r !== graph[nb].r && Math.hypot(graph[cur].p[0] - graph[nb].p[0], graph[cur].p[1] - graph[nb].p[1]) > 10;
+      const alt = dist[cur] + d(cur, nb) ** 1.6 * (intoOtherRoom ? 50 : 1);
       if (dist[nb] == null || alt < dist[nb]) {
         dist[nb] = alt;
         prev[nb] = cur;

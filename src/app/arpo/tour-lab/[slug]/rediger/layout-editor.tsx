@@ -121,6 +121,12 @@ export function LayoutEditor({ config, edit, onTab, preview }: { config: TourCon
             title="Dæmp touren bag menuen"
             hint="Touren bliver lidt mørkere, når menuen er åben, og et tryk på den lukker menuen. Fra: touren står klar og kan bruges, mens menuen er åben."
           />
+          <Toggle
+            on={config.fullscreenButton !== false}
+            onChange={(on) => edit((d) => void (d.fullscreenButton = on ? undefined : false))}
+            title="Fuldskærmsknap"
+            hint="En lille knap øverst til højre ved menuen, der sætter touren i fuld skærm. Den lægger sig aldrig oven på andre knapper. Vises ikke på iPhone, som ikke kan det."
+          />
           <button type="button" className={more} onClick={() => onTab("menu")}>
             Menupunkter og grupper under Menu →
           </button>
