@@ -53,10 +53,10 @@ const COLS: Col[] = [
   { key: "phone", label: "Telefon", w: 140, field: "phone", text: (d) => d.contactPhone ?? "" },
   { key: "contactEmail", label: "E-mail", w: 200, field: "contactEmail", text: (d) => d.contactEmail ?? "" },
   { key: "website", label: "Hjemmeside", w: 170, field: "website", text: (d) => d.websiteUrl ?? "" },
+  { key: "note", label: "Seneste note", w: 320, field: "note", text: (d) => d.lastCallNote?.body ?? "" },
   { key: "area", label: "Område", w: 150, text: (d) => (d.place ? `${d.place.kommune} · ${Math.round(d.place.km)} km` : "") },
   { key: "address", label: "Adresse", w: 210, text: (d) => d.address ?? "" },
   { key: "voicemail", label: "Telefonsvar", w: 170, text: (d) => (d.lastVoicemailAt ? `${d.voicemailCount ?? 1}× · ${short(d.lastVoicemailAt)}${d.lastVoicemailBy ? ` · ${d.lastVoicemailBy}` : ""}` : "") },
-  { key: "note", label: "Seneste note", w: 320, field: "note", text: (d) => d.lastCallNote?.body ?? "" },
   { key: "cvr", label: "CVR", w: 95, text: (d) => d.cvrNumber ?? "" },
 ];
 const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";

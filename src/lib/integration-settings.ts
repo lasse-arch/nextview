@@ -44,6 +44,22 @@ export async function isDineroTestMode(): Promise<boolean> {
 /** Settings that hold a text value instead of an on/off switch. */
 export type SettingValueKey = "MATTERPORT_SDK_KEY" | "TOUR_PROTOTYPE_GA4_ID" | "ANTHROPIC_API_KEY" | "MATTERPORT_API_TOKEN" | "BREAKEVEN_MONTHLY_COST" | "GEMINI_API_KEY";
 
+/**
+ * Arpo's own bookkeeping, not settings anyone types in: what the DocuSeal
+ * webhook last received (lib/docuseal-webhook-log.ts) and when waiting
+ * contracts were last checked with DocuSeal (lib/contract-sync.ts).
+ */
+export type InternalStateKey = "DOCUSEAL_WEBHOOK_LOG" | "CONTRACT_SYNC_AT";
+
+export async function getInternalState(key: InternalStateKey): Promise<string | null> {
+  const setting = await prisma.integrationSetting.findUnique({ where: { key } });
+  return setting?.value ?? null;
+}
+
+export async function setInternalState(key: InternalStateKey, value: string): Promise<void> {
+  await prisma.integrationSetting.upsert({ where: { key }, create: { key, value }, update: { value } });
+}
+
 export async function getSettingValue(key: SettingValueKey): Promise<string | null> {
   const setting = await prisma.integrationSetting.findUnique({ where: { key } });
   return setting?.value ?? null;

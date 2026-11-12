@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { submissionEvents } from "@/lib/docuseal";
+import { isDocuSealConfigured, submissionEvents } from "@/lib/docuseal";
 import { handleDocuSealEvent } from "@/lib/docuseal-events";
 
 /*
@@ -31,13 +31,13 @@ export async function syncContract(
         : "unchanged";
 }
 
-/** Every contract still waiting for the customer (sent within the last half year) - the daily backstop. */
-export async function syncWaitingContracts(): Promise<{
+/** Every contract still waiting for the customer (sent within the last half year, or `days`) - the daily backstop. */
+export async function syncWaitingContracts(days = 183): Promise<{
   checked: number;
   signed: number;
   failed: number;
 }> {
-  const since = new Date(Date.now() - 183 * 86_400_000);
+  const since = new Date(Date.now() - days * 86_400_000);
   const where = {
     contractStatus: { in: ["SENT" as const, "VIEWED" as const] },
     docusealSubmissionId: { not: null },
@@ -74,4 +74,29 @@ export async function syncWaitingContracts(): Promise<{
     }
   }
   return { checked: all.length, signed, failed };
+}
+
+const EVERY_MS = 4 * 60_000;
+
+/**
+ * While the team is in Arpo (called after each page, see arpo/layout.tsx):
+ * contracts sent within the last two months are checked with DocuSeal at most
+ * every four minutes - so "opened" and "signed" show up within minutes even
+ * when DocuSeal's webhook doesn't arrive. One instance at a time: the check is
+ * claimed in the database first.
+ */
+export async function syncContractsIfDue(): Promise<void> {
+  try {
+    if (!(await isDocuSealConfigured())) return;
+    const key = "CONTRACT_SYNC_AT";
+    await prisma.integrationSetting.upsert({ where: { key }, create: { key, value: "0", updatedAt: new Date(0) }, update: {} });
+    const claimed = await prisma.integrationSetting.updateMany({
+      where: { key, updatedAt: { lt: new Date(Date.now() - EVERY_MS) } },
+      data: { value: new Date().toISOString() },
+    });
+    if (claimed.count !== 1) return;
+    await syncWaitingContracts(62);
+  } catch (err) {
+    console.error("Kontraktstatus kunne ikke tjekkes:", err);
+  }
 }

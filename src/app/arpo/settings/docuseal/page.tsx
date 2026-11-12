@@ -1,12 +1,19 @@
 import Link from "next/link";
 import { isDocuSealConfigured } from "@/lib/docuseal";
-import { isIntegrationEnabled } from "@/lib/integration-settings";
+import { getInternalState, isIntegrationEnabled } from "@/lib/integration-settings";
+import { readWebhookLog } from "@/lib/docuseal-webhook-log";
+import { requireUser } from "@/lib/auth";
 import { IntegrationToggle } from "../integration-toggle";
 
 const hasCredentials = Boolean(process.env.DOCUSEAL_API_KEY);
 
 export default async function DocuSealSettingsPage() {
-  const [configured, enabled] = await Promise.all([isDocuSealConfigured(), isIntegrationEnabled("DOCUSEAL")]);
+  await requireUser();
+  const [configured, enabled, log, syncedAt] = await Promise.all([isDocuSealConfigured(), isIntegrationEnabled("DOCUSEAL"), readWebhookLog(), getInternalState("CONTRACT_SYNC_AT")]);
+  const when = (iso?: string | null) =>
+    iso && !Number.isNaN(Date.parse(iso)) ? new Intl.DateTimeFormat("da-DK", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Copenhagen" }).format(new Date(iso)) : null;
+  const refusedLatest = log.refused && (!log.ok || log.refused.at > log.ok.at);
+  const EVENTS = ["form.viewed", "form.completed", "form.declined"];
   const appBaseUrl = process.env.APP_BASE_URL || "http://localhost:3000";
 
   return (
@@ -56,6 +63,37 @@ export default async function DocuSealSettingsPage() {
           Kopiér derefter signeringsnøglen fra webhookens HMAC-fane (starter med{" "}
           <span className="font-mono">whsec_</span>) ind som <span className="font-mono">DOCUSEAL_WEBHOOK_SECRET</span>.
         </p>
+        <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
+          <p className="font-medium text-slate-900">Modtaget fra DocuSeal</p>
+          {!log.ok && !log.refused ? (
+            <p className="mt-1 text-amber-700">
+              Intet modtaget endnu. Tjek at adressen i DocuSeal er præcis den ovenfor (ikke arpo.dk eller www - DocuSeal følger ikke en omdirigering).
+            </p>
+          ) : (
+            <>
+              {log.ok && <p className="mt-1 text-slate-600">Sidst modtaget: {when(log.ok.at)} ({log.ok.type})</p>}
+              {log.refused && (
+                <p className={`mt-1 ${refusedLatest ? "text-red-700" : "text-slate-500"}`}>
+                  {refusedLatest ? "Afvist" : "Sidst afvist"}: {when(log.refused.at)} - {log.refused.reason}
+                </p>
+              )}
+              <ul className="mt-2 flex flex-wrap gap-1.5 text-xs">
+                {EVENTS.map((e) => (
+                  <li key={e} className={`rounded-full px-2 py-0.5 font-mono ${log.types?.[e] ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>
+                    {e}: {when(log.types?.[e]) ?? "aldrig modtaget"}
+                  </li>
+                ))}
+              </ul>
+              {log.ok && !log.types?.["form.viewed"] && (
+                <p className="mt-2 text-xs text-amber-700">form.viewed er aldrig kommet - sæt flueben ved den under webhooken i DocuSeal, så &quot;åbnet&quot; vises med det samme.</p>
+              )}
+            </>
+          )}
+          <p className="mt-2 text-xs text-slate-500">
+            Arpo tjekker også selv kontrakter, der venter på underskrift, hvert fjerde minut, mens nogen fra teamet bruger Arpo
+            {when(syncedAt) ? ` (sidst ${when(syncedAt)})` : ""} - og en gang om dagen.
+          </p>
+        </div>
         <p className="mt-2 text-sm text-slate-600">
           Når kontrakten underskrives, sættes dealens &quot;solgt dato&quot; automatisk, provisionen beregnes med
           det samme, og sælgeren + alle admins får en e-mail.

@@ -20,6 +20,7 @@ import { getUnreadNewsCount } from "@/lib/actions/news";
 import { after } from "next/server";
 import { headers } from "next/headers";
 import { ipOf, rememberTeamNetwork } from "@/lib/team-network";
+import { syncContractsIfDue } from "@/lib/contract-sync";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   // Every team member gets the frame; what's in the menu follows their role (src/lib/team-roles.ts), and each page checks again.
@@ -33,6 +34,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const sales = teamCan(user, "sales");
   const tours = teamCan(user, "tours");
   const filming = teamCan(user, "filming");
+  // Contracts out for signing: checked with DocuSeal every few minutes while the team is here - "opened"/"signed" shows
+  // up even when DocuSeal's webhook doesn't arrive (lib/contract-sync.ts). After the page, so nobody waits for it.
+  if (sales) after(syncContractsIfDue);
 
   const [unreadNewsCount, unreadBell, overdue] = sales
     ? await Promise.all([getUnreadNewsCount(user.id, user.newsReadAt ?? null), unreadNotifications(user), overdueTasksFor(user.id)])
