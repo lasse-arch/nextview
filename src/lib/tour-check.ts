@@ -5,6 +5,8 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { getSettingValue } from "@/lib/integration-settings";
 import { canEmbed } from "@/lib/link-embed";
+import { safeFetchTo } from "@/lib/safe-fetch";
+import { tagged } from "@/app/arpo/tour-lab/tours/link-tag";
 import { fetchLiveUnits } from "@/lib/availability/live";
 import { tourPanoramas } from "@/lib/tour-pano-copies";
 import { claudeCostUsd } from "@/lib/claude-cost";
@@ -69,14 +71,28 @@ function picturesIn(c: TourConfig): { where: string; url: string }[] {
   return out.filter((p) => p.url);
 }
 
-async function answers(url: string): Promise<number | "down"> {
+/** How a link answers - and the address it ends on after redirects. Public addresses only (every redirect checked too). */
+async function answers(url: string): Promise<{ s: number | "down"; final: string | null }> {
+  const UA = "Mozilla/5.0 (compatible; Nextview360-linktjek)";
   try {
-    let res = await fetch(url, { method: "HEAD", redirect: "follow", cache: "no-store", signal: AbortSignal.timeout(7000) });
-    // Some sites don't answer HEAD - ask properly before calling it broken.
-    if (res.status === 405 || res.status === 403 || res.status === 501) res = await fetch(url, { redirect: "follow", cache: "no-store", signal: AbortSignal.timeout(8000) });
-    return res.status;
+    let r = await safeFetchTo(url, { method: "HEAD", cache: "no-store", headers: { "User-Agent": UA }, signal: AbortSignal.timeout(7000) });
+    // Some sites don't answer HEAD (or answer it wrongly) - ask properly before calling it broken.
+    if (r.res.status >= 400) r = await safeFetchTo(url, { cache: "no-store", headers: { "User-Agent": UA }, signal: AbortSignal.timeout(9000) });
+    await r.res.body?.cancel().catch(() => {});
+    return { s: r.res.status, final: r.url };
   } catch {
-    return "down";
+    return { s: "down", final: null };
+  }
+}
+
+/** The link with the tour's own tracking taken off again - the address to put in instead. */
+function withoutTracking(href: string): string {
+  try {
+    const u = new URL(href);
+    for (const k of ["utm_source", "utm_medium", "utm_campaign"]) u.searchParams.delete(k);
+    return u.toString();
+  } catch {
+    return href;
   }
 }
 
@@ -127,8 +143,28 @@ export async function checkTour(c: TourConfig, opts: { ai?: boolean } = {}): Pro
   for (const g of c.guide?.stops ?? []) if ("point" in g && !c.points.some((p) => p.id === g.point)) add("fejl", "Funktioner", `"Vis mig rundt" har et stop ved et punkt, der ikke findes længere (${g.point}).`);
 
   // Links out of the tour: do they answer?
-  const outsideLinks = [...new Map(links.filter((l) => /^https?:\/\//.test(l.href) && !isPlaceHref(l.href) && !imageOfHref(l.href)).map((l) => [l.href, l])).values()].slice(0, 25);
-  const statuses = await Promise.all(outsideLinks.map(async (l) => ({ l, s: await answers(l.href) })));
+  // Tested exactly as the tour opens them - with its tracking (utm) on: some sites answer "not found" to a link with
+  // it that works without (Skyum: efterskolerne.dk's price calculator). Then the address the link ends on is tried.
+  const outsideLinks = [...new Map(links.filter((l) => /^https?:\/\//.test(l.href) && !isPlaceHref(l.href) && !imageOfHref(l.href)).map((l) => [l.href, l])).values()].slice(0, 60);
+  const statuses: { l: { where: string; href: string }; s: number | "down"; better?: string }[] = [];
+  for (let i = 0; i < outsideLinks.length; i += 8) {
+    statuses.push(
+      ...(await Promise.all(
+        outsideLinks.slice(i, i + 8).map(async (l) => {
+          const opened = tagged(c, l.href);
+          const a = await answers(opened);
+          const bad = a.s === "down" || a.s >= 400;
+          if (!bad || opened === l.href) return { l, s: a.s };
+          // Broken with the tracking on: does the link work without it - and does the address it lands on take it?
+          const plain = await answers(l.href);
+          if (plain.s === "down" || plain.s >= 400 || !plain.final) return { l, s: a.s };
+          const landed = withoutTracking(plain.final);
+          const ok = (await answers(tagged(c, landed))).s;
+          return { l, s: a.s, better: typeof ok === "number" && ok < 400 ? landed : "uden-sporing" };
+        })
+      ))
+    );
+  }
   let broken = statuses.filter((x) => x.s === "down" || (typeof x.s === "number" && x.s >= 400));
   // Not one answered: it's our connection just now, not every link the tour has.
   if (statuses.length > 2 && statuses.every((x) => x.s === "down")) {
@@ -136,7 +172,17 @@ export async function checkTour(c: TourConfig, opts: { ai?: boolean } = {}): Pro
     broken = [];
   }
   // Only "not there" (404/410) is certainly broken - booking systems often turn automatic checks away (403, 429, 500 …).
-  for (const b of broken.slice(0, 8)) {
+  for (const b of broken.slice(0, 12)) {
+    if (b.better) {
+      add(
+        "fejl",
+        "Funktioner",
+        b.better === "uden-sporing"
+          ? `${b.l.where}: siden findes ikke, når touren åbner den (med Nextviews sporing i adressen) - den virker kun uden. Find et andet link, eller bed nextviewAI om at slå sporingen fra (${b.l.href}).`
+          : `${b.l.where}: siden findes ikke, når touren åbner den - linket sender videre, og den nye adresse virker. Skift linket til ${b.better}`
+      );
+      continue;
+    }
     const gone = b.s === 404 || b.s === 410;
     add(gone ? "fejl" : "warn", "Funktioner", `${b.l.where}: linket ${b.s === "down" ? "svarer ikke" : gone ? "findes ikke (fejl " + b.s + ")" : `svarede med fejl ${b.s} på tjekket - åbn det selv og se, at det virker`} (${b.l.href}).`);
   }

@@ -28,6 +28,11 @@ export class BlockedAddress extends Error {}
 
 /** fetch() for an address from outside: public http(s) only, every redirect re-checked (at most `maxRedirects`). Throws BlockedAddress when it isn't allowed. */
 export async function safeFetch(raw: string | URL, init: RequestInit & { maxRedirects?: number } = {}): Promise<Response> {
+  return (await safeFetchTo(raw, init)).res;
+}
+
+/** safeFetch, and the address it ended on after the redirects. */
+export async function safeFetchTo(raw: string | URL, init: RequestInit & { maxRedirects?: number } = {}): Promise<{ res: Response; url: string }> {
   const { maxRedirects = 5, ...rest } = init;
   let next = String(raw);
   for (let hop = 0; hop <= maxRedirects; hop++) {
@@ -38,7 +43,7 @@ export async function safeFetch(raw: string | URL, init: RequestInit & { maxRedi
       next = new URL(res.headers.get("location")!, url).href;
       continue;
     }
-    return res;
+    return { res, url: url.href };
   }
   throw new BlockedAddress("For mange omdirigeringer.");
 }
