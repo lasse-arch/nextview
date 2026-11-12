@@ -1,6 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db";
-import { addDays, DK_REGIONS, type TourStats } from "@/lib/tour-stats";
+import { addDays, type TourStats } from "@/lib/tour-stats";
 import type { TourConfig } from "@/app/arpo/tour-lab/tours/types";
 
 /*
@@ -66,22 +66,6 @@ function seeded(seed: string) {
   };
 }
 
-/** Towns for the map, by region (lat/lng rounded like the real ones). */
-const TOWNS: [string, string, number, number, number][] = [
-  ["Aalborg", "81", 57.0, 9.9, 9],
-  ["Hjørring", "81", 57.5, 10.0, 3],
-  ["Aarhus", "82", 56.2, 10.2, 8],
-  ["Viborg", "82", 56.5, 9.4, 3],
-  ["Herning", "82", 56.1, 9.0, 2],
-  ["Odense", "83", 55.4, 10.4, 4],
-  ["Esbjerg", "83", 55.5, 8.5, 2],
-  ["Vejle", "83", 55.7, 9.5, 2],
-  ["København", "84", 55.7, 12.6, 6],
-  ["Hillerød", "84", 55.9, 12.3, 1],
-  ["Roskilde", "85", 55.6, 12.1, 2],
-  ["Næstved", "85", 55.2, 11.8, 1],
-];
-
 /** Numbers for the period that look like a good tour's - made up, steady for the tour and the period. */
 export function exampleStats(slug: string, T: TourConfig, from: string, to: string): TourStats {
   const rnd = seeded(`${slug}|${from}|${to}`);
@@ -98,12 +82,6 @@ export function exampleStats(slug: string, T: TourConfig, from: string, to: stri
   const ranked = (labels: string[], top: number) =>
     labels.slice(0, 8).map((label, i) => ({ label, count: share(top * Math.pow(0.78, i) * (0.85 + rnd() * 0.3)) }));
   const rooms = menuRoomNames(T);
-  const located = Math.round(visits * 0.92);
-  const weight = TOWNS.reduce((n, t) => n + t[4], 0);
-  const abroad = Math.round(located * 0.06);
-  const dk = located - abroad;
-  const points = TOWNS.map(([city, , lat, lng, w]) => ({ lat, lng, city, count: Math.max(1, Math.round((dk * w) / weight)) }));
-  const byRegion = (code: string) => points.filter((_, i) => TOWNS[i][1] === code).reduce((n, p) => n + p.count, 0);
   const guideStarted = share(0.31);
   return {
     days: days.length,
@@ -128,17 +106,6 @@ export function exampleStats(slug: string, T: TourConfig, from: string, to: stri
     live: { seen: 0, opened: 0, viewed: 0, booked: 0, units: [] },
     menu: { opened: share(0.64), groups: ranked(T.menu.filter((m) => "items" in m).map((m) => m.title), 0.3) },
     rooms: ranked(rooms, 0.38),
-    geo: {
-      located,
-      regions: DK_REGIONS.map(([code, label]) => ({ code, label, count: byRegion(code) })),
-      denmarkElse: 0,
-      abroad: [
-        { label: "Tyskland", count: Math.round(abroad * 0.6) },
-        { label: "Sverige", count: Math.round(abroad * 0.25) },
-        { label: "Norge", count: abroad - Math.round(abroad * 0.6) - Math.round(abroad * 0.25) },
-      ].filter((a) => a.count > 0),
-      points,
-    },
     roomTime: rooms
       .slice(0, 6)
       .map((label, i) => ({ label, seconds: Math.round(48 - i * 5 + rnd() * 10), count: share(0.2 * Math.pow(0.8, i)) }))

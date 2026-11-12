@@ -9,7 +9,6 @@ import { DateRangePicker, periodText, presetName, type Period } from "@/componen
 import type { TourStats } from "@/lib/tour-stats";
 import { shown, type ReportShare, type ShareWhen } from "@/lib/tour-share";
 import { CustomerReport } from "./customer-report";
-import { VisitorMap } from "./visitor-map";
 import { Choice, Field, Group, Toggle } from "./ui";
 
 /*
@@ -122,7 +121,6 @@ function ShareSettings({ slug, brand, share: initial, shareStats, token: initial
         <Toggle on={share.roomTime} onChange={(on) => change({ roomTime: on })} title="Hvor de blev længst (tid i rum)" />
         <Toggle on={share.opened} onChange={(on) => change({ opened: on })} title="Det, de åbnede (punkter, infopunkter, stedkort, 360°)" />
         <Toggle on={share.sources} onChange={(on) => change({ sources: on })} title="Hvor besøgene kom fra" />
-        <Toggle on={share.geo} onChange={(on) => change({ geo: on })} title="Danmarkskort (hvor i landet de besøgende er)" />
         <Toggle on={share.live} onChange={(on) => change({ live: on })} title="Ledige (live data)" />
         {url ? (
           <button
@@ -367,9 +365,6 @@ function OurNumbers({ slug, initial, guideStops, guideNames }: { slug: string; i
       </Group>
       <Group title="Kom fra">
         <Ranked rows={stats.sources} empty="-" />
-      </Group>
-      <Group title="Hvor i landet">
-        <VisitorMap geo={stats.geo} />
       </Group>
     </div>
   );

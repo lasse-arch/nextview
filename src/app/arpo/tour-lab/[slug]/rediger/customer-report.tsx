@@ -1,6 +1,5 @@
 import type { TourStats } from "@/lib/tour-stats";
 import { shown, type ReportShare } from "@/lib/tour-share";
-import { VisitorMap } from "./visitor-map";
 
 /*
  * The customer's report: exactly the numbers chosen to be shared - the same
@@ -186,7 +185,6 @@ export function CustomerReport({ stats, share, brand, lang = "da", title }: { st
           <Ranked rows={stats.opened} label={label} />
         </div>
       )}
-      {share.geo && (stats.geo?.located ?? 0) > 0 && <VisitorMap geo={stats.geo} lang={lang} className={card} />}
       {share.sources && stats.sources.length > 0 && (
         <div className={card}>
           <div className="mb-2 text-[13px] font-medium text-[#6e6e73]">{t.sources}</div>

@@ -75,12 +75,6 @@ const DEFAULT_POSTS: { title: string; body: string; minutesAgo: number; screensh
   },
   {
     minutesAgo: 0,
-    title: "Danmarkskort i statistikken: se hvor i landet de besøgende kommer fra",
-    body: "Under Resultater på hver tour er der nu et Danmarkskort: en prik for hver by, besøgene kom fra (jo større, jo flere), og hvor stor en del der kom fra hver region - fx 33 % fra Nordjylland og 18 % fra Syddanmark - plus Udlandet med landene.\n\nKortet kommer også med i kundens rapport og i kundeportalen (slå \"Danmarkskort\" fra under Kundens rapport, hvis det ikke skal deles). Det fyldes fra i dag, efterhånden som touren får besøg.\n\nStedet er groft: byen ud fra den besøgendes netværk, rundet af til ca. 10 km. Vi gemmer aldrig IP-adressen eller en adresse, og kun ét sted pr. besøg.",
-    screenshotUrl: "/news/danmarkskort.png",
-  },
-  {
-    minutesAgo: 0,
     title: "Gør mig klar til møde: nextviewAI forbereder dig til mødet ud fra kalenderen",
     body: "Under Salg → Generator → Spørg er der nu \"Gør mig klar til møde\". Du ser dine kundemøder fra kalenderen de næste tre uger - både dem, der er booket i Arpo, og dem, der kun ligger i Google Kalender (\"Alle møder\" viser hele teamets). Vælg et møde, skriv evt. hvad du særligt vil have styr på, og tryk \"Gør mig klar\".\n\nnextviewAI læser det, vi ved om kunden i Arpo (noter og mails), kundens hjemmeside, og søger på nettet efter nyt om stedet, dem du skal mødes med, og hvad de poster på Facebook, Instagram og LinkedIn. Efter 1-3 minutter får du: kort om kunden, hvem du mødes med, hvad de har gang i, vinklen du skal sælge ind på (med en åbningssætning), de funktioner der giver mening for dem og hvordan du siger det, kunder du kan nævne, gode spørgsmål, de indvendinger de sandsynligvis kommer med - med svar - og en plan for mødet. Kilderne står nederst.\n\nForberedelsen gemmes, så du og dine kolleger kan åbne den igen (\"forberedt ✓\" på mødet), og med \"Gem som note på dealen\" ligger den ved kunden. Tjek altid fakta fra nettet, før du bruger dem.\n\nSikkerhed: kun teamet kan bruge det, højst 15 forberedelser i timen pr. sælger, og mødet slås altid op i kalenderen på serveren. Personer slås kun op professionelt (rolle og offentlige udtalelser) - aldrig privatliv. Alt fra hjemmesider og nettet bruges kun som data.",
     screenshotUrl: "/news/moedeforberedelse.png",
@@ -391,6 +385,9 @@ export async function ensureDefaultNewsPosts(adminUserId: string): Promise<void>
   await prisma.newsPost.deleteMany({
     where: { title: "Velkomstmail når kunden sættes Live", body: { contains: "Link til produkt" } },
   });
+
+  // The map of where visitors came from was taken out again (a phone's network address seldom says where it is).
+  await prisma.newsPost.deleteMany({ where: { title: "Danmarkskort i statistikken: se hvor i landet de besøgende kommer fra" } });
 
   // "Send eksempel" moved from the deal and the call list to its own page under Salg.
   {
