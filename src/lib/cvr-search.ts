@@ -95,10 +95,13 @@ export const MAX_CVR_SEARCH_WINDOW = 10000;
  * under Elasticsearch's own default 10,000 max_result_window, so there's no
  * server-side ceiling to worry about at this size.
  */
-export const MAX_LEAD_FILTER_RESULTS = 1000;
+export const CVR_PAGE_SIZE = 1000;
+
+/** The most new leads one filter run may add ("Op til N pr. kørsel") - more than one page, so the run pages through. */
+export const MAX_LEAD_FILTER_RESULTS = 2000;
 
 export async function searchCvr(filter: CvrSearchFilter, limit = 50, from = 0): Promise<CvrSearchResult> {
-  limit = Math.min(Math.max(1, limit), MAX_LEAD_FILTER_RESULTS);
+  limit = Math.min(Math.max(1, limit), CVR_PAGE_SIZE);
   from = Math.max(0, from);
   if (from + limit > MAX_CVR_SEARCH_WINDOW) limit = MAX_CVR_SEARCH_WINDOW - from;
   if (limit <= 0) return { ok: true, hits: [], total: null };

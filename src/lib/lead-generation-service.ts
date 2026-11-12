@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { searchCvr, MAX_LEAD_FILTER_RESULTS, MAX_CVR_SEARCH_WINDOW, type CvrSearchHit } from "@/lib/cvr-search";
+import { searchCvr, CVR_PAGE_SIZE, MAX_CVR_SEARCH_WINDOW, type CvrSearchHit } from "@/lib/cvr-search";
 import { scanUrlForCvrLeads } from "@/lib/url-lead-scan";
 import { lookupCvrNumber } from "@/lib/cvr";
 import { claimCandidateAndUpsertDeal } from "@/lib/lead-candidate-claim";
@@ -74,8 +74,8 @@ export async function runLeadFilter(filterId: string): Promise<RunLeadFilterResu
   const seen = new Set<string>();
   let alreadyKnown = 0;
   let matched: number | null = null;
-  for (let from = 0; from < MAX_CVR_SEARCH_WINDOW && fresh.length < filter.maxResults; from += MAX_LEAD_FILTER_RESULTS) {
-    const page = await searchCvr(search, MAX_LEAD_FILTER_RESULTS, from);
+  for (let from = 0; from < MAX_CVR_SEARCH_WINDOW && fresh.length < filter.maxResults; from += CVR_PAGE_SIZE) {
+    const page = await searchCvr(search, CVR_PAGE_SIZE, from);
     if (!page.ok) {
       if (from === 0) return page;
       break; // keep what earlier pages found rather than losing the whole run
@@ -100,7 +100,7 @@ export async function runLeadFilter(filterId: string): Promise<RunLeadFilterResu
       }
     }
 
-    if (page.hits.length < MAX_LEAD_FILTER_RESULTS) break; // last page
+    if (page.hits.length < CVR_PAGE_SIZE) break; // last page
   }
 
   // The ES search doesn't expose an owner name the way the single-CVR lookup
@@ -109,7 +109,11 @@ export async function runLeadFilter(filterId: string): Promise<RunLeadFilterResu
   // MAX_LEAD_FILTER_RESULTS fresh hits in one run (not just "usually a
   // handful"), these run a few at a time instead of one-by-one so a big
   // first run doesn't eat into the route's own time budget.
-  const ownerLookups = await mapWithConcurrency(fresh, 5, async (h) => {
+  // With up to 2000 new finds the owner names get two and a half minutes at most - after that the leads are added
+  // without one (it's a nice-to-have), so the run never hits the route's own limit.
+  const ownerDeadline = Date.now() + 150_000;
+  const ownerLookups = await mapWithConcurrency(fresh, 8, async (h) => {
+    if (Date.now() > ownerDeadline) return { cvr: h.cvr, ownerName: null };
     const lookup = await lookupCvrNumber(h.cvr);
     return { cvr: h.cvr, ownerName: lookup.ok ? lookup.data.contactName : null };
   });

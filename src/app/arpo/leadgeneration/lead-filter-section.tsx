@@ -78,7 +78,7 @@ export type LeadFilterData = {
 
 export type CallListOption = { id: string; name: string };
 
-const MAX_RESULTS_OPTIONS = [25, 50, 100, 200, 500, 1000] as const;
+const MAX_RESULTS_OPTIONS = [25, 50, 100, 200, 500, 1000, 2000] as const;
 const FOUNDED_WITHIN_OPTIONS = [7, 14, 30, 60, 90, 180, 365] as const;
 
 function formatDateShort(iso: string): string {
