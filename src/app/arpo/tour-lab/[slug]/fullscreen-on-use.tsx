@@ -50,19 +50,27 @@ export const FULLSCREEN_CSS = `
 .fs-knap svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
 `;
 
-const SIZE = 40;
 const GAP = 8;
 const MENU_BUTTONS = ".hv-menuknap, .bm-knap, .sp-menuknap";
 const OBSTACLES = "button, a, select, input, [role='button'], .hv-logo, .hv-live-chip";
 
 /** Where the button can sit: left of the menu button, past anything else in that row - null where there's no room. */
-function placeFor(button: HTMLElement): { top: number; left: number } | null {
+type Place = { top: number; left: number; size: number; bg: string; fg: string; shadow: string };
+
+/** Where the button can sit, and how it looks: a round twin of the menu button (its height, colour and shadow). */
+function placeFor(button: HTMLElement): Place | null {
   const root = button.closest(".hv") ?? document.body;
   // Something open on top of the tour (a menu of another design, a sheet): out of the way until it's closed.
-  if (root.querySelector('.bm.vis, .sp-menu, [role="dialog"][aria-modal="true"]:not([aria-hidden="true"])')) return null;
+  // Also while the menu hint points at the menu button - the hint gets the attention alone.
+  if (root.querySelector('.bm.vis, .sp-menu, .mh-ring, [role="dialog"][aria-modal="true"]:not([aria-hidden="true"])')) return null;
   const vw = window.innerWidth;
   const menu = [...root.querySelectorAll<HTMLElement>(MENU_BUTTONS)].find((el) => el.getClientRects().length && el.checkVisibility?.({ opacityProperty: true, visibilityProperty: true }) !== false);
   const m = menu?.getBoundingClientRect();
+  const SIZE = m ? Math.round(Math.min(48, Math.max(34, m.height))) : 40;
+  const cs = menu ? getComputedStyle(menu) : null;
+  // The menu button's own colour - a see-through one (rare) gets the dark glass instead.
+  const solid = cs && cs.backgroundColor && !/rgba\(.*,\s*0\)$|transparent/.test(cs.backgroundColor);
+  const look = { size: SIZE, bg: solid ? cs.backgroundColor : "rgba(10,18,20,.62)", fg: solid ? cs.color : "#fff", shadow: cs?.boxShadow && cs.boxShadow !== "none" ? cs.boxShadow : "0 4px 14px rgba(0,0,0,.25)" };
   const top = m ? m.top + m.height / 2 - SIZE / 2 : 14;
   let left = (m ? m.left : vw - 14) - GAP - SIZE;
   const others = [...root.querySelectorAll<HTMLElement>(OBSTACLES)]
@@ -73,7 +81,7 @@ function placeFor(button: HTMLElement): { top: number; left: number } | null {
   // Step left past anything in the way - a language switch, a button under the menu - and give up when it reaches the left half.
   for (let i = 0; i < 8; i++) {
     const hit = others.find((r) => r.left < left + SIZE + GAP / 2 && r.right > left - GAP / 2 && r.top < top + SIZE + GAP / 2 && r.bottom > top - GAP / 2);
-    if (!hit) return left > vw / 2 - SIZE ? { top, left } : null;
+    if (!hit) return left > vw / 2 - SIZE ? { top, left, ...look } : null;
     left = hit.left - GAP - SIZE;
   }
   return null;
@@ -93,7 +101,7 @@ export function FullscreenButton({ onToggle }: { onToggle?: (on: boolean) => voi
   // Known only in the browser (the server draws nothing, so the page matches when it wakes up).
   const canFull = useSyncExternalStore(noop, () => Boolean(document.fullscreenEnabled && document.documentElement.requestFullscreen), () => false);
   const [on, setOn] = useState(false);
-  const [place, setPlace] = useState<{ top: number; left: number } | null>(null);
+  const [place, setPlace] = useState<Place | null>(null);
   const [el, setEl] = useState<HTMLButtonElement | null>(null);
 
   useEffect(() => {
@@ -109,7 +117,7 @@ export function FullscreenButton({ onToggle }: { onToggle?: (on: boolean) => voi
     let last = "";
     const measure = () => {
       const p = placeFor(el);
-      const key = p ? `${Math.round(p.top)},${Math.round(p.left)}` : "";
+      const key = p ? `${Math.round(p.top)},${Math.round(p.left)},${p.size},${p.bg},${p.fg}` : "";
       if (key !== last) {
         last = key;
         setPlace(p);
@@ -130,7 +138,7 @@ export function FullscreenButton({ onToggle }: { onToggle?: (on: boolean) => voi
       ref={setEl}
       type="button"
       className="fs-hjorne"
-      style={place ? { top: place.top, left: place.left } : { visibility: "hidden" }}
+      style={place ? { top: place.top, left: place.left, width: place.size, height: place.size, background: place.bg, color: place.fg, boxShadow: place.shadow } : { visibility: "hidden" }}
       aria-label={on ? tr("Luk fuld skærm") : tr("Fuld skærm")}
       title={on ? tr("Luk fuld skærm") : tr("Fuld skærm")}
       onClick={() => {
@@ -147,7 +155,7 @@ export function FullscreenButton({ onToggle }: { onToggle?: (on: boolean) => voi
 }
 
 export const FULLSCREEN_BUTTON_CSS = `
-.fs-hjorne{position:fixed;z-index:9;width:${SIZE}px;height:${SIZE}px;display:grid;place-items:center;border:0;border-radius:12px;background:rgba(10,18,20,.62);color:#fff;cursor:pointer;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);box-shadow:0 4px 14px rgba(0,0,0,.25);animation:hvFade .4s ease}
-.fs-hjorne:hover{background:rgba(10,18,20,.82)}
+.fs-hjorne{position:fixed;z-index:9;width:40px;height:40px;padding:0;display:grid;place-items:center;border:0;border-radius:999px;cursor:pointer;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);animation:hvFade .4s ease;transition:filter .15s}
+.fs-hjorne:hover{filter:brightness(1.12)}
 .fs-hjorne svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
 `;
