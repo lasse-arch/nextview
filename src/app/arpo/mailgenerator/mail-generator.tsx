@@ -16,6 +16,11 @@ const input = "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text
 const label = "block text-[11px] font-semibold uppercase tracking-wide text-slate-500";
 const toNum = (v: string) => (v.trim() === "" ? null : Number(v.replace(/\./g, "").replace(",", ".")));
 
+/** Files with the mail: at most this many and this much in all (Gmail takes 25 MB, with room for the mail itself). */
+const MAX_FILES = 10;
+const MAX_FILES_BYTES = 20 * 1024 * 1024;
+const size = (bytes: number) => (bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`);
+
 /** Quick ways to make a draft over. */
 const REDO = ["Kortere", "Mere personlig", "Lidt mere formel", "Mere om touren"];
 
@@ -126,6 +131,17 @@ export function MailGenerator({ deals, tours, signature: mine, learned, senders 
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, start] = useTransition();
   const [sending, startSend] = useTransition();
+  /** Files to send with the mail - only here in the tab (a file can't be kept in the browser's storage), gone after sending. */
+  const [files, setFiles] = useState<File[]>([]);
+  const filesBytes = files.reduce((n, f) => n + f.size, 0);
+  const fileInput = useRef<HTMLInputElement>(null);
+  function addFiles(list: FileList | null) {
+    if (!list?.length) return;
+    const next = [...files, ...Array.from(list)].slice(0, MAX_FILES);
+    if (next.reduce((n, f) => n + f.size, 0) > MAX_FILES_BYTES) return setMsg({ ok: false, text: "Filerne fylder for meget samlet (højst 20 MB)." });
+    setMsg(null);
+    setFiles(next);
+  }
 
   /** The deals found for what's typed - searched among all of them on the server (not only the latest few hundred). */
   const [found, setFound] = useState<DealHit[]>([]);
@@ -220,10 +236,11 @@ export function MailGenerator({ deals, tours, signature: mine, learned, senders 
     if (!confirm(other ? `Send mailen til ${recipient} fra ${sender?.name}s Gmail, i ${sender?.name}s navn?` : `Send mailen til ${recipient} fra din Gmail?`)) return;
     setMsg(null);
     startSend(async () => {
-      const r = await sendSalesMail(draft.id, to, draft.subject, draft.body, other ? as : undefined).catch(() => ({ ok: false as const, error: "Der skete en fejl - prøv igen." }));
+      const r = await sendSalesMail(draft.id, to, draft.subject, draft.body, other ? as : undefined, files).catch(() => ({ ok: false as const, error: "Der skete en fejl - prøv igen." }));
       setMsg(r.ok ? { ok: true, text: `Sendt til ${recipient}.${deal ? " Den ligger på dealen." : ""}` } : { ok: false, text: r.error });
       // Sent: not kept any longer (a reload starts empty).
       if (r.ok) {
+        setFiles([]);
         setCleared(true);
         try {
           localStorage.removeItem(KEEP);
@@ -235,7 +252,7 @@ export function MailGenerator({ deals, tours, signature: mine, learned, senders 
   async function copy() {
     if (!draft) return;
     await navigator.clipboard.writeText(`${draft.body}\n\n${signature.join("\n")}`);
-    setMsg({ ok: true, text: "Kopieret - sæt den ind i din mail." });
+    setMsg({ ok: true, text: files.length ? "Kopieret - sæt den ind i din mail, og vedhæft filerne dér." : "Kopieret - sæt den ind i din mail." });
     copiedSalesMail(draft.id, draft.subject, draft.body, other ? as : undefined).catch(() => {});
   }
 
@@ -437,6 +454,50 @@ export function MailGenerator({ deals, tours, signature: mine, learned, senders 
                 <button type="button" disabled={busy || !redo.trim()} onClick={() => write(redo)} className="rounded-md bg-slate-200 px-2.5 py-1 text-xs font-medium disabled:opacity-50">
                   {busy ? "…" : "Lav om"}
                 </button>
+              </div>
+
+              <div
+                className="rounded-lg border border-dashed border-slate-300 px-3 py-2.5"
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  addFiles(e.dataTransfer.files);
+                }}
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className={label}>Vedhæftede filer</span>
+                  <button type="button" onClick={() => fileInput.current?.click()} className="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-200">
+                    + Vedhæft fil
+                  </button>
+                  <input
+                    ref={fileInput}
+                    type="file"
+                    multiple
+                    className="hidden"
+                    onChange={(e) => {
+                      addFiles(e.target.files);
+                      e.target.value = "";
+                    }}
+                  />
+                </div>
+                {files.length ? (
+                  <ul className="mt-2 space-y-1">
+                    {files.map((f, i) => (
+                      <li key={`${f.name}-${i}`} className="flex items-center justify-between gap-2 rounded-md bg-slate-50 px-2 py-1 text-xs text-slate-700">
+                        <span className="min-w-0 truncate">📎 {f.name}</span>
+                        <span className="flex shrink-0 items-center gap-2 text-slate-400">
+                          {size(f.size)}
+                          <button type="button" aria-label={`Fjern ${f.name}`} onClick={() => setFiles(files.filter((_, j) => j !== i))} className="rounded px-1 text-slate-500 hover:bg-slate-200 hover:text-slate-800">
+                            ×
+                          </button>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-1 text-xs text-slate-400">Træk filer hertil, eller vælg dem - fx et tilbud som PDF eller billeder. Højst {MAX_FILES} filer og 20 MB i alt.</p>
+                )}
+                {files.length > 0 && <p className="mt-1 text-[11px] text-slate-400">{size(filesBytes)} i alt · sendes med, når du trykker Send</p>}
               </div>
 
               <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">

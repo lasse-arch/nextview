@@ -212,7 +212,7 @@ const EMAIL_RE = /^[^\s@<>,;"]+@[^\s@<>,;"]+\.[^\s@<>,;"]+$/;
  * (to its contact, logged on the deal, follow-up task); without, to the
  * address typed in.
  */
-export async function sendSalesMail(id: string, to: string, subject: string, body: string, as?: string): Promise<{ ok: true } | { ok: false; error: string }> {
+export async function sendSalesMail(id: string, to: string, subject: string, body: string, as?: string, attachments: File[] = []): Promise<{ ok: true } | { ok: false; error: string }> {
   const own = await ownDraft(id);
   if (!own) return { ok: false, error: "Mailen findes ikke." };
   const { user: me, row } = own;
@@ -223,6 +223,10 @@ export async function sendSalesMail(id: string, to: string, subject: string, bod
   const s = cap(subject, 300).trim();
   const b = cap(body, 10_000).trim();
   if (!s || !b) return { ok: false, error: "Mailen mangler emne eller tekst." };
+  // Files sent along (the seller's own, from their computer): only real files, at most 10 and 20 MB in all.
+  const files = Array.isArray(attachments) ? attachments.filter((f): f is File => f instanceof File && f.size > 0) : [];
+  if (files.length > 10) return { ok: false, error: "Højst 10 vedhæftede filer." };
+  if (files.reduce((n, f) => n + f.size, 0) > 20 * 1024 * 1024) return { ok: false, error: "Filerne fylder for meget samlet (højst 20 MB)." };
 
   if (row.dealId) {
     const deal = await prisma.deal.findUnique({ where: { id: row.dealId }, select: { contactEmail: true, invoiceEmail: true, ownerId: true } });
@@ -233,7 +237,7 @@ export async function sendSalesMail(id: string, to: string, subject: string, bod
     const known = deal.contactEmail || deal.invoiceEmail;
     if (!typed && !known) return { ok: false, error: "Dealen har ingen e-mail - skriv den, du vil sende til." };
     const trackingId = randomUUID();
-    const r = await sendDealEmail(user, row.dealId, s, b, [], [], onBehalf ? { id: me.id, name: me.name } : undefined, typed && typed.toLowerCase() !== known?.toLowerCase() ? typed : undefined, cc, trackingId);
+    const r = await sendDealEmail(user, row.dealId, s, b, [], files, onBehalf ? { id: me.id, name: me.name } : undefined, typed && typed.toLowerCase() !== known?.toLowerCase() ? typed : undefined, cc, trackingId);
     if (!r.ok) return r;
     await keepSent(id, typed || known || "", cc, trackingId, b);
     // The deal had no contact e-mail: the one it was sent to is put on it - by someone who may work on the deal.
@@ -275,6 +279,9 @@ export async function sendSalesMail(id: string, to: string, subject: string, bod
       bodyText: `${b}${signOff.text}`,
       bodyHtml: `<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.5">${html}${signOff.html}${pixel}</div>`,
       fromName: sellerName,
+      attachments: files.length
+        ? await Promise.all(files.map(async (f) => ({ filename: f.name.replace(/[\r\n"]/g, "").slice(0, 150) || "fil", contentType: f.type || "application/octet-stream", data: Buffer.from(await f.arrayBuffer()) })))
+        : undefined,
     });
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Kunne ikke sende e-mailen." };
