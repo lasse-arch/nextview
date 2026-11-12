@@ -39,7 +39,7 @@ const css = (style: React.CSSProperties) =>
 export function embedCode(url: string, title: string, size: EmbedSize) {
   return `<div style="${css(embedBox(size))}">
   <iframe src="${url}" title="${title.replace(/"/g, "&quot;")}" style="position:absolute;inset:0;width:100%;height:100%;border:0;border-radius:12px"
-    allow="fullscreen; xr-spatial-tracking; gyroscope; accelerometer; autoplay; clipboard-write" allowfullscreen loading="lazy"></iframe>
+    allow="fullscreen; xr-spatial-tracking; gyroscope; accelerometer; autoplay; clipboard-write; geolocation" allowfullscreen loading="lazy"></iframe>
 </div>`;
 }
 

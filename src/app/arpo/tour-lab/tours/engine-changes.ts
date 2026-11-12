@@ -9,6 +9,7 @@
 export type EngineChange = { date: string; kind: "ny" | "sikkerhed" | "hastighed" | "rettelse"; text: string };
 
 export const ENGINE_CHANGES: EngineChange[] = [
+  { date: "2026-11-12", kind: "ny", text: "Vej til skolen: knappen \"Find vej fra min placering\" - gæsten deler sin placering i stedet for at skrive adressen (den gemmes ikke). I en hjemmeside virker den kun med den nye indlejringskode." },
   { date: "2026-11-11", kind: "ny", text: "Rum: står man i et rum (fx et feriehus), kan man kun gå mellem rummets egne scanpunkter - Matterport flyver ikke længere hen til et scan langt væk." },
   { date: "2026-11-11", kind: "ny", text: "Find vej: touren kan have sin egen tekst under overskriften og i søgefeltet (fx \"Tast depotrumsnummer eller vælg fx Ankomstområde\")." },
   { date: "2026-11-11", kind: "rettelse", text: "Find vej går ikke længere over skjulte scanpunkter - kun hvis der slet ingen anden vej er." },

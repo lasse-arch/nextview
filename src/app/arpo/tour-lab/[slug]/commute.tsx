@@ -59,6 +59,33 @@ export function CommuteSheet({ T, onClose, onEvent }: { T: TourConfig; onClose: 
     onEvent("commute", { km: j.km });
   }
 
+  /** "Find vej fra min placering": the browser asks the visitor; the spot only goes to Arpo for the journey, never kept. */
+  const [locating, setLocating] = useState(false);
+  function fromHere() {
+    setError(null);
+    if (!navigator.geolocation) return setError(tr("Din browser kan ikke finde din placering - skriv din adresse i stedet."));
+    setLocating(true);
+    onEvent("commute_here");
+    navigator.geolocation.getCurrentPosition(
+      (p) => {
+        setLocating(false);
+        const lat = p.coords.latitude;
+        const lon = p.coords.longitude;
+        if (!(Math.abs(lat - 56) < 3 && Math.abs(lon - 11) < 5)) return setError(tr("Du ser ud til at være uden for Danmark - skriv en adresse i stedet."));
+        void pick({ text: tr("Din placering"), lat, lon });
+      },
+      (e) => {
+        setLocating(false);
+        setError(
+          e.code === e.PERMISSION_DENIED
+            ? tr("Placeringen blev ikke delt - skriv din adresse i stedet.")
+            : tr("Din placering kunne ikke findes - skriv din adresse i stedet.")
+        );
+      },
+      { enableHighAccuracy: false, timeout: 12_000, maximumAge: 300_000 }
+    );
+  }
+
   const [mapOpen, setMapOpen] = useState(false);
   // Google's own embeddable map with the journey by public transport (dirflg=r) - no key, nothing about the visitor kept by us.
   // (Its embed address directly - the short maps?output=embed one redirects through a page that refuses to be framed.)
@@ -108,12 +135,18 @@ export function CommuteSheet({ T, onClose, onEvent }: { T: TourConfig; onClose: 
             </ul>
           )}
         </div>
+        <button type="button" className="vt-her" onClick={fromHere} disabled={locating || busy}>
+          <svg viewBox="0 0 24 24" aria-hidden width="17" height="17">
+            <path d="M12 2l7 19-7-4-7 4z" fill="currentColor" transform="rotate(45 12 12)" />
+          </svg>
+          {locating ? tr("Finder din placering …") : tr("Find vej fra min placering")}
+        </button>
         {busy && <p className="vt-note">{tr("Finder vejen …")}</p>}
         {error && <p className="vt-note vt-fejl">{error}</p>}
         {result && (
           <>
             <p className="vt-note">
-              {tr("Fra")} {from?.text.split(",")[0]} · {result.km.toLocaleString("da-DK")} km
+              {tr("Fra")} {from?.text.split(",")[0].toLocaleLowerCase() === tr("Din placering").toLocaleLowerCase() ? tr("din placering") : from?.text.split(",")[0]} · {result.km.toLocaleString("da-DK")} km
             </p>
             <div className="vt-tal">
               {tiles.map(([icon, label, min]) =>
@@ -174,6 +207,10 @@ export const COMMUTE_CSS = `
 .vt-liste button{display:flex;align-items:center;gap:10px;width:100%;text-align:left;border:0;background:none;padding:11px 10px;border-radius:10px;font:inherit;font-size:15px;color:#1d2a30;cursor:pointer}
 .vt-liste button::before{content:"";flex:none;width:8px;height:8px;border-radius:50%;background:var(--c-accent);opacity:.7}
 .vt-liste button:hover,.vt-liste button:focus-visible{background:#f4f4f2;outline:none}
+.vt-her{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:8px;border:1.5px solid color-mix(in srgb,var(--c-accent) 45%,#fff);border-radius:12px;background:#fff;padding:11px 12px;font:inherit;font-size:15px;font-weight:800;color:var(--c-main);cursor:pointer}
+.vt-her svg{color:var(--c-accent);flex:none}
+.vt-her:hover{background:color-mix(in srgb,var(--c-accent) 7%,#fff)}
+.vt-her:disabled{opacity:.6;cursor:default}
 .vt-note{margin:12px 2px 0;font-size:13px;color:#6b7a80}
 .vt-fejl{color:#c0392b}
 .vt-tal{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px;margin-top:8px}
