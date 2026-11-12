@@ -63,6 +63,9 @@ export type LeadFilterData = {
   industryQuery: string | null;
   municipality: string | null;
   activeOnly: boolean;
+  /** Searches workplaces (P-enheder, with P-nummer) instead of companies. */
+  productionUnits: boolean;
+  secondaryIndustries: boolean;
   foundedFrom: string | null;
   foundedTo: string | null;
   foundedWithinDays: number | null;
@@ -86,11 +89,13 @@ function formatDateShort(iso: string): string {
 }
 
 function criteriaSummary(
-  f: Pick<LeadFilterData, "industryQuery" | "municipality" | "activeOnly" | "foundedFrom" | "foundedTo" | "foundedWithinDays" | "maxResults">
+  f: Pick<LeadFilterData, "industryQuery" | "municipality" | "activeOnly" | "productionUnits" | "secondaryIndustries" | "foundedFrom" | "foundedTo" | "foundedWithinDays" | "maxResults">
 ): string {
   const parts: string[] = [];
   if (f.industryQuery) parts.push(`Branche: ${f.industryQuery}`);
   if (f.municipality) parts.push(`Område: ${f.municipality}`);
+  if (f.productionUnits) parts.push("Afdelinger (P-numre)");
+  if (f.secondaryIndustries) parts.push("Inkl. bibrancher");
   if (f.foundedWithinDays) {
     parts.push(`Stiftet inden for de sidste ${f.foundedWithinDays} dage`);
   } else if (f.foundedFrom || f.foundedTo) {
@@ -229,6 +234,22 @@ function FilterForm({
       <label className="flex items-center gap-2 text-sm text-slate-700">
         <input type="checkbox" name="activeOnly" defaultChecked={initial?.activeOnly ?? true} />
         Kun aktive virksomheder
+      </label>
+      <label className="flex items-start gap-2 text-sm text-slate-700">
+        <input type="checkbox" name="productionUnits" defaultChecked={initial?.productionUnits ?? false} className="mt-0.5" />
+        <span>
+          Søg i afdelinger (P-numre)
+          <span className="block text-xs text-slate-400">
+            Finder hvert arbejdssted med egen adresse og P-nummer - fx kædehotellet i Aalborg, selvom kæden er registreret i København. Stiftelsesdato bruges ikke her.
+          </span>
+        </span>
+      </label>
+      <label className="flex items-start gap-2 text-sm text-slate-700">
+        <input type="checkbox" name="secondaryIndustries" defaultChecked={initial?.secondaryIndustries ?? false} className="mt-0.5" />
+        <span>
+          Bibrancher tæller med
+          <span className="block text-xs text-slate-400">Også steder, hvor branchen kun er en bibranche (fx en restaurant, der også har værelser).</span>
+        </span>
       </label>
       <div>
         <label className="block text-xs font-medium text-slate-600">Ringeliste (automatisk)</label>

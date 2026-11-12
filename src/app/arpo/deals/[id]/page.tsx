@@ -286,6 +286,15 @@ export default async function DealDetailPage({
                   <DisplayNameInput defaultValue={deal.displayName ?? ""} />
                 </div>
                 <CvrLookupField defaultValue={deal.cvrNumber ?? ""} />
+                {deal.pNumber && (
+                  <p className="col-span-2 -mt-1 text-xs text-slate-500">
+                    Afdeling med P-nr.{" "}
+                    <a href={`https://datacvr.virk.dk/enhed/produktionsenhed/${deal.pNumber}`} target="_blank" rel="noopener noreferrer" className="font-medium text-slate-700 underline decoration-dotted">
+                      {deal.pNumber}
+                    </a>{" "}
+                    - CVR-nummeret er firmaets.
+                  </p>
+                )}
                 <div className="col-span-2">
                   <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Adresse</label>
                   <AddressAutocomplete defaultValue={deal.address ?? ""} />

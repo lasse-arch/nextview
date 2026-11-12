@@ -105,18 +105,21 @@ async function loadFoundLeadLists() {
     where: {
       OR: [
         { id: { in: rows.map((r) => r.candidate.dealId).filter((id): id is string => Boolean(id)) } },
-        { cvrNumber: { in: rows.map((r) => r.candidate.cvrNumber).filter((c): c is string => Boolean(c)) } },
+        { cvrNumber: { in: rows.filter((r) => !r.candidate.pNumber).map((r) => r.candidate.cvrNumber).filter((c): c is string => Boolean(c)) }, pNumber: null },
+        { pNumber: { in: rows.map((r) => r.candidate.pNumber).filter((p): p is string => Boolean(p)) } },
       ],
     },
-    select: { id: true, cvrNumber: true, stage: true, callList: { select: { name: true } } },
+    select: { id: true, cvrNumber: true, pNumber: true, stage: true, callList: { select: { name: true } } },
   });
   const dealById = new Map(deals.map((d) => [d.id, d]));
-  const dealByCvr = new Map(deals.filter((d) => d.cvrNumber).map((d) => [d.cvrNumber as string, d]));
+  // A workplace (P-unit) is known by its own P-nummer - a deal with the chain's head office isn't the hotel in Aalborg.
+  const dealByCvr = new Map(deals.filter((d) => d.cvrNumber && !d.pNumber).map((d) => [d.cvrNumber as string, d]));
+  const dealByP = new Map(deals.filter((d) => d.pNumber).map((d) => [d.pNumber as string, d]));
 
   return rows.map((r) => {
     const deal =
       (r.candidate.dealId && dealById.get(r.candidate.dealId)) ||
-      (r.candidate.cvrNumber ? dealByCvr.get(r.candidate.cvrNumber) : undefined);
+      (r.candidate.pNumber ? dealByP.get(r.candidate.pNumber) : r.candidate.cvrNumber ? dealByCvr.get(r.candidate.cvrNumber) : undefined);
     const known: KnownLeadStatus | null = deal
       ? { kind: "deal", dealId: deal.id, stage: deal.stage, callListName: deal.callList?.name ?? null }
       : r.candidate.status === "DISMISSED"
@@ -186,6 +189,8 @@ export default async function LeadGenerationPage() {
           industryQuery: f.industryQuery,
           municipality: f.municipality,
           activeOnly: f.activeOnly,
+          productionUnits: f.productionUnits,
+          secondaryIndustries: f.secondaryIndustries,
           foundedFrom: f.foundedFrom ? f.foundedFrom.toISOString() : null,
           foundedTo: f.foundedTo ? f.foundedTo.toISOString() : null,
           foundedWithinDays: f.foundedWithinDays,
@@ -221,6 +226,7 @@ export default async function LeadGenerationPage() {
             id: c.id,
             companyName: c.companyName,
             cvrNumber: c.cvrNumber,
+            pNumber: c.pNumber,
             address: c.address,
             industryText: c.industryText,
             industryCode: c.industryCode,

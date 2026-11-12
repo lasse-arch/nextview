@@ -22,6 +22,8 @@ function readFilterFields(formData: FormData) {
   const industryQuery = String(formData.get("industryQuery") || "").trim() || null;
   const municipality = String(formData.get("municipality") || "").trim() || null;
   const activeOnly = formData.get("activeOnly") === "on";
+  const productionUnits = formData.get("productionUnits") === "on";
+  const secondaryIndustries = formData.get("secondaryIndustries") === "on";
   const foundedWithinRaw = Number(formData.get("foundedWithinDays"));
   const foundedWithinDays = Number.isInteger(foundedWithinRaw) && foundedWithinRaw > 0 ? foundedWithinRaw : null;
   // A rolling window replaces any fixed dates.
@@ -34,13 +36,16 @@ function readFilterFields(formData: FormData) {
   const ringelisteTarget = String(formData.get("ringelisteTarget") || "");
   const autoCreateDailyList = ringelisteTarget === "__daily__";
   const targetCallListId = !autoCreateDailyList && ringelisteTarget ? ringelisteTarget : null;
-  return { name, industryQuery, municipality, activeOnly, foundedFrom, foundedTo, foundedWithinDays, maxResults, autoCreateDailyList, targetCallListId };
+  return { name, industryQuery, municipality, activeOnly, productionUnits, secondaryIndustries, foundedFrom, foundedTo, foundedWithinDays, maxResults, autoCreateDailyList, targetCallListId };
 }
 
 function validateFilterFields(fields: ReturnType<typeof readFilterFields>): string | null {
   if (!fields.name) return "Giv filteret et navn.";
   if (!fields.industryQuery && !fields.municipality && !fields.foundedFrom && !fields.foundedTo && !fields.foundedWithinDays) {
     return "Angiv mindst branche, område eller en periode.";
+  }
+  if (fields.productionUnits && !fields.industryQuery && !fields.municipality) {
+    return "Afdelinger (P-numre) har ingen stiftelsesdato - angiv branche eller område.";
   }
   if (fields.foundedFrom && fields.foundedTo && fields.foundedFrom > fields.foundedTo) {
     return "Periodens \"fra\"-dato skal være før \"til\"-datoen.";
@@ -153,9 +158,11 @@ export async function moveLeadDealsToCallList(
   for (const candidate of candidates) {
     const deal = candidate.dealId
       ? await prisma.deal.findUnique({ where: { id: candidate.dealId } })
-      : candidate.cvrNumber
-        ? await prisma.deal.findFirst({ where: { cvrNumber: candidate.cvrNumber } })
-        : null;
+      : candidate.pNumber
+        ? await prisma.deal.findFirst({ where: { pNumber: candidate.pNumber } })
+        : candidate.cvrNumber
+          ? await prisma.deal.findFirst({ where: { cvrNumber: candidate.cvrNumber, pNumber: null } })
+          : null;
     if (!deal) continue;
     if (deal.callListId !== callListId) {
       await prisma.deal.update({ where: { id: deal.id }, data: { callListId } });

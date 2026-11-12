@@ -51,10 +51,16 @@ export type CvrSearchFilter = {
   /** Founding-date window, "YYYY-MM-DD" - either or both bounds may be set. */
   foundedFrom?: string | null;
   foundedTo?: string | null;
+  /** Search production units (P-enheder) - each workplace with its own address - instead of companies. No founding dates there. */
+  productionUnits?: boolean;
+  /** Match the industry against the bibrancher too, not only the hovedbranche. */
+  secondaryIndustries?: boolean;
 };
 
 export type CvrSearchHit = {
   cvr: string;
+  /** The P-nummer when the hit is a production unit (then `cvr` is its company's). */
+  pNumber: string | null;
   name: string;
   address: string | null;
   industryText: string | null;
@@ -122,16 +128,23 @@ export async function searchCvr(filter: CvrSearchFilter, limit = 50, from = 0): 
   // free-text branch below and match nothing. Mixed with ordinary text terms
   // in the same comma-separated field, since a seller might know the code
   // for one industry and only the name for another.
+  // A production unit (P-enhed) is its own document with the same shape under other names.
+  const units = Boolean(filter.productionUnits);
+  const meta = units ? "VrproduktionsEnhed.produktionsEnhedMetadata" : "Vrvirksomhed.virksomhedMetadata";
+  // The hovedbranche - and, when asked, the up to three bibrancher as well.
+  const branches = ["nyesteHovedbranche", ...(filter.secondaryIndustries ? ["nyesteBibranche1", "nyesteBibranche2", "nyesteBibranche3"] : [])];
   const industryTerms = splitTerms(filter.industryQuery);
   if (industryTerms.length > 0) {
     must.push({
       bool: {
-        should: industryTerms.map((term) => {
+        should: industryTerms.flatMap((term) => {
           const trimmed = term.trim();
           const digitsOnly = trimmed.replace(/\./g, "");
-          return /^\d+$/.test(digitsOnly)
-            ? { wildcard: { "Vrvirksomhed.virksomhedMetadata.nyesteHovedbranche.branchekode": `${digitsOnly}*` } }
-            : { wildcard: { "Vrvirksomhed.virksomhedMetadata.nyesteHovedbranche.branchetekst": `*${trimmed.toLowerCase()}*` } };
+          return branches.map((b) =>
+            /^\d+$/.test(digitsOnly)
+              ? { wildcard: { [`${meta}.${b}.branchekode`]: `${digitsOnly}*` } }
+              : { wildcard: { [`${meta}.${b}.branchetekst`]: `*${trimmed.toLowerCase()}*` } }
+          );
         }),
         minimum_should_match: 1,
       },
@@ -143,7 +156,7 @@ export async function searchCvr(filter: CvrSearchFilter, limit = 50, from = 0): 
     must.push({
       bool: {
         should: municipalities.map((m) => ({
-          match: { "Vrvirksomhed.virksomhedMetadata.nyesteBeliggenhedsadresse.kommune.kommuneNavn": m },
+          match: { [`${meta}.nyesteBeliggenhedsadresse.kommune.kommuneNavn`]: m },
         })),
         minimum_should_match: 1,
       },
@@ -155,26 +168,27 @@ export async function searchCvr(filter: CvrSearchFilter, limit = 50, from = 0): 
   // virksomheder, foreninger and selvejende institutioner (efterskoler,
   // friskoler, ...) read "AKTIV" instead, so matching "NORMAL" alone silently
   // dropped every one of those from an "only active" filter.
+  // A production unit reads "Aktiv" or "Ophørt" (matched case-insensitively, like the others).
   if (filter.activeOnly !== false) {
     must.push({
       bool: {
-        should: ["NORMAL", "AKTIV"].map((status) => ({
-          match: { "Vrvirksomhed.virksomhedMetadata.sammensatStatus": status },
+        should: (units ? ["AKTIV"] : ["NORMAL", "AKTIV"]).map((status) => ({
+          match: { [`${meta}.sammensatStatus`]: status },
         })),
         minimum_should_match: 1,
       },
     });
   }
 
-  if (filter.foundedFrom || filter.foundedTo) {
+  if (!units && (filter.foundedFrom || filter.foundedTo)) {
     const range: Record<string, string> = {};
     if (filter.foundedFrom) range.gte = filter.foundedFrom;
     if (filter.foundedTo) range.lte = filter.foundedTo;
     must.push({ range: { "Vrvirksomhed.virksomhedMetadata.stiftelsesDato": range } });
   }
 
-  if (industryTerms.length === 0 && municipalities.length === 0 && !filter.foundedFrom && !filter.foundedTo) {
-    return { ok: false, error: "Angiv mindst ét kriterie (branche, område eller periode)." };
+  if (industryTerms.length === 0 && municipalities.length === 0 && (units || (!filter.foundedFrom && !filter.foundedTo))) {
+    return { ok: false, error: units ? "Angiv branche eller område, når der søges i afdelinger (P-numre)." : "Angiv mindst ét kriterie (branche, område eller periode)." };
   }
 
   const username = process.env.CVR_API_USERNAME!;
@@ -183,7 +197,7 @@ export async function searchCvr(filter: CvrSearchFilter, limit = 50, from = 0): 
 
   let res: Response;
   try {
-    res = await fetch("http://distribution.virk.dk/cvr-permanent/virksomhed/_search", {
+    res = await fetch(`http://distribution.virk.dk/cvr-permanent/${units ? "produktionsenhed" : "virksomhed"}/_search`, {
       method: "POST",
       headers: { Authorization: `Basic ${auth}`, "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -193,10 +207,13 @@ export async function searchCvr(filter: CvrSearchFilter, limit = 50, from = 0): 
         // cvrNummer as tiebreaker so paging (`from`) is stable across
         // companies sharing a founding date - otherwise a page boundary
         // could skip or repeat some of them.
-        sort: [
-          { "Vrvirksomhed.virksomhedMetadata.stiftelsesDato": "desc" },
-          { "Vrvirksomhed.cvrNummer": "asc" },
-        ],
+        // P-units have no founding date - by P-nummer, which is stable for paging.
+        sort: units
+          ? [{ "VrproduktionsEnhed.pNummer": "asc" }]
+          : [
+              { "Vrvirksomhed.virksomhedMetadata.stiftelsesDato": "desc" },
+              { "Vrvirksomhed.cvrNummer": "asc" },
+            ],
       }),
     });
   } catch {
@@ -218,9 +235,24 @@ export async function searchCvr(filter: CvrSearchFilter, limit = 50, from = 0): 
 
   const results: CvrSearchHit[] = hits
     .map((hit) => {
-      const source = hit as { _source?: { Vrvirksomhed?: { cvrNummer?: number; virksomhedMetadata?: Record<string, unknown> } } };
-      const v = source._source?.Vrvirksomhed;
-      const meta = v?.virksomhedMetadata as
+      const source = hit as {
+        _source?: {
+          Vrvirksomhed?: { cvrNummer?: number; virksomhedMetadata?: Record<string, unknown> };
+          VrproduktionsEnhed?: {
+            pNummer?: number | string;
+            produktionsEnhedMetadata?: Record<string, unknown> & { nyesteCvrNummerRelation?: number | string | null };
+            virksomhedsrelation?: { cvrNummer?: number | string | null; periode?: { gyldigTil?: string | null } | null }[] | null;
+          };
+        };
+      };
+      const pu = source._source?.VrproduktionsEnhed;
+      const company = source._source?.Vrvirksomhed;
+      // A P-unit's company: its latest CVR relation (or the open one in its relation history).
+      const cvrNummer = units
+        ? (pu?.produktionsEnhedMetadata?.nyesteCvrNummerRelation ?? pu?.virksomhedsrelation?.find((r) => r.cvrNummer && !r.periode?.gyldigTil)?.cvrNummer ?? pu?.virksomhedsrelation?.at(-1)?.cvrNummer)
+        : company?.cvrNummer;
+      const v = cvrNummer ? { cvrNummer } : undefined;
+      const meta = (units ? pu?.produktionsEnhedMetadata : company?.virksomhedMetadata) as
         | {
             nyesteNavn?: { navn?: string | null } | null;
             nyesteBeliggenhedsadresse?: VirkAddress | null;
@@ -235,6 +267,7 @@ export async function searchCvr(filter: CvrSearchFilter, limit = 50, from = 0): 
 
       return {
         cvr: String(v.cvrNummer),
+        pNumber: units && pu?.pNummer != null ? String(pu.pNummer) : null,
         name: meta.nyesteNavn.navn,
         address: formatVirkAddress(meta.nyesteBeliggenhedsadresse),
         industryText: meta.nyesteHovedbranche?.branchetekst ?? null,

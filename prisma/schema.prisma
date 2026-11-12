@@ -466,6 +466,9 @@ model Deal {
   /// actually known as.
   displayName  String?
   cvrNumber    String?
+  /// The P-nummer when the deal is one workplace of a company (e.g. one hotel of a chain, found by
+  /// Leadgeneration searching P-enheder) - the company's CVR stays in cvrNumber.
+  pNumber      String?
   address      String?
   /// Geocoded from address (Danish addresses only, via DAWA) - filled in lazily
   /// the first time the customer map needs it, then cached here.
@@ -687,6 +690,7 @@ model Deal {
 
   @@index([inLeadInbox, stage])
   @@index([tourAssigneeId])
+  @@index([pNumber])
   siteLogo                SiteLogo?
 }
 
@@ -1035,6 +1039,12 @@ model LeadFilter {
   /// ES query either way, so raising this doesn't add extra round-trips,
   /// just a bigger page (see MAX_LEAD_FILTER_RESULTS for the hard cap).
   maxResults Int @default(50)
+  /// Search the register's production units (P-enheder) instead of companies: each workplace with
+  /// its own address and P-nummer, so a chain's hotel in Aalborg counts as in Aalborg even when the
+  /// company is registered in Copenhagen. Founding dates don't apply to P-units.
+  productionUnits     Boolean @default(false)
+  /// Also match the industry against the bibrancher (up to three), not only the hovedbranche.
+  secondaryIndustries Boolean @default(false)
 
   enabled   Boolean   @default(true)
   lastRunAt DateTime?
@@ -1085,7 +1095,12 @@ model LeadCandidate {
 
   /// Always set for filter/page-scan finds; optional only for CSV imports,
   /// whose lists (e.g. a list of højskoler) often carry no CVR numbers.
-  cvrNumber    String?   @unique
+  /// Unique among whole companies only (a partial unique index, WHERE "pNumber" IS NULL - see
+  /// migration 20270104090000): a chain's P-units found by a filter share their company's CVR.
+  cvrNumber    String?
+  /// The production unit (P-enhed) this lead is - e.g. one hotel of a chain - when found by a filter
+  /// searching P-units; null for a whole company.
+  pNumber      String?   @unique
   companyName  String
   address      String?
   industryText String?
@@ -1113,6 +1128,7 @@ model LeadCandidate {
   matches LeadFilterMatch[]
 
   @@index([status, createdAt])
+  @@index([cvrNumber])
 }
 
 /// A CSV file imported under "Fundne leads" - its rows become that list's

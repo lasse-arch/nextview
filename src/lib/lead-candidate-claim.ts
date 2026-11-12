@@ -29,8 +29,12 @@ export async function claimCandidateAndUpsertDeal(
   // A CSV-imported lead may have no CVR number - matching on a null one
   // would hit any deal without a CVR, so it falls back to the deal the
   // import already linked it to (see importLeadCsv), if any.
-  const existingDeal = candidate.cvrNumber
-    ? await prisma.deal.findFirst({ where: { cvrNumber: candidate.cvrNumber } })
+  // One workplace of a company (a P-unit, e.g. a chain's hotel) is its own deal - matched by its P-nummer, not by the
+  // chain's CVR, so the hotel in Aalborg isn't swallowed by a deal with the head office.
+  const existingDeal = candidate.pNumber
+    ? await prisma.deal.findFirst({ where: { pNumber: candidate.pNumber } })
+    : candidate.cvrNumber
+    ? await prisma.deal.findFirst({ where: { cvrNumber: candidate.cvrNumber, pNumber: null } })
     : candidate.dealId
       ? await prisma.deal.findUnique({ where: { id: candidate.dealId } })
       : null;
@@ -57,6 +61,7 @@ export async function claimCandidateAndUpsertDeal(
       data: {
         companyName: candidate.companyName,
         cvrNumber: candidate.cvrNumber,
+        pNumber: candidate.pNumber,
         address: candidate.address,
         contactEmail: candidate.contactEmail,
         contactPhone: candidate.contactPhone,

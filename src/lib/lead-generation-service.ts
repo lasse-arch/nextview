@@ -51,6 +51,8 @@ export async function runLeadFilter(filterId: string): Promise<RunLeadFilterResu
     industryQuery: filter.industryQuery,
     municipality: filter.municipality,
     activeOnly: filter.activeOnly,
+    productionUnits: filter.productionUnits,
+    secondaryIndustries: filter.secondaryIndustries,
     // "Stiftet inden for de sidste N dage" is counted from each run, so a
     // daily filter keeps rolling forward.
     foundedFrom: filter.foundedWithinDays
@@ -67,6 +69,10 @@ export async function runLeadFilter(filterId: string): Promise<RunLeadFilterResu
   // and never reach the older matches behind it. Pages through the register
   // (newest-founded first) skipping known CVR numbers until N fresh ones are
   // collected or the matches run out.
+  // Searching production units: a workplace is known by its P-nummer - a chain's hotel in Aalborg is a lead of its own,
+  // even when the chain (its CVR) is already a deal. Searching companies: by CVR, as always.
+  const units = filter.productionUnits;
+  const keyOf = (h: CvrSearchHit) => (units ? (h.pNumber ?? `cvr:${h.cvr}`) : h.cvr);
   const fresh: CvrSearchHit[] = [];
   // Matches the CRM already knows - another filter's candidate, or an
   // existing deal (dealId set when there's no candidate row for it yet).
@@ -82,19 +88,24 @@ export async function runLeadFilter(filterId: string): Promise<RunLeadFilterResu
     }
     matched ??= page.total;
 
-    const pageHits = page.hits.filter((h) => !seen.has(h.cvr));
-    pageHits.forEach((h) => seen.add(h.cvr));
-    const cvrNumbers = pageHits.map((h) => h.cvr);
+    const pageHits = page.hits.filter((h) => (units ? h.pNumber : true) && !seen.has(keyOf(h)));
+    pageHits.forEach((h) => seen.add(keyOf(h)));
+    const keys = pageHits.map(keyOf);
     const [existingCandidates, existingDeals] = await Promise.all([
-      prisma.leadCandidate.findMany({ where: { cvrNumber: { in: cvrNumbers } }, select: { cvrNumber: true } }),
-      prisma.deal.findMany({ where: { cvrNumber: { in: cvrNumbers } }, select: { id: true, cvrNumber: true } }),
+      units
+        ? prisma.leadCandidate.findMany({ where: { pNumber: { in: keys } }, select: { pNumber: true } }).then((r) => r.map((c) => c.pNumber))
+        : prisma.leadCandidate.findMany({ where: { cvrNumber: { in: keys }, pNumber: null }, select: { cvrNumber: true } }).then((r) => r.map((c) => c.cvrNumber)),
+      units
+        ? prisma.deal.findMany({ where: { pNumber: { in: keys } }, select: { id: true, pNumber: true } }).then((r) => r.map((d) => [d.pNumber, d.id] as const))
+        : prisma.deal.findMany({ where: { cvrNumber: { in: keys }, pNumber: null }, select: { id: true, cvrNumber: true } }).then((r) => r.map((d) => [d.cvrNumber, d.id] as const)),
     ]);
-    const candidateCvrs = new Set(existingCandidates.map((c) => c.cvrNumber));
-    const dealIdByCvr = new Map(existingDeals.map((d) => [d.cvrNumber, d.id]));
+    const candidateKeys = new Set(existingCandidates);
+    const dealIdByKey = new Map(existingDeals);
     for (const h of pageHits) {
-      if (candidateCvrs.has(h.cvr) || dealIdByCvr.has(h.cvr)) {
+      const k = keyOf(h);
+      if (candidateKeys.has(k) || dealIdByKey.has(k)) {
         alreadyKnown++;
-        knownHits.push({ hit: h, dealIdWithoutCandidate: candidateCvrs.has(h.cvr) ? null : dealIdByCvr.get(h.cvr)! });
+        knownHits.push({ hit: h, dealIdWithoutCandidate: candidateKeys.has(k) ? null : dealIdByKey.get(k)! });
       } else if (fresh.length < filter.maxResults) {
         fresh.push(h);
       }
@@ -112,7 +123,8 @@ export async function runLeadFilter(filterId: string): Promise<RunLeadFilterResu
   // With up to 2000 new finds the owner names get two and a half minutes at most - after that the leads are added
   // without one (it's a nice-to-have), so the run never hits the route's own limit.
   const ownerDeadline = Date.now() + 150_000;
-  const ownerLookups = await mapWithConcurrency(fresh, 8, async (h) => {
+  // (Not for P-units: their company is the chain - its owner isn't the hotel's contact.)
+  const ownerLookups = await mapWithConcurrency(units ? [] : fresh, 8, async (h) => {
     if (Date.now() > ownerDeadline) return { cvr: h.cvr, ownerName: null };
     const lookup = await lookupCvrNumber(h.cvr);
     return { cvr: h.cvr, ownerName: lookup.ok ? lookup.data.contactName : null };
@@ -124,6 +136,7 @@ export async function runLeadFilter(filterId: string): Promise<RunLeadFilterResu
       data: fresh.map((h) => ({
         filterId: filter.id,
         cvrNumber: h.cvr,
+        pNumber: units ? h.pNumber : null,
         companyName: h.name,
         address: h.address,
         industryText: h.industryText,
@@ -147,7 +160,7 @@ export async function runLeadFilter(filterId: string): Promise<RunLeadFilterResu
         : filter.targetCallListId!;
       const list = await prisma.callList.findUniqueOrThrow({ where: { id: callListId } });
       const freshCandidates = await prisma.leadCandidate.findMany({
-        where: { cvrNumber: { in: fresh.map((h) => h.cvr) }, filterId: filter.id },
+        where: units ? { pNumber: { in: fresh.map(keyOf) }, filterId: filter.id } : { cvrNumber: { in: fresh.map((h) => h.cvr) }, pNumber: null, filterId: filter.id },
         select: { id: true },
       });
       for (const candidate of freshCandidates) {
@@ -178,6 +191,7 @@ export async function runLeadFilter(filterId: string): Promise<RunLeadFilterResu
       data: dealOnly.map(({ hit: h, dealIdWithoutCandidate }) => ({
         filterId: filter.id,
         cvrNumber: h.cvr,
+        pNumber: units ? h.pNumber : null,
         companyName: h.name,
         address: h.address,
         industryText: h.industryText,
@@ -197,14 +211,13 @@ export async function runLeadFilter(filterId: string): Promise<RunLeadFilterResu
   // are recorded as already handled - kept only so a later run doesn't
   // treat them as unseen.
   const handledAt = filter.autoCreateDailyList || filter.targetCallListId ? new Date() : null;
-  const candidateIdsFor = async (cvrs: string[]) =>
-    cvrs.length === 0
+  const candidateIdsFor = async (keys: string[]) =>
+    keys.length === 0
       ? []
-      : (await prisma.leadCandidate.findMany({ where: { cvrNumber: { in: cvrs } }, select: { id: true } })).map((c) => c.id);
-  const [freshIds, knownIds] = await Promise.all([
-    candidateIdsFor(fresh.map((h) => h.cvr)),
-    candidateIdsFor(knownHits.map((k) => k.hit.cvr)),
-  ]);
+      : (
+          await prisma.leadCandidate.findMany({ where: units ? { pNumber: { in: keys } } : { cvrNumber: { in: keys }, pNumber: null }, select: { id: true } })
+        ).map((c) => c.id);
+  const [freshIds, knownIds] = await Promise.all([candidateIdsFor(fresh.map(keyOf)), candidateIdsFor(knownHits.map((k) => keyOf(k.hit)))]);
   await prisma.leadFilterMatch.createMany({
     data: freshIds.map((candidateId) => ({ filterId: filter.id, candidateId, handledAt })),
     skipDuplicates: true,

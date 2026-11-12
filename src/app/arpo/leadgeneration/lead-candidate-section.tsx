@@ -29,6 +29,8 @@ export type LeadCandidateData = {
   companyName: string;
   /** Null only for a CSV-imported lead without a CVR column. */
   cvrNumber: string | null;
+  /** The workplace's P-nummer when found among the P-units (cvrNumber is then its company's). */
+  pNumber?: string | null;
   address: string | null;
   industryText: string | null;
   industryCode: string | null;
@@ -225,6 +227,18 @@ function CandidateCard({
           )}
           <p className="mt-0.5 text-xs text-slate-500">
             {[
+              candidate.pNumber && (
+                <a
+                  key="p"
+                  href={`https://datacvr.virk.dk/enhed/produktionsenhed/${candidate.pNumber}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-slate-700 underline decoration-dotted hover:text-slate-900"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  P-nr. {candidate.pNumber}
+                </a>
+              ),
               candidate.cvrNumber && (
                 <a
                   key="cvr"
@@ -261,7 +275,7 @@ function CandidateCard({
               .flatMap((part, i) => (i === 0 ? [part] : [" · ", part]))}
           </p>
           {/* A CSV import rarely carries a founding date - only shown when known. */}
-          {(candidate.cvrNumber || candidate.foundedDate) && (
+          {!candidate.pNumber && (candidate.cvrNumber || candidate.foundedDate) && (
             <p className="mt-0.5 text-xs text-slate-400">Stiftet {formatDate(candidate.foundedDate)}</p>
           )}
           {(candidate.ownerName || candidate.contactPhone || candidate.contactEmail) && (
