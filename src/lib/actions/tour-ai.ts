@@ -24,7 +24,7 @@ import { pageAsText, readUnits, type LiveUnit } from "@/lib/availability/live";
 import { hostFiles, hostNewFiles } from "@/lib/tour-files";
 import { claudeCostUsd } from "@/lib/claude-cost";
 import { withoutDeadAerialLinks } from "@/app/arpo/tour-lab/tours/places";
-import { BRANCHES, DESIGN_PRESETS, MENU_STYLES, START_STYLES, setLayout, type Branch, type DesignPreset, type NewTourLayout } from "@/app/arpo/tour-lab/tours/presets";
+import { BRANCHES, DESIGN_PRESETS, MENU_STYLES, START_STYLES, copyLayout, layoutOfTour, setLayout, type Branch, type DesignPreset, type NewTourLayout } from "@/app/arpo/tour-lab/tours/presets";
 
 /** The prototype tour each ready-made design starts from (for its kind of features). */
 const PRESET_BASE: Record<DesignPreset["id"], string> = {
@@ -456,6 +456,8 @@ type NewTourInput = {
   preset?: DesignPreset["id"];
   /** The three layout steps chosen in "Ny tour" - they win over the preset's start and menu. */
   layout?: NewTourLayout;
+  /** "Kopiér layout fra en anden tour": that tour's layout (copyLayout) - the new tour keeps its own brand and content. */
+  layoutFrom?: string;
   branch?: Branch;
   /** The branch and audience in the user's own words. */
   about?: string;
@@ -672,6 +674,11 @@ export async function createTourFromWebsite(input: NewTourInput & { plan?: TourP
     setLayout(base, lay.start, lay.menu);
     base.logoSide = lay.logoSide === "right" ? "right" : undefined;
     base.menuHint = lay.menuHint === "off" ? undefined : lay.menuHint;
+  }
+  // The rest of another tour's layout (one this user may see) - on top of the steps above, which it filled in.
+  if (input.layoutFrom) {
+    const from = await prisma.tour.findUnique({ where: { slug: String(input.layoutFrom) }, select: { config: true } });
+    if (from) copyLayout(base, from.config as unknown as TourConfig);
   }
   const branch = BRANCHES.find(([b]) => b === input.branch)?.[1];
 
@@ -1491,6 +1498,13 @@ export async function suggestSiteLook(
 function layoutOf(l: NewTourLayout | undefined): NewTourLayout | null {
   if (!l || !START_STYLES.some(([v]) => v === l.start) || !MENU_STYLES.some(([v]) => v === l.menu)) return null;
   return { start: l.start, menu: l.menu, logoSide: l.logoSide === "right" ? "right" : "left", menuHint: l.menuHint === "all" || l.menuHint === "off" ? l.menuHint : "mobile" };
+}
+
+/** "Kopiér layout fra en anden tour": that tour's start, menu, logo side and menu arrow - to fill in the layout steps. */
+export async function tourLayout(slug: string): Promise<NewTourLayout | null> {
+  await requireTeam("tours");
+  const t = await prisma.tour.findUnique({ where: { slug: String(slug) }, select: { config: true } });
+  return t ? layoutOfTour(t.config as unknown as TourConfig) : null;
 }
 
 /** The layout in words for nextviewAI - it keeps it. */

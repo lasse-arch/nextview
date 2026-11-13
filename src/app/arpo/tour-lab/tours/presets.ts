@@ -201,6 +201,31 @@ export function setLayout(d: TourConfig, start: StartStyle, menu: MenuStyle): vo
   }
 }
 
+/** A tour's layout as "Ny tour" shows it (start, menu, logo side, menu arrow) - to start a new tour from it. */
+export function layoutOfTour(c: TourConfig): NewTourLayout {
+  const w = c.design?.welcome ?? (c.cover ? "cover" : c.welcome ? "tiles" : "none");
+  const start: StartStyle = w === "cover" ? (c.cover?.video ? "hero" : "cover") : w;
+  return { start, menu: c.design?.menu ?? "side", logoSide: c.logoSide === "right" ? "right" : "left", menuHint: c.menuHint ?? "off" };
+}
+
+/**
+ * "Kopiér layout fra en anden tour": how the other tour looks and is laid out - not its brand or content. The new tour
+ * keeps its own colours, logo, fonts, texts and places; this takes where things sit and how they behave (logo
+ * background, menu open at start, the dim behind the menu, the overview's boxes and filters, place cards' side, how
+ * the menu moves you, stories on/off, how links open). Start and menu come through the layout steps (setLayout).
+ */
+export function copyLayout(d: TourConfig, from: TourConfig): void {
+  const keys = ["logoBg", "logoBgTiles", "logoAlignTiles", "menuOpenOnStart", "menuDim", "fullscreenButton", "overviewUi", "placeCardSide", "jump", "matterportUi"] as const;
+  const rec = d as unknown as Record<string, unknown>;
+  for (const k of keys) {
+    const v = (from as unknown as Record<string, unknown>)[k];
+    if (v === undefined) delete rec[k];
+    else rec[k] = structuredClone(v);
+  }
+  if (from.stories) d.stories = { ...(d.stories ?? {}), mobile: from.stories.mobile, desktop: from.stories.desktop, ...(from.stories.scroll ? { scroll: { ...from.stories.scroll } } : {}) };
+  if (from.linkOpen) d.linkOpen = { ...(d.linkOpen ?? {}), default: from.linkOpen.default, ...(from.linkOpen.size ? { size: from.linkOpen.size } : {}), ...(from.linkOpen.custom ? { custom: { ...from.linkOpen.custom } } : {}), ...(from.linkOpen.showSite === false ? { showSite: false } : {}) };
+}
+
 /** What "Ny tour" chooses in the layout steps - the branch's recommended design fills it in first. */
 export type NewTourLayout = { start: StartStyle; menu: MenuStyle; logoSide: "left" | "right"; menuHint: "off" | "mobile" | "all" };
 

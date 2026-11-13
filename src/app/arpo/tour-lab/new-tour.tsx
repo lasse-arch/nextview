@@ -8,6 +8,7 @@ import {
   matterportConnected,
   peekExploreTour,
   planTourFromWebsite,
+  tourLayout,
   type TourPlanResult,
   matterportModels,
   searchMatterportSpaces,
@@ -30,6 +31,44 @@ import { BRANCHES, DESIGN_PRESETS, FOCUS, MENU_STYLES, PRESET_LAYOUT, START_STYL
 type Who = { kind: "deal"; deal: TourCustomer } | { kind: "test" } | { kind: "none" };
 type Space = { id: string; name: string };
 const STEPS = ["Kunde", "Matterport", "Branche", "Layout", "Indhold", "Plan"] as const;
+/*
+ * Saved as it's filled in (in this browser, a fortnight at most), so a tour
+ * one got stuck on - no Matterport space yet, waiting for the customer's
+ * website - can be picked up again from "+ Ny tour". The drone photo and film
+ * aren't kept (too big) - they're added again.
+ */
+const DRAFT = "ny-tour:v1";
+type Draft = {
+  at: number;
+  step: number;
+  who: Who | null;
+  space: Space | null;
+  branch: Branch | null;
+  preset: DesignPreset["id"] | null;
+  layout: NewTourLayout | null;
+  layoutFrom: string | null;
+  name: string;
+  website: string;
+  focus: string;
+  about: string;
+  notes: string;
+  explore: string;
+  plan: TourPlanResult | null;
+  corrections: string;
+};
+function readDraft(): Draft | null {
+  try {
+    const d = JSON.parse(localStorage.getItem(DRAFT) ?? "null") as Draft | null;
+    return d && Date.now() - d.at < 14 * 86_400_000 && (d.name || d.space || d.who) ? d : null;
+  } catch {
+    return null;
+  }
+}
+function dropDraft() {
+  try {
+    localStorage.removeItem(DRAFT);
+  } catch {}
+}
 const thumb = (id: string) => `https://my.matterport.com/api/v1/player/models/${id}/thumb`;
 
 /** `forDeal`: opened from a customer under Tours (no button) - the customer is picked already, so it starts at the space. */
@@ -48,6 +87,10 @@ export function NewTour({ tours, forDeal, onClose, replaces }: { tours: { slug: 
   const [preset, setPresetId] = useState<DesignPreset["id"] | null>(null);
   /** The three layout steps - filled in from the branch's recommended design, then chosen one by one. */
   const [layout, setLayout] = useState<NewTourLayout | null>(null);
+  /** "Kopiér layout fra en anden tour": the tour whose layout the new one takes (its own brand and content stay). */
+  const [layoutFrom, setLayoutFrom] = useState<string | null>(null);
+  /** A tour left half made in this browser - offered when "+ Ny tour" is opened. */
+  const [draftOffer, setDraftOffer] = useState<Draft | null>(null);
   const setPreset = (id: DesignPreset["id"]) => {
     setPresetId(id);
     setLayout((l) => ({ logoSide: l?.logoSide ?? "left", menuHint: l?.menuHint ?? "mobile", ...PRESET_LAYOUT[id] }));
@@ -73,6 +116,8 @@ export function NewTour({ tours, forDeal, onClose, replaces }: { tours: { slug: 
   const [pending, start] = useTransition();
 
   function reset() {
+    setLayoutFrom(null);
+    setDraftOffer(null);
     setStep(0);
     setWho(null);
     setSpace(null);
@@ -100,6 +145,7 @@ export function NewTour({ tours, forDeal, onClose, replaces }: { tours: { slug: 
     dealId: who?.kind === "deal" ? who.deal.id : undefined,
     preset: preset ?? undefined,
     layout: layout ?? undefined,
+    layoutFrom: layoutFrom ?? undefined,
     branch: branch ?? undefined,
     about,
     focus,
@@ -131,6 +177,7 @@ export function NewTour({ tours, forDeal, onClose, replaces }: { tours: { slug: 
         ? await createTour(name, copyOf)
         : await createTourFromWebsite({ ...aiInput(), plan: plan ?? undefined }).catch((err: unknown) => ({ ok: false as const, error: `Noget gik galt (${err instanceof Error ? err.message : err}) - prøv igen.` }));
       if (!r.ok) return setError(r.error);
+      if (!forDeal && !replaces) dropDraft();
       // The drone film: up to the new tour, and in as the front page's film. If it fails, the tour is there all the same - the film can be put in under Start.
       if (droneVideo && layout?.start === "hero") {
         setVideoNote("Uploader dronevideoen …");
@@ -157,6 +204,46 @@ export function NewTour({ tours, forDeal, onClose, replaces }: { tours: { slug: 
     });
   }
 
+  // Kept as it's filled in - only the plain "+ Ny tour" (a customer's own button or "Start forfra" start where they are).
+  const keeps = open && !forDeal && !replaces && copyOf == null && !draftOffer;
+  useEffect(() => {
+    if (!keeps || !(name.trim() || space || who)) return;
+    const t = window.setTimeout(() => {
+      try {
+        localStorage.setItem(DRAFT, JSON.stringify({ at: Date.now(), step, who, space, branch, preset, layout, layoutFrom, name, website, focus, about, notes, explore, plan, corrections } satisfies Draft));
+      } catch {}
+    }, 400);
+    return () => window.clearTimeout(t);
+  }, [keeps, step, who, space, branch, preset, layout, layoutFrom, name, website, focus, about, notes, explore, plan, corrections]);
+  function resume(d: Draft) {
+    setDraftOffer(null);
+    setWho(d.who);
+    setSpace(d.space);
+    setBranch(d.branch);
+    setPresetId(d.preset);
+    setLayout(d.layout);
+    setLayoutFrom(d.layoutFrom);
+    setName(d.name);
+    setWebsite(d.website);
+    setFocus(d.focus);
+    setAbout(d.about);
+    setNotes(d.notes);
+    setExplore(d.explore);
+    setPlan(d.plan);
+    setCorrections(d.corrections);
+    setStep(Math.min(Math.max(0, d.step), 5));
+  }
+  /** Another tour's layout into the steps - and the rest of it (where things sit, how they behave) when it's built. */
+  function copyLayoutFrom(slug: string) {
+    if (!slug) return setLayoutFrom(null);
+    setLayoutFrom(slug);
+    start(async () => {
+      const l = await tourLayout(slug).catch(() => null);
+      if (l) setLayout(l);
+      else setError("Layoutet kunne ikke hentes.");
+    });
+  }
+
   const canNext = [Boolean(who), Boolean(space), Boolean(branch) || Boolean(about.trim()), Boolean(layout), Boolean(name.trim()), Boolean(plan)][step];
 
   return (
@@ -166,6 +253,8 @@ export function NewTour({ tours, forDeal, onClose, replaces }: { tours: { slug: 
           type="button"
           onClick={() => {
             reset();
+            // One left half made here: offered first ("Fortsæt" / "Start forfra").
+            setDraftOffer(readDraft());
             setOpen(true);
           }}
           className="rounded-full bg-[#0071e3] px-4 py-2 text-[14px] font-medium text-white hover:bg-[#0077ed]"
@@ -199,7 +288,34 @@ export function NewTour({ tours, forDeal, onClose, replaces }: { tours: { slug: 
             )}
 
             <div className="min-h-0 flex-1 overflow-y-auto p-5">
-              {copyOf != null ? (
+              {draftOffer ? (
+                <div className="space-y-3">
+                  <h2 className="text-[19px] font-semibold tracking-tight">Du har en tour i gang</h2>
+                  <div className="rounded-2xl bg-white p-4 ring-1 ring-black/[.06]">
+                    <p className="text-[15px] font-semibold">{draftOffer.name || draftOffer.space?.name || "Ny tour"}</p>
+                    <p className="text-[13px] text-[#6e6e73]">
+                      Nået til {STEPS[Math.min(draftOffer.step, STEPS.length - 1)]} · gemt {new Date(draftOffer.at).toLocaleString("da-DK", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                      {draftOffer.plan ? " · med nextviewAIs plan" : ""}
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => resume(draftOffer)} className="flex-1 rounded-xl bg-[#0071e3] py-2.5 text-[15px] font-medium text-white">
+                      Fortsæt hvor jeg slap
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        dropDraft();
+                        setDraftOffer(null);
+                      }}
+                      className="rounded-xl bg-white px-4 py-2.5 text-[15px] font-medium ring-1 ring-black/[.06]"
+                    >
+                      Start en ny
+                    </button>
+                  </div>
+                  <p className="text-[12px] text-[#8e8e93]">Gemt her i browseren. Et dronebillede og en dronefilm skal vælges igen.</p>
+                </div>
+              ) : copyOf != null ? (
                 <CopyStep tours={tours} copyOf={copyOf} setCopyOf={setCopyOf} name={name} setName={setName} />
               ) : step === 0 ? (
                 <CustomerStep
@@ -282,6 +398,26 @@ export function NewTour({ tours, forDeal, onClose, replaces }: { tours: { slug: 
                     <h2 className="text-[19px] font-semibold tracking-tight">Layout</h2>
                     <p className="text-[13px] text-[#6e6e73]">Tre trin: hvordan touren starter, menuen og hvor tingene sidder. Det anbefalede til branchen er valgt - alt kan ændres bagefter under Layout i editoren.</p>
                   </div>
+                  {tours.length > 0 && (
+                    <div className="rounded-2xl bg-white p-3 ring-1 ring-black/[.06]">
+                      <label className="block text-[13px] font-semibold">
+                        Kopiér layout fra en anden tour
+                        <select value={layoutFrom ?? ""} onChange={(e) => copyLayoutFrom(e.target.value)} className={`${input} mt-1.5`}>
+                          <option value="">Nej - vælg selv herunder</option>
+                          {tours.map((t) => (
+                            <option key={t.slug} value={t.slug}>
+                              {t.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <p className="mt-1.5 text-[12px] leading-snug text-[#6e6e73]">
+                        {layoutFrom
+                          ? "Start, menu og placeringer er hentet herunder - og resten af layoutet (logoets baggrund, menuen ved start, stedkortenes side, historier, hvordan links åbner) kommer med. Kundens egne farver, logo, skrift og indhold bruges."
+                          : "Samme opbygning som en tour, I er glade for - med den nye kundes egne farver, logo og indhold."}
+                      </p>
+                    </div>
+                  )}
                   {layout && (
                     <>
                       <LayoutStep n={1} title="Sådan starter touren" value={layout.start} options={START_STYLES} onChange={(start) => setLayout({ ...layout, start })} />
@@ -390,7 +526,12 @@ export function NewTour({ tours, forDeal, onClose, replaces }: { tours: { slug: 
                 {step === 0 && copyOf == null ? "Annullér" : "Tilbage"}
               </button>
               <div className="flex-1" />
-              {copyOf != null ? (
+              {keeps && step > 0 && (
+                <button type="button" disabled={pending} onClick={() => setOpen(false)} className="rounded-xl px-3 py-2.5 text-[14px] font-medium text-[#0071e3] disabled:opacity-50" title="Gemt her i browseren - åbn + Ny tour for at fortsætte">
+                  Gem og luk
+                </button>
+              )}
+              {draftOffer ? null : copyOf != null ? (
                 <button type="button" disabled={pending || !name.trim()} onClick={build} className="rounded-xl bg-[#0071e3] px-5 py-2.5 text-[15px] font-medium text-white disabled:opacity-40">
                   {pending ? "Opretter…" : "Opret kopi"}
                 </button>
