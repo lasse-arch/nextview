@@ -108,6 +108,13 @@ export function fileSlots(c: TourConfig): Slot[] {
     l.day.forEach((d) => typeof d !== "string" && stopImages(d));
     l.trips?.forEach((t) => slots.push({ get: () => t.image, set: (v) => (t.image = v) }));
   });
+  // "Personer" (Mød os): their photos - e.g. taken from the customer's "Om os" page.
+  c.team?.people.forEach((p) => slots.push({ get: () => p.image, set: (v) => (p.image = v) }));
+  // "Se det i brug": the photo and the more photos.
+  c.inUse?.forEach((i) => {
+    if (i.kind === "image") slots.push({ get: () => i.src, set: (v) => (i.src = v) });
+    stopImages(i);
+  });
   return slots;
 }
 

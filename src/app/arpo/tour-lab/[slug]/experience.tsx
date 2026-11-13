@@ -32,6 +32,7 @@ import { MENU_HINT_CSS, MenuHint } from "./menu-hint";
 import { PlayGate } from "./play-gate";
 import { FLOAT_DOCK_CSS, FloatDock } from "./float-dock";
 import { TEAM_CSS, TeamSheet, teamIdOf } from "./team";
+import { withPeople } from "../tours/people";
 import { FULLSCREEN_BUTTON_CSS, FULLSCREEN_CSS, FullscreenButton, FullscreenOnUse } from "./fullscreen-on-use";
 import { CONTACT_CSS, CONTACT_HREF, ContactForm } from "./contact-form";
 import { DAY_CSS, DayBar, DaySheet } from "./day";
@@ -460,7 +461,7 @@ function TourExperience({
 }: ExperienceProps & { setLang?: (lang: string) => void; /** Started from the play button - that was the front page, so the cover isn't shown again. */ played?: boolean }) {
   // The setup in the visitor's language; names that reach outside it (statistics, ?rum=, pictures) stay Danish.
   // "Direkte i touren" (design.welcome "none"): the welcome's tiles are kept in the setup, never shown.
-  const T = useMemo(() => withoutDeadAerialLinks(asScene(localize(savedTour.design?.welcome === "none" ? { ...savedTour, welcome: undefined } : savedTour, lang))), [savedTour, lang]);
+  const T = useMemo(() => withPeople(withoutDeadAerialLinks(asScene(localize(savedTour.design?.welcome === "none" ? { ...savedTour, welcome: undefined } : savedTour, lang)))), [savedTour, lang]);
   const tx = useMemo(() => makeT(savedTour, lang), [savedTour, lang]);
   // The scan points kept closed. "Låst inde i rummene": every hidden one - also those the menu links to (the rooms) - but the
   // start, worked out from the setup itself, so the editor's preview locks as soon as it's switched on (before it's saved).

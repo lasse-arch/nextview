@@ -90,7 +90,19 @@ export function tourConfigProblem(config: unknown): string | null {
   if (c.placeCards?.some((p) => p.people != null && (!arr(p.people) || p.people.length > 3 || !p.people.every((x) => obj(x) && str(x.image) && (x.name == null || str(x.name)) && (x.role == null || str(x.role))))))
     return "Personer på et stedkort: højst 3, hver med et billede.";
   if (c.nudge && (!obj(c.nudge) || typeof c.nudge.afterSeconds !== "number" || !arr(c.nudge.buttons))) return '"Din plads venter" har en forkert form.';
-  if (c.design && (!obj(c.design) || !["tiles", "cover", "simple", "none"].includes(c.design.welcome) || !["side", "dock", "picker", "simple", "bento"].includes(c.design.menu))) return '"design" skal have welcome (tiles/cover/simple/none) og menu (side/dock/picker/simple/bento).';
+  if (c.design && (!obj(c.design) || !["tiles", "cover", "simple", "none"].includes(c.design.welcome) || !["side", "glass", "dock", "float", "picker", "simple", "bento"].includes(c.design.menu))) return '"design" skal have welcome (tiles/cover/simple/none) og menu (side/glass/dock/float/picker/simple/bento).';
+  if (c.team !== undefined) {
+    if (!obj(c.team) || !arr(c.team.people) || c.team.people.length > 30) return '"Personer" skal være en liste (højst 30).';
+    const ids = new Set<string>();
+    for (const p of c.team.people) {
+      if (!obj(p) || !str(p.id) || !/^[a-z0-9-]{1,40}$/.test(p.id) || !str(p.image) || typeof p.name !== "string") return "En person mangler id, navn eller foto.";
+      if (ids.has(p.id)) return `To personer har samme id ("${p.id}").`;
+      ids.add(p.id);
+      if ([p.role, p.bio, p.quote, p.ask, p.href].some((v) => v !== undefined && typeof v !== "string")) return `${p.name || p.id}: rolle, tekst, citat og sted skal være tekst.`;
+    }
+  }
+  if (c.inUse?.some((i) => (i.images !== undefined && (!arr(i.images) || i.images.length > 12 || !i.images.every(str))) || (i.button !== undefined && (!obj(i.button) || typeof i.button.label !== "string" || typeof i.button.href !== "string"))))
+    return '"Se det i brug": højst 12 billeder, og knappen skal have tekst og link.';
   if (c.languages !== undefined && (!arr(c.languages) || !c.languages.every(str))) return '"languages" skal være en liste af sprogkoder.';
   if (c.translations !== undefined && (!obj(c.translations) || !Object.values(c.translations).every((m) => obj(m) && Object.values(m as object).every(str)))) return '"translations" skal være sprog med tekst -> oversættelse.';
   if (c.embeds && (!obj(c.embeds) || (c.embeds.pages !== undefined && (!obj(c.embeds.pages) || !Object.values(c.embeds.pages).every(str))))) return '"embeds.pages" skal være steder med en adresse.';

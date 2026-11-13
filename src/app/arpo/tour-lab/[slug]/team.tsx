@@ -14,6 +14,7 @@ import { useT } from "../tours/i18n-react";
 /** The team member a place card's person is (same name, or same photo) - their profile can open from the card. */
 export function teamIdOf(T: TourConfig, p: CardPerson): string | null {
   const people = T.team?.people ?? [];
+  if (p.id && people.some((x) => x.id === p.id)) return p.id;
   const name = p.name?.trim().toLowerCase();
   return people.find((x) => (name && x.name.trim().toLowerCase() === name) || x.image === p.image)?.id ?? null;
 }

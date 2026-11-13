@@ -1,5 +1,6 @@
 "use client";
 
+import { PersonPicker } from "./people-editor";
 import { useState } from "react";
 import type { CardPerson, LineDayStop, LineTrip, TourConfig } from "../../tours/types";
 import { CardImages, Rows } from "./content";
@@ -113,7 +114,7 @@ export function LineDayEditor({ config, edit, preview }: { config: TourConfig; e
           title={(s) => `${s.time} · ${s.title}`}
           subtitle={(s) => [s.place, s.href ? "har et sted" : "intet sted endnu", `${L.lines.filter((x) => x.day.includes(s.id)).length} linjer`].filter(Boolean).join(" · ")}
           empty="Ingen fælles stop endnu."
-          editor={(s, put) => <StopEditor stop={s} onChange={put} preview={preview} />}
+          editor={(s, put) => <StopEditor stop={s} config={config} onChange={put} preview={preview} />}
         />
         <button type="button" className={linkBtn} onClick={() => set((l) => void l.shared.push({ id: newId("stop"), time: "", title: "Nyt stop" }))}>
           + Fælles stop
@@ -192,7 +193,7 @@ export function LineDayEditor({ config, edit, preview }: { config: TourConfig; e
 }
 
 /** One stop: time, place, text, where in the tour, small facts and the people there. */
-function StopEditor({ stop, onChange, preview, peopleHint }: { stop: LineDayStop; onChange: (s: LineDayStop) => void; preview: PreviewApi; peopleHint?: string }) {
+function StopEditor({ stop, onChange, preview, peopleHint, config }: { stop: LineDayStop; onChange: (s: LineDayStop) => void; preview: PreviewApi; peopleHint?: string; config?: TourConfig }) {
   const [busy, setBusy] = useState(false);
   return (
     <>
@@ -245,19 +246,21 @@ function StopEditor({ stop, onChange, preview, peopleHint }: { stop: LineDayStop
           }}
         />
       </Field>
-      <People people={stop.people} onChange={(people) => onChange({ ...stop, people })} hint={peopleHint} />
+      <People config={config} people={stop.people} onChange={(people) => onChange({ ...stop, people })} hint={peopleHint} />
     </>
   );
 }
 
 /** Up to 4 people: a photo, a name and a role. */
-function People({ people, onChange, hint, title = "Personer her (valgfri)" }: { people?: CardPerson[]; onChange: (p: CardPerson[] | undefined) => void; hint?: string; title?: string }) {
+function People({ config, people, onChange, hint, title = "Personer her (valgfri)" }: { config?: TourConfig; people?: CardPerson[]; onChange: (p: CardPerson[] | undefined) => void; hint?: string; title?: string }) {
   const list = people ?? [];
   const put = (next: CardPerson[]) => onChange(next.length ? next : undefined);
+  const team = config?.team?.people ?? [];
   return (
     <Field title={title} hint={hint ?? "Højst 4 - rigtige portrætter, gerne fra skolens hjemmeside."}>
       <div className="space-y-1.5">
-        {list.map((p, i) => (
+        {config && <PersonPicker config={config} people={list} onChange={put} max={4} />}
+        {list.map((p, i) => team.some((t) => t.id === p.id) ? null : (
           <div key={i} className="flex items-center gap-1.5">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={p.image} alt="" className="h-9 w-9 flex-none rounded-full object-cover" />
@@ -301,7 +304,7 @@ function LineEditor({ line, L, config, onChange, preview, sharedName }: { line: 
       <Field title="Startsætning (valgfri)" hint='Fx "... der starter i stalden, før du har åbnet en bog."'>
         <input className={`${input} bg-white`} value={line.teaser ?? ""} onChange={(e) => onChange({ ...line, teaser: e.target.value || undefined })} />
       </Field>
-      <People title="Linjens lærere" people={line.people} onChange={(people) => onChange({ ...line, people })} hint="Vises ved linjen og på linjens egne stop - højst 4." />
+      <People config={config} title="Linjens lærere" people={line.people} onChange={(people) => onChange({ ...line, people })} hint="Vises ved linjen og på linjens egne stop - højst 4." />
       <Field title="Dagen" hint="I rækkefølge. Fælles stop er skolens; linjens egne ligger imellem.">
         <div className="-mx-1 divide-y divide-black/[.05] rounded-xl bg-white ring-1 ring-black/[.05]">
           {line.day.map((d, i) => {
@@ -325,7 +328,7 @@ function LineEditor({ line, L, config, onChange, preview, sharedName }: { line: 
                 </div>
                 {open === i && typeof d !== "string" && (
                   <div className="space-y-2 bg-[#f9f9fb] px-3 pb-3 pt-1">
-                    <StopEditor stop={d} preview={preview} peopleHint="Tom = linjens lærere." onChange={(next) => onChange({ ...line, day: line.day.map((x, k) => (k === i ? next : x)) })} />
+                    <StopEditor stop={d} config={config} preview={preview} peopleHint="Tom = linjens lærere." onChange={(next) => onChange({ ...line, day: line.day.map((x, k) => (k === i ? next : x)) })} />
                   </div>
                 )}
               </div>

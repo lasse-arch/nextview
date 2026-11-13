@@ -163,18 +163,30 @@ export function GuidePlayer({
         {/* Who you meet here (the stop's own people, or the place card's at the same spot). */}
         {(stop.people ?? []).filter((p) => p.image).length > 0 && (
           <div className="gd-folk">
-            {stop.people!.filter((p) => p.image).slice(0, 3).map((p, i) => (
-              <figure key={i}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={p.image} alt="" loading="lazy" />
-                {(p.name?.trim() || p.role?.trim()) && (
-                  <figcaption>
-                    {p.name?.trim() && <b>{p.name}</b>}
-                    {p.role?.trim() && <span>{p.role}</span>}
-                  </figcaption>
-                )}
-              </figure>
-            ))}
+            {stop.people!.filter((p) => p.image).slice(0, 3).map((p, i) => {
+              const face = (
+                <>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={p.image} alt="" loading="lazy" />
+                  {(p.name?.trim() || p.role?.trim()) && (
+                    <figcaption>
+                      {p.name?.trim() && <b>{p.name}</b>}
+                      {p.role?.trim() && <span>{p.role}</span>}
+                    </figcaption>
+                  )}
+                </>
+              );
+              // Picked from "Personer": a tap opens their profile in "Mød os".
+              return p.id ? (
+                <figure key={i} className="gd-folk-mod">
+                  <button type="button" aria-label={tr("Mød {navn}", { navn: p.name ?? "" })} onClick={() => window.dispatchEvent(new CustomEvent("hv-mod", { detail: p.id }))}>
+                    {face}
+                  </button>
+                </figure>
+              ) : (
+                <figure key={i}>{face}</figure>
+              );
+            })}
           </div>
         )}
         {held && timed && <div className="gd-next">{tr("På pause - du kigger selv rundt")}</div>}
@@ -292,6 +304,7 @@ export const GUIDE_CSS = `
 .gd-video{margin:-4px -4px 12px}
 .gd-video .hv-pvideo{margin:0;border-radius:12px}
 .gd-card p{margin:0 0 14px;font-size:15px;line-height:1.5;color:#3d4a50}
+.gd-folk-mod button{display:flex;flex-direction:inherit;align-items:inherit;gap:inherit;min-width:0;max-width:100%;border:0;background:none;padding:0;text-align:inherit;cursor:pointer;font:inherit;color:inherit}
 .gd-folk{display:flex;gap:12px;margin:-4px 0 14px}
 .gd-folk figure{margin:0;display:flex;align-items:center;gap:10px;min-width:0}
 .gd-folk img{flex:none;width:44px;height:44px;border-radius:50%;object-fit:cover;object-position:50% 20%;background:#eef2f2;box-shadow:0 0 0 2px #fff,0 0 0 3.5px color-mix(in srgb,var(--c-accent) 55%,transparent)}

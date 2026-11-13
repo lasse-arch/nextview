@@ -525,7 +525,7 @@ function InUseEditor({ config, edit, preview }: { config: TourConfig; edit: Edit
   return (
     <Group title="Se det i brug">
       <p className={small}>
-        En kort film (uden lyd, kører i ring) eller et billede af stedet i brug - fx fodboldholdet på banen. Den glider op i en lille boks, når man står i rummet, første gang i et besøg. Et tryk viser den stor (filmen med lyd). På telefon er boksen lille, under menuknappen.
+        En kort film (uden lyd, kører i ring) eller billeder af stedet i brug - fx fodboldholdet på banen, eller smagninger i et baglokale, der står tomt i touren. Den glider op i en lille boks, når man står i rummet, første gang i et besøg. Flere billeder toner over i hinanden. Et tryk viser det stort - billederne kan bladres i, med teksten og knappen. På telefon er boksen lille, under menuknappen.
       </p>
       <Rows<InUseItem>
         items={items}
@@ -545,9 +545,38 @@ function InUseEditor({ config, edit, preview }: { config: TourConfig; edit: Edit
                 <UploadButton accept={i.kind === "video" ? "video/mp4,video/webm" : "image/*"} onDone={(url) => set({ ...i, src: url })} />
               </div>
             </Field>
-            <Field title="Tekst (valgfri)" hint='Står med i boksen, fx "Fodbold i hallen". Tom: "Se det i brug".'>
+            {i.kind === "image" && (
+              <Field title="Flere billeder (valgfri)" hint="Toner over i hinanden i boksen - og kan bladres i, når man trykker. Fx billeder fra tidligere arrangementer.">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {(i.images ?? []).map((src, k) => (
+                    <span key={src + k} className="relative">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={src} alt="" className="h-14 w-20 rounded-lg object-cover" />
+                      <button type="button" aria-label="Fjern billedet" className="absolute -right-1.5 -top-1.5 h-5 w-5 rounded-full bg-black/70 text-[12px] leading-none text-white" onClick={() => set({ ...i, images: (i.images ?? []).filter((_, x) => x !== k) || undefined })}>
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                  <UploadButton accept="image/*" shrink={2000} label="+ Billede" onDone={(url) => set({ ...i, images: [...(i.images ?? []), url] })} />
+                </div>
+              </Field>
+            )}
+            <Field title="Overskrift (valgfri)" hint='Står med i boksen, fx "Smagninger i baglokalet". Tom: "Se det i brug".'>
               <input className={`${input} bg-white`} value={i.title ?? ""} onChange={(e) => set({ ...i, title: e.target.value || undefined })} />
             </Field>
+            {i.kind === "image" && (
+              <>
+                <Field title="Tekst (valgfri)" hint='Vises med billederne, når man trykker - fx "Plads til op til 70 gæster - vinsmagninger, Riedel-glasseminarer og firmaarrangementer."'>
+                  <textarea rows={3} className={`${input} bg-white`} value={i.text ?? ""} onChange={(e) => set({ ...i, text: e.target.value || undefined })} />
+                </Field>
+                <Field title="Knap (valgfri)" hint='Fx "Book en smagning" - til en side eller "#kontakt".'>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <input className={`${input} bg-white`} placeholder="Teksten på knappen" value={i.button?.label ?? ""} onChange={(e) => set({ ...i, button: e.target.value || i.button?.href ? { label: e.target.value, href: i.button?.href ?? "" } : undefined })} />
+                    <input className={`${input} bg-white`} placeholder="https://… eller #kontakt" value={i.button?.href ?? ""} onChange={(e) => set({ ...i, button: e.target.value || i.button?.label ? { label: i.button?.label ?? "", href: e.target.value.trim() } : undefined })} />
+                  </div>
+                </Field>
+              </>
+            )}
             <Field title="Vises ved punkt" hint="De scanpunkter i rummet, hvor boksen kommer frem.">
               <div className="flex flex-wrap items-center gap-1.5">
                 {i.ss.map((n) => (

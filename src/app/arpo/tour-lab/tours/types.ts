@@ -203,7 +203,8 @@ export type PlaceCard = {
    */
   people?: CardPerson[];
 };
-export type CardPerson = { name?: string; role?: string; image: string };
+/** A person shown in the tour. `id`: picked from "Personer" (TourConfig.team) - the photo, name and role then come from there (see tours/people.ts); left out: one written here only. */
+export type CardPerson = { id?: string; name?: string; role?: string; image: string };
 
 /**
  * A subject in "Byg dit skema" - shown the best way there is: a place in the

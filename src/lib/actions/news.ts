@@ -63,6 +63,12 @@ export async function getUnreadNewsCount(userId: string, newsReadAt: Date | null
 const DEFAULT_POSTS: { title: string; body: string; minutesAgo: number; screenshotUrl: string }[] = [
   {
     minutesAgo: 0,
+    title: "Personer og \"Mød os\" i touren - og flere billeder i \"Se det i brug\"",
+    body: "I tour-editoren er der en ny fane, Personer. Her laves hver person én gang - foto, navn, rolle, et par linjer om dem, et citat, hvad man kan spørge dem om, og hvor man møder dem i touren. Derefter vælges de bare fra listen på stedkort, i Vis mig rundt og på linjerne. Retter du et foto eller en rolle, skifter det overalt.\n\nPersonerne er også \"Mød os\": læg et menupunkt med linket #mod (knappen ligger i fanen), så kan gæsten se alle og åbne en profil med stort foto, citat og \"Se hvor du møder …\", der tager touren derhen. Et tryk på en person på et stedkort åbner også profilen.\n\n\"Se det i brug\" (Virtual staging) kan nu have flere billeder, der toner over i hinanden, og en tekst og en knap, når man trykker - fx billeder fra tidligere smagninger i et baglokale, der står tomt i touren.",
+    screenshotUrl: "/news/mod-os.png",
+  },
+  {
+    minutesAgo: 0,
     title: "Databehandleraftale er nu en del af kontrakten",
     body: "Alle nye kontrakter har nu et afsnit om databehandling og en databehandleraftale som Bilag 1 - på både dansk og engelsk. Den bygger på EU's standardaftale og beskriver kort, hvilke personoplysninger vi passer på for kunden (fx henvendelser fra kontaktformularen og personer på billeder), hvem vores underleverandører er, og hvad vi gør ved et brud.\n\nKunden skriver under på det hele på én gang, når kontrakten underskrives - der er ikke noget ekstra at sende. Spørger en kunde efter en databehandleraftale, kan du svare, at den er med i kontrakten. Kontrakter, der allerede er sendt eller underskrevet, er ikke ændret.",
     screenshotUrl: "/news/databehandleraftale.png",

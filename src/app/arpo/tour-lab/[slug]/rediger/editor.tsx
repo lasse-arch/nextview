@@ -1,5 +1,6 @@
 "use client";
 
+import { PeopleEditor } from "./people-editor";
 import { EventsEditor, ShopTourEditor } from "./events-editor";
 import { InsightsPanel } from "./insights";
 import { LanguagesPanel } from "./languages";
@@ -57,7 +58,7 @@ const FIND_ASIDE: [FindStepAside, string][] = [
 const zoomLabel = (z: number) => (Math.abs(z - 1) < 0.01 ? "normal" : z < 1 ? `zoomet ud (${Math.round(z * 100)} %)` : `zoomet ind (${Math.round(z * 100)} %)`);
 
 type Version = { id: string; note: string | null; by: string | null; at: string };
-type Tab = "layout" | "sprog" | "claude" | "live" | "scan" | "okonomi" | "resultater" | "del" | "tags" | "staging" | "linjedag" | "skema" | "start" | "rundvisning" | "kort" | "kortet" | "feedback" | "generelt" | "design" | "menu" | "funktioner" | "links" | "avanceret" | "versioner";
+type Tab = "personer" | "layout" | "sprog" | "claude" | "live" | "scan" | "okonomi" | "resultater" | "del" | "tags" | "staging" | "linjedag" | "skema" | "start" | "rundvisning" | "kort" | "kortet" | "feedback" | "generelt" | "design" | "menu" | "funktioner" | "links" | "avanceret" | "versioner";
 
 /** Claude's mark: a small sunburst. */
 const NO_TABS: Tab[] = [];
@@ -82,6 +83,7 @@ const TABS: [Tab, string, string, string?][] = [
   ["kortet", "Luftfoto og kort", '<path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/>'],
   ["rundvisning", "Vis mig rundt", '<circle cx="12" cy="12" r="9"/><path d="M10 8.5v7l5.5-3.5z"/>'],
   ["kort", "Stedkort", '<rect x="4" y="5" width="16" height="14" rx="2"/><path d="M8 10h8M8 14h5"/>', "3 · Indhold"],
+  ["personer", "Personer", '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.5 3.5-5.5 6.5-5.5s5.7 2 6.5 5.5"/><circle cx="17" cy="9" r="2.5"/><path d="M16 14.5c2.7 0 4.8 1.6 5.5 4.5"/>'],
   ["tags", "Tags", '<path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z"/><circle cx="8" cy="8" r="1.5"/>'],
   ["linjedag", "En dag på linjen", '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/><path d="M4 4l3 3"/>'],
   ["skema", "Byg dit skema", '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M9 9v12M15 9v12M8 2v4M16 2v4"/>'],
@@ -997,6 +999,7 @@ export function TourEditor({
               </>
             )}
             {tab === "scan" && <ScanPointsEditor config={config} edit={edit} preview={preview} map={scanMap} mpskinsHidden={mpskinsHidden} expected={scanCount} here={here} />}
+            {tab === "personer" && <PeopleEditor config={config} edit={edit} preview={preview} />}
             {tab === "tags" && <TagsEditor config={config} edit={edit} slug={slug} preview={preview} />}
             {tab === "staging" && <StagingEditor config={config} edit={edit} preview={preview} focus={stagingFocus} />}
             {tab === "linjedag" && <LineDayEditor config={config} edit={edit} preview={preview} />}

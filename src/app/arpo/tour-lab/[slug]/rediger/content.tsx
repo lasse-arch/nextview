@@ -1,5 +1,6 @@
 "use client";
 
+import { PersonPicker } from "./people-editor";
 import { LinkInput } from "./links-open";
 import { CardVoices, cardVoiceState, StopVoice, VoiceGroup } from "./voice-editor";
 import { startStyleOf } from "../../tours/presets";
@@ -1406,12 +1407,31 @@ function DayEditor({ config, edit, preview }: Omit<Props, "slug">) {
 /* ------------------------------------------------------------------ */
 
 /** "Personer på kortet": up to three small photos with name and role, e.g. the kitchen staff. */
-function CardPeople({ people, onChange, title = "Personer på kortet", hint = "Op til 3 - fx køkkenpersonalet ved spisesalen. Små runde billeder under teksten - navn og rolle kan udelades." }: { people: CardPerson[]; onChange: (p: CardPerson[]) => void; title?: string; hint?: string }) {
+function CardPeople({ config, people, onChange, title = "Personer på kortet", hint = "Op til 3 - fx køkkenpersonalet ved spisesalen. Små runde billeder under teksten - navn og rolle kan udelades." }: { config: TourConfig; people: CardPerson[]; onChange: (p: CardPerson[]) => void; title?: string; hint?: string }) {
   const setAt = (i: number, p: Partial<CardPerson>) => onChange(people.map((x, j) => (j === i ? { ...x, ...p } : x)));
+  const team = config.team?.people ?? [];
   return (
     <Field title={title} hint={hint}>
       <div className="flex flex-col gap-2">
-        {people.map((p, i) => (
+        <PersonPicker config={config} people={people} onChange={onChange} max={3} />
+        {people.map((p, i) => {
+          // Picked from "Personer": shown as it is there (changed there, it changes here too).
+          const t = p.id ? team.find((x) => x.id === p.id) : undefined;
+          if (t)
+            return (
+              <div key={i} className="flex items-center gap-2.5 rounded-xl bg-white p-2 ring-1 ring-black/[.06]">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={t.image} alt="" className="h-11 w-11 shrink-0 rounded-full bg-[#f2f2f7] object-cover object-[50%_20%]" />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[14px] font-medium">{t.name}</div>
+                  <div className="truncate text-[12px] text-[#8e8e93]">{t.role ? `${t.role} · ` : ""}fra Personer</div>
+                </div>
+                <button type="button" className="text-[12px] text-[#ff3b30]" onClick={() => onChange(people.filter((_, j) => j !== i))}>
+                  Fjern
+                </button>
+              </div>
+            );
+          return (
           <div key={i} className="flex items-center gap-2.5 rounded-xl bg-white p-2 ring-1 ring-black/[.06]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={p.image} alt="" className="h-11 w-11 shrink-0 rounded-full bg-[#f2f2f7] object-cover object-[50%_20%]" />
@@ -1426,7 +1446,8 @@ function CardPeople({ people, onChange, title = "Personer på kortet", hint = "O
               </button>
             </div>
           </div>
-        ))}
+          );
+        })}
         {people.length < 3 && <UploadButton accept="image/*" label={people.length ? "+ Tilføj en person mere" : "+ Tilføj person (billede)"} onDone={(url) => onChange([...people, { image: url }])} />}
       </div>
     </Field>
@@ -1629,7 +1650,7 @@ export function CardsEditor({ config, edit, preview, scanMap, mpskinsHidden }: O
                 </Field>
               )}
               <CardImages images={c.images ?? []} hint="En lille række billeder under teksten - et tryk viser dem stort." onChange={(images) => set({ ...c, images: images.length ? images : undefined })} />
-              <CardPeople people={c.people ?? []} onChange={(people) => set({ ...c, people: people.length ? people : undefined })} />
+              <CardPeople config={config} people={c.people ?? []} onChange={(people) => set({ ...c, people: people.length ? people : undefined })} />
               <details className="text-[13px]">
                 <summary className="cursor-pointer select-none text-[#0071e3]">&quot;Læs mere&quot;-side (valgfri)</summary>
                 <div className="mt-2 space-y-2">
@@ -2156,7 +2177,7 @@ function StopPeople({ config, stop, onChange }: { config: TourConfig; stop: { hr
           </p>
         )}
       </Field>
-      {mode === "own" && <CardPeople people={stop.people ?? []} title="Stoppets personer" hint="Op til 3. Navn og rolle kan udelades." onChange={(p) => onChange(p)} />}
+      {mode === "own" && <CardPeople config={config} people={stop.people ?? []} title="Stoppets personer" hint="Op til 3. Navn og rolle kan udelades." onChange={(p) => onChange(p)} />}
     </>
   );
 }
