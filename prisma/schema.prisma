@@ -1394,6 +1394,11 @@ model Tour {
   reviewRemindedAt DateTime?
   reviewReminders  Int               @default(0)
   reviewApprovedAt DateTime?
+  /// The customer on the review link (not the team): first and last visit since the review mail, and how many visits
+  /// (a new one after 10 minutes away). Reset when the tour is sent for review anew.
+  reviewFirstSeenAt DateTime?
+  reviewLastSeenAt  DateTime?
+  reviewSeen        Int       @default(0)
   reviewApprovedBy String?
   /// Who the review mail (and its customer page) goes to, when not the deal's contact - e.g. the one who
   /// knows the place, while the director signed the contract. Reminders and "rettelser lavet" go there too.

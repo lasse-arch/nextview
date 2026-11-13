@@ -14,6 +14,7 @@ const TYPE_ICON: Record<string, string> = {
   DEAL_VOICEMAIL: "📞",
   DEAL_CALLBACK: "🔁",
   CONTRACT_VIEWED: "👀",
+  REVIEW_SEEN: "👀",
   CONTRACT_SIGNED: "✍️",
   TASK_DONE: "✅",
   CUSTOMER_REPORT_SENT: "📊",

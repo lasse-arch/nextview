@@ -153,6 +153,11 @@ export function FeedbackPanel({
               {status.reminders ? ` · ${status.reminders} påmindelse${status.reminders === 1 ? "" : "r"} (sidst ${when(status.remindedAt!)})` : ""}
               {status.open ? ` · ${status.open} rettelse${status.open === 1 ? "" : "r"} fra kunden` : ""}
             </p>
+            <p className={`mt-1 text-[12px] font-medium ${status.seenFirst ? "text-[#1f7a35]" : "text-[#7a5a2a]"}`}>
+              {status.seenFirst
+                ? `👀 Set af kunden ${when(status.seenFirst)}${status.seen > 1 && status.seenLast ? ` · ${status.seen} besøg, sidst ${when(status.seenLast)}` : ""}`
+                : "Ikke åbnet endnu"}
+            </p>
           </div>
         ) : (
           <p className="text-[13px] leading-snug text-[#6e6e73]">

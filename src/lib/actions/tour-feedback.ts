@@ -131,6 +131,10 @@ export type ReviewStatus = {
   reminders: number;
   approvedAt: string | null;
   approvedBy: string | null;
+  /** The customer on the review link: first and last visit, and how many visits. */
+  seenFirst: string | null;
+  seenLast: string | null;
+  seen: number;
   open: number;
   /** A second person who gets the same mails (and the customer page). */
   to2: string | null;
@@ -141,7 +145,7 @@ export async function reviewStatus(slug: string): Promise<ReviewStatus> {
   await requireTour(slug);
   const t = await prisma.tour.findUnique({
     where: { slug },
-    select: { reviewSentAt: true, reviewRemindedAt: true, reviewReminders: true, reviewApprovedAt: true, reviewApprovedBy: true, reviewEmail: true, reviewName: true, reviewEmail2: true, reviewName2: true, deal: { select: { id: true, contactEmail: true, contactName: true, filmingActualMinutes: true } } },
+    select: { reviewFirstSeenAt: true, reviewLastSeenAt: true, reviewSeen: true, reviewSentAt: true, reviewRemindedAt: true, reviewReminders: true, reviewApprovedAt: true, reviewApprovedBy: true, reviewEmail: true, reviewName: true, reviewEmail2: true, reviewName2: true, deal: { select: { id: true, contactEmail: true, contactName: true, filmingActualMinutes: true } } },
   });
   const open = await prisma.tourFeedback.count({ where: { tourSlug: slug, status: "open" } });
   const who = t?.deal ? reviewRecipient(t, t.deal) : null;
@@ -158,6 +162,9 @@ export async function reviewStatus(slug: string): Promise<ReviewStatus> {
     reminders: t?.reviewReminders ?? 0,
     approvedAt: t?.reviewApprovedAt?.toISOString() ?? null,
     approvedBy: t?.reviewApprovedBy ?? null,
+    seenFirst: t?.reviewFirstSeenAt?.toISOString() ?? null,
+    seenLast: t?.reviewLastSeenAt?.toISOString() ?? null,
+    seen: t?.reviewSeen ?? 0,
     open,
   };
 }

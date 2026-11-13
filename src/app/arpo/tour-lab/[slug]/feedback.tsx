@@ -80,6 +80,14 @@ export function FeedbackLayer({
       .then((r) => (r.ok ? r.json() : []))
       .then(setNotes)
       .catch(() => {});
+  // The customer has the tour up: noted a few seconds in (a link checker that only fetches the page never gets here).
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      if (document.visibilityState === "visible")
+        void fetch(apiUrl("/api/tour-review"), { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token }), keepalive: true }).catch(() => {});
+    }, 4000);
+    return () => window.clearTimeout(t);
+  }, [token]);
   useEffect(() => {
     load();
     fetch(apiUrl(`/api/tour-review?token=${encodeURIComponent(token)}`))

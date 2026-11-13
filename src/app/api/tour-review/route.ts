@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { approveTour } from "@/lib/tour-review";
 import { tourOfReviewToken } from "@/lib/review-tokens";
+import { getTeamUser } from "@/lib/auth";
+import { logActivity } from "@/lib/activity";
 
 /*
  * "Godkend touren" from a tour's review link (/p/<token>). Only the review
@@ -32,4 +34,30 @@ export async function POST(request: Request) {
   const name = typeof body?.name === "string" ? body.name.trim().slice(0, 80) : "";
   await approveTour(tour.slug, { name, customer: true });
   return NextResponse.json({ ok: true });
+}
+
+/**
+ * The customer has the tour up (sent by the review page a few seconds after it opens, only in a real browser): noted as
+ * a visit - a new one after 10 minutes away. The first one goes in the activity feed. Not the team looking through the
+ * link (signed in to Arpo), and not the notes-only link (staff, developers) - only the customer's own.
+ */
+export async function PATCH(request: Request) {
+  const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
+  const tour = await tourOf(body?.token);
+  if (!tour || !tour.canApprove) return new NextResponse(null, { status: 204 });
+  if (await getTeamUser()) return new NextResponse(null, { status: 204 });
+  const now = new Date();
+  const row = await prisma.tour.findUnique({ where: { slug: tour.slug }, select: { reviewSentAt: true, reviewFirstSeenAt: true, reviewLastSeenAt: true, dealId: true, config: true, deal: { select: { companyName: true, displayName: true } } } });
+  if (!row?.reviewSentAt) return new NextResponse(null, { status: 204 });
+  const newVisit = !row.reviewLastSeenAt || now.getTime() - row.reviewLastSeenAt.getTime() > 10 * 60_000;
+  await prisma.tour.update({
+    where: { slug: tour.slug },
+    data: { reviewLastSeenAt: now, ...(row.reviewFirstSeenAt ? {} : { reviewFirstSeenAt: now }), ...(newVisit ? { reviewSeen: { increment: 1 } } : {}) },
+  });
+  if (!row.reviewFirstSeenAt) {
+    const who = row.deal ? row.deal.displayName || row.deal.companyName : "Kunden";
+    const title = (row.config as { title?: string } | null)?.title ?? tour.slug;
+    await logActivity({ type: "REVIEW_SEEN", message: `${who} så "${title}" til gennemgang`, dealId: row.dealId });
+  }
+  return new NextResponse(null, { status: 204 });
 }

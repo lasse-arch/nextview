@@ -345,7 +345,7 @@ export async function sendReviewMail(
   const now = new Date();
   await prisma.tour.update({
     where: { slug },
-    data: reminder ? { ...chosen, reviewToken: token, reviewRemindedAt: now, reviewReminders: { increment: 1 } } : { ...chosen, reviewToken: token, reviewSentAt: now, reviewApprovedAt: null, reviewApprovedBy: null },
+    data: reminder ? { ...chosen, reviewToken: token, reviewRemindedAt: now, reviewReminders: { increment: 1 } } : { ...chosen, reviewToken: token, reviewSentAt: now, reviewApprovedAt: null, reviewApprovedBy: null, reviewFirstSeenAt: null, reviewLastSeenAt: null, reviewSeen: 0 },
   });
   await logActivity({ type: "DEAL_UPDATED", message: `${reminder ? "Påmindelse om gennemgang" : "Tour sendt til gennemgang"}${newAccess ? " (kundesiden åbnet)" : ""}: ${dealName(deal)}`, actorId: actor.id, dealId: deal.id });
   // The deal moves on to "Gennemgang inden live" (from Kontrakt underskrevet or Filmet - never back from Live).
