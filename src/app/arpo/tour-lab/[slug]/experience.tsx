@@ -30,6 +30,7 @@ import { GUIDE_CSS, GuidePlayer, guideStops } from "./guide";
 import { ONBOARDING_CSS, Onboarding } from "./onboarding";
 import { MENU_HINT_CSS, MenuHint } from "./menu-hint";
 import { PlayGate } from "./play-gate";
+import { FLOAT_DOCK_CSS, FloatDock } from "./float-dock";
 import { FULLSCREEN_BUTTON_CSS, FULLSCREEN_CSS, FullscreenButton, FullscreenOnUse } from "./fullscreen-on-use";
 import { CONTACT_CSS, CONTACT_HREF, ContactForm } from "./contact-form";
 import { DAY_CSS, DayBar, DaySheet } from "./day";
@@ -1266,7 +1267,7 @@ function TourExperience({
     setTimeout(() => openPoint(p), 700);
   }
   /** Where the language button stands, per device - "menu" only works in the side menu (others get the button by the menu button). */
-  const sideMenu = (T.design?.menu ?? "side") === "side";
+  const sideMenu = (T.design?.menu ?? "side") === "side" || T.design?.menu === "glass";
   const langPlace = (v: string) => (v === "menu" && !sideMenu ? "corner" : v);
   const langClasses = `hv-sprog-d-${langPlace(T.langSwitch?.desktop ?? "top")} hv-sprog-m-${langPlace(T.langSwitch?.mobile ?? "menu")}`;
   /** The points shown on the scene, by id → their name (walking times and the finder only name these). */
@@ -2894,7 +2895,7 @@ function TourExperience({
   return (
     <TourLang.Provider value={{ lang, t: tx }}>
     <LinkProvider T={T} popup={popup}>
-    <div className={`hv fixed inset-0 z-50 overflow-hidden bg-[#0d1b20] ${selected ? "hv-punkt" : ""} ${zoomed ? "hv-zoom" : ""} ${welcome ? "hv-welcome" : ""} ${phase === "tour" && T.stories?.mobile ? "hv-st-on-m" : ""} ${menuOpen ? "hv-menu-aaben" : ""} ${T.overviewUi?.box?.desktop === false ? "hv-boks-ud-d" : ""} ${T.overviewUi?.box?.mobile === false ? "hv-boks-ud-m" : ""} ${T.overviewUi?.titleMobile ? "hv-titel-m" : ""} ${T.overviewUi?.boxStyle ? "hv-boks-logo" : ""} ${T.overviewUi?.filter?.desktop === false ? "hv-filter-ud-d" : ""} ${T.overviewUi?.filter?.mobile === false ? "hv-filter-ud-m" : ""} ${T.overviewUi?.names?.desktop ? `hv-navne-d-${T.overviewUi.names.desktop}` : ""} ${T.overviewUi?.names?.mobile ? `hv-navne-m-${T.overviewUi.names.mobile}` : ""} ${T.overviewUi?.filterColumns ? `hv-filter-kol hv-filter-kol-${T.overviewUi.filterColumns}` : T.overviewUi?.filterScroll ? "hv-filter-rul" : ""} ${langClasses} ${T.design?.menu === "dock" ? "hv-dock" : ""} ${T.logoSide === "right" ? "hv-logo-h" : ""} ${T.logoBg ? `hv-logobg-${T.logoBg}` : ""} ${T.logoBgTiles ?? T.logoBg ? `hv-tlogobg-${T.logoBgTiles ?? T.logoBg}` : ""} hv-tlogo-${T.logoAlignTiles ?? "midt"} ${guideAt != null || (dayAt != null && !dayOpen) || (lineRun && !lineRun.end) ? "hv-guiding" : ""} ${route ? "hv-routing" : ""} ${phase === "tour" ? "hv-i-tour" : ""} ${T.wayfinding ? "hv-har-rute" : ""} ${findAside.map((a) => `rt-vig-${a}`).join(" ")} ${showCard != null ? "hv-med-stedkort" : ""} ${T.placeCardSide?.desktop === "right" ? "hv-pc-h-d" : ""} ${T.placeCardSide?.mobile === "right" ? "hv-pc-h-m" : ""} ${showCard != null && pano ? "hv-pano-kort" : ""} ${nudgeOn && T.nudge && phase === "tour" ? "hv-med-nudge" : ""} ${T.wayfinding?.button?.desktop ? `rt-d-${T.wayfinding.button.desktop}` : ""} ${T.wayfinding?.button?.mobile ? `rt-m-${T.wayfinding.button.mobile}` : ""} ${showCard != null || (nudgeOn && T.nudge && phase === "tour") ? "hv-med-kort" : ""} ${showMeasures && phase === "tour" ? "hv-maler" : ""} ${phase === "tour" && T.stories?.desktop ? "hv-st-on-d" : ""}`} style={
+    <div className={`hv fixed inset-0 z-50 overflow-hidden bg-[#0d1b20] ${selected ? "hv-punkt" : ""} ${zoomed ? "hv-zoom" : ""} ${welcome ? "hv-welcome" : ""} ${phase === "tour" && T.stories?.mobile ? "hv-st-on-m" : ""} ${menuOpen ? "hv-menu-aaben" : ""} ${T.overviewUi?.box?.desktop === false ? "hv-boks-ud-d" : ""} ${T.overviewUi?.box?.mobile === false ? "hv-boks-ud-m" : ""} ${T.overviewUi?.titleMobile ? "hv-titel-m" : ""} ${T.overviewUi?.boxStyle ? "hv-boks-logo" : ""} ${T.overviewUi?.filter?.desktop === false ? "hv-filter-ud-d" : ""} ${T.overviewUi?.filter?.mobile === false ? "hv-filter-ud-m" : ""} ${T.overviewUi?.names?.desktop ? `hv-navne-d-${T.overviewUi.names.desktop}` : ""} ${T.overviewUi?.names?.mobile ? `hv-navne-m-${T.overviewUi.names.mobile}` : ""} ${T.overviewUi?.filterColumns ? `hv-filter-kol hv-filter-kol-${T.overviewUi.filterColumns}` : T.overviewUi?.filterScroll ? "hv-filter-rul" : ""} ${langClasses} ${T.design?.menu === "dock" ? "hv-dock" : ""} ${T.design?.menu === "glass" ? "hv-glas" : ""} ${T.design?.menu === "float" ? "hv-menu-flyd" : ""} ${T.logoSide === "right" ? "hv-logo-h" : ""} ${T.logoBg ? `hv-logobg-${T.logoBg}` : ""} ${T.logoBgTiles ?? T.logoBg ? `hv-tlogobg-${T.logoBgTiles ?? T.logoBg}` : ""} hv-tlogo-${T.logoAlignTiles ?? "midt"} ${guideAt != null || (dayAt != null && !dayOpen) || (lineRun && !lineRun.end) ? "hv-guiding" : ""} ${route ? "hv-routing" : ""} ${phase === "tour" ? "hv-i-tour" : ""} ${T.wayfinding ? "hv-har-rute" : ""} ${findAside.map((a) => `rt-vig-${a}`).join(" ")} ${showCard != null ? "hv-med-stedkort" : ""} ${T.placeCardSide?.desktop === "right" ? "hv-pc-h-d" : ""} ${T.placeCardSide?.mobile === "right" ? "hv-pc-h-m" : ""} ${showCard != null && pano ? "hv-pano-kort" : ""} ${nudgeOn && T.nudge && phase === "tour" ? "hv-med-nudge" : ""} ${T.wayfinding?.button?.desktop ? `rt-d-${T.wayfinding.button.desktop}` : ""} ${T.wayfinding?.button?.mobile ? `rt-m-${T.wayfinding.button.mobile}` : ""} ${showCard != null || (nudgeOn && T.nudge && phase === "tour") ? "hv-med-kort" : ""} ${showMeasures && phase === "tour" ? "hv-maler" : ""} ${phase === "tour" && T.stories?.desktop ? "hv-st-on-d" : ""}`} style={
         {
           fontFamily: `'${T.font}', system-ui, sans-serif`,
           "--c-main": T.colors.main,
@@ -2915,7 +2916,7 @@ function TourExperience({
       {[...new Set([...fontHrefs(T.font, [400, 600, 700, 800, 900]), ...(T.fontHeading ? fontHrefs(T.fontHeading, [500, 600]) : [])])].map((href) => (
         <link key={href} rel="stylesheet" href={href} />
       ))}
-      <style>{CSS + TOUR_LOGO_CSS + CONTACT_CSS + STORIES_CSS + LIGHTBOX_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + ONBOARDING_CSS + MENU_HINT_CSS + INFO_CSS + STAGING_CSS + (T.staging?.some((i) => i.kind === "treasure") ? CONTEST_CSS : "") + (T.inUse?.length ? IN_USE_CSS : "") + (T.lineDays ? LINE_DAY_CSS : "") + (T.yearWheel ? YEARWHEEL_CSS : "") + (T.schedule ? SCHEDULE_CSS : "") + MAP_CSS + (T.sitePlan?.overlay ? SITE_PLAN_CSS + SITE_PLAN_360_CSS : "") + ROUTE_CSS + MEASURES_CSS + CARDS_CSS + DAY_CSS + (T.events ? EVENTS_CSS : "") + (T.shop || T.points.some((p) => p.shop) ? SHOP_CSS : "") + SIMPLE_CSS + BENTO_CSS + LOGO_RIGHT_CSS + LANG_CSS + WEATHER_CSS + COMMUTE_CSS + FEATURES_CSS + FINDER_CSS + FULLSCREEN_BUTTON_CSS + (review ? FEEDBACK_CSS : "")}</style>
+      <style>{CSS + TOUR_LOGO_CSS + CONTACT_CSS + STORIES_CSS + LIGHTBOX_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + ONBOARDING_CSS + MENU_HINT_CSS + INFO_CSS + STAGING_CSS + (T.staging?.some((i) => i.kind === "treasure") ? CONTEST_CSS : "") + (T.inUse?.length ? IN_USE_CSS : "") + (T.lineDays ? LINE_DAY_CSS : "") + (T.yearWheel ? YEARWHEEL_CSS : "") + (T.schedule ? SCHEDULE_CSS : "") + MAP_CSS + (T.sitePlan?.overlay ? SITE_PLAN_CSS + SITE_PLAN_360_CSS : "") + ROUTE_CSS + MEASURES_CSS + CARDS_CSS + DAY_CSS + (T.events ? EVENTS_CSS : "") + (T.shop || T.points.some((p) => p.shop) ? SHOP_CSS : "") + SIMPLE_CSS + BENTO_CSS + LOGO_RIGHT_CSS + LANG_CSS + WEATHER_CSS + COMMUTE_CSS + FEATURES_CSS + FINDER_CSS + FULLSCREEN_BUTTON_CSS + (T.design?.menu === "float" ? FLOAT_DOCK_CSS : "") + (T.design?.menu === "glass" ? GLASS_MENU_CSS : "") + (review ? FEEDBACK_CSS : "")}</style>
       {/* The tour's own design on top (written by Claude or by hand under Avanceret). */}
       {T.customCss && <style>{T.customCss.replace(/<\/?style/gi, "")}</style>}
 
@@ -3344,6 +3345,19 @@ function TourExperience({
         )
       ) : T.design?.menu === "picker" ? (
         phase === "tour" && !cover && <PickerMenu T={T} units={units} onGo={menuGo} onCta={(label, href) => ctaClick(label, href, "picker")} />
+      ) : T.design?.menu === "float" ? (
+        phase === "tour" &&
+        !cover &&
+        !welcome && (
+          <FloatDock
+            T={T}
+            room={roomShown}
+            hasGuide={GUIDES.length > 0}
+            onGuide={() => startGuide("dock")}
+            onGo={menuGo}
+            onCta={(label, href) => ctaClick(label, href, "dock")}
+          />
+        )
       ) : T.design?.menu === "dock" ? (
         phase === "tour" && !cover && <DockMenu T={T} room={roomShown} onGuide={() => startGuide("dock")} onPlace={(p) => placeGo(p, "dock")} onItem={(label, href) => ctaClick(label, href, "dock")} />
       ) : (
@@ -3374,7 +3388,7 @@ function TourExperience({
           )}
         </div>
         {events && T.events?.menu && <EventsBlock T={T} events={events} className="ev-menu" onSignUp={(label, href) => ctaClick(label, href, "menu_events")} />}
-        {setLang && (T.design?.menu ?? "side") === "side" && tourLanguages(savedTour).length > 1 && (
+        {setLang && sideMenu && tourLanguages(savedTour).length > 1 && (
           <div className={`hv-menu-sprog ${tourLanguages(savedTour).length > 3 ? "hv-sprog-mange" : ""}`} role="group" aria-label={tx("Sprog")}>
             {tourLanguages(savedTour).map((code) => {
               const l = LANGUAGES.find((x) => x.code === code);
@@ -4732,3 +4746,40 @@ const CONTACT_ICONS = {
 function ContactIcon({ kind }: { kind: keyof typeof CONTACT_ICONS }) {
   return <svg className="hv-ci" viewBox="0 0 24 24" aria-hidden dangerouslySetInnerHTML={{ __html: CONTACT_ICONS[kind] }} />;
 }
+
+/*
+ * "Glas-panel": the side menu as a floating glass panel - rounded, a little in
+ * from the edges, the tour showing through. Its head without the colour band
+ * (the logo on the glass), "Vis mig rundt" and the groups as calm rows, the
+ * main button a pill at the bottom. On a phone: a glass sheet from below.
+ */
+const GLASS_MENU_CSS = `
+.hv-glas .hv-menu{top:calc(66px + env(safe-area-inset-top,0px));right:16px;bottom:16px;width:300px;border-radius:22px;background:rgba(255,255,255,.8);backdrop-filter:blur(20px) saturate(1.4);-webkit-backdrop-filter:blur(20px) saturate(1.4);box-shadow:0 14px 40px rgba(0,0,0,.22);transform:translateX(calc(100% + 32px));transition:transform .35s cubic-bezier(.2,.7,.2,1)}
+.hv-glas .hv-menu.aaben{transform:none}
+.hv-glas.hv-logo-h .hv-menu{right:auto;left:16px;transform:translateX(calc(-100% - 32px));box-shadow:0 14px 40px rgba(0,0,0,.22)}
+.hv-glas.hv-logo-h .hv-menu.aaben{transform:none}
+/* The head: the tour's colour as a rounded tile on the glass (a white logo needs it) - a logo made for light: right on the glass. */
+.hv-glas .hv-menu-head{margin:12px 12px 6px;border-radius:16px;padding:16px 16px 12px;text-align:left}
+.hv-glas .hv-menu-head img{height:40px;max-width:180px;margin:0 0 6px}
+.hv-glas .hv-menu-head img:last-child{height:44px;max-width:200px}
+.hv-glas .hv-menu-titel{font-size:14px;letter-spacing:.04em}
+.hv-glas .hv-menu-head.hv-light{background:transparent !important;margin:4px 4px 0;color:var(--c-main)}
+.hv-glas .hv-menu-head.hv-light .hv-menu-titel{color:var(--c-main)}
+.hv-glas .hv-menu-head.hv-light .hv-sub{color:#4b5753}
+.hv-glas .hv-gruppe,.hv-glas .hv-gtitel.hv-enkel{margin:0 12px;border-bottom:1px solid rgba(0,0,0,.07)}
+.hv-glas .hv-gtitel{padding:11px 8px;font-size:15px}
+.hv-glas .hv-items{padding:2px 0 10px 6px;display:flex;flex-direction:column;gap:2px}
+.hv-glas .hv-items button{padding:7px 10px;border-radius:10px;font-size:14px}
+.hv-glas .hv-items button:hover{background:color-mix(in srgb,var(--c-main) 10%,transparent);color:var(--c-main)}
+.hv-glas .hv-menu-cta{padding:14px 16px 12px}
+.hv-glas .hv-menu-cta .hv-btn{border-radius:999px}
+.hv-glas .hv-contact{margin:0 16px 18px;background:rgba(255,255,255,.55)}
+@media (max-width:760px){
+  .hv-glas .hv-menu{top:auto;left:0;right:0;bottom:0;width:auto;max-height:78%;border-radius:22px 22px 0 0;transform:translateY(105%);padding-bottom:env(safe-area-inset-bottom,0px)}
+  .hv-glas.hv-logo-h .hv-menu{left:0;transform:translateY(105%)}
+  .hv-glas .hv-menu.aaben,.hv-glas.hv-logo-h .hv-menu.aaben{transform:none}
+  .hv-glas .hv-menu::before{content:"";display:block;width:40px;height:4px;margin:10px auto 0;border-radius:4px;background:rgba(0,0,0,.2)}
+  .hv-glas .hv-menu-head{margin:8px 12px 6px;padding:12px 14px 10px}
+}
+`;
+

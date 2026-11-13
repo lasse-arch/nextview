@@ -163,7 +163,9 @@ export const START_STYLES: [StartStyle, string, string][] = [
 
 export const MENU_STYLES: [MenuStyle, string, string][] = [
   ["side", "Sidemenu", "En menu i siden med grupper - til mange rum."],
+  ["glass", "Glas-panel", "Sidemenuen som et svævende glaspanel - på mobil et glasark nedefra."],
   ["dock", "Bar i bunden", "Stederne, rundvisningen og hovedknappen i en bar nederst."],
+  ["float", "Flydende dock", "En lille glas-pille nederst med grupperne, Vis mig rundt og hovedknappen - fylder kun det, den skal."],
   ["bento", "Flisemenu", "Menuen som store billedfliser."],
   ["simple", "Helt enkel", "Én knap med én liste - intet andet."],
   ["picker", "Rumvælger", "Vælg størrelse og rum i bunden. Kun til få kunder (fx depotrum)."],

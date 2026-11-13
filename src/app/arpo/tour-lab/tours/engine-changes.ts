@@ -9,6 +9,7 @@
 export type EngineChange = { date: string; kind: "ny" | "sikkerhed" | "hastighed" | "rettelse"; text: string };
 
 export const ENGINE_CHANGES: EngineChange[] = [
+  { date: "2026-11-13", kind: "ny", text: "To nye menuer: Glas-panel (sidemenuen som et svævende glaspanel - på mobil et glasark nedefra) og Flydende dock (en lille glas-pille nederst med grupperne, Vis mig rundt og hovedknappen, der kun fylder det, den skal). Vælges under Layout → Menuen." },
   { date: "2026-11-12", kind: "rettelse", text: "\"Her er menuen\" vises kun én gang - ikke igen hver gang menuen eller et billede lukkes (også i editorens forhåndsvisning)." },
   { date: "2026-11-12", kind: "ny", text: "Fuldskærmsknap øverst til højre ved menuknappen - den lægger sig aldrig oven på andre knapper (vises ikke på iPhone, som ikke kan fuld skærm). Kan slås fra under Udseende." },
   { date: "2026-11-12", kind: "rettelse", text: "Find vej går ikke længere gennem vægge: et langt spring ind i et andet rum (set gennem et vindue) bruges kun, hvis der slet ingen anden vej er - ruten går gennem dørene i korte skridt." },

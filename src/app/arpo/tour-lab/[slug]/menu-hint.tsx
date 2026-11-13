@@ -13,7 +13,7 @@ import { useT } from "../tours/i18n-react";
  */
 
 /** The things that open the menu, in every menu design. */
-const TRIGGERS = [".hv-menuknap", ".bm-knap", ".sp-menuknap", ".dz-dock", ".pk-mini"];
+const TRIGGERS = [".hv-menuknap", ".bm-knap", ".sp-menuknap", ".dz-dock", ".fd-dock", ".pk-mini"];
 
 type Spot = { x: number; y: number; w: number; h: number };
 
