@@ -24,8 +24,7 @@ function headers(): Record<string, string> {
   return { "X-Auth-Token": apiKey(), "Content-Type": "application/json" };
 }
 
-/** `sendEmail: false`: DocuSeal doesn't mail this one - Arpo sends the link itself (from the seller's own Gmail). */
-export type DocuSealSubmitter = { role: string; name: string; email: string; externalId: string; sendEmail?: boolean };
+export type DocuSealSubmitter = { role: string; name: string; email: string; externalId: string };
 
 export type DocuSealSubmission = {
   id: number;
@@ -58,7 +57,6 @@ export async function createAndSendSubmission(params: {
         name: s.name,
         email: s.email,
         external_id: s.externalId,
-        ...(s.sendEmail === false ? { send_email: false } : {}),
       })),
       // "preserved" (the default) only emails the customer after the
       // director has signed - "random" sends to both immediately so the

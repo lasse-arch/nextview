@@ -22,7 +22,6 @@ import { logActivity } from "@/lib/activity";
 import { dealName, totalContractValue } from "@/lib/labels";
 import { contactNameProblem } from "@/lib/contact-name";
 import { sendDealEmail } from "@/lib/deal-email-send";
-import { sendSigningMail, sendsOwnSigningMail } from "@/lib/contract-signing-mail";
 import { syncFixedTermEnd } from "@/lib/fixed-term";
 
 /**
@@ -128,15 +127,13 @@ export async function buildAndSendContract(
     const pdfBuffer = await renderContractPdf(html);
 
     const documentName = `Nextview360 x ${deal.displayName || deal.companyName}`;
-    // The customer's mail comes from the seller's own Gmail (lib/contract-signing-mail.ts) - DocuSeal only mails them when the seller has none.
-    const ownMail = await sendsOwnSigningMail(sender.id);
     const submission = await createAndSendSubmission({
       fileName: `${documentName}.pdf`,
       fileBuffer: pdfBuffer,
       documentName,
       submitters: [
         { role: "Company", name: CONTRACT_SIGNER.name, email: CONTRACT_SIGNER.email, externalId: "director" },
-        { role: "Customer", name: deal.contactName, email: deal.contactEmail, externalId: "customer", sendEmail: !ownMail },
+        { role: "Customer", name: deal.contactName, email: deal.contactEmail, externalId: "customer" },
       ],
       metadata: { dealId: deal.id },
     });
@@ -170,10 +167,6 @@ export async function buildAndSendContract(
     await syncFixedTermEnd(dealId).catch(() => {});
 
     let warning: string | undefined;
-    if (ownMail) {
-      const mail = await sendSigningMail({ sender, submissionId: String(submission.id), to: deal.contactEmail, contactName: deal.contactName, lang: products.language === "en" ? "en" : "da", dealId });
-      warning = mail.warning;
-    }
     // The reader: the contract as a PDF from the sender's own Gmail - to them alone (the mail says who signs it).
     if (reviewer) {
       const company = deal.displayName || deal.companyName;
@@ -185,7 +178,7 @@ export async function buildAndSendContract(
         : `Hej ${first}\n\n${deal.contactName} har fået aftalen mellem ${company} og Nextview360 tilsendt til underskrift. Du får den her til gennemsyn, så I begge kan læse den - du skal ikke selv skrive under.\n\nAftalen er vedhæftet som PDF. Har du spørgsmål, så svar bare på denne mail${sender.phone ? ` eller ring til mig på ${sender.phone}` : ""}.`;
       const pdf = new File([new Uint8Array(pdfBuffer)], `${documentName}.pdf`, { type: "application/pdf" });
       const sent = await sendDealEmail(sender, dealId, subject, body, [], [pdf], undefined, reviewer.email, [], undefined, { followUpTask: false, lang: en ? "en" : "da" }).catch((err: unknown) => ({ ok: false as const, error: err instanceof Error ? err.message : String(err) }));
-      if (!sent.ok) warning = [warning, `Kontrakten er sendt til underskrift, men mailen til ${reviewer.name} kom ikke af sted: ${sent.error}`].filter(Boolean).join(" ");
+      if (!sent.ok) warning = `Kontrakten er sendt til underskrift, men mailen til ${reviewer.name} kom ikke af sted: ${sent.error}`;
     }
     await logActivity({
       type: "CONTRACT_SENT",
@@ -347,29 +340,10 @@ export async function checkContractStatus(dealId: string): Promise<{ ok: true; t
 }
 
 /** DocuSeal sends the customer the signing mail once more. */
-export async function resendContractMail(dealId: string): Promise<{ ok: true; warning?: string } | { ok: false; error: string }> {
+export async function resendContractMail(dealId: string): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
-    const submissionId = await sentContractOf(dealId);
-    // Again from the one who sent the contract (their own Gmail), whoever presses it - else DocuSeal's mail.
-    const user = await requireUser();
-    const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId }, select: { contactEmail: true, contactName: true, contractProducts: true, contractSentById: true, ownerId: true } });
-    // Contracts sent before this was kept: who the log says sent it, else the deal's seller.
-    const sentById =
-      deal.contractSentById ??
-      (await prisma.activityEvent.findFirst({ where: { dealId, type: "CONTRACT_SENT", actorId: { not: null } }, orderBy: { createdAt: "desc" }, select: { actorId: true } }))?.actorId ??
-      deal.ownerId;
-    const sender = (await prisma.user.findUnique({ where: { id: sentById } })) ?? user;
-    if (!(await sendsOwnSigningMail(sender.id))) {
-      await resendCustomerSigningMail(submissionId);
-      return { ok: true };
-    }
-    if (!deal.contactEmail) {
-      await resendCustomerSigningMail(submissionId);
-      return { ok: true };
-    }
-    const lang = (deal.contractProducts as { language?: string } | null)?.language === "en" ? "en" : "da";
-    const mail = await sendSigningMail({ sender, submissionId, to: deal.contactEmail, contactName: deal.contactName, lang, dealId, actor: sender.id === user.id ? undefined : { id: user.id, name: user.name } });
-    return { ok: true, warning: mail.warning };
+    await resendCustomerSigningMail(await sentContractOf(dealId));
+    return { ok: true };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Mailen kunne ikke sendes igen." };
   }

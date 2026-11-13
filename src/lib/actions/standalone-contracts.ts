@@ -5,7 +5,6 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { isDocuSealConfigured, createAndSendSubmission } from "@/lib/docuseal";
-import { sendSigningMail, sendsOwnSigningMail } from "@/lib/contract-signing-mail";
 import { lookupCvrNumber } from "@/lib/cvr";
 import { recalcCommission } from "@/lib/commission-service";
 import { sendContractSignedNotification } from "@/lib/notification-service";
@@ -44,7 +43,7 @@ export type StandaloneContractCustomer = {
 export async function sendStandaloneContract(
   customer: StandaloneContractCustomer,
   products: ContractProducts
-): Promise<{ ok: true; id: string; warning?: string } | { ok: false; error: string }> {
+): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   try {
     const user = await requireUser();
 
@@ -93,21 +92,16 @@ export async function sendStandaloneContract(
     const pdfBuffer = await renderContractPdf(html);
 
     const documentName = `Nextview360 x ${customer.displayName || customer.companyName}`;
-    // From the seller's own Gmail when they have one (lib/contract-signing-mail.ts) - else DocuSeal's mail.
-    const ownMail = await sendsOwnSigningMail(user.id);
     const submission = await createAndSendSubmission({
       fileName: `${documentName}.pdf`,
       fileBuffer: pdfBuffer,
       documentName,
       submitters: [
         { role: "Company", name: CONTRACT_SIGNER.name, email: CONTRACT_SIGNER.email, externalId: "director" },
-        { role: "Customer", name: customer.contactName, email: customer.contactEmail, externalId: "customer", sendEmail: !ownMail },
+        { role: "Customer", name: customer.contactName, email: customer.contactEmail, externalId: "customer" },
       ],
       metadata: { standalone: "true" },
     });
-    const mail = ownMail
-      ? await sendSigningMail({ sender: user, submissionId: String(submission.id), to: customer.contactEmail, contactName: customer.contactName, lang: products.language === "en" ? "en" : "da" })
-      : null;
 
     const created = await prisma.standaloneContract.create({
       data: {
@@ -134,7 +128,7 @@ export async function sendStandaloneContract(
     });
 
     revalidatePath("/arpo/settings/docuseal/standalone-contracts");
-    return { ok: true, id: created.id, warning: mail?.warning };
+    return { ok: true, id: created.id };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Der opstod en fejl ved afsendelse af kontrakten." };
   }

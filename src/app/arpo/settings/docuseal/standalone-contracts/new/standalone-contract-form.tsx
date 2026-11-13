@@ -143,8 +143,6 @@ export function StandaloneContractForm() {
         setError(result.error);
         return;
       }
-      // Sent - but the mail went through DocuSeal instead of the seller's Gmail: said before moving on.
-      if (result.warning) window.alert(result.warning);
       router.push("/arpo/settings/docuseal/standalone-contracts");
     });
   }
