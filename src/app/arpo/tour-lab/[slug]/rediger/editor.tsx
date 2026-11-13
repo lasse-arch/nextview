@@ -1,7 +1,7 @@
 "use client";
 
 import { PeopleEditor } from "./people-editor";
-import { EventsEditor, ShopTourEditor } from "./events-editor";
+import { ClassesEditor, EventsEditor, ShopTourEditor } from "./events-editor";
 import { InsightsPanel } from "./insights";
 import { LanguagesPanel } from "./languages";
 import { tourUrl } from "@/lib/public-urls";
@@ -120,7 +120,7 @@ const FINDS: Partial<Record<Tab, string[]>> = {
   staging: ["Årshjul|aarshjul|kalender|begivenheder|året", "Video på en flade|tv|skærm|storskærm|film på væggen", "Billede på en flade|plakat|maleri|foto på væggen", "Hjemmeside på en flade|instagram|facebook|some|webside", "Skilt|velkomstskilt|tekst på væggen", "Se det i brug|film i rummet|video i rummet|levende|i brug", "Tryk for lyd|lyd på video"],
   linjedag: ["En dag på linjen|linjefag|linjer|dagen på linjen"],
   skema: ["Byg dit skema|skema|ugeskema|fag|valgfag|hovedfag|sidefag|fagblok|perioder|timer"],
-  live: ["Live data", "Ledige pladser", "Ledige rum", "Book-knap", "Hent nye data"],
+  live: ["Live data", "Ledige pladser", "Ledige rum", "Book-knap", "Hent nye data", "Holdplan|hold|flexybox|holdbooking"],
   kort: ["Stedkort", "Kort ved punkt", "Din plads venter", "Kort efter et stykke tid", "Knap til scanpunkt|opdækket|skjult scan"],
   links: ["Knapper", "Book", "Kontakt", "Telefon", "E-mail", "Adresse", "Sociale medier", "Kontaktformular", "Skriv til os", "Åbning", "Popup", "Ny fane", "Kort-link"],
   design: ["Farver", "Skrift", "Font", "Logo", "Logostørrelse", "Logoets afstand", "Favicon", "Mørkt logo", "Farvefilter", "Brug hjemmesidens farver|hjemmeside|rød tråd|brand"],
@@ -1009,6 +1009,7 @@ export function TourEditor({
                 <LiveDataEditor config={config} edit={edit} slug={slug} preview={preview} />
                 <ShopTourEditor config={config} edit={edit} slug={slug} />
                 <EventsEditor config={config} edit={edit} slug={slug} />
+                <ClassesEditor config={config} edit={edit} slug={slug} />
               </>
             )}
             {tab === "kortet" && (

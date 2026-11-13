@@ -186,6 +186,9 @@ export type PlaceCard = {
   images?: string[];
   /** true: the card shows "Næste rundvisninger" (TourConfig.events) - the coming dates and the sign-up button. */
   events?: true;
+  /** true: the card shows the next classes from the class schedule (TourConfig.classes) - in `classesRoom` when set (e.g. "Holdsal"), and "Se hele holdplanen". */
+  classes?: true;
+  classesRoom?: string;
   /** Pictures (their addresses - e.g. a drone photo in the menu or a stop of "Vis mig rundt") the card belongs to: shown when the picture opens from the menu, and a guide stop at the picture shows the card's people. */
   pictures?: string[];
   /** Points on the drone scene / map (their ids) whose 360° photo shows the card when it opens - like arriving in a room. */
@@ -816,6 +819,18 @@ export type TourConfig = {
    * dates (default 3).
    */
   events?: { source: string; title?: string; button?: string; field?: string; welcome?: boolean; menu?: boolean; max?: number };
+  /**
+   * "Holdplan": the gym's classes from Flexybox (its class page,
+   * https://profile.flexybox.com/<kæde>/… - read every 10 minutes), the coming
+   * week of one centre (`department`: its Flexybox id). Any link "#hold" (menu,
+   * tile, button) opens it as a sheet - per day: time, class, instructor, room,
+   * "Aflyst", and free places / "Fuldt" only where the gym shows that publicly -
+   * each with a button to book (`bookHref`, default the class page itself).
+   * Place cards with `classes` show the next classes there. `room`: only
+   * classes in that room (part of its name). `title` default "Holdplan",
+   * `button` default "Book".
+   */
+  classes?: { source: string; department?: string; room?: string; title?: string; button?: string; bookHref?: string };
   /** Which side the place cards stand on, per device - left out: the left (bottom left corner). */
   placeCardSide?: { desktop?: "right"; mobile?: "right" };
   /** How big the card of "Vis mig rundt" is: "lille" (title, a few lines, the buttons), "mellem" (the default), "stor" (the whole width on a phone). Scales with the screen either way. */

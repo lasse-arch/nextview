@@ -39,6 +39,7 @@ import { DAY_CSS, DayBar, DaySheet } from "./day";
 import { SHOP_CSS, ShopSheet } from "./shop";
 import { PointVideo } from "./point-video";
 import { EVENTS_CSS, EventsBlock, useTourEvents } from "./events";
+import { CLASSES_CSS, ClassesNext, ClassesSheet, useTourClasses } from "./classes";
 import { FEEDBACK_CSS, FeedbackLayer } from "./feedback";
 import { ICONS } from "../tours/icons";
 import { SIMPLE_CSS, SimpleMenu, SimpleWelcome } from "./simple";
@@ -733,6 +734,13 @@ function TourExperience({
     window.addEventListener("hv-mod", open);
     return () => window.removeEventListener("hv-mod", open);
   }, []);
+  /** "Holdplan" is open - from any link "#hold" (and "Se hele holdplanen" on a place card). */
+  const [classesOpen, setClassesOpen] = useState(false);
+  useEffect(() => {
+    const open = () => setClassesOpen(true);
+    window.addEventListener("hv-hold", open);
+    return () => window.removeEventListener("hv-hold", open);
+  }, []);
   /** "Vej til skolen" is open - from any link "#vej". */
   const [commuteOpen, setCommuteOpen] = useState(false);
   useEffect(() => {
@@ -781,6 +789,8 @@ function TourExperience({
   }, [T.shop, T.brand]);
   /** "Næste rundvisninger" (T.events): the coming dates, where the tour shows them. */
   const events = useTourEvents(T);
+  /** "Holdplan" (T.classes): the coming week's classes. */
+  const classes = useTourClasses(T);
   /** The tour opens on the cover welcome: it's there from the very first picture (no flash of the drone scene before it). */
   const startsCovered = T.design?.welcome === "cover" && Boolean(T.cover) && !T.intro && !played;
   const [cover, setCover] = useState(startsCovered);
@@ -2925,7 +2935,7 @@ function TourExperience({
       {[...new Set([...fontHrefs(T.font, [400, 600, 700, 800, 900]), ...(T.fontHeading ? fontHrefs(T.fontHeading, [500, 600]) : [])])].map((href) => (
         <link key={href} rel="stylesheet" href={href} />
       ))}
-      <style>{CSS + TOUR_LOGO_CSS + CONTACT_CSS + STORIES_CSS + LIGHTBOX_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + ONBOARDING_CSS + MENU_HINT_CSS + INFO_CSS + STAGING_CSS + (T.staging?.some((i) => i.kind === "treasure") ? CONTEST_CSS : "") + (T.inUse?.length ? IN_USE_CSS : "") + (T.lineDays ? LINE_DAY_CSS : "") + (T.yearWheel ? YEARWHEEL_CSS : "") + (T.schedule ? SCHEDULE_CSS : "") + MAP_CSS + (T.sitePlan?.overlay ? SITE_PLAN_CSS + SITE_PLAN_360_CSS : "") + ROUTE_CSS + MEASURES_CSS + CARDS_CSS + DAY_CSS + (T.events ? EVENTS_CSS : "") + (T.shop || T.points.some((p) => p.shop) ? SHOP_CSS : "") + SIMPLE_CSS + BENTO_CSS + LOGO_RIGHT_CSS + LANG_CSS + WEATHER_CSS + COMMUTE_CSS + FEATURES_CSS + FINDER_CSS + FULLSCREEN_BUTTON_CSS + (T.design?.menu === "float" ? FLOAT_DOCK_CSS : "") + (T.team?.people.length ? TEAM_CSS : "") + (T.design?.menu === "glass" ? GLASS_MENU_CSS : "") + (review ? FEEDBACK_CSS : "")}</style>
+      <style>{CSS + TOUR_LOGO_CSS + CONTACT_CSS + STORIES_CSS + LIGHTBOX_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + ONBOARDING_CSS + MENU_HINT_CSS + INFO_CSS + STAGING_CSS + (T.staging?.some((i) => i.kind === "treasure") ? CONTEST_CSS : "") + (T.inUse?.length ? IN_USE_CSS : "") + (T.lineDays ? LINE_DAY_CSS : "") + (T.yearWheel ? YEARWHEEL_CSS : "") + (T.schedule ? SCHEDULE_CSS : "") + MAP_CSS + (T.sitePlan?.overlay ? SITE_PLAN_CSS + SITE_PLAN_360_CSS : "") + ROUTE_CSS + MEASURES_CSS + CARDS_CSS + DAY_CSS + (T.events ? EVENTS_CSS : "") + (T.classes ? CLASSES_CSS : "") + (T.shop || T.points.some((p) => p.shop) ? SHOP_CSS : "") + SIMPLE_CSS + BENTO_CSS + LOGO_RIGHT_CSS + LANG_CSS + WEATHER_CSS + COMMUTE_CSS + FEATURES_CSS + FINDER_CSS + FULLSCREEN_BUTTON_CSS + (T.design?.menu === "float" ? FLOAT_DOCK_CSS : "") + (T.team?.people.length ? TEAM_CSS : "") + (T.design?.menu === "glass" ? GLASS_MENU_CSS : "") + (review ? FEEDBACK_CSS : "")}</style>
       {/* The tour's own design on top (written by Claude or by hand under Avanceret). */}
       {T.customCss && <style>{T.customCss.replace(/<\/?style/gi, "")}</style>}
 
@@ -3852,6 +3862,14 @@ function TourExperience({
           }}
         />
       ) : null}
+      {classesOpen && T.classes?.source && (
+        <ClassesSheet
+          T={T}
+          data={classes}
+          onClose={() => setClassesOpen(false)}
+          onBook={(label, href) => ctaClick(label, href, "classes")}
+        />
+      )}
       {commuteOpen && T.commute && <CommuteSheet T={T} onClose={() => setCommuteOpen(false)} onEvent={(name, params) => track(name, params ?? {})} />}
       {contactOpen && T.contactForm && (
         <ContactForm T={T} preview={inPreview} showcase={Boolean(demo)} room={room} onClose={() => setContactOpen(false)} onSent={() => track("contact_form", { place: "form" })} />
@@ -3926,7 +3944,14 @@ function TourExperience({
           card={T.placeCards![showCard]}
           size={T.placeCardSize}
           onPhotos={(images, at) => setLightbox({ images, at, title: T.placeCards![showCard].title })}
-          extra={events && T.placeCards![showCard].events ? <EventsBlock T={T} events={events} onSignUp={(label, href) => ctaClick(label, href, "place_card_events")} /> : undefined}
+          extra={
+            (events && T.placeCards![showCard].events) || (classes && T.placeCards![showCard].classes) ? (
+              <>
+                {events && T.placeCards![showCard].events && <EventsBlock T={T} events={events} onSignUp={(label, href) => ctaClick(label, href, "place_card_events")} />}
+                {classes && T.placeCards![showCard].classes && <ClassesNext T={T} data={classes} room={T.placeCards![showCard].classesRoom} onBook={(label, href) => ctaClick(label, href, "place_card_classes")} />}
+              </>
+            ) : undefined
+          }
           voice={T.placeCardVoice ? tx(T.placeCardVoice.label || "Svært ved at læse? Få det læst op") : undefined}
           onClose={(how) => {
             track("place_card_close", { title: T.placeCards![showCard].title, how });

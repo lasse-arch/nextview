@@ -91,6 +91,12 @@ export function tourConfigProblem(config: unknown): string | null {
     return "Personer på et stedkort: højst 3, hver med et billede.";
   if (c.nudge && (!obj(c.nudge) || typeof c.nudge.afterSeconds !== "number" || !arr(c.nudge.buttons))) return '"Din plads venter" har en forkert form.';
   if (c.design && (!obj(c.design) || !["tiles", "cover", "simple", "none"].includes(c.design.welcome) || !["side", "glass", "dock", "float", "picker", "simple", "bento"].includes(c.design.menu))) return '"design" skal have welcome (tiles/cover/simple/none) og menu (side/glass/dock/float/picker/simple/bento).';
+  if (c.classes !== undefined) {
+    const k = c.classes;
+    if (!obj(k) || !str(k.source) || !/^https:\/\/profile\.flexybox\.com\//.test(k.source)) return 'Holdplanen skal have kundens Flexybox-link (https://profile.flexybox.com/…).';
+    if (k.department !== undefined && (typeof k.department !== "string" || !/^[0-9a-f-]{36}$/i.test(k.department))) return "Holdplanen: centeret har en forkert form.";
+    if ([k.room, k.title, k.button, k.bookHref].some((v) => v !== undefined && typeof v !== "string")) return "Holdplanen: sal, overskrift, knap og link skal være tekst.";
+  }
   if (c.team !== undefined) {
     if (!obj(c.team) || !arr(c.team.people) || c.team.people.length > 30) return '"Personer" skal være en liste (højst 30).';
     const ids = new Set<string>();

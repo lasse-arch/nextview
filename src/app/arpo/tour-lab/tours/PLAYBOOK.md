@@ -274,6 +274,11 @@ booking i denne måned". Derfor:
 
 ## Live data
 
+- **Fitness med Flexybox** (holdbooking på profile.flexybox.com/<kæde>/…): sæt
+  Holdplan op under Live data (link, vælg centeret), læg "Holdplan" (#hold) i
+  menuen og de næste hold på stedkortet i holdsalen. Det beviser "varieret
+  holdplan" med rigtige hold i stedet for at sige det.
+
 Har kunden en side med ledige pladser, rum eller boliger (campingpladser,
 depotrum, værelser), så vis dem live i touren (Live data): "12 ledige
 pladser" med en book-knap ved hver - og "Ledig" ved de rum i menuen, der er

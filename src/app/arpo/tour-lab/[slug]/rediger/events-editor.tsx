@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { checkTourDates } from "@/lib/actions/tour-dates";
 import { checkShopProduct } from "@/lib/actions/tour-shop";
+import { checkTourClasses, flexyboxCentres } from "@/lib/actions/tour-classes";
 import type { TourConfig } from "../../tours/types";
 import { Field, Group, input, Toggle } from "./ui";
 
@@ -149,6 +150,117 @@ export function ShopTourEditor({ config, edit, slug }: { config: TourConfig; edi
             title="I menuen"
             hint="Som et menupunkt nederst - kan flyttes under Menu."
           />
+        </>
+      )}
+    </Group>
+  );
+}
+
+/** "Holdplan": the gym's classes from Flexybox (TourConfig.classes) - opened by "#hold", and the next classes on place cards. */
+export function ClassesEditor({ config, edit, slug }: { config: TourConfig; edit: Edit; slug: string }) {
+  const k = config.classes;
+  const [note, setNote] = useState<{ text: string; error?: boolean } | null>(null);
+  const [centres, setCentres] = useState<{ id: string; name: string }[] | null>(null);
+  const [busy, start] = useTransition();
+  const set = (patch: Partial<NonNullable<TourConfig["classes"]>>) => edit((d) => void (d.classes = { ...(d.classes ?? { source: "" }), ...patch }));
+  const cards = config.placeCards ?? [];
+  const title = k?.title || "Holdplan";
+  const inMenu = config.menu.some((m) => ("items" in m ? m.items.some(([, h]) => h === "#hold") : m.href === "#hold"));
+  const loadCentres = () =>
+    start(async () => {
+      const r = await flexyboxCentres(slug, k!.source);
+      if (r.ok) setCentres(r.departments);
+      else setNote({ text: r.error, error: true });
+    });
+  return (
+    <Group title="Holdplan (Flexybox)">
+      <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">
+        Centerets hold den kommende uge fra Flexybox - tid, hold, instruktør, sal, aflyste hold og en knap til at booke. Opdateres af sig selv hvert 10. minut. Åbnes fra et menupunkt, en flise eller en knap med linket <code>#hold</code>, og kan stå på stedkort (fx i holdsalen). Ledige pladser vises kun på de hold, hvor centeret selv viser det.
+      </p>
+      <Field title="Link til kundens Flexybox-side" hint="Fx siden med holdene, som kunden linker til fra hjemmesiden.">
+        <input
+          className={input}
+          placeholder="https://profile.flexybox.com/…"
+          value={k?.source ?? ""}
+          onChange={(e) => {
+            setNote(null);
+            setCentres(null);
+            const source = e.target.value.trim();
+            edit((d) => void (d.classes = source ? { ...(d.classes ?? {}), source } : undefined));
+          }}
+        />
+      </Field>
+      {k?.source && (
+        <>
+          <Field title="Center" hint="En kæde har flere centre i Flexybox - vælg det, touren er fra.">
+            {centres ? (
+              <select className={input} value={k.department ?? ""} onChange={(e) => set({ department: e.target.value || undefined })}>
+                <option value="">Alle centre</option>
+                {centres.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <button type="button" disabled={busy} className="self-start rounded-lg px-2 py-1 text-[13px] font-medium text-[#0071e3] hover:bg-[#0071e3]/5" onClick={loadCentres}>
+                {busy ? "Henter…" : k.department ? "Skift center" : "Vælg center"}
+              </button>
+            )}
+          </Field>
+          <Field title="Kun hold i salen (valgfri)" hint='Fx "Holdsal" - tom: alle hold i centeret.'>
+            <input className={input} value={k.room ?? ""} onChange={(e) => set({ room: e.target.value || undefined })} />
+          </Field>
+          <button
+            type="button"
+            disabled={busy}
+            className="self-start rounded-lg px-2 py-1 text-[13px] font-medium text-[#0071e3] hover:bg-[#0071e3]/5"
+            onClick={() => start(async () => setNote(((r) => (r.ok ? { text: r.text } : { text: r.error, error: true }))(await checkTourClasses(slug, k.source, k.department, k.room))))}
+          >
+            {busy ? "Tjekker…" : "Tjek holdene"}
+          </button>
+          {note && <p className={`px-1 text-[12px] leading-snug ${note.error ? "text-[#ff3b30]" : "text-[#1f7a35]"}`}>{note.text}</p>}
+          <div className="flex gap-2">
+            <Field title="Overskrift">
+              <input className={input} placeholder="Holdplan" value={k.title ?? ""} onChange={(e) => set({ title: e.target.value || undefined })} />
+            </Field>
+            <Field title="Knappen">
+              <input className={input} placeholder="Book" value={k.button ?? ""} onChange={(e) => set({ button: e.target.value || undefined })} />
+            </Field>
+          </div>
+          <Field title="Book-knappen går til (valgfri)" hint="Tom: Flexybox-siden ovenfor.">
+            <input className={input} placeholder={k.source} value={k.bookHref ?? ""} onChange={(e) => set({ bookHref: e.target.value.trim() || undefined })} />
+          </Field>
+          <Toggle
+            on={inMenu}
+            onChange={(on) =>
+              edit(
+                (d) =>
+                  void (d.menu = on
+                    ? [...d.menu, { title, href: "#hold" }]
+                    : d.menu.map((m) => ("items" in m ? { ...m, items: m.items.filter(([, h]) => h !== "#hold") } : m)).filter((m) => ("items" in m ? true : m.href !== "#hold")))
+              )
+            }
+            title="I menuen"
+            hint="Som et menupunkt nederst - kan flyttes under Menu."
+          />
+          {cards.length > 0 && (
+            <Field title="De næste hold på stedkort" hint="Under kortets tekst - fx stedkortet i holdsalen. Skriv salen, så kortet kun viser holdene dér.">
+              <div className="flex flex-col gap-1.5">
+                {cards.map((c, i) => (
+                  <div key={i} className="flex items-center gap-2 text-[13px]">
+                    <label className="flex flex-1 items-center gap-2">
+                      <input type="checkbox" checked={Boolean(c.classes)} onChange={(e) => edit((d) => void (d.placeCards![i] = { ...d.placeCards![i], classes: e.target.checked || undefined, classesRoom: e.target.checked ? d.placeCards![i].classesRoom : undefined }))} />
+                      {c.title || `Stedkort ${i + 1}`}
+                    </label>
+                    {c.classes && (
+                      <input className={`${input} w-32 py-1 text-[12px]`} placeholder="Sal (valgfri)" value={c.classesRoom ?? ""} onChange={(e) => edit((d) => void (d.placeCards![i] = { ...d.placeCards![i], classesRoom: e.target.value || undefined }))} />
+                    )}
+                  </div>
+                ))}
+              </div>
+            </Field>
+          )}
         </>
       )}
     </Group>
