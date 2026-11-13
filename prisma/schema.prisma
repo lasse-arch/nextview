@@ -466,6 +466,8 @@ model Deal {
   /// actually known as.
   displayName  String?
   cvrNumber    String?
+  /// Who sent the contract (to sign) - the signing mail is sent again from their Gmail.
+  contractSentById String?
   /// The P-nummer when the deal is one workplace of a company (e.g. one hotel of a chain, found by
   /// Leadgeneration searching P-enheder) - the company's CVR stays in cvrNumber.
   pNumber      String?

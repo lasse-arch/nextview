@@ -147,6 +147,7 @@ export async function buildAndSendContract(
         docusealSubmissionId: String(submission.id),
         contractStatus: "SENT",
         contractSentAt: new Date(),
+        contractSentById: sender.id,
         contractViewedAt: null,
         contractSignedAt: null,
         stage: "CONTRACT_SENT",
@@ -349,19 +350,25 @@ export async function checkContractStatus(dealId: string): Promise<{ ok: true; t
 export async function resendContractMail(dealId: string): Promise<{ ok: true; warning?: string } | { ok: false; error: string }> {
   try {
     const submissionId = await sentContractOf(dealId);
-    // Again from the one pressing it - their own Gmail when they have one, else DocuSeal's mail.
+    // Again from the one who sent the contract (their own Gmail), whoever presses it - else DocuSeal's mail.
     const user = await requireUser();
-    if (!(await sendsOwnSigningMail(user.id))) {
+    const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId }, select: { contactEmail: true, contactName: true, contractProducts: true, contractSentById: true, ownerId: true } });
+    // Contracts sent before this was kept: who the log says sent it, else the deal's seller.
+    const sentById =
+      deal.contractSentById ??
+      (await prisma.activityEvent.findFirst({ where: { dealId, type: "CONTRACT_SENT", actorId: { not: null } }, orderBy: { createdAt: "desc" }, select: { actorId: true } }))?.actorId ??
+      deal.ownerId;
+    const sender = (await prisma.user.findUnique({ where: { id: sentById } })) ?? user;
+    if (!(await sendsOwnSigningMail(sender.id))) {
       await resendCustomerSigningMail(submissionId);
       return { ok: true };
     }
-    const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId }, select: { contactEmail: true, contactName: true, contractProducts: true } });
     if (!deal.contactEmail) {
       await resendCustomerSigningMail(submissionId);
       return { ok: true };
     }
     const lang = (deal.contractProducts as { language?: string } | null)?.language === "en" ? "en" : "da";
-    const mail = await sendSigningMail({ sender: user, submissionId, to: deal.contactEmail, contactName: deal.contactName, lang, dealId });
+    const mail = await sendSigningMail({ sender, submissionId, to: deal.contactEmail, contactName: deal.contactName, lang, dealId, actor: sender.id === user.id ? undefined : { id: user.id, name: user.name } });
     return { ok: true, warning: mail.warning };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Mailen kunne ikke sendes igen." };

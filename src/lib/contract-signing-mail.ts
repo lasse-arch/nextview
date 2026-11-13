@@ -47,16 +47,18 @@ export async function sendSigningMail(opts: {
   contactName: string | null;
   lang: "da" | "en";
   dealId?: string;
+  /** Who pressed send, when it isn't the sender (sending again for a colleague) - named in the deal's log. */
+  actor?: { id: string; name: string };
 }): Promise<{ via: "gmail" | "docuseal"; warning?: string }> {
   const fallback = async (why: string) => {
     await resendCustomerSigningMail(opts.submissionId);
-    return { via: "docuseal" as const, warning: `Mailen fra din Gmail kom ikke af sted (${why}) - DocuSeal har sendt den i stedet.` };
+    return { via: "docuseal" as const, warning: `Mailen fra ${opts.actor ? `${opts.sender.name}s` : "din"} Gmail kom ikke af sted (${why}) - DocuSeal har sendt den i stedet.` };
   };
   const link = await customerSigningLink(opts.submissionId).catch(() => null);
   if (!link) return fallback("DocuSeal gav ikke noget link til kunden");
   const { subject, html } = signingMail(opts.lang, opts.contactName, link, opts.sender.phone);
   if (opts.dealId) {
-    const r = await sendDealEmail(opts.sender, opts.dealId, subject, html, [], [], undefined, opts.to, [], undefined, { followUpTask: false, lang: opts.lang }).catch((err: unknown) => ({
+    const r = await sendDealEmail(opts.sender, opts.dealId, subject, html, [], [], opts.actor, opts.to, [], undefined, { followUpTask: false, lang: opts.lang }).catch((err: unknown) => ({
       ok: false as const,
       error: err instanceof Error ? err.message : String(err),
     }));
