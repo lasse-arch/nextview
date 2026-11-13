@@ -88,6 +88,8 @@ type DocuSealSubmissionDetails = {
     id?: number;
     role?: string;
     external_id?: string;
+    /** The signer's own code - their signing page is <signing site>/s/<slug>. */
+    slug?: string;
     embed_src?: string;
     status?: string;
     opened_at?: string | null;
@@ -99,11 +101,21 @@ type DocuSealSubmissionDetails = {
   completed_at?: string | null;
 };
 
+/**
+ * Where DocuSeal shows its signing pages: our own domain on the DocuSeal account (Console → Domains, set as default).
+ * DOCUSEAL_SIGN_ORIGIN overrides it (e.g. https://docuseal.eu if the domain is ever taken off).
+ */
+function signOrigin(): string {
+  const o = (process.env.DOCUSEAL_SIGN_ORIGIN ?? "").trim().replace(/\/+$/, "");
+  return /^https:\/\/[a-z0-9.-]+$/i.test(o) ? o : "https://sign.nextview360.dk";
+}
+
 /** The customer's own signing page in DocuSeal (the same link as the button in DocuSeal's mail), or null when it isn't there. */
 export async function customerSigningLink(submissionId: string): Promise<string | null> {
   const s = await getSubmission(submissionId);
   const customer = s.submitters?.find((x) => x.external_id === "customer" || x.role === "Customer");
-  const url = customer?.embed_src ?? null;
+  // Looking a submission up gives the signer's code (slug), not the link - the link is built from it.
+  const url = customer?.embed_src ?? (customer?.slug && /^[A-Za-z0-9_-]{6,64}$/.test(customer.slug) ? `${signOrigin()}/s/${customer.slug}` : null);
   // Only DocuSeal's own addresses - theirs, or our own signing domain there (sign.nextview360.dk) - never anything else from the answer.
   return url && /^https:\/\/(([a-z0-9-]+\.)*docuseal\.(eu|com)|sign\.nextview360\.dk)\//i.test(url) ? url : null;
 }
