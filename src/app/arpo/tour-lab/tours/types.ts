@@ -339,7 +339,41 @@ export type TourPoint = {
 };
 
 /** A menu item: a spot in the tour, "#luften" (back to the drone scene / map), "#punkt:<point id>" (a point on the drone scene / map, its card open), "#plan" (the site plan full screen), or a page out of the tour. */
-export type InUseItem = { id: string; kind: "video" | "image"; src: string; title?: string; ss: number[] };
+export type InUseItem = {
+  id: string;
+  kind: "video" | "image";
+  src: string;
+  title?: string;
+  ss: number[];
+  /** More photos of the place in use (after `src`) - the box cross-fades between them, and big they're swiped through. E.g. three photos from earlier tastings in an empty back room. */
+  images?: string[];
+  /** A few words shown with it big, e.g. "Plads til op til 70 gæster - vinsmagninger, Riedel-glasseminarer og firmaarrangementer." */
+  text?: string;
+  /** A button with it big, e.g. "Book en smagning". */
+  button?: { label: string; href: string };
+};
+
+/**
+ * A person in "Mød os" (TourConfig.team): a profile with a big photo, name,
+ * role, a few words, a quote and what to ask them about - e.g. the shop's two
+ * owners. Opened by "#mod" (everyone) / "#mod:<id>" (one), and from a place
+ * card's person of the same name.
+ */
+export type TeamPerson = {
+  /** Short and unique, lowercase, e.g. "per". */
+  id: string;
+  name: string;
+  role?: string;
+  image: string;
+  /** A few short paragraphs (blank line between). */
+  bio?: string;
+  /** Their own words, e.g. "Vi sælger kvalitet til de rigtige penge." */
+  quote?: string;
+  /** "Spørg Per, når …": what to ask them about. */
+  ask?: string;
+  /** Where you meet them in the tour (a place link) - "Se hvor du møder Per". */
+  href?: string;
+};
 
 export type MenuEntry = { title: string; href: string } | { title: string; items: [string, string][] };
 
@@ -737,6 +771,8 @@ export type TourConfig = {
    * it ("Fodbold i hallen") - left out: "Se det i brug".
    */
   inUse?: InUseItem[];
+  /** "Mød os": the people behind the place, each with a profile (TeamPerson) - opened by "#mod" / "#mod:<id>" and from place cards. `title` left out: "Mød os". */
+  team?: { title?: string; people: TeamPerson[] };
   /** The year wheel (see YearWheel) - opened by "#aarshjul", and on a screen as staging. */
   yearWheel?: YearWheel;
   /**

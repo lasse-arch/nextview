@@ -243,6 +243,7 @@ export function withoutDeadAerialLinks<T extends TourConfig>(c: T): T {
     if (h === "#dag") return !c.day;
     if (h === "#skema") return !c.schedule;
     if (h === "#vej") return !c.commute;
+    if (h === "#mod" || h.startsWith("#mod:")) return !c.team?.people.some((p) => h === "#mod" || h === `#mod:${p.id}`);
     if (h === "#find") return !c.finder;
     if (h === "#live") return !c.live;
     if (h === "#book") return !c.shop?.url;

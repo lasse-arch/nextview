@@ -2,7 +2,7 @@
 
 import { useT } from "../tours/i18n-react";
 import { useEffect, useRef, useState } from "react";
-import type { PlaceCard as Card, TourConfig } from "../tours/types";
+import type { CardPerson, PlaceCard as Card, TourConfig } from "../tours/types";
 import { TourLink } from "./links";
 
 /**
@@ -19,6 +19,7 @@ export function PlaceCard({
   voice,
   onPhotos,
   extra,
+  profileOf,
 }: {
   card: Card;
   /** Something more on the card's first page, under the text (e.g. "Næste rundvisninger"). */
@@ -31,6 +32,8 @@ export function PlaceCard({
   onClose: (how: "timer" | "close" | "button") => void;
   onRoom: (name: string) => void;
   onLink: (label: string, href: string) => void;
+  /** "Mød os": the profile a person on the card has (its id), if any - a tap on them opens it. */
+  profileOf?: (p: CardPerson) => string | null;
 }) {
   const tr = useT();
   const [stopped, setStopped] = useState(false);
@@ -117,18 +120,31 @@ export function PlaceCard({
           {card.images?.length ? <CardPhotos images={card.images} onOpen={(at) => onPhotos?.(card.images!, at)} /> : null}
           {people.length > 0 && (
             <div className={`pc-folk pc-folk-${people.length}${people.some((p) => p.name?.trim() || p.role?.trim()) ? "" : " pc-folk-bare"}`}>
-              {people.map((p, i) => (
-                <figure key={i}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={p.image} alt="" loading="lazy" />
-                  {(p.name?.trim() || p.role?.trim()) && (
-                    <figcaption>
-                      {p.name?.trim() && <b>{p.name}</b>}
-                      {p.role?.trim() && <span>{p.role}</span>}
-                    </figcaption>
-                  )}
-                </figure>
-              ))}
+              {people.map((p, i) => {
+                const id = profileOf?.(p) ?? null;
+                const face = (
+                  <>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={p.image} alt="" loading="lazy" />
+                    {(p.name?.trim() || p.role?.trim()) && (
+                      <figcaption>
+                        {p.name?.trim() && <b>{p.name}</b>}
+                        {p.role?.trim() && <span>{p.role}</span>}
+                      </figcaption>
+                    )}
+                  </>
+                );
+                // With a profile in "Mød os": a tap opens it.
+                return id ? (
+                  <figure key={i} className="pc-folk-mod">
+                    <button type="button" aria-label={tr("Mød {navn}", { navn: p.name ?? "" })} onClick={() => (setStopped(true), window.dispatchEvent(new CustomEvent("hv-mod", { detail: id })))}>
+                      {face}
+                    </button>
+                  </figure>
+                ) : (
+                  <figure key={i}>{face}</figure>
+                );
+              })}
             </div>
           )}
           <div className="pc-btns">
@@ -227,6 +243,8 @@ export const CARDS_CSS = `
 .pc-folk b{font-size:13px;font-weight:800;color:var(--c-main);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pc-folk span{font-size:12px;color:#5d7177;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
 .pc-folk-1 figure{flex:1 1 auto;flex-direction:row;align-items:center;gap:12px;text-align:left}
+.pc-folk-mod button{display:flex;flex-direction:inherit;align-items:inherit;gap:inherit;min-width:0;max-width:100%;border:0;background:none;padding:0;text-align:inherit;cursor:pointer;font:inherit;color:inherit}
+.pc-folk-mod:hover img{box-shadow:0 0 0 2px #fff,0 0 0 4px var(--c-accent)}
 /* Only photos, no names: close together. */
 .pc-folk-bare{gap:8px}
 .pc-folk-bare figure{flex:0 0 auto}

@@ -218,6 +218,14 @@ function startsGuide(href: string): boolean {
   return true;
 }
 
+/** "#mod" / "#mod:<person id>": "Mød os" - everyone, or one person's profile (the engine listens for "hv-mod", detail = the id or ""). */
+function opensTeam(href: string): boolean {
+  const m = /^#mod(?::([\w-]+))?$/.exec(href);
+  if (!m) return false;
+  window.dispatchEvent(new CustomEvent("hv-mod", { detail: m[1] ?? "" }));
+  return true;
+}
+
 /** "#linjedag" / "#linjedag:<line id>": "En dag på din linje" - the picker, or that line's day (the engine listens for "hv-linjedag", detail = the id or null). */
 function startsLineDay(href: string): boolean {
   const m = /^#linjedag(?::([\w-]+))?$/.exec(href);
@@ -238,6 +246,7 @@ export function openLink(T: TourConfig, href: string, label: string, popup: (hre
   if (IN_TOUR[href]) return void window.dispatchEvent(new Event(IN_TOUR[href]));
   if (startsGuide(href)) return;
   if (startsLineDay(href)) return;
+  if (opensTeam(href)) return;
   if (goesInTour(href, label)) return;
   // Never a javascript:/data: link from the setup - it would run in the visitor's page.
   if (!safeHref(href)) return;
@@ -288,6 +297,10 @@ export function TourLink({
           return;
         }
         if (startsLineDay(href)) {
+          e.preventDefault();
+          return;
+        }
+        if (opensTeam(href)) {
           e.preventDefault();
           return;
         }

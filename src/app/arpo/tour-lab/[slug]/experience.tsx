@@ -31,6 +31,7 @@ import { ONBOARDING_CSS, Onboarding } from "./onboarding";
 import { MENU_HINT_CSS, MenuHint } from "./menu-hint";
 import { PlayGate } from "./play-gate";
 import { FLOAT_DOCK_CSS, FloatDock } from "./float-dock";
+import { TEAM_CSS, TeamSheet, teamIdOf } from "./team";
 import { FULLSCREEN_BUTTON_CSS, FULLSCREEN_CSS, FullscreenButton, FullscreenOnUse } from "./fullscreen-on-use";
 import { CONTACT_CSS, CONTACT_HREF, ContactForm } from "./contact-form";
 import { DAY_CSS, DayBar, DaySheet } from "./day";
@@ -723,6 +724,13 @@ function TourExperience({
     const t = window.setTimeout(() => (demo || !featuresSeen(T.slug)) && setFeaturesOpen(true), 900);
     return () => window.clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once, when the review link opens
+  }, []);
+  /** "Mød os" is open: "" = everyone, else one person's id - from any link "#mod" / "#mod:<id>" and the people on place cards. */
+  const [teamOpen, setTeamOpen] = useState<string | null>(null);
+  useEffect(() => {
+    const open = (e: Event) => setTeamOpen(typeof (e as CustomEvent).detail === "string" ? (e as CustomEvent<string>).detail : "");
+    window.addEventListener("hv-mod", open);
+    return () => window.removeEventListener("hv-mod", open);
   }, []);
   /** "Vej til skolen" is open - from any link "#vej". */
   const [commuteOpen, setCommuteOpen] = useState(false);
@@ -2916,7 +2924,7 @@ function TourExperience({
       {[...new Set([...fontHrefs(T.font, [400, 600, 700, 800, 900]), ...(T.fontHeading ? fontHrefs(T.fontHeading, [500, 600]) : [])])].map((href) => (
         <link key={href} rel="stylesheet" href={href} />
       ))}
-      <style>{CSS + TOUR_LOGO_CSS + CONTACT_CSS + STORIES_CSS + LIGHTBOX_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + ONBOARDING_CSS + MENU_HINT_CSS + INFO_CSS + STAGING_CSS + (T.staging?.some((i) => i.kind === "treasure") ? CONTEST_CSS : "") + (T.inUse?.length ? IN_USE_CSS : "") + (T.lineDays ? LINE_DAY_CSS : "") + (T.yearWheel ? YEARWHEEL_CSS : "") + (T.schedule ? SCHEDULE_CSS : "") + MAP_CSS + (T.sitePlan?.overlay ? SITE_PLAN_CSS + SITE_PLAN_360_CSS : "") + ROUTE_CSS + MEASURES_CSS + CARDS_CSS + DAY_CSS + (T.events ? EVENTS_CSS : "") + (T.shop || T.points.some((p) => p.shop) ? SHOP_CSS : "") + SIMPLE_CSS + BENTO_CSS + LOGO_RIGHT_CSS + LANG_CSS + WEATHER_CSS + COMMUTE_CSS + FEATURES_CSS + FINDER_CSS + FULLSCREEN_BUTTON_CSS + (T.design?.menu === "float" ? FLOAT_DOCK_CSS : "") + (T.design?.menu === "glass" ? GLASS_MENU_CSS : "") + (review ? FEEDBACK_CSS : "")}</style>
+      <style>{CSS + TOUR_LOGO_CSS + CONTACT_CSS + STORIES_CSS + LIGHTBOX_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + ONBOARDING_CSS + MENU_HINT_CSS + INFO_CSS + STAGING_CSS + (T.staging?.some((i) => i.kind === "treasure") ? CONTEST_CSS : "") + (T.inUse?.length ? IN_USE_CSS : "") + (T.lineDays ? LINE_DAY_CSS : "") + (T.yearWheel ? YEARWHEEL_CSS : "") + (T.schedule ? SCHEDULE_CSS : "") + MAP_CSS + (T.sitePlan?.overlay ? SITE_PLAN_CSS + SITE_PLAN_360_CSS : "") + ROUTE_CSS + MEASURES_CSS + CARDS_CSS + DAY_CSS + (T.events ? EVENTS_CSS : "") + (T.shop || T.points.some((p) => p.shop) ? SHOP_CSS : "") + SIMPLE_CSS + BENTO_CSS + LOGO_RIGHT_CSS + LANG_CSS + WEATHER_CSS + COMMUTE_CSS + FEATURES_CSS + FINDER_CSS + FULLSCREEN_BUTTON_CSS + (T.design?.menu === "float" ? FLOAT_DOCK_CSS : "") + (T.team?.people.length ? TEAM_CSS : "") + (T.design?.menu === "glass" ? GLASS_MENU_CSS : "") + (review ? FEEDBACK_CSS : "")}</style>
       {/* The tour's own design on top (written by Claude or by hand under Avanceret). */}
       {T.customCss && <style>{T.customCss.replace(/<\/?style/gi, "")}</style>}
 
@@ -3827,6 +3835,22 @@ function TourExperience({
           <i aria-hidden /> Se funktionerne
         </button>
       )}
+      {teamOpen != null && T.team?.people.length ? (
+        <TeamSheet
+          T={T}
+          open={teamOpen}
+          setOpen={(v) => {
+            if (v) track("team_open", { label: v });
+            setTeamOpen(v);
+          }}
+          onGo={(href, label) => {
+            setTeamOpen(null);
+            setMenuOpen(false);
+            track("team_go", { label });
+            window.dispatchEvent(new CustomEvent("hv-gaa-til", { detail: { href, label } }));
+          }}
+        />
+      ) : null}
       {commuteOpen && T.commute && <CommuteSheet T={T} onClose={() => setCommuteOpen(false)} onEvent={(name, params) => track(name, params ?? {})} />}
       {contactOpen && T.contactForm && (
         <ContactForm T={T} preview={inPreview} showcase={Boolean(demo)} room={room} onClose={() => setContactOpen(false)} onSent={() => track("contact_form", { place: "form" })} />
@@ -3909,6 +3933,7 @@ function TourExperience({
           }}
           onRoom={goRoom}
           onLink={(label, href) => ctaClick(label, href, "place_card")}
+          profileOf={T.team?.people.length ? (p) => teamIdOf(T, p) : undefined}
         />
       )}
       {nudgeOn && showCard == null && !menuOpen && T.nudge && phase === "tour" && (
