@@ -102,8 +102,8 @@ export async function customerSigningLink(submissionId: string): Promise<string 
   const s = await getSubmission(submissionId);
   const customer = s.submitters?.find((x) => x.external_id === "customer" || x.role === "Customer");
   const url = customer?.embed_src ?? null;
-  // Only DocuSeal's own address - never anything else from the answer.
-  return url && /^https:\/\/([a-z0-9-]+\.)*docuseal\.(eu|com)\//i.test(url) ? url : null;
+  // Only DocuSeal's own addresses - theirs, or our own signing domain there (sign.nextview360.dk) - never anything else from the answer.
+  return url && /^https:\/\/(([a-z0-9-]+\.)*docuseal\.(eu|com)|sign\.nextview360\.dk)\//i.test(url) ? url : null;
 }
 
 /** DocuSeal sends the customer the signing mail again. */
