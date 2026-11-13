@@ -69,6 +69,15 @@ type Labels = {
   section6Body: string;
   section7Title: string;
   section7Body: string;
+  /** The data processing agreement (GDPR art. 28) - its section, and Appendix 1 (approved text, 2026-11-13). */
+  dpa: {
+    title: (n: number) => string;
+    body: string;
+    appendixTitle: string;
+    basisTitle: string;
+    basis: string;
+    sections: { title: string; items?: [string, string][]; text?: string; table?: { cols: [string, string, string]; rows: [string, string, string][]; after: string } }[];
+  };
   signaturesTitle: string;
   invoiceEmailLabel: string;
 };
@@ -180,6 +189,57 @@ const LABELS: Record<ContractLanguage, Labels> = {
     section7Title: "7) Brug som reference",
     section7Body:
       "Kunden giver Nextview360 ret til at bruge den virtuelle tour, billeder og video fra optagelsen samt kundens navn og logo som reference i Nextview360's markedsføring – fx på Nextview360's hjemmeside, på sociale medier, i præsentationer og i salgsmateriale. Nextview360 præsenterer altid kunden på en ordentlig og flot måde, der afspejler kunden positivt. Retten gælder i aftalens løbetid og i op til 12 måneder efter dens ophør, og den er en undtagelse fra fortroligheden i afsnit 5. Statistik og andre oplysninger fra kundeportalen bruges ikke uden kundens skriftlige samtykke.",
+    dpa: {
+      title: (n) => `${n}) Databehandling`,
+      body: "Når Nextview360 behandler personoplysninger for Kunden, sker det efter databehandleraftalen i Bilag 1. Bilaget er en del af denne aftale og underskrives sammen med den. Kunden er dataansvarlig, og Nextview360 er databehandler.",
+      appendixTitle: "Bilag 1: Databehandleraftale",
+      basisTitle: "Grundlag",
+      basis: "Parterne bruger EU-Kommissionens standardkontraktbestemmelser for databehandlere (gennemførelsesafgørelse (EU) 2021/915, i Datatilsynets danske udgave). Bestemmelserne gælder uændret, og punkterne herunder er deres bilag A–D.",
+      sections: [
+        {
+          title: "A. Hvad vi behandler og hvorfor",
+          items: [
+            ["Formål", "At levere Kundens virtuelle tour, kontaktformular, konkurrencer og kundeportal."],
+            ["Hvem oplysningerne handler om", "Besøgende, der skriver til Kunden gennem touren eller deltager i en konkurrence. Personer, der kan ses på billeder og film i touren. Kundens egne brugere af kundeportalen."],
+            ["Hvilke oplysninger", "Navn, e-mail, telefon og den besked, personen selv skriver. Billeder og film af personer i Kundens lokaler. Login-e-mail til kundeportalen."],
+            ["Ingen følsomme oplysninger", "Der behandles ikke følsomme oplysninger, medmindre Kunden selv beder besøgende om det."],
+            ["Hvad vi ikke gemmer", "Besøgsstatistikken gemmer ikke IP-adresser eller andet, der kan bruges til at genkende den enkelte besøgende."],
+            ["Hvor længe", "Så længe aftalen løber. Henvendelser fra kontaktformularen gemmes i 12 måneder, medmindre Kunden ønsker andet."],
+          ],
+        },
+        {
+          title: "B. Underleverandører",
+          text: "Kunden godkender disse underleverandører. Vi giver besked mindst 30 dage før, vi tager en ny i brug, og Kunden kan sige nej.",
+          table: {
+            cols: ["Leverandør", "Bruges til", "Hvor"],
+            rows: [
+              ["Vercel Inc.", "Drift af hjemmeside og kundeportal, filer", "EU"],
+              ["Neon Inc.", "Database", "EU"],
+              ["Cloudflare Inc.", "Visning af den udgivne tour", "EU / USA"],
+              ["Matterport Inc.", "3D-scanninger og 360°-billeder", "USA"],
+              ["Resend Inc.", "Afsendelse af kontaktformularer og login-mails", "USA"],
+              ["Anthropic PBC", "nextviewAI: tjek af billeder for personer, så de kan skjules", "USA"],
+            ],
+            after: "Overførsel til USA sker efter EU-USA-ordningen (Data Privacy Framework) eller EU's standardkontrakt for overførsler.",
+          },
+        },
+        {
+          title: "C. Instruks og sikkerhed",
+          items: [
+            ["Kun efter Kundens instruks", "Vi bruger kun oplysningerne til formålet i punkt A."],
+            ["Adgang", "Kun medarbejdere, der skal bruge oplysningerne, har adgang. De har tavshedspligt og logger ind personligt."],
+            ["Beskyttelse", "Al trafik er krypteret (HTTPS). Adgangskoder og nøgler gemmes ikke i koden."],
+            ["Personer på billeder", "Personer, der kan genkendes på billeder i touren, kan skjules på Kundens anmodning."],
+            ["Brud", "Opdager vi et brud på sikkerheden, giver vi Kunden besked uden unødig forsinkelse og senest inden for 48 timer."],
+            ["Hjælp til Kunden", "Vi hjælper Kunden, hvis en person beder om at se, rette eller slette sine oplysninger."],
+          ],
+        },
+        {
+          title: "D. Når aftalen slutter",
+          text: "Inden for 30 dage efter aftalens ophør sletter vi Kundens personoplysninger, eller vi giver dem tilbage, hvis Kunden beder om det. Det gælder ikke, hvis loven kræver, at vi gemmer dem.",
+        },
+      ],
+    },
     signaturesTitle: "Underskrifter",
     invoiceEmailLabel: "E-mail til fakturaer",
   },
@@ -289,6 +349,57 @@ const LABELS: Record<ContractLanguage, Labels> = {
     section7Title: "7) Use as a reference",
     section7Body:
       "The Customer grants Nextview360 the right to use the virtual tour, images and video from the shoot, and the Customer's name and logo as a reference in Nextview360's marketing – e.g. on Nextview360's website, on social media, in presentations and in sales material. Nextview360 will always present the Customer in a proper and attractive way that reflects well on the Customer. This right applies during the agreement and for up to 12 months after it ends, and is an exception to the confidentiality in section 5. Statistics and other information from the customer portal are not used without the Customer's written consent.",
+    dpa: {
+      title: (n) => `${n}) Data processing`,
+      body: "When Nextview360 processes personal data on the Customer's behalf, it does so under the data processing agreement in Appendix 1. The appendix is part of this agreement and is signed with it. The Customer is the data controller, and Nextview360 is the data processor.",
+      appendixTitle: "Appendix 1: Data Processing Agreement",
+      basisTitle: "Basis",
+      basis: "The parties use the European Commission's standard contractual clauses for processors (Implementing Decision (EU) 2021/915). The clauses apply unchanged, and the points below are their Annexes A–D.",
+      sections: [
+        {
+          title: "A. What we process and why",
+          items: [
+            ["Purpose", "To provide the Customer's virtual tour, contact form, competitions and customer portal."],
+            ["Whose data", "Visitors who write to the Customer through the tour or enter a competition. People who can be seen in photos and videos in the tour. The Customer's own users of the customer portal."],
+            ["What data", "Name, e-mail, phone and the message the person writes. Photos and videos of people in the Customer's premises. Login e-mail for the customer portal."],
+            ["No sensitive data", "No sensitive data is processed, unless the Customer asks visitors for it."],
+            ["What we don't keep", "Visit statistics do not store IP addresses or anything else that can identify the individual visitor."],
+            ["How long", "For as long as the agreement runs. Messages from the contact form are kept for 12 months, unless the Customer wishes otherwise."],
+          ],
+        },
+        {
+          title: "B. Sub-processors",
+          text: "The Customer approves these sub-processors. We give notice at least 30 days before using a new one, and the Customer may object.",
+          table: {
+            cols: ["Provider", "Used for", "Where"],
+            rows: [
+              ["Vercel Inc.", "Hosting of website and customer portal, files", "EU"],
+              ["Neon Inc.", "Database", "EU"],
+              ["Cloudflare Inc.", "Serving the published tour", "EU / USA"],
+              ["Matterport Inc.", "3D scans and 360° images", "USA"],
+              ["Resend Inc.", "Sending contact-form and login e-mails", "USA"],
+              ["Anthropic PBC", "nextviewAI: checking images for people so they can be hidden", "USA"],
+            ],
+            after: "Transfers to the USA take place under the EU-US Data Privacy Framework or the EU standard contractual clauses for transfers.",
+          },
+        },
+        {
+          title: "C. Instructions and security",
+          items: [
+            ["Only on the Customer's instructions", "We only use the data for the purpose in point A."],
+            ["Access", "Only staff who need the data have access. They are bound by confidentiality and log in personally."],
+            ["Protection", "All traffic is encrypted (HTTPS). Passwords and keys are not stored in the code."],
+            ["People in images", "People who can be recognised in images in the tour can be hidden at the Customer's request."],
+            ["Breaches", "If we discover a security breach, we notify the Customer without undue delay and no later than 48 hours."],
+            ["Helping the Customer", "We help the Customer if a person asks to see, correct or delete their data."],
+          ],
+        },
+        {
+          title: "D. When the agreement ends",
+          text: "Within 30 days of the agreement ending, we delete the Customer's personal data, or return it if the Customer asks. This does not apply where the law requires us to keep it.",
+        },
+      ],
+    },
     signaturesTitle: "Signatures",
     invoiceEmailLabel: "Email for invoices",
   },
@@ -458,6 +569,11 @@ export function buildContractHtml(data: ContractHtmlData, language: ContractLang
   .overview-row .field-label{ font-weight:600; color:var(--ink); }
   .overview-note{ font-size:13px; color:var(--ink); margin-top:8px; }
   .terms-box{ border:1px solid var(--line); border-radius:12px; padding:14px 18px; font-size:13.5px; margin-bottom:8px; white-space:pre-wrap; }
+  .dpa{ margin:28px 0 20px; page-break-before:always; break-before:page; font-size:13.5px; }
+  .dpa p{ margin:0 0 8px; }
+  .dpa-h{ font-size:14.5px; font-weight:700; margin:16px 0 6px !important; color:var(--ink); }
+  .dpa-list{ margin:0 0 8px; padding-left:20px; }
+  .dpa-list li{ margin-bottom:5px; }
   .sig-title{ font-size:19px; font-weight:800; margin:0 0 16px; color:var(--ink); }
   .sig-grid{ display:flex; flex-wrap:wrap; gap:40px; page-break-inside:avoid; break-inside:avoid; }
   .sig-grid > div{ flex:1 1 0; min-width:220px; }
@@ -552,6 +668,27 @@ ${
 `
     : ""
 }
+  <div class="section">
+    <p class="section-title">${esc(t.dpa.title(data.referenceUse ? 8 : 7))}</p>
+    <p>${esc(t.dpa.body)}</p>
+  </div>
+
+  <div class="dpa">
+    <p class="section-title" style="font-size:19px;font-weight:800">${esc(t.dpa.appendixTitle)}</p>
+    <p class="dpa-h">${esc(t.dpa.basisTitle)}</p>
+    <p>${esc(t.dpa.basis)}</p>
+${t.dpa.sections
+  .map(
+    (sec) => `    <p class="dpa-h">${esc(sec.title)}</p>
+${sec.text ? `    <p>${esc(sec.text)}</p>\n` : ""}${sec.items ? `    <ul class="dpa-list">${sec.items.map(([k, v]) => `<li><b>${esc(k)}:</b> ${esc(v)}</li>`).join("")}</ul>\n` : ""}${
+      sec.table
+        ? `    <table class="loc-table"><thead><tr>${sec.table.cols.map((c) => `<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>${sec.table.rows.map((row) => `<tr>${row.map((c) => `<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table>
+    <p>${esc(sec.table.after)}</p>\n`
+        : ""
+    }`
+  )
+  .join("")}
+  </div>
   <hr class="rule">
 
   <p class="sig-title">${esc(t.signaturesTitle)}</p>

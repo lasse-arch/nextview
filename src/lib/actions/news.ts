@@ -63,6 +63,12 @@ export async function getUnreadNewsCount(userId: string, newsReadAt: Date | null
 const DEFAULT_POSTS: { title: string; body: string; minutesAgo: number; screenshotUrl: string }[] = [
   {
     minutesAgo: 0,
+    title: "Databehandleraftale er nu en del af kontrakten",
+    body: "Alle nye kontrakter har nu et afsnit om databehandling og en databehandleraftale som Bilag 1 - på både dansk og engelsk. Den bygger på EU's standardaftale og beskriver kort, hvilke personoplysninger vi passer på for kunden (fx henvendelser fra kontaktformularen og personer på billeder), hvem vores underleverandører er, og hvad vi gør ved et brud.\n\nKunden skriver under på det hele på én gang, når kontrakten underskrives - der er ikke noget ekstra at sende. Spørger en kunde efter en databehandleraftale, kan du svare, at den er med i kontrakten. Kontrakter, der allerede er sendt eller underskrevet, er ikke ændret.",
+    screenshotUrl: "/news/databehandleraftale.png",
+  },
+  {
+    minutesAgo: 0,
     title: "Ringelisten som regneark: \"Sheet\"-visning med noter",
     body: "På Ringelisten kan du nu skifte mellem \"Kort\" og \"Sheet\". Sheet viser hele listen som et regneark: én række pr. lead med firma, kontakt, telefon, e-mail, hjemmeside, område, adresse, telefonsvar, seneste note og CVR.\n\nKlik på en celle og skriv - Enter gemmer og går ned, Tab går til højre, piletasterne flytter, og Esc fortryder. I kolonnen \"Seneste note\" skriver du en ny note fra opkaldet direkte i cellen, og den gemmes på dealen. Linjen øverst viser hele indholdet af den valgte celle, så en lang note kan læses.\n\n\"Telefonsvar\" sidder på hver række, og \"Mere\" åbner leadets kort under rækken med Book møde, Ring tilbage, Tabt og produkter. Arpo husker på din computer, hvilken visning du sidst brugte.",
     screenshotUrl: "/news/ringeliste-sheet.png",
