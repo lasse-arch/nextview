@@ -43,7 +43,7 @@ export function SigningLinkButtons({ dealId }: { dealId: string }) {
         onClick={() =>
           start(async () => {
             const r = await resendContractMail(dealId);
-            setNote(r.ok ? { text: "DocuSeal har sendt mailen til kunden igen." } : { text: r.error, error: true });
+            setNote(r.ok ? (r.warning ? { text: r.warning, error: true } : { text: "Kontraktmailen er sendt til kunden igen." }) : { text: r.error, error: true });
           })
         }
       >
