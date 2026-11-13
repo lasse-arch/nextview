@@ -55,6 +55,8 @@ type Draft = {
   explore: string;
   plan: TourPlanResult | null;
   corrections: string;
+  /** The plan's improvements over the old tour that are unticked (their index). */
+  skipUpgrades?: number[];
 };
 function readDraft(): Draft | null {
   try {
@@ -112,6 +114,8 @@ export function NewTour({ tours, forDeal, onClose, replaces }: { tours: { slug: 
   /** nextviewAI's plan, before it builds - and the user's corrections to it. */
   const [plan, setPlan] = useState<TourPlanResult | null>(null);
   const [corrections, setCorrections] = useState("");
+  /** The improvements over the old explore tour the user unticked (their index in plan.upgrades) - those stay as they were. */
+  const [skipUpgrades, setSkipUpgrades] = useState<number[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
@@ -135,6 +139,7 @@ export function NewTour({ tours, forDeal, onClose, replaces }: { tours: { slug: 
     setExplore("");
     setPlan(null);
     setCorrections("");
+    setSkipUpgrades([]);
     setError(null);
   }
 
@@ -165,6 +170,7 @@ export function NewTour({ tours, forDeal, onClose, replaces }: { tours: { slug: 
       }));
       if (!r.ok) return setError(r.error);
       setPlan(r.plan);
+      setSkipUpgrades([]);
       setCorrections("");
       setStep(5);
     });
@@ -175,7 +181,7 @@ export function NewTour({ tours, forDeal, onClose, replaces }: { tours: { slug: 
     start(async () => {
       const r = copyOf
         ? await createTour(name, copyOf)
-        : await createTourFromWebsite({ ...aiInput(), plan: plan ?? undefined }).catch((err: unknown) => ({ ok: false as const, error: `Noget gik galt (${err instanceof Error ? err.message : err}) - prøv igen.` }));
+        : await createTourFromWebsite({ ...aiInput(), plan: plan ?? undefined, skipUpgrades }).catch((err: unknown) => ({ ok: false as const, error: `Noget gik galt (${err instanceof Error ? err.message : err}) - prøv igen.` }));
       if (!r.ok) return setError(r.error);
       if (!forDeal && !replaces) dropDraft();
       // The drone film: up to the new tour, and in as the front page's film. If it fails, the tour is there all the same - the film can be put in under Start.
@@ -210,11 +216,11 @@ export function NewTour({ tours, forDeal, onClose, replaces }: { tours: { slug: 
     if (!keeps || !(name.trim() || space || who)) return;
     const t = window.setTimeout(() => {
       try {
-        localStorage.setItem(DRAFT, JSON.stringify({ at: Date.now(), step, who, space, branch, preset, layout, layoutFrom, name, website, focus, about, notes, explore, plan, corrections } satisfies Draft));
+        localStorage.setItem(DRAFT, JSON.stringify({ at: Date.now(), step, who, space, branch, preset, layout, layoutFrom, name, website, focus, about, notes, explore, plan, corrections, skipUpgrades } satisfies Draft));
       } catch {}
     }, 400);
     return () => window.clearTimeout(t);
-  }, [keeps, step, who, space, branch, preset, layout, layoutFrom, name, website, focus, about, notes, explore, plan, corrections]);
+  }, [keeps, step, who, space, branch, preset, layout, layoutFrom, name, website, focus, about, notes, explore, plan, corrections, skipUpgrades]);
   function resume(d: Draft) {
     setDraftOffer(null);
     setWho(d.who);
@@ -231,6 +237,7 @@ export function NewTour({ tours, forDeal, onClose, replaces }: { tours: { slug: 
     setExplore(d.explore);
     setPlan(d.plan);
     setCorrections(d.corrections);
+    setSkipUpgrades(d.skipUpgrades ?? []);
     setStep(Math.min(Math.max(0, d.step), 5));
   }
   /** Another tour's layout into the steps - and the rest of it (where things sit, how they behave) when it's built. */
@@ -511,7 +518,7 @@ export function NewTour({ tours, forDeal, onClose, replaces }: { tours: { slug: 
                   {pending && <p className="px-1 text-center text-[13px] text-[#6e6e73]">nextviewAI læser hjemmesiden og lægger en plan - det tager typisk et halvt minut…</p>}
                 </div>
               ) : (
-                <PlanStep plan={plan} corrections={corrections} setCorrections={setCorrections} pending={pending} onReplan={makePlan} />
+                <PlanStep plan={plan} corrections={corrections} setCorrections={setCorrections} pending={pending} onReplan={makePlan} skip={skipUpgrades} setSkip={setSkipUpgrades} />
               )}
               {error && <p className="mt-3 px-1 text-[13px] text-[#ff3b30]">{error}</p>}
             </div>
@@ -556,6 +563,8 @@ export function NewTour({ tours, forDeal, onClose, replaces }: { tours: { slug: 
   );
 }
 
+const UPGRADE_AREA: Record<string, string> = { start: "Start", menu: "Menuen", rum: "Rummene", handling: "Handling", funktion: "Ny funktion", design: "Design" };
+
 /** nextviewAI's plan in its own words - read it, write what should be different, and get a new one (or build). */
 function PlanStep({
   plan,
@@ -563,14 +572,19 @@ function PlanStep({
   setCorrections,
   pending,
   onReplan,
+  skip,
+  setSkip,
 }: {
   plan: TourPlanResult | null;
   corrections: string;
   setCorrections: (s: string) => void;
   pending: boolean;
   onReplan: () => void;
+  skip: number[];
+  setSkip: (s: number[]) => void;
 }) {
   if (!plan) return null;
+  const upgrades = plan.upgrades ?? [];
   return (
     <div className="space-y-3">
       <h2 className="text-[19px] font-semibold tracking-tight">Sådan vil nextviewAI bygge touren</h2>
@@ -591,6 +605,32 @@ function PlanStep({
           )}
         </section>
       ))}
+      {upgrades.length > 0 && (
+        <section className="rounded-2xl bg-white p-4 ring-1 ring-black/[.04]">
+          <h3 className="text-[13px] font-semibold uppercase tracking-wide text-[#6e6e73]">Sådan er den nu → sådan vil jeg lave den</h3>
+          <p className="mt-1 text-[13px] leading-snug text-[#6e6e73]">Stederne fra den gamle tour genbruges altid. Fjern fluebenet ved det, der skal blive som i den gamle tour.</p>
+          <ul className="mt-2 divide-y divide-black/[.06]">
+            {upgrades.map((u, i) => {
+              const on = !skip.includes(i);
+              return (
+                <li key={i}>
+                  <label className="flex cursor-pointer gap-3 py-3">
+                    <input type="checkbox" className="mt-1 h-4 w-4 flex-none accent-[#0071e3]" checked={on} onChange={() => setSkip(on ? [...skip, i] : skip.filter((x) => x !== i))} />
+                    <span className={`min-w-0 flex-1 ${on ? "" : "opacity-50"}`}>
+                      <span className="block text-[11px] font-semibold uppercase tracking-wide text-[#0071e3]">{UPGRADE_AREA[u.area] ?? u.area}</span>
+                      <span className="mt-0.5 block text-[13px] text-[#6e6e73]">
+                        <span className="font-medium">Nu:</span> {u.now}
+                      </span>
+                      <span className="mt-0.5 block text-[14px] font-medium">→ {u.then}</span>
+                      <span className="mt-0.5 block text-[13px] text-[#6e6e73]">{u.why}</span>
+                    </span>
+                  </label>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
       {plan.questions.length > 0 && (
         <section className="rounded-2xl bg-[#fff8e6] p-4 ring-1 ring-[#f5d27a]/60">
           <h3 className="text-[13px] font-semibold uppercase tracking-wide text-[#8a6100]">nextviewAI spørger</h3>

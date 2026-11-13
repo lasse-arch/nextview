@@ -53,7 +53,7 @@ export function PeopleEditor({ config, edit, preview }: { config: TourConfig; ed
           onChange={setPeople}
           icon={["bg-[#af52de]", '<circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4.5-6 8-6s7 2 8 6"/>']}
           title={(p) => p.name || "Ny person"}
-          subtitle={(p) => [p.role, p.image ? null : "mangler foto", p.bio ? null : "ingen tekst", p.href ? "har et sted" : null].filter(Boolean).join(" · ") || "-"}
+          subtitle={(p) => [p.role, p.image ? null : "mangler foto", p.bio ? null : "ingen tekst", p.href ? "har et sted" : null, p.video ? "har video" : null].filter(Boolean).join(" · ") || "-"}
           empty="Ingen endnu."
           editor={(p, set) => <PersonFields p={p} set={set} preview={preview} />}
         />
@@ -117,6 +117,21 @@ function PersonFields({ p, set, preview }: { p: TeamPerson; set: (next: TeamPers
       </Field>
       <Field title="Spørg mig om (valgfrit)" hint='Står efter "Spørg Per, …", fx "når du skal finde den franske flaske til middagen."'>
         <input className={`${input} bg-white`} value={p.ask ?? ""} onChange={(e) => put({ ask: e.target.value || undefined })} />
+      </Field>
+      <Field title="Video (valgfri)" hint='Fx centerlederen, der præsenterer stedet. Står i profilen i stedet for fotoet - kører uden lyd, et tryk tænder lyden. Brug selve filen (MP4) - et Facebook- eller Instagram-link kan ikke afspilles her.'>
+        <div className="flex flex-wrap items-center gap-2">
+          {p.video ? (
+            <>
+              <video src={p.video} poster={p.image} muted playsInline className="h-20 rounded-lg bg-black" />
+              <UploadButton accept="video/mp4,video/webm" label="Skift video" onDone={(video) => put({ video })} />
+              <button type="button" className="text-[13px] text-[#ff3b30]" onClick={() => put({ video: undefined })}>
+                Fjern
+              </button>
+            </>
+          ) : (
+            <UploadButton accept="video/mp4,video/webm" label="Upload video" onDone={(video) => put({ video })} />
+          )}
+        </div>
       </Field>
       <Field title="Her møder du mig (valgfrit)" hint='Giver knappen "Se hvor du møder …" i profilen.'>
         <div className="flex flex-wrap items-center gap-2">

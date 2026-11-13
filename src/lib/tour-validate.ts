@@ -98,7 +98,7 @@ export function tourConfigProblem(config: unknown): string | null {
       if (!obj(p) || !str(p.id) || !/^[a-z0-9-]{1,40}$/.test(p.id) || !str(p.image) || typeof p.name !== "string") return "En person mangler id, navn eller foto.";
       if (ids.has(p.id)) return `To personer har samme id ("${p.id}").`;
       ids.add(p.id);
-      if ([p.role, p.bio, p.quote, p.ask, p.href].some((v) => v !== undefined && typeof v !== "string")) return `${p.name || p.id}: rolle, tekst, citat og sted skal være tekst.`;
+      if ([p.role, p.bio, p.quote, p.ask, p.href, p.video].some((v) => v !== undefined && typeof v !== "string")) return `${p.name || p.id}: rolle, tekst, citat, sted og video skal være tekst.`;
     }
   }
   if (c.inUse?.some((i) => (i.images !== undefined && (!arr(i.images) || i.images.length > 12 || !i.images.every(str))) || (i.button !== undefined && (!obj(i.button) || typeof i.button.label !== "string" || typeof i.button.href !== "string"))))

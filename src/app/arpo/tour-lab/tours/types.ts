@@ -374,6 +374,12 @@ export type TeamPerson = {
   ask?: string;
   /** Where you meet them in the tour (a place link) - "Se hvor du møder Per". */
   href?: string;
+  /**
+   * A video of them (MP4/WebM, e.g. the manager presenting the place) - shown in their profile
+   * instead of the photo: it plays at once without sound, a tap turns the sound on. The photo
+   * is its still picture before it plays, and stays their face everywhere else.
+   */
+  video?: string;
 };
 
 export type MenuEntry = { title: string; href: string } | { title: string; items: [string, string][] };

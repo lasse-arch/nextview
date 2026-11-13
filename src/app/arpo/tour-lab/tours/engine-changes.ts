@@ -9,6 +9,7 @@
 export type EngineChange = { date: string; kind: "ny" | "sikkerhed" | "hastighed" | "rettelse"; text: string };
 
 export const ENGINE_CHANGES: EngineChange[] = [
+  { date: "2026-11-13", kind: "ny", text: "\"Mød os\": en person kan have en video (fx centerlederen, der præsenterer stedet) i stedet for fotoet i sin profil - den kører uden lyd, et tryk tænder lyden. På listen har personen et lille afspil-mærke." },
   { date: "2026-11-13", kind: "ny", text: "Personer og \"Mød os\": personerne laves én gang og vælges på stedkort, i Vis mig rundt og på linjerne - og hver har en profil (stort foto, lidt om dem, citat, \"Spørg …\" og \"Se hvor du møder …\"), åbnet fra menuen (#mod) eller ved et tryk på personen." },
   { date: "2026-11-13", kind: "ny", text: "\"Se det i brug\" kan have flere billeder, der toner over i hinanden, og - stort - en tekst og en knap (fx billeder fra tidligere smagninger i et tomt baglokale, og \"Book en smagning\")." },
   { date: "2026-11-13", kind: "ny", text: "To nye menuer: Glas-panel (sidemenuen som et svævende glaspanel - på mobil et glasark nedefra) og Flydende dock (en lille glas-pille nederst med grupperne, Vis mig rundt og hovedknappen, der kun fylder det, den skal). Vælges under Layout → Menuen." },

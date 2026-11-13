@@ -2,13 +2,16 @@
 
 import type { CardPerson, TeamPerson, TourConfig } from "../tours/types";
 import { useT } from "../tours/i18n-react";
+import { PointVideo } from "./point-video";
 
 /*
  * "Mød os" (TourConfig.team): the people behind the place, in the tour. A
  * list (photo, name, role) and each one's profile - a big photo, a few words,
  * their own quote, "Spørg Per, når …" and "Se hvor du møder Per", which takes
  * the tour to where they're found. Opened by "#mod" / "#mod:<id>" (menu,
- * tiles, buttons) and by a tap on the same person on a place card.
+ * tiles, buttons) and by a tap on the same person on a place card. A person
+ * with a video (fx the manager presenting the place) has it in place of the
+ * photo in their profile - silent at first, a tap for sound.
  */
 
 /** The team member a place card's person is (same name, or same photo) - their profile can open from the card. */
@@ -51,6 +54,13 @@ export function TeamSheet({
                 <button key={p.id} type="button" onClick={() => setOpen(p.id)}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={p.image} alt="" loading="lazy" />
+                  {p.video && (
+                    <i className="tm-play" aria-label={tr("Video")}>
+                      <svg viewBox="0 0 24 24" aria-hidden>
+                        <path d="M8 5v14l11-7z" />
+                      </svg>
+                    </i>
+                  )}
                   <b>{p.name}</b>
                   {p.role && <span>{p.role}</span>}
                 </button>
@@ -68,8 +78,14 @@ function Profile({ p, back, onGo }: { p: TeamPerson; back?: () => void; onGo: (h
   const first = p.name.split(/\s+/)[0];
   return (
     <div className="tm-p">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img className="tm-foto" src={p.image} alt={p.name} />
+      {p.video ? (
+        <div className="tm-video">
+          <PointVideo video={{ src: p.video, poster: p.image }} name={p.name} />
+        </div>
+      ) : (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img className="tm-foto" src={p.image} alt={p.name} />
+      )}
       <div className="tm-tekst">
         {back && (
           <button type="button" className="tm-tilbage" onClick={back}>
@@ -113,10 +129,15 @@ export const TEAM_CSS = `
 .tm-x{position:absolute;top:12px;right:12px;z-index:2;width:34px;height:34px;border:0;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;font-size:20px;line-height:1;cursor:pointer}
 .tm-titel{margin:0 44px 16px 0;font-size:24px;font-weight:900;color:var(--c-main);font-family:var(--font-heading,inherit)}
 .tm-liste{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px}
-.tm-liste button{display:flex;flex-direction:column;align-items:center;gap:6px;border:0;border-radius:18px;padding:16px 10px;background:var(--c-soft,#f4f4f2);font:inherit;color:inherit;cursor:pointer;text-align:center}
+.tm-liste button{position:relative;display:flex;flex-direction:column;align-items:center;gap:6px;border:0;border-radius:18px;padding:16px 10px;background:var(--c-soft,#f4f4f2);font:inherit;color:inherit;cursor:pointer;text-align:center}
 .tm-liste button:hover{background:color-mix(in srgb,var(--c-accent) 12%,#fff)}
 .tm-liste img{width:84px;height:84px;border-radius:50%;object-fit:cover;object-position:50% 25%;box-shadow:0 0 0 3px #fff,0 0 0 5px color-mix(in srgb,var(--c-accent) 55%,transparent)}
 .tm-liste b{font-size:15px;color:var(--c-main)}
+.tm-play{position:absolute;top:76px;left:calc(50% + 22px);width:28px;height:28px;display:grid;place-items:center;border-radius:50%;background:var(--c-accent);color:var(--c-on-accent,#fff);box-shadow:0 0 0 3px #fff}
+.tm-play svg{width:13px;height:13px;fill:currentColor;margin-left:2px}
+.tm-video{min-height:420px;max-height:640px;background:#000}
+.tm-video .hv-pvideo{margin:0;height:100%;aspect-ratio:auto;border-radius:0}
+.tm-video .hv-pvideo video{object-position:50% 30%}
 .tm-liste span{font-size:12.5px;color:#5d7177}
 .tm-p{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr)}
 .tm-foto{display:block;width:100%;height:100%;min-height:420px;max-height:640px;object-fit:cover;object-position:50% 20%}
@@ -136,6 +157,8 @@ export const TEAM_CSS = `
   .tm-ark{padding:20px 16px calc(20px + env(safe-area-inset-bottom,0px))}
   .tm-p{grid-template-columns:1fr}
   .tm-foto{min-height:0;height:min(48vh,380px)}
+  .tm-video{min-height:0;height:min(58vh,480px)}
+  .tm-video .hv-pvideo video{object-fit:contain}
   .tm-tekst{padding:18px 18px 24px}
   .tm-tekst h2{font-size:25px}
   .tm-liste{grid-template-columns:repeat(2,minmax(0,1fr))}

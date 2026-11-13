@@ -127,6 +127,10 @@ Fx specialefterskoler (ADHD, autisme, nedsat kognitivt funktionsniveau):
   køkkenpersonalet ved spisesalen eller linjens lærere i deres lokale. Højst 3,
   rigtige portrætter (ansigtet tydeligt), fornavn og evt. rolle. Det gør stedet
   trygt og personligt - især på skoler.
+- **Video i "Mød os"**: har kunden en præsentationsvideo (fx centerlederen,
+  der fortæller om stedet), så læg den på personen under Personer - den står i
+  profilen i stedet for fotoet. Brug selve filen (MP4); et Facebook- eller
+  Instagram-link kan ikke afspilles i touren. Kort er bedst (under ca. 1 minut).
 - **"Din plads venter"**: et kort efter ca. 90 sekunder med kundens vigtigste
   handling. Ét kort, aldrig mens menuen er åben.
 
@@ -227,6 +231,15 @@ Fx specialefterskoler (ADHD, autisme, nedsat kognitivt funktionsniveau):
   Tysk og engelsk er næsten altid relevant. Se Hals Strand Camping.
 - **Kirkegård/skovbegravelse:** rolig tone; kun "Kontakt os".
 - **Ukendt:** oplevelse → praktisk → "dit sted" → handling.
+
+## Gamle explore-tours
+
+- En gammel tour konverteres aldrig bare 1:1. Stederne (placeringerne bag
+  menuen og start) genbruges, men resten gøres bedre: nextviewAI viser "nu →
+  sådan vil jeg lave den" for hvert punkt, og brugeren fjerner fluebenet ved
+  det, der skal blive som før.
+- Typisk gammeldags: ingen velkomst, en lang menu uden grupper, ingen tekst i
+  rummene, ingen tydelig knap til hovedhandlingen, engelske standardtekster.
 
 ## Konvertering og måling
 
