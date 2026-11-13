@@ -78,12 +78,15 @@ async function handleStandaloneEvent(
   isCustomer: boolean,
   changedAt: Date,
 ) {
+  // In the activity feed too, like a deal's contract (the first open and the signature) - just without a deal to link to.
+  const name = contract.displayName || contract.companyName;
   if (type === "form.viewed") {
     if (isCustomer && !contract.contractViewedAt) {
       await prisma.standaloneContract.update({
         where: { id: contract.id },
         data: { contractStatus: "VIEWED", contractViewedAt: changedAt },
       });
+      await logActivity({ type: "CONTRACT_VIEWED", message: `${name} åbnede kontrakten (uden deal)` });
     }
   } else if (
     (type === "form.completed" && isCustomer) ||
@@ -94,6 +97,7 @@ async function handleStandaloneEvent(
         where: { id: contract.id },
         data: { contractStatus: "SIGNED", contractSignedAt: changedAt },
       });
+      await logActivity({ type: "CONTRACT_SIGNED", message: `${name} underskrev kontrakten (uden deal)` });
     }
     if (type === "submission.completed") {
       try {

@@ -569,7 +569,7 @@ export function buildContractHtml(data: ContractHtmlData, language: ContractLang
   .overview-row .field-label{ font-weight:600; color:var(--ink); }
   .overview-note{ font-size:13px; color:var(--ink); margin-top:8px; }
   .terms-box{ border:1px solid var(--line); border-radius:12px; padding:14px 18px; font-size:13.5px; margin-bottom:8px; white-space:pre-wrap; }
-  .dpa{ margin:28px 0 20px; page-break-before:always; break-before:page; font-size:13.5px; }
+  .dpa{ margin:28px 0 20px; padding-top:22px; border-top:1px solid var(--line); font-size:13.5px; }
   .dpa p{ margin:0 0 8px; }
   .dpa-h{ font-size:14.5px; font-weight:700; margin:16px 0 6px !important; color:var(--ink); }
   .dpa-list{ margin:0 0 8px; padding-left:20px; }

@@ -29,7 +29,9 @@ export async function renderContractPdf(html: string): Promise<Buffer> {
     const contentHeight = await page.evaluate(() => Math.ceil(document.documentElement.scrollHeight));
     const pdf = await page.pdf({
       width: "794px",
-      height: `${contentHeight}px`,
+      // A little room below: the print layout can come out a pixel taller than measured, and the signatures (kept in one
+      // piece) would then be pushed onto a page of their own.
+      height: `${contentHeight + 40}px`,
       printBackground: true,
       margin: { top: "0", bottom: "0", left: "0", right: "0" },
     });
