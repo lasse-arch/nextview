@@ -101,7 +101,8 @@ export async function flexyboxClasses(source: string, department?: string, room?
     if (!start || !end || !name || typeof c.Id !== "string" || Date.parse(end) < now) continue;
     // "Fitness United Skanderborg, Holdsal" → "Holdsal".
     const location = text(c.LocationName, 120);
-    const roomName = location?.includes(",") ? location.slice(location.lastIndexOf(",") + 1).trim() : location;
+    // Without a room after the comma it's only the centre's name ("Fitness United Risskov") - nothing to show.
+    const roomName = location?.includes(",") ? location.slice(location.lastIndexOf(",") + 1).trim() : undefined;
     if (wantRoom && !roomName?.toLowerCase().includes(wantRoom)) continue;
     const cls: FlexyClass = { id: c.Id.slice(0, 40), name, start, end, ...(text(c.InstructorName) ? { instructor: text(c.InstructorName) } : {}), ...(roomName ? { room: roomName } : {}) };
     if (c.IsCanceled === true) cls.cancelled = true;

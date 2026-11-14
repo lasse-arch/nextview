@@ -68,8 +68,11 @@ function Status({ c }: { c: TourClass }) {
 function Row({ T, c, onBook }: { T: TourConfig; c: TourClass; onBook: (label: string, href: string) => void }) {
   const tr = useT();
   const k = T.classes!;
-  const label = k.button ? tr(k.button) : tr("Book");
+  const book = k.button ? tr(k.button) : tr("Book");
   const href = k.bookHref || k.source;
+  // Full: "Venteliste" (still to the booking - that's where you join it), or a quiet "Fuldt booket" that does nothing.
+  const full = c.free === 0;
+  const label = full && c.waitingList ? tr("Venteliste") : book;
   return (
     <li className={c.cancelled ? "kl-er-aflyst" : ""}>
       <span className="kl-tid">
@@ -81,8 +84,10 @@ function Row({ T, c, onBook }: { T: TourConfig; c: TourClass; onBook: (label: st
         <span>{[c.instructor, c.room].filter(Boolean).join(" · ")}</span>
         <Status c={c} />
       </span>
-      {!c.cancelled && (
-        <TourLink href={href} label={`${label}: ${c.name}`} className="kl-book" onClick={() => onBook(`${label}: ${c.name}`, href)}>
+      {!c.cancelled && full && !c.waitingList ? (
+        <span className="kl-book kl-book-fuld">{tr("Fuldt booket")}</span>
+      ) : !c.cancelled && (
+        <TourLink href={href} label={`${label}: ${c.name}`} className={`kl-book ${full ? "kl-book-vente" : ""}`} onClick={() => onBook(`${label}: ${c.name}`, href)}>
           {label}
         </TourLink>
       )}
@@ -169,6 +174,10 @@ export const CLASSES_CSS = `
 .kl-dage::-webkit-scrollbar{display:none}
 .kl-dage button{flex:none;display:inline-flex;align-items:center;box-sizing:border-box;height:auto;min-height:34px;line-height:1.2;white-space:nowrap;border:0;border-radius:999px;padding:7px 14px;background:var(--c-soft,#f2f3f4);color:#1d2a30;font:inherit;font-size:13.5px;font-weight:700;cursor:pointer}
 .kl-dage button.valgt{background:var(--c-main);color:#fff}
+/* A computer: every day in view - the row wraps instead of hiding days off to the side (no swipe with a mouse). */
+@media (min-width:761px){.kl-dage{flex-wrap:wrap;overflow:visible}}
+/* A phone: swiped - the edge fades, so it shows there are more days. */
+@media (max-width:760px){.kl-dage{-webkit-mask-image:linear-gradient(90deg,#000 85%,transparent);mask-image:linear-gradient(90deg,#000 85%,transparent)}}
 .kl-dag{margin:12px 0 2px;font-size:13px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#5d7177}
 .kl-ark .kl-liste{overflow-y:auto;overscroll-behavior:contain;margin:0 -22px;padding:0 22px 8px}
 .kl-liste{list-style:none;margin:0;padding:0}
@@ -185,6 +194,8 @@ export const CLASSES_CSS = `
 .kl-aflyst{background:#fdecec;color:#b3261e}
 .kl-er-aflyst .kl-hold b,.kl-er-aflyst .kl-tid{text-decoration:line-through;opacity:.6}
 .kl-book{flex:none;border-radius:999px;padding:8px 16px;background:var(--c-accent);color:var(--c-on-accent,#fff);font-size:13.5px;font-weight:800;text-decoration:none}
+.kl-book-vente{background:transparent;color:var(--c-main);box-shadow:inset 0 0 0 2px var(--c-main)}
+.kl-book-fuld{background:#eef0f1;color:#6b7a80;font-weight:700}
 .kl-tom{margin:8px 0 16px;color:#5d7177}
 .kl-naeste{margin:12px 0 4px;padding:10px 14px 8px;border-radius:12px;background:color-mix(in srgb,var(--c-accent) 9%,transparent);text-align:left}
 .kl-naeste-titel{display:block;font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--c-main)}

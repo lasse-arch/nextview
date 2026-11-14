@@ -9,6 +9,7 @@
 export type EngineChange = { date: string; kind: "ny" | "sikkerhed" | "hastighed" | "rettelse"; text: string };
 
 export const ENGINE_CHANGES: EngineChange[] = [
+  { date: "2026-11-14", kind: "rettelse", text: "Holdplan: et fuldt hold har knappen \"Venteliste\" (eller \"Fuldt booket\", hvis der ikke er venteliste) i stedet for Book, og centerets navn står ikke længere som sal. På computer: alle dage står fremme (på to linjer, hvis der skal) - ingen dage gemt ude til siden. På telefon swipes de stadig, og kanten toner ud." },
   { date: "2026-11-14", kind: "ny", text: "Tekst på stedkort, i Vis mig rundt og i infobokse kan have linjeskift, og linjer som \"Mandag - torsdag: 8-12 og 14-19\" vises som en pæn lille tabel med dagene til venstre og tiderne til højre." },
   { date: "2026-11-14", kind: "rettelse", text: "Holdplan: med mange hold ruller kun listen - dag-knapperne bliver ikke længere klemt og skåret." },
   { date: "2026-11-14", kind: "ny", text: "Invitation til rundvisning: starter touren direkte, kommer et lille kort lidt efter - \"Skal jeg vise dig rundt?\" med en persons ansigt (fx centerlederen), hvor lang rundvisningen er, Vis mig rundt og Jeg kigger selv rundt. Én gang pr. besøg, og det går væk, når gæsten selv begynder at kigge rundt." },
