@@ -93,6 +93,16 @@ export function tourConfigProblem(config: unknown): string | null {
   if (c.design && (!obj(c.design) || !["tiles", "cover", "simple", "none"].includes(c.design.welcome) || !["side", "glass", "dock", "float", "picker", "simple", "bento"].includes(c.design.menu))) return '"design" skal have welcome (tiles/cover/simple/none) og menu (side/glass/dock/float/picker/simple/bento).';
   if (c.contact?.hours !== undefined && (!arr(c.contact.hours) || c.contact.hours.length > 10 || !c.contact.hours.every((h) => obj(h) && typeof h.days === "string" && typeof h.time === "string")))
     return "Åbningstiderne skal være højst 10 rækker med dage og tid.";
+  if (c.boxes !== undefined) {
+    if (!arr(c.boxes) || c.boxes.length > 40) return "Infoboksene skal være en liste (højst 40).";
+    const ids = new Set<string>();
+    for (const b of c.boxes) {
+      if (!obj(b) || !str(b.id) || !/^[a-z0-9-]{1,40}$/.test(b.id) || typeof b.title !== "string" || typeof b.text !== "string") return "En infoboks mangler id, titel eller tekst.";
+      if (ids.has(b.id)) return `To infobokse har samme id ("${b.id}").`;
+      ids.add(b.id);
+      if ((b.image !== undefined && typeof b.image !== "string") || (b.link !== undefined && (!obj(b.link) || typeof b.link.label !== "string" || typeof b.link.href !== "string"))) return `${b.title || b.id}: billede eller knap har en forkert form.`;
+    }
+  }
   if (c.classes !== undefined) {
     const k = c.classes;
     if (!obj(k) || !str(k.source) || !/^https:\/\/profile\.flexybox\.com\//.test(k.source)) return 'Holdplanen skal have kundens Flexybox-link (https://profile.flexybox.com/…).';

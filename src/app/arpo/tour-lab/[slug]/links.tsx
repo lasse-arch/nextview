@@ -226,6 +226,14 @@ function opensTeam(href: string): boolean {
   return true;
 }
 
+/** "#boks:<id>": an Infoboks (the engine listens for "hv-boks", detail = the id). */
+function opensBox(href: string): boolean {
+  const m = /^#boks:([\w-]+)$/.exec(href);
+  if (!m) return false;
+  window.dispatchEvent(new CustomEvent("hv-boks", { detail: m[1] }));
+  return true;
+}
+
 /** "#linjedag" / "#linjedag:<line id>": "En dag på din linje" - the picker, or that line's day (the engine listens for "hv-linjedag", detail = the id or null). */
 function startsLineDay(href: string): boolean {
   const m = /^#linjedag(?::([\w-]+))?$/.exec(href);
@@ -247,6 +255,7 @@ export function openLink(T: TourConfig, href: string, label: string, popup: (hre
   if (startsGuide(href)) return;
   if (startsLineDay(href)) return;
   if (opensTeam(href)) return;
+  if (opensBox(href)) return;
   if (goesInTour(href, label)) return;
   // Never a javascript:/data: link from the setup - it would run in the visitor's page.
   if (!safeHref(href)) return;
@@ -301,6 +310,10 @@ export function TourLink({
           return;
         }
         if (opensTeam(href)) {
+          e.preventDefault();
+          return;
+        }
+        if (opensBox(href)) {
           e.preventDefault();
           return;
         }

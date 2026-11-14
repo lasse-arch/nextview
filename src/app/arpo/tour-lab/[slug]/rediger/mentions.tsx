@@ -42,6 +42,7 @@ export function tourTargets(T: TourConfig): Target[] {
   if (T.schedule) add(T.schedule.title || "Byg dit skema", "Funktion", "#skema");
   if (T.wayfinding) add("Find vej", "Funktion", "#findvej");
   if (T.classes?.source) add(T.classes.title || "Holdplan", "Funktion", "#hold");
+  for (const b of T.boxes ?? []) if (b.title) add(b.title, "Infoboks", `#boks:${b.id}`, { image: b.image });
   for (const c of T.cta) if (/^https?:\/\//.test(c.href)) add(c.label, "Knap", c.href);
   // Same name twice (two "Dronefoto"s): the name gets where it is, so "@Name" still means one of them.
   const count = new Map<string, number>();

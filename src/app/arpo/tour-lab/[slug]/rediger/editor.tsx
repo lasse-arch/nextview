@@ -42,6 +42,7 @@ import { MapEditor } from "./map-editor";
 import { FeedbackPanel } from "./feedback-panel";
 import { LinkInput, LinkOpenContext, LinksOpenEditor } from "./links-open";
 import { CommuteEditor } from "./commute-editor";
+import { BoxesEditor } from "./boxes-editor";
 import { AiImageButton } from "./ai-image";
 import { matchTargets, mentionAt, MentionList, tourTargets, type Target } from "./mentions";
 import { deleteStoryImages } from "@/lib/actions/tour-lab";
@@ -125,7 +126,7 @@ const FINDS: Partial<Record<Tab, string[]>> = {
   links: ["Knapper", "Book", "Kontakt", "Telefon", "E-mail", "Adresse", "Sociale medier", "Kontaktformular", "Skriv til os", "Åbning", "Popup", "Ny fane", "Kort-link"],
   design: ["Farver", "Skrift", "Font", "Logo", "Logostørrelse", "Logoets afstand", "Favicon", "Mørkt logo", "Farvefilter", "Brug hjemmesidens farver|hjemmeside|rød tråd|brand"],
   sprog: ["Sprog", "Engelsk", "Tysk", "Oversæt"],
-  funktioner: ["Navigation", "Bevægelse", "Fri bevægelse", "Kun punkter", "Skift mellem steder", "Fade", "Flyv", "Zoom", "Lås zoom på mobil", "Find vej", "Vis mål", "Matterports egne knapper", "Sådan går du rundt|hjælp ved start|onboarding", "Vej til stedet|vej til skolen|hvor langt|afstand|adresse|postnummer|bus|tog|rejseplan|google maps|mødetid", "Flyvetid"],
+  funktioner: ["Infobokse|infoboks|læs mere|læs om|boks", "Navigation", "Bevægelse", "Fri bevægelse", "Kun punkter", "Skift mellem steder", "Fade", "Flyv", "Zoom", "Lås zoom på mobil", "Find vej", "Vis mål", "Matterports egne knapper", "Sådan går du rundt|hjælp ved start|onboarding", "Vej til stedet|vej til skolen|hvor langt|afstand|adresse|postnummer|bus|tog|rejseplan|google maps|mødetid", "Flyvetid"],
   generelt: ["Navn", "Firmanavn", "Undertitel", "Matterport-model", "Matterports indstillinger|dukkehus|plantegning|etagevælger"],
   okonomi: ["Tid", "Pris", "Timer", "Økonomi"],
   versioner: ["Versioner", "Fortryd", "Gendan", "Historik"],
@@ -1059,6 +1060,7 @@ export function TourEditor({
 
             {tab === "funktioner" && (
               <>
+                <BoxesEditor config={config} edit={edit} />
                 <Group
                   title="Navigation"
                   more={

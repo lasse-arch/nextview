@@ -131,6 +131,10 @@ Fx specialefterskoler (ADHD, autisme, nedsat kognitivt funktionsniveau):
   der fortæller om stedet), så læg den på personen under Personer - den står i
   profilen i stedet for fotoet. Brug selve filen (MP4); et Facebook- eller
   Instagram-link kan ikke afspilles i touren. Kort er bedst (under ca. 1 minut).
+- **Infobokse ("Læs om …")**: vil man forklare noget kort (Wave, saunaen, et
+  medlemskab), så lav en infoboks (boxes) og giv knappen linket "#boks:<id>" -
+  den åbner oven på touren, og gæsten bliver i touren. Brug den hellere end at
+  sende gæsten ud på hjemmesiden for et par linjer.
 - **"Din plads venter"**: et kort efter ca. 90 sekunder med kundens vigtigste
   handling. Ét kort, aldrig mens menuen er åben.
 

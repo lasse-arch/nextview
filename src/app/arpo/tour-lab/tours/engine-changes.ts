@@ -9,6 +9,7 @@
 export type EngineChange = { date: string; kind: "ny" | "sikkerhed" | "hastighed" | "rettelse"; text: string };
 
 export const ENGINE_CHANGES: EngineChange[] = [
+  { date: "2026-11-14", kind: "ny", text: "Infobokse: en lille boks med overskrift, et par linjer og evt. billede og knap (fx \"Læs om Wave\") over touren - åbnes af enhver knap med linket \"#boks:<id>\" (Vis mig rundt, stedkort, fliser, menuen)." },
   { date: "2026-11-14", kind: "rettelse", text: "Glas-panelet kan ikke længere scrolle til siden (et menupunkt uden gruppe, fx \"Vis mig rundt med …\", var bredere end panelet), og dagene i Holdplan bliver ikke længere skåret af i tours med en anden skrift." },
   { date: "2026-11-14", kind: "ny", text: "Åbningstider i kontaktboksen: rækker med dage og tid (eller én pr. dag) og \"Åbent nu · lukker 23.00\" / \"Lukket · åbner 05.00\" efter stedets eget ur - og en lille linje under (fx bemandede tider)." },
   { date: "2026-11-14", kind: "rettelse", text: "En lang mailadresse i kontaktboksen står altid på én linje - bliver den for bred, bliver skriften lidt mindre i stedet for at bryde midt i adressen." },

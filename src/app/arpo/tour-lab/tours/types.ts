@@ -64,6 +64,14 @@ export type LinkOpen = "popup" | "tab" | "same";
 /** How big a popup over the tour is (see links.tsx). */
 export type PopupSize = "lille" | "mellem" | "stor" | "egen" | "fuld";
 
+/**
+ * "Infoboks": a small box with a few words about something (e.g. "Fitness
+ * United Wave") - opened from any link "#boks:<id>" (a button on a stop of
+ * "Vis mig rundt", a place card, a tile, the menu), over the tour; the tour
+ * goes on when it's closed. `link`: a button in the box (a page, or in the tour).
+ */
+export type TourBox = { id: string; title: string; text: string; image?: string; link?: { label: string; href: string } };
+
 export type TourInfo = {
   title: string;
   text: string;
@@ -777,6 +785,8 @@ export type TourConfig = {
    * prototype panel), `ss` the scan points it's shown from.
    */
   info?: TourInfo[];
+  /** Infobokse - opened by "#boks:<id>" (see TourBox). */
+  boxes?: TourBox[];
   /** Virtual staging: videos, pictures, web pages, signs and the year wheel on surfaces in the tour (see StagingItem). */
   staging?: StagingItem[];
   /**
