@@ -58,7 +58,7 @@ export async function cached(key: string, read: () => Promise<string>, days = 7)
 
 /** The look and the front page (see digest), cached. */
 export function siteDigest(address: string): Promise<string> {
-  return cached(`digest:${publicUrl(address)}`, () => digest(address));
+  return cached(`digest2:${publicUrl(address)}`, () => digest(address));
 }
 
 /** Words in a link that point to what a tour needs to know - the most telling first. */
@@ -76,10 +76,29 @@ const USEFUL = [
 ];
 
 /** A page's own words: headings, paragraphs and list items - not its menus, header or footer. */
+/**
+ * A page's visible text, a line per block - headings as "## …". Not only <p>,
+ * <li> and tables: many site builders (Tilda, Wix, Webflow …) write their text
+ * straight into <div>s with <br>s (e.g. Fitness United's opening hours), which
+ * a paragraph-only reading misses.
+ */
+function visibleText(html: string, drop = "script|style|noscript|svg|template"): string {
+  const body = html.replace(new RegExp(`<(${drop})\\b[\\s\\S]*?<\\/\\1>`, "gi"), " ").replace(/<!--[\s\S]*?-->/g, " ");
+  const text = body
+    .replace(/<(h[1-4])\b[^>]*>([\s\S]*?)<\/\1>/gi, (_, _h: string, t: string) => `\n## ${strip(t)}\n`)
+    .replace(/<(br|hr)\b[^>]*>/gi, "\n")
+    .replace(/<\/?(p|div|li|ul|ol|tr|td|th|table|section|article|h[5-6]|blockquote|dd|dt|figcaption)\b[^>]*>/gi, "\n");
+  const lines = decode(text.replace(/<[^>]+>/g, " "))
+    .split("\n")
+    .map((l) => l.replace(/\s+/g, " ").trim())
+    .filter((l) => l.length > 2 && l !== "##");
+  // A long line seen before (a menu, a footer repeated) only once - short ones (a label like "Sauna" before its times) where they stand.
+  const seen = new Set<string>();
+  return lines.filter((l) => l.length < 30 || (!seen.has(l) && Boolean(seen.add(l)))).join("\n");
+}
+
 function pageText(html: string): string {
-  const body = html.replace(/<(script|style|noscript|svg|nav|header|footer|form)[\s\S]*?<\/\1>/gi, " ");
-  const parts = [...body.matchAll(/<(h[1-4]|p|li|td|th)\b[^>]*>([\s\S]*?)<\/\1>/gi)].map((m) => (m[1].startsWith("h") ? `## ${strip(m[2])}` : strip(m[2]))).filter((t) => t.length > 2);
-  return [...new Set(parts)].join("\n");
+  return visibleText(html, "script|style|noscript|svg|template|nav|header|footer|form");
 }
 
 /**
@@ -108,7 +127,7 @@ export async function siteResearch(address: string, also: string[] = []): Promis
         .filter((u): u is string => Boolean(u)),
     ),
   ].slice(0, 4);
-  const json = await cached(`research2:${base}${asked.length ? `|${asked.join("|")}` : ""}`, async () => {
+  const json = await cached(`research3:${base}${asked.length ? `|${asked.join("|")}` : ""}`, async () => {
     const front = await digest(address);
     const html = await fetchText(base, 1_500_000);
     const links = [...html.matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi)]
@@ -138,7 +157,7 @@ export async function siteResearch(address: string, also: string[] = []): Promis
     const htmls = await Promise.all(pages.map((l) => fetchText(l.url, 1_000_000).catch(() => "")));
     const read = pages.map((l, i) => {
       const text = pageText(htmls[i]);
-      return text ? `\n<side adresse="${l.url}" link="${l.text}">\n${text.slice(0, 3500)}\n</side>` : "";
+      return text ? `\n<side adresse="${l.url}" link="${l.text}">\n${text.slice(0, 5000)}\n</side>` : "";
     });
     // PDFs on the front page and the pages behind it that are worth reading.
     const pdfs = [...new Set(links.filter((l) => /\.pdf$/i.test(l.url.pathname) && /skema|uge|dag|pris|menu|kalender|info|program|brochure|folder/i.test(`${l.url.pathname} ${l.text}`)).map((l) => l.url.toString()))];
@@ -223,7 +242,8 @@ async function digest(address: string): Promise<string> {
 
   const body = html.replace(/<(script|style|noscript|svg)[\s\S]*?<\/\1>/gi, " ");
   const headings = [...body.matchAll(/<h([1-3])\b[^>]*>([\s\S]*?)<\/h\1>/gi)].map((m) => `${"#".repeat(Number(m[1]))} ${strip(m[2])}`).filter((h) => h.length > 3);
-  const paragraphs = [...body.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi)].map((m) => strip(m[1])).filter((p) => p.length > 30);
+  // All the visible text (not only <p>s - see visibleText), the headings left out (they're listed above).
+  const paragraphs = visibleText(html).split("\n").filter((l) => !l.startsWith("## "));
 
   return [
     `Adresse: ${base}`,
@@ -240,6 +260,6 @@ async function digest(address: string): Promise<string> {
     `Farver i CSS (mest brugt først): ${colors.join(", ")}`,
     `\nLinks (tekst → adresse):\n${uniqueLinks.map((l) => `- ${l.text} → ${l.href}`).join("\n")}`,
     `\nOverskrifter:\n${headings.slice(0, 30).join("\n")}`,
-    `\nTekst:\n${paragraphs.join("\n").slice(0, 5000)}`,
+    `\nTekst:\n${paragraphs.join("\n").slice(0, 7000)}`,
   ].join("\n");
 }
