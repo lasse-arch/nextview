@@ -56,9 +56,19 @@ export async function cached(key: string, read: () => Promise<string>, days = 7)
   return text;
 }
 
+const SOCIAL = /^https?:\/\/(www\.|m\.|[a-z]{2}-[a-z]{2}\.)?(facebook\.com|instagram\.com|linkedin\.com|tiktok\.com|youtube\.com|x\.com|twitter\.com|pinterest\.[a-z.]+|threads\.net)\//i;
+/** Share buttons ("del på Facebook") - not the place's own profile. */
+const SHARE = /sharer|\/share|intent\/|shareArticle|\/dialog\//i;
+
+/** The place's social media profiles named on a page (the "Sociale medier" line of its digest). */
+export async function socialLinksOn(address: string): Promise<string[]> {
+  const line = (await siteDigest(address)).split("\n").find((l) => l.startsWith("Sociale medier"));
+  return line ? line.replace(/^[^:]*:\s*/, "").split(" | ").filter((u) => /^https?:\/\//.test(u)) : [];
+}
+
 /** The look and the front page (see digest), cached. */
 export function siteDigest(address: string): Promise<string> {
-  return cached(`digest2:${publicUrl(address)}`, () => digest(address));
+  return cached(`digest3:${publicUrl(address)}`, () => digest(address));
 }
 
 /** Words in a link that point to what a tour needs to know - the most telling first. */
@@ -239,6 +249,9 @@ async function digest(address: string): Promise<string> {
     .map((m) => ({ href: abs(attr(m[1], "href")), text: strip(m[2]).slice(0, 60) }))
     .filter((l): l is { href: string; text: string } => Boolean(l.href && l.text) && !l.href!.startsWith("javascript:"));
   const uniqueLinks = links.filter((l, i) => links.findIndex((x) => x.href === l.href) === i).slice(0, 70);
+  // The place's own profiles on social media - always, however many other links the page has (they sit in the footer, past the first 70).
+  const hrefs = [...html.matchAll(/href\s*=\s*["']([^"']+)["']/gi)].map((m) => abs(decode(m[1])));
+  const social = [...new Set(hrefs.filter((u): u is string => Boolean(u) && SOCIAL.test(u as string) && !SHARE.test(u as string)))].slice(0, 12);
 
   const body = html.replace(/<(script|style|noscript|svg)[\s\S]*?<\/\1>/gi, " ");
   const headings = [...body.matchAll(/<h([1-3])\b[^>]*>([\s\S]*?)<\/h\1>/gi)].map((m) => `${"#".repeat(Number(m[1]))} ${strip(m[2])}`).filter((h) => h.length > 3);
@@ -258,6 +271,7 @@ async function digest(address: string): Promise<string> {
     `Skrifter i CSS (mest brugt først): ${fontFamilies.join(", ")}`,
     `Farvevariabler: ${cssVars.join("; ")}`,
     `Farver i CSS (mest brugt først): ${colors.join(", ")}`,
+    `Sociale medier (sidens egne links): ${social.join(" | ") || "(ingen på siden)"}`,
     `\nLinks (tekst → adresse):\n${uniqueLinks.map((l) => `- ${l.text} → ${l.href}`).join("\n")}`,
     `\nOverskrifter:\n${headings.slice(0, 30).join("\n")}`,
     `\nTekst:\n${paragraphs.join("\n").slice(0, 7000)}`,
