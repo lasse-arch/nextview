@@ -9,6 +9,8 @@
 export type EngineChange = { date: string; kind: "ny" | "sikkerhed" | "hastighed" | "rettelse"; text: string };
 
 export const ENGINE_CHANGES: EngineChange[] = [
+  { date: "2026-11-14", kind: "ny", text: "Tekst på stedkort, i Vis mig rundt og i infobokse kan have linjeskift, og linjer som \"Mandag - torsdag: 8-12 og 14-19\" vises som en pæn lille tabel med dagene til venstre og tiderne til højre." },
+  { date: "2026-11-14", kind: "rettelse", text: "Holdplan: med mange hold ruller kun listen - dag-knapperne bliver ikke længere klemt og skåret." },
   { date: "2026-11-14", kind: "ny", text: "Invitation til rundvisning: starter touren direkte, kommer et lille kort lidt efter - \"Skal jeg vise dig rundt?\" med en persons ansigt (fx centerlederen), hvor lang rundvisningen er, Vis mig rundt og Jeg kigger selv rundt. Én gang pr. besøg, og det går væk, når gæsten selv begynder at kigge rundt." },
   { date: "2026-11-14", kind: "rettelse", text: "Adressen i kontaktboksen åbner Google Maps med stedets navn og adresse, så Google viser selve stedet." },
   { date: "2026-11-14", kind: "ny", text: "\"Mød os\": det kan slås fra, at et tryk på en person på et stedkort eller i Vis mig rundt åbner profilen (Personer → Mød os) - personen vises stadig med foto, navn og rolle." },

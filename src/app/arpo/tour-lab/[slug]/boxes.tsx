@@ -1,5 +1,6 @@
 "use client";
 
+import { RichText } from "./rich-text";
 import { useEffect } from "react";
 import { useT } from "../tours/i18n-react";
 import type { TourBox } from "../tours/types";
@@ -17,10 +18,6 @@ export function BoxSheet({ box, onClose, onLink }: { box: TourBox; onClose: () =
     window.addEventListener("keydown", esc);
     return () => window.removeEventListener("keydown", esc);
   }, [onClose]);
-  const paragraphs = box.text
-    .split(/\n\s*\n/)
-    .map((t) => t.trim())
-    .filter(Boolean);
   return (
     <div className="bx-bg" onClick={onClose}>
       <div className={`bx-ark ${box.image ? "bx-med-foto" : ""}`} role="dialog" aria-modal="true" aria-label={tr(box.title)} onClick={(e) => e.stopPropagation()}>
@@ -33,9 +30,9 @@ export function BoxSheet({ box, onClose, onLink }: { box: TourBox; onClose: () =
         )}
         <div className="bx-tekst">
           <h2>{tr(box.title)}</h2>
-          {paragraphs.map((p, i) => (
-            <p key={i}>{tr(p)}</p>
-          ))}
+          <p>
+            <RichText text={tr(box.text)} />
+          </p>
           {box.link?.label && box.link.href && (
             <TourLink className="bx-knap" href={box.link.href} label={box.link.label} onClick={() => onLink(box.link!.label, box.link!.href)}>
               {tr(box.link.label)}

@@ -126,6 +126,11 @@ Fx specialefterskoler (ADHD, autisme, nedsat kognitivt funktionsniveau):
 
 ## Stedkort og "Din plads venter"
 
+- **Tider i teksten** (åbningstider, bemanding, sauna): aldrig i én lang
+  sætning. En kort sætning og så én linje pr. dag med kolon - "Mandag -
+  torsdag: 8-12 og 14-19" - så viser touren dem som en lille tabel. Selve
+  åbningstiderne hører til i kontaktboksen (Kontakt → Åbningstider).
+
 - **Stedkort**: når man lander et vigtigt sted, kommer et lille kort med 1-3
   sætninger om stedet og evt. en knap (til et andet rum eller en side). Kun på
   de vigtigste steder - ikke overalt.

@@ -1,5 +1,6 @@
 "use client";
 
+import { RICH_TEXT_CSS } from "./rich-text";
 import { textOn } from "../tours/contrast";
 import { TourLogo, TOUR_LOGO_CSS } from "./tour-logo";
 import { LANG_CSS, Flag, LangSwitch } from "./lang-switch";
@@ -2947,7 +2948,7 @@ function TourExperience({
       {[...new Set([...fontHrefs(T.font, [400, 600, 700, 800, 900]), ...(T.fontHeading ? fontHrefs(T.fontHeading, [500, 600]) : [])])].map((href) => (
         <link key={href} rel="stylesheet" href={href} />
       ))}
-      <style>{CSS + TOUR_LOGO_CSS + CONTACT_CSS + STORIES_CSS + LIGHTBOX_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + ONBOARDING_CSS + MENU_HINT_CSS + INFO_CSS + STAGING_CSS + (T.staging?.some((i) => i.kind === "treasure") ? CONTEST_CSS : "") + (T.inUse?.length ? IN_USE_CSS : "") + (T.lineDays ? LINE_DAY_CSS : "") + (T.yearWheel ? YEARWHEEL_CSS : "") + (T.schedule ? SCHEDULE_CSS : "") + MAP_CSS + (T.sitePlan?.overlay ? SITE_PLAN_CSS + SITE_PLAN_360_CSS : "") + ROUTE_CSS + MEASURES_CSS + CARDS_CSS + DAY_CSS + (T.events ? EVENTS_CSS : "") + (T.classes ? CLASSES_CSS : "") + (T.contact?.hours?.length ? HOURS_CSS : "") + (T.boxes?.length ? BOXES_CSS : "") + (T.invite ? INVITE_CSS : "") + (T.shop || T.points.some((p) => p.shop) ? SHOP_CSS : "") + SIMPLE_CSS + BENTO_CSS + LOGO_RIGHT_CSS + LANG_CSS + WEATHER_CSS + COMMUTE_CSS + FEATURES_CSS + FINDER_CSS + FULLSCREEN_BUTTON_CSS + (T.design?.menu === "float" ? FLOAT_DOCK_CSS : "") + (T.team?.people.length ? TEAM_CSS : "") + (T.design?.menu === "glass" ? GLASS_MENU_CSS : "") + (review ? FEEDBACK_CSS : "")}</style>
+      <style>{CSS + TOUR_LOGO_CSS + CONTACT_CSS + STORIES_CSS + LIGHTBOX_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + ONBOARDING_CSS + MENU_HINT_CSS + INFO_CSS + STAGING_CSS + (T.staging?.some((i) => i.kind === "treasure") ? CONTEST_CSS : "") + (T.inUse?.length ? IN_USE_CSS : "") + (T.lineDays ? LINE_DAY_CSS : "") + (T.yearWheel ? YEARWHEEL_CSS : "") + (T.schedule ? SCHEDULE_CSS : "") + MAP_CSS + (T.sitePlan?.overlay ? SITE_PLAN_CSS + SITE_PLAN_360_CSS : "") + ROUTE_CSS + MEASURES_CSS + CARDS_CSS + DAY_CSS + (T.events ? EVENTS_CSS : "") + (T.classes ? CLASSES_CSS : "") + (T.contact?.hours?.length ? HOURS_CSS : "") + (T.boxes?.length ? BOXES_CSS : "") + (T.invite ? INVITE_CSS : "") + RICH_TEXT_CSS + (T.shop || T.points.some((p) => p.shop) ? SHOP_CSS : "") + SIMPLE_CSS + BENTO_CSS + LOGO_RIGHT_CSS + LANG_CSS + WEATHER_CSS + COMMUTE_CSS + FEATURES_CSS + FINDER_CSS + FULLSCREEN_BUTTON_CSS + (T.design?.menu === "float" ? FLOAT_DOCK_CSS : "") + (T.team?.people.length ? TEAM_CSS : "") + (T.design?.menu === "glass" ? GLASS_MENU_CSS : "") + (review ? FEEDBACK_CSS : "")}</style>
       {/* The tour's own design on top (written by Claude or by hand under Avanceret). */}
       {T.customCss && <style>{T.customCss.replace(/<\/?style/gi, "")}</style>}
 

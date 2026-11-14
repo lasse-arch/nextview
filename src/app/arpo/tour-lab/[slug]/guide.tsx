@@ -1,5 +1,6 @@
 "use client";
 
+import { RichText } from "./rich-text";
 import { CardPhotos } from "./cards";
 import { PointVideo } from "./point-video";
 
@@ -161,7 +162,11 @@ export function GuidePlayer({
         </div>
         <h3>{stop.title}</h3>
         {/* The card's own short text when it has one - the voice still reads `text`. */}
-        {(stop.short || stop.text) && <p>{stop.short || stop.text}</p>}
+        {(stop.short || stop.text) && (
+          <p>
+            <RichText text={stop.short || stop.text} />
+          </p>
+        )}
         {stop.images?.length ? <CardPhotos images={stop.images} onOpen={(at) => onPhotos?.(stop.images!, at)} /> : null}
         {/* Who you meet here (the stop's own people, or the place card's at the same spot). */}
         {(stop.people ?? []).filter((p) => p.image).length > 0 && (

@@ -1,5 +1,6 @@
 "use client";
 
+import { RichText } from "./rich-text";
 import { useT } from "../tours/i18n-react";
 import { useEffect, useRef, useState } from "react";
 import type { CardPerson, PlaceCard as Card, TourConfig } from "../tours/types";
@@ -109,7 +110,7 @@ export function PlaceCard({
             </button>
           )}
           <p ref={textEl} className={open ? "" : "pc-klip"}>
-            {card.text}
+            <RichText text={card.text} />
           </p>
           {!open && clipped && (
             <button type="button" className="pc-mere-mobil" onClick={() => setOpen(true)}>
@@ -169,7 +170,7 @@ export function PlaceCard({
       ) : (
         <>
           <h3>{card.title}</h3>
-          <p>{card.more?.text}</p>
+          <p>{card.more?.text && <RichText text={card.more.text} />}</p>
           <div className="pc-btns">
             <button type="button" className="pc-btn" onClick={() => setPage(1)}>
               ← {tr("Tilbage")}
