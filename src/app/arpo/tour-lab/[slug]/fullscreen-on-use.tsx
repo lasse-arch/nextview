@@ -71,10 +71,15 @@ function placeFor(button: HTMLElement): Place | null {
   // The menu button's own colour - a see-through one (rare) gets the dark glass instead.
   const solid = cs && cs.backgroundColor && !/rgba\(.*,\s*0\)$|transparent/.test(cs.backgroundColor);
   const look = { size: SIZE, bg: solid ? cs.backgroundColor : "rgba(10,18,20,.62)", fg: solid ? cs.color : "#fff", shadow: cs?.boxShadow && cs.boxShadow !== "none" ? cs.boxShadow : "0 4px 14px rgba(0,0,0,.25)" };
-  const top = m ? m.top + m.height / 2 - SIZE / 2 : 14;
-  let left = (m ? m.left : vw - 14) - GAP - SIZE;
+  // No menu button up there (the menu is at the bottom - a dock, a floating bar): the corner is the button's own, as far
+  // in from the edge as the logo is in its corner - not a menu button's width further in.
+  const logo = root.querySelector<HTMLElement>(".hv-logo")?.getBoundingClientRect();
+  const inset = logo && logo.width ? Math.round(Math.min(32, Math.max(10, Math.min(logo.left, vw - logo.right)))) : 14;
+  const top = m ? m.top + m.height / 2 - SIZE / 2 : logo && logo.height ? Math.round(logo.top) : 14;
+  let left = m ? m.left - GAP - SIZE : vw - inset - SIZE;
   const others = [...root.querySelectorAll<HTMLElement>(OBSTACLES)]
-    .filter((el) => el !== button && !button.contains(el) && el !== menu && el.getClientRects().length && el.checkVisibility?.({ opacityProperty: true, visibilityProperty: true }) !== false)
+    // The editor preview's own "Tour klar" badge isn't part of the tour.
+    .filter((el) => el !== button && !button.contains(el) && el !== menu && !el.closest(".hv-dev") && el.getClientRects().length && el.checkVisibility?.({ opacityProperty: true, visibilityProperty: true }) !== false)
     .map((el) => el.getBoundingClientRect())
     // Whole-screen layers (the tour itself, a dim behind the menu) aren't in the way.
     .filter((r) => r.width < vw * 0.6 && r.width > 0 && r.height > 0);
@@ -89,7 +94,8 @@ function placeFor(button: HTMLElement): Place | null {
 
 /*
  * A small full-screen button in the top right corner of the tour, just left
- * of the menu button - it measures where that is (every menu design puts its
+ * of the menu button - or in the corner itself when there is none up there
+ * (the menu sits at the bottom) - it measures where that is (every menu design puts its
  * own there) and steps past anything else in the row, and stays away when
  * there's no free spot, so it never lies on top of another button. Only
  * where the browser can make the page full screen (not an iPhone).
