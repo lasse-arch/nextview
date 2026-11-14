@@ -67,4 +67,9 @@ export const RICH_TEXT_CSS = `
 .rt-tid{display:contents}
 .rt-tid>span{opacity:.85}
 .rt-tid>b{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+/* A phone: the table small and tight - a card there has little room. */
+@media (max-width:760px){
+  .rt-afsnit+.rt-afsnit{margin-top:.4em}
+  .rt-tider{column-gap:12px;row-gap:0;margin:.3em 0 .1em;padding:5px 9px;border-radius:9px;font-size:.84em;line-height:1.4}
+}
 `;
