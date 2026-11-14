@@ -93,6 +93,15 @@ declare global {
 }
 
 /** The tour is the editor's live preview: in a frame on Arpo's own tour editor (a customer's site is another address, and reading it throws). */
+/** An event's date as the page writes it ("19/12 2026", "19.12.2026") read nicely - "lør. 19. dec. 2026"; anything else as it is. */
+function eventDate(raw: string, lang: string): string {
+  const m = /^\s*(\d{1,2})[/.-](\d{1,2})[/.\s-]+(\d{4})\b(.*)$/.exec(raw);
+  if (!m) return raw;
+  const d = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]), 12);
+  if (d.getDate() !== Number(m[1])) return raw;
+  return `${d.toLocaleDateString(lang === "da" ? "da-DK" : lang, { weekday: "short", day: "numeric", month: "short", year: "numeric" })}${m[4].trim() ? ` ${m[4].trim()}` : ""}`;
+}
+
 function inEditorPreview(): boolean {
   if (window.parent === window) return false;
   try {
@@ -2485,7 +2494,9 @@ function TourExperience({
     };
   }, [T.live, savedTour.slug]);
   /** Prices and memberships, not free units: no counts, no "ledig", no badges in the menu. */
-  const livePrices = T.live?.kind === "priser";
+  /** Prices and events are lists to choose from - no counts, no "ledig", no badges in the menu. */
+  const livePrices = T.live?.kind === "priser" || T.live?.kind === "events";
+  const liveEvents = T.live?.kind === "events";
   const freeNames = useMemo(() => (livePrices ? [] : liveUnits.map((u) => u.name.toLowerCase())), [liveUnits, livePrices]);
   /** Is a menu item one of the free units? Whole words only - unit "1" isn't "12". */
   const isFree = (name: string) => {
@@ -3620,8 +3631,10 @@ function TourExperience({
                     <span>
                       <b>{u.name}</b>
                       <small>
-                        {livePrices
-                          ? [T.live!.showSize !== false && u.size, u.from].filter(Boolean).join(" · ")
+                        {liveEvents
+                          ? [u.from && eventDate(u.from, lang), T.live!.showSize !== false && u.size].filter(Boolean).join(", ")
+                          : livePrices
+                          ? [T.live!.showSize !== false && u.size, u.from].filter(Boolean).join(", ")
                           : [T.live!.showSize !== false && u.size && (/^\d+$/.test(u.size.trim()) ? `${u.size.trim()} ledige` : u.size), u.from && (/^(ledig|nu)\b/i.test(u.from) ? "ledig nu" : `ledig fra ${u.from}`)].filter(Boolean).join(", ")}
                       </small>
                     </span>
@@ -3640,8 +3653,8 @@ function TourExperience({
                       </button>
                     )}
                     {href && (
-                      <TourLink href={href} label={`${T.live!.bookLabel ?? tx("Book")} ${u.name}`} className="hv-btn hv-primary" onClick={() => track("live_book", { label: u.name, link_url: href, ...(u.price ? { price: u.price } : {}) })}>
-                        {T.live!.bookLabel ?? tx("Book")}
+                      <TourLink href={href} label={`${T.live!.bookLabel ?? (liveEvents ? tx("Køb billet") : tx("Book"))} ${u.name}`} className="hv-btn hv-primary" onClick={() => track("live_book", { label: u.name, link_url: href, ...(u.price ? { price: u.price } : {}) })}>
+                        {T.live!.bookLabel ?? (liveEvents ? tx("Køb billet") : tx("Book"))}
                       </TourLink>
                     )}
                   </li>

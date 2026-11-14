@@ -9,6 +9,7 @@
 export type EngineChange = { date: string; kind: "ny" | "sikkerhed" | "hastighed" | "rettelse"; text: string };
 
 export const ENGINE_CHANGES: EngineChange[] = [
+  { date: "2026-11-14", kind: "ny", text: "Live data kan være events (koncerter, foredrag, shows): listen viser dato, titel, kategori og pris med \"Køb billet\" til eventets egen side - læst fra kundens eventside og opdateret af sig selv." },
   { date: "2026-11-14", kind: "rettelse", text: "Åbningstider i en smal kontaktboks: dagene (\"Mandag - søndag\") brydes aldrig midt i - er der ikke plads, står tiden på linjen under." },
   { date: "2026-11-14", kind: "rettelse", text: "Færre prikker (\"·\") i tourens egne tekster - åbningstider, holdplan og invitationen skriver med komma i stedet." },
   { date: "2026-11-14", kind: "rettelse", text: "Tider som tabel i teksten fylder mindre på telefon (mindre skrift og tættere linjer)." },

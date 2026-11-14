@@ -1013,6 +1013,7 @@ const LiveRecipe = z.object({
   pattern: z.string().describe("JavaScript-regex (uden skråstreger) med navngivne grupper: name (krævet) og evt. size, price, from, link. Ét match = én ledig enhed."),
   flags: z.string().describe('Regex-flag uden g, fx "i" eller "is".'),
   explanation: z.string().describe("Kort forklaring på dansk af, hvad der læses, og evt. hvad der ikke kunne findes."),
+  kind: z.enum(["ledige", "priser", "events"]).describe('"ledige": ledige enheder (pladser, rum, boliger, rundvisninger med tilmelding). "priser": priser og medlemskaber. "events": arrangementer med billetter (koncerter, foredrag, shows, fester) på en dato.'),
 });
 
 type LiveSpec = NonNullable<TourConfig["live"]>;
@@ -1042,7 +1043,7 @@ export async function setupLiveData(slug: string, url: string, what: string): Pr
         model: "claude-opus-5-5",
         max_tokens: 8000,
         system:
-          "Du skriver regulære udtryk, der læser ledige enheder (campingpladser, depotrum, værelser, boliger …) ud af en hjemmeside, så en virtuel tour kan vise dem live. Teksten er siden som ren tekst, links skrevet som [tekst](adresse). Skriv ét JavaScript-regex med navngivne grupper: name (enhedens navn/nummer - krævet), og hvis siden har dem: size, price, from (ledig fra), link (adressen til at booke netop den). Ét match skal være én ledig enhed - kun de ledige, ikke de optagne, fulde eller dem på venteliste (fx 0 ledige pladser). Er det begivenheder (rundvisninger, åbent hus), er hver begivenhed én enhed: name er dens dato og tid (fx tirsdag d. 15. december kl. 18.30), size antal ledige pladser, og link dens egen tilmeldingsknap (tilmeldingsformularen), så Book fører direkte til den. Andre datoer i samme række (tilmeldingsfrist o.l.) er ikke enheder. Brug ikke-grådige mønstre og [\\s\\S] frem for punktum over linjeskift. Regexet skal virke på hele siden og fortsat virke, når der kommer flere eller færre enheder.",
+          "Du skriver regulære udtryk, der læser ledige enheder (campingpladser, depotrum, værelser, boliger …) ud af en hjemmeside, så en virtuel tour kan vise dem live. Teksten er siden som ren tekst, links skrevet som [tekst](adresse). Skriv ét JavaScript-regex med navngivne grupper: name (enhedens navn/nummer - krævet), og hvis siden har dem: size, price, from (ledig fra), link (adressen til at booke netop den). Ét match skal være én ledig enhed - kun de ledige, ikke de optagne, fulde eller dem på venteliste (fx 0 ledige pladser). Er det begivenheder (rundvisninger, åbent hus), er hver begivenhed én enhed: name er dens dato og tid (fx tirsdag d. 15. december kl. 18.30), size antal ledige pladser, og link dens egen tilmeldingsknap (tilmeldingsformularen), så Book fører direkte til den. Andre datoer i samme række (tilmeldingsfrist o.l.) er ikke enheder. Er det arrangementer med billetter (koncerter, foredrag, shows, fester, banko …): kind = events, og hvert arrangement er én enhed: name = dets titel, from = datoen præcis som siden skriver den (fx 19/12 2026), size = kategorien (fx Koncert), price = prisen (fx Fra 195 kr.), link = arrangementets egen side. Brug ikke-grådige mønstre og [\\s\\S] frem for punktum over linjeskift. Regexet skal virke på hele siden og fortsat virke, når der kommer flere eller færre enheder.",
         messages: [{ role: "user", content: `Hvad skal læses: ${what || "de ledige enheder"}\nSidens adresse: ${url}\n${feedback}\n<side>\n${text.slice(0, 45_000)}\n</side>` }],
         output_config: { effort: "medium", format: zodOutputFormat(LiveRecipe) },
       });
@@ -1056,7 +1057,7 @@ export async function setupLiveData(slug: string, url: string, what: string): Pr
       .catch(() => {});
     const recipe = r.parsed_output;
     if (!recipe) return { ok: false, error: "nextviewAI svarede ikke som forventet - prøv igen." };
-    const spec: LiveSpec = { url, title: recipe.title, pattern: recipe.pattern, flags: recipe.flags.replace(/[^imsu]/g, "") };
+    const spec: LiveSpec = { url, title: recipe.title, pattern: recipe.pattern, flags: recipe.flags.replace(/[^imsu]/g, ""), ...(recipe.kind !== "ledige" ? { kind: recipe.kind } : {}) };
     let units: LiveUnit[] = [];
     try {
       units = await readUnits(text, spec);

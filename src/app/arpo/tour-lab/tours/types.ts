@@ -966,8 +966,13 @@ export type TourConfig = {
   live?: {
     url: string;
     title: string;
-    /** "priser": prices and memberships (a gym's memberships, a menu …) - shown without counts, "ledig" or badges. Default: free units. */
-    kind?: "priser";
+    /**
+     * "priser": prices and memberships (a gym's memberships, a menu …) - shown without counts, "ledig" or badges.
+     * "events": events with tickets (concerts, talks, shows) - each unit's `from` is its date (e.g. "19/12 2026"),
+     * `size` its category ("Koncert"), `price` and `link` its own page; shown by date, with "Køb billet".
+     * Default: free units.
+     */
+    kind?: "priser" | "events";
     pattern: string;
     flags?: string;
     exclude?: string[];

@@ -103,6 +103,7 @@ export function tourConfigProblem(config: unknown): string | null {
       if ((b.image !== undefined && typeof b.image !== "string") || (b.link !== undefined && (!obj(b.link) || typeof b.link.label !== "string" || typeof b.link.href !== "string"))) return `${b.title || b.id}: billede eller knap har en forkert form.`;
     }
   }
+  if (c.live?.kind !== undefined && !["priser", "events"].includes(c.live.kind)) return 'Live data: "kind" skal være "priser" eller "events".';
   if (c.invite !== undefined && (!obj(c.invite) || [c.invite.person, c.invite.guide, c.invite.title, c.invite.text, c.invite.button, c.invite.skip].some((v) => v !== undefined && typeof v !== "string") || (c.invite.delaySeconds !== undefined && (typeof c.invite.delaySeconds !== "number" || c.invite.delaySeconds < 0 || c.invite.delaySeconds > 60))))
     return "Invitationen til rundvisning har en forkert form.";
   if (c.classes !== undefined) {

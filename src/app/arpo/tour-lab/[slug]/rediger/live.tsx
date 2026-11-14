@@ -112,12 +112,13 @@ export function LiveDataEditor({ config, edit, slug, preview }: { config: TourCo
       {live && (
         <>
           <Group title="I touren">
-            <Field title="Det er" hint={live.kind === "priser" ? "Vises som en liste med pris og knap - uden antal og uden \"ledig\"." : "Vises som ledige med antal - og \"Ledig\" ved menupunkter med samme navn."}>
+            <Field title="Det er" hint={live.kind === "events" ? "Vises efter dato med kategori, pris og \"Køb billet\" til eventets egen side." : live.kind === "priser" ? "Vises som en liste med pris og knap - uden antal og uden \"ledig\"." : "Vises som ledige med antal - og \"Ledig\" ved menupunkter med samme navn."}>
               <div className="flex rounded-lg bg-[#f2f2f7] p-0.5 text-[13px] font-medium">
                 {(
                   [
                     [undefined, "Ledige (pladser, rum …)"],
                     ["priser", "Priser og medlemskaber"],
+                    ["events", "Events"],
                   ] as const
                 ).map(([k, label]) => (
                   <button key={label} type="button" onClick={() => edit((d) => void (k ? (d.live!.kind = k) : delete d.live!.kind))} className={`flex-1 rounded-md py-1.5 ${live.kind === k ? "bg-white shadow-sm" : "text-[#6e6e73]"}`}>
