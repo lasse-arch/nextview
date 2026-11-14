@@ -463,6 +463,9 @@ export type TourConfig = {
    * or one row a day) - shown under the contact lines, with "Åbent nu · lukker
    * 23.00" when the rows can be read as days and times. `hoursNote`: one small
    * line under them (e.g. "Bemandet hverdage 9-12 og 16-19").
+   * `mapUrl`: leave it out - the address then opens Google Maps searching the
+   * brand and the address, which finds the business itself. Only set it to a
+   * map link the customer's own site uses, copied exactly - never make one up.
    */
   contact?: { address?: string; mapUrl?: string; phone?: string; email?: string; instagram?: string; social?: Partial<Record<import("./social").SocialKind, string>>; hours?: { days: string; time: string }[]; hoursNote?: string };
   /** The drone scene in front of the tour - leave out to start straight in the tour. */

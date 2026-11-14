@@ -7,7 +7,7 @@ import { danishOf, LANGUAGES, localize, makeT, tourLanguages } from "../tours/i1
 import { TourLang, useT } from "../tours/i18n-react";
 import { socialLinks } from "../tours/social";
 import { escapeHtml, safeColor } from "../tours/safe";
-import { shownGuides, cssFilter, droneViewsOfHref, formatPhone, GUIDE_HREF, guideOfHref, guideSetup, isDroneHref, guideExit, imageOfHref, isInTourHref, isPlaceHref, placeHref, panoHfov, placeSlug, pointOfHref, startPlaces, startTargets, welcomeTiles, withoutDeadAerialLinks } from "../tours/places";
+import { shownGuides, cssFilter, droneViewsOfHref, formatPhone, GUIDE_HREF, guideOfHref, guideSetup, isDroneHref, guideExit, imageOfHref, isInTourHref, isPlaceHref, mapsSearch, placeHref, panoHfov, placeSlug, pointOfHref, startPlaces, startTargets, welcomeTiles, withoutDeadAerialLinks } from "../tours/places";
 import type { LiveUnit } from "@/lib/availability/live";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { flushSync } from "react-dom";
@@ -3480,7 +3480,7 @@ function TourExperience({
           <div className="hv-contact">
             <div className="hv-contact-t">{tx("Kontakt")}</div>
             {T.contact.address && (
-              <TourLink href={T.contact.mapUrl ?? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(T.contact.address ?? "")}`} label={T.contact.address ?? tx("Kort")} onClick={() => track("contact_click", { kind: "map" })}>
+              <TourLink href={T.contact.mapUrl ?? mapsSearch(T.brand, T.contact.address ?? "")} label={T.contact.address ?? tx("Kort")} onClick={() => track("contact_click", { kind: "map" })}>
                 <ContactIcon kind="pin" />
                 {T.contact.address}
               </TourLink>

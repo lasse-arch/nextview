@@ -3,7 +3,7 @@
 import { TourLogo } from "./tour-logo";
 import { MailText } from "./links";
 import { useT } from "../tours/i18n-react";
-import { imageOfHref, isInTourHref, isPlaceHref } from "../tours/places";
+import { imageOfHref, isInTourHref, isPlaceHref, mapsSearch } from "../tours/places";
 import type { BentoTile, TourConfig } from "../tours/types";
 
 /*
@@ -109,7 +109,7 @@ export function BentoMenu({
               <h4>{tr("Kontakt")}</h4>
               <div className="bm-contact">
                 {c.address && (
-                  <a href={c.mapUrl ?? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(c.address)}`} target="_blank" rel="noopener noreferrer">
+                  <a href={c.mapUrl ?? mapsSearch(T.brand, c.address)} target="_blank" rel="noopener noreferrer">
                     {c.address}
                   </a>
                 )}

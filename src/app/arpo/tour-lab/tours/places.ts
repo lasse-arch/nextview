@@ -232,6 +232,17 @@ export function guideStops(T: TourConfig, guideId: string | null = null): GuideS
  * menu items and welcome tiles (e.g. "… fra luften", made by nextviewAI from a
  * template) are left out rather than shown as buttons that do nothing.
  */
+/**
+ * The address on Google Maps: a search for the place's name AND its address
+ * ("Fitness United, Frijsenborgvej 5A, 8240 Risskov") - so Google opens the
+ * business itself (opening hours, reviews), not just a pin on the street.
+ */
+export function mapsSearch(brand: string | undefined, address: string): string {
+  const name = brand?.trim();
+  const query = name && !address.toLowerCase().includes(name.toLowerCase()) ? `${name}, ${address}` : address;
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+}
+
 export function withoutDeadAerialLinks<T extends TourConfig>(c: T): T {
   const guides = new Set((c.guides ?? []).map((g) => g.id));
   // A link to something the tour hasn't got (any more) - shown nowhere, so nobody presses a button that does nothing.
