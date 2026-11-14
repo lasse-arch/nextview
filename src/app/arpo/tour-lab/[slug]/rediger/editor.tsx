@@ -1620,7 +1620,7 @@ export function TourEditor({
   );
 }
 
-type ChatMsg = { role: "user" | "assistant"; text: string; images?: string[]; error?: boolean; changed?: number; before?: TourConfig; undone?: boolean; remembered?: string[]; forgot?: string[]; /** Notes nextviewAI asks whether to remember - and what the user answered (by index). */ askRemember?: MemoryNote[]; answered?: Record<number, "ja" | "nej"> };
+type ChatMsg = { role: "user" | "assistant"; text: string; images?: string[]; /** Where Arpo keeps the pictures sent (from nextviewAI's answer) - told again in later messages. */ imageUrls?: string[]; error?: boolean; changed?: number; before?: TourConfig; undone?: boolean; remembered?: string[]; forgot?: string[]; /** Notes nextviewAI asks whether to remember - and what the user answered (by index). */ askRemember?: MemoryNote[]; answered?: Record<number, "ja" | "nej"> };
 
 /** A picture made small enough to send to nextviewAI (longest side 1600 px, JPEG) - as a data URL. */
 /**
@@ -1854,7 +1854,12 @@ function ClaudePanel({
     if (!ask || pending) return;
     const history: ChatTurn[] = chat
       .filter((m) => !m.error)
-      .map((m) => ({ role: m.role, text: m.images?.length ? `${m.text}\n(${m.images.length === 1 ? "sendte et billede" : `sendte ${m.images.length} billeder`})` : m.text }));
+      .map((m) => ({
+        role: m.role,
+        text: m.images?.length
+          ? `${m.text}\n(${m.images.length === 1 ? "sendte et billede" : `sendte ${m.images.length} billeder`}${m.imageUrls?.length ? ` - gemt hos os, brug adresserne direkte i opsætningen: ${m.imageUrls.map((u, i) => `Billede ${i + 1}: ${u}`).join(", ")}` : ""})`
+          : m.text,
+      }));
     setChat((c) => [...c, { role: "user", text: ask, images: pics.length ? pics : undefined }]);
     setText("");
     setImages([]);
@@ -1872,6 +1877,8 @@ function ClaudePanel({
         if (r.error.startsWith("nextviewAI-nøglen")) setReady(false);
         return setChat((c) => [...c, { role: "assistant", text: r.error, error: true }]);
       }
+      // The pictures are kept now - their addresses go with this message in the history, so a later message can use them.
+      if (r.imageUrls?.length) setChat((c) => c.map((m, i) => (i === c.length - 1 && m.role === "user" && m.images?.length ? { ...m, imageUrls: r.imageUrls } : m)));
       if (r.changed) onApply(r.config);
       if (r.remembered.length || r.forgot.length) setLearned((n) => n + 1);
       setChat((c) => [...c, { role: "assistant", text: r.reply, changed: r.changed, before: r.changed ? before : undefined, remembered: r.remembered, forgot: r.forgot, askRemember: r.askRemember }]);

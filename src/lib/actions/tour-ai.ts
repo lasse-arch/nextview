@@ -129,7 +129,7 @@ const Edits = z.object({
 
 export type ChatTurn = { role: "user" | "assistant"; text: string };
 export type MemoryNote = { scope: "all" | "tour"; text: string };
-export type AiEditResult = { ok: true; reply: string; config: TourConfig; changed: number; remembered: string[]; forgot: string[]; /** Notes nextviewAI asks whether to remember - the user says yes (addTourAiMemory) or no. */ askRemember: MemoryNote[] } | { ok: false; error: string };
+export type AiEditResult = { ok: true; reply: string; config: TourConfig; changed: number; remembered: string[]; forgot: string[]; /** Notes nextviewAI asks whether to remember - the user says yes (addTourAiMemory) or no. */ askRemember: MemoryNote[]; /** Where the pictures sent with this message are kept now - so later messages can still use them. */ imageUrls?: string[] } | { ok: false; error: string };
 
 
 /** Applies one change to a copy-in-progress of the setup. Paths are "/"-separated keys and list indexes. */
@@ -203,6 +203,7 @@ Sådan arbejder du (du hedder nextviewAI i Arpo):
 - Hvem handler, og hvad er næste skridt i virkeligheden (fx "Book en rundvisning", fordi optagelse altid starter der)? Gør det til hovedhandlingen.
 - Mindre er mere: hellere få, tydelige valg end mange.
 - Du får tourens live data-side, som den ser ud lige nu (<live-data>), og sider, brugeren linker til (<side>). Handler ønsket om sprog eller links, får du også <sprogudgaver>: hvert link i touren er læst nu, med de engelske, tyske … adresser, siden selv nævner - læg dem i linkTranslations uden at spørge brugeren om adresserne. Sig aldrig, at du ikke kan finde sprogsiderne: du har dem dér. Et link uden adresse dér har ingen sprogudgave på siden. Brug dem til at tjekke i stedet for at gætte: virker mønsteret ikke, så ret live.pattern, så det finder enhederne på siden.
+- Billeder, brugeren sender i chatten, er gemt hos os med det samme: deres adresser står i beskeden ("Billede 1: …") eller i samtalens historik. Brug dem direkte i opsætningen (fx images på et punkt, stedkort eller "Se det i brug", et personfoto, en flise) - sig aldrig, at billeder fra chatten ikke kan bruges, eller at de skal uploades i editoren.
 - Tider i en tekst (stedkort, Vis mig rundt, infobokse): skriv dem ikke i en lang sætning. Skriv en kort sætning og så én linje pr. dag eller gruppe af dage med kolon, adskilt med linjeskift (\\n), fx "Receptionen er bemandet:\\nMandag - torsdag: 8-12 og 14-19\\nFredag: 8-12 og 14-17\\nWeekend og helligdage: 9-12". Touren viser sådanne linjer som en pæn lille tabel. Har touren contact.hours, så står åbningstiderne også i kontaktboksen.
 - Skriv som et menneske: aldrig "·", "—", "–" eller "|" mellem ord eller som pynt. Brug komma, punktum, kolon eller en almindelig bindestreg.
 
@@ -448,7 +449,9 @@ export async function askClaudeForTour(config: TourConfig, history: ChatTurn[], 
       ? `\n\n(Brugeren har sendt ${images.length === 1 ? "et billede" : `${images.length} billeder`} med - i rækkefølge. Er det et skærmbillede (af forhåndsvisningen, kundens hjemmeside), så brug det til at forstå, hvad de mener. Er det et foto, de vil have i touren, så brug adressen herunder direkte i opsætningen (fx images på et punkt eller stedkort, et personbillede, en flise) - billedet er allerede gemt hos os.${addresses.length ? `\n${addresses.join("\n")}` : ""})`
       : "";
     const web = await webContext(config, request).catch(() => "");
-    return await claudeEdits(key, { name: user.name, kind: "ændring" }, config, history, `Ønske: ${request}${seen}${web}`, 16000, true, [], images);
+    const r = await claudeEdits(key, { name: user.name, kind: "ændring" }, config, history, `Ønske: ${request}${seen}${web}`, 16000, true, [], images);
+    // The pictures' addresses go back to the editor, which puts them in the history of later messages ("læg dem i baglokalet").
+    return r.ok ? { ...r, imageUrls: kept.filter((u): u is string => Boolean(u)) } : r;
   } catch (err) {
     console.error("askClaudeForTour", err);
     return { ok: false, error: `Noget gik galt hos nextviewAI (${err instanceof Error ? err.message : err}) - prøv igen.` };
