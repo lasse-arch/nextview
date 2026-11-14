@@ -123,8 +123,9 @@ export const HOURS_CSS = `
 .hv-aabent-top em.aaben::before{content:"";display:inline-block;width:6px;height:6px;margin-right:6px;border-radius:50%;background:#22a04f;vertical-align:1px}
 .hv-aabent-top em.lukket{background:rgba(0,0,0,.06);color:#5d7177}
 .hv-aabent dl{margin:0 0 0 26px;display:flex;flex-direction:column;gap:3px}
-.hv-aabent dl div{display:flex;justify-content:space-between;gap:12px;font-size:13.5px}
-.hv-aabent dt{color:#4b5d63}
-.hv-aabent dd{margin:0;font-weight:700;color:var(--c-main);font-variant-numeric:tabular-nums;white-space:nowrap}
+.hv-aabent dl div{display:flex;flex-wrap:wrap;justify-content:space-between;column-gap:12px;row-gap:0;font-size:13.5px}
+/* The days never break inside ("Mandag - søndag" on one line) - short of room, the time moves under them, to the right. */
+.hv-aabent dt{color:#4b5d63;white-space:nowrap}
+.hv-aabent dd{margin:0;font-weight:700;color:var(--c-main);font-variant-numeric:tabular-nums;white-space:nowrap;margin-left:auto}
 .hv-aabent-note{margin:2px 0 0 26px;font-size:12px;line-height:1.4;color:#6b7a80}
 `;
