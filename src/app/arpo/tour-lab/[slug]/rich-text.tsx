@@ -1,5 +1,8 @@
 "use client";
 
+import { useState } from "react";
+import { useT } from "../tours/i18n-react";
+
 /*
  * A text from the setup with a little form: a blank line = a new paragraph, a
  * line break stays a line break, and lines like "Mandag - torsdag: 8-12 og
@@ -16,7 +19,33 @@ function isHoursLine(line: string): [string, string] | null {
   return m && DAY.test(m[1]) && /\d|lukket|closed/i.test(m[2]) ? [m[1], m[2]] : null;
 }
 
-export function RichText({ text }: { text: string }) {
+/** The times as a table - with `fold`, on a phone it waits behind a small "Se tiderne" button (a card there has little room). */
+function Times({ rows, fold }: { rows: [string, string][]; fold: boolean }) {
+  const tr = useT();
+  const [open, setOpen] = useState(false);
+  const table = (
+    <span className={`rt-tider ${fold ? "rt-fold" : ""} ${open ? "aaben" : ""}`}>
+      {rows.map(([days, time], k) => (
+        <span key={k} className="rt-tid">
+          <span>{days}</span>
+          <b>{time}</b>
+        </span>
+      ))}
+    </span>
+  );
+  if (!fold) return table;
+  return (
+    <>
+      <button type="button" className="rt-se" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+        {open ? tr("Skjul tiderne") : tr("Se tiderne")} <span aria-hidden>{open ? "▴" : "▾"}</span>
+      </button>
+      {table}
+    </>
+  );
+}
+
+/** `fold`: tables of times fold away on a phone (see Times) - for the guide's card. */
+export function RichText({ text, fold = false }: { text: string; fold?: boolean }) {
   const paragraphs = text
     .replace(/\r/g, "")
     .split(/\n\s*\n/)
@@ -42,14 +71,7 @@ export function RichText({ text }: { text: string }) {
                   {part.text}
                 </span>
               ) : (
-                <span key={j} className="rt-tider">
-                  {part.rows.map(([days, time], k) => (
-                    <span key={k} className="rt-tid">
-                      <span>{days}</span>
-                      <b>{time}</b>
-                    </span>
-                  ))}
-                </span>
+                <Times key={j} rows={part.rows} fold={fold} />
               )
             )}
           </span>
@@ -67,9 +89,12 @@ export const RICH_TEXT_CSS = `
 .rt-tid{display:contents}
 .rt-tid>span{opacity:.85}
 .rt-tid>b{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.rt-se{display:none;margin:.35em 0 0;padding:4px 11px;border:0;border-radius:999px;background:color-mix(in srgb,var(--c-main) 8%,transparent);color:var(--c-main);font:inherit;font-size:.86em;font-weight:700;cursor:pointer}
 /* A phone: the table small and tight - a card there has little room. */
 @media (max-width:760px){
   .rt-afsnit+.rt-afsnit{margin-top:.4em}
+  .rt-se{display:inline-block}
+  .rt-fold:not(.aaben){display:none}
   .rt-tider{column-gap:12px;row-gap:0;margin:.3em 0 .1em;padding:5px 9px;border-radius:9px;font-size:.84em;line-height:1.4}
 }
 `;

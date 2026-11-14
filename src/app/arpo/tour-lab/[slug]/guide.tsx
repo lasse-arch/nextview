@@ -164,7 +164,7 @@ export function GuidePlayer({
         {/* The card's own short text when it has one - the voice still reads `text`. */}
         {(stop.short || stop.text) && (
           <p>
-            <RichText text={stop.short || stop.text} />
+            <RichText text={stop.short || stop.text} fold />
           </p>
         )}
         {stop.images?.length ? <CardPhotos images={stop.images} onOpen={(at) => onPhotos?.(stop.images!, at)} /> : null}
