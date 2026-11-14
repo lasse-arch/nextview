@@ -9,6 +9,7 @@ import { tourEmbeds } from "@/lib/tour-embeds";
 import { CLOUDFLARE_TOUR_ORIGIN } from "@/lib/public-urls";
 import { CustomerAccessSection } from "../../deals/[id]/customer-access-section";
 import { customerCards, forPicker } from "@/lib/customer-cards";
+import { contractTerm } from "@/lib/contract-term";
 import { CustomerPicker, Thumb } from "../customer-picker";
 
 export const metadata = { title: "Kunde" };
@@ -22,6 +23,30 @@ export const metadata = { title: "Kunde" };
  */
 
 const d = (x: Date | null | undefined) => (x ? x.toLocaleDateString("da-DK", { day: "numeric", month: "short", year: "numeric" }) : "–");
+
+/** When the contract ends or renews, and the last day to give notice (see lib/contract-term.ts) - as rows for "Aftale og betaling". */
+function termRows(deal: Parameters<typeof contractTerm>[0]): [string, React.ReactNode][] {
+  const t = contractTerm(deal);
+  if (t.kind === "not-started") return deal.bindingMonths ? [["Aftalen løber", <span key="s" className="text-slate-500">fra touren er leveret</span>]] : [];
+  if (t.kind === "ends")
+    return [
+      ["Ophører", <b key="e">{d(t.end)}</b>],
+      ...(t.noticeGivenAt ? ([["Opsagt", d(t.noticeGivenAt)]] as [string, React.ReactNode][]) : []),
+    ];
+  return [
+    ["Periode slutter", <span key="p">{d(t.periodEnd)} <span className="text-slate-500">(forlænges så {t.months} mdr.)</span></span>],
+    [
+      "Senest opsigelse",
+      t.late ? (
+        <span key="n">
+          <span className="text-slate-500 line-through">{d(t.noticeBy)}</span> <span className="text-amber-700">for sent til denne periode</span> - næste: <b>{d(t.late.noticeBy)}</b> <span className="text-slate-500">(til {d(t.late.periodEnd)})</span>
+        </span>
+      ) : (
+        <b key="n">{d(t.noticeBy)}</b>
+      ),
+    ],
+  ];
+}
 const dt = (x: Date) => x.toLocaleString("da-DK", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 const num = (n: number) => n.toLocaleString("da-DK");
 
@@ -241,7 +266,7 @@ export default async function CustomerOverviewPage({ params }: { params: Promise
                 ["Binding", deal.bindingMonths ? `${deal.bindingMonths} måneder` : null],
                 ["Underskrevet", deal.contractSignedAt ? d(deal.contractSignedAt) : null],
                 ["Fakturering fra", deal.billingStartDate ? d(deal.billingStartDate) : null],
-                ["Ophører", deal.contractEndDate ? d(deal.contractEndDate) : null],
+                ...termRows(deal),
                 ["Betaling", deal.paymentMethod === "BETALINGSSERVICE" ? `Betalingsservice${deal.bsMandateStatus === "ACTIVE" ? " · tilmeldt" : deal.bsMandateStatus === "CANCELLED" ? " · afmeldt" : " · ikke tilmeldt endnu"}` : "Faktura"],
                 // Only contracts signed through DocuSeal can be fetched - older ones came from the previous system and aren't in Arpo.
                 ["Kontrakt", deal.contractSignedAt ? (deal.docusealSubmissionId && isAdmin ? <a href={`/kunde/kontrakt/${deal.id}`} target="_blank" rel="noopener" className="text-[#0071e3]">Hent PDF ↗</a> : deal.docusealSubmissionId ? "Underskrevet i DocuSeal" : <span className="text-slate-500">Fra det gamle system - ikke i Arpo</span>) : null],
