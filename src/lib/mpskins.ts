@@ -130,7 +130,9 @@ export async function readExploreTour(raw: string): Promise<ExploreTour | null> 
     return null;
   }
   if (url.protocol !== "https:" || url.hostname !== "explore.nextview360.dk" || !/^\/(?:[a-z]{2}\/)?tour\/[\w-]+\/?$/.test(url.pathname)) return null;
-  const res = await fetch(new URL(url.pathname, url.origin), { signal: AbortSignal.timeout(15_000), redirect: "error" }).catch(() => null);
+  // Without a language ("/tour/…") explore only redirects to "/da/tour/…" - asked for that page straight away (redirects aren't followed).
+  const path = /^\/[a-z]{2}\//.test(url.pathname) ? url.pathname : `/da${url.pathname}`;
+  const res = await fetch(new URL(path, url.origin), { signal: AbortSignal.timeout(15_000), redirect: "error" }).catch(() => null);
   if (!res?.ok) return null;
   const html = (await res.text()).slice(0, 3_000_000);
   const cfg = extractCfg(html);
