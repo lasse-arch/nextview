@@ -162,9 +162,9 @@ export const CLASSES_CSS = `
 .kl-ark{position:relative;display:flex;flex-direction:column;width:min(560px,calc(100% - 32px));max-height:calc(100% - 48px);box-sizing:border-box;padding:22px 22px 12px;border-radius:24px;background:#fff;color:#1d2a30;box-shadow:0 20px 60px rgba(0,0,0,.35);animation:hvUp .35s cubic-bezier(.2,.7,.2,1) both}
 .kl-x{position:absolute;top:12px;right:12px;width:34px;height:34px;border:0;border-radius:50%;background:#f0f1f2;color:#1d2a30;font-size:20px;line-height:1;cursor:pointer}
 .kl-titel{margin:0 44px 12px 0;font-size:24px;font-weight:900;color:var(--c-main);font-family:var(--font-heading,inherit)}
-.kl-dage{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
+.kl-dage{display:flex;align-items:center;gap:6px;overflow-x:auto;overflow-y:hidden;padding:3px 2px 6px;scrollbar-width:none}
 .kl-dage::-webkit-scrollbar{display:none}
-.kl-dage button{flex:none;border:0;border-radius:999px;padding:8px 14px;background:var(--c-soft,#f2f3f4);color:#1d2a30;font:inherit;font-size:13.5px;font-weight:700;cursor:pointer}
+.kl-dage button{flex:none;display:inline-flex;align-items:center;box-sizing:border-box;height:auto;min-height:34px;line-height:1.2;white-space:nowrap;border:0;border-radius:999px;padding:7px 14px;background:var(--c-soft,#f2f3f4);color:#1d2a30;font:inherit;font-size:13.5px;font-weight:700;cursor:pointer}
 .kl-dage button.valgt{background:var(--c-main);color:#fff}
 .kl-dag{margin:12px 0 2px;font-size:13px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#5d7177}
 .kl-ark .kl-liste{overflow-y:auto;overscroll-behavior:contain;margin:0 -22px;padding:0 22px 8px}

@@ -4820,7 +4820,9 @@ const GLASS_MENU_CSS = `
 .hv-glas .hv-menu-head.hv-light{background:transparent !important;margin:4px 4px 0;color:var(--c-main)}
 .hv-glas .hv-menu-head.hv-light .hv-menu-titel{color:var(--c-main)}
 .hv-glas .hv-menu-head.hv-light .hv-sub{color:#4b5753}
-.hv-glas .hv-gruppe,.hv-glas .hv-gtitel.hv-enkel{margin:0 12px;border-bottom:1px solid rgba(0,0,0,.07)}
+.hv-glas .hv-gruppe,.hv-glas .hv-gtitel.hv-enkel{margin:0 12px;border-bottom:1px solid rgba(0,0,0,.07);width:calc(100% - 24px);box-sizing:border-box}
+/* Never sideways: nothing in the panel may be wider than it. */
+.hv-glas .hv-menu{overflow-x:hidden}
 .hv-glas .hv-gtitel{padding:11px 8px;font-size:15px}
 .hv-glas .hv-items{padding:2px 0 10px 6px;display:flex;flex-direction:column;gap:2px}
 .hv-glas .hv-items button{padding:7px 10px;border-radius:10px;font-size:14px}
