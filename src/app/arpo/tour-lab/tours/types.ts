@@ -449,7 +449,14 @@ export type TourConfig = {
    * icons - only the ones filled in. `instagram` is the older single field
    * (still shown, as its icon).
    */
-  contact?: { address?: string; mapUrl?: string; phone?: string; email?: string; instagram?: string; social?: Partial<Record<import("./social").SocialKind, string>> };
+  /**
+   * The contact box at the bottom of the menu. `hours`: opening hours as rows
+   * the customer writes them ({ days: "Mandag - søndag", time: "05.00 - 23.00" },
+   * or one row a day) - shown under the contact lines, with "Åbent nu · lukker
+   * 23.00" when the rows can be read as days and times. `hoursNote`: one small
+   * line under them (e.g. "Bemandet hverdage 9-12 og 16-19").
+   */
+  contact?: { address?: string; mapUrl?: string; phone?: string; email?: string; instagram?: string; social?: Partial<Record<import("./social").SocialKind, string>>; hours?: { days: string; time: string }[]; hoursNote?: string };
   /** The drone scene in front of the tour - leave out to start straight in the tour. */
   /**
    * What lies over the drone scene / map, per device - false hides it: the

@@ -40,6 +40,7 @@ import { SHOP_CSS, ShopSheet } from "./shop";
 import { PointVideo } from "./point-video";
 import { EVENTS_CSS, EventsBlock, useTourEvents } from "./events";
 import { CLASSES_CSS, ClassesNext, ClassesSheet, useTourClasses } from "./classes";
+import { HOURS_CSS, OpeningHours } from "./hours";
 import { FEEDBACK_CSS, FeedbackLayer } from "./feedback";
 import { ICONS } from "../tours/icons";
 import { SIMPLE_CSS, SimpleMenu, SimpleWelcome } from "./simple";
@@ -56,7 +57,7 @@ import { MAP_CSS, MapScene, type MapApi, type MapView } from "./map";
 import { CARDS_CSS, NudgeCard, PlaceCard } from "./cards";
 import { MEASURES_CSS, MeasureShield } from "./measures";
 import { ROUTE_CSS, RouteLine, RouteSheet, RouteStatus, flightMs, routeNetwork, shortestPath, straighten, withoutSweeps, type Destination, type RouteGraph } from "./wayfinding";
-import { LINKS_CSS, LinkPopup, LinkProvider, TourLink, openLink, popupSize, prefetchFrames, prefetchLinks, siteOf, type LinkPopupState } from "./links";
+import { LINKS_CSS, LinkPopup, LinkProvider, MailText, TourLink, openLink, popupSize, prefetchFrames, prefetchLinks, siteOf, type LinkPopupState } from "./links";
 import { Stories, STORIES_CSS, storyJpeg, type StoryRoom } from "./stories";
 import { LIGHTBOX_CSS, Lightbox, type LightboxState } from "./lightbox";
 import "pannellum/build/pannellum.css";
@@ -2935,7 +2936,7 @@ function TourExperience({
       {[...new Set([...fontHrefs(T.font, [400, 600, 700, 800, 900]), ...(T.fontHeading ? fontHrefs(T.fontHeading, [500, 600]) : [])])].map((href) => (
         <link key={href} rel="stylesheet" href={href} />
       ))}
-      <style>{CSS + TOUR_LOGO_CSS + CONTACT_CSS + STORIES_CSS + LIGHTBOX_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + ONBOARDING_CSS + MENU_HINT_CSS + INFO_CSS + STAGING_CSS + (T.staging?.some((i) => i.kind === "treasure") ? CONTEST_CSS : "") + (T.inUse?.length ? IN_USE_CSS : "") + (T.lineDays ? LINE_DAY_CSS : "") + (T.yearWheel ? YEARWHEEL_CSS : "") + (T.schedule ? SCHEDULE_CSS : "") + MAP_CSS + (T.sitePlan?.overlay ? SITE_PLAN_CSS + SITE_PLAN_360_CSS : "") + ROUTE_CSS + MEASURES_CSS + CARDS_CSS + DAY_CSS + (T.events ? EVENTS_CSS : "") + (T.classes ? CLASSES_CSS : "") + (T.shop || T.points.some((p) => p.shop) ? SHOP_CSS : "") + SIMPLE_CSS + BENTO_CSS + LOGO_RIGHT_CSS + LANG_CSS + WEATHER_CSS + COMMUTE_CSS + FEATURES_CSS + FINDER_CSS + FULLSCREEN_BUTTON_CSS + (T.design?.menu === "float" ? FLOAT_DOCK_CSS : "") + (T.team?.people.length ? TEAM_CSS : "") + (T.design?.menu === "glass" ? GLASS_MENU_CSS : "") + (review ? FEEDBACK_CSS : "")}</style>
+      <style>{CSS + TOUR_LOGO_CSS + CONTACT_CSS + STORIES_CSS + LIGHTBOX_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + ONBOARDING_CSS + MENU_HINT_CSS + INFO_CSS + STAGING_CSS + (T.staging?.some((i) => i.kind === "treasure") ? CONTEST_CSS : "") + (T.inUse?.length ? IN_USE_CSS : "") + (T.lineDays ? LINE_DAY_CSS : "") + (T.yearWheel ? YEARWHEEL_CSS : "") + (T.schedule ? SCHEDULE_CSS : "") + MAP_CSS + (T.sitePlan?.overlay ? SITE_PLAN_CSS + SITE_PLAN_360_CSS : "") + ROUTE_CSS + MEASURES_CSS + CARDS_CSS + DAY_CSS + (T.events ? EVENTS_CSS : "") + (T.classes ? CLASSES_CSS : "") + (T.contact?.hours?.length ? HOURS_CSS : "") + (T.shop || T.points.some((p) => p.shop) ? SHOP_CSS : "") + SIMPLE_CSS + BENTO_CSS + LOGO_RIGHT_CSS + LANG_CSS + WEATHER_CSS + COMMUTE_CSS + FEATURES_CSS + FINDER_CSS + FULLSCREEN_BUTTON_CSS + (T.design?.menu === "float" ? FLOAT_DOCK_CSS : "") + (T.team?.people.length ? TEAM_CSS : "") + (T.design?.menu === "glass" ? GLASS_MENU_CSS : "") + (review ? FEEDBACK_CSS : "")}</style>
       {/* The tour's own design on top (written by Claude or by hand under Avanceret). */}
       {T.customCss && <style>{T.customCss.replace(/<\/?style/gi, "")}</style>}
 
@@ -3485,9 +3486,10 @@ function TourExperience({
             {T.contact.email && (
               <a href={`mailto:${T.contact.email}`} onClick={() => track("contact_click", { kind: "email" })}>
                 <ContactIcon kind="mail" />
-                {T.contact.email}
+                <MailText email={T.contact.email} />
               </a>
             )}
+            {T.contact.hours?.some((h) => h.days.trim() || h.time.trim()) && <OpeningHours hours={T.contact.hours.filter((h) => h.days.trim() || h.time.trim())} note={T.contact.hoursNote} />}
             {T.contactForm && (T.contactForm.inBox ?? !T.cta.some((c) => c.href === "#kontakt")) && (
               <button
                 type="button"
@@ -4552,6 +4554,7 @@ html:has(.hv.fixed),html:has(.hv.fixed) body{overflow:hidden;overscroll-behavior
 .hv-contact{margin:0 22px 26px;padding:14px 16px;border-radius:14px;background:var(--c-soft);display:flex;flex-direction:column;gap:8px}
 .hv-contact-t{font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#7a8a90}
 .hv-contact a{display:flex;gap:8px;align-items:center;overflow-wrap:anywhere;min-width:0;color:var(--c-main);text-decoration:none;font-size:14px;font-weight:600}
+.hv-mail{display:inline-block;max-width:100%;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom}
 .hv-contact a:hover{color:var(--c-accent-dark)}
 .hv-ci{flex:none;width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;opacity:.65}
 .hv-contact-form .hv-ci{opacity:.9}

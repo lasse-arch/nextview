@@ -79,7 +79,30 @@ export function LiveDataEditor({ config, edit, slug, preview }: { config: TourCo
             Det er Next-Stay - dens side kan ikke læses her. Brug i stedet <b>Luftfoto og kort → Pladskort over luftfotoet → Ledige pladser live fra Next-Stay</b>: sæt linket ind dér og tryk Hent pladser, så kommer alle pladser og hytter som prikker på pladskortet og lyser grønt, når de er ledige.
           </p>
         )}
-        <button type="button" disabled={pending || !url.trim() || /next-stay/i.test(url)} onClick={read} className="w-full rounded-xl bg-[#0071e3] py-2.5 text-[15px] font-medium text-white disabled:opacity-40">
+        {/flexybox\.com/i.test(url) && (
+          // Flexybox's class page is drawn by JavaScript - nothing to read here. Its classes come straight from Flexybox instead (Holdplan).
+          <div className="space-y-2 rounded-xl bg-[#0071e3]/5 px-3 py-2 text-[13px] leading-snug text-[#1d1d1f]">
+            <p>
+              Det er Flexybox - siden kan ikke læses her. Den bruges i stedet i <b>Holdplan (Flexybox)</b> længere nede: holdene hentes direkte fra Flexybox, med tid, hold, instruktør og Book.
+            </p>
+            {config.classes?.source ? (
+              <p className="text-[#6e6e73]">Holdplanen er sat op længere nede.</p>
+            ) : (
+              <button
+                type="button"
+                className="rounded-lg bg-[#0071e3] px-3 py-1.5 text-[13px] font-medium text-white"
+                onClick={() => {
+                  const source = url.trim();
+                  edit((d) => void (d.classes = { source }));
+                  setUrl("");
+                }}
+              >
+                Brug linket til Holdplan
+              </button>
+            )}
+          </div>
+        )}
+        <button type="button" disabled={pending || !url.trim() || /next-stay|flexybox\.com/i.test(url)} onClick={read} className="w-full rounded-xl bg-[#0071e3] py-2.5 text-[15px] font-medium text-white disabled:opacity-40">
           {pending ? "nextviewAI læser siden…" : live ? "Læs siden igen med nextviewAI" : "Læs siden med nextviewAI"}
         </button>
         {error && <p className="px-1 text-[12px] text-[#ff3b30]">{error}</p>}

@@ -1,6 +1,7 @@
 "use client";
 
 import { TourLogo } from "./tour-logo";
+import { MailText } from "./links";
 import { useT } from "../tours/i18n-react";
 import { imageOfHref, isInTourHref, isPlaceHref } from "../tours/places";
 import type { BentoTile, TourConfig } from "../tours/types";
@@ -113,7 +114,7 @@ export function BentoMenu({
                   </a>
                 )}
                 {c.phone && <a href={`tel:${c.phone.replace(/[^\d+]/g, "")}`}>{c.phone}</a>}
-                {c.email && <a href={`mailto:${c.email}`}>{c.email}</a>}
+                {c.email && <a href={`mailto:${c.email}`}><MailText email={c.email} /></a>}
               </div>
             </>
           )}

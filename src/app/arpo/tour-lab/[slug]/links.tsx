@@ -3,7 +3,7 @@
 import { safeHref } from "../tours/safe";
 import { tagged } from "../tours/link-tag";
 import { useT } from "../tours/i18n-react";
-import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { apiUrl } from "../tours/api";
 import type { LinkOpen, PopupSize, TourConfig } from "../tours/types";
 import { guideOfHref, isPlaceHref } from "../tours/places";
@@ -349,3 +349,35 @@ export const LINKS_CSS = `
   .lk-popup,.lk-egen .lk-popup{width:100%;height:94%;border-radius:18px 18px 0 0}
 }
 `;
+
+/**
+ * An e-mail address on one line, never broken: when it's wider than its box
+ * (a long address in a narrow menu), its letters get a little smaller until it
+ * fits (not under 10px) - measured again when the box changes size.
+ */
+export function MailText({ email }: { email: string }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    const box = el?.parentElement;
+    if (!el || !box) return;
+    const fit = () => {
+      el.style.fontSize = "";
+      let size = parseFloat(getComputedStyle(el).fontSize);
+      // The span may shrink in its row (min-width 0, overflow hidden): too wide = its text is wider than itself.
+      while (el.scrollWidth > el.clientWidth + 0.5 && size > 10) {
+        size -= 0.5;
+        el.style.fontSize = `${size}px`;
+      }
+    };
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(box);
+    return () => ro.disconnect();
+  }, [email]);
+  return (
+    <span ref={ref} className="hv-mail">
+      {email}
+    </span>
+  );
+}

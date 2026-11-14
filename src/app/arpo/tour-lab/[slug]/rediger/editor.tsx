@@ -1290,6 +1290,59 @@ export function TourEditor({
                     />
                   </Field>
                 ))}
+                <Field title="Åbningstider" hint='Står under kontaktoplysningerne med "Åbent nu · lukker 23.00", når dage og tider kan læses. Én række for hele ugen ("Mandag - søndag" · "05.00 - 23.00") eller én pr. dag.'>
+                  <div className="space-y-1.5">
+                    {(config.contact?.hours ?? []).map((h, i) => {
+                      const setRow = (patch: Partial<{ days: string; time: string }>) =>
+                        edit((d) => void (d.contact = { ...d.contact, hours: (d.contact?.hours ?? []).map((x, j) => (j === i ? { ...x, ...patch } : x)) }));
+                      return (
+                        <div key={i} className="flex items-center gap-1.5">
+                          <input className={input} placeholder="Mandag - søndag" value={h.days} onChange={(e) => setRow({ days: e.target.value })} />
+                          <input className={`${input} w-36 flex-none`} placeholder="05.00 - 23.00" value={h.time} onChange={(e) => setRow({ time: e.target.value })} />
+                          <button
+                            type="button"
+                            aria-label="Fjern rækken"
+                            className="flex-none px-1 text-[18px] leading-none text-[#ff3b30]"
+                            onClick={() =>
+                              edit((d) => {
+                                const hours = (d.contact?.hours ?? []).filter((_, j) => j !== i);
+                                d.contact = { ...d.contact, hours: hours.length ? hours : undefined, ...(hours.length ? {} : { hoursNote: undefined }) };
+                              })
+                            }
+                          >
+                            ×
+                          </button>
+                        </div>
+                      );
+                    })}
+                    <div className="flex flex-wrap gap-3">
+                      <button
+                        type="button"
+                        className="px-1 text-[13px] font-medium text-[#0071e3] hover:underline"
+                        onClick={() => edit((d) => void (d.contact = { ...d.contact, hours: [...(d.contact?.hours ?? []), { days: d.contact?.hours?.length ? "" : "Mandag - søndag", time: "" }] }))}
+                      >
+                        + Tilføj række
+                      </button>
+                      {!config.contact?.hours?.length && (
+                        <button
+                          type="button"
+                          className="px-1 text-[13px] font-medium text-[#0071e3] hover:underline"
+                          onClick={() => edit((d) => void (d.contact = { ...d.contact, hours: ["Mandag", "Tirsdag", "Onsdag", "Torsdag", "Fredag", "Lørdag", "Søndag"].map((days) => ({ days, time: "" })) }))}
+                        >
+                          + Én pr. dag
+                        </button>
+                      )}
+                    </div>
+                    {config.contact?.hours?.length ? (
+                      <input
+                        className={input}
+                        placeholder="Lille linje under (valgfri) - fx Bemandet hverdage 9-12 og 16-19"
+                        value={config.contact.hoursNote ?? ""}
+                        onChange={(e) => edit((d) => void (d.contact = { ...d.contact, hoursNote: e.target.value || undefined }))}
+                      />
+                    ) : null}
+                  </div>
+                </Field>
                 <Field title="Sociale medier" hint="Vises som ikoner nederst i menuen. Udfyld linket til dem, kunden vil have vist.">
                   <div className="space-y-1.5">
                     {SOCIALS.map((so) => {

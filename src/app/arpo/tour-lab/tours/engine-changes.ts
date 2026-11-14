@@ -9,6 +9,8 @@
 export type EngineChange = { date: string; kind: "ny" | "sikkerhed" | "hastighed" | "rettelse"; text: string };
 
 export const ENGINE_CHANGES: EngineChange[] = [
+  { date: "2026-11-14", kind: "ny", text: "Åbningstider i kontaktboksen: rækker med dage og tid (eller én pr. dag) og \"Åbent nu · lukker 23.00\" / \"Lukket · åbner 05.00\" efter stedets eget ur - og en lille linje under (fx bemandede tider)." },
+  { date: "2026-11-14", kind: "rettelse", text: "En lang mailadresse i kontaktboksen står altid på én linje - bliver den for bred, bliver skriften lidt mindre i stedet for at bryde midt i adressen." },
   { date: "2026-11-13", kind: "ny", text: "Holdplan fra Flexybox: centerets hold den kommende uge live i touren (opdateres hvert 10. minut) - et link \"#hold\" åbner den dag for dag med tid, hold, instruktør, sal, aflyste hold og Book. Stedkort kan vise de næste hold (fx i holdsalen). Ledige pladser vises kun, hvor centeret selv viser dem." },
   { date: "2026-11-13", kind: "ny", text: "\"Mød os\": en person kan have en video (fx centerlederen, der præsenterer stedet) i stedet for fotoet i sin profil - den kører uden lyd, et tryk tænder lyden. På listen har personen et lille afspil-mærke." },
   { date: "2026-11-13", kind: "ny", text: "Personer og \"Mød os\": personerne laves én gang og vælges på stedkort, i Vis mig rundt og på linjerne - og hver har en profil (stort foto, lidt om dem, citat, \"Spørg …\" og \"Se hvor du møder …\"), åbnet fra menuen (#mod) eller ved et tryk på personen." },
