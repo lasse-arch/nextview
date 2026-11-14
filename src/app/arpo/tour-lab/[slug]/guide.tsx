@@ -312,6 +312,8 @@ export const GUIDE_CSS = `
 .gd-video{margin:-4px -4px 12px}
 .gd-video .hv-pvideo{margin:0;border-radius:12px}
 .gd-card p{margin:0 0 14px;font-size:15px;line-height:1.5;color:#3d4a50}
+/* A text with a table of times ("Se tiderne") is never cut off after a few lines - the table would be hidden under the cut. It folds away itself instead. */
+.gd-card p:has(.rt-tider){display:block!important;-webkit-line-clamp:unset!important;overflow:visible!important}
 .gd-folk-mod button{display:flex;flex-direction:inherit;align-items:inherit;gap:inherit;min-width:0;max-width:100%;border:0;background:none;padding:0;text-align:inherit;cursor:pointer;font:inherit;color:inherit}
 .gd-folk{display:flex;gap:12px;margin:-4px 0 14px}
 .gd-folk figure{margin:0;display:flex;align-items:center;gap:10px;min-width:0}
