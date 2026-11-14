@@ -9,6 +9,7 @@
 export type EngineChange = { date: string; kind: "ny" | "sikkerhed" | "hastighed" | "rettelse"; text: string };
 
 export const ENGINE_CHANGES: EngineChange[] = [
+  { date: "2026-11-14", kind: "rettelse", text: "Færre prikker (\"·\") i tourens egne tekster - åbningstider, holdplan og invitationen skriver med komma i stedet." },
   { date: "2026-11-14", kind: "rettelse", text: "Tider som tabel i teksten fylder mindre på telefon (mindre skrift og tættere linjer)." },
   { date: "2026-11-14", kind: "rettelse", text: "Holdplan: et fuldt hold har knappen \"Venteliste\" (eller \"Fuldt booket\", hvis der ikke er venteliste) i stedet for Book, og centerets navn står ikke længere som sal. På computer: alle dage står fremme (på to linjer, hvis der skal) - ingen dage gemt ude til siden. På telefon swipes de stadig, og kanten toner ud." },
   { date: "2026-11-14", kind: "ny", text: "Tekst på stedkort, i Vis mig rundt og i infobokse kan have linjeskift, og linjer som \"Mandag - torsdag: 8-12 og 14-19\" vises som en pæn lille tabel med dagene til venstre og tiderne til højre." },
@@ -18,7 +19,7 @@ export const ENGINE_CHANGES: EngineChange[] = [
   { date: "2026-11-14", kind: "ny", text: "\"Mød os\": det kan slås fra, at et tryk på en person på et stedkort eller i Vis mig rundt åbner profilen (Personer → Mød os) - personen vises stadig med foto, navn og rolle." },
   { date: "2026-11-14", kind: "ny", text: "Infobokse: en lille boks med overskrift, et par linjer og evt. billede og knap (fx \"Læs om Wave\") over touren - åbnes af enhver knap med linket \"#boks:<id>\" (Vis mig rundt, stedkort, fliser, menuen)." },
   { date: "2026-11-14", kind: "rettelse", text: "Glas-panelet kan ikke længere scrolle til siden (et menupunkt uden gruppe, fx \"Vis mig rundt med …\", var bredere end panelet), og dagene i Holdplan bliver ikke længere skåret af i tours med en anden skrift." },
-  { date: "2026-11-14", kind: "ny", text: "Åbningstider i kontaktboksen: rækker med dage og tid (eller én pr. dag) og \"Åbent nu · lukker 23.00\" / \"Lukket · åbner 05.00\" efter stedets eget ur - og en lille linje under (fx bemandede tider)." },
+  { date: "2026-11-14", kind: "ny", text: "Åbningstider i kontaktboksen: rækker med dage og tid (eller én pr. dag) og \"Åbent nu, lukker 23.00\" / \"Lukket, åbner 05.00\" efter stedets eget ur - og en lille linje under (fx bemandede tider)." },
   { date: "2026-11-14", kind: "rettelse", text: "En lang mailadresse i kontaktboksen står altid på én linje - bliver den for bred, bliver skriften lidt mindre i stedet for at bryde midt i adressen." },
   { date: "2026-11-13", kind: "ny", text: "Holdplan fra Flexybox: centerets hold den kommende uge live i touren (opdateres hvert 10. minut) - et link \"#hold\" åbner den dag for dag med tid, hold, instruktør, sal, aflyste hold og Book. Stedkort kan vise de næste hold (fx i holdsalen). Ledige pladser vises kun, hvor centeret selv viser dem." },
   { date: "2026-11-13", kind: "ny", text: "\"Mød os\": en person kan have en video (fx centerlederen, der præsenterer stedet) i stedet for fotoet i sin profil - den kører uden lyd, et tryk tænder lyden. På listen har personen et lille afspil-mærke." },

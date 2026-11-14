@@ -61,7 +61,7 @@ function Status({ c }: { c: TourClass }) {
   const tr = useT();
   if (c.cancelled) return <span className="kl-status kl-aflyst">{tr("Aflyst")}</span>;
   if (c.free === undefined) return null;
-  if (c.free === 0) return <span className="kl-status kl-fuldt">{c.waitingList ? tr("Fuldt · venteliste") : tr("Fuldt")}</span>;
+  if (c.free === 0) return <span className="kl-status kl-fuldt">{c.waitingList ? tr("Fuldt, venteliste") : tr("Fuldt")}</span>;
   return <span className="kl-status kl-ledig">{c.free === 1 ? tr("1 ledig plads") : tr("{n} ledige pladser", { n: String(c.free) })}</span>;
 }
 
@@ -81,7 +81,7 @@ function Row({ T, c, onBook }: { T: TourConfig; c: TourClass; onBook: (label: st
       </span>
       <span className="kl-hold">
         <b>{c.name}</b>
-        <span>{[c.instructor, c.room].filter(Boolean).join(" · ")}</span>
+        <span>{[c.instructor, c.room].filter(Boolean).join(", ")}</span>
         <Status c={c} />
       </span>
       {!c.cancelled && full && !c.waitingList ? (
@@ -148,7 +148,7 @@ export function ClassesNext({ T, data, room, onBook }: { T: TourConfig; data: To
   return (
     <div className="kl-naeste">
       <b className="kl-naeste-titel">
-        {tr("Næste hold")} · {dayName(day, data)}
+        {tr("Næste hold")}: {dayName(day, data)}
       </b>
       <ul className="kl-liste">
         {next.map((c) => (

@@ -21,7 +21,7 @@ export async function checkTourClasses(slug: string, source: string, department?
     const all = await flexyboxClasses(source, department || undefined, room || undefined);
     if (!all.length) return { ok: true, text: "Ingen hold den kommende uge - tjek centeret og salen." };
     const next = all.slice(0, 3).map((c) => `${c.start.slice(8, 10)}/${c.start.slice(5, 7)} kl. ${c.start.slice(11, 16)} ${c.name}${c.cancelled ? " (aflyst)" : ""}`);
-    return { ok: true, text: `${all.length} hold den kommende uge. De næste: ${next.join(" · ")}` };
+    return { ok: true, text: `${all.length} hold den kommende uge. De næste: ${next.join(", ")}` };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Flexybox kunne ikke læses." };
   }

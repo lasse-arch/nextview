@@ -301,8 +301,8 @@ export function NewTour({ tours, forDeal, onClose, replaces }: { tours: { slug: 
                   <div className="rounded-2xl bg-white p-4 ring-1 ring-black/[.06]">
                     <p className="text-[15px] font-semibold">{draftOffer.name || draftOffer.space?.name || "Ny tour"}</p>
                     <p className="text-[13px] text-[#6e6e73]">
-                      Nået til {STEPS[Math.min(draftOffer.step, STEPS.length - 1)]} · gemt {new Date(draftOffer.at).toLocaleString("da-DK", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
-                      {draftOffer.plan ? " · med nextviewAIs plan" : ""}
+                      Nået til {STEPS[Math.min(draftOffer.step, STEPS.length - 1)]} , gemt {new Date(draftOffer.at).toLocaleString("da-DK", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                      {draftOffer.plan ? ", med nextviewAIs plan" : ""}
                     </p>
                   </div>
                   <div className="flex gap-2">

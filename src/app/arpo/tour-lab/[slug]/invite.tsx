@@ -26,7 +26,7 @@ export function InviteCard({
   T: TourConfig;
   /** Shown every time (the editor's preview) - not only once a visit. */
   everyTime?: boolean;
-  /** How many stops the guided tour has, and seconds per stop - for "10 steder · ca. 2 min". */
+  /** How many stops the guided tour has, and seconds per stop - for "10 steder, ca. 2 min". */
   stops: number;
   seconds: number;
   onStart: () => void;
@@ -78,7 +78,7 @@ export function InviteCard({
           <img className="iv-foto" src={person.image} alt="" />
         )}
         <div className="iv-hvem">
-          {person && <span className="iv-navn">{[person.name, person.role].filter(Boolean).join(" · ")}</span>}
+          {person && <span className="iv-navn">{[person.name, person.role].filter(Boolean).join(", ")}</span>}
           <b>{title}</b>
         </div>
         <button
@@ -108,7 +108,7 @@ export function InviteCard({
           </svg>
           {inv.button ? tr(inv.button) : tr("Vis mig rundt")}
         </button>
-        <span className="iv-tid">{tr("{n} steder · ca. {min} min", { n: String(stops), min: String(min) })}</span>
+        <span className="iv-tid">{tr("{n} steder, ca. {min} min", { n: String(stops), min: String(min) })}</span>
       </div>
       <button
         type="button"

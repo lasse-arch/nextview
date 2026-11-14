@@ -1294,7 +1294,7 @@ export function TourEditor({
                     />
                   </Field>
                 ))}
-                <Field title="Åbningstider" hint='Står under kontaktoplysningerne med "Åbent nu · lukker 23.00", når dage og tider kan læses. Én række for hele ugen ("Mandag - søndag" · "05.00 - 23.00") eller én pr. dag.'>
+                <Field title="Åbningstider" hint='Står under kontaktoplysningerne med "Åbent nu, lukker 23.00", når dage og tider kan læses. Én række for hele ugen ("Mandag - søndag" · "05.00 - 23.00") eller én pr. dag.'>
                   <div className="space-y-1.5">
                     {(config.contact?.hours ?? []).map((h, i) => {
                       const setRow = (patch: Partial<{ days: string; time: string }>) =>

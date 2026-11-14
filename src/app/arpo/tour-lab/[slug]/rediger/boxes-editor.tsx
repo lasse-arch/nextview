@@ -34,7 +34,7 @@ export function BoxesEditor({ config, edit }: { config: TourConfig; edit: Edit }
         onChange={setBoxes}
         icon={["bg-[#5ac8fa]", '<rect x="4" y="5" width="16" height="14" rx="3"/><path d="M8 10h8M8 14h5"/>']}
         title={(b) => b.title || "Ny infoboks"}
-        subtitle={(b) => `#boks:${b.id}${b.image ? " · billede" : ""}${b.link?.label ? " · knap" : ""}`}
+        subtitle={(b) => `#boks:${b.id}${b.image ? ", billede" : ""}${b.link?.label ? ", knap" : ""}`}
         empty="Ingen endnu."
         editor={(b, set) => (
           <>

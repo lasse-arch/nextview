@@ -6,8 +6,8 @@ import type { TourConfig } from "../tours/types";
 
 /*
  * Åbningstider in the contact box (TourConfig.contact.hours): the rows as the
- * customer writes them ("Mandag - søndag" · "05.00 - 23.00"), and - when the
- * rows can be read as days and times - "Åbent nu · lukker 23.00" / "Lukket ·
+ * customer writes them ("Mandag - søndag", "05.00 - 23.00"), and - when the
+ * rows can be read as days and times - "Åbent nu, lukker 23.00" / "Lukket,
  * åbner 05.00", worked out on the place's own clock (Copenhagen).
  */
 
@@ -55,7 +55,7 @@ export function timesOf(text: string): [number, number] | "closed" | null {
 
 const clock = (min: number) => `${String(Math.floor(min / 60) % 24).padStart(2, "0")}.${String(min % 60).padStart(2, "0")}`;
 
-/** "Åbent nu · lukker 23.00" or "Lukket · åbner 05.00" (today) - null when the rows don't say. */
+/** "Åbent nu, lukker 23.00" or "Lukket, åbner 05.00" (today) - null when the rows don't say. */
 function statusNow(hours: Hours, weekday: number, minutes: number): { open: boolean; at?: string } | null {
   let known = false;
   let today: [number, number] | "closed" | null = null;
@@ -98,7 +98,7 @@ export function OpeningHours({ hours, note }: { hours: Hours; note?: string }) {
         <span>{tr("Åbningstider")}</span>
         {now && (
           <em className={now.open ? "aaben" : "lukket"}>
-            {now.open ? (now.at ? tr("Åbent nu · lukker {tid}", { tid: now.at }) : tr("Åbent nu")) : now.at ? tr("Lukket · åbner {tid}", { tid: now.at }) : tr("Lukket nu")}
+            {now.open ? (now.at ? tr("Åbent nu, lukker {tid}", { tid: now.at }) : tr("Åbent nu")) : now.at ? tr("Lukket, åbner {tid}", { tid: now.at }) : tr("Lukket nu")}
           </em>
         )}
       </div>
