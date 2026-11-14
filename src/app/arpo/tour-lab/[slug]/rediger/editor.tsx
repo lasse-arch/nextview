@@ -13,7 +13,7 @@ import { Component, memo, useCallback, useEffect, useMemo, useRef, useState, use
 import { detachToursFromMpskins, logTourWork, renameTourSlug, restoreTourVersion, saveTour, saveTourDraft, searchDeals, setTourDeal } from "@/lib/actions/tours";
 import { SOCIALS } from "../../tours/social";
 import { guideStops } from "../guide";
-import { askClaudeForTour, saveAnthropicKey, suggestTourFilter, type ChatTurn } from "@/lib/actions/tour-ai";
+import { addTourAiMemory, askClaudeForTour, saveAnthropicKey, suggestTourFilter, type ChatTurn, type MemoryNote } from "@/lib/actions/tour-ai";
 import type { FindStepAside, MenuEntry, TourConfig } from "../../tours/types";
 import type { TourStats } from "@/lib/tour-stats";
 import type { ReportShare } from "@/lib/tour-share";
@@ -1618,7 +1618,7 @@ export function TourEditor({
   );
 }
 
-type ChatMsg = { role: "user" | "assistant"; text: string; images?: string[]; error?: boolean; changed?: number; before?: TourConfig; undone?: boolean; remembered?: string[]; forgot?: string[] };
+type ChatMsg = { role: "user" | "assistant"; text: string; images?: string[]; error?: boolean; changed?: number; before?: TourConfig; undone?: boolean; remembered?: string[]; forgot?: string[]; /** Notes nextviewAI asks whether to remember - and what the user answered (by index). */ askRemember?: MemoryNote[]; answered?: Record<number, "ja" | "nej"> };
 
 /** A picture made small enough to send to nextviewAI (longest side 1600 px, JPEG) - as a data URL. */
 /**
@@ -1872,7 +1872,7 @@ function ClaudePanel({
       }
       if (r.changed) onApply(r.config);
       if (r.remembered.length || r.forgot.length) setLearned((n) => n + 1);
-      setChat((c) => [...c, { role: "assistant", text: r.reply, changed: r.changed, before: r.changed ? before : undefined, remembered: r.remembered, forgot: r.forgot }]);
+      setChat((c) => [...c, { role: "assistant", text: r.reply, changed: r.changed, before: r.changed ? before : undefined, remembered: r.remembered, forgot: r.forgot, askRemember: r.askRemember }]);
     });
   }
 
@@ -1941,6 +1941,40 @@ function ClaudePanel({
                         Husker nu: {t}
                       </p>
                     ))}
+                    {m.askRemember?.map((n, k) => {
+                      const answer = m.answered?.[k];
+                      const answerWith = (a: "ja" | "nej") => setChat((c) => c.map((x, j) => (j === i ? { ...x, answered: { ...x.answered, [k]: a } } : x)));
+                      return (
+                        <div key={k} className="mt-2 rounded-xl bg-[#f5f5f7] px-3 py-2.5 text-[13px] leading-snug">
+                          <p className="text-[12px] font-medium text-[#8e8e93]">Skal jeg huske det? {n.scope === "all" ? "(alle tours)" : "(kun denne tour)"}</p>
+                          <p className="mt-0.5">{n.text}</p>
+                          {answer === "ja" ? (
+                            <p className="mt-1.5 text-[12px] text-[#248a3d]">✓ Husket</p>
+                          ) : answer === "nej" ? (
+                            <p className="mt-1.5 text-[12px] text-[#8e8e93]">Ikke husket</p>
+                          ) : (
+                            <div className="mt-2 flex gap-2">
+                              <button
+                                type="button"
+                                className="rounded-full bg-[#0071e3] px-3 py-1 text-[12px] font-medium text-white"
+                                onClick={async () => {
+                                  const r = await addTourAiMemory(config.slug, n.scope, n.text).catch(() => ({ ok: false as const, error: "Kunne ikke gemmes - prøv igen." }));
+                                  if (r.ok) {
+                                    answerWith("ja");
+                                    setLearned((x) => x + 1);
+                                  } else alert(r.error);
+                                }}
+                              >
+                                Husk det
+                              </button>
+                              <button type="button" className="rounded-full bg-white px-3 py-1 text-[12px] font-medium text-[#1d1d1f] ring-1 ring-black/[.08]" onClick={() => answerWith("nej")}>
+                                Nej tak
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                     {m.forgot?.map((t) => (
                       <p key={t} className="mt-1 text-[12px] leading-snug text-[#8e8e93] line-through decoration-[#c7c7cc]">
                         Glemt: {t}
@@ -1981,7 +2015,7 @@ function ClaudePanel({
             )}
       </>
     ),
-    [chat, pending, setChat]
+    [chat, pending, setChat, config.slug]
   );
 
   if (!ready)

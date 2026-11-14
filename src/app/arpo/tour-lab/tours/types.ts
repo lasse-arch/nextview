@@ -798,8 +798,11 @@ export type TourConfig = {
    * it ("Fodbold i hallen") - left out: "Se det i brug".
    */
   inUse?: InUseItem[];
-  /** "Mød os": the people behind the place, each with a profile (TeamPerson) - opened by "#mod" / "#mod:<id>" and from place cards. `title` left out: "Mød os". */
-  team?: { title?: string; people: TeamPerson[] };
+  /**
+   * "Mød os": the people behind the place, each with a profile (TeamPerson) - opened by "#mod" / "#mod:<id>" and from place cards. `title` left out: "Mød os".
+   * `openFromFaces: false`: a tap on a person on a place card or a stop of "Vis mig rundt" doesn't open their profile (they're only shown there).
+   */
+  team?: { title?: string; people: TeamPerson[]; openFromFaces?: false };
   /** The year wheel (see YearWheel) - opened by "#aarshjul", and on a screen as staging. */
   yearWheel?: YearWheel;
   /**

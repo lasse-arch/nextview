@@ -34,7 +34,10 @@ export function GuidePlayer({
   onEvent,
   stopLabel,
   onPhotos,
+  openProfiles = true,
 }: {
+  /** A tap on a person on the stop opens their profile in "Mød os" (TourConfig.team.openFromFaces). */
+  openProfiles?: boolean;
   /** A tap on one of the stop's photos: show them big, from that one. */
   onPhotos?: (images: string[], at: number) => void;
   /** The stop button's words (default "Gå selv rundt"). */
@@ -177,7 +180,7 @@ export function GuidePlayer({
                 </>
               );
               // Picked from "Personer": a tap opens their profile in "Mød os".
-              return p.id ? (
+              return p.id && openProfiles ? (
                 <figure key={i} className="gd-folk-mod">
                   <button type="button" aria-label={tr("Mød {navn}", { navn: p.name ?? "" })} onClick={() => window.dispatchEvent(new CustomEvent("hv-mod", { detail: p.id }))}>
                     {face}

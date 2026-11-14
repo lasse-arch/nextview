@@ -3927,6 +3927,7 @@ function TourExperience({
         <GuidePlayer
           onPhotos={(images, at) => setLightbox({ images, at, title: guideAt != null ? (GUIDE[guideAt]?.title ?? "") : "" })}
           stops={GUIDE}
+          openProfiles={T.team?.openFromFaces !== false}
           index={guideAt}
           size={T.guideCardSize}
           sizeMobile={T.guideCardSizeMobile}
@@ -3979,7 +3980,7 @@ function TourExperience({
           }}
           onRoom={goRoom}
           onLink={(label, href) => ctaClick(label, href, "place_card")}
-          profileOf={T.team?.people.length ? (p) => teamIdOf(T, p) : undefined}
+          profileOf={T.team?.people.length && T.team.openFromFaces !== false ? (p) => teamIdOf(T, p) : undefined}
         />
       )}
       {nudgeOn && showCard == null && !menuOpen && T.nudge && phase === "tour" && (

@@ -113,14 +113,23 @@ const Edits = z.object({
         text: z.string().describe("Én kort sætning på dansk."),
       })
     )
-    .describe("Det, du har lært og skal huske til næste gang (se Hukommelse). Ofte tom."),
+    .describe("Gemmes med det samme - KUN når brugeren selv beder dig huske noget, eller når du bygger en ny tour (se Hukommelse). Ellers tom."),
+  ask_remember: z
+    .array(
+      z.object({
+        scope: z.enum(["all", "tour"]).describe('"all": gælder alle tours. "tour": kun denne kunde.'),
+        text: z.string().describe("Én kort sætning på dansk - præcis det, der skal huskes."),
+      })
+    )
+    .describe("Noter, du foreslår at huske - brugeren bliver spurgt og vælger selv (se Hukommelse). Højst 2, ofte tom."),
   forget: z
     .array(z.string())
     .describe("Noter, der skal slettes fra hukommelsen - hver skrevet præcis, som den står i <hukommelse>. Kun når brugeren beder om det, eller en note er blevet forkert (se Hukommelse). Ofte tom."),
 });
 
 export type ChatTurn = { role: "user" | "assistant"; text: string };
-export type AiEditResult = { ok: true; reply: string; config: TourConfig; changed: number; remembered: string[]; forgot: string[] } | { ok: false; error: string };
+export type MemoryNote = { scope: "all" | "tour"; text: string };
+export type AiEditResult = { ok: true; reply: string; config: TourConfig; changed: number; remembered: string[]; forgot: string[]; /** Notes nextviewAI asks whether to remember - the user says yes (addTourAiMemory) or no. */ askRemember: MemoryNote[] } | { ok: false; error: string };
 
 
 /** Applies one change to a copy-in-progress of the setup. Paths are "/"-separated keys and list indexes. */
@@ -199,8 +208,9 @@ Sådan arbejder du (du hedder nextviewAI i Arpo):
 Hukommelse (remember):
 - Du har en hukommelse, der gives tilbage til dig hver gang (se <hukommelse> nedenfor og i beskeden). Brug den.
 - Motoren bliver løbende bygget ud. Står der i hukommelsen eller i samtalen, at touren ikke kan noget, men typerne nedenfor viser, at den kan, så følg typerne.
-- Gem en kort sætning, når du lærer noget, der skal bruges igen: når brugeren retter dig eller siger, hvordan Nextview360 vil have tingene (scope "all"), eller vigtige fakta om kunden, som ikke står i opsætningen (scope "tour").
-- Gem ikke det, der allerede står i drejebogen eller hukommelsen, og ikke selve ændringen. Oftest er listen tom.
+- Spørg, før du husker: når du lærer noget, der kan bruges igen - brugeren retter dig, siger hvordan Nextview360 vil have tingene (scope "all"), eller fortæller vigtige fakta om kunden, som ikke står i opsætningen (scope "tour") - så læg en kort sætning i ask_remember. Brugeren får så spørgsmålet "Skal jeg huske det?" med knapper og vælger selv. Spørg ikke også i reply-teksten.
+- remember (gemmes med det samme) bruger du kun, når brugeren selv beder dig huske noget ("husk at …", "det skal du huske"), og når du bygger en ny tour.
+- Foreslå ikke det, der allerede står i drejebogen eller hukommelsen, og ikke selve ændringen (den står i opsætningen). Oftest er listen tom.
 - Du kan selv slette noter (forget): beder brugeren dig glemme eller slette noget fra hukommelsen, så skriv notens tekst præcis, som den står, i forget - sig aldrig, at du ikke kan. Er en note blevet forkert (fx "skal bygges ind i motoren", men typerne viser, at motoren kan det nu), så slet den også og sig det i dit svar.
 
 <drejebog>
@@ -313,7 +323,7 @@ async function claudeEdits(key: string, who: { name: string; kind: string }, con
   const hosted = await hostNewFiles(config.slug, config, { ...(next as unknown as TourConfig), slug: config.slug }).catch((err: unknown) => (console.error("hostNewFiles", err), null));
   const edited = hosted?.config ?? ({ ...(next as unknown as TourConfig), slug: config.slug } as TourConfig);
   const note = hosted?.failed.length ? `\n\n⚠️ ${hosted.failed.join("\n⚠️ ")}\nUpload filen selv (fx logoet under Design), så den ligger hos os.` : "";
-  return { ok: true, reply: parsed.reply + note, config: plainWordsInConfig(edited), changed: parsed.changes.length, remembered, forgot };
+  return { ok: true, reply: parsed.reply + note, config: plainWordsInConfig(edited), changed: parsed.changes.length, remembered, forgot, askRemember: (parsed.ask_remember ?? []).filter((n) => n.text.trim()).slice(0, 2).map((n) => ({ scope: n.scope, text: n.text.trim().slice(0, 300) })) };
 }
 
 /** Screenshots sent with a request (data URLs from the editor, made small there) as image blocks - anything else is dropped. */

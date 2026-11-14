@@ -112,6 +112,7 @@ export function tourConfigProblem(config: unknown): string | null {
   if (c.team !== undefined) {
     if (!obj(c.team) || !arr(c.team.people) || c.team.people.length > 30) return '"Personer" skal være en liste (højst 30).';
     const ids = new Set<string>();
+    if (c.team.openFromFaces !== undefined && c.team.openFromFaces !== false) return '"openFromFaces" kan kun være false.';
     for (const p of c.team.people) {
       if (!obj(p) || !str(p.id) || !/^[a-z0-9-]{1,40}$/.test(p.id) || !str(p.image) || typeof p.name !== "string") return "En person mangler id, navn eller foto.";
       if (ids.has(p.id)) return `To personer har samme id ("${p.id}").`;

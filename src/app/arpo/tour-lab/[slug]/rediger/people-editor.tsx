@@ -3,7 +3,7 @@
 import type { CardPerson, TeamPerson, TourConfig } from "../../tours/types";
 import { personId, pickOf } from "../../tours/people";
 import { Rows } from "./content";
-import { Field, Group, input, UploadButton, type PreviewApi } from "./ui";
+import { Field, Group, input, Toggle, UploadButton, type PreviewApi } from "./ui";
 
 type Edit = (fn: (d: TourConfig) => void) => void;
 const small = "px-1 text-[12px] leading-snug text-[#8e8e93]";
@@ -76,6 +76,12 @@ export function PeopleEditor({ config, edit, preview }: { config: TourConfig; ed
           <Field title="Overskrift" hint='Tom: "Mød os". Fx "Mød Per og Enrico".'>
             <input className={`${input} bg-white`} placeholder="Mød os" value={config.team?.title ?? ""} onChange={(e) => edit((d) => void (d.team = { ...(d.team ?? { people: [] }), title: e.target.value || undefined }))} />
           </Field>
+          <Toggle
+            on={config.team?.openFromFaces !== false}
+            onChange={(on) => edit((d) => void (d.team = { ...(d.team ?? { people: [] }), openFromFaces: on ? undefined : false }))}
+            title="Åbn profilen ved tryk på personen"
+            hint="På stedkort og i Vis mig rundt. Slået fra: personen vises dér med foto, navn og rolle, men et tryk gør ingenting. Mød os åbner stadig fra menuen og knapper (#mod)."
+          />
           <p className={small}>Åbnes fra et menupunkt, en flise eller en knap med linket &quot;#mod&quot; (alle) eller &quot;#mod:{people[0].id}&quot; (én). Personerne på stedkort og i rundvisningen åbner også deres profil.</p>
           {!inMenu && (
             <button
