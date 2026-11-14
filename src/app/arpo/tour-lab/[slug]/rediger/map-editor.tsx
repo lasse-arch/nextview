@@ -859,6 +859,17 @@ function OverviewUiToggles({ config, edit, preview }: { config: TourConfig; edit
         title="Overskrift ved logoet på mobil"
         hint="Fra (standard): boksen øverst viser kun logoet og knappen på en telefon - logoet siger navnet. Til: overskriften står ved logoet, når der er plads til den."
       />
+      <Toggle
+        on={Boolean(ui?.doubleTapZoom)}
+        onChange={(on) =>
+          edit((d) => {
+            const rest = { ...d.overviewUi, doubleTapZoom: on ? (true as const) : undefined };
+            d.overviewUi = Object.values(rest).some((v) => v !== undefined) ? rest : undefined;
+          })
+        }
+        title="Dobbelttryk zoomer"
+        hint="Til: to hurtige tryk (eller dobbeltklik) på luftfotoet zoomer ind dér - og næste dobbelttryk zoomer ud igen. Fra (standard): et dobbelttryk gør ingenting, så man ikke ved et uheld zoomer, når man trykker på punkterne."
+      />
       <Field title="Filteret på mobil" hint="Vis alle: alle kategorier i rækker, så man ser dem. Rul: én række, man skubber sidelæns. Skjul: intet filter.">
         <Choice
           value={ui?.filter?.mobile === false ? "skjul" : ui?.filterColumns ? String(ui.filterColumns) : ui?.filterScroll ? "rul" : "alle"}

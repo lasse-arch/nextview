@@ -1512,6 +1512,8 @@ function TourExperience({
         maxPitch: look.up ?? (D.panorama ? 90 : 25),
         mouseZoom: true,
         keyboardZoom: false,
+        // Pannellum zooms on a double click by itself - only when the tour wants it (Luftfoto og kort → Dobbelttryk zoomer).
+        doubleClickZoom: Boolean(T.overviewUi?.doubleTapZoom),
         hotSpots,
       }, D.panorama ? T.imageView?.[D.panorama]?.cover : null, droneEl.current.clientWidth / Math.max(1, droneEl.current.clientHeight)));
       drone.current.on("zoomchange", (hfov) => setZoomed(Number(hfov) < 56));

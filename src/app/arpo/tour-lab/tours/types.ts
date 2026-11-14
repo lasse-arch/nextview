@@ -507,6 +507,8 @@ export type TourConfig = {
     filterColumns?: 2 | 3 | 4;
     /** Phones: the categories in one row to scroll sideways instead (fewer lines over the picture). */
     filterScroll?: true;
+    /** true: a double tap/click on the aerial photo zooms in there - and the next one out again (360° drone photo and flat map alike). Default off: a double tap does nothing. */
+    doubleTapZoom?: true;
   };
   /**
    * How one can look around the 360° aerial photo, per device (left out = as always):

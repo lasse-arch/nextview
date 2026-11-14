@@ -169,6 +169,8 @@ export function MapScene({
 
   /** Where the finger (or mouse) went down - a move of more than a few pixels is a drag, not a tap on a point. */
   const downAt = useRef<{ x: number; y: number } | null>(null);
+  /** The last single tap (when, where) - a second one close by soon after is a double tap (overviewUi.doubleTapZoom). */
+  const lastTap = useRef<{ t: number; x: number; y: number } | null>(null);
   const handlers = {
     onPointerDown(e: React.PointerEvent) {
       pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -203,6 +205,25 @@ export function MapScene({
     onPointerUp(e: React.PointerEvent) {
       pointers.current.delete(e.pointerId);
       if (pointers.current.size < 2) pinch.current = null;
+      // A double tap/click (two quick taps close together, no drag): in to there - fully in, out again. Only when the tour wants it.
+      if (T.overviewUi?.doubleTapZoom && viewRef.current && pointers.current.size === 0) {
+        const now = e.timeStamp;
+        const from = downAt.current;
+        const still = !from || Math.hypot(e.clientX - from.x, e.clientY - from.y) < 10;
+        const prev = lastTap.current;
+        if (still && prev && now - prev.t < 320 && Math.hypot(e.clientX - prev.x, e.clientY - prev.y) < 30) {
+          lastTap.current = null;
+          const r = box.current!.getBoundingClientRect();
+          const v = viewRef.current;
+          if (v.s >= fit() * 3.9) go({ s: fit(), x: 0, y: 0 }, 400);
+          else {
+            const s = Math.min(v.s * 2, fit() * 4);
+            const cx = e.clientX - r.left;
+            const cy = e.clientY - r.top;
+            go({ s, x: cx - (cx - v.x) * (s / v.s), y: cy - (cy - v.y) * (s / v.s) }, 400);
+          }
+        } else if (still) lastTap.current = { t: now, x: e.clientX, y: e.clientY };
+      }
     },
     onWheel(e: React.WheelEvent) {
       if (!viewRef.current) return;
