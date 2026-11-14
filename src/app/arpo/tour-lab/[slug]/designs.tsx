@@ -229,6 +229,19 @@ export function DockMenu({
       ];
   const primary = dock.find((d) => d.primary && typeof d.go !== "string");
   const atPlace = room && T.places?.some((p) => p.name === room);
+  // The bar's real height (a long label can take two lines on a phone) - cards and sheets keep above it (--dock-h).
+  const bar = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const el = bar.current;
+    const root = el?.closest<HTMLElement>(".hv");
+    if (!el || !root || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => root.style.setProperty("--dock-h", `${Math.round(el.getBoundingClientRect().height)}px`));
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+      root.style.removeProperty("--dock-h");
+    };
+  }, []);
   return (
     <>
       {sheet && T.places && (
@@ -255,7 +268,7 @@ export function DockMenu({
           <b>{primary.label} her →</b>
         </TourLink>
       )}
-      <nav className="dz-dock">
+      <nav ref={bar} className="dz-dock">
         {dock.map((d) =>
           d.go === "guide" ? (
             <button key={d.label} type="button" onClick={onGuide}>
@@ -533,6 +546,8 @@ export const DESIGNS_CSS = `
 .dz-here span{font-family:var(--font-heading);font-size:18px;font-weight:600}
 .dz-here b{padding:7px 14px;border-radius:999px;background:var(--c-accent);color:#1a1209;font-size:13px}
 .hv-dock .hv-room{display:none}
+/* Place cards and "Din plads venter" stand above the bar, never on it. */
+.hv-dock .pc{bottom:calc(var(--dock-h,70px) + 30px)}
 .hv-dock .hv-dev{bottom:auto;top:calc(12px + env(safe-area-inset-top,0px));right:12px}
 @media (max-width:760px){
   .dz-cover{padding:calc(28px + env(safe-area-inset-top,0px)) 20px calc(18px + env(safe-area-inset-bottom,0px));background:linear-gradient(rgba(12,9,6,.55),rgba(12,9,6,.86) 55%,rgba(12,9,6,.95)),var(--cover-m) center/cover}
@@ -549,8 +564,8 @@ export const DESIGNS_CSS = `
   .dz-places{padding:4px 20px 6px}
   .dz-place{width:150px;height:112px}
   .dz-dock{left:8px;right:8px;bottom:calc(8px + env(safe-area-inset-bottom,0px));translate:none;justify-content:space-between}
-  .dz-dock>*{min-width:0;flex:1;padding:8px 2px 6px;font-size:10.5px;white-space:nowrap}
-  .dz-sheet{bottom:calc(86px + env(safe-area-inset-bottom,0px))}
-  .dz-here{bottom:calc(86px + env(safe-area-inset-bottom,0px))}
+  /* A long label ("Book en smagning") breaks onto two lines in its own button - never out over the edge. */
+  .dz-dock>*{min-width:0;flex:1;padding:8px 3px 6px;font-size:10.5px;line-height:1.15;text-align:center;white-space:normal;overflow-wrap:break-word;hyphens:manual}
+  .dz-sheet,.dz-here,.hv-dock .pc{bottom:calc(var(--dock-h,70px) + 24px + env(safe-area-inset-bottom,0px))}
 }
 `;
