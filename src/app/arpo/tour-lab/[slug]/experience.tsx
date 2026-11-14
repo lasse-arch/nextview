@@ -42,6 +42,7 @@ import { EVENTS_CSS, EventsBlock, useTourEvents } from "./events";
 import { CLASSES_CSS, ClassesNext, ClassesSheet, useTourClasses } from "./classes";
 import { HOURS_CSS, OpeningHours } from "./hours";
 import { BOXES_CSS, BoxSheet } from "./boxes";
+import { INVITE_CSS, InviteCard } from "./invite";
 import { FEEDBACK_CSS, FeedbackLayer } from "./feedback";
 import { ICONS } from "../tours/icons";
 import { SIMPLE_CSS, SimpleMenu, SimpleWelcome } from "./simple";
@@ -743,6 +744,8 @@ function TourExperience({
     window.addEventListener("hv-hold", open);
     return () => window.removeEventListener("hv-hold", open);
   }, []);
+  /** "Invitation til rundvisning" answered (started, skipped, or they looked around themselves) - the menu hint may come after it. */
+  const [inviteDone, setInviteDone] = useState(false);
   /** An Infoboks is open (its id) - from any link "#boks:<id>". */
   const [boxOpen, setBoxOpen] = useState<string | null>(null);
   useEffect(() => {
@@ -2944,7 +2947,7 @@ function TourExperience({
       {[...new Set([...fontHrefs(T.font, [400, 600, 700, 800, 900]), ...(T.fontHeading ? fontHrefs(T.fontHeading, [500, 600]) : [])])].map((href) => (
         <link key={href} rel="stylesheet" href={href} />
       ))}
-      <style>{CSS + TOUR_LOGO_CSS + CONTACT_CSS + STORIES_CSS + LIGHTBOX_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + ONBOARDING_CSS + MENU_HINT_CSS + INFO_CSS + STAGING_CSS + (T.staging?.some((i) => i.kind === "treasure") ? CONTEST_CSS : "") + (T.inUse?.length ? IN_USE_CSS : "") + (T.lineDays ? LINE_DAY_CSS : "") + (T.yearWheel ? YEARWHEEL_CSS : "") + (T.schedule ? SCHEDULE_CSS : "") + MAP_CSS + (T.sitePlan?.overlay ? SITE_PLAN_CSS + SITE_PLAN_360_CSS : "") + ROUTE_CSS + MEASURES_CSS + CARDS_CSS + DAY_CSS + (T.events ? EVENTS_CSS : "") + (T.classes ? CLASSES_CSS : "") + (T.contact?.hours?.length ? HOURS_CSS : "") + (T.boxes?.length ? BOXES_CSS : "") + (T.shop || T.points.some((p) => p.shop) ? SHOP_CSS : "") + SIMPLE_CSS + BENTO_CSS + LOGO_RIGHT_CSS + LANG_CSS + WEATHER_CSS + COMMUTE_CSS + FEATURES_CSS + FINDER_CSS + FULLSCREEN_BUTTON_CSS + (T.design?.menu === "float" ? FLOAT_DOCK_CSS : "") + (T.team?.people.length ? TEAM_CSS : "") + (T.design?.menu === "glass" ? GLASS_MENU_CSS : "") + (review ? FEEDBACK_CSS : "")}</style>
+      <style>{CSS + TOUR_LOGO_CSS + CONTACT_CSS + STORIES_CSS + LIGHTBOX_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + ONBOARDING_CSS + MENU_HINT_CSS + INFO_CSS + STAGING_CSS + (T.staging?.some((i) => i.kind === "treasure") ? CONTEST_CSS : "") + (T.inUse?.length ? IN_USE_CSS : "") + (T.lineDays ? LINE_DAY_CSS : "") + (T.yearWheel ? YEARWHEEL_CSS : "") + (T.schedule ? SCHEDULE_CSS : "") + MAP_CSS + (T.sitePlan?.overlay ? SITE_PLAN_CSS + SITE_PLAN_360_CSS : "") + ROUTE_CSS + MEASURES_CSS + CARDS_CSS + DAY_CSS + (T.events ? EVENTS_CSS : "") + (T.classes ? CLASSES_CSS : "") + (T.contact?.hours?.length ? HOURS_CSS : "") + (T.boxes?.length ? BOXES_CSS : "") + (T.invite ? INVITE_CSS : "") + (T.shop || T.points.some((p) => p.shop) ? SHOP_CSS : "") + SIMPLE_CSS + BENTO_CSS + LOGO_RIGHT_CSS + LANG_CSS + WEATHER_CSS + COMMUTE_CSS + FEATURES_CSS + FINDER_CSS + FULLSCREEN_BUTTON_CSS + (T.design?.menu === "float" ? FLOAT_DOCK_CSS : "") + (T.team?.people.length ? TEAM_CSS : "") + (T.design?.menu === "glass" ? GLASS_MENU_CSS : "") + (review ? FEEDBACK_CSS : "")}</style>
       {/* The tour's own design on top (written by Claude or by hand under Avanceret). */}
       {T.customCss && <style>{T.customCss.replace(/<\/?style/gi, "")}</style>}
 
@@ -3920,7 +3923,24 @@ function TourExperience({
           {tx("Gør touren klar …")}
         </div>
       )}
-      {T.menuHint && (T.menuHint === "all" || (typeof window !== "undefined" && window.innerWidth <= 760)) && (helpDone || !T.onboarding) && phase === "tour" && !cover && !welcome && !intro && sdk && guideAt == null && !menuOpen && !contactOpen && !pano && !guideImage && (
+      {T.invite && !inviteDone && phase === "tour" && !cover && !welcome && !intro && sdk && guideAt == null && !pano && !guideImage && guideStops(T, T.invite.guide ?? null).length > 0 && (
+        <InviteCard
+          T={T}
+          stops={guideStops(T, T.invite.guide ?? null).length}
+          seconds={guideSetup(T, T.invite.guide ?? null)?.seconds ?? 9}
+          everyTime={inEditorPreview()}
+          onStart={() => {
+            setInviteDone(true);
+            track("invite_start", {});
+            startGuide("invite", T.invite?.guide ?? null);
+          }}
+          onSkip={(how) => {
+            setInviteDone(true);
+            track("invite_skip", { how });
+          }}
+        />
+      )}
+      {T.menuHint && (!T.invite || inviteDone) && (T.menuHint === "all" || (typeof window !== "undefined" && window.innerWidth <= 760)) && (helpDone || !T.onboarding) && phase === "tour" && !cover && !welcome && !intro && sdk && guideAt == null && !menuOpen && !contactOpen && !pano && !guideImage && (
         <MenuHint slug={T.slug} again={inEditorPreview()} />
       )}
       {guideAt != null && GUIDE[guideAt] && (

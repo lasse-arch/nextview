@@ -33,6 +33,12 @@ lærer begge det nye.
 
 ## Start: hvordan touren åbner
 
+- **Direkte i touren + invitation**: starter touren direkte (fx fordi kundens
+  hjemmeside allerede har fortalt historien), så slå "Invitation til
+  rundvisning" til (invite) med en person fra Personer (fx centerlederen). Et
+  ansigt, der spørger "Skal jeg vise dig rundt?", får langt flere til at tage
+  rundvisningen end en knap i menuen.
+
 Ikke alle tours skal starte med et valg. Vælg ud fra, hvor folk kommer fra:
 
 - **Direkte i touren** - når folk kommer fra en knap på hjemmesiden, der allerede

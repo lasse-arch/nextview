@@ -9,6 +9,8 @@
 export type EngineChange = { date: string; kind: "ny" | "sikkerhed" | "hastighed" | "rettelse"; text: string };
 
 export const ENGINE_CHANGES: EngineChange[] = [
+  { date: "2026-11-14", kind: "ny", text: "Invitation til rundvisning: starter touren direkte, kommer et lille kort lidt efter - \"Skal jeg vise dig rundt?\" med en persons ansigt (fx centerlederen), hvor lang rundvisningen er, Vis mig rundt og Jeg kigger selv rundt. Én gang pr. besøg, og det går væk, når gæsten selv begynder at kigge rundt." },
+  { date: "2026-11-14", kind: "rettelse", text: "Adressen i kontaktboksen åbner Google Maps med stedets navn og adresse, så Google viser selve stedet." },
   { date: "2026-11-14", kind: "ny", text: "\"Mød os\": det kan slås fra, at et tryk på en person på et stedkort eller i Vis mig rundt åbner profilen (Personer → Mød os) - personen vises stadig med foto, navn og rolle." },
   { date: "2026-11-14", kind: "ny", text: "Infobokse: en lille boks med overskrift, et par linjer og evt. billede og knap (fx \"Læs om Wave\") over touren - åbnes af enhver knap med linket \"#boks:<id>\" (Vis mig rundt, stedkort, fliser, menuen)." },
   { date: "2026-11-14", kind: "rettelse", text: "Glas-panelet kan ikke længere scrolle til siden (et menupunkt uden gruppe, fx \"Vis mig rundt med …\", var bredere end panelet), og dagene i Holdplan bliver ikke længere skåret af i tours med en anden skrift." },

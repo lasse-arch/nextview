@@ -680,6 +680,16 @@ export type TourConfig = {
    */
   guide?: GuideSetup;
   /**
+   * "Invitation til rundvisning": when the tour starts straight in (no
+   * welcome/cover), a small card a moment after it's there - "Skal jeg vise
+   * dig rundt?" with a person's face (`person`: a TeamPerson id - their photo,
+   * name and role), how long it is, "Vis mig rundt" (starts `guide`, a guided
+   * tour's id - left out: the main one) and "Jeg kigger selv rundt". Once a
+   * visit; it goes by itself when the visitor starts looking around. `title`,
+   * `text`, `button`, `skip`: own words; `delaySeconds` default 1.5.
+   */
+  invite?: { person?: string; guide?: string; title?: string; text?: string; button?: string; skip?: string; delaySeconds?: number };
+  /**
    * More guided tours beside the main one (`guide`), each with its own name,
    * stops and settings - e.g. one per linjefag ("Padel", "Ridning") next to
    * "Vis mig rundt" for the whole school. Started from a welcome tile
