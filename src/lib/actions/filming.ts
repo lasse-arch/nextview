@@ -51,13 +51,17 @@ export async function bookFilming(
     if (!EMAIL_RE.test(email)) return { ok: false, error: `Ugyldig e-mail: ${email}` };
   }
 
-  const account = await prisma.emailAccount.findUnique({
-    where: { userId_provider: { userId: user.id, provider: "GOOGLE" } },
-  });
+  // Who invites: the booker, when they're filming themselves. When they aren't (Victor books a filming only Lasse goes
+  // to), it goes out from the calendar of the one filming - in their name, as the one the customer meets. Only ever from
+  // the booker's own calendar or that of someone who is going (and has connected Google); else the booker's own.
+  const filmers = await prisma.emailAccount.findMany({ where: { userId: { in: input.crewUserIds }, provider: "GOOGLE" } });
+  const byFilmer = input.crewUserIds.includes(user.id) ? null : input.crewUserIds.map((id) => filmers.find((a) => a.userId === id)).find(Boolean);
+  const account = byFilmer ?? (await prisma.emailAccount.findUnique({ where: { userId_provider: { userId: user.id, provider: "GOOGLE" } } }));
   if (!account) return { ok: false, error: "Du har ikke forbundet Google under Indstillinger → E-mail." };
+  const senderId = account.userId;
 
   const [organizer, crew] = await Promise.all([
-    prisma.user.findUniqueOrThrow({ where: { id: user.id } }),
+    prisma.user.findUniqueOrThrow({ where: { id: senderId } }),
     prisma.user.findMany({ where: { id: { in: input.crewUserIds } }, orderBy: { name: "asc" } }),
   ]);
   const crewNames = crew.map((c) => c.name);
@@ -81,7 +85,7 @@ export async function bookFilming(
   let eventId: string;
   try {
     eventId = await upsertCalendarEvent(account, {
-      eventId: prevOrganizerId === user.id ? prevEventId : null,
+      eventId: prevOrganizerId === senderId ? prevEventId : null,
       summary: `Optagelse: ${dealName(deal)} x Nextview360`,
       description,
       location: deal.address,
@@ -89,7 +93,7 @@ export async function bookFilming(
       endIso: toWallClockDateTime(end),
       timeZone: MEETING_TIME_ZONE,
       attendeeEmails: [contactEmail, ...extraEmails, ...crew.map((c) => c.email)],
-      acceptedEmails: crew.some((c) => c.id === user.id) ? [organizer.email] : [],
+      acceptedEmails: crew.some((c) => c.id === senderId) ? [organizer.email] : [],
     });
   } catch (err) {
     console.error("Filming invite failed", err);
@@ -102,7 +106,7 @@ export async function bookFilming(
       filmingAt: start,
       filmingDurationMinutes: durationMinutes,
       filmingCrewIds: crew.map((c) => c.id).join(","),
-      filmingEventId: `${user.id}:${eventId}`,
+      filmingEventId: `${senderId}:${eventId}`,
       ...(contactEmail !== deal.contactEmail && !deal.contactEmail ? { contactEmail } : {}),
     },
   });
@@ -114,12 +118,12 @@ export async function bookFilming(
       dealId,
       authorId: user.id,
       kind: "MANUAL",
-      body: `Optagelse booket ${date} kl. ${time} (ca. ${hours} t) med ${joinNames(crewNames)}. Invitation sendt til ${sentTo.join(", ")}.`,
+      body: `Optagelse booket ${date} kl. ${time} (ca. ${hours} t) med ${joinNames(crewNames)}. Invitation sendt til ${sentTo.join(", ")}${senderId !== user.id ? ` fra ${organizer.name}s kalender (booket af ${user.name})` : ""}.`,
     },
   });
   await logActivity({
     type: "DEAL_FILMING_BOOKED",
-    message: `${user.name} bookede optagelse hos ${dealName(deal)} ${date} kl. ${time}`,
+    message: `${user.name} bookede optagelse hos ${dealName(deal)} ${date} kl. ${time}${senderId !== user.id ? ` (sendt fra ${organizer.name}s kalender)` : ""}`,
     actorId: user.id,
     dealId,
   });
