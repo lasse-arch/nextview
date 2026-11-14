@@ -247,6 +247,18 @@ Fx specialefterskoler (ADHD, autisme, nedsat kognitivt funktionsniveau):
 - **Kirkegård/skovbegravelse:** rolig tone; kun "Kontakt os".
 - **Ukendt:** oplevelse → praktisk → "dit sted" → handling.
 
+## Kæder med flere afdelinger
+
+- En kæde (fx Fitness United med 5-6 centre) laves med "Søsterafdeling": den
+  første afdeling bygges færdig og flot, og de næste laves i "Ny tour" med den
+  som forbillede og "Søsterafdeling - samme kæde" sat til. Logo, farver,
+  design, knapper, menuens grupper, infobokse, holdplan og invitation er så
+  ens på alle, og kun afdelingens eget skiftes: navn, adresse, åbningstider,
+  sociale medier, live data-siden, steder og personer.
+- Brug afdelingens egen side som hjemmeside (fx fitnessunited.dk/skanderborg),
+  ikke kædens forside - og afdelingens explore-link, hvis den har en gammel
+  tour, så stederne kommer med.
+
 ## Gamle explore-tours
 
 - En gammel tour konverteres aldrig bare 1:1. Stederne (placeringerne bag

@@ -57,6 +57,8 @@ type Draft = {
   corrections: string;
   /** The plan's improvements over the old tour that are unticked (their index). */
   skipUpgrades?: number[];
+  /** The forbillede is another branch of the same chain. */
+  sister?: boolean;
 };
 function readDraft(): Draft | null {
   try {
@@ -91,6 +93,8 @@ export function NewTour({ tours, forDeal, onClose, replaces }: { tours: { slug: 
   const [layout, setLayout] = useState<NewTourLayout | null>(null);
   /** "Kopiér layout fra en anden tour": the tour whose layout the new one takes (its own brand and content stay). */
   const [layoutFrom, setLayoutFrom] = useState<string | null>(null);
+  /** "Søsterafdeling": `layoutFrom` is another branch of the same chain - its look and the chain's content are copied exactly. */
+  const [sister, setSister] = useState(false);
   /** A tour left half made in this browser - offered when "+ Ny tour" is opened. */
   const [draftOffer, setDraftOffer] = useState<Draft | null>(null);
   const setPreset = (id: DesignPreset["id"]) => {
@@ -121,6 +125,7 @@ export function NewTour({ tours, forDeal, onClose, replaces }: { tours: { slug: 
 
   function reset() {
     setLayoutFrom(null);
+    setSister(false);
     setDraftOffer(null);
     setStep(0);
     setWho(null);
@@ -151,6 +156,7 @@ export function NewTour({ tours, forDeal, onClose, replaces }: { tours: { slug: 
     preset: preset ?? undefined,
     layout: layout ?? undefined,
     layoutFrom: layoutFrom ?? undefined,
+    sister: Boolean(layoutFrom && sister) || undefined,
     branch: branch ?? undefined,
     about,
     focus,
@@ -216,11 +222,11 @@ export function NewTour({ tours, forDeal, onClose, replaces }: { tours: { slug: 
     if (!keeps || !(name.trim() || space || who)) return;
     const t = window.setTimeout(() => {
       try {
-        localStorage.setItem(DRAFT, JSON.stringify({ at: Date.now(), step, who, space, branch, preset, layout, layoutFrom, name, website, focus, about, notes, explore, plan, corrections, skipUpgrades } satisfies Draft));
+        localStorage.setItem(DRAFT, JSON.stringify({ at: Date.now(), step, who, space, branch, preset, layout, layoutFrom, name, website, focus, about, notes, explore, plan, corrections, skipUpgrades, sister } satisfies Draft));
       } catch {}
     }, 400);
     return () => window.clearTimeout(t);
-  }, [keeps, step, who, space, branch, preset, layout, layoutFrom, name, website, focus, about, notes, explore, plan, corrections, skipUpgrades]);
+  }, [keeps, step, who, space, branch, preset, layout, layoutFrom, name, website, focus, about, notes, explore, plan, corrections, skipUpgrades, sister]);
   function resume(d: Draft) {
     setDraftOffer(null);
     setWho(d.who);
@@ -238,6 +244,7 @@ export function NewTour({ tours, forDeal, onClose, replaces }: { tours: { slug: 
     setPlan(d.plan);
     setCorrections(d.corrections);
     setSkipUpgrades(d.skipUpgrades ?? []);
+    setSister(Boolean(d.sister));
     setStep(Math.min(Math.max(0, d.step), 5));
   }
   /** Another tour's layout into the steps - and the rest of it (where things sit, how they behave) when it's built. */
@@ -418,8 +425,21 @@ export function NewTour({ tours, forDeal, onClose, replaces }: { tours: { slug: 
                           ))}
                         </select>
                       </label>
+                      {layoutFrom && (
+                        <label className="mt-2 flex cursor-pointer items-start gap-2 rounded-xl bg-[#f5f5f7] px-3 py-2.5">
+                          <input type="checkbox" className="mt-0.5 h-4 w-4 flex-none accent-[#0071e3]" checked={sister} onChange={(e) => setSister(e.target.checked)} />
+                          <span className="text-[13px] leading-snug">
+                            <b className="font-semibold">Søsterafdeling - samme kæde</b>
+                            <span className="block text-[12px] text-[#6e6e73]">
+                              Kopiér det, kæden har til fælles, præcist: logo, farver, skrift, design, knapper, menuens grupper, infobokse, holdplan og invitation. nextviewAI udfylder kun afdelingens eget fra dens side: navn, adresse, åbningstider, sociale medier og stederne (fra explore-linket).
+                            </span>
+                          </span>
+                        </label>
+                      )}
                       <p className="mt-1.5 text-[12px] leading-snug text-[#6e6e73]">
-                        {layoutFrom
+                        {layoutFrom && sister
+                          ? "Layoutet herunder kommer fra søsterafdelingen og bruges, som det er."
+                          : layoutFrom
                           ? "Layoutet er hentet herunder og resten kommer med (logoets baggrund, menuen ved start, stedkortenes side, historier, links). nextviewAI ser også, hvordan forbilledet er bygget - menuens grupper, funktionerne, velkomsten og rundvisningen - og laver den nye i samme stil. Kundens egne farver, logo, skrift og indhold bruges; intet kopieres fra den anden kundes tekster."
                           : "En tour, I er glade for: samme layout, opbygning og slags funktioner - med den nye kundes egne farver, logo og indhold."}
                       </p>
