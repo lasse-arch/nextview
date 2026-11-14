@@ -408,7 +408,7 @@ export function NewTour({ tours, forDeal, onClose, replaces }: { tours: { slug: 
                   {tours.length > 0 && (
                     <div className="rounded-2xl bg-white p-3 ring-1 ring-black/[.06]">
                       <label className="block text-[13px] font-semibold">
-                        Kopiér layout fra en anden tour
+                        Brug en anden tour som forbillede
                         <select value={layoutFrom ?? ""} onChange={(e) => copyLayoutFrom(e.target.value)} className={`${input} mt-1.5`}>
                           <option value="">Nej - vælg selv herunder</option>
                           {tours.map((t) => (
@@ -420,8 +420,8 @@ export function NewTour({ tours, forDeal, onClose, replaces }: { tours: { slug: 
                       </label>
                       <p className="mt-1.5 text-[12px] leading-snug text-[#6e6e73]">
                         {layoutFrom
-                          ? "Start, menu og placeringer er hentet herunder - og resten af layoutet (logoets baggrund, menuen ved start, stedkortenes side, historier, hvordan links åbner) kommer med. Kundens egne farver, logo, skrift og indhold bruges."
-                          : "Samme opbygning som en tour, I er glade for - med den nye kundes egne farver, logo og indhold."}
+                          ? "Layoutet er hentet herunder og resten kommer med (logoets baggrund, menuen ved start, stedkortenes side, historier, links). nextviewAI ser også, hvordan forbilledet er bygget - menuens grupper, funktionerne, velkomsten og rundvisningen - og laver den nye i samme stil. Kundens egne farver, logo, skrift og indhold bruges; intet kopieres fra den anden kundes tekster."
+                          : "En tour, I er glade for: samme layout, opbygning og slags funktioner - med den nye kundes egne farver, logo og indhold."}
                       </p>
                     </div>
                   )}
