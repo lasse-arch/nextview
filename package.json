@@ -9,7 +9,8 @@
     "lint": "eslint",
     "db:seed": "tsx prisma/seed.ts",
     "postinstall": "prisma generate",
-    "vercel-build": "if [ \"$VERCEL_ENV\" = \"production\" ]; then prisma db execute --file prisma/fixes/clear-failed-preview-migration.sql --schema prisma/schema.prisma && DATABASE_URL=${DIRECT_URL:-$DATABASE_URL} prisma migrate deploy; fi && node scripts/build-tour-engine.mjs && next build"
+    "vercel-build": "if [ \"$VERCEL_ENV\" = \"production\" ]; then prisma db execute --file prisma/fixes/clear-failed-preview-migration.sql --schema prisma/schema.prisma && DATABASE_URL=${DIRECT_URL:-$DATABASE_URL} prisma migrate deploy; fi && node scripts/build-tour-engine.mjs && next build",
+    "security:check": "node scripts/security-check.mjs"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
