@@ -557,7 +557,7 @@ function InUseEditor({ config, edit, preview }: { config: TourConfig; edit: Edit
                       </button>
                     </span>
                   ))}
-                  <UploadButton accept="image/*" shrink={2000} label="+ Billede" onDone={(url) => set({ ...i, images: [...(i.images ?? []), url] })} />
+                  <UploadButton accept="image/*" shrink={2000} label="+ Billeder" onMany={(urls) => set({ ...i, images: [...(i.images ?? []), ...urls] })} />
                 </div>
               </Field>
             )}

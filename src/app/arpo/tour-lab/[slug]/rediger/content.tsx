@@ -1448,7 +1448,7 @@ function CardPeople({ config, people, onChange, title = "Personer på kortet", h
           </div>
           );
         })}
-        {people.length < 3 && <UploadButton accept="image/*" label={people.length ? "+ Tilføj en person mere" : "+ Tilføj person (billede)"} onDone={(url) => onChange([...people, { image: url }])} />}
+        {people.length < 3 && <UploadButton accept="image/*" label={people.length ? "+ Tilføj flere personer" : "+ Tilføj personer (billeder)"} onMany={(urls) => onChange([...people, ...urls.map((image) => ({ image }))].slice(0, 3))} />}
       </div>
     </Field>
   );

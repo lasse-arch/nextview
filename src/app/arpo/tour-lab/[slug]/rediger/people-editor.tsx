@@ -60,9 +60,13 @@ export function PeopleEditor({ config, edit, preview }: { config: TourConfig; ed
         <UploadButton
           accept="image/*"
           shrink={1600}
-          label="+ Ny person (vælg et foto)"
+          label="+ Nye personer (vælg et foto pr. person - gerne flere)"
           className={linkBtn}
-          onDone={(image) => setPeople([...people, { id: personId("person", people.map((x) => x.id)), name: "", image }])}
+          onMany={(urls) => {
+            const all = [...people];
+            for (const image of urls) all.push({ id: personId("person", all.map((x) => x.id)), name: "", image });
+            setPeople(all);
+          }}
         />
         {loose > 0 && (
           <button type="button" className={linkBtn} onClick={gather}>

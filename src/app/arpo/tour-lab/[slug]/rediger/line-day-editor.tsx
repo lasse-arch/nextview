@@ -271,7 +271,7 @@ function People({ config, people, onChange, hint, title = "Personer her (valgfri
             </button>
           </div>
         ))}
-        {list.length < 4 && <UploadButton accept="image/*" label="+ Person (billede)" onDone={(image) => put([...list, { image }])} />}
+        {list.length < 4 && <UploadButton accept="image/*" label="+ Personer (billeder)" onMany={(urls) => put([...list, ...urls.map((image) => ({ image }))].slice(0, 4))} />}
       </div>
     </Field>
   );
