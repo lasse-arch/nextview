@@ -4,7 +4,6 @@ import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { getSettingValue } from "@/lib/integration-settings";
 import { claudeCostUsd } from "@/lib/claude-cost";
 import { ACTION, tourStats } from "@/lib/tour-stats";
 import type { TourConfig } from "@/app/arpo/tour-lab/tours/types";
@@ -48,7 +47,7 @@ async function byLabel(slug: string, since: Date, where: string) {
 
 /** The tips themselves (also run by the monthly cron) - `who` is kept with the AI usage. */
 export async function runTourInsights(slug: string, config: TourConfig, who: string, days = 60): Promise<InsightResult> {
-  const key = process.env.ANTHROPIC_API_KEY || (await getSettingValue("ANTHROPIC_API_KEY"));
+  const key = (process.env.ANTHROPIC_API_KEY || null);
   if (!key) return { ok: false, error: "nextviewAI er ikke sat op endnu - indsæt en nøgle under fanen nextviewAI." };
 
   const since = new Date(Date.now() - days * 86_400_000);

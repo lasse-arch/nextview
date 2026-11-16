@@ -114,18 +114,19 @@ export async function healthChecks(): Promise<CheckGroup[]> {
       const [newest] = await backups();
       if (!newest) return { status: "down", detail: "Ingen backup fundet" };
       const hours = (Date.now() - newest.uploadedAt.getTime()) / 3600_000;
-      return { status: hours < 30 ? "ok" : "down", detail: `Seneste ${ago(newest.uploadedAt)} (${Math.round(newest.size / 1024 / 1024)} MB)` };
+      // Encrypted with its own key (BACKUP_KEY in Vercel) - not the login's AUTH_SECRET, which then would open both.
+      const own = Boolean(process.env.BACKUP_KEY);
+      return { status: hours >= 30 ? "down" : own ? "ok" : "warn", detail: `Seneste ${ago(newest.uploadedAt)} (${Math.round(newest.size / 1024 / 1024)} MB)${own ? "" : " - krypteret med AUTH_SECRET: sæt en egen BACKUP_KEY i Vercel"}` };
     }),
     timed("Matterport", async () => ((await getSettingValue("MATTERPORT_SDK_KEY")) ? { status: "ok", detail: "SDK-nøgle sat" } : { status: "warn", detail: "Ingen SDK-nøgle - tourene bruger Matterports almindelige visning" })),
-    timed("nextviewAI", async () => ((process.env.ANTHROPIC_API_KEY || (await getSettingValue("ANTHROPIC_API_KEY"))) ? { status: "ok", detail: "Nøgle sat" } : { status: "off", detail: "Ingen nøgle" })),
+    timed("nextviewAI", async () => (process.env.ANTHROPIC_API_KEY ? { status: "ok", detail: "Nøgle sat i Vercel" } : { status: "off", detail: "Ingen ANTHROPIC_API_KEY i Vercel" })),
     timed("AI-billeder (Gemini)", async () => {
-      // The key in Vercel (GEMINI_API_KEY) first, like "Ret med AI" itself - else one saved in Arpo. And whether Google takes it.
-      const fromEnv = Boolean(process.env.GEMINI_API_KEY);
-      const key = process.env.GEMINI_API_KEY || (await getSettingValue("GEMINI_API_KEY"));
-      if (!key) return { status: "off", detail: "Ingen nøgle" };
+      // The key in Vercel (GEMINI_API_KEY) - and whether Google takes it.
+      const key = process.env.GEMINI_API_KEY;
+      if (!key) return { status: "off", detail: "Ingen GEMINI_API_KEY i Vercel" };
       const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=1", { headers: { "x-goog-api-key": key }, signal: AbortSignal.timeout(8000) }).catch(() => null);
       if (!res) return { status: "warn", detail: "Kunne ikke nå Google lige nu" };
-      return res.ok ? { status: "ok", detail: fromEnv ? "Nøgle i Vercel virker" : "Nøgle virker" } : { status: "down", detail: `Google afviser nøglen (${res.status})` };
+      return res.ok ? { status: "ok", detail: "Nøgle i Vercel virker" } : { status: "down", detail: `Google afviser nøglen (${res.status})` };
     }),
     // Only whether the key is there - a real check would cost an SMS.
     timed("SureSMS (Send eksempel på SMS)", async () =>

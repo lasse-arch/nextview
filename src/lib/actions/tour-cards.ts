@@ -7,7 +7,6 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 import { requireTour } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { getSettingValue } from "@/lib/integration-settings";
 import { siteResearch } from "@/lib/site-digest";
 import { claudeCostUsd } from "@/lib/claude-cost";
 import { plainWords } from "@/app/arpo/tour-lab/tours/i18n";
@@ -47,7 +46,7 @@ async function websiteOf(slug: string, config: TourConfig): Promise<string | nul
 export async function writePlaceCards(slug: string, config: TourConfig, places: { ss: number; name: string | null; image?: string }[]): Promise<CardsResult> {
   const user = await requireTour(slug).catch(() => null);
   if (!user) return { ok: false, error: "Du har ikke adgang til tours." };
-  const key = process.env.ANTHROPIC_API_KEY || (await getSettingValue("ANTHROPIC_API_KEY"));
+  const key = (process.env.ANTHROPIC_API_KEY || null);
   if (!key) return { ok: false, error: "nextviewAI er ikke sat op endnu - indsæt en nøgle under fanen nextviewAI." };
   if (!places.length) return { ok: false, error: "Ingen steder at skrive kort til." };
 
@@ -128,7 +127,7 @@ const Speeches = z.object({ speeches: z.array(z.object({ index: z.number().int()
 export async function writeCardSpeeches(slug: string, config: TourConfig, indices: number[]): Promise<{ ok: true; speeches: Record<number, string> } | { ok: false; error: string }> {
   const user = await requireTour(slug).catch(() => null);
   if (!user) return { ok: false, error: "Du har ikke adgang til tours." };
-  const key = process.env.ANTHROPIC_API_KEY || (await getSettingValue("ANTHROPIC_API_KEY"));
+  const key = (process.env.ANTHROPIC_API_KEY || null);
   if (!key) return { ok: false, error: "nextviewAI er ikke sat op endnu - indsæt en nøgle under fanen nextviewAI." };
   const cards = indices.map((i) => ({ i, c: config.placeCards?.[i] })).filter((x): x is { i: number; c: PlaceCard } => Boolean(x.c));
   if (!cards.length) return { ok: false, error: "Ingen stedkort at skrive til." };

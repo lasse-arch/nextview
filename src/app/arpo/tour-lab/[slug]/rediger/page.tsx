@@ -3,7 +3,6 @@ import { notFound, redirect } from "next/navigation";
 import { requireTour } from "@/lib/auth";
 import { teamCan } from "@/lib/team-roles";
 import { prisma } from "@/lib/db";
-import { getSettingValue } from "@/lib/integration-settings";
 import { blobReady } from "@/lib/tour-files";
 import { addDays, todayDK, tourStats } from "@/lib/tour-stats";
 import { shareOf } from "@/lib/tour-share";
@@ -87,7 +86,7 @@ export default async function TourEditPage({ params, searchParams }: { params: P
       reviewToken={tour.reviewToken && !teamCan(user, "numbers") ? await noteTokenOf(tour.slug) : tour.reviewToken}
       canDemo={teamCan(user, "sales")}
       feedbackOpen={await prisma.tourFeedback.count({ where: { tourSlug: tour.slug, status: "open" } })}
-      aiReady={Boolean(process.env.ANTHROPIC_API_KEY || (await getSettingValue("ANTHROPIC_API_KEY")))}
+      aiReady={Boolean((process.env.ANTHROPIC_API_KEY || null))}
       assignment={{
         canAssign: teamCan(user, "admin"),
         // Everyone who works on tours (developers, and admins themselves).

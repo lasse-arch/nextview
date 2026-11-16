@@ -2,7 +2,7 @@
 
 import { useContext, useEffect, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import { createPortal } from "react-dom";
-import { cutTourView, editTourImage, imageAiReady, pasteTourEdit, saveGeminiKey } from "@/lib/actions/tour-image-ai";
+import { cutTourView, editTourImage, imageAiReady, pasteTourEdit } from "@/lib/actions/tour-image-ai";
 import { FilesContext, Icon, input } from "./ui";
 
 const SPARK = '<path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8"/>';
@@ -41,7 +41,6 @@ export function AiImageButton({ src, onUse }: { src: string; onUse: (url: string
   const { slug } = useContext(FilesContext);
   const [open, setOpen] = useState(false);
   const [ready, setReady] = useState<boolean | null>(null);
-  const [key, setKey] = useState("");
   const [ask, setAsk] = useState("");
   const result = useSyncExternalStore(
     (cb) => (window.addEventListener(keptEvent, cb), () => window.removeEventListener(keptEvent, cb)),
@@ -117,25 +116,8 @@ export function AiImageButton({ src, onUse }: { src: string; onUse: (url: string
       {ready === false ? (
         <>
           <p className="text-[12px] leading-snug text-[#6e6e73]">
-            Billeder rettes af Googles Gemini-billedmodel (nextviewAI kan kun se billeder, ikke tegne). Indsæt en API-nøgle fra Google AI Studio (aistudio.google.com) - den gemmes i Arpo til alle admins.
+            Billeder rettes af Googles Gemini-billedmodel (nextviewAI kan kun se billeder, ikke tegne). Nøglen fra Google AI Studio ligger kun i Vercel: en admin sætter den som <b>GEMINI_API_KEY</b> under Settings → Environment Variables og udgiver Arpo igen.
           </p>
-          <input className={`${input} bg-[#f2f2f7]`} type="password" placeholder="Gemini API-nøgle" value={key} onChange={(e) => setKey(e.target.value)} />
-          <button
-            type="button"
-            disabled={pending || !key.trim()}
-            className="w-full rounded-xl bg-[#1d1d1f] py-2 text-[14px] font-medium text-white disabled:opacity-40"
-            onClick={() =>
-              start(async () => {
-                setError(null);
-                const r = await saveGeminiKey(key);
-                if (!r.ok) return setError(r.error);
-                setKey("");
-                setReady(true);
-              })
-            }
-          >
-            {pending ? "Tjekker nøglen…" : "Gem nøgle"}
-          </button>
         </>
       ) : (
         <>

@@ -17,7 +17,6 @@ import { prisma } from "@/lib/db";
 import { trashSteps } from "@/lib/tour-trash";
 import { fitPlan } from "@/app/arpo/tour-lab/[slug]/rediger/plan-fit";
 import { tourChanged } from "@/lib/tour-cache";
-import { getSettingValue, setSettingValue } from "@/lib/integration-settings";
 import { publicUrl, siteDigest, siteResearch, socialLinksOn } from "@/lib/site-digest";
 import { measureSiteLook } from "@/lib/site-look";
 import { darker } from "@/app/arpo/tour-lab/tours/contrast";
@@ -75,7 +74,7 @@ function aiFailure(err: unknown, where: string): string {
 }
 
 async function apiKey() {
-  return process.env.ANTHROPIC_API_KEY || (await getSettingValue("ANTHROPIC_API_KEY"));
+  return (process.env.ANTHROPIC_API_KEY || null);
 }
 
 export async function tourAiReady(): Promise<boolean> {
@@ -83,19 +82,6 @@ export async function tourAiReady(): Promise<boolean> {
   return Boolean(await apiKey());
 }
 
-/** Saves the Claude API key in Arpo's settings (used when it isn't set as an environment variable). */
-export async function saveAnthropicKey(key: string): Promise<{ ok: true } | { ok: false; error: string }> {
-  await requireTeam("admin");
-  const value = key.trim();
-  if (!value.startsWith("sk-ant-")) return { ok: false, error: "En nøgle fra Anthropic starter med sk-ant-" };
-  try {
-    await new Anthropic({ apiKey: value }).models.list({ limit: 1 });
-  } catch {
-    return { ok: false, error: "Nøglen virker ikke - tjek at den er kopieret helt." };
-  }
-  await setSettingValue("ANTHROPIC_API_KEY", value);
-  return { ok: true };
-}
 
 const Edits = z.object({
   reply: z.string().describe("Kort svar til brugeren på dansk: hvad du har ændret, eller et opklarende spørgsmål."),
@@ -1117,24 +1103,14 @@ async function mayMakeAnyTour() {
 
 export async function matterportConnected(): Promise<boolean> {
   await mayMakeAnyTour();
-  return Boolean(process.env.MATTERPORT_API_TOKEN || (await getSettingValue("MATTERPORT_API_TOKEN")));
+  return Boolean((process.env.MATTERPORT_API_TOKEN || null));
 }
 
-/** Connects our Matterport account (an API token: id and secret) - checked against Matterport before it's kept. */
-export async function connectMatterport(tokenId: string, secret: string): Promise<{ ok: true } | { ok: false; error: string }> {
-  await requireTeam("admin");
-  const token = `${tokenId.trim()}:${secret.trim()}`;
-  if (token.length < 10) return { ok: false, error: "Indsæt både token-id og secret." };
-  const test = await searchAccountModels(token, "");
-  if (!test.ok) return test;
-  await setSettingValue("MATTERPORT_API_TOKEN", token);
-  return { ok: true };
-}
 
 /** Spaces on our Matterport account, searchable. */
 export async function searchMatterportSpaces(query: string, offset?: string | null) {
   await mayMakeAnyTour();
-  const token = process.env.MATTERPORT_API_TOKEN || (await getSettingValue("MATTERPORT_API_TOKEN"));
+  const token = (process.env.MATTERPORT_API_TOKEN || null);
   if (!token) return { ok: false as const, error: "Matterport er ikke forbundet." };
   return searchAccountModels(token, query, offset);
 }

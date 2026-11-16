@@ -42,7 +42,7 @@ export async function isDineroTestMode(): Promise<boolean> {
 }
 
 /** Settings that hold a text value instead of an on/off switch. */
-export type SettingValueKey = "MATTERPORT_SDK_KEY" | "TOUR_PROTOTYPE_GA4_ID" | "ANTHROPIC_API_KEY" | "MATTERPORT_API_TOKEN" | "BREAKEVEN_MONTHLY_COST" | "GEMINI_API_KEY";
+export type SettingValueKey = "MATTERPORT_SDK_KEY" | "TOUR_PROTOTYPE_GA4_ID" | "BREAKEVEN_MONTHLY_COST";
 
 /**
  * Arpo's own bookkeeping, not settings anyone types in: what the DocuSeal

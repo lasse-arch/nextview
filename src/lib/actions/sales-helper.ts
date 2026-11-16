@@ -4,7 +4,6 @@ import Anthropic from "@anthropic-ai/sdk";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { getSettingValue } from "@/lib/integration-settings";
 import { claudeCostUsd } from "@/lib/claude-cost";
 import { teamCan } from "@/lib/team-roles";
 import { helperKnowledge, teamAnswers, type SalesKind } from "@/lib/sales-helper";
@@ -49,7 +48,7 @@ export async function askSalesHelper(rawTurns: HelperTurn[]): Promise<HelperResu
   while (turns.length && turns[0].role !== "user") turns.shift();
   if (!turns.length || turns[turns.length - 1].role !== "user") return { ok: false, error: "Skriv et spørgsmål." };
   if (await rateLimited(user.name)) return { ok: false, error: "Du har spurgt meget den sidste time - prøv igen om lidt." };
-  const key = process.env.ANTHROPIC_API_KEY || (await getSettingValue("ANTHROPIC_API_KEY"));
+  const key = (process.env.ANTHROPIC_API_KEY || null);
   if (!key) return { ok: false, error: "nextviewAI er ikke sat op endnu - en admin indsætter nøglen i tour-editoren under fanen nextviewAI." };
 
   const [knowledge, answers] = await Promise.all([helperKnowledge(), teamAnswers()]);

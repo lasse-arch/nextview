@@ -1,7 +1,6 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "@/lib/db";
-import { getSettingValue } from "@/lib/integration-settings";
 import { claudeCostUsd } from "@/lib/claude-cost";
 
 /*
@@ -15,7 +14,7 @@ import { claudeCostUsd } from "@/lib/claude-cost";
 export type BriefSource = { url: string; title: string };
 export type BriefResult = { ok: true; body: string; sources: BriefSource[] } | { ok: false; error: string };
 
-export const apiKey = async () => process.env.ANTHROPIC_API_KEY || (await getSettingValue("ANTHROPIC_API_KEY"));
+export const apiKey = async () => (process.env.ANTHROPIC_API_KEY || null);
 
 /** The pages it read on the web: the ones it cited first, then what it fetched. */
 function sourcesOf(blocks: Anthropic.ContentBlock[], max: number): BriefSource[] {

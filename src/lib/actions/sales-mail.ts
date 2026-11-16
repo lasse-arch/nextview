@@ -6,7 +6,6 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { getSettingValue } from "@/lib/integration-settings";
 import { claudeCostUsd } from "@/lib/claude-cost";
 import { mailSignOff, sendGmailMessage } from "@/lib/gmail";
 import { logActivity } from "@/lib/activity";
@@ -120,7 +119,7 @@ export async function draftSalesMail(raw: SalesMailInput, revise?: { subject: st
   // Written in the name of the one it's from (an admin's colleague, when chosen) - and learns from their mails.
   const user = await senderFor(me, as);
   if (!user) return { ok: false, error: "Kun en admin kan skrive i en andens navn." };
-  const key = process.env.ANTHROPIC_API_KEY || (await getSettingValue("ANTHROPIC_API_KEY"));
+  const key = (process.env.ANTHROPIC_API_KEY || null);
   if (!key) return { ok: false, error: "nextviewAI er ikke sat op endnu - en admin indsætter nøglen i tour-editoren under fanen nextviewAI." };
   const i = clean(raw);
   if (!i.notes.trim() && !revise) return { ok: false, error: "Skriv et par linjer om, hvad mailen skal handle om." };

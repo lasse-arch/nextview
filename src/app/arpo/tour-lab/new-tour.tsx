@@ -3,7 +3,6 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import {
-  connectMatterport,
   createTourFromWebsite,
   matterportConnected,
   peekExploreTour,
@@ -746,10 +745,8 @@ function SpaceStep({
   const [q, setQ] = useState("");
   const [spaces, setSpaces] = useState<AccountModel[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [tokenId, setTokenId] = useState("");
-  const [secret, setSecret] = useState("");
   const [pasted, setPasted] = useState("");
-  const [pending, start] = useTransition();
+  const [, start] = useTransition();
 
   useEffect(() => {
     matterportConnected().then(setConnected).catch(() => setConnected(false));
@@ -799,28 +796,8 @@ function SpaceStep({
         <div className="space-y-2 rounded-2xl bg-white p-4 ring-1 ring-black/[.04]">
           <div className="text-[15px] font-semibold">Forbind Matterport</div>
           <p className="text-[12px] leading-snug text-[#6e6e73]">
-            Én gang: på my.matterport.com → Settings → Developer Tools → API Token Management, lav en nøgle og indsæt den her. Så kan alle jeres Matterport-tours vælges her.
+            Én gang: på my.matterport.com → Settings → Developer Tools → API Token Management, lav en nøgle. En admin sætter den i Vercel under Settings → Environment Variables som <b>MATTERPORT_API_TOKEN</b> (token-id og secret med kolon imellem: id:secret) og udgiver Arpo igen. Så kan alle jeres Matterport-tours vælges her.
           </p>
-          <div className="grid grid-cols-2 gap-2">
-            <input className={input} placeholder="Token-id" value={tokenId} onChange={(e) => setTokenId(e.target.value)} />
-            <input className={input} type="password" placeholder="Secret" value={secret} onChange={(e) => setSecret(e.target.value)} />
-          </div>
-          {error && <p className="text-[12px] text-[#ff3b30]">{error}</p>}
-          <button
-            type="button"
-            disabled={pending || !tokenId || !secret}
-            className="w-full rounded-xl bg-[#1d1d1f] py-2 text-[14px] font-medium text-white disabled:opacity-40"
-            onClick={() =>
-              start(async () => {
-                const r = await connectMatterport(tokenId, secret);
-                if (!r.ok) return setError(r.error);
-                setError(null);
-                setConnected(true);
-              })
-            }
-          >
-            {pending ? "Forbinder…" : "Forbind Matterport"}
-          </button>
         </div>
       ) : null}
       <details className="text-[13px]">

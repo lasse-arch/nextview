@@ -13,7 +13,7 @@ import { Component, memo, useCallback, useContext, useEffect, useMemo, useRef, u
 import { detachToursFromMpskins, logTourWork, renameTourSlug, restoreTourVersion, saveTour, saveTourDraft, searchDeals, setTourDeal } from "@/lib/actions/tours";
 import { SOCIALS } from "../../tours/social";
 import { guideStops } from "../guide";
-import { addTourAiMemory, askClaudeForTour, measureTourLogo, saveAnthropicKey, suggestTourFilter, type ChatTurn, type MemoryNote } from "@/lib/actions/tour-ai";
+import { addTourAiMemory, askClaudeForTour, measureTourLogo, suggestTourFilter, type ChatTurn, type MemoryNote } from "@/lib/actions/tour-ai";
 import type { FindStepAside, MenuEntry, TourConfig } from "../../tours/types";
 import type { TourStats } from "@/lib/tour-stats";
 import type { ReportShare } from "@/lib/tour-share";
@@ -1858,8 +1858,6 @@ function ClaudePanel({
       setImages((now) => [...new Set([...now, ...made.filter((x): x is string => Boolean(x))])].slice(0, MAX_CHAT_IMAGES));
     }
   }
-  const [key, setKey] = useState("");
-  const [keyError, setKeyError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const [learned, setLearned] = useState(0);
   const end = useRef<HTMLDivElement>(null);
@@ -2054,24 +2052,9 @@ function ClaudePanel({
           <Icon d={SPARK} className="h-6 w-6" />
         </span>
         <h2 className="text-[17px] font-semibold">{initiallyReady ? "nextviewAI-nøglen virker ikke længere" : "Sæt nextviewAI op"}</h2>
-        <p className="mt-1 text-[13px] leading-snug text-[#6e6e73]">Indsæt en API-nøgle fra Anthropic. Den gemmes i Arpo, så alle admins kan bruge nextviewAI i editoren.</p>
-        <input className={`${input} mt-4 bg-white`} type="password" placeholder="sk-ant-…" value={key} onChange={(e) => setKey(e.target.value)} />
-        {keyError && <p className="mt-2 text-[12px] text-[#ff3b30]">{keyError}</p>}
-        <button
-          type="button"
-          disabled={pending || !key.trim()}
-          className="mt-3 w-full rounded-xl bg-[#1d1d1f] py-2.5 text-[14px] font-medium text-white disabled:opacity-40"
-          onClick={() =>
-            start(async () => {
-              const r = await saveAnthropicKey(key);
-              if (!r.ok) return setKeyError(r.error);
-              setKey("");
-              setReady(true);
-            })
-          }
-        >
-          {pending ? "Tjekker nøglen…" : "Gem nøgle"}
-        </button>
+        <p className="mt-1 text-[13px] leading-snug text-[#6e6e73]">
+          Nøglen fra Anthropic ligger kun i Vercel (hemmeligheder gemmes aldrig i Arpo): en admin sætter den under Settings → Environment Variables som <b>ANTHROPIC_API_KEY</b> og udgiver Arpo igen.
+        </p>
       </div>
     );
 

@@ -1,3 +1,4 @@
+import { sealToken } from "@/lib/token-crypt";
 import { NextResponse, type NextRequest } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
@@ -62,14 +63,14 @@ export async function GET(request: NextRequest) {
         userId: user.id,
         provider: "GOOGLE",
         email: profile.email,
-        accessToken: tokens.access_token,
-        refreshToken: tokens.refresh_token,
+        accessToken: sealToken(tokens.access_token),
+        refreshToken: sealToken(tokens.refresh_token),
         expiresAt: new Date(Date.now() + tokens.expires_in * 1000),
       },
       update: {
         email: profile.email,
-        accessToken: tokens.access_token,
-        refreshToken: tokens.refresh_token ?? undefined,
+        accessToken: sealToken(tokens.access_token),
+        refreshToken: tokens.refresh_token ? sealToken(tokens.refresh_token) : undefined,
         expiresAt: new Date(Date.now() + tokens.expires_in * 1000),
       },
     });

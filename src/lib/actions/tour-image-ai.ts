@@ -7,7 +7,6 @@ import path from "node:path";
 import sharp from "sharp";
 import { requireTeam, requireTour } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { getSettingValue, setSettingValue } from "@/lib/integration-settings";
 import { storeTourFile } from "@/lib/tour-files";
 import { changeMask, keepSharpWhereUnchanged } from "@/lib/image-merge";
 import { pasteView, renderView, type PanoView } from "@/lib/pano-view";
@@ -28,22 +27,13 @@ async function admin() {
   return user;
 }
 
-const geminiKey = async () => process.env.GEMINI_API_KEY || (await getSettingValue("GEMINI_API_KEY"));
+const geminiKey = async () => (process.env.GEMINI_API_KEY || null);
 
 export async function imageAiReady(): Promise<boolean> {
   await admin();
   return Boolean(await geminiKey());
 }
 
-export async function saveGeminiKey(key: string): Promise<{ ok: true } | { ok: false; error: string }> {
-  await requireTeam("admin");
-  const k = key.trim();
-  if (!k) return { ok: false, error: "Indsæt nøglen." };
-  const res = await fetch(`${API}/models?pageSize=1`, { headers: { "x-goog-api-key": k }, signal: AbortSignal.timeout(15_000) }).catch(() => null);
-  if (!res?.ok) return { ok: false, error: "Nøglen virker ikke - tjek, at det er en Gemini API-nøgle fra Google AI Studio." };
-  await setSettingValue("GEMINI_API_KEY", k);
-  return { ok: true };
-}
 
 /**
  * The picture's bytes: our own files from disk or the database, anything else

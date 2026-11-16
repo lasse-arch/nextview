@@ -3,7 +3,6 @@ import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { getSettingValue } from "@/lib/integration-settings";
 import { canEmbed } from "@/lib/link-embed";
 import { safeFetchTo } from "@/lib/safe-fetch";
 import { tagged } from "@/app/arpo/tour-lab/tours/link-tag";
@@ -258,7 +257,7 @@ export async function checkTour(c: TourConfig, opts: { ai?: boolean } = {}): Pro
 
 /** nextviewAI's own short look: what a visitor would stumble on, in a few lines (never the setup itself). */
 async function aiLook(c: TourConfig, items: CheckItem[]): Promise<AiNote[] | null> {
-  const key = process.env.ANTHROPIC_API_KEY || (await getSettingValue("ANTHROPIC_API_KEY"));
+  const key = (process.env.ANTHROPIC_API_KEY || null);
   if (!key) return null;
   const client = new Anthropic({ apiKey: key });
   const Out = z.object({

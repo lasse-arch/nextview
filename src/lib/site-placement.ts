@@ -5,7 +5,6 @@ import { z } from "zod";
 import sharp from "sharp";
 import type { Browser, Page } from "puppeteer-core";
 import { prisma } from "@/lib/db";
-import { getSettingValue } from "@/lib/integration-settings";
 import { claudeCostUsd } from "@/lib/claude-cost";
 import { launchHeadlessChromium } from "@/lib/headless-chromium";
 import { isPublicHost } from "@/lib/public-host";
@@ -241,7 +240,7 @@ export async function readSite(site: URL): Promise<Read[]> {
 /* ----- nextviewAI picks the places ----- */
 
 async function aiKey() {
-  return process.env.ANTHROPIC_API_KEY || (await getSettingValue("ANTHROPIC_API_KEY"));
+  return (process.env.ANTHROPIC_API_KEY || null);
 }
 
 export async function analyzeSite(T: TourConfig, slug: string, site: URL, lang: "da" | "en", who: string): Promise<Placement> {

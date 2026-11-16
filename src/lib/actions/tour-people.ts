@@ -9,7 +9,6 @@ import { requireTeam, requireTour, toursOf } from "@/lib/auth";
 import { teamCan } from "@/lib/team-roles";
 import { prisma } from "@/lib/db";
 import { claudeCostUsd } from "@/lib/claude-cost";
-import { getSettingValue } from "@/lib/integration-settings";
 import { fetchScanImages, fetchSweepGraph, type ScanImages, type SweepGraph } from "@/lib/matterport-graph";
 import { fetchMpskinsCfg, hiddenSweeps, ssOf } from "@/lib/mpskins";
 import { strandedBy } from "@/lib/sweep-reach";
@@ -122,7 +121,7 @@ export async function recheckTour(slug: string): Promise<{ ok: true } | { ok: fa
 /** Checks some of a tour's scans (the client sends them a dozen at a time, so it never runs too long). */
 export async function checkScansForPeople(slug: string, sweepIds: string[]): Promise<{ ok: true; checked: number; found: number } | { ok: false; error: string }> {
   const user = await requireTour(slug);
-  const key = process.env.ANTHROPIC_API_KEY || (await getSettingValue("ANTHROPIC_API_KEY"));
+  const key = (process.env.ANTHROPIC_API_KEY || null);
   if (!key) return { ok: false, error: "nextviewAI er ikke sat op - indsæt en nøgle i en tours editor." };
   const m = await modelOf(slug);
   if (!m) return { ok: false, error: "Touren har ingen Matterport-model." };

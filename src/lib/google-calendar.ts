@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/db";
 import type { EmailAccount } from "@prisma/client";
+import { needsReseal, openToken, sealToken } from "@/lib/token-crypt";
 
 const CALENDAR_API_BASE = "https://www.googleapis.com/calendar/v3";
 
@@ -21,20 +22,40 @@ async function refreshAccessToken(refreshToken: string): Promise<{ accessToken: 
   return { accessToken: tokens.access_token, expiresAt: new Date(Date.now() + tokens.expires_in * 1000) };
 }
 
+/** The account's Google access token (kept encrypted - lib/token-crypt.ts), renewed when it has run out. */
 export async function getValidAccessToken(account: EmailAccount): Promise<string> {
-  const stillValid = account.accessToken && account.expiresAt && account.expiresAt.getTime() > Date.now() + 60_000;
-  if (stillValid) return account.accessToken!;
+  const current = openToken(account.accessToken);
+  const refresh = openToken(account.refreshToken);
+  const stillValid = current && account.expiresAt && account.expiresAt.getTime() > Date.now() + 60_000;
+  if (stillValid) {
+    // Kept from before encryption (or with an older key): sealed now.
+    if (needsReseal(account.accessToken) || needsReseal(account.refreshToken))
+      await prisma.emailAccount.update({ where: { id: account.id }, data: { accessToken: sealToken(current), refreshToken: sealToken(refresh) } }).catch(() => {});
+    return current;
+  }
 
-  if (!account.refreshToken) {
+  if (!refresh) {
     throw new Error("Google-forbindelsen mangler et refresh-token. Forbind Gmail igen under Indstillinger.");
   }
 
-  const { accessToken, expiresAt } = await refreshAccessToken(account.refreshToken);
+  const { accessToken, expiresAt } = await refreshAccessToken(refresh);
   await prisma.emailAccount.update({
     where: { id: account.id },
-    data: { accessToken, expiresAt },
+    data: { accessToken: sealToken(accessToken), expiresAt, ...(needsReseal(account.refreshToken) ? { refreshToken: sealToken(refresh) } : {}) },
   });
   return accessToken;
+}
+
+/** Seals every Gmail token still kept as plain text (or with an older key) - run by the daily e-mail sync. */
+export async function resealEmailTokens(): Promise<number> {
+  const rows = await prisma.emailAccount.findMany({ select: { id: true, accessToken: true, refreshToken: true } });
+  let n = 0;
+  for (const r of rows) {
+    if (!needsReseal(r.accessToken) && !needsReseal(r.refreshToken)) continue;
+    await prisma.emailAccount.update({ where: { id: r.id }, data: { accessToken: sealToken(openToken(r.accessToken)), refreshToken: sealToken(openToken(r.refreshToken)) } });
+    n++;
+  }
+  return n;
 }
 
 export type CalendarEventInput = {

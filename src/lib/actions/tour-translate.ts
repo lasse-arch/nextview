@@ -5,7 +5,6 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 import { requireTour } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { getSettingValue } from "@/lib/integration-settings";
 import { claudeCostUsd } from "@/lib/claude-cost";
 import { langName, plainWords, translatableTexts } from "@/app/arpo/tour-lab/tours/i18n";
 import type { TourConfig } from "@/app/arpo/tour-lab/tours/types";
@@ -25,7 +24,7 @@ export async function translateTour(slug: string, config: TourConfig, langs: str
   const user = await requireTour(slug).catch(() => null);
   if (!user) return { ok: false, error: "Du har ikke adgang til tours." };
   const userName = user.name;
-  const key = process.env.ANTHROPIC_API_KEY || (await getSettingValue("ANTHROPIC_API_KEY"));
+  const key = (process.env.ANTHROPIC_API_KEY || null);
   if (!key) return { ok: false, error: "nextviewAI er ikke sat op endnu - indsæt en nøgle under fanen nextviewAI." };
   const client = new Anthropic({ apiKey: key });
   const texts = translatableTexts(config);

@@ -3,7 +3,6 @@ import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { getSettingValue } from "@/lib/integration-settings";
 import { claudeCostUsd } from "@/lib/claude-cost";
 import { publicUrl, siteResearch } from "@/lib/site-digest";
 import { measureSiteLook } from "@/lib/site-look";
@@ -59,7 +58,7 @@ export async function proposalRateLimited(name: string): Promise<boolean> {
 
 /** The proposal for a website (and the seller's own notes). */
 export async function writeProposal(who: { name: string }, website: string, notes: string): Promise<{ ok: true; data: ProposalData } | { ok: false; error: string }> {
-  const key = process.env.ANTHROPIC_API_KEY || (await getSettingValue("ANTHROPIC_API_KEY"));
+  const key = (process.env.ANTHROPIC_API_KEY || null);
   if (!key) return { ok: false, error: "nextviewAI er ikke sat op endnu - en admin indsætter nøglen i tour-editoren under fanen nextviewAI." };
   let site: URL;
   try {
