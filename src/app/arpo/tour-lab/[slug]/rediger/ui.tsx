@@ -179,7 +179,22 @@ export async function shrinkPhoto(file: File, max = 1600): Promise<File> {
 }
 
 /** A button that picks a file and uploads it - or takes one dragged onto it (from the desktop or a folder). */
-export function UploadButton({ accept, onDone, label = "Upload", className, shrink }: { accept: string; onDone: (url: string) => void; label?: string; className?: string; /** Photos made light first (longest side in px) - see shrinkPhoto. */ shrink?: number }) {
+export function UploadButton({
+  accept,
+  onDone,
+  onMany,
+  label = "Upload",
+  className,
+  shrink,
+}: {
+  accept: string;
+  onDone?: (url: string) => void;
+  /** Several files at once (picked or dropped together): all their addresses in one go, in order. */
+  onMany?: (urls: string[]) => void;
+  label?: string;
+  className?: string;
+  /** Photos made light first (longest side in px) - see shrinkPhoto. */ shrink?: number;
+}) {
   const { slug, blob } = useContext(FilesContext);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -190,16 +205,29 @@ export function UploadButton({ accept, onDone, label = "Upload", className, shri
       const t = a.trim();
       return t === "*" || t === type || (t.endsWith("/*") && type.startsWith(t.slice(0, -1)));
     });
-  async function take(file: File | undefined) {
-    if (!file || busy) return;
-    if (!fits(file.type)) return setError(`Den slags fil kan ikke bruges her (${file.type || "ukendt"}).`);
+  const [done, setDone] = useState<[number, number] | null>(null);
+  async function take(list: File[]) {
+    const files = onMany ? list : list.slice(0, 1);
+    if (!files.length || busy) return;
+    const bad = files.find((f) => !fits(f.type));
+    if (bad) return setError(`Den slags fil kan ikke bruges her (${bad.type || "ukendt"}).`);
     setBusy(true);
     setError(null);
+    const urls: string[] = [];
     try {
-      onDone(await uploadToTour(slug, shrink ? await shrinkPhoto(file, shrink) : file, blob));
+      // One at a time (a phone's 20 photos at once would choke the upload).
+      for (const [i, file] of files.entries()) {
+        setDone(files.length > 1 ? [i, files.length] : null);
+        urls.push(await uploadToTour(slug, shrink ? await shrinkPhoto(file, shrink) : file, blob));
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
+    if (urls.length) {
+      if (onMany) onMany(urls);
+      else onDone?.(urls[0]);
+    }
+    setDone(null);
     setBusy(false);
   }
   return (
@@ -217,20 +245,21 @@ export function UploadButton({ accept, onDone, label = "Upload", className, shri
         e.preventDefault();
         e.stopPropagation();
         setOver(false);
-        void take(e.dataTransfer.files[0]);
+        void take([...e.dataTransfer.files]);
       }}
     >
       <label className={`${className ?? "cursor-pointer rounded-xl bg-white px-3 py-2 text-center text-[14px] font-medium text-[#0071e3] ring-1 ring-black/[.06] hover:bg-[#0071e3]/5"} ${over ? "!ring-2 !ring-[#0071e3] bg-[#0071e3]/10" : ""}`}>
-        {busy ? "Uploader…" : over ? "Slip for at uploade" : label}
+        {busy ? (done ? `Uploader ${done[0] + 1} af ${done[1]}…` : "Uploader…") : over ? "Slip for at uploade" : label}
         <input
           type="file"
           accept={accept}
+          multiple={Boolean(onMany)}
           className="hidden"
           disabled={busy}
           onChange={async (e) => {
-            const file = e.target.files?.[0];
+            const files = [...(e.target.files ?? [])];
             e.target.value = "";
-            await take(file);
+            await take(files);
           }}
         />
       </label>

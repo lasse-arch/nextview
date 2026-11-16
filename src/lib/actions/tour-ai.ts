@@ -3,6 +3,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
+import { readLimited, safeFetch } from "@/lib/safe-fetch";
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { SITE_LOOK_RULES, SiteLook } from "@/lib/site-look-rules";
@@ -333,7 +334,7 @@ async function claudeEdits(key: string, who: { name: string; kind: string }, con
 
 /** Screenshots sent with a request (data URLs from the editor, made small there) as image blocks - anything else is dropped. */
 function imageBlocks(images: string[]): Anthropic.ImageBlockParam[] {
-  return images.slice(0, 4).flatMap((url): Anthropic.ImageBlockParam[] => {
+  return images.slice(0, MAX_CHAT_PICTURES).flatMap((url): Anthropic.ImageBlockParam[] => {
     const m = /^data:(image\/(?:jpeg|png|webp|gif));base64,([A-Za-z0-9+/=]+)$/.exec(url);
     if (!m || m[2].length > 6_000_000) return [];
     return [{ type: "image", source: { type: "base64", media_type: m[1] as "image/jpeg" | "image/png" | "image/webp" | "image/gif", data: m[2] } }];
@@ -433,26 +434,60 @@ ${JSON.stringify(r.found)}
   return parts.length ? `\n\n${parts.join("\n\n")}` : "";
 }
 
+/** How many pictures one chat message can carry (the editor's limit too). */
+const MAX_CHAT_PICTURES = 30;
+
+/**
+ * The pictures sent in the chat: where each is kept (`kept`, its address in the tour's files) and a light copy
+ * nextviewAI looks at (`seenBy`, data URLs). The editor uploads them first and sends their addresses - only this
+ * tour's own files are read (an address that isn't one is dropped); an older editor's data URL is kept here.
+ */
+async function chatPictures(slug: string, images: string[]): Promise<{ kept: (string | null)[]; seenBy: string[] }> {
+  const list = images.slice(0, MAX_CHAT_PICTURES);
+  // Many pictures: each a little smaller, so the message stays a sensible size.
+  const side = list.length > 8 ? 1000 : 1400;
+  const light = (bytes: Buffer) =>
+    sharp(bytes).rotate().resize({ width: side, height: side, fit: "inside", withoutEnlargement: true }).jpeg({ quality: 78 }).toBuffer().then((b) => `data:image/jpeg;base64,${b.toString("base64")}`);
+  const rows = await Promise.all(
+    list.map(async (url, i): Promise<{ kept: string | null; seen: string | null }> => {
+      const data = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/.exec(url);
+      if (data) {
+        if (data[2].length > 12_000_000) return { kept: null, seen: null };
+        const kept = await storeTourFile(slug, `chat-billede-${Date.now()}-${i + 1}`, data[1], Buffer.from(data[2], "base64")).catch(() => null);
+        return { kept, seen: await light(Buffer.from(data[2], "base64")).catch(() => null) };
+      }
+      const id = /^\/api\/tour-files\/([\w-]+)$/.exec(url)?.[1];
+      const file = await prisma.tourFile.findFirst({ where: { tourSlug: slug, contentType: { startsWith: "image/" }, ...(id ? { id } : { url }) }, select: { data: true, url: true } });
+      if (!file) return { kept: null, seen: null };
+      let bytes: Buffer | null = file.data ? Buffer.from(file.data) : null;
+      if (!bytes && file.url && /^https:\/\/[\w.-]+\.blob\.vercel-storage\.com\//.test(file.url)) {
+        const res = await safeFetch(file.url, { signal: AbortSignal.timeout(15_000) }).catch(() => null);
+        bytes = res?.ok ? await readLimited(res, 15_000_000).catch(() => null) : null;
+      }
+      return { kept: url, seen: bytes ? await light(bytes).catch(() => null) : null };
+    })
+  );
+  return { kept: rows.map((r) => r.kept), seenBy: rows.map((r) => r.seen).filter((x): x is string => Boolean(x)) };
+}
+
 /** A change asked for in the editor's chat - `images`: screenshots the user sent along (of the preview, the customer's site …). */
 export async function askClaudeForTour(config: TourConfig, history: ChatTurn[], request: string, images: string[] = []): Promise<AiEditResult> {
   const user = await requireTour(config.slug);
   const key = await apiKey();
   if (!key) return { ok: false, error: "nextviewAI er ikke sat op endnu - indsæt en nøgle." };
   try {
-    // Each picture is also kept with the tour's files, so it has an address the tour can show - nextviewAI may put it on a card, a point, a tile …
-    const kept = await Promise.all(
-      images.slice(0, 4).map(async (url, i) => {
-        const m = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/.exec(url);
-        if (!m || m[2].length > 12_000_000) return null;
-        return storeTourFile(config.slug, `chat-billede-${Date.now()}-${i + 1}`, m[1], Buffer.from(m[2], "base64")).catch(() => null);
-      })
-    );
+    const { kept, seenBy } = await chatPictures(config.slug, images);
     const addresses = kept.map((u, i) => (u ? `Billede ${i + 1}: ${u}` : null)).filter(Boolean);
+    const many = images.length > 3;
     const seen = images.length
-      ? `\n\n(Brugeren har sendt ${images.length === 1 ? "et billede" : `${images.length} billeder`} med - i rækkefølge. Er det et skærmbillede (af forhåndsvisningen, kundens hjemmeside), så brug det til at forstå, hvad de mener. Er det et foto, de vil have i touren, så brug adressen herunder direkte i opsætningen (fx images på et punkt eller stedkort, et personbillede, en flise) - billedet er allerede gemt hos os.${addresses.length ? `\n${addresses.join("\n")}` : ""})`
+      ? `\n\n(Brugeren har sendt ${images.length === 1 ? "et billede" : `${images.length} billeder`} med - i rækkefølge. Er det et skærmbillede (af forhåndsvisningen, kundens hjemmeside), så brug det til at forstå, hvad de mener. Er det et foto, de vil have i touren, så brug adressen herunder direkte i opsætningen (fx images på et punkt eller stedkort, et personbillede, en flise) - billedet er allerede gemt hos os.${
+          many
+            ? " Se på hvert foto for sig: hvad sker der, hvor er det (inde/ude, hvilket rum eller sted), hvem er med, og hvilken tid på dagen ligner det? Kobl det med det, hjemmesiden og de sociale medier fortæller (linjens fag, skema, ture, lærere). Beder brugeren om en dag på en linje (eller sender mange fotos fra en linje uden at sige mere), så byg eller udvid lineDays: stop i dagens rækkefølge med time, place, title, en kort text i skolens tone og 1-3 images pr. stop; brug fælles stop (shared) for det, alle linjer har. Står tiderne på hjemmesiden, så brug dem; ellers skriv fx \"Formiddag\" i stedet for at gætte et klokkeslæt. Et stop kan godt være fotos alene uden sted i touren (ingen href). Brug ikke et foto, der er uskarpt, et skærmbillede eller ikke passer. Sig kort i reply, hvilke fotos du brugte hvor, og hvilke du lod ligge og hvorfor. Facebook og Instagram kan du ikke læse opslag fra (de kræver login) - bruger brugeren tekst derfra, skal de indsætte den i chatten."
+            : ""
+        }${addresses.length ? `\n${addresses.join("\n")}` : ""})`
       : "";
     const web = await webContext(config, request).catch(() => "");
-    const r = await claudeEdits(key, { name: user.name, kind: "ændring" }, config, history, `Ønske: ${request}${seen}${web}`, 16000, true, [], images);
+    const r = await claudeEdits(key, { name: user.name, kind: "ændring" }, config, history, `Ønske: ${request}${seen}${web}`, many ? 24000 : 16000, true, [], seenBy);
     // The pictures' addresses go back to the editor, which puts them in the history of later messages ("læg dem i baglokalet").
     return r.ok ? { ...r, imageUrls: kept.filter((u): u is string => Boolean(u)) } : r;
   } catch (err) {

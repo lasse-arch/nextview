@@ -1138,7 +1138,7 @@ function PointPanel({
               ))}
             </div>
           )}
-          <UploadButton accept="image/*" label="Tilføj billede" onDone={(url) => setPoint((x) => void (x.images = [...(x.images ?? []), url]))} />
+          <UploadButton accept="image/*" label="Tilføj billeder" onMany={(urls) => setPoint((x) => void (x.images = [...(x.images ?? []), ...urls]))} />
           {/* Any of the photos - e.g. a closed pool made summery. */}
           <AiImageList images={p.images ?? []} onReplace={(i, url) => setPoint((x) => void (x.images = (x.images ?? []).map((y, j) => (j === i ? url : y))))} />
         </Field>

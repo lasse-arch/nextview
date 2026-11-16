@@ -9,7 +9,7 @@ import { droneHref, droneViewsOfHref, formatPhone, IMAGE_HREF, imageOfHref, isDr
 import { tourConfigProblem } from "@/lib/tour-validate";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Component, memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, useTransition } from "react";
+import { Component, memo, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import { detachToursFromMpskins, logTourWork, renameTourSlug, restoreTourVersion, saveTour, saveTourDraft, searchDeals, setTourDeal } from "@/lib/actions/tours";
 import { SOCIALS } from "../../tours/social";
 import { guideStops } from "../guide";
@@ -28,7 +28,7 @@ import type { ScanMap } from "@/lib/matterport-graph";
 import { EconomyPanel, type TourEconomy } from "./economy";
 import { AssignmentGroup, type Assignment } from "./assignment";
 import { DEFAULT_EMBED, SharePanel, SitePreview, type EmbedSize } from "./share";
-import { Choice, Field, FilesContext, Group, Icon, input, logoTone, outsideFiles, PanoZoom, Toggle, UploadButton, withProtocol, type PreviewApi } from "./ui";
+import { Choice, Field, FilesContext, Group, Icon, input, logoTone, outsideFiles, PanoZoom, shrinkPhoto, Toggle, UploadButton, uploadToTour, withProtocol, type PreviewApi } from "./ui";
 import { fetchSiteFavicon, hostTourFiles } from "@/lib/actions/tour-files";
 import { AiMemoryPanel } from "./memory";
 import { WeatherEditor } from "./weather-editor";
@@ -1787,29 +1787,8 @@ const SectionNav = memo(function SectionNav({ tab, menu, feedbackOpen, unused, o
   );
 });
 
-function shrinkImage(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = () => {
-      const k = Math.min(1, 1600 / Math.max(img.width, img.height));
-      const c = document.createElement("canvas");
-      c.width = Math.round(img.width * k);
-      c.height = Math.round(img.height * k);
-      const g = c.getContext("2d")!;
-      g.fillStyle = "#fff";
-      g.fillRect(0, 0, c.width, c.height);
-      g.drawImage(img, 0, 0, c.width, c.height);
-      URL.revokeObjectURL(url);
-      resolve(c.toDataURL("image/jpeg", 0.82));
-    };
-    img.onerror = () => {
-      URL.revokeObjectURL(url);
-      reject(new Error("Billedet kunne ikke læses."));
-    };
-    img.src = url;
-  });
-}
+/** How many pictures one chat message can carry (a day on a line can take many). */
+const MAX_CHAT_IMAGES = 30;
 
 const SUGGESTIONS = ["Gør det helt enkelt - få store knapper og én menu", "Tilføj en knap til booking", "Gør farverne mørkere og mere eksklusive", "Ryd op i menuen, så den er nemmere at overskue"];
 
@@ -1849,16 +1828,34 @@ function ClaudePanel({
     setText((x) => `${x.slice(0, mention.start)}@${t.label} ${x.slice(end)}`);
     setMention(null);
   }
-  /** Pictures to send with the next message (pasted, dropped or picked). */
+  /**
+   * Pictures to send with the next message (pasted, dropped or picked) - up to MAX_CHAT_IMAGES. Each is made light
+   * and kept with the tour's files as it's added, so only its address goes with the message (20 photos at once
+   * would be too big to send along), and nextviewAI can put it straight into the tour.
+   */
   const [images, setImages] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(0);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const files = useContext(FilesContext);
   const [dragging, setDragging] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
-  async function addImages(files: Iterable<File>) {
-    const pics = [...files].filter((f) => f.type.startsWith("image/"));
+  async function addImages(list: Iterable<File>) {
+    const pics = [...list].filter((f) => f.type.startsWith("image/")).slice(0, Math.max(0, MAX_CHAT_IMAGES - images.length - uploading));
     if (!pics.length) return;
-    const made = await Promise.all(pics.map((f) => shrinkImage(f).catch(() => null)));
-    // The same picture only once - a drag can hand the browser the same file twice (e.g. from another tab or Finder).
-    setImages((now) => [...new Set([...now, ...made.filter((x): x is string => Boolean(x))])].slice(0, 4));
+    setUploadError(null);
+    setUploading((n) => n + pics.length);
+    // A few at a time - in the order they were picked.
+    for (let i = 0; i < pics.length; i += 3) {
+      const made = await Promise.all(
+        pics.slice(i, i + 3).map((f) =>
+          shrinkPhoto(f, 1600)
+            .then((small) => uploadToTour(files.slug, small, files.blob))
+            .catch((err: unknown) => (setUploadError(`Et billede kunne ikke uploades (${err instanceof Error ? err.message : err}).`), null))
+        )
+      );
+      setUploading((n) => n - made.length);
+      setImages((now) => [...new Set([...now, ...made.filter((x): x is string => Boolean(x))])].slice(0, MAX_CHAT_IMAGES));
+    }
   }
   const [key, setKey] = useState("");
   const [keyError, setKeyError] = useState<string | null>(null);
@@ -1872,8 +1869,8 @@ function ClaudePanel({
 
   function send(request: string) {
     const pics = images;
-    const ask = request.trim() || (pics.length ? "Se billedet" : "");
-    if (!ask || pending) return;
+    const ask = request.trim() || (pics.length ? (pics.length === 1 ? "Se billedet" : "Se billederne") : "");
+    if (!ask || pending || uploading) return;
     const history: ChatTurn[] = chat
       .filter((m) => !m.error)
       .map((m) => ({
@@ -2104,8 +2101,11 @@ function ClaudePanel({
           addImages(e.dataTransfer.files);
         }}
       >
+        {(uploading > 0 || uploadError) && (
+          <p className={`px-2 pb-1 text-[12px] ${uploadError ? "text-[#ff3b30]" : "text-[#6e6e73]"}`}>{uploading > 0 ? `Uploader ${uploading} ${uploading === 1 ? "billede" : "billeder"}…` : uploadError}</p>
+        )}
         {images.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 px-1 pb-1.5 pt-0.5">
+          <div className="flex max-h-40 flex-wrap gap-1.5 overflow-y-auto px-1 pb-1.5 pt-0.5">
             {images.map((src, i) => (
               <span key={i} className="relative">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -2161,9 +2161,9 @@ function ClaudePanel({
         <div className="flex items-center justify-between gap-2 px-1">
           <button
             type="button"
-            title="Send et billede med (fx et skærmbillede)"
+            title="Send billeder med (fx skærmbilleder eller fotos til touren - op til 30)"
             aria-label="Vedhæft billede"
-            disabled={images.length >= 4}
+            disabled={images.length + uploading >= MAX_CHAT_IMAGES}
             onClick={() => fileInput.current?.click()}
             className="flex h-8 w-8 flex-none items-center justify-center rounded-full text-[#6e6e73] hover:bg-[#f2f2f7] disabled:opacity-40"
           >
@@ -2181,7 +2181,7 @@ function ClaudePanel({
             }}
           />
           <span className="flex-1 text-[11px] text-[#8e8e93]">nextviewAI kan tage fejl - tjek forhåndsvisningen.</span>
-          <button type="submit" disabled={pending || (!text.trim() && !images.length)} aria-label="Send" className="flex h-8 w-8 items-center justify-center rounded-full bg-[#d97757] text-white transition hover:bg-[#c96442] disabled:bg-[#e9e9eb] disabled:text-[#8e8e93]">
+          <button type="submit" disabled={pending || uploading > 0 || (!text.trim() && !images.length)} aria-label="Send" className="flex h-8 w-8 items-center justify-center rounded-full bg-[#d97757] text-white transition hover:bg-[#c96442] disabled:bg-[#e9e9eb] disabled:text-[#8e8e93]">
             <Icon d='<path d="M12 19V5M5 12l7-7 7 7"/>' className="h-4 w-4" />
           </button>
         </div>

@@ -836,7 +836,7 @@ function PointStop({ config, id, edit, onEdit, preview }: { config: TourConfig; 
           </div>
         )}
         <div className="flex flex-wrap items-center gap-2">
-          <UploadButton accept="image/*" label="Tilføj billede" onDone={(url) => setPoint((x) => void (x.images = [...(x.images ?? []), url]))} />
+          <UploadButton accept="image/*" label="Tilføj billeder" onMany={(urls) => setPoint((x) => void (x.images = [...(x.images ?? []), ...urls]))} />
           <AiImageList images={images} onReplace={(i, url) => setPoint((x) => void (x.images = (x.images ?? []).map((y, j) => (j === i ? url : y))))} />
         </div>
       </Field>
@@ -2229,7 +2229,7 @@ export function CardImages({ images, hint, onChange, max, shrink }: { images: st
           ))}
         </div>
       )}
-      {(max == null || images.length < max) && <UploadButton accept="image/*" shrink={shrink} label={images.length ? "+ Tilføj et billede mere" : "+ Tilføj billede"} onDone={(url) => onChange([...images, url])} />}
+      {(max == null || images.length < max) && <UploadButton accept="image/*" shrink={shrink} label={images.length ? "+ Tilføj flere billeder" : "+ Tilføj billeder"} onMany={(urls) => onChange([...images, ...urls].slice(0, max ?? Infinity))} />}
     </Field>
   );
 }
