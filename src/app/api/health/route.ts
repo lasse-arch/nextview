@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { tooManyFrom } from "@/lib/ip-limit";
 
 /*
  * For an uptime monitor (e.g. UptimeRobot or Better Stack, every few
@@ -10,7 +11,9 @@ import { prisma } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(request: Request) {
+  // An uptime monitor asks every few minutes - a flood from one address only reaches the database a little.
+  if (tooManyFrom(request, "health", 30)) return NextResponse.json({ ok: true, limited: true }, { status: 429, headers: { "Cache-Control": "no-store" } });
   const started = Date.now();
   try {
     await prisma.$queryRawUnsafe("SELECT 1");

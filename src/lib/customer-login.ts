@@ -1,4 +1,5 @@
 import "server-only";
+import { after } from "next/server";
 import { createHash, randomBytes } from "node:crypto";
 import { prisma } from "@/lib/db";
 import { getAppBaseUrl } from "@/lib/email-oauth";
@@ -138,7 +139,8 @@ export async function requestLoginLink(emailRaw: string, ip: string): Promise<vo
   if (!account) return;
   const recent = await prisma.customerLoginToken.count({ where: { accountId: account.id, createdAt: { gte: new Date(Date.now() - 3600_000) } } });
   if (recent >= MAX_PER_ACCOUNT_HOUR) return;
-  await sendLoginMail(account).catch((err) => console.error("Kunne ikke sende login-link", err));
+  // Sent after the answer - so a known and an unknown e-mail take the same time (it can't be told which is a customer).
+  after(() => sendLoginMail(account).catch((err) => console.error("Kunne ikke sende login-link", err)));
 }
 
 /** The link from the e-mail, used: the account it belongs to, or null if it's unknown, used or too old. */

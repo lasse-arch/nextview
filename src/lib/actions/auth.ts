@@ -4,7 +4,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { verifyPassword } from "@/lib/password";
-import { createSession, destroySession, getCurrentUser, safeNextPath } from "@/lib/auth";
+import { createSession, destroySession, endCustomerSessions, getCurrentCustomer, getCurrentUser, safeNextPath } from "@/lib/auth";
 import { isGoogleLoginRequired } from "@/lib/google-login";
 
 export type LoginState = { error?: string } | undefined;
@@ -42,7 +42,9 @@ export async function login(_prevState: LoginState, formData: FormData): Promise
 
   const user = await prisma.user.findUnique({ where: { email }, omit: { passwordHash: false } });
   // A deactivated user gets the same answer as a wrong password.
-  if (!user || !(await verifyPassword(password, user.passwordHash)) || user.disabledAt) {
+  // An unknown e-mail is checked against a made-up hash too - so it takes as long, and the answer's speed can't tell who exists.
+  const ok = await verifyPassword(password, user?.passwordHash ?? DUMMY_HASH);
+  if (!user || !ok || user.disabledAt) {
     await prisma.loginFailure.create({ data: { email, ip } });
     // Old failures are no use - cleared as we go, so the table stays small.
     await prisma.loginFailure.deleteMany({ where: { createdAt: { lt: new Date(Date.now() - 24 * 3600_000) } } });
@@ -53,9 +55,15 @@ export async function login(_prevState: LoginState, formData: FormData): Promise
   redirect(safeNextPath(next));
 }
 
+/** A bcrypt hash of nothing anyone types (cost 10, as real ones) - see login. */
+const DUMMY_HASH = "$2b$10$.W0/lXu/Rkwf8vaziaveneDbBYp70xsd8GLLYi/XZM/UP2atv2eUC";
+
 export async function logout() {
   // The team lands on their own login again; customers on theirs.
   const staff = await getCurrentUser();
+  // A customer: every session of theirs ends (also a copied cookie on another device).
+  const customer = staff ? null : await getCurrentCustomer();
+  if (customer) await endCustomerSessions(customer.id);
   await destroySession();
   redirect(staff ? "/login?next=/arpo" : "/login");
 }

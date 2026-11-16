@@ -2,6 +2,7 @@ import "server-only";
 import fs from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
+import { readLimited, safeFetch } from "@/lib/safe-fetch";
 import type { ReportInterval, ReportLanguage } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { SHOWN, tourStats } from "@/lib/tour-stats";
@@ -112,11 +113,13 @@ async function loadImage(src: string): Promise<Buffer | null> {
   }
   if (!raw) {
     if (!onTheInternet(src)) return null;
-    const res = await fetch(src, { signal: AbortSignal.timeout(15_000), cache: "no-store", redirect: "error" });
-    if (!res.ok || !/^image\//.test(res.headers.get("content-type") ?? "")) return null;
+    // Our own address as it is; anything else only through the guard against our own network (SSRF), and capped.
+    const own = src.startsWith(getAppBaseUrl());
+    const res = own ? await fetch(src, { signal: AbortSignal.timeout(15_000), cache: "no-store", redirect: "error" }) : await safeFetch(src, { signal: AbortSignal.timeout(15_000), cache: "no-store" }).catch(() => null);
+    if (!res?.ok || !/^image\//.test(res.headers.get("content-type") ?? "")) return null;
     const len = Number(res.headers.get("content-length") ?? 0);
     if (len > 25_000_000) return null;
-    raw = Buffer.from(await res.arrayBuffer());
+    raw = await readLimited(res, 25_000_000);
   }
   return sharp(raw, { limitInputPixels: 120_000_000 }).resize({ width: 1280, height: 720, fit: "cover" }).jpeg({ quality: 80 }).toBuffer();
 }

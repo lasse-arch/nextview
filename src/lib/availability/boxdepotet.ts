@@ -1,4 +1,5 @@
 import "server-only";
+import { readLimited, safeFetch } from "@/lib/safe-fetch";
 
 /** A storage room that can be booked right now or soon. */
 export type AvailableUnit = {
@@ -27,9 +28,10 @@ const text = (html: string) =>
  */
 export async function fetchBoxdepotetUnits(pageUrl: string): Promise<AvailableUnit[]> {
   try {
-    const res = await fetch(pageUrl, { next: { revalidate: 600 }, signal: AbortSignal.timeout(10_000) });
+    // The address comes from a tour's setup - fetched only through the guard against our own network (SSRF), and capped.
+    const res = await safeFetch(pageUrl, { signal: AbortSignal.timeout(10_000) });
     if (!res.ok) return [];
-    const html = await res.text();
+    const html = (await readLimited(res, 3_000_000)).toString("utf8");
     const origin = new URL(pageUrl).origin;
     const units: AvailableUnit[] = [];
     let prev = 0;

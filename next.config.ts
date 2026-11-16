@@ -4,6 +4,8 @@ const TOUR_HOST = process.env.NEXT_PUBLIC_TOUR_ORIGIN?.replace(/^https?:\/\//, "
 const SITE_HOST = process.env.NEXT_PUBLIC_SITE_ORIGIN?.replace(/^https?:\/\//, "").replace(/\/.*$/, "").replace(/^www\./, "");
 
 const nextConfig: NextConfig = {
+  // No "X-Powered-By: Next.js" on every answer.
+  poweredByHeader: false,
   // ssh2 (Betalingsservice SFTP) loads optional native/crypto modules at
   // runtime - kept out of the bundle and required from node_modules instead.
   serverExternalPackages: ["ssh2", "ssh2-sftp-client", "blake3-wasm", "sharp"],
@@ -114,6 +116,11 @@ const nextConfig: NextConfig = {
         source: "/p/:token",
         headers: [{ key: "X-Frame-Options", value: "SAMEORIGIN" }],
       },
+      // Arpo, the customers' pages and the login use no camera or microphone, and location only for a tour previewed in the editor ("Find vej") - nothing else on them can ask for it.
+      ...["/arpo/:path*", "/kunde/:path*", "/login/:path*", "/login"].map((source) => ({
+        source,
+        headers: [{ key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(self), payment=(), usb=()" }],
+      })),
       {
         // The tour editor previews the tour in an iframe on its own page.
         source: "/arpo/tour-lab/:slug",

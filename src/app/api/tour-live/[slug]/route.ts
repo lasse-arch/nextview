@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { fetchLiveUnits, refreshSeconds } from "@/lib/availability/live";
 import { tourCors } from "@/lib/tour-cors";
+import { tooManyFrom } from "@/lib/ip-limit";
 import type { TourConfig } from "@/app/arpo/tour-lab/tours/types";
 
 /*
@@ -12,6 +13,7 @@ import type { TourConfig } from "@/app/arpo/tour-lab/tours/types";
  * public page anyway.
  */
 export async function GET(request: Request, { params }: { params: Promise<{ slug: string }> }) {
+  if (tooManyFrom(request, "tour-live", 30)) return NextResponse.json({ units: null }, { status: 429, headers: tourCors(request) });
   const tour = await prisma.tour.findUnique({ where: { slug: (await params).slug }, select: { config: true } });
   const live = (tour?.config as unknown as TourConfig | undefined)?.live;
   if (!live) return NextResponse.json({ units: [] }, { headers: tourCors(request) });

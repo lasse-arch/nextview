@@ -1,5 +1,6 @@
 import "server-only";
 import { cached, publicUrl } from "@/lib/site-digest";
+import { readLimited, safeFetch } from "@/lib/safe-fetch";
 import { placeSlug, type StartPlace } from "@/app/arpo/tour-lab/tours/places";
 
 /*
@@ -12,9 +13,10 @@ import { placeSlug, type StartPlace } from "@/app/arpo/tour-lab/tours/places";
 const UA = "Mozilla/5.0 (compatible; ArpoTourBuilder/1.0; +https://nextview360.dk)";
 type Page = { url: string; title: string };
 
+/** A page of the customer's site - addresses come from their site (sitemaps too), so only via the SSRF guard, and capped. */
 async function get(url: string): Promise<string> {
-  const res = await fetch(url, { headers: { "User-Agent": UA }, signal: AbortSignal.timeout(15_000), redirect: "follow" });
-  return res.ok ? (await res.text()).slice(0, 3_000_000) : "";
+  const res = await safeFetch(url, { headers: { "User-Agent": UA }, signal: AbortSignal.timeout(15_000) });
+  return res.ok ? (await readLimited(res, 3_000_000)).toString("utf8") : "";
 }
 
 const decode = (s: string) => s.replace(/&amp;/g, "&").replace(/&#0?39;|&apos;/g, "'").replace(/&quot;/g, '"').replace(/&nbsp;/g, " ").replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)));

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { fetchBoxdepotetUnits } from "@/lib/availability/boxdepotet";
 import { tourCors } from "@/lib/tour-cors";
+import { tooManyFrom } from "@/lib/ip-limit";
 import type { TourConfig } from "@/app/arpo/tour-lab/tours/types";
 
 /*
@@ -12,6 +13,7 @@ import type { TourConfig } from "@/app/arpo/tour-lab/tours/types";
  * for 10 minutes so visitors don't reach the customer's site.
  */
 export async function GET(request: Request, { params }: { params: Promise<{ slug: string }> }) {
+  if (tooManyFrom(request, "tour-units", 30)) return NextResponse.json({ units: null }, { status: 429, headers: tourCors(request) });
   const tour = await prisma.tour.findUnique({ where: { slug: (await params).slug }, select: { config: true, published: true } });
   const availability = tour?.published ? (tour.config as unknown as TourConfig).availability : undefined;
   if (!availability) return NextResponse.json({ units: [] }, { headers: tourCors(request) });
