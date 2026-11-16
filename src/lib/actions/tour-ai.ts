@@ -22,6 +22,7 @@ import { measureSiteLook } from "@/lib/site-look";
 import { darker } from "@/app/arpo/tour-lab/tours/contrast";
 import { pageAsText, readUnits, type LiveUnit } from "@/lib/availability/live";
 import { hostFiles, hostNewFiles } from "@/lib/tour-files";
+import { measureLogo, withMeasuredLogo, type LogoFix } from "@/lib/logo-fix";
 import { claudeCostUsd } from "@/lib/claude-cost";
 import { allGuides, guideStops, isPlaceHref, withoutDeadAerialLinks } from "@/app/arpo/tour-lab/tours/places";
 import { BRANCHES, DESIGN_PRESETS, MENU_STYLES, START_STYLES, copyLayout, layoutOfTour, setLayout, type Branch, type DesignPreset, type NewTourLayout } from "@/app/arpo/tour-lab/tours/presets";
@@ -323,7 +324,9 @@ async function claudeEdits(key: string, who: { name: string; kind: string }, con
   const forgot = await forget(config.slug, parsed.forget ?? []).catch((err: unknown) => (console.error("forget", err), []));
   // Pictures it put in from another site: copied to us now - one that can't be fetched isn't left as a broken picture.
   const hosted = await hostNewFiles(config.slug, config, { ...(next as unknown as TourConfig), slug: config.slug }).catch((err: unknown) => (console.error("hostNewFiles", err), null));
-  const edited = hosted?.config ?? ({ ...(next as unknown as TourConfig), slug: config.slug } as TourConfig);
+  let edited = hosted?.config ?? ({ ...(next as unknown as TourConfig), slug: config.slug } as TourConfig);
+  // A new logo: measured, not guessed (its background, and an empty edge cut away).
+  if (edited.logo && edited.logo !== config.logo) edited = (await withMeasuredLogo(config.slug, edited).catch(() => ({ config: edited }))).config;
   const note = hosted?.failed.length ? `\n\n⚠️ ${hosted.failed.join("\n⚠️ ")}\nUpload filen selv (fx logoet under Design), så den ligger hos os.` : "";
   return { ok: true, reply: parsed.reply + note, config: plainWordsInConfig(edited), changed: parsed.changes.length, remembered, forgot, askRemember: (parsed.ask_remember ?? []).filter((n) => n.text.trim()).slice(0, 2).map((n) => ({ scope: n.scope, text: n.text.trim().slice(0, 300) })) };
 }
@@ -866,6 +869,9 @@ Steder i touren skrives som https://my.matterport.com/show/?m=${model.id}&ss=<sc
   }
   // The logo and pictures from the website are copied to us, so the tour keeps them whatever happens to the site.
   const hosted = await hostFiles(slug, built);
+  // The logo measured, not guessed: the background that suits it, and an empty edge around it cut away.
+  const measured = await withMeasuredLogo(slug, hosted.config).catch(() => ({ config: hosted.config, note: null }));
+  hosted.config = measured.config;
   const config = hosted.config as unknown as Prisma.InputJsonValue;
   // The customer's tour was given to a developer: the new tour is theirs, with the same deadline.
   const given = input.dealId ? await prisma.deal.findUnique({ where: { id: input.dealId }, select: { tourAssigneeId: true, tourDeadline: true } }) : null;
@@ -1719,4 +1725,10 @@ function layoutText(l: NewTourLayout | undefined): string {
   const start = START_STYLES.find(([v]) => v === x.start)![1];
   const menu = MENU_STYLES.find(([v]) => v === x.menu)![1];
   return `\nLayout valgt af brugeren (bevar det): start "${start}", menu "${menu}", logo til ${x.logoSide === "right" ? "højre" : "venstre"}.`;
+}
+
+/** The editor's "Ret logoet": the logo measured (dark or light) and an empty edge cut away - see lib/logo-fix.ts. */
+export async function measureTourLogo(slug: string, url: string): Promise<LogoFix> {
+  await requireTour(slug);
+  return measureLogo(slug, url).catch(() => ({ tone: null, trimmed: null }));
 }

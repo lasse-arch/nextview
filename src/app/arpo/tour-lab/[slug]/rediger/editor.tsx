@@ -13,7 +13,7 @@ import { Component, memo, useCallback, useEffect, useMemo, useRef, useState, use
 import { detachToursFromMpskins, logTourWork, renameTourSlug, restoreTourVersion, saveTour, saveTourDraft, searchDeals, setTourDeal } from "@/lib/actions/tours";
 import { SOCIALS } from "../../tours/social";
 import { guideStops } from "../guide";
-import { addTourAiMemory, askClaudeForTour, saveAnthropicKey, suggestTourFilter, type ChatTurn, type MemoryNote } from "@/lib/actions/tour-ai";
+import { addTourAiMemory, askClaudeForTour, measureTourLogo, saveAnthropicKey, suggestTourFilter, type ChatTurn, type MemoryNote } from "@/lib/actions/tour-ai";
 import type { FindStepAside, MenuEntry, TourConfig } from "../../tours/types";
 import type { TourStats } from "@/lib/tour-stats";
 import type { ReportShare } from "@/lib/tour-share";
@@ -789,6 +789,28 @@ export function TourEditor({
                     <UploadButton accept="image/*" onDone={(url) => (edit((d) => void (d.logo = url)), void autoLogoTone(url))} />
                   </div>
                   {config.logo && !/\.svg(\?|$)/i.test(config.logo) && <AiImageButton src={config.logo} onUse={(url) => edit((d) => void (d.logo = url))} />}
+                  {config.logo && (
+                    <button
+                      type="button"
+                      className="self-start rounded-lg px-2 py-1 text-[13px] font-medium text-[#0071e3] hover:bg-[#0071e3]/5"
+                      onClick={async () => {
+                        setLogoNote("Måler logoet …");
+                        const fix = await measureTourLogo(slug, config.logo).catch(() => ({ tone: null, trimmed: null }));
+                        if (!fix.tone && !fix.trimmed) return setLogoNote("Logoet har sin egen baggrund (eller kunne ikke læses) - det står, som det er.");
+                        edit((d) => {
+                          if (fix.trimmed) d.logo = fix.trimmed;
+                          if (fix.tone) {
+                            d.logoOnLight = fix.tone === "dark" ? true : undefined;
+                            if (fix.tone === "light" && d.logoBg === "light") d.logoBg = undefined;
+                            if (fix.tone === "light" && d.logoBgTiles === "light") d.logoBgTiles = undefined;
+                          }
+                        });
+                        setLogoNote([fix.trimmed ? "Den tomme kant er skåret væk" : null, fix.tone === "dark" ? "mørkt logo - lys baggrund" : fix.tone === "light" ? "lyst logo - hovedfarven bag" : null].filter(Boolean).join(", ") + ".");
+                      }}
+                    >
+                      Ret logoet (mål farven og skær tom kant væk)
+                    </button>
+                  )}
                 </Field>
                 <Field title="Favicon" hint="Det lille ikon i browserfanen. Tomt = logoet.">
                   <div className="flex items-center gap-2">
