@@ -812,6 +812,7 @@ export default async function DealDetailPage({
               defaultName={deal.contactName}
               branchCount={deal.branches.length}
               inviteLinks={deal.customerInviteLinks.filter((l) => l.uses < l.maxUses)}
+              parent={deal.parent ? { id: deal.parent.id, name: dealName(deal.parent) } : null}
             />
           )}
 

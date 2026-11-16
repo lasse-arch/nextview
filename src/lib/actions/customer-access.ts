@@ -149,3 +149,27 @@ export async function revokeCustomerInviteLink(dealId: string, linkId: string): 
   revalidatePath(`/arpo/kunder/${dealId}`);
   return { ok: true };
 }
+
+/**
+ * A location's logins onto its whole chain: each gets the same role on the main deal and all its locations, so they
+ * see every place on one customer page. Those with access somewhere already keep what they have there.
+ */
+export async function shareAccessWithChain(dealId: string): Promise<Result> {
+  const user = await requireAdmin();
+  const deal = await prisma.deal.findUnique({ where: { id: dealId }, select: { parentDealId: true, customerAccounts: { select: { accountId: true, role: true, canApprove: true, expiresAt: true, invitedById: true, account: { select: { email: true } } } } } });
+  if (!deal?.parentDealId) return { ok: false, error: "Denne kunde er ikke en afdeling af en kæde." };
+  const chain = await prisma.deal.findUnique({ where: { id: deal.parentDealId }, select: { id: true, companyName: true, displayName: true, branches: { select: { id: true } } } });
+  if (!chain) return { ok: false, error: "Kæden findes ikke." };
+  for (const id of [chain.id, ...chain.branches.map((b) => b.id)])
+    for (const a of deal.customerAccounts)
+      await prisma.customerAccountDeal.upsert({
+        where: { accountId_dealId: { accountId: a.accountId, dealId: id } },
+        create: { accountId: a.accountId, dealId: id, role: a.role, canApprove: a.canApprove, expiresAt: a.expiresAt, invitedById: a.invitedById },
+        update: {},
+      });
+  const who = deal.customerAccounts.map((a) => a.account.email).join(", ");
+  await prisma.note.create({ data: { dealId: chain.id, authorId: user.id, kind: "MANUAL", body: `${who} har nu adgang til hele kæden på kundesiden (fra en afdeling).` } });
+  revalidatePath(`/arpo/deals/${dealId}`);
+  revalidatePath(`/arpo/deals/${chain.id}`);
+  return { ok: true };
+}

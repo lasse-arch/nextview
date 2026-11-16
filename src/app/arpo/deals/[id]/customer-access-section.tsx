@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { createCustomerInviteLink, grantCustomerAccess, revokeCustomerInviteLink, renameCustomerLogin, resendCustomerLogin, revokeCustomerAccess, setCustomerLoginRole, setCustomersMayInvite } from "@/lib/actions/customer-access";
+import { createCustomerInviteLink, grantCustomerAccess, shareAccessWithChain, revokeCustomerInviteLink, renameCustomerLogin, resendCustomerLogin, revokeCustomerAccess, setCustomerLoginRole, setCustomersMayInvite } from "@/lib/actions/customer-access";
 import { ROLE_NAMES } from "@/lib/customer-roles";
 import type { CustomerRole } from "@prisma/client";
 import { useToast } from "@/components/toast";
@@ -36,6 +36,7 @@ export function CustomerAccessSection({
   branchCount,
   mayInvite,
   inviteLinks,
+  parent,
 }: {
   dealId: string;
   accounts: Access[];
@@ -46,6 +47,8 @@ export function CustomerAccessSection({
   mayInvite: boolean;
   /** Invitation links that still work. */
   inviteLinks: InviteLink[];
+  /** The chain's main deal, when this deal is one of its locations. */
+  parent?: { id: string; name: string } | null;
 }) {
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -66,8 +69,34 @@ export function CustomerAccessSection({
       </div>
       <p className="mt-1 text-xs text-slate-500">
         Kunden logger ind på nextview360.dk/login med et link på mail og ser sine tours, tal, koder til hjemmesiden og kontrakten. Fakturaer kan de ikke se der - dem får de tilsendt.
-        {branchCount > 0 && ` Adgangen gælder også de ${branchCount} afdelinger.`}
+        {branchCount > 0 && ` Adgangen gælder også de ${branchCount} afdelinger, så de ser alle steder på én kundeside.`}
       </p>
+      {parent ? (
+        <div className="mt-3 rounded-lg bg-amber-50 p-3 text-xs text-amber-900">
+          Dette er en afdeling af <a href={`/arpo/deals/${parent.id}`} className="font-medium underline">{parent.name}</a>. Logins her ser kun denne afdeling. Skal de se alle steder, så giv adgangen på {parent.name}
+          {accounts.length > 0 && (
+            <>
+              {" - eller "}
+              <button
+                type="button"
+                disabled={pending}
+                className="font-medium underline"
+                onClick={() =>
+                  start(async () => {
+                    const r = await shareAccessWithChain(dealId);
+                    showToast(r.ok ? "De ser nu alle steder i kæden" : r.error);
+                  })
+                }
+              >
+                giv dem her adgang til hele kæden
+              </button>
+            </>
+          )}
+          .
+        </div>
+      ) : (
+        branchCount === 0 && <p className="mt-1 text-xs text-slate-500">Har kunden flere steder? Kæd dem sammen nedenfor, så får de én kundeside med alle stederne.</p>
+      )}
 
       <label className="mt-3 flex items-center gap-2 text-xs text-slate-600">
         <input
@@ -87,8 +116,8 @@ export function CustomerAccessSection({
       {accounts.length > 0 && (
         <ul className="mt-4 divide-y divide-slate-100 rounded-md border border-slate-100">
           {accounts.map((a) => (
-            <li key={a.id} className="flex items-center gap-3 px-3 py-2 text-sm">
-              <div className="min-w-0 flex-1">
+            <li key={a.id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-2.5 text-sm">
+              <div className="min-w-0 basis-full">
                 {renaming === a.id ? (
                   <form
                     className="flex items-center gap-1.5"
@@ -112,14 +141,17 @@ export function CustomerAccessSection({
                     </button>
                   </form>
                 ) : (
-                  <div className="flex min-w-0 items-baseline gap-2">
-                    <p className="truncate font-medium text-slate-900">{a.name ? `${a.name} · ${a.email}` : a.email}</p>
+                  <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
+                    <p className="min-w-0 break-words font-medium text-slate-900">
+                      {a.name ?? a.email}
+                      {a.name && <span className="block break-all text-xs font-normal text-slate-500">{a.email}</span>}
+                    </p>
                     <button type="button" onClick={() => setRenaming(a.id)} className="flex-none text-xs text-slate-500 hover:text-slate-900" title="Ret navn">
                       ✎ Ret navn
                     </button>
                   </div>
                 )}
-                <p className="flex flex-wrap items-center gap-x-1.5 text-xs text-slate-500">
+                <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500">
                   <select
                     aria-label={`Rolle for ${a.email}`}
                     value={choiceOf(a.role, a.canApprove)}
@@ -131,7 +163,7 @@ export function CustomerAccessSection({
                         showToast(r.ok ? `${a.email} er nu ${e.target.selectedOptions[0]?.text ?? ROLE_NAMES.da[next.role]}` : r.error);
                       });
                     }}
-                    className="rounded border border-slate-200 bg-white px-1 py-0.5 text-xs font-medium text-slate-700"
+                    className="!w-auto rounded border border-slate-200 bg-white py-0.5 pl-1.5 pr-7 text-xs font-medium text-slate-700"
                   >
                     {CHOICES.map(([v, label]) => (
                       <option key={v} value={v}>
@@ -145,8 +177,8 @@ export function CustomerAccessSection({
                     a.byCustomer && a.invitedByName && `Inviteret af ${a.invitedByName} (kunden)`,
                   ]
                     .filter(Boolean)
-                    .join(" · ")}
-                </p>
+                    .join(", ")}
+                </div>
               </div>
               <button
                 type="button"
