@@ -97,6 +97,7 @@ export default async function CustomerOverviewPage({ params }: { params: Promise
       parent: { select: { id: true, companyName: true, displayName: true } },
       branches: { select: { id: true, companyName: true, displayName: true, stage: true } },
       items: { orderBy: { createdAt: "asc" } },
+      customerInviteLinks: { where: { revokedAt: null, expiresAt: { gt: new Date() } }, orderBy: { createdAt: "desc" }, select: { id: true, role: true, canApprove: true, uses: true, maxUses: true, expiresAt: true } },
       customerAccounts: {
         orderBy: { createdAt: "asc" },
         include: { account: { include: { logins: { orderBy: { at: "desc" }, take: 50 }, _count: { select: { logins: true } } } } },
@@ -282,6 +283,7 @@ export default async function CustomerOverviewPage({ params }: { params: Promise
               defaultEmail={deal.contactEmail}
               defaultName={deal.contactName}
               branchCount={deal.branches.length}
+              inviteLinks={deal.customerInviteLinks.filter((l) => l.uses < l.maxUses)}
             />
           )}
           {deal.customerAccounts.length > 0 && (

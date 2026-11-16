@@ -138,6 +138,7 @@ export default async function DealDetailPage({
         tasks: { orderBy: { createdAt: "asc" } },
         reports: { orderBy: { sentAt: "desc" }, take: 1 },
         timeEntries: { include: { user: true }, orderBy: { date: "desc" } },
+        customerInviteLinks: { where: { revokedAt: null, expiresAt: { gt: new Date() } }, orderBy: { createdAt: "desc" }, select: { id: true, role: true, canApprove: true, uses: true, maxUses: true, expiresAt: true } },
         customerAccounts: { orderBy: { createdAt: "asc" }, include: { account: { select: { id: true, email: true, name: true, lastLoginAt: true, invitedByName: true } } } },
       },
     }),
@@ -810,6 +811,7 @@ export default async function DealDetailPage({
               defaultEmail={deal.contactEmail}
               defaultName={deal.contactName}
               branchCount={deal.branches.length}
+              inviteLinks={deal.customerInviteLinks.filter((l) => l.uses < l.maxUses)}
             />
           )}
 

@@ -63,6 +63,12 @@ export async function getUnreadNewsCount(userId: string, newsReadAt: Date | null
 const DEFAULT_POSTS: { title: string; body: string; minutesAgo: number; screenshotUrl: string }[] = [
   {
     minutesAgo: 0,
+    title: "Invitationslink: kundens folk tilføjer sig selv til kundesiden",
+    body: "Under Kundens login på en deal (og i kundeoverblikket) kan en admin nu lave et invitationslink. Vælg rolle, hvor længe det gælder (7, 14 eller 30 dage), og hvor mange personer der må bruge det - og send linket til kunden.\n\nHver person skriver navn og e-mail og får så et login-link på mailen, så kun den, der har mailboksen, kommer ind. Linket vises kun én gang, når det laves, og kan stoppes når som helst. Hvem der har tilføjet sig, står som en note på dealen.\n\nEr kunden en kæde, gælder adgangen på hovedafdelingen også alle afdelinger - de får én kundeside, hvor de skifter mellem stederne. Det følger nu også med, når en afdeling kobles på eller af senere.",
+    screenshotUrl: "/news/invitationslink.png",
+  },
+  {
+    minutesAgo: 0,
     title: "Personer og \"Mød os\" i touren - og flere billeder i \"Se det i brug\"",
     body: "I tour-editoren er der en ny fane, Personer. Her laves hver person én gang - foto, navn, rolle, et par linjer om dem, et citat, hvad man kan spørge dem om, og hvor man møder dem i touren. Derefter vælges de bare fra listen på stedkort, i Vis mig rundt og på linjerne. Retter du et foto eller en rolle, skifter det overalt.\n\nPersonerne er også \"Mød os\": læg et menupunkt med linket #mod (knappen ligger i fanen), så kan gæsten se alle og åbne en profil med stort foto, citat og \"Se hvor du møder …\", der tager touren derhen. Et tryk på en person på et stedkort åbner også profilen.\n\n\"Se det i brug\" (Virtual staging) kan nu have flere billeder, der toner over i hinanden, og en tekst og en knap, når man trykker - fx billeder fra tidligere smagninger i et baglokale, der står tomt i touren.",
     screenshotUrl: "/news/mod-os.png",

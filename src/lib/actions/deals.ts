@@ -1,5 +1,6 @@
 "use server";
 
+import { shareChainAccess, unshareChainAccess } from "@/lib/customer-invite";
 import { deleteDealArchived, hasSigned, SIGNED_NO_DELETE } from "@/lib/deal-archive";
 import { noteNewOwner } from "@/lib/deal-owner";
 import { releaseEstablishmentOnLive } from "@/lib/establishment-approval";
@@ -623,6 +624,8 @@ export async function linkDealToParent(
   }
 
   await prisma.deal.update({ where: { id: dealId }, data: { parentDealId } });
+  // The chain's customer logins see the new location too.
+  await shareChainAccess(parentDealId);
   revalidatePath(`/arpo/deals/${dealId}`);
   revalidatePath(`/arpo/deals/${parentDealId}`);
   return { ok: true };
@@ -655,6 +658,8 @@ export async function linkBranchesToDeal(
   }
 
   await prisma.deal.updateMany({ where: { id: { in: branchDealIds } }, data: { parentDealId } });
+  // The chain's customer logins see the new locations too.
+  await shareChainAccess(parentDealId);
   revalidatePath(`/arpo/deals/${parentDealId}`);
   for (const id of branchDealIds) revalidatePath(`/arpo/deals/${id}`);
   return { ok: true };
@@ -664,6 +669,8 @@ export async function unlinkDealFromParent(dealId: string) {
   await requireUser();
   const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId } });
   await prisma.deal.update({ where: { id: dealId }, data: { parentDealId: null } });
+  // No longer part of the chain: the chain's customer logins lose this location again.
+  if (deal.parentDealId) await unshareChainAccess(deal.parentDealId, dealId);
   revalidatePath(`/arpo/deals/${dealId}`);
   if (deal.parentDealId) revalidatePath(`/arpo/deals/${deal.parentDealId}`);
 }

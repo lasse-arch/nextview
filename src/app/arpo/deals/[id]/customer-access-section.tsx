@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { grantCustomerAccess, renameCustomerLogin, resendCustomerLogin, revokeCustomerAccess, setCustomerLoginRole, setCustomersMayInvite } from "@/lib/actions/customer-access";
+import { createCustomerInviteLink, grantCustomerAccess, revokeCustomerInviteLink, renameCustomerLogin, resendCustomerLogin, revokeCustomerAccess, setCustomerLoginRole, setCustomersMayInvite } from "@/lib/actions/customer-access";
 import { ROLE_NAMES } from "@/lib/customer-roles";
 import type { CustomerRole } from "@prisma/client";
 import { useToast } from "@/components/toast";
@@ -35,6 +35,7 @@ export function CustomerAccessSection({
   defaultName,
   branchCount,
   mayInvite,
+  inviteLinks,
 }: {
   dealId: string;
   accounts: Access[];
@@ -43,6 +44,8 @@ export function CustomerAccessSection({
   branchCount: number;
   /** Deal.customersMayInvite - the customer's owners may invite their own people on /kunde. */
   mayInvite: boolean;
+  /** Invitation links that still work. */
+  inviteLinks: InviteLink[];
 }) {
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -215,6 +218,105 @@ export function CustomerAccessSection({
         </button>
         {error && <p className="w-full text-xs text-red-600">{error}</p>}
       </form>
+      <InviteLinks dealId={dealId} links={inviteLinks} />
     </section>
+  );
+}
+
+type InviteLink = { id: string; role: CustomerRole; canApprove: boolean; uses: number; maxUses: number; expiresAt: Date };
+
+/**
+ * "Invitationslink": one link for the customer's people - each writes their name and e-mail and gets a login
+ * link on that e-mail. The link is shown once (only its hash is kept); it runs out, has a number of uses and can
+ * be stopped.
+ */
+function InviteLinks({ dealId, links }: { dealId: string; links: InviteLink[] }) {
+  const [pending, start] = useTransition();
+  const [choice, setChoice] = useState("STAFF");
+  const [days, setDays] = useState(14);
+  const [uses, setUses] = useState(5);
+  const [url, setUrl] = useState<string | null>(null);
+  const showToast = useToast();
+  const copy = (u: string) => navigator.clipboard?.writeText(u).then(() => showToast("Linket er kopieret"), () => {});
+
+  return (
+    <div className="mt-5 border-t border-slate-100 pt-4">
+      <h3 className="text-xs font-semibold text-slate-900">Invitationslink</h3>
+      <p className="mt-0.5 text-xs text-slate-500">Ét link, I kan sende til kunden. Hver person skriver navn og e-mail og får et login-link på mailen, så kun den, der har mailboksen, kommer ind.</p>
+      <div className="mt-2 flex flex-wrap items-end gap-2">
+        <select value={choice} onChange={(e) => setChoice(e.target.value)} aria-label="Rolle" className="rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm">
+          {CHOICES.map(([v, label]) => (
+            <option key={v} value={v}>
+              {label}
+            </option>
+          ))}
+        </select>
+        <select value={days} onChange={(e) => setDays(Number(e.target.value))} aria-label="Gælder i" className="rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm">
+          {[7, 14, 30].map((d) => (
+            <option key={d} value={d}>
+              Gælder {d} dage
+            </option>
+          ))}
+        </select>
+        <select value={uses} onChange={(e) => setUses(Number(e.target.value))} aria-label="Antal personer" className="rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm">
+          {[1, 3, 5, 10, 25].map((n) => (
+            <option key={n} value={n}>
+              Op til {n} {n === 1 ? "person" : "personer"}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() =>
+            start(async () => {
+              const a = accessOf(choice);
+              const r = await createCustomerInviteLink(dealId, a.role, a.canApprove, days, uses);
+              if (!r.ok) return showToast(r.error);
+              setUrl(r.url);
+              copy(r.url);
+            })
+          }
+          className="rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+        >
+          {pending ? "Laver…" : "Lav link"}
+        </button>
+      </div>
+      {url && (
+        <div className="mt-2 rounded-lg bg-amber-50 p-2.5 text-xs text-amber-900">
+          <p className="font-medium">Kopiér linket nu - det vises kun denne ene gang.</p>
+          <div className="mt-1.5 flex gap-2">
+            <input readOnly value={url} onFocus={(e) => e.target.select()} className="min-w-0 flex-1 rounded border border-amber-200 bg-white px-2 py-1 font-mono text-[11px]" />
+            <button type="button" onClick={() => copy(url)} className="rounded bg-amber-900 px-2 py-1 font-medium text-white">
+              Kopiér
+            </button>
+          </div>
+        </div>
+      )}
+      {links.length > 0 && (
+        <ul className="mt-2 divide-y divide-slate-100 text-xs text-slate-600">
+          {links.map((l) => (
+            <li key={l.id} className="flex items-center justify-between gap-2 py-1.5">
+              <span>
+                {CHOICES.find(([v]) => v === choiceOf(l.role, l.canApprove))?.[1]}: brugt {l.uses} af {l.maxUses}, gælder til {day(l.expiresAt)}
+              </span>
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() =>
+                  start(async () => {
+                    const r = await revokeCustomerInviteLink(dealId, l.id);
+                    showToast(r.ok ? "Linket er stoppet" : r.error);
+                  })
+                }
+                className="font-medium text-red-600 hover:underline"
+              >
+                Stop
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }

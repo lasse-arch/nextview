@@ -8,6 +8,7 @@ import { logActivity } from "@/lib/activity";
 import { normalizeEmail, sendLoginMail } from "@/lib/customer-login";
 import { ROLE_NAMES, ROLES } from "@/lib/customer-roles";
 import type { CustomerRole } from "@prisma/client";
+import { createInviteLink } from "@/lib/customer-invite";
 
 /*
  * "Kundens login" on the deal page: gives an e-mail access to the customer's
@@ -117,5 +118,34 @@ export async function setCustomersMayInvite(dealId: string, on: boolean): Promis
   await prisma.deal.updateMany({ where: { id: { in: [deal.id, ...deal.branches.map((b) => b.id)] } }, data: { customersMayInvite: Boolean(on) } });
   await logActivity({ type: "DEAL_UPDATED", message: `Kunden må ${on ? "nu" : "ikke længere"} selv invitere brugere`, actorId: user.id, dealId });
   revalidatePath(`/arpo/deals/${dealId}`);
+  return { ok: true };
+}
+
+/**
+ * "Invitationslink": a link the customer's people use to add themselves (name and e-mail, then a login link to that
+ * e-mail). Admins only. The link itself is shown once - only its hash is kept.
+ */
+export async function createCustomerInviteLink(dealId: string, roleRaw: CustomerRole, approveRaw: boolean, daysRaw: number, usesRaw: number): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
+  const user = await requireAdmin();
+  const deal = await prisma.deal.findUnique({ where: { id: dealId }, select: { id: true, companyName: true, displayName: true } });
+  if (!deal) return { ok: false, error: "Kunden findes ikke." };
+  const access = roleOf(roleRaw, approveRaw);
+  const days = Number(daysRaw) || 14;
+  const uses = Number(usesRaw) || 5;
+  const url = await createInviteLink(deal.id, user, { ...access, days, maxUses: uses });
+  await prisma.note.create({ data: { dealId, authorId: user.id, kind: "MANUAL", body: `Invitationslink lavet: ${ROLE_NAMES.da[access.role]}${access.canApprove ? " (må godkende)" : ""}, op til ${uses} personer, gælder ${days} dage.` } });
+  await logActivity({ type: "DEAL_UPDATED", message: `Invitationslink til kundesiden lavet (${dealName(deal)})`, actorId: user.id, dealId });
+  revalidatePath(`/arpo/deals/${dealId}`);
+  revalidatePath(`/arpo/kunder/${dealId}`);
+  return { ok: true, url };
+}
+
+/** Stops an invitation link at once - those who used it keep their access (that is taken away one by one). */
+export async function revokeCustomerInviteLink(dealId: string, linkId: string): Promise<Result> {
+  await requireAdmin();
+  const r = await prisma.customerInviteLink.updateMany({ where: { id: linkId, dealId, revokedAt: null }, data: { revokedAt: new Date() } });
+  if (!r.count) return { ok: false, error: "Linket findes ikke (eller er allerede stoppet)." };
+  revalidatePath(`/arpo/deals/${dealId}`);
+  revalidatePath(`/arpo/kunder/${dealId}`);
   return { ok: true };
 }

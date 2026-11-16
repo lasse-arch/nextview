@@ -267,6 +267,7 @@ model Invoice {
 }
 
 model User {
+  customerInviteLinks CustomerInviteLink[]
   id                String              @id @default(cuid())
   name              String
   email             String              @unique
@@ -455,6 +456,7 @@ model ImportBatch {
 }
 
 model Deal {
+  customerInviteLinks CustomerInviteLink[]
   id           String  @id @default(cuid())
   /// The developer who builds this customer's tour - given before the tour exists; carried onto the tour when it's made.
   tourAssigneeId String?
@@ -1802,6 +1804,27 @@ model CustomerAccountDeal {
   invitedById String?
 
   @@id([accountId, dealId])
+  @@index([dealId])
+}
+
+/// "Invitationslink": a link Nextview gives a customer, so their people can add
+/// themselves - name and e-mail, then a login link to that e-mail. Only its hash
+/// is kept; it runs out, has a number of uses and can be stopped.
+model CustomerInviteLink {
+  id          String       @id @default(cuid())
+  tokenHash   String       @unique
+  dealId      String
+  deal        Deal         @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  role        CustomerRole @default(STAFF)
+  canApprove  Boolean      @default(false)
+  maxUses     Int          @default(5)
+  uses        Int          @default(0)
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  createdById String?
+  createdBy   User?        @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime     @default(now())
+
   @@index([dealId])
 }
 

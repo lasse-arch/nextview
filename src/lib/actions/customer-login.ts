@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createCustomerSession } from "@/lib/auth";
 import { consumeLoginLink, PORTAL_PAGES, requestLoginLink } from "@/lib/customer-login";
+import { acceptInvite } from "@/lib/customer-invite";
 
 export type LinkState = { sent?: boolean; error?: string } | undefined;
 
@@ -24,4 +25,13 @@ export async function loginWithLinkAction(formData: FormData): Promise<void> {
   // Only a known page of their own customer page - never an address from the link.
   const to = String(formData.get("til") || "");
   redirect((PORTAL_PAGES as readonly string[]).includes(to) ? `/kunde?side=${to}` : "/kunde");
+}
+
+export type InviteState = { done?: boolean; error?: string } | undefined;
+
+/** "Tilføj mig" on an invitation link's page (public): name and e-mail - a login link goes to that e-mail. */
+export async function acceptInviteAction(_prev: InviteState, formData: FormData): Promise<InviteState> {
+  const ip = (await headers()).get("x-forwarded-for")?.split(",")[0].trim() || "ukendt";
+  const r = await acceptInvite(String(formData.get("t") || ""), String(formData.get("name") || ""), String(formData.get("email") || ""), ip);
+  return r.ok ? { done: true } : { error: r.error };
 }
