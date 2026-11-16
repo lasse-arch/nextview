@@ -40,6 +40,10 @@
     {
       "path": "/api/cron/contest-cleanup",
       "schedule": "20 3 * * *"
+    },
+    {
+      "path": "/api/cron/tour-tips",
+      "schedule": "20 6 * * *"
     }
   ]
 }

@@ -2,7 +2,7 @@
 
 import { PeopleEditor } from "./people-editor";
 import { ClassesEditor, EventsEditor, ShopTourEditor } from "./events-editor";
-import { InsightsPanel } from "./insights";
+import { InsightsPanel, LooksPanel } from "./insights";
 import { LanguagesPanel } from "./languages";
 import { tourUrl } from "@/lib/public-urls";
 import { droneHref, droneViewsOfHref, formatPhone, IMAGE_HREF, imageOfHref, isDroneHref, isPlaceHref, pointOfHref } from "../../tours/places";
@@ -928,6 +928,7 @@ export function TourEditor({
                     setAiAsk({ request, at: Date.now() });
                   }}
                 />
+                <LooksPanel slug={slug} config={config} preview={preview} />
                 <ResultsPanel stats={stats} guideStops={guideStops(config).map((s) => s.title)} guideNames={Object.fromEntries([["#rundvisning", "Vis mig rundt"], ...(config.guides ?? []).map((g) => [`#rundvisning:${g.id}`, g.title])])} slug={slug} brand={config.brand} share={share} shareStats={shareStats} token={shareToken} />
               </>
             )}

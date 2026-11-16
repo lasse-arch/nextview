@@ -2225,6 +2225,50 @@ function TourExperience({
     return () => sub.cancel();
   }, [sdk]);
   /*
+   * Where visitors look (Resultater: "Hvor folk kigger"): each second the tour is
+   * on the screen, the direction the camera faces at a scan point counts in one
+   * of 12 slices of 30° around it. When the visitor moves on (or leaves), the
+   * scan point's slices go as one "room_look": "<ss>:<12 seconds>", the seconds
+   * in all, and the room's name. The guide's own turns and the tour's own moves
+   * don't count - only the visitor's own looking.
+   */
+  useEffect(() => {
+    if (!sdk) return;
+    let yaw: number | null = null;
+    let at: number | null = null;
+    let slices = new Array<number>(12).fill(0);
+    const send = () => {
+      const total = slices.reduce((a, b) => a + b, 0);
+      if (at != null && total >= 2) {
+        const name = roomNamesRef.current[at];
+        track("room_look", { label: `${at}:${slices.join(",")}`, seconds: total, ...(name ? { link_url: name } : {}) });
+      }
+      slices = new Array<number>(12).fill(0);
+    };
+    const sub = sdk.Camera.pose.subscribe((p) => void (yaw = p.rotation.y));
+    const tick = window.setInterval(() => {
+      const ss = currentSsRef.current;
+      if (ss !== at) {
+        send();
+        at = ss;
+      }
+      if (yaw == null || ss == null || document.hidden || phaseRef.current !== "tour" || guideAtRef.current != null || sweepMoving.current || now() - selfMoveAt.current < 2500) return;
+      const slice = Math.floor((((yaw % 360) + 360) % 360) / 30) % 12;
+      slices[slice] = Math.min(3600, slices[slice] + 1);
+    }, 1000);
+    const leave = () => {
+      send();
+      flushEvents();
+    };
+    window.addEventListener("pagehide", leave);
+    return () => {
+      window.clearInterval(tick);
+      window.removeEventListener("pagehide", leave);
+      send();
+      sub.cancel();
+    };
+  }, [sdk]);
+  /*
    * While the guide runs, the visitor may take over: walk to another scan
    * point or turn to look at something. Then the guide waits (its timer
    * stops) until they press Fortsæt or Næste - meanwhile it's just their tour.

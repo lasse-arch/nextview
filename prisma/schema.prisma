@@ -2053,3 +2053,20 @@ model TeamNetwork {
 
   @@index([lastSeen])
 }
+
+/// "Forslag ud fra tallene", kept: nextviewAI's tips for a tour from its
+/// numbers - made by hand in Resultater, or by itself every month for a tour
+/// with enough visits (the admins get a notification in the bell).
+model TourTipRun {
+  id          String   @id @default(cuid())
+  tourSlug    String
+  summary     String
+  /// [{ title, why, ask }]
+  suggestions Json
+  visits      Int
+  /// "hånd" (from Resultater) or "auto" (the monthly run).
+  source      String   @default("hånd")
+  createdAt   DateTime @default(now())
+
+  @@index([tourSlug, createdAt])
+}

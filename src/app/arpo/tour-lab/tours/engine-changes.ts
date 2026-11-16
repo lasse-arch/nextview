@@ -9,6 +9,7 @@
 export type EngineChange = { date: string; kind: "ny" | "sikkerhed" | "hastighed" | "rettelse"; text: string };
 
 export const ENGINE_CHANGES: EngineChange[] = [
+  { date: "2026-11-16", kind: "ny", text: "Touren måler, hvor de besøgende selv kigger hen i hvert rum (hvilken retning og hvor længe) - vises i Resultater under \"Hvor folk kigger\" og bruges af nextviewAI's forslag. Kun retning og tid, ingen personlige oplysninger." },
   { date: "2026-11-14", kind: "rettelse", text: "Bar i bunden på telefon: en lang knaptekst (\"Book en smagning\") deler sig på to linjer i sin egen knap i stedet for at løbe ud over kanten, og stedkort og \"Din plads venter\" står altid over baren - aldrig oven på den." },
   { date: "2026-11-14", kind: "rettelse", text: "Fuldskærmsknappen står helt i hjørnet øverst til højre, når menuen ligger i bunden (ingen menuknap øverst) - samme afstand til kanten som logoet." },
   { date: "2026-11-14", kind: "ny", text: "Luftfotoet zoomer ikke længere ved dobbelttryk/dobbeltklik (det gjorde 360°-dronefotoet af sig selv). Det kan slås til under Luftfoto og kort → Dobbelttryk zoomer: ind dér, man trykker, og ud igen - både på 360°-dronefoto og fladt luftfoto." },
