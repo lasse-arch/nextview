@@ -1745,6 +1745,8 @@ model CustomerAccount {
   tokens        CustomerLoginToken[]
   logins        CustomerLogin[]
   mails         SystemMail[]
+  /// Bumped when the customer logs out - every session made before it (on any device) stops working.
+  sessionVersion Int @default(0)
 }
 
 /// Every time a customer logged in on nextview360.dk/login - for the customer overview in Arpo.

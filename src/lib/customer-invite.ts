@@ -20,6 +20,8 @@ const hash = (token: string) => createHash("sha256").update(token).digest("hex")
 const MAX_PER_IP = 20;
 
 export async function createInviteLink(dealId: string, by: { id: string }, o: { role: CustomerRole; canApprove: boolean; days: number; maxUses: number }): Promise<string> {
+  // A link anyone holding it can use never makes an owner (owners can see the contract and add users) - at most staff.
+  if (o.role === "OWNER") o = { ...o, role: "STAFF", canApprove: true };
   const token = randomBytes(32).toString("base64url");
   await prisma.customerInviteLink.create({
     data: {

@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { ipOf, isTeamNetwork } from "@/lib/team-network";
+import { tooManyFrom } from "@/lib/ip-limit";
 
 /*
  * Arpo's own measurement of the tours: the engine (experience.tsx) sends what
@@ -23,6 +24,8 @@ async function tourExists(slug: string) {
 const text = (v: unknown, max: number) => (typeof v === "string" && v.trim() ? v.trim().slice(0, max) : null);
 
 export async function POST(request: NextRequest) {
+  // A visit sends a small batch every few seconds at most - far more from one address is a script, not visitors.
+  if (tooManyFrom(request, "tour-events", 120)) return new NextResponse(null, { status: 429 });
   const raw = await request.text();
   if (raw.length > 20_000) return new NextResponse(null, { status: 413 });
   let body: { tour?: unknown; session?: unknown; device?: unknown; events?: unknown };

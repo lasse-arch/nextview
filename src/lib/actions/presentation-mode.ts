@@ -11,6 +11,9 @@ export async function setPresentationMode(enabled: boolean) {
   store.set(PRESENTATION_MODE_COOKIE, enabled ? "1" : "0", {
     path: "/",
     maxAge: 60 * 60 * 24 * 30,
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
   });
   revalidatePath("/", "layout");
 }

@@ -36,8 +36,12 @@ export async function addDealItem(
 }
 
 export async function removeDealItem(dealId: string, itemId: string) {
-  await requireUser();
-  await prisma.dealItem.delete({ where: { id: itemId } });
+  const user = await requireUser();
+  // Only an item of this deal - and one with its delivery link set is admin only (as changing the link).
+  const item = await prisma.dealItem.findFirst({ where: { id: itemId, dealId }, select: { url: true } });
+  if (!item) throw new Error("Produktet findes ikke på denne kunde.");
+  if (item.url && user.role !== "ADMIN") throw new Error("Kun administratorer kan fjerne et produkt, der har et link.");
+  await prisma.dealItem.deleteMany({ where: { id: itemId, dealId } });
   revalidatePath(`/arpo/deals/${dealId}`);
 }
 
@@ -62,7 +66,7 @@ export async function updateDealItemImageAction(
   await requireUser();
 
   if (!dataUrl) {
-    await prisma.dealItem.update({ where: { id: itemId }, data: { imageUrl: null } });
+    await prisma.dealItem.updateMany({ where: { id: itemId, dealId }, data: { imageUrl: null } });
     revalidatePath(`/arpo/deals/${dealId}`);
     revalidatePath("/arpo/kunder");
     return { ok: true };
@@ -75,7 +79,8 @@ export async function updateDealItemImageAction(
     return { ok: false, error: "Billedet er for stort - prøv et mindre billede." };
   }
 
-  await prisma.dealItem.update({ where: { id: itemId }, data: { imageUrl: dataUrl } });
+  const r = await prisma.dealItem.updateMany({ where: { id: itemId, dealId }, data: { imageUrl: dataUrl } });
+  if (!r.count) return { ok: false, error: "Produktet findes ikke på denne kunde." };
   revalidatePath(`/arpo/deals/${dealId}`);
   revalidatePath("/arpo/kunder");
   return { ok: true };

@@ -1,0 +1,1 @@
+ALTER TABLE "CustomerAccount" ADD COLUMN "sessionVersion" INTEGER NOT NULL DEFAULT 0;

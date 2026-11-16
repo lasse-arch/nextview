@@ -11,7 +11,7 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { storeTourFile } from "@/lib/tour-files";
 import type { Prisma } from "@prisma/client";
-import { requireNewTour, requireTeam, requireTour, teamSeesTour } from "@/lib/auth";
+import { getCurrentUser, requireNewTour, requireTeam, requireTour, teamSeesTour } from "@/lib/auth";
 import { teamCan } from "@/lib/team-roles";
 import { prisma } from "@/lib/db";
 import { trashSteps } from "@/lib/tour-trash";
@@ -248,9 +248,12 @@ async function forget(slug: string, texts: string[]): Promise<string[]> {
 /** Keeps what nextviewAI learned (skipping what it already knew). */
 async function remember(slug: string, by: string, notes: { scope: "all" | "tour"; text: string }[]): Promise<string[]> {
   const kept: string[] = [];
+  // A note for every tour steers nextviewAI on all customers' tours - only an admin's (others' go on this tour only).
+  const me = notes.some((n) => n.scope === "all") ? await getCurrentUser() : null;
+  const mayAll = Boolean(me && teamCan(me, "admin"));
   for (const n of notes) {
     const text = n.text.trim().slice(0, 400);
-    const scope = n.scope === "all" ? "all" : slug;
+    const scope = n.scope === "all" && mayAll ? "all" : slug;
     if (!text || (await prisma.tourAiMemory.findFirst({ where: { scope, text }, select: { id: true } }))) continue;
     await prisma.tourAiMemory.create({ data: { scope, text, createdBy: by } });
     kept.push(text);
@@ -1701,6 +1704,8 @@ function layoutOf(l: NewTourLayout | undefined): NewTourLayout | null {
 /** "Kopiér layout fra en anden tour": that tour's start, menu, logo side and menu arrow - to fill in the layout steps. */
 export async function tourLayout(slug: string): Promise<NewTourLayout | null> {
   await requireTeam("tours");
+  // A developer only reads the tours given to them.
+  if (!(await teamSeesTour(slug))) return null;
   const t = await prisma.tour.findUnique({ where: { slug: String(slug) }, select: { config: true } });
   return t ? layoutOfTour(t.config as unknown as TourConfig) : null;
 }

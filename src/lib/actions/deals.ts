@@ -613,7 +613,7 @@ export async function linkDealToParent(
   dealId: string,
   formData: FormData
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  await requireUser();
+  const user = await requireUser();
   const parentDealId = String(formData.get("parentDealId") || "");
   if (!parentDealId) return { ok: false, error: "Vælg en kunde at kæde sammen med." };
   if (parentDealId === dealId) return { ok: false, error: "En deal kan ikke kædes sammen med sig selv." };
@@ -624,8 +624,9 @@ export async function linkDealToParent(
   }
 
   await prisma.deal.update({ where: { id: dealId }, data: { parentDealId } });
-  // The chain's customer logins see the new location too.
-  await shareChainAccess(parentDealId);
+  // The chain's customer logins see the new location too - giving customers access is an admin's call (as under Kundens
+  // login), so only when an admin links; otherwise an admin does it there ("giv dem adgang til hele kæden").
+  if (user.role === "ADMIN") await shareChainAccess(parentDealId);
   revalidatePath(`/arpo/deals/${dealId}`);
   revalidatePath(`/arpo/deals/${parentDealId}`);
   return { ok: true };
@@ -640,7 +641,7 @@ export async function linkBranchesToDeal(
   parentDealId: string,
   formData: FormData
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  await requireUser();
+  const user = await requireUser();
   const branchDealIds = formData.getAll("branchDealIds").map(String).filter(Boolean);
   if (branchDealIds.length === 0) return { ok: false, error: "Vælg mindst én afdeling at kæde sammen." };
   if (branchDealIds.includes(parentDealId)) {
@@ -659,7 +660,7 @@ export async function linkBranchesToDeal(
 
   await prisma.deal.updateMany({ where: { id: { in: branchDealIds } }, data: { parentDealId } });
   // The chain's customer logins see the new locations too.
-  await shareChainAccess(parentDealId);
+  if (user.role === "ADMIN") await shareChainAccess(parentDealId);
   revalidatePath(`/arpo/deals/${parentDealId}`);
   for (const id of branchDealIds) revalidatePath(`/arpo/deals/${id}`);
   return { ok: true };
@@ -803,10 +804,14 @@ export async function markDealInactive(dealId: string) {
   revalidatePath("/arpo/deals");
 }
 
-export async function reactivateDeal(dealId: string) {
-  await requireUser();
+export async function reactivateDeal(dealId: string): Promise<{ error: string } | void> {
+  const user = await requireUser();
   // Clear any past termination too - otherwise a deal auto-churned by an
   // expired notice would just get immediately re-churned on the next run.
+  // Taking back a termination is an admin's call (as withdrawTermination) - a deal under notice stays so for others.
+  const deal = await prisma.deal.findUnique({ where: { id: dealId }, select: { terminationNoticeAt: true } });
+  if (!deal) return;
+  if (deal.terminationNoticeAt && user.role !== "ADMIN") return { error: "Kunden er opsagt - kun en administrator kan trække opsigelsen tilbage." };
   await prisma.deal.update({
     where: { id: dealId },
     data: { churnedAt: null, terminationNoticeAt: null, contractEndDate: null },

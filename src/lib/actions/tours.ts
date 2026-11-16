@@ -32,6 +32,7 @@ function panoCopiesLater(slug: string) {
 /** Saves a tour's setup as a new version. */
 export async function saveTour(slug: string, config: TourConfig, note: string): Promise<Result<{ versionId: string }>> {
   const user = await requireTour(slug);
+  if (JSON.stringify(config ?? null).length > 5_000_000) return { ok: false, error: "Opsætningen er for stor til at gemme." };
   const error = tourConfigProblem(config);
   if (error) return { ok: false, error };
   const tour = await prisma.tour.findUnique({ where: { slug }, select: { id: true } });

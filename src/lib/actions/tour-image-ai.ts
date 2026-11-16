@@ -66,7 +66,10 @@ async function load(src: string, slug?: string): Promise<Buffer> {
       if (local) return local;
     }
     // Our own site's address - never one built from the request's Host header.
-    const own = await fetch(new URL(src, getAppBaseUrl()), { signal: AbortSignal.timeout(30_000) });
+    // Only ever our own site: "/\\host/x" would otherwise be read as another host.
+    const ownUrl = new URL(src, getAppBaseUrl());
+    if (ownUrl.origin !== new URL(getAppBaseUrl()).origin) throw new Error("Billedet skal ligge hos os eller på en offentlig hjemmeside.");
+    const own = await fetch(ownUrl, { signal: AbortSignal.timeout(30_000) });
     if (!own.ok) throw new Error(`Billedet kunne ikke hentes (${own.status}).`);
     return readLimited(own, 60_000_000);
   }

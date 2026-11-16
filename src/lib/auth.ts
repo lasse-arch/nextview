@@ -38,7 +38,7 @@ export type LoginMethod = "password" | "google";
 
 /** The team (Arpo) or a customer (their own page, /kunde) - never both: a
  * customer's session doesn't open Arpo, and the team's doesn't open /kunde. */
-type Session = { kind: "staff"; userId: string; method: LoginMethod; sv: number } | { kind: "customer"; customerId: string };
+type Session = { kind: "staff"; userId: string; method: LoginMethod; sv: number } | { kind: "customer"; customerId: string; sv: number };
 
 async function setSessionCookie(payload: Record<string, string | number>) {
   const token = await new SignJWT(payload)
@@ -66,9 +66,15 @@ export async function createSession(userId: string, method: LoginMethod) {
   await setSessionCookie({ userId, method, sv: user.sessionVersion });
 }
 
-/** A customer logged in with the link from their e-mail. */
+/** A customer logged in with the link from their e-mail - with their sessionVersion, so logging out ends it everywhere. */
 export async function createCustomerSession(customerId: string) {
-  await setSessionCookie({ customerId, method: "link" });
+  const account = await prisma.customerAccount.findUnique({ where: { id: customerId }, select: { sessionVersion: true } });
+  await setSessionCookie({ customerId, method: "link", sv: account?.sessionVersion ?? 0 });
+}
+
+/** Ends every session a customer has (logging out on one device logs out all - a copied cookie stops working too). */
+export async function endCustomerSessions(customerId: string) {
+  await prisma.customerAccount.update({ where: { id: customerId }, data: { sessionVersion: { increment: 1 } } }).catch(() => {});
 }
 
 export async function destroySession() {
@@ -82,7 +88,7 @@ async function getSessionFromCookie(): Promise<Session | null> {
   if (!token) return null;
   try {
     const { payload } = await jwtVerify(token, getSecret());
-    if (typeof payload.customerId === "string") return { kind: "customer", customerId: payload.customerId };
+    if (typeof payload.customerId === "string") return { kind: "customer", customerId: payload.customerId, sv: typeof payload.sv === "number" ? payload.sv : 0 };
     if (typeof payload.userId !== "string") return null;
     // Sessions from before login methods were recorded were all password ones.
     return { kind: "staff", userId: payload.userId, method: payload.method === "google" ? "google" : "password", sv: typeof payload.sv === "number" ? payload.sv : 0 };
@@ -121,10 +127,12 @@ export async function getCurrentCustomer() {
   const session = await getSessionFromCookie();
   if (session?.kind !== "customer") return null;
   // Only access that hasn't run out (a developer's 30 days) - with the role, so every check can ask can() (src/lib/customer-roles.ts).
-  return prisma.customerAccount.findUnique({
+  const account = await prisma.customerAccount.findUnique({
     where: { id: session.customerId },
     include: { deals: { where: { OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] }, select: { dealId: true, role: true, canApprove: true } } },
   });
+  // Logged out since (on this or another device): the session no longer counts.
+  return account && account.sessionVersion === session.sv ? account : null;
 }
 
 export async function requireUser(): Promise<User> {
@@ -220,7 +228,9 @@ export function safeNextPath(next: string | null | undefined): string {
   try {
     const u = new URL(next, base);
     if (u.origin !== base) return "/";
-    return u.pathname + u.search + u.hash;
+    const path = u.pathname + u.search + u.hash;
+    // "/.//evil.com" comes out as "//evil.com", which a browser reads as another site.
+    return path.startsWith("//") ? "/" : path;
   } catch {
     return "/";
   }

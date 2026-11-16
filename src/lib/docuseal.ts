@@ -214,7 +214,7 @@ export function verifyWebhookSignature(rawBody: string, signatureHeader: string 
 
   const [timestamp, signature] = signatureHeader.split(".", 2);
   if (!timestamp || !signature) return false;
-  if (Math.abs(Date.now() / 1000 - Number(timestamp)) > 300) return false;
+  if (!Number.isFinite(Number(timestamp)) || Math.abs(Date.now() / 1000 - Number(timestamp)) > 300) return false;
 
   const expected = crypto.createHmac("sha256", secret).update(`${timestamp}.${rawBody}`).digest("hex");
   try {

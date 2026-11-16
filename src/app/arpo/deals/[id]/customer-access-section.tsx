@@ -277,7 +277,7 @@ function InviteLinks({ dealId, links }: { dealId: string; links: InviteLink[] })
       <p className="mt-0.5 text-xs text-slate-500">Ét link, I kan sende til kunden. Hver person skriver navn og e-mail og får et login-link på mailen, så kun den, der har mailboksen, kommer ind.</p>
       <div className="mt-2 flex flex-wrap items-end gap-2">
         <select value={choice} onChange={(e) => setChoice(e.target.value)} aria-label="Rolle" className="rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm">
-          {CHOICES.map(([v, label]) => (
+          {CHOICES.filter(([v]) => v !== "OWNER").map(([v, label]) => (
             <option key={v} value={v}>
               {label}
             </option>
