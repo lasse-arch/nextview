@@ -160,7 +160,7 @@ const eventLog: TrackedEvent[] = [];
 const logListeners = new Set<() => void>();
 
 /** The tour being measured (set when the tour mounts). */
-const tracking = { slug: "", session: "", demo: "", off: false, inArpo: false, used: false, queue: [] as { name: string; label?: string; url?: string; value?: number }[], timer: 0, da: (s: string) => s };
+const tracking = { slug: "", session: "", demo: "", off: false, inArpo: false, used: false, queue: [] as { name: string; label?: string; url?: string; value?: number }[], timer: 0, da: (s: string) => s, lastAt: 0 };
 
 /** Sends the waiting events to Arpo's own measurement (/api/tour-events) - also when the page is closed. */
 function flushEvents() {
@@ -196,12 +196,13 @@ function track(name: string, params: Record<string, string | number> = {}) {
   const full = { tour: tracking.slug, ...params };
   // Arpo's own count - not from Arpo's own previews (the editor's, the share page's); a customer's site showing it in a frame counts.
   if (tracking.slug && !tracking.off && !tracking.inArpo) {
-    const label = params.label ?? params.item_name ?? params.place_name ?? params.point_name ?? params.room_name ?? params.kind ?? params.title ?? params.name;
+    const label = params.label ?? params.item_name ?? params.place_name ?? params.point_name ?? params.room_name ?? params.destination ?? params.kind ?? params.title ?? params.name;
     // A number that matters, kept with the event: the seconds spent in a room.
     // …or the stop of "Vis mig rundt" it happened at.
     // …or how long the tour took to be ready / to go in (tenths of a second - Health shows how fast the tours are for real visitors).
     const ms = typeof params.load_ms === "number" ? params.load_ms : typeof params.enter_ms === "number" ? params.enter_ms : null;
     const value = typeof params.seconds === "number" ? Math.round(params.seconds) : typeof params.stop === "number" ? params.stop : ms != null ? Math.min(3600, Math.round(ms / 100)) : undefined;
+    tracking.lastAt = Date.now();
     tracking.queue.push({ name, label: label != null ? tracking.da(String(label)) : undefined, url: params.link_url != null ? String(params.link_url) : params.guide != null ? String(params.guide) : undefined, value });
     if (name === "cta_click" || name === "contact_click") flushEvents(); // the visitor may be leaving
     else tracking.timer ||= window.setTimeout(flushEvents, 4000);
@@ -2268,6 +2269,80 @@ function TourExperience({
       sub.cancel();
     };
   }, [sdk]);
+  /*
+   * Everything else a visitor does is measured too (Resultater, the customer's
+   * page): a video they start (and how long they watch it), a picture opened
+   * big, an Infoboks, the Holdplan, "Vej hertil" - and every link out of the
+   * tour (booking, social media, the customer's own pages) that its own button
+   * didn't already count. Videos playing by themselves (muted, in the
+   * background) don't count - only one the visitor started.
+   */
+  useEffect(() => {
+    const started = new WeakMap<HTMLVideoElement, number>();
+    const nameOf = (v: HTMLElement) =>
+      v.getAttribute("aria-label") ||
+      v.closest<HTMLElement>("[data-track-name]")?.dataset.trackName ||
+      v.closest("[aria-label]")?.getAttribute("aria-label") ||
+      decodeURIComponent((v.getAttribute("src") || (v as HTMLVideoElement).currentSrc || "video").split("/").pop()!.split("?")[0]).replace(/\.[a-z0-9]{2,4}$/i, "").slice(0, 80);
+    const play = (e: Event) => {
+      const v = e.target;
+      if (!(v instanceof HTMLVideoElement) || (v.muted && !v.controls)) return;
+      if (!navigator.userActivation?.isActive && !v.controls) return;
+      if (!started.has(v)) track("video_play", { label: nameOf(v) });
+      started.set(v, v.currentTime);
+    };
+    // A video playing by itself (muted) that the visitor turns the sound on for: that's watching it.
+    const sound = (e: Event) => {
+      const v = e.target;
+      if (v instanceof HTMLVideoElement && !v.muted && !v.paused && !started.has(v)) {
+        track("video_play", { label: nameOf(v) });
+        started.set(v, v.currentTime);
+      }
+    };
+    const stop = (e: Event) => {
+      const v = e.target;
+      if (!(v instanceof HTMLVideoElement) || !started.has(v)) return;
+      const seconds = Math.max(0, Math.round(v.currentTime - started.get(v)!));
+      if (seconds >= 1) track("video_watch", { label: nameOf(v), seconds });
+      started.set(v, v.currentTime);
+    };
+    // After the tour's own click handlers (bubbling): a link out that nothing counted just now.
+    const click = (e: MouseEvent) => {
+      const a = (e.target as Element | null)?.closest?.("a[href]");
+      if (!(a instanceof HTMLAnchorElement) || Date.now() - tracking.lastAt < 300) return;
+      const href = a.href;
+      const out = /^(tel|mailto):/i.test(href) || (/^https?:/i.test(href) && new URL(href).host !== location.host);
+      if (!out) return;
+      const text = (a.getAttribute("aria-label") || a.textContent || "").replace(/\s+/g, " ").trim().slice(0, 80);
+      track("link_out", { label: text || new URL(href, location.href).hostname, link_url: href.split("?")[0].slice(0, 300) });
+    };
+    document.addEventListener("play", play, true);
+    document.addEventListener("volumechange", sound, true);
+    document.addEventListener("pause", stop, true);
+    document.addEventListener("ended", stop, true);
+    document.addEventListener("click", click);
+    return () => {
+      document.removeEventListener("play", play, true);
+      document.removeEventListener("volumechange", sound, true);
+      document.removeEventListener("pause", stop, true);
+      document.removeEventListener("ended", stop, true);
+      document.removeEventListener("click", click);
+    };
+  }, []);
+  const lightboxKey = lightbox ? `${lightbox.title}|${lightbox.images[0]}` : null;
+  useEffect(() => {
+    if (lightboxKey) track("image_open", { label: lightboxKey.split("|")[0] || "billede" });
+  }, [lightboxKey]);
+  useEffect(() => {
+    const box = boxOpen ? T.boxes?.find((b) => b.id === boxOpen) : null;
+    if (box) track("box_open", { label: box.title });
+  }, [boxOpen, T.boxes]);
+  useEffect(() => {
+    if (classesOpen) track("classes_open");
+  }, [classesOpen]);
+  useEffect(() => {
+    if (commuteOpen) track("commute_open");
+  }, [commuteOpen]);
   /*
    * While the guide runs, the visitor may take over: walk to another scan
    * point or turn to look at something. Then the guide waits (its timer

@@ -318,7 +318,7 @@ function SubjectCard({
             {embed ? (
               <iframe src={embed} title={x.name} allow="autoplay; fullscreen; picture-in-picture" allowFullScreen />
             ) : (
-              <video src={x.video} controls playsInline preload="metadata" />
+              <video src={x.video} controls playsInline preload="metadata" aria-label={x.name} />
             )}
           </div>
         ) : images.length ? (

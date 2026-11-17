@@ -8,7 +8,7 @@ import { resetTourStats, tourStatsForPeriod } from "@/lib/actions/tour-period-st
 import { DateRangePicker, periodText, presetName, type Period } from "@/components/date-range-picker";
 import type { TourStats } from "@/lib/tour-stats";
 import { shown, type ReportShare, type ShareWhen } from "@/lib/tour-share";
-import { CustomerReport } from "./customer-report";
+import { CustomerReport, UsedList } from "./customer-report";
 import { Choice, Field, Group, Toggle } from "./ui";
 
 /*
@@ -119,6 +119,7 @@ function ShareSettings({ slug, brand, share: initial, shareStats, token: initial
         <Toggle on={share.places} onChange={(on) => change({ places: on })} title="Det, de valgte i menuen" />
         <Toggle on={share.rooms} onChange={(on) => change({ rooms: on })} title="Hvor de gik rundt (rum)" />
         <Toggle on={share.roomTime} onChange={(on) => change({ roomTime: on })} title="Hvor de blev længst (tid i rum)" />
+        <Toggle on={share.used} onChange={(on) => change({ used: on })} title="Det, de brugte i touren (Find vej og hvorhen, videoer, billeder, personer, infobokse, links …)" />
         <Toggle on={share.looks} onChange={(on) => change({ looks: on })} title="Hvor de kigger længst rundt (stederne med rummets billede - på kundesiden og rapportlinket)" />
         <Toggle on={share.opened} onChange={(on) => change({ opened: on })} title="Det, de åbnede (punkter, infopunkter, stedkort, 360°)" />
         <Toggle on={share.sources} onChange={(on) => change({ sources: on })} title="Hvor besøgene kom fra" />
@@ -284,6 +285,9 @@ function OurNumbers({ slug, initial, guideStops, guideNames }: { slug: string; i
           empty="Ingen tal endnu - tiden i hvert rum måles fra nu af (mindst 3 besøg pr. rum)."
         />
         <p className="text-[11px] text-[#8e8e93]">Typisk tid i rummet, hos rum med mindst 3 besøg.</p>
+      </Group>
+      <Group title="Det, de brugte i touren">
+        {stats.used?.length ? <UsedList used={stats.used} /> : <p className="text-[13px] text-[#8e8e93]">Ingen tal endnu - Find vej, videoer, billeder, personer, infobokse og links ud måles fra nu af.</p>}
       </Group>
       <Group title="Det, de åbnede i touren">
         <Ranked rows={stats.opened} empty="Ingen har åbnet punkter, infopunkter, stedkort eller 360°-billeder endnu." />

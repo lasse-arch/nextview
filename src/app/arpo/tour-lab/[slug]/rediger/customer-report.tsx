@@ -37,6 +37,11 @@ const T = {
     looks: "Hvor de kigger længst rundt",
     looksHint: "Steder, hvor de besøgende selv har stået og kigget rundt",
     looksVisits: "besøg",
+    used: "Det, de brugte i touren",
+    usedNames: { find: "Find vej", video: "Videoer", images: "Billeder", people: "Personer", boxes: "Infobokse", lineday: "En dag på linjen", day: "Dagsplan og skema", classes: "Holdplan", commute: "Vej hertil", links: "Links ud af touren" },
+    found: (started: number, arrived: number) => `${started} fandt vej, ${arrived} nåede frem`,
+    watched: "set i alt",
+    most: "Mest",
     opened: "Det, de åbnede i touren",
   },
   en: {
@@ -65,6 +70,11 @@ const T = {
     looks: "Where they look around longest",
     looksHint: "Places where visitors stood and looked around themselves",
     looksVisits: "visits",
+    used: "What they used in the tour",
+    usedNames: { find: "Find your way", video: "Videos", images: "Pictures", people: "People", boxes: "Info boxes", lineday: "A day on the line", day: "Day plan and timetable", classes: "Class schedule", commute: "Getting here", links: "Links out of the tour" },
+    found: (started: number, arrived: number) => `${started} found a way, ${arrived} got there`,
+    watched: "watched in all",
+    most: "Most",
     opened: "What they opened in the tour",
   },
 };
@@ -211,6 +221,12 @@ export function CustomerReport({ stats, share, brand, lang = "da", title, looks 
           </ul>
         </div>
       )}
+      {share.used && (stats.used?.length ?? 0) > 0 && (
+        <div className={card}>
+          <div className="mb-2 text-[13px] font-medium text-[#6e6e73]">{t.used}</div>
+          <UsedList used={stats.used!} lang={lang} />
+        </div>
+      )}
       {share.opened && stats.opened.length > 0 && (
         <div className={card}>
           <div className="mb-2 text-[13px] font-medium text-[#6e6e73]">{t.opened}</div>
@@ -263,5 +279,33 @@ function DayBars({ days, lang, visitsWord }: { days: TourStats["perDay"]; lang: 
         ))}
       </div>
     </div>
+  );
+}
+
+/** "Det, de brugte i touren": each feature used, how many visits used it, and what in it - e.g. where Find vej took them. */
+export function UsedList({ used, lang = "da" }: { used: NonNullable<TourStats["used"]>; lang?: ReportLang }) {
+  const t = T[lang];
+  const time = (s: number) => (s < 60 ? `${s} ${t.sec}` : s < 3600 ? `${Math.round(s / 60)} min` : `${(s / 3600).toFixed(1).replace(".", lang === "da" ? "," : ".")} t`);
+  return (
+    <ul className="divide-y divide-black/[.05]">
+      {used.map((u) => {
+        const bits = [
+          u.key === "find" && u.started != null ? t.found(u.started, u.arrived ?? 0) : null,
+          u.key === "video" && u.watchSeconds ? `${time(u.watchSeconds)} ${t.watched}` : null,
+          u.top.length ? `${t.most}: ${u.top.slice(0, 3).map((x) => x.label).join(", ")}` : null,
+        ].filter(Boolean);
+        return (
+          <li key={u.key} className="py-2 first:pt-0 last:pb-0">
+            <div className="flex items-baseline justify-between gap-3 text-[14px]">
+              <span className="font-medium">{t.usedNames[u.key]}</span>
+              <span className="flex-none tabular-nums text-[#6e6e73]">
+                {u.visits} {t.looksVisits}
+              </span>
+            </div>
+            {bits.length > 0 && <p className="mt-0.5 text-[12.5px] leading-snug text-[#6e6e73]">{bits.join(". ")}</p>}
+          </li>
+        );
+      })}
+    </ul>
   );
 }

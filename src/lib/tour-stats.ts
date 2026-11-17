@@ -22,6 +22,35 @@ export const ACTION = `(name IN ('cta_click', 'live_book', 'contact_form') OR (n
 export const SHOWN = `(NOT bool_or(name = 'tour_embed') OR bool_or(name IN ('tour_seen', 'tour_use')))`;
 const ENGAGED = `(bool_or(name = 'tour_use') OR (NOT bool_or(name = 'tour_embed') AND bool_or(name IN ('menu_click','place_click','room_view','guide_start','welcome_choice','route_start','info_open','place_card_view'))))`;
 
+/** A feature of the tour a visitor used (Resultater, the customer's page): how many visits used it, and what in it. */
+export type UsedKey = "find" | "video" | "images" | "people" | "boxes" | "lineday" | "day" | "classes" | "commute" | "links";
+export type UsedFeature = {
+  key: UsedKey;
+  /** Visits that used it. */
+  visits: number;
+  /** The most used inside it: the videos, pictures, people, places found, links … */
+  top: { label: string; count: number }[];
+  /** Find vej: visits that started a route, and that got there. */
+  started?: number;
+  arrived?: number;
+  /** Videos: seconds watched in all. */
+  watchSeconds?: number;
+};
+
+/** Which events make up each feature (the first is what counts as "used it"). */
+export const USED: { key: UsedKey; names: string[]; topFrom: string }[] = [
+  { key: "find", names: ["route_open", "route_start", "route_arrive"], topFrom: "route_start" },
+  { key: "video", names: ["video_play"], topFrom: "video_play" },
+  { key: "images", names: ["image_open"], topFrom: "image_open" },
+  { key: "people", names: ["team_open"], topFrom: "team_open" },
+  { key: "boxes", names: ["box_open"], topFrom: "box_open" },
+  { key: "lineday", names: ["lineday_start"], topFrom: "lineday_start" },
+  { key: "day", names: ["day_view", "schedule_open"], topFrom: "day_view" },
+  { key: "classes", names: ["classes_open"], topFrom: "classes_open" },
+  { key: "commute", names: ["commute_open"], topFrom: "commute_open" },
+  { key: "links", names: ["link_out"], topFrom: "link_out" },
+];
+
 export type TourStats = {
   days: number;
   /** The chosen period ("YYYY-MM-DD", both included) - null for "the last `days` days". */
@@ -59,6 +88,8 @@ export type TourStats = {
     /** Each stop of the main one, by its title: how many saw it, how long they stayed (median seconds) and how often its voice was played. */
     stops?: { title: string; seen: number; medianSeconds: number; voice: number }[];
   };
+  /** What else they used in the tour: Find vej, videos, pictures, people, Infobokse, links out … (only those used). */
+  used?: UsedFeature[];
 };
 
 /**
@@ -191,6 +222,7 @@ export async function tourStats(slug: string, range: number | StatsRange = 30): 
       until
     ),
   ]);
+  const used = await usedFeatures(slug, since, until).catch(() => []);
   const s = sessions[0];
   const visits = Number(s?.visits ?? 0);
   const byDay = new Map(perDay.map((d) => [d.day.toISOString().slice(0, 10), d]));
@@ -231,7 +263,42 @@ export async function tourStats(slug: string, range: number | StatsRange = 30): 
       byGuide: byGuide.length > 1 ? byGuide.map((r) => ({ guide: r.guide, started: Number(r.started), completed: Number(r.completed) })) : undefined,
       stops: guideStopRows.length ? guideStopRows.map((r) => ({ title: r.title, seen: Number(r.seen), medianSeconds: Math.round(Number(r.median ?? 0)), voice: Number(r.voice) })) : undefined,
     },
+    used,
   };
+}
+
+/** The features of USED that were used in the period - most used first. */
+async function usedFeatures(slug: string, since: Date, until: Date): Promise<UsedFeature[]> {
+  const names = [...new Set([...USED.flatMap((u) => u.names), "video_watch"])];
+  const [byName, byLabel] = await Promise.all([
+    prisma.$queryRawUnsafe<{ name: string; visits: bigint; total: bigint | null }[]>(
+      `SELECT name, count(DISTINCT session) AS visits, sum(value) AS total FROM "TourEvent"
+       WHERE "tourSlug" = $1 AND "createdAt" >= $2 AND "createdAt" < $3 AND name = ANY($4::text[]) GROUP BY name`,
+      slug,
+      since,
+      until,
+      names
+    ),
+    prisma.$queryRawUnsafe<{ name: string; label: string; count: bigint }[]>(
+      `SELECT name, label, count(DISTINCT session) AS count FROM "TourEvent"
+       WHERE "tourSlug" = $1 AND "createdAt" >= $2 AND "createdAt" < $3 AND name = ANY($4::text[]) AND label IS NOT NULL
+       GROUP BY name, label ORDER BY count DESC LIMIT 400`,
+      slug,
+      since,
+      until,
+      USED.map((u) => u.topFrom)
+    ),
+  ]);
+  const n = (name: string) => Number(byName.find((r) => r.name === name)?.visits ?? 0);
+  return USED.map((u): UsedFeature => {
+    const top = byLabel.filter((r) => r.name === u.topFrom).slice(0, 5).map((r) => ({ label: r.label, count: Number(r.count) }));
+    const base = { key: u.key, visits: Math.max(...u.names.map(n)), top };
+    if (u.key === "find") return { ...base, started: n("route_start"), arrived: n("route_arrive") };
+    if (u.key === "video") return { ...base, watchSeconds: Number(byName.find((r) => r.name === "video_watch")?.total ?? 0) };
+    return base;
+  })
+    .filter((u) => u.visits > 0)
+    .sort((a, b) => b.visits - a.visits);
 }
 
 async function top(slug: string, since: Date, until: Date, where: string) {

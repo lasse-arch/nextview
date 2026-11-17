@@ -78,6 +78,8 @@ export async function runTourInsights(slug: string, config: TourConfig, who: str
     typicalVisitSeconds: stats.medianSeconds,
     mobileShare: Math.round(stats.mobileShare * 100) + " %",
     openedFrom: stats.sources,
+    // Features used (visits that used each, and what in it): Find vej and where to, videos, pictures, people, Infobokse, links out …
+    featuresUsed: stats.used ?? [],
     placesChosen: places,
     roomsSeen: rooms,
     firstChoiceInWelcome: firstChoices,
