@@ -90,7 +90,6 @@ export function CustomerReport({ stats, share, brand, lang = "da", title }: { st
   const label = (l: string) => (l === "phone" ? t.phone : l === "email" ? t.email : l === "direkte" ? t.direct : l);
   const leads = shown(share.leads, stats.leads);
   const actions = shown(share.actions, stats.leads) && stats.actions.length > 0;
-  const max = Math.max(1, ...stats.perDay.map((d) => d.visits));
   const tiles = [
     share.visits && [String(stats.visits), t.visits],
     share.engaged && [pct(stats.visits ? stats.engaged / stats.visits : 0), t.engaged],
@@ -125,13 +124,7 @@ export function CustomerReport({ stats, share, brand, lang = "da", title }: { st
       {share.perDay && (
         <div className={card}>
           <div className="mb-2 text-[13px] font-medium text-[#6e6e73]">{t.perDay}</div>
-          <div className="flex h-20 items-end gap-[2px]">
-            {stats.perDay.map((d) => (
-              <div key={d.day} title={`${d.day}: ${d.visits} ${t.visits}`} className="flex h-full flex-1 items-end">
-                <div className="w-full rounded-t-[3px]" style={{ height: d.visits ? `${Math.max(4, (d.visits / max) * 100)}%` : 0, background: "var(--report-accent, #0071e3)" }} />
-              </div>
-            ))}
-          </div>
+          <DayBars days={stats.perDay} lang={lang} visitsWord={t.visits} />
         </div>
       )}
       {actions && (
@@ -191,6 +184,45 @@ export function CustomerReport({ stats, share, brand, lang = "da", title }: { st
           <Ranked rows={stats.sources} label={label} />
         </div>
       )}
+    </div>
+  );
+}
+
+/** A day as it reads under its bar: "Tirs 10" / "Tue 10". */
+function dayName(day: string, lang: ReportLang): string {
+  const d = new Date(`${day}T12:00:00`);
+  const wd = lang === "en" ? d.toLocaleDateString("en-GB", { weekday: "short" }) : ["Søn", "Man", "Tirs", "Ons", "Tors", "Fre", "Lør"][d.getDay()];
+  return `${wd} ${d.getDate()}`;
+}
+
+/**
+ * Visits per day as bars - the number over each bar and the day under it.
+ * A long period (a month or more) names only some of the days, evenly
+ * spread, so they never run into each other; the number is then shown on
+ * hover only.
+ */
+function DayBars({ days, lang, visitsWord }: { days: TourStats["perDay"]; lang: ReportLang; visitsWord: string }) {
+  const max = Math.max(1, ...days.map((d) => d.visits));
+  const few = days.length <= 14;
+  // Every n-th day named - at most ~8 names - and always the last.
+  const step = Math.max(1, Math.ceil(days.length / 8));
+  return (
+    <div>
+      <div className={`flex items-end gap-[2px] ${few ? "h-24" : "h-20"}`}>
+        {days.map((d) => (
+          <div key={d.day} title={`${dayName(d.day, lang)}: ${d.visits} ${visitsWord}`} className="flex h-full flex-1 flex-col items-center justify-end">
+            {few && d.visits > 0 && <span className="mb-0.5 text-[11px] font-medium tabular-nums text-[#1d1d1f]">{d.visits}</span>}
+            <div className="w-full rounded-t-[3px]" style={{ height: d.visits ? `${Math.max(4, (d.visits / max) * (few ? 80 : 100))}%` : 2, background: d.visits ? "var(--report-accent, #0071e3)" : "rgba(0,0,0,.06)" }} />
+          </div>
+        ))}
+      </div>
+      <div className="mt-1.5 flex gap-[2px] border-t border-black/[.06] pt-1.5">
+        {days.map((d, i) => (
+          <span key={d.day} className="min-w-0 flex-1 overflow-visible whitespace-nowrap text-center text-[11px] text-[#8e8e93]">
+            {(i % step === 0 && days.length - 1 - i >= step / 2) || i === days.length - 1 ? (few ? dayName(d.day, lang) : `${new Date(`${d.day}T12:00:00`).getDate()}/${new Date(`${d.day}T12:00:00`).getMonth() + 1}`) : ""}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }
