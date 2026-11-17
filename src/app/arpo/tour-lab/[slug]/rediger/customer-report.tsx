@@ -34,6 +34,9 @@ const T = {
     roomsHint: "Rum, de besøgende kom ind i - uanset om de gik derhen selv eller via menuen",
     roomTime: "Hvor de blev længst",
     roomTimeHint: "Typisk tid i rummet",
+    looks: "Hvor de kigger længst rundt",
+    looksHint: "Steder, hvor de besøgende selv har stået og kigget rundt",
+    looksVisits: "besøg",
     opened: "Det, de åbnede i touren",
   },
   en: {
@@ -59,6 +62,9 @@ const T = {
     roomsHint: "Rooms visitors came to - whether they walked there or used the menu",
     roomTime: "Where they stayed longest",
     roomTimeHint: "Typical time in the room",
+    looks: "Where they look around longest",
+    looksHint: "Places where visitors stood and looked around themselves",
+    looksVisits: "visits",
     opened: "What they opened in the tour",
   },
 };
@@ -84,7 +90,10 @@ function Ranked({ rows, label, show = String }: { rows: { label: string; count: 
   );
 }
 
-export function CustomerReport({ stats, share, brand, lang = "da", title }: { stats: TourStats; share: ReportShare; brand: string; lang?: ReportLang; title?: string }) {
+/** A place visitors looked around at (lib/tour-looks.ts) - the room, never the exact view. */
+export type ReportLook = { room: string; seconds: number; visits: number; image: string | null };
+
+export function CustomerReport({ stats, share, brand, lang = "da", title, looks = [] }: { stats: TourStats; share: ReportShare; brand: string; lang?: ReportLang; title?: string; looks?: ReportLook[] }) {
   const t = T[lang];
   const duration = (s: number) => (s < 60 ? `${s} ${t.sec}` : `${Math.floor(s / 60)} min${s % 60 ? ` ${s % 60} ${t.sec}` : ""}`);
   const label = (l: string) => (l === "phone" ? t.phone : l === "email" ? t.email : l === "direkte" ? t.direct : l);
@@ -170,6 +179,36 @@ export function CustomerReport({ stats, share, brand, lang = "da", title }: { st
           <div className="text-[13px] font-medium text-[#6e6e73]">{t.roomTime}</div>
           <p className="mb-2 text-[11.5px] text-[#8e8e93]">{t.roomTimeHint}</p>
           <Ranked rows={stats.roomTime.map((r) => ({ label: r.label, count: r.seconds }))} label={label} show={duration} />
+        </div>
+      )}
+      {share.looks && looks.length > 0 && (
+        <div className={card}>
+          <div className="text-[13px] font-medium text-[#6e6e73]">{t.looks}</div>
+          <p className="mb-3 text-[11.5px] text-[#8e8e93]">{t.looksHint}</p>
+          <ul className="space-y-2.5">
+            {looks.slice(0, 6).map((l) => (
+              <li key={l.room} className="flex items-center gap-3">
+                {l.image ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={l.image} alt="" loading="lazy" className="h-12 w-16 flex-none rounded-lg object-cover ring-1 ring-black/[.06]" />
+                ) : (
+                  <span className="h-12 w-16 flex-none rounded-lg bg-[#f2f2f7]" />
+                )}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-baseline justify-between gap-2 text-[14px]">
+                    <span className="truncate font-medium">{l.room}</span>
+                    <span className="flex-none tabular-nums text-[#6e6e73]">{duration(l.seconds)}</span>
+                  </div>
+                  <div className="mt-1 h-1.5 rounded-full bg-[#f2f2f7]">
+                    <div className="h-full rounded-full" style={{ width: `${(l.seconds / looks[0].seconds) * 100}%`, background: "var(--report-accent, #0071e3)" }} />
+                  </div>
+                  <div className="mt-0.5 text-[11.5px] text-[#8e8e93]">
+                    {l.visits} {t.looksVisits}
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
       {share.opened && stats.opened.length > 0 && (

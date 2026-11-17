@@ -87,7 +87,7 @@ export function addDays(ymd: string, n: number): string {
 }
 
 /** Midnight at the start of a day in Danish time (summer or winter). */
-function dayStart(ymd: string): Date {
+export function dayStart(ymd: string): Date {
   const noon = new Date(`${ymd}T12:00:00Z`);
   const off = new Intl.DateTimeFormat("en-US", { timeZone: "Europe/Copenhagen", timeZoneName: "shortOffset" }).formatToParts(noon).find((p) => p.type === "timeZoneName")?.value ?? "GMT+1";
   const hours = Number(/GMT([+-]\d+)/.exec(off)?.[1] ?? 1);

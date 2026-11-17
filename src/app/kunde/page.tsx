@@ -11,7 +11,8 @@ import { addDays, isYmd, todayDK, tourStats, type TourStats } from "@/lib/tour-s
 import { shareOf, shown } from "@/lib/tour-share";
 import { mergeShare, mergeStats } from "@/lib/merge-stats";
 import { parseContractProducts } from "@/lib/contract-template-data";
-import { CustomerReport } from "@/app/arpo/tour-lab/[slug]/rediger/customer-report";
+import { CustomerReport, type ReportLook } from "@/app/arpo/tour-lab/[slug]/rediger/customer-report";
+import { tourLooks } from "@/lib/tour-looks";
 import type { TourConfig } from "@/app/arpo/tour-lab/tours/types";
 import { startTargets } from "@/app/arpo/tour-lab/tours/places";
 import { contestChests, deleteOldContestEntries } from "@/lib/tour-contest";
@@ -202,6 +203,19 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
     : { preset: "7", from: addDays(today, -6), to: today };
   const stats: TourStats[] = !needStats ? [] : example ? statTours.map((x) => exampleStats(x.slug, x.config, period.from, period.to)) : await Promise.all(statTours.map((x) => tourStats(x.slug, { from: period.from, to: period.to })));
   const together = needStats ? mergeStats(stats) : null;
+  // "Hvor de kigger længst rundt": per tour (if its report shows it), the places with the room's picture - only on Statistik.
+  const looks: ReportLook[][] =
+    page === "tal" && !example
+      ? await Promise.all(
+          statTours.map(async (x) =>
+            x.share.looks ? (await tourLooks(x.slug, { from: period.from, to: period.to }).catch(() => [])).filter((l) => l.room).map((l) => ({ room: l.room!, seconds: l.seconds, visits: l.visits, image: l.image })) : []
+          )
+        )
+      : statTours.map(() => []);
+  // All tours together: the same room in two tours counts as two places (named with the tour when there are several).
+  const lookTogether = looks
+    .flatMap((list, i) => list.map((l) => (statTours.length > 1 ? { ...l, room: `${l.room} (${statTours[i].config.title || statTours[i].name})` } : l)))
+    .sort((a, b) => b.seconds - a.seconds);
   const togetherShare = mergeShare(statTours.map((x) => x.share));
   // "Lodtrækning": each chest's entries (the list only for those who may see it - else the number).
   if (page === "lodtraekning") await deleteOldContestEntries().catch(() => 0);
@@ -475,7 +489,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
                     <PortalPeriod value={period} lang={lang} />
                   </div>
                   <section className={card}>
-                    <CustomerReport stats={together} share={togetherShare} brand={sted ? dealName(scope[0]) : company} lang={lang} title={`${statTours.length > 1 ? t.allTogether(statTours.length).replace(/afdelinger|locations/, lang === "en" ? "tours" : "tours") : t.overview} · ${periodText(period, lang)}`} />
+                    <CustomerReport looks={lookTogether} stats={together} share={togetherShare} brand={sted ? dealName(scope[0]) : company} lang={lang} title={`${statTours.length > 1 ? t.allTogether(statTours.length).replace(/afdelinger|locations/, lang === "en" ? "tours" : "tours") : t.overview} · ${periodText(period, lang)}`} />
                   </section>
                   {statTours.length > 1 && (
                     <>
@@ -492,7 +506,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
                             </span>
                           </summary>
                           <div className="mt-4" style={{ ["--report-accent" as string]: x.config.colors.accent }}>
-                            <CustomerReport stats={stats[i]} share={x.share} brand={x.config.title} lang={lang} />
+                            <CustomerReport stats={stats[i]} share={x.share} brand={x.config.title} lang={lang} looks={looks[i]} />
                           </div>
                         </details>
                       ))}

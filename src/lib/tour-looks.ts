@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db";
+import { addDays, dayStart } from "@/lib/tour-stats";
 
 /*
  * "Hvor folk kigger": the tour sends, per scan point a visitor stood at, how
@@ -19,11 +20,15 @@ export type LookSpot = {
   slices: number[];
   /** The slices most looked at, best first (with their share of the time there). */
   top: { yaw: number; share: number }[];
+  /** The room's picture (the story cards' one), when it has one. */
+  image: string | null;
 };
 
-export async function tourLooks(slug: string, days = 60): Promise<LookSpot[]> {
+/** `range`: the last N days, or a period ("YYYY-MM-DD", both days included - Danish time). */
+export async function tourLooks(slug: string, range: number | { from: string; to: string } = 60): Promise<LookSpot[]> {
+  const createdAt = typeof range === "number" ? { gte: new Date(Date.now() - range * 86_400_000) } : { gte: dayStart(range.from), lt: dayStart(addDays(range.to, 1)) };
   const rows = await prisma.tourEvent.findMany({
-    where: { tourSlug: slug, name: "room_look", createdAt: { gte: new Date(Date.now() - days * 86_400_000) } },
+    where: { tourSlug: slug, name: "room_look", createdAt },
     select: { label: true, url: true, session: true },
     take: 50_000,
   });
@@ -38,6 +43,9 @@ export async function tourLooks(slug: string, days = 60): Promise<LookSpot[]> {
     spot.sessions.add(r.session);
     by.set(ss, spot);
   }
+  const rooms = [...new Set([...by.values()].map((s) => s.room).filter((r): r is string => Boolean(r)))];
+  const pictures = rooms.length ? await prisma.tourStoryImage.findMany({ where: { tourSlug: slug, room: { in: rooms } }, select: { room: true, updatedAt: true } }) : [];
+  const picture = new Map(pictures.map((p) => [p.room, `/t/${slug}/historie?rum=${encodeURIComponent(p.room)}&v=${p.updatedAt.getTime()}`]));
   return [...by.entries()]
     .map(([ss, s]) => {
       const seconds = s.slices.reduce((a, b) => a + b, 0);
@@ -48,7 +56,7 @@ export async function tourLooks(slug: string, days = 60): Promise<LookSpot[]> {
         .slice(0, 3)
         // The middle of the slice, as the camera's yaw (-180..180).
         .map((x) => ({ yaw: ((x.i * 30 + 15 + 180) % 360) - 180, share: x.n / seconds }));
-      return { ss, room: s.room, seconds, visits: s.sessions.size, slices: s.slices, top };
+      return { ss, room: s.room, seconds, visits: s.sessions.size, slices: s.slices, top, image: s.room ? picture.get(s.room) ?? null : null };
     })
     .filter((s) => s.seconds > 0)
     .sort((a, b) => b.seconds - a.seconds);
