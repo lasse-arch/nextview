@@ -15,7 +15,11 @@ import { welcomeTiles } from "../tours/places";
  */
 export function PlayGate({ T, isPreview, onPlay }: { T: TourConfig; /** Asked when pressed (it reads the window): the editor's preview just starts, no full screen. */ isPreview: () => boolean; onPlay: () => void }) {
   const tr = useT();
-  const image = T.cover?.image || T.places?.find((p) => p.image)?.image || welcomeTiles(T).find((t) => t.image)?.image || "";
+  const fallback = T.cover?.image || T.places?.find((p) => p.image)?.image || welcomeTiles(T).find((t) => t.image)?.image || "";
+  const bg = T.playGate?.background;
+  // The chosen background - a choice without its picture falls back to the colour.
+  const image = bg === "color" ? "" : bg ? (T.playGate?.image ?? "") : fallback;
+  const blur = bg === "tour" && Boolean(image);
   const title = T.cover?.title || T.brand || T.title;
   const lead = T.cover?.lead || T.subtitle || "";
 
@@ -39,10 +43,10 @@ export function PlayGate({ T, isPreview, onPlay }: { T: TourConfig; /** Asked wh
     <button
       type="button"
       onClick={play}
-      className="pg"
+      className={blur ? "pg pg-sloret" : "pg"}
       style={
         {
-          "--pg-bg": image ? `url(${image})` : "none",
+          "--pg-bg": image ? `url(${JSON.stringify(image)})` : "none",
           "--c-main": T.colors.main,
           "--c-accent": T.colors.accent,
           "--c-on-accent": textOn(T.colors.accent, T.colors.main),
@@ -50,6 +54,7 @@ export function PlayGate({ T, isPreview, onPlay }: { T: TourConfig; /** Asked wh
         } as React.CSSProperties
       }
     >
+      {blur && <span className="pg-blur" aria-hidden />}
       <span className="pg-tekst">
         <TourLogo T={T} className="pg-logo" />
         <span className="pg-titel">{title}</span>
@@ -73,6 +78,9 @@ export function PlayGate({ T, isPreview, onPlay }: { T: TourConfig; /** Asked wh
 
 const PLAY_CSS = `
 .pg{position:fixed;inset:0;z-index:60;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;width:100%;border:0;padding:calc(24px + env(safe-area-inset-top,0px)) 24px calc(24px + env(safe-area-inset-bottom,0px));cursor:pointer;color:#fff;text-align:center;background:linear-gradient(180deg,rgba(0,0,0,.55),rgba(0,0,0,.25) 45%,rgba(0,0,0,.6)),var(--pg-bg) center/cover,var(--c-main)}
+.pg-sloret{background:var(--c-main);overflow:hidden;isolation:isolate}
+.pg-blur{position:absolute;inset:-40px;z-index:-2;background:var(--pg-bg) center/cover;filter:blur(22px) saturate(1.1);transform:scale(1.05)}
+.pg-sloret::before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(180deg,rgba(0,0,0,.35),rgba(0,0,0,.12) 45%,rgba(0,0,0,.45))}
 .pg-tekst{display:flex;flex-direction:column;align-items:center;gap:6px;max-width:640px}
 .pg-logo{height:46px;width:auto;max-width:200px;object-fit:contain;filter:drop-shadow(0 2px 8px rgba(0,0,0,.4));margin-bottom:4px}
 .pg-titel{font-size:clamp(22px,4vw,40px);font-weight:800;line-height:1.1;text-shadow:0 2px 14px rgba(0,0,0,.45)}

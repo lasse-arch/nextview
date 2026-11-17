@@ -21,6 +21,7 @@ const when = (d: Date) =>
 
 export type SentFilter = { fra?: string; kanal?: string; dage?: string };
 const PERIODS = [
+  { key: "idag", label: "I dag" },
   { key: "7", label: "7 dage" },
   { key: "30", label: "30 dage" },
   { key: "90", label: "90 dage" },
@@ -35,7 +36,15 @@ const CHANNELS = [
 const LIST_MAX = 60;
 
 /** The start of the period (null = everything). */
-const sinceOf = (dage: string) => (dage === "alt" ? null : new Date(Date.now() - Number(dage) * 86_400_000));
+const sinceOf = (dage: string) => (dage === "alt" ? null : dage === "idag" ? todayStart() : new Date(Date.now() - Number(dage) * 86_400_000));
+/** Midnight today in Denmark (the server runs in UTC). */
+function todayStart(): Date {
+  const now = new Date();
+  const dk = new Date(now.toLocaleString("en-US", { timeZone: "Europe/Copenhagen" }));
+  const offset = dk.getTime() - new Date(now.toLocaleString("en-US", { timeZone: "UTC" })).getTime();
+  const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Copenhagen" }).format(now);
+  return new Date(new Date(`${day}T00:00:00Z`).getTime() - offset);
+}
 
 type LinkInfo = { slug: string; name: string; visits: DemoVisit[] };
 type Row = {
@@ -248,7 +257,7 @@ export async function SentMails({ user, filter }: { user: NonNullable<Awaited<Re
           })}
         </ul>
       ) : (
-        <p className="mt-4 text-sm text-slate-500">Intet sendt i den valgte periode.</p>
+        <p className="mt-4 text-sm text-slate-500">{dage === "idag" ? "Intet sendt i dag endnu." : "Intet sendt i den valgte periode."}</p>
       )}
       {rows.length > LIST_MAX && <p className="mt-2 text-xs text-slate-400">Viser de {LIST_MAX} nyeste af {rows.length}. Tallene øverst tæller dem alle.</p>}
       <p className="mt-3 text-xs text-slate-400">

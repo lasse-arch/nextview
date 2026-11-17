@@ -937,6 +937,14 @@ export type TourConfig = {
    */
   autoplay?: false;
   /**
+   * What's behind the play button (autoplay off, or a phone with "play"):
+   * "color" = the main colour; "tour" = `image` (a shot of the tour taken in
+   * the editor) shown blurred, so the place shimmers behind the title;
+   * "image" = `image` sharp (a photo of their own). Left out = the cover's
+   * photo (or a place's / welcome tile's) when there is one, else the colour.
+   */
+  playGate?: { background: "color" | "tour" | "image"; image?: string };
+  /**
    * On a phone, where the tour sits in someone's page. Left out (the
    * standard): it loads in the frame, and the first tap in it puts it in full
    * screen (an iPhone, where a frame can't go full screen, gets a "Fuld skærm"

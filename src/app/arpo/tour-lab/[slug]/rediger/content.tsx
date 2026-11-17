@@ -221,7 +221,7 @@ function FilmFrameButton({ src, onDone }: { src: string; onDone: (src: string) =
 }
 
 /** A photo - taken from the preview, or an address. */
-function PhotoPicker({ image, onChange, preview, slug, photoKey }: { image: string; onChange: (src: string) => void; preview: PreviewApi; slug: string; photoKey: string }) {
+export function PhotoPicker({ image, onChange, preview, slug, photoKey }: { image: string; onChange: (src: string) => void; preview: PreviewApi; slug: string; photoKey: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   return (

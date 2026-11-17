@@ -9,6 +9,7 @@
 export type EngineChange = { date: string; kind: "ny" | "sikkerhed" | "hastighed" | "rettelse"; text: string };
 
 export const ENGINE_CHANGES: EngineChange[] = [
+  { date: "2026-11-17", kind: "ny", text: "Afspil-skærmen (touren på en hjemmeside, før man trykker) kan have tre baggrunde: hovedfarven, et billede af touren vist sløret, eller et eget billede. Vælges under Ekstra i editoren." },
   { date: "2026-11-17", kind: "ny", text: "Touren måler mere: videoer de besøgende starter (og hvor længe de ser dem), billeder åbnet stort, infobokse, holdplanen, Vej hertil, alle links ud af touren - og hvor Find vej fører dem hen. Vises i Resultater og på kundesiden under \"Det, de brugte i touren\"." },
   { date: "2026-11-16", kind: "ny", text: "Touren måler, hvor de besøgende selv kigger hen i hvert rum (hvilken retning og hvor længe) - vises i Resultater under \"Hvor folk kigger\" og bruges af nextviewAI's forslag. Kun retning og tid, ingen personlige oplysninger." },
   { date: "2026-11-14", kind: "rettelse", text: "Bar i bunden på telefon: en lang knaptekst (\"Book en smagning\") deler sig på to linjer i sin egen knap i stedet for at løbe ud over kanten, og stedkort og \"Din plads venter\" står altid over baren - aldrig oven på den." },

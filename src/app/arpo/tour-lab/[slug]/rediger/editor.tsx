@@ -17,7 +17,7 @@ import { addTourAiMemory, askClaudeForTour, measureTourLogo, suggestTourFilter, 
 import type { FindStepAside, MenuEntry, TourConfig } from "../../tours/types";
 import type { TourStats } from "@/lib/tour-stats";
 import type { ReportShare } from "@/lib/tour-share";
-import { CardsEditor, DroneViewPicker, GuideEditor, StartEditor, TagsEditor, ViewFromPreview } from "./content";
+import { CardsEditor, DroneViewPicker, GuideEditor, PhotoPicker, StartEditor, TagsEditor, ViewFromPreview } from "./content";
 import { ResultsPanel } from "./results";
 import { LayoutEditor } from "./layout-editor";
 import { ScanPointsEditor, ScanRoomsEditor } from "./scanpoints";
@@ -1184,6 +1184,37 @@ export function TourEditor({
                     onChange={(v) => edit((d) => void (d.phoneEmbed = v === "use" ? undefined : v))}
                   />
                 </Field>
+                <Field
+                  title="Baggrund bag afspil-knappen"
+                  hint={
+                    (config.playGate?.background ?? "auto") === "tour"
+                      ? "Stil forhåndsvisningen der, hvor touren er flottest, og tryk Tag billede - det vises sløret bag navnet og knappen."
+                      : config.playGate?.background === "image"
+                        ? "Et billede af jeres eget, skarpt og med en mørk tone over, så teksten kan læses."
+                        : config.playGate?.background === "color"
+                          ? "Hovedfarven - roligt og hurtigt."
+                          : "Ikke valgt: forsidens billede, hvis touren har et - ellers hovedfarven."
+                  }
+                >
+                  <Choice<"color" | "tour" | "image">
+                    value={config.playGate?.background ?? (config.cover?.image || config.places?.some((p) => p.image) ? "image" : "color")}
+                    options={[
+                      ["color", "Farve"],
+                      ["tour", "Sløret tour"],
+                      ["image", "Billede"],
+                    ]}
+                    onChange={(v) => edit((d) => void (d.playGate = { background: v, ...(v !== "color" && d.playGate?.image ? { image: d.playGate.image } : {}) }))}
+                  />
+                </Field>
+                {config.playGate && config.playGate.background !== "color" && (
+                  <PhotoPicker
+                    image={config.playGate.image ?? ""}
+                    onChange={(src) => edit((d) => void (d.playGate = { background: d.playGate?.background ?? "image", ...(src ? { image: src } : {}) }))}
+                    preview={preview}
+                    slug={slug}
+                    photoKey="afspil-baggrund"
+                  />
+                )}
                 <Toggle
                   on={Boolean(config.onboarding)}
                   onChange={(on) => edit((d) => void (d.onboarding = on || undefined))}
