@@ -63,6 +63,12 @@ export async function getUnreadNewsCount(userId: string, newsReadAt: Date | null
 const DEFAULT_POSTS: { title: string; body: string; minutesAgo: number; screenshotUrl: string }[] = [
   {
     minutesAgo: 0,
+    title: "Touren måler meget mere - og kunden kan se det",
+    body: "Touren måler nu også, hvor de besøgende selv kigger hen i hvert rum, hvilke videoer de starter (og hvor længe de ser dem), hvilke billeder de åbner, hvilke personer de trykker på, infobokse, holdplanen, Vej hertil, alle links ud af touren - og hvor Find vej fører dem hen, og om de når frem.\n\nPå kundesiden og rapportlinket er der to nye bokse: \"Det, de brugte i touren\" og \"Hvor de kigger længst rundt\" (stederne med rummets billede). I Resultater i editoren ser I det samme - og under \"Hvor folk kigger\" kan I dreje forhåndsvisningen præcis derhen, hvor folk kigger mest. Begge kan slås fra under Kundens rapport.\n\nHver måned kommer der også forslag til forbedringer af sig selv (i klokken), bygget på tallene - fx en ny rækkefølge i menuen. Husk at trykke \"Opdater alle udgivne tours\", så målingen kommer ud i de udgivne tours.",
+    screenshotUrl: "/news/det-de-brugte.png",
+  },
+  {
+    minutesAgo: 0,
     title: "Invitationslink: kundens folk tilføjer sig selv til kundesiden",
     body: "Under Kundens login på en deal (og i kundeoverblikket) kan en admin nu lave et invitationslink. Vælg rolle, hvor længe det gælder (7, 14 eller 30 dage), og hvor mange personer der må bruge det - og send linket til kunden.\n\nHver person skriver navn og e-mail og får så et login-link på mailen, så kun den, der har mailboksen, kommer ind. Linket vises kun én gang, når det laves, og kan stoppes når som helst. Hvem der har tilføjet sig, står som en note på dealen.\n\nEr kunden en kæde, gælder adgangen på hovedafdelingen også alle afdelinger - de får én kundeside, hvor de skifter mellem stederne. Det følger nu også med, når en afdeling kobles på eller af senere.",
     screenshotUrl: "/news/invitationslink.png",
