@@ -63,6 +63,12 @@ export async function getUnreadNewsCount(userId: string, newsReadAt: Date | null
 const DEFAULT_POSTS: { title: string; body: string; minutesAgo: number; screenshotUrl: string }[] = [
   {
     minutesAgo: 0,
+    title: "Generator: se hvem der har sendt hvad - og hvordan det virker",
+    body: "Under Sendt i Generator står mails og SMS'er nu samlet. Øverst kan I filtrere på hvem der har sendt (admins), mail eller SMS, og periode (7, 30 eller 90 dage eller alt).\n\nOver listen står tallene for det, der er valgt: hvor mange der er sendt, hvor mange mails der er åbnet (og hvor mange åbninger i alt), hvor mange links der er åbnet, og hvor mange minutter folk har gået rundt i touren. Sælgere ser deres egne, admins ser alle.",
+    screenshotUrl: "/news/generator-sendt.png",
+  },
+  {
+    minutesAgo: 0,
     title: "Touren måler meget mere - og kunden kan se det",
     body: "Touren måler nu også, hvor de besøgende selv kigger hen i hvert rum, hvilke videoer de starter (og hvor længe de ser dem), hvilke billeder de åbner, hvilke personer de trykker på, infobokse, holdplanen, Vej hertil, alle links ud af touren - og hvor Find vej fører dem hen, og om de når frem.\n\nPå kundesiden og rapportlinket er der to nye bokse: \"Det, de brugte i touren\" og \"Hvor de kigger længst rundt\" (stederne med rummets billede). I Resultater i editoren ser I det samme - og under \"Hvor folk kigger\" kan I dreje forhåndsvisningen præcis derhen, hvor folk kigger mest. Begge kan slås fra under Kundens rapport.\n\nHver måned kommer der også forslag til forbedringer af sig selv (i klokken), bygget på tallene - fx en ny rækkefølge i menuen. Husk at trykke \"Opdater alle udgivne tours\", så målingen kommer ud i de udgivne tours.",
     screenshotUrl: "/news/det-de-brugte.png",

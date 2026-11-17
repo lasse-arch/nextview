@@ -29,10 +29,11 @@ export const maxDuration = 300;
  * and "Gør mig klar til møde" prepares a meeting from the calendar
  * (src/lib/meeting-prep.ts).
  */
-export default async function GeneratorPage({ searchParams }: { searchParams: Promise<{ fane?: string }> }) {
+export default async function GeneratorPage({ searchParams }: { searchParams: Promise<{ fane?: string; fra?: string; kanal?: string; dage?: string }> }) {
   const user = await getCurrentUser();
   if (!user) redirect("/api/auth/session-ended?next=/arpo/generator");
-  const fane = (await searchParams).fane;
+  const sp = await searchParams;
+  const fane = sp.fane;
   const sms = fane === "sms";
   const spoerg = fane === "spoerg";
   const portal = fane === "kundeportal";
@@ -72,7 +73,7 @@ export default async function GeneratorPage({ searchParams }: { searchParams: Pr
         <>
           <ProposalSection recent={await listProposals()} />
           <MailSection user={user} />
-          <SentMails user={user} />
+          <SentMails user={user} filter={{ fra: sp.fra, kanal: sp.kanal, dage: sp.dage }} />
         </>
       )}
     </div>
