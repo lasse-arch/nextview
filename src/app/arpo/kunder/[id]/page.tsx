@@ -82,6 +82,19 @@ const MAIL_KIND: Record<string, string> = {
   review_fixed: "Rettelser lavet - se og godkend touren",
 };
 
+/** The top of a chain (a location's main deal, or its main deal's, ...) - stops on a loop. */
+async function chainRoot(id: string): Promise<string> {
+  const seen = new Set<string>();
+  let at = id;
+  while (!seen.has(at)) {
+    seen.add(at);
+    const up = await prisma.deal.findUnique({ where: { id: at }, select: { parentDealId: true } });
+    if (!up?.parentDealId) break;
+    at = up.parentDealId;
+  }
+  return at;
+}
+
 export default async function CustomerOverviewPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user) redirect("/api/auth/session-ended?next=/arpo");
@@ -105,6 +118,8 @@ export default async function CustomerOverviewPage({ params }: { params: Promise
     },
   });
   if (!deal) notFound();
+  // A chain has ONE overview: opened from a location, show the main deal's (which brings every location along).
+  if (deal.parentDealId) redirect(`/arpo/kunder/${await chainRoot(deal.parentDealId)}`);
   const dealIds = [deal.id, ...deal.branches.map((b) => b.id)];
   const accountIds = deal.customerAccounts.map((c) => c.accountId);
 
@@ -253,7 +268,7 @@ export default async function CustomerOverviewPage({ params }: { params: Promise
                 ["Adresse", deal.address],
                 ["Hjemmeside", deal.websiteUrl ? <a href={/^https?:/.test(deal.websiteUrl) ? deal.websiteUrl : `https://${deal.websiteUrl}`} target="_blank" rel="noopener" className="text-[#0071e3]">{deal.websiteUrl.replace(/^https?:\/\//, "")}</a> : null],
                 ["Sælger", deal.owner.name],
-                ["Afdelinger", deal.branches.length ? deal.branches.map((b, i) => <span key={b.id}>{i ? ", " : ""}<Link href={`/arpo/kunder/${b.id}`} className="text-[#0071e3]">{dealName(b)}</Link></span>) : null],
+                ["Afdelinger", deal.branches.length ? deal.branches.map((b, i) => <span key={b.id}>{i ? ", " : ""}<Link href={`/arpo/deals/${b.id}`} className="text-[#0071e3]">{dealName(b)}</Link></span>) : null],
               ]}
             />
           </Card>
