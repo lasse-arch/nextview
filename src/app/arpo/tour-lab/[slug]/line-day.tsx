@@ -5,13 +5,15 @@ import { useT } from "../tours/i18n-react";
 import type { CardPerson, LineDayStop, TourConfig } from "../tours/types";
 
 /*
- * "En dag på din linje": the visitor picks a line and lives a school day.
- * The tour flies from stop to stop - the line's own places (the stable
- * before breakfast) woven together with the school's shared ones (morning
- * assembly, the room at night) - each with its time, a few words and the
- * people met there. Nothing moves by itself: "Næste" goes on. "Lidt af det
- * hele" is the shared day with a short visit to every line, for those in
- * doubt. The end gathers the day, the next visit and another line's day.
+ * "En linje på <skolen>" (was "En dag på din linje"): the visitor picks a
+ * line and sees what it is like to go there - a few moments, the line's own
+ * places woven together with the school's shared ones, each with a photo of
+ * the life there, a few words and the people met there. No schedule.
+ * A moment with a place: its photo fills the screen and fades into the same
+ * place in the tour (a room, or a drone point). Without a place: the photos
+ * stand big with the tour blurred behind. Nothing moves on by itself:
+ * "Næste" goes on. "Lidt af det hele" is a short visit to every line, for
+ * those in doubt. The end gathers the moments, the next visit and another line.
  */
 
 type L = NonNullable<TourConfig["lineDays"]>;
@@ -48,6 +50,16 @@ export function lineDayStops(L: L, line: string): ShownStop[] {
     })
     .filter((s): s is ShownStop => Boolean(s));
 }
+
+/** The feature's name: its own title - or "En linje på <the tour's name>" (also for tours still called the old "En dag på din linje"). */
+export function lineDaysTitle(T: TourConfig, tr: (s: string, v?: Record<string, string | number>) => string): string {
+  const own = T.lineDays?.title?.trim();
+  if (own && !/^en dag på din linje$/i.test(own)) return own;
+  return tr("En linje på {skole}", { skole: T.title || T.brand });
+}
+
+/** A line's photo on the picker: its own, else the first photo of its own moments. */
+const lineImage = (l: L["lines"][number]) => l.image || l.day.flatMap((d) => (typeof d === "string" ? [] : (d.images ?? []))).find(Boolean) || null;
 
 const names = (people?: CardPerson[]) => {
   const n = (people ?? []).map((p) => p.name?.split(" ")[0]).filter(Boolean) as string[];
@@ -127,24 +139,30 @@ function StopPhotos({ images, alt }: { images: string[]; alt: string }) {
 }
 
 /** The start: "Forestil dig en skoledag ..." - the lines with their teachers, or a bit of everything. */
-export function LineDayPicker({ L, onPick, onClose }: { L: L; onPick: (line: string) => void; onClose: () => void }) {
+export function LineDayPicker({ L, title, onPick, onClose }: { L: L; title: string; onPick: (line: string) => void; onClose: () => void }) {
   const tr = useT();
+  // The photos only when (nearly) every line has one - a row of photos with one plain tile looks unfinished.
+  const photos = L.lines.filter((l) => lineImage(l)).length >= Math.max(1, L.lines.length - 1);
   return (
     <div className="ld" onClick={onClose}>
-      <div className="ld-pick" role="dialog" aria-label={L.title} onClick={(e) => e.stopPropagation()}>
+      <div className="ld-pick" role="dialog" aria-label={title} onClick={(e) => e.stopPropagation()}>
         <button type="button" className="ld-x" aria-label={tr("Luk")} onClick={onClose}>
           ×
         </button>
-        <h2>{L.title}</h2>
+        <h2>{title}</h2>
         {L.lead && <p className="ld-lead">{L.lead}</p>}
-        <div className="ld-lines">
-          {L.lines.map((l) => (
-            <button key={l.id} type="button" className="ld-line" onClick={() => onPick(l.id)}>
-              <Faces people={l.people} size={38} />
-              <b>{l.name}</b>
-              {l.people?.length ? <small>{tr("Med {navne}", { navne: names(l.people) })}</small> : l.teaser ? <small>{l.teaser}</small> : null}
-            </button>
-          ))}
+        <div className={`ld-lines ${photos ? "med-fotos" : ""}`}>
+          {L.lines.map((l) => {
+            const img = photos ? lineImage(l) : null;
+            return (
+              <button key={l.id} type="button" className={`ld-line ${img ? "med-foto" : ""}`} onClick={() => onPick(l.id)}>
+                {img && <FadeImg src={img} />}
+                <Faces people={l.people} size={img ? 30 : 38} />
+                <b>{l.name}</b>
+                {l.people?.length ? <small>{tr("Med {navne}", { navne: names(l.people) })}</small> : l.teaser ? <small>{l.teaser}</small> : null}
+              </button>
+            );
+          })}
         </div>
         <div className="ld-or">
           {L.mix !== false && (
@@ -164,6 +182,8 @@ export function LineDayPicker({ L, onPick, onClose }: { L: L; onPick: (line: str
 /** While the day runs: where in the day, the stop, the people - and Næste. */
 export function LineDayCard({ L, stops, run, onGo, onClose }: { L: L; stops: ShownStop[]; run: LineDayRun; onGo: (at: number | "end") => void; onClose: () => void }) {
   const tr = useT();
+  /** The photo shown big again (a thumbnail pressed) - each press shows it anew. */
+  const [again, setAgain] = useState<{ n: number; at: number }>({ n: 0, at: 0 });
   // The next stops' first photos are fetched while this one is read - so they're there when Næste is pressed.
   const coming = stops
     .slice(run.at + 1, run.at + 3)
@@ -185,31 +205,53 @@ export function LineDayCard({ L, stops, run, onGo, onClose }: { L: L; stops: Sho
   const metBefore = L.people === "faces" || (Boolean(who(s)) && stops.slice(0, run.at).some((x) => who(x) === who(s)));
   // "Kun én": just the first person, in full.
   const people = L.people === "one" ? s.people?.slice(0, 1) : s.people;
-  const title = run.line === MIX ? (L.mix && L.mix.title) || tr("Lidt af det hele") : tr("En dag på {linje}", { linje: L.lines.find((l) => l.id === run.line)?.name ?? "" });
+  const title = run.line === MIX ? (L.mix && L.mix.title) || tr("Lidt af det hele") : (L.lines.find((l) => l.id === run.line)?.name ?? "");
   const photos = (s.images ?? []).filter(Boolean).slice(0, 3);
+  const placed = Boolean(s.href);
+  const label = (x: ShownStop) => [x.time, x.title].filter(Boolean).join(" ");
   return (
-    <div className={`ld-card ${photos.length ? "ld-med-foto" : ""}`} key={s.id + run.at}>
-      {photos.length > 0 && <StopPhotos key={s.id + run.at} images={photos} alt={s.title} />}
+    <>
+      {photos.length > 0 &&
+        (placed ? (
+          <StopReveal key={`${s.id}:${run.at}:${again.n}`} src={photos[again.n ? again.at : 0]} alt={s.title} />
+        ) : (
+          <div className="ld-frame" key={`${s.id}:${run.at}`}>
+            <div className="ld-frame-photos">
+              <StopPhotos images={photos} alt={s.title} />
+            </div>
+          </div>
+        ))}
+    <div className="ld-card" key={s.id + run.at}>
       <div className="ld-top">
         <span className="ld-kicker">{title}</span>
         <button type="button" className="ld-x2" aria-label={tr("Luk")} onClick={onClose}>
           ×
         </button>
       </div>
-      <ol className="ld-dots" aria-label={tr("Dagen")}>
+      <ol className="ld-dots" aria-label={tr("Øjeblikke")}>
         {stops.map((x, i) => (
           <li key={x.id + i}>
-            <button type="button" className={i === run.at ? "nu" : i < run.at ? "set" : ""} title={`${x.time} · ${x.title}`} aria-label={`${x.time} · ${x.title}`} onClick={() => onGo(i)} />
+            <button type="button" className={i === run.at ? "nu" : i < run.at ? "set" : ""} title={label(x)} aria-label={label(x)} onClick={() => onGo(i)} />
           </li>
         ))}
       </ol>
       <div className="ld-when">
-        <time>{s.time}</time>
+        {s.time && <time>{s.time}</time>}
         <span className={`ld-badge ${s.shared ? "faelles" : ""}`}>{s.shared ? tr("Hele skolen") : s.lineName}</span>
         {s.place && <span className="ld-place">{s.place}</span>}
       </div>
       <h3>{s.title}</h3>
       {s.text && <p>{s.text}</p>}
+      {placed && photos.length > 0 && (
+        <div className="ld-thumbs">
+          {photos.map((src, i) => (
+            <button key={src + i} type="button" aria-label={tr("Se billedet stort")} onClick={() => setAgain((a) => ({ n: a.n + 1, at: i }))}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={src} alt="" loading="lazy" decoding="async" />
+            </button>
+          ))}
+        </div>
+      )}
       {s.tags?.length ? (
         <div className="ld-tags">
           {s.tags.map((t) => (
@@ -245,9 +287,31 @@ export function LineDayCard({ L, stops, run, onGo, onClose }: { L: L; stops: Sho
           </button>
         )}
         <button type="button" className="ld-next" onClick={() => onGo(next ? run.at + 1 : "end")}>
-          {next ? `${tr("Næste")}: ${next.time} ${next.title}` : tr("Se hele dagen")} ›
+          {next ? `${tr("Næste")}: ${next.title}` : tr("Se det hele samlet")} ›
         </button>
       </div>
+    </div>
+    </>
+  );
+}
+
+/**
+ * A moment's photo of the life there, full screen as the moment opens - then
+ * it fades away into the same place in the tour (which has moved there
+ * meanwhile). A tap lets the tour through at once.
+ */
+function StopReveal({ src, alt }: { src: string; alt: string }) {
+  const [phase, setPhase] = useState<"show" | "fade" | "gone">("show");
+  useEffect(() => {
+    const calm = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    const a = setTimeout(() => setPhase((p) => (p === "show" ? "fade" : p)), calm ? 1400 : 2600);
+    const b = setTimeout(() => setPhase("gone"), calm ? 1800 : 4000);
+    return () => (clearTimeout(a), clearTimeout(b));
+  }, []);
+  if (phase === "gone") return null;
+  return (
+    <div className={`ld-reveal ${phase === "fade" ? "ud" : ""}`} onClick={() => setPhase("fade")} onTransitionEnd={() => phase === "fade" && setPhase("gone")}>
+      <FadeImg src={src} alt={alt} eager />
     </div>
   );
 }
@@ -258,15 +322,15 @@ export function LineDayEnd({ L, stops, run, onPick, onVisit, onClose }: { L: L; 
   const line = L.lines.find((l) => l.id === run.line);
   return (
     <div className="ld" onClick={onClose}>
-      <div className="ld-pick ld-end" role="dialog" aria-label={tr("Din dag")} onClick={(e) => e.stopPropagation()}>
+      <div className="ld-pick ld-end" role="dialog" aria-label={tr("Linjen")} onClick={(e) => e.stopPropagation()}>
         <button type="button" className="ld-x" aria-label={tr("Luk")} onClick={onClose}>
           ×
         </button>
         <div className="ld-end-grid">
-          <ol className="ld-sum">
+          <ol className={`ld-sum ${stops.some((s) => s.time) ? "" : "uden-tid"}`}>
             {stops.map((s, i) => (
               <li key={s.id + i}>
-                <time>{s.time}</time>
+                {s.time ? <time>{s.time}</time> : <time aria-hidden>{i + 1}</time>}
                 <span>
                   <b>{s.title}</b>
                   {!s.shared && s.lineName && run.line === MIX && <small>{s.lineName}</small>}
@@ -275,7 +339,7 @@ export function LineDayEnd({ L, stops, run, onPick, onVisit, onClose }: { L: L; 
             ))}
           </ol>
           <div>
-            <h2>{line ? tr("Det var en dag på {linje}.", { linje: line.name }) : tr("Det var en dag hos os.")}</h2>
+            <h2>{line ? tr("Sådan er det at gå på {linje}.", { linje: line.name }) : tr("Sådan er det at gå hos os.")}</h2>
             {line?.outro && <p className="ld-lead">{line.outro}</p>}
             {line?.trips?.length ? (
               <div className="ld-trips">
@@ -307,7 +371,7 @@ export function LineDayEnd({ L, stops, run, onPick, onVisit, onClose }: { L: L; 
                 </button>
               </div>
             )}
-            <span className="ld-kicker">{run.line === MIX ? tr("Se en hel dag på din linje") : tr("Se en dag på en anden linje")}</span>
+            <span className="ld-kicker">{run.line === MIX ? tr("Se din linje") : tr("Se en anden linje")}</span>
             <div className="ld-chips">
               {L.lines
                 .filter((l) => l.id !== run.line)
@@ -341,6 +405,30 @@ export const LINE_DAY_CSS = `
 .ld-faces img+img{margin-left:-10px}
 .ld-or{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:16px}
 .ld-or button{border:0;background:none;padding:6px 0;font:inherit;font-size:14px;font-weight:700;color:var(--c-accent);cursor:pointer}
+/* The line's photo on the picker: the tile is the photo, with the faces and the name on it. */
+.ld-line.med-foto{position:relative;justify-content:flex-end;min-height:150px;padding:12px;border:0;overflow:hidden;color:#fff;background:#2a3135}
+.ld-line.med-foto>.ld-img{position:absolute;inset:0}
+.ld-line.med-foto::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,0) 30%,rgba(0,0,0,.7));pointer-events:none}
+.ld-line.med-foto>*:not(.ld-img){position:relative;z-index:1}
+.ld-line.med-foto .ld-faces{position:absolute;top:10px;left:10px}
+.ld-line.med-foto b{color:#fff;font-size:18px}
+.ld-line.med-foto small{color:rgba(255,255,255,.88)}
+.ld-line.med-foto:hover .ld-img img{transform:scale(1.04)}
+/* A moment's photo, full screen as it opens - fading into the same place in the tour. */
+.ld-reveal{position:absolute;inset:0;z-index:29;background:#111;opacity:1;transition:opacity 1.3s ease;cursor:pointer}
+.ld-reveal .ld-img{width:100%;height:100%}
+.ld-reveal .ld-img img{transform:scale(1.04);transition:opacity .4s ease,transform 4s ease-out}
+.ld-reveal .ld-img.klar img{transform:scale(1)}
+.ld-reveal.ud{opacity:0;pointer-events:none}
+/* A moment with no place: its photos big, the tour blurred behind. */
+.ld-frame{position:absolute;inset:0;z-index:29;background:rgba(10,14,16,.35);-webkit-backdrop-filter:blur(18px) saturate(1.1);backdrop-filter:blur(18px) saturate(1.1);animation:hvFade .4s ease}
+.ld-frame-photos{position:absolute;top:24px;right:24px;bottom:24px;left:440px;display:flex}
+.ld-frame-photos .ld-photos{flex:1!important;margin:0;border-radius:20px;box-shadow:0 20px 60px rgba(0,0,0,.4)}
+/* The moment's photos, small - a tap shows one big again. */
+.ld-thumbs{display:flex;gap:6px;margin-top:10px}
+.ld-thumbs button{width:46px;height:46px;padding:0;border:0;border-radius:10px;overflow:hidden;background:#e9ecee;cursor:pointer}
+.ld-thumbs img{width:100%;height:100%;object-fit:cover;display:block}
+.ld-sum.uden-tid time{width:22px;color:#b3bcc0}
 /* The card never scrolls: the text is cut short instead (the whole text is in the day's summary). */
 .ld-card{position:absolute;left:16px;bottom:16px;z-index:30;width:min(400px,calc(100% - 32px));max-height:calc(100% - 120px);overflow:hidden;padding:16px 18px;border-radius:20px;background:rgba(255,255,255,.98);color:#1d2a30;box-shadow:0 16px 44px rgba(0,0,0,.32);animation:hvUp .35s cubic-bezier(.2,.7,.2,1) both}
 .ld-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
@@ -436,6 +524,8 @@ export const LINE_DAY_CSS = `
   .ld-people small{font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .ld-people>span>span{min-width:0}
   .ld-end-grid{grid-template-columns:1fr;gap:16px}
+  .ld-frame-photos{top:calc(12px + env(safe-area-inset-top,0px));left:10px;right:10px;bottom:auto;height:42%}
+  .ld-line.med-foto{min-height:128px}
   .ld-sum{border-right:0;padding-right:0;order:2}
 }
 `;

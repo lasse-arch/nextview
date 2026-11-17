@@ -5,6 +5,7 @@ import { mouseScroll } from "./mouse-scroll";
 import { useT } from "../tours/i18n-react";
 import { shownGuides, guideStops, startPlaces } from "../tours/places";
 import type { TourConfig } from "../tours/types";
+import { lineDaysTitle } from "./line-day";
 
 /*
  * "Det kan jeres tour": the first time a customer opens their tour on the
@@ -212,8 +213,8 @@ function featuresOf(T: TourConfig, tr: (s: string, v?: Record<string, string | n
   if (T.lineDays?.lines.length)
     out.push({
       key: "linjedag",
-      title: T.lineDays.title || tr("En dag på din linje"),
-      text: tr("Gæsten vælger en linje ({n} at vælge imellem) og følger en hel dag - hvor de er, hvem de møder, og hvad de laver.", { n: T.lineDays.lines.length }),
+      title: lineDaysTitle(T, tr),
+      text: tr("Gæsten vælger en linje ({n} at vælge imellem) og ser, hvordan det er at gå der - stederne, livet og de mennesker, de møder.", { n: T.lineDays.lines.length }),
       scene: (
         <div className="ft-scene ft-dag">
           {T.lineDays.lines.slice(0, 3).map((l, i) => (
@@ -448,7 +449,7 @@ const CAN_ALSO: [string, string][] = [
   ["cards", "Stedkort"],
   ["info", "Punkter med fakta og video"],
   ["dag", "Sådan ser en dag ud"],
-  ["linjedag", "En dag på din linje"],
+  ["linjedag", "En linje på skolen"],
   ["aarshjul", "Årshjul"],
   ["finder", "Find din plads"],
   ["vej", "Hvor langt har du til os?"],

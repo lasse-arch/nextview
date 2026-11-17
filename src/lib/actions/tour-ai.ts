@@ -176,7 +176,7 @@ Regler:
   - små prikker med info på ting i rummet → info (tags)
   - billeder af rummene i bunden → stories (stories.desktop / stories.mobile slår dem til - aldrig med CSS)
   - steder med foto at vælge imellem → places + design.welcome "cover" eller design.menu "dock"
-  - en efterskole med linjefag → lineDays ("En dag på din linje": fælles stop + hver linjes egne, lærere med billeder), åbnes med #linjedag
+  - en efterskole med linjefag → lineDays ("En linje på <skolen>": 4-6 øjeblikke pr. linje uden tider - fælles + linjens egne, hver med et foto af livet dér (toner over i stedet), lærere med billeder, linjens foto til valget), åbnes med #linjedag
   - en dronefilm eller anden kort film, der skal køre i baggrunden af forsiden → design.welcome "cover" + cover.video ("Forside med film"; intro bruges så ikke)
   - fliserne skal ligge over en film i stedet for over touren → welcome.video { src, srcMobile? } (design.welcome "tiles" eller "simple")
   - størrelser/rum at skifte mellem → design.menu "picker"
@@ -471,7 +471,7 @@ export async function askClaudeForTour(config: TourConfig, history: ChatTurn[], 
     const seen = images.length
       ? `\n\n(Brugeren har sendt ${images.length === 1 ? "et billede" : `${images.length} billeder`} med - i rækkefølge. Er det et skærmbillede (af forhåndsvisningen, kundens hjemmeside), så brug det til at forstå, hvad de mener. Er det et foto, de vil have i touren, så brug adressen herunder direkte i opsætningen (fx images på et punkt eller stedkort, et personbillede, en flise) - billedet er allerede gemt hos os.${
           many
-            ? " Se på hvert foto for sig: hvad sker der, hvor er det (inde/ude, hvilket rum eller sted), hvem er med, og hvilken tid på dagen ligner det? Kobl det med det, hjemmesiden og de sociale medier fortæller (linjens fag, skema, ture, lærere). Beder brugeren om en dag på en linje (eller sender mange fotos fra en linje uden at sige mere), så byg eller udvid lineDays: stop i dagens rækkefølge med time, place, title, en kort text i skolens tone og 1-3 images pr. stop; brug fælles stop (shared) for det, alle linjer har. Står tiderne på hjemmesiden, så brug dem; ellers skriv fx \"Formiddag\" i stedet for at gætte et klokkeslæt. Et stop kan godt være fotos alene uden sted i touren (ingen href). Brug ikke et foto, der er uskarpt, et skærmbillede eller ikke passer. Sig kort i reply, hvilke fotos du brugte hvor, og hvilke du lod ligge og hvorfor. Facebook og Instagram kan du ikke læse opslag fra (de kræver login) - bruger brugeren tekst derfra, skal de indsætte den i chatten."
+            ? " Se på hvert foto for sig: hvad sker der, hvor er det (inde/ude, hvilket rum eller sted), hvem er med, og hvilken tid på dagen ligner det? Kobl det med det, hjemmesiden og de sociale medier fortæller (linjens fag, skema, ture, lærere). Beder brugeren om en linje (\"En linje på\", eller sender mange fotos fra en linje uden at sige mere), så byg eller udvid lineDays: 4-6 øjeblikke pr. linje UDEN time (det er ikke et skema), med place, title, en kort text i skolens tone og 1-3 images pr. øjeblik, og et href til stedet i touren, hvor fotoet er taget (et scannet rum eller et dronepunkt), så fotoet toner over i stedet; brug fælles øjeblikke (shared) for det, alle linjer har, og sæt linjens bedste foto som lines[].image. Et stop kan godt være fotos alene uden sted i touren (ingen href). Brug ikke et foto, der er uskarpt, et skærmbillede eller ikke passer. Sig kort i reply, hvilke fotos du brugte hvor, og hvilke du lod ligge og hvorfor. Facebook og Instagram kan du ikke læse opslag fra (de kræver login) - bruger brugeren tekst derfra, skal de indsætte den i chatten."
             : ""
         }${addresses.length ? `\n${addresses.join("\n")}` : ""})`
       : "";
@@ -1716,7 +1716,7 @@ async function exemplarText(slug: string | undefined): Promise<string> {
   if (c.nudge) has.push('"Din plads venter"');
   if (c.stories?.mobile || c.stories?.desktop) has.push("historier (rummene som kort)");
   if (c.day) has.push("Sådan ser en dag ud");
-  if (c.lineDays) has.push("En dag på din linje");
+  if (c.lineDays) has.push("En linje på skolen");
   if (c.schedule) has.push("Byg dit skema");
   if (c.wayfinding) has.push("Find vej");
   if (c.map || c.drone) has.push("luftfoto med punkter");

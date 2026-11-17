@@ -149,15 +149,22 @@ Fx specialefterskoler (ADHD, autisme, nedsat kognitivt funktionsniveau):
 - **"Din plads venter"**: et kort efter ca. 90 sekunder med kundens vigtigste
   handling. Ét kort, aldrig mens menuen er åben.
 
-## Efterskoler med linjer: "En dag på din linje"
+## Efterskoler med linjer: "En linje på <skolen>"
 
-- Lad gæsten vælge linje og leve en skoledag: linjens egne steder (stalden
-  før morgenmaden) flettet sammen med skolens fælles (morgensamling,
-  spisesalen, værelset om aftenen). Fælles stop skrives én gang.
-- Brug rigtige tider fra skolens hjemmeside og rigtige lærerportrætter -
+- Ikke et skema, men hvordan det er at gå på linjen: 4-6 øjeblikke uden
+  klokkeslæt (På banen, Fysisk træning, Swingen på video, Ude at spille,
+  Sammen med hele skolen). Linjens egne steder flettet sammen med skolens
+  fælles - fælles øjeblikke skrives én gang.
+- Hvert øjeblik har et sted i touren OG et foto af livet dér. Fotoet fylder
+  skærmen og toner over i det samme sted (et scannet rum eller et punkt på
+  dronebilledet) - det tomme rum og rummet fyldt med elever bliver ét. Tag
+  fotoet fra samme sted som scanningen, så virker det bedst.
+- Har øjeblikket intet sted (golfbanen, en tur), står fotoene stort med
+  touren sløret bagved - sæt aldrig et udendørs øjeblik i et tilfældigt rum.
+- Hver linje får sit bedste foto på valget, og rigtige lærerportrætter -
   det er menneskene og det konkrete, der får tiøren til at falde.
-- Slut med en invitation (besøgsaften) og "Lidt af det hele" til dem i tvivl.
-  Åbnes med #linjedag fra en flise eller menuen.
+- Slut med "Linjen fylder 7 timer om ugen", årets ture, en invitation
+  (besøgsaften) og "Lidt af det hele" til dem i tvivl. Åbnes med #linjedag.
 
 ## Højskoler og skoler med valgfag: "Byg dit skema"
 

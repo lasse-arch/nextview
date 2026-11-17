@@ -53,7 +53,7 @@ import { STAGING_CSS, StagingLayer, StagingSound } from "./staging";
 import { IN_USE_CSS, InUseBox } from "./in-use";
 import { CONTEST_CSS, ContestBox } from "./treasure";
 import { IN_3D, useStaging3d } from "./staging-3d";
-import { LINE_DAY_CSS, LineDayCard, LineDayEnd, LineDayPicker, lineDayStops, type LineDayRun } from "./line-day";
+import { LINE_DAY_CSS, LineDayCard, LineDayEnd, LineDayPicker, lineDayStops, lineDaysTitle, type LineDayRun } from "./line-day";
 import { YEARWHEEL_CSS, YearWheelPanel } from "./yearwheel";
 import { SCHEDULE_CSS, ScheduleSheet } from "./schedule";
 import { MAP_CSS, MapScene, type MapApi, type MapView } from "./map";
@@ -3951,6 +3951,7 @@ function TourExperience({
       {linePicker && T.lineDays && (
         <LineDayPicker
           L={T.lineDays}
+          title={lineDaysTitle(T, tx)}
           onPick={(line) => {
             track("lineday_start", { label: line });
             setLinePicker(false);

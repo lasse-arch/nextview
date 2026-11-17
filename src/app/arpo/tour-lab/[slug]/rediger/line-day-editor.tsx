@@ -10,7 +10,7 @@ import { LinkInput } from "./links-open";
 import { Choice, Field, Group, input, Toggle, UploadButton, type PreviewApi } from "./ui";
 
 /*
- * "En dag på din linje" in the editor: the shared stops (written once and
+ * "En linje på <skolen>" (was "En dag på din linje") in the editor: the shared stops (written once and
  * used by every line), the lines with their teachers and their day (shared
  * stops and the line's own, in order), "Lidt af det hele" and the ending.
  * A stop's place is taken from where the preview stands.
@@ -33,14 +33,14 @@ const newId = (title: string) =>
     .replace(/^-|-$/g, "")
     .slice(0, 24) || "stop"}-${Math.random().toString(36).slice(2, 6)}`;
 
-/** A school day most efterskoler share - the start for the shared stops (times as at Aalestrup; change them). */
+/** Moments most efterskoler share - the start for the shared ones (change them). */
 const STARTER: LineDayStop[] = [
-  { id: "morgenmad", time: "07.25", place: "Spisesalen", title: "Morgenmad", text: "Dagen starter med morgenmad sammen med hele skolen." },
-  { id: "morgensamling", time: "Formiddag", place: "Fællessalen", title: "Morgensamling og fag", text: "Her mødes alle elever til morgensamling - og så er der skolefag." },
-  { id: "frokost", time: "Middag", place: "Spisesalen", title: "Frokost og rengøring", text: "Frokost sammen, og så en kort tur med kost og klud." },
-  { id: "aftensmad", time: "18.00", place: "Spisesalen", title: "Aftensmad", text: "Alle spiser sammen." },
-  { id: "aftenkaffe", time: "21.15", place: "Fællesrummet", title: "Aftenkaffe", text: "Dagen samles op over en kop te eller kaffe." },
-  { id: "vaerelset", time: "22.00", place: "Værelset", title: "Her slutter dagen", text: "Kl. 22.00 er du på værelset, og kl. 23.00 slukker vi lyset.", tags: ["Lys ud kl. 23.00"] },
+  { id: "morgenmad", place: "Spisesalen", title: "Morgenmad", text: "Dagen starter med morgenmad sammen med hele skolen." },
+  { id: "morgensamling", place: "Fællessalen", title: "Morgensamling og fag", text: "Her mødes alle elever til morgensamling - og så er der skolefag." },
+  { id: "frokost", place: "Spisesalen", title: "Frokost og rengøring", text: "Frokost sammen, og så en kort tur med kost og klud." },
+  { id: "aftensmad", place: "Spisesalen", title: "Aftensmad", text: "Alle spiser sammen." },
+  { id: "aftenkaffe", place: "Fællesrummet", title: "Aftenkaffe", text: "Dagen samles op over en kop te eller kaffe." },
+  { id: "vaerelset", place: "Værelset", title: "Her slutter dagen", text: "Kl. 22.00 er du på værelset, og kl. 23.00 slukker vi lyset.", tags: ["Lys ud kl. 23.00"] },
 ];
 
 export function LineDayEditor({ config, edit, preview }: { config: TourConfig; edit: Edit; preview: PreviewApi }) {
@@ -51,7 +51,7 @@ export function LineDayEditor({ config, edit, preview }: { config: TourConfig; e
     return (
       <Group>
         <p className="text-[14px] leading-snug">
-          <b>En dag på din linje</b>: gæsten vælger en linje og lever en skoledag - linjens egne steder og skolens fælles steder flettet sammen, med tidspunkt, et par ord og lærerne, man møder. Til efterskoler med linjefag.
+          <b>En linje på {config.title || "skolen"}</b>: gæsten vælger en linje og ser, hvordan det er at gå der - 4-6 øjeblikke med linjens egne steder og skolens fælles, hver med et foto af livet dér, et par ord og lærerne, man møder. Fotoet toner over i det samme sted i touren. Til efterskoler med linjefag.
         </p>
         <button
           type="button"
@@ -60,8 +60,8 @@ export function LineDayEditor({ config, edit, preview }: { config: TourConfig; e
             edit(
               (d) =>
                 void (d.lineDays = {
-                  title: "Forestil dig en skoledag ...",
-                  lead: "Vælg en linje og se, hvem du skal være sammen med.",
+                  title: `En linje på ${d.title || d.brand}`,
+                  lead: "Vælg en linje og se, hvordan det er at gå der.",
                   shared: STARTER,
                   lines: [],
                   mix: { after: "frokost" },
@@ -69,9 +69,9 @@ export function LineDayEditor({ config, edit, preview }: { config: TourConfig; e
             )
           }
         >
-          Lav en dag på linjen
+          Lav &quot;En linje på&quot;
         </button>
-        <p className={small}>Starter med en almindelig efterskoledag som fælles stop - ret tider og tekster, sæt stederne, og tilføj linjerne.</p>
+        <p className={small}>Starter med et par fælles øjeblikke for hele skolen - ret tekster, sæt stederne og fotoene, og tilføj linjerne.</p>
       </Group>
     );
 
@@ -86,9 +86,44 @@ export function LineDayEditor({ config, edit, preview }: { config: TourConfig; e
             Vis i forhåndsvisningen
           </button>
         </p>
-        <Field title="Overskrift">
-          <input className={`${input} bg-white`} value={L.title} onChange={(e) => set((l) => void (l.title = e.target.value))} />
+        <Field title="Overskrift" hint={`Tom = "En linje på ${config.title || config.brand}".`}>
+          <input className={`${input} bg-white`} placeholder={`En linje på ${config.title || config.brand}`} value={/^en dag på din linje$/i.test(L.title) ? "" : L.title} onChange={(e) => set((l) => void (l.title = e.target.value))} />
         </Field>
+        {(/^en dag på din linje$/i.test(L.title) || L.shared.concat(L.lines.flatMap((x) => x.day.filter((d): d is LineDayStop => typeof d !== "string"))).some((x) => x.time)) && (
+          <p className={small}>
+            Lavet som &quot;En dag på din linje&quot;?{" "}
+            <button
+              type="button"
+              className={linkBtn}
+              onClick={() =>
+                edit((d) => {
+                  const l = d.lineDays;
+                  if (!l) return;
+                  if (/^en dag på din linje$/i.test(l.title) || /skoledag/i.test(l.title)) l.title = "";
+                  for (const x of [...l.shared, ...l.lines.flatMap((y) => y.day.filter((z): z is LineDayStop => typeof z !== "string"))]) delete x.time;
+                  // The menu's and the welcome's buttons to it get the new name too.
+                  const name = `En linje på ${d.title || d.brand}`;
+                  const rename = (e: { label?: string; title?: string; href?: string }) => {
+                    if (!e.href?.startsWith("#linjedag")) return;
+                    if (e.label && /dag på (din )?linje/i.test(e.label)) e.label = name;
+                    if (e.title && /dag på (din )?linje/i.test(e.title)) e.title = name;
+                  };
+                  const walk = (v: unknown) => {
+                    if (Array.isArray(v)) v.forEach(walk);
+                    else if (v && typeof v === "object") {
+                      rename(v as { label?: string; title?: string; href?: string });
+                      Object.values(v).forEach(walk);
+                    }
+                  };
+                  walk(d.menu);
+                  walk(d.welcome);
+                })
+              }
+            >
+              Gør til &quot;En linje på&quot; - fjern tiderne og omdøb knapperne
+            </button>
+          </p>
+        )}
         <Field title="Undertekst">
           <input className={`${input} bg-white`} value={L.lead ?? ""} onChange={(e) => set((l) => void (l.lead = e.target.value || undefined))} />
         </Field>
@@ -111,12 +146,12 @@ export function LineDayEditor({ config, edit, preview }: { config: TourConfig; e
           items={L.shared}
           onChange={(shared) => set((l) => void (l.shared = shared))}
           icon={["bg-[#5856d6]", '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>']}
-          title={(s) => `${s.time} · ${s.title}`}
+          title={(s) => [s.time, s.title].filter(Boolean).join(" ")}
           subtitle={(s) => [s.place, s.href ? "har et sted" : "intet sted endnu", `${L.lines.filter((x) => x.day.includes(s.id)).length} linjer`].filter(Boolean).join(" · ")}
           empty="Ingen fælles stop endnu."
           editor={(s, put) => <StopEditor stop={s} config={config} onChange={put} preview={preview} />}
         />
-        <button type="button" className={linkBtn} onClick={() => set((l) => void l.shared.push({ id: newId("stop"), time: "", title: "Nyt stop" }))}>
+        <button type="button" className={linkBtn} onClick={() => set((l) => void l.shared.push({ id: newId("stop"), title: "Nyt stop" }))}>
           + Fælles stop
         </button>
       </Group>
@@ -153,7 +188,7 @@ export function LineDayEditor({ config, edit, preview }: { config: TourConfig; e
               <option value="">Midt på dagen</option>
               {L.shared.map((s) => (
                 <option key={s.id} value={s.id}>
-                  {s.time} · {s.title}
+                  {[s.time, s.title].filter(Boolean).join(" ")}
                 </option>
               ))}
             </select>
@@ -198,8 +233,8 @@ function StopEditor({ stop, onChange, preview, peopleHint, config }: { stop: Lin
   return (
     <>
       <div className="flex gap-1.5">
-        <Field title="Tidspunkt">
-          <input className={`${input} bg-white`} placeholder="07.25" value={stop.time} onChange={(e) => onChange({ ...stop, time: e.target.value })} />
+        <Field title="Tidspunkt (valgfrit)" hint="Lad den stå tom - linjen fortælles som øjeblikke, ikke som et skema.">
+          <input className={`${input} bg-white`} placeholder="Ingen" value={stop.time ?? ""} onChange={(e) => onChange({ ...stop, time: e.target.value || undefined })} />
         </Field>
         <Field title="Sted (over overskriften)">
           <input className={`${input} bg-white`} placeholder="Stalden på Gården" value={stop.place ?? ""} onChange={(e) => onChange({ ...stop, place: e.target.value || undefined })} />
@@ -233,7 +268,7 @@ function StopEditor({ stop, onChange, preview, peopleHint, config }: { stop: Lin
         images={stop.images ?? []}
         max={3}
         shrink={1600}
-        hint="1-3 billeder øverst på kortet - man bladrer i dem. Godt til det, der ikke er scannet (fx fiskeri i åen): så kan stoppet være billeder alene, uden et sted i touren. Billederne gøres lette, før de uploades."
+        hint="1-3 fotos af livet dér. Med et sted i touren: det første fylder skærmen og toner over i stedet (tag det gerne fra samme sted som scanningen). Uden et sted (fx golfbanen eller åen): fotoene står stort med touren sløret bagved."
         onChange={(images) => onChange({ ...stop, images: images.length ? images : undefined })}
       />
       <Field title="Små fakta (valgfri)" hint="Adskilt med komma, fx Fitness, Minibiograf.">
@@ -287,7 +322,7 @@ function LineEditor({ line, L, config, onChange, preview, sharedName }: { line: 
     .filter((m): m is Extract<typeof m, { items: [string, string][] }> => "items" in m)
     .map((m) => ({ title: m.title, rooms: m.items.filter(([, h]) => isPlaceHref(h) && !inDay.has(h)) }))
     .filter((g) => g.rooms.length > 1);
-  const addRooms = (rooms: [string, string][]) => onChange({ ...line, day: [...line.day, ...rooms.map(([name, href]): LineDayStop => ({ id: newId(name), time: "", place: name, title: name, href }))] });
+  const addRooms = (rooms: [string, string][]) => onChange({ ...line, day: [...line.day, ...rooms.map(([name, href]): LineDayStop => ({ id: newId(name), place: name, title: name, href }))] });
   const move = (i: number, by: number) => {
     const day = [...line.day];
     const j = i + by;
@@ -304,6 +339,20 @@ function LineEditor({ line, L, config, onChange, preview, sharedName }: { line: 
       <Field title="Startsætning (valgfri)" hint='Fx "... der starter i stalden, før du har åbnet en bog."'>
         <input className={`${input} bg-white`} value={line.teaser ?? ""} onChange={(e) => onChange({ ...line, teaser: e.target.value || undefined })} />
       </Field>
+      <Field title="Linjens foto" hint="Vises som flisen, når man vælger linje - linjens bedste billede. Tom = det første foto i linjens egne øjeblikke.">
+        <div className="flex items-center gap-3">
+          {line.image && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={line.image} alt="" className="h-12 w-16 rounded-lg object-cover ring-1 ring-black/[.06]" />
+          )}
+          <UploadButton accept="image/*" shrink={1400} label={line.image ? "Skift" : "+ Foto"} onDone={(image) => onChange({ ...line, image })} />
+          {line.image && (
+            <button type="button" className={linkBtn} onClick={() => onChange({ ...line, image: undefined })}>
+              Fjern
+            </button>
+          )}
+        </div>
+      </Field>
       <People config={config} title="Linjens lærere" people={line.people} onChange={(people) => onChange({ ...line, people })} hint="Vises ved linjen og på linjens egne stop - højst 4." />
       <Field title="Dagen" hint="I rækkefølge. Fælles stop er skolens; linjens egne ligger imellem.">
         <div className="-mx-1 divide-y divide-black/[.05] rounded-xl bg-white ring-1 ring-black/[.05]">
@@ -314,7 +363,7 @@ function LineEditor({ line, L, config, onChange, preview, sharedName }: { line: 
                 <div className="flex items-center gap-2 px-2 py-1.5">
                   <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${typeof d === "string" ? "bg-[#5856d6]/10 text-[#5856d6]" : "bg-[#ff9500]/15 text-[#c76a00]"}`}>{typeof d === "string" ? "Fælles" : "Linjen"}</span>
                   <button type="button" className="min-w-0 flex-1 truncate text-left text-[14px]" onClick={() => typeof d !== "string" && setOpen(open === i ? null : i)}>
-                    {s ? `${s.time} · ${s.title}` : `Mangler (${String(d)})`}
+                    {s ? [s.time, s.title].filter(Boolean).join(" ") : `Mangler (${String(d)})`}
                   </button>
                   <button type="button" aria-label="Op" className="px-1 text-[#8e8e93]" onClick={() => move(i, -1)}>
                     ↑
@@ -340,7 +389,7 @@ function LineEditor({ line, L, config, onChange, preview, sharedName }: { line: 
             type="button"
             className={linkBtn}
             onClick={() => {
-              const stop: LineDayStop = { id: newId(line.name), time: "", title: "Nyt stop på linjen" };
+              const stop: LineDayStop = { id: newId(line.name), title: "Nyt stop på linjen" };
               onChange({ ...line, day: [...line.day, stop] });
               setOpen(line.day.length);
             }}
@@ -355,7 +404,7 @@ function LineEditor({ line, L, config, onChange, preview, sharedName }: { line: 
             <option value="">+ Fælles stop …</option>
             {L.shared.map((s) => (
               <option key={s.id} value={s.id}>
-                {s.time} · {s.title}
+                {[s.time, s.title].filter(Boolean).join(" ")}
               </option>
             ))}
           </select>
@@ -396,7 +445,7 @@ function LineEditor({ line, L, config, onChange, preview, sharedName }: { line: 
             <option value="">Linjens første egne stop</option>
             {own.map((s) => (
               <option key={s.id} value={s.id}>
-                {s.time} · {s.title}
+                {[s.time, s.title].filter(Boolean).join(" ")}
               </option>
             ))}
           </select>

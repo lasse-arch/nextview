@@ -265,12 +265,12 @@ export type ScheduleSlot = {
   periods?: string[];
 };
 
-/** One part of a day on a line ("En dag på din linje"): when, what, where in the tour - and who you're with there. */
+/** One moment on a line ("En linje på ..."): what, where in the tour - and who you're with there (a time only if it helps). */
 export type LineDayStop = {
   /** Short and unique within the day, e.g. "morgenmad". */
   id: string;
-  /** "07.25", "Før 7.25", "Eftermiddag". */
-  time: string;
+  /** Left out (the standard now): no time - the line is told as moments, not a schedule. Or "07.25", "Eftermiddag", if a time says something. */
+  time?: string;
   /** Over the title, e.g. "Stalden på Gården" or "Actionhuset". */
   place?: string;
   title: string;
@@ -281,7 +281,13 @@ export type LineDayStop = {
   people?: CardPerson[];
   /** Small facts as chips, e.g. "Fitness", "Lys ud kl. 23.00". */
   tags?: string[];
-  /** 1-3 photos at the top of the stop's card, swiped through - e.g. for a line without scans of its own (fishing in the river, a hunt): the stop can be photos only, with no place in the tour. */
+  /**
+   * 1-3 photos of the life there. With a place (a scanned room or a drone
+   * point): the first fills the screen as the stop opens and fades into the
+   * same place in the tour - the empty room and the room full of life become
+   * one. Without a place (the golf course, a hunt): the photos stand big with
+   * the tour blurred behind. Best taken from where the scan was.
+   */
   images?: string[];
 };
 
@@ -733,9 +739,12 @@ export type TourConfig = {
    * coming, e.g. a special efterskole. A step without href has no place.
    */
   /**
-   * "En dag på din linje": the visitor picks a line and lives a school day -
-   * the line's own places and the school's shared ones woven together,
-   * each with its time, a few words and the people met there. `shared` =
+   * "En linje på <skolen>" (was "En dag på din linje"): the visitor picks a
+   * line and sees what it is like to go there - 4-6 moments, the line's own
+   * places and the school's shared ones woven together, each with a photo of
+   * the life there, a few words and the people met there. No schedule: times
+   * are left out unless they say something. `title` default "En linje på
+   * <tour's title>". `shared` =
    * the stops every line has (written once); each line lists its day as ids
    * of shared stops and its own stops. "Lidt af det hele" (`mix`) is the
    * shared day with a short visit to every line (each line's `signature`
@@ -752,6 +761,8 @@ export type TourConfig = {
       name: string;
       /** "... der starter i stalden, før du har åbnet en bog." */
       teaser?: string;
+      /** The line's photo on the picker (its best one - the horse in the stable). Left out: the first photo of its own moments. */
+      image?: string;
       /** The line's teachers on the picker and its stops (up to 4). */
       people?: CardPerson[];
       /** The day in order: a shared stop's id, or a stop of the line's own. */
