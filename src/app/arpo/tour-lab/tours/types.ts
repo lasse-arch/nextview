@@ -765,6 +765,13 @@ export type TourConfig = {
       teaser?: string;
       /** The line's photo on the picker (its best one - the horse in the stable). Left out: the first photo of its own moments. */
       image?: string;
+      /**
+       * The overview first, before the moments: what the line is over a week
+       * and a year ("En uge på Fiskelinjen" - a whole morning and afternoon
+       * every week, two full weeks a year). `facts` = short chips ("1 formiddag
+       * + 1 eftermiddag om ugen", "2 linjefagsuger"). Shown with the line's photo.
+       */
+      intro?: { title?: string; text: string; facts?: string[] };
       /** The line's teachers on the picker and its stops (up to 4). */
       people?: CardPerson[];
       /** The day in order: a shared stop's id, or a stop of the line's own. */

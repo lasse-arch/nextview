@@ -339,6 +339,11 @@ function LineEditor({ line, L, config, onChange, preview, sharedName }: { line: 
       <Field title="Startsætning (valgfri)" hint='Fx "... der starter i stalden, før du har åbnet en bog."'>
         <input className={`${input} bg-white`} value={line.teaser ?? ""} onChange={(e) => onChange({ ...line, teaser: e.target.value || undefined })} />
       </Field>
+      <Field title="Overblik i starten" hint='Vises først, før øjeblikkene, med linjens foto - hvordan linjen er over en uge og et år. Fx overskrift "En uge på Fiskelinjen" og skolens egen tekst. Tom tekst = intet overblik.'>
+        <input className={`${input} bg-white`} placeholder={`Overskrift (tom = ${line.name})`} value={line.intro?.title ?? ""} onChange={(e) => onChange({ ...line, intro: { text: line.intro?.text ?? "", ...line.intro, title: e.target.value || undefined } })} />
+        <textarea className={`${textarea} mt-1.5`} placeholder="Du har en hel formiddag og en hel eftermiddag hver uge, hvor det kun handler om fiskeri ..." value={line.intro?.text ?? ""} onChange={(e) => onChange({ ...line, intro: e.target.value || line.intro?.title || line.intro?.facts?.length ? { ...line.intro, text: e.target.value } : undefined })} />
+        <FactsInput key={line.id} facts={line.intro?.facts ?? []} onChange={(facts) => onChange({ ...line, intro: { text: line.intro?.text ?? "", ...line.intro, facts: facts.length ? facts : undefined } })} />
+      </Field>
       <Field title="Linjens foto" hint="Vises som flisen, når man vælger linje - linjens bedste billede. Tom = det første foto i linjens egne øjeblikke.">
         <div className="flex items-center gap-3">
           {line.image && (
@@ -496,5 +501,19 @@ function TripsEditor({ trips, onChange }: { trips: LineTrip[]; onChange: (t: Lin
         )}
       </div>
     </Field>
+  );
+}
+
+/** The overview's facts as one line, comma between - kept as typed while writing, saved as a list when the field is left. */
+function FactsInput({ facts, onChange }: { facts: string[]; onChange: (facts: string[]) => void }) {
+  const [text, setText] = useState(facts.join(", "));
+  return (
+    <input
+      className={`${input} mt-1.5 bg-white`}
+      placeholder="Fakta, adskilt med komma: 1 formiddag + 1 eftermiddag om ugen, 2 linjefagsuger om året"
+      value={text}
+      onChange={(e) => setText(e.target.value)}
+      onBlur={() => onChange(text.split(",").map((x) => x.trim()).filter(Boolean).slice(0, 6))}
+    />
   );
 }

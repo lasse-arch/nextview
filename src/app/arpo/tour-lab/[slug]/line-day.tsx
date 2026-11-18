@@ -19,9 +19,13 @@ import type { CardPerson, LineDayStop, TourConfig } from "../tours/types";
 type L = NonNullable<TourConfig["lineDays"]>;
 export type LineDayRun = { line: string; at: number; end?: boolean };
 /** A stop as shown: the stop, and whether it's the whole school's or which line's. */
-export type ShownStop = LineDayStop & { shared: boolean; lineName?: string; lineId?: string; people?: CardPerson[] };
+export type ShownStop = LineDayStop & { shared: boolean; lineName?: string; lineId?: string; people?: CardPerson[]; /** The line's overview, before its moments. */ intro?: boolean };
 
 export const MIX = "mix";
+
+/** A line's photo on the picker: its own, else the first photo of its own moments. */
+const lineImage = (l: L["lines"][number]) => l.image || l.day.flatMap((d) => (typeof d === "string" ? [] : (d.images ?? []))).find(Boolean) || null;
+
 
 /** The day for a line (or "Lidt af det hele"), in order. */
 export function lineDayStops(L: L, line: string): ShownStop[] {
@@ -40,7 +44,12 @@ export function lineDayStops(L: L, line: string): ShownStop[] {
   }
   const l = L.lines.find((x) => x.id === line);
   if (!l) return [];
-  return l.day
+  // The overview first (what the line is over a week and a year), with the line's photo - the tour stays where it is, blurred.
+  const photo = lineImage(l);
+  const intro: ShownStop[] = l.intro?.text
+    ? [{ id: `${l.id}-overblik`, title: l.intro.title || l.name, text: l.intro.text, tags: l.intro.facts?.filter(Boolean), images: photo ? [photo] : undefined, people: l.people, shared: false, lineName: l.name, lineId: l.id, intro: true }]
+    : [];
+  return [...intro, ...l.day
     .map((d): ShownStop | null => {
       if (typeof d === "string") {
         const s = shared.get(d);
@@ -48,7 +57,7 @@ export function lineDayStops(L: L, line: string): ShownStop[] {
       }
       return { ...d, people: d.people ?? l.people, shared: false, lineName: l.name, lineId: l.id };
     })
-    .filter((s): s is ShownStop => Boolean(s));
+    .filter((s): s is ShownStop => Boolean(s))];
 }
 
 /** The feature's name: its own title - or "En linje på <the tour's name>" (also for tours still called the old "En dag på din linje"). */
@@ -58,8 +67,6 @@ export function lineDaysTitle(T: TourConfig, tr: (s: string, v?: Record<string, 
   return tr("En linje på {skole}", { skole: T.title || T.brand });
 }
 
-/** A line's photo on the picker: its own, else the first photo of its own moments. */
-const lineImage = (l: L["lines"][number]) => l.image || l.day.flatMap((d) => (typeof d === "string" ? [] : (d.images ?? []))).find(Boolean) || null;
 
 const names = (people?: CardPerson[]) => {
   const n = (people ?? []).map((p) => p.name?.split(" ")[0]).filter(Boolean) as string[];
@@ -221,7 +228,7 @@ export function LineDayCard({ L, stops, run, onGo, onClose }: { L: L; stops: Sho
             </div>
           </div>
         ))}
-    <div className="ld-card" key={s.id + run.at}>
+    <div className={`ld-card ${s.intro ? "ld-overblik" : ""}`} key={s.id + run.at}>
       <div className="ld-top">
         <span className="ld-kicker">{title}</span>
         <button type="button" className="ld-x2" aria-label={tr("Luk")} onClick={onClose}>
@@ -237,7 +244,7 @@ export function LineDayCard({ L, stops, run, onGo, onClose }: { L: L; stops: Sho
       </ol>
       <div className="ld-when">
         {s.time && <time>{s.time}</time>}
-        <span className={`ld-badge ${s.shared ? "faelles" : ""}`}>{s.shared ? tr("Hele skolen") : s.lineName}</span>
+        <span className={`ld-badge ${s.shared ? "faelles" : ""}`}>{s.shared ? tr("Hele skolen") : s.intro ? tr("Overblik") : s.lineName}</span>
         {s.place && <span className="ld-place">{s.place}</span>}
       </div>
       <h3>{s.title}</h3>
@@ -328,7 +335,7 @@ export function LineDayEnd({ L, stops, run, onPick, onVisit, onClose }: { L: L; 
         </button>
         <div className="ld-end-grid">
           <ol className={`ld-sum ${stops.some((s) => s.time) ? "" : "uden-tid"}`}>
-            {stops.map((s, i) => (
+            {stops.filter((s) => !s.intro).map((s, i) => (
               <li key={s.id + i}>
                 {s.time ? <time>{s.time}</time> : <time aria-hidden>{i + 1}</time>}
                 <span>
@@ -428,6 +435,8 @@ export const LINE_DAY_CSS = `
 .ld-thumbs{display:flex;gap:6px;margin-top:10px}
 .ld-thumbs button{width:46px;height:46px;padding:0;border:0;border-radius:10px;overflow:hidden;background:#e9ecee;cursor:pointer}
 .ld-thumbs img{width:100%;height:100%;object-fit:cover;display:block}
+/* The line's overview: room for its words (it is the one card that tells). */
+.ld-overblik p{-webkit-line-clamp:7!important}
 .ld-sum.uden-tid time{width:22px;color:#b3bcc0}
 /* The card never scrolls: the text is cut short instead (the whole text is in the day's summary). */
 .ld-card{position:absolute;left:16px;bottom:16px;z-index:30;width:min(400px,calc(100% - 32px));max-height:calc(100% - 120px);overflow:hidden;padding:16px 18px;border-radius:20px;background:rgba(255,255,255,.98);color:#1d2a30;box-shadow:0 16px 44px rgba(0,0,0,.32);animation:hvUp .35s cubic-bezier(.2,.7,.2,1) both}
