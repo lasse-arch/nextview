@@ -3077,6 +3077,7 @@ function TourExperience({
           "--c-soft": T.colors.soft,
           "--font-heading": `'${T.fontHeading ?? T.font}', '${T.font}', sans-serif`,
           "--logo-h": `${T.logoSize ?? 46}px`,
+          "--tlogo-h": `${T.logoSizeTiles ?? 56}px`,
           "--pkt-d": T.overviewUi?.pointSize?.desktop ?? 1,
           "--pkt-m": T.overviewUi?.pointSize?.mobile ?? 0.85,
           ...(T.logoOffset?.top != null && { "--logo-top": `${T.logoOffset.top}px` }),
@@ -4777,7 +4778,7 @@ html:has(.hv.fixed),html:has(.hv.fixed) body{overflow:hidden;overscroll-behavior
 .hv-film .hv-film-play{position:absolute;left:50%;top:50%;right:auto;bottom:auto;translate:-50% -50%;width:84px;height:84px;padding:0 0 0 6px;border-radius:50%;border:0;background:rgba(255,255,255,.92);color:#111;font-size:30px;box-shadow:0 10px 30px rgba(0,0,0,.35);cursor:pointer}
 .hv-film button{position:absolute;right:20px;bottom:24px;border:1px solid rgba(255,255,255,.5);background:rgba(0,0,0,.35);color:#fff;border-radius:999px;padding:9px 18px;font:inherit;font-weight:700;font-size:13px;letter-spacing:.06em;cursor:pointer;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
 .hv-wel-main.hv-light img{width:auto;height:64px;max-width:200px;object-fit:contain;object-position:left;padding:0;background:none;border-radius:0}
-.hv-wel-main img{box-sizing:border-box;height:56px;width:auto;min-width:56px;max-width:220px;object-fit:contain;background:var(--c-main);border-radius:12px;padding:8px;margin-bottom:18px}
+.hv-wel-main img{box-sizing:border-box;height:var(--tlogo-h,56px);width:auto;min-width:var(--tlogo-h,56px);max-width:min(100%,calc(var(--tlogo-h,56px) * 4));object-fit:contain;background:var(--c-main);border-radius:12px;padding:8px;margin-bottom:18px}
 .hv-wel-kick{font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:#7a8a90}
 .hv-wel-main h1{margin:6px 0 10px;font-size:42px;line-height:1.02;font-weight:900;color:var(--c-main);letter-spacing:-.01em;text-wrap:balance}
 .hv-wel-main p{margin:0;font-size:16px;line-height:1.55;color:#3d4a50}
@@ -4909,7 +4910,7 @@ html:has(.hv.fixed),html:has(.hv.fixed) body{overflow:hidden;overscroll-behavior
   .hv-wel{align-items:flex-start;padding:12px;overflow-y:auto}
   .hv-wel-grid{grid-template-columns:1fr 1fr;gap:10px;grid-auto-rows:auto}
   .hv-wel-main{grid-column:span 2;grid-row:auto;padding:16px 18px}
-  .hv-wel-main img{height:40px;min-width:40px;max-width:160px;padding:6px;margin-bottom:10px}
+  .hv-wel-main img{height:calc(var(--tlogo-h,56px) * .72);min-width:calc(var(--tlogo-h,56px) * .72);max-width:min(100%,calc(var(--tlogo-h,56px) * 2.9));padding:6px;margin-bottom:10px}
   .hv-wel-kick{display:none}
   .hv-wel-main h1{font-size:26px;margin-top:0}
   .hv-wel-main p{font-size:14px}

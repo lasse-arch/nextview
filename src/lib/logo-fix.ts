@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { readLimited, safeFetch } from "@/lib/safe-fetch";
 import { storeTourFile } from "@/lib/tour-files";
 import type { TourConfig } from "@/app/arpo/tour-lab/tours/types";
+import { placeLogo } from "@/app/arpo/tour-lab/tours/logo-place";
 
 /*
  * A tour's logo, measured instead of guessed (nextviewAI picks logoOnLight from
@@ -27,12 +28,16 @@ async function bytesOf(url: string): Promise<Buffer | null> {
   return readLimited(res, 8_000_000);
 }
 
-export type LogoFix = { tone: "dark" | "light" | null; trimmed: string | null };
+export type { LogoFix } from "@/app/arpo/tour-lab/tours/logo-place";
+import type { LogoFix } from "@/app/arpo/tour-lab/tours/logo-place";
+
 
 /** Measures (and, if worth it, trims) the logo at `url` - see the top of the file. */
 export async function measureLogo(slug: string, url: string): Promise<LogoFix> {
   const bytes = await bytesOf(url).catch(() => null);
   if (!bytes) return { tone: null, trimmed: null };
+  const full = await sharp(bytes, { density: svg0(url, bytes) ? 144 : undefined }).metadata().catch(() => null);
+  const fullAspect = full?.width && full.height ? full.width / full.height : null;
   const svg = /\.svg(\?|$)/i.test(url) || bytes.subarray(0, 200).toString("utf8").includes("<svg");
   const img = sharp(bytes, { density: svg ? 144 : undefined }).ensureAlpha();
   const { data, info } = await img.clone().resize({ width: 96, height: 96, fit: "inside" }).raw().toBuffer({ resolveWithObject: true });
@@ -55,14 +60,17 @@ export async function measureLogo(slug: string, url: string): Promise<LogoFix> {
     }
   }
   // A logo on its own background (no transparency) carries its own background - neither measured nor trimmed.
-  if (!n || (corners && cornerAlpha / corners > 0.9)) return { tone: null, trimmed: null };
+  if (!n) return { tone: null, trimmed: null, aspect: fullAspect };
+  if (corners && cornerAlpha / corners > 0.9) return { tone: null, trimmed: null, aspect: fullAspect, ownBg: true };
   const tone = sum / n < 0.55 ? "dark" : "light";
 
   // An empty transparent edge of more than ~6% on a side: cut away (never an svg - it stays sharp as it is).
   let trimmed: string | null = null;
+  let aspect = fullAspect;
   if (!svg) {
     const meta = await sharp(bytes).metadata();
     const out = await sharp(bytes).trim({ threshold: 1 }).png().toBuffer({ resolveWithObject: true }).catch(() => null);
+    if (out?.info.width && out.info.height) aspect = out.info.width / out.info.height;
     if (out && meta.width && meta.height && (out.info.width < meta.width * 0.94 || out.info.height < meta.height * 0.94)) {
       // A little air stays around it.
       const pad = Math.round(Math.max(out.info.width, out.info.height) * 0.02);
@@ -72,8 +80,10 @@ export async function measureLogo(slug: string, url: string): Promise<LogoFix> {
       trimmed = await storeTourFile(slug, "logo-beskaaret", "image/png", padded).catch(() => null);
     }
   }
-  return { tone, trimmed };
+  return { tone, trimmed, aspect };
 }
+
+const svg0 = (url: string, bytes: Buffer) => /\.svg(\?|$)/i.test(url) || bytes.subarray(0, 200).toString("utf8").includes("<svg");
 
 /**
  * The setup with its logo put right: the trimmed copy in its place, and the
@@ -83,8 +93,8 @@ export async function measureLogo(slug: string, url: string): Promise<LogoFix> {
 export async function withMeasuredLogo(slug: string, c: TourConfig): Promise<{ config: TourConfig; note: string | null }> {
   if (!c.logo) return { config: c, note: null };
   const fix = await measureLogo(slug, c.logo).catch(() => ({ tone: null, trimmed: null }) as LogoFix);
-  if (!fix.tone && !fix.trimmed) return { config: c, note: null };
-  const next: TourConfig = { ...c };
+  if (!fix.tone && !fix.trimmed && !fix.aspect) return { config: c, note: null };
+  const next: TourConfig = placeLogo(c, fix);
   const said: string[] = [];
   if (fix.trimmed) {
     next.logo = fix.trimmed;
@@ -96,5 +106,6 @@ export async function withMeasuredLogo(slug: string, c: TourConfig): Promise<{ c
     if (fix.tone === "light" && next.logoBgTiles === "light") next.logoBgTiles = undefined;
     said.push(fix.tone === "dark" ? "logoet er mørkt og står på en lys baggrund" : "logoet er lyst og står på hovedfarven");
   }
+  said.push("logoet står til venstre over overskriften i en størrelse, der passer til formen");
   return { config: next, note: said.join(", ") };
 }

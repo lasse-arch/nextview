@@ -30,6 +30,7 @@ import { AssignmentGroup, type Assignment } from "./assignment";
 import { DEFAULT_EMBED, SharePanel, SitePreview, type EmbedSize } from "./share";
 import { Choice, Field, FilesContext, Group, Icon, input, logoTone, outsideFiles, PanoZoom, shrinkPhoto, Toggle, UploadButton, uploadToTour, withProtocol, type PreviewApi } from "./ui";
 import { fetchSiteFavicon, hostTourFiles } from "@/lib/actions/tour-files";
+import { placeLogo, type LogoFix } from "../../tours/logo-place";
 import { AiMemoryPanel } from "./memory";
 import { WeatherEditor } from "./weather-editor";
 import { StagingEditor } from "./staging-editor";
@@ -125,7 +126,7 @@ const FINDS: Partial<Record<Tab, string[]>> = {
   live: ["Live data", "Ledige pladser", "Ledige rum", "Book-knap", "Hent nye data", "Holdplan|hold|flexybox|holdbooking"],
   kort: ["Stedkort", "Kort ved punkt", "Din plads venter", "Kort efter et stykke tid", "Knap til scanpunkt|opdækket|skjult scan"],
   links: ["Knapper", "Book", "Kontakt", "Telefon", "E-mail", "Adresse", "Sociale medier", "Kontaktformular", "Skriv til os", "Åbning", "Popup", "Ny fane", "Kort-link"],
-  design: ["Farver", "Skrift", "Font", "Logo", "Logostørrelse", "Logoets afstand", "Favicon", "Mørkt logo", "Farvefilter", "Brug hjemmesidens farver|hjemmeside|rød tråd|brand"],
+  design: ["Farver", "Skrift", "Font", "Logo", "Logostørrelse", "Logoets størrelse på fliserne|logo på velkomsten|logo i boksen|velkomstlogo", "Logoets afstand", "Favicon", "Mørkt logo", "Farvefilter", "Brug hjemmesidens farver|hjemmeside|rød tråd|brand"],
   sprog: ["Sprog", "Engelsk", "Tysk", "Oversæt"],
   funktioner: ["Baggrund bag afspil-knappen|afspil-knap|afspilknap|play-knap|baggrund|sløret|sløret tour|start af sig selv|autoplay", "På en telefon på en hjemmeside|fuld skærm ved brug|i rammen", "Infobokse|infoboks|læs mere|læs om|boks", "Navigation", "Bevægelse", "Fri bevægelse", "Kun punkter", "Skift mellem steder", "Fade", "Flyv", "Zoom", "Lås zoom på mobil", "Find vej", "Vis mål", "Matterports egne knapper", "Sådan går du rundt|hjælp ved start|onboarding", "Vej til stedet|vej til skolen|hvor langt|afstand|adresse|postnummer|bus|tog|rejseplan|google maps|mødetid", "Flyvetid"],
   generelt: ["Navn", "Firmanavn", "Undertitel", "Matterport-model", "Matterports indstillinger|dukkehus|plantegning|etagevælger"],
@@ -786,7 +787,17 @@ export function TourEditor({
                       {config.logo && <img src={config.logo} alt="" className="max-h-full max-w-full object-contain" />}
                     </div>
                     <input className={input} value={config.logo} onChange={(e) => edit((d) => void (d.logo = e.target.value))} />
-                    <UploadButton accept="image/*" onDone={(url) => (edit((d) => void (d.logo = url)), void autoLogoTone(url))} />
+                    <UploadButton
+                      accept="image/*"
+                      onDone={(url) => {
+                        edit((d) => void (d.logo = url));
+                        void autoLogoTone(url);
+                        // Placed nicely on the welcome at once (left, a height for its shape).
+                        void measureTourLogo(slug, url)
+                          .then((fix) => fix.aspect && edit((d) => void Object.assign(d, placeLogo(d, fix))))
+                          .catch(() => {});
+                      }}
+                    />
                   </div>
                   {config.logo && !/\.svg(\?|$)/i.test(config.logo) && <AiImageButton src={config.logo} onUse={(url) => edit((d) => void (d.logo = url))} />}
                   {config.logo && (
@@ -795,9 +806,10 @@ export function TourEditor({
                       className="self-start rounded-lg px-2 py-1 text-[13px] font-medium text-[#0071e3] hover:bg-[#0071e3]/5"
                       onClick={async () => {
                         setLogoNote("Måler logoet …");
-                        const fix = await measureTourLogo(slug, config.logo).catch(() => ({ tone: null, trimmed: null }));
-                        if (!fix.tone && !fix.trimmed) return setLogoNote("Logoet har sin egen baggrund (eller kunne ikke læses) - det står, som det er.");
+                        const fix: LogoFix = await measureTourLogo(slug, config.logo).catch(() => ({ tone: null, trimmed: null }));
+                        if (!fix.tone && !fix.trimmed && !fix.aspect) return setLogoNote("Logoet kunne ikke læses - det står, som det er.");
                         edit((d) => {
+                          Object.assign(d, placeLogo(d, fix));
                           if (fix.trimmed) d.logo = fix.trimmed;
                           if (fix.tone) {
                             d.logoOnLight = fix.tone === "dark" ? true : undefined;
@@ -805,10 +817,10 @@ export function TourEditor({
                             if (fix.tone === "light" && d.logoBgTiles === "light") d.logoBgTiles = undefined;
                           }
                         });
-                        setLogoNote([fix.trimmed ? "Den tomme kant er skåret væk" : null, fix.tone === "dark" ? "mørkt logo - lys baggrund" : fix.tone === "light" ? "lyst logo - hovedfarven bag" : null].filter(Boolean).join(", ") + ".");
+                        setLogoNote([fix.trimmed ? "Den tomme kant er skåret væk" : null, fix.tone === "dark" ? "mørkt logo - lys baggrund" : fix.tone === "light" ? "lyst logo - hovedfarven bag" : null, fix.ownBg ? "logoet har sin egen baggrund - ingen boks om det" : null, "på velkomsten står det til venstre i en størrelse, der passer til formen"].filter(Boolean).join(", ") + ".");
                       }}
                     >
-                      Ret logoet (mål farven og skær tom kant væk)
+                      Sæt logoet pænt (mål farven, skær tom kant væk, placér og størrelse)
                     </button>
                   )}
                 </Field>
@@ -893,6 +905,9 @@ export function TourEditor({
                     ]}
                     onChange={(v) => edit((d) => void (d.logoAlignTiles = v === "midt" ? undefined : v))}
                   />
+                </Field>
+                <Field title={`Logoets størrelse på fliserne: ${config.logoSizeTiles ?? 56} px`} hint="Højden i boksen med overskriften på en computer - en telefon viser det lidt mindre.">
+                  <input type="range" min={32} max={140} className="w-full accent-[#0071e3]" value={config.logoSizeTiles ?? 56} onChange={(e) => edit((d) => void (d.logoSizeTiles = Number(e.target.value) === 56 ? undefined : Number(e.target.value)))} />
                 </Field>
                 <Field title="Under logoet i menuen" hint="Til et logo, der selv viser navnet (fx Skyum): kun undertitlen - eller kun logoet.">
                   <Choice<"both" | "subtitle" | "none">

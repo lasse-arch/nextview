@@ -431,6 +431,8 @@ export type TourConfig = {
   logoBgTiles?: "none" | "light" | "main";
   /** Where the logo sits in the welcome tiles' box (left out: in the middle). */
   logoAlignTiles?: "left" | "right";
+  /** The logo's height in the welcome tiles' box, in px (computer; a phone shows it at about 70 %). Default 56. */
+  logoSizeTiles?: number;
   /** Which top corner the logo sits in - the menu button takes the other one. Default "left". */
   logoSide?: "left" | "right";
   /** The logo's height over the tour, in px (computer; a phone shows it a bit smaller). Default 46. */

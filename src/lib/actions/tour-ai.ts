@@ -803,7 +803,7 @@ export async function createTourFromWebsite(input: NewTourInput & { plan?: TourP
 
 Udfyld ud fra kundens hjemmeside nedenfor, efter drejebogen:
 - Find først ud af, hvordan kunden sælger sig selv til sine egne kunder: deres vigtigste salgsargumenter, hvem de taler til, og de ord, de selv bruger. Byg så touren til at vise netop de argumenter frem - menupunkternes navne, velkomst, stedkort, historier, chips og "Din plads venter" skal sige det, kunden selv siger, og funktionerne vælges efter, hvad der beviser deres argumenter bedst (fx fællesskab → historier og "Sådan ser en dag ud"; faciliteter → stedkort i de rum; ledige pladser/priser → live data og booking). Nævn i reply kort, hvilke argumenter du har bygget touren op om.
-- brand, title, subtitle, logo (en logo-kandidat fra hjemmesiden; logoOnLight hvis logoet er mørkt), favicon (hjemmesidens favicon, gerne apple-touch-icon), colors og font/fontHeading så touren ligner hjemmesiden (rød tråd).
+- brand, title, subtitle, logo (en logo-kandidat fra hjemmesiden; logoOnLight hvis logoet er mørkt - logoets baggrund, placering og størrelse på velkomsten måles bagefter, så sæt ikke logoAlignTiles/logoSizeTiles/logoBgTiles selv), favicon (hjemmesidens favicon, gerne apple-touch-icon), colors og font/fontHeading så touren ligner hjemmesiden (rød tråd).
 - start: scanpunkt 1, medmindre brugeren har sagt andet (det rettes i editoren under Scanpunkter).
 - menu: kundens handlinger og grupper efter drejebogen. Rummene vælges bagefter i editoren ved at stå i dem - lav tomme grupper med gode navne, som brugeren fylder.
 - cta og contact: hjemmesidens vigtigste handling(er) og kontaktoplysninger. linkOpen: popup for booking.
@@ -869,7 +869,7 @@ Steder i touren skrives som https://my.matterport.com/show/?m=${model.id}&ss=<sc
   let built: TourConfig = tidyBuilt({ ...result.config, slug });
   // A sister branch: what the chain has in common stays exactly as the other branch has it, whatever nextviewAI did.
   if (sisterRow) {
-    const keep = ["brand", "logo", "logoOnLight", "logoSize", "logoCard", "logoBg", "logoBgTiles", "logoAlignTiles", "logoSide", "favicon", "colors", "font", "fontHeading", "design", "boxes", "languages", "linkOpen", "menuOpenOnStart", "menuDim", "menuHint", "navigation", "jump", "matterportUi", "fullscreenButton", "placeCardSide", "guideCardSize", "guideCardSizeMobile"] as const;
+    const keep = ["brand", "logo", "logoOnLight", "logoSize", "logoCard", "logoBg", "logoBgTiles", "logoAlignTiles", "logoSizeTiles", "logoSide", "favicon", "colors", "font", "fontHeading", "design", "boxes", "languages", "linkOpen", "menuOpenOnStart", "menuDim", "menuHint", "navigation", "jump", "matterportUi", "fullscreenButton", "placeCardSide", "guideCardSize", "guideCardSizeMobile"] as const;
     const b = built as unknown as Record<string, unknown>;
     for (const k of keep) {
       const v = (base as unknown as Record<string, unknown>)[k];

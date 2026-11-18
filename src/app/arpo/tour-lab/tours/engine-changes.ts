@@ -9,6 +9,7 @@
 export type EngineChange = { date: string; kind: "ny" | "sikkerhed" | "hastighed" | "rettelse"; text: string };
 
 export const ENGINE_CHANGES: EngineChange[] = [
+  { date: "2026-11-18", kind: "ny", text: "Logoets størrelse i velkomstens boks kan vælges (Design). nextviewAI og \"Sæt logoet pænt\" sætter det selv: til venstre over overskriften, i en højde der passer til logoets form, og uden ekstra boks om et logo med egen baggrund." },
   { date: "2026-11-18", kind: "rettelse", text: "\"Sådan går du rundt\" ligger aldrig oven på et stedkort, invitationen eller En linje på - den venter, til de er lukket. Sidder touren på en hjemmeside (ikke i fuld skærm), er det kun en lille boble \"Træk for at se dig omkring\", der ikke dækker noget og går væk ved første tryk. Rummets navn i bunden skjules, mens et stedkort med samme navn er åbent." },
   { date: "2026-11-17", kind: "ny", text: "\"En dag på din linje\" hedder nu \"En linje på <skolen>\" og fortæller, hvordan det er at gå på linjen - øjeblikke uden klokkeslæt. Et øjeblik med et sted: fotoet af livet fylder skærmen og toner over i det samme sted i touren (rum eller dronepunkt). Uden et sted: fotoene står stort med touren sløret bagved. Linjevalget viser hver linjes foto." },
   { date: "2026-11-17", kind: "ny", text: "Afspil-skærmen (touren på en hjemmeside, før man trykker) kan have tre baggrunde: hovedfarven, et billede af touren vist sløret, eller et eget billede. Vælges under Ekstra i editoren." },

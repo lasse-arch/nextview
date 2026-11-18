@@ -348,3 +348,11 @@ bygninger eller et stort område (skoler, campingpladser, ferieparker).
 - Få kategorier (3-6) med tydelige farver - de bliver til filtret over kortet.
 - De vigtigste steder lidt større (`size`), resten normale.
 - Kortet kan stå alene - det behøver ikke en drone-scene.
+
+## Logoet på velkomsten
+
+- Står til venstre over overskriften (teksten er venstrestillet - et logo i
+  midten over den ser forkert ud), i en højde efter formen: et firkantet
+  badge større, et langt ordmærke lavere. Har logoet sin egen baggrund, får
+  det ingen boks af os omkring. Det måles og sættes af sig selv (nextviewAI,
+  upload og "Sæt logoet pænt") - ret kun, hvis det ser forkert ud.

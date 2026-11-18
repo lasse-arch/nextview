@@ -217,7 +217,7 @@ export function layoutOfTour(c: TourConfig): NewTourLayout {
  * the menu moves you, stories on/off, how links open). Start and menu come through the layout steps (setLayout).
  */
 export function copyLayout(d: TourConfig, from: TourConfig): void {
-  const keys = ["logoBg", "logoBgTiles", "logoAlignTiles", "menuOpenOnStart", "menuDim", "fullscreenButton", "overviewUi", "placeCardSide", "jump", "matterportUi"] as const;
+  const keys = ["logoBg", "logoBgTiles", "logoAlignTiles", "logoSizeTiles", "menuOpenOnStart", "menuDim", "fullscreenButton", "overviewUi", "placeCardSide", "jump", "matterportUi"] as const;
   const rec = d as unknown as Record<string, unknown>;
   for (const k of keys) {
     const v = (from as unknown as Record<string, unknown>)[k];
