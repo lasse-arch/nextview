@@ -209,7 +209,8 @@ export function LineDayCard({ L, stops, run, onGo, onClose }: { L: L; stops: Sho
   const next = stops[run.at + 1];
   // The same people as on a stop before (most often the line's teachers): only their faces and names on one line - the whole list is shown where they're met first.
   const who = (x?: ShownStop) => (x?.people ?? []).map((p) => p.image).join("|");
-  const metBefore = L.people === "faces" || (Boolean(who(s)) && stops.slice(0, run.at).some((x) => who(x) === who(s)));
+  // Small faces on one line also for the overview and for 3 or more people (a list of 3-4 would fill the card).
+  const metBefore = L.people === "faces" || Boolean(s.intro) || (s.people?.length ?? 0) >= 3 || (Boolean(who(s)) && stops.slice(0, run.at).some((x) => who(x) === who(s)));
   // "Kun én": just the first person, in full.
   const people = L.people === "one" ? s.people?.slice(0, 1) : s.people;
   const title = run.line === MIX ? (L.mix && L.mix.title) || tr("Lidt af det hele") : (L.lines.find((l) => l.id === run.line)?.name ?? "");
@@ -248,7 +249,7 @@ export function LineDayCard({ L, stops, run, onGo, onClose }: { L: L; stops: Sho
         {s.place && <span className="ld-place">{s.place}</span>}
       </div>
       <h3>{s.title}</h3>
-      {s.text && <p>{s.text}</p>}
+      {s.text && <LongText key={s.id + run.at} text={s.text} />}
       {placed && photos.length > 0 && (
         <div className="ld-thumbs">
           {photos.map((src, i) => (
@@ -298,6 +299,30 @@ export function LineDayCard({ L, stops, run, onGo, onClose }: { L: L; stops: Sho
         </button>
       </div>
     </div>
+    </>
+  );
+}
+
+/** A text kept to a few lines - "Læs mere" shows the rest, in the card. */
+function LongText({ text }: { text: string }) {
+  const tr = useT();
+  const [open, setOpen] = useState(false);
+  const [cut, setCut] = useState(false);
+  return (
+    <>
+      <p
+        className={open ? "aaben" : ""}
+        ref={(el) => {
+          if (el && !open) setCut(el.scrollHeight > el.clientHeight + 2);
+        }}
+      >
+        {text}
+      </p>
+      {(cut || open) && (
+        <button type="button" className="ld-mere" onClick={() => setOpen(!open)}>
+          {open ? tr("Vis mindre") : tr("Læs mere")}
+        </button>
+      )}
     </>
   );
 }
@@ -435,8 +460,15 @@ export const LINE_DAY_CSS = `
 .ld-thumbs{display:flex;gap:6px;margin-top:10px}
 .ld-thumbs button{width:46px;height:46px;padding:0;border:0;border-radius:10px;overflow:hidden;background:#e9ecee;cursor:pointer}
 .ld-thumbs img{width:100%;height:100%;object-fit:cover;display:block}
-/* The line's overview: room for its words (it is the one card that tells). */
-.ld-overblik p{-webkit-line-clamp:7!important}
+/* Long words fold: 3 lines, "Læs mere" for the rest (the card scrolls only then). */
+.ld-card>p{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.ld-card>p.aaben{display:block;-webkit-line-clamp:unset;overflow:visible}
+.ld-card:has(p.aaben){overflow-y:auto;overscroll-behavior:contain}
+.ld-mere{align-self:flex-start;margin-top:2px;padding:2px 0;border:0;background:none;font:inherit;font-size:13px;font-weight:800;color:var(--c-accent);cursor:pointer}
+/* The facts: one row of small chips (swiped sideways when there are many). */
+.ld-tags{flex-wrap:nowrap!important;overflow-x:auto;scrollbar-width:none;margin-top:8px!important}
+.ld-tags::-webkit-scrollbar{display:none}
+.ld-tags span{flex:none;padding:3px 9px!important;font-size:11.5px!important}
 .ld-sum.uden-tid time{width:22px;color:#b3bcc0}
 /* The card never scrolls: the text is cut short instead (the whole text is in the day's summary). */
 .ld-card{position:absolute;left:16px;bottom:16px;z-index:30;width:min(400px,calc(100% - 32px));max-height:calc(100% - 120px);overflow:hidden;padding:16px 18px;border-radius:20px;background:rgba(255,255,255,.98);color:#1d2a30;box-shadow:0 16px 44px rgba(0,0,0,.32);animation:hvUp .35s cubic-bezier(.2,.7,.2,1) both}

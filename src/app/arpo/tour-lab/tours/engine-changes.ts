@@ -9,6 +9,7 @@
 export type EngineChange = { date: string; kind: "ny" | "sikkerhed" | "hastighed" | "rettelse"; text: string };
 
 export const ENGINE_CHANGES: EngineChange[] = [
+  { date: "2026-11-18", kind: "rettelse", text: "En linje på fylder mindre: teksten står i 3 linjer med \"Læs mere\", fakta står på én række, og 3 eller flere lærere (og overblikket) vises som små ansigter med navnene på én linje." },
   { date: "2026-11-18", kind: "ny", text: "En linje på: hver linje kan starte med et overblik (fx \"En uge på Fiskelinjen\") - hvordan linjen er over en uge og et år, med korte fakta og linjens foto - før øjeblikkene." },
   { date: "2026-11-18", kind: "ny", text: "Logoets størrelse i velkomstens boks kan vælges (Design). nextviewAI og \"Sæt logoet pænt\" sætter det selv: til venstre over overskriften, i en højde der passer til logoets form, og uden ekstra boks om et logo med egen baggrund." },
   { date: "2026-11-18", kind: "rettelse", text: "\"Sådan går du rundt\" ligger aldrig oven på et stedkort, invitationen eller En linje på - den venter, til de er lukket. Sidder touren på en hjemmeside (ikke i fuld skærm), er det kun en lille boble \"Træk for at se dig omkring\", der ikke dækker noget og går væk ved første tryk. Rummets navn i bunden skjules, mens et stedkort med samme navn er åbent." },
