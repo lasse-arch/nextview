@@ -82,7 +82,7 @@ export function LineDayEditor({ config, edit, preview }: { config: TourConfig; e
       <Group>
         <p className={small}>
           Åbnes med linket <b>#linjedag</b> (vælg linje) eller <b>#linjedag:&lt;linje&gt;</b> - sæt det på en flise, i menuen eller på en knap.{" "}
-          <button type="button" className={linkBtn} onClick={() => preview.go("En dag på linjen", "#linjedag")}>
+          <button type="button" className={linkBtn} onClick={() => preview.go("En linje på", "#linjedag")}>
             Vis i forhåndsvisningen
           </button>
         </p>
@@ -220,8 +220,8 @@ export function LineDayEditor({ config, edit, preview }: { config: TourConfig; e
           </>
         )}
       </Group>
-      <button type="button" className="px-1 text-[13px] text-[#ff3b30]" onClick={() => confirm("Fjern hele En dag på linjen?") && edit((d) => void (d.lineDays = undefined))}>
-        Fjern En dag på linjen
+      <button type="button" className="px-1 text-[13px] text-[#ff3b30]" onClick={() => confirm("Fjern hele En linje på?") && edit((d) => void (d.lineDays = undefined))}>
+        Fjern En linje på
       </button>
     </>
   );

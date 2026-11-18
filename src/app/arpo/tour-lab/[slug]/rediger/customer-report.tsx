@@ -38,7 +38,7 @@ const T = {
     looksHint: "Steder, hvor de besøgende selv har stået og kigget rundt",
     looksVisits: "besøg",
     used: "Det, de brugte i touren",
-    usedNames: { find: "Find vej", video: "Videoer", images: "Billeder", people: "Personer", boxes: "Infobokse", lineday: "En dag på linjen", day: "Dagsplan og skema", classes: "Holdplan", commute: "Vej hertil", links: "Links ud af touren" },
+    usedNames: { find: "Find vej", video: "Videoer", images: "Billeder", people: "Personer", boxes: "Infobokse", lineday: "En linje på skolen", day: "Dagsplan og skema", classes: "Holdplan", commute: "Vej hertil", links: "Links ud af touren" },
     found: (started: number, arrived: number) => `${started} fandt vej, ${arrived} nåede frem`,
     watched: "set i alt",
     most: "Mest",
