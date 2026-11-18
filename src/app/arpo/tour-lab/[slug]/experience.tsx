@@ -564,6 +564,12 @@ function TourExperience({
   // Rooms are known by their Danish names (Matterport and statistics); `roomShown` is the name in the visitor's language.
   const { names: ROOM_NAMES, links: ROOM_LINKS } = useMemo(() => roomIndex([...savedTour.menu, ...(savedTour.places ? [{ title: "", items: savedTour.places.map((p): [string, string] => [p.name, p.href]) }] : [])]), [savedTour]);
   const LAST_ROOM_KEY = `${T.slug}-last-room`;
+  /** In someone's page (an iframe, also the editor's preview) and not full screen: the help is only a small hint there. */
+  const inPage = useSyncExternalStore(
+    (on) => (document.addEventListener("fullscreenchange", on), () => document.removeEventListener("fullscreenchange", on)),
+    () => window.parent !== window && !document.fullscreenElement,
+    () => false
+  );
   /** "Sådan går du rundt" seen (remembered per visitor - not in the editor's preview, where it's shown each time to try it). */
   const [helpDone, setHelpDone] = useState(() => {
     if (typeof window === "undefined" || inEditorPreview()) return false;
@@ -3468,7 +3474,8 @@ function TourExperience({
               onEvent={track}
             />
           )}
-          {roomShown && <div className="hv-room">{roomShown}</div>}
+          {/* The room's name - not while a place card with the same name is open (the same words twice). */}
+          {roomShown && !(showCard != null && T.placeCards?.[showCard]?.title?.trim().toLowerCase() === roomShown.trim().toLowerCase()) && <div className="hv-room">{roomShown}</div>}
         </>
       )}
 
@@ -4033,8 +4040,10 @@ function TourExperience({
       {contactOpen && T.contactForm && (
         <ContactForm T={T} preview={inPreview} showcase={Boolean(demo)} room={room} onClose={() => setContactOpen(false)} onSent={() => track("contact_form", { place: "form" })} />
       )}
-      {T.onboarding && !helpDone && phase === "tour" && !cover && !welcome && !intro && sdk && guideAt == null && !menuOpen && !contactOpen && (
+      {/* Never over a place card or the invitation: it waits for them. In someone's page (not full screen) only a small hint. */}
+      {T.onboarding && !helpDone && phase === "tour" && !cover && !welcome && !intro && sdk && guideAt == null && !menuOpen && !contactOpen && showCard == null && !(lineRun || linePicker) && (!T.invite || inviteDone) && (
         <Onboarding
+          compact={inPage}
           hasMenu={T.menu.length > 0}
           onGuide={GUIDES.length ? () => startGuide("onboarding") : undefined}
           onDone={() => {

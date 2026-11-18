@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useT } from "../tours/i18n-react";
 
 /**
@@ -8,8 +8,46 @@ import { useT } from "../tours/i18n-react";
  * (Træd indenfor) - drag to look around, tap to walk, the menu to jump - so
  * the tour never feels dead or confusing. Shown once per visitor (switched
  * on under Funktioner); it goes by itself after a while or with Forstået.
+ * Never over another card (the engine waits for a place card to close), and
+ * in someone's page only a small hint - see OnboardingHint.
  */
-export function Onboarding({ hasMenu, onGuide, onDone }: { hasMenu: boolean; onGuide?: () => void; onDone: () => void }) {
+export function Onboarding({ hasMenu, onGuide, onDone, compact }: { hasMenu: boolean; onGuide?: () => void; onDone: () => void; /** In someone's page (not full screen): a small hint that covers nothing, gone at the first touch. */ compact?: boolean }) {
+  const tr = useT();
+  if (compact) return <OnboardingHint onDone={onDone} />;
+  return <OnboardingCard hasMenu={hasMenu} onGuide={onGuide} onDone={onDone} />;
+}
+
+const DRAG = '<path d="M9 11V5.5a1.5 1.5 0 0 1 3 0V11m0-1.5a1.5 1.5 0 0 1 3 0V11m0-.5a1.5 1.5 0 0 1 3 0v4a6 6 0 0 1-6 6h-.6a6 6 0 0 1-4.6-2.2L4.6 15a1.5 1.5 0 0 1 2.3-1.9L9 15"/><path d="M3 5h3M3 5l1.5-1.5M3 5l1.5 1.5M21 5h-3m3 0-1.5-1.5M21 5l-1.5 1.5"/>';
+
+/**
+ * The tour in someone's page: the visitor has only scrolled down to it - no
+ * card over the place. A small hint a moment after, that blocks nothing and
+ * goes at the first drag or tap (or after a while).
+ */
+function OnboardingHint({ onDone }: { onDone: () => void }) {
+  const tr = useT();
+  const done = useRef(onDone);
+  useEffect(() => {
+    done.current = onDone;
+  });
+  const [shown, setShown] = useState(false);
+  useEffect(() => {
+    const show = setTimeout(() => setShown(true), 1800);
+    const end = setTimeout(() => done.current(), 9000);
+    const used = () => setTimeout(() => done.current(), 400);
+    window.addEventListener("pointerdown", used, { once: true, capture: true });
+    return () => (clearTimeout(show), clearTimeout(end), window.removeEventListener("pointerdown", used, true));
+  }, []);
+  if (!shown) return null;
+  return (
+    <div className="ob-hint" role="status">
+      <svg viewBox="0 0 24 24" aria-hidden className="ob-traek" dangerouslySetInnerHTML={{ __html: DRAG }} />
+      {tr("Træk for at se dig omkring")}
+    </div>
+  );
+}
+
+function OnboardingCard({ hasMenu, onGuide, onDone }: { hasMenu: boolean; onGuide?: () => void; onDone: () => void }) {
   const tr = useT();
   // Goes by itself after a while - one timer, however often the tour around it draws again.
   const done = useRef(onDone);
@@ -21,7 +59,7 @@ export function Onboarding({ hasMenu, onGuide, onDone }: { hasMenu: boolean; onG
     return () => clearTimeout(t);
   }, []);
   const tips: [string, string][] = [
-    ['<path d="M9 11V5.5a1.5 1.5 0 0 1 3 0V11m0-1.5a1.5 1.5 0 0 1 3 0V11m0-.5a1.5 1.5 0 0 1 3 0v4a6 6 0 0 1-6 6h-.6a6 6 0 0 1-4.6-2.2L4.6 15a1.5 1.5 0 0 1 2.3-1.9L9 15"/><path d="M3 5h3M3 5l1.5-1.5M3 5l1.5 1.5M21 5h-3m3 0-1.5-1.5M21 5l-1.5 1.5"/>', tr("Træk i billedet for at se dig omkring")],
+    [DRAG, tr("Træk i billedet for at se dig omkring")],
     ['<circle cx="12" cy="16" r="5"/><ellipse cx="12" cy="16" rx="8" ry="3" opacity=".5"/><path d="M12 3v6M9.5 6.5 12 9l2.5-2.5"/>', tr("Tryk på de hvide cirkler for at gå hen til dem")],
     ...(hasMenu ? [['<path d="M4 6h16M4 12h16M4 18h10"/>', tr("Åbn menuen for at hoppe direkte til et sted")] as [string, string]] : []),
   ];
@@ -61,6 +99,8 @@ export const ONBOARDING_CSS = `
 .ob-kort svg{flex:none;width:34px;height:34px;padding:6px;border-radius:12px;background:color-mix(in srgb,var(--c-accent) 14%,#fff);fill:none;stroke:var(--c-accent);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .ob-traek{animation:obTraek 2.2s ease-in-out infinite}
 @keyframes obTraek{0%,100%{transform:translateX(-3px)}50%{transform:translateX(3px)}}
+.ob-hint{position:absolute;left:50%;top:calc(50% - 22px);z-index:13;display:flex;align-items:center;gap:8px;translate:-50% 0;padding:8px 16px 8px 10px;border-radius:999px;background:rgba(255,255,255,.95);color:#1d2a30;font-size:14px;font-weight:700;white-space:nowrap;box-shadow:0 8px 24px rgba(0,0,0,.28);pointer-events:none;animation:hvUp .45s cubic-bezier(.2,.7,.2,1) both}
+.ob-hint svg{width:26px;height:26px;padding:3px;border-radius:50%;background:color-mix(in srgb,var(--c-accent) 14%,#fff);fill:none;stroke:var(--c-accent);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .ob-knapper{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
 .ob-knapper .hv-btn{padding:10px 16px;font-size:14px}
 `;

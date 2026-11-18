@@ -155,6 +155,7 @@ export const UI_STRINGS = [
   "Tilbage til touren",
   "Sådan går du rundt",
   "Træk i billedet for at se dig omkring",
+  "Træk for at se dig omkring",
   "Tryk på de hvide cirkler for at gå hen til dem",
   "Åbn menuen for at hoppe direkte til et sted",
   "Forstået",
