@@ -3025,6 +3025,16 @@ function TourExperience({
             </button>
           );
         })}
+        {/* "En linje på" as the menu's big button (like Vis mig rundt) - at the top or the bottom, when it's set so. */}
+        {T.lineDays?.lines.length && T.lineDays.menu === at ? (
+          <button type="button" className="hv-guide-knap" onClick={() => (track("lineday_open", { from: "menu" }), setMenuOpen(false), setLinePicker(true))}>
+            ▶
+            <span>
+              {lineDaysTitle(T, tx)}
+              <small>{tx("Vælg din linje ({n} linjer)", { n: T.lineDays.lines.length })}</small>
+            </span>
+          </button>
+        ) : null}
         {/* Find vej, when its button isn't on the tour (on this device) - up here by the guided tours, not lost among the menu items. */}
         {at === "top" && T.wayfinding && (T.wayfinding.button?.desktop === "menu" || T.wayfinding.button?.mobile === "menu") && (
           <button type="button" className="hv-day-knap hv-find-knap" onClick={() => (track("route_open", { from: "menu" }), setMenuOpen(false), setRouteOpen(true))}>

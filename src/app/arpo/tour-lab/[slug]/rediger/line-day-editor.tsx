@@ -127,6 +127,17 @@ export function LineDayEditor({ config, edit, preview }: { config: TourConfig; e
         <Field title="Undertekst">
           <input className={`${input} bg-white`} value={L.lead ?? ""} onChange={(e) => set((l) => void (l.lead = e.target.value || undefined))} />
         </Field>
+        <Field title="Stor knap i menuen" hint='Som "Vis mig rundt": en stor knap i accentfarven med "Vælg din linje". Øverst eller nederst i menuen.'>
+          <Choice<"none" | "top" | "bottom">
+            value={L.menu ?? "none"}
+            options={[
+              ["none", "Ingen"],
+              ["top", "Øverst"],
+              ["bottom", "Nederst"],
+            ]}
+            onChange={(v) => set((l) => void (v === "none" ? delete l.menu : (l.menu = v)))}
+          />
+        </Field>
         <Field title="Touren bag linjevalget" hint="Mens man vælger linje, går touren ind på skolen bagved. Standard: tourens start (det første scan).">
           <Choice<"start" | "here" | "none">
             value={L.backdrop === false ? "none" : L.backdrop ? "here" : "start"}

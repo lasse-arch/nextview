@@ -101,6 +101,7 @@ export const UI_STRINGS = [
   "En dag på {linje}",
   "En linje på {skole}",
   "Overblik",
+  "Vælg din linje ({n} linjer)",
   "Vis mindre",
   "Øjeblikke",
   "Linjen",

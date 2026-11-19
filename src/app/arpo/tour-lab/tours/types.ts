@@ -805,6 +805,8 @@ export type TourConfig = {
     mix?: false | { title?: string; after?: string };
     /** Where the tour stands behind the line picker (a place link) - so the school itself is seen while choosing. Left out: the tour's start (its first scan); false: the tour stays where it is. */
     backdrop?: string | false;
+    /** The menu's big button (like Vis mig rundt's) for it: "top" or "bottom" of the menu. Left out: no such button (it's opened from tiles, menu items or links "#linjedag"). */
+    menu?: "top" | "bottom";
     visit?: { title: string; text?: string; label: string; href: string };
     /** The people on the day's card: "all" (default - the whole list where they're met first, then small faces), "one" (only the first, with name and role), "faces" (always only small faces and the first names). */
     people?: "all" | "one" | "faces";
