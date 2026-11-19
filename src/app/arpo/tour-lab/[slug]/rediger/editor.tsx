@@ -118,7 +118,7 @@ const FINDS: Partial<Record<Tab, string[]>> = {
   start: ["Hvor touren starter|startpunkt|startposition|start-link|start her", "Forsiden", "Velkomsten", "Fliser", "Kort film før touren", "Intro-video", "Steder med foto", "Træd indenfor"],
   menu: ["Menupunkter", "Grupper", "Tilføj det sted, du ser", "Billede i menuen", "360°-billede", "Webside", "Luftfotoet", "Scanpunkter i menuen"],
   rundvisning: ["Invitation til rundvisning|skal jeg vise dig rundt|invitation", "Historier|stories", "Start skjult|historier skjult|fold sammen", "Scroll i historierne", "Tag billeder til historierne|fjern billederne", "Sådan ser en dag ud|dagen|program", "Vis mig rundt", "Guide", "Guidet tur", "Stop", "Drejning", "Sekunder ved hvert stop", "Stemme|lyd|elevenlabs|speak|oplæsning", "Lav den ud fra menuen", "Knappen i menuen|øverst|nederst|ikke i menuen", "Egen knap på stop"],
-  kortet: ["Interaktivt kort", "Luftfoto", "Dronebillede", "360°-kort", "Punkter på kortet", "Kategorier", "Skyer", "Boksen øverst", "Filteret", "Luftfotoets første udsnit|startudsnit", "Ikoner", "Vejret|vejr|temperatur|dmi|sol", "Find din plads|finder|spørgsmål|guide til plads", "Gåafstande|gåafstand|minutter|afstand", "Bevægelse på luftfotoet|kig ned|kig op|zoom ved punkt", "Hent fra en kortside|lovable|importer kort"],
+  kortet: ["Hvor touren starter|start på luftfotoet|start inde i touren|luftfoto kun fra menuen|kun fra menupunkt", "Interaktivt kort", "Luftfoto", "Dronebillede", "360°-kort", "Punkter på kortet", "Kategorier", "Skyer", "Boksen øverst", "Filteret", "Luftfotoets første udsnit|startudsnit", "Ikoner", "Vejret|vejr|temperatur|dmi|sol", "Find din plads|finder|spørgsmål|guide til plads", "Gåafstande|gåafstand|minutter|afstand", "Bevægelse på luftfotoet|kig ned|kig op|zoom ved punkt", "Hent fra en kortside|lovable|importer kort"],
   scan: ["Scanpunkter", "Skjul scanpunkter", "Personer i scans"],
   tags: ["Tags", "Infotags", "Hotspots", "Pris", "Video"],
   staging: ["Årshjul|aarshjul|kalender|begivenheder|året", "Video på en flade|tv|skærm|storskærm|film på væggen", "Billede på en flade|plakat|maleri|foto på væggen", "Hjemmeside på en flade|instagram|facebook|some|webside", "Skilt|velkomstskilt|tekst på væggen", "Se det i brug|film i rummet|video i rummet|levende|i brug", "Tryk for lyd|lyd på video"],
@@ -1056,6 +1056,23 @@ export function TourEditor({
             )}
             {tab === "kortet" && (
               <>
+                {(config.drone || config.map) && (
+                  <Group title="Hvor touren starter">
+                    <Choice<"drone" | "tour">
+                      value={config.droneStart === false ? "tour" : "drone"}
+                      options={[
+                        ["drone", "På luftfotoet"],
+                        ["tour", "Inde i touren"],
+                      ]}
+                      onChange={(v) => edit((d) => void (v === "tour" ? (d.droneStart = false) : delete d.droneStart))}
+                    />
+                    <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">
+                      {config.droneStart === false
+                        ? "Touren starter inde, og luftfotoet vises kun fra et menupunkt (eller en flise), der linker til det. Der er ingen \"Tilbage til luften\"-knap i touren."
+                        : "Touren starter på luftfotoet med boksen og filteret, og der er en knap tilbage til luften inde i touren."}
+                    </p>
+                  </Group>
+                )}
                 <MapEditor config={config} edit={edit} focus={pointFocus} preview={preview} slug={slug} />
                 {(config.drone || config.map) && <FinderEditor config={config} edit={edit} />}
                 {(config.drone || config.map) && <WeatherEditor config={config} edit={edit} />}

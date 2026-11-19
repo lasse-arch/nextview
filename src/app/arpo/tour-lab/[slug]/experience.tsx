@@ -661,7 +661,8 @@ function TourExperience({
     : T.map
       ? { intro: T.map.intro ?? { title: T.brand, lead: tx("Tryk på et sted for at se mere - eller gå direkte ind.") }, backLabel: T.map.backLabel ?? tx("Tilbage til kortet"), filterTitle: T.map.filterTitle ?? tx("Vis") }
       : null;
-  const [phase, setPhase] = useState<"drone" | "tour">(OV ? "drone" : "tour");
+  // With droneStart false the tour starts inside; the aerial photo is only opened from the menu.
+  const [phase, setPhase] = useState<"drone" | "tour">(OV && T.droneStart !== false ? "drone" : "tour");
   const [selected, setSelected] = useState<Point | null>(null);
   /** The open point whose whole text is shown (on a phone it's cut short). */
   const [textOpenFor, setTextOpenFor] = useState<string | null>(null);
@@ -3488,7 +3489,7 @@ function TourExperience({
       {/* Inside the tour: back to the air, the room's name, the menu. */}
       {phase === "tour" && (
         <>
-          {OV && (
+          {OV && T.droneStart !== false && (
           <button type="button" className="hv-luften" onClick={() => backToDrone()}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M5 5l4 4M19 5l-4 4M5 19l4-4M19 19l-4-4M9 9h6v6H9z" />

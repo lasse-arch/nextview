@@ -538,6 +538,12 @@ export type TourConfig = {
    * `point` = the view when a point is pressed: "keep" the zoom, or a field of view (small = in, big = out).
    */
   droneLook?: { desktop?: DroneLook; mobile?: DroneLook };
+  /**
+   * false: the tour starts inside (the 3D tour), and the aerial photo / map is
+   * only shown from a menu item (or a tile) linking to it - no "back to the air"
+   * button in the tour. Left out: the tour starts on the aerial photo.
+   */
+  droneStart?: false;
   drone?: {
     /** One 360° photo (equirectangular) instead of the tiles below - set by the engine for a 360° map. */
     panorama?: string;
