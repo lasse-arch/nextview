@@ -27,6 +27,7 @@ import { FinderSheet, FINDER_CSS, WalkLines } from "./finder";
 import { apiUrl, isStaticTour } from "../tours/api";
 import type { DroneView, FindStepAside, GuideTurn, MenuEntry, PanoCover, StagingItem, TourConfig, TourPlace, TourPoint, WelcomeGo } from "../tours/types";
 import { sideCtas } from "../tours/types";
+import { contrast } from "../tours/contrast";
 import { CoverWelcome, DESIGNS_CSS, DockMenu, PickerMenu, WelcomeFilm, welcomeFilmClass } from "./designs";
 import { GUIDE_CSS, GuidePlayer, guideStops } from "./guide";
 import { ONBOARDING_CSS, Onboarding } from "./onboarding";
@@ -661,6 +662,11 @@ function TourExperience({
     : T.map
       ? { intro: T.map.intro ?? { title: T.brand, lead: tx("Tryk på et sted for at se mere - eller gå direkte ind.") }, backLabel: T.map.backLabel ?? tx("Tilbage til kortet"), filterTitle: T.map.filterTitle ?? tx("Vis") }
       : null;
+  // The top bar on a phone: when its colour is too close to the button's (a green button on a green bar), the button turns white.
+  const introButtonLight = (() => {
+    const bar = T.overviewUi?.barMobile === "white" ? "#ffffff" : T.overviewUi?.barMobile === "glass" || !T.logoOnLight ? T.colors.main : T.colors.soft;
+    return contrast(T.colors.accent, bar) < 2;
+  })();
   // With droneStart false the tour starts inside; the aerial photo is only opened from the menu.
   const [phase, setPhase] = useState<"drone" | "tour">(OV && T.droneStart !== false ? "drone" : "tour");
   const [selected, setSelected] = useState<Point | null>(null);
@@ -3180,7 +3186,7 @@ function TourExperience({
           </>
         )}
 
-        <div className={`hv-intro ${T.logoOnLight ? "" : "hv-intro-moerk"}`}>
+        <div className={`hv-intro ${T.logoOnLight ? "" : "hv-intro-moerk"} ${T.overviewUi?.barMobile ? `hv-bar-m-${T.overviewUi.barMobile}` : ""} ${introButtonLight ? "hv-intro-knap-lys" : ""}`}>
           <div className="hv-intro-head" style={{ background: T.colors.main }}>
             <TourLogo T={T} />
             <div className="hv-sub">{T.subtitle}</div>
@@ -3489,12 +3495,12 @@ function TourExperience({
       {/* Inside the tour: back to the air, the room's name, the menu. */}
       {phase === "tour" && (
         <>
-          {OV && T.droneStart !== false && (
+          {OV && (T.droneStart !== false ? T.droneButton !== false : Boolean(T.droneButton)) && (
           <button type="button" className="hv-luften" onClick={() => backToDrone()}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M5 5l4 4M19 5l-4 4M5 19l4-4M19 19l-4-4M9 9h6v6H9z" />
             </svg>
-            {tx(OV.backLabel)}
+            {tx((T.droneButton && T.droneButton.label) || (T.droneStart === false ? "Se det fra luften" : OV.backLabel))}
           </button>
           )}
           {T.stories && storyRooms.length > 0 && (
@@ -4902,6 +4908,14 @@ html:has(.hv.fixed),html:has(.hv.fixed) body{overflow:hidden;overscroll-behavior
   @container (max-width:130px){.hv-titel-m .hv-intro-body h1{display:none}}
   .hv-intro-body p{display:none}
   .hv-intro .hv-btn{padding:6px 10px;font-size:12.5px;white-space:nowrap}
+  /* The bar's own colour, when chosen - and a button that always stands out from it. */
+  .hv-bar-m-white{background:#fff!important}
+  .hv-bar-m-white.hv-intro-moerk .hv-intro-body h1{color:var(--c-main)}
+  .hv-bar-m-white.hv-intro-moerk .hv-intro-head{background:var(--c-main)!important;border-radius:10px;margin:5px 0 5px 5px;padding:5px 8px}
+  .hv-bar-m-glass{background:rgba(16,20,18,.42)!important;-webkit-backdrop-filter:blur(14px) saturate(1.2);backdrop-filter:blur(14px) saturate(1.2);box-shadow:0 8px 24px rgba(0,0,0,.22)}
+  .hv-bar-m-glass .hv-intro-body h1{color:#fff}
+  .hv-bar-m-glass:not(.hv-intro-moerk) .hv-intro-head{background:rgba(255,255,255,.94)!important;border-radius:10px;margin:5px 0 5px 5px;padding:5px 8px}
+  .hv-intro-knap-lys .hv-btn.hv-primary{background:#fff;color:var(--c-main);box-shadow:none}
   .hv-menuknap{top:calc(12px + env(safe-area-inset-top,0px));right:10px;padding:10px 16px;font-size:13px}
   /* Categories: one row you can swipe. */
   .hv-filtre{left:10px;right:10px;bottom:calc(10px + env(safe-area-inset-bottom,0px));max-width:none;padding:7px 8px}

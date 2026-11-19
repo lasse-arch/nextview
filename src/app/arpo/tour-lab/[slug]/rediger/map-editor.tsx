@@ -848,6 +848,22 @@ function OverviewUiToggles({ config, edit, preview }: { config: TourConfig; edit
           }
         />
       </Field>
+      <Field title="Bjælken øverst på mobil" hint="Logoet og knappen øverst på en telefon. Knappen skiller sig altid ud: har bjælken samme farve som knappen, bliver knappen hvid. Et lyst logo på en hvid bjælke får sin egen lille farveflade.">
+        <Choice<"main" | "white" | "glass">
+          value={ui?.barMobile ?? "main"}
+          options={[
+            ["main", "Farve"],
+            ["white", "Hvid"],
+            ["glass", "Glas"],
+          ]}
+          onChange={(v) =>
+            edit((d) => {
+              const rest = { ...d.overviewUi, barMobile: v === "main" ? undefined : v };
+              d.overviewUi = Object.values(rest).some((x) => x !== undefined) ? rest : undefined;
+            })
+          }
+        />
+      </Field>
       <Toggle
         on={Boolean(ui?.titleMobile)}
         onChange={(on) =>

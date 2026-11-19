@@ -118,7 +118,7 @@ const FINDS: Partial<Record<Tab, string[]>> = {
   start: ["Hvor touren starter|startpunkt|startposition|start-link|start her", "Forsiden", "Velkomsten", "Fliser", "Kort film før touren", "Intro-video", "Steder med foto", "Træd indenfor"],
   menu: ["Menupunkter", "Grupper", "Tilføj det sted, du ser", "Billede i menuen", "360°-billede", "Webside", "Luftfotoet", "Scanpunkter i menuen"],
   rundvisning: ["Invitation til rundvisning|skal jeg vise dig rundt|invitation", "Historier|stories", "Start skjult|historier skjult|fold sammen", "Scroll i historierne", "Tag billeder til historierne|fjern billederne", "Sådan ser en dag ud|dagen|program", "Vis mig rundt", "Guide", "Guidet tur", "Stop", "Drejning", "Sekunder ved hvert stop", "Stemme|lyd|elevenlabs|speak|oplæsning", "Lav den ud fra menuen", "Knappen i menuen|øverst|nederst|ikke i menuen", "Egen knap på stop"],
-  kortet: ["Hvor touren starter|start på luftfotoet|start inde i touren|luftfoto kun fra menuen|kun fra menupunkt", "Interaktivt kort", "Luftfoto", "Dronebillede", "360°-kort", "Punkter på kortet", "Kategorier", "Skyer", "Boksen øverst", "Filteret", "Luftfotoets første udsnit|startudsnit", "Ikoner", "Vejret|vejr|temperatur|dmi|sol", "Find din plads|finder|spørgsmål|guide til plads", "Gåafstande|gåafstand|minutter|afstand", "Bevægelse på luftfotoet|kig ned|kig op|zoom ved punkt", "Hent fra en kortside|lovable|importer kort"],
+  kortet: ["Hvor touren starter|start på luftfotoet|start inde i touren|luftfoto kun fra menuen|kun fra menupunkt|se skolen fra luften|tilbage til luften|knap til luftfotoet", "Interaktivt kort", "Luftfoto", "Dronebillede", "360°-kort", "Punkter på kortet", "Kategorier", "Skyer", "Boksen øverst", "Filteret", "Luftfotoets første udsnit|startudsnit", "Ikoner", "Vejret|vejr|temperatur|dmi|sol", "Find din plads|finder|spørgsmål|guide til plads", "Gåafstande|gåafstand|minutter|afstand", "Bevægelse på luftfotoet|kig ned|kig op|zoom ved punkt", "Hent fra en kortside|lovable|importer kort"],
   scan: ["Scanpunkter", "Skjul scanpunkter", "Personer i scans"],
   tags: ["Tags", "Infotags", "Hotspots", "Pris", "Video"],
   staging: ["Årshjul|aarshjul|kalender|begivenheder|året", "Video på en flade|tv|skærm|storskærm|film på væggen", "Billede på en flade|plakat|maleri|foto på væggen", "Hjemmeside på en flade|instagram|facebook|some|webside", "Skilt|velkomstskilt|tekst på væggen", "Se det i brug|film i rummet|video i rummet|levende|i brug", "Tryk for lyd|lyd på video"],
@@ -1068,9 +1068,31 @@ export function TourEditor({
                     />
                     <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">
                       {config.droneStart === false
-                        ? "Touren starter inde, og luftfotoet vises kun fra et menupunkt (eller en flise), der linker til det. Der er ingen \"Tilbage til luften\"-knap i touren."
+                        ? "Touren starter inde, og luftfotoet vises kun fra et menupunkt (eller en flise), der linker til det. Knappen til luftfotoet inde i touren slår du til herunder."
                         : "Touren starter på luftfotoet med boksen og filteret, og der er en knap tilbage til luften inde i touren."}
                     </p>
+                    <Toggle
+                      on={config.droneStart === false ? Boolean(config.droneButton) : config.droneButton !== false}
+                      onChange={(on) =>
+                        edit((d) => {
+                          const label = d.droneButton ? d.droneButton.label : undefined;
+                          if (d.droneStart === false) d.droneButton = on ? { ...(label ? { label } : {}) } : undefined;
+                          else d.droneButton = on ? (label ? { label } : undefined) : false;
+                        })
+                      }
+                      title="Knap til luftfotoet inde i touren"
+                      hint='Nederst til venstre i touren, fx "Se skolen fra luften".'
+                    />
+                    {(config.droneStart === false ? Boolean(config.droneButton) : config.droneButton !== false) && (
+                      <Field title="Knappens tekst">
+                        <input
+                          className={input}
+                          placeholder={config.droneStart === false ? "Se det fra luften" : (config.drone?.backLabel ?? "Tilbage til luften")}
+                          value={(config.droneButton && config.droneButton.label) || ""}
+                          onChange={(e) => edit((d) => void (d.droneButton = { label: e.target.value || undefined }))}
+                        />
+                      </Field>
+                    )}
                   </Group>
                 )}
                 <MapEditor config={config} edit={edit} focus={pointFocus} preview={preview} slug={slug} />

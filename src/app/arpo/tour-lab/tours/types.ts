@@ -520,6 +520,8 @@ export type TourConfig = {
     boxStyle?: "logo" | "logo-cta";
     /** true: on a phone the top box shows the title beside the logo (only when there is room for it). Left out: the logo and the button only - the logo says the name. */
     titleMobile?: true;
+    /** Phones: the bar at the top (logo and button) - "main" the tour's colour (default), "white", or "glass" (see-through, the photo behind). Whatever it is, the button always stands out from it (a white button on a bar in the button's own colour). */
+    barMobile?: "main" | "white" | "glass";
     /** The points' names on the drone scene / map: always, only when zoomed in, or never (the open point's card has the name). Default: computer always, phone when zoomed in. */
     names?: { desktop?: "always" | "zoom" | "never"; mobile?: "always" | "zoom" | "never" };
     /** The points' size (icon and name) on the drone scene / map, per device: 1 = normal. Default: computer 1, phone 0.85. */
@@ -544,6 +546,13 @@ export type TourConfig = {
    * button in the tour. Left out: the tour starts on the aerial photo.
    */
   droneStart?: false;
+  /**
+   * The button inside the tour to the aerial photo / map: false = none. With
+   * the tour starting inside (droneStart false) it's off unless switched on
+   * here; `label` = its words (e.g. "Se skolen fra luften" - default the
+   * drone's backLabel, or "Se det fra luften" when the tour starts inside).
+   */
+  droneButton?: false | { label?: string };
   drone?: {
     /** One 360° photo (equirectangular) instead of the tiles below - set by the engine for a 360° map. */
     panorama?: string;

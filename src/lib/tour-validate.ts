@@ -40,6 +40,7 @@ export function tourConfigProblem(config: unknown): string | null {
   const wb = c.wayfinding?.blocks;
   if (wb !== undefined && !(arr(wb) && wb.length <= 200 && wb.every((x) => arr(x) && x.length === 2 && x.every((n) => typeof n === "number" && Number.isInteger(n) && n > 0)))) return "Find vej: spærringerne skal være par af scanpunkter.";
   if (c.droneStart !== undefined && c.droneStart !== false) return '"droneStart" skal være false eller udeladt.';
+  if (c.droneButton !== undefined && c.droneButton !== false && !(obj(c.droneButton) && (c.droneButton.label === undefined || str(c.droneButton.label)))) return "Knappen til luftfotoet har en forkert form.";
   const ld = c.lineDays;
   if (ld !== undefined) {
     const stopOk = (x: unknown) => {

@@ -9,6 +9,7 @@
 export type EngineChange = { date: string; kind: "ny" | "sikkerhed" | "hastighed" | "rettelse"; text: string };
 
 export const ENGINE_CHANGES: EngineChange[] = [
+  { date: "2026-11-19", kind: "ny", text: "Bjælken øverst på telefon (logo og knap) kan være i tourens farve, hvid eller glas, og knappen skiller sig altid ud af sig selv - har bjælken samme farve som knappen, bliver knappen hvid. Knappen til luftfotoet inde i touren kan slås til og fra og have sin egen tekst (fx \"Se skolen fra luften\")." },
   { date: "2026-11-19", kind: "ny", text: "Luftfotoet kan vises kun fra et menupunkt: touren starter inde i 3D, og der er ingen \"Tilbage til luften\"-knap (Luftfoto og kort, Hvor touren starter)." },
   { date: "2026-11-19", kind: "ny", text: "En linje på kan være den store knap i menuen (som Vis mig rundt), øverst eller nederst - med \"Vælg din linje\" og antallet af linjer." },
   { date: "2026-11-19", kind: "rettelse", text: "Luftfoto og kort på telefon: punkternes navne ligger aldrig oven i hinanden (heller ikke med \"Altid\" - et navn, der ville dække et andet, vises ved tryk), boksen øverst er kun så bred som logoet og knappen (ingen lang tom bjælke), og filteret skjules, når der kun er én kategori." },
