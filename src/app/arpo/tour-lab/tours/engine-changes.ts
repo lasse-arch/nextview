@@ -9,6 +9,7 @@
 export type EngineChange = { date: string; kind: "ny" | "sikkerhed" | "hastighed" | "rettelse"; text: string };
 
 export const ENGINE_CHANGES: EngineChange[] = [
+  { date: "2026-11-19", kind: "ny", text: "Fast knap i højre side (fx \"Tilmeld dig som elev\"), som på mange skolers hjemmesider - med ikon, i hovedfarven, accentfarven ved hover. Slås til under Knapper." },
   { date: "2026-11-19", kind: "ny", text: "En linje på: når linjevalget åbner, går touren bagved ind på skolen (tourens start, det første scan - eller et valgt sted), så man ser skolen, mens man vælger linje." },
   { date: "2026-11-19", kind: "rettelse", text: "En linje på: slutskærmen kan ses uden at scrolle på en computer - rejserne side om side og invitationen på én række." },
   { date: "2026-11-19", kind: "ny", text: "En linje på: et øjeblik uden sted (og overblikket) er ét panel - fotoet til venstre og teksten til højre på computer, fotoet øverst i kortet på telefon. Overblikket kan stå et sted i touren (fx ridehallen) i stedet for med et foto. Fotoet, der toner over i stedet, vises helt (aldrig beskåret). Rækker med fakta, rejser og andre linjer kan scrolles med musen og har pile." },

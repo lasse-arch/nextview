@@ -444,6 +444,13 @@ export type TourConfig = {
   font: string;
   cta: { label: string; href: string; primary: boolean }[];
   /**
+   * A button fixed to the right edge of the screen, always there (like "Tilmeld
+   * dig som elev" on many schools' sites): a label, where it goes, and a small
+   * icon. Hidden while the welcome, the menu or a guided tour is open.
+   * `phone: false` = not on phones (where it would cover the tour).
+   */
+  sideCta?: { label: string; href: string; icon?: "person" | "calendar" | "phone" | "mail" | "arrow" | "none"; phone?: false };
+  /**
    * How links out of the tour open: a default, and single links (by their URL)
    * set differently. Left out = new tab. `size`: how big a popup is (left out =
    * "stor"). A popup says which site it shows ("Fra claude.ai"), so visitors

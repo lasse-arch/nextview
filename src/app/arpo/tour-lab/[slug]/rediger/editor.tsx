@@ -125,7 +125,7 @@ const FINDS: Partial<Record<Tab, string[]>> = {
   skema: ["Byg dit skema|skema|ugeskema|fag|valgfag|hovedfag|sidefag|fagblok|perioder|timer"],
   live: ["Live data", "Ledige pladser", "Ledige rum", "Book-knap", "Hent nye data", "Holdplan|hold|flexybox|holdbooking"],
   kort: ["Stedkort", "Kort ved punkt", "Din plads venter", "Kort efter et stykke tid", "Knap til scanpunkt|opdækket|skjult scan"],
-  links: ["Knapper", "Book", "Kontakt", "Telefon", "E-mail", "Adresse", "Sociale medier", "Kontaktformular", "Skriv til os", "Åbning", "Popup", "Ny fane", "Kort-link"],
+  links: ["Fast knap i højre side|knap i højre kant|tilmeld dig som elev|sideknap|cta i siden", "Knapper", "Book", "Kontakt", "Telefon", "E-mail", "Adresse", "Sociale medier", "Kontaktformular", "Skriv til os", "Åbning", "Popup", "Ny fane", "Kort-link"],
   design: ["Farver", "Skrift", "Font", "Logo", "Logostørrelse", "Logoets størrelse på fliserne|logo på velkomsten|logo i boksen|velkomstlogo", "Logoets afstand", "Favicon", "Mørkt logo", "Farvefilter", "Brug hjemmesidens farver|hjemmeside|rød tråd|brand"],
   sprog: ["Sprog", "Engelsk", "Tysk", "Oversæt"],
   funktioner: ["Baggrund bag afspil-knappen|afspil-knap|afspilknap|play-knap|baggrund|sløret|sløret tour|start af sig selv|autoplay", "På en telefon på en hjemmeside|fuld skærm ved brug|i rammen", "Infobokse|infoboks|læs mere|læs om|boks", "Navigation", "Bevægelse", "Fri bevægelse", "Kun punkter", "Skift mellem steder", "Fade", "Flyv", "Zoom", "Lås zoom på mobil", "Find vej", "Vis mål", "Matterports egne knapper", "Sådan går du rundt|hjælp ved start|onboarding", "Vej til stedet|vej til skolen|hvor langt|afstand|adresse|postnummer|bus|tog|rejseplan|google maps|mødetid", "Flyvetid"],
@@ -1342,6 +1342,39 @@ export function TourEditor({
                 </Group>
                 <Group title="Knapper">
                 <CtaEditor cta={config.cta} live={Boolean(config.live)} form={Boolean(config.contactForm)} onChange={(cta) => edit((d) => void (d.cta = cta))} />
+                </Group>
+                <Group title="Fast knap i højre side">
+                  <Toggle
+                    on={Boolean(config.sideCta)}
+                    onChange={(on) => edit((d) => void (d.sideCta = on ? { label: d.cta.find((c) => c.primary)?.label ?? "Book en rundvisning", href: d.cta.find((c) => c.primary)?.href ?? "", icon: "arrow" } : undefined))}
+                    title="Knap i højre kant"
+                    hint='Sidder fast ude i højre side hele tiden - som "Tilmeld dig som elev" på mange skolers hjemmesider. Skjules, mens velkomsten, menuen eller en rundvisning er åben.'
+                  />
+                  {config.sideCta && (
+                    <>
+                      <Field title="Tekst">
+                        <input className={input} placeholder="Tilmeld dig som elev" value={config.sideCta.label} onChange={(e) => edit((d) => void (d.sideCta && (d.sideCta.label = e.target.value)))} />
+                      </Field>
+                      <Field title="Link" hint="Hjemmesidens side, et sted i touren (@) eller #kontakt.">
+                        <LinkInput value={config.sideCta.href} onChange={(href) => edit((d) => void (d.sideCta && (d.sideCta.href = href)))} />
+                      </Field>
+                      <Field title="Ikon">
+                        <Choice<"person" | "calendar" | "phone" | "mail" | "arrow" | "none">
+                          value={config.sideCta.icon ?? "arrow"}
+                          options={[
+                            ["person", "Tilmeld"],
+                            ["calendar", "Kalender"],
+                            ["phone", "Telefon"],
+                            ["mail", "Mail"],
+                            ["arrow", "Pil"],
+                            ["none", "Intet"],
+                          ]}
+                          onChange={(v) => edit((d) => void (d.sideCta && (d.sideCta.icon = v)))}
+                        />
+                      </Field>
+                      <Toggle on={config.sideCta.phone !== false} onChange={(on) => edit((d) => void (d.sideCta && (on ? delete d.sideCta.phone : (d.sideCta.phone = false))))} title="Også på telefon" hint="På telefon er den mindre og sidder lidt over bunden - den går væk, mens et stedkort er åbent." />
+                    </>
+                  )}
                 </Group>
                 <Group title="Kontakt">
                 <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">Vises nederst i menuen. Udfyld kun det, kunden vil have vist.</p>

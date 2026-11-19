@@ -273,6 +273,15 @@ function declutterNames(selected: string | null) {
   });
 }
 
+/** The fixed side button's icons (stroke, 24x24). */
+const SIDE_ICONS: Record<string, string> = {
+  person: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M19 8v6M16 11h6"/>',
+  calendar: '<rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
+  phone: '<path d="M5 4h3.5l1.5 4.5-2 1.3a11 11 0 0 0 6.2 6.2l1.3-2 4.5 1.5V19a1.5 1.5 0 0 1-1.6 1.5A16.5 16.5 0 0 1 3.5 5.6 1.5 1.5 0 0 1 5 4z"/>',
+  mail: '<rect x="3" y="5.5" width="18" height="13" rx="2"/><path d="M3.5 7l8.5 6 8.5-6"/>',
+  arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+};
+
 function readLastRoom(key: string): { name: string; href: string } | null {
   try {
     return JSON.parse(localStorage.getItem(key) ?? "null");
@@ -3998,6 +4007,17 @@ function TourExperience({
       )}
       {/* Full screen, in the top right corner by the menu button - only while the tour itself is up (not the welcome, a cover or an open menu). */}
       {T.fullscreenButton !== false && !welcome && !(cover && T.cover) && !menuOpen && <FullscreenButton onToggle={(on) => track("fullscreen", { on: on ? 1 : 0 })} />}
+      {/* The fixed button on the right edge (e.g. "Tilmeld dig som elev") - not over the welcome, the menu, a guided tour or En linje på. */}
+      {T.sideCta?.label && T.sideCta.href && !welcome && !(cover && T.cover) && !menuOpen && guideAt == null && !route && !lineRun && !linePicker && dayAt == null && (
+        <button
+          type="button"
+          className={`hv-sidecta ${T.sideCta.phone === false ? "hv-sidecta-ikke-m" : ""}`}
+          onClick={() => (ctaClick(T.sideCta!.label, T.sideCta!.href, "side_cta"), openLink(T, T.sideCta!.href, T.sideCta!.label, popup))}
+        >
+          {T.sideCta.icon !== "none" && <svg viewBox="0 0 24 24" aria-hidden dangerouslySetInnerHTML={{ __html: SIDE_ICONS[T.sideCta.icon ?? "arrow"] }} />}
+          <span>{tx(T.sideCta.label)}</span>
+        </button>
+      )}
       {T.commute?.button && !welcome && !(cover && T.cover) && guideAt == null && !route && (
         <button type="button" className={`vt-tur-knap vt-tur-knap-${T.commute.button}`} onClick={() => (track("commute_open", { from: "button" }), setCommuteOpen(true))}>
           🚌 {T.commute.title || tx("Hvor langt har du til os?")}
@@ -4710,6 +4730,10 @@ html:has(.hv.fixed),html:has(.hv.fixed) body{overflow:hidden;overscroll-behavior
 .hv-signatur:hover{color:#1d2a30}
 .hv-luften{position:absolute;left:16px;bottom:20px;z-index:6;display:flex;align-items:center;gap:8px;background:var(--c-main);color:#fff;border:0;border-radius:999px;padding:11px 18px;font:800 14px inherit;font-family:inherit;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.3)}
 .hv-luften svg{width:18px;height:18px}
+.hv-sidecta{position:absolute;right:0;top:56%;z-index:7;display:flex;align-items:center;gap:10px;padding:13px 22px 13px 18px;border:0;border-radius:999px 0 0 999px;background:var(--c-main);color:#fff;font:inherit;font-size:16px;font-weight:800;cursor:pointer;box-shadow:0 8px 22px rgba(0,0,0,.28);transition:padding .2s ease,background .2s ease;animation:hvFade .4s ease}
+.hv-sidecta:hover{padding-right:28px;background:var(--c-accent);color:var(--c-on-accent,#fff)}
+.hv-sidecta svg{width:20px;height:20px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+@media (max-width:760px){.hv-sidecta{top:auto;bottom:calc(150px + env(safe-area-inset-bottom,0px));padding:9px 14px 9px 12px;gap:7px;font-size:13.5px}.hv-sidecta svg{width:17px;height:17px}.hv-sidecta-ikke-m{display:none}.hv-med-kort .hv-sidecta{display:none}}
 .hv-room{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);z-index:6;background:rgba(255,255,255,.95);color:var(--c-main);border-radius:999px;padding:8px 16px;font-weight:800;font-size:14px;line-height:1.25;box-shadow:0 4px 14px rgba(0,0,0,.25);width:max-content;max-width:min(560px,calc(100% - 32px));text-align:center;text-wrap:balance}
 /* A long name: two even, centred lines in a rounded box - not a stretched pill with a ragged edge. (One line: still a pill.) */
 .hv-room{border-radius:18px}

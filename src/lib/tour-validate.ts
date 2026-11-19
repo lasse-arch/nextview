@@ -33,6 +33,7 @@ export function tourConfigProblem(config: unknown): string | null {
   if (c.lockInHidden !== undefined && c.lockInHidden !== true) return '"lockInHidden" skal være true eller udeladt.';
   if (c.welcome && (!obj(c.welcome) || !arr(c.welcome.tiles) || !c.welcome.tiles.every((t) => obj(t) && str(t.title) && obj(t.go)))) return "Velkomstens fliser har en forkert form.";
   if (c.cover && (!obj(c.cover) || !["kicker", "title", "lead", "image", "enter", "placesTitle"].every((k) => str((c.cover as Record<string, unknown>)[k])))) return "Forsiden mangler tekster eller billede.";
+  if (c.sideCta !== undefined && !(obj(c.sideCta) && str(c.sideCta.label) && str(c.sideCta.href))) return "Knappen i højre side skal have en tekst og et link.";
   const ld = c.lineDays;
   if (ld !== undefined) {
     const stopOk = (x: unknown) => {
