@@ -769,9 +769,15 @@ export type TourConfig = {
        * The overview first, before the moments: what the line is over a week
        * and a year ("En uge på Fiskelinjen" - a whole morning and afternoon
        * every week, two full weeks a year). `facts` = short chips ("1 formiddag
-       * + 1 eftermiddag om ugen", "2 linjefagsuger"). Shown with the line's photo.
+       * + 1 eftermiddag om ugen", "2 linjefagsuger"). Shown with the line's photo - or, with `href`, in that place in the tour.
        */
-      intro?: { title?: string; text: string; facts?: string[] };
+      intro?: {
+        title?: string;
+        text: string;
+        facts?: string[];
+        /** Where the overview stands in the tour (a place link, e.g. the riding hall): the tour goes there and shows it - no photo. Left out: the line's photo, the tour blurred behind. */
+        href?: string;
+      };
       /** The line's teachers on the picker and its stops (up to 4). */
       people?: CardPerson[];
       /** The day in order: a shared stop's id, or a stop of the line's own. */

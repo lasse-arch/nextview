@@ -339,10 +339,11 @@ function LineEditor({ line, L, config, onChange, preview, sharedName }: { line: 
       <Field title="Startsætning (valgfri)" hint='Fx "... der starter i stalden, før du har åbnet en bog."'>
         <input className={`${input} bg-white`} value={line.teaser ?? ""} onChange={(e) => onChange({ ...line, teaser: e.target.value || undefined })} />
       </Field>
-      <Field title="Overblik i starten" hint='Vises først, før øjeblikkene, med linjens foto - hvordan linjen er over en uge og et år. Fx overskrift "En uge på Fiskelinjen" og skolens egen tekst. Tom tekst = intet overblik.'>
+      <Field title="Overblik i starten" hint='Vises først, før øjeblikkene - hvordan linjen er over en uge og et år. Med et sted i touren (fx ridehallen) står det dér uden foto; ellers med linjens foto og touren sløret bagved. Fx overskrift "En uge på Fiskelinjen" og skolens egen tekst. Tom tekst = intet overblik.'>
         <input className={`${input} bg-white`} placeholder={`Overskrift (tom = ${line.name})`} value={line.intro?.title ?? ""} onChange={(e) => onChange({ ...line, intro: { text: line.intro?.text ?? "", ...line.intro, title: e.target.value || undefined } })} />
         <textarea className={`${textarea} mt-1.5`} placeholder="Du har en hel formiddag og en hel eftermiddag hver uge, hvor det kun handler om fiskeri ..." value={line.intro?.text ?? ""} onChange={(e) => onChange({ ...line, intro: e.target.value || line.intro?.title || line.intro?.facts?.length ? { ...line.intro, text: e.target.value } : undefined })} />
         <FactsInput key={line.id} facts={line.intro?.facts ?? []} onChange={(facts) => onChange({ ...line, intro: { text: line.intro?.text ?? "", ...line.intro, facts: facts.length ? facts : undefined } })} />
+        <IntroPlace href={line.intro?.href ?? ""} preview={preview} onChange={(href) => onChange({ ...line, intro: { text: line.intro?.text ?? "", ...line.intro, href: href || undefined } })} />
       </Field>
       <Field title="Linjens foto" hint="Vises som flisen, når man vælger linje - linjens bedste billede. Tom = det første foto i linjens egne øjeblikke.">
         <div className="flex items-center gap-3">
@@ -515,5 +516,28 @@ function FactsInput({ facts, onChange }: { facts: string[]; onChange: (facts: st
       onChange={(e) => setText(e.target.value)}
       onBlur={() => onChange(text.split(",").map((x) => x.trim()).filter(Boolean).slice(0, 6))}
     />
+  );
+}
+
+/** Where the overview stands in the tour (e.g. the riding hall) - from the preview, or a link. Empty: the line's photo instead. */
+function IntroPlace({ href, preview, onChange }: { href: string; preview: PreviewApi; onChange: (href: string) => void }) {
+  const [busy, setBusy] = useState(false);
+  return (
+    <div className="mt-1.5 flex flex-col gap-1.5">
+      <LinkInput className="bg-white" placeholder="@ stedet i touren (tom = linjens foto)" value={href} onChange={onChange} />
+      <button
+        type="button"
+        disabled={busy}
+        className={`${linkBtn} self-start`}
+        onClick={async () => {
+          setBusy(true);
+          const r = await preview.view();
+          setBusy(false);
+          if (r.href) onChange(r.href);
+        }}
+      >
+        {busy ? "Henter…" : "Overblikket står i stedet i forhåndsvisningen"}
+      </button>
+    </div>
   );
 }

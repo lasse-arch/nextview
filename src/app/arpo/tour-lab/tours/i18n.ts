@@ -162,6 +162,7 @@ export const UI_STRINGS = [
   "Forstået",
   "Gå ind i touren",
   "Tilbage",
+  "Flere",
   "Tilbage til luften",
   "Menu",
   "Luk",

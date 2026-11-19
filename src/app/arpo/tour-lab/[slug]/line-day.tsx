@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useT } from "../tours/i18n-react";
+import { mouseScroll } from "./mouse-scroll";
 import type { CardPerson, LineDayStop, TourConfig } from "../tours/types";
 
 /*
@@ -47,7 +48,7 @@ export function lineDayStops(L: L, line: string): ShownStop[] {
   // The overview first (what the line is over a week and a year), with the line's photo - the tour stays where it is, blurred.
   const photo = lineImage(l);
   const intro: ShownStop[] = l.intro?.text
-    ? [{ id: `${l.id}-overblik`, title: l.intro.title || l.name, text: l.intro.text, tags: l.intro.facts?.filter(Boolean), images: photo ? [photo] : undefined, people: l.people, shared: false, lineName: l.name, lineId: l.id, intro: true }]
+    ? [{ id: `${l.id}-overblik`, title: l.intro.title || l.name, text: l.intro.text, tags: l.intro.facts?.filter(Boolean), href: l.intro.href || undefined, images: !l.intro.href && photo ? [photo] : undefined, people: l.people, shared: false, lineName: l.name, lineId: l.id, intro: true }]
     : [];
   return [...intro, ...l.day
     .map((d): ShownStop | null => {
@@ -214,6 +215,7 @@ export function LineDayCard({ L, stops, run, onGo, onClose }: { L: L; stops: Sho
   const title = run.line === MIX ? (L.mix && L.mix.title) || tr("Lidt af det hele") : (L.lines.find((l) => l.id === run.line)?.name ?? "");
   const photos = (s.images ?? []).filter(Boolean).slice(0, 3);
   const placed = Boolean(s.href);
+  const stor = photos.length > 0 && !placed;
   const label = (x: ShownStop) => [x.time, x.title].filter(Boolean).join(" ");
   return (
     <>
@@ -221,13 +223,11 @@ export function LineDayCard({ L, stops, run, onGo, onClose }: { L: L; stops: Sho
         (placed ? (
           <StopReveal key={`${s.id}:${run.at}`} src={photos[0]} alt={s.title} />
         ) : (
-          <div className="ld-frame" key={`${s.id}:${run.at}`}>
-            <div className="ld-frame-photos">
-              <StopPhotos images={photos} alt={s.title} />
-            </div>
-          </div>
+          // No place: the tour blurred behind, and the photos are part of the card (one panel - photo and words together).
+          <div className="ld-frame" key={`${s.id}:${run.at}`} />
         ))}
-    <div className={`ld-card ${s.intro ? "ld-overblik" : ""}`} key={s.id + run.at} role="dialog" aria-label={title}>
+    <div className={`ld-card ${s.intro ? "ld-overblik" : ""} ${stor ? "ld-stor" : ""}`} key={s.id + run.at} role="dialog" aria-label={title}>
+      {stor && <StopPhotos key={`${s.id}:${run.at}`} images={photos} alt={s.title} />}
       {/* The moments as dots, and Luk - one row (the line's name is on the badge below). */}
       <div className="ld-top">
         <ol className="ld-dots" aria-label={tr("Øjeblikke")}>
@@ -250,11 +250,11 @@ export function LineDayCard({ L, stops, run, onGo, onClose }: { L: L; stops: Sho
       {s.text && <LongText key={s.id + run.at} text={s.text} />}
       {/* Small facts only on the overview - on a moment they only made the card taller. */}
       {s.intro && s.tags?.length ? (
-        <div className="ld-tags">
+        <ScrollRow className="ld-tags">
           {s.tags.map((t) => (
             <span key={t}>{t}</span>
           ))}
-        </div>
+        </ScrollRow>
       ) : null}
       {people?.length && metBefore && L.people !== "one" ? (
         <div className="ld-people-kort">
@@ -289,6 +289,51 @@ export function LineDayCard({ L, stops, run, onGo, onClose }: { L: L; stops: Sho
       </div>
     </div>
     </>
+  );
+}
+
+/**
+ * A row that runs on sideways (facts, trips, the other lines): swiped on a
+ * phone; with a mouse the wheel and a drag move it, and arrows at the ends
+ * (only where there is more) go from one side to the other.
+ */
+function ScrollRow({ className, children }: { className: string; children: React.ReactNode }) {
+  const tr = useT();
+  const box = useRef<HTMLDivElement | null>(null);
+  const [more, setMore] = useState<{ left: boolean; right: boolean }>({ left: false, right: false });
+  const measure = () => {
+    const el = box.current;
+    if (!el) return;
+    const left = el.scrollLeft > 2;
+    const right = el.scrollLeft + el.clientWidth < el.scrollWidth - 2;
+    setMore((m) => (m.left === left && m.right === right ? m : { left, right }));
+  };
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    const off = mouseScroll(el);
+    return () => (ro.disconnect(), off?.());
+  }, []);
+  const go = (dir: 1 | -1) => box.current?.scrollBy({ left: dir * box.current.clientWidth * 0.8, behavior: "smooth" });
+  return (
+    <div className={`ld-rul ${more.left ? "mere-v" : ""} ${more.right ? "mere-h" : ""}`}>
+      <div ref={box} className={className} onScroll={measure}>
+        {children}
+      </div>
+      {more.left && (
+        <button type="button" className="ld-rul-pil v" aria-label={tr("Tilbage")} onClick={() => go(-1)}>
+          ‹
+        </button>
+      )}
+      {more.right && (
+        <button type="button" className="ld-rul-pil h" aria-label={tr("Flere")} onClick={() => go(1)}>
+          ›
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -332,7 +377,11 @@ function StopReveal({ src, alt }: { src: string; alt: string }) {
   if (phase === "gone") return null;
   return (
     <div className={`ld-reveal ${phase === "fade" ? "ud" : ""}`} onClick={() => setPhase("fade")} onTransitionEnd={() => phase === "fade" && setPhase("gone")}>
-      <FadeImg src={src} alt={alt} eager />
+      {/* The whole photo, never cut - on a blurred copy of itself that fills the screen. */}
+      <span className="ld-reveal-bag" style={{ backgroundImage: `url(${JSON.stringify(src)})` }} aria-hidden />
+      <span className="ld-reveal-foto">
+        <FadeImg src={src} alt={alt} eager />
+      </span>
     </div>
   );
 }
@@ -354,7 +403,7 @@ export function LineDayEnd({ L, run, onPick, onVisit, onClose }: { L: L; stops: 
             {line?.trips?.length ? (
               <div className="ld-trips">
                 <span className="ld-kicker">{tr("Det venter dig også")}</span>
-                <div className="ld-trip-row">
+                <ScrollRow className="ld-trip-row">
                   {line.trips.slice(0, 6).map((t, i) => (
                     <article key={t.title + i} className={`ld-trip ${t.image ? "" : "uden-foto"}`}>
                       {t.image && (
@@ -369,7 +418,7 @@ export function LineDayEnd({ L, run, onPick, onVisit, onClose }: { L: L; stops: 
                       </div>
                     </article>
                   ))}
-                </div>
+                </ScrollRow>
               </div>
             ) : null}
             {L.visit && (
@@ -382,7 +431,7 @@ export function LineDayEnd({ L, run, onPick, onVisit, onClose }: { L: L; stops: 
               </div>
             )}
             <span className="ld-kicker">{run.line === MIX ? tr("Se din linje") : tr("Se en anden linje")}</span>
-            <div className="ld-chips">
+            <ScrollRow className="ld-chips">
               {L.lines
                 .filter((l) => l.id !== run.line)
                 .map((l) => (
@@ -390,7 +439,7 @@ export function LineDayEnd({ L, run, onPick, onVisit, onClose }: { L: L; stops: 
                     {l.name}
                   </button>
                 ))}
-            </div>
+            </ScrollRow>
           </div>
         </div>
       </div>
@@ -426,14 +475,35 @@ export const LINE_DAY_CSS = `
 .ld-line.med-foto:hover .ld-img img{transform:scale(1.04)}
 /* A moment's photo, full screen as it opens - fading into the same place in the tour. */
 .ld-reveal{position:absolute;inset:0;z-index:29;background:#111;opacity:1;transition:opacity 1.3s ease;cursor:pointer}
-.ld-reveal .ld-img{width:100%;height:100%}
-.ld-reveal .ld-img img{transform:scale(1.04);transition:opacity .4s ease,transform 4s ease-out}
+.ld-reveal-bag{position:absolute;inset:-40px;background:center/cover no-repeat;filter:blur(28px) brightness(.75)}
+.ld-reveal-foto{position:absolute;inset:24px}
+.ld-reveal .ld-img{width:100%;height:100%;background:none!important;animation:none!important}
+.ld-reveal .ld-img img{object-fit:contain;transform:scale(1.03);transition:opacity .4s ease,transform 4s ease-out;filter:drop-shadow(0 12px 30px rgba(0,0,0,.35))}
 .ld-reveal .ld-img.klar img{transform:scale(1)}
 .ld-reveal.ud{opacity:0;pointer-events:none}
 /* A moment with no place: its photos big, the tour blurred behind. */
 .ld-frame{position:absolute;inset:0;z-index:29;background:rgba(10,14,16,.35);-webkit-backdrop-filter:blur(18px) saturate(1.1);backdrop-filter:blur(18px) saturate(1.1);animation:hvFade .4s ease}
-.ld-frame-photos{position:absolute;top:24px;right:24px;bottom:24px;left:440px;display:flex}
-.ld-frame-photos .ld-photos{flex:1!important;margin:0;border-radius:20px;box-shadow:0 20px 60px rgba(0,0,0,.4)}
+/* A row that runs on sideways: arrows at the ends with a mouse, the edge fades where there is more. */
+.ld-rul{position:relative;min-width:0}
+.ld-rul>div{cursor:grab}
+.ld-rul.mere-h>div{-webkit-mask-image:linear-gradient(90deg,#000 85%,transparent);mask-image:linear-gradient(90deg,#000 85%,transparent)}
+.ld-rul.mere-v.mere-h>div{-webkit-mask-image:linear-gradient(90deg,transparent,#000 12%,#000 85%,transparent);mask-image:linear-gradient(90deg,transparent,#000 12%,#000 85%,transparent)}
+.ld-rul.mere-v:not(.mere-h)>div{-webkit-mask-image:linear-gradient(90deg,transparent,#000 12%);mask-image:linear-gradient(90deg,transparent,#000 12%)}
+.ld-rul-pil{position:absolute;top:50%;translate:0 -50%;z-index:2;display:none;width:28px;height:28px;padding:0 0 2px;border:0;border-radius:50%;background:#fff;color:#1d2a30;font:inherit;font-size:18px;font-weight:800;line-height:1;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.22)}
+.ld-rul-pil.v{left:-4px}.ld-rul-pil.h{right:-4px}
+@media (hover:hover) and (pointer:fine){.ld-rul-pil{display:grid;place-items:center}}
+/* A moment with no place: one panel in the middle - the photo on the left, the words on the right (on a phone: the photo on top). */
+@media (min-width:761px){
+  .ld-card.ld-stor{left:50%;top:50%;bottom:auto;translate:-50% -50%;width:min(880px,calc(100% - 48px));height:min(520px,calc(100% - 48px));max-height:none;padding:0;display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);grid-template-rows:repeat(11,auto) 1fr;animation:hvFade .35s ease both}
+  .ld-stor>*{grid-column:2;margin-left:26px!important;margin-right:26px!important}
+  .ld-stor>.ld-top{margin-top:24px}
+  .ld-stor>.ld-photos{grid-column:1;grid-row:1/13;margin:0!important;height:auto;min-height:0;border-radius:20px 0 0 20px}
+  .ld-stor>.ld-nav{grid-row:12;align-self:end;margin-bottom:24px}
+  .ld-stor h3{font-size:26px}
+  .ld-card.ld-stor>p{-webkit-line-clamp:9}
+  .ld-stor>.ld-mere{justify-self:start}
+  .ld-card.ld-stor>p.aaben{overflow-y:auto;min-height:0}
+}
 /* A tighter card: dots and Luk on one row. */
 .ld-top{gap:12px}
 .ld-top .ld-dots{flex:1;margin:0}
@@ -516,7 +586,7 @@ export const LINE_DAY_CSS = `
 .ld-visit b{display:block;font-size:17px;color:var(--c-main)}
 .ld-visit p{margin:4px 0 12px;font-size:14px;line-height:1.45;color:#3d4a50}
 .ld-visit button{padding:11px 18px;border:0;border-radius:999px;background:var(--c-accent);color:var(--c-on-accent,#fff);font:inherit;font-weight:800;cursor:pointer}
-.ld-chips{display:flex;flex-wrap:nowrap;gap:6px;margin-top:8px;overflow-x:auto;scrollbar-width:none;-webkit-mask-image:linear-gradient(90deg,#000 88%,transparent);mask-image:linear-gradient(90deg,#000 88%,transparent);padding-right:24px}
+.ld-chips{display:flex;flex-wrap:nowrap;gap:6px;margin-top:8px;overflow-x:auto;scrollbar-width:none}
 .ld-chips::-webkit-scrollbar{display:none}
 .ld-chips button{flex:none;white-space:nowrap}
 .ld-chips button{padding:9px 14px;border:1px solid #e3e1dc;border-radius:999px;background:#fff;font:inherit;font-size:14px;font-weight:700;color:var(--c-main);cursor:pointer}
@@ -529,13 +599,18 @@ export const LINE_DAY_CSS = `
   .ld-card{left:10px;right:10px;width:auto;bottom:calc(10px + env(safe-area-inset-bottom,0px));max-height:58%;padding:12px 14px}
   .ld-card h3{font-size:18px;margin:6px 0 3px}
   .ld-card>p{-webkit-line-clamp:2}
+  .ld-card.ld-stor{max-height:calc(100% - 70px - env(safe-area-inset-top,0px))}
+  /* On a phone the photo stands over the card (the card covers the lower part). */
+  .ld-reveal-foto{inset:calc(10px + env(safe-area-inset-top,0px)) 10px 46% 10px}
+  .ld-reveal .ld-img img{object-position:center}
   .ld-card .ld-when{margin-top:8px}
   .ld-x2{width:26px;height:26px;font-size:16px}
   .ld-nav{margin-top:10px}
   .ld-next{padding:10px 12px;font-size:14px}
   .ld-people-kort{margin-top:8px}
   .ld-people-kort .ld-faces img{width:24px!important;height:24px!important}
-  .ld-chips button{padding:7px 12px;font-size:13px}
+  .ld-chips{gap:5px}
+  .ld-chips button{padding:6px 10px;font-size:12.5px}
   .ld-card h3{font-size:19px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
   .ld-photos{margin:-14px -14px 10px}
   .ld-photos{flex-basis:min(170px,22vh)!important}
@@ -549,7 +624,6 @@ export const LINE_DAY_CSS = `
   .ld-people b{font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .ld-people small{font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .ld-people>span>span{min-width:0}
-  .ld-frame-photos{top:calc(12px + env(safe-area-inset-top,0px));left:10px;right:10px;bottom:auto;height:42%}
   .ld-line.med-foto{min-height:128px}
   }
 `;

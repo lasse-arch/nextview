@@ -47,7 +47,7 @@ export function tourConfigProblem(config: unknown): string | null {
     const sharedIds = new Set(ld.shared.map((x) => x.id));
     for (const l of ld.lines) {
       if (!obj(l) || !str(l.id) || !str(l.name) || !arr(l.day)) return "En linje mangler id, navn eller sine øjeblikke.";
-      if (l.intro !== undefined && !(obj(l.intro) && str(l.intro.text) && (l.intro.title === undefined || str(l.intro.title)) && (l.intro.facts === undefined || (arr(l.intro.facts) && l.intro.facts.length <= 6 && l.intro.facts.every(str))))) return `${l.name}: overblikket skal have en tekst (og højst 6 fakta).`;
+      if (l.intro !== undefined && !(obj(l.intro) && str(l.intro.text) && (l.intro.title === undefined || str(l.intro.title)) && (l.intro.href === undefined || str(l.intro.href)) && (l.intro.facts === undefined || (arr(l.intro.facts) && l.intro.facts.length <= 6 && l.intro.facts.every(str))))) return `${l.name}: overblikket skal have en tekst (og højst 6 fakta).`;
       if (l.image !== undefined && !(str(l.image) && /^(https?:\/\/|\/)/.test(l.image))) return `${l.name}: linjens foto skal være en adresse.`;
       if (l.people !== undefined && (!arr(l.people) || l.people.length > 4 || !l.people.every((p) => obj(p) && str(p.image)))) return `${l.name}: højst 4 lærere, hver med et billede.`;
       if (l.trips !== undefined && (!arr(l.trips) || l.trips.length > 6 || !l.trips.every((t) => obj(t) && str(t.title) && (t.image === undefined || (str(t.image) && /^(https?:\/\/|\/)/.test(t.image)))))) return `${l.name}: højst 6 rejser, hver med en titel.`;
