@@ -60,7 +60,7 @@ import { SCHEDULE_CSS, ScheduleSheet } from "./schedule";
 import { MAP_CSS, MapScene, type MapApi, type MapView } from "./map";
 import { CARDS_CSS, NudgeCard, PlaceCard } from "./cards";
 import { MEASURES_CSS, MeasureShield } from "./measures";
-import { ROUTE_CSS, RouteLine, RouteSheet, RouteStatus, flightMs, routeNetwork, shortestPath, straighten, withoutSweeps, type Destination, type RouteGraph } from "./wayfinding";
+import { ROUTE_CSS, RouteLine, RouteSheet, RouteStatus, flightMs, routeNetwork, shortestPath, straighten, withoutLinks, withoutSweeps, type Destination, type RouteGraph } from "./wayfinding";
 import { LINKS_CSS, LinkPopup, LinkProvider, MailText, TourLink, openLink, popupSize, prefetchFrames, prefetchLinks, siteOf, type LinkPopupState } from "./links";
 import { Stories, STORIES_CSS, storyJpeg, type StoryRoom } from "./stories";
 import { LIGHTBOX_CSS, Lightbox, type LightboxState } from "./lightbox";
@@ -2906,7 +2906,9 @@ function TourExperience({
     const from = currentSweep.current;
     // The way goes over the scan points the visitor may see - the hidden ones are left out. Only if there's no other
     // way at all (a hidden point is the one door between two rooms) is the whole network used.
-    const all = sdk ? routeNetwork(routeGraph, sweepData.current) : null;
+    const blocked = (T.wayfinding?.blocks ?? []).map(([x, y]) => [sweepForSs(x), sweepForSs(y)]).filter((p): p is [string, string] => Boolean(p[0] && p[1]));
+    const net0 = sdk ? routeNetwork(routeGraph, sweepData.current) : null;
+    const all = net0 ? withoutLinks(net0, blocked) : null;
     const open = all && goal && from ? withoutSweeps(all, new Set(hiddenSweeps), [from, goal]) : null;
     const openPath = open && goal && from ? shortestPath(open, from, goal) : null;
     const net = openPath ? open : all;

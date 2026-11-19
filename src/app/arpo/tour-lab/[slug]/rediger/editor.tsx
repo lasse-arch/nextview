@@ -129,7 +129,7 @@ const FINDS: Partial<Record<Tab, string[]>> = {
   links: ["Fast knap i højre side|knap i højre kant|tilmeld dig som elev|sideknap|cta i siden", "Knapper", "Book", "Kontakt", "Telefon", "E-mail", "Adresse", "Sociale medier", "Kontaktformular", "Skriv til os", "Åbning", "Popup", "Ny fane", "Kort-link"],
   design: ["Farver", "Skrift", "Font", "Logo", "Logostørrelse", "Logoets størrelse på fliserne|logo på velkomsten|logo i boksen|velkomstlogo", "Logoets afstand", "Favicon", "Mørkt logo", "Farvefilter", "Brug hjemmesidens farver|hjemmeside|rød tråd|brand"],
   sprog: ["Sprog", "Engelsk", "Tysk", "Oversæt"],
-  funktioner: ["Baggrund bag afspil-knappen|afspil-knap|afspilknap|play-knap|baggrund|sløret|sløret tour|start af sig selv|autoplay", "På en telefon på en hjemmeside|fuld skærm ved brug|i rammen", "Infobokse|infoboks|læs mere|læs om|boks", "Navigation", "Bevægelse", "Fri bevægelse", "Kun punkter", "Skift mellem steder", "Fade", "Flyv", "Zoom", "Lås zoom på mobil", "Find vej", "Vis mål", "Matterports egne knapper", "Sådan går du rundt|hjælp ved start|onboarding", "Vej til stedet|vej til skolen|hvor langt|afstand|adresse|postnummer|bus|tog|rejseplan|google maps|mødetid", "Flyvetid"],
+  funktioner: ["Spær vejen|find vej gennem væg|gennem vægge|gennem døre|ruten går forkert", "Baggrund bag afspil-knappen|afspil-knap|afspilknap|play-knap|baggrund|sløret|sløret tour|start af sig selv|autoplay", "På en telefon på en hjemmeside|fuld skærm ved brug|i rammen", "Infobokse|infoboks|læs mere|læs om|boks", "Navigation", "Bevægelse", "Fri bevægelse", "Kun punkter", "Skift mellem steder", "Fade", "Flyv", "Zoom", "Lås zoom på mobil", "Find vej", "Vis mål", "Matterports egne knapper", "Sådan går du rundt|hjælp ved start|onboarding", "Vej til stedet|vej til skolen|hvor langt|afstand|adresse|postnummer|bus|tog|rejseplan|google maps|mødetid", "Flyvetid"],
   generelt: ["Navn", "Firmanavn", "Undertitel", "Matterport-model", "Matterports indstillinger|dukkehus|plantegning|etagevælger"],
   okonomi: ["Tid", "Pris", "Timer", "Økonomi"],
   versioner: ["Versioner", "Fortryd", "Gendan", "Historik"],
@@ -1245,6 +1245,7 @@ export function TourEditor({
                   </Field>
                 )}
                 {config.wayfinding && <FindTargets config={config} edit={edit} preview={preview} />}
+                {config.wayfinding && <FindBlocks config={config} edit={edit} preview={preview} />}
                 {config.wayfinding && (
                   <Field title='Knap på "Du er fremme"' hint="Kortet, når Find vej er nået frem. Linket kan også være #live (listen med ledige), #kontakt (formularen) eller #vej.">
                     <Choice<"main" | "own" | "none">
@@ -3354,5 +3355,61 @@ function FindExtraRow({
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Find vej: walks it may never take - where it went through a window, a glass
+ * door or a wall. Stand on one side in the preview, press, step to the other
+ * side, press again: those two scan points are never walked between directly.
+ */
+function FindBlocks({ config, edit, preview }: { config: TourConfig; edit: (fn: (d: TourConfig) => void) => void; preview: PreviewApi }) {
+  const blocks = config.wayfinding?.blocks ?? [];
+  const [first, setFirst] = useState<number | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+  async function here() {
+    const v = await preview.view();
+    const ss = v.href ? Number(new URLSearchParams(v.href.split("?")[1] ?? "").get("ss")) : NaN;
+    if (!Number.isFinite(ss) || ss <= 0) return setNote("Stil forhåndsvisningen på et scanpunkt i touren først.");
+    if (first == null) {
+      setFirst(ss);
+      return setNote(`Scanpunkt ${ss} valgt. Gå til punktet på den anden side af væggen/døren, og tryk igen.`);
+    }
+    if (ss === first) return setNote("Det er det samme punkt - gå til punktet på den anden side.");
+    edit((d) => void (d.wayfinding = { ...d.wayfinding, blocks: [...(d.wayfinding?.blocks ?? []), [first, ss]] }));
+    setFirst(null);
+    setNote(`Find vej går ikke længere direkte mellem ${first} og ${ss}.`);
+  }
+  return (
+    <Field title="Spær vejen" hint="Gik Find vej gennem en væg, et vindue eller en lukket dør? Stil dig på den ene side i forhåndsvisningen og tryk, gå til den anden side og tryk igen. Så tager ruten aldrig det skridt - den går rundt gennem den rigtige dør.">
+      <div className="flex flex-col gap-1.5">
+        <div className="flex flex-wrap items-center gap-3">
+          <button type="button" className="rounded-lg px-2 py-1 text-[13px] font-medium text-[#0071e3] hover:bg-[#0071e3]/5" onClick={here}>
+            {first == null ? "Spær vejen herfra" : `… og hertil (fra ${first})`}
+          </button>
+          {first != null && (
+            <button type="button" className="text-[13px] text-[#8e8e93]" onClick={() => (setFirst(null), setNote(null))}>
+              Fortryd
+            </button>
+          )}
+        </div>
+        {note && <p className="px-1 text-[12px] leading-snug text-[#1f7a35]">{note}</p>}
+        {blocks.map(([a, b], i) => (
+          <div key={`${a}-${b}-${i}`} className="flex items-center justify-between rounded-lg bg-white px-2.5 py-1.5 text-[13px] ring-1 ring-black/[.06]">
+            <span>
+              Scanpunkt {a} ↔ {b}
+            </span>
+            <button
+              type="button"
+              aria-label="Fjern spærringen"
+              className="px-1 text-[16px] leading-none text-[#ff3b30]"
+              onClick={() => edit((d) => void (d.wayfinding = { ...d.wayfinding, blocks: (d.wayfinding?.blocks ?? []).filter((_, j) => j !== i) }))}
+            >
+              ×
+            </button>
+          </div>
+        ))}
+      </div>
+    </Field>
   );
 }

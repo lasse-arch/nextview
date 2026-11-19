@@ -37,6 +37,8 @@ export function tourConfigProblem(config: unknown): string | null {
     const list = Array.isArray(c.sideCta) ? c.sideCta : [c.sideCta];
     if (list.length > 3 || !list.every((b) => obj(b) && str(b.label) && str(b.href))) return "Knapperne i højre side: højst 3, hver med en tekst og et link.";
   }
+  const wb = c.wayfinding?.blocks;
+  if (wb !== undefined && !(arr(wb) && wb.length <= 200 && wb.every((x) => arr(x) && x.length === 2 && x.every((n) => typeof n === "number" && Number.isInteger(n) && n > 0)))) return "Find vej: spærringerne skal være par af scanpunkter.";
   const ld = c.lineDays;
   if (ld !== undefined) {
     const stopOk = (x: unknown) => {

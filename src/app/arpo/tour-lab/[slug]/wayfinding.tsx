@@ -33,6 +33,13 @@ export function routeNetwork(server: RouteGraph | null, sweeps: Record<string, {
   return out;
 }
 
+/** The network without the walks the tour's maker has blocked (two scan points that "see" each other through glass or a wall). */
+export function withoutLinks(graph: RouteGraph, pairs: [string, string][]): RouteGraph {
+  if (!pairs.length) return graph;
+  const cut = new Set(pairs.flatMap(([a, b]) => [`${a}|${b}`, `${b}|${a}`]));
+  return Object.fromEntries(Object.entries(graph).map(([id, node]) => [id, { ...node, n: node.n.filter((nb) => !cut.has(`${id}|${nb}`)) }]));
+}
+
 /** The network without some scan points (the hidden ones) - except `keep` (where the walk starts and ends). */
 export function withoutSweeps(graph: RouteGraph, drop: Set<string>, keep: string[]): RouteGraph {
   const out: RouteGraph = {};
@@ -59,8 +66,11 @@ export function shortestPath(graph: RouteGraph, from: string, to: string): strin
       // A long jump into another room is almost always one seen through a window (Matterport counts it as a neighbour),
       // not a door - a door is a few steps. So it's taken only when there's no other way at all (e.g. Skyum: the dining
       // hall to the football pitch went 34 m straight through the wall).
-      const intoOtherRoom = graph[cur].r && graph[nb].r && graph[cur].r !== graph[nb].r && Math.hypot(graph[cur].p[0] - graph[nb].p[0], graph[cur].p[1] - graph[nb].p[1]) > 10;
-      const alt = dist[cur] + d(cur, nb) ** 1.6 * (intoOtherRoom ? 50 : 1);
+      // A door is a few steps: into another room more than ~4 m away is most likely through glass (a window, a closed glass door).
+      const step = Math.hypot(graph[cur].p[0] - graph[nb].p[0], graph[cur].p[1] - graph[nb].p[1]);
+      const otherRoom = Boolean(graph[cur].r && graph[nb].r && graph[cur].r !== graph[nb].r);
+      const penalty = otherRoom ? (step > 10 ? 50 : step > 4 ? 20 : 1) : step > 12 ? 4 : 1;
+      const alt = dist[cur] + d(cur, nb) ** 1.6 * penalty;
       if (dist[nb] == null || alt < dist[nb]) {
         dist[nb] = alt;
         prev[nb] = cur;
@@ -83,6 +93,7 @@ const flat = (graph: RouteGraph, a: string, b: string) => Math.hypot(graph[a].p[
  * glides down a corridor and only stops at the corners.
  */
 export function straighten(graph: RouteGraph, path: string[], maxM = 30): string[] {
+  const sees = (a: string, b: string) => graph[a].n.includes(b);
   const out = [path[0]];
   let i = 0;
   while (i < path.length - 1) {
@@ -94,11 +105,16 @@ export function straighten(graph: RouteGraph, path: string[], maxM = 30): string
       // later point on the way will do - not only one Matterport counts as a neighbour - as long as every scan point
       // between lies on the straight line (they're on the walked way, so the glide can't cut through a wall), and it's level.
       if (flat(graph, path[i], path[k]) > maxM || Math.abs(a[2] - b[2]) > 0.5) continue;
+      // Only a glide between two points that see each other (Matterport's own neighbours) - never past a corner it can't see round.
+      if (!sees(path[i], path[k])) continue;
+      // Through a door: the glide may not cut its frame - it stops in the doorway unless the door point lies right on the line.
+      const between = path.slice(i + 1, k);
+      const rooms = new Set([path[i], ...between, path[k]].map((m) => graph[m].r).filter(Boolean));
       const len = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
       const off = path.slice(i + 1, k).every((m) => {
         const c = graph[m].p;
         // Close to the straight line (a glide that bends around a door frame would cut through the wall).
-        return Math.abs((b[0] - a[0]) * (a[1] - c[1]) - (a[0] - c[0]) * (b[1] - a[1])) / len < 0.6;
+        return Math.abs((b[0] - a[0]) * (a[1] - c[1]) - (a[0] - c[0]) * (b[1] - a[1])) / len < (rooms.size > 1 ? 0.25 : 0.5);
       });
       if (off) {
         j = k;

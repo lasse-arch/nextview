@@ -9,6 +9,7 @@
 export type EngineChange = { date: string; kind: "ny" | "sikkerhed" | "hastighed" | "rettelse"; text: string };
 
 export const ENGINE_CHANGES: EngineChange[] = [
+  { date: "2026-11-19", kind: "rettelse", text: "Find vej går ikke gennem vægge, vinduer og glasdøre: et skridt ind i et andet rum på mere end ca. 4 m (set gennem glas) tages kun, hvis der ingen anden vej er, ruten glider kun mellem punkter, der kan se hinanden, og stopper i døråbningen i stedet for at skære hjørnet. Gik den stadig forkert et sted, kan vejen spærres i editoren (Find vej, Spær vejen)." },
   { date: "2026-11-19", kind: "ny", text: "Næste rundvisninger kan læse datoerne direkte fra skolens egen side (fx besøgsaftenerne på \"Besøg os\"), ikke kun fra en Zenbi-formular - opdateret hvert 10. minut, passerede datoer vises ikke." },
   { date: "2026-11-19", kind: "ny", text: "Op til 3 faste knapper i højre side (fx \"Tilmeld dig som elev\"), som på mange skolers hjemmesider - med ikon; den første i hovedfarven, de andre hvide, accentfarven ved hover. Slås til under Knapper." },
   { date: "2026-11-19", kind: "ny", text: "En linje på: når linjevalget åbner, går touren bagved ind på skolen (tourens start, det første scan - eller et valgt sted), så man ser skolen, mens man vælger linje." },
