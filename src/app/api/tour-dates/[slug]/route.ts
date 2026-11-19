@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { teamSeesTour } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { tourCors } from "@/lib/tour-cors";
-import { zenbiEvents } from "@/lib/availability/zenbi";
+import { tourEvents } from "@/lib/availability/page-dates";
 import type { TourConfig } from "@/app/arpo/tour-lab/tours/types";
 
 /*
@@ -36,7 +36,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
   const ev = tour ? (tour.config as unknown as TourConfig).events : undefined;
   if (!tour || (!tour.published && !team) || !ev?.source) return NextResponse.json({ error: "Ikke fundet." }, { status: 404, headers: tourCors(request) });
   try {
-    const events = (await zenbiEvents(ev.source, ev.field)).slice(0, Math.max(1, Math.min(8, ev.max ?? 3)));
+    const events = (await tourEvents(ev.source, ev.field)).slice(0, Math.max(1, Math.min(8, ev.max ?? 3)));
     return NextResponse.json({ events }, { headers: tourCors(request, { "Cache-Control": team ? "private, no-store" : "public, s-maxage=300, stale-while-revalidate=600" }) });
   } catch {
     return NextResponse.json({ error: "Tilmeldingen svarer ikke lige nu." }, { status: 502, headers: tourCors(request) });

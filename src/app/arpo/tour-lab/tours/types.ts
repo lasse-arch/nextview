@@ -886,9 +886,10 @@ export type TourConfig = {
    */
   shop?: { url: string; title?: string; /** A page linking to whole weeks sold as their own products (e.g. Bondegårdsferie): the days the calendar can't book by the night can be booked as that week. */ weeks?: string };
   /**
-   * "Næste rundvisninger": the coming dates from a sign-up form (a Zenbi form,
-   * https://signup.zenbi.dk/form/<id> - read every 10 minutes, past dates left
-   * out) with a button to the form. Shown where chosen: on the welcome
+   * "Næste rundvisninger": the coming dates from the school's own page (any
+   * https page with the dates written on it, e.g. "D. 25/11 2026" on "Besøg
+   * os") or a Zenbi sign-up form (https://signup.zenbi.dk/form/<id>) - read every
+   * 10 minutes, past dates left out - with a button to that page or form. Shown where chosen: on the welcome
    * (`welcome`), in the menu (`menu`) and/or on place cards (placeCards[].events).
    * `title` default "Næste rundvisninger", `button` default "Tilmeld", `field`:
    * the form's date field when it isn't the one called "…dato…", `max`: how many

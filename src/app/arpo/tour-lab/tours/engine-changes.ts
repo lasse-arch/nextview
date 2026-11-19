@@ -9,6 +9,7 @@
 export type EngineChange = { date: string; kind: "ny" | "sikkerhed" | "hastighed" | "rettelse"; text: string };
 
 export const ENGINE_CHANGES: EngineChange[] = [
+  { date: "2026-11-19", kind: "ny", text: "Næste rundvisninger kan læse datoerne direkte fra skolens egen side (fx besøgsaftenerne på \"Besøg os\"), ikke kun fra en Zenbi-formular - opdateret hvert 10. minut, passerede datoer vises ikke." },
   { date: "2026-11-19", kind: "ny", text: "Op til 3 faste knapper i højre side (fx \"Tilmeld dig som elev\"), som på mange skolers hjemmesider - med ikon; den første i hovedfarven, de andre hvide, accentfarven ved hover. Slås til under Knapper." },
   { date: "2026-11-19", kind: "ny", text: "En linje på: når linjevalget åbner, går touren bagved ind på skolen (tourens start, det første scan - eller et valgt sted), så man ser skolen, mens man vælger linje." },
   { date: "2026-11-19", kind: "rettelse", text: "En linje på: slutskærmen kan ses uden at scrolle på en computer - rejserne side om side og invitationen på én række." },

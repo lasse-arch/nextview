@@ -9,7 +9,7 @@ import { Field, Group, input, Toggle } from "./ui";
 
 type Edit = (fn: (d: TourConfig) => void) => void;
 
-/** "Næste rundvisninger": the coming dates from a sign-up form (Zenbi) - and where the tour shows them. */
+/** "Næste rundvisninger": the coming dates from the school's own page or a sign-up form (Zenbi) - and where the tour shows them. */
 export function EventsEditor({ config, edit, slug }: { config: TourConfig; edit: Edit; slug: string }) {
   const ev = config.events;
   const [note, setNote] = useState<{ text: string; error?: boolean } | null>(null);
@@ -19,12 +19,12 @@ export function EventsEditor({ config, edit, slug }: { config: TourConfig; edit:
   return (
     <Group title="Næste rundvisninger (tilmelding)">
       <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">
-        De kommende datoer fra en tilmeldingsformular (Zenbi) med en knap til at tilmelde sig. Opdateres af sig selv hvert 10. minut - datoer, der er passeret, vises ikke.
+        De kommende datoer fra skolens egen side (fx &quot;Besøg os&quot; med besøgsaftenerne) eller en tilmeldingsformular (Zenbi), med en knap til at tilmelde sig - knappen åbner siden. Opdateres af sig selv hvert 10. minut - datoer, der er passeret, vises ikke.
       </p>
-      <Field title="Link til formularen">
+      <Field title="Siden med datoerne">
         <input
           className={input}
-          placeholder="https://signup.zenbi.dk/form/…"
+          placeholder="https://www.skole.dk/besoeg-os/ eller https://signup.zenbi.dk/form/…"
           value={ev?.source ?? ""}
           onChange={(e) => {
             setNote(null);
@@ -71,7 +71,7 @@ export function EventsEditor({ config, edit, slug }: { config: TourConfig; edit:
             </Field>
           )}
           <details className="text-[12px] text-[#8e8e93]">
-            <summary className="cursor-pointer select-none">Formularens datofelt hedder noget andet</summary>
+            <summary className="cursor-pointer select-none">Zenbi: formularens datofelt hedder noget andet</summary>
             <input className={`${input} mt-1.5`} placeholder='Feltets navn - tom: det, der hedder "…dato…"' value={ev.field ?? ""} onChange={(e) => set({ field: e.target.value || undefined })} />
           </details>
         </>
