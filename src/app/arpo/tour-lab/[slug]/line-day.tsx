@@ -586,6 +586,19 @@ export const LINE_DAY_CSS = `
 .ld-visit b{display:block;font-size:17px;color:var(--c-main)}
 .ld-visit p{margin:4px 0 12px;font-size:14px;line-height:1.45;color:#3d4a50}
 .ld-visit button{padding:11px 18px;border:0;border-radius:999px;background:var(--c-accent);color:var(--c-on-accent,#fff);font:inherit;font-weight:800;cursor:pointer}
+/* On a computer the end fits without scrolling: the trips side by side, the invitation on one row. */
+@media (min-width:761px){
+  .ld-end{width:min(880px,100%);padding:24px 28px}
+  .ld-end h2{font-size:26px;margin-bottom:4px}
+  .ld-end .ld-lead{font-size:14.5px;margin-bottom:14px}
+  .ld-end .ld-trips{margin-bottom:14px}
+  .ld-end .ld-trip-row{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);overflow:visible}
+  .ld-end .ld-trip-pic{height:96px}
+  .ld-end .ld-trip p{-webkit-line-clamp:2}
+  .ld-end .ld-visit{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:16px;align-items:center;margin-bottom:14px;padding:14px 18px}
+  .ld-end .ld-visit p{margin:2px 0 0;grid-column:1}
+  .ld-end .ld-visit button{grid-column:2;grid-row:1/3;white-space:nowrap}
+}
 .ld-chips{display:flex;flex-wrap:nowrap;gap:6px;margin-top:8px;overflow-x:auto;scrollbar-width:none}
 .ld-chips::-webkit-scrollbar{display:none}
 .ld-chips button{flex:none;white-space:nowrap}

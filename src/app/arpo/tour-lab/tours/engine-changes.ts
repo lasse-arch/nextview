@@ -9,6 +9,7 @@
 export type EngineChange = { date: string; kind: "ny" | "sikkerhed" | "hastighed" | "rettelse"; text: string };
 
 export const ENGINE_CHANGES: EngineChange[] = [
+  { date: "2026-11-19", kind: "rettelse", text: "En linje på: slutskærmen kan ses uden at scrolle på en computer - rejserne side om side og invitationen på én række." },
   { date: "2026-11-19", kind: "ny", text: "En linje på: et øjeblik uden sted (og overblikket) er ét panel - fotoet til venstre og teksten til højre på computer, fotoet øverst i kortet på telefon. Overblikket kan stå et sted i touren (fx ridehallen) i stedet for med et foto. Fotoet, der toner over i stedet, vises helt (aldrig beskåret). Rækker med fakta, rejser og andre linjer kan scrolles med musen og har pile." },
   { date: "2026-11-19", kind: "rettelse", text: "En linje på: fotoet står ikke længere også som lille billede på kortet - det vises stort, når øjeblikket åbner, og toner over i stedet." },
   { date: "2026-11-19", kind: "rettelse", text: "En linje på: øjeblikkets små billeder står i rækken med mærket (ingen række for sig), og \"Se en anden linje\" står på én række, der kan swipes." },
