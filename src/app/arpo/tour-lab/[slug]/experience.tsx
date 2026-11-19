@@ -8,7 +8,7 @@ import { danishOf, LANGUAGES, localize, makeT, tourLanguages } from "../tours/i1
 import { TourLang, useT } from "../tours/i18n-react";
 import { socialLinks } from "../tours/social";
 import { escapeHtml, safeColor } from "../tours/safe";
-import { shownGuides, cssFilter, droneViewsOfHref, formatPhone, GUIDE_HREF, guideOfHref, guideSetup, isDroneHref, guideExit, imageOfHref, isInTourHref, isPlaceHref, mapsSearch, placeHref, panoHfov, placeSlug, pointOfHref, startPlaces, startTargets, welcomeTiles, withoutDeadAerialLinks } from "../tours/places";
+import { shownGuides, cssFilter, droneViewsOfHref, formatPhone, GUIDE_HREF, guideOfHref, guideSetup, isDroneHref, guideExit, imageOfHref, isInTourHref, isPlaceHref, mapsSearch, placeHref, panoHfov, placeSlug, pointOfHref, startPlaces, startTargets, tilePhotos, welcomeTiles, withoutDeadAerialLinks } from "../tours/places";
 import type { LiveUnit } from "@/lib/availability/live";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { flushSync } from "react-dom";
@@ -41,7 +41,7 @@ import { CONTACT_CSS, CONTACT_HREF, ContactForm } from "./contact-form";
 import { DAY_CSS, DayBar, DaySheet } from "./day";
 import { SHOP_CSS, ShopSheet } from "./shop";
 import { PointVideo } from "./point-video";
-import { EVENTS_CSS, EventsBlock, useTourEvents } from "./events";
+import { EVENTS_CSS, EventsBlock, EventsSpace, useTourEvents } from "./events";
 import { CLASSES_CSS, ClassesNext, ClassesSheet, useTourClasses } from "./classes";
 import { HOURS_CSS, OpeningHours } from "./hours";
 import { BOXES_CSS, BoxSheet } from "./boxes";
@@ -282,6 +282,50 @@ const SIDE_ICONS: Record<string, string> = {
   mail: '<rect x="3" y="5.5" width="18" height="13" rx="2"/><path d="M3.5 7l8.5 6 8.5-6"/>',
   arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
 };
+
+/**
+ * A welcome tile's other photos, fading in over its first one, one at a time.
+ * Nothing is fetched until the tour is ready (so the start is as fast as
+ * without), each photo only shows once it's loaded, and with motion turned
+ * off on the device the tile just keeps its first photo.
+ */
+function TileSlides({ photos, ready }: { photos: string[]; ready: boolean }) {
+  const [loaded, setLoaded] = useState<string[]>([]);
+  const [at, setAt] = useState(-1);
+  useEffect(() => {
+    if (!ready || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    let dead = false;
+    // One after the other, after the tour itself.
+    (async () => {
+      for (const src of photos) {
+        await new Promise<void>((done) => {
+          const img = new Image();
+          img.decoding = "async";
+          img.onload = img.onerror = () => done();
+          img.src = src;
+        });
+        if (dead) return;
+        setLoaded((l) => (l.includes(src) ? l : [...l, src]));
+      }
+    })();
+    return () => {
+      dead = true;
+    };
+  }, [ready, photos]);
+  useEffect(() => {
+    if (!loaded.length) return;
+    // -1 = the tile's own first photo; then each loaded one in turn.
+    const t = setInterval(() => setAt((a) => (a + 1 >= loaded.length ? -1 : a + 1)), 4200);
+    return () => clearInterval(t);
+  }, [loaded.length]);
+  return (
+    <span className="hv-tile-slides" aria-hidden>
+      {loaded.map((src, i) => (
+        <span key={src} className={i === at ? "nu" : ""} style={{ backgroundImage: `linear-gradient(180deg,rgba(0,0,0,0) 35%,rgba(0,0,0,.62)),url(${JSON.stringify(src)})` }} />
+      ))}
+    </span>
+  );
+}
 
 function readLastRoom(key: string): { name: string; href: string } | null {
   try {
@@ -3406,6 +3450,7 @@ function TourExperience({
               <h1>{T.welcome.title}</h1>
               <p>{T.welcome.lead}</p>
               {events && T.events?.welcome && <EventsBlock T={T} events={events} onSignUp={(label, href) => ctaClick(label, href, "welcome_events")} />}
+              {events === undefined && T.events?.source && T.events.welcome && <EventsSpace />}
               {GUIDES.length > 0 && !T.welcome.tiles.some((t) => "guide" in t.go) && (
                 <button type="button" className="hv-wel-guide" onClick={() => chooseWelcome({ guide: true }, "Vis mig rundt")}>
                   ▶ {tx("Vis mig rundt")}
@@ -3422,20 +3467,25 @@ function TourExperience({
                 <b>{tx(lastRoom.name)}</b>
               </button>
             )}
-            {welcomeTiles(T).map((t) => (
+            {welcomeTiles(T).map((t) => {
+              const photos = tilePhotos(T, t);
+              const first = photos[0];
+              return (
               <button
                 key={t.title}
                 type="button"
-                className={`hv-tile hv-tile-${t.style} ${t.image ? "hv-tile-foto" : ""}`}
-                style={t.image ? { backgroundImage: `linear-gradient(180deg,rgba(0,0,0,0) 35%,rgba(0,0,0,.62)),url(${t.image})` } : undefined}
+                className={`hv-tile hv-tile-${t.style} ${first ? "hv-tile-foto" : ""}`}
+                style={first ? { backgroundImage: `linear-gradient(180deg,rgba(0,0,0,0) 35%,rgba(0,0,0,.62)),url(${JSON.stringify(first)})` } : undefined}
                 onClick={() => chooseWelcome(t.go, t.title)}
               >
+                {photos.length > 1 && <TileSlides photos={photos.slice(1)} ready={Boolean(sdk)} />}
                 {t.recommended && <em>{tx("Anbefalet")}</em>}
                 <span className="hv-tile-plus">+</span>
                 <small>{t.kicker}</small>
                 <b>{t.title}</b>
               </button>
-            ))}
+              );
+            })}
           </div>
           <button type="button" className="hv-wel-x" aria-label={tx("Luk")} onClick={() => chooseWelcome("skip", "luk")}>
             ×
@@ -4857,6 +4907,12 @@ html:has(.hv.fixed),html:has(.hv.fixed) body{overflow:hidden;overscroll-behavior
 .hv-tile-light{background:#fff;color:var(--c-main)}.hv-tile-light .hv-tile-plus{background:var(--c-main);color:#fff}
 .hv-tile-dark{background:var(--c-main);color:#fff}.hv-tile-dark .hv-tile-plus{background:#fff;color:var(--c-main)}
 .hv-tile-accent{background:var(--c-accent);color:var(--c-on-accent,#fff)}.hv-tile-accent em{background:rgba(255,255,255,.24)}.hv-tile-accent .hv-tile-plus{background:#fff;color:var(--c-accent)}
+.hv-tile-slides{position:absolute;inset:0;border-radius:inherit;overflow:hidden;pointer-events:none}
+.hv-tile-slides>span{position:absolute;inset:0;background-size:cover;background-position:center;opacity:0;transition:opacity 1.2s ease}
+.hv-tile-slides>span.nu{opacity:1}
+.hv-tile-foto>small,.hv-tile-foto>b{position:relative;z-index:1}
+.hv-tile-foto>em{position:relative;z-index:1}
+.hv-tile-foto>.hv-tile-plus{z-index:1}
 .hv-tile-foto{background-size:cover;background-position:center;color:#fff;text-shadow:0 1px 8px rgba(0,0,0,.35)}.hv-tile-foto small{opacity:.9}.hv-tile-foto .hv-tile-plus{background:#fff;color:var(--c-main);text-shadow:none}
 .hv-tile-last{background:#e7eef0;color:var(--c-main)}.hv-tile-last .hv-tile-plus{background:var(--c-main);color:#fff}
 .hv-wel-x{position:absolute;top:calc(16px + env(safe-area-inset-top,0px));right:16px;width:44px;height:44px;border-radius:12px;border:0;background:rgba(255,255,255,.92);font-size:24px;cursor:pointer;color:var(--c-main)}

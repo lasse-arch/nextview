@@ -551,6 +551,13 @@ export function StartEditor({ config, edit, slug, preview }: Props) {
                     />
                   </Field>
                   <Toggle on={Boolean(t.recommended)} onChange={(on) => set({ ...t, recommended: on || undefined })} title="Anbefalet" hint='Får et "Anbefalet"-mærke.' />
+                  <CardImages
+                    images={[t.image, ...(t.images ?? [])].filter((x): x is string => Boolean(x))}
+                    max={6}
+                    shrink={1200}
+                    hint={'Flisen viser det første foto og toner så over i de næste - de hentes først, når touren er klar, så starten er lige hurtig. En flise til "En linje på" skifter af sig selv mellem linjernes fotos.'}
+                    onChange={(list) => set({ ...t, image: list[0], images: list.length > 1 ? list.slice(1) : undefined })}
+                  />
                   <Field title="Fører til">
                     <Choice
                       value={"room" in t.go ? "room" : "guide" in t.go ? "guide" : "day" in t.go ? "day" : "href" in t.go ? "href" : "menu" in t.go ? "menu" : "drone"}

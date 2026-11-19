@@ -14,9 +14,9 @@ import { TourLink } from "./links";
 
 export type TourEvent = { title: string; date: string | null };
 
-/** The coming dates, fetched once for the tour (null while loading or when there are none). */
-export function useTourEvents(T: TourConfig): TourEvent[] | null {
-  const [events, setEvents] = useState<TourEvent[] | null>(null);
+/** The coming dates, fetched once for the tour: undefined while loading, null when there are none (or they can't be read). */
+export function useTourEvents(T: TourConfig): TourEvent[] | null | undefined {
+  const [events, setEvents] = useState<TourEvent[] | null | undefined>(undefined);
   const wanted = Boolean(T.events?.source && (T.events.welcome || T.events.menu || T.placeCards?.some((c) => c.events)));
   useEffect(() => {
     if (!wanted) return;
@@ -24,7 +24,7 @@ export function useTourEvents(T: TourConfig): TourEvent[] | null {
     fetch(apiUrl(`/api/tour-dates/${encodeURIComponent(T.slug)}`))
       .then((r) => r.json())
       .then((d: { events?: TourEvent[] }) => !dead && setEvents(d.events?.length ? d.events : null))
-      .catch(() => {});
+      .catch(() => !dead && setEvents(null));
     return () => {
       dead = true;
     };
@@ -72,7 +72,26 @@ export function EventsBlock({ T, events, onSignUp, className = "" }: { T: TourCo
   );
 }
 
+/** The dates' place, kept free while they load - so the welcome doesn't grow when they come. */
+export function EventsSpace() {
+  return (
+    <div className="ev ev-venter" aria-hidden>
+      <div className="ev-top">
+        <i />
+      </div>
+      <ul>
+        {[0, 1, 2].map((i) => (
+          <li key={i} />
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export const EVENTS_CSS = `
+.ev-venter .ev-top i{display:block;width:140px;height:11px;margin:3px 0;border-radius:6px;background:rgba(0,0,0,.07)}
+.ev-venter li{height:62px;min-width:54px;background:rgba(0,0,0,.04);box-shadow:none!important;animation:evPuls 1.4s ease-in-out infinite}
+@keyframes evPuls{50%{opacity:.5}}
 .ev{margin:14px 0 4px;text-align:left}
 .ev-top{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
 .ev-titel{display:block;font-size:11.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--c-main);opacity:.75}
@@ -86,5 +105,5 @@ export const EVENTS_CSS = `
 .ev li.ev-tekst{flex-direction:row;font-size:13px;font-weight:600;padding:8px 12px}
 .ev li:first-child{box-shadow:0 0 0 2px var(--c-accent)}
 .ev-menu{margin:14px 18px 6px}
-@media (max-width:760px){.ev li{min-width:48px;padding:5px 7px 6px}.ev li b{font-size:17px}}
+@media (max-width:760px){.ev li{min-width:48px;padding:5px 7px 6px}.ev li b{font-size:17px}.ev-venter li{height:56px}}
 `;

@@ -1065,7 +1065,12 @@ export type TourConfig = {
      * takes its name, small heading, photo and spot from there, so a place is
      * written once. The tile's own title/kicker/image only win when filled in.
      */
-    tiles: { kicker: string; title: string; go: WelcomeGo; style: "dark" | "light" | "accent"; recommended?: boolean; image?: string; place?: string }[];
+    /**
+     * `images`: more photos (up to 5) that the tile fades between, after `image`
+     * - fetched only once the tour is ready, so the start is just as fast. A
+     * tile to "#linjedag" fades between the lines' own photos by itself.
+     */
+    tiles: { kicker: string; title: string; go: WelcomeGo; style: "dark" | "light" | "accent"; recommended?: boolean; image?: string; images?: string[]; place?: string }[];
     skip: string;
     /**
      * A looping film behind the tiles instead of the tour itself (e.g. the

@@ -287,6 +287,23 @@ export function welcomeTiles(T: Pick<TourConfig, "welcome" | "places">): Welcome
 }
 
 /**
+ * The photos a welcome tile fades between: its own (`image`, then `images`) -
+ * or, for a tile to "En linje på" with no photos of its own besides one, the
+ * lines' photos (each line's own, else the first of its moments). At most 6.
+ */
+export function tilePhotos(T: Pick<TourConfig, "lineDays">, t: WelcomeTile): string[] {
+  const own = [t.image, ...(t.images ?? [])].filter((x): x is string => Boolean(x));
+  const toLines = "href" in t.go && t.go.href.startsWith("#linjedag");
+  if (toLines && own.length <= 1 && T.lineDays) {
+    const lines = T.lineDays.lines
+      .map((l) => l.image || l.day.flatMap((d) => (typeof d === "string" ? [] : (d.images ?? []))).find(Boolean))
+      .filter((x): x is string => Boolean(x));
+    return [...new Set([...own, ...lines])].slice(0, 6);
+  }
+  return [...new Set(own)].slice(0, 6);
+}
+
+/**
  * Moves a tour's welcome tiles onto its Steder where they are the same spot:
  * a tile going to a place's spot is linked to it, and what it repeats from the
  * place is dropped - so it looks exactly as before, and the place is written
