@@ -57,6 +57,7 @@ export function tourConfigProblem(config: unknown): string | null {
         } else if (!stopOk(d)) return `${l.name}: et øjeblik mangler id eller overskrift.`;
       }
     }
+    if (ld.backdrop !== undefined && ld.backdrop !== false && !str(ld.backdrop)) return "Stedet bag linjevalget skal være et link.";
     if (ld.visit !== undefined && (!obj(ld.visit) || !str(ld.visit.title) || !str(ld.visit.label) || !str(ld.visit.href))) return "Afslutningen skal have overskrift, knaptekst og link.";
   }
   const sp = c.sitePlan;

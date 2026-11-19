@@ -127,6 +127,34 @@ export function LineDayEditor({ config, edit, preview }: { config: TourConfig; e
         <Field title="Undertekst">
           <input className={`${input} bg-white`} value={L.lead ?? ""} onChange={(e) => set((l) => void (l.lead = e.target.value || undefined))} />
         </Field>
+        <Field title="Touren bag linjevalget" hint="Mens man vælger linje, går touren ind på skolen bagved. Standard: tourens start (det første scan).">
+          <Choice<"start" | "here" | "none">
+            value={L.backdrop === false ? "none" : L.backdrop ? "here" : "start"}
+            options={[
+              ["start", "Tourens start"],
+              ["here", "Et bestemt sted"],
+              ["none", "Bliv hvor den er"],
+            ]}
+            onChange={async (v) => {
+              if (v === "start") return set((l) => void delete l.backdrop);
+              if (v === "none") return set((l) => void (l.backdrop = false));
+              const r = await preview.view();
+              if (r.href) set((l) => void (l.backdrop = r.href));
+            }}
+          />
+          {L.backdrop ? (
+            <button
+              type="button"
+              className={`${linkBtn} self-start`}
+              onClick={async () => {
+                const r = await preview.view();
+                if (r.href) set((l) => void (l.backdrop = r.href));
+              }}
+            >
+              Brug stedet i forhåndsvisningen
+            </button>
+          ) : null}
+        </Field>
         <Field title="Lærerne på kortet" hint="Hvor meget personerne fylder, mens dagen kører. Alle: hele listen, hvor man møder dem første gang - derefter små ansigter. Kun én: kun den første lærer, med navn og rolle. Kun ansigter: altid små ansigter og fornavnene.">
           <Choice
             value={L.people ?? "all"}

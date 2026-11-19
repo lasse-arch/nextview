@@ -1356,6 +1356,13 @@ function TourExperience({
     openFinderRef.current = () => openFinder("link");
     openDayRef.current = (from) => T.day && openDay(from);
   });
+  // The line picker opens: the tour behind it goes into the school (its start - the first scan), so the place itself is seen while choosing.
+  useEffect(() => {
+    if (!linePicker || !T.lineDays || T.lineDays.backdrop === false) return;
+    const href = T.lineDays.backdrop || T.start;
+    if (href && isPlaceHref(href)) goToRef.current(href, lineDaysTitle(T, tx));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once each time it opens
+  }, [linePicker]);
   // "En dag på din linje": each stop with a place flies the tour there (as a menu item would).
   const lineStops = lineRun && T.lineDays ? lineDayStops(T.lineDays, lineRun.line) : [];
   const lineStopKey = lineRun && !lineRun.end ? `${lineRun.line}|${lineRun.at}` : null;
