@@ -389,6 +389,14 @@ export function Experience(props: ExperienceProps) {
   useEffect(() => {
     if (window.parent === window) return;
     const onMessage = (e: MessageEvent) => {
+      // The editor on a phone, with the settings in front: the preview sleeps - nothing of it (nor Matterport inside it)
+      // is drawn - so typing in the editor isn't slowed down by a tour nobody can see. It wakes when it's shown again.
+      if (e.origin === location.origin && e.source === window.parent && (e.data?.type === "tour-sleep" || e.data?.type === "tour-wake")) {
+        const sleep = e.data.type === "tour-sleep";
+        document.documentElement.classList.toggle("hv-sover", sleep);
+        if (!sleep) window.dispatchEvent(new Event("resize"));
+        return;
+      }
       if (e.origin === location.origin && e.source === window.parent && e.data?.type === "tour-draft") {
         const next = e.data.config as TourConfig;
         // Only a real change is a new setup: the same draft again (the editor sends it each time the tour says it's ready)
@@ -4943,6 +4951,7 @@ html:has(.hv.fixed),html:has(.hv.fixed) body{overflow:hidden;overscroll-behavior
 .hv-tile-light{background:#fff;color:var(--c-main)}.hv-tile-light .hv-tile-plus{background:var(--c-main);color:#fff}
 .hv-tile-dark{background:var(--c-main);color:#fff}.hv-tile-dark .hv-tile-plus{background:#fff;color:var(--c-main)}
 .hv-tile-accent{background:var(--c-accent);color:var(--c-on-accent,#fff)}.hv-tile-accent em{background:rgba(255,255,255,.24)}.hv-tile-accent .hv-tile-plus{background:#fff;color:var(--c-accent)}
+html.hv-sover .hv{display:none!important}
 .hv-tile-slides{position:absolute;inset:0;border-radius:inherit;overflow:hidden;pointer-events:none}
 .hv-tile-slides>span{position:absolute;inset:0;background-size:cover;background-position:center;opacity:0;transition:opacity 1.2s ease}
 .hv-tile-slides>span.nu{opacity:1}

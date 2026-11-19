@@ -361,10 +361,38 @@ export function TourEditor({
   const latest = useRef(config);
   /** A design hovered in the gallery (shown in the preview until the mouse leaves it). */
   const hovered = useRef<TourConfig | null>(null);
+  /*
+   * On a phone the preview is out of sight while the settings are in front: it sleeps then (draws nothing, Matterport
+   * included) and gets no drafts - each one made it build the whole tour again on the same thread as the typing, which
+   * is what made typing slow. Shown again, it wakes and gets the latest at once.
+   */
+  const narrow = useSyncExternalStore(
+    (on) => {
+      const m = window.matchMedia("(max-width: 767px)");
+      m.addEventListener("change", on);
+      return () => m.removeEventListener("change", on);
+    },
+    () => window.matchMedia("(max-width: 767px)").matches,
+    () => false
+  );
+  const previewShown = !narrow || pane === "preview";
+  const shownRef = useRef(previewShown);
+  /** A preview that has just loaded while out of sight goes to sleep - asked again a little later, as the tour may not listen yet. */
+  function sleepIfHidden() {
+    for (const ms of [0, 1500, 4000])
+      setTimeout(() => !shownRef.current && frame.current?.contentWindow?.postMessage({ type: "tour-sleep" }, location.origin), ms);
+  }
+  useEffect(() => {
+    shownRef.current = previewShown;
+    const w = frame.current?.contentWindow;
+    w?.postMessage({ type: previewShown ? "tour-wake" : "tour-sleep" }, location.origin);
+    if (previewShown && !tourConfigProblem(latest.current)) w?.postMessage({ type: "tour-draft", config: latest.current }, location.origin);
+  }, [previewShown]);
   useEffect(() => {
     // Only a whole setup goes to the preview - a half-typed one would break the tour there.
     if (tourConfigProblem(config)) return;
     latest.current = config;
+    if (!shownRef.current) return; // sent when the preview is shown again
     const t = setTimeout(() => frame.current?.contentWindow?.postMessage({ type: "tour-draft", config }, location.origin), 250);
     return () => clearTimeout(t);
   }, [config]);
@@ -384,6 +412,8 @@ export function TourEditor({
       if (e.origin === location.origin && e.source === frame.current?.contentWindow && e.data?.type === "tour-ready") {
         // While a design is hovered, the restarted preview gets the design to show - not the saved look back.
         frame.current?.contentWindow?.postMessage({ type: "tour-draft", config: hovered.current ?? latest.current }, location.origin);
+        // Out of sight (a phone, the settings in front): to sleep as soon as it's there.
+        if (!shownRef.current) frame.current?.contentWindow?.postMessage({ type: "tour-sleep" }, location.origin);
         const to = carry.current;
         carry.current = null;
         if (to) setTimeout(() => frame.current?.contentWindow?.postMessage({ type: "tour-go", name: "", href: to }, location.origin), 300);
@@ -436,7 +466,21 @@ export function TourEditor({
         };
         const timer = setTimeout(() => done({ error: "Forhåndsvisningen svarede ikke - er touren indlæst?" } as T & { error?: string }), wait);
         window.addEventListener("message", onMessage);
-        frame.current?.contentWindow?.postMessage({ type, id, ...extra }, location.origin);
+        const w = frame.current?.contentWindow;
+        // A sleeping preview (a phone, the settings in front) is woken for the question - with the latest setup - and put back to sleep after.
+        if (!shownRef.current && w) {
+          w.postMessage({ type: "tour-wake" }, location.origin);
+          if (!tourConfigProblem(latest.current)) w.postMessage({ type: "tour-draft", config: latest.current }, location.origin);
+          setTimeout(() => w.postMessage({ type, id, ...extra }, location.origin), 500);
+          const back = () => !shownRef.current && w.postMessage({ type: "tour-sleep" }, location.origin);
+          window.addEventListener("message", function sleepAgain(e: MessageEvent) {
+            if (e.origin === location.origin && e.data?.id === id && e.data.type === type) {
+              window.removeEventListener("message", sleepAgain);
+              setTimeout(back, 300);
+            }
+          });
+          setTimeout(back, wait + 500);
+        } else w?.postMessage({ type, id, ...extra }, location.origin);
       });
     return {
       view: () => ask<{ href?: string; room?: string | null; position?: { x: number; y: number; z: number } }>("tour-view"),
@@ -1760,13 +1804,13 @@ export function TourEditor({
             )}
             {device === "site" ? (
               <SitePreview config={config} size={embed} width={siteWidth}>
-                <iframe ref={frame} key={previewKey} title="Forhåndsvisning" src={`/arpo/tour-lab/${slug}`} className="h-full w-full bg-black" allow="fullscreen; xr-spatial-tracking; autoplay; clipboard-write" />
+                <iframe ref={frame} key={previewKey} onLoad={sleepIfHidden} title="Forhåndsvisning" src={`/arpo/tour-lab/${slug}`} className="h-full w-full bg-black" allow="fullscreen; xr-spatial-tracking; autoplay; clipboard-write" />
               </SitePreview>
             ) : (
               // Computer and phone share one frame, so switching between them (or grabbing a zoom slider) only changes the
               // frame around the tour - the tour itself isn't reloaded and stays where it is.
               <DeviceFrame phone={device === "mobil"} big={big} address={tourUrl(slug, "").replace(/^https?:\/\//, "") || `/t/${slug}`}>
-                <iframe ref={frame} key={previewKey} title="Forhåndsvisning" src={`/arpo/tour-lab/${slug}`} className="h-full w-full bg-black" allow="fullscreen; xr-spatial-tracking; autoplay; clipboard-write" />
+                <iframe ref={frame} key={previewKey} onLoad={sleepIfHidden} title="Forhåndsvisning" src={`/arpo/tour-lab/${slug}`} className="h-full w-full bg-black" allow="fullscreen; xr-spatial-tracking; autoplay; clipboard-write" />
               </DeviceFrame>
             )}
           </div>
