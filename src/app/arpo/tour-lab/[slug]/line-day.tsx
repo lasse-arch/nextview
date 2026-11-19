@@ -229,20 +229,20 @@ export function LineDayCard({ L, stops, run, onGo, onClose }: { L: L; stops: Sho
             </div>
           </div>
         ))}
-    <div className={`ld-card ${s.intro ? "ld-overblik" : ""}`} key={s.id + run.at}>
+    <div className={`ld-card ${s.intro ? "ld-overblik" : ""}`} key={s.id + run.at} role="dialog" aria-label={title}>
+      {/* The moments as dots, and Luk - one row (the line's name is on the badge below). */}
       <div className="ld-top">
-        <span className="ld-kicker">{title}</span>
+        <ol className="ld-dots" aria-label={tr("Øjeblikke")}>
+          {stops.map((x, i) => (
+            <li key={x.id + i}>
+              <button type="button" className={i === run.at ? "nu" : i < run.at ? "set" : ""} title={label(x)} aria-label={label(x)} onClick={() => onGo(i)} />
+            </li>
+          ))}
+        </ol>
         <button type="button" className="ld-x2" aria-label={tr("Luk")} onClick={onClose}>
           ×
         </button>
       </div>
-      <ol className="ld-dots" aria-label={tr("Øjeblikke")}>
-        {stops.map((x, i) => (
-          <li key={x.id + i}>
-            <button type="button" className={i === run.at ? "nu" : i < run.at ? "set" : ""} title={label(x)} aria-label={label(x)} onClick={() => onGo(i)} />
-          </li>
-        ))}
-      </ol>
       <div className="ld-when">
         {s.time && <time>{s.time}</time>}
         <span className={`ld-badge ${s.shared ? "faelles" : ""}`}>{s.shared ? tr("Hele skolen") : s.intro ? tr("Overblik") : s.lineName}</span>
@@ -260,7 +260,8 @@ export function LineDayCard({ L, stops, run, onGo, onClose }: { L: L; stops: Sho
           ))}
         </div>
       )}
-      {s.tags?.length ? (
+      {/* Small facts only on the overview - on a moment they only made the card taller. */}
+      {s.intro && s.tags?.length ? (
         <div className="ld-tags">
           {s.tags.map((t) => (
             <span key={t}>{t}</span>
@@ -449,6 +450,10 @@ export const LINE_DAY_CSS = `
 .ld-thumbs{display:flex;gap:6px;margin-top:10px}
 .ld-thumbs button{width:46px;height:46px;padding:0;border:0;border-radius:10px;overflow:hidden;background:#e9ecee;cursor:pointer}
 .ld-thumbs img{width:100%;height:100%;object-fit:cover;display:block}
+/* A tighter card: dots and Luk on one row. */
+.ld-top{gap:12px}
+.ld-top .ld-dots{flex:1;margin:0}
+.ld-card .ld-when{margin-top:10px}
 /* Long words fold: 3 lines, "Læs mere" for the rest (the card scrolls only then). */
 .ld-card>p{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .ld-card>p.aaben{display:block;-webkit-line-clamp:unset;overflow:visible}
@@ -533,14 +538,24 @@ export const LINE_DAY_CSS = `
   .ld-pick{border-radius:22px 22px 0 0;padding:22px 18px calc(18px + env(safe-area-inset-bottom,0px));max-height:90%}
   .ld-pick h2{font-size:26px}
   .ld-lines{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .ld-card{left:10px;right:10px;width:auto;bottom:calc(10px + env(safe-area-inset-bottom,0px));max-height:58%;padding:14px}
+  .ld-card{left:10px;right:10px;width:auto;bottom:calc(10px + env(safe-area-inset-bottom,0px));max-height:58%;padding:12px 14px}
+  .ld-card h3{font-size:18px;margin:6px 0 3px}
+  .ld-card>p{-webkit-line-clamp:2}
+  .ld-card .ld-when{margin-top:8px}
+  .ld-x2{width:26px;height:26px;font-size:16px}
+  .ld-nav{margin-top:10px}
+  .ld-next{padding:10px 12px;font-size:14px}
+  .ld-people-kort{margin-top:8px}
+  .ld-people-kort .ld-faces img{width:24px!important;height:24px!important}
+  .ld-thumbs{margin-top:8px}
+  .ld-thumbs button{width:38px;height:38px;border-radius:8px}
   .ld-card h3{font-size:19px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
   .ld-photos{margin:-14px -14px 10px}
   .ld-photos{flex-basis:min(170px,22vh)!important}
   /* With photos on top, the words keep it short, so the card stays clear of the top and never scrolls. */
   .ld-med-foto h3{-webkit-line-clamp:2}
   .ld-med-foto p{-webkit-line-clamp:2}
-  .ld-card p{font-size:14px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+  .ld-card p{font-size:14px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
   /* On the phone the people take less room: smaller faces, close together. */
   .ld-people{display:grid;grid-template-columns:minmax(0,1fr);gap:6px;margin-top:10px}
   .ld-people img{width:30px;height:30px}
