@@ -100,3 +100,58 @@ export async function onlineTours(): Promise<OnlineTour[]> {
   list.sort((a, b) => a.name.localeCompare(b.name, "da"));
   return list;
 }
+
+/** A tour still being built, for the sellers' "Tours i gang" - who builds it, by when, where it stands. No money. */
+export type TourInProgress = {
+  slug: string;
+  name: string;
+  customer: string | null;
+  dealId: string | null;
+  status: "i-gang" | "gennemgang" | "godkendt";
+  builder: string | null;
+  deadline: string | null;
+  /** When it was last saved (what "Se touren" shows), and by whom. */
+  savedAt: string;
+  savedBy: string | null;
+  /** Someone has unsaved changes newer than that (they show once saved). */
+  working: boolean;
+};
+
+/** Every tour not out yet (not published, no live version) - the ones due first at the top. */
+export async function toursInProgress(): Promise<TourInProgress[]> {
+  const tours = await prisma.tour.findMany({
+    where: { published: false, liveVersion: null },
+    select: {
+      slug: true,
+      name: true,
+      updatedAt: true,
+      draftAt: true,
+      draftByName: true,
+      reviewSentAt: true,
+      reviewApprovedAt: true,
+      deadline: true,
+      assignedTo: { select: { name: true } },
+      deal: { select: { id: true, companyName: true, displayName: true, tourDeadline: true } },
+      versions: { orderBy: { createdAt: "desc" }, take: 1, select: { createdAt: true, createdByName: true } },
+    },
+  });
+  return tours
+    .map((t) => {
+      const saved = t.versions[0];
+      const draftNewer = t.draftAt && (!saved || t.draftAt > saved.createdAt);
+      const deadline = t.deadline ?? t.deal?.tourDeadline ?? null;
+      return {
+        slug: t.slug,
+        name: t.name,
+        customer: t.deal ? (t.deal.displayName || t.deal.companyName) : null,
+        dealId: t.deal?.id ?? null,
+        status: t.reviewApprovedAt ? ("godkendt" as const) : t.reviewSentAt ? ("gennemgang" as const) : ("i-gang" as const),
+        builder: t.assignedTo?.name ?? null,
+        deadline: deadline ? deadline.toISOString().slice(0, 10) : null,
+        savedAt: (saved?.createdAt ?? t.updatedAt).toISOString(),
+        savedBy: saved?.createdByName ?? null,
+        working: Boolean(draftNewer),
+      };
+    })
+    .sort((a, b) => (a.deadline ?? "9999").localeCompare(b.deadline ?? "9999") || b.savedAt.localeCompare(a.savedAt));
+}

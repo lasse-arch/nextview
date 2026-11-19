@@ -63,6 +63,12 @@ export async function getUnreadNewsCount(userId: string, newsReadAt: Date | null
 const DEFAULT_POSTS: { title: string; body: string; minutesAgo: number; screenshotUrl: string }[] = [
   {
     minutesAgo: 0,
+    title: "Tours i gang: sælgerne kan følge med i de tours, vi bygger",
+    body: "Under Online kunder er der en ny fane, Tours i gang. Her står alle tours, der ikke er ude endnu: hvor langt de er (I gang, Sendt til gennemgang, Godkendt af kunden), hvem der bygger dem, hvornår de skal være klar, og hvornår de sidst er gemt. Man kan filtrere på status og søge på kunden.\n\n\"Se touren\" åbner den senest gemte version - kun til at kigge, der kan ikke ændres noget, og besøget tæller ikke med i kundens tal. Send den ikke til kunden, den er ikke færdig.",
+    screenshotUrl: "/news/tours-i-gang.png",
+  },
+  {
+    minutesAgo: 0,
     title: "Generator: se hvem der har sendt hvad - og hvordan det virker",
     body: "Under Sendt i Generator står mails og SMS'er nu samlet. Øverst kan I filtrere på hvem der har sendt (admins), mail eller SMS, og periode (7, 30 eller 90 dage eller alt).\n\nOver listen står tallene for det, der er valgt: hvor mange der er sendt, hvor mange mails der er åbnet (og hvor mange åbninger i alt), hvor mange links der er åbnet, og hvor mange minutter folk har gået rundt i touren. Sælgere ser deres egne, admins ser alle.",
     screenshotUrl: "/news/generator-sendt.png",

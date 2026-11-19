@@ -559,7 +559,8 @@ function TourExperience({
       tracking.session = Math.random().toString(36).slice(2, 14);
     }
     tracking.slug = savedTour.slug;
-    tracking.off = Boolean(review); // the customer's review isn't a visit
+    // The customer's review isn't a visit - nor the team looking at a tour inside Arpo (a seller's "Se touren", the prototype).
+    tracking.off = Boolean(review) || location.pathname.startsWith("/arpo/");
     tracking.demo = demo?.token ?? ""; // a showcase to a new customer is counted on its own (flushEvents)
     // In a frame: on Arpo's own pages (a preview) - or on a site showing the tour ("Her er touren vist").
     const from = (() => {
