@@ -247,19 +247,20 @@ export function LineDayCard({ L, stops, run, onGo, onClose }: { L: L; stops: Sho
         {s.time && <time>{s.time}</time>}
         <span className={`ld-badge ${s.shared ? "faelles" : ""}`}>{s.shared ? tr("Hele skolen") : s.intro ? tr("Overblik") : s.lineName}</span>
         {s.place && <span className="ld-place">{s.place}</span>}
+        {/* The moment's photos, small at the end of this row - a tap shows one big again (no row of its own). */}
+        {placed && photos.length > 0 && (
+          <span className="ld-thumbs">
+            {photos.map((src, i) => (
+              <button key={src + i} type="button" aria-label={tr("Se billedet stort")} onClick={() => setAgain((a) => ({ n: a.n + 1, at: i }))}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={src} alt="" loading="lazy" decoding="async" />
+              </button>
+            ))}
+          </span>
+        )}
       </div>
       <h3>{s.title}</h3>
       {s.text && <LongText key={s.id + run.at} text={s.text} />}
-      {placed && photos.length > 0 && (
-        <div className="ld-thumbs">
-          {photos.map((src, i) => (
-            <button key={src + i} type="button" aria-label={tr("Se billedet stort")} onClick={() => setAgain((a) => ({ n: a.n + 1, at: i }))}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={src} alt="" loading="lazy" decoding="async" />
-            </button>
-          ))}
-        </div>
-      )}
       {/* Small facts only on the overview - on a moment they only made the card taller. */}
       {s.intro && s.tags?.length ? (
         <div className="ld-tags">
@@ -447,13 +448,15 @@ export const LINE_DAY_CSS = `
 .ld-frame-photos{position:absolute;top:24px;right:24px;bottom:24px;left:440px;display:flex}
 .ld-frame-photos .ld-photos{flex:1!important;margin:0;border-radius:20px;box-shadow:0 20px 60px rgba(0,0,0,.4)}
 /* The moment's photos, small - a tap shows one big again. */
-.ld-thumbs{display:flex;gap:6px;margin-top:10px}
-.ld-thumbs button{width:46px;height:46px;padding:0;border:0;border-radius:10px;overflow:hidden;background:#e9ecee;cursor:pointer}
+.ld-thumbs{display:flex;gap:4px;margin-left:auto}
+.ld-thumbs button{width:34px;height:34px;padding:0;border:0;border-radius:8px;overflow:hidden;background:#e9ecee;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.15)}
 .ld-thumbs img{width:100%;height:100%;object-fit:cover;display:block}
 /* A tighter card: dots and Luk on one row. */
 .ld-top{gap:12px}
 .ld-top .ld-dots{flex:1;margin:0}
-.ld-card .ld-when{margin-top:10px}
+.ld-card .ld-when{margin-top:10px;flex-wrap:nowrap;min-width:0}
+.ld-card .ld-when>*{flex:none}
+.ld-card .ld-when .ld-place{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* Long words fold: 3 lines, "Læs mere" for the rest (the card scrolls only then). */
 .ld-card>p{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .ld-card>p.aaben{display:block;-webkit-line-clamp:unset;overflow:visible}
@@ -530,7 +533,9 @@ export const LINE_DAY_CSS = `
 .ld-visit b{display:block;font-size:17px;color:var(--c-main)}
 .ld-visit p{margin:4px 0 12px;font-size:14px;line-height:1.45;color:#3d4a50}
 .ld-visit button{padding:11px 18px;border:0;border-radius:999px;background:var(--c-accent);color:var(--c-on-accent,#fff);font:inherit;font-weight:800;cursor:pointer}
-.ld-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.ld-chips{display:flex;flex-wrap:nowrap;gap:6px;margin-top:8px;overflow-x:auto;scrollbar-width:none;-webkit-mask-image:linear-gradient(90deg,#000 88%,transparent);mask-image:linear-gradient(90deg,#000 88%,transparent);padding-right:24px}
+.ld-chips::-webkit-scrollbar{display:none}
+.ld-chips button{flex:none;white-space:nowrap}
 .ld-chips button{padding:9px 14px;border:1px solid #e3e1dc;border-radius:999px;background:#fff;font:inherit;font-size:14px;font-weight:700;color:var(--c-main);cursor:pointer}
 .ld-chips button:hover{border-color:var(--c-accent)}
 @media (max-width:760px){
@@ -547,8 +552,8 @@ export const LINE_DAY_CSS = `
   .ld-next{padding:10px 12px;font-size:14px}
   .ld-people-kort{margin-top:8px}
   .ld-people-kort .ld-faces img{width:24px!important;height:24px!important}
-  .ld-thumbs{margin-top:8px}
-  .ld-thumbs button{width:38px;height:38px;border-radius:8px}
+  .ld-thumbs button{width:30px;height:30px;border-radius:7px}
+  .ld-chips button{padding:7px 12px;font-size:13px}
   .ld-card h3{font-size:19px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
   .ld-photos{margin:-14px -14px 10px}
   .ld-photos{flex-basis:min(170px,22vh)!important}

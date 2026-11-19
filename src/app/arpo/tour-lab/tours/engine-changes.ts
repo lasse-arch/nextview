@@ -9,6 +9,7 @@
 export type EngineChange = { date: string; kind: "ny" | "sikkerhed" | "hastighed" | "rettelse"; text: string };
 
 export const ENGINE_CHANGES: EngineChange[] = [
+  { date: "2026-11-19", kind: "rettelse", text: "En linje på: øjeblikkets små billeder står i rækken med mærket (ingen række for sig), og \"Se en anden linje\" står på én række, der kan swipes." },
   { date: "2026-11-19", kind: "rettelse", text: "En linje på: et mindre kort - prikkerne og Luk på én række (linjens navn står kun på mærket), stikord kun på overblikket, teksten i 2 linjer på telefon med Læs mere, og mindre billeder og ansigter." },
   { date: "2026-11-19", kind: "rettelse", text: "En linje på: slutskærmen har ikke længere listen over dagen (Morgen, Formiddag ...) - kun linjens afslutning, rejserne, invitationen og de andre linjer." },
   { date: "2026-11-18", kind: "rettelse", text: "En linje på fylder mindre: teksten står i 3 linjer med \"Læs mere\", fakta står på én række, og 3 eller flere lærere (og overblikket) vises som små ansigter med navnene på én linje." },
