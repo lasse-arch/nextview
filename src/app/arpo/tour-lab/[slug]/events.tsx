@@ -32,36 +32,59 @@ export function useTourEvents(T: TourConfig): TourEvent[] | null {
   return events;
 }
 
+const DAYS = ["søn", "man", "tir", "ons", "tor", "fre", "lør"];
+const MONTHS = ["jan", "feb", "mar", "apr", "maj", "jun", "jul", "aug", "sep", "okt", "nov", "dec"];
+
+/**
+ * The dates as small calendar leaves on one row (weekday, the day big, the
+ * month) with "Tilmeld →" beside the heading - calm next to the tiles. A date
+ * that couldn't be read as a day keeps its own words.
+ */
 export function EventsBlock({ T, events, onSignUp, className = "" }: { T: TourConfig; events: TourEvent[]; onSignUp: (label: string, href: string) => void; className?: string }) {
   const tr = useT();
   const ev = T.events!;
   const label = ev.button ? tr(ev.button) : tr("Tilmeld");
   return (
     <div className={`ev ${className}`}>
-      <b className="ev-titel">{ev.title ? tr(ev.title) : tr("Næste rundvisninger")}</b>
+      <div className="ev-top">
+        <b className="ev-titel">{ev.title ? tr(ev.title) : tr("Næste rundvisninger")}</b>
+        <TourLink href={ev.source} label={label} className="ev-knap" onClick={() => onSignUp(label, ev.source)}>
+          {label} →
+        </TourLink>
+      </div>
       <ul>
-        {events.map((e) => (
-          <li key={e.title}>
-            <i aria-hidden />
-            {e.title}
-          </li>
-        ))}
+        {events.map((e) => {
+          const d = e.date ? new Date(`${e.date}T12:00:00Z`) : null;
+          return d ? (
+            <li key={e.title} title={e.title} aria-label={e.title}>
+              <small>{tr(DAYS[d.getUTCDay()])}</small>
+              <b>{d.getUTCDate()}</b>
+              <small>{tr(MONTHS[d.getUTCMonth()])}</small>
+            </li>
+          ) : (
+            <li key={e.title} className="ev-tekst">
+              {e.title}
+            </li>
+          );
+        })}
       </ul>
-      <TourLink href={ev.source} label={label} className="hv-btn hv-primary ev-knap" onClick={() => onSignUp(label, ev.source)}>
-        {label}
-      </TourLink>
     </div>
   );
 }
 
 export const EVENTS_CSS = `
-.ev{margin:12px 0 4px;padding:12px 14px;border-radius:12px;background:color-mix(in srgb,var(--c-accent) 9%,transparent);text-align:left}
-.ev-titel{display:block;font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--c-main)}
-.ev ul{margin:6px 0 10px;padding:0;list-style:none}
-.ev li{display:flex;align-items:center;gap:8px;padding:3px 0;font-size:14px;font-weight:600;color:#1d2a30}
-.ev li i{flex:none;width:7px;height:7px;border-radius:50%;background:var(--c-accent)}
-.ev .ev-knap{display:inline-flex;margin:0;padding:8px 18px;font-size:14px}
-.hv-light .ev li,.pc .ev li{color:#1d2a30}
+.ev{margin:14px 0 4px;text-align:left}
+.ev-top{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.ev-titel{display:block;font-size:11.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--c-main);opacity:.75}
+.ev .ev-knap{flex:none;font-size:13.5px;font-weight:800;color:var(--c-accent);text-decoration:none;white-space:nowrap}
+.ev .ev-knap:hover{text-decoration:underline}
+.ev ul{display:flex;gap:8px;margin:8px 0 0;padding:0 0 2px;list-style:none;overflow-x:auto;scrollbar-width:none}
+.ev ul::-webkit-scrollbar{display:none}
+.ev li{flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:54px;padding:6px 8px 7px;border-radius:12px;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.07);color:#1d2a30;line-height:1.1}
+.ev li small{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#6b7a80}
+.ev li b{font-size:19px;font-weight:800;color:var(--c-main);margin:1px 0}
+.ev li.ev-tekst{flex-direction:row;font-size:13px;font-weight:600;padding:8px 12px}
+.ev li:first-child{box-shadow:0 0 0 2px var(--c-accent)}
 .ev-menu{margin:14px 18px 6px}
-@media (max-width:760px){.ev{padding:10px 12px}.ev li{font-size:13px}}
+@media (max-width:760px){.ev li{min-width:48px;padding:5px 7px 6px}.ev li b{font-size:17px}}
 `;
