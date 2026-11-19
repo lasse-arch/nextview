@@ -250,12 +250,10 @@ const overlaps = (a: Box, b: Box) => a.left < b.right && b.left < a.right && a.t
  * under its icon; one that would be in the way is hidden (it shows when its
  * icon is hovered). A hidden one needs a little room to spare before it shows
  * again, so a name on the edge doesn't blink on and off as the view moves.
- * With names set to "Altid" nothing is hidden.
+ * With names set to "Altid" a name is only hidden where it would lie on top
+ * of another name or icon (text over text can't be read anyway).
  */
 function declutterNames(selected: string | null) {
-  const root = document.querySelector(".hv");
-  const phone = window.innerWidth <= 760;
-  const always = phone ? Boolean(root?.classList.contains("hv-navne-m-always")) : !root?.classList.contains("hv-navne-d-zoom") && !root?.classList.contains("hv-navne-d-never");
   const points = [...document.querySelectorAll<HTMLElement>(".hv-hs[data-punkt]:not(.hv-skjult)")].filter((el) => el.style.visibility !== "hidden");
   points.sort((a, b) => Number(b.dataset.punkt === selected) - Number(a.dataset.punkt === selected));
   const icons = points.map((el) => el.querySelector(".hv-ikon")?.getBoundingClientRect());
@@ -269,8 +267,9 @@ function declutterNames(selected: string | null) {
     const wasHidden = name.classList.contains("hv-gemt");
     const b = grow(box, wasHidden ? 6 : 0);
     const free = !icons.some((icon, j) => j !== i && icon && icon.width && overlaps(b, icon)) && !shown.some((s) => overlaps(b, s));
-    if (free || always) shown.push(box);
-    name.classList.toggle("hv-gemt", !free && !always);
+    // "Altid" still never lets two names (or a name and an icon) lie on top of each other - the later one waits for a tap/hover.
+    if (free) shown.push(box);
+    name.classList.toggle("hv-gemt", !free);
   });
 }
 
@@ -3178,9 +3177,11 @@ function TourExperience({
           <div className="hv-intro-body">
             <h1>{OV?.intro.title}</h1>
             <p>{OV?.intro.lead && tx(OV.intro.lead)}</p>
-            <TourLink className="hv-btn hv-primary" href={T.cta[0].href} label={T.cta[0].label} onClick={() => ctaClick(T.cta[0].label, T.cta[0].href, "intro")}>
-              {T.cta[0].label}
-            </TourLink>
+            {T.cta[0]?.label && T.cta[0].href ? (
+              <TourLink className="hv-btn hv-primary" href={T.cta[0].href} label={T.cta[0].label} onClick={() => ctaClick(T.cta[0].label, T.cta[0].href, "intro")}>
+                {T.cta[0].label}
+              </TourLink>
+            ) : null}
             {T.finder && finderPoints.length > 0 && (
               <button type="button" className="hv-btn hv-secondary hv-find" onClick={() => openFinder("intro")}>
                 {tx(T.finder.button)}
@@ -3212,7 +3213,8 @@ function TourExperience({
         )}
         {selectedWalks.length ? <WalkLines from={selected!.id} walks={selectedWalks} names={pointNames} /> : null}
 
-        <div className="hv-filtre" ref={filterEl}>
+        {/* The filter only when there is something to choose between (one category alone is just a label). */}
+        <div className={`hv-filtre ${Object.keys(T.categories).length < 2 && !(plan360.on && plan360.free) ? "hv-filtre-en" : ""}`} ref={filterEl}>
           <div className="hv-filtre-t">{plan360.on && plan360.free ? tx("Ledige") : OV?.filterTitle}</div>
           {/* The free units shown: their kinds (pitches, cabins, rooms …) in their colours - in place of the points' categories. */}
           {plan360.on && plan360.free ? (
@@ -4637,6 +4639,7 @@ html:has(.hv.fixed),html:has(.hv.fixed) body{overflow:hidden;overscroll-behavior
 .hv-secondary{background:#fff;color:var(--c-main);border:2px solid var(--c-main)}
 .hv-wide{width:100%;margin-top:12px}
 .hv-filtre{position:absolute;left:16px;bottom:16px;z-index:5;background:#fff;border-radius:14px;padding:10px 12px;box-shadow:0 8px 24px rgba(0,0,0,.25);max-width:calc(100% - 32px)}
+.hv-filtre-en{display:none}
 .hv-filtre-t{font-size:12.5px;font-weight:800;margin:0 2px 8px;color:#5c6b72}
 .hv-chips{display:flex;flex-wrap:wrap;gap:6px}
 .hv-chips button{display:flex;align-items:center;gap:6px;border:1.5px solid #e3ddd1;background:#fff;border-radius:999px;padding:4px 11px 4px 5px;font-family:inherit;font-size:12.5px;font-weight:700;cursor:pointer;color:#1d2a30}
@@ -4868,7 +4871,9 @@ html:has(.hv.fixed),html:has(.hv.fixed) body{overflow:hidden;overscroll-behavior
 /* The points' names (Luftfoto og kort → Over kortet), per device - after the defaults further down, so they win. */
 @media (max-width:760px){
   /* Slim welcome bar instead of the big card, with room for the menu button. */
-  .hv-intro{top:calc(10px + env(safe-area-inset-top,0px));left:10px;right:104px;width:auto;display:flex;align-items:center;border-radius:14px}
+  /* As wide as what's in it (the logo and the button) - never a long empty bar - and clear of the menu button. */
+  .hv-intro{top:calc(10px + env(safe-area-inset-top,0px));left:10px;right:auto;max-width:calc(100% - 114px);width:auto;display:flex;align-items:center;border-radius:14px}
+  .hv-titel-m .hv-intro{right:104px;max-width:none}
   .hv-intro-head{padding:8px 10px;flex:0 1 auto;min-width:0}
   /* A fixed height (an SVG logo with no size of its own was 0 x 0 with height:auto); a wide logo may shrink a little - kept in proportion - so the button keeps one line. */
   .hv-intro-head img{height:30px;width:auto;max-width:100%;object-fit:contain;object-position:left center;margin:0}
