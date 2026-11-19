@@ -26,6 +26,7 @@ import { FeatureTour, featuresSeen, FEATURES_CSS, type DemoContact } from "./fea
 import { FinderSheet, FINDER_CSS, WalkLines } from "./finder";
 import { apiUrl, isStaticTour } from "../tours/api";
 import type { DroneView, FindStepAside, GuideTurn, MenuEntry, PanoCover, StagingItem, TourConfig, TourPlace, TourPoint, WelcomeGo } from "../tours/types";
+import { sideCtas } from "../tours/types";
 import { CoverWelcome, DESIGNS_CSS, DockMenu, PickerMenu, WelcomeFilm, welcomeFilmClass } from "./designs";
 import { GUIDE_CSS, GuidePlayer, guideStops } from "./guide";
 import { ONBOARDING_CSS, Onboarding } from "./onboarding";
@@ -4008,15 +4009,20 @@ function TourExperience({
       {/* Full screen, in the top right corner by the menu button - only while the tour itself is up (not the welcome, a cover or an open menu). */}
       {T.fullscreenButton !== false && !welcome && !(cover && T.cover) && !menuOpen && <FullscreenButton onToggle={(on) => track("fullscreen", { on: on ? 1 : 0 })} />}
       {/* The fixed button on the right edge (e.g. "Tilmeld dig som elev") - not over the welcome, the menu, a guided tour or En linje på. */}
-      {T.sideCta?.label && T.sideCta.href && !welcome && !(cover && T.cover) && !menuOpen && guideAt == null && !route && !lineRun && !linePicker && dayAt == null && (
-        <button
-          type="button"
-          className={`hv-sidecta ${T.sideCta.phone === false ? "hv-sidecta-ikke-m" : ""}`}
-          onClick={() => (ctaClick(T.sideCta!.label, T.sideCta!.href, "side_cta"), openLink(T, T.sideCta!.href, T.sideCta!.label, popup))}
-        >
-          {T.sideCta.icon !== "none" && <svg viewBox="0 0 24 24" aria-hidden dangerouslySetInnerHTML={{ __html: SIDE_ICONS[T.sideCta.icon ?? "arrow"] }} />}
-          <span>{tx(T.sideCta.label)}</span>
-        </button>
+      {sideCtas(T).length > 0 && !welcome && !(cover && T.cover) && !menuOpen && guideAt == null && !route && !lineRun && !linePicker && dayAt == null && (
+        <div className="hv-sidectas">
+          {sideCtas(T).map((b, i) => (
+            <button
+              key={b.label + i}
+              type="button"
+              className={`hv-sidecta ${i ? "hv-sidecta-2" : ""} ${b.phone === false ? "hv-sidecta-ikke-m" : ""}`}
+              onClick={() => (ctaClick(b.label, b.href, "side_cta"), openLink(T, b.href, b.label, popup))}
+            >
+              {b.icon !== "none" && <svg viewBox="0 0 24 24" aria-hidden dangerouslySetInnerHTML={{ __html: SIDE_ICONS[b.icon ?? "arrow"] }} />}
+              <span>{tx(b.label)}</span>
+            </button>
+          ))}
+        </div>
       )}
       {T.commute?.button && !welcome && !(cover && T.cover) && guideAt == null && !route && (
         <button type="button" className={`vt-tur-knap vt-tur-knap-${T.commute.button}`} onClick={() => (track("commute_open", { from: "button" }), setCommuteOpen(true))}>
@@ -4730,10 +4736,12 @@ html:has(.hv.fixed),html:has(.hv.fixed) body{overflow:hidden;overscroll-behavior
 .hv-signatur:hover{color:#1d2a30}
 .hv-luften{position:absolute;left:16px;bottom:20px;z-index:6;display:flex;align-items:center;gap:8px;background:var(--c-main);color:#fff;border:0;border-radius:999px;padding:11px 18px;font:800 14px inherit;font-family:inherit;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.3)}
 .hv-luften svg{width:18px;height:18px}
-.hv-sidecta{position:absolute;right:0;top:56%;z-index:7;display:flex;align-items:center;gap:10px;padding:13px 22px 13px 18px;border:0;border-radius:999px 0 0 999px;background:var(--c-main);color:#fff;font:inherit;font-size:16px;font-weight:800;cursor:pointer;box-shadow:0 8px 22px rgba(0,0,0,.28);transition:padding .2s ease,background .2s ease;animation:hvFade .4s ease}
+.hv-sidectas{position:absolute;right:0;top:56%;z-index:7;display:flex;flex-direction:column;align-items:flex-end;gap:8px;translate:0 -50%}
+.hv-sidecta{display:flex;align-items:center;gap:10px;padding:13px 22px 13px 18px;border:0;border-radius:999px 0 0 999px;background:var(--c-main);color:#fff;font:inherit;font-size:16px;font-weight:800;cursor:pointer;box-shadow:0 8px 22px rgba(0,0,0,.28);transition:padding .2s ease,background .2s ease;animation:hvFade .4s ease}
+.hv-sidecta-2{background:#fff;color:var(--c-main)}
 .hv-sidecta:hover{padding-right:28px;background:var(--c-accent);color:var(--c-on-accent,#fff)}
 .hv-sidecta svg{width:20px;height:20px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-@media (max-width:760px){.hv-sidecta{top:auto;bottom:calc(150px + env(safe-area-inset-bottom,0px));padding:9px 14px 9px 12px;gap:7px;font-size:13.5px}.hv-sidecta svg{width:17px;height:17px}.hv-sidecta-ikke-m{display:none}.hv-med-kort .hv-sidecta{display:none}}
+@media (max-width:760px){.hv-sidectas{top:auto;bottom:calc(150px + env(safe-area-inset-bottom,0px));translate:none;gap:6px}.hv-sidecta{padding:9px 14px 9px 12px;gap:7px;font-size:13.5px}.hv-sidecta svg{width:17px;height:17px}.hv-sidecta-ikke-m{display:none}.hv-med-kort .hv-sidectas{display:none}}
 .hv-room{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);z-index:6;background:rgba(255,255,255,.95);color:var(--c-main);border-radius:999px;padding:8px 16px;font-weight:800;font-size:14px;line-height:1.25;box-shadow:0 4px 14px rgba(0,0,0,.25);width:max-content;max-width:min(560px,calc(100% - 32px));text-align:center;text-wrap:balance}
 /* A long name: two even, centred lines in a rounded box - not a stretched pill with a ragged edge. (One line: still a pill.) */
 .hv-room{border-radius:18px}

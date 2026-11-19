@@ -292,6 +292,12 @@ export type LineDayStop = {
 };
 
 /** A trip or experience of a line ("Gåsejagt i Vadehavet"), shown when its day ends ("Det venter dig også"). */
+/** One button fixed to the right edge (`sideCta`). */
+export type SideCta = { label: string; href: string; icon?: "person" | "calendar" | "phone" | "mail" | "arrow" | "none"; phone?: false };
+
+/** The fixed buttons on the right edge as a list (a setup may hold one, as before, or up to 3). */
+export const sideCtas = (c: { sideCta?: SideCta | SideCta[] }): SideCta[] => (Array.isArray(c.sideCta) ? c.sideCta : c.sideCta ? [c.sideCta] : []).filter((b) => b.label && b.href).slice(0, 3);
+
 export type LineTrip = {
   title: string;
   /** When, e.g. "Uge 44" or "Hvert forår". */
@@ -444,12 +450,12 @@ export type TourConfig = {
   font: string;
   cta: { label: string; href: string; primary: boolean }[];
   /**
-   * A button fixed to the right edge of the screen, always there (like "Tilmeld
-   * dig som elev" on many schools' sites): a label, where it goes, and a small
-   * icon. Hidden while the welcome, the menu or a guided tour is open.
+   * Up to 3 buttons fixed to the right edge of the screen, one over the other,
+   * always there (like "Tilmeld dig som elev" on many schools' sites): a label,
+   * where it goes, and a small icon (a single one is still read). Hidden while the welcome, the menu or a guided tour is open.
    * `phone: false` = not on phones (where it would cover the tour).
    */
-  sideCta?: { label: string; href: string; icon?: "person" | "calendar" | "phone" | "mail" | "arrow" | "none"; phone?: false };
+  sideCta?: SideCta | SideCta[];
   /**
    * How links out of the tour open: a default, and single links (by their URL)
    * set differently. Left out = new tab. `size`: how big a popup is (left out =

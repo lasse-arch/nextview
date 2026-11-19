@@ -14,7 +14,8 @@ import { detachToursFromMpskins, logTourWork, renameTourSlug, restoreTourVersion
 import { SOCIALS } from "../../tours/social";
 import { guideStops } from "../guide";
 import { addTourAiMemory, askClaudeForTour, measureTourLogo, suggestTourFilter, type ChatTurn, type MemoryNote } from "@/lib/actions/tour-ai";
-import type { FindStepAside, MenuEntry, TourConfig } from "../../tours/types";
+import type { FindStepAside, MenuEntry, SideCta, TourConfig } from "../../tours/types";
+import { sideCtas } from "../../tours/types";
 import type { TourStats } from "@/lib/tour-stats";
 import type { ReportShare } from "@/lib/tour-share";
 import { CardsEditor, DroneViewPicker, GuideEditor, PhotoPicker, StartEditor, TagsEditor, ViewFromPreview } from "./content";
@@ -1343,24 +1344,25 @@ export function TourEditor({
                 <Group title="Knapper">
                 <CtaEditor cta={config.cta} live={Boolean(config.live)} form={Boolean(config.contactForm)} onChange={(cta) => edit((d) => void (d.cta = cta))} />
                 </Group>
-                <Group title="Fast knap i højre side">
-                  <Toggle
-                    on={Boolean(config.sideCta)}
-                    onChange={(on) => edit((d) => void (d.sideCta = on ? { label: d.cta.find((c) => c.primary)?.label ?? "Book en rundvisning", href: d.cta.find((c) => c.primary)?.href ?? "", icon: "arrow" } : undefined))}
-                    title="Knap i højre kant"
-                    hint='Sidder fast ude i højre side hele tiden - som "Tilmeld dig som elev" på mange skolers hjemmesider. Skjules, mens velkomsten, menuen eller en rundvisning er åben.'
-                  />
-                  {config.sideCta && (
-                    <>
-                      <Field title="Tekst">
-                        <input className={input} placeholder="Tilmeld dig som elev" value={config.sideCta.label} onChange={(e) => edit((d) => void (d.sideCta && (d.sideCta.label = e.target.value)))} />
-                      </Field>
-                      <Field title="Link" hint="Hjemmesidens side, et sted i touren (@) eller #kontakt.">
-                        <LinkInput value={config.sideCta.href} onChange={(href) => edit((d) => void (d.sideCta && (d.sideCta.href = href)))} />
-                      </Field>
-                      <Field title="Ikon">
+                <Group title="Faste knapper i højre side">
+                  <p className="px-1 text-[12px] leading-snug text-[#8e8e93]">Op til 3 knapper, der sidder fast ude i højre kant hele tiden - som &quot;Tilmeld dig som elev&quot; på mange skolers hjemmesider. Den første er i hovedfarven, de andre hvide. Skjules, mens velkomsten, menuen eller en rundvisning er åben.</p>
+                  {sideCtas(config).map((b, i) => {
+                    const put = (patch: Partial<SideCta> | null) =>
+                      edit((d) => {
+                        const list = sideCtas(d).map((x, j) => (j === i ? (patch ? { ...x, ...patch } : null) : x)).filter((x): x is SideCta => Boolean(x));
+                        d.sideCta = list.length ? list : undefined;
+                      });
+                    return (
+                      <div key={i} className="space-y-1.5 rounded-xl bg-white p-2.5 ring-1 ring-black/[.06]">
+                        <div className="flex items-center gap-2">
+                          <input className={input} placeholder="Tilmeld dig som elev" value={b.label} onChange={(e) => put({ label: e.target.value })} />
+                          <button type="button" aria-label="Fjern knappen" className="flex-none px-1 text-[18px] leading-none text-[#ff3b30]" onClick={() => put(null)}>
+                            ×
+                          </button>
+                        </div>
+                        <LinkInput value={b.href} onChange={(href) => put({ href })} />
                         <Choice<"person" | "calendar" | "phone" | "mail" | "arrow" | "none">
-                          value={config.sideCta.icon ?? "arrow"}
+                          value={b.icon ?? "arrow"}
                           options={[
                             ["person", "Tilmeld"],
                             ["calendar", "Kalender"],
@@ -1369,11 +1371,27 @@ export function TourEditor({
                             ["arrow", "Pil"],
                             ["none", "Intet"],
                           ]}
-                          onChange={(v) => edit((d) => void (d.sideCta && (d.sideCta.icon = v)))}
+                          onChange={(icon) => put({ icon })}
                         />
-                      </Field>
-                      <Toggle on={config.sideCta.phone !== false} onChange={(on) => edit((d) => void (d.sideCta && (on ? delete d.sideCta.phone : (d.sideCta.phone = false))))} title="Også på telefon" hint="På telefon er den mindre og sidder lidt over bunden - den går væk, mens et stedkort er åbent." />
-                    </>
+                        <Toggle on={b.phone !== false} onChange={(on) => put({ phone: on ? undefined : false })} title="Også på telefon" />
+                      </div>
+                    );
+                  })}
+                  {sideCtas(config).length < 3 && (
+                    <button
+                      type="button"
+                      className="px-1 text-left text-[13px] font-medium text-[#0071e3] hover:underline"
+                      onClick={() =>
+                        edit((d) => {
+                          const first = !sideCtas(d).length;
+                          const main = d.cta.find((c) => c.primary);
+                          // A new one starts with the label and link filled in (the main button's, for the first) - an empty one isn't shown.
+                          d.sideCta = [...sideCtas(d), { label: first ? (main?.label ?? "Book en rundvisning") : "Kontakt os", href: first ? (main?.href ?? "#kontakt") : "#kontakt", icon: first ? "person" : "mail" }];
+                        })
+                      }
+                    >
+                      + Tilføj knap i højre side
+                    </button>
                   )}
                 </Group>
                 <Group title="Kontakt">
