@@ -349,7 +349,7 @@ function StopReveal({ src, alt }: { src: string; alt: string }) {
 }
 
 /** The end: the day gathered, the next visit, another line's day. */
-export function LineDayEnd({ L, stops, run, onPick, onVisit, onClose }: { L: L; stops: ShownStop[]; run: LineDayRun; onPick: (line: string) => void; onVisit: (label: string, href: string) => void; onClose: () => void }) {
+export function LineDayEnd({ L, run, onPick, onVisit, onClose }: { L: L; stops: ShownStop[]; run: LineDayRun; onPick: (line: string) => void; onVisit: (label: string, href: string) => void; onClose: () => void }) {
   const tr = useT();
   const line = L.lines.find((l) => l.id === run.line);
   return (
@@ -359,17 +359,6 @@ export function LineDayEnd({ L, stops, run, onPick, onVisit, onClose }: { L: L; 
           ×
         </button>
         <div className="ld-end-grid">
-          <ol className={`ld-sum ${stops.some((s) => s.time) ? "" : "uden-tid"}`}>
-            {stops.filter((s) => !s.intro).map((s, i) => (
-              <li key={s.id + i}>
-                {s.time ? <time>{s.time}</time> : <time aria-hidden>{i + 1}</time>}
-                <span>
-                  <b>{s.title}</b>
-                  {!s.shared && s.lineName && run.line === MIX && <small>{s.lineName}</small>}
-                </span>
-              </li>
-            ))}
-          </ol>
           <div>
             <h2>{line ? tr("Sådan er det at gå på {linje}.", { linje: line.name }) : tr("Sådan er det at gå hos os.")}</h2>
             {line?.outro && <p className="ld-lead">{line.outro}</p>}
@@ -469,7 +458,6 @@ export const LINE_DAY_CSS = `
 .ld-tags{flex-wrap:nowrap!important;overflow-x:auto;scrollbar-width:none;margin-top:8px!important}
 .ld-tags::-webkit-scrollbar{display:none}
 .ld-tags span{flex:none;padding:3px 9px!important;font-size:11.5px!important}
-.ld-sum.uden-tid time{width:22px;color:#b3bcc0}
 /* The card never scrolls: the text is cut short instead (the whole text is in the day's summary). */
 .ld-card{position:absolute;left:16px;bottom:16px;z-index:30;width:min(400px,calc(100% - 32px));max-height:calc(100% - 120px);overflow:hidden;padding:16px 18px;border-radius:20px;background:rgba(255,255,255,.98);color:#1d2a30;box-shadow:0 16px 44px rgba(0,0,0,.32);animation:hvUp .35s cubic-bezier(.2,.7,.2,1) both}
 .ld-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
@@ -531,13 +519,8 @@ export const LINE_DAY_CSS = `
 .ld-trip small{display:block;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--c-accent)}
 .ld-trip b{display:block;margin-top:2px;font-size:14.5px;line-height:1.25;color:var(--c-main)}
 .ld-trip p{margin:4px 0 0;font-size:13px;line-height:1.4;color:#56636a;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
-.ld-end{width:min(860px,100%)}
-.ld-end-grid{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:28px}
-.ld-sum{margin:0;padding:0;list-style:none;border-right:1px solid #eee;padding-right:20px}
-.ld-sum li{display:flex;gap:12px;padding:7px 0}
-.ld-sum time{flex:none;width:96px;font-weight:800;font-size:13.5px;color:var(--c-accent)}
-.ld-sum b{display:block;font-size:14.5px}
-.ld-sum small{display:block;font-size:12px;color:#8a969b}
+.ld-end{width:min(640px,100%)}
+.ld-end-grid{display:block}
 .ld-visit{margin:4px 0 20px;padding:16px;border-radius:16px;background:var(--c-soft)}
 .ld-visit b{display:block;font-size:17px;color:var(--c-main)}
 .ld-visit p{margin:4px 0 12px;font-size:14px;line-height:1.45;color:#3d4a50}
@@ -564,9 +547,7 @@ export const LINE_DAY_CSS = `
   .ld-people b{font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .ld-people small{font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .ld-people>span>span{min-width:0}
-  .ld-end-grid{grid-template-columns:1fr;gap:16px}
   .ld-frame-photos{top:calc(12px + env(safe-area-inset-top,0px));left:10px;right:10px;bottom:auto;height:42%}
   .ld-line.med-foto{min-height:128px}
-  .ld-sum{border-right:0;padding-right:0;order:2}
-}
+  }
 `;
