@@ -80,6 +80,7 @@ type Labels = {
   };
   signaturesTitle: string;
   invoiceEmailLabel: string;
+  eanLabel: string;
 };
 
 const LABELS: Record<ContractLanguage, Labels> = {
@@ -242,6 +243,7 @@ const LABELS: Record<ContractLanguage, Labels> = {
     },
     signaturesTitle: "Underskrifter",
     invoiceEmailLabel: "E-mail til fakturaer",
+    eanLabel: "EAN-nummer (valgfrit, kun offentlige institutioner)",
   },
   en: {
     docTitle: "Subscription Agreement",
@@ -402,6 +404,7 @@ const LABELS: Record<ContractLanguage, Labels> = {
     },
     signaturesTitle: "Signatures",
     invoiceEmailLabel: "Email for invoices",
+    eanLabel: "EAN number (optional, public institutions only)",
   },
 };
 
@@ -435,6 +438,8 @@ function bulletList(bullets: string[]): string {
 /** The customer fills in where their invoices go when signing - picked up
  * by the DocuSeal webhook and saved as the deal's invoice e-mail. */
 export const INVOICE_EMAIL_FIELD = "Fakturamail";
+/** Optional: the customer's EAN number (public institutions, e.g. efterskoler - e-invoices via NemHandel). Picked up by the webhook the same way. */
+export const EAN_FIELD = "EANnummer";
 
 export function buildContractHtml(data: ContractHtmlData, language: ContractLanguage): string {
   const t = LABELS[language];
@@ -713,6 +718,10 @@ ${sec.text ? `    <p>${esc(sec.text)}</p>\n` : ""}${sec.items ? `    <ul class="
       <p class="sig-meta" style="margin-top:10px">
         ${esc(t.invoiceEmailLabel)}:<br>
         {{${INVOICE_EMAIL_FIELD};type=text;role=Customer;required=true}}
+      </p>
+      <p class="sig-meta" style="margin-top:10px">
+        ${esc(t.eanLabel)}:<br>
+        {{${EAN_FIELD};type=text;role=Customer;required=false}}
       </p>
     </div>
   </div>

@@ -27,7 +27,8 @@ import {
 } from "@/lib/task-automation";
 import { logActivity } from "@/lib/activity";
 import { dealName } from "@/lib/labels";
-import { INVOICE_EMAIL_FIELD } from "@/lib/contract-html-template";
+import { EAN_FIELD, INVOICE_EMAIL_FIELD } from "@/lib/contract-html-template";
+import { normalizeEanNumber } from "@/lib/ean";
 
 type DocuSealFieldValue = { field?: string; value?: unknown };
 
@@ -56,6 +57,27 @@ function invoiceEmailFromPayload(payload: DocuSealEvent): string | null {
   const raw = values.find((v) => v.field === INVOICE_EMAIL_FIELD)?.value;
   const email = typeof raw === "string" ? raw.trim().toLowerCase() : "";
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : null;
+}
+
+/**
+ * The EAN number the customer typed into the contract (optional): the clean
+ * 13 digits when valid, "invalid" with what was typed when not, null when empty.
+ */
+function eanFromPayload(payload: DocuSealEvent): { ean: string } | { invalid: string } | null {
+  const values =
+    payload.data?.values ??
+    payload.data?.submitters?.find((s) => s.external_id === "customer")
+      ?.values ??
+    [];
+  const raw = values.find((v) => v.field === EAN_FIELD)?.value;
+  const typed = typeof raw === "string" ? raw.trim().slice(0, 40) : "";
+  if (!typed) return null;
+  try {
+    const ean = normalizeEanNumber(typed);
+    return ean ? { ean } : null;
+  } catch {
+    return { invalid: typed };
+  }
 }
 
 /**
@@ -178,6 +200,21 @@ export async function handleDocuSealEvent(
         where: { id: deal!.id },
         data: { invoiceEmail },
       });
+    }
+    // The EAN, if they wrote one: saved on the deal (an EAN customer gets e-invoices via NemHandel - never
+    // Betalingsservice, as when it's set in Arpo), and a note says so - money changes way, so someone sees it.
+    // One that doesn't check out is never saved - only noted, to be asked about.
+    const ean = eanFromPayload(payload);
+    if (ean && "ean" in ean && ean.ean !== deal!.eanNumber) {
+      await prisma.deal.update({ where: { id: deal!.id }, data: { eanNumber: ean.ean, paymentMethod: "INVOICE" } });
+      await prisma.note
+        .create({ data: { dealId: deal!.id, authorId: deal!.ownerId, kind: "MANUAL", body: `Kunden skrev EAN-nummer ${ean.ean} ved underskriften - gemt på dealen, og betalingen er sat til faktura (e-faktura via NemHandel).${deal!.cvrNumber ? "" : " Husk CVR-nummer: Dinero kræver det for EAN-fakturaer."}` } })
+        .catch(() => {});
+    } else if (ean && "invalid" in ean && !(await prisma.note.count({ where: { dealId: deal!.id, body: { contains: `"${ean.invalid}" som EAN-nummer` } } }))) {
+      // (Once - the webhook comes both when the customer signs and when the whole contract is done.)
+      await prisma.note
+        .create({ data: { dealId: deal!.id, authorId: deal!.ownerId, kind: "MANUAL", body: `Kunden skrev "${ean.invalid}" som EAN-nummer ved underskriften, men det er ikke et gyldigt EAN-nummer (13 cifre med rigtigt kontrolciffer). Det er ikke gemt - spørg kunden.` } })
+        .catch(() => {});
     }
     if (deal!.contractSignedAt) return;
     await prisma.deal.update({
