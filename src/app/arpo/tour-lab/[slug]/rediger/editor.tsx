@@ -1995,7 +1995,10 @@ function ClaudePanel({
       setImages((now) => [...new Set([...now, ...made.filter((x): x is string => Boolean(x))])].slice(0, MAX_CHAT_IMAGES));
     }
   }
-  const [pending, start] = useTransition();
+  /** The question nextviewAI is answering now (its number) - Stop throws its answer away, so nothing is changed. */
+  const runRef = useRef(0);
+  const [waiting, setWaiting] = useState<{ id: number; text: string; images: string[] } | null>(null);
+  const pending = Boolean(waiting);
   const [learned, setLearned] = useState(0);
   const end = useRef<HTMLDivElement>(null);
   // A block body on purpose: newer Chrome returns a promise from scrollIntoView, and an effect must return nothing (or a cleanup).
@@ -2019,7 +2022,11 @@ function ClaudePanel({
     setText("");
     setImages([]);
     const before = config;
-    start(async () => {
+    const id = ++runRef.current;
+    setWaiting({ id, text: request, images: pics });
+    // Stopped (or a newer question) in the meantime: the answer is thrown away - nothing changes.
+    const live = () => runRef.current === id;
+    void (async () => {
       // "@Name" in the message: nextviewAI is told exactly which place, point or feature it means (and its link).
       const named = tourTargets(config).filter((t) => ask.includes(`@${t.label}`));
       // Where the preview stands right now (place + the way it looks) - so "det, der er i forhåndsvisningen nu" means something. A short wait at most.
@@ -2027,6 +2034,8 @@ function ClaudePanel({
       const at = here?.href ? `\n\n(Forhåndsvisningen står lige nu her: ${here.room ? `"${here.room}", ` : ""}linket ${here.href} - med den retning, den kigger. Siger brugeren "her", "det jeg ser" eller "som i forhåndsvisningen", er det dette sted.)` : "";
       const sent = (named.length ? `${ask}\n\n(@-henvisninger: ${named.map((t) => `@${t.label} = ${t.kind.toLowerCase()} med linket ${t.href}`).join("; ")})` : ask) + at;
       const r = await askClaudeForTour(config, history, sent, pics).catch((err: unknown) => ({ ok: false as const, error: `Kunne ikke nå nextviewAI (${err instanceof Error ? err.message : err}) - prøv igen.` }));
+      if (!live()) return;
+      setWaiting(null);
       if (!r.ok) {
         // A revoked/changed key: ask for the new one right here.
         if (r.error.startsWith("nextviewAI-nøglen")) setReady(false);
@@ -2037,7 +2046,22 @@ function ClaudePanel({
       if (r.changed) onApply(r.config);
       if (r.remembered.length || r.forgot.length) setLearned((n) => n + 1);
       setChat((c) => [...c, { role: "assistant", text: r.reply, changed: r.changed, before: r.changed ? before : undefined, remembered: r.remembered, forgot: r.forgot, askRemember: r.askRemember }]);
+    })().finally(() => live() && setWaiting(null));
+  }
+
+  /** Stop: nextviewAI's answer to the last message is thrown away (nothing changes), and the message is back in the box to be put right. */
+  function stop() {
+    if (!waiting) return;
+    runRef.current++;
+    const w = waiting;
+    setWaiting(null);
+    setChat((c) => {
+      // The sent message goes back into the box - taken out of the conversation, as if it was never sent.
+      const at = c.map((m) => m.role).lastIndexOf("user");
+      return at >= 0 ? [...c.slice(0, at), ...c.slice(at + 1), { role: "assistant", text: "Stoppet - intet er ændret. Ret beskeden, og send den igen.", error: true }] : c;
     });
+    setText(w.text);
+    setImages(w.images);
   }
 
   // A suggestion from Resultater: sent once, as if typed (after the render, so not from inside the effect itself).
@@ -2302,9 +2326,15 @@ function ClaudePanel({
             }}
           />
           <span className="flex-1 text-[11px] text-[#8e8e93]">nextviewAI kan tage fejl - tjek forhåndsvisningen.</span>
-          <button type="submit" disabled={pending || uploading > 0 || (!text.trim() && !images.length)} aria-label="Send" className="flex h-8 w-8 items-center justify-center rounded-full bg-[#d97757] text-white transition hover:bg-[#c96442] disabled:bg-[#e9e9eb] disabled:text-[#8e8e93]">
-            <Icon d='<path d="M12 19V5M5 12l7-7 7 7"/>' className="h-4 w-4" />
-          </button>
+          {pending ? (
+            <button type="button" onClick={stop} aria-label="Stop" title="Stop - intet bliver ændret" className="flex h-8 w-8 items-center justify-center rounded-full bg-[#1d1d1f] text-white transition hover:bg-black">
+              <span className="block h-2.5 w-2.5 rounded-[2px] bg-white" />
+            </button>
+          ) : (
+            <button type="submit" disabled={uploading > 0 || (!text.trim() && !images.length)} aria-label="Send" className="flex h-8 w-8 items-center justify-center rounded-full bg-[#d97757] text-white transition hover:bg-[#c96442] disabled:bg-[#e9e9eb] disabled:text-[#8e8e93]">
+              <Icon d='<path d="M12 19V5M5 12l7-7 7 7"/>' className="h-4 w-4" />
+            </button>
+          )}
         </div>
       </form>
     </div>
