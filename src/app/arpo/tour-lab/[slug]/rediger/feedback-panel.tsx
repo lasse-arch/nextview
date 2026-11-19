@@ -626,11 +626,12 @@ function CheckResult({
         ) : null;
       })}
       {check.ai != null && <AiNotes key={check.at} notes={check.ai} initialDone={check.done} onDone={onDone} config={config} onApply={onApply} />}
-      <div className="flex gap-2 pt-1">
-        <button type="button" disabled={pending || checking} onClick={onSend} className={`flex-1 whitespace-nowrap rounded-xl py-2.5 text-[14px] font-semibold text-white disabled:opacity-40 ${errors ? "bg-[#ff3b30]" : "bg-[#0071e3]"}`}>
+      {/* One over the other: side by side, "Gem og send til gennemgang" didn't fit the panel and was cut off. */}
+      <div className="flex flex-col gap-2 pt-1">
+        <button type="button" disabled={pending || checking} onClick={onSend} className={`w-full rounded-xl px-3 py-2.5 text-[14px] font-semibold leading-snug text-white disabled:opacity-40 ${errors ? "bg-[#ff3b30]" : "bg-[#0071e3]"}`}>
           {pending ? "Sender …" : `${dirty ? "Gem og " + sendLabel.charAt(0).toLowerCase() + sendLabel.slice(1) : sendLabel}${errors ? " alligevel" : ""}`}
         </button>
-        <button type="button" disabled={checking || pending} onClick={onAgain} className="whitespace-nowrap rounded-xl bg-white px-4 py-2 text-[14px] font-medium text-[#0071e3] ring-1 ring-black/[.08] disabled:opacity-50">
+        <button type="button" disabled={checking || pending} onClick={onAgain} className="w-full rounded-xl bg-white px-4 py-2 text-[14px] font-medium text-[#0071e3] ring-1 ring-black/[.08] disabled:opacity-50">
           {checking ? "Tjekker …" : dirty ? "Gem og tjek igen" : "Tjek igen"}
         </button>
       </div>

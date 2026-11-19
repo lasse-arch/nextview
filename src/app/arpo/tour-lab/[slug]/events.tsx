@@ -97,7 +97,7 @@ export const EVENTS_CSS = `
 .ev-titel{display:block;font-size:11.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--c-main);opacity:.75}
 .ev .ev-knap{flex:none;font-size:13.5px;font-weight:800;color:var(--c-accent);text-decoration:none;white-space:nowrap}
 .ev .ev-knap:hover{text-decoration:underline}
-.ev ul{display:flex;gap:8px;margin:8px 0 0;padding:0 0 2px;list-style:none;overflow-x:auto;scrollbar-width:none}
+.ev ul{display:flex;gap:8px;margin:6px -3px 0;padding:3px;list-style:none;overflow-x:auto;scrollbar-width:none}
 .ev ul::-webkit-scrollbar{display:none}
 .ev li{flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:54px;padding:6px 8px 7px;border-radius:12px;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.07);color:#1d2a30;line-height:1.1}
 .ev li small{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#6b7a80}

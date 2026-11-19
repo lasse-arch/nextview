@@ -9,6 +9,7 @@
 export type EngineChange = { date: string; kind: "ny" | "sikkerhed" | "hastighed" | "rettelse"; text: string };
 
 export const ENGINE_CHANGES: EngineChange[] = [
+  { date: "2026-11-19", kind: "rettelse", text: "En linje på: trykker man Næste eller Tilbage, mens touren er på vej, flyver den ikke to steder hen på én gang - den gør turen færdig og går så direkte til det sidst valgte. Fremvisningens Stedkort vender touren den vej, rummet er ment at blive set. Den nærmeste rundvisningsdato har ringen hele vejen rundt." },
   { date: "2026-11-19", kind: "ny", text: "Velkomstens fliser kan skifte mellem flere fotos (op til 6) - hentet først, når touren er klar, så starten er lige hurtig. En flise til En linje på skifter af sig selv mellem linjernes fotos. Næste rundvisninger holder sin plads fri, mens datoerne hentes, så fliserne ikke springer." },
   { date: "2026-11-19", kind: "rettelse", text: "Næste rundvisninger fylder mindre: datoerne står som små kalenderblade på én række (ugedag, dato, måned), og Tilmeld er et link ved overskriften i stedet for en stor knap." },
   { date: "2026-11-19", kind: "ny", text: "Bjælken øverst på telefon (logo og knap) kan være i tourens farve, hvid eller glas, og knappen skiller sig altid ud af sig selv - har bjælken samme farve som knappen, bliver knappen hvid. Knappen til luftfotoet inde i touren kan slås til og fra og have sin egen tekst (fx \"Se skolen fra luften\")." },

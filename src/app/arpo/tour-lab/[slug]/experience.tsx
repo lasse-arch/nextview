@@ -779,7 +779,7 @@ function TourExperience({
     return () => window.removeEventListener("hv-skema", open);
   }, []);
   // A button or link to a place in the tour (written with @ in the editor): there, as if picked in the menu.
-  const goToRef = useRef<(href: string, label: string) => void>(() => {});
+  const goToRef = useRef<(href: string, label: string) => Promise<void> | void>(() => {});
   useEffect(() => {
     const go = (e: Event) => {
       const d = (e as CustomEvent<{ href: string; label: string }>).detail;
@@ -979,9 +979,21 @@ function TourExperience({
       setClosedCards([]);
       const cards = T.placeCards ?? [];
       const here = currentSsRef.current;
-      if (!cards.length || (here != null && cards.some((c) => c.ss.includes(here)))) return;
-      const first = cards.find((c) => c.ss.length);
-      if (first) goToRef.current(placeHref(T, first.ss[0]), first.title);
+      if (!cards.length) return;
+      // Standing on a card's point already: only turned the way the room is meant to be seen (if a link says which way).
+      const hereCard = here != null ? cards.find((c) => c.ss.includes(here)) : undefined;
+      const first = hereCard ? { ...hereCard, ss: [here!] } : cards.find((c) => c.ss.length);
+      if (!first) return;
+      // To the room the way it's meant to be seen: a menu item or a place on that scan point carries its direction (rot=) -
+      // a bare scan point left the tour looking at a wall while the card showed.
+      const ss = first.ss[0];
+      const withView = [...T.menu.flatMap((m) => ("items" in m ? m.items.map((i) => i[1]) : [m.href])), ...(T.places ?? []).map((p) => p.href)].find((h) => {
+        if (!h || !isPlaceHref(h)) return false;
+        const q = new URLSearchParams(h.split("?")[1] ?? "");
+        return Number(q.get("ss")) === ss && (q.has("rot") || q.has("sr"));
+      });
+      if (hereCard && !withView) return;
+      goToRef.current(withView ?? placeHref(T, ss), first.title);
     };
     window.addEventListener("hv-stedkort", show);
     return () => window.removeEventListener("hv-stedkort", show);
@@ -1423,6 +1435,29 @@ function TourExperience({
     if (href && isPlaceHref(href)) goToRef.current(href, lineDaysTitle(T, tx));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once each time it opens
   }, [linePicker]);
+  /*
+   * One move at a time in En linje på: pressing Næste/Tilbage while the tour is still on its way doesn't start a second
+   * flight on top of the first (that left it stuck or in the wrong room) - the one under way finishes, and then the tour
+   * goes straight to the moment pressed last; the ones skipped in between are never flown to.
+   */
+  const lineMove = useRef<{ busy: boolean; want: { href: string; title: string } | null }>({ busy: false, want: null });
+  function lineGo(href: string, title: string) {
+    const m = lineMove.current;
+    m.want = { href, title };
+    if (m.busy) return;
+    m.busy = true;
+    void (async () => {
+      try {
+        while (m.want) {
+          const next = m.want;
+          m.want = null;
+          await Promise.resolve(goToRef.current(next.href, next.title)).catch(() => {});
+        }
+      } finally {
+        m.busy = false;
+      }
+    })();
+  }
   // "En dag på din linje": each stop with a place flies the tour there (as a menu item would).
   const lineStops = lineRun && T.lineDays ? lineDayStops(T.lineDays, lineRun.line) : [];
   const lineStopKey = lineRun && !lineRun.end ? `${lineRun.line}|${lineRun.at}` : null;
@@ -1430,7 +1465,7 @@ function TourExperience({
     if (!lineStopKey || !lineRun) return;
     const s = lineStops[lineRun.at];
     track("lineday_stop", { label: `${lineRun.line}: ${s?.title ?? ""}`, stop: lineRun.at + 1 });
-    if (s?.href) goToRef.current(s.href, s.title);
+    if (s?.href) lineGo(s.href, s.title);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once per stop
   }, [lineStopKey]);
   /** "#punkt:<id>" → that point, if the setup has it. */
@@ -1927,7 +1962,7 @@ function TourExperience({
     goToRef.current = (href, label) => {
       setLightbox(null);
       setSelected(null);
-      void menuGo(label, "link", href);
+      return menuGo(label, "link", href);
     };
   });
 
