@@ -189,8 +189,6 @@ export function LineDayPicker({ L, title, onPick, onClose }: { L: L; title: stri
 /** While the day runs: where in the day, the stop, the people - and Næste. */
 export function LineDayCard({ L, stops, run, onGo, onClose }: { L: L; stops: ShownStop[]; run: LineDayRun; onGo: (at: number | "end") => void; onClose: () => void }) {
   const tr = useT();
-  /** The photo shown big again (a thumbnail pressed) - each press shows it anew. */
-  const [again, setAgain] = useState<{ n: number; at: number }>({ n: 0, at: 0 });
   // The next stops' first photos are fetched while this one is read - so they're there when Næste is pressed.
   const coming = stops
     .slice(run.at + 1, run.at + 3)
@@ -221,7 +219,7 @@ export function LineDayCard({ L, stops, run, onGo, onClose }: { L: L; stops: Sho
     <>
       {photos.length > 0 &&
         (placed ? (
-          <StopReveal key={`${s.id}:${run.at}:${again.n}`} src={photos[again.n ? again.at : 0]} alt={s.title} />
+          <StopReveal key={`${s.id}:${run.at}`} src={photos[0]} alt={s.title} />
         ) : (
           <div className="ld-frame" key={`${s.id}:${run.at}`}>
             <div className="ld-frame-photos">
@@ -247,17 +245,6 @@ export function LineDayCard({ L, stops, run, onGo, onClose }: { L: L; stops: Sho
         {s.time && <time>{s.time}</time>}
         <span className={`ld-badge ${s.shared ? "faelles" : ""}`}>{s.shared ? tr("Hele skolen") : s.intro ? tr("Overblik") : s.lineName}</span>
         {s.place && <span className="ld-place">{s.place}</span>}
-        {/* The moment's photos, small at the end of this row - a tap shows one big again (no row of its own). */}
-        {placed && photos.length > 0 && (
-          <span className="ld-thumbs">
-            {photos.map((src, i) => (
-              <button key={src + i} type="button" aria-label={tr("Se billedet stort")} onClick={() => setAgain((a) => ({ n: a.n + 1, at: i }))}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={src} alt="" loading="lazy" decoding="async" />
-              </button>
-            ))}
-          </span>
-        )}
       </div>
       <h3>{s.title}</h3>
       {s.text && <LongText key={s.id + run.at} text={s.text} />}
@@ -447,10 +434,6 @@ export const LINE_DAY_CSS = `
 .ld-frame{position:absolute;inset:0;z-index:29;background:rgba(10,14,16,.35);-webkit-backdrop-filter:blur(18px) saturate(1.1);backdrop-filter:blur(18px) saturate(1.1);animation:hvFade .4s ease}
 .ld-frame-photos{position:absolute;top:24px;right:24px;bottom:24px;left:440px;display:flex}
 .ld-frame-photos .ld-photos{flex:1!important;margin:0;border-radius:20px;box-shadow:0 20px 60px rgba(0,0,0,.4)}
-/* The moment's photos, small - a tap shows one big again. */
-.ld-thumbs{display:flex;gap:4px;margin-left:auto}
-.ld-thumbs button{width:34px;height:34px;padding:0;border:0;border-radius:8px;overflow:hidden;background:#e9ecee;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.15)}
-.ld-thumbs img{width:100%;height:100%;object-fit:cover;display:block}
 /* A tighter card: dots and Luk on one row. */
 .ld-top{gap:12px}
 .ld-top .ld-dots{flex:1;margin:0}
@@ -552,7 +535,6 @@ export const LINE_DAY_CSS = `
   .ld-next{padding:10px 12px;font-size:14px}
   .ld-people-kort{margin-top:8px}
   .ld-people-kort .ld-faces img{width:24px!important;height:24px!important}
-  .ld-thumbs button{width:30px;height:30px;border-radius:7px}
   .ld-chips button{padding:7px 12px;font-size:13px}
   .ld-card h3{font-size:19px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
   .ld-photos{margin:-14px -14px 10px}

@@ -109,7 +109,6 @@ export const UI_STRINGS = [
   "Se det hele samlet",
   "Se din linje",
   "Se en anden linje",
-  "Se billedet stort",
   "Gæsten vælger en linje ({n} at vælge imellem) og ser, hvordan det er at gå der - stederne, livet og de mennesker, de møder.",
   "En linje på skolen",
   "Dagen",
