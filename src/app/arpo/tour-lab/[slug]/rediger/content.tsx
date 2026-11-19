@@ -7,6 +7,8 @@ import { startStyleOf } from "../../tours/presets";
 import { cardPeopleAt, guideExit, IMAGE_HREF, imageOfHref, isPlaceHref, PANO_HFOV, placeHref, startPlaces } from "../../tours/places";
 import { AiImageButton, AiImageList } from "./ai-image";
 import { writePlaceCards, type CardDraft } from "@/lib/actions/tour-cards";
+import { designWelcomeTiles } from "@/lib/actions/tour-tiles-ai";
+import { darker as darkerHex } from "../../tours/contrast";
 import { useContext, useEffect, useState } from "react";
 import { tourUrl } from "@/lib/public-urls";
 import { saveTourStoryImage } from "@/lib/actions/tour-lab";
@@ -588,6 +590,7 @@ export function StartEditor({ config, edit, slug, preview }: Props) {
             <button type="button" className={`${linkButton} w-full`} onClick={() => edit((d) => void d.welcome!.tiles.push({ kicker: "", title: "Ny flise", go: { guide: true }, style: "light" }))}>
               + Flise
             </button>
+            <TilesAiButton config={config} edit={edit} slug={slug} />
           </Group>
         </>
       )}
@@ -2303,6 +2306,79 @@ export function ViewFromPreview({ preview, onPick }: { preview: PreviewApi; onPi
         {busy ? "Henter…" : "Brug udsynet i forhåndsvisningen"}
       </button>
       {error && <p className="text-[12px] text-[#ff3b30]">{error}</p>}
+    </div>
+  );
+}
+
+/** What a welcome tile does, in words for nextviewAI. */
+function tileDoes(go: WelcomeGo): string {
+  if ("guide" in go) return "starter rundvisningen (Vis mig rundt)";
+  if ("day" in go) return "viser en dag på skolen";
+  if ("drone" in go) return "viser luftfotoet";
+  if ("room" in go) return `går ind i rummet ${go.name}`;
+  if ("menu" in go) return `åbner menuens gruppe ${go.menu}`;
+  const h = go.href;
+  if (h.startsWith("#linjedag")) return "åbner En linje på (vælg linje)";
+  if (h.startsWith("#kontakt") || /book|tilmeld|kontakt|bestil|rundvisning|besoeg|besøg/i.test(h)) return `handling: ${h}`;
+  return isPlaceHref(h) ? "går til et sted i touren" : `åbner ${h}`;
+}
+
+/** "Sæt fliserne flot": nextviewAI picks each tile's colour, photo and the recommended one - from the customer's site, to draw the visitor in. */
+function TilesAiButton({ config, edit, slug }: { config: TourConfig; edit: (fn: (d: TourConfig) => void) => void; slug: string }) {
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<{ text: string; error?: boolean } | null>(null);
+  const site = (() => {
+    const href = config.cta.find((c) => /^https?:/.test(c.href))?.href;
+    try {
+      return href ? new URL(href).origin : "";
+    } catch {
+      return "";
+    }
+  })();
+  async function run() {
+    const tiles = config.welcome?.tiles ?? [];
+    if (!tiles.length) return;
+    // The tour's own photos, each with what it shows - the tiles may only get one of these.
+    const seen = new Set<string>();
+    const photos: { url: string; name: string }[] = [];
+    const add = (url: string | undefined, name: string) => url && !seen.has(url) && (seen.add(url), photos.push({ url, name }));
+    config.places?.forEach((p) => add(p.image, p.name));
+    config.points.forEach((p) => p.images?.forEach((u) => add(u, p.name)));
+    tiles.forEach((t) => add(t.image, t.title));
+    config.lineDays?.lines.forEach((l) => add(l.image, `linjen ${l.name}`));
+    add(config.cover?.image, "forsiden");
+    setBusy(true);
+    setNote(null);
+    const r = await designWelcomeTiles(slug, {
+      site,
+      brand: config.brand,
+      colors: config.colors,
+      tiles: tiles.map((t) => ({ title: t.title, kicker: t.kicker, does: tileDoes(t.go) })),
+      photos,
+    }).catch((err: unknown) => ({ ok: false as const, error: err instanceof Error ? err.message : String(err) }));
+    setBusy(false);
+    if (!r.ok) return setNote({ text: r.error, error: true });
+    edit((d) => {
+      d.welcome?.tiles.forEach((t, i) => {
+        const x = r.tiles[i];
+        if (!x) return;
+        t.style = x.style;
+        // A tile following a place keeps the place's photo unless nextviewAI picked one.
+        if (x.image) t.image = x.image;
+        else if (!t.place) delete t.image;
+        if (x.recommended) t.recommended = true;
+        else delete t.recommended;
+      });
+      if (r.accent) d.colors = { ...d.colors, accent: r.accent, accentDark: darkerHex(r.accent) };
+    });
+    setNote({ text: r.reason + (r.accent ? ` Accentfarven er sat til ${r.accent} fra hjemmesiden.` : "") + " Ret en flise bagefter, hvis noget ikke passer." });
+  }
+  return (
+    <div className="space-y-1">
+      <button type="button" disabled={busy} className={`${linkButton} w-full`} onClick={run}>
+        {busy ? "nextviewAI sætter fliserne …" : "✦ Sæt fliserne flot med nextviewAI"}
+      </button>
+      {note && <p className={`px-1 text-[12px] leading-snug ${note.error ? "text-[#ff3b30]" : "text-[#1f7a35]"}`}>{note.text}</p>}
     </div>
   );
 }

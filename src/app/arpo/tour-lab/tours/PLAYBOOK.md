@@ -356,3 +356,16 @@ bygninger eller et stort område (skoler, campingpladser, ferieparker).
   badge større, et langt ordmærke lavere. Har logoet sin egen baggrund, får
   det ingen boks af os omkring. Det måles og sættes af sig selv (nextviewAI,
   upload og "Sæt logoet pænt") - ret kun, hvis det ser forkert ud.
+
+## Velkomstens fliser - flot og tiltrækkende
+
+- Farverne fra kundens hjemmeside (rød tråd). Fliserne er "dark" (hovedfarven),
+  "light" (hvid) eller "accent".
+- Den flise, der fører til at handle (book, tilmeld, kontakt), står i accent -
+  højst én. Har siden en anden stærk farve (fx en orange knap ved siden af den
+  grønne), kan den være accent, så handlingen springer i øjnene.
+- Én anbefalet flise (den bedste første oplevelse), gerne med et foto. Højst 2
+  fliser med foto; ingen foto på accent-flisen.
+- Resten skifter mellem dark og light, så naboer ikke har samme farve.
+- Knappen "Sæt fliserne flot med nextviewAI" under Fliser gør det af sig selv.
+
