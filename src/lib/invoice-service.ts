@@ -92,9 +92,10 @@ function computeDueLines(
   const lines: DueLine[] = [];
   let nextDueDate: Date | null = null;
 
-  const establishmentDueDate = deal.contractSignedAt ? addDays(deal.contractSignedAt, 1) : deal.billingStartDate;
-  // Normally the establishment fee waits until the day after signing, so
-  // it's not drafted the very same moment a contract gets signed. A seller
+  const establishmentDueDate = deal.contractSignedAt ? addDays(deal.contractSignedAt, 2) : deal.billingStartDate;
+  // Normally the establishment fee waits 48 hours after signing (customers
+  // felt an invoice the next day came too fast), so it's not drafted right
+  // after a contract gets signed. A seller
   // choosing to send it same-day via the deal page's manual button can
   // override that wait with sendEstablishmentNow.
   const establishmentReady = options.sendEstablishmentNow
