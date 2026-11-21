@@ -480,6 +480,12 @@ function withNoteSuffix(note: string, suffix: string | null): string {
   return suffix ? `${suffix}\n\n${note}` : note;
 }
 
+/** On the establishment invoice (the first one) only: that it was made automatically - approved by Lasse. */
+const AUTO_INVOICE_NOTE = {
+  da: "Denne faktura er dannet automatisk, efter at aftalen er underskrevet. Har du spørgsmål til den, er du altid velkommen til at skrive til info@nextview360.dk.",
+  en: "This invoice was created automatically after the agreement was signed. If you have any questions about it, you're always welcome to write to info@nextview360.dk.",
+} as const;
+
 function invoiceLanguage(deal: { contractProducts: unknown }): "da" | "en" {
   return parseContractProducts(deal.contractProducts)?.language === "en" ? "en" : "da";
 }
@@ -526,7 +532,8 @@ async function draftInvoiceLine(
       address: deal.address,
       eanNumber: deal.eanNumber,
       attPerson: deal.contactName,
-      note: withNoteSuffix(note, terms.noteSuffix),
+      // The Betalingsservice notice first, then (establishment only) that it was made automatically, then what it's for.
+      note: withNoteSuffix(invoiceRow.quarterIndex === 0 ? `${AUTO_INVOICE_NOTE[invoiceLanguage(deal)]}\n\n${note}` : note, terms.noteSuffix),
       lines,
       invoiceDate,
       paymentDays: terms.paymentDays,
