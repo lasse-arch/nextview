@@ -1,5 +1,6 @@
 "use client";
 
+import { ATTACHMENT_TOO_BIG, MAX_SEND_ATTACHMENT_BYTES } from "@/lib/attachment-limit";
 import { useState, useTransition } from "react";
 import { sendTemplatedEmailAction } from "@/lib/actions/deal-email";
 import { createEmailTemplate } from "@/lib/actions/email-templates";
@@ -43,6 +44,7 @@ export function SendEmailSection({
     // point the same FileList object has already been emptied out from
     // under us - Array.from(selected) would then always yield [].
     const picked = Array.from(selected);
+    if ([...files, ...picked].reduce((n, f) => n + f.size, 0) > MAX_SEND_ATTACHMENT_BYTES) return showToast(ATTACHMENT_TOO_BIG);
     setFiles((prev) => [...prev, ...picked]);
   }
 

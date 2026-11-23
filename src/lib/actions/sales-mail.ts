@@ -1,5 +1,6 @@
 "use server";
 
+import { ATTACHMENT_TOO_BIG, MAX_SEND_ATTACHMENT_BYTES } from "@/lib/attachment-limit";
 import { randomUUID } from "node:crypto";
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
@@ -222,10 +223,10 @@ export async function sendSalesMail(id: string, to: string, subject: string, bod
   const s = cap(subject, 300).trim();
   const b = cap(body, 10_000).trim();
   if (!s || !b) return { ok: false, error: "Mailen mangler emne eller tekst." };
-  // Files sent along (the seller's own, from their computer): only real files, at most 10 and 20 MB in all.
+  // Files sent along (the seller's own, from their computer): only real files, at most 10 and 4 MB in all (lib/attachment-limit.ts).
   const files = Array.isArray(attachments) ? attachments.filter((f): f is File => f instanceof File && f.size > 0) : [];
   if (files.length > 10) return { ok: false, error: "Højst 10 vedhæftede filer." };
-  if (files.reduce((n, f) => n + f.size, 0) > 20 * 1024 * 1024) return { ok: false, error: "Filerne fylder for meget samlet (højst 20 MB)." };
+  if (files.reduce((n, f) => n + f.size, 0) > MAX_SEND_ATTACHMENT_BYTES) return { ok: false, error: ATTACHMENT_TOO_BIG };
 
   if (row.dealId) {
     const deal = await prisma.deal.findUnique({ where: { id: row.dealId }, select: { contactEmail: true, invoiceEmail: true, ownerId: true } });

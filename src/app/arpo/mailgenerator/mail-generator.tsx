@@ -1,5 +1,6 @@
 "use client";
 
+import { ATTACHMENT_TOO_BIG, MAX_SEND_ATTACHMENT_BYTES } from "@/lib/attachment-limit";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { dealForMail, findDeals, type DealHit } from "@/lib/actions/deal-search";
 import { INDUSTRIES } from "@/lib/industries";
@@ -18,7 +19,7 @@ const toNum = (v: string) => (v.trim() === "" ? null : Number(v.replace(/\./g, "
 
 /** Files with the mail: at most this many and this much in all (Gmail takes 25 MB, with room for the mail itself). */
 const MAX_FILES = 10;
-const MAX_FILES_BYTES = 20 * 1024 * 1024;
+const MAX_FILES_BYTES = MAX_SEND_ATTACHMENT_BYTES;
 const size = (bytes: number) => (bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`);
 
 /** Quick ways to make a draft over. */
@@ -138,7 +139,7 @@ export function MailGenerator({ deals, tours, signature: mine, learned, senders 
   function addFiles(list: FileList | null) {
     if (!list?.length) return;
     const next = [...files, ...Array.from(list)].slice(0, MAX_FILES);
-    if (next.reduce((n, f) => n + f.size, 0) > MAX_FILES_BYTES) return setMsg({ ok: false, text: "Filerne fylder for meget samlet (højst 20 MB)." });
+    if (next.reduce((n, f) => n + f.size, 0) > MAX_FILES_BYTES) return setMsg({ ok: false, text: ATTACHMENT_TOO_BIG });
     setMsg(null);
     setFiles(next);
   }
@@ -495,7 +496,7 @@ export function MailGenerator({ deals, tours, signature: mine, learned, senders 
                     ))}
                   </ul>
                 ) : (
-                  <p className="mt-1 text-xs text-slate-400">Træk filer hertil, eller vælg dem - fx et tilbud som PDF eller billeder. Højst {MAX_FILES} filer og 20 MB i alt.</p>
+                  <p className="mt-1 text-xs text-slate-400">Træk filer hertil, eller vælg dem - fx et tilbud som PDF eller billeder. Højst {MAX_FILES} filer og 4 MB i alt.</p>
                 )}
                 {files.length > 0 && <p className="mt-1 text-[11px] text-slate-400">{size(filesBytes)} i alt · sendes med, når du trykker Send</p>}
               </div>
