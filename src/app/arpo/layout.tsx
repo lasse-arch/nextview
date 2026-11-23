@@ -55,6 +55,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     {
       section: "Salg",
       items: [
+        { href: "/arpo/min-dag", label: "Min dag", icon: "sun" },
         { href: "/arpo/deals", label: "Deals", icon: "deals" },
         { href: "/arpo/leadindbakke", label: "Leadindbakke", icon: "inbox" },
         { href: "/arpo/leadgeneration", label: "Leadgeneration", icon: "radar" },
@@ -80,7 +81,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       items: [
         { href: "/arpo/commission", label: "Provision", icon: "percent" },
         ...(user.canAccessBilling ? [{ href: "/arpo/stats", label: "Stats", icon: "stats" as const }] : []),
-        ...(admin ? [{ href: "/arpo/vaekst", label: "Vækst", icon: "growth" as const }, { href: "/arpo/health", label: "Health", icon: "pulse" as const }] : []),
+        ...(admin
+          ? [
+              { href: "/arpo/vaekst", label: "Vækst", icon: "growth" as const },
+              { href: "/arpo/prognose", label: "Prognose", icon: "forecast" as const },
+              { href: "/arpo/budget", label: "Budget", icon: "wallet" as const },
+              { href: "/arpo/health", label: "Health", icon: "pulse" as const },
+            ]
+          : []),
       ],
     },
     {

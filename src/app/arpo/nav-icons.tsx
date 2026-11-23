@@ -234,3 +234,24 @@ export function IconChat({ className }: { className?: string }) {
     </svg>
   );
 }
+
+/** Prognose: a line that goes on as a dashed one. */
+export function IconForecast({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 20h18" />
+      <path d="M4 16l4-4 3 2 3-4" />
+      <path d="M14 10l2.5-2 2 1.5L21 6" strokeDasharray="2 2.5" />
+    </svg>
+  );
+}
+
+/** Min dag: a sun over the horizon. */
+export function IconSun({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M7 17a5 5 0 0 1 10 0" />
+      <path d="M3 21h18M12 4v3M4.9 9.9l2 2M19.1 9.9l-2 2M2 17h2M20 17h2" />
+    </svg>
+  );
+}

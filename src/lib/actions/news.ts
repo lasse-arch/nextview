@@ -63,6 +63,18 @@ export async function getUnreadNewsCount(userId: string, newsReadAt: Date | null
 const DEFAULT_POSTS: { title: string; body: string; minutesAgo: number; screenshotUrl: string }[] = [
   {
     minutesAgo: 0,
+    title: "Min dag: din dag på én side",
+    body: "Øverst under Salg er der en ny side, Min dag. Her står, hvor mange møder du skal booke i dag og i denne uge, regnet ud fra dit eget mål (eller årets plan), og hvor langt du er.\n\nNedenunder står dagens møder og filmninger, dine opgaver (også dem, der er gået over tid), kontrakter, der venter på underskrift, og dine deals, der mangler et næste skridt. Tryk på en, så kommer du ind på dealen. Du ser kun dine egne.",
+    screenshotUrl: "/news/min-dag.png",
+  },
+  {
+    minutesAgo: 1,
+    title: "Prognose og Budget: næste år regnet ud fra jeres egne tal (admin)",
+    body: "Under Virksomheden er der to nye sider til admins.\n\nPrognose regner året ud nedefra: møder, nye kunder, kunder og penge. Tallene kommer fra jeres historik i Arpo (lukkerate, priser, opsigelser, tid til salg og sæson), og I kan rette dem og se året ændre sig med det samme. Der er tre scenarier, forsigtig, realistisk og ambitiøs. Gem et som årets prognose, så kan I hver måned se, om I er foran eller bagud. Præsentér planen viser det hele som slides til et møde.\n\nBudget holder udgifterne op mod prognosen: resultatet, pengene på kontoen og hvornår I tjener penge. Alle beløb er uden moms.",
+    screenshotUrl: "/news/prognose.png",
+  },
+  {
+    minutesAgo: 0,
     title: "Tours i gang: sælgerne kan følge med i de tours, vi bygger",
     body: "Under Online kunder er der en ny fane, Tours i gang. Her står alle tours, der ikke er ude endnu: hvor langt de er (I gang, Sendt til gennemgang, Godkendt af kunden), hvem der bygger dem, hvornår de skal være klar, og hvornår de sidst er gemt. Man kan filtrere på status og søge på kunden.\n\n\"Se touren\" åbner den senest gemte version - kun til at kigge, der kan ikke ændres noget, og besøget tæller ikke med i kundens tal. Send den ikke til kunden, den er ikke færdig.",
     screenshotUrl: "/news/tours-i-gang.png",
