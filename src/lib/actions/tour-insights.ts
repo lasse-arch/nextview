@@ -1,5 +1,8 @@
 "use server";
 
+import { tourHeat, type HeatData } from "@/lib/tour-heat";
+import { getTourConfig } from "@/lib/tours";
+
 import { requireTour } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { tourLooks, type LookSpot } from "@/lib/tour-looks";
@@ -27,6 +30,13 @@ export async function latestTourTips(slug: string): Promise<{ summary: string; s
   await requireTour(slug);
   const run = await prisma.tourTipRun.findFirst({ where: { tourSlug: slug }, orderBy: { createdAt: "desc" } });
   return run ? { summary: run.summary, suggestions: run.suggestions as Insight[], visits: run.visits, at: run.createdAt.toISOString(), auto: run.source === "auto" } : null;
+}
+
+/** The heatmap in Resultater (the saved tour's setup). */
+export async function tourHeatFor(slug: string): Promise<HeatData | null> {
+  await requireTour(slug);
+  const config = await getTourConfig(slug);
+  return config ? tourHeat(slug, config) : null;
 }
 
 /** "Hvor folk kigger" in Resultater. */

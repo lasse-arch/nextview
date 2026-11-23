@@ -13,6 +13,7 @@ import { mergeShare, mergeStats } from "@/lib/merge-stats";
 import { parseContractProducts } from "@/lib/contract-template-data";
 import { CustomerReport, type ReportLook } from "@/app/arpo/tour-lab/[slug]/rediger/customer-report";
 import { tourLooks } from "@/lib/tour-looks";
+import { tourHeat, type HeatData } from "@/lib/tour-heat";
 import type { TourConfig } from "@/app/arpo/tour-lab/tours/types";
 import { startTargets } from "@/app/arpo/tour-lab/tours/places";
 import { contestChests, deleteOldContestEntries } from "@/lib/tour-contest";
@@ -212,6 +213,9 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
           )
         )
       : statTours.map(() => []);
+  // The heatmap: per tour (if its report shows it) - one tour's at a time, never several together.
+  const heats: (HeatData | null)[] =
+    page === "tal" && !example ? await Promise.all(statTours.map((x) => (x.share.heatmap ? tourHeat(x.slug, x.config, { from: period.from, to: period.to }).catch(() => null) : Promise.resolve(null)))) : statTours.map(() => null);
   // All tours together: the same room in two tours counts as two places (named with the tour when there are several).
   const lookTogether = looks
     .flatMap((list, i) => list.map((l) => (statTours.length > 1 ? { ...l, room: `${l.room} (${statTours[i].config.title || statTours[i].name})` } : l)))
@@ -489,7 +493,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
                     <PortalPeriod value={period} lang={lang} />
                   </div>
                   <section className={card}>
-                    <CustomerReport looks={lookTogether} stats={together} share={togetherShare} brand={sted ? dealName(scope[0]) : company} lang={lang} title={`${statTours.length > 1 ? t.allTogether(statTours.length).replace(/afdelinger|locations/, lang === "en" ? "tours" : "tours") : t.overview} · ${periodText(period, lang)}`} />
+                    <CustomerReport looks={lookTogether} heat={statTours.length === 1 ? heats[0] : undefined} stats={together} share={togetherShare} brand={sted ? dealName(scope[0]) : company} lang={lang} title={`${statTours.length > 1 ? t.allTogether(statTours.length).replace(/afdelinger|locations/, lang === "en" ? "tours" : "tours") : t.overview} · ${periodText(period, lang)}`} />
                   </section>
                   {statTours.length > 1 && (
                     <>
@@ -506,7 +510,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
                             </span>
                           </summary>
                           <div className="mt-4" style={{ ["--report-accent" as string]: x.config.colors.accent }}>
-                            <CustomerReport stats={stats[i]} share={x.share} brand={x.config.title} lang={lang} looks={looks[i]} />
+                            <CustomerReport stats={stats[i]} share={x.share} brand={x.config.title} lang={lang} looks={looks[i]} heat={heats[i]} />
                           </div>
                         </details>
                       ))}

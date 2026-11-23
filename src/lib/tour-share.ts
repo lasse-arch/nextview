@@ -28,11 +28,13 @@ export type ReportShare = {
   opened: boolean;
   /** Where they looked around longest: the places, with the room's picture (never the exact view or a link to it). */
   looks: boolean;
+  /** The heatmap: where they stay inside (the floor plan) and what they open on the aerial photo. */
+  heatmap: boolean;
   /** What else they used: Find vej (and where to), videos, pictures, people, Infobokse, links out … */
   used: boolean;
 };
 
-export const DEFAULT_SHARE: ReportShare = { days: 30, visits: true, engaged: true, duration: true, leads: "auto", actions: "auto", perDay: true, places: true, sources: false, live: true, rooms: true, roomTime: true, opened: true, looks: true, used: true };
+export const DEFAULT_SHARE: ReportShare = { days: 30, visits: true, engaged: true, duration: true, leads: "auto", actions: "auto", perDay: true, places: true, sources: false, live: true, rooms: true, roomTime: true, opened: true, looks: true, heatmap: true, used: true };
 
 export const shareOf = (raw: unknown): ReportShare => ({ ...DEFAULT_SHARE, ...(raw && typeof raw === "object" ? (raw as Partial<ReportShare>) : {}) });
 

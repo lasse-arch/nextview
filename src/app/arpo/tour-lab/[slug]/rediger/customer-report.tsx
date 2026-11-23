@@ -1,5 +1,7 @@
 import type { TourStats } from "@/lib/tour-stats";
 import { shown, type ReportShare } from "@/lib/tour-share";
+import type { HeatData } from "@/lib/tour-heat";
+import { HeatmapView } from "./heatmap-view";
 
 /*
  * The customer's report: exactly the numbers chosen to be shared - the same
@@ -35,6 +37,8 @@ const T = {
     roomTime: "Hvor de blev længst",
     roomTimeHint: "Typisk tid i rummet",
     looks: "Hvor de kigger længst rundt",
+    heatmap: "Heatmap: hvor de opholder sig",
+    heatmapHint: "Jo varmere, jo mere tid eller flere besøg. Inde i touren på plantegningen, og hvad de åbner på luftfotoet.",
     looksHint: "Steder, hvor de besøgende selv har stået og kigget rundt",
     looksVisits: "besøg",
     used: "Det, de brugte i touren",
@@ -68,6 +72,8 @@ const T = {
     roomTime: "Where they stayed longest",
     roomTimeHint: "Typical time in the room",
     looks: "Where they look around longest",
+    heatmap: "Heatmap: where visitors spend their time",
+    heatmapHint: "The warmer, the more time or visits. Inside the tour on the floor plan, and what they open on the aerial photo.",
     looksHint: "Places where visitors stood and looked around themselves",
     looksVisits: "visits",
     used: "What they used in the tour",
@@ -103,7 +109,7 @@ function Ranked({ rows, label, show = String }: { rows: { label: string; count: 
 /** A place visitors looked around at (lib/tour-looks.ts) - the room, never the exact view. */
 export type ReportLook = { room: string; seconds: number; visits: number; image: string | null };
 
-export function CustomerReport({ stats, share, brand, lang = "da", title, looks = [] }: { stats: TourStats; share: ReportShare; brand: string; lang?: ReportLang; title?: string; looks?: ReportLook[] }) {
+export function CustomerReport({ stats, share, brand, lang = "da", title, looks = [], heat }: { stats: TourStats; share: ReportShare; brand: string; lang?: ReportLang; title?: string; looks?: ReportLook[]; /** The heatmap (lib/tour-heat.ts) - one tour's, never several together. */ heat?: HeatData | null }) {
   const t = T[lang];
   const duration = (s: number) => (s < 60 ? `${s} ${t.sec}` : `${Math.floor(s / 60)} min${s % 60 ? ` ${s % 60} ${t.sec}` : ""}`);
   const label = (l: string) => (l === "phone" ? t.phone : l === "email" ? t.email : l === "direkte" ? t.direct : l);
@@ -219,6 +225,13 @@ export function CustomerReport({ stats, share, brand, lang = "da", title, looks 
               </li>
             ))}
           </ul>
+        </div>
+      )}
+      {share.heatmap && heat && (heat.plan || heat.aerial) && (
+        <div className={card}>
+          <div className="text-[13px] font-medium text-[#6e6e73]">{t.heatmap}</div>
+          <p className="mb-3 text-[11.5px] text-[#8e8e93]">{t.heatmapHint}</p>
+          <HeatmapView data={heat} lang={lang} />
         </div>
       )}
       {share.used && (stats.used?.length ?? 0) > 0 && (

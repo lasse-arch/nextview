@@ -81,7 +81,7 @@ export function mergeStats(all: TourStats[]): TourStats | null {
 export function mergeShare(all: ReportShare[]): ReportShare | null {
   if (!all.length) return null;
   const when = (k: "leads" | "actions"): ShareWhen => (all.some((s) => s[k] === "off") ? "off" : all.every((s) => s[k] === "on") ? "on" : "auto");
-  const every = (k: "visits" | "engaged" | "duration" | "perDay" | "places" | "sources" | "live" | "rooms" | "roomTime" | "opened" | "looks" | "used") => all.every((s) => s[k]);
+  const every = (k: "visits" | "engaged" | "duration" | "perDay" | "places" | "sources" | "live" | "rooms" | "roomTime" | "opened" | "looks" | "heatmap" | "used") => all.every((s) => s[k]);
   return {
     days: all.every((s) => s.days === 90) ? 90 : 30,
     visits: every("visits"),
@@ -97,6 +97,7 @@ export function mergeShare(all: ReportShare[]): ReportShare | null {
     roomTime: every("roomTime"),
     opened: every("opened"),
     looks: every("looks"),
+    heatmap: every("heatmap"),
     used: every("used"),
   };
 }

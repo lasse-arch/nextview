@@ -7,6 +7,7 @@ import { tourStats } from "@/lib/tour-stats";
 import { shareOf } from "@/lib/tour-share";
 import { CustomerReport } from "@/app/arpo/tour-lab/[slug]/rediger/customer-report";
 import { tourLooks } from "@/lib/tour-looks";
+import { tourHeat } from "@/lib/tour-heat";
 import type { TourConfig } from "@/app/arpo/tour-lab/tours/types";
 import { startTargets } from "@/app/arpo/tour-lab/tours/places";
 import { PortalEmbeds } from "./embeds";
@@ -27,6 +28,7 @@ export default async function CustomerReportPage({ params }: { params: Promise<{
   const config = tour.config as unknown as TourConfig;
   const share = shareOf(tour.share);
   const stats = await tourStats(tour.slug, share.days);
+  const heat = share.heatmap ? await tourHeat(tour.slug, config, share.days).catch(() => null) : null;
   const looks = share.looks ? (await tourLooks(tour.slug, share.days).catch(() => [])).filter((l) => l.room).map((l) => ({ room: l.room!, seconds: l.seconds, visits: l.visits, image: l.image })) : [];
   return (
     <main
@@ -38,7 +40,7 @@ export default async function CustomerReportPage({ params }: { params: Promise<{
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={config.logo} alt={config.brand} className="max-h-10 max-w-[60%] object-contain" />
         </div>
-        <CustomerReport stats={stats} share={share} brand={config.title} looks={looks} />
+        <CustomerReport stats={stats} share={share} brand={config.title} looks={looks} heat={heat} />
         {tour.published && (
           <PortalEmbeds
             url={tourUrl(tour.slug, `${(await headers()).get("x-forwarded-proto") ?? "https"}://${(await headers()).get("host")}`, tour.liveVersion != null)}

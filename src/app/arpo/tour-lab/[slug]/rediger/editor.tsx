@@ -989,7 +989,7 @@ export function TourEditor({
                     setAiAsk({ request, at: Date.now() });
                   }}
                 />
-                <HeatmapPanel slug={slug} config={config} map={scanMap} preview={preview} />
+                <HeatmapPanel slug={slug} config={config} preview={preview} />
                 <LooksPanel slug={slug} config={config} preview={preview} />
                 <ResultsPanel stats={stats} guideStops={guideStops(config).map((s) => s.title)} guideNames={Object.fromEntries([["#rundvisning", "Vis mig rundt"], ...(config.guides ?? []).map((g) => [`#rundvisning:${g.id}`, g.title])])} slug={slug} brand={config.brand} share={share} shareStats={shareStats} token={shareToken} />
               </>

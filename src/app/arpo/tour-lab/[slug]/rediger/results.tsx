@@ -121,6 +121,7 @@ function ShareSettings({ slug, brand, share: initial, shareStats, token: initial
         <Toggle on={share.roomTime} onChange={(on) => change({ roomTime: on })} title="Hvor de blev længst (tid i rum)" />
         <Toggle on={share.used} onChange={(on) => change({ used: on })} title="Det, de brugte i touren (Find vej og hvorhen, videoer, billeder, personer, infobokse, links …)" />
         <Toggle on={share.looks} onChange={(on) => change({ looks: on })} title="Hvor de kigger længst rundt (stederne med rummets billede - på kundesiden og rapportlinket)" />
+        <Toggle on={share.heatmap} onChange={(on) => change({ heatmap: on })} title="Heatmap (hvor de opholder sig på plantegningen, og hvad de åbner på luftfotoet - på kundesiden og rapportlinket)" />
         <Toggle on={share.opened} onChange={(on) => change({ opened: on })} title="Det, de åbnede (punkter, infopunkter, stedkort, 360°)" />
         <Toggle on={share.sources} onChange={(on) => change({ sources: on })} title="Hvor besøgene kom fra" />
         <Toggle on={share.live} onChange={(on) => change({ live: on })} title="Ledige (live data)" />
