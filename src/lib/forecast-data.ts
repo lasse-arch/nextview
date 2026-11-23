@@ -47,6 +47,10 @@ export type ForecastHistory = {
   hoursPerTour: number | null;
   /** Customers billing today, and their monthly total. */
   today: { customers: number; mrr: number; pipeline: number; open: number };
+  /** The months the assumptions are read from. */
+  window: number;
+  /** How many months Arpo has real data for (meetings or sales). */
+  monthsOfData: number;
 };
 
 export type LockedForecast = { at: string; by: string; scenario: ScenarioKey; assumptions: Assumptions; months: MonthResult[] };
@@ -58,6 +62,10 @@ export type Plan = {
   /** What the budget is held against: a scenario, or the locked forecast ("laast"). */
   budgetScenario: ScenarioKey | "laast";
   locked: LockedForecast | null;
+  /** "Tallene bygger på": months back the assumptions are read from - null = Arpo picks. */
+  window: number | null;
+  /** The sales goal: sold for (contract value) a month, in kr. - 0 = none. */
+  salesGoal: number;
   updatedAt: string | null;
   updatedBy: string | null;
 };
@@ -72,7 +80,14 @@ const avg = (xs: number[]) => (xs.length ? xs.reduce((s, x) => s + x, 0) / xs.le
 const ymKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 const round = (n: number, d = 0) => Math.round(n * 10 ** d) / 10 ** d;
 
-export async function forecastHistory(now = new Date()): Promise<ForecastHistory> {
+/** How many months back the assumptions are read from ("Tallene bygger på"). */
+export const HISTORY_WINDOWS = [2, 3, 6, 12] as const;
+
+/**
+ * The history the assumptions come from - read from the last `windowMonths`
+ * months (default: a year, or all there is when it's less than half a year).
+ */
+export async function forecastHistory(now = new Date(), windowMonths?: number): Promise<ForecastHistory> {
   const [deals, invoices, time] = await Promise.all([
     prisma.deal.findMany({
       select: {
@@ -90,6 +105,8 @@ export async function forecastHistory(now = new Date()): Promise<ForecastHistory
         establishmentFee: true,
         billingStartDate: true,
         contractEndDate: true,
+        bindingMonths: true,
+        createdAt: true,
         updatedAt: true,
       },
     }),
@@ -100,23 +117,30 @@ export async function forecastHistory(now = new Date()): Promise<ForecastHistory
     prisma.timeEntry.groupBy({ by: ["dealId"], where: { source: "MANUAL", deal: { liveAt: { gte: new Date(now.getTime() - 365 * DAY) } } }, _sum: { minutes: true } }),
   ]);
 
-  const yearAgo = new Date(now.getTime() - 365 * DAY);
+  // How long Arpo has had real data: from the first meeting or sale.
+  const firstData = deals.reduce<number>((min, d) => Math.min(min, d.meetingDate?.getTime() ?? Infinity, d.soldAt?.getTime() ?? Infinity), Infinity);
+  const monthsOfData = Number.isFinite(firstData) ? Math.max(0, Math.floor((now.getTime() - firstData) / (30.44 * DAY))) : 0;
+  const win = HISTORY_WINDOWS.includes(windowMonths as (typeof HISTORY_WINDOWS)[number]) ? windowMonths! : monthsOfData < 6 ? Math.max(2, Math.min(6, monthsOfData || 2)) : 12;
+  const yearAgo = new Date(now.getFullYear(), now.getMonth() - win, now.getDate());
+  const winWeeks = (now.getTime() - yearAgo.getTime()) / (7 * DAY);
+  const period = win === 12 ? "det seneste år" : `de seneste ${win} måneder`;
   const isSold = (d: (typeof deals)[number]) => Boolean(d.soldAt) || SOLD_STAGES.has(d.stage) || Boolean(d.churnedAt && d.contractSignedAt);
 
   // Meetings held: how many, by whom, over how long.
   const held = deals.filter((d) => d.meetingDate && d.meetingDate <= now);
   const heldYear = held.filter((d) => d.meetingDate! >= yearAgo);
   const firstMeeting = held.reduce<Date | null>((min, d) => (!min || d.meetingDate! < min ? d.meetingDate! : min), null);
-  const spanWeeks = firstMeeting ? Math.max(4, Math.min(52, (now.getTime() - Math.max(firstMeeting.getTime(), yearAgo.getTime())) / (7 * DAY))) : 52;
-  const halfYear = new Date(now.getTime() - 182 * DAY);
+  const spanWeeks = firstMeeting ? Math.max(4, Math.min(winWeeks, (now.getTime() - Math.max(firstMeeting.getTime(), yearAgo.getTime())) / (7 * DAY))) : winWeeks;
+  const halfYear = new Date(now.getFullYear(), now.getMonth() - Math.min(6, win), now.getDate());
   const byOwner = new Map<string, number>();
   for (const d of held.filter((d) => d.meetingDate! >= halfYear)) byOwner.set(d.ownerId, (byOwner.get(d.ownerId) ?? 0) + 1);
-  const sellers = Math.max(1, [...byOwner.values()].filter((n) => n >= 3).length || byOwner.size || 1);
+  const sellers = Math.max(1, [...byOwner.values()].filter((n) => n >= Math.min(3, win)).length || byOwner.size || 1);
   const yearlyMeetings = (heldYear.length / spanWeeks) * 52;
   const meetingsPerSellerWeek = yearlyMeetings / sellers / DEFAULT_SALES_WEEKS;
 
-  // Close rate: meetings held 1-15 months ago (time enough to decide).
-  const decided = held.filter((d) => d.meetingDate! <= new Date(now.getTime() - 30 * DAY) && d.meetingDate! >= new Date(now.getTime() - 456 * DAY));
+  // Close rate: meetings in the period that have had time to be decided (two weeks; a month when reading a year).
+  const settle = (win >= 6 ? 30 : 14) * DAY;
+  const decided = held.filter((d) => d.meetingDate! <= new Date(now.getTime() - settle) && d.meetingDate! >= new Date(yearAgo.getTime() - (win >= 6 ? 90 * DAY : settle)));
   const won = decided.filter(isSold);
   const closeRate = decided.length ? (won.length / decided.length) * 100 : 25;
 
@@ -129,12 +153,13 @@ export async function forecastHistory(now = new Date()): Promise<ForecastHistory
   const soldPool = soldYear.length >= 3 ? soldYear : deals.filter((d) => d.soldAt);
   const avgMonthly = avg(soldPool.filter((d) => (d.saleAmount ?? 0) > 0).map((d) => d.saleAmount!)) ?? 0;
   const avgEstablishment = avg(soldPool.map((d) => d.establishmentFee ?? 0)) ?? 0;
+  const bindingMonths = avg(soldPool.filter((d) => (d.bindingMonths ?? 0) > 0).map((d) => d.bindingMonths!)) ?? 12;
 
   // Churn: customers who stopped in the last year, against everyone who billed in it.
   const liveNow = deals.filter((d) => d.stage === "LIVE" && !d.churnedAt && (d.saleAmount ?? 0) > 0);
   const churnedYear = deals.filter((d) => d.churnedAt && d.churnedAt >= yearAgo && d.churnedAt <= now);
   const churnBase = liveNow.length + churnedYear.length;
-  const churnPerYear = churnBase ? (churnedYear.length / churnBase) * 100 : 10;
+  const churnPerYear = churnBase ? Math.min(100, ((churnedYear.length * (12 / win)) / churnBase) * 100) : 5;
 
   // Time: meeting → signature, signature → live.
   const toSign = median(deals.filter((d) => d.meetingDate && d.soldAt && d.soldAt >= d.meetingDate && d.soldAt >= new Date(now.getTime() - 548 * DAY)).map((d) => (d.soldAt!.getTime() - d.meetingDate!.getTime()) / DAY));
@@ -156,18 +181,26 @@ export async function forecastHistory(now = new Date()): Promise<ForecastHistory
     daysToSign: Math.round(toSign ?? 14),
     daysToLive: Math.round(toLive ?? 30),
     capacityPerMonth: 0,
+    bindingMonths: Math.round(bindingMonths),
+    priceStepMonth: 0,
+    priceStepMonthly: 0,
+    priceStepEstablishment: 0,
   };
   const basis: Basis = {
     sellers: byOwner.size ? `${byOwner.size} har holdt møder det seneste halve år` : "Ingen møder endnu",
-    meetingsPerSellerWeek: heldYear.length ? `${heldYear.length} møder det seneste år` : "Ingen møder endnu",
+    meetingsPerSellerWeek: heldYear.length ? `${heldYear.length} møder ${period}` : "Ingen møder endnu",
     salesWeeks: "52 uger minus ferier og stille uger",
     closeRate: decided.length ? `${won.length} af ${decided.length} møder blev til en kunde` : "For få møder - et gæt",
     avgMonthly: soldPool.length ? `Snit af ${soldPool.length} salg` : "Ingen salg endnu",
     avgEstablishment: soldPool.length ? `Snit af ${soldPool.length} salg` : "Ingen salg endnu",
-    churnPerYear: churnBase ? `${churnedYear.length} af ${churnBase} kunder stoppede det seneste år` : "Ingen kunder endnu - et gæt",
+    churnPerYear: churnBase ? `${churnedYear.length} af ${churnBase} kunder stoppede ${period}` : "Ingen kunder endnu - et gæt",
     daysToSign: toSign !== null ? "Midten af jeres salg" : "Et gæt - for få salg med mødedato",
     daysToLive: toLive !== null ? "Midten af jeres kunder" : "Et gæt - for få kunder gået live",
     capacityPerMonth: maxLives ? `Højest ${maxLives} gik live på én måned. 0 = ingen grænse` : "0 = ingen grænse",
+    bindingMonths: soldPool.length ? `Snit af ${soldPool.length} salg. Ingen stopper før` : "Et gæt",
+    priceStepMonth: "0 = samme priser hele året",
+    priceStepMonthly: "0 = som nu",
+    priceStepEstablishment: "0 = som nu",
   };
 
   // Season: meetings per calendar month over the last two years - only when there are enough of them.
@@ -202,7 +235,8 @@ export async function forecastHistory(now = new Date()): Promise<ForecastHistory
         const expected = new Date(signedAt.getTime() + assumptions.daysToLive * DAY);
         liveFrom = expected < now ? new Date(now.getTime() + 14 * DAY) : expected;
       }
-      return { monthly: d.saleAmount!, liveFrom: liveFrom.toISOString(), endsAt: d.contractEndDate ? d.contractEndDate.toISOString() : null };
+      const boundUntil = d.bindingMonths ? new Date(liveFrom.getFullYear(), liveFrom.getMonth() + d.bindingMonths, liveFrom.getDate()) : null;
+      return { monthly: d.saleAmount!, liveFrom: liveFrom.toISOString(), endsAt: d.contractEndDate ? d.contractEndDate.toISOString() : null, boundUntil: boundUntil ? boundUntil.toISOString() : null };
     });
 
   // Open deals still in play: a meeting held, a follow-up, a contract out - recent ones only.
@@ -233,6 +267,7 @@ export async function forecastHistory(now = new Date()): Promise<ForecastHistory
       newCustomers: sold.length,
       newMonthly: sold.reduce((s, d) => s + (d.saleAmount ?? 0), 0),
       establishment: sold.reduce((s, d) => s + (d.establishmentFee ?? 0), 0),
+      soldValue: sold.reduce((s, d) => s + (d.establishmentFee ?? 0) + (d.saleAmount ?? 0) * Math.max(1, d.bindingMonths ?? 1), 0),
       customers: billing.length,
       mrr: billing.reduce((s, d) => s + (d.saleAmount ?? 0), 0),
       invoiced: invoices
@@ -251,6 +286,8 @@ export async function forecastHistory(now = new Date()): Promise<ForecastHistory
     open,
     actual,
     hoursPerTour: hours.length >= 3 ? round(avg(hours)!, 1) : null,
+    window: win,
+    monthsOfData,
     today: {
       customers: liveNow.length,
       mrr: liveNow.reduce((s, d) => s + (d.saleAmount ?? 0), 0),
@@ -265,7 +302,7 @@ export async function forecastHistory(now = new Date()): Promise<ForecastHistory
 const planKey = (year: number) => `PLAN_${year}`;
 
 export function emptyPlan(year: number): Plan {
-  return { year, overrides: {}, costs: [], startCash: 0, budgetScenario: "realistisk", locked: null, updatedAt: null, updatedBy: null };
+  return { year, overrides: {}, costs: [], startCash: 0, budgetScenario: "realistisk", locked: null, window: null, salesGoal: 0, updatedAt: null, updatedBy: null };
 }
 
 /** The plan saved for a year - checked again on the way out, whatever is in the database. */
@@ -281,6 +318,8 @@ export async function loadPlan(year: number): Promise<Plan> {
       startCash: typeof raw.startCash === "number" && Number.isFinite(raw.startCash) ? raw.startCash : 0,
       budgetScenario: raw.budgetScenario === "laast" || SCENARIO_KEYS.includes(raw.budgetScenario as ScenarioKey) ? (raw.budgetScenario as ScenarioKey | "laast") : "realistisk",
       locked: raw.locked && Array.isArray(raw.locked.months) ? (raw.locked as LockedForecast) : null,
+      window: HISTORY_WINDOWS.includes(raw.window as (typeof HISTORY_WINDOWS)[number]) ? (raw.window as number) : null,
+      salesGoal: typeof raw.salesGoal === "number" && Number.isFinite(raw.salesGoal) && raw.salesGoal > 0 ? Math.min(1e9, raw.salesGoal) : 0,
       updatedAt: typeof raw.updatedAt === "string" ? raw.updatedAt : null,
       updatedBy: typeof raw.updatedBy === "string" ? raw.updatedBy : null,
     };

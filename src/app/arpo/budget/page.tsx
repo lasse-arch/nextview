@@ -16,7 +16,8 @@ export default async function BudgetPage({ searchParams }: { searchParams: Promi
   const q = await searchParams;
   const years = planYears();
   const year = years.includes(Number(q.aar)) ? Number(q.aar) : defaultPlanYear();
-  const [history, plan] = await Promise.all([forecastHistory(), loadPlan(year)]);
+  const plan = await loadPlan(year);
+  const history = await forecastHistory(new Date(), plan.window ?? undefined);
   const costs = plan.costs.length ? plan.costs : await suggestedCosts();
 
   return (

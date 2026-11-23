@@ -9,7 +9,7 @@ export type SlidesData = {
   year: number;
   lockedBy: string | null;
   today: { customers: number; mrr: number; pipeline: number; open: number; newLastYear: number; meetingsLastYear: number };
-  goal: { revenue: number; newCustomers: number; endCustomers: number; endMrr: number; meetings: number };
+  goal: { soldValue: number; salesGoal: number; revenue: number; newCustomers: number; endCustomers: number; endMrr: number; meetings: number };
   assumptions: Assumptions;
   months: { ym: string; revenue: number; real: boolean }[];
   scenarios: { key: ScenarioKey; revenue: number; newCustomers: number; endMrr: number }[];
@@ -116,10 +116,10 @@ function buildSlides(d: SlidesData): React.ReactNode[] {
     <div key="goal">
       <Kicker>Målet</Kicker>
       <Title>{d.year} i tal</Title>
-      <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Big label="Omsætning" value={krShort(d.goal.revenue)} />
+      <div className="mt-10 grid gap-4 sm:grid-cols-2">
+        <Big label="Solgt for" value={krShort(d.goal.soldValue)} sub={d.goal.salesGoal ? `Mål: ${krShort(d.goal.salesGoal)} om måneden` : `Cirka ${krShort(d.goal.soldValue / 12)} om måneden`} />
+        <Big label="Omsætning i året" value={krShort(d.goal.revenue)} sub="Det, der lander i år. Resten kommer de næste år" />
         <Big label="Nye kunder" value={count(d.goal.newCustomers)} sub={`Cirka ${count(d.goal.newCustomers / 12)} om måneden`} />
-        <Big label="Kunder i december" value={count(d.goal.endCustomers)} />
         <Big label="Månedsbetaling i december" value={krShort(d.goal.endMrr)} sub={`${krShort(d.goal.endMrr * 12)} om året`} />
       </div>
     </div>,

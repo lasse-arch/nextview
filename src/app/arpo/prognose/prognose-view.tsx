@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { useToast } from "@/components/toast";
 import { lockForecast, saveForecastAssumptions, unlockForecast } from "@/lib/actions/forecast";
-import { ASSUMPTION_KEYS, SCENARIOS, SCENARIO_KEYS, forecastYear, yearRows, type Assumptions, type MonthResult, type ScenarioKey } from "@/lib/forecast";
+import { ASSUMPTION_KEYS, SCENARIOS, SCENARIO_KEYS, contractValue, forecastYear, meetingsForSales, yearRows, type Assumptions, type MonthResult, type ScenarioKey } from "@/lib/forecast";
+import { MonthPanel } from "./month-panel";
 import type { ForecastHistory, Plan } from "@/lib/forecast-data";
 import { count, kr, krShort, monthLong, monthShort, ymNow } from "./format";
 
@@ -20,12 +21,19 @@ const FIELDS: Record<keyof Assumptions, { label: string; unit: string; step: num
   daysToSign: { label: "Fra møde til underskrift", unit: "dage", step: 1 },
   daysToLive: { label: "Fra underskrift til live", unit: "dage", step: 1 },
   capacityPerMonth: { label: "Tours vi kan levere pr. måned", unit: "tours", step: 1 },
+  bindingMonths: { label: "Binding pr. ny kunde", unit: "mdr.", step: 1 },
+  priceStepMonth: { label: "Fra måned (1-12)", unit: "", step: 1 },
+  priceStepMonthly: { label: "Månedspris derfra", unit: "kr.", step: 50 },
+  priceStepEstablishment: { label: "Etablering derfra", unit: "kr.", step: 500 },
 };
+const STEP_KEYS = ["priceStepMonth", "priceStepMonthly", "priceStepEstablishment"] as const;
+const MAIN_KEYS = ASSUMPTION_KEYS.filter((k) => !(STEP_KEYS as readonly string[]).includes(k));
+const WINDOWS = [2, 3, 6, 12];
 
 
 const toDraft = (a: Assumptions) => Object.fromEntries(ASSUMPTION_KEYS.map((k) => [k, String(a[k])])) as Record<keyof Assumptions, string>;
 
-export function PrognoseView({ year, years, history, plan, nowIso }: { year: number; years: number[]; history: ForecastHistory; plan: Plan; nowIso: string }) {
+export function PrognoseView({ year, month, years, history, plan, nowIso }: { year: number; month: string | null; years: number[]; history: ForecastHistory; plan: Plan; nowIso: string }) {
   const now = new Date(nowIso);
   const router = useRouter();
   const toast = useToast();
@@ -34,6 +42,7 @@ export function PrognoseView({ year, years, history, plan, nowIso }: { year: num
   const [draft, setDraft] = useState(() => toDraft(saved));
   const [scenario, setScenario] = useState<ScenarioKey>(plan.locked?.scenario ?? "realistisk");
   const [target, setTarget] = useState("");
+  const [goal, setGoal] = useState(plan.salesGoal ? String(plan.salesGoal) : "");
 
   // The draft as numbers - an empty or broken field falls back to Arpo's own figure.
   const assumptions = Object.fromEntries(
@@ -42,7 +51,8 @@ export function PrognoseView({ year, years, history, plan, nowIso }: { year: num
       return [k, Number.isFinite(v) && draft[k].trim() !== "" ? v : history.assumptions[k]];
     }),
   ) as Assumptions;
-  const dirty = ASSUMPTION_KEYS.some((k) => assumptions[k] !== saved[k]);
+  const goalN = Number(goal) || 0;
+  const dirty = ASSUMPTION_KEYS.some((k) => assumptions[k] !== saved[k]) || history.window !== plan.window || goalN !== plan.salesGoal;
   const base = { assumptions, season: history.season, start: history.start, open: history.open, now, year };
   const results = Object.fromEntries(SCENARIO_KEYS.map((s) => [s, forecastYear({ ...base, scenario: s })])) as Record<ScenarioKey, MonthResult[]>;
   const nowYm = ymNow(now);
@@ -51,22 +61,22 @@ export function PrognoseView({ year, years, history, plan, nowIso }: { year: num
   const rowsFor = (s: ScenarioKey) => yearRows(year, nowYm, history.actual, results[s]);
   const totalsFor = (s: ScenarioKey) => {
     const rows = rowsFor(s);
-    const sum = (k: "revenue" | "newCustomers") => rows.reduce((t, r) => t + r[k], 0);
+    const sum = (k: "revenue" | "newCustomers" | "soldValue") => rows.reduce((t, r) => t + r[k], 0);
     const last = rows[rows.length - 1];
-    return { revenue: sum("revenue"), newCustomers: sum("newCustomers"), endCustomers: last?.customers ?? 0, endMrr: last?.mrr ?? 0 };
+    return { revenue: sum("revenue"), newCustomers: sum("newCustomers"), soldValue: sum("soldValue"), endCustomers: last?.customers ?? 0, endMrr: last?.mrr ?? 0 };
   };
 
   function save() {
     const overrides = Object.fromEntries(ASSUMPTION_KEYS.filter((k) => assumptions[k] !== history.assumptions[k]).map((k) => [k, assumptions[k]]));
     start(async () => {
-      const r = await saveForecastAssumptions(year, overrides);
+      const r = await saveForecastAssumptions(year, overrides, { window: history.window, salesGoal: goalN });
       toast(r.ok ? "Gemt - Budget og Min dag regner med de nye tal" : r.error);
       if (r.ok) router.refresh();
     });
   }
   function lock() {
     start(async () => {
-      const r = dirty ? await saveForecastAssumptions(year, Object.fromEntries(ASSUMPTION_KEYS.filter((k) => assumptions[k] !== history.assumptions[k]).map((k) => [k, assumptions[k]]))) : { ok: true as const };
+      const r = dirty ? await saveForecastAssumptions(year, Object.fromEntries(ASSUMPTION_KEYS.filter((k) => assumptions[k] !== history.assumptions[k]).map((k) => [k, assumptions[k]])), { window: history.window, salesGoal: goalN }) : { ok: true as const };
       const l = r.ok ? await lockForecast(year, scenario) : r;
       toast(l.ok ? `Gemt som prognosen for ${year}` : l.error);
       if (l.ok) router.refresh();
@@ -92,6 +102,20 @@ export function PrognoseView({ year, years, history, plan, nowIso }: { year: num
   const perMeeting = (assumptions.closeRate / 100) * assumptions.sellers * assumptions.salesWeeks;
   const neededPerWeek = targetN > 0 && perMeeting > 0 ? targetN / perMeeting : null;
 
+  const deal = contractValue(assumptions.avgMonthly, assumptions.avgEstablishment, assumptions.bindingMonths);
+  const goalMeetings = meetingsForSales(goalN, assumptions);
+  // Links keep the months the numbers are read from.
+  const q = `grundlag=${history.window}`;
+  const cur = new Date(now.getFullYear(), now.getMonth(), 1);
+  const ymAt = (k: number) => ymNow(new Date(cur.getFullYear(), cur.getMonth() + k, 1));
+  const periods: [string, string, boolean][] = [
+    ["Sidste måned", `?maaned=${ymAt(-1)}&${q}`, month === ymAt(-1)],
+    ["Denne måned", `?maaned=${ymAt(0)}&${q}`, month === ymAt(0)],
+    ["Næste måned", `?maaned=${ymAt(1)}&${q}`, month === ymAt(1)],
+    ...years.map((y): [string, string, boolean] => [String(y), `?aar=${y}&${q}`, !month && y === year]),
+  ];
+  const here = month ? `maaned=${month}` : `aar=${year}`;
+
   const locked = plan.locked;
   const lockedRows = locked ? locked.months.filter((m) => m.ym <= nowYm) : [];
 
@@ -106,13 +130,35 @@ export function PrognoseView({ year, years, history, plan, nowIso }: { year: num
           <Link href={`/arpo/prognose/praesentation?aar=${year}`} className="mr-2 rounded-full bg-blue-600 px-3.5 py-1.5 text-sm font-medium text-white hover:bg-blue-700">
             Præsentér planen
           </Link>
-          {years.map((y) => (
-            <Link key={y} href={`?aar=${y}`} className={`rounded-full px-3.5 py-1.5 text-sm font-medium ring-1 ring-inset ${y === year ? "bg-slate-900 text-white ring-slate-900" : "bg-white text-slate-600 ring-slate-200 hover:bg-slate-50"}`}>
-              {y}
+          {periods.map(([label, href, on]) => (
+            <Link key={label} href={href} className={`rounded-full px-3.5 py-1.5 text-sm font-medium ring-1 ring-inset ${on ? "bg-slate-900 text-white ring-slate-900" : "bg-white text-slate-600 ring-slate-200 hover:bg-slate-50"}`}>
+              {label}
             </Link>
           ))}
         </div>
       </div>
+
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm">
+        <span className="font-medium text-slate-700">Tallene bygger på</span>
+        <div className="flex gap-1">
+          {WINDOWS.map((w) => (
+            <Link key={w} href={`?${here}&grundlag=${w}`} className={`rounded-md px-2.5 py-1 text-sm font-medium ${w === history.window ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200"}`}>
+              {w === 12 ? "Seneste år" : `Seneste ${w} mdr.`}
+            </Link>
+          ))}
+        </div>
+        <span className="text-xs text-slate-500">
+          Fra {new Date(now.getFullYear(), now.getMonth() - history.window, now.getDate()).toLocaleDateString("da-DK", { day: "numeric", month: "long" })} til i dag.{" "}
+          {history.window <= 3 ? "Kun de seneste måneder bruges til at regne de næste." : "Vælg kortere, hvis de seneste måneder ligner det, der kommer, bedst."}
+          {history.window !== plan.window && " Tryk Gem tallene for at bruge det i Budget og Min dag."}
+        </span>
+      </div>
+
+      {history.monthsOfData < 6 && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <b>Arpo har kun {history.monthsOfData === 1 ? "1 måneds" : `${history.monthsOfData} måneders`} tal.</b> Det er for lidt til at stole på alene. Sæt jeres egne tal herunder, fx priser, binding og lukkerate, og brug Arpos tal som kontrol.
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Fact label="Kunder der betaler i dag" value={String(history.today.customers)} />
@@ -121,6 +167,10 @@ export function PrognoseView({ year, years, history, plan, nowIso }: { year: num
         <Fact label="Åbne deals i spil" value={String(history.today.open)} sub="Møde holdt, opfølgning eller kontrakt ude" />
       </div>
 
+      {month && <MonthPanel month={month} nowYm={nowYm} history={history} assumptions={assumptions} results={results} locked={plan.locked} />}
+
+      {!month && (
+      <>
       <div className="grid gap-3 md:grid-cols-3">
         {SCENARIO_KEYS.map((s) => {
           const t = totalsFor(s);
@@ -139,6 +189,7 @@ export function PrognoseView({ year, years, history, plan, nowIso }: { year: num
               <div className="mt-0.5 text-xs text-slate-500">{SCENARIOS[s].note}</div>
               <div className="money mt-3 text-2xl font-semibold text-slate-900">{krShort(t.revenue)}</div>
               <div className="text-xs text-slate-500">Omsætning i {year}</div>
+              <div className="money mt-2 text-sm font-medium text-slate-700">Solgt for {krShort(t.soldValue)}</div>
               <dl className="mt-3 grid grid-cols-3 gap-2 text-xs">
                 <div>
                   <dt className="text-slate-500">Nye kunder</dt>
@@ -180,6 +231,8 @@ export function PrognoseView({ year, years, history, plan, nowIso }: { year: num
           ))}
         </div>
       </section>
+      </>
+      )}
 
       <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -196,13 +249,13 @@ export function PrognoseView({ year, years, history, plan, nowIso }: { year: num
             </button>
           </div>
         </div>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          {ASSUMPTION_KEYS.map((k) => {
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
+          {[...MAIN_KEYS, ...STEP_KEYS].map((k) => {
             const f = FIELDS[k];
             const own = assumptions[k] !== history.assumptions[k];
             return (
-              <label key={k} className={`block rounded-lg p-3 ring-1 ring-inset ${own ? "bg-amber-50 ring-amber-200" : "bg-slate-50 ring-slate-200"}`}>
-                <span className="block text-xs font-medium text-slate-700">{f.label}</span>
+              <label key={k} className={`block rounded-lg p-3 ring-1 ring-inset ${own ? "bg-amber-50 ring-amber-200" : (STEP_KEYS as readonly string[]).includes(k) ? "bg-blue-50/60 ring-blue-100" : "bg-slate-50 ring-slate-200"}`}>
+                <span className="block text-xs font-medium text-slate-700">{(STEP_KEYS as readonly string[]).includes(k) ? <span className="text-blue-700">Større aftaler: </span> : null}{f.label}</span>
                 <span className="mt-1.5 flex items-center gap-1.5">
                   <input
                     inputMode="decimal"
@@ -230,6 +283,9 @@ export function PrognoseView({ year, years, history, plan, nowIso }: { year: num
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-slate-100 pt-4 text-sm text-slate-600">
           <span>
+            <b className="font-medium text-slate-900">En ny aftale:</b> {kr(deal)} i alt ({kr(assumptions.avgEstablishment)} i etablering og {kr(assumptions.avgMonthly)} om måneden i {assumptions.bindingMonths} måneder)
+          </span>
+          <span>
             <b className="font-medium text-slate-900">Sæson:</b> {history.seasonFromData ? "Møderne fordeles over året, som jeres møder har gjort de seneste to år." : "Jævnt over året. Der er for lidt historik til at se en sæson endnu."}
           </span>
           {history.hoursPerTour !== null && (
@@ -254,20 +310,36 @@ export function PrognoseView({ year, years, history, plan, nowIso }: { year: num
             <span className="text-slate-400">: skriv et antal.</span>
           )}
         </div>
+        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3 text-sm text-slate-700">
+          For at sælge for
+          <input inputMode="numeric" value={goal} onChange={(e) => setGoal(e.target.value.replace(/[^\d]/g, ""))} placeholder="300000" className="w-28 rounded-md border border-slate-300 px-2 py-1 text-sm" />
+          kr. om måneden
+          {goalMeetings !== null ? (
+            <span>
+              ({count(goalN / deal)} aftaler á {kr(deal)}) skal hver sælger holde <b className="text-slate-900">{count(goalMeetings)} møder om ugen</b>, cirka {count(goalMeetings / 5)} om dagen.
+              {goalN !== plan.salesGoal ? " Gem tallene, så bruger Min dag det som sælgernes mål." : plan.salesGoal ? " Min dag bruger det som sælgernes mål." : ""}
+            </span>
+          ) : (
+            <span className="text-slate-400">: skriv et beløb. Det er kontraktværdi, altså etablering plus månedsbetalingen i hele bindingen.</span>
+          )}
+        </div>
       </section>
 
+      {!month && (
+      <>
       <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <div className="px-5 pt-5">
           <h2 className="text-sm font-semibold text-slate-900">Måned for måned, {SCENARIOS[scenario].label.toLowerCase()}</h2>
           {year === now.getFullYear() && <p className="mt-0.5 text-xs text-slate-500">Måneder, der er gået, viser de faktiske tal. Denne måned er det, der er sket indtil nu, plus prognosen for resten.</p>}
         </div>
         <div className="mt-3 overflow-x-auto">
-          <table className="w-full min-w-[860px] text-sm">
+          <table className="w-full min-w-[960px] text-sm">
             <thead>
               <tr className="border-y border-slate-100 bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                 <th className="px-5 py-2">Måned</th>
                 <th className="px-3 py-2 text-right">Møder</th>
                 <th className="px-3 py-2 text-right">Nye kunder</th>
+                <th className="px-3 py-2 text-right">Solgt for</th>
                 <th className="px-3 py-2 text-right">Ny md.-betaling</th>
                 <th className="px-3 py-2 text-right">Etablering</th>
                 <th className="px-3 py-2 text-right">Kunder</th>
@@ -287,6 +359,7 @@ export function PrognoseView({ year, years, history, plan, nowIso }: { year: num
                   </td>
                   <td className="px-3 py-2 text-right">{count(r.meetings)}</td>
                   <td className="px-3 py-2 text-right">{count(r.newCustomers)}</td>
+                  <td className="money px-3 py-2 text-right">{kr(r.soldValue)}</td>
                   <td className="money px-3 py-2 text-right">{kr(r.newMonthly)}</td>
                   <td className="money px-3 py-2 text-right">{kr(r.establishment)}</td>
                   <td className="px-3 py-2 text-right">{count(r.customers)}</td>
@@ -361,6 +434,9 @@ export function PrognoseView({ year, years, history, plan, nowIso }: { year: num
             <p className="mt-3 text-sm text-slate-500">Sammenligningen starter i januar {year}, når de første faktiske tal kommer.</p>
           ))}
       </section>
+
+      </>
+      )}
 
       <details className="rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-600 shadow-sm">
         <summary className="cursor-pointer font-semibold text-slate-900">Sådan regnes prognosen</summary>

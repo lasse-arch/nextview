@@ -16,14 +16,15 @@ export default async function PlanPresentationPage({ searchParams }: { searchPar
 
   const q = await searchParams;
   const year = planYears().includes(Number(q.aar)) ? Number(q.aar) : defaultPlanYear();
-  const [history, plan] = await Promise.all([forecastHistory(), loadPlan(year)]);
+  const plan = await loadPlan(year);
+  const history = await forecastHistory(new Date(), plan.window ?? undefined);
   const now = new Date();
   const nowYm = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   const scenarios = scenariosFor(history, plan, now);
   const main = plan.locked ? plan.locked.months : scenarios.realistisk;
   const rows = yearRows(year, nowYm, history.actual, main);
   const a = plan.locked?.assumptions ?? mergedAssumptions(history, plan);
-  const sum = (k: "revenue" | "newCustomers" | "meetings") => rows.reduce((s, r) => s + r[k], 0);
+  const sum = (k: "revenue" | "newCustomers" | "meetings" | "soldValue") => rows.reduce((s, r) => s + r[k], 0);
   const last = rows[rows.length - 1];
   const budget = plan.costs.some((c) => c.amount > 0) ? budgetYear(rows, plan.costs, plan.startCash) : null;
   const yearAgo = history.actual.slice(-12);
@@ -36,7 +37,7 @@ export default async function PlanPresentationPage({ searchParams }: { searchPar
       newLastYear: yearAgo.reduce((s, m) => s + m.newCustomers, 0),
       meetingsLastYear: yearAgo.reduce((s, m) => s + m.meetings, 0),
     },
-    goal: { revenue: sum("revenue"), newCustomers: sum("newCustomers"), endCustomers: last?.customers ?? 0, endMrr: last?.mrr ?? 0, meetings: sum("meetings") },
+    goal: { soldValue: sum("soldValue"), salesGoal: plan.salesGoal, revenue: sum("revenue"), newCustomers: sum("newCustomers"), endCustomers: last?.customers ?? 0, endMrr: last?.mrr ?? 0, meetings: sum("meetings") },
     assumptions: a,
     months: rows.map((r) => ({ ym: r.ym, revenue: r.revenue, real: r.kind === "actual" })),
     scenarios: SCENARIO_KEYS.map((k) => {

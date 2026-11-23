@@ -30,6 +30,14 @@ export type Assumptions = {
   daysToLive: number;
   /** Most tours we can film and deliver in a month - 0 = no limit. */
   capacityPerMonth: number;
+  /** Months a new customer is bound - nobody stops before that. */
+  bindingMonths: number;
+  /** Bigger deals from this month of the year (1-12) - 0 = the same prices all year. */
+  priceStepMonth: number;
+  /** The monthly price from then (kr.) - 0 = unchanged. */
+  priceStepMonthly: number;
+  /** The establishment fee from then (kr.) - 0 = unchanged. */
+  priceStepEstablishment: number;
 };
 
 export const ASSUMPTION_KEYS = [
@@ -43,6 +51,10 @@ export const ASSUMPTION_KEYS = [
   "daysToSign",
   "daysToLive",
   "capacityPerMonth",
+  "bindingMonths",
+  "priceStepMonth",
+  "priceStepMonthly",
+  "priceStepEstablishment",
 ] as const satisfies readonly (keyof Assumptions)[];
 
 export const ASSUMPTION_LIMITS: Record<keyof Assumptions, [number, number]> = {
@@ -56,7 +68,14 @@ export const ASSUMPTION_LIMITS: Record<keyof Assumptions, [number, number]> = {
   daysToSign: [0, 365],
   daysToLive: [0, 365],
   capacityPerMonth: [0, 1000],
+  bindingMonths: [0, 120],
+  priceStepMonth: [0, 12],
+  priceStepMonthly: [0, 1_000_000],
+  priceStepEstablishment: [0, 10_000_000],
 };
+
+/** A new customer's whole contract: establishment plus the monthly price over the binding. */
+export const contractValue = (monthly: number, establishment: number, bindingMonths: number) => establishment + monthly * Math.max(1, bindingMonths);
 
 export type ScenarioKey = "forsigtig" | "realistisk" | "ambitios";
 /** The three takes on the same assumptions: what changes in each. */
@@ -74,6 +93,8 @@ export type StartCustomer = {
   liveFrom: string;
   /** Its known last day (notice given, or a fixed term) - null = runs on. */
   endsAt: string | null;
+  /** When its binding runs out - it can't stop before (null = it can). */
+  boundUntil?: string | null;
 };
 /** An open deal (a meeting held, follow-up, contract out) - weighted by how likely it is to be signed. */
 export type OpenDeal = { monthly: number; establishment: number; chance: number };
@@ -85,6 +106,8 @@ export type MonthResult = {
   newCustomers: number;
   newMonthly: number;
   establishment: number;
+  /** "Solgt for": the new contracts' whole value (establishment + the monthly price over the binding). */
+  soldValue: number;
   /** Customers billing at the month's end. */
   customers: number;
   /** Monthly revenue from subscriptions at the month's end. */
@@ -133,7 +156,12 @@ export function forecastYear(input: ForecastInput): MonthResult[] {
   const yearlyMeetings = a.sellers * a.meetingsPerSellerWeek * a.salesWeeks * sc.meetings;
   const close = Math.min(1, (a.closeRate / 100) * sc.close);
   const monthlyChurn = 1 - Math.pow(1 - Math.min(0.99, (a.churnPerYear / 100) * sc.churn), 1 / 12);
+  const binding = Math.max(0, Math.round(a.bindingMonths || 0));
   const span = endIdx - startIdx + 1;
+  // The prices a deal signed in month `idx` gets: bigger from the step month of the year on.
+  const stepIdx = a.priceStepMonth > 0 ? year * 12 + a.priceStepMonth - 1 : Infinity;
+  const priceAt = (idx: number) =>
+    idx >= stepIdx ? { monthly: a.priceStepMonthly || a.avgMonthly, est: a.priceStepEstablishment || a.avgEstablishment } : { monthly: a.avgMonthly, est: a.avgEstablishment };
 
   // What's left of the current month (the meetings already held are history).
   const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
@@ -156,9 +184,10 @@ export function forecastYear(input: ForecastInput): MonthResult[] {
     const at = t + signLag;
     if (at < span) {
       const n = meetings[t] * close;
+      const p = priceAt(startIdx + at);
       signed[at].n += n;
-      signed[at].monthly += n * a.avgMonthly;
-      signed[at].est += n * a.avgEstablishment;
+      signed[at].monthly += n * p.monthly;
+      signed[at].est += n * p.est;
     }
   }
 
@@ -177,33 +206,37 @@ export function forecastYear(input: ForecastInput): MonthResult[] {
     queue = { n: queue.n - take, monthly: queue.monthly * (1 - share) };
   }
 
-  // Today's customers month by month: known ends drop out, the rest wear down at the churn rate.
+  // Today's customers: known ends drop out; the rest wear down at the churn rate - but only once their binding has run out.
   const startAt = input.start.map((c) => ({
     monthly: c.monthly,
     from: monthIndex(new Date(c.liveFrom)),
     to: c.endsAt ? monthIndex(new Date(c.endsAt)) : Infinity,
     known: Boolean(c.endsAt),
+    free: c.boundUntil ? monthIndex(new Date(c.boundUntil)) : startIdx,
   }));
+  const wear = (months: number) => Math.pow(1 - monthlyChurn, Math.max(0, months));
 
   const out: MonthResult[] = [];
-  let newBase = { n: 0, monthly: 0 };
   for (let t = 0; t < span; t++) {
     const idx = startIdx + t;
-    const survive = Math.pow(1 - monthlyChurn, t);
     let customers = 0;
     let mrr = 0;
     let startingNow = 0;
     for (const c of startAt) {
       if (c.from > idx || c.to < idx) continue;
-      const w = c.known ? 1 : survive;
+      const w = c.known ? 1 : wear(idx - Math.max(startIdx, c.free));
       customers += w;
       mrr += w * c.monthly;
       if (c.from === idx) startingNow += w * c.monthly;
     }
-    newBase = { n: newBase.n + lives[t].n, monthly: newBase.monthly + lives[t].monthly };
-    customers += newBase.n;
-    mrr += newBase.monthly;
-    startingNow += lives[t].monthly;
+    // New customers, cohort by cohort: bound for `binding` months, then the churn rate.
+    for (let k = 0; k <= t; k++) {
+      if (!lives[k].n) continue;
+      const w = wear(t - k - binding);
+      customers += lives[k].n * w;
+      mrr += lives[k].monthly * w;
+      if (k === t) startingNow += lives[k].monthly;
+    }
 
     // Money in: a quarter's subscriptions at its start; a customer starting mid-quarter pays the rest of it at once.
     const month = idx % 12;
@@ -219,6 +252,7 @@ export function forecastYear(input: ForecastInput): MonthResult[] {
         newCustomers: signed[t].n,
         newMonthly: signed[t].monthly,
         establishment: signed[t].est,
+        soldValue: signed[t].est + signed[t].monthly * Math.max(1, binding),
         customers,
         mrr,
         revenue: mrr + signed[t].est,
@@ -230,7 +264,7 @@ export function forecastYear(input: ForecastInput): MonthResult[] {
 }
 
 /** A month as it really was (lib/forecast-data.ts). */
-export type ActualMonth = { ym: string; meetings: number; newCustomers: number; newMonthly: number; establishment: number; customers: number; mrr: number; invoiced: number };
+export type ActualMonth = { ym: string; meetings: number; newCustomers: number; newMonthly: number; establishment: number; soldValue: number; customers: number; mrr: number; invoiced: number };
 export type YearRow = MonthResult & { kind: "actual" | "now" | "forecast" };
 
 /**
@@ -245,7 +279,7 @@ export function yearRows(year: number, nowYm: string, actual: ActualMonth[], for
   return Array.from({ length: 12 }, (_, i) => `${year}-${String(i + 1).padStart(2, "0")}`).flatMap((ym): YearRow[] => {
     const a = actualByYm.get(ym);
     const f = byYm.get(ym);
-    const real = (x: ActualMonth) => ({ ym, meetings: x.meetings, newCustomers: x.newCustomers, newMonthly: x.newMonthly, establishment: x.establishment, customers: x.customers, mrr: x.mrr });
+    const real = (x: ActualMonth) => ({ ym, meetings: x.meetings, newCustomers: x.newCustomers, newMonthly: x.newMonthly, establishment: x.establishment, soldValue: x.soldValue, customers: x.customers, mrr: x.mrr });
     if (ym < nowYm) return a ? [{ ...real(a), kind: "actual", revenue: a.mrr + a.establishment, cashIn: a.invoiced }] : [];
     if (!f) return [];
     if (ym === nowYm && a)
@@ -257,6 +291,7 @@ export function yearRows(year: number, nowYm: string, actual: ActualMonth[], for
           newCustomers: a.newCustomers + f.newCustomers,
           newMonthly: a.newMonthly + f.newMonthly,
           establishment: a.establishment + f.establishment,
+          soldValue: a.soldValue + f.soldValue,
           customers: f.customers,
           mrr: f.mrr,
           revenue: f.revenue + a.establishment,
@@ -267,7 +302,7 @@ export function yearRows(year: number, nowYm: string, actual: ActualMonth[], for
   });
 }
 
-export type Totals = { meetings: number; newCustomers: number; newMonthly: number; establishment: number; revenue: number; cashIn: number; endMrr: number; endCustomers: number };
+export type Totals = { meetings: number; newCustomers: number; newMonthly: number; establishment: number; soldValue: number; revenue: number; cashIn: number; endMrr: number; endCustomers: number };
 export function totalsOf(months: MonthResult[]): Totals {
   const sum = (k: keyof MonthResult) => months.reduce((s, m) => s + (m[k] as number), 0);
   const last = months[months.length - 1];
@@ -276,6 +311,7 @@ export function totalsOf(months: MonthResult[]): Totals {
     newCustomers: sum("newCustomers"),
     newMonthly: sum("newMonthly"),
     establishment: sum("establishment"),
+    soldValue: sum("soldValue"),
     revenue: sum("revenue"),
     cashIn: sum("cashIn"),
     endMrr: last?.mrr ?? 0,
@@ -382,4 +418,44 @@ export function cleanCostLines(raw: unknown): CostLine[] {
       },
     ];
   });
+}
+
+/* ------------------------------------------------------------ one past month */
+
+export type MonthCheck = { meetings: number; newCustomers: number; soldValue: number; establishment: number; revenue: number; mrr: number };
+
+/**
+ * A month that is over, seen from the model: what its meetings should have
+ * given with today's assumptions (the meetings `daysToSign` before it, times
+ * the close rate) - to hold up against what really happened.
+ */
+export function backcastMonth(ym: string, actual: ActualMonth[], a: Assumptions): MonthCheck | null {
+  const byYm = new Map(actual.map((m) => [m.ym, m]));
+  const [y, m] = ym.split("-").map(Number);
+  const shift = (k: number) => {
+    const d = new Date(y, m - 1 - k, 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  };
+  const here = byYm.get(ym);
+  if (!here) return null;
+  const lag = Math.max(0, Math.round(a.daysToSign / DAYS_PER_MONTH));
+  const basis = byYm.get(shift(lag))?.meetings ?? 0;
+  const before = byYm.get(shift(1))?.mrr ?? here.mrr;
+  const n = basis * (a.closeRate / 100);
+  return {
+    meetings: basis,
+    newCustomers: n,
+    soldValue: n * contractValue(a.avgMonthly, a.avgEstablishment, a.bindingMonths),
+    establishment: n * a.avgEstablishment,
+    mrr: before,
+    revenue: before + n * a.avgEstablishment,
+  };
+}
+
+/** Meetings per seller per week needed to sell for `goalPerMonth` kr. (contract value) a month. */
+export function meetingsForSales(goalPerMonth: number, a: Assumptions): number | null {
+  const perDeal = contractValue(a.avgMonthly, a.avgEstablishment, a.bindingMonths);
+  const perMeeting = (a.closeRate / 100) * perDeal;
+  if (!(goalPerMonth > 0) || perMeeting <= 0 || a.sellers <= 0 || a.salesWeeks <= 0) return null;
+  return (goalPerMonth * 12) / perMeeting / a.sellers / a.salesWeeks;
 }

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
 import { SCENARIO_KEYS, cleanAssumptions, cleanCostLines, type ScenarioKey } from "@/lib/forecast";
-import { forecastHistory, loadPlan, mergedAssumptions, planYears, savePlan, scenariosFor } from "@/lib/forecast-data";
+import { HISTORY_WINDOWS, forecastHistory, loadPlan, mergedAssumptions, planYears, savePlan, scenariosFor } from "@/lib/forecast-data";
 
 /*
  * Prognose and Budget's saving - admins only (the company's money and plans).
@@ -28,12 +28,15 @@ function refresh() {
   revalidatePath("/arpo/min-dag");
 }
 
-/** "Gem tallene": the assumptions set by hand (the rest follow Arpo's history). */
-export async function saveForecastAssumptions(year: number, overrides: unknown): Promise<Result> {
+/** "Gem tallene": the assumptions set by hand (the rest follow Arpo's history), the months they're read from and the sales goal. */
+export async function saveForecastAssumptions(year: number, overrides: unknown, extra?: { window?: unknown; salesGoal?: unknown }): Promise<Result> {
   const who = await adminFor(year);
   if ("error" in who) return { ok: false, error: who.error };
   const plan = await loadPlan(who.year);
-  await savePlan({ ...plan, overrides: cleanAssumptions(overrides), updatedAt: new Date().toISOString(), updatedBy: who.name });
+  const window = HISTORY_WINDOWS.includes(Number(extra?.window) as (typeof HISTORY_WINDOWS)[number]) ? Number(extra!.window) : plan.window;
+  const goal = Number(extra?.salesGoal);
+  const salesGoal = extra && "salesGoal" in extra ? (Number.isFinite(goal) && goal > 0 ? Math.min(1e9, Math.round(goal)) : 0) : plan.salesGoal;
+  await savePlan({ ...plan, overrides: cleanAssumptions(overrides), window, salesGoal, updatedAt: new Date().toISOString(), updatedBy: who.name });
   refresh();
   return { ok: true };
 }
@@ -43,7 +46,8 @@ export async function lockForecast(year: number, scenario: string): Promise<Resu
   const who = await adminFor(year);
   if ("error" in who) return { ok: false, error: who.error };
   if (!SCENARIO_KEYS.includes(scenario as ScenarioKey)) return { ok: false, error: "Ukendt scenarie." };
-  const [history, plan] = await Promise.all([forecastHistory(), loadPlan(who.year)]);
+  const plan = await loadPlan(who.year);
+  const history = await forecastHistory(new Date(), plan.window ?? undefined);
   const months = scenariosFor(history, plan)[scenario as ScenarioKey];
   if (!months.length) return { ok: false, error: "Året er gået - der er intet at gemme en prognose for." };
   await savePlan({

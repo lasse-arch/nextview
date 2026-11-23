@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { dealName } from "@/lib/labels";
 import { forecastHistory, loadPlan, mergedAssumptions } from "@/lib/forecast-data";
 import { goalPeriodEnd } from "@/lib/goals-data";
+import { meetingsForSales } from "@/lib/forecast";
 
 /*
  * Min dag: one seller's day - only their own deals, meetings and tasks (the
@@ -101,9 +102,14 @@ export async function myDay(user: { id: string; name: string; role: string }, no
     target = { perDay: left / days, perWeek: Math.min(left, (left / days) * 5), source: `Dit mål: ${goal.targetValue} møder, ${left} tilbage` };
   }
   if (!target) {
-    const [history, plan] = await Promise.all([forecastHistory(now), loadPlan(now.getFullYear())]);
+    const plan = await loadPlan(now.getFullYear());
+    const history = await forecastHistory(now, plan.window ?? undefined);
     const a = mergedAssumptions(history, plan);
-    target = { perDay: a.meetingsPerSellerWeek / 5, perWeek: a.meetingsPerSellerWeek, source: `Årets plan: ${a.meetingsPerSellerWeek.toLocaleString("da-DK")} møder om ugen pr. sælger` };
+    // A sales goal in kroner: the meetings it takes, worked back with the close rate and the deal size.
+    const forGoal = plan.salesGoal ? meetingsForSales(plan.salesGoal, a) : null;
+    target = forGoal
+      ? { perDay: forGoal / 5, perWeek: forGoal, source: `Salgsmålet: solgt for ${plan.salesGoal.toLocaleString("da-DK")} kr. om måneden` }
+      : { perDay: a.meetingsPerSellerWeek / 5, perWeek: a.meetingsPerSellerWeek, source: `Årets plan: ${a.meetingsPerSellerWeek.toLocaleString("da-DK")} møder om ugen pr. sælger` };
   }
 
   const hhmm = (d: Date) => `${String(d.getUTCHours()).padStart(2, "0")}.${String(d.getUTCMinutes()).padStart(2, "0")}`;
