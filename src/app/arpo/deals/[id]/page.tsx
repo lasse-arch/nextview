@@ -68,6 +68,7 @@ import { InvoiceLabelTooltip } from "./invoice-label-tooltip";
 import { MarkSentManuallyButton } from "./mark-sent-manually-button";
 import { MarkPeriodSentManuallyButton } from "./mark-period-sent-manually-button";
 import { CheckPaymentButton } from "./check-payment-button";
+import { ResendEInvoiceButton } from "./resend-einvoice-button";
 import { CreditInvoiceButton } from "./credit-invoice-button";
 import { MarkInvoicePaidButton } from "./mark-invoice-paid-button";
 import { CustomerReportSection } from "./customer-report-section";
@@ -740,6 +741,9 @@ export default async function DealDetailPage({
                       )}
                       {currentUser?.role === "ADMIN" && !inv.paidAt && inv.dineroInvoiceGuid && !inv.dineroInvoiceGuid.startsWith("TEST-") && (
                         <CheckPaymentButton invoiceId={inv.id} />
+                      )}
+                      {currentUser?.role === "ADMIN" && deal.eanNumber && !inv.sentAt && inv.failureReason?.startsWith("Oprettet, men ikke sendt") && inv.dineroInvoiceGuid && !inv.dineroInvoiceGuid.startsWith("TEST-") && (
+                        <ResendEInvoiceButton invoiceId={inv.id} />
                       )}
                       {currentUser?.role === "ADMIN" && <MarkInvoicePaidButton invoiceId={inv.id} paid={Boolean(inv.paidAt)} />}
                       {currentUser?.role === "ADMIN" && <DeleteInvoiceButton invoiceId={inv.id} />}

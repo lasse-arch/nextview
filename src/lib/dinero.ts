@@ -146,6 +146,9 @@ function contactBody(input: DineroContactInput) {
     CountryKey: "DK",
     IsPerson: false,
     EanNumber: input.ean || undefined,
+    // An EAN customer gets e-invoices on its EAN ("E-faktura modtagertype" in Dinero's screen) - without it Dinero
+    // refuses the e-invoice ("receiverCanNotReceiveEReminder").
+    InvoiceMailOutOptionKey: input.ean ? "GLN" : undefined,
     AttPerson: input.attPerson || undefined,
     PaymentConditionType: "Netto",
     PaymentConditionNumberOfDays: 8,
@@ -180,14 +183,16 @@ async function createContact(accessToken: string, input: DineroContactInput): Pr
 async function updateContact(accessToken: string, contactGuid: string, input: DineroContactInput): Promise<void> {
   const orgId = process.env.DINERO_ORGANIZATION_ID!;
   const body = contactBody(input);
-  // Nothing changed: the contact is left alone. Settings only made in Dinero's own screen - the e-invoice receiver
-  // type an EAN contact gets when it is saved there (not in Dinero's API) - are then never at risk of being reset.
+  // Nothing changed: the contact is left alone (the e-invoice receiver type, InvoiceMailOutOptionKey, is compared too).
   const now = await dineroFetch(`${DINERO_API_BASE}/${orgId}/contacts/${contactGuid}`, { headers: { Authorization: `Bearer ${accessToken}` } }).catch(() => null);
   if (now?.ok) {
     const cur = (await now.json().catch(() => null)) as Record<string, unknown> | null;
     const same = (a: unknown, b: unknown) => String(a ?? "").trim().toLowerCase() === String(b ?? "").trim().toLowerCase();
     const keys = ["Name", "VatNumber", "Email", "Phone", "Street", "ZipCode", "City", "EanNumber", "AttPerson"] as const;
-    if (cur && keys.every((k) => same(cur[k], body[k]))) return;
+    // A receiver type set by hand in Dinero is kept - only an EAN contact without one gets "GLN".
+    const typeOk = !body.InvoiceMailOutOptionKey || Boolean(cur?.InvoiceMailOutOptionKey);
+    if (cur && typeOk && keys.every((k) => same(cur[k], body[k]))) return;
+    if (cur?.InvoiceMailOutOptionKey && body.InvoiceMailOutOptionKey) body.InvoiceMailOutOptionKey = String(cur.InvoiceMailOutOptionKey);
   }
 
   const res = await dineroFetch(`${DINERO_API_BASE}/${orgId}/contacts/${contactGuid}`, {
@@ -526,13 +531,34 @@ async function bookAndSendInvoice(
 }
 
 /**
+ * Gives the contact on an invoice the e-invoice receiver type EAN ("GLN"),
+ * with the EAN - everything else on the contact as it is. True when done.
+ */
+async function setEanReceiverType(accessToken: string, invoiceGuid: string, eanNumber: string): Promise<boolean> {
+  const orgId = process.env.DINERO_ORGANIZATION_ID!;
+  const auth = { Authorization: `Bearer ${accessToken}` };
+  const inv = await dineroFetch(`${DINERO_API_BASE}/${orgId}/invoices/${invoiceGuid}`, { headers: auth }).catch(() => null);
+  const contactGuid = inv?.ok ? ((await inv.json().catch(() => null)) as { ContactGuid?: string } | null)?.ContactGuid : null;
+  if (!contactGuid) return false;
+  const res = await dineroFetch(`${DINERO_API_BASE}/${orgId}/contacts/${contactGuid}`, { headers: auth }).catch(() => null);
+  const cur = res?.ok ? ((await res.json().catch(() => null)) as Record<string, unknown> | null) : null;
+  if (!cur) return false;
+  const keep = ["ExternalReference", "Name", "Street", "ZipCode", "City", "CountryKey", "Phone", "Email", "Webpage", "AttPerson", "VatNumber", "SENumber", "PNumber", "PaymentConditionType", "PaymentConditionNumberOfDays", "IsPerson", "IsMember", "MemberNumber", "UseCvr", "CompanyTypeKey", "PreferredInvoiceLanguageKey", "PreferredInvoiceCurrencyKey"];
+  const body: Record<string, unknown> = Object.fromEntries(keep.filter((k) => cur[k] !== undefined).map((k) => [k, cur[k]]));
+  body.EanNumber = cur.EanNumber || eanNumber;
+  body.InvoiceMailOutOptionKey = "GLN";
+  const put = await dineroFetch(`${DINERO_API_BASE}/${orgId}/contacts/${contactGuid}`, { method: "PUT", headers: { ...auth, "Content-Type": "application/json" }, body: JSON.stringify(body) }).catch(() => null);
+  return Boolean(put?.ok);
+}
+
+/**
  * Sends a booked invoice as an e-invoice (OIOUBL via NemHandel) to the EAN
  * number on its contact - POST /v3/{org}/invoices/{guid}/e-invoice, per
  * Dinero's OpenAPI spec. The payment means is the FI code ("FIK", +71 - the
  * organization has FI payment codes on), so the payment is matched
  * automatically; if Dinero refuses that, plain bank transfer ("Domestic").
  */
-async function sendEInvoice(accessToken: string, invoiceGuid: string, eanNumber: string): Promise<void> {
+async function sendEInvoice(accessToken: string, invoiceGuid: string, eanNumber: string, healed = false): Promise<void> {
   const orgId = process.env.DINERO_ORGANIZATION_ID!;
   let lastError = "";
   for (const paymentMean of ["FIK", "Domestic"]) {
@@ -545,7 +571,10 @@ async function sendEInvoice(accessToken: string, invoiceGuid: string, eanNumber:
     lastError = `${res.status}: ${await res.text()}`;
     if (res.status !== 400) break;
   }
-  // The contact has the EAN but no e-invoice receiver type - set in Dinero's own screen (not in its API).
+  // The contact has the EAN but no e-invoice receiver type: set it to EAN (GLN) on the invoice's contact, and try once more.
+  if (lastError.includes("receiverCanNotReceiveEReminder") && !healed && (await setEanReceiverType(accessToken, invoiceGuid, eanNumber))) {
+    return sendEInvoice(accessToken, invoiceGuid, eanNumber, true);
+  }
   if (lastError.includes("receiverCanNotReceiveEReminder")) {
     throw new Error(
       `Kontakten i Dinero har EAN ${eanNumber}, men ingen e-faktura-modtagertype. Åbn kontakten i Dinero, redigér den, så modtagertypen (EAN) er valgt, og gem - send så fakturaen som e-faktura i Dinero. Så går det normalt af sig selv næste gang.`
@@ -596,6 +625,12 @@ export async function getInvoicePaymentStatus(
   const status = data.PaymentStatus ?? data.Status ?? null;
   const paid = status === "Paid" || status === "OverPaid";
   return { paid, paidDate: null, rawStatus: status };
+}
+
+/** "Send som e-faktura": a booked invoice that wasn't sent sent again as an e-invoice (the receiver type fixed on the way). */
+export async function resendEInvoice(invoiceGuid: string, eanNumber: string): Promise<void> {
+  const accessToken = await getAccessToken();
+  await sendEInvoice(accessToken, invoiceGuid, eanNumber);
 }
 
 /** Health: can Arpo log in to Dinero right now (one token request, nothing else). */

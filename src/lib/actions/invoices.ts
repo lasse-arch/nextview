@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { creditInvoiceInDinero, deleteTestModeDraft, TEST_DRAFT_PREFIX } from "@/lib/dinero";
+import { creditInvoiceInDinero, deleteTestModeDraft, resendEInvoice, TEST_DRAFT_PREFIX } from "@/lib/dinero";
 import { formatDKK } from "@/lib/labels";
 import {
   runQuarterlyInvoiceGeneration,
@@ -276,4 +276,23 @@ export async function creditInvoiceAction(
   revalidatePath(`/arpo/deals/${inv.deal.id}`);
   revalidatePath(`/arpo/kunder/${inv.deal.id}`);
   return { ok: true, number: r.number, sendError: r.sendError };
+}
+
+/** "Send som e-faktura": an EAN customer's invoice that Dinero refused to send - sent again (admin only). */
+export async function resendEInvoiceAction(invoiceId: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const user = await requireUser();
+  if (user.role !== "ADMIN") return { ok: false, error: "Kun admin kan sende fakturaer." };
+  const inv = await prisma.invoice.findUnique({ where: { id: String(invoiceId) }, select: { dealId: true, dineroInvoiceGuid: true, sentAt: true, deal: { select: { eanNumber: true } } } });
+  if (!inv?.dineroInvoiceGuid || inv.dineroInvoiceGuid.startsWith("TEST-")) return { ok: false, error: "Fakturaen findes ikke i Dinero." };
+  if (!inv.deal.eanNumber) return { ok: false, error: "Kunden har intet EAN-nummer." };
+  if (inv.sentAt) return { ok: false, error: "Fakturaen er allerede sendt." };
+  try {
+    await resendEInvoice(inv.dineroInvoiceGuid, inv.deal.eanNumber);
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Den kunne ikke sendes." };
+  }
+  await prisma.invoice.update({ where: { id: String(invoiceId) }, data: { sentAt: new Date(), failureReason: null } });
+  revalidatePath(`/arpo/deals/${inv.dealId}`);
+  revalidatePath("/arpo/settings/dinero");
+  return { ok: true };
 }
