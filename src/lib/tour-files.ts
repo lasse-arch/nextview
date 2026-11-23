@@ -34,6 +34,8 @@ const EXT: Record<string, string> = {
   "audio/x-m4a": "m4a",
   "audio/wav": "wav",
   "audio/x-wav": "wav",
+  // A document sent to nextviewAI in the editor's chat (e.g. a customer's list of corrections) - read, not shown in the tour.
+  "application/pdf": "pdf",
 };
 export const ALLOWED_TYPES = Object.keys(EXT);
 

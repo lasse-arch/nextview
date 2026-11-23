@@ -2023,8 +2023,22 @@ function ClaudePanel({
   const files = useContext(FilesContext);
   const [dragging, setDragging] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
+  /** PDFs to send with the next message (a customer's corrections …) - nextviewAI reads them. At most 3, 20 MB each. */
+  const [docs, setDocs] = useState<{ url: string; name: string }[]>([]);
   async function addImages(list: Iterable<File>) {
-    const pics = [...list].filter((f) => f.type.startsWith("image/")).slice(0, Math.max(0, MAX_CHAT_IMAGES - images.length - uploading));
+    const all = [...list];
+    const pdfs = all.filter((f) => f.type === "application/pdf").slice(0, Math.max(0, 3 - docs.length));
+    for (const f of pdfs) {
+      if (f.size > 20_000_000) {
+        setUploadError(`${f.name} er over 20 MB.`);
+        continue;
+      }
+      setUploading((n) => n + 1);
+      const url = await uploadToTour(files.slug, f, files.blob).catch((err: unknown) => (setUploadError(`${f.name} kunne ikke uploades (${err instanceof Error ? err.message : err}).`), null));
+      setUploading((n) => n - 1);
+      if (url) setDocs((d) => [...d, { url, name: f.name }].slice(0, 3));
+    }
+    const pics = all.filter((f) => f.type.startsWith("image/")).slice(0, Math.max(0, MAX_CHAT_IMAGES - images.length - uploading));
     if (!pics.length) return;
     setUploadError(null);
     setUploading((n) => n + pics.length);
@@ -2054,7 +2068,8 @@ function ClaudePanel({
 
   function send(request: string) {
     const pics = images;
-    const ask = request.trim() || (pics.length ? (pics.length === 1 ? "Se billedet" : "Se billederne") : "");
+    const sentDocs = docs;
+    const ask = request.trim() || (sentDocs.length ? "Lav rettelserne fra PDF'en" : pics.length ? (pics.length === 1 ? "Se billedet" : "Se billederne") : "");
     if (!ask || pending || uploading) return;
     const history: ChatTurn[] = chat
       .filter((m) => !m.error)
@@ -2064,9 +2079,10 @@ function ClaudePanel({
           ? `${m.text}\n(${m.images.length === 1 ? "sendte et billede" : `sendte ${m.images.length} billeder`}${m.imageUrls?.length ? ` - gemt hos os, brug adresserne direkte i opsætningen: ${m.imageUrls.map((u, i) => `Billede ${i + 1}: ${u}`).join(", ")}` : ""})`
           : m.text,
       }));
-    setChat((c) => [...c, { role: "user", text: ask, images: pics.length ? pics : undefined }]);
+    setChat((c) => [...c, { role: "user", text: sentDocs.length ? `${ask}\n📄 ${sentDocs.map((d) => d.name).join(", ")}` : ask, images: pics.length ? pics : undefined }]);
     setText("");
     setImages([]);
+    setDocs([]);
     const before = config;
     const id = ++runRef.current;
     setWaiting({ id, text: request, images: pics });
@@ -2079,7 +2095,7 @@ function ClaudePanel({
       const here = preview ? await Promise.race([preview.view().catch(() => null), new Promise<null>((r) => setTimeout(() => r(null), 2500))]) : null;
       const at = here?.href ? `\n\n(Forhåndsvisningen står lige nu her: ${here.room ? `"${here.room}", ` : ""}linket ${here.href} - med den retning, den kigger. Siger brugeren "her", "det jeg ser" eller "som i forhåndsvisningen", er det dette sted.)` : "";
       const sent = (named.length ? `${ask}\n\n(@-henvisninger: ${named.map((t) => `@${t.label} = ${t.kind.toLowerCase()} med linket ${t.href}`).join("; ")})` : ask) + at;
-      const r = await askClaudeForTour(config, history, sent, pics).catch((err: unknown) => ({ ok: false as const, error: `Kunne ikke nå nextviewAI (${err instanceof Error ? err.message : err}) - prøv igen.` }));
+      const r = await askClaudeForTour(config, history, sent, pics, sentDocs.map((d) => d.url)).catch((err: unknown) => ({ ok: false as const, error: `Kunne ikke nå nextviewAI (${err instanceof Error ? err.message : err}) - prøv igen.` }));
       if (!live()) return;
       setWaiting(null);
       if (!r.ok) {
@@ -2293,7 +2309,7 @@ function ClaudePanel({
         }}
       >
         {(uploading > 0 || uploadError) && (
-          <p className={`px-2 pb-1 text-[12px] ${uploadError ? "text-[#ff3b30]" : "text-[#6e6e73]"}`}>{uploading > 0 ? `Uploader ${uploading} ${uploading === 1 ? "billede" : "billeder"}…` : uploadError}</p>
+          <p className={`px-2 pb-1 text-[12px] ${uploadError ? "text-[#ff3b30]" : "text-[#6e6e73]"}`}>{uploading > 0 ? `Uploader ${uploading} ${uploading === 1 ? "fil" : "filer"}…` : uploadError}</p>
         )}
         {images.length > 0 && (
           <div className="flex max-h-40 flex-wrap gap-1.5 overflow-y-auto px-1 pb-1.5 pt-0.5">
@@ -2307,6 +2323,19 @@ function ClaudePanel({
                   onClick={() => setImages((now) => now.filter((_, j) => j !== i))}
                   className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-[#1d1d1f] text-[12px] leading-none text-white"
                 >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+        {docs.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 px-1 pb-1.5 pt-0.5">
+            {docs.map((d, i) => (
+              <span key={d.url} className="flex items-center gap-1.5 rounded-lg bg-[#f2f2f7] py-1 pl-2 pr-1 text-[12.5px] ring-1 ring-black/[.06]">
+                <span aria-hidden>📄</span>
+                <span className="max-w-[200px] truncate">{d.name}</span>
+                <button type="button" aria-label="Fjern PDF'en" onClick={() => setDocs((now) => now.filter((_, j) => j !== i))} className="flex h-5 w-5 items-center justify-center rounded-full text-[13px] text-[#6e6e73] hover:bg-black/10">
                   ×
                 </button>
               </span>
@@ -2346,13 +2375,13 @@ function ClaudePanel({
               send(text);
             }
           }}
-          placeholder="Beskriv en ændring… (@ for et sted i touren - indsæt eller træk et billede ind)"
+          placeholder="Beskriv en ændring… (@ for et sted i touren - indsæt eller træk et billede eller en PDF ind)"
           className="block w-full resize-none border-0 bg-transparent px-2 py-1 text-[15px] placeholder:text-[#8e8e93] focus:outline-none focus:ring-0"
         />
         <div className="flex items-center justify-between gap-2 px-1">
           <button
             type="button"
-            title="Send billeder med (fx skærmbilleder eller fotos til touren - op til 30)"
+            title="Send billeder eller en PDF med (fx skærmbilleder, fotos til touren eller kundens rettelser)"
             aria-label="Vedhæft billede"
             disabled={images.length + uploading >= MAX_CHAT_IMAGES}
             onClick={() => fileInput.current?.click()}
@@ -2363,7 +2392,7 @@ function ClaudePanel({
           <input
             ref={fileInput}
             type="file"
-            accept="image/*"
+            accept="image/*,application/pdf"
             multiple
             className="hidden"
             onChange={(e) => {
@@ -2377,7 +2406,7 @@ function ClaudePanel({
               <span className="block h-2.5 w-2.5 rounded-[2px] bg-white" />
             </button>
           ) : (
-            <button type="submit" disabled={uploading > 0 || (!text.trim() && !images.length)} aria-label="Send" className="flex h-8 w-8 items-center justify-center rounded-full bg-[#d97757] text-white transition hover:bg-[#c96442] disabled:bg-[#e9e9eb] disabled:text-[#8e8e93]">
+            <button type="submit" disabled={uploading > 0 || (!text.trim() && !images.length && !docs.length)} aria-label="Send" className="flex h-8 w-8 items-center justify-center rounded-full bg-[#d97757] text-white transition hover:bg-[#c96442] disabled:bg-[#e9e9eb] disabled:text-[#8e8e93]">
               <Icon d='<path d="M12 19V5M5 12l7-7 7 7"/>' className="h-4 w-4" />
             </button>
           )}

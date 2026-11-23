@@ -22,7 +22,7 @@ import { measureSiteLook } from "@/lib/site-look";
 import { darker } from "@/app/arpo/tour-lab/tours/contrast";
 import { pageAsText, readUnits, type LiveUnit } from "@/lib/availability/live";
 import { hostFiles, hostNewFiles } from "@/lib/tour-files";
-import { measureLogo, withMeasuredLogo, type LogoFix } from "@/lib/logo-fix";
+import { bytesOf, measureLogo, withMeasuredLogo, type LogoFix } from "@/lib/logo-fix";
 import { cropPhoto, type PhotoCrop } from "@/lib/photo-crop";
 import { claudeCostUsd } from "@/lib/claude-cost";
 import { allGuides, guideStops, isPlaceHref, withoutDeadAerialLinks } from "@/app/arpo/tour-lab/tours/places";
@@ -249,12 +249,12 @@ async function remember(slug: string, by: string, notes: { scope: "all" | "tour"
 }
 
 /** Asks nextviewAI for edits to a setup and applies them to a copy. `pdfs`: documents (by address) it reads along with the request. */
-async function claudeEdits(key: string, who: { name: string; kind: string }, config: TourConfig, history: ChatTurn[], request: string, maxTokens = 16000, retry = true, pdfs: string[] = [], images: string[] = []): Promise<AiEditResult> {
+async function claudeEdits(key: string, who: { name: string; kind: string }, config: TourConfig, history: ChatTurn[], request: string, maxTokens = 16000, retry = true, pdfs: (string | { data: string })[] = [], images: string[] = []): Promise<AiEditResult> {
   const mem = await memories(config.slug);
   const text = `Opsætningen lige nu:\n\`\`\`json\n${JSON.stringify(config)}\n\`\`\`\n\n${mem.tour ? `<hukommelse om denne kunde>\n${mem.tour}\n</hukommelse>\n\n` : ""}${request}`;
   const messages: Anthropic.MessageParam[] = [
     ...history.slice(-10).map((t): Anthropic.MessageParam => ({ role: t.role, content: t.text })),
-    { role: "user", content: [...pdfs.map((url): Anthropic.DocumentBlockParam => ({ type: "document", source: { type: "url", url } })), ...imageBlocks(images), { type: "text", text }] },
+    { role: "user", content: [...pdfs.map((p): Anthropic.DocumentBlockParam => (typeof p === "string" ? { type: "document", source: { type: "url", url: p } } : { type: "document", source: { type: "base64", media_type: "application/pdf", data: p.data } })), ...imageBlocks(images), { type: "text", text }] },
   ];
   let parsed: z.infer<typeof Edits> | null;
   try {
@@ -460,12 +460,39 @@ async function chatPictures(slug: string, images: string[]): Promise<{ kept: (st
   return { kept: rows.map((r) => r.kept), seenBy: rows.map((r) => r.seen).filter((x): x is string => Boolean(x)) };
 }
 
+/**
+ * The PDFs sent along in the editor's chat - only the tour's own files (just
+ * uploaded through the chat), at most 3 and 20 MB each, read here and given to
+ * nextviewAI as the document itself (never as a link it fetches).
+ */
+async function chatDocuments(slug: string, urls: string[]): Promise<{ name: string; data: string }[]> {
+  const list = [...new Set(urls.filter((u) => typeof u === "string"))].slice(0, 3);
+  if (!list.length) return [];
+  const ids = list.map((u) => /^\/api\/tour-files\/([\w-]+)$/.exec(u)?.[1]).filter((x): x is string => Boolean(x));
+  const rows = await prisma.tourFile.findMany({
+    where: { tourSlug: slug, contentType: "application/pdf", OR: [{ id: { in: ids } }, { url: { in: list } }] },
+    select: { id: true, name: true, url: true, size: true },
+  });
+  const out: { name: string; data: string }[] = [];
+  for (const r of rows) {
+    if (r.size > 20_000_000) continue;
+    const bytes = await bytesOf(r.url ?? `/api/tour-files/${r.id}`).catch(() => null);
+    if (bytes && bytes.subarray(0, 5).toString() === "%PDF-") out.push({ name: r.name, data: bytes.toString("base64") });
+  }
+  return out;
+}
+
 /** A change asked for in the editor's chat - `images`: screenshots the user sent along (of the preview, the customer's site …). */
-export async function askClaudeForTour(config: TourConfig, history: ChatTurn[], request: string, images: string[] = []): Promise<AiEditResult> {
+export async function askClaudeForTour(config: TourConfig, history: ChatTurn[], request: string, images: string[] = [], pdfs: string[] = []): Promise<AiEditResult> {
   const user = await requireTour(config.slug);
   const key = await apiKey();
   if (!key) return { ok: false, error: "nextviewAI er ikke sat op endnu - indsæt en nøgle." };
   try {
+    const docs = await chatDocuments(config.slug, pdfs);
+    if (pdfs.length && !docs.length) return { ok: false, error: "PDF'en kunne ikke læses - prøv at vedhæfte den igen." };
+    const docNote = docs.length
+      ? `\n\n(Brugeren har sendt ${docs.length === 1 ? `en PDF med (${docs[0].name})` : `${docs.length} PDF'er med (${docs.map((d) => d.name).join(", ")})`}. Læs den grundigt - typisk en kundes liste over rettelser til touren. Lav alle de ændringer, der kan laves i opsætningen: tekster (brug kundens nye tekster ordret, når de står der), links på knapper, menupunkter der skal samles, fjernes eller omdøbes. Gæt ikke på det, der kræver noget, du ikke har (et nyt foto, en ny video, en ny scanning, et startsted du ikke kan se) eller en beslutning fra kunden. Skriv i reply en kort tjekliste: hvad du har lavet (punkt for punkt med kundens nummer), og hvad brugeren selv skal gøre eller spørge kunden om.)`
+      : "";
     const { kept, seenBy } = await chatPictures(config.slug, images);
     const addresses = kept.map((u, i) => (u ? `Billede ${i + 1}: ${u}` : null)).filter(Boolean);
     const many = images.length > 3;
@@ -477,7 +504,7 @@ export async function askClaudeForTour(config: TourConfig, history: ChatTurn[], 
         }${addresses.length ? `\n${addresses.join("\n")}` : ""})`
       : "";
     const web = await webContext(config, request).catch(() => "");
-    const r = await claudeEdits(key, { name: user.name, kind: "ændring" }, config, history, `Ønske: ${request}${seen}${web}`, many ? 24000 : 16000, true, [], seenBy);
+    const r = await claudeEdits(key, { name: user.name, kind: "ændring" }, config, history, `Ønske: ${request}${seen}${docNote}${web}`, many || docs.length ? 24000 : 16000, true, docs.map((d) => ({ data: d.data })), seenBy);
     // The pictures' addresses go back to the editor, which puts them in the history of later messages ("læg dem i baglokalet").
     return r.ok ? { ...r, imageUrls: kept.filter((u): u is string => Boolean(u)) } : r;
   } catch (err) {
