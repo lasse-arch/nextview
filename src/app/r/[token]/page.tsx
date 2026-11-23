@@ -29,7 +29,7 @@ export default async function CustomerReportPage({ params }: { params: Promise<{
   const share = shareOf(tour.share);
   const stats = await tourStats(tour.slug, share.days);
   const heat = share.heatmap ? await tourHeat(tour.slug, config, share.days).catch(() => null) : null;
-  const looks = share.looks ? (await tourLooks(tour.slug, share.days).catch(() => [])).filter((l) => l.room).map((l) => ({ room: l.room!, seconds: l.seconds, visits: l.visits, image: l.image })) : [];
+  const looks = share.looks ? (await tourLooks(tour.slug, share.days).catch(() => [])).filter((l) => l.room).map((l) => ({ room: l.room!, ss: l.ss, seconds: l.seconds, visits: l.visits, image: l.image })) : [];
   return (
     <main
       className="min-h-screen bg-[#f5f5f7] px-4 py-8 text-[#1d1d1f]"

@@ -2348,13 +2348,21 @@ function TourExperience({
    * of 12 slices of 30° around it. When the visitor moves on (or leaves), the
    * scan point's slices go as one "room_look": "<ss>:<12 seconds>", the seconds
    * in all, and the room's name. The guide's own turns and the tour's own moves
-   * don't count - only the visitor's own looking.
+   * don't count - only the visitor's own looking. And only while they're there:
+   * nothing after 20 seconds without a touch, a click or a turn (a tour left
+   * open at the start counted every second before), and at most 3 minutes per
+   * stop at a scan point.
    */
   useEffect(() => {
     if (!sdk) return;
     let yaw: number | null = null;
+    let lastYaw: number | null = null;
+    let active = now();
     let at: number | null = null;
     let slices = new Array<number>(12).fill(0);
+    const touched = () => void (active = now());
+    const events = ["pointerdown", "pointermove", "wheel", "keydown", "touchstart"] as const;
+    events.forEach((e) => window.addEventListener(e, touched, { passive: true }));
     const send = () => {
       const total = slices.reduce((a, b) => a + b, 0);
       if (at != null && total >= 2) {
@@ -2370,9 +2378,12 @@ function TourExperience({
         send();
         at = ss;
       }
+      if (yaw != null && lastYaw != null && Math.abs(((yaw - lastYaw + 540) % 360) - 180) > 1) active = now();
+      lastYaw = yaw;
       if (yaw == null || ss == null || document.hidden || phaseRef.current !== "tour" || guideAtRef.current != null || sweepMoving.current || now() - selfMoveAt.current < 2500) return;
+      if (now() - active > 20_000 || slices.reduce((a, b) => a + b, 0) >= 180) return;
       const slice = Math.floor((((yaw % 360) + 360) % 360) / 30) % 12;
-      slices[slice] = Math.min(3600, slices[slice] + 1);
+      slices[slice] += 1;
     }, 1000);
     const leave = () => {
       send();
@@ -2382,6 +2393,7 @@ function TourExperience({
     return () => {
       window.clearInterval(tick);
       window.removeEventListener("pagehide", leave);
+      events.forEach((e) => window.removeEventListener(e, touched));
       send();
       sub.cancel();
     };

@@ -17,7 +17,7 @@ import type { TourConfig } from "@/app/arpo/tour-lab/tours/types";
 export type HeatSpot = { ss: number; floor: number; px: number; py: number; room: string | null; seconds: number; visits: number };
 export type HeatPoint = { name: string; opens: number; /** On a 360° scene: where the point is. */ yaw?: number; pitch?: number; /** On a flat map: % of the picture. */ x?: number; y?: number };
 export type HeatData = {
-  plan: { floors: { name: string; image: string | null; aspect: number | null }[]; spots: HeatSpot[] } | null;
+  plan: { floors: { name: string; image: string | null; aspect: number | null }[]; spots: HeatSpot[]; /** Every scan point on the plan - the ones nobody stood at too. */ points: { ss: number; floor: number; px: number; py: number }[] } | null;
   aerial:
     | {
         /** A 360° scene (the drone's tiles, or one 360° photo) - shown at its start view. */
@@ -45,7 +45,8 @@ export async function tourHeat(slug: string, config: TourConfig, range: number |
       .map((l) => ({ l, p: at.get(l.ss) }))
       .filter((x): x is { l: (typeof looks)[number]; p: NonNullable<typeof x.p> } => x.p?.px != null && x.p.py != null)
       .map(({ l, p }) => ({ ss: l.ss, floor: p.floor, px: p.px!, py: p.py!, room: l.room, seconds: l.seconds, visits: l.visits }));
-    if (spots.length) plan = { floors: scanMap.floors, spots };
+    const points = scanMap.points.filter((p) => p.px != null && p.py != null).map((p) => ({ ss: p.ss, floor: p.floor, px: p.px!, py: p.py! }));
+    if (spots.length) plan = { floors: scanMap.floors, spots, points };
   }
 
   // The aerial photo / map: how often each point was opened (its card, or its 360° photo).

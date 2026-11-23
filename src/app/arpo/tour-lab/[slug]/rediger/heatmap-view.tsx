@@ -20,6 +20,8 @@ const T = {
   en: { inside: "Inside the tour", aerial: "Aerial photo and points", time: "Time", visits: "Visits", little: "Little", much: "A lot", opened: (n: number) => `opened ${n} time${n === 1 ? "" : "s"}`, show: "Show the place", floor: (i: number) => `Floor ${i + 1}`, visitsN: (n: number) => `${n} visits` },
 };
 
+/** The number in a circle: minutes (or seconds under one), or visits. */
+const short = (v: number, metric: Metric) => (metric === "visits" ? String(v) : v < 60 ? `${v}s` : v < 6000 ? `${Math.round(v / 60)}m` : `${Math.round(v / 3600)}t`);
 const time = (s: number, lang: Lang) => (s < 60 ? `${s} ${lang === "en" ? "sec" : "sek"}` : s < 3600 ? `${Math.round(s / 60)} min` : `${(s / 3600).toFixed(1).replace(".", lang === "en" ? "." : ",")} ${lang === "en" ? "h" : "t"}`);
 
 /** One warm hue from little (light amber) to a lot (deep red). */
@@ -74,6 +76,7 @@ function Inside({ plan, lang, onGo }: { plan: NonNullable<HeatData["plan"]>; lan
   const [metric, setMetric] = useState<Metric>("seconds");
   const [floor, setFloor] = useState<number | null>(null);
   const [picked, setPicked] = useState<number | null>(null);
+  const [hover, setHover] = useState<number | null>(null);
   const [broken, setBroken] = useState<Record<number, boolean>>({});
   const floors = useMemo(() => [...new Set(plan.spots.map((s) => s.floor))].sort((a, b) => a - b), [plan.spots]);
   const shown = floor != null && floors.includes(floor) ? floor : (floors[0] ?? 0);
@@ -152,18 +155,43 @@ function Inside({ plan, lang, onGo }: { plan: NonNullable<HeatData["plan"]>; lan
           // eslint-disable-next-line @next/next/no-img-element
           <img src={fl.image} alt="" className="absolute inset-0 h-full w-full object-contain opacity-80" onError={() => setBroken((b) => ({ ...b, [shown]: true }))} />
         )}
-        <canvas ref={canvas} className="pointer-events-none absolute inset-0 h-full w-full mix-blend-multiply" aria-hidden />
-        {here.map((s) => (
-          <button
-            key={s.ss}
-            type="button"
-            aria-label={`${name(s)}: ${time(s.seconds, lang)}, ${t.visitsN(s.visits)}`}
-            title={`${name(s)}: ${time(s.seconds, lang)}, ${t.visitsN(s.visits)}`}
-            onClick={() => setPicked(s.ss === picked ? null : s.ss)}
-            className={`absolute h-6 w-6 -translate-x-1/2 -translate-y-1/2 rounded-full ${s.ss === picked ? "ring-2 ring-white ring-offset-1 ring-offset-black/40" : ""}`}
-            style={{ left: `${s.px}%`, top: `${s.py}%` }}
-          />
+        <canvas ref={canvas} className="pointer-events-none absolute inset-0 h-full w-full opacity-60 mix-blend-multiply" aria-hidden />
+        {/* Every scan point: nobody there = a small dot; the rest a circle, bigger and warmer the more, with its number. */}
+        {(plan.points ?? []).filter((p) => p.floor === shown && !here.some((s) => s.ss === p.ss)).map((p) => (
+          <span key={`p${p.ss}`} className="pointer-events-none absolute h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/90 ring-1 ring-black/25" style={{ left: `${p.px}%`, top: `${p.py}%` }} />
         ))}
+        {[...here].sort((a, b) => value(a) - value(b)).map((s) => {
+          const share = Math.sqrt(value(s) / max);
+          const d = Math.round(20 + 22 * share);
+          const [r, g, b] = heat(0.25 + 0.75 * share);
+          const on = s.ss === picked || s.ss === hover;
+          return (
+            <button
+              key={s.ss}
+              type="button"
+              aria-label={`${name(s)}: ${time(s.seconds, lang)}, ${t.visitsN(s.visits)}`}
+              onClick={() => setPicked(s.ss === picked ? null : s.ss)}
+              onMouseEnter={() => setHover(s.ss)}
+              onMouseLeave={() => setHover(null)}
+              className={`absolute flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full text-[10px] font-semibold tabular-nums text-white shadow-[0_1px_4px_rgba(0,0,0,.35)] transition-transform ${on ? "z-20 scale-125" : "z-10"}`}
+              style={{ left: `${s.px}%`, top: `${s.py}%`, width: d, height: d, background: `rgb(${r},${g},${b})`, boxShadow: `0 0 0 2px rgba(255,255,255,.9), 0 0 0 ${on ? 5 : 0}px rgba(${r},${g},${b},.35)` }}
+            >
+              {short(value(s), metric)}
+            </button>
+          );
+        })}
+        {(() => {
+          const h = here.find((s) => s.ss === hover);
+          if (!h) return null;
+          return (
+            <div className="pointer-events-none absolute z-30 -translate-x-1/2 whitespace-nowrap rounded-lg bg-[#1d1d1f] px-2.5 py-1.5 text-[11.5px] text-white shadow-lg" style={{ left: `${Math.min(85, Math.max(15, h.px))}%`, top: `calc(${h.py}% + 18px)` }}>
+              <b>{name(h)}</b>
+              <span className="ml-1.5 text-white/70">
+                {time(h.seconds, lang)}, {t.visitsN(h.visits)}
+              </span>
+            </div>
+          );
+        })()}
       </div>
       <Legend lang={lang} />
       {chosen && (

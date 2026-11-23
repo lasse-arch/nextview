@@ -209,7 +209,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
     page === "tal" && !example
       ? await Promise.all(
           statTours.map(async (x) =>
-            x.share.looks ? (await tourLooks(x.slug, { from: period.from, to: period.to }).catch(() => [])).filter((l) => l.room).map((l) => ({ room: l.room!, seconds: l.seconds, visits: l.visits, image: l.image })) : []
+            x.share.looks ? (await tourLooks(x.slug, { from: period.from, to: period.to }).catch(() => [])).filter((l) => l.room).map((l) => ({ room: l.room!, ss: l.ss, seconds: l.seconds, visits: l.visits, image: l.image })) : []
           )
         )
       : statTours.map(() => []);

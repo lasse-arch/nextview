@@ -24,6 +24,9 @@ export type LookSpot = {
   image: string | null;
 };
 
+/** The most one stop at a scan point counts (the tour stops counting there, too - experience.tsx). */
+const MAX_PER_STOP = 180;
+
 /** `range`: the last N days, or a period ("YYYY-MM-DD", both days included - Danish time). */
 export async function tourLooks(slug: string, range: number | { from: string; to: string } = 60): Promise<LookSpot[]> {
   const createdAt = typeof range === "number" ? { gte: new Date(Date.now() - range * 86_400_000) } : { gte: dayStart(range.from), lt: dayStart(addDays(range.to, 1)) };
@@ -38,16 +41,25 @@ export async function tourLooks(slug: string, range: number | { from: string; to
     if (!m) continue;
     const ss = Number(m[1]);
     const spot = by.get(ss) ?? { room: null, slices: new Array<number>(12).fill(0), sessions: new Set<string>() };
-    m[2].split(",").forEach((n, i) => (spot.slices[i] += Number(n)));
+    // At most 3 minutes per stop: older tours counted every second a tour stood open (at the start, mostly) - scaled down.
+    const got = m[2].split(",").map(Number);
+    const total = got.reduce((a, b) => a + b, 0);
+    const k = total > MAX_PER_STOP ? MAX_PER_STOP / total : 1;
+    got.forEach((n, i) => (spot.slices[i] += n * k));
     spot.room ??= r.url;
     spot.sessions.add(r.session);
     by.set(ss, spot);
   }
+  // A picture for each place: the story card's, else the first photo on the tour's place card at that scan point.
+  const tour = await prisma.tour.findUnique({ where: { slug }, select: { config: true } }).catch(() => null);
+  const cards = ((tour?.config as { placeCards?: { ss?: number[]; images?: string[] }[] } | null)?.placeCards ?? []).filter((c) => Array.isArray(c.ss) && c.images?.length);
+  const cardImage = (ss: number) => cards.find((c) => c.ss!.includes(ss))?.images?.[0] ?? null;
   const rooms = [...new Set([...by.values()].map((s) => s.room).filter((r): r is string => Boolean(r)))];
   const pictures = rooms.length ? await prisma.tourStoryImage.findMany({ where: { tourSlug: slug, room: { in: rooms } }, select: { room: true, updatedAt: true } }) : [];
   const picture = new Map(pictures.map((p) => [p.room, `/t/${slug}/historie?rum=${encodeURIComponent(p.room)}&v=${p.updatedAt.getTime()}`]));
   return [...by.entries()]
     .map(([ss, s]) => {
+      s.slices = s.slices.map((n) => Math.round(n));
       const seconds = s.slices.reduce((a, b) => a + b, 0);
       const top = s.slices
         .map((n, i) => ({ i, n }))
@@ -56,7 +68,7 @@ export async function tourLooks(slug: string, range: number | { from: string; to
         .slice(0, 3)
         // The middle of the slice, as the camera's yaw (-180..180).
         .map((x) => ({ yaw: ((x.i * 30 + 15 + 180) % 360) - 180, share: x.n / seconds }));
-      return { ss, room: s.room, seconds, visits: s.sessions.size, slices: s.slices, top, image: s.room ? picture.get(s.room) ?? null : null };
+      return { ss, room: s.room, seconds, visits: s.sessions.size, slices: s.slices, top, image: (s.room ? picture.get(s.room) : null) ?? cardImage(ss) };
     })
     .filter((s) => s.seconds > 0)
     .sort((a, b) => b.seconds - a.seconds);

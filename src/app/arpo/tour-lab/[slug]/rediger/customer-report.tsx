@@ -2,6 +2,7 @@ import type { TourStats } from "@/lib/tour-stats";
 import { shown, type ReportShare } from "@/lib/tour-share";
 import type { HeatData } from "@/lib/tour-heat";
 import { HeatmapView } from "./heatmap-view";
+import { LooksList } from "./looks-list";
 
 /*
  * The customer's report: exactly the numbers chosen to be shared - the same
@@ -107,7 +108,7 @@ function Ranked({ rows, label, show = String }: { rows: { label: string; count: 
 }
 
 /** A place visitors looked around at (lib/tour-looks.ts) - the room, never the exact view. */
-export type ReportLook = { room: string; seconds: number; visits: number; image: string | null };
+export type ReportLook = { room: string; ss?: number; seconds: number; visits: number; image: string | null };
 
 export function CustomerReport({ stats, share, brand, lang = "da", title, looks = [], heat }: { stats: TourStats; share: ReportShare; brand: string; lang?: ReportLang; title?: string; looks?: ReportLook[]; /** The heatmap (lib/tour-heat.ts) - one tour's, never several together. */ heat?: HeatData | null }) {
   const t = T[lang];
@@ -201,30 +202,7 @@ export function CustomerReport({ stats, share, brand, lang = "da", title, looks 
         <div className={card}>
           <div className="text-[13px] font-medium text-[#6e6e73]">{t.looks}</div>
           <p className="mb-3 text-[11.5px] text-[#8e8e93]">{t.looksHint}</p>
-          <ul className="space-y-2.5">
-            {looks.slice(0, 6).map((l) => (
-              <li key={l.room} className="flex items-center gap-3">
-                {l.image ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={l.image} alt="" loading="lazy" className="h-12 w-16 flex-none rounded-lg object-cover ring-1 ring-black/[.06]" />
-                ) : (
-                  <span className="h-12 w-16 flex-none rounded-lg bg-[#f2f2f7]" />
-                )}
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-baseline justify-between gap-2 text-[14px]">
-                    <span className="truncate font-medium">{l.room}</span>
-                    <span className="flex-none tabular-nums text-[#6e6e73]">{duration(l.seconds)}</span>
-                  </div>
-                  <div className="mt-1 h-1.5 rounded-full bg-[#f2f2f7]">
-                    <div className="h-full rounded-full" style={{ width: `${(l.seconds / looks[0].seconds) * 100}%`, background: "var(--report-accent, #0071e3)" }} />
-                  </div>
-                  <div className="mt-0.5 text-[11.5px] text-[#8e8e93]">
-                    {l.visits} {t.looksVisits}
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
+          <LooksList looks={looks.slice(0, 6)} plan={heat?.plan ?? null} lang={lang} />
         </div>
       )}
       {share.heatmap && heat && (heat.plan || heat.aerial) && (
