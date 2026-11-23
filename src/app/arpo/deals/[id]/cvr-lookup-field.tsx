@@ -16,6 +16,14 @@ function setFieldValue(el: Element | RadioNodeList | null, value: string) {
   el.dispatchEvent(new Event("input", { bubbles: true }));
 }
 
+/** The message after a lookup - and which of phone / e-mail were left as they were. */
+export function cvrMessage(kept: string[]): string {
+  const what = kept.join(" og ");
+  return kept.length
+    ? `Data hentet fra CVR. ${what[0].toUpperCase() + what.slice(1)}, der stod der, er beholdt. Ret til, hvis det er nødvendigt.`
+    : "Data hentet fra CVR. Ret til, hvis det er nødvendigt.";
+}
+
 /**
  * CVR-nummer field with a "Slå op" lookup, same idea as the one on the new-
  * deal form - lets an existing deal's company info be refreshed from CVR
@@ -45,10 +53,22 @@ export function CvrLookupField({ defaultValue }: { defaultValue: string }) {
       if (data.name) setFieldValue(form?.elements.namedItem("companyName") ?? null, data.name);
       if (data.address) setFieldValue(form?.elements.namedItem("address") ?? null, data.address);
       if (data.contactName) setFieldValue(form?.elements.namedItem("contactName") ?? null, data.contactName);
-      if (data.phone) setFieldValue(form?.elements.namedItem("contactPhone") ?? null, data.phone);
-      if (data.email) setFieldValue(form?.elements.namedItem("contactEmail") ?? null, data.email);
+      // Phone and e-mail: what's already written stays - CVR only fills an empty field.
+      const kept: string[] = [];
+      for (const [field, value, label] of [
+        ["contactPhone", data.phone, "telefonnummeret"],
+        ["contactEmail", data.email, "mailen"],
+      ] as const) {
+        const el = form?.elements.namedItem(field) ?? null;
+        if (!value) continue;
+        if (el instanceof HTMLInputElement && el.value.trim()) {
+          if (el.value.trim() !== String(value).trim()) kept.push(label);
+          continue;
+        }
+        setFieldValue(el, value);
+      }
 
-      setLookupState({ status: "success", message: "Data hentet fra CVR — ret til hvis nødvendigt." });
+      setLookupState({ status: "success", message: cvrMessage(kept) });
     } catch {
       setLookupState({ status: "error", message: "Kunne ikke kontakte CVR-opslagstjenesten." });
     }

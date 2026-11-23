@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { createDealManual } from "@/lib/actions/deals";
 import { DisplayNameInput } from "../../display-name-input";
+import { cvrMessage } from "../[id]/cvr-lookup-field";
 
 type User = { id: string; name: string };
 type AddressSuggestion = { text: string; lat: number | null; lon: number | null };
@@ -66,9 +67,17 @@ export function NewDealForm({ users, defaultOwnerId }: { users: User[]; defaultO
       setCompanyName(data.name || "");
       setAddress(data.address || "");
       if (data.contactName) setContactName(data.contactName);
-      if (data.phone) setContactPhone(data.phone);
-      if (data.email) setContactEmail(data.email);
-      setLookupState({ status: "success", message: "Data hentet fra CVR — ret til hvis nødvendigt." });
+      // Phone and e-mail: what's already written stays - CVR only fills an empty field.
+      const kept: string[] = [];
+      if (data.phone) {
+        if (!contactPhone.trim()) setContactPhone(data.phone);
+        else if (contactPhone.trim() !== String(data.phone).trim()) kept.push("telefonnummeret");
+      }
+      if (data.email) {
+        if (!contactEmail.trim()) setContactEmail(data.email);
+        else if (contactEmail.trim() !== String(data.email).trim()) kept.push("mailen");
+      }
+      setLookupState({ status: "success", message: cvrMessage(kept) });
     } catch {
       setLookupState({ status: "error", message: "Kunne ikke kontakte CVR-opslagstjenesten." });
     }
