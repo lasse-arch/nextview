@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import {
   IconChevronDown,
   IconHome,
@@ -155,20 +155,71 @@ function NavGroup({ group, onNavigate }: { group: SidebarNavGroup; onNavigate?: 
   );
 }
 
+/*
+ * The sections fold up (a small menu): the one holding the current page is
+ * always open, the others open or closed as this person last left them -
+ * kept in this browser only (a convenience, nothing else depends on it).
+ */
+const FOLD_KEY = "arpo-menu-open";
+const foldListeners = new Set<() => void>();
+function readFolds(): string {
+  try {
+    return localStorage.getItem(FOLD_KEY) ?? "{}";
+  } catch {
+    return "{}";
+  }
+}
+function writeFolds(next: Record<string, boolean>) {
+  try {
+    localStorage.setItem(FOLD_KEY, JSON.stringify(next));
+  } catch {}
+  foldListeners.forEach((l) => l());
+}
+function useFolds(): Record<string, boolean> {
+  const raw = useSyncExternalStore(
+    (l) => {
+      foldListeners.add(l);
+      return () => foldListeners.delete(l);
+    },
+    readFolds,
+    () => "{}",
+  );
+  try {
+    return JSON.parse(raw) as Record<string, boolean>;
+  } catch {
+    return {};
+  }
+}
+
+function NavSection({ section, onNavigate, hrefs, folds }: { section: SidebarNavSection; onNavigate?: () => void; hrefs: string[]; folds: Record<string, boolean> }) {
+  const pathname = usePathname();
+  const here = section.items.some((i) => isActive(pathname, i.href));
+  // Salg is open until it's closed; the rest closed until opened.
+  const open = here || (folds[section.section] ?? section.section === "Salg");
+  return (
+    <div className="mt-1 flex flex-col gap-0.5">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => !here && writeFolds({ ...folds, [section.section]: !open })}
+        className={`flex items-center justify-between rounded-md px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-[.08em] ${here ? "cursor-default text-slate-500" : "text-slate-400 hover:bg-slate-100 hover:text-slate-600"}`}
+      >
+        {section.section}
+        <IconChevronDown className={`h-3.5 w-3.5 transition-transform ${open ? "rotate-180" : ""} ${here ? "opacity-0" : ""}`} />
+      </button>
+      {open && section.items.map((link) => <NavLink key={link.href} item={link} onNavigate={onNavigate} hrefs={hrefs} />)}
+    </div>
+  );
+}
+
 export function SidebarNav({ items, onNavigate }: { items: SidebarNavItem[]; onNavigate?: () => void }) {
   const hrefs = allHrefs(items);
+  const folds = useFolds();
   return (
     <div className="flex flex-col gap-0.5">
       {items.map((item) =>
         "section" in item ? (
-          item.items.length > 0 && (
-            <div key={item.section} className="mt-3 flex flex-col gap-0.5">
-              <p className="px-2.5 pb-1 text-[11px] font-semibold uppercase tracking-[.08em] text-slate-400">{item.section}</p>
-              {item.items.map((link) => (
-                <NavLink key={link.href} item={link} onNavigate={onNavigate} hrefs={hrefs} />
-              ))}
-            </div>
-          )
+          item.items.length > 0 && <NavSection key={item.section} section={item} onNavigate={onNavigate} hrefs={hrefs} folds={folds} />
         ) : "children" in item ? (
           item.children.length > 0 && <NavGroup key={item.label} group={item} onNavigate={onNavigate} />
         ) : (
