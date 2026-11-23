@@ -23,6 +23,7 @@ import { darker } from "@/app/arpo/tour-lab/tours/contrast";
 import { pageAsText, readUnits, type LiveUnit } from "@/lib/availability/live";
 import { hostFiles, hostNewFiles } from "@/lib/tour-files";
 import { measureLogo, withMeasuredLogo, type LogoFix } from "@/lib/logo-fix";
+import { cropPhoto, type PhotoCrop } from "@/lib/photo-crop";
 import { claudeCostUsd } from "@/lib/claude-cost";
 import { allGuides, guideStops, isPlaceHref, withoutDeadAerialLinks } from "@/app/arpo/tour-lab/tours/places";
 import { BRANCHES, DESIGN_PRESETS, MENU_STYLES, START_STYLES, copyLayout, layoutOfTour, setLayout, type Branch, type DesignPreset, type NewTourLayout } from "@/app/arpo/tour-lab/tours/presets";
@@ -1747,4 +1748,14 @@ function layoutText(l: NewTourLayout | undefined): string {
 export async function measureTourLogo(slug: string, url: string): Promise<LogoFix> {
   await requireTour(slug);
   return measureLogo(slug, url).catch(() => ({ tone: null, trimmed: null }));
+}
+
+/** The editor's "Vælg udsnit" on a person's photo: the chosen part cut out and kept with the tour's files - see lib/photo-crop.ts. */
+export async function cropTourPhoto(slug: string, url: string, crop: PhotoCrop): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
+  await requireTour(slug);
+  try {
+    return { ok: true, url: await cropPhoto(slug, url, crop) };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Udsnittet kunne ikke laves." };
+  }
 }

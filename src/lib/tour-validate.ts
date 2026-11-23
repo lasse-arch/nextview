@@ -134,6 +134,9 @@ export function tourConfigProblem(config: unknown): string | null {
       if (ids.has(p.id)) return `To personer har samme id ("${p.id}").`;
       ids.add(p.id);
       if ([p.role, p.bio, p.quote, p.ask, p.href, p.video].some((v) => v !== undefined && typeof v !== "string")) return `${p.name || p.id}: rolle, tekst, citat, sted og video skal være tekst.`;
+      if (p.original !== undefined && !str(p.original)) return `${p.name || p.id}: det oprindelige foto skal være en adresse.`;
+      const k = p.crop;
+      if (k !== undefined && !(obj(k) && [k.x, k.y, k.w, k.h].every((n) => typeof n === "number" && n >= 0 && n <= 1))) return `${p.name || p.id}: fotoets udsnit er ugyldigt.`;
     }
   }
   if (c.inUse?.some((i) => (i.images !== undefined && (!arr(i.images) || i.images.length > 12 || !i.images.every(str))) || (i.button !== undefined && (!obj(i.button) || typeof i.button.label !== "string" || typeof i.button.href !== "string"))))

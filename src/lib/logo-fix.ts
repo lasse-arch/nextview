@@ -16,7 +16,8 @@ import { placeLogo } from "@/app/arpo/tour-lab/tours/logo-place";
  * as it is. Nothing happens when the logo can't be read.
  */
 
-async function bytesOf(url: string): Promise<Buffer | null> {
+/** A tour file's bytes: from the database, or fetched safely (https only, size-capped). */
+export async function bytesOf(url: string): Promise<Buffer | null> {
   const db = /^\/api\/tour-files\/([\w-]+)$/.exec(url);
   if (db) {
     const row = await prisma.tourFile.findUnique({ where: { id: db[1] }, select: { data: true } });

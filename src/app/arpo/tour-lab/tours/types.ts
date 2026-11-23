@@ -389,6 +389,10 @@ export type TeamPerson = {
   name: string;
   role?: string;
   image: string;
+  /** The photo as uploaded, when `image` is a part cut from it ("Vælg udsnit" in the editor) - kept so the part can be chosen again. */
+  original?: string;
+  /** That part: fractions (0-1) of the original's width and height. */
+  crop?: { x: number; y: number; w: number; h: number };
   /** A few short paragraphs (blank line between). */
   bio?: string;
   /** Their own words, e.g. "Vi sælger kvalitet til de rigtige penge." */

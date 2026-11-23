@@ -1,8 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import type { CardPerson, TeamPerson, TourConfig } from "../../tours/types";
 import { personId, pickOf } from "../../tours/people";
 import { Rows } from "./content";
+import { PhotoCropper } from "./photo-crop";
 import { Field, Group, input, Toggle, UploadButton, type PreviewApi } from "./ui";
 
 type Edit = (fn: (d: TourConfig) => void) => void;
@@ -104,13 +106,39 @@ export function PeopleEditor({ config, edit, preview }: { config: TourConfig; ed
 
 function PersonFields({ p, set, preview }: { p: TeamPerson; set: (next: TeamPerson) => void; preview: PreviewApi }) {
   const put = (patch: Partial<TeamPerson>) => set({ ...p, ...patch });
+  const [cropping, setCropping] = useState(false);
   return (
     <>
       <div className="flex items-center gap-3">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         {p.image ? <img src={p.image} alt="" className="h-16 w-16 rounded-full object-cover object-[50%_20%]" /> : <div className="h-16 w-16 rounded-full bg-[#f2f2f7]" />}
-        <UploadButton accept="image/*" shrink={1600} label="Skift foto" onDone={(image) => put({ image })} />
+        <UploadButton
+          accept="image/*"
+          shrink={1600}
+          label="Skift foto"
+          onDone={(image) => {
+            // A new photo: no part chosen yet - and straight on to choosing one.
+            set({ ...p, image, original: undefined, crop: undefined });
+            setCropping(true);
+          }}
+        />
+        {p.image && (
+          <button type="button" className={linkBtn} onClick={() => setCropping(true)}>
+            Vælg udsnit
+          </button>
+        )}
       </div>
+      {cropping && p.image && (
+        <PhotoCropper
+          src={p.original ?? p.image}
+          crop={p.original ? p.crop : undefined}
+          onClose={() => setCropping(false)}
+          onDone={(image, crop) => {
+            put({ image, original: p.original ?? p.image, crop });
+            setCropping(false);
+          }}
+        />
+      )}
       <div className="grid grid-cols-2 gap-2">
         <Field title="Navn">
           <input className={`${input} bg-white`} placeholder="Per Muldbjerg" value={p.name} onChange={(e) => put({ name: e.target.value })} />
