@@ -9,6 +9,7 @@
 export type EngineChange = { date: string; kind: "ny" | "sikkerhed" | "hastighed" | "rettelse"; text: string };
 
 export const ENGINE_CHANGES: EngineChange[] = [
+  { date: "2026-11-24", kind: "ny", text: "En linje på: et øjeblik på luftfotoet kan vise markeringer, fx \"Skolen\" og \"Gården\", med en stiplet linje imellem - så man ser, hvor linjen er i forhold til skolen." },
   { date: "2026-11-24", kind: "ny", text: "En linje på: ved et sted i touren står touren nu frit, og fotoene ligger som en række på kortet, der kan åbnes store (før fyldte det første foto skærmen og tonede over - det kan stadig vælges). Kortet er lidt større på computer." },
   { date: "2026-11-24", kind: "ny", text: "Se det i brug: billederne fylder meget mere på computer (op til 1320 px bredt), med større tekst." },
   { date: "2026-11-24", kind: "ny", text: "En linje på: personerne er store på computer (72 px), så man kan se, hvem det er." },

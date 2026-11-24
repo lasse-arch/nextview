@@ -2,7 +2,7 @@
 
 import { PersonPicker } from "./people-editor";
 import { useState } from "react";
-import type { CardPerson, LineDayStop, LineTrip, TourConfig } from "../../tours/types";
+import type { CardPerson, DroneMark, LineDayStop, LineTrip, TourConfig } from "../../tours/types";
 import { CardImages, Rows } from "./content";
 import { menuRooms } from "./map-editor";
 import { isPlaceHref } from "../../tours/places";
@@ -324,6 +324,7 @@ function StopEditor({ stop, onChange, preview, peopleHint, config }: { stop: Lin
           </button>
         </div>
       </Field>
+      <DroneMarksField marks={stop.marks ?? []} preview={preview} onChange={(marks) => onChange({ ...stop, marks: marks.length ? marks : undefined })} />
       <CardImages
         images={stop.images ?? []}
         max={3}
@@ -599,5 +600,49 @@ function IntroPlace({ href, preview, onChange }: { href: string; preview: Previe
         {busy ? "Henter…" : "Overblikket står i stedet i forhåndsvisningen"}
       </button>
     </div>
+  );
+}
+
+/** Marks on the drone photo for a moment (e.g. "Skolen" and "Gården", with a line between): each placed where the preview looks. */
+function DroneMarksField({ marks, preview, onChange }: { marks: DroneMark[]; preview: PreviewApi; onChange: (m: DroneMark[]) => void }) {
+  const [msg, setMsg] = useState<string | null>(null);
+  const here = async () => {
+    setMsg(null);
+    const v = await preview.droneView();
+    if (v.error || v.yaw == null || v.pitch == null) {
+      setMsg(v.error ?? "Åbn luftfotoet i forhåndsvisningen først.");
+      return null;
+    }
+    return { yaw: Math.round(v.yaw * 10) / 10, pitch: Math.round(v.pitch * 10) / 10 };
+  };
+  return (
+    <Field title="Markeringer på luftfotoet (valgfri)" hint='Når øjeblikket står på luftfotoet: navne på stederne med en stiplet linje imellem, fx "Skolen" og "Gården". Drej forhåndsvisningen, så stedet er midt i billedet, og tryk "Her". Den første er skolen.'>
+      <div className="space-y-1.5">
+        {marks.map((m, i) => (
+          <div key={i} className="flex items-center gap-1.5">
+            <input className={`${input} flex-1 bg-white`} value={m.label} placeholder={i === 0 ? "Skolen" : "Gården"} onChange={(e) => onChange(marks.map((x, k) => (k === i ? { ...x, label: e.target.value } : x)))} />
+            <button type="button" className="rounded-lg bg-[#f2f2f7] px-2.5 py-1.5 text-[13px] font-medium text-[#0071e3]" onClick={async () => { const v = await here(); if (v) onChange(marks.map((x, k) => (k === i ? { ...x, ...v } : x))); }}>
+              Her
+            </button>
+            <button type="button" aria-label="Fjern" className="rounded-lg px-2 py-1.5 text-[13px] text-[#ff3b30]" onClick={() => onChange(marks.filter((_, k) => k !== i))}>
+              ×
+            </button>
+          </div>
+        ))}
+        {marks.length < 4 && (
+          <button
+            type="button"
+            className={linkBtn}
+            onClick={async () => {
+              const v = await here();
+              if (v) onChange([...marks, { label: marks.length ? "" : "Skolen", ...v }]);
+            }}
+          >
+            + Markering, der hvor forhåndsvisningen kigger
+          </button>
+        )}
+        {msg && <p className="text-[12.5px] text-[#ff3b30]">{msg}</p>}
+      </div>
+    </Field>
   );
 }

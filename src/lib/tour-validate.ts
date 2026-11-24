@@ -45,10 +45,11 @@ export function tourConfigProblem(config: unknown): string | null {
   const ld = c.lineDays;
   if (ld !== undefined) {
     const stopOk = (x: unknown) => {
-      const st = x as { id?: unknown; time?: unknown; title?: unknown; people?: unknown; tags?: unknown; href?: unknown; images?: unknown };
+      const st = x as { id?: unknown; time?: unknown; title?: unknown; people?: unknown; tags?: unknown; href?: unknown; images?: unknown; marks?: unknown };
       return obj(x) && str(st.id) && (st.time === undefined || str(st.time)) && str(st.title) && (st.href === undefined || str(st.href)) &&
         (st.people === undefined || (arr(st.people) && (st.people as unknown[]).length <= 4 && (st.people as unknown[]).every((p) => obj(p) && str((p as { image?: unknown }).image)))) &&
         (st.tags === undefined || (arr(st.tags) && (st.tags as unknown[]).every(str))) &&
+        (st.marks === undefined || (arr(st.marks) && (st.marks as unknown[]).length <= 4 && (st.marks as unknown[]).every((m) => obj(m) && typeof (m as { label?: unknown }).label === "string" && Number.isFinite((m as { yaw?: unknown }).yaw) && Number.isFinite((m as { pitch?: unknown }).pitch)))) &&
         (st.images === undefined || (arr(st.images) && (st.images as unknown[]).length <= 3 && (st.images as unknown[]).every((u) => str(u) && /^(https?:\/\/|\/)/.test(u as string))));
     };
     if (!obj(ld) || !str(ld.title) || !arr(ld.shared) || !arr(ld.lines)) return "En linje på skal have en overskrift (den må være tom), fælles øjeblikke og linjer.";

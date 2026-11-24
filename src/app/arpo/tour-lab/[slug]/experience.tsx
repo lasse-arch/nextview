@@ -55,6 +55,7 @@ import { STAGING_CSS, StagingLayer, StagingSound } from "./staging";
 import { IN_USE_CSS, InUseBox } from "./in-use";
 import { CONTEST_CSS, ContestBox } from "./treasure";
 import { IN_3D, useStaging3d } from "./staging-3d";
+import { DroneMarks } from "./drone-marks";
 import { LINE_DAY_CSS, LineDayCard, LineDayEnd, LineDayPicker, lineDayStops, lineDaysTitle, type LineDayRun } from "./line-day";
 import { YEARWHEEL_CSS, YearWheelPanel } from "./yearwheel";
 import { SCHEDULE_CSS, ScheduleSheet } from "./schedule";
@@ -3362,6 +3363,10 @@ function TourExperience({
         ) : (
           <>
             <div ref={droneEl} className="absolute inset-0" />
+            {/* "En linje på": the moment's marks on the drone photo (e.g. Skolen and Gården, with a line between). */}
+            {phase === "drone" && lineRun && !lineRun.end && (lineStops[lineRun.at]?.marks?.length ?? 0) > 0 && (
+              <DroneMarks key={lineStopKey ?? ""} marks={lineStops[lineRun.at]!.marks!} viewer={droneViewer} />
+            )}
             {plan360On && (
               <>
                 <SitePlan360Layer T={T} viewer={droneViewer} scene={droneEl} state={plan360} onPick={(u) => setPlan360((st) => ({ ...st, picked: u }))} />

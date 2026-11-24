@@ -289,7 +289,16 @@ export type LineDayStop = {
    * the tour blurred behind. Best taken from where the scan was.
    */
   images?: string[];
+  /**
+   * With a place on the drone photo: marks shown on the photo while the moment
+   * is open, joined by a dashed line - e.g. "Skolen" and "Gården", so it's seen
+   * where the line is compared to the school. The first is "here" (the school).
+   */
+  marks?: DroneMark[];
 };
+
+/** A mark on the 360° drone photo: its name, where it is (yaw/pitch). */
+export type DroneMark = { label: string; yaw: number; pitch: number };
 
 /** A trip or experience of a line ("Gåsejagt i Vadehavet"), shown when its day ends ("Det venter dig også"). */
 /** One button fixed to the right edge (`sideCta`). */
