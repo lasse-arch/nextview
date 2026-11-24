@@ -230,7 +230,7 @@ export function LineDayCard({ L, stops, run, onGo, onClose }: { L: L; stops: Sho
   const placed = Boolean(s.href);
   const stor = photos.length > 0 && !placed;
   // The place in the tour stays free to look around in; the photos are a row on the card instead.
-  const strip = placed && photos.length > 0 && L.photosAtPlace === "strip";
+  const strip = placed && photos.length > 0 && L.photosAtPlace !== "reveal";
   const bigAt = big && big.stop === `${s.id}:${run.at}` ? big.at : null;
   const label = (x: ShownStop) => [x.time, x.title].filter(Boolean).join(" ");
   return (
@@ -605,6 +605,15 @@ export const LINE_DAY_CSS = `
 .ld-card{display:flex;flex-direction:column}
 .ld-card>*{flex:none}
 .ld-card>p{flex:0 1 auto;min-height:0}
+/* On a computer the card is a little bigger - and the photos a row of real pictures. */
+@media (min-width:761px){
+  .ld-card:not(.ld-stor){width:min(500px,calc(100% - 32px));padding:20px 22px;left:20px;bottom:20px}
+  .ld-card:not(.ld-stor) h3{font-size:26px}
+  .ld-card:not(.ld-stor) p{font-size:16px;line-height:1.55}
+  .ld-card:not(.ld-stor)>p{-webkit-line-clamp:4}
+  .ld-strip{gap:10px;margin-top:14px}
+  .ld-strip-foto{width:148px;height:104px}
+}
 .ld-photos{position:relative;flex:0 1 min(210px,28vh)!important;min-height:96px;margin:-16px -18px 12px;border-radius:20px 20px 0 0;overflow:hidden;background:#e9ecee}
 .ld-photo-strip{height:100%;display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch}
 .ld-photo-strip::-webkit-scrollbar{display:none}
