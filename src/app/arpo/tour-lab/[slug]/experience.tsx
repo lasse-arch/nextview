@@ -1480,6 +1480,11 @@ function TourExperience({
     if (!lineStopKey || !lineRun) return;
     const s = lineStops[lineRun.at];
     track("lineday_stop", { label: `${lineRun.line}: ${s?.title ?? ""}`, stop: lineRun.at + 1 });
+    // A 360° photo (or a big picture) the last moment opened is closed when this one goes somewhere else - else it stays over the tour.
+    if (s?.href && !imageOfHref(s.href)) {
+      setPano(null);
+      setGuideImage(null);
+    }
     if (s?.href) lineGo(s.href, s.title);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once per stop
   }, [lineStopKey]);

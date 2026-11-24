@@ -9,6 +9,7 @@
 export type EngineChange = { date: string; kind: "ny" | "sikkerhed" | "hastighed" | "rettelse"; text: string };
 
 export const ENGINE_CHANGES: EngineChange[] = [
+  { date: "2026-11-24", kind: "rettelse", text: "En linje på: efter et øjeblik med et 360°-foto (fx dronefotoet) går Næste ind i scanningen igen - fotoet lukkes, så det ikke bliver liggende over touren." },
   { date: "2026-11-24", kind: "rettelse", text: "En linje på: brede fotos (fx dronens panoramafotos) vises hele på kortet, på en sløret kopi af sig selv - ikke beskåret til midten og forstørret." },
   { date: "2026-11-24", kind: "rettelse", text: "En linje på: markeringerne (fx Skolen og Gården) vises også, når øjeblikket åbner et 360°-foto oven på luftfotoet. I editoren vælges stedet med et tryk på billedet." },
   { date: "2026-11-24", kind: "rettelse", text: "En linje på: alle navnene på personerne står fuldt ud på computer (ikke skåret af); på mobil vises kun billederne." },
