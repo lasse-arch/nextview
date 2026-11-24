@@ -127,6 +127,8 @@ export type PreviewApi = {
   panoView: () => Promise<{ yaw?: number; pitch?: number; hfov?: number; phone?: boolean; image?: string; error?: string }>;
   /** Where the drone picture in the preview looks, and whether the preview is a phone. */
   droneView: () => Promise<{ yaw?: number; pitch?: number; hfov?: number; phone?: boolean; error?: string }>;
+  /** "Vælg sted": waits for a tap on the drone picture (or the 360° picture open on it) and gives where it was. */
+  dronePick: () => Promise<{ yaw?: number; pitch?: number; error?: string }>;
 };
 
 /** The scan point number (ss) of a link to a place in the tour. */

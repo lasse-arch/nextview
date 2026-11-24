@@ -493,6 +493,7 @@ export function TourEditor({
       device: () => deviceRef.current,
       panoView: () => ask<{ yaw?: number; pitch?: number; hfov?: number; phone?: boolean; image?: string }>("tour-pano-view"),
       droneView: () => ask<{ yaw?: number; pitch?: number; hfov?: number; phone?: boolean }>("tour-drone-view"),
+      dronePick: () => ask<{ yaw?: number; pitch?: number }>("tour-drone-pick", 62_000),
     };
   }, []);
 

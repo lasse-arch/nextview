@@ -2941,11 +2941,40 @@ function TourExperience({
         return reply({ type: "tour-pano-view", id: e.data.id, ...v, phone: window.innerWidth <= 760 });
       }
       if (e.data.type === "tour-drone-view") {
-        // Where the drone picture looks - for a tile that leads to the drone picture.
-        const v = drone.current;
-        if (!v || bridge.current.phase !== "drone") return reply({ type: "tour-drone-view", id: e.data.id, error: "Gå til luftfotoet i forhåndsvisningen først." });
+        // Where the drone picture looks - for a tile that leads to the drone picture. A 360° picture open on top of it counts too.
+        const v = openPanoViewer ?? drone.current;
+        if (!v || (!openPanoViewer && bridge.current.phase !== "drone")) return reply({ type: "tour-drone-view", id: e.data.id, error: "Gå til luftfotoet i forhåndsvisningen først." });
         const r = (n: number) => Math.round(n * 10) / 10;
         return reply({ type: "tour-drone-view", id: e.data.id, yaw: r(v.getYaw()), pitch: r(v.getPitch()), hfov: r(v.getHfov()), phone: window.innerWidth <= 760 });
+      }
+      if (e.data.type === "tour-drone-pick") {
+        // "Vælg sted": the next tap on the drone picture (or the 360° picture open on it) - where it is, as yaw/pitch.
+        const v = (openPanoViewer ?? drone.current) as (PannellumViewer & { mouseEventToCoords?: (e: MouseEvent) => [number, number]; getContainer?: () => HTMLElement }) | null;
+        const box = v?.getContainer?.() ?? droneEl.current;
+        if (!v || !box || (!openPanoViewer && bridge.current.phase !== "drone")) return reply({ type: "tour-drone-pick", id: e.data.id, error: "Gå til luftfotoet i forhåndsvisningen først." });
+        const hint = document.createElement("div");
+        hint.className = "hv-pick-hint";
+        hint.textContent = "Tryk på billedet, der hvor stedet er";
+        document.body.appendChild(hint);
+        let down: { x: number; y: number } | null = null;
+        const onDown = (ev: PointerEvent) => void (down = { x: ev.clientX, y: ev.clientY });
+        const onUp = (ev: PointerEvent) => {
+          if (!down || Math.hypot(ev.clientX - down.x, ev.clientY - down.y) > 6) return;
+          const c = v.mouseEventToCoords?.(ev);
+          stop();
+          if (!c) return reply({ type: "tour-drone-pick", id: e.data.id, error: "Kunne ikke læse stedet." });
+          const r = (n: number) => Math.round(n * 10) / 10;
+          reply({ type: "tour-drone-pick", id: e.data.id, pitch: r(c[0]), yaw: r(((c[1] + 540) % 360) - 180) });
+        };
+        const stop = () => {
+          box.removeEventListener("pointerdown", onDown, true);
+          box.removeEventListener("pointerup", onUp, true);
+          hint.remove();
+        };
+        box.addEventListener("pointerdown", onDown, true);
+        box.addEventListener("pointerup", onUp, true);
+        setTimeout(stop, 60_000);
+        return;
       }
       if (e.data.type === "tour-view") {
         // The view the preview stands in, as a menu link (scan point + exact direction).
@@ -3055,6 +3084,8 @@ function TourExperience({
     return () => window.removeEventListener("hv-luk-alt", all);
   }, []);
   const droneViewer = useCallback(() => drone.current, []);
+  // The marks follow the 360° photo open over the drone photo, when there is one.
+  const markViewer = useCallback(() => openPanoViewer ?? drone.current, []);
 
   /* ----- "Find vej" ----- */
   const DESTINATIONS = useMemo<Destination[]>(
@@ -3363,10 +3394,6 @@ function TourExperience({
         ) : (
           <>
             <div ref={droneEl} className="absolute inset-0" />
-            {/* "En linje på": the moment's marks on the drone photo (e.g. Skolen and Gården, with a line between). */}
-            {phase === "drone" && lineRun && !lineRun.end && (lineStops[lineRun.at]?.marks?.length ?? 0) > 0 && (
-              <DroneMarks key={lineStopKey ?? ""} marks={lineStops[lineRun.at]!.marks!} viewer={droneViewer} />
-            )}
             {plan360On && (
               <>
                 <SitePlan360Layer T={T} viewer={droneViewer} scene={droneEl} state={plan360} onPick={(u) => setPlan360((st) => ({ ...st, picked: u }))} />
@@ -3670,6 +3697,10 @@ function TourExperience({
             if (fromMenu) setMenuOpen(true);
           }}
         />
+      )}
+      {/* "En linje på": the moment's marks (e.g. Skolen and Gården, with a line between) - on the drone photo, or the 360° photo open over it. */}
+      {lineRun && !lineRun.end && (lineStops[lineRun.at]?.marks?.length ?? 0) > 0 && (phase === "drone" || pano) && (
+        <DroneMarks key={`${lineStopKey ?? ""}${pano?.id ?? ""}`} marks={lineStops[lineRun.at]!.marks!} viewer={markViewer} />
       )}
       {lightbox && <Lightbox key={lightbox.title + lightbox.at} state={lightbox} onClose={() => setLightbox(null)} />}
       {guideImage && guideAt != null && (
@@ -4528,6 +4559,8 @@ function prefetchPano(url: string, priority: "low" | "high" = "low"): Promise<vo
 
 /** The 360° picture open right now (PanoView) - the editor asks for its view to save where it starts and how zoomed. */
 let openPanoView: (() => { yaw: number; pitch: number; hfov: number; image?: string }) | null = null;
+/** The open 360° picture's viewer itself (for marks drawn on it, and picking a place on it in the editor). */
+let openPanoViewer: PannellumViewer | null = null;
 
 function PanoView({
   name,
@@ -4630,6 +4663,7 @@ function PanoView({
       if ((v as unknown as { isLoaded?: () => boolean }).isLoaded?.()) reveal();
       setTimeout(reveal, 2500);
       openPanoView = () => ({ yaw: v.getYaw(), pitch: v.getPitch(), hfov: v.getHfov(), image });
+      openPanoViewer = v;
       if (!later) return;
       // The sharp copy: fetched meanwhile, then a second viewer over the first - same view - shown once it has drawn, and the small one let go.
       let firstShown = false;
@@ -4645,6 +4679,7 @@ function PanoView({
           s.lookAt(v.getPitch(), v.getYaw(), v.getHfov(), 0);
           sharpBox.classList.add("hv-pano-skarp-vist");
           openPanoView = () => ({ yaw: s.getYaw(), pitch: s.getPitch(), hfov: s.getHfov(), image });
+          openPanoViewer = s;
           setTimeout(() => {
             if (viewer === v) {
               v.destroy();
@@ -4668,6 +4703,7 @@ function PanoView({
       cancelled = true;
       sized?.disconnect();
       openPanoView = null;
+      openPanoViewer = null;
       viewer?.destroy();
       sharpViewer?.destroy();
       sharpBox?.classList.remove("hv-pano-skarp-vist");
@@ -4842,6 +4878,7 @@ html:has(.hv.fixed),html:has(.hv.fixed) body{overflow:hidden;overscroll-behavior
 @keyframes hvKantH{50%{transform:translateX(3px)}}
 @media (max-width:640px){.hv-kantpil .hv-pil-navn{display:none}.hv-kantpil[data-side=left]{left:8px}.hv-kantpil[data-side=right]{right:8px}}
 @media (prefers-reduced-motion:reduce){.hv-kantpil .hv-pil-ikon{animation:none}}
+.hv-pick-hint{position:fixed;left:50%;top:18px;translate:-50% 0;z-index:2147483600;padding:10px 18px;border-radius:999px;background:#1d1d1f;color:#fff;font-weight:700;font-size:14px;box-shadow:0 8px 24px rgba(0,0,0,.35);pointer-events:none;animation:hvFade .25s ease}
 .hv-pil{position:relative;transform:translate(-50%,-50%);display:flex;align-items:center;gap:8px;padding:6px 14px 6px 6px;border-radius:999px;background:rgba(255,255,255,.94);color:#1d1d1f;font-weight:700;font-size:13px;line-height:1.1;white-space:nowrap;box-shadow:0 6px 18px rgba(0,0,0,.28);cursor:pointer;animation:hvPilPuls 2.4s ease-in-out infinite}
 .hv-pil:not(:has(.hv-pil-navn)){padding:6px}
 .hv-pil-ikon{display:grid;place-items:center;width:30px;height:30px;border-radius:50%;background:var(--c-main,#1d1d1f);color:#fff}

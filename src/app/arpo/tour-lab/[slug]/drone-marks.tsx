@@ -94,7 +94,7 @@ export function DroneMarks({ marks, viewer }: { marks: DroneMark[]; viewer: () =
 }
 
 const DM_CSS = `
-.dm{position:absolute;inset:0;z-index:4;pointer-events:none;animation:hvFade .5s ease}
+.dm{position:absolute;inset:0;z-index:20;pointer-events:none;animation:hvFade .5s ease}
 .dm-svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
 .dm-linje{fill:none;stroke:#fff;stroke-width:3;stroke-linecap:round;stroke-dasharray:2 9;filter:drop-shadow(0 1px 3px rgba(0,0,0,.5));animation:dmGaa 1.2s linear infinite}
 @keyframes dmGaa{to{stroke-dashoffset:-22}}
