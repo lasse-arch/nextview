@@ -9,6 +9,7 @@
 export type EngineChange = { date: string; kind: "ny" | "sikkerhed" | "hastighed" | "rettelse"; text: string };
 
 export const ENGINE_CHANGES: EngineChange[] = [
+  { date: "2026-11-24", kind: "ny", text: "Luftfotoet: pile, der viser, at der er mere at se bagved, til venstre eller til højre - et tryk drejer billedet derhen. En linje på: et 360°-foto vises ikke længere fladt (touren går direkte til stedet, og på kortet ses kun horisonten), og personerne er større. Nyt valg: fotos som en række på kortet, mens stedet i touren står frit." },
   { date: "2026-11-24", kind: "ny", text: "En linje på: kortet med foto og tekst kan være lille, mellem eller stort (Størrelse på kortet i editoren)." },
   { date: "2026-11-24", kind: "rettelse", text: "\"Hvor de kigger\" tæller kun, mens den besøgende er der: intet efter 20 sekunder uden et tryk, en klik eller en drejning, og højst 3 minutter pr. stop. En tour, der stod åben ved startpunktet, talte før hvert sekund." },
   { date: "2026-11-19", kind: "rettelse", text: "En linje på: trykker man Næste eller Tilbage, mens touren er på vej, flyver den ikke to steder hen på én gang - den gør turen færdig og går så direkte til det sidst valgte. Fremvisningens Stedkort vender touren den vej, rummet er ment at blive set. Den nærmeste rundvisningsdato har ringen hele vejen rundt." },

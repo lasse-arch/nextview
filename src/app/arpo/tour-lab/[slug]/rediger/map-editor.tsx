@@ -11,7 +11,7 @@ import { ICONS, ICON_NAMES, guessIcon } from "../../tours/icons";
 import { PANO_HFOV, isPlaceHref, panoHfov, pointOfHref } from "../../tours/places";
 import { fitPano } from "../../tours/pano-cover";
 import "pannellum/build/pannellum.css";
-import type { DroneLook, TourConfig, TourPoint } from "../../tours/types";
+import type { DroneArrow, DroneLook, TourConfig, TourPoint } from "../../tours/types";
 import { Choice, EnterLabelField, Field, FilesContext, Group, Icon, input, PanoZoom, Toggle, UploadButton, type PreviewApi } from "./ui";
 import { AiImageButton, AiImageList } from "./ai-image";
 
@@ -99,6 +99,7 @@ export function MapEditor({ config, edit, focus, preview, slug }: { config: Tour
       <>
       {config.drone && <OverviewUiToggles config={config} edit={edit} preview={preview} />}
       {config.drone && <DroneLookEditor config={config} edit={edit} panorama={Boolean(config.drone.panorama)} />}
+      {config.drone && preview && <DroneArrowsEditor config={config} edit={edit} preview={preview} />}
       {config.drone && <DroneToMap config={config} edit={edit} />}
       <MapPageImport config={config} edit={edit} />
       <Group>
@@ -1409,6 +1410,76 @@ function CategoriesPanel({ config, edit }: { config: TourConfig; edit: Edit }) {
       >
         + Kategori
       </button>
+    </Group>
+  );
+}
+
+/* ----- "Pile på luftfotoet": there's more to see that way - a tap turns the photo there. ----- */
+
+function DroneArrowsEditor({ config, edit, preview }: { config: TourConfig; edit: Edit; preview: PreviewApi }) {
+  const arrows = config.droneArrows ?? [];
+  const [msg, setMsg] = useState<string | null>(null);
+  const put = (i: number, patch: Partial<DroneArrow> | null) =>
+    edit((d) => {
+      const list = [...(d.droneArrows ?? [])];
+      if (patch === null) list.splice(i, 1);
+      else list[i] = { ...list[i], ...patch };
+      d.droneArrows = list.length ? list : undefined;
+    });
+  /** The middle of what the preview shows now. */
+  const here = async () => {
+    setMsg(null);
+    const v = await preview.droneView();
+    if (v.error || v.yaw == null || v.pitch == null) {
+      setMsg(v.error ?? "Åbn luftfotoet i forhåndsvisningen først.");
+      return null;
+    }
+    return { yaw: Math.round(v.yaw * 10) / 10, pitch: Math.round(v.pitch * 10) / 10 };
+  };
+  return (
+    <Group title="Pile på luftfotoet">
+      <p className="px-1 text-[12.5px] leading-snug text-[#6e6e73]">
+        En pil viser, at der er mere at se bagved, til venstre eller til højre. Et tryk drejer billedet derhen. Drej forhåndsvisningen, så pilen skal stå midt i billedet, og tryk &quot;Pilen står her&quot;. Drej så derhen, den skal vise, og tryk &quot;Den drejer hertil&quot;.
+      </p>
+      {arrows.map((a, i) => {
+        const turn = ((a.to.yaw - a.yaw + 540) % 360) - 180;
+        const dir = Math.abs(turn) > 135 ? "bagud" : turn > 0 ? "til højre" : "til venstre";
+        return (
+          <div key={a.id} className="space-y-2 rounded-xl bg-white p-3 ring-1 ring-black/[.06]">
+            <div className="flex items-center gap-2">
+              <input className={`${input} flex-1 bg-white`} placeholder="Tekst på pilen, fx Hallen og banerne" value={a.label ?? ""} onChange={(e) => put(i, { label: e.target.value || undefined })} />
+              <button type="button" onClick={() => put(i, null)} className="rounded-lg px-2 py-1 text-[13px] text-[#ff3b30] hover:bg-[#ff3b30]/10">
+                Fjern
+              </button>
+            </div>
+            <div className="flex gap-1.5">
+              <button type="button" className="flex-1 rounded-lg bg-[#f2f2f7] px-2 py-1.5 text-[13px] font-medium text-[#0071e3]" onClick={async () => { const v = await here(); if (v) put(i, v); }}>
+                Pilen står her
+              </button>
+              <button type="button" className="flex-1 rounded-lg bg-[#f2f2f7] px-2 py-1.5 text-[13px] font-medium text-[#0071e3]" onClick={async () => { const v = await here(); if (v) put(i, { to: v }); }}>
+                Den drejer hertil
+              </button>
+            </div>
+            <p className="px-1 text-[12px] text-[#8e8e93]">Peger {dir}.</p>
+          </div>
+        );
+      })}
+      <button
+        type="button"
+        className="px-1 text-left text-[13px] font-medium text-[#0071e3] hover:underline"
+        onClick={async () => {
+          const v = await here();
+          if (!v) return;
+          const ids = new Set(arrows.map((a) => a.id));
+          let n = arrows.length + 1;
+          while (ids.has(`pil-${n}`)) n++;
+          // Pointed round (behind you) until it's told where.
+          edit((d) => void (d.droneArrows = [...(d.droneArrows ?? []), { id: `pil-${n}`, ...v, to: { yaw: ((v.yaw + 360) % 360) - 180 } }]));
+        }}
+      >
+        + Ny pil, der hvor forhåndsvisningen kigger
+      </button>
+      {msg && <p className="px-1 text-[12.5px] text-[#ff3b30]">{msg}</p>}
     </Group>
   );
 }

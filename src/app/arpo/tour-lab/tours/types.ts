@@ -545,6 +545,12 @@ export type TourConfig = {
    */
   droneLook?: { desktop?: DroneLook; mobile?: DroneLook };
   /**
+   * Arrows on the 360° drone photo saying there's more to see that way (behind
+   * the visitor, to the left, to the right): placed at yaw/pitch, a tap turns
+   * the view to `to`. The arrow points left, right or round, from where `to` is.
+   */
+  droneArrows?: DroneArrow[];
+  /**
    * false: the tour starts inside (the 3D tour), and the aerial photo / map is
    * only shown from a menu item (or a tile) linking to it - no "back to the air"
    * button in the tour. Left out: the tour starts on the aerial photo.
@@ -828,6 +834,8 @@ export type TourConfig = {
     menu?: "top" | "bottom";
     /** How big the card is when a moment's photos are shown beside its text (no place in the tour): "small", "medium" (default) or "large". */
     size?: "small" | "medium" | "large";
+    /** A moment's photos when it has a place in the tour: "reveal" (default - the first fills the screen and tones into the place) or "strip" (the place stays free to look around in, the photos a row on the card - a tap shows one big). */
+    photosAtPlace?: "reveal" | "strip";
     visit?: { title: string; text?: string; label: string; href: string };
     /** The people on the day's card: "all" (default - the whole list where they're met first, then small faces), "one" (only the first, with name and role), "faces" (always only small faces and the first names). */
     people?: "all" | "one" | "faces";
@@ -1165,4 +1173,15 @@ export type TourConfig = {
   matterportParams: Record<string, string>;
   /** How long a fly to a spot takes (ms). */
   flyMs: number;
+};
+
+export type DroneArrow = {
+  /** Short and unique, e.g. "bagved". */
+  id: string;
+  yaw: number;
+  pitch: number;
+  /** The words on it, e.g. "Hallen og banerne". Left out: just the arrow. */
+  label?: string;
+  /** Where a tap turns the view (pitch left out: as it is). */
+  to: { yaw: number; pitch?: number };
 };

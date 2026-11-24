@@ -87,14 +87,25 @@ function Faces({ people, size = 34 }: { people?: CardPerson[]; size?: number }) 
 }
 
 /** A photo that fades in once it's there - on a soft, moving placeholder until then (also when it was already in the cache). */
-function FadeImg({ src, alt = "", eager = false }: { src: string; alt?: string; eager?: boolean }) {
+/** A 360° photo (equirectangular, twice as wide as high) - never shown flat as it is. */
+const isPano = (img: HTMLImageElement) => Math.abs(img.naturalWidth / Math.max(1, img.naturalHeight) - 2) < 0.05;
+
+function FadeImg({ src, alt = "", eager = false, onPano }: { src: string; alt?: string; eager?: boolean; /** Told when the photo turns out to be a 360° one. */ onPano?: () => void }) {
   const [shown, setShown] = useState(false);
+  const [pano, setPano] = useState(false);
+  const loaded = (el: HTMLImageElement) => {
+    setShown(true);
+    if (isPano(el)) {
+      setPano(true);
+      onPano?.();
+    }
+  };
   return (
-    <span className={`ld-img ${shown ? "klar" : ""}`}>
+    <span className={`ld-img ${shown ? "klar" : ""} ${pano ? "pano" : ""}`}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         ref={(el) => {
-          if (el?.complete && el.naturalWidth) setShown(true);
+          if (el?.complete && el.naturalWidth) loaded(el);
         }}
         src={src}
         alt={alt}
@@ -102,7 +113,7 @@ function FadeImg({ src, alt = "", eager = false }: { src: string; alt?: string; 
         decoding="async"
         fetchPriority={eager ? "high" : "low"}
         draggable={false}
-        onLoad={() => setShown(true)}
+        onLoad={(e) => loaded(e.currentTarget)}
         onError={() => setShown(true)}
       />
     </span>
@@ -203,6 +214,8 @@ export function LineDayCard({ L, stops, run, onGo, onClose }: { L: L; stops: Sho
       img.src = src;
     }
   }, [coming]);
+  // A photo of the "strip" open big (which moment it belongs to, and which photo).
+  const [big, setBig] = useState<{ stop: string; at: number } | null>(null);
   const s = stops[run.at];
   if (!s) return null;
   const next = stops[run.at + 1];
@@ -216,11 +229,14 @@ export function LineDayCard({ L, stops, run, onGo, onClose }: { L: L; stops: Sho
   const photos = (s.images ?? []).filter(Boolean).slice(0, 3);
   const placed = Boolean(s.href);
   const stor = photos.length > 0 && !placed;
+  // The place in the tour stays free to look around in; the photos are a row on the card instead.
+  const strip = placed && photos.length > 0 && L.photosAtPlace === "strip";
+  const bigAt = big && big.stop === `${s.id}:${run.at}` ? big.at : null;
   const label = (x: ShownStop) => [x.time, x.title].filter(Boolean).join(" ");
   return (
     <>
       {photos.length > 0 &&
-        (placed ? (
+        (strip ? null : placed ? (
           <StopReveal key={`${s.id}:${run.at}`} src={photos[0]} alt={s.title} />
         ) : (
           // No place: the tour blurred behind, and the photos are part of the card (one panel - photo and words together).
@@ -248,6 +264,15 @@ export function LineDayCard({ L, stops, run, onGo, onClose }: { L: L; stops: Sho
       </div>
       <h3>{s.title}</h3>
       {s.text && <LongText key={s.id + run.at} text={s.text} />}
+      {strip && (
+        <ScrollRow className="ld-strip">
+          {photos.map((src, i) => (
+            <button key={src + i} type="button" className="ld-strip-foto" aria-label={tr("Vis billedet stort")} onClick={() => setBig({ stop: `${s.id}:${run.at}`, at: i })}>
+              <FadeImg src={src} alt={i === 0 ? s.title : ""} eager={i === 0} />
+            </button>
+          ))}
+        </ScrollRow>
+      )}
       {/* Small facts only on the overview - on a moment they only made the card taller. */}
       {s.intro && s.tags?.length ? (
         <ScrollRow className="ld-tags">
@@ -258,7 +283,7 @@ export function LineDayCard({ L, stops, run, onGo, onClose }: { L: L; stops: Sho
       ) : null}
       {people?.length && metBefore && L.people !== "one" ? (
         <div className="ld-people-kort">
-          <Faces people={people} size={28} />
+          <Faces people={people} size={42} />
           <small>{tr("Med {navne}", { navne: names(people) })}</small>
         </div>
       ) : people?.length ? (
@@ -288,6 +313,26 @@ export function LineDayCard({ L, stops, run, onGo, onClose }: { L: L; stops: Sho
         </button>
       </div>
     </div>
+      {bigAt !== null && (
+        <div className="ld-big" role="dialog" aria-label={s.title} onClick={() => setBig(null)}>
+          <span className="ld-reveal-bag" style={{ backgroundImage: `url(${JSON.stringify(photos[bigAt])})` }} aria-hidden />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={photos[bigAt]} alt={s.title} onClick={(e) => e.stopPropagation()} />
+          {photos.length > 1 && (
+            <>
+              <button type="button" className="ld-photo-pil forrige" aria-label={tr("Forrige billede")} onClick={(e) => (e.stopPropagation(), setBig({ stop: `${s.id}:${run.at}`, at: (bigAt + photos.length - 1) % photos.length }))}>
+                ‹
+              </button>
+              <button type="button" className="ld-photo-pil naeste" aria-label={tr("Næste billede")} onClick={(e) => (e.stopPropagation(), setBig({ stop: `${s.id}:${run.at}`, at: (bigAt + 1) % photos.length }))}>
+                ›
+              </button>
+            </>
+          )}
+          <button type="button" className="ld-x2 ld-big-x" aria-label={tr("Luk")} onClick={() => setBig(null)}>
+            ×
+          </button>
+        </div>
+      )}
     </>
   );
 }
@@ -380,7 +425,8 @@ function StopReveal({ src, alt }: { src: string; alt: string }) {
       {/* The whole photo, never cut - on a blurred copy of itself that fills the screen. */}
       <span className="ld-reveal-bag" style={{ backgroundImage: `url(${JSON.stringify(src)})` }} aria-hidden />
       <span className="ld-reveal-foto">
-        <FadeImg src={src} alt={alt} eager />
+        {/* A 360° photo isn't shown flat: straight to the place in the tour instead. */}
+        <FadeImg src={src} alt={alt} eager onPano={() => setPhase("gone")} />
       </span>
     </div>
   );
@@ -461,7 +507,7 @@ export const LINE_DAY_CSS = `
 .ld-line small{font-size:13px;line-height:1.35;color:#6b7a80}
 .ld-faces{display:flex}
 .ld-faces img{border-radius:50%;object-fit:cover;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.18)}
-.ld-faces img+img{margin-left:-10px}
+.ld-faces img+img{margin-left:-12px}
 .ld-or{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:16px}
 .ld-or button{border:0;background:none;padding:6px 0;font:inherit;font-size:14px;font-weight:700;color:var(--c-accent);cursor:pointer}
 /* The line's photo on the picker: the tile is the photo, with the faces and the name on it. */
@@ -543,11 +589,11 @@ export const LINE_DAY_CSS = `
 .ld-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
 .ld-tags span{padding:4px 10px;border-radius:999px;background:var(--c-soft);font-size:12.5px;font-weight:700;color:var(--c-main)}
 .ld-people{display:flex;flex-wrap:wrap;gap:10px 14px;margin-top:12px}
-.ld-people-kort{display:flex;align-items:center;gap:8px;margin-top:10px;min-width:0}
-.ld-people-kort small{min-width:0;font-size:12.5px;font-weight:700;color:#56636a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ld-people-kort{display:flex;align-items:center;gap:10px;margin-top:12px;min-width:0}
+.ld-people-kort small{min-width:0;font-size:13.5px;font-weight:700;color:#56636a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ld-people>span{display:flex;align-items:center;gap:8px;min-width:0}
-.ld-people img{width:42px;height:42px;border-radius:50%;object-fit:cover;flex:none}
-.ld-people b{display:block;font-size:13.5px}
+.ld-people img{width:52px;height:52px;border-radius:50%;object-fit:cover;flex:none}
+.ld-people b{display:block;font-size:14px}
 .ld-people small{display:block;font-size:12px;color:#6b7a80}
 .ld-nav{display:flex;gap:8px;margin-top:14px}
 .ld-nav button{border:0;border-radius:12px;font:inherit;font-weight:800;cursor:pointer}
@@ -564,6 +610,20 @@ export const LINE_DAY_CSS = `
 .ld-photo{flex:0 0 100%;scroll-snap-align:center;scroll-snap-stop:always;height:100%}
 .ld-img{position:relative;display:block;width:100%;height:100%;overflow:hidden;background:linear-gradient(100deg,#e7eaec 30%,#f3f5f6 50%,#e7eaec 70%) 0 0/300% 100%;animation:ldShimmer 1.4s linear infinite}
 .ld-img.klar{animation:none;background:#e9ecee}
+/* "strip": the moment's photos in a row on the card while the place stays free. */
+.ld-strip{display:flex;gap:8px;margin-top:12px;overflow-x:auto;scrollbar-width:none}
+.ld-strip::-webkit-scrollbar{display:none}
+.ld-strip-foto{flex:none;width:132px;height:92px;padding:0;border:0;border-radius:12px;overflow:hidden;cursor:zoom-in;box-shadow:0 2px 8px rgba(0,0,0,.12);transition:transform .2s}
+.ld-strip-foto:hover{transform:translateY(-2px)}
+.ld-big{position:fixed;inset:0;z-index:90;display:flex;align-items:center;justify-content:center;background:rgba(8,10,12,.6);animation:hvFade .3s ease}
+.ld-big>img{position:relative;max-width:min(1200px,calc(100% - 120px));max-height:calc(100% - 100px);border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.45);object-fit:contain}
+.ld-big .ld-photo-pil{position:absolute;top:50%;translate:0 -50%;opacity:1}
+.ld-big .ld-photo-pil.forrige{left:20px}
+.ld-big .ld-photo-pil.naeste{right:20px}
+.ld-big-x{position:absolute!important;top:18px;right:18px}
+@media (max-width:640px){.ld-strip-foto{width:104px;height:74px}.ld-big>img{max-width:calc(100% - 24px)}}
+/* A 360° photo on a card: only its middle band (the horizon), not the stretched sky and ground. */
+.ld-img.pano img{object-position:50% 58%;transform:scale(1.9)!important}
 .ld-img img{display:block;width:100%;height:100%;object-fit:cover;opacity:0;transform:scale(1.02);transition:opacity .4s ease,transform .6s cubic-bezier(.2,.7,.2,1)}
 .ld-img.klar img{opacity:1;transform:none}
 @keyframes ldShimmer{from{background-position:100% 0}to{background-position:-50% 0}}
@@ -626,7 +686,7 @@ export const LINE_DAY_CSS = `
   .ld-nav{margin-top:10px}
   .ld-next{padding:10px 12px;font-size:14px}
   .ld-people-kort{margin-top:8px}
-  .ld-people-kort .ld-faces img{width:24px!important;height:24px!important}
+  .ld-people-kort .ld-faces img{width:36px!important;height:36px!important}
   .ld-chips{gap:5px}
   .ld-chips button{padding:6px 10px;font-size:12.5px}
   .ld-card h3{font-size:19px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}

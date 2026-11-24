@@ -138,6 +138,16 @@ export function LineDayEditor({ config, edit, preview }: { config: TourConfig; e
             onChange={(v) => set((l) => void (v === "none" ? delete l.menu : (l.menu = v)))}
           />
         </Field>
+        <Field title="Fotos ved et sted i touren" hint="Når et øjeblik har både et sted i touren og fotos: det første foto fylder skærmen og toner over i stedet, eller stedet står frit (man kan kigge rundt), og fotoene ligger som en række på kortet, der kan åbnes store.">
+          <Choice<"reveal" | "strip">
+            value={L.photosAtPlace ?? "reveal"}
+            options={[
+              ["reveal", "Fylder skærmen først"],
+              ["strip", "Række på kortet"],
+            ]}
+            onChange={(v) => set((l) => void (v === "reveal" ? delete l.photosAtPlace : (l.photosAtPlace = v)))}
+          />
+        </Field>
         <Field title="Størrelse på kortet" hint="Kortet med foto til venstre og tekst til højre (øjeblikke uden et sted i touren). Kun på computer - på mobil fylder det skærmen.">
           <Choice<"small" | "medium" | "large">
             value={L.size ?? "medium"}

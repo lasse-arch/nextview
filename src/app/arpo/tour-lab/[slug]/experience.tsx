@@ -25,7 +25,7 @@ import { SITE_PLAN_CSS, SitePlanControls, SitePlanLegend, type SitePlanState } f
 import { FeatureTour, featuresSeen, FEATURES_CSS, type DemoContact } from "./features";
 import { FinderSheet, FINDER_CSS, WalkLines } from "./finder";
 import { apiUrl, isStaticTour } from "../tours/api";
-import type { DroneView, FindStepAside, GuideTurn, MenuEntry, PanoCover, StagingItem, TourConfig, TourPlace, TourPoint, WelcomeGo } from "../tours/types";
+import type { DroneArrow, DroneView, FindStepAside, GuideTurn, MenuEntry, PanoCover, StagingItem, TourConfig, TourPlace, TourPoint, WelcomeGo } from "../tours/types";
 import { sideCtas } from "../tours/types";
 import { contrast } from "../tours/contrast";
 import { CoverWelcome, DESIGNS_CSS, DockMenu, PickerMenu, WelcomeFilm, welcomeFilmClass } from "./designs";
@@ -254,6 +254,11 @@ const overlaps = (a: Box, b: Box) => a.left < b.right && b.left < a.right && a.t
  * With names set to "Altid" a name is only hidden where it would lie on top
  * of another name or icon (text over text can't be read anyway).
  */
+/** The arrows on the drone photo (droneArrows): left, right, and round (behind you). */
+const ARROW_LEFT = '<path d="M19 12H5M11 6l-6 6 6 6"/>';
+const ARROW_RIGHT = '<path d="M5 12h14M13 6l6 6-6 6"/>';
+const ARROW_BACK = '<path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>';
+
 function declutterNames(selected: string | null) {
   const points = [...document.querySelectorAll<HTMLElement>(".hv-hs[data-punkt]:not(.hv-skjult)")].filter((el) => el.style.visibility !== "hidden");
   points.sort((a, b) => Number(b.dataset.punkt === selected) - Number(a.dataset.punkt === selected));
@@ -1556,6 +1561,8 @@ function TourExperience({
   const droneWaiting = Boolean(T.drone && !T.map) && droneLoaded !== droneKey;
   const droneT = useRef(T);
   const openPointRef = useRef(openPoint);
+  /** Turns the drone photo to an arrow's view (set when the photo is made). */
+  const turnToRef = useRef<(id: string) => void>(() => {});
   useEffect(() => {
     droneT.current = T;
     openPointRef.current = openPoint;
@@ -1599,6 +1606,39 @@ function TourExperience({
           });
         },
       }));
+      // Arrows: there's more that way - a tap turns the view there.
+      const turnTo = (a: DroneArrow) => {
+        const v = drone.current;
+        if (!v) return;
+        v.lookAt(a.to.pitch ?? v.getPitch(), a.to.yaw, v.getHfov(), 1100);
+        track("drone_arrow", { label: a.label || a.id });
+      };
+      turnToRef.current = (id: string) => {
+        const a = (T.droneArrows ?? []).find((x) => x.id === id);
+        if (a) turnTo(a);
+      };
+      for (const a of T.droneArrows ?? []) {
+        const turn = ((a.to.yaw - a.yaw + 540) % 360) - 180;
+        const path = Math.abs(turn) > 135 ? ARROW_BACK : turn > 0 ? ARROW_RIGHT : ARROW_LEFT;
+        hotSpots.push({
+          id: `pil-${a.id}`,
+          pitch: a.pitch,
+          yaw: a.yaw,
+          cssClass: "hv-hs hv-pil-hs",
+          createTooltipFunc: (el) => {
+            el.dataset.pil = a.id;
+            el.innerHTML = `<div class="hv-pil"><span class="hv-pil-ikon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">${path}</svg></span>${a.label ? `<span class="hv-pil-navn">${escapeHtml(a.label)}</span>` : ""}</div>`;
+            let down: { x: number; y: number } | null = null;
+            el.addEventListener("pointerdown", (e) => void (down = { x: e.clientX, y: e.clientY }));
+            el.addEventListener("click", (e) => {
+              e.stopPropagation();
+              const moved = down ? Math.hypot(e.clientX - down.x, e.clientY - down.y) : 0;
+              down = null;
+              if (moved <= 10) turnTo(a);
+            });
+          },
+        });
+      }
       drone.current = window.pannellum.viewer(droneEl.current, fitPano({
         // One uploaded 360° photo, or the drone's prepared tiles.
         ...(D.panorama
@@ -1677,7 +1717,12 @@ function TourExperience({
             if (!best || d < best.d) best = { el, d };
           }
           const point = best && T.points.find((x) => x.id === best.el.dataset.punkt);
-          if (point) openPointRef.current(point);
+          if (point) return openPointRef.current(point);
+          // An arrow under the finger: turn the view.
+          for (const el of box.querySelectorAll<HTMLElement>(".hv-hs[data-pil]")) {
+            const r = el.getBoundingClientRect();
+            if (r.width && e.clientX >= r.left - 8 && e.clientX <= r.right + 8 && e.clientY >= r.top - 8 && e.clientY <= r.bottom + 8) return turnToRef.current(el.dataset.pil!);
+          }
         };
         const cancel = (e: PointerEvent) => void fingers.delete(e.pointerId);
         box.addEventListener("pointerdown", down, true);
@@ -4730,6 +4775,12 @@ html:has(.hv.fixed),html:has(.hv.fixed) body{overflow:hidden;overscroll-behavior
 .hv-hs.hv-aktiv .hv-ikon{transform:scale(1.18);box-shadow:0 0 0 4px rgba(255,255,255,.55),0 3px 10px rgba(0,0,0,.35)}
 /* The icon's centre is the place it marks, so it stays put at every zoom; the name hangs below it. */
 .hv-pkt{position:relative;transform:translate(-50%,-50%) scale(var(--pkt-d,1));cursor:pointer;pointer-events:none}
+.hv-pil{position:relative;transform:translate(-50%,-50%);display:flex;align-items:center;gap:8px;padding:6px 14px 6px 6px;border-radius:999px;background:rgba(255,255,255,.94);color:#1d1d1f;font-weight:700;font-size:13px;line-height:1.1;white-space:nowrap;box-shadow:0 6px 18px rgba(0,0,0,.28);cursor:pointer;animation:hvPilPuls 2.4s ease-in-out infinite}
+.hv-pil:not(:has(.hv-pil-navn)){padding:6px}
+.hv-pil-ikon{display:grid;place-items:center;width:30px;height:30px;border-radius:50%;background:var(--c-main,#1d1d1f);color:#fff}
+.hv-pil-ikon svg{width:18px;height:18px}
+@keyframes hvPilPuls{0%,100%{box-shadow:0 6px 18px rgba(0,0,0,.28),0 0 0 0 rgba(255,255,255,.55)}50%{box-shadow:0 6px 18px rgba(0,0,0,.28),0 0 0 10px rgba(255,255,255,0)}}
+@media (prefers-reduced-motion:reduce){.hv-pil{animation:none}}
 .hv-ikon,.hv-navn{pointer-events:auto}
 .hv-ikon{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;border:3px solid #fff;box-shadow:0 3px 10px rgba(0,0,0,.35);transition:transform .15s}
 .hv-ikon svg{width:17px;height:17px}
