@@ -9,6 +9,7 @@
 export type EngineChange = { date: string; kind: "ny" | "sikkerhed" | "hastighed" | "rettelse"; text: string };
 
 export const ENGINE_CHANGES: EngineChange[] = [
+  { date: "2026-11-24", kind: "ny", text: "Se det i brug: billederne fylder meget mere på computer (op til 1320 px bredt), med større tekst." },
   { date: "2026-11-24", kind: "ny", text: "En linje på: personerne er store på computer (72 px), så man kan se, hvem det er." },
   { date: "2026-11-24", kind: "ny", text: "Luftfotoet: pile ude i siden af billedet (eller på fotoet), der viser, at der er mere at se til venstre, til højre eller bagved - et tryk drejer billedet derhen. En linje på: et 360°-foto vises ikke længere fladt (touren går direkte til stedet, og på kortet ses kun horisonten), og personerne er større. Nyt valg: fotos som en række på kortet, mens stedet i touren står frit." },
   { date: "2026-11-24", kind: "ny", text: "En linje på: kortet med foto og tekst kan være lille, mellem eller stort (Størrelse på kortet i editoren)." },

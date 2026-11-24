@@ -214,6 +214,16 @@ export const IN_USE_CSS = `
 .iu-gal-tekst h3{margin:0 30px 0 0;font-size:24px;line-height:1.15;font-weight:800;color:var(--c-main)}
 .iu-gal-tekst p{margin:0;font-size:15px;line-height:1.55;color:#33474d}
 .iu-gal-knap{align-self:flex-start;margin-top:4px;border-radius:999px;padding:12px 20px;background:var(--c-accent);color:var(--c-on-accent,#fff);font-weight:800;font-size:14.5px;text-decoration:none}
+/* On a computer it fills the room there is: a big photo, bigger words. */
+@media (min-width:761px){
+  .iu-gal-ark{width:min(1320px,calc(100% - 64px));max-height:calc(100% - 48px);grid-template-columns:minmax(0,2fr) minmax(0,1fr)}
+  .iu-gal-foto{min-height:0;height:min(76vh,780px)}
+  .iu-gal-tekst{padding:40px 36px;gap:16px;overflow-y:auto}
+  .iu-gal-tekst h3{font-size:30px}
+  .iu-gal-tekst p{font-size:17px;line-height:1.6}
+  .iu-gal-pil{width:50px;height:50px;font-size:30px}
+  .iu-gal-forrige{left:18px}.iu-gal-naeste{right:18px}
+}
 .iu-gal-luk{position:absolute;top:12px;right:12px;width:34px;height:34px;border:0;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;font-size:20px;line-height:1;cursor:pointer}
 @media (max-width:760px){
   .iu-gal{align-items:flex-end}
