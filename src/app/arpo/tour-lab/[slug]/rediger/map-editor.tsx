@@ -156,6 +156,7 @@ export function MapEditor({ config, edit, focus, preview, slug }: { config: Tour
       {M.panorama && slug && <FlatFromPano config={config} edit={edit} />}
       <OverviewUiToggles config={config} edit={edit} preview={preview} />
       {M.panorama && <DroneLookEditor config={config} edit={edit} panorama />}
+      {M.panorama && preview && <DroneArrowsEditor config={config} edit={edit} preview={preview} />}
       <MapPageImport config={config} edit={edit} />
       <Group title="Billede">
         <div className="flex gap-2">
