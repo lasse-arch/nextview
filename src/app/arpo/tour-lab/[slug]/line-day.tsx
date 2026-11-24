@@ -590,6 +590,7 @@ export const LINE_DAY_CSS = `
 .ld-tags span{padding:4px 10px;border-radius:999px;background:var(--c-soft);font-size:12.5px;font-weight:700;color:var(--c-main)}
 .ld-people{display:flex;flex-wrap:wrap;gap:10px 14px;margin-top:12px}
 .ld-people-kort{display:flex;align-items:center;gap:10px;margin-top:12px;min-width:0}
+@media (min-width:641px){.ld-people-kort{gap:14px;margin-top:16px}.ld-people-kort .ld-faces img{width:72px!important;height:72px!important;border-width:3px}.ld-people-kort .ld-faces img+img{margin-left:-16px}.ld-people-kort small{font-size:15px}.ld-people img{width:72px;height:72px}.ld-people b{font-size:15px}}
 .ld-people-kort small{min-width:0;font-size:13.5px;font-weight:700;color:#56636a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ld-people>span{display:flex;align-items:center;gap:8px;min-width:0}
 .ld-people img{width:52px;height:52px;border-radius:50%;object-fit:cover;flex:none}
