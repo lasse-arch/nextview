@@ -240,18 +240,23 @@ export async function sendFixesDoneMail(slug: string, actor: { id: string; name:
     console.log(`[rettelser lavet] Mail til ${to}: ${mail.subject}\n${mail.bodyText}`);
   }
   await prisma.systemMail.create({ data: { dealId: deal.id, kind: "review_fixed", to, subject: mail.subject } }).catch(() => {});
+  let secondSent = false;
   if (second) {
     const m2 = mailFor(second.name);
     try {
       if (canSend) await sendSystemMail(sender, { to: [second.email], subject: m2.subject, bodyText: m2.bodyText, bodyHtml: m2.bodyHtml, fromName: "Nextview360", fromAddress: LOGIN_MAIL_FROM, replyTo: LOGIN_MAIL_FROM });
       else console.log(`[rettelser lavet] Mail til ${second.email}: ${m2.subject}`);
       await prisma.systemMail.create({ data: { dealId: deal.id, kind: "review_fixed", to: second.email, subject: m2.subject } }).catch(() => {});
+      secondSent = true;
     } catch (err) {
       await prisma.systemMail.create({ data: { dealId: deal.id, kind: "review_fixed", to: second.email, subject: m2.subject, error: (err instanceof Error ? err.message : String(err)).slice(0, 300) } }).catch(() => {});
     }
   }
-  await logActivity({ type: "DEAL_UPDATED", message: `Rettelser lavet - mail sendt til ${to}: ${dealName(deal)}`, actorId: actor.id, dealId: deal.id });
-  return second ? `${to} og ${second.email}` : to;
+  // Everyone it went to (and one that failed) in the one line.
+  const sentTo = secondSent ? `${to} og ${second!.email}` : to;
+  const failed = second && !secondSent ? ` (kunne ikke sendes til ${second.email})` : "";
+  await logActivity({ type: "DEAL_UPDATED", message: `Rettelser lavet - mail sendt til ${sentTo}${failed}: ${dealName(deal)}`, actorId: actor.id, dealId: deal.id });
+  return sentTo;
 }
 
 /**
