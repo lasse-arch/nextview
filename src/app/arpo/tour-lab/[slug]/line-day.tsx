@@ -93,15 +93,18 @@ const isPano = (img: HTMLImageElement) => Math.abs(img.naturalWidth / Math.max(1
 function FadeImg({ src, alt = "", eager = false, onPano }: { src: string; alt?: string; eager?: boolean; /** Told when the photo turns out to be a 360° one. */ onPano?: () => void }) {
   const [shown, setShown] = useState(false);
   const [pano, setPano] = useState(false);
+  // A wide photo (a drone's panorama, 2:1 or wider): shown whole, on a blurred copy of itself - never cut to its middle and blown up.
+  const [wide, setWide] = useState(false);
   const loaded = (el: HTMLImageElement) => {
     setShown(true);
+    setWide(el.naturalWidth / Math.max(1, el.naturalHeight) > 1.7);
     if (isPano(el)) {
       setPano(true);
       onPano?.();
     }
   };
   return (
-    <span className={`ld-img ${shown ? "klar" : ""} ${pano ? "pano" : ""}`}>
+    <span className={`ld-img ${shown ? "klar" : ""} ${pano ? "pano" : ""} ${wide ? "bred" : ""}`} style={wide ? { ["--bred" as string]: `url(${JSON.stringify(src)})` } : undefined}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         ref={(el) => {
@@ -633,8 +636,10 @@ export const LINE_DAY_CSS = `
 .ld-big .ld-photo-pil.naeste{right:20px}
 .ld-big-x{position:absolute!important;top:18px;right:18px}
 @media (max-width:640px){.ld-strip-foto{width:104px;height:74px}.ld-big>img{max-width:calc(100% - 24px)}}
-/* A 360° photo on a card: only its middle band (the horizon), not the stretched sky and ground. */
-.ld-img.pano img{object-position:50% 58%;transform:scale(1.9)!important}
+/* A wide photo (or a 360° one) on a card: whole, on a blurred copy of itself - not cut to its middle and blown up. */
+.ld-img.bred{background:none!important;animation:none!important}
+.ld-img.bred::before{content:"";position:absolute;inset:-20px;background:var(--bred) center/cover;filter:blur(18px) brightness(.85)}
+.ld-img.bred img{position:relative;object-fit:contain}
 .ld-img img{display:block;width:100%;height:100%;object-fit:cover;opacity:0;transform:scale(1.02);transition:opacity .4s ease,transform .6s cubic-bezier(.2,.7,.2,1)}
 .ld-img.klar img{opacity:1;transform:none}
 @keyframes ldShimmer{from{background-position:100% 0}to{background-position:-50% 0}}

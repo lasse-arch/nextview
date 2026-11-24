@@ -2047,7 +2047,7 @@ function ClaudePanel({
     for (let i = 0; i < pics.length; i += 3) {
       const made = await Promise.all(
         pics.slice(i, i + 3).map((f) =>
-          shrinkPhoto(f, 1600)
+          shrinkPhoto(f, 2400)
             .then((small) => uploadToTour(files.slug, small, files.blob))
             .catch((err: unknown) => (setUploadError(`Et billede kunne ikke uploades (${err instanceof Error ? err.message : err}).`), null))
         )
