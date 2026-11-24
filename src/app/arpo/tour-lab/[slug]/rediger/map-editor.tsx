@@ -1439,7 +1439,7 @@ function DroneArrowsEditor({ config, edit, preview }: { config: TourConfig; edit
   return (
     <Group title="Pile på luftfotoet">
       <p className="px-1 text-[12.5px] leading-snug text-[#6e6e73]">
-        En pil viser, at der er mere at se bagved, til venstre eller til højre. Et tryk drejer billedet derhen. Drej forhåndsvisningen, så pilen skal stå midt i billedet, og tryk &quot;Pilen står her&quot;. Drej så derhen, den skal vise, og tryk &quot;Den drejer hertil&quot;.
+        En pil viser, at der er mere at se til venstre, til højre eller bagved. Et tryk drejer billedet derhen. Drej forhåndsvisningen derhen, pilen skal vise, og tryk &quot;Den drejer hertil&quot;. Pilen står ude i siden af billedet, så længe det er uden for billedet. Vælg &quot;På billedet&quot;, hvis den i stedet skal stå et bestemt sted på fotoet (&quot;Pilen står her&quot;).
       </p>
       {arrows.map((a, i) => {
         const turn = ((a.to.yaw - a.yaw + 540) % 360) - 180;
@@ -1460,7 +1460,14 @@ function DroneArrowsEditor({ config, edit, preview }: { config: TourConfig; edit
                 Den drejer hertil
               </button>
             </div>
-            <p className="px-1 text-[12px] text-[#8e8e93]">Peger {dir}.</p>
+            <div className="flex gap-1 rounded-lg bg-[#f2f2f7] p-0.5 text-[12.5px] font-medium">
+              {([["edge", "Ude i siden"], ["scene", "På billedet"]] as const).map(([v, l]) => (
+                <button key={v} type="button" onClick={() => put(i, { place: v === "edge" ? undefined : v })} className={`flex-1 rounded-md py-1 ${(a.place ?? "edge") === v ? "bg-white shadow" : "text-[#1d1d1f]/70"}`}>
+                  {l}
+                </button>
+              ))}
+            </div>
+            <p className="px-1 text-[12px] text-[#8e8e93]">{(a.place ?? "edge") === "edge" ? `Står ude i siden, så længe det, den viser, er uden for billedet (peger ${dir} fra starten).` : `Står på billedet og peger ${dir}.`}</p>
           </div>
         );
       })}

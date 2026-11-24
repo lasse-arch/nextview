@@ -145,7 +145,7 @@ export function tourConfigProblem(config: unknown): string | null {
     const num = (n: unknown) => typeof n === "number" && Number.isFinite(n);
     if (!arr(c.droneArrows) || c.droneArrows.length > 20) return "Pilene på luftfotoet skal være en liste (højst 20).";
     for (const a of c.droneArrows) {
-      if (!obj(a) || !str(a.id) || !num(a.yaw) || !num(a.pitch) || !obj(a.to) || !num(a.to.yaw) || (a.to.pitch !== undefined && !num(a.to.pitch)) || (a.label !== undefined && typeof a.label !== "string"))
+      if (!obj(a) || !str(a.id) || !num(a.yaw) || !num(a.pitch) || !obj(a.to) || !num(a.to.yaw) || (a.to.pitch !== undefined && !num(a.to.pitch)) || (a.label !== undefined && typeof a.label !== "string") || (a.place !== undefined && a.place !== "edge" && a.place !== "scene"))
         return "En pil på luftfotoet mangler sin placering eller retning.";
     }
   }

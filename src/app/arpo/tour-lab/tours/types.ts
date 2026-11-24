@@ -1184,4 +1184,6 @@ export type DroneArrow = {
   label?: string;
   /** Where a tap turns the view (pitch left out: as it is). */
   to: { yaw: number; pitch?: number };
+  /** "edge" (default): out in the side of the screen, pointing that way, while what it shows is out of sight. "scene": on the photo, at yaw/pitch. */
+  place?: "edge" | "scene";
 };

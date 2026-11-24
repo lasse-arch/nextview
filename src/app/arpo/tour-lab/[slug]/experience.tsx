@@ -1577,6 +1577,7 @@ function TourExperience({
     let declutter = 0;
     let sized: ResizeObserver | null = null;
     let untouch: (() => void) | null = null;
+    let removeEdge: (() => void) | null = null;
     let shownTimer = 0;
     const key = droneKey;
     // The 360° photo's copy for this screen (made when the tour was saved), when there is one.
@@ -1617,7 +1618,7 @@ function TourExperience({
         const a = (T.droneArrows ?? []).find((x) => x.id === id);
         if (a) turnTo(a);
       };
-      for (const a of T.droneArrows ?? []) {
+      for (const a of (T.droneArrows ?? []).filter((x) => x.place === "scene")) {
         const turn = ((a.to.yaw - a.yaw + 540) % 360) - 180;
         const path = Math.abs(turn) > 135 ? ARROW_BACK : turn > 0 ? ARROW_RIGHT : ARROW_LEFT;
         hotSpots.push({
@@ -1690,7 +1691,55 @@ function TourExperience({
         sized = new ResizeObserver(() => drone.current?.resize());
         sized.observe(droneEl.current);
       }
-      declutter = window.setInterval(() => declutterNames(selectedId.current), 120);
+      // Arrows out in the side of the screen: there while what they show is out of sight, pointing that way.
+      const edgeArrows = (T.droneArrows ?? []).filter((a) => a.place !== "scene");
+      const edgeBox = edgeArrows.length && droneEl.current?.parentElement ? document.createElement("div") : null;
+      const edgeEls: HTMLButtonElement[] = [];
+      if (edgeBox) {
+        edgeBox.className = "hv-kantpile";
+        for (const a of edgeArrows) {
+          const b = document.createElement("button");
+          b.type = "button";
+          b.className = "hv-kantpil";
+          b.setAttribute("aria-label", a.label || "Mere at se");
+          b.innerHTML = `<span class="hv-pil-ikon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></svg></span>${a.label ? `<span class="hv-pil-navn">${escapeHtml(a.label)}</span>` : ""}`;
+          b.addEventListener("click", (e) => {
+            e.stopPropagation();
+            turnTo(a);
+          });
+          edgeBox.appendChild(b);
+          edgeEls.push(b);
+        }
+        droneEl.current!.parentElement!.appendChild(edgeBox);
+        removeEdge = () => edgeBox.remove();
+      }
+      const placeEdges = () => {
+        const v = drone.current;
+        if (!v || !edgeEls.length) return;
+        const yaw = v.getYaw();
+        const half = v.getHfov() / 2;
+        const seen = { left: 0, right: 0 };
+        edgeArrows.forEach((a, i) => {
+          const el = edgeEls[i];
+          const d = ((a.to.yaw - yaw + 540) % 360) - 180;
+          const out = Math.abs(d) > half * 0.8;
+          el.classList.toggle("vis", out);
+          if (!out) return;
+          const side = d > 0 ? "right" : "left";
+          el.dataset.side = side;
+          el.style.setProperty("--n", String(seen[side]++));
+          const path = Math.abs(d) > 135 ? ARROW_BACK : d > 0 ? ARROW_RIGHT : ARROW_LEFT;
+          const svg = el.querySelector("svg");
+          if (svg && svg.dataset.p !== path) {
+            svg.innerHTML = path;
+            svg.dataset.p = path;
+          }
+        });
+      };
+      declutter = window.setInterval(() => {
+        declutterNames(selectedId.current);
+        placeEdges();
+      }, 120);
       // Touch screens: the points let every touch through to the picture (so a pinch or a drag that starts on a point
       // still zooms and turns it) - a real tap is found here instead: one finger, hardly moved, quickly up, on a point.
       const box = droneEl.current;
@@ -1741,6 +1790,7 @@ function TourExperience({
       untouch?.();
       sized?.disconnect();
       window.clearInterval(declutter);
+      removeEdge?.();
       window.clearTimeout(shownTimer);
       drone.current?.destroy();
       drone.current = null;
@@ -4775,6 +4825,18 @@ html:has(.hv.fixed),html:has(.hv.fixed) body{overflow:hidden;overscroll-behavior
 .hv-hs.hv-aktiv .hv-ikon{transform:scale(1.18);box-shadow:0 0 0 4px rgba(255,255,255,.55),0 3px 10px rgba(0,0,0,.35)}
 /* The icon's centre is the place it marks, so it stays put at every zoom; the name hangs below it. */
 .hv-pkt{position:relative;transform:translate(-50%,-50%) scale(var(--pkt-d,1));cursor:pointer;pointer-events:none}
+.hv-kantpile{position:absolute;inset:0;pointer-events:none;z-index:6}
+.hv-kantpil{position:absolute;top:calc(50% + var(--n,0) * 56px);translate:0 -50%;display:none;align-items:center;gap:8px;padding:6px 14px 6px 6px;border:0;border-radius:999px;background:rgba(255,255,255,.94);color:#1d1d1f;font-weight:700;font-size:13px;line-height:1.1;white-space:nowrap;box-shadow:0 6px 18px rgba(0,0,0,.28);cursor:pointer;pointer-events:auto}
+.hv-kantpil.vis{display:flex;animation:hvFade .3s ease}
+.hv-kantpil[data-side=left]{left:16px}
+.hv-kantpil[data-side=right]{right:16px;flex-direction:row-reverse;padding:6px 6px 6px 14px}
+.hv-kantpil:not(:has(.hv-pil-navn)){padding:6px}
+.hv-kantpil[data-side=left] .hv-pil-ikon{animation:hvKantV 1.6s ease-in-out infinite}
+.hv-kantpil[data-side=right] .hv-pil-ikon{animation:hvKantH 1.6s ease-in-out infinite}
+@keyframes hvKantV{50%{transform:translateX(-3px)}}
+@keyframes hvKantH{50%{transform:translateX(3px)}}
+@media (max-width:640px){.hv-kantpil .hv-pil-navn{display:none}.hv-kantpil[data-side=left]{left:8px}.hv-kantpil[data-side=right]{right:8px}}
+@media (prefers-reduced-motion:reduce){.hv-kantpil .hv-pil-ikon{animation:none}}
 .hv-pil{position:relative;transform:translate(-50%,-50%);display:flex;align-items:center;gap:8px;padding:6px 14px 6px 6px;border-radius:999px;background:rgba(255,255,255,.94);color:#1d1d1f;font-weight:700;font-size:13px;line-height:1.1;white-space:nowrap;box-shadow:0 6px 18px rgba(0,0,0,.28);cursor:pointer;animation:hvPilPuls 2.4s ease-in-out infinite}
 .hv-pil:not(:has(.hv-pil-navn)){padding:6px}
 .hv-pil-ikon{display:grid;place-items:center;width:30px;height:30px;border-radius:50%;background:var(--c-main,#1d1d1f);color:#fff}
