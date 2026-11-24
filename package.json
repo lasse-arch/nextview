@@ -9,7 +9,7 @@
     "lint": "eslint",
     "db:seed": "tsx prisma/seed.ts",
     "postinstall": "prisma generate",
-    "vercel-build": "if [ \"$VERCEL_ENV\" = \"production\" ]; then prisma db execute --file prisma/fixes/clear-failed-preview-migration.sql --schema prisma/schema.prisma && DATABASE_URL=${DIRECT_URL:-$DATABASE_URL} prisma migrate deploy; fi && node scripts/build-tour-engine.mjs && next build",
+    "vercel-build": "if [ \"$VERCEL_ENV\" = \"production\" ]; then prisma db execute --file prisma/fixes/clear-failed-preview-migration.sql --schema prisma/schema.prisma && DATABASE_URL=${DIRECT_URL:-$DATABASE_URL} prisma migrate deploy; fi && node scripts/build-tour-engine.mjs && node scripts/build-chromium-pack.mjs && next build",
     "security:check": "node scripts/security-check.mjs"
   },
   "prisma": {
@@ -20,7 +20,7 @@
     "@photo-sphere-viewer/core": "5.15.1",
     "@photo-sphere-viewer/markers-plugin": "5.15.1",
     "@prisma/client": "^6.19.3",
-    "@sparticuz/chromium": "^153.0.0",
+    "@sparticuz/chromium-min": "153.0.0",
     "@types/qrcode": "^1.5.5",
     "@vercel/blob": "^2.8.2",
     "bcryptjs": "^3.0.3",
@@ -41,6 +41,7 @@
     "zod": "^4.6.6"
   },
   "devDependencies": {
+    "@sparticuz/chromium": "153.0.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/papaparse": "^5.5.2",

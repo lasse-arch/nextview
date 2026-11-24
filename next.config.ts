@@ -8,11 +8,13 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   // ssh2 (Betalingsservice SFTP) loads optional native/crypto modules at
   // runtime - kept out of the bundle and required from node_modules instead.
-  serverExternalPackages: ["ssh2", "ssh2-sftp-client", "blake3-wasm", "sharp"],
+  serverExternalPackages: ["ssh2", "ssh2-sftp-client", "blake3-wasm", "sharp", "@sparticuz/chromium-min"],
   // The contract PDF renderer reads public/logo.png via fs at request time
   // (see contract-html-template.ts) - without this it can be left out of
   // the deployed serverless function bundle and contract generation fails
   // in production, the same issue the old .docx template had.
+  // Chromium's files are static files fetched on first use (lib/headless-chromium.ts) - never inside a function.
+  outputFileTracingExcludes: { "/*": ["./public/_chromium/**/*"], "/**": ["./public/_chromium/**/*"] },
   outputFileTracingIncludes: {
     "/*": ["./public/logo.png"],
     // The tour editor's Claude reads the tour setup's documented types (see tour-ai.ts).
@@ -20,38 +22,9 @@ const nextConfig: NextConfig = {
     // The new site's pages, only shown to the team (see lib/beta-site.ts).
     "/web/*": ["./site-web/*.html"],
     // Generator → Spørg reads the site's pages and the tour drejebog (see lib/sales-helper.ts).
-    // (and Chromium - its "Oplæg" can measure the customer's site, see below).
-    "/arpo/generator": ["./site-web/*.html", "./src/app/arpo/tour-lab/tours/PLAYBOOK.md", "./src/lib/sales-handbook.md", "./src/app/kunde/text.ts", "./node_modules/@sparticuz/chromium/bin/**/*"],
-    // Headless Chromium (~67 MB) ONLY in the routes that can start it - the contract PDF, the customer reports and
-    // their Matterport stats, "Brug hjemmesidens farver", "Hvor skal touren sidde?" and Pocket transcripts - found by
-    // following the imports from every page and route to lib/headless-chromium.ts and the modules that use it. It
-    // used to go into every function of every deployment, which is what filled Vercel's function storage. A new
-    // place that opens a browser must be added here (it fails with "Chromium not found" in production otherwise).
-    ...Object.fromEntries(
-      [
-        "/arpo",
-        "/arpo/commission",
-        "/arpo/deals",
-        "/arpo/deals/**",
-        "/arpo/generator/**",
-        "/arpo/leadgeneration",
-        "/arpo/ringeliste",
-        "/arpo/settings/docuseal/standalone-contracts",
-        "/arpo/settings/docuseal/standalone-contracts/**",
-        "/arpo/stats",
-        "/arpo/tour-lab",
-        "/arpo/tour-lab/*/rediger",
-        "/kunde",
-        "/oplaeg/*",
-        "/r/*",
-        "/api/cron/customer-reports",
-        "/api/internal/process-customer-reports",
-        "/api/internal/process-download-jobs",
-        "/api/kunde/**",
-        "/api/stats/download-report/**",
-        "/api/deals/*/contract/preview",
-      ].map((route) => [route, ["./node_modules/@sparticuz/chromium/bin/**/*"]])
-    ),
+    "/arpo/generator": ["./site-web/*.html", "./src/app/arpo/tour-lab/tours/PLAYBOOK.md", "./src/lib/sales-handbook.md", "./src/app/kunde/text.ts"],
+    // Headless Chromium (~67 MB) is in no function: it's fetched on first use from the deployment's own static files
+    // (see lib/headless-chromium.ts and scripts/build-chromium-pack.mjs) - in ~20 functions it made each deploy take ~10 minutes.
   },
 
   // Basic hardening on every response: no framing of Arpo by other sites

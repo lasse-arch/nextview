@@ -172,5 +172,5 @@ async function arpoGate(token: string, pathname: string): Promise<string | null>
 }
 
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|matterport/|.*\\.(?:png|jpg|jpeg|gif|svg|webp|ico)$).*)"],
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|matterport/|_chromium/|.*\\.(?:png|jpg|jpeg|gif|svg|webp|ico)$).*)"],
 };

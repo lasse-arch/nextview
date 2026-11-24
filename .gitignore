@@ -44,3 +44,4 @@ next-env.d.ts
 
 # Built by scripts/build-tour-engine.mjs
 /public/tour-engine/
+/public/_chromium/
