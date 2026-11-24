@@ -67,6 +67,7 @@ export function tourConfigProblem(config: unknown): string | null {
       }
     }
     if (ld.menu !== undefined && ld.menu !== "top" && ld.menu !== "bottom") return 'En linje på: knappen i menuen skal være "top" eller "bottom".';
+    if (ld.size !== undefined && !(["small", "medium", "large"] as unknown[]).includes(ld.size)) return 'En linje på: størrelsen skal være "small", "medium" eller "large".';
     if (ld.backdrop !== undefined && ld.backdrop !== false && !str(ld.backdrop)) return "Stedet bag linjevalget skal være et link.";
     if (ld.visit !== undefined && (!obj(ld.visit) || !str(ld.visit.title) || !str(ld.visit.label) || !str(ld.visit.href))) return "Afslutningen skal have overskrift, knaptekst og link.";
   }

@@ -226,7 +226,7 @@ export function LineDayCard({ L, stops, run, onGo, onClose }: { L: L; stops: Sho
           // No place: the tour blurred behind, and the photos are part of the card (one panel - photo and words together).
           <div className="ld-frame" key={`${s.id}:${run.at}`} />
         ))}
-    <div className={`ld-card ${s.intro ? "ld-overblik" : ""} ${stor ? "ld-stor" : ""}`} key={s.id + run.at} role="dialog" aria-label={title}>
+    <div className={`ld-card ${s.intro ? "ld-overblik" : ""} ${stor ? `ld-stor ${L.size === "small" ? "ld-lille" : L.size === "large" ? "ld-stort" : ""}` : ""}`} key={s.id + run.at} role="dialog" aria-label={title}>
       {stor && <StopPhotos key={`${s.id}:${run.at}`} images={photos} alt={s.title} />}
       {/* The moments as dots, and Luk - one row (the line's name is on the badge below). */}
       <div className="ld-top">
@@ -500,6 +500,11 @@ export const LINE_DAY_CSS = `
   .ld-stor>.ld-photos{grid-column:1;grid-row:1/13;margin:0!important;height:auto;min-height:0;border-radius:20px 0 0 20px}
   .ld-stor>.ld-nav{grid-row:12;align-self:end;margin-bottom:24px}
   .ld-stor h3{font-size:26px}
+  .ld-card.ld-stor.ld-lille{width:min(720px,calc(100% - 48px));height:min(430px,calc(100% - 48px))}
+  .ld-lille h3{font-size:22px}
+  .ld-card.ld-stor.ld-stort{width:min(1120px,calc(100% - 48px));height:min(680px,calc(100% - 48px))}
+  .ld-stort h3{font-size:32px}
+  .ld-card.ld-stor.ld-stort>p{font-size:17px;-webkit-line-clamp:12}
   .ld-card.ld-stor>p{-webkit-line-clamp:9}
   .ld-stor>.ld-mere{justify-self:start}
   .ld-card.ld-stor>p.aaben{overflow-y:auto;min-height:0}
