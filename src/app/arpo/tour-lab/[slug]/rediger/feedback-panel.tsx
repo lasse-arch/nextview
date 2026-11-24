@@ -396,6 +396,7 @@ export function FeedbackPanel({
             disabled={pending}
             className="w-full rounded-xl bg-white py-2 text-[13px] font-medium text-[#0071e3] ring-1 ring-black/[.06] disabled:opacity-50"
             onClick={() => {
+              if (pending) return;
               if (open > 0 && !confirm(`Der er stadig ${open} åbne rettelse${open === 1 ? "" : "r"}. Send alligevel mailen om, at rettelserne er lavet?`)) return;
               setDoneNote(null);
               start(async () => {
@@ -405,7 +406,7 @@ export function FeedbackPanel({
               });
             }}
           >
-            ✉ Send &quot;Jeres rettelser er lavet&quot; nu
+            {pending ? "Sender…" : <>✉ Send &quot;Jeres rettelser er lavet&quot; nu</>}
           </button>
         )}
         {doneNote && <p className={`rounded-lg px-3 py-2 text-[13px] ${doneNote.error ? "bg-[#ff3b30]/10 text-[#d70015]" : "bg-[#34c759]/10 text-[#1d7a35]"}`}>{doneNote.text}</p>}

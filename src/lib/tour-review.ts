@@ -203,7 +203,13 @@ export async function sendFixesDoneMail(slug: string, actor: { id: string; name:
   }
   const done = (reportedAt: null | undefined) => prisma.tourFeedback.findMany({ where: { tourSlug: slug, status: "done", ...(reportedAt === null ? { reportedAt: null } : {}) }, orderBy: { createdAt: "asc" }, take: 30, select: { id: true, text: true } });
   let fixes = await done(null);
-  if (!fixes.length && manual) fixes = await done(undefined);
+  if (!fixes.length && manual) {
+    // Nothing new since the last mail: not sent again if it went out a short while ago (two presses, or the automatic one just before).
+    const last = deal ? await prisma.systemMail.findFirst({ where: { dealId: deal.id, kind: "review_fixed", error: null }, orderBy: { sentAt: "desc" }, select: { sentAt: true } }) : null;
+    const mins = last ? Math.floor((Date.now() - last.sentAt.getTime()) / 60_000) : null;
+    if (mins !== null && mins < 60) throw new Error(`Mailen er allerede sendt for ${mins < 1 ? "under et minut" : mins === 1 ? "1 minut" : `${mins} minutter`} siden, og der er ingen nye rettelser siden. Den sendes ikke igen.`);
+    fixes = await done(undefined);
+  }
   if (!fixes.length && !manual) return null;
   if (!deal || !who) return null;
   const to = who.email;
