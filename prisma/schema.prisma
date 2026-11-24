@@ -268,6 +268,7 @@ model Invoice {
 
 model User {
   customerInviteLinks CustomerInviteLink[]
+  callBriefs        CallBrief[]
   id                String              @id @default(cuid())
   name              String
   email             String              @unique
@@ -457,6 +458,7 @@ model ImportBatch {
 
 model Deal {
   customerInviteLinks CustomerInviteLink[]
+  callBriefs CallBrief[]
   id           String  @id @default(cuid())
   /// The developer who builds this customer's tour - given before the tour exists; carried onto the tour when it's made.
   tourAssigneeId String?
@@ -2071,4 +2073,21 @@ model TourTipRun {
   createdAt   DateTime @default(now())
 
   @@index([tourSlug, createdAt])
+}
+
+/// Generator → "Første opkald": a call card written by nextviewAI - kept, so it can be found again by person and day.
+model CallBrief {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  site      String
+  url       String
+  body      String
+  sources   Json
+  deal      Deal?    @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  dealId    String?
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([createdAt])
 }
