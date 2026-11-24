@@ -1466,39 +1466,10 @@ function TourExperience({
    * Stops at the next moment, when the line closes, or the moment the visitor drags the view themselves.
    */
   function lineTurn(ticket: number) {
-    const cam = sdk?.Camera;
-    if (!cam?.setRotation || T.lineDays?.turn === "none") return;
-    const speed = 3; // degrees a second - "normal" in Vis mig rundt
-    let cur: { x: number; y: number } | null = null;
-    const sub = cam.pose.subscribe((p) => void (cur = { x: p.rotation.x, y: p.rotation.y }));
-    const off = (a: number, b: number) => ((((a - b + 540) % 360) + 360) % 360) - 180;
+    if (T.lineDays?.turn === "none") return;
+    // A moment after arriving (Matterport may not take a turn right after a move) - then Vis mig rundt's turn, at its "normal" speed.
     const live = () => ticket === lineTurnTicket.current && phaseRef.current === "tour";
-    let yaw: number | null = null;
-    let last = 0;
-    let pending = 0;
-    const frame = (t: number) => {
-      if (!live()) return sub.cancel();
-      const c = cur as { x: number; y: number } | null;
-      if (c) {
-        if (yaw == null) {
-          yaw = c.y;
-          last = t;
-        } else if (Math.abs(off(c.y, yaw)) > 4) {
-          // The visitor turned it: theirs from now on.
-          return sub.cancel();
-        } else if (pending < 2) {
-          yaw = off(yaw - speed * (Math.min(100, t - last) / 1000), 0);
-          last = t;
-          pending++;
-          void cam.setRotation!({ x: c.x, y: yaw }, { speed: 2000 })
-            .catch(() => {})
-            .finally(() => pending--);
-        }
-      }
-      requestAnimationFrame(frame);
-    };
-    // A moment after arriving (Matterport may not take a turn right after a move).
-    setTimeout(() => (live() ? requestAnimationFrame(frame) : sub.cancel()), 700);
+    setTimeout(() => live() && turnOn({ dir: 1, speed: 3, live }), 400);
   }
   function lineGo(href: string, title: string) {
     const ticket = ++lineTurnTicket.current;
@@ -2290,13 +2261,29 @@ function TourExperience({
    * moment the visitor touches, drags, scrolls (see the input watch) or the view is turned by anyone else.
    */
   function guideTurnOn(ticket: number, dir: number, speed: number, /** Degrees to turn in all (360 = once round), then it stands still. */ limit = Infinity) {
+    guideTurnDir.current = dir;
+    turnOn({
+      dir,
+      speed,
+      limit,
+      live: () => ticket === guideTicket.current && guideTurnDir.current === dir && !guideHeldRef.current && guideAtRef.current != null && phaseRef.current === "tour",
+      stopped: () => {
+        if (ticket === guideTicket.current && guideTurnDir.current === dir) guideTurnDir.current = 0;
+      },
+      taken: () => {
+        guideTurnDir.current = 0;
+        guideHeldRef.current = true;
+        setGuideHeld(true);
+      },
+    });
+  }
+  /** The slow, even turn - Vis mig rundt's and En linje på's: runs while `live()`, `taken` when the visitor turned the view themselves. */
+  function turnOn({ dir, speed, limit = Infinity, live, stopped, taken }: { dir: number; speed: number; limit?: number; live: () => boolean; stopped?: () => void; taken?: () => void }) {
     const cam = sdk?.Camera;
     if (!cam?.setRotation) return;
-    guideTurnDir.current = dir;
     let cur: { x: number; y: number } | null = null;
     const sub = cam.pose.subscribe((p) => void (cur = { x: p.rotation.x, y: p.rotation.y }));
     const off = (a: number, b: number) => ((((a - b + 540) % 360) + 360) % 360) - 180;
-    const live = () => ticket === guideTicket.current && guideTurnDir.current === dir && !guideHeldRef.current && guideAtRef.current != null && phaseRef.current === "tour";
     let yaw: number | null = null;
     let sign = dir;
     let last = 0;
@@ -2304,7 +2291,7 @@ function TourExperience({
     let turned = 0;
     const stop = () => {
       sub.cancel();
-      if (ticket === guideTicket.current && guideTurnDir.current === dir) guideTurnDir.current = 0;
+      stopped?.();
     };
     const frame = (t: number) => {
       if (!live()) return stop();
@@ -2315,9 +2302,7 @@ function TourExperience({
           last = t;
         } else if (Math.abs(off(c.y, yaw)) > 4) {
           // Turned by someone else (the visitor dragging): theirs from now on.
-          guideTurnDir.current = 0;
-          guideHeldRef.current = true;
-          setGuideHeld(true);
+          taken?.();
           return stop();
         } else if (turned >= limit) {
           // All the way round: it stands still now - the view is the visitor's.
@@ -2328,6 +2313,8 @@ function TourExperience({
           yaw = off(yaw + sign * step, 0);
           last = t;
           pending++;
+          // The tour's own turn - not counted as the visitor looking around (statistics, heatmap).
+          selfMoveAt.current = now();
           void cam.setRotation!({ x: c.x, y: yaw }, { speed: 2000 })
             .catch(() => {})
             .finally(() => pending--);
@@ -2668,6 +2655,18 @@ function TourExperience({
       for (const e of events) doc?.removeEventListener(e, take);
     };
   }, [guideAt, phase]);
+  /* "En linje på" turning at a moment: a touch, drag, scroll or key in the 3D tour stops it at once - the view is the visitor's. */
+  const lineOn = Boolean(lineRun && !lineRun.end);
+  useEffect(() => {
+    if (!lineOn || phase !== "tour") return;
+    const doc = iframe.current?.contentDocument;
+    const take = () => void lineTurnTicket.current++;
+    const events = ["pointerdown", "wheel", "touchstart", "keydown"] as const;
+    for (const e of events) doc?.addEventListener(e, take, { passive: true });
+    return () => {
+      for (const e of events) doc?.removeEventListener(e, take);
+    };
+  }, [lineOn, phase]);
   /** Starts a guided tour from the beginning: the main one (null) or one of `guides` by id. */
   function startGuide(from: string, id: string | null = null) {
     if (!tourReady()) {

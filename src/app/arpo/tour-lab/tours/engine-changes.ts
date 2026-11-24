@@ -9,6 +9,7 @@
 export type EngineChange = { date: string; kind: "ny" | "sikkerhed" | "hastighed" | "rettelse"; text: string };
 
 export const ENGINE_CHANGES: EngineChange[] = [
+  { date: "2026-11-24", kind: "rettelse", text: "En linje på: drejningen ved hvert øjeblik er nu den samme som i Vis mig rundt (rystede før), og den stopper med det samme, når man rører touren med musen, fingeren, hjulet eller tastaturet." },
   { date: "2026-11-24", kind: "ny", text: "En linje på: ved hvert øjeblik et sted i touren drejer udsigten langsomt rundt (som i Vis mig rundt), til man går videre eller selv rører touren. Kan slås fra i editoren (Drejning ved hvert øjeblik: Stå stille)." },
   { date: "2026-11-24", kind: "rettelse", text: "En linje på: kun fotos der er meget højere end deres ramme skæres fra den øverste del - de andre skæres om midten igen (liggende fotos viste ellers mest himmel)." },
   { date: "2026-11-24", kind: "ny", text: "En linje på, mobil: kortet ved et sted i touren er meget lavere - personerne er små ansigter øverst til højre, og fotoene er små ved siden af Læs mere - så man ser mere af rummet." },
