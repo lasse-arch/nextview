@@ -720,5 +720,8 @@ export const LINE_DAY_CSS = `
   .ld-people small{font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .ld-people>span>span{min-width:0}
   .ld-line.med-foto{min-height:128px}
+  /* A moment with no place, on a phone: there is nothing to see behind it, so the card fills the screen and the photo takes the room. */
+  .ld-card.ld-stor{top:calc(12px + env(safe-area-inset-top,0px));max-height:none}
+  .ld-stor>.ld-photos{flex:1 1 0!important;min-height:140px}
   }
 `;
