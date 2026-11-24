@@ -69,6 +69,7 @@ export function tourConfigProblem(config: unknown): string | null {
     }
     if (ld.menu !== undefined && ld.menu !== "top" && ld.menu !== "bottom") return 'En linje på: knappen i menuen skal være "top" eller "bottom".';
     if (ld.cardSide !== undefined && ld.cardSide !== "right") return 'En linje på: kortets side kan kun være "right".';
+    if (ld.turn !== undefined && ld.turn !== "none") return 'En linje på: drejning skal være "none" eller udeladt.';
     if (ld.photosAtPlace !== undefined && ld.photosAtPlace !== "reveal" && ld.photosAtPlace !== "strip") return 'En linje på: fotos ved et sted skal være "reveal" eller "strip".';
     if (ld.size !== undefined && !(["small", "medium", "large"] as unknown[]).includes(ld.size)) return 'En linje på: størrelsen skal være "small", "medium" eller "large".';
     if (ld.backdrop !== undefined && ld.backdrop !== false && !str(ld.backdrop)) return "Stedet bag linjevalget skal være et link.";

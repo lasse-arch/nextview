@@ -1455,10 +1455,55 @@ function TourExperience({
    * flight on top of the first (that left it stuck or in the wrong room) - the one under way finishes, and then the tour
    * goes straight to the moment pressed last; the ones skipped in between are never flown to.
    */
-  const lineMove = useRef<{ busy: boolean; want: { href: string; title: string } | null }>({ busy: false, want: null });
+  const lineMove = useRef<{ busy: boolean; want: { href: string; title: string; ticket: number } | null }>({ busy: false, want: null });
+  /** "En linje på": a new number for each move (and on closing) - the slow turn at a moment stops when it changes. */
+  const lineTurnTicket = useRef(0);
+  useEffect(() => {
+    if (!lineRun || lineRun.end) lineTurnTicket.current++;
+  }, [lineRun]);
+  /**
+   * The slow turn at a moment in the tour (as Vis mig rundt's): the view is set every screen frame, so it's smooth.
+   * Stops at the next moment, when the line closes, or the moment the visitor drags the view themselves.
+   */
+  function lineTurn(ticket: number) {
+    const cam = sdk?.Camera;
+    if (!cam?.setRotation || T.lineDays?.turn === "none") return;
+    const speed = 3; // degrees a second - "normal" in Vis mig rundt
+    let cur: { x: number; y: number } | null = null;
+    const sub = cam.pose.subscribe((p) => void (cur = { x: p.rotation.x, y: p.rotation.y }));
+    const off = (a: number, b: number) => ((((a - b + 540) % 360) + 360) % 360) - 180;
+    const live = () => ticket === lineTurnTicket.current && phaseRef.current === "tour";
+    let yaw: number | null = null;
+    let last = 0;
+    let pending = 0;
+    const frame = (t: number) => {
+      if (!live()) return sub.cancel();
+      const c = cur as { x: number; y: number } | null;
+      if (c) {
+        if (yaw == null) {
+          yaw = c.y;
+          last = t;
+        } else if (Math.abs(off(c.y, yaw)) > 4) {
+          // The visitor turned it: theirs from now on.
+          return sub.cancel();
+        } else if (pending < 2) {
+          yaw = off(yaw - speed * (Math.min(100, t - last) / 1000), 0);
+          last = t;
+          pending++;
+          void cam.setRotation!({ x: c.x, y: yaw }, { speed: 2000 })
+            .catch(() => {})
+            .finally(() => pending--);
+        }
+      }
+      requestAnimationFrame(frame);
+    };
+    // A moment after arriving (Matterport may not take a turn right after a move).
+    setTimeout(() => (live() ? requestAnimationFrame(frame) : sub.cancel()), 700);
+  }
   function lineGo(href: string, title: string) {
+    const ticket = ++lineTurnTicket.current;
     const m = lineMove.current;
-    m.want = { href, title };
+    m.want = { href, title, ticket };
     if (m.busy) return;
     m.busy = true;
     void (async () => {
@@ -1473,6 +1518,8 @@ function TourExperience({
             setGuideImage(null);
           }
           await Promise.resolve(goToRef.current(next.href, next.title)).catch(() => {});
+          // Arrived at the newest moment (none pressed meanwhile), at a place in the scan: the slow turn.
+          if (!m.want && next.ticket === lineTurnTicket.current && !imageOfHref(next.href)) lineTurn(next.ticket);
         }
       } finally {
         m.busy = false;

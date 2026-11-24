@@ -847,6 +847,8 @@ export type TourConfig = {
     photosAtPlace?: "reveal" | "strip";
     /** Which side the moment's card stands on, on a computer: left (default) or "right". */
     cardSide?: "right";
+    /** At each moment with a place in the tour the view turns slowly round (until the next moment or the visitor takes over). "none": it stands still. */
+    turn?: "none";
     visit?: { title: string; text?: string; label: string; href: string };
     /** The people on the day's card: "all" (default - the whole list where they're met first, then small faces), "one" (only the first, with name and role), "faces" (always only small faces and the first names). */
     people?: "all" | "one" | "faces";

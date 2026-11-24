@@ -148,6 +148,16 @@ export function LineDayEditor({ config, edit, preview }: { config: TourConfig; e
             onChange={(v) => set((l) => void (v === "strip" ? delete l.photosAtPlace : (l.photosAtPlace = v)))}
           />
         </Field>
+        <Field title="Drejning ved hvert øjeblik" hint="Når et øjeblik står et sted i touren, drejer udsigten langsomt rundt i rummet, til man går videre eller selv rører touren - som i Vis mig rundt.">
+          <Choice<"round" | "none">
+            value={L.turn ?? "round"}
+            options={[
+              ["round", "Drej langsomt rundt"],
+              ["none", "Stå stille"],
+            ]}
+            onChange={(v) => set((l) => void (v === "round" ? delete l.turn : (l.turn = v)))}
+          />
+        </Field>
         <Field title="Kortets placering" hint="Hvilken side kortet med øjeblikket står i på computer. På mobil står det altid nederst.">
           <Choice<"left" | "right">
             value={L.cardSide ?? "left"}
