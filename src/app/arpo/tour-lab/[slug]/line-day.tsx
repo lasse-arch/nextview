@@ -94,21 +94,24 @@ function FadeImg({ src, alt = "", eager = false, onPano }: { src: string; alt?: 
   const [shown, setShown] = useState(false);
   const [pano, setPano] = useState(false);
   // A photo much wider than its box (a drone's panorama, or a wide photo in a tall box on a phone): shown whole, on a
-  // blurred copy of itself - never cut to its middle and blown up. A tall photo in a wide box is cut from its upper part (see the CSS).
+  // blurred copy of itself - never cut to its middle and blown up. A tall photo in a wide box is cut from its upper part.
   const [wide, setWide] = useState(false);
+  // A photo much taller than its box: cut from its upper part (faces, not feet). Others are cut around their middle.
+  const [tall, setTall] = useState(false);
   const loaded = (el: HTMLImageElement) => {
     setShown(true);
     const photo = el.naturalWidth / Math.max(1, el.naturalHeight);
     const box = el.parentElement && el.parentElement.clientHeight > 0 ? el.parentElement.clientWidth / el.parentElement.clientHeight : null;
     const fit = box ? photo / box : 1;
     setWide(photo > 1.7 || fit > 1.6);
+    setTall(fit < 0.75);
     if (isPano(el)) {
       setPano(true);
       onPano?.();
     }
   };
   return (
-    <span className={`ld-img ${shown ? "klar" : ""} ${pano ? "pano" : ""} ${wide ? "bred" : ""}`} style={wide ? { ["--bred" as string]: `url(${JSON.stringify(src)})` } : undefined}>
+    <span className={`ld-img ${shown ? "klar" : ""} ${pano ? "pano" : ""} ${wide ? "bred" : ""} ${tall && !wide ? "hoej" : ""}`} style={wide ? { ["--bred" as string]: `url(${JSON.stringify(src)})` } : undefined}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         ref={(el) => {
@@ -658,8 +661,8 @@ export const LINE_DAY_CSS = `
 .ld-img.bred img{position:relative;object-fit:contain}
 .ld-img img{display:block;width:100%;height:100%;object-fit:cover;opacity:0;transform:scale(1.02);transition:opacity .4s ease,transform .6s cubic-bezier(.2,.7,.2,1)}
 .ld-img.klar img{opacity:1;transform:none}
-/* Cut a little: keep the upper part (faces, not feet). */
-.ld-img:not(.bred) img{object-position:50% 28%}
+/* A tall photo in a wide box: keep the upper part (faces, not feet). */
+.ld-img.hoej img{object-position:50% 28%}
 @keyframes ldShimmer{from{background-position:100% 0}to{background-position:-50% 0}}
 .ld-photo-dots{position:absolute;left:0;right:0;bottom:9px;display:flex;justify-content:center;gap:5px;pointer-events:none}
 .ld-photo-dots i{width:6px;height:6px;border-radius:3px;background:rgba(255,255,255,.55);box-shadow:0 1px 3px rgba(0,0,0,.3);transition:width .2s,background .2s}
