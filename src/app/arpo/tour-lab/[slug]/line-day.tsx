@@ -268,6 +268,12 @@ export function LineDayCard({ L, stops, run, onGo, onClose }: { L: L; stops: Sho
         {s.time && <time>{s.time}</time>}
         <span className={`ld-badge ${s.shared ? "faelles" : ""}`}>{s.shared ? tr("Hele skolen") : s.intro ? tr("Overblik") : s.lineName}</span>
         {s.place && <span className="ld-place">{s.place}</span>}
+        {/* On a phone, at a place, the people are only small faces up here - the card stays low, the room free. */}
+        {placed && people?.length ? (
+          <span className="ld-when-faces">
+            <Faces people={people} size={24} />
+          </span>
+        ) : null}
       </div>
       <h3>{s.title}</h3>
       {s.text && <LongText key={s.id + run.at} text={s.text} />}
@@ -610,6 +616,7 @@ export const LINE_DAY_CSS = `
 /* A stop's photos: edge to edge at the top of the card, a fixed frame (no jump while they load), swiped with the finger. */
 /* The card is a column: when space is short, the photo and the text give way - the people and Næste are always seen. */
 .ld-card{display:flex;flex-direction:column}
+.ld-when-faces{display:none}
 /* A moment at a place in the tour: the card is frosted glass, so the scan shows through it. */
 .ld-card.ld-glas{background:rgba(255,255,255,.62);-webkit-backdrop-filter:blur(22px) saturate(1.6);backdrop-filter:blur(22px) saturate(1.6);border:1px solid rgba(255,255,255,.55)}
 .ld-glas .ld-dots button:not(.nu):not(.set){background:rgba(29,42,48,.18)}
@@ -731,6 +738,22 @@ export const LINE_DAY_CSS = `
   .ld-people small{font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .ld-people>span>span{min-width:0}
   .ld-line.med-foto{min-height:128px}
+  /* At a place in the tour: a low card, so you see the room - smaller words and photos, the people as small faces at the top. */
+  .ld-card.ld-glas{padding:10px 12px;max-height:46%}
+  .ld-glas .ld-when{margin-top:6px}
+  .ld-glas .ld-when-faces{display:flex;margin-left:auto;flex:none}
+  .ld-glas .ld-when-faces img+img{margin-left:-8px}
+  .ld-glas .ld-when-faces img{border-width:1.5px}
+  .ld-glas h3{font-size:16px;margin:4px 0 2px;-webkit-line-clamp:1}
+  .ld-glas p{font-size:13px;-webkit-line-clamp:2}
+  .ld-glas .ld-people-kort,.ld-glas .ld-people{display:none}
+  .ld-card.ld-glas{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center}
+  .ld-glas>*{grid-column:1/-1}
+  .ld-glas>.ld-mere{grid-column:1;justify-self:start}
+  .ld-glas>.ld-strip{grid-column:2;justify-self:end;margin-top:4px;gap:5px}
+  .ld-glas .ld-strip-foto{width:50px;height:38px;border-radius:8px}
+  .ld-glas .ld-nav{margin-top:8px}
+  .ld-glas .ld-next{padding:9px 12px}
   /* A moment with no place, on a phone: there is nothing to see behind it, so the card fills the screen and the photo takes the room. */
   .ld-card.ld-stor{top:calc(12px + env(safe-area-inset-top,0px));max-height:none}
   .ld-stor>.ld-photos{flex:1 1 0!important;min-height:140px}
