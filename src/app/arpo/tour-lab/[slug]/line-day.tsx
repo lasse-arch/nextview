@@ -242,7 +242,7 @@ export function LineDayCard({ L, stops, run, onGo, onClose }: { L: L; stops: Sho
           // No place: the tour blurred behind, and the photos are part of the card (one panel - photo and words together).
           <div className="ld-frame" key={`${s.id}:${run.at}`} />
         ))}
-    <div className={`ld-card ${s.intro ? "ld-overblik" : ""} ${stor ? `ld-stor ${L.size === "small" ? "ld-lille" : L.size === "large" ? "ld-stort" : ""}` : ""}`} key={s.id + run.at} role="dialog" aria-label={title}>
+    <div className={`ld-card ${L.cardSide === "right" ? "ld-hoejre" : ""} ${s.intro ? "ld-overblik" : ""} ${stor ? `ld-stor ${L.size === "small" ? "ld-lille" : L.size === "large" ? "ld-stort" : ""}` : ""}`} key={s.id + run.at} role="dialog" aria-label={title}>
       {stor && <StopPhotos key={`${s.id}:${run.at}`} images={photos} alt={s.title} />}
       {/* The moments as dots, and Luk - one row (the line's name is on the badge below). */}
       <div className="ld-top">
@@ -609,6 +609,7 @@ export const LINE_DAY_CSS = `
 @media (min-width:761px){
   .ld-card:not(.ld-stor){width:min(500px,calc(100% - 32px));padding:20px 22px;left:20px;bottom:20px}
   .ld-card:not(.ld-stor) h3{font-size:26px}
+  .ld-card.ld-hoejre:not(.ld-stor){left:auto;right:20px}
   .ld-card:not(.ld-stor) p{font-size:16px;line-height:1.55}
   .ld-card:not(.ld-stor)>p{-webkit-line-clamp:4}
   .ld-strip{gap:10px;margin-top:14px}

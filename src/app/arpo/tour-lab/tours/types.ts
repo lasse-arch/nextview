@@ -845,6 +845,8 @@ export type TourConfig = {
     size?: "small" | "medium" | "large";
     /** A moment's photos when it has a place in the tour: "strip" (default - the place stays free to look around in, the photos a row on the card - a tap shows one big) or "reveal" (the first fills the screen and tones into the place). */
     photosAtPlace?: "reveal" | "strip";
+    /** Which side the moment's card stands on, on a computer: left (default) or "right". */
+    cardSide?: "right";
     visit?: { title: string; text?: string; label: string; href: string };
     /** The people on the day's card: "all" (default - the whole list where they're met first, then small faces), "one" (only the first, with name and role), "faces" (always only small faces and the first names). */
     people?: "all" | "one" | "faces";
