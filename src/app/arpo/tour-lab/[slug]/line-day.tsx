@@ -93,11 +93,15 @@ const isPano = (img: HTMLImageElement) => Math.abs(img.naturalWidth / Math.max(1
 function FadeImg({ src, alt = "", eager = false, onPano }: { src: string; alt?: string; eager?: boolean; /** Told when the photo turns out to be a 360° one. */ onPano?: () => void }) {
   const [shown, setShown] = useState(false);
   const [pano, setPano] = useState(false);
-  // A wide photo (a drone's panorama, 2:1 or wider): shown whole, on a blurred copy of itself - never cut to its middle and blown up.
+  // A photo much wider than its box (a drone's panorama, or a wide photo in a tall box on a phone): shown whole, on a
+  // blurred copy of itself - never cut to its middle and blown up. A tall photo in a wide box is cut from its upper part (see the CSS).
   const [wide, setWide] = useState(false);
   const loaded = (el: HTMLImageElement) => {
     setShown(true);
-    setWide(el.naturalWidth / Math.max(1, el.naturalHeight) > 1.7);
+    const photo = el.naturalWidth / Math.max(1, el.naturalHeight);
+    const box = el.parentElement && el.parentElement.clientHeight > 0 ? el.parentElement.clientWidth / el.parentElement.clientHeight : null;
+    const fit = box ? photo / box : 1;
+    setWide(photo > 1.7 || fit > 1.6);
     if (isPano(el)) {
       setPano(true);
       onPano?.();
@@ -245,7 +249,7 @@ export function LineDayCard({ L, stops, run, onGo, onClose }: { L: L; stops: Sho
           // No place: the tour blurred behind, and the photos are part of the card (one panel - photo and words together).
           <div className="ld-frame" key={`${s.id}:${run.at}`} />
         ))}
-    <div className={`ld-card ${L.cardSide === "right" ? "ld-hoejre" : ""} ${s.intro ? "ld-overblik" : ""} ${stor ? `ld-stor ${L.size === "small" ? "ld-lille" : L.size === "large" ? "ld-stort" : ""}` : ""}`} key={s.id + run.at} role="dialog" aria-label={title}>
+    <div className={`ld-card ${L.cardSide === "right" ? "ld-hoejre" : ""} ${s.intro ? "ld-overblik" : ""} ${placed ? "ld-glas" : ""} ${stor ? `ld-stor ${L.size === "small" ? "ld-lille" : L.size === "large" ? "ld-stort" : ""}` : ""}`} key={s.id + run.at} role="dialog" aria-label={title}>
       {stor && <StopPhotos key={`${s.id}:${run.at}`} images={photos} alt={s.title} />}
       {/* The moments as dots, and Luk - one row (the line's name is on the badge below). */}
       <div className="ld-top">
@@ -606,6 +610,11 @@ export const LINE_DAY_CSS = `
 /* A stop's photos: edge to edge at the top of the card, a fixed frame (no jump while they load), swiped with the finger. */
 /* The card is a column: when space is short, the photo and the text give way - the people and Næste are always seen. */
 .ld-card{display:flex;flex-direction:column}
+/* A moment at a place in the tour: the card is frosted glass, so the scan shows through it. */
+.ld-card.ld-glas{background:rgba(255,255,255,.62);-webkit-backdrop-filter:blur(22px) saturate(1.6);backdrop-filter:blur(22px) saturate(1.6);border:1px solid rgba(255,255,255,.55)}
+.ld-glas .ld-dots button:not(.nu):not(.set){background:rgba(29,42,48,.18)}
+.ld-glas .ld-x2,.ld-glas .ld-back{background:rgba(255,255,255,.6)}
+.ld-glas>p,.ld-glas .ld-place,.ld-glas .ld-people-kort small{color:#26333a}
 .ld-card>*{flex:none}
 .ld-card>p{flex:0 1 auto;min-height:0}
 /* On a computer the card is a little bigger - and the photos a row of real pictures. */
@@ -642,6 +651,8 @@ export const LINE_DAY_CSS = `
 .ld-img.bred img{position:relative;object-fit:contain}
 .ld-img img{display:block;width:100%;height:100%;object-fit:cover;opacity:0;transform:scale(1.02);transition:opacity .4s ease,transform .6s cubic-bezier(.2,.7,.2,1)}
 .ld-img.klar img{opacity:1;transform:none}
+/* Cut a little: keep the upper part (faces, not feet). */
+.ld-img:not(.bred) img{object-position:50% 28%}
 @keyframes ldShimmer{from{background-position:100% 0}to{background-position:-50% 0}}
 .ld-photo-dots{position:absolute;left:0;right:0;bottom:9px;display:flex;justify-content:center;gap:5px;pointer-events:none}
 .ld-photo-dots i{width:6px;height:6px;border-radius:3px;background:rgba(255,255,255,.55);box-shadow:0 1px 3px rgba(0,0,0,.3);transition:width .2s,background .2s}

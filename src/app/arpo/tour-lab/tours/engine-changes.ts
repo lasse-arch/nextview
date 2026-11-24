@@ -9,6 +9,7 @@
 export type EngineChange = { date: string; kind: "ny" | "sikkerhed" | "hastighed" | "rettelse"; text: string };
 
 export const ENGINE_CHANGES: EngineChange[] = [
+  { date: "2026-11-24", kind: "forbedring", text: "En linje på: kortet er gennemsigtigt (frostet glas) når der er et sted i touren bagved, så scanningen ses igennem. Fotos skæres fra den øverste del (ansigter, ikke fødder), og et foto der er meget bredere end sin ramme vises helt på en sløret kopi af sig selv." },
   { date: "2026-11-24", kind: "forbedring", text: "En linje på, mobil: et øjeblik uden sted i touren fylder hele skærmen, og fotoet bruger pladsen i stedet for den slørede tour bagved." },
   { date: "2026-11-24", kind: "rettelse", text: "En linje på: navnene under ansigterne vises nu helt på computer i stedet for at blive klippet af med \"...\"." },
   { date: "2026-11-24", kind: "rettelse", text: "En linje på: efter et øjeblik med et 360°-foto (fx dronefotoet) går Næste ind i scanningen igen - fotoet lukkes, så det ikke bliver liggende over touren." },
