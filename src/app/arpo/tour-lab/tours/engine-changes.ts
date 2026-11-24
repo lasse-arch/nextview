@@ -9,6 +9,7 @@
 export type EngineChange = { date: string; kind: "ny" | "sikkerhed" | "hastighed" | "rettelse"; text: string };
 
 export const ENGINE_CHANGES: EngineChange[] = [
+  { date: "2026-11-24", kind: "rettelse", text: "Drejningen (Vis mig rundt og En linje på) starter blødt i stedet for med et hak - den lille prøvedrejning sker kun første gang i Vis mig rundt og aldrig i En linje på." },
   { date: "2026-11-24", kind: "rettelse", text: "En linje på: drejningen ved hvert øjeblik er nu den samme som i Vis mig rundt (rystede før), og den stopper med det samme, når man rører touren med musen, fingeren, hjulet eller tastaturet." },
   { date: "2026-11-24", kind: "ny", text: "En linje på: ved hvert øjeblik et sted i touren drejer udsigten langsomt rundt (som i Vis mig rundt), til man går videre eller selv rører touren. Kan slås fra i editoren (Drejning ved hvert øjeblik: Stå stille)." },
   { date: "2026-11-24", kind: "rettelse", text: "En linje på: kun fotos der er meget højere end deres ramme skæres fra den øverste del - de andre skæres om midten igen (liggende fotos viste ellers mest himmel)." },

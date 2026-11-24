@@ -1469,7 +1469,7 @@ function TourExperience({
     if (T.lineDays?.turn === "none") return;
     // A moment after arriving (Matterport may not take a turn right after a move) - then Vis mig rundt's turn, at its "normal" speed.
     const live = () => ticket === lineTurnTicket.current && phaseRef.current === "tour";
-    setTimeout(() => live() && turnOn({ dir: 1, speed: 3, live }), 400);
+    setTimeout(() => live() && turnOn({ dir: 1, speed: 3, live, calibrate: false }), 400);
   }
   function lineGo(href: string, title: string) {
     const ticket = ++lineTurnTicket.current;
@@ -2277,8 +2277,10 @@ function TourExperience({
       },
     });
   }
+  /** Which way Matterport's yaw runs for a rotate() to the right (1 or -1) - found by the first turn's tiny test turn. */
+  const yawRuns = useRef<number | null>(null);
   /** The slow, even turn - Vis mig rundt's and En linje på's: runs while `live()`, `taken` when the visitor turned the view themselves. */
-  function turnOn({ dir, speed, limit = Infinity, live, stopped, taken }: { dir: number; speed: number; limit?: number; live: () => boolean; stopped?: () => void; taken?: () => void }) {
+  function turnOn({ dir, speed, limit = Infinity, live, stopped, taken, calibrate = true }: { dir: number; speed: number; limit?: number; live: () => boolean; stopped?: () => void; taken?: () => void; /** Find out which way the yaw runs (a tiny real turn) - only when the direction matters, and only the first time. */ calibrate?: boolean }) {
     const cam = sdk?.Camera;
     if (!cam?.setRotation) return;
     let cur: { x: number; y: number } | null = null;
@@ -2289,6 +2291,7 @@ function TourExperience({
     let last = 0;
     let pending = 0;
     let turned = 0;
+    let began: number | null = null;
     const stop = () => {
       sub.cancel();
       stopped?.();
@@ -2308,7 +2311,11 @@ function TourExperience({
           // All the way round: it stands still now - the view is the visitor's.
           return stop();
         } else if (pending < 2) {
-          const step = Math.min(limit - turned, speed * (Math.min(100, t - last) / 1000));
+          // It starts softly: up to full speed over the first 1.5 seconds (no jolt at the start).
+          began ??= t;
+          const k = Math.min(1, (t - began) / 1500);
+          const ease = k * k * (3 - 2 * k);
+          const step = Math.min(limit - turned, speed * Math.max(0.04, ease) * (Math.min(100, t - last) / 1000));
           turned += step;
           yaw = off(yaw + sign * step, 0);
           last = t;
@@ -2323,6 +2330,12 @@ function TourExperience({
       requestAnimationFrame(frame);
     };
     // Which way the yaw runs for "Mod højre": read from a tiny real turn (rotate is what it has always meant).
+    // Known from an earlier turn (or not needed): straight on, without the little test turn.
+    if (yawRuns.current != null || !calibrate) {
+      sign = dir * (yawRuns.current ?? 1);
+      requestAnimationFrame(frame);
+      return;
+    }
     void (async () => {
       await new Promise((r) => setTimeout(r, 80));
       // Right after loading or a move Matterport may not take a turn at once - a few tries.
@@ -2334,6 +2347,7 @@ function TourExperience({
         const after = (cur as { y: number } | null)?.y;
         if (before != null && after != null && Math.abs(off(after, before)) > 0.1) {
           sign = Math.sign(off(after, before));
+          yawRuns.current = sign * dir;
           break;
         }
       }
