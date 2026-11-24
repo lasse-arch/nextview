@@ -24,6 +24,7 @@ import { pageAsText, readUnits, type LiveUnit } from "@/lib/availability/live";
 import { hostFiles, hostNewFiles } from "@/lib/tour-files";
 import { bytesOf, measureLogo, withMeasuredLogo, type LogoFix } from "@/lib/logo-fix";
 import { cropPhoto, type PhotoCrop } from "@/lib/photo-crop";
+import { withPanoZoom } from "@/lib/pano-zoom";
 import { claudeCostUsd } from "@/lib/claude-cost";
 import { allGuides, guideStops, isPlaceHref, withoutDeadAerialLinks } from "@/app/arpo/tour-lab/tours/places";
 import { BRANCHES, DESIGN_PRESETS, MENU_STYLES, START_STYLES, copyLayout, layoutOfTour, setLayout, type Branch, type DesignPreset, type NewTourLayout } from "@/app/arpo/tour-lab/tours/presets";
@@ -318,6 +319,8 @@ async function claudeEdits(key: string, who: { name: string; kind: string }, con
   let edited = hosted?.config ?? ({ ...(next as unknown as TourConfig), slug: config.slug } as TourConfig);
   // A new logo: measured, not guessed (its background, and an empty edge cut away).
   if (edited.logo && edited.logo !== config.logo) edited = (await withMeasuredLogo(config.slug, edited).catch(() => ({ config: edited }))).config;
+  // 360° photos (a stop's, the drone's, a card's): zoomed out on computer and phone as far as their pixels need, so they're sharp.
+  edited = await withPanoZoom(edited).catch(() => edited);
   const note = hosted?.failed.length ? `\n\n⚠️ ${hosted.failed.join("\n⚠️ ")}\nUpload filen selv (fx logoet under Design), så den ligger hos os.` : "";
   return { ok: true, reply: parsed.reply + note, config: plainWordsInConfig(edited), changed: parsed.changes.length, remembered, forgot, askRemember: (parsed.ask_remember ?? []).filter((n) => n.text.trim()).slice(0, 2).map((n) => ({ scope: n.scope, text: n.text.trim().slice(0, 300) })) };
 }

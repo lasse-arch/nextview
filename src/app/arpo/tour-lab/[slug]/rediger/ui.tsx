@@ -162,6 +162,8 @@ export async function shrinkPhoto(file: File, max = 1600): Promise<File> {
   if (!/^image\/(jpeg|png|webp|heic|heif)$/i.test(file.type) || typeof createImageBitmap === "undefined") return file;
   try {
     const bmp = await createImageBitmap(file);
+    // A 360° photo (twice as wide as high) keeps its pixels - shrunk, it's blurred in the tour. Up to 8192 px across.
+    if (Math.abs(bmp.width / bmp.height - 2) < 0.05) max = Math.max(max, 8192);
     const k = Math.min(1, max / Math.max(bmp.width, bmp.height));
     if (k === 1 && file.size < 450_000) return file;
     const c = document.createElement("canvas");
