@@ -1,13 +1,15 @@
 ---
 /*
  * Every page of nextview360.dk: the head (title, description, canonical, Open Graph, structured data) from the
- * page's props, the bar at the top, the page itself and the footer. The fonts are our own files (fonts.css - no call
- * to Google Fonts: faster, and no visitor data to a third party).
+ * page's props, the bar at the top, the page itself and the footer. The fonts are our own files (public/fonts - the
+ * same files Google Fonts serves, without a call to Google: faster, and no visitor data to a third party).
  */
-import "../fonts.css";
 import Header from "../components/Header.astro";
 import Footer from "../components/Footer.astro";
-import { ARPO_URL, INDEXABLE, SITE_URL } from "../site";
+import { BASE, INDEXABLE, SITE_URL } from "../site";
+
+const LATIN = "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD";
+const LATIN_EXT = "U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF";
 
 interface Props {
   /** The title in Google and on the tab (keep it under ~60 characters). */
@@ -29,6 +31,10 @@ interface Props {
 }
 const { title, description, path, image, ld, current, css = [], scripts = [], noindex = false } = Astro.props;
 const url = SITE_URL + path;
+// Plus Jakarta Sans (variable, 400-800): latin, and latin-ext only when a page needs it. SIL Open Font License.
+const face = (file: string, range: string) =>
+  `@font-face{font-family:'Plus Jakarta Sans';font-style:normal;font-weight:400 800;font-display:swap;src:url(${BASE}fonts/${file}) format('woff2');unicode-range:${range}}`;
+const fonts = [face("plus-jakarta-sans-latin-ext.woff2", LATIN_EXT), face("plus-jakarta-sans-latin.woff2", LATIN)].join("");
 ---
 <!doctype html>
 <html lang="da">
@@ -43,14 +49,15 @@ const url = SITE_URL + path;
 <meta property="og:type" content="website"><meta property="og:locale" content="da_DK"><meta property="og:site_name" content="Nextview360">
 <meta property="og:title" content={title}><meta property="og:description" content={description}><meta property="og:url" content={url}><meta property="og:image" content={image}>
 <meta name="twitter:card" content="summary_large_image">
-<link rel="icon" type="image/png" href="/icon.png">
-<link rel="preload" href="/fonts/plus-jakarta-sans-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="sitemap" type="application/xml" href="/sitemap.xml">
+<link rel="icon" type="image/png" href={`${BASE}icon.png`}>
+<link rel="preload" href={`${BASE}fonts/plus-jakarta-sans-latin.woff2`} as="font" type="font/woff2" crossorigin>
+<link rel="sitemap" type="application/xml" href={`${BASE}sitemap.xml`}>
+<style is:inline set:html={fonts}></style>
 <link rel="stylesheet" href="style.css">
 {css.map((href) => <link rel="stylesheet" href={href}>)}
 <script type="application/ld+json" set:html={JSON.stringify(ld).replace(/</g, "\\u003c")} />
 </head>
-<body data-arpo={ARPO_URL === SITE_URL ? undefined : ARPO_URL}>
+<body>
 <a class="skip" href="#indhold">Spring til indhold</a>
 <Header current={current} />
 <slot />

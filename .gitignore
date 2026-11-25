@@ -45,3 +45,7 @@ next-env.d.ts
 # Built by scripts/build-tour-engine.mjs
 /public/tour-engine/
 /public/_chromium/
+
+# Built from website/ on every build (scripts/build-website.mjs)
+/site-web/
+/public/web/

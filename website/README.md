@@ -1,17 +1,10 @@
 # nextview360.dk (Astro)
 
-Hjemmesiden som et statisk Astro-site. Siderne ligger i `src/pages/` (én fil pr. side, samme adresser som før: `/priser.html` …), det fælles layout i `src/layouts/Site.astro`, topmenu og footer i `src/components/`. Billeder, video, CSS og JS ligger i `public/`.
+Hjemmesiden som et statisk Astro-site. Siderne ligger i `src/pages/` (én fil pr. side, samme adresser som før: `/priser.html` …), det fælles layout i `src/layouts/Site.astro`, topmenu og footer i `src/components/`. Billeder, video, CSS, JS og fonte ligger i `public/`.
 
-- `npm run dev` – kør lokalt
-- `npm run build` – byg til `dist/`
+Arpo bygger sitet ved hvert deploy (`scripts/build-website.mjs`, kører i `vercel-build`): siderne lægges i `site-web/` og resten i `public/web/` – begge laves på ny hver gang, så `website/` er det eneste sted, man retter. Lige nu ser kun teamet sitet, på `/web/` i Arpo. Kundebåndet på forsiden fyldes af Arpo, når siden sendes.
 
-## Vercel
+- `npm run dev` (i `website/`) – kør sitet lokalt
+- `npm run build:website` (i roden) – byg det ind i Arpo, som på Vercel
 
-Eget projekt med **Root Directory = `website`** (framework: Astro). Miljøvariabler:
-
-- `ARPO_URL` – Arpo (default `https://nextview360.dk`). Kundebåndet hentes derfra ved build, og kontaktformularen sender dertil.
-- `SITE_INDEXABLE=1` – **kun når sitet er live på nextview360.dk.** Uden den siger alle sider noindex og robots.txt lukker for søgemaskiner, så en prøveversion aldrig kommer i Google.
-
-I Arpos Vercel-projekt: sæt `SITE_ORIGINS` til prøveversionens adresse (fx `https://nextview360-website.vercel.app`), så kontaktformularen må sende derfra.
-
-Kundebåndet opdateres ved hvert build.
+Når sitet skal på nextview360.dk/, bygges det med `SITE_BASE=/` og `SITE_INDEXABLE=1` (så det må komme i Google).

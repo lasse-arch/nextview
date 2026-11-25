@@ -17,7 +17,7 @@
       var on = sb.getAttribute('aria-pressed') !== 'true';
       if (on) {
         // Med lyd: forfra, i fuld kvalitet på store skærme, og uden at gentage sig.
-        if (big && v.currentSrc.indexOf('hero-1080') < 0) { v.src = '/web/video/hero-1080.mp4'; }
+        if (big && v.currentSrc.indexOf('hero-1080') < 0) { v.src = 'video/hero-1080.mp4'; }
         v.loop = false; v.currentTime = 0; v.muted = false;
       } else { v.muted = true; v.loop = true; }
       var q = v.play(); if (q && q.catch) q.catch(function () {});
