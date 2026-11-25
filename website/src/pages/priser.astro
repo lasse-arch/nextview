@@ -1,0 +1,107 @@
+---
+import Site from "../layouts/Site.astro";
+
+const ld = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "ProfessionalService",
+      "@id": "https://nextview360.dk/#org",
+      "name": "Nextview360 ApS",
+      "url": "https://nextview360.dk/",
+      "logo": "https://nextview360.dk/img/logo-dark.png",
+      "image": "https://nextview360.dk/img/padel.webp",
+      "telephone": "+4520910294",
+      "vatID": "DK46452445",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "Vesterbro 18, st.",
+        "postalCode": "9000",
+        "addressLocality": "Aalborg",
+        "addressCountry": "DK"
+      },
+      "areaServed": [
+        {
+          "@type": "AdministrativeArea",
+          "name": "Nordjylland"
+        },
+        {
+          "@type": "Country",
+          "name": "Danmark"
+        }
+      ],
+      "founder": [
+        {
+          "@type": "Person",
+          "name": "Lasse Sander Larsen"
+        },
+        {
+          "@type": "Person",
+          "name": "Victor Emil Rasmussen"
+        }
+      ],
+      "knowsAbout": [
+        "Virtuel rundvisning",
+        "Droneoptagelser"
+      ]
+    },
+    {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Forside",
+          "item": "https://nextview360.dk/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Priser",
+          "item": "https://nextview360.dk/priser.html"
+        }
+      ]
+    },
+    {
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "Er priserne inklusive moms?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Nej, alle priser er ekskl. moms."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Kan prisen forhandles?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Prisen afhænger af størrelse og omfang. Du får altid en fast pris, før vi går i gang."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Hvad er bindingsperioden på rundvisning?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Abonnementet løber over 36 måneder. Derefter fortsætter det måned for måned."
+          }
+        }
+      ]
+    }
+  ]
+};
+---
+<Site title={"Priser på virtuel rundvisning og drone | Nextview360"} description={"Se priser: Virtuel rundvisning fra 500 kr./md. og droneoptagelser fra 2.500 kr. Fast pris før vi går i gang."} path="/priser.html" image={"https://nextview360.dk/img/padel.webp"} ld={ld}>
+<main id="indhold">
+<nav class="crumbs wrap" aria-label="Brødkrumme"><a href="index.html">Forside</a><span aria-hidden="true">/</span><span aria-current="page">Priser</span></nav><section class="page-hero"><div class="wrap grid"><div><p class="eyebrow">Priser</p><h1 style="margin-top:12px">Klare priser, ingen overraskelser</h1><p class="lead">Her er vores udgangspriser. Du får altid en fast pris tilpasset jeres virksomhed, før vi går i gang.</p></div></div></section><section class="sec" style="padding-top:0"><div class="wrap"><div class="pricing two">
+<div class="plan main"><span class="badge">Mest populær</span><h3>Virtuel rundvisning</h3><p class="p">500 kr. <small>/md.</small></p><p class="muted">+ 5.000 kr. i opstart, 36 mdr.</p><ul class="checks"><li>Optaget i skarp 4K</li><li>Eget design og menu</li><li>Hjemmeside, Google og SoMe</li><li>Hosting inkluderet</li></ul><a class="btn btn-blue" href="kontakt.html">Få et tilbud</a></div>
+<div class="plan"><span class="badge">Tilvalg</span><h3>Droneoptagelser</h3><p class="p">2.500 kr.</p><p class="muted">Engangspris</p><ul class="checks"><li>Luftfoto til hjemmesiden</li><li>Panorama fra luften</li><li>Bygges ind i rundvisningen</li></ul><a class="btn btn-navy" href="kontakt.html">Få et tilbud</a></div>
+</div><p class="muted small center" style="margin-top:18px">Alle priser er ekskl. moms.</p></div></section>
+<section class="sec soft"><div class="narrow"><div class="head center"><h2>Spørgsmål om priser</h2></div><div class="faq"><details><summary>Er priserne inklusive moms?</summary><p>Nej, alle priser er ekskl. moms.</p></details><details><summary>Kan prisen forhandles?</summary><p>Prisen afhænger af størrelse og omfang. Du får altid en fast pris, før vi går i gang.</p></details><details><summary>Hvad er bindingsperioden på rundvisning?</summary><p>Abonnementet løber over 36 måneder. Derefter fortsætter det måned for måned.</p></details></div></div></section><section class="cta-band"><div class="inner on-blue"><div class="copy"><h2>Skal vi tage en uforpligtende snak?</h2><p class="lead">Ring eller skriv, så vender vi tilbage samme dag. Vi kommer gerne forbi og viser, hvordan det kunne se ud for jer.</p>
+<div class="btn-row"><a class="btn btn-white" href="kontakt.html">Book et gratis møde</a><a class="btn btn-line no-arrow" href="tel:+4520910294">Ring +45 20 91 02 94</a></div></div>
+<div class="faces"><img src="img/gustav.webp" alt="Gustav Enström, Sales Manager" loading="lazy" width="170" height="212"><img src="img/victor.webp" alt="Victor Emil Rasmussen, Sales & Tech Manager" loading="lazy" width="170" height="212"><img src="img/lasse.webp" alt="Lasse Sander Larsen, Sales & Account Manager" loading="lazy" width="170" height="212"></div></div></section>
+</main>
+</Site>

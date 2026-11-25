@@ -1,0 +1,125 @@
+---
+import Site from "../layouts/Site.astro";
+
+const ld = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "ProfessionalService",
+      "@id": "https://nextview360.dk/#org",
+      "name": "Nextview360 ApS",
+      "url": "https://nextview360.dk/",
+      "logo": "https://nextview360.dk/img/logo-dark.png",
+      "image": "https://nextview360.dk/img/padel.webp",
+      "telephone": "+4520910294",
+      "vatID": "DK46452445",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "Vesterbro 18, st.",
+        "postalCode": "9000",
+        "addressLocality": "Aalborg",
+        "addressCountry": "DK"
+      },
+      "areaServed": [
+        {
+          "@type": "AdministrativeArea",
+          "name": "Nordjylland"
+        },
+        {
+          "@type": "Country",
+          "name": "Danmark"
+        }
+      ],
+      "founder": [
+        {
+          "@type": "Person",
+          "name": "Lasse Sander Larsen"
+        },
+        {
+          "@type": "Person",
+          "name": "Victor Emil Rasmussen"
+        }
+      ],
+      "knowsAbout": [
+        "Virtuel rundvisning",
+        "Droneoptagelser"
+      ]
+    },
+    {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Forside",
+          "item": "https://nextview360.dk/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Om os",
+          "item": "https://nextview360.dk/om-os.html"
+        }
+      ]
+    },
+    {
+      "@type": "AboutPage",
+      "name": "Om Nextview360",
+      "about": {
+        "@id": "https://nextview360.dk/#org"
+      }
+    },
+    {
+      "@type": "Person",
+      "name": "Gustav Enström",
+      "jobTitle": "Sales Manager",
+      "telephone": "+45 29 89 95 55",
+      "email": "gustav@nextview360.dk",
+      "image": "https://nextview360.dk/img/gustav.webp",
+      "worksFor": {
+        "@id": "https://nextview360.dk/#org"
+      }
+    },
+    {
+      "@type": "Person",
+      "name": "Victor Emil Rasmussen",
+      "jobTitle": "Sales & Tech Manager",
+      "telephone": "+45 20 91 02 94",
+      "email": "victor@nextview360.dk",
+      "image": "https://nextview360.dk/img/victor.webp",
+      "worksFor": {
+        "@id": "https://nextview360.dk/#org"
+      }
+    },
+    {
+      "@type": "Person",
+      "name": "Lasse Sander Larsen",
+      "jobTitle": "Sales & Account Manager",
+      "telephone": "+45 23 27 07 86",
+      "email": "lasse@nextview360.dk",
+      "image": "https://nextview360.dk/img/lasse.webp",
+      "worksFor": {
+        "@id": "https://nextview360.dk/#org"
+      }
+    }
+  ]
+};
+---
+<Site title={"Om Nextview360 – holdet i Aalborg | Gustav, Victor og Lasse"} description={"Mød holdet bag Nextview360: Gustav, Victor og Lasse. Et lokalt team i Aalborg, der laver virtuelle rundvisninger."} path="/om-os.html" image={"https://nextview360.dk/img/victor.webp"} ld={ld} current="om-os">
+<main id="indhold">
+<nav class="crumbs wrap" aria-label="Brødkrumme"><a href="index.html">Forside</a><span aria-hidden="true">/</span><span aria-current="page">Om os</span></nav><section class="page-hero center"><div class="narrow"><p class="eyebrow">Aalborg</p><h1 style="margin-top:12px">Ansigterne bag Nextview360</h1><p class="lead">Vi er et hands-on team, der bygger virtuelle rundvisninger, som får virksomheder til at blive set, husket og valgt.</p></div></section>
+<section class="sec" style="padding-top:0"><div class="wrap team"><article class="member"><img src="img/gustav.webp" alt="Gustav Enström, Sales Manager hos Nextview360" width="779" height="973"><div class="b"><h3>Gustav</h3><p class="role">Sales Manager</p><a href="tel:+4529899555">+45 29 89 95 55</a><a href="mailto:gustav@nextview360.dk">gustav@nextview360.dk</a></div></article><article class="member"><img src="img/victor.webp" alt="Victor Emil Rasmussen, Sales & Tech Manager hos Nextview360" width="779" height="973"><div class="b"><h3>Victor</h3><p class="role">Sales & Tech Manager</p><a href="tel:+4520910294">+45 20 91 02 94</a><a href="mailto:victor@nextview360.dk">victor@nextview360.dk</a></div></article><article class="member"><img src="img/lasse.webp" alt="Lasse Sander Larsen, Sales & Account Manager hos Nextview360" width="779" height="973"><div class="b"><h3>Lasse</h3><p class="role">Sales & Account Manager</p><a href="tel:+4523270786">+45 23 27 07 86</a><a href="mailto:lasse@nextview360.dk">lasse@nextview360.dk</a></div></article></div></section>
+<section class="sec soft"><div class="wrap split"><div><p class="eyebrow">Om os</p><h2 style="margin-top:10px">Vi hjælper dig med at fortælle din historie</h2></div>
+<div class="body"><p class="lead">I hver virksomhed er der en historie. Man knokler og bygger noget op, fordi man brænder for det. Den historie vil vi hjælpe dig med at vise frem.</p>
+<p>Idéen til Nextview360 fik vi for flere år siden. Vi brugte tiden på at udvikle og finpudse produktet, før vi begyndte at tilbyde det til andre. Derfor ved vi præcis, hvad der skal til, for at en rundvisning rent faktisk skaber kunder.</p>
+<p>Vil du vise dine omgivelser frem gennem en Nextview360 Tour, så er du kommet det rette sted. Vi optager, designer og bygger selv, og vi følger dig hele vejen fra første snak til længe efter lancering.</p>
+<p>Vi brænder for at give lokale virksomheder et digitalt udtryk, der er lige så stærkt som det, kunderne oplever, når de træder ind ad døren.</p>
+<div class="btn-row"><a class="btn btn-navy" href="kontakt.html">Fortæl os din historie</a></div></div></div></section>
+<section class="sec values-sec"><div class="wrap values"><div class="v-head"><p class="eyebrow">Vores værdier</p><h2>Det, vi står for</h2><p class="lead">Fire ting, du kan regne med, når vi bygger jeres rundvisning.</p></div><ol class="v-list"><li><span>01</span><div><h3>Tæt på</h3><p>Du taler med dem, der optager, designer og bygger. Ingen mellemled, ingen skiftende konsulenter, og du har altid et direkte nummer.</p></div></li><li><span>02</span><div><h3>Ærlige svar</h3><p>Vi siger det, hvis en løsning ikke giver mening for dig. Hellere en god anbefaling end et ekstra salg.</p></div></li><li><span>03</span><div><h3>Kvalitet i detaljen</h3><p>Fra lyset i et rum til teksten på en knap. Det er detaljerne, der får kunderne til at vælge dig.</p></div></li><li><span>04</span><div><h3>Resultater frem for pynt</h3><p>Alt vi laver, skal hjælpe dig med at blive fundet, husket og valgt. Det er dét, vi måler os selv på.</p></div></li></ol></div></section>
+<section class="sec"><div class="wrap"><div class="nums-band"><p class="nb-lead">Tal, vi er stolte af</p><dl class="nb">
+<div><dt>50+</dt><dd>rundvisninger leveret, fra fitnesscentre til skove og padelhaller</dd></div>
+<div><dt>24/7</dt><dd>synlige for jeres kunder, også når I har lukket</dd></div>
+<div><dt>100%</dt><dd>lavet af os selv, fra optagelse til lancering</dd></div>
+<div><dt>1</dt><dd>fast kontaktperson, der kender jer og jeres historie</dd></div></dl></div></div></section>
+</main>
+</Site>

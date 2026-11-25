@@ -1,0 +1,61 @@
+---
+/*
+ * Every page of nextview360.dk: the head (title, description, canonical, Open Graph, structured data) from the
+ * page's props, the bar at the top, the page itself and the footer. The fonts are our own files (fonts.css - no call
+ * to Google Fonts: faster, and no visitor data to a third party).
+ */
+import "../fonts.css";
+import Header from "../components/Header.astro";
+import Footer from "../components/Footer.astro";
+import { ARPO_URL, INDEXABLE, SITE_URL } from "../site";
+
+interface Props {
+  /** The title in Google and on the tab (keep it under ~60 characters). */
+  title: string;
+  /** The text under the title in Google (~120-160 characters). */
+  description: string;
+  /** The page's own address on the site, e.g. "/priser.html" ("/" for the front page) - its canonical URL. */
+  path: string;
+  /** The picture when the page is shared (a full https address). */
+  image: string;
+  /** schema.org data for the page (JSON-LD). */
+  ld: object;
+  current?: "cases" | "kontakt" | "om-os";
+  /** The page's own stylesheets and scripts (in public/), besides style.css and site.js. */
+  css?: string[];
+  scripts?: string[];
+  /** Never in Google (the 404 page). */
+  noindex?: boolean;
+}
+const { title, description, path, image, ld, current, css = [], scripts = [], noindex = false } = Astro.props;
+const url = SITE_URL + path;
+---
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>{title}</title>
+<meta name="description" content={description}>
+<link rel="canonical" href={url}>
+<meta name="robots" content={INDEXABLE && !noindex ? "index,follow,max-image-preview:large" : "noindex,nofollow"}>
+<meta name="geo.region" content="DK-81"><meta name="geo.placename" content="Aalborg">
+<meta property="og:type" content="website"><meta property="og:locale" content="da_DK"><meta property="og:site_name" content="Nextview360">
+<meta property="og:title" content={title}><meta property="og:description" content={description}><meta property="og:url" content={url}><meta property="og:image" content={image}>
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/png" href="/icon.png">
+<link rel="preload" href="/fonts/plus-jakarta-sans-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="sitemap" type="application/xml" href="/sitemap.xml">
+<link rel="stylesheet" href="style.css">
+{css.map((href) => <link rel="stylesheet" href={href}>)}
+<script type="application/ld+json" set:html={JSON.stringify(ld).replace(/</g, "\\u003c")} />
+</head>
+<body data-arpo={ARPO_URL === SITE_URL ? undefined : ARPO_URL}>
+<a class="skip" href="#indhold">Spring til indhold</a>
+<Header current={current} />
+<slot />
+<Footer />
+<script is:inline src="site.js"></script>
+{scripts.map((src) => <script is:inline src={src}></script>)}
+</body>
+</html>

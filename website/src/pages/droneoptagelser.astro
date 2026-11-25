@@ -1,0 +1,114 @@
+---
+import Site from "../layouts/Site.astro";
+
+const ld = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "ProfessionalService",
+      "@id": "https://nextview360.dk/#org",
+      "name": "Nextview360 ApS",
+      "url": "https://nextview360.dk/",
+      "logo": "https://nextview360.dk/img/logo-dark.png",
+      "image": "https://nextview360.dk/img/padel.webp",
+      "telephone": "+4520910294",
+      "vatID": "DK46452445",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "Vesterbro 18, st.",
+        "postalCode": "9000",
+        "addressLocality": "Aalborg",
+        "addressCountry": "DK"
+      },
+      "areaServed": [
+        {
+          "@type": "AdministrativeArea",
+          "name": "Nordjylland"
+        },
+        {
+          "@type": "Country",
+          "name": "Danmark"
+        }
+      ],
+      "founder": [
+        {
+          "@type": "Person",
+          "name": "Lasse Sander Larsen"
+        },
+        {
+          "@type": "Person",
+          "name": "Victor Emil Rasmussen"
+        }
+      ],
+      "knowsAbout": [
+        "Virtuel rundvisning",
+        "Droneoptagelser"
+      ]
+    },
+    {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Forside",
+          "item": "https://nextview360.dk/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Droneoptagelser",
+          "item": "https://nextview360.dk/droneoptagelser.html"
+        }
+      ]
+    },
+    {
+      "@type": "Service",
+      "name": "Droneoptagelser",
+      "description": "Luftfoto og panoramaer fra drone, integreret i virtuelle rundvisninger.",
+      "provider": {
+        "@id": "https://nextview360.dk/#org"
+      },
+      "areaServed": [
+        "Aalborg",
+        "Nordjylland",
+        "Danmark"
+      ],
+      "offers": {
+        "@type": "Offer",
+        "price": "2500",
+        "priceCurrency": "DKK"
+      }
+    },
+    {
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "Hvad koster droneoptagelser?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Droneoptagelser starter fra 2.500 kr. og kan lægges sammen med en rundvisning."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Må I flyve over alle områder?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Vi flyver efter de danske droneregler og tjekker altid området på forhånd. Enkelte zoner kræver tilladelse, som vi søger om."
+          }
+        }
+      ]
+    }
+  ]
+};
+---
+<Site title={"Droneoptagelser og luftfoto – fra 2.500 kr. | Nextview360"} description={"Droneoptagelser og luftfoto til virksomheder, oplevelsessteder og ejendomme. Kan bygges ind i jeres virtuelle rundvisning. Fra 2.500 kr. Aalborg og hele Danmark."} path="/droneoptagelser.html" image={"https://nextview360.dk/img/drone.webp"} ld={ld}>
+<main id="indhold">
+<nav class="crumbs wrap" aria-label="Brødkrumme"><a href="index.html">Forside</a><span aria-hidden="true">/</span><span aria-current="page">Droneoptagelser</span></nav><section class="page-hero"><div class="wrap grid"><div><p class="eyebrow">Drone</p><h1 style="margin-top:12px">Droneoptagelser, der giver det store overblik</h1><p class="lead">Luftfoto og panoramaer fra drone viser hele området. Vi bygger dem ind i rundvisningen, så kunderne kan hoppe fra luften og ind ad døren.</p><div class="btn-row"><a class="btn btn-blue" href="kontakt.html">Få et uforpligtende tilbud</a><a class="btn btn-line no-arrow" href="tel:+4520910294">Ring +45 20 91 02 94</a></div></div><div class="img"><img src="img/drone.webp" alt="" width="700" height="525"></div></div></section><section class="sec soft"><div class="wrap"><div class="feat"><div><h3>Luftfoto til hjemmesiden</h3><p>Skarpe billeder fra luften til forsiden, Google og sociale medier.</p></div><div><h3>Panorama fra luften</h3><p>Panoramaer, kunderne selv kan dreje rundt i, bygget ind i touren.</p></div><div><h3>Overblik over store områder</h3><p>Perfekt til parker, campingpladser, idrætscentre og erhvervsområder.</p></div></div></div></section>
+<section class="sec"><div class="narrow"><div class="head center"><h2>Spørgsmål om drone</h2></div><div class="faq"><details><summary>Hvad koster droneoptagelser?</summary><p>Droneoptagelser starter fra 2.500 kr. og kan lægges sammen med en rundvisning.</p></details><details><summary>Må I flyve over alle områder?</summary><p>Vi flyver efter de danske droneregler og tjekker altid området på forhånd. Enkelte zoner kræver tilladelse, som vi søger om.</p></details></div></div></section><section class="cta-band"><div class="inner on-blue"><div class="copy"><h2>Skal vi tage en uforpligtende snak?</h2><p class="lead">Ring eller skriv, så vender vi tilbage samme dag. Vi kommer gerne forbi og viser, hvordan det kunne se ud for jer.</p>
+<div class="btn-row"><a class="btn btn-white" href="kontakt.html">Book et gratis møde</a><a class="btn btn-line no-arrow" href="tel:+4520910294">Ring +45 20 91 02 94</a></div></div>
+<div class="faces"><img src="img/gustav.webp" alt="Gustav Enström, Sales Manager" loading="lazy" width="170" height="212"><img src="img/victor.webp" alt="Victor Emil Rasmussen, Sales & Tech Manager" loading="lazy" width="170" height="212"><img src="img/lasse.webp" alt="Lasse Sander Larsen, Sales & Account Manager" loading="lazy" width="170" height="212"></div></div></section>
+</main>
+</Site>

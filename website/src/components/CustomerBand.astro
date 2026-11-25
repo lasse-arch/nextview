@@ -1,0 +1,29 @@
+---
+/*
+ * "Steder, der allerede viser sig frem med Nextview360": the logo of every customer whose tour is online, read from
+ * Arpo when the site is built (GET /api/site/kunder - public, read-only). The answer is treated as outside data:
+ * only https logos, names as text. If Arpo can't be reached, the band is left out and the build goes on.
+ */
+import { ARPO_URL } from "../site";
+
+type Customer = { name: string; logo: string; tone: string };
+const TONES = new Set(["dark", "light", "box", "boxdark"]);
+let list: Customer[] = [];
+try {
+  const res = await fetch(`${ARPO_URL}/api/site/kunder`, { signal: AbortSignal.timeout(15_000) });
+  const data = res.ok ? ((await res.json()) as { customers?: unknown }) : null;
+  if (Array.isArray(data?.customers))
+    list = data.customers
+      .filter((c): c is Customer => !!c && typeof c.name === "string" && typeof c.logo === "string" && /^https:\/\/[^\s"'<>]+$/i.test(c.logo) && TONES.has(c.tone))
+      .slice(0, 200);
+} catch (err) {
+  console.warn(`Kundebåndet kunne ikke hentes fra ${ARPO_URL}:`, err instanceof Error ? err.message : err);
+}
+const dur = Math.max(30, list.length * 4);
+---
+{list.length > 0 && (
+  <ul class="cb-track" style={`--cb-dur:${dur}s`}>
+    {list.map((c) => <li><img src={c.logo} alt={c.name} loading="lazy" decoding="async" class={`t-${c.tone}`} /></li>)}
+    {list.map((c) => <li aria-hidden="true"><img src={c.logo} alt={c.name} loading="lazy" decoding="async" class={`t-${c.tone}`} /></li>)}
+  </ul>
+)}

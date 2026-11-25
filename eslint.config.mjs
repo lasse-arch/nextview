@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // The website (Astro) has its own tooling.
+    "website/**",
   ]),
 ]);
 
