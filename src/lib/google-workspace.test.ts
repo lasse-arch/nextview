@@ -1,10 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createVerify, generateKeyPairSync } from "node:crypto";
-
-// A throwaway key - Google is never called: fetch is replaced below.
-const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
-process.env.GOOGLE_WORKSPACE_KEY = JSON.stringify({ client_email: "arpo@test.iam.gserviceaccount.com", private_key: privateKey.export({ type: "pkcs8", format: "pem" }) });
+// Google is never called: fetch is replaced below. Vercel's OIDC token comes from the env, as in local dev.
+process.env.VERCEL_OIDC_TOKEN = "vercel-oidc";
+process.env.GCP_PROJECT_NUMBER = "123456789";
+process.env.GCP_WORKLOAD_POOL_ID = "vercel";
+process.env.GCP_WORKLOAD_PROVIDER_ID = "vercel";
+process.env.GCP_SERVICE_ACCOUNT_EMAIL = "arpo-workspace@nextview360aps.iam.gserviceaccount.com";
 
 type Call = { method: string; url: string; body: unknown };
 const calls: Call[] = [];
@@ -19,13 +20,17 @@ globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
   const body = typeof init?.body === "string" ? JSON.parse(init.body) : init?.body instanceof URLSearchParams ? Object.fromEntries(init.body) : null;
   calls.push({ method, url, body });
   const json = (status: number, data: unknown) => new Response(JSON.stringify(data), { status });
-  if (url.startsWith("https://oauth2.googleapis.com/token")) {
-    const [h, c, sig] = String((body as { assertion: string }).assertion).split(".");
-    const ok = createVerify("RSA-SHA256").update(`${h}.${c}`).verify(publicKey, Buffer.from(sig, "base64url"));
-    const claims = JSON.parse(Buffer.from(c, "base64url").toString());
-    if (!ok || claims.sub !== undefined || claims.scope !== "https://www.googleapis.com/auth/admin.directory.user") return json(401, { error: "invalid_grant" });
-    return json(200, { access_token: "t" });
+  if (url === "https://sts.googleapis.com/v1/token") {
+    const b = body as Record<string, string>;
+    const ok = b.subject_token === "vercel-oidc" && b.audience === "//iam.googleapis.com/projects/123456789/locations/global/workloadIdentityPools/vercel/providers/vercel";
+    return ok ? json(200, { access_token: "federated" }) : json(400, { error: "invalid_grant" });
   }
+  if (url.startsWith("https://iamcredentials.googleapis.com/")) {
+    const ok = url.includes("arpo-workspace%40nextview360aps.iam.gserviceaccount.com:generateAccessToken") && (init?.headers as Record<string, string>).Authorization === "Bearer federated";
+    const scope = (body as { scope: string[] }).scope;
+    return ok && scope.length === 1 && scope[0] === "https://www.googleapis.com/auth/admin.directory.user" ? json(200, { accessToken: "sa" }) : json(403, { error: { status: "PERMISSION_DENIED" } });
+  }
+  if ((init?.headers as Record<string, string>).Authorization !== "Bearer sa") return json(401, {});
   const m = url.match(/\/users\/([^/]+)(\/signOut)?$/);
   const email = m ? decodeURIComponent(m[1]) : "";
   if (method === "POST" && !m) return users[(body as { primaryEmail: string }).primaryEmail] ? json(409, {}) : json(200, {});

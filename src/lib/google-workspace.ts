@@ -1,17 +1,19 @@
 import "server-only";
-import { createSign, randomInt } from "node:crypto";
+import { randomInt } from "node:crypto";
+import { getVercelOidcTokenSync } from "@vercel/oidc";
 
 /*
- * Google Workspace accounts made from Arpo (HR → "Giv adgang til Arpo"): a new employee's @nextview360.dk account is
- * created, and suspended the day after their last day of work - so nobody has to go into Google Admin.
+ * Google Workspace accounts made from Arpo (HR → "Giv adgang til Arpo", Brugere): created, given a new password,
+ * signed out, closed and opened again - so nobody has to go into Google Admin.
  *
- * Set up once (see docs/google-workspace.md), only in Vercel env - never in code:
- *  - GOOGLE_WORKSPACE_KEY: the service account's JSON key (as is, or base64). The service account itself holds a
- *    custom admin role in Google that may only manage users (not a super admin) - no user to act as, no domain-wide
- *    delegation. Google never lets such a role change a super admin, so the key can't touch Lasse.
+ * No key anywhere: Vercel proves to Google that the call comes from our Vercel project (OIDC federation - Vercel
+ * signs a short-lived token per request), Google's Workload Identity Pool trusts only our team, project and
+ * production, and lets it act as the service account `arpo-workspace`, which holds a custom admin role in Google that
+ * may only manage users (not a super admin). Google never lets such a role change a super admin, so Lasse's account
+ * can't be touched. Setup: docs/google-workspace.md. Vercel env (ids, not secrets):
+ *  - GCP_PROJECT_NUMBER, GCP_WORKLOAD_POOL_ID, GCP_WORKLOAD_PROVIDER_ID, GCP_SERVICE_ACCOUNT_EMAIL
  *  - GOOGLE_WORKSPACE_OU (optional): an organisational unit to keep Arpo inside - new accounts go there, and only
  *    accounts in it are managed. Without it, new accounts go in the top unit and any non-admin can be managed.
- *  - GOOGLE_WORKSPACE_ADMIN (optional, not used by us): a user to act as through domain-wide delegation instead.
  * Only the scope admin.directory.user is asked for. On top of Google's own limits, Arpo only touches accounts on our
  * domain that aren't admins in Google.
  */
@@ -20,21 +22,18 @@ export const WORKSPACE_DOMAIN = "nextview360.dk";
 const SCOPE = "https://www.googleapis.com/auth/admin.directory.user";
 const API = "https://admin.googleapis.com/admin/directory/v1/users";
 
-type Key = { client_email: string; private_key: string };
-
-function key(): Key | null {
-  const raw = process.env.GOOGLE_WORKSPACE_KEY?.trim();
-  if (!raw) return null;
-  try {
-    const json = JSON.parse(raw.startsWith("{") ? raw : Buffer.from(raw, "base64").toString("utf8")) as Partial<Key>;
-    return json.client_email && json.private_key ? { client_email: json.client_email, private_key: json.private_key } : null;
-  } catch {
-    return null;
-  }
+function federation() {
+  const project = process.env.GCP_PROJECT_NUMBER?.trim();
+  const pool = process.env.GCP_WORKLOAD_POOL_ID?.trim();
+  const provider = process.env.GCP_WORKLOAD_PROVIDER_ID?.trim();
+  const account = process.env.GCP_SERVICE_ACCOUNT_EMAIL?.trim();
+  if (!project || !pool || !provider || !account) return null;
+  if (!/^\d+$/.test(project) || !/^[a-z0-9-]+$/.test(pool) || !/^[a-z0-9-]+$/.test(provider) || !/^[a-z0-9-]+@[a-z0-9-]+\.iam\.gserviceaccount\.com$/.test(account)) return null;
+  return { audience: `//iam.googleapis.com/projects/${project}/locations/global/workloadIdentityPools/${pool}/providers/${provider}`, account };
 }
 
-/** Is Arpo set up to make Google accounts? */
-export const workspaceReady = () => key() != null;
+/** Is Arpo set up to manage Google accounts? */
+export const workspaceReady = () => federation() != null;
 
 /** The unit Arpo is kept inside, or null (the whole domain, admins aside). */
 export const workspaceUnit = (): string | null => {
@@ -43,26 +42,52 @@ export const workspaceUnit = (): string | null => {
   return ou.startsWith("/") ? ou : `/${ou}`;
 };
 
-const b64url = (b: Buffer | string) => Buffer.from(b).toString("base64url");
-
-/** An access token for the service account (its own admin role) - fetched per call, never kept. */
-async function token(): Promise<string> {
-  const k = key();
-  if (!k) throw new Error("Google Workspace er ikke sat op i Arpo endnu.");
-  const now = Math.floor(Date.now() / 1000);
-  const head = b64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
-  const claims = b64url(JSON.stringify({ iss: k.client_email, ...(process.env.GOOGLE_WORKSPACE_ADMIN ? { sub: process.env.GOOGLE_WORKSPACE_ADMIN } : {}), scope: SCOPE, aud: "https://oauth2.googleapis.com/token", iat: now, exp: now + 600 }));
-  const sig = createSign("RSA-SHA256").update(`${head}.${claims}`).sign(k.private_key).toString("base64url");
-  const res = await fetch("https://oauth2.googleapis.com/token", {
+async function post<T>(url: string, init: { body: string | URLSearchParams; auth?: string; json?: boolean }): Promise<{ ok: boolean; status: number; data: T | null }> {
+  const res = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion: `${head}.${claims}.${sig}` }),
+    headers: { "Content-Type": init.json ? "application/json" : "application/x-www-form-urlencoded", ...(init.auth ? { Authorization: `Bearer ${init.auth}` } : {}) },
+    body: init.body,
     signal: AbortSignal.timeout(15_000),
   });
-  const body = (await res.json().catch(() => null)) as { access_token?: string; error?: string } | null;
-  // Only Google's error code - never the key or the token.
-  if (!res.ok || !body?.access_token) throw new Error(`Google afviste Arpos nøgle (${body?.error ?? res.status}) - tjek opsætningen.`);
-  return body.access_token;
+  return { ok: res.ok, status: res.status, data: (await res.json().catch(() => null)) as T | null };
+}
+
+let cached: { token: string; until: number } | null = null;
+
+/**
+ * An access token for the service account: Vercel's OIDC token → Google STS (a federated token) → the service
+ * account's own token, with only the users scope, for 10 minutes. Kept in memory only, never logged.
+ */
+async function token(): Promise<string> {
+  const f = federation();
+  if (!f) throw new Error("Google Workspace er ikke sat op i Arpo endnu.");
+  if (cached && cached.until > Date.now()) return cached.token;
+  let oidc: string;
+  try {
+    oidc = getVercelOidcTokenSync();
+  } catch {
+    throw new Error("Vercel gav ikke Arpo et OIDC-token - er OIDC slået til under projektets Settings → Security?");
+  }
+  const sts = await post<{ access_token?: string; error?: string }>("https://sts.googleapis.com/v1/token", {
+    body: new URLSearchParams({
+      grant_type: "urn:ietf:params:oauth:grant-type:token-exchange",
+      audience: f.audience,
+      scope: "https://www.googleapis.com/auth/cloud-platform",
+      requested_token_type: "urn:ietf:params:oauth:token-type:access_token",
+      subject_token_type: "urn:ietf:params:oauth:token-type:jwt",
+      subject_token: oidc,
+    }),
+  });
+  // Only Google's error code - never a token.
+  if (!sts.ok || !sts.data?.access_token) throw new Error(`Google afviste Vercels login (${sts.data?.error ?? sts.status}) - tjek Workload Identity-poolen.`);
+  const sa = await post<{ accessToken?: string; error?: { status?: string } }>(`https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/${encodeURIComponent(f.account)}:generateAccessToken`, {
+    auth: sts.data.access_token,
+    json: true,
+    body: JSON.stringify({ scope: [SCOPE], lifetime: "600s" }),
+  });
+  if (!sa.ok || !sa.data?.accessToken) throw new Error(`Google lod ikke Arpo bruge servicekontoen (${sa.data?.error?.status ?? sa.status}) - tjek rollen Workload Identity User.`);
+  cached = { token: sa.data.accessToken, until: Date.now() + 540_000 };
+  return sa.data.accessToken;
 }
 
 async function call<T>(method: string, path: string, body?: object): Promise<{ status: number; data: T | null }> {
