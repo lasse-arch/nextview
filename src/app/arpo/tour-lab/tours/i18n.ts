@@ -123,6 +123,7 @@ export const UI_STRINGS = [
   "Se det fra luften",
   "Vælg din linje ({n} linjer)",
   "Vis mindre",
+  "Se billederne",
   "Øjeblikke",
   "Linjen",
   "Sådan er det at gå på {linje}.",

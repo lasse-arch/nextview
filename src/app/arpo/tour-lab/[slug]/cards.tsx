@@ -40,6 +40,8 @@ export function PlaceCard({
   const [stopped, setStopped] = useState(false);
   const [page, setPage] = useState<1 | 2>(1);
   const [open, setOpen] = useState(false); // the text unfolded ("Læs mere")
+  // Reading mode ("Læs mere"): the card grows into a reading panel - bigger type, the first photo on top, the buttons kept in view.
+  const [wide, setWide] = useState(false);
   // "Læs mere" only when the text is actually cut off (a short text has nothing more to read).
   const textEl = useRef<HTMLParagraphElement>(null);
   const [clipped, setClipped] = useState(false);
@@ -91,7 +93,7 @@ export function PlaceCard({
   // At most three, and only those with a photo (name and role are optional).
   const people = (card.people ?? []).filter((p) => p.image).slice(0, 3);
   return (
-    <div className={`pc pc-${size}`} onPointerDown={() => setStopped(true)}>
+    <div className={`pc pc-${size}${wide ? " pc-laeser" : ""}`} onPointerDown={() => setStopped(true)}>
       <div className="pc-bar">
         <i style={{ animationDuration: `${seconds}s`, animationPlayState: stopped ? "paused" : "running" }} onAnimationEnd={() => onClose("timer")} />
       </div>
@@ -100,6 +102,12 @@ export function PlaceCard({
       </button>
       {page === 1 ? (
         <>
+          {wide && card.images?.[0] && (
+            <button type="button" className="pc-hero" onClick={() => onPhotos?.(card.images!, 0)} aria-label={tr("Se billederne")}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={card.images[0]} alt="" />
+            </button>
+          )}
           <h3>{card.title}</h3>
           {voice && audio && (
             <button type="button" className={`pc-laes ${reading ? "aktiv" : ""}`} onClick={readAloud} aria-label={reading ? tr("Stop oplæsningen") : voice} title={reading ? tr("Stop oplæsningen") : voice}>
@@ -112,12 +120,25 @@ export function PlaceCard({
           <p ref={textEl} className={open ? "pc-aaben" : "pc-klip"}>
             <RichText text={card.text} />
           </p>
+          {wide && (
+            <button
+              type="button"
+              className="pc-mere-mobil pc-mindre"
+              onClick={() => {
+                setWide(false);
+                setOpen(false);
+              }}
+            >
+              {tr("Vis mindre")}
+            </button>
+          )}
           {!open && clipped && (
             <button
               type="button"
               className="pc-mere-mobil"
               onClick={() => {
                 setOpen(true);
+                setWide(true);
                 setStopped(true); // reading: the card stays until it's closed
               }}
             >
@@ -313,6 +334,28 @@ export const CARDS_CSS = `
   .pc-folk img{width:32px;height:32px}
   .pc-folk span{display:none}
   .pc-stor{width:min(42vw,340px)}.pc-lille{width:min(30vw,250px)}
+}
+/* Reading mode ("Læs mere"): a calm reading panel - wider, bigger type, the first photo on top, the text scrolling under a soft fade, the buttons always in view. A sheet from below on phones. */
+.pc.pc-laeser{width:min(560px,calc(100% - 48px));padding:26px 30px 20px;border-radius:20px;box-shadow:0 28px 80px rgba(0,0,0,.38);animation:pcGrow .38s cubic-bezier(.2,.7,.2,1) both;max-height:calc(100% - 120px);overflow:hidden;display:flex;flex-direction:column}
+@keyframes pcGrow{from{opacity:.4;transform:translateY(14px) scale(.985)}to{opacity:1;transform:none}}
+.pc-laeser .pc-bar{display:none}
+.pc-laeser .pc-luk{z-index:2;background:rgba(255,255,255,.92);box-shadow:0 2px 10px rgba(0,0,0,.15)}
+.pc-hero{flex:none;display:block;margin:-26px -30px 20px;padding:0;border:0;height:210px;overflow:hidden;cursor:zoom-in;background:#eef2f2}
+.pc-hero img{display:block;width:100%;height:100%;object-fit:cover;transition:transform .6s ease}
+.pc-hero:hover img{transform:scale(1.03)}
+.pc-laeser h3{flex:none;font-size:27px;line-height:1.15;letter-spacing:-.01em;margin-bottom:12px}
+.pc-laeser p.pc-aaben{flex:1 1 auto;min-height:0;max-height:none;overflow:auto;overscroll-behavior:contain;font-size:16px;line-height:1.72;color:#2c3e44;max-width:62ch;padding-bottom:18px;margin-bottom:2px;-webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(to bottom,#000 calc(100% - 28px),transparent)}
+.pc-laeser .pc-mindre{flex:none;display:block;text-align:left;margin:0 0 12px;padding:2px 0;border:0;background:none;font:inherit;font-size:13.5px;font-weight:800;color:var(--c-accent);cursor:pointer}
+.pc-laeser .pc-fotos,.pc-laeser .pc-folk{flex:none}
+.pc-laeser .pc-btns{flex:none;padding-top:14px;border-top:1px solid #eef1f2;gap:8px}
+.pc-laeser .pc-btn{padding:9px 18px;font-size:14.5px}
+@media (max-width:760px){
+  .pc.pc-laeser{left:0;right:0;bottom:0;width:auto;max-height:82dvh;padding:22px 20px calc(16px + env(safe-area-inset-bottom,0px));border-radius:22px 22px 0 0}
+  .pc.pc-laeser::before{content:"";position:absolute;left:50%;top:8px;width:40px;height:4px;margin-left:-20px;border-radius:2px;background:rgba(0,0,0,.18);z-index:2}
+  .pc-hero{margin:-22px -20px 16px;height:170px}
+  .pc-laeser h3{font-size:22px}
+  .pc-laeser p.pc-aaben{font-size:15px;line-height:1.65;display:block;-webkit-line-clamp:unset}
+  .pc-laeser .pc-mere-mobil{display:block}
 }
 /* Computers too: a few lines and "Læs mere" - the whole text only when asked for (then it scrolls in the card if long). */
 @media (min-width:761px) and (min-height:501px){
