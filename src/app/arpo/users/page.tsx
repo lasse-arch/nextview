@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
-import { createUser, endUserSessions, setUserActive, updateUser } from "@/lib/actions/users";
+import { createUser, endUserSessions, resetGooglePassword, setUserActive, signOutGoogle, updateUser } from "@/lib/actions/users";
+import { onOurDomain, workspaceReady, workspaceState, workspaceUnit } from "@/lib/google-workspace";
+import { WORKSPACE_MAIL_APPROVED } from "@/lib/workspace-mail";
 import { commissionFrequencyLabels } from "@/lib/labels";
 import { AvatarUploader } from "../avatar-uploader";
 import { RequireGoogleLoginToggle } from "./require-google-login-toggle";
@@ -37,6 +39,10 @@ export default async function UsersPage() {
   const notYetGoogle = users.filter((u) => !u.lastGoogleLoginAt);
   // Secrets whose absence leaves a door open (the routes they guard accept
   // anyone without them) - checked here since they live in Vercel, not Arpo.
+  // Each @nextview360.dk account's state in Google - only when Arpo is set up to manage them.
+  const google = workspaceReady()
+    ? new Map(await Promise.all(users.filter((u) => u.id !== currentUser.id && onOurDomain(u.email)).map(async (u) => [u.id, await workspaceState(u.email)] as const)))
+    : null;
   const securityChecks = [
     {
       ok: Boolean(process.env.CRON_SECRET),
@@ -204,6 +210,31 @@ export default async function UsersPage() {
                       Log ud overalt
                     </button>
                   </form>
+                  {(() => {
+                    const g = google?.get(u.id);
+                    if (!g) return null;
+                    if (g.state === "outside") return <span className="w-full text-[11px] text-slate-500">Google: {g.why}</span>;
+                    if (g.state === "missing") return <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">Ingen Google-konto</span>;
+                    return (
+                      <>
+                        <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${g.state === "active" ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>{g.state === "active" ? "Google-konto åben" : "Google-konto lukket"}</span>
+                        {g.state === "active" && WORKSPACE_MAIL_APPROVED && (
+                          <form action={resetGooglePassword.bind(null, u.id)}>
+                            <button type="submit" className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50">
+                              Nulstil adgangskode
+                            </button>
+                          </form>
+                        )}
+                        {g.state === "active" && (
+                          <form action={signOutGoogle.bind(null, u.id)}>
+                            <button type="submit" className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50">
+                              Log ud af Google
+                            </button>
+                          </form>
+                        )}
+                      </>
+                    );
+                  })()}
                   <form action={setUserActive.bind(null, u.id, Boolean(u.disabledAt))}>
                     <button type="submit" className={`rounded-lg px-3 py-1.5 text-xs font-medium ${u.disabledAt ? "border border-slate-300 text-slate-700 hover:bg-slate-50" : "bg-red-600 text-white hover:bg-red-700"}`}>
                       {u.disabledAt ? "Genaktivér" : "Deaktivér (stopper login med det samme)"}
@@ -215,6 +246,12 @@ export default async function UsersPage() {
           );
         })}
       </div>
+
+      <p className="text-xs text-slate-500">
+        {google
+          ? `Google-konti i ${workspaceUnit()} styres herfra: Deaktivér lukker også Google-kontoen, Genaktivér åbner den igen${WORKSPACE_MAIL_APPROVED ? ", og en ny adgangskode sendes til personens egen e-mail" : ""}. Administratorer i Google styres ikke fra Arpo.`
+          : "Google Workspace er ikke koblet til Arpo endnu - så oprettes, lukkes og nulstilles Google-konti stadig i Google Admin (se docs/google-workspace.md)."}
+      </p>
 
       <section className="rounded-lg border border-dashed border-slate-300 bg-white p-4">
         <h2 className="text-sm font-semibold text-slate-900">Opret ny medarbejder</h2>

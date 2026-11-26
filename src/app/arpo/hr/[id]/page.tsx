@@ -12,6 +12,8 @@ import { EmploymentFields, PayFields } from "../employee-form";
 import { PayLine } from "../pay-view";
 import { contractProblem } from "@/lib/employment-contract";
 import { CONTRACT_SIGNER } from "@/lib/contract-template-data";
+import { workspaceReady } from "@/lib/google-workspace";
+import { WORKSPACE_MAIL_APPROVED } from "@/lib/workspace-mail";
 
 const CATEGORY_NAMES: Record<string, string> = { FILMING: "Filmning", TOUR_EDITING: "Tour-opbygning", REFILMING: "Genoptagelse", CORRECTIONS: "Rettelser", WEBSITE: "Hjemmeside" };
 
@@ -24,6 +26,7 @@ export default async function EmployeePage({ params, searchParams }: { params: P
   if (!user) redirect("/api/auth/session-ended?next=/arpo/hr");
   if (!isHrAdmin(user)) redirect("/arpo/mig");
   const [{ id }, sp] = await Promise.all([params, searchParams]);
+  const googleReady = workspaceReady() && WORKSPACE_MAIL_APPROVED;
   const e = await prisma.employee.findUnique({
     where: { id },
     include: { user: { select: { id: true, name: true, lastName: true, email: true, role: true, extraRoles: true, disabledAt: true } }, manager: { select: { name: true } }, pay: { orderBy: { effectiveFrom: "desc" } }, absences: { orderBy: { from: "desc" } }, tasks: { orderBy: [{ sort: "asc" }, { label: "asc" }] } },
@@ -88,8 +91,15 @@ export default async function EmployeePage({ params, searchParams }: { params: P
                   <input name="workEmail" type="email" placeholder="fornavn@nextview360.dk" className={input} />
                 </label>
                 <button className={btn}>Giv adgang til Arpo</button>
+                {googleReady && (
+                  <label className="flex w-full items-center gap-2 text-sm text-slate-700">
+                    <input type="checkbox" name="createGoogle" defaultChecked />
+                    Opret Google-kontoen også, og send login til {e.privateEmail ?? e.user.email}
+                  </label>
+                )}
                 <p className="w-full text-xs text-slate-500">
-                  {e.kind === "SALARIED" && !e.contractSignedAt ? "Normalt først når kontrakten er underskrevet. " : ""}Opret Google-kontoen først. De logger ind med Google på den adresse. Deres egen e-mail ({e.privateEmail ?? e.user.email}) bliver stående på kortet.
+                  {e.kind === "SALARIED" && !e.contractSignedAt ? "Normalt først når kontrakten er underskrevet. " : ""}
+                  {googleReady ? "Uden fluebenet skal Google-kontoen findes i forvejen. " : "Opret Google-kontoen først. "}De logger ind med Google på den adresse. Deres egen e-mail ({e.privateEmail ?? e.user.email}) bliver stående på kortet.
                 </p>
               </form>
             )}

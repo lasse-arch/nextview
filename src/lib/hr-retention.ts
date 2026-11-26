@@ -1,10 +1,12 @@
 import "server-only";
 import { prisma } from "@/lib/db";
 import { addDays, todayDk } from "@/lib/hr";
+import { suspendWorkspaceUser } from "@/lib/google-workspace";
 
 /*
  * Run daily (the deal-follow-up cron):
- *  - The day after the last day of work, the person's login to Arpo is closed and every session ends.
+ *  - The day after the last day of work, the person's login to Arpo is closed and every session ends - and their
+ *    Google account is suspended (when Arpo manages it, lib/google-workspace.ts).
  *  - 5 years after the employment ended, HR clears what it holds about them (GDPR: no longer than needed): pay,
  *    absence notes, checklists, the access log, notes and the payroll number. The name, title and dates stay,
  *    so it's still known that the person worked here. The payroll system keeps what bookkeeping law needs.
@@ -14,7 +16,11 @@ import { addDays, todayDk } from "@/lib/hr";
 export async function runHrHousekeeping(today = todayDk()): Promise<{ closed: number; cleared: number; days: number }> {
   // Never an admin: closing the last admin out can't be undone from Arpo - an admin is closed by hand (Brugere).
   const ended = await prisma.employee.findMany({ where: { endDate: { lt: new Date(`${today}T00:00:00Z`) }, user: { disabledAt: null, role: { not: "ADMIN" } } }, select: { userId: true } });
-  for (const e of ended) await prisma.user.update({ where: { id: e.userId }, data: { disabledAt: new Date(), sessionVersion: { increment: 1 } } });
+  for (const e of ended) {
+    const u = await prisma.user.update({ where: { id: e.userId }, data: { disabledAt: new Date(), sessionVersion: { increment: 1 } }, select: { email: true } });
+    // Their Google account closes too (where Arpo manages it) - mails and files stay.
+    await suspendWorkspaceUser(u.email).catch((err) => console.error("[hr] Google-kontoen kunne ikke lukkes", u.email, err instanceof Error ? err.message : err));
+  }
 
   const fiveYears = `${Number(today.slice(0, 4)) - 5}${today.slice(4)}`;
   const old = await prisma.employee.findMany({ where: { endDate: { lt: new Date(`${fiveYears}T00:00:00Z`) }, anonymizedAt: null }, select: { id: true } });

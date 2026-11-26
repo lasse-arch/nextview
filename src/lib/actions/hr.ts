@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 import { randomBytes } from "node:crypto";
 import type { AbsenceKind, EmploymentKind, PayModel, Role } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { WORKSPACE_DOMAIN, createWorkspaceUser, onOurDomain, workspaceReady } from "@/lib/google-workspace";
+import { WORKSPACE_MAIL_APPROVED, sendWorkspaceMail } from "@/lib/workspace-mail";
 import { hashPassword } from "@/lib/password";
 import { TEAM_ROLES } from "@/lib/team-roles";
 import { employeeFor, hrViewer, isHrAdmin, requireHrAdmin } from "@/lib/hr-access";
@@ -153,17 +155,39 @@ export async function createEmployee(f: FormData) {
  */
 export async function activateAccess(employeeId: string, f: FormData) {
   const admin = await requireHrAdmin();
-  const e = await prisma.employee.findUnique({ where: { id: String(employeeId) }, include: { user: { select: { id: true, email: true } } } });
+  const e = await prisma.employee.findUnique({ where: { id: String(employeeId) }, include: { user: { select: { id: true, email: true, name: true, lastName: true } } } });
   if (!e) throw new Error("Medarbejderen findes ikke.");
   const email = str(f, "workEmail", 200).toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Skriv arbejds-e-mailen (Google-kontoen).");
   const other = await prisma.user.findUnique({ where: { email }, select: { id: true } });
   if (other && other.id !== e.userId) throw new Error("Den e-mail bruges allerede af en anden bruger.");
+  const privateEmail = e.privateEmail ?? (e.user.email !== email ? e.user.email : null);
+
+  // "Opret Google-kontoen også": made before anything changes in Arpo, so a no from Google leaves the card as it was.
+  let password: string | null = null;
+  if (f.get("createGoogle") === "on") {
+    if (!WORKSPACE_MAIL_APPROVED) throw new Error("Mailen med login er ikke godkendt endnu - opret kontoen i Google Admin indtil da.");
+    if (!workspaceReady()) throw new Error("Google Workspace er ikke sat op i Arpo endnu (se docs/google-workspace.md).");
+    if (!onOurDomain(email)) throw new Error(`Arbejds-mailen skal ende på @${WORKSPACE_DOMAIN}.`);
+    if (!privateEmail || onOurDomain(privateEmail)) throw new Error("Medarbejderen mangler en privat e-mail at sende login til - skriv den på kortet først.");
+    ({ password } = await createWorkspaceUser({ email, givenName: e.user.name, familyName: e.user.lastName ?? "" }));
+  }
+
   await prisma.$transaction([
     prisma.user.update({ where: { id: e.userId }, data: { email, disabledAt: null, sessionVersion: { increment: 1 } } }),
-    prisma.employee.update({ where: { id: e.id }, data: { privateEmail: e.privateEmail ?? (e.user.email !== email ? e.user.email : null) } }),
+    prisma.employee.update({ where: { id: e.id }, data: { privateEmail } }),
     prisma.hrTask.updateMany({ where: { employeeId: e.id, phase: "start", label: { startsWith: "Google-konto" }, doneAt: null }, data: { doneAt: new Date(), doneById: admin.id } }),
   ]);
+  if (password && privateEmail) {
+    try {
+      await sendWorkspaceMail("new", privateEmail, e.user.name, email, password);
+    } catch (err) {
+      // The password is never shown or kept - a new one is made in Google Admin.
+      console.error("[hr] login-mail fejlede", err instanceof Error ? err.message : err);
+      back(`/arpo/hr/${e.id}`, `Google-kontoen ${email} er oprettet, men mailen med login kunne ikke sendes - nulstil adgangskoden under Brugere`);
+    }
+    back(`/arpo/hr/${e.id}`, `Google-kontoen ${email} er oprettet, og login er sendt til ${privateEmail}`);
+  }
   back(`/arpo/hr/${e.id}`, `Adgangen er åben - ${email} kan logge ind med Google`);
 }
 

@@ -55,6 +55,8 @@
     "src/lib/google-drive.ts:28",
     "src/lib/google-drive.ts:35",
     "src/lib/google-drive.ts:80",
+    "src/lib/google-workspace.ts:53",
+    "src/lib/google-workspace.ts:66",
     "src/lib/headless-chromium.ts:46",
     "src/lib/health.ts:38",
     "src/lib/health.ts:74",
