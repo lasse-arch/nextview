@@ -14,6 +14,13 @@ import { claudeCostUsd } from "@/lib/claude-cost";
  * texts in its draft, and the user saves.
  */
 
+const SYSTEM = `Du deler tekster fra en virtuel 360°-tour i afsnit, så de er lette at læse på et kort.
+- Sæt en tom linje (to linjeskift) mellem afsnit, der hvor emnet naturligt skifter. Typisk 2-4 sætninger pr. afsnit; første afsnit er gerne en kort indledning.
+- Ret ALDRIG et ord, et tal, et tegn eller tegnsætningen. Tilføj, fjern eller flyt intet - indsæt kun afsnitsskift mellem sætninger.
+- En tekst, der kun handler om én ting, må gerne blive ét afsnit.
+- Teksterne kan være på dansk, engelsk, tysk, svensk eller norsk - del dem på samme måde.
+- Svar med hver tekst under sit nummer.`;
+
 const Items = z.object({ items: z.array(z.object({ i: z.number().int(), text: z.string() })) });
 const same = (a: string, b: string) => a.replace(/\s+/g, " ").trim() === b.replace(/\s+/g, " ").trim();
 
@@ -25,30 +32,42 @@ export async function paragraphTexts(slug: string, texts: string[]): Promise<{ o
   const list = [...new Set((Array.isArray(texts) ? texts : []).filter((t) => typeof t === "string" && t.trim().length >= 200 && t.length <= 6000).map((t) => t.trim()))].slice(0, 150);
   if (!list.length) return { ok: true, out: {} };
   const client = new Anthropic({ apiKey: key });
-  let r;
+  // Small parcels side by side (at most ~10,000 characters each): quick, and well within one request's limits.
+  const parcels: number[][] = [];
+  let size = Infinity;
+  list.forEach((t, i) => {
+    if (size + t.length > 10_000 || parcels[parcels.length - 1]?.length >= 12) {
+      parcels.push([]);
+      size = 0;
+    }
+    parcels[parcels.length - 1].push(i);
+    size += t.length;
+  });
+  const results: { i: number; text: string }[] = [];
   try {
-    r = await client.messages.parse({
-      model: "claude-opus-5-5",
-      max_tokens: 32000,
-      system: `Du deler tekster fra en virtuel 360°-tour i afsnit, så de er lette at læse på et kort.
-- Sæt en tom linje (to linjeskift) mellem afsnit, der hvor emnet naturligt skifter. Typisk 2-4 sætninger pr. afsnit; første afsnit er gerne en kort indledning.
-- Ret ALDRIG et ord, et tal, et tegn eller tegnsætningen. Tilføj, fjern eller flyt intet - indsæt kun afsnitsskift mellem sætninger.
-- En tekst, der kun handler om én ting, må gerne blive ét afsnit.
-- Teksterne kan være på dansk, engelsk, tysk, svensk eller norsk - del dem på samme måde.
-- Svar med hver tekst under sit nummer.`,
-      messages: [{ role: "user", content: list.map((t, i) => `<tekst nummer="${i}">\n${t}\n</tekst>`).join("\n") }],
-      output_config: { effort: "low", format: zodOutputFormat(Items) },
-    });
+    await Promise.all(
+      parcels.map(async (idx) => {
+        const r = await client.messages.parse({
+          model: "claude-opus-5-5",
+          max_tokens: 8000,
+          system: SYSTEM,
+          messages: [{ role: "user", content: idx.map((i) => `<tekst nummer="${i}">\n${list[i]}\n</tekst>`).join("\n") }],
+          output_config: { effort: "low", format: zodOutputFormat(Items) },
+        });
+        const u = r.usage;
+        await prisma.tourAiUsage
+          .create({ data: { tourSlug: slug, userName: user.name, kind: "afsnit", inputTokens: u.input_tokens, outputTokens: u.output_tokens, cacheReadTokens: u.cache_read_input_tokens ?? 0, cacheWriteTokens: u.cache_creation_input_tokens ?? 0, costUsd: claudeCostUsd(u) } })
+          .catch(() => {});
+        const wanted = new Set(idx);
+        results.push(...(r.parsed_output?.items ?? []).filter((it) => wanted.has(it.i)));
+      })
+    );
   } catch (err) {
     if (err instanceof Anthropic.AuthenticationError) return { ok: false, error: "nextviewAI-nøglen virker ikke længere." };
-    return { ok: false, error: `Kunne ikke få fat i nextviewAI (${err instanceof Error ? err.message : err}).` };
+    if (!results.length) return { ok: false, error: `Kunne ikke få fat i nextviewAI (${err instanceof Error ? err.message : err}).` };
   }
-  const u = r.usage;
-  await prisma.tourAiUsage
-    .create({ data: { tourSlug: slug, userName: user.name, kind: "afsnit", inputTokens: u.input_tokens, outputTokens: u.output_tokens, cacheReadTokens: u.cache_read_input_tokens ?? 0, cacheWriteTokens: u.cache_creation_input_tokens ?? 0, costUsd: claudeCostUsd(u) } })
-    .catch(() => {});
   const out: Record<string, string> = {};
-  for (const it of r.parsed_output?.items ?? []) {
+  for (const it of results) {
     const before = list[it.i];
     if (!before) continue;
     // Tidy the breaks: paragraphs separated by exactly one blank line, no stray spaces.
