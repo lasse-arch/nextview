@@ -3,21 +3,19 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
-import { upsertCalendarEvent } from "@/lib/google-calendar";
-import { MEETING_TIME_ZONE, toWallClockDateTime } from "@/lib/calendar-service";
-import { buildFilmingDescription, formatFilmingDate, joinNames } from "@/lib/filming";
+import { formatFilmingDate, joinNames } from "@/lib/filming";
+import { sendFilmingInvite, type FilmingInput } from "@/lib/filming-invite";
+import { annualRefilming } from "@/lib/refilming";
 import { logActivity } from "@/lib/activity";
 import { dealName } from "@/lib/labels";
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export type BookFilmingResult = { ok: true; sentTo: string[] } | { ok: false; error: string };
 
 /**
  * "Book filming" on the deal page: saves when we come out to film, who from
  * Nextview360 is filming and the expected length, and sends a Google
- * Calendar invite from the booker's own calendar to the customer's contract
- * e-mail (plus an optional "Send også til" address) and the crew, with the
+ * Calendar invite (lib/filming-invite.ts) to the customer's contract e-mail
+ * (plus an optional "Send også til" address) and the crew, with the
  * practical "ryd op inden"-text so expectations are aligned up front.
  *
  * filmingEventId is stored as "<organizerUserId>:<googleEventId>" - an event
@@ -25,109 +23,102 @@ export type BookFilmingResult = { ok: true; sentTo: string[] } | { ok: false; er
  * same person moves the existing invite, while someone else rebooking sends
  * a new one.
  */
-export async function bookFilming(
-  dealId: string,
-  input: { startLocal: string; hours: number; crewUserIds: string[]; contactEmail: string; extraEmails: string }
-): Promise<BookFilmingResult> {
+export async function bookFilming(dealId: string, input: FilmingInput): Promise<BookFilmingResult> {
   const user = await requireUser();
   const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId } });
-
-  const raw = input.startLocal.trim();
-  if (!raw) return { ok: false, error: "Vælg dato og tidspunkt for optagelsen." };
-  const start = new Date(/(Z|[+-]\d\d:?\d\d)$/.test(raw) ? raw : `${raw}Z`);
-  if (isNaN(start.getTime())) return { ok: false, error: "Ugyldigt tidspunkt." };
-
-  const hours = Number(input.hours);
-  if (!(hours > 0 && hours <= 24)) return { ok: false, error: "Vælg hvor mange timer optagelsen tager." };
-  if (input.crewUserIds.length === 0) return { ok: false, error: "Vælg hvem der skal filme." };
-
-  const contactEmail = input.contactEmail.trim();
-  if (!contactEmail) return { ok: false, error: "Der mangler en kunde-e-mail at sende invitationen til." };
-  const extraEmails = input.extraEmails
-    .split(/[,;\s]+/)
-    .map((e) => e.trim())
-    .filter(Boolean);
-  for (const email of [contactEmail, ...extraEmails]) {
-    if (!EMAIL_RE.test(email)) return { ok: false, error: `Ugyldig e-mail: ${email}` };
-  }
-
-  // Who invites: the booker, when they're filming themselves. When they aren't (Victor books a filming only Lasse goes
-  // to), it goes out from the calendar of the one filming - in their name, as the one the customer meets. Only ever from
-  // the booker's own calendar or that of someone who is going (and has connected Google); else the booker's own.
-  const filmers = await prisma.emailAccount.findMany({ where: { userId: { in: input.crewUserIds }, provider: "GOOGLE" } });
-  const byFilmer = input.crewUserIds.includes(user.id) ? null : input.crewUserIds.map((id) => filmers.find((a) => a.userId === id)).find(Boolean);
-  const account = byFilmer ?? (await prisma.emailAccount.findUnique({ where: { userId_provider: { userId: user.id, provider: "GOOGLE" } } }));
-  if (!account) return { ok: false, error: "Du har ikke forbundet Google under Indstillinger → E-mail." };
-  const senderId = account.userId;
-
-  const [organizer, crew] = await Promise.all([
-    prisma.user.findUniqueOrThrow({ where: { id: senderId } }),
-    prisma.user.findMany({ where: { id: { in: input.crewUserIds } }, orderBy: { name: "asc" } }),
-  ]);
-  const crewNames = crew.map((c) => c.name);
-  const durationMinutes = Math.round(hours * 60);
-  const end = new Date(start.getTime() + durationMinutes * 60_000);
-
-  const description = buildFilmingDescription({
-    start,
-    hours,
-    crewNames,
-    contactName: deal.contactName,
-    address: deal.address,
-    organizer: {
-      fullName: [organizer.name, organizer.lastName].filter(Boolean).join(" "),
-      email: organizer.email,
-      phone: organizer.phone,
-    },
-  });
-
-  const [prevOrganizerId, prevEventId] = deal.filmingEventId?.split(":") ?? [];
-  let eventId: string;
-  try {
-    eventId = await upsertCalendarEvent(account, {
-      eventId: prevOrganizerId === senderId ? prevEventId : null,
-      summary: `Optagelse: ${dealName(deal)} x Nextview360`,
-      description,
-      location: deal.address,
-      startIso: toWallClockDateTime(start),
-      endIso: toWallClockDateTime(end),
-      timeZone: MEETING_TIME_ZONE,
-      attendeeEmails: [contactEmail, ...extraEmails, ...crew.map((c) => c.email)],
-      acceptedEmails: crew.some((c) => c.id === senderId) ? [organizer.email] : [],
-    });
-  } catch (err) {
-    console.error("Filming invite failed", err);
-    return { ok: false, error: err instanceof Error ? err.message : "Kalenderinvitationen kunne ikke sendes." };
-  }
+  const r = await sendFilmingInvite(user, deal, input, { prevEventId: deal.filmingEventId });
+  if (!r.ok) return r;
 
   await prisma.deal.update({
     where: { id: dealId },
     data: {
-      filmingAt: start,
-      filmingDurationMinutes: durationMinutes,
-      filmingCrewIds: crew.map((c) => c.id).join(","),
-      filmingEventId: `${senderId}:${eventId}`,
-      ...(contactEmail !== deal.contactEmail && !deal.contactEmail ? { contactEmail } : {}),
+      filmingAt: r.start,
+      filmingDurationMinutes: r.durationMinutes,
+      filmingCrewIds: r.crew.map((c) => c.id).join(","),
+      filmingEventId: r.eventId,
+      ...(input.contactEmail.trim() !== deal.contactEmail && !deal.contactEmail ? { contactEmail: input.contactEmail.trim() } : {}),
     },
   });
 
-  const { date, time } = formatFilmingDate(start);
-  const sentTo = [contactEmail, ...extraEmails];
+  const { date, time } = formatFilmingDate(r.start);
+  const fromOther = r.senderId !== user.id;
   await prisma.note.create({
     data: {
       dealId,
       authorId: user.id,
       kind: "MANUAL",
-      body: `Optagelse booket ${date} kl. ${time} (ca. ${hours} t) med ${joinNames(crewNames)}. Invitation sendt til ${sentTo.join(", ")}${senderId !== user.id ? ` fra ${organizer.name}s kalender (booket af ${user.name})` : ""}.`,
+      body: `Optagelse booket ${date} kl. ${time} (ca. ${input.hours} t) med ${joinNames(r.crew.map((c) => c.name))}. Invitation sendt til ${r.sentTo.join(", ")}${fromOther ? ` fra ${r.organizerName}s kalender (booket af ${user.name})` : ""}.`,
     },
   });
   await logActivity({
     type: "DEAL_FILMING_BOOKED",
-    message: `${user.name} bookede optagelse hos ${dealName(deal)} ${date} kl. ${time}${senderId !== user.id ? ` (sendt fra ${organizer.name}s kalender)` : ""}`,
+    message: `${user.name} bookede optagelse hos ${dealName(deal)} ${date} kl. ${time}${fromOther ? ` (sendt fra ${r.organizerName}s kalender)` : ""}`,
     actorId: user.id,
     dealId,
   });
 
   revalidatePath(`/arpo/deals/${dealId}`);
-  return { ok: true, sentTo };
+  return { ok: true, sentTo: r.sentTo };
+}
+
+/**
+ * The filming brief: what the seller agreed with the customer - drone or not, and where and what to film - for the
+ * one filming (they see it on "Mine filmninger").
+ */
+export async function saveFilmingBrief(dealId: string, input: { drone: boolean | null; brief: string }): Promise<{ ok: true } | { ok: false; error: string }> {
+  const user = await requireUser();
+  const brief = String(input.brief ?? "").trim().slice(0, 5000);
+  if (input.drone === null || input.drone === undefined) return { ok: false, error: "Vælg om der skal drone med." };
+  if (brief.length < 10) return { ok: false, error: "Skriv hvad der er aftalt med kunden - hvor og hvad der skal filmes." };
+  const deal = await prisma.deal.findUnique({ where: { id: String(dealId) }, select: { id: true } });
+  if (!deal) return { ok: false, error: "Dealen findes ikke." };
+  await prisma.deal.update({ where: { id: deal.id }, data: { filmingDrone: Boolean(input.drone), filmingBrief: brief, filmingBriefAt: new Date(), filmingBriefById: user.id } });
+  revalidatePath(`/arpo/deals/${deal.id}`);
+  return { ok: true };
+}
+
+/**
+ * Genoptagelse: filming a customer again, once their tour is live - with its own brief and calendar invitation.
+ * `annual`: it uses the contract's yearly refilming (only while there's one left this contract year).
+ */
+export async function bookRefilming(
+  dealId: string,
+  input: FilmingInput & { drone: boolean | null; brief: string; annual: boolean }
+): Promise<BookFilmingResult> {
+  const user = await requireUser();
+  const deal = await prisma.deal.findUniqueOrThrow({ where: { id: String(dealId) }, include: { refilmings: true } });
+  if (deal.stage !== "LIVE") return { ok: false, error: "Genoptagelse kan bookes, når kunden er live." };
+  const brief = String(input.brief ?? "").trim().slice(0, 5000);
+  if (input.drone === null || input.drone === undefined) return { ok: false, error: "Vælg om der skal drone med." };
+  if (brief.length < 10) return { ok: false, error: "Skriv hvad der skal filmes igen - og hvorfor." };
+  const r = await sendFilmingInvite(user, deal, input, { title: "Genoptagelse" });
+  if (!r.ok) return r;
+  const allowance = annualRefilming(deal, deal.refilmings, r.start);
+  const annual = Boolean(input.annual && allowance && allowance.left > 0);
+  await prisma.refilming.create({
+    data: { dealId: deal.id, at: r.start, durationMinutes: r.durationMinutes, crewIds: r.crew.map((c) => c.id).join(","), eventId: r.eventId, drone: Boolean(input.drone), brief, annual, createdById: user.id },
+  });
+  const { date, time } = formatFilmingDate(r.start);
+  await prisma.note.create({
+    data: {
+      dealId: deal.id,
+      authorId: user.id,
+      kind: "MANUAL",
+      body: `Genoptagelse booket ${date} kl. ${time} (ca. ${input.hours} t) med ${joinNames(r.crew.map((c) => c.name))}${annual ? " - bruger den årlige genoptagelse" : input.annual ? " - ingen årlig genoptagelse tilbage, så den er ekstra" : " - ekstra genoptagelse"}. Invitation sendt til ${r.sentTo.join(", ")}.`,
+    },
+  });
+  await logActivity({ type: "DEAL_FILMING_BOOKED", message: `${user.name} bookede genoptagelse hos ${dealName(deal)} ${date} kl. ${time}`, actorId: user.id, dealId: deal.id });
+  revalidatePath(`/arpo/deals/${deal.id}`);
+  return { ok: true, sentTo: r.sentTo };
+}
+
+/** Cancels a booked refilming in Arpo (the yearly one is free again) - the calendar invitation is cancelled by hand. */
+export async function cancelRefilming(refilmingId: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const user = await requireUser();
+  const r = await prisma.refilming.findUnique({ where: { id: String(refilmingId) } });
+  if (!r || r.cancelledAt) return { ok: false, error: "Genoptagelsen findes ikke." };
+  await prisma.refilming.update({ where: { id: r.id }, data: { cancelledAt: new Date() } });
+  await prisma.note.create({ data: { dealId: r.dealId, authorId: user.id, kind: "MANUAL", body: `Genoptagelse ${formatFilmingDate(r.at).date} aflyst af ${user.name}.` } });
+  revalidatePath(`/arpo/deals/${r.dealId}`);
+  return { ok: true };
 }

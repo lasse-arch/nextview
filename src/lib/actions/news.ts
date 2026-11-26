@@ -63,6 +63,12 @@ export async function getUnreadNewsCount(userId: string, newsReadAt: Date | null
 const DEFAULT_POSTS: { title: string; body: string; minutesAgo: number; screenshotUrl: string }[] = [
   {
     minutesAgo: 0,
+    title: "Optagelsesbrief og genoptagelse",
+    body: "Når kontrakten er underskrevet, beder dealen nu om en optagelsesbrief: skal der drone med, og hvad er aftalt med kunden - hvor og hvad der skal filmes, og hvad der ikke må komme med. Indtil den er udfyldt, står dealen som en advarsel på dealen og under Min dag.\n\nOptageren ser briefen ved hver opgave under Mine filmninger - også på telefonen.\n\nPå en kunde, der er live, kan I nu booke en genoptagelse med sin egen brief og kalenderinvitation. Kontrakten indeholder 1 årlig genoptagelse pr. lokation: Arpo viser, om den er brugt i kontraktåret, og en genoptagelse kan markeres som den årlige eller som ekstra.",
+    screenshotUrl: "/news/optagelsesbrief.png",
+  },
+  {
+    minutesAgo: 0,
     title: "HR: medarbejdere, timer, ferie og fravær",
     body: "Arpo har nu HR. Under Virksomheden → HR (kun admin) står alle, der arbejder for Nextview360: ansatte og freelancere, med stilling, ansættelse, løn og løn-historik. Lønnen kan kun ses af admin og personen selv, og hver gang en admin åbner den, bliver det logget. CPR-nummer og bankkonto gemmes ikke i Arpo, kun i lønsystemet.\n\nAlle har fået en ny side, Mig. Her registrerer man sin arbejdstid, som arbejdstidsloven kræver: dagene er udfyldt med den aftalte tid (7,4 timer), man retter de dage, der var anderledes, og trykker Registrér ugen. Man kan også søge ferie og fri og melde sig syg, og se sit ferieregnskab (2,08 dage pr. måned efter ferieloven).\n\nAdmin godkender uger og fravær i HR. Der er advarsler ved mere end 48 timer om ugen i snit, for lange dage og manglende fridøgn. Registreret tid kan ikke slettes, og alle rettelser gemmes. Nye ansatte kan få rollen Medarbejder, som kun ser Mig.",
     screenshotUrl: "/news/hr.png",

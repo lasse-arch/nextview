@@ -638,6 +638,14 @@ model Deal {
   filmingActualMinutes   Int?
   filmingCrewIds         String?
   filmingEventId         String?
+  /// The filming brief - what the seller agreed with the customer, for the one filming: drone (null = not answered yet)
+  /// and where and what to film. The seller is warned until it's filled in, once the contract is signed.
+  filmingDrone           Boolean?
+  filmingBrief           String?
+  filmingBriefAt         DateTime?
+  filmingBriefById       String?
+  /// Filming again on a customer (Genoptagelse) - also the yearly one the contract includes.
+  refilmings             Refilming[]
   /// When the "Velkommen til Nextview360" e-mail went out (sent once,
   /// automatically, the first time the deal is set Live).
   welcomeMailSentAt      DateTime?
@@ -2268,4 +2276,27 @@ model HrAccessLog {
   at         DateTime @default(now())
 
   @@index([employeeId, at])
+}
+
+
+/// A new filming on a customer who already has their tour (Genoptagelse) - booked on the deal, with its own brief.
+/// `annual`: it uses the contract's "1 årlig genoptagelse pr. lokation" for that contract year (lib/refilming.ts).
+model Refilming {
+  id              String    @id @default(cuid())
+  deal            Deal      @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  dealId          String
+  /// Wall-clock time as UTC (like Deal.filmingAt).
+  at              DateTime
+  durationMinutes Int
+  /// User ids, comma-separated (like Deal.filmingCrewIds).
+  crewIds         String
+  eventId         String?
+  drone           Boolean?
+  brief           String?
+  annual          Boolean   @default(false)
+  createdById     String
+  createdAt       DateTime  @default(now())
+  cancelledAt     DateTime?
+
+  @@index([dealId, at])
 }

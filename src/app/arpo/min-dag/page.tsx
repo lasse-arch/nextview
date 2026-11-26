@@ -39,6 +39,23 @@ export default async function MinDagPage() {
       </div>
       <p className="-mt-3 text-xs text-slate-500">Målene er regnet ud fra {d.target.source.charAt(0).toLowerCase() + d.target.source.slice(1)}.</p>
 
+      {d.briefMissing.length > 0 && (
+        <section className="rounded-xl border border-amber-300 bg-amber-50 p-4">
+          <h2 className="text-sm font-semibold text-amber-900">Mangler optagelsesbrief ({d.briefMissing.length})</h2>
+          <p className="mt-0.5 text-xs text-amber-900">Skriv på dealen, hvad der er aftalt med kunden om filmning og drone - optageren skal bruge det.</p>
+          <ul className="mt-2 space-y-1">
+            {d.briefMissing.map((b) => (
+              <li key={b.id}>
+                <Link href={`/arpo/deals/${b.dealId}`} className="text-sm font-medium text-amber-950 underline">
+                  {b.title}
+                </Link>{" "}
+                <span className="text-xs text-amber-900">{b.sub}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       <div className="grid gap-6 lg:grid-cols-2 [&>*]:min-w-0">
         <div className="space-y-6">
           <Box title="I dag" empty="Ingen møder eller filmninger i dag. God tid til at ringe.">

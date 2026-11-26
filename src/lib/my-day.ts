@@ -32,6 +32,8 @@ export type MyDay = {
   tasks: MyDayItem[];
   contracts: MyDayItem[];
   noNextStep: MyDayItem[];
+  /** Signed, not filmed yet, and the filming brief isn't filled in - the one filming needs it. */
+  briefMissing: MyDayItem[];
   leadsWaiting: number;
 };
 
@@ -52,7 +54,7 @@ export async function myDay(user: { id: string; name: string; role: string }, no
   const monday = new Date(dayStart.getTime() - ((dayStart.getUTCDay() + 6) % 7) * DAY);
   const mondayKey = monday.toISOString().slice(0, 10);
 
-  const [meetings, filmings, tasks, contracts, open, booked, soldWeek, leadsWaiting, goals] = await Promise.all([
+  const [meetings, filmings, tasks, contracts, open, booked, soldWeek, leadsWaiting, goals, noBrief] = await Promise.all([
     prisma.deal.findMany({
       where: { ownerId: user.id, meetingDate: { gte: dayStart, lt: dayEnd } },
       orderBy: { meetingDate: "asc" },
@@ -89,6 +91,11 @@ export async function myDay(user: { id: string; name: string; role: string }, no
     prisma.deal.count({ where: { ownerId: user.id, soldAt: { gte: new Date(monday.getTime() - 2 * 3600_000) } } }),
     prisma.deal.count({ where: { ownerId: user.id, inLeadInbox: true, stage: { in: ["LEAD", "CONTACTED"] } } }),
     prisma.goal.findMany({ where: { userId: user.id, metric: "MEETINGS_BOOKED" } }),
+    prisma.deal.findMany({
+      where: { ownerId: user.id, stage: "CONTRACT_SIGNED", contractSignedAt: { not: null }, OR: [{ filmingBrief: null }, { filmingDrone: null }] },
+      orderBy: { contractSignedAt: "asc" },
+      select: { id: true, companyName: true, displayName: true, contractSignedAt: true, filmingAt: true },
+    }),
   ]);
 
   // Today's target: their own meetings goal when it's running, else the plan's meetings per seller.
@@ -142,6 +149,14 @@ export async function myDay(user: { id: string; name: string; role: string }, no
       days: c.contractSentAt ? ago(c.contractSentAt) : 0,
       sub: c.contractViewedAt ? `Åbnet ${ago(c.contractViewedAt) === 0 ? "i dag" : `for ${ago(c.contractViewedAt)} dage siden`}` : "Ikke åbnet endnu",
       late: Boolean(c.contractSentAt && ago(c.contractSentAt) >= 3),
+    })),
+    briefMissing: noBrief.map((d) => ({
+      id: d.id,
+      dealId: d.id,
+      title: dealName(d),
+      sub: d.filmingAt ? "Filmning booket - optageren mangler briefen" : "Underskrevet - skriv hvad der er aftalt om filmning og drone",
+      days: d.contractSignedAt ? ago(d.contractSignedAt) : 0,
+      late: Boolean(d.filmingAt),
     })),
     noNextStep: open.map((d) => ({
       id: d.id,

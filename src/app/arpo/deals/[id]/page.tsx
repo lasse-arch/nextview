@@ -42,6 +42,9 @@ import { InactiveToggleButton } from "./inactive-toggle-button";
 import { PaymentMethodControl } from "./payment-method-control";
 import { BookMeetingButton } from "./book-meeting-button";
 import { BookFilmingButton } from "./book-filming-button";
+import { FilmingBrief } from "./filming-brief";
+import { RefilmingCard } from "./refilming-card";
+import { annualRefilming } from "@/lib/refilming";
 import { FilmingTimeButton } from "./filming-time-button";
 import { WelcomeMailControl } from "./welcome-mail-control";
 import { TerminationSection } from "./termination-section";
@@ -139,6 +142,7 @@ export default async function DealDetailPage({
         tasks: { orderBy: { createdAt: "asc" } },
         reports: { orderBy: { sentAt: "desc" }, take: 1 },
         timeEntries: { include: { user: true }, orderBy: { date: "desc" } },
+        refilmings: { where: { cancelledAt: null }, orderBy: { at: "desc" } },
         customerInviteLinks: { where: { revokedAt: null, expiresAt: { gt: new Date() } }, orderBy: { createdAt: "desc" }, select: { id: true, role: true, canApprove: true, uses: true, maxUses: true, expiresAt: true } },
         customerAccounts: { orderBy: { createdAt: "asc" }, include: { account: { select: { id: true, email: true, name: true, lastLoginAt: true, invitedByName: true } } } },
       },
@@ -239,6 +243,43 @@ export default async function DealDetailPage({
           </div>
         </div>
       </div>
+
+      {(deal.contractSignedAt || deal.filmingAt || deal.filmingBrief) && (
+        <div className="mt-4">
+          <FilmingBrief
+            dealId={deal.id}
+            drone={deal.filmingDrone}
+            brief={deal.filmingBrief}
+            savedAt={deal.filmingBriefAt ? formatDate(deal.filmingBriefAt) : null}
+            savedBy={users.find((u) => u.id === deal.filmingBriefById)?.name ?? null}
+            required={Boolean(deal.contractSignedAt)}
+          />
+        </div>
+      )}
+      {deal.stage === "LIVE" && (
+        <div className="mt-4">
+          <RefilmingCard
+            dealId={deal.id}
+            rows={deal.refilmings.map((r) => ({
+              id: r.id,
+              when: new Intl.DateTimeFormat("da-DK", { weekday: "short", day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "UTC" }).format(r.at),
+              hours: `${String(r.durationMinutes / 60).replace(".", ",")} t`,
+              crew: r.crewIds.split(",").map((cid) => users.find((u) => u.id === cid)?.name).filter(Boolean).join(" og "),
+              drone: r.drone,
+              brief: r.brief,
+              annual: r.annual,
+              past: r.at.toISOString().slice(0, 10) < new Date().toISOString().slice(0, 10),
+            }))}
+            annual={(() => {
+              const a = annualRefilming(deal, deal.refilmings);
+              return a ? { included: a.included, used: a.used, left: a.left, period: `${formatDate(a.from)} - ${formatDate(new Date(a.to.getTime() - 86_400_000))}` } : null;
+            })()}
+            contactEmail={deal.contactEmail}
+            crewOptions={users.map((u) => ({ id: u.id, name: u.name }))}
+            defaultCrewIds={users.filter((u) => u.email === "lasse@nextview360.dk").map((u) => u.id)}
+          />
+        </div>
+      )}
 
       {possibleDuplicates.length > 0 && (
         <div className="mt-4 rounded-md bg-amber-50 px-4 py-3 text-sm text-amber-800">
