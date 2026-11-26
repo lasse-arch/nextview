@@ -28,6 +28,8 @@ import {
   IconPulse,
   IconForecast,
   IconSun,
+  IconPerson,
+  IconIdCard,
 } from "./nav-icons";
 
 /**
@@ -61,6 +63,8 @@ const NAV_ICONS = {
   pulse: IconPulse,
   forecast: IconForecast,
   sun: IconSun,
+  person: IconPerson,
+  idCard: IconIdCard,
 } as const;
 
 export type NavIconName = keyof typeof NAV_ICONS;

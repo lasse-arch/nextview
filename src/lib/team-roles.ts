@@ -19,24 +19,28 @@ export type TeamPerm =
   | "tourPublish"
   /** The filmings one is on the crew of: when, where and who to meet. */
   | "filming"
-  /** Users, roles and the company's settings. */
-  | "admin";
+  /** Users, roles and the company's settings - and HR (employees, pay). */
+  | "admin"
+  /** "Mig": one's own hours, absence and holiday (HR) - everybody on the team. */
+  | "self";
 
 const PERMS: Record<Role, TeamPerm[]> = {
-  ADMIN: ["sales", "numbers", "tours", "tourPublish", "filming", "admin"],
-  SALES: ["sales", "numbers"],
-  DEVELOPER: ["tours", "tourPublish"],
-  FILMER: ["filming"],
+  ADMIN: ["sales", "numbers", "tours", "tourPublish", "filming", "admin", "self"],
+  SALES: ["sales", "numbers", "self"],
+  DEVELOPER: ["tours", "tourPublish", "self"],
+  FILMER: ["filming", "self"],
+  EMPLOYEE: ["self"],
 };
 
-export const TEAM_ROLES: Role[] = ["ADMIN", "SALES", "FILMER", "DEVELOPER"];
-export const TEAM_ROLE_NAMES: Record<Role, string> = { ADMIN: "Admin", SALES: "Sælger", FILMER: "Filmer", DEVELOPER: "Udvikler" };
+export const TEAM_ROLES: Role[] = ["ADMIN", "SALES", "FILMER", "DEVELOPER", "EMPLOYEE"];
+export const TEAM_ROLE_NAMES: Record<Role, string> = { ADMIN: "Admin", SALES: "Sælger", FILMER: "Filmer", DEVELOPER: "Udvikler", EMPLOYEE: "Medarbejder" };
 /** What the role gets - and doesn't - in words, on the Brugere page. */
 export const TEAM_ROLE_SCOPE: Record<Role, string> = {
   ADMIN: "Alt - også brugere og indstillinger.",
   SALES: "Deals, kunder, kalender, opgaver og tal. Ikke tours.",
   DEVELOPER: "De tours, der er givet til dem (også udgive dem), og de kunders portal, som kunden ser den. Ingen tal, priser eller kontrakter.",
   FILMER: "Egne filmninger: hvornår, hvor og hvem man skal møde. Ingen tal, priser eller kontrakter.",
+  EMPLOYEE: "Kun Mig: egne timer, fravær, ferie og ansættelse. Alle andre roller har også Mig.",
 };
 
 type Member = { role: Role; extraRoles?: Role[] | null };
@@ -56,6 +60,7 @@ export function homeOf(u: Member): string {
   if (teamCan(u, "sales")) return "/arpo";
   if (teamCan(u, "tours")) return "/arpo/tour-lab";
   if (teamCan(u, "filming")) return "/arpo/filmninger";
+  if (teamCan(u, "self")) return "/arpo/mig";
   return "/arpo/ingen-adgang";
 }
 
@@ -68,6 +73,7 @@ export function homeOf(u: Member): string {
 const PATHS: [TeamPerm, string[]][] = [
   ["tours", ["/arpo/tour-lab"]],
   ["filming", ["/arpo/filmninger"]],
+  ["self", ["/arpo/mig"]],
 ];
 const under = (path: string, base: string) => path === base || path.startsWith(`${base}/`);
 export function arpoPathAllowed(u: Member, pathname: string): boolean {

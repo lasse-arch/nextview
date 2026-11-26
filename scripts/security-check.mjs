@@ -45,7 +45,7 @@ const files = walk(join(ROOT, "src"));
 const read = (p) => readFileSync(p, "utf8");
 
 /** Calls that check who is asking (team, customer, cron, or a file's own admin helper). */
-const GUARD = /\b(require[A-Z]\w*|requireAdmin|getCurrentUser|getCurrentCustomer|getTeamUser|teamSees\w*|adminPreview|cronAuthorized|canAccessBilling|admin|requireSales|assert\w*Access|ensure\w*|guard\w*|currentUser|viewer)\s*\(/;
+const GUARD = /\b(require[A-Z]\w*|requireAdmin|getCurrentUser|getCurrentCustomer|getTeamUser|teamSees\w*|adminPreview|cronAuthorized|canAccessBilling|admin|requireSales|assert\w*Access|ensure\w*|guard\w*|currentUser|viewer|hrViewer)\s*\(/;
 /** Signs that a public route limits how often it can be called. */
 const LIMIT = /\b(tooMany\w*|rateLimit\w*|loginFailure|limiter|overLimit|limited)\b/;
 

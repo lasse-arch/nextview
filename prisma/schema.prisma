@@ -14,6 +14,8 @@ enum Role {
   SALES
   FILMER
   DEVELOPER
+  /// An employee who only has "Mig" (own hours, absence, holiday) - see HR.
+  EMPLOYEE
 }
 
 enum CommissionFrequency {
@@ -346,6 +348,9 @@ model User {
   timeEntriesCreated  TimeEntry[]          @relation("TimeEntryCreatedBy")
   /// "Husk faktura for din provisionsperiode" closed for the period starting then (ISO) - shown again next period.
   commissionReminderHiddenFor String?
+  /// HR: their employment (one per person) and the people they lead.
+  employee            Employee?            @relation("EmployeeUser")
+  leads               Employee[]           @relation("EmployeeManager")
 }
 
 /// One entry per notable thing that happened in the CRM (deal created,
@@ -2090,4 +2095,177 @@ model CallBrief {
 
   @@index([userId, createdAt])
   @@index([createdAt])
+}
+
+
+// ---------------------------------------------------------------------------
+// HR (src/lib/hr.ts, /arpo/hr and /arpo/mig). No CPR numbers and no bank
+// accounts here - they live only in the payroll system. Working time is kept
+// at least 5 years (arbejdstidsloven): an employee is never deleted, only
+// ended, and every change of a registered day is kept in WorkDayChange.
+// ---------------------------------------------------------------------------
+
+/// How someone works for Nextview360.
+enum EmploymentKind {
+  /// Funktionær on a monthly salary.
+  SALARIED
+  /// Paid by the hour.
+  HOURLY
+  /// Elev or praktikant.
+  TRAINEE
+  /// Not employed: a freelancer who invoices (no working-time registration, no holiday).
+  FREELANCE
+}
+
+/// How the pay is made up.
+enum PayModel {
+  MONTHLY
+  HOURLY
+  MONTHLY_COMMISSION
+  /// An employee paid only commission (A-income through payroll).
+  COMMISSION_ONLY
+  /// A freelancer invoicing their commission or work.
+  INVOICE
+}
+
+enum AbsenceKind {
+  VACATION
+  SICK
+  CHILD_SICK
+  LEAVE
+  TIME_OFF
+  UNPAID
+}
+
+enum AbsenceStatus {
+  REQUESTED
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+model Employee {
+  id            String         @id @default(cuid())
+  user          User           @relation("EmployeeUser", fields: [userId], references: [id])
+  userId        String         @unique
+  kind          EmploymentKind
+  title         String
+  /// Approves their hours and absence (sees neither their pay nor anyone else's).
+  manager       User?          @relation("EmployeeManager", fields: [managerId], references: [id])
+  managerId     String?
+  startDate     DateTime       @db.Date
+  /// Last day of work - after it, the person is no longer active.
+  endDate       DateTime?      @db.Date
+  probationEnd  DateTime?      @db.Date
+  /// The agreed hours a week, in minutes (37 h = 2220).
+  weeklyMinutes Int            @default(2220)
+  /// The days they work (1 = Monday … 7 = Sunday) - the week's hours are spread evenly on them.
+  workDays      Int[]          @default([1, 2, 3, 4, 5])
+  /// Their number in the payroll system.
+  payrollNumber String?
+  /// Holiday days carried over into the holiday year that began `vacationCarryFrom` (set by an admin).
+  vacationCarryDays Float      @default(0)
+  vacationCarryFrom DateTime?  @db.Date
+  note          String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  pay           PayTerms[]
+  days          WorkDay[]
+  dayChanges    WorkDayChange[]
+  weeks         WorkWeek[]
+  absences      Absence[]
+}
+
+/// The pay from a date on - a new row for each change, so the history stays.
+model PayTerms {
+  id                 String   @id @default(cuid())
+  employee           Employee @relation(fields: [employeeId], references: [id])
+  employeeId         String
+  effectiveFrom      DateTime @db.Date
+  model              PayModel
+  /// Monthly salary in øre.
+  monthlyOre         Int?
+  /// Hourly rate in øre.
+  hourlyOre          Int?
+  /// Commission in percent (shown with Arpo's commission).
+  commissionPct      Float?
+  pensionEmployeePct Float?
+  pensionEmployerPct Float?
+  note               String?
+  createdById        String
+  createdAt          DateTime @default(now())
+
+  @@index([employeeId, effectiveFrom])
+}
+
+/// One day's registered working time (arbejdstidsloven): the total for the day.
+model WorkDay {
+  id          String   @id @default(cuid())
+  employee    Employee @relation(fields: [employeeId], references: [id])
+  employeeId  String
+  date        DateTime @db.Date
+  minutes     Int
+  note        String?
+  updatedById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([employeeId, date])
+}
+
+/// Every registration and change of a day - never changed or deleted, so the registration can be relied on.
+model WorkDayChange {
+  id         String   @id @default(cuid())
+  employee   Employee @relation(fields: [employeeId], references: [id])
+  employeeId String
+  date       DateTime @db.Date
+  oldMinutes Int?
+  newMinutes Int
+  byId       String
+  at         DateTime @default(now())
+
+  @@index([employeeId, date])
+}
+
+/// A week (Monday) the employee has registered - and who approved it.
+model WorkWeek {
+  id           String    @id @default(cuid())
+  employee     Employee  @relation(fields: [employeeId], references: [id])
+  employeeId   String
+  weekStart    DateTime  @db.Date
+  submittedAt  DateTime?
+  approvedAt   DateTime?
+  approvedById String?
+
+  @@unique([employeeId, weekStart])
+}
+
+model Absence {
+  id            String        @id @default(cuid())
+  employee      Employee      @relation(fields: [employeeId], references: [id])
+  employeeId    String
+  kind          AbsenceKind
+  from          DateTime      @db.Date
+  to            DateTime      @db.Date
+  /// Only half of each day.
+  halfDay       Boolean       @default(false)
+  status        AbsenceStatus @default(REQUESTED)
+  note          String?
+  requestedById String
+  decidedById   String?
+  decidedAt     DateTime?
+  createdAt     DateTime      @default(now())
+
+  @@index([employeeId, from])
+}
+
+/// Who opened someone's pay, and when (GDPR: the access to pay can be traced).
+model HrAccessLog {
+  id         String   @id @default(cuid())
+  viewerId   String
+  employeeId String
+  what       String
+  at         DateTime @default(now())
+
+  @@index([employeeId, at])
 }

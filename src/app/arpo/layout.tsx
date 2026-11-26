@@ -2,7 +2,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentCustomer, getTeamUser } from "@/lib/auth";
-import { teamCan } from "@/lib/team-roles";
+import { homeOf, teamCan } from "@/lib/team-roles";
+import { prisma } from "@/lib/db";
 import { logout } from "@/lib/actions/auth";
 import { ToastProvider } from "@/components/toast";
 import { DropFiles } from "@/components/drop-files";
@@ -47,12 +48,23 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   // The menu in named parts - what a seller uses every day first, the company's own pages and money last.
   const admin = user.role === "ADMIN";
+  // HR: everybody has "Mig"; a leader also "Mit team" (approving the team's hours and absence).
+  const leads = (await prisma.employee.count({ where: { managerId: user.id } }).catch(() => 0)) > 0;
+  const meSection = {
+    section: "Mig",
+    items: [
+      { href: "/arpo/mig", label: "Mig", icon: "person" as const },
+      // Only once someone has been given a leader - until then an admin approves in HR.
+      ...(leads ? [{ href: "/arpo/mig/team", label: "Mit team", icon: "users" as const }] : []),
+    ],
+  };
   const navItems: SidebarNavItem[] = !sales
     ? [
         ...(tours
           ? [{ section: "Tours", items: [{ href: "/arpo/tour-lab", label: "Tours", icon: "tour" as const }, { href: "/arpo/tour-lab/personer", label: "Personer i scans", icon: "scanPeople" as const }] }]
           : []),
         ...(filming ? [{ section: "Filmning", items: [{ href: "/arpo/filmninger", label: "Mine filmninger", icon: "calendar" as const }] }] : []),
+        meSection,
       ]
     : [
     {
@@ -70,6 +82,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       ],
     },
     { section: "Kunder", items: [{ href: "/arpo/kunder", label: "Live kunder", icon: "users" }] },
+    meSection,
     {
       section: "Tours",
       items: tours
@@ -90,6 +103,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               { href: "/arpo/prognose", label: "Prognose", icon: "forecast" as const },
               { href: "/arpo/budget", label: "Budget", icon: "wallet" as const },
               { href: "/arpo/health", label: "Health", icon: "pulse" as const },
+              { href: "/arpo/hr", label: "HR", icon: "idCard" as const },
             ]
           : []),
       ],
@@ -131,7 +145,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <DropFiles />
       <div className="flex min-h-screen" data-presentation={presenting ? "true" : "false"}>
         <aside className="arpo-sidebar sticky top-0 hidden h-screen w-60 shrink-0 flex-col overflow-y-auto border-r border-slate-200 bg-slate-50 p-3 md:flex">
-          <Link href={sales ? "/arpo" : tours ? "/arpo/tour-lab" : "/arpo/filmninger"} className="flex items-center px-2.5 pb-3 pt-3">
+          <Link href={homeOf(user)} className="flex items-center px-2.5 pb-3 pt-3">
             <Image src="/logo.png" alt="Nextview360" width={942} height={219} className="h-6 w-auto" priority />
           </Link>
 

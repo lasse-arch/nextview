@@ -63,6 +63,12 @@ export async function getUnreadNewsCount(userId: string, newsReadAt: Date | null
 const DEFAULT_POSTS: { title: string; body: string; minutesAgo: number; screenshotUrl: string }[] = [
   {
     minutesAgo: 0,
+    title: "HR: medarbejdere, timer, ferie og fravær",
+    body: "Arpo har nu HR. Under Virksomheden → HR (kun admin) står alle, der arbejder for Nextview360: ansatte og freelancere, med stilling, ansættelse, løn og løn-historik. Lønnen kan kun ses af admin og personen selv, og hver gang en admin åbner den, bliver det logget. CPR-nummer og bankkonto gemmes ikke i Arpo, kun i lønsystemet.\n\nAlle har fået en ny side, Mig. Her registrerer man sin arbejdstid, som arbejdstidsloven kræver: dagene er udfyldt med den aftalte tid (7,4 timer), man retter de dage, der var anderledes, og trykker Registrér ugen. Man kan også søge ferie og fri og melde sig syg, og se sit ferieregnskab (2,08 dage pr. måned efter ferieloven).\n\nAdmin godkender uger og fravær i HR. Der er advarsler ved mere end 48 timer om ugen i snit, for lange dage og manglende fridøgn. Registreret tid kan ikke slettes, og alle rettelser gemmes. Nye ansatte kan få rollen Medarbejder, som kun ser Mig.",
+    screenshotUrl: "/news/hr.png",
+  },
+  {
+    minutesAgo: 0,
     title: "Min dag: din dag på én side",
     body: "Øverst under Salg er der en ny side, Min dag. Her står, hvor mange møder du skal booke i dag og i denne uge, regnet ud fra dit eget mål (eller årets plan), og hvor langt du er.\n\nNedenunder står dagens møder og filmninger, dine opgaver (også dem, der er gået over tid), kontrakter, der venter på underskrift, og dine deals, der mangler et næste skridt. Tryk på en, så kommer du ind på dealen. Du ser kun dine egne.",
     screenshotUrl: "/news/min-dag.png",

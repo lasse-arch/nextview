@@ -1,0 +1,276 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { randomBytes } from "node:crypto";
+import type { AbsenceKind, EmploymentKind, PayModel, Role } from "@prisma/client";
+import { prisma } from "@/lib/db";
+import { hashPassword } from "@/lib/password";
+import { TEAM_ROLES } from "@/lib/team-roles";
+import { employeeFor, hrViewer, isHrAdmin, requireHrAdmin } from "@/lib/hr-access";
+import { ABSENCE_NAMES, KIND_NAMES, PAY_NAMES, addDays, isYmd, mondayOf, normMinutes, parseHours, registersTime, todayDk, weekOf } from "@/lib/hr";
+
+/*
+ * HR's actions. Every one asks who is asking (lib/hr-access.ts) and only ever trusts the ids and values it checks
+ * itself. Registered working time is never deleted: a change writes the new total and a row in WorkDayChange.
+ */
+
+const str = (f: FormData, k: string, max = 200) => String(f.get(k) ?? "").trim().slice(0, max);
+const day = (f: FormData, k: string) => {
+  const v = str(f, k, 10);
+  return isYmd(v) ? v : null;
+};
+const asDate = (s: string) => new Date(`${s}T00:00:00Z`);
+const ymdOfDate = (d: Date) => d.toISOString().slice(0, 10);
+const kronerToOre = (raw: string): number | null => {
+  const s = raw.replace(/\./g, "").replace(",", ".").replace(/[^\d.]/g, "");
+  if (!s) return null;
+  const n = Number(s);
+  return Number.isFinite(n) && n >= 0 && n < 10_000_000 ? Math.round(n * 100) : null;
+};
+const pct = (raw: string): number | null => {
+  const n = Number(raw.replace(",", "."));
+  return raw && Number.isFinite(n) && n >= 0 && n <= 100 ? n : null;
+};
+const oneOf = <T extends string>(v: string, all: readonly T[], fallback: T): T => ((all as readonly string[]).includes(v) ? (v as T) : fallback);
+const KINDS = Object.keys(KIND_NAMES) as EmploymentKind[];
+const MODELS = Object.keys(PAY_NAMES) as PayModel[];
+const ABSENCES = Object.keys(ABSENCE_NAMES) as AbsenceKind[];
+const back = (path: string, msg: string): never => redirect(`${path}${path.includes("?") ? "&" : "?"}saved=${encodeURIComponent(msg)}`);
+
+/** The employment terms from the form (shared by create and update). */
+function termsFrom(f: FormData) {
+  const kind = oneOf(str(f, "kind"), KINDS, "SALARIED");
+  const title = str(f, "title", 120);
+  const startDate = day(f, "startDate");
+  const endDate = day(f, "endDate");
+  const probationEnd = day(f, "probationEnd");
+  const hours = Number(str(f, "weeklyHours").replace(",", ".") || "37");
+  const workDays = f
+    .getAll("workDays")
+    .map(Number)
+    .filter((n) => Number.isInteger(n) && n >= 1 && n <= 7);
+  if (!title) throw new Error("Skriv en stilling.");
+  if (!startDate) throw new Error("Vælg den første arbejdsdag.");
+  if (endDate && endDate < startDate) throw new Error("Sidste arbejdsdag ligger før den første.");
+  if (probationEnd && probationEnd < startDate) throw new Error("Prøvetiden slutter før ansættelsen begynder.");
+  if (!Number.isFinite(hours) || hours < 0 || hours > 48) throw new Error("Timer om ugen skal være mellem 0 og 48.");
+  if (kind !== "FREELANCE" && !workDays.length) throw new Error("Vælg mindst én arbejdsdag.");
+  return {
+    kind,
+    title,
+    startDate: asDate(startDate),
+    endDate: endDate ? asDate(endDate) : null,
+    probationEnd: probationEnd ? asDate(probationEnd) : null,
+    weeklyMinutes: kind === "FREELANCE" ? 0 : Math.round(hours * 60),
+    workDays: [...new Set(workDays)].sort(),
+    payrollNumber: str(f, "payrollNumber", 40) || null,
+    note: str(f, "note", 2000) || null,
+  };
+}
+
+async function managerFrom(f: FormData, selfUserId: string | null): Promise<string | null> {
+  const id = str(f, "managerId", 40);
+  if (!id || id === selfUserId) return null;
+  const u = await prisma.user.findUnique({ where: { id }, select: { id: true, disabledAt: true } });
+  return u && !u.disabledAt ? u.id : null;
+}
+
+function payFrom(f: FormData, kind: EmploymentKind) {
+  const model = kind === "FREELANCE" ? "INVOICE" : oneOf(str(f, "payModel"), MODELS.filter((m) => m !== "INVOICE"), "MONTHLY");
+  const monthlyOre = kronerToOre(str(f, "monthly"));
+  const hourlyOre = kronerToOre(str(f, "hourly"));
+  if ((model === "MONTHLY" || model === "MONTHLY_COMMISSION") && !monthlyOre) throw new Error("Skriv månedslønnen.");
+  if (model === "HOURLY" && !hourlyOre) throw new Error("Skriv timelønnen.");
+  return {
+    model: model as PayModel,
+    monthlyOre: model === "MONTHLY" || model === "MONTHLY_COMMISSION" ? monthlyOre : null,
+    hourlyOre: model === "HOURLY" ? hourlyOre : null,
+    commissionPct: model === "MONTHLY_COMMISSION" || model === "COMMISSION_ONLY" || model === "INVOICE" ? pct(str(f, "commissionPct")) : null,
+    pensionEmployeePct: kind === "FREELANCE" ? null : pct(str(f, "pensionEmployeePct")),
+    pensionEmployerPct: kind === "FREELANCE" ? null : pct(str(f, "pensionEmployerPct")),
+    note: str(f, "payNote", 500) || null,
+  };
+}
+
+/** A new person in HR: an existing Arpo user, or a new one (role Medarbejder unless chosen) who logs in with Google. */
+export async function createEmployee(f: FormData) {
+  const admin = await requireHrAdmin();
+  const terms = termsFrom(f);
+  let userId = str(f, "userId", 40);
+  if (userId) {
+    const u = await prisma.user.findUnique({ where: { id: userId }, include: { employee: { select: { id: true } } } });
+    if (!u) throw new Error("Brugeren findes ikke.");
+    if (u.employee) throw new Error(`${u.name} er allerede i HR.`);
+  } else {
+    const name = str(f, "name", 80);
+    const lastName = str(f, "lastName", 80) || null;
+    const email = str(f, "email", 200).toLowerCase();
+    if (!name || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Skriv navn og en gyldig e-mail.");
+    if (await prisma.user.findUnique({ where: { email } })) throw new Error("Der findes allerede en bruger med den e-mail - vælg personen på listen.");
+    const role = oneOf(str(f, "role"), TEAM_ROLES.filter((r) => r !== "ADMIN"), "EMPLOYEE") as Role;
+    // No password: they log in with Google (the same e-mail) - a long random one nobody knows keeps the password door shut.
+    const u = await prisma.user.create({
+      data: { name, lastName, email, role, passwordHash: await hashPassword(randomBytes(32).toString("base64url")), isCommissionBased: false, canAccessBilling: false, commissionRate: 0 },
+    });
+    userId = u.id;
+  }
+  const pay = payFrom(f, terms.kind);
+  const e = await prisma.employee.create({
+    data: { ...terms, userId, managerId: await managerFrom(f, userId), pay: { create: { ...pay, effectiveFrom: terms.startDate, createdById: admin.id } } },
+  });
+  revalidatePath("/arpo/hr");
+  back(`/arpo/hr/${e.id}`, "Medarbejderen er oprettet");
+}
+
+export async function updateEmployee(employeeId: string, f: FormData) {
+  await requireHrAdmin();
+  const e = await prisma.employee.findUnique({ where: { id: String(employeeId) } });
+  if (!e) throw new Error("Medarbejderen findes ikke.");
+  const terms = termsFrom(f);
+  const carry = Number(str(f, "vacationCarryDays").replace(",", ".") || "0");
+  const carryFrom = day(f, "vacationCarryFrom");
+  await prisma.employee.update({
+    where: { id: e.id },
+    data: {
+      ...terms,
+      managerId: await managerFrom(f, e.userId),
+      vacationCarryDays: Number.isFinite(carry) && carry >= -30 && carry <= 60 ? carry : 0,
+      vacationCarryFrom: carryFrom ? asDate(carryFrom) : null,
+    },
+  });
+  revalidatePath(`/arpo/hr/${e.id}`);
+  back(`/arpo/hr/${e.id}`, "Gemt");
+}
+
+/** New pay from a date - the earlier terms stay as history. */
+export async function addPayTerms(employeeId: string, f: FormData) {
+  const admin = await requireHrAdmin();
+  const e = await prisma.employee.findUnique({ where: { id: String(employeeId) } });
+  if (!e) throw new Error("Medarbejderen findes ikke.");
+  const from = day(f, "effectiveFrom");
+  if (!from) throw new Error("Vælg datoen, lønnen gælder fra.");
+  await prisma.payTerms.create({ data: { ...payFrom(f, e.kind), employeeId: e.id, effectiveFrom: asDate(from), createdById: admin.id } });
+  revalidatePath(`/arpo/hr/${e.id}`);
+  back(`/arpo/hr/${e.id}`, "Lønnen er gemt");
+}
+
+/**
+ * A week's registered time: each day's total (filled in with the agreed hours, corrected where it differs).
+ * The employee saves and confirms their own week until it's approved; their leader or an admin may correct it
+ * (also after approval - only an admin). Every change is kept.
+ */
+export async function saveWeek(employeeId: string, monday: string, back_: string, f: FormData) {
+  const viewer = await hrViewer();
+  const { e, reach } = await employeeFor(viewer, employeeId);
+  if (!registersTime(e.kind)) throw new Error("Freelancere registrerer ikke arbejdstid.");
+  if (!isYmd(monday) || mondayOf(monday) !== monday) throw new Error("Ugen findes ikke.");
+  const week = await prisma.workWeek.findUnique({ where: { employeeId_weekStart: { employeeId: e.id, weekStart: asDate(monday) } } });
+  if (week?.approvedAt && reach !== "admin") throw new Error("Ugen er godkendt - bed en admin om at rette den.");
+  const today = todayDk();
+  const submit = f.get("submit") === "1";
+  const terms = { startDate: ymdOfDate(e.startDate), endDate: e.endDate ? ymdOfDate(e.endDate) : null, weeklyMinutes: e.weeklyMinutes, workDays: e.workDays };
+  const days = weekOf(monday);
+  const values = days.map((d) => {
+    const m = parseHours(str(f, `d_${d}`, 8));
+    if (m === null) throw new Error(`Tjek timerne for ${d} (0-24 timer, fx 7,4 eller 7:24).`);
+    return { d, m };
+  });
+  if (submit && days[0] > today) throw new Error("Ugen er ikke begyndt endnu.");
+  const old = await prisma.workDay.findMany({ where: { employeeId: e.id, date: { gte: asDate(days[0]), lte: asDate(days[6]) } } });
+  const oldOf = new Map(old.map((w) => [ymdOfDate(w.date), w.minutes]));
+  await prisma.$transaction(async (tx) => {
+    for (const { d, m } of values) {
+      // Days that haven't come yet, and days outside the employment, aren't registered.
+      if (d > today || d < terms.startDate || (terms.endDate && d > terms.endDate)) continue;
+      const before = oldOf.get(d);
+      if (before === m) continue;
+      if (before === undefined && !submit && m === normMinutes(terms, d)) continue; // still just the prefill
+      await tx.workDay.upsert({ where: { employeeId_date: { employeeId: e.id, date: asDate(d) } }, create: { employeeId: e.id, date: asDate(d), minutes: m, updatedById: viewer.id }, update: { minutes: m, updatedById: viewer.id } });
+      await tx.workDayChange.create({ data: { employeeId: e.id, date: asDate(d), oldMinutes: before ?? null, newMinutes: m, byId: viewer.id } });
+    }
+    if (submit)
+      await tx.workWeek.upsert({
+        where: { employeeId_weekStart: { employeeId: e.id, weekStart: asDate(monday) } },
+        create: { employeeId: e.id, weekStart: asDate(monday), submittedAt: new Date() },
+        update: { submittedAt: new Date() },
+      });
+  });
+  revalidatePath("/arpo/mig");
+  back(back_.startsWith("/arpo/") ? back_ : "/arpo/mig", submit ? "Ugen er registreret" : "Gemt");
+}
+
+/** A leader (or an admin) approves a registered week - never their own, unless they're an admin. */
+export async function approveWeek(employeeId: string, monday: string, back_: string) {
+  const viewer = await hrViewer();
+  const { e } = await employeeFor(viewer, employeeId, isHrAdmin(viewer) ? "see" : "approve");
+  if (!isYmd(monday)) throw new Error("Ugen findes ikke.");
+  const week = await prisma.workWeek.findUnique({ where: { employeeId_weekStart: { employeeId: e.id, weekStart: asDate(monday) } } });
+  if (!week?.submittedAt) throw new Error("Ugen er ikke registreret af medarbejderen endnu.");
+  await prisma.workWeek.update({ where: { id: week.id }, data: { approvedAt: new Date(), approvedById: viewer.id } });
+  revalidatePath("/arpo/mig/team");
+  back(back_.startsWith("/arpo/") ? back_ : "/arpo/mig/team", "Ugen er godkendt");
+}
+
+/** Opens an approved week again (an admin) - e.g. when a day must be corrected. */
+export async function reopenWeek(employeeId: string, monday: string) {
+  await requireHrAdmin();
+  if (!isYmd(monday)) throw new Error("Ugen findes ikke.");
+  await prisma.workWeek.updateMany({ where: { employeeId: String(employeeId), weekStart: asDate(monday) }, data: { approvedAt: null, approvedById: null } });
+  back(`/arpo/hr/${employeeId}?uge=${monday}`, "Ugen er åbnet igen");
+}
+
+/**
+ * Absence: the employee asks (holiday, time off, leave) - or reports sickness, which needs no approval. A leader
+ * or an admin registering it for someone approves it at once.
+ */
+export async function requestAbsence(employeeId: string, back_: string, f: FormData) {
+  const viewer = await hrViewer();
+  const { e, reach } = await employeeFor(viewer, employeeId);
+  if (!registersTime(e.kind)) throw new Error("Freelancere har ikke fravær i HR.");
+  const kind = oneOf(str(f, "kind"), ABSENCES, "VACATION");
+  const from = day(f, "from");
+  const to = day(f, "to") ?? from;
+  if (!from || !to || to < from) throw new Error("Vælg fra og til.");
+  if (to > addDays(from, 366)) throw new Error("Højst et år ad gangen.");
+  const sickness = kind === "SICK" || kind === "CHILD_SICK";
+  const byOther = reach !== "self";
+  await prisma.absence.create({
+    data: {
+      employeeId: e.id,
+      kind,
+      from: asDate(from),
+      to: asDate(to),
+      halfDay: f.get("halfDay") === "on",
+      note: str(f, "note", 500) || null,
+      requestedById: viewer.id,
+      ...(sickness || byOther ? { status: "APPROVED", decidedById: viewer.id, decidedAt: new Date() } : {}),
+    },
+  });
+  revalidatePath("/arpo/mig");
+  back(back_.startsWith("/arpo/") ? back_ : "/arpo/mig", sickness ? "Sygdom er registreret - god bedring" : byOther ? "Fraværet er registreret" : "Sendt til godkendelse");
+}
+
+export async function decideAbsence(absenceId: string, approve: boolean, back_: string) {
+  const viewer = await hrViewer();
+  const a = await prisma.absence.findUnique({ where: { id: String(absenceId) } });
+  if (!a) throw new Error("Fraværet findes ikke.");
+  await employeeFor(viewer, a.employeeId, isHrAdmin(viewer) ? "see" : "approve");
+  if (a.status !== "REQUESTED") throw new Error("Fraværet er allerede afgjort.");
+  await prisma.absence.update({ where: { id: a.id }, data: { status: approve ? "APPROVED" : "REJECTED", decidedById: viewer.id, decidedAt: new Date() } });
+  revalidatePath("/arpo/mig/team");
+  back(back_.startsWith("/arpo/") ? back_ : "/arpo/mig/team", approve ? "Godkendt" : "Afvist");
+}
+
+/** The employee takes back a request (or a holiday not begun yet); an admin may cancel any. */
+export async function cancelAbsence(absenceId: string, back_: string) {
+  const viewer = await hrViewer();
+  const a = await prisma.absence.findUnique({ where: { id: String(absenceId) } });
+  if (!a) throw new Error("Fraværet findes ikke.");
+  const { reach } = await employeeFor(viewer, a.employeeId);
+  const notBegun = ymdOfDate(a.from) > todayDk();
+  if (reach !== "admin" && !(a.status === "REQUESTED" || (a.status === "APPROVED" && notBegun))) throw new Error("Fraværet er begyndt - bed en admin om at rette det.");
+  await prisma.absence.update({ where: { id: a.id }, data: { status: "CANCELLED", decidedById: viewer.id, decidedAt: new Date() } });
+  revalidatePath("/arpo/mig");
+  back(back_.startsWith("/arpo/") ? back_ : "/arpo/mig", "Annulleret");
+}

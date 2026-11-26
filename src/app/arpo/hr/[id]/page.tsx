@@ -1,0 +1,152 @@
+import Link from "next/link";
+import { notFound, redirect } from "next/navigation";
+import { prisma } from "@/lib/db";
+import { getTeamUser } from "@/lib/auth";
+import { isHrAdmin, maySeePay, reachOf } from "@/lib/hr-access";
+import { addPayTerms, reopenWeek, updateEmployee } from "@/lib/actions/hr";
+import { KIND_NAMES, addDays, hoursText, isYmd, mondayOf, registersTime, todayDk } from "@/lib/hr";
+import { holidayBalance, loadWeek, warningsFor } from "@/lib/hr-data";
+import { TEAM_ROLE_NAMES, rolesOf } from "@/lib/team-roles";
+import { AbsenceForm, AbsenceList, Card, HolidayBox, Saved, WeekForm, Warnings, btn, btnLight, fmtDate, input, label } from "../hr-ui";
+import { EmploymentFields, PayFields } from "../employee-form";
+import { PayLine } from "../pay-view";
+
+const CATEGORY_NAMES: Record<string, string> = { FILMING: "Filmning", TOUR_EDITING: "Tour-opbygning", REFILMING: "Genoptagelse", CORRECTIONS: "Rettelser", WEBSITE: "Hjemmeside" };
+
+/*
+ * One person in HR (admin): the employment, pay and its history (each look logged), the registered weeks,
+ * absence and holiday - and what they've worked on in Arpo.
+ */
+export default async function EmployeePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ uge?: string; saved?: string }> }) {
+  const user = await getTeamUser();
+  if (!user) redirect("/api/auth/session-ended?next=/arpo/hr");
+  if (!isHrAdmin(user)) redirect("/arpo/mig");
+  const [{ id }, sp] = await Promise.all([params, searchParams]);
+  const e = await prisma.employee.findUnique({
+    where: { id },
+    include: { user: { select: { id: true, name: true, lastName: true, email: true, role: true, extraRoles: true, disabledAt: true } }, manager: { select: { name: true } }, pay: { orderBy: { effectiveFrom: "desc" } }, absences: { orderBy: { from: "desc" } } },
+  });
+  if (!e) notFound();
+  const reach = reachOf(user, e)!;
+  const today = todayDk();
+  const time = registersTime(e.kind);
+  const monday = isYmd(sp.uge) ? mondayOf(sp.uge) : mondayOf(today);
+  const showPay = await maySeePay(user, e, reach);
+  const since = new Date(`${addDays(today, -30)}T00:00:00Z`);
+  const [week, warnings, work, leaders, changes] = await Promise.all([
+    time ? loadWeek(e, monday) : null,
+    time ? warningsFor(e, today) : [],
+    prisma.timeEntry.groupBy({ by: ["category"], where: { userId: e.userId, date: { gte: since } }, _sum: { minutes: true } }),
+    prisma.user.findMany({ where: { disabledAt: null, id: { not: e.userId } }, select: { id: true, name: true, lastName: true }, orderBy: { name: "asc" } }),
+    time ? prisma.workDayChange.findMany({ where: { employeeId: e.id, date: { gte: new Date(`${monday}T00:00:00Z`), lte: new Date(`${addDays(monday, 6)}T00:00:00Z`) } }, orderBy: { at: "desc" }, take: 20 }) : [],
+  ]);
+  const byIds = [...new Set(changes.map((c) => c.byId))];
+  const by = new Map((await prisma.user.findMany({ where: { id: { in: byIds } }, select: { id: true, name: true } })).map((u) => [u.id, u.name]));
+  const name = `${e.user.name}${e.user.lastName ? ` ${e.user.lastName}` : ""}`;
+  const here = `/arpo/hr/${e.id}`;
+
+  return (
+    <div className="mx-auto max-w-4xl space-y-5">
+      <Link href="/arpo/hr" className="text-sm text-slate-500 hover:text-slate-800">
+        ‹ HR
+      </Link>
+      <div>
+        <h1 className="text-2xl font-semibold text-slate-900">{name}</h1>
+        <p className="mt-1 text-sm text-slate-500">
+          {e.title}, {KIND_NAMES[e.kind].toLowerCase()}. I Arpo: {rolesOf(e.user).map((r) => TEAM_ROLE_NAMES[r]).join(", ")}. {e.user.email}
+          {e.user.disabledAt ? " (deaktiveret)" : ""}
+        </p>
+      </div>
+      <Saved msg={sp.saved} />
+      <Warnings list={warnings} />
+
+      {week && (
+        <>
+          <WeekForm employee={e} monday={monday} rows={week.rows} week={week.week} approverName={week.approverName} basePath={here} canEdit canApprove />
+          {week.week?.approvedAt && (
+            <form action={reopenWeek.bind(null, e.id, monday)}>
+              <button className={btnLight}>Åbn ugen igen</button>
+            </form>
+          )}
+          {changes.length > 0 && (
+            <Card title="Ændringer i ugen" sub="Alle registreringer og rettelser gemmes og kan ikke slettes.">
+              <ul className="space-y-1 text-xs text-slate-600">
+                {changes.map((c) => (
+                  <li key={c.id}>
+                    {fmtDate(c.date)}: {c.oldMinutes == null ? "registreret" : `${hoursText(c.oldMinutes)} →`} {hoursText(c.newMinutes)} af {by.get(c.byId) ?? "ukendt"}, {c.at.toLocaleString("da-DK", { timeZone: "Europe/Copenhagen" })}
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
+        </>
+      )}
+
+      {time && <HolidayBox b={holidayBalance(e, e.absences, today)} />}
+      {time && (
+        <Card title="Fravær">
+          <AbsenceForm employeeId={e.id} backTo={here} forOther />
+          <div className="mt-5 border-t border-slate-100 pt-3">
+            <AbsenceList list={e.absences} backTo={here} mode="admin" />
+          </div>
+        </Card>
+      )}
+
+      {showPay && (
+        <Card title="Løn" sub="Kun admin og personen selv kan se lønnen. Hver gang en admin åbner den, logges det.">
+          {e.pay.length ? (
+            <ul className="space-y-3">
+              {e.pay.map((p, i) => (
+                <li key={p.id} className={i ? "opacity-60" : ""}>
+                  <PayLine p={p} />
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-slate-500">Ingen løn sat endnu.</p>
+          )}
+          <details className="mt-4 border-t border-slate-100 pt-3">
+            <summary className="cursor-pointer text-sm font-semibold text-slate-700">Ny løn fra en dato</summary>
+            <form action={addPayTerms.bind(null, e.id)} className="mt-3 space-y-3">
+              <PayFields p={e.pay[0]} withDate />
+              <button className={btn}>Gem lønnen</button>
+            </form>
+          </details>
+        </Card>
+      )}
+
+      <Card title="Hvad de laver" sub="Timer på kunder i Arpo de seneste 30 dage (filmning, tours osv.).">
+        {work.length ? (
+          <ul className="flex flex-wrap gap-2 text-sm">
+            {work.map((w) => (
+              <li key={w.category ?? "x"} className="rounded-lg bg-slate-50 px-3 py-1.5">
+                {CATEGORY_NAMES[w.category ?? ""] ?? "Mails"}: <span className="font-semibold tabular-nums">{hoursText(w._sum.minutes ?? 0)}</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-slate-500">Ingen timer på kunder de seneste 30 dage.</p>
+        )}
+      </Card>
+
+      <Card title="Ansættelse">
+        <form action={updateEmployee.bind(null, e.id)} className="space-y-4">
+          <EmploymentFields e={e} leaders={leaders.map((l) => ({ id: l.id, name: `${l.name}${l.lastName ? ` ${l.lastName}` : ""}` }))} />
+          {time && (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <label>
+                <span className={label}>Overført ferie (dage)</span>
+                <input name="vacationCarryDays" inputMode="decimal" defaultValue={String(e.vacationCarryDays).replace(".", ",")} className={input} />
+              </label>
+              <label>
+                <span className={label}>Til ferieåret, der begyndte</span>
+                <input type="date" name="vacationCarryFrom" defaultValue={e.vacationCarryFrom?.toISOString().slice(0, 10) ?? ""} className={input} />
+              </label>
+            </div>
+          )}
+          <button className={btn}>Gem</button>
+        </form>
+      </Card>
+    </div>
+  );
+}
