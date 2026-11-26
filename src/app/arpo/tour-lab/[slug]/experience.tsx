@@ -14,6 +14,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, use
 import { flushSync } from "react-dom";
 import { useRouter } from "next/navigation";
 import { saveTourStoryImage, storyImagesSaved } from "@/lib/actions/tour-lab";
+import { LITE_CSS, softwareRendering, watchSlowFrames } from "./lite-mode";
 import { connectSdk, showcaseUrl, uLinkTarget, type CameraPose, type MpSdk, type Rotation, type SweepInfo, type Vec3 } from "../matterport";
 import type { AvailableUnit } from "@/lib/availability/boxdepotet";
 import { WeatherChip, WEATHER_CSS } from "./weather";
@@ -1085,6 +1086,9 @@ function TourExperience({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [intro === "play"]);
   const [lastRoom, setLastRoom] = useState<{ name: string; href: string } | null>(null);
+  /** "Let tilstand" (lite-mode.ts): a computer that struggles with the 3D gets a lighter tour - set once, never back. */
+  const [lite, setLite] = useState(false);
+  const liteRef = useRef(false);
   const [, rerender] = useState(0);
   const mobile = useRef(false);
   /** The open point, for the name-declutter loop (which runs outside React). */
@@ -1287,7 +1291,9 @@ function TourExperience({
       if (!sdkRef.current || !sweep) return false;
       const sdk = await sdkRef.current;
       // This place's own move (jumpFor, set on the menu item), else the tour's.
-      const jump = T.jumpFor?.[href] ?? T.jump;
+      // A struggling computer: straight there - no flight, no cross-fade (its screenshot is heavy too).
+      const jump = liteRef.current ? "instant" : (T.jumpFor?.[href] ?? T.jump);
+      if (transition === "fly" && liteRef.current) transition = "instant";
       if (transition === "fly" && jump === "fade") {
         // A real cross-fade instead of Matterport's fade to black: a picture of the view on top,
         // the new room underneath at once, then the picture fades away - like stepping to the next scan.
@@ -1466,7 +1472,7 @@ function TourExperience({
    * Stops at the next moment, when the line closes, or the moment the visitor drags the view themselves.
    */
   function lineTurn(ticket: number) {
-    if (T.lineDays?.turn === "none") return;
+    if (T.lineDays?.turn === "none" || liteRef.current) return;
     // A moment after arriving (Matterport may not take a turn right after a move) - then Vis mig rundt's turn, at its "normal" speed.
     const live = () => ticket === lineTurnTicket.current && phaseRef.current === "tour";
     setTimeout(() => live() && turnOn({ dir: 1, speed: 3, live, calibrate: false }), 400);
@@ -2393,7 +2399,8 @@ function TourExperience({
         // The slow turn as it has always been - one short, smooth Matterport turn (its way and speed chosen in the
         // editor), and then the view stands still for the visitor.
         // How long it turns: the stop's own, else the guide's - one short turn when neither says.
-        const mode = stop.turnMode ?? G?.turnMode ?? "once";
+        // A struggling computer: only the one short turn (the continuous one sets the view on every frame).
+        const mode = liteRef.current ? "once" : (stop.turnMode ?? G?.turnMode ?? "once");
         if (mode !== "once" && sdk?.Camera.setRotation) {
           guideTurnOn(ticket, dir, speed, mode === "round" ? 360 : Infinity);
           setTimeout(() => ticket === guideTicket.current && void guideDone(stop, ticket), 700);
@@ -2669,6 +2676,26 @@ function TourExperience({
       for (const e of events) doc?.removeEventListener(e, take);
     };
   }, [guideAt, phase]);
+  /*
+   * "Let tilstand" (lite-mode.ts): at once when the browser draws 3D without a graphics card, else when the tour has
+   * stayed slow while it's on the screen. Counted (Health shows how many visitors get it) - and never turned back.
+   */
+  useEffect(() => {
+    if (liteRef.current) return;
+    const turnOnLite = (why: string) => {
+      if (liteRef.current) return;
+      liteRef.current = true;
+      setLite(true);
+      track("lite_mode", { label: why });
+    };
+    const first = window.setTimeout(() => softwareRendering() && turnOnLite("Ingen grafikacceleration"), 0);
+    const stop = phase === "tour" ? watchSlowFrames(() => turnOnLite("Langsom grafik")) : () => {};
+    return () => {
+      window.clearTimeout(first);
+      stop();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- watched while the visitor is in the tour
+  }, [phase]);
   /* "En linje på" turning at a moment: a touch, drag, scroll or key in the 3D tour stops it at once - the view is the visitor's. */
   const lineOn = Boolean(lineRun && !lineRun.end);
   useEffect(() => {
@@ -3393,7 +3420,7 @@ function TourExperience({
   return (
     <TourLang.Provider value={{ lang, t: tx }}>
     <LinkProvider T={T} popup={popup}>
-    <div className={`hv fixed inset-0 z-50 overflow-hidden bg-[#0d1b20] ${selected ? "hv-punkt" : ""} ${zoomed ? "hv-zoom" : ""} ${welcome ? "hv-welcome" : ""} ${phase === "tour" && T.stories?.mobile ? "hv-st-on-m" : ""} ${menuOpen ? "hv-menu-aaben" : ""} ${T.overviewUi?.box?.desktop === false ? "hv-boks-ud-d" : ""} ${T.overviewUi?.box?.mobile === false ? "hv-boks-ud-m" : ""} ${T.overviewUi?.titleMobile ? "hv-titel-m" : ""} ${T.overviewUi?.boxStyle ? "hv-boks-logo" : ""} ${T.overviewUi?.filter?.desktop === false ? "hv-filter-ud-d" : ""} ${T.overviewUi?.filter?.mobile === false ? "hv-filter-ud-m" : ""} ${T.overviewUi?.names?.desktop ? `hv-navne-d-${T.overviewUi.names.desktop}` : ""} ${T.overviewUi?.names?.mobile ? `hv-navne-m-${T.overviewUi.names.mobile}` : ""} ${T.overviewUi?.filterColumns ? `hv-filter-kol hv-filter-kol-${T.overviewUi.filterColumns}` : T.overviewUi?.filterScroll ? "hv-filter-rul" : ""} ${langClasses} ${T.design?.menu === "dock" ? "hv-dock" : ""} ${T.design?.menu === "glass" ? "hv-glas" : ""} ${T.design?.menu === "float" ? "hv-menu-flyd" : ""} ${T.logoSide === "right" ? "hv-logo-h" : ""} ${T.logoBg ? `hv-logobg-${T.logoBg}` : ""} ${T.logoBgTiles ?? T.logoBg ? `hv-tlogobg-${T.logoBgTiles ?? T.logoBg}` : ""} hv-tlogo-${T.logoAlignTiles ?? "midt"} ${guideAt != null || (dayAt != null && !dayOpen) || (lineRun && !lineRun.end) ? "hv-guiding" : ""} ${route ? "hv-routing" : ""} ${phase === "tour" ? "hv-i-tour" : ""} ${T.wayfinding ? "hv-har-rute" : ""} ${findAside.map((a) => `rt-vig-${a}`).join(" ")} ${showCard != null ? "hv-med-stedkort" : ""} ${T.placeCardSide?.desktop === "right" ? "hv-pc-h-d" : ""} ${T.placeCardSide?.mobile === "right" ? "hv-pc-h-m" : ""} ${showCard != null && pano ? "hv-pano-kort" : ""} ${nudgeOn && T.nudge && phase === "tour" ? "hv-med-nudge" : ""} ${T.wayfinding?.button?.desktop ? `rt-d-${T.wayfinding.button.desktop}` : ""} ${T.wayfinding?.button?.mobile ? `rt-m-${T.wayfinding.button.mobile}` : ""} ${showCard != null || (nudgeOn && T.nudge && phase === "tour") ? "hv-med-kort" : ""} ${showMeasures && phase === "tour" ? "hv-maler" : ""} ${phase === "tour" && T.stories?.desktop ? "hv-st-on-d" : ""}`} style={
+    <div className={`hv fixed inset-0 z-50 overflow-hidden bg-[#0d1b20] ${lite ? "hv-let" : ""} ${selected ? "hv-punkt" : ""} ${zoomed ? "hv-zoom" : ""} ${welcome ? "hv-welcome" : ""} ${phase === "tour" && T.stories?.mobile ? "hv-st-on-m" : ""} ${menuOpen ? "hv-menu-aaben" : ""} ${T.overviewUi?.box?.desktop === false ? "hv-boks-ud-d" : ""} ${T.overviewUi?.box?.mobile === false ? "hv-boks-ud-m" : ""} ${T.overviewUi?.titleMobile ? "hv-titel-m" : ""} ${T.overviewUi?.boxStyle ? "hv-boks-logo" : ""} ${T.overviewUi?.filter?.desktop === false ? "hv-filter-ud-d" : ""} ${T.overviewUi?.filter?.mobile === false ? "hv-filter-ud-m" : ""} ${T.overviewUi?.names?.desktop ? `hv-navne-d-${T.overviewUi.names.desktop}` : ""} ${T.overviewUi?.names?.mobile ? `hv-navne-m-${T.overviewUi.names.mobile}` : ""} ${T.overviewUi?.filterColumns ? `hv-filter-kol hv-filter-kol-${T.overviewUi.filterColumns}` : T.overviewUi?.filterScroll ? "hv-filter-rul" : ""} ${langClasses} ${T.design?.menu === "dock" ? "hv-dock" : ""} ${T.design?.menu === "glass" ? "hv-glas" : ""} ${T.design?.menu === "float" ? "hv-menu-flyd" : ""} ${T.logoSide === "right" ? "hv-logo-h" : ""} ${T.logoBg ? `hv-logobg-${T.logoBg}` : ""} ${T.logoBgTiles ?? T.logoBg ? `hv-tlogobg-${T.logoBgTiles ?? T.logoBg}` : ""} hv-tlogo-${T.logoAlignTiles ?? "midt"} ${guideAt != null || (dayAt != null && !dayOpen) || (lineRun && !lineRun.end) ? "hv-guiding" : ""} ${route ? "hv-routing" : ""} ${phase === "tour" ? "hv-i-tour" : ""} ${T.wayfinding ? "hv-har-rute" : ""} ${findAside.map((a) => `rt-vig-${a}`).join(" ")} ${showCard != null ? "hv-med-stedkort" : ""} ${T.placeCardSide?.desktop === "right" ? "hv-pc-h-d" : ""} ${T.placeCardSide?.mobile === "right" ? "hv-pc-h-m" : ""} ${showCard != null && pano ? "hv-pano-kort" : ""} ${nudgeOn && T.nudge && phase === "tour" ? "hv-med-nudge" : ""} ${T.wayfinding?.button?.desktop ? `rt-d-${T.wayfinding.button.desktop}` : ""} ${T.wayfinding?.button?.mobile ? `rt-m-${T.wayfinding.button.mobile}` : ""} ${showCard != null || (nudgeOn && T.nudge && phase === "tour") ? "hv-med-kort" : ""} ${showMeasures && phase === "tour" ? "hv-maler" : ""} ${phase === "tour" && T.stories?.desktop ? "hv-st-on-d" : ""}`} style={
         {
           fontFamily: `'${T.font}', system-ui, sans-serif`,
           "--c-main": T.colors.main,
@@ -3415,7 +3442,7 @@ function TourExperience({
       {[...new Set([...fontHrefs(T.font, [400, 600, 700, 800, 900]), ...(T.fontHeading ? fontHrefs(T.fontHeading, [500, 600]) : [])])].map((href) => (
         <link key={href} rel="stylesheet" href={href} />
       ))}
-      <style>{CSS + TOUR_LOGO_CSS + CONTACT_CSS + STORIES_CSS + LIGHTBOX_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + ONBOARDING_CSS + MENU_HINT_CSS + INFO_CSS + STAGING_CSS + (T.staging?.some((i) => i.kind === "treasure") ? CONTEST_CSS : "") + (T.inUse?.length ? IN_USE_CSS : "") + (T.lineDays ? LINE_DAY_CSS : "") + (T.yearWheel ? YEARWHEEL_CSS : "") + (T.schedule ? SCHEDULE_CSS : "") + MAP_CSS + (T.sitePlan?.overlay ? SITE_PLAN_CSS + SITE_PLAN_360_CSS : "") + ROUTE_CSS + MEASURES_CSS + CARDS_CSS + DAY_CSS + (T.events ? EVENTS_CSS : "") + (T.classes ? CLASSES_CSS : "") + (T.contact?.hours?.length ? HOURS_CSS : "") + (T.boxes?.length ? BOXES_CSS : "") + (T.invite ? INVITE_CSS : "") + RICH_TEXT_CSS + (T.shop || T.points.some((p) => p.shop) ? SHOP_CSS : "") + SIMPLE_CSS + BENTO_CSS + LOGO_RIGHT_CSS + LANG_CSS + WEATHER_CSS + COMMUTE_CSS + FEATURES_CSS + FINDER_CSS + FULLSCREEN_BUTTON_CSS + (T.design?.menu === "float" ? FLOAT_DOCK_CSS : "") + (T.team?.people.length ? TEAM_CSS : "") + (T.design?.menu === "glass" ? GLASS_MENU_CSS : "") + (review ? FEEDBACK_CSS : "")}</style>
+      <style>{CSS + LITE_CSS + TOUR_LOGO_CSS + CONTACT_CSS + STORIES_CSS + LIGHTBOX_CSS + DESIGNS_CSS + LINKS_CSS + GUIDE_CSS + ONBOARDING_CSS + MENU_HINT_CSS + INFO_CSS + STAGING_CSS + (T.staging?.some((i) => i.kind === "treasure") ? CONTEST_CSS : "") + (T.inUse?.length ? IN_USE_CSS : "") + (T.lineDays ? LINE_DAY_CSS : "") + (T.yearWheel ? YEARWHEEL_CSS : "") + (T.schedule ? SCHEDULE_CSS : "") + MAP_CSS + (T.sitePlan?.overlay ? SITE_PLAN_CSS + SITE_PLAN_360_CSS : "") + ROUTE_CSS + MEASURES_CSS + CARDS_CSS + DAY_CSS + (T.events ? EVENTS_CSS : "") + (T.classes ? CLASSES_CSS : "") + (T.contact?.hours?.length ? HOURS_CSS : "") + (T.boxes?.length ? BOXES_CSS : "") + (T.invite ? INVITE_CSS : "") + RICH_TEXT_CSS + (T.shop || T.points.some((p) => p.shop) ? SHOP_CSS : "") + SIMPLE_CSS + BENTO_CSS + LOGO_RIGHT_CSS + LANG_CSS + WEATHER_CSS + COMMUTE_CSS + FEATURES_CSS + FINDER_CSS + FULLSCREEN_BUTTON_CSS + (T.design?.menu === "float" ? FLOAT_DOCK_CSS : "") + (T.team?.people.length ? TEAM_CSS : "") + (T.design?.menu === "glass" ? GLASS_MENU_CSS : "") + (review ? FEEDBACK_CSS : "")}</style>
       {/* The tour's own design on top (written by Claude or by hand under Avanceret). */}
       {T.customCss && <style>{T.customCss.replace(/<\/?style/gi, "")}</style>}
 

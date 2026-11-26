@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
-import { healthChecks, tourSpeed, tourVisits, type Status } from "@/lib/health";
+import { healthChecks, liteModeShare, tourSpeed, tourVisits, type Status } from "@/lib/health";
 import { AutoRefresh } from "./auto-refresh";
 import { BackupNow } from "./backup-now";
 
@@ -20,7 +20,7 @@ export default async function HealthPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/api/auth/session-ended?next=/arpo");
   if (user.role !== "ADMIN") redirect("/arpo");
-  const [groups, visits, speed] = await Promise.all([healthChecks(), tourVisits(), tourSpeed().catch(() => null)]);
+  const [groups, visits, speed, lite] = await Promise.all([healthChecks(), tourVisits(), tourSpeed().catch(() => null), liteModeShare().catch(() => null)]);
   const checks = groups.flatMap((g) => g.checks);
   const down = checks.filter((c) => c.status === "down");
   const warn = checks.filter((c) => c.status === "warn");
@@ -119,6 +119,12 @@ export default async function HealthPage() {
                 </div>
               ))}
             </div>
+            {lite && lite.visits > 0 && (
+              <p className="mt-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-[13px] text-slate-600">
+                <span className="font-semibold text-slate-900">Let tilstand: {num(lite.lite)} af {num(lite.visits)} besøg</span> ({Math.round((lite.lite / lite.visits) * 100)} %) havde en computer, der havde svært ved 3D, og fik en lettere tour af sig selv
+                {lite.lite ? ` - ${num(lite.noGpu)} uden grafikacceleration, ${num(lite.slow)} med langsom grafik` : ""}.
+              </p>
+            )}
             <details className="group mt-3">
               <summary className="flex cursor-pointer list-none items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-[14px] font-medium text-slate-900 hover:bg-slate-50 [&::-webkit-details-marker]:hidden">
                 <span className="text-slate-400 transition-transform group-open:rotate-90">›</span>

@@ -170,6 +170,21 @@ export async function tourSpeed(): Promise<{ all: { device: string; visits: numb
   };
 }
 
+/**
+ * "Let tilstand" in the last 7 days: the visits whose computer struggled with the 3D (lite-mode.ts), and why - no
+ * graphics acceleration in the browser, or slow drawing - out of all visits with a ready tour.
+ */
+export async function liteModeShare(): Promise<{ lite: number; noGpu: number; slow: number; visits: number }> {
+  const since = new Date(Date.now() - 7 * 86400_000);
+  const [r] = await prisma.$queryRaw<{ lite: bigint; nogpu: bigint; slow: bigint; visits: bigint }[]>`
+    SELECT count(DISTINCT session) FILTER (WHERE name = 'lite_mode') AS lite,
+      count(DISTINCT session) FILTER (WHERE name = 'lite_mode' AND label = 'Ingen grafikacceleration') AS nogpu,
+      count(DISTINCT session) FILTER (WHERE name = 'lite_mode' AND label = 'Langsom grafik') AS slow,
+      count(DISTINCT session) FILTER (WHERE name = 'tour_ready') AS visits
+    FROM "TourEvent" WHERE "createdAt" > ${since} AND name IN ('lite_mode', 'tour_ready')`;
+  return { lite: Number(r?.lite ?? 0), noGpu: Number(r?.nogpu ?? 0), slow: Number(r?.slow ?? 0), visits: Number(r?.visits ?? 0) };
+}
+
 export type TourVisits = { slug: string; name: string; now: number; day: number; week: number; month: number };
 
 /** Visitors on the tours that are out there: right now (last 5 min.), the last day, 7 and 30 days - one visit = one browser tab. */
