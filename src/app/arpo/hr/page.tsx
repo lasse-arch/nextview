@@ -7,7 +7,7 @@ import { createEmployee } from "@/lib/actions/hr";
 import { KIND_NAMES, addDays, registersTime, todayDk, weekNumber } from "@/lib/hr";
 import { holidayBalance, missingWeeks } from "@/lib/hr-data";
 import { TEAM_ROLES, TEAM_ROLE_NAMES } from "@/lib/team-roles";
-import { AbsenceList, Card, Saved, btn, fmtDate, input, label } from "./hr-ui";
+import { AbsenceList, Card, Saved, btn, btnLight, fmtDate, input, label } from "./hr-ui";
 import { EmploymentFields, PayFields } from "./employee-form";
 
 /*
@@ -46,9 +46,14 @@ export default async function HrPage({ searchParams }: { searchParams: Promise<{
           <h1 className="text-2xl font-semibold text-slate-900">HR</h1>
           <p className="mt-1 text-sm text-slate-500">Alle, der arbejder for Nextview360: ansatte og freelancere. Kun admin ser denne side.</p>
         </div>
-        <a href="#ny" className={btn}>
-          Tilføj medarbejder
-        </a>
+        <div className="flex gap-2">
+          <Link href="/arpo/hr/loen" className={btnLight}>
+            Lønsedler-grundlag
+          </Link>
+          <a href="#ny" className={btn}>
+            Tilføj medarbejder
+          </a>
+        </div>
       </div>
       <Saved msg={sp.saved} />
 

@@ -197,3 +197,52 @@ export const ABSENCE_NAMES = { VACATION: "Ferie", SICK: "Sygdom", CHILD_SICK: "B
 export const ABSENCE_STATUS_NAMES = { REQUESTED: "Venter", APPROVED: "Godkendt", REJECTED: "Afvist", CANCELLED: "Annulleret" } as const;
 /** Freelancers aren't employees: no working-time registration, no holiday. */
 export const registersTime = (kind: string) => kind !== "FREELANCE";
+
+/** The last day of the month `s` is in. */
+export function endOfMonth(s: Ymd): Ymd {
+  const y = Number(s.slice(0, 4));
+  const m = Number(s.slice(5, 7));
+  return `${y}-${pad(m)}-${pad(new Date(Date.UTC(y, m, 0)).getUTCDate())}`;
+}
+const addMonths = (s: Ymd, n: number): Ymd => {
+  const d = new Date(Date.UTC(Number(s.slice(0, 4)), Number(s.slice(5, 7)) - 1 + n, 1));
+  const last = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
+  return toYmd(new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), Math.min(Number(s.slice(8)), last))));
+};
+
+/**
+ * Opsigelsesvarsel efter funktionærloven § 2 - the last day of work when notice is given on `noticeDay`:
+ *  - by the employer: 1 month within the first 5 months; 3 months from 6 months; 4 from 2 years 9 months;
+ *    5 from 5 years 8 months; 6 from 8 years 7 months - to the end of a month. In an agreed probation
+ *    (at most the first 3 months): 14 days, to any day.
+ *  - by the employee: 1 month, to the end of a month.
+ * Only for funktionærer: an apprentice (elev), an hourly worker who isn't one, and freelancers follow their own
+ * contract - then null. The 120-days rule (§ 2, stk. 5) isn't applied: it must be agreed in writing.
+ */
+export function noticeEnd(kind: string, startDate: Ymd, probationEnd: Ymd | null, noticeDay: Ymd, by: "employer" | "employee"): { lastDay: Ymd; months: number | null; why: string } | null {
+  if (kind !== "SALARIED") return null;
+  if (by === "employee") return { lastDay: endOfMonth(addMonths(noticeDay, 1)), months: 1, why: "Medarbejderens varsel: 1 måned til udgangen af en måned." };
+  if (probationEnd && noticeDay <= probationEnd && probationEnd <= addMonths(startDate, 3)) return { lastDay: addDays(noticeDay, 14), months: null, why: "Opsagt i prøvetiden: 14 dage." };
+  // Seniority when the notice is given (the 1 month applies "within the first 5 months" of employment).
+  const months = daysBetween(startDate, noticeDay) / 30.44;
+  const m = months < 5 ? 1 : months < 33 ? 3 : months < 68 ? 4 : months < 103 ? 5 : 6;
+  return { lastDay: endOfMonth(addMonths(noticeDay, m)), months: m, why: `Ansat i ${Math.floor(months / 12)} år og ${Math.floor(months % 12)} måneder: ${m} måned${m > 1 ? "er" : ""} til udgangen af en måned.` };
+}
+
+export const START_TASKS = [
+  "Ansættelseskontrakt underskrevet (senest 7 dage efter første arbejdsdag)",
+  "Oprettet i lønsystemet med medarbejdernummer",
+  "Pension oprettet",
+  "Privatlivsmeddelelse givet til medarbejderen",
+  "Google-konto og adgang til Arpo",
+  "Udstyr udleveret (computer, telefon, nøgler)",
+  "Introduktion: arbejdsmiljø, sikkerhed og hvem man spørger",
+];
+export const STOP_TASKS = [
+  "Opsigelse givet skriftligt og varsel tjekket",
+  "Sidste løn, feriepenge og provision opgjort i lønsystemet",
+  "Kunder, deals og opgaver overdraget",
+  "Udstyr og nøgler afleveret",
+  "Andre konti lukket (Google, e-mail, adgangskoder)",
+  "Udtalelse skrevet, hvis medarbejderen ønsker det",
+];

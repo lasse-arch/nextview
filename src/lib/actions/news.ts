@@ -63,6 +63,12 @@ export async function getUnreadNewsCount(userId: string, newsReadAt: Date | null
 const DEFAULT_POSTS: { title: string; body: string; minutesAgo: number; screenshotUrl: string }[] = [
   {
     minutesAgo: 0,
+    title: "HR: lønsedler-grundlag, opsigelse og tjeklister",
+    body: "Under HR → Lønsedler-grundlag står hver måned det, lønsystemet skal bruge pr. medarbejder: lønmodel og løn, registrerede timer mod normtiden, fravær pr. type og månedens provision. Hent det som CSV til import eller som PDF. Mangler nogen at registrere timer, står det som en bemærkning, før lønnen køres.\n\nPå medarbejderkortet registreres en opsigelse: Arpo regner sidste arbejdsdag ud efter funktionærloven (også i prøvetiden), og adgangen til Arpo lukker af sig selv dagen efter. Der er tjeklister for, når nogen starter og stopper.\n\nHR-oplysninger slettes automatisk 5 år efter, at ansættelsen er ophørt, og registreret arbejdstid efter de 5 år, arbejdstidsloven kræver.",
+    screenshotUrl: "/news/hr-loen.png",
+  },
+  {
+    minutesAgo: 0,
     title: "Optagelsesbrief og genoptagelse",
     body: "Når kontrakten er underskrevet, beder dealen nu om en optagelsesbrief: skal der drone med, og hvad er aftalt med kunden - hvor og hvad der skal filmes, og hvad der ikke må komme med. Indtil den er udfyldt, står dealen som en advarsel på dealen og under Min dag.\n\nOptageren ser briefen ved hver opgave under Mine filmninger - også på telefonen.\n\nPå en kunde, der er live, kan I nu booke en genoptagelse med sin egen brief og kalenderinvitation. Kontrakten indeholder 1 årlig genoptagelse pr. lokation: Arpo viser, om den er brugt i kontraktåret, og en genoptagelse kan markeres som den årlige eller som ekstra.",
     screenshotUrl: "/news/optagelsesbrief.png",

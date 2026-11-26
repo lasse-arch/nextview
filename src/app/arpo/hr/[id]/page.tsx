@@ -3,8 +3,8 @@ import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getTeamUser } from "@/lib/auth";
 import { isHrAdmin, maySeePay, reachOf } from "@/lib/hr-access";
-import { addPayTerms, reopenWeek, updateEmployee } from "@/lib/actions/hr";
-import { KIND_NAMES, addDays, hoursText, isYmd, mondayOf, registersTime, todayDk } from "@/lib/hr";
+import { addHrTask, addPayTerms, giveNotice, reopenWeek, toggleHrTask, updateEmployee, withdrawNotice } from "@/lib/actions/hr";
+import { KIND_NAMES, addDays, hoursText, isYmd, mondayOf, noticeEnd, registersTime, todayDk } from "@/lib/hr";
 import { holidayBalance, loadWeek, warningsFor } from "@/lib/hr-data";
 import { TEAM_ROLE_NAMES, rolesOf } from "@/lib/team-roles";
 import { AbsenceForm, AbsenceList, Card, HolidayBox, Saved, WeekForm, Warnings, btn, btnLight, fmtDate, input, label } from "../hr-ui";
@@ -24,7 +24,7 @@ export default async function EmployeePage({ params, searchParams }: { params: P
   const [{ id }, sp] = await Promise.all([params, searchParams]);
   const e = await prisma.employee.findUnique({
     where: { id },
-    include: { user: { select: { id: true, name: true, lastName: true, email: true, role: true, extraRoles: true, disabledAt: true } }, manager: { select: { name: true } }, pay: { orderBy: { effectiveFrom: "desc" } }, absences: { orderBy: { from: "desc" } } },
+    include: { user: { select: { id: true, name: true, lastName: true, email: true, role: true, extraRoles: true, disabledAt: true } }, manager: { select: { name: true } }, pay: { orderBy: { effectiveFrom: "desc" } }, absences: { orderBy: { from: "desc" } }, tasks: { orderBy: [{ sort: "asc" }, { label: "asc" }] } },
   });
   if (!e) notFound();
   const reach = reachOf(user, e)!;
@@ -126,6 +126,77 @@ export default async function EmployeePage({ params, searchParams }: { params: P
           </ul>
         ) : (
           <p className="text-sm text-slate-500">Ingen timer på kunder de seneste 30 dage.</p>
+        )}
+      </Card>
+
+      {(["start", "stop"] as const).map((phase) => {
+        const list = e.tasks.filter((t) => t.phase === phase);
+        if (phase === "stop" && !list.length) return null;
+        const done = list.filter((t) => t.doneAt).length;
+        return (
+          <Card key={phase} title={phase === "start" ? "Når de starter" : "Når de stopper"} sub={`${done} af ${list.length} klaret`}>
+            <ul className="space-y-1.5">
+              {list.map((t) => (
+                <li key={t.id}>
+                  <form action={toggleHrTask.bind(null, t.id)}>
+                    <button className="flex items-start gap-2.5 text-left text-sm">
+                      <span className={`mt-0.5 flex h-4 w-4 flex-none items-center justify-center rounded border text-[10px] ${t.doneAt ? "border-emerald-600 bg-emerald-600 text-white" : "border-slate-300 bg-white"}`}>{t.doneAt ? "✓" : ""}</span>
+                      <span className={t.doneAt ? "text-slate-400 line-through" : "text-slate-800"}>{t.label}</span>
+                    </button>
+                  </form>
+                </li>
+              ))}
+            </ul>
+            <form action={addHrTask.bind(null, e.id, phase)} className="mt-3 flex gap-2">
+              <input name="label" maxLength={200} placeholder="Tilføj et punkt" className={input} />
+              <button className={btnLight}>Tilføj</button>
+            </form>
+          </Card>
+        );
+      })}
+
+      <Card
+        title="Fratrædelse"
+        sub={
+          e.noticeGivenAt
+            ? `Opsagt ${fmtDate(e.noticeGivenAt)} af ${e.noticeBy === "employee" ? "medarbejderen" : "Nextview360"}. Sidste arbejdsdag ${fmtDate(e.endDate)}. Adgangen til Arpo lukker dagen efter.`
+            : "Når nogen siger op eller bliver opsagt: varslet regnes ud efter funktionærloven, og adgangen lukker af sig selv efter sidste dag."
+        }
+      >
+        {e.noticeGivenAt ? (
+          <form action={withdrawNotice.bind(null, e.id)}>
+            <button className={btnLight}>Træk opsigelsen tilbage</button>
+          </form>
+        ) : (
+          <form action={giveNotice.bind(null, e.id)} className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <label>
+              <span className={label}>Opsagt af</span>
+              <select name="by" className={input}>
+                <option value="employer">Nextview360</option>
+                <option value="employee">Medarbejderen</option>
+              </select>
+            </label>
+            <label>
+              <span className={label}>Opsagt den</span>
+              <input type="date" name="noticeDay" required defaultValue={today} className={input} />
+            </label>
+            <label>
+              <span className={label}>Sidste dag (kun ved anden aftale)</span>
+              <input type="date" name="lastDay" className={input} />
+            </label>
+            <div className="flex items-end">
+              <button className={btn}>Registrér opsigelsen</button>
+            </div>
+            <p className="col-span-2 text-xs text-slate-500 sm:col-span-4">
+              {(() => {
+                const a = noticeEnd(e.kind, e.startDate.toISOString().slice(0, 10), e.probationEnd?.toISOString().slice(0, 10) ?? null, today, "employer");
+                const b = noticeEnd(e.kind, e.startDate.toISOString().slice(0, 10), e.probationEnd?.toISOString().slice(0, 10) ?? null, today, "employee");
+                return a && b
+                  ? `Opsagt i dag: af Nextview360 er sidste dag ${fmtDate(a.lastDay)} (${a.why.charAt(0).toLowerCase()}${a.why.slice(1)}) Af medarbejderen: ${fmtDate(b.lastDay)}. Opsigelsen skal gives skriftligt. 120-dages-reglen gælder kun, hvis den står i kontrakten.`
+                  : "Varslet følger kontrakten (ikke funktionærloven) - skriv sidste dag. Er en timelønnet funktionær (over 8 timer om ugen), gælder funktionærlovens varsel også."
+              })()}
+            </p>
+          </form>
         )}
       </Card>
 

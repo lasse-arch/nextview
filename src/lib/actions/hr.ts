@@ -8,7 +8,7 @@ import { prisma } from "@/lib/db";
 import { hashPassword } from "@/lib/password";
 import { TEAM_ROLES } from "@/lib/team-roles";
 import { employeeFor, hrViewer, isHrAdmin, requireHrAdmin } from "@/lib/hr-access";
-import { ABSENCE_NAMES, KIND_NAMES, PAY_NAMES, addDays, isYmd, mondayOf, normMinutes, parseHours, registersTime, todayDk, weekOf } from "@/lib/hr";
+import { ABSENCE_NAMES, KIND_NAMES, PAY_NAMES, START_TASKS, STOP_TASKS, addDays, isYmd, mondayOf, noticeEnd, normMinutes, parseHours, registersTime, todayDk, weekOf } from "@/lib/hr";
 
 /*
  * HR's actions. Every one asks who is asking (lib/hr-access.ts) and only ever trusts the ids and values it checks
@@ -117,7 +117,13 @@ export async function createEmployee(f: FormData) {
   }
   const pay = payFrom(f, terms.kind);
   const e = await prisma.employee.create({
-    data: { ...terms, userId, managerId: await managerFrom(f, userId), pay: { create: { ...pay, effectiveFrom: terms.startDate, createdById: admin.id } } },
+    data: {
+      ...terms,
+      userId,
+      managerId: await managerFrom(f, userId),
+      pay: { create: { ...pay, effectiveFrom: terms.startDate, createdById: admin.id } },
+      tasks: { create: (terms.kind === "FREELANCE" ? START_TASKS.filter((t) => !/lønsystemet|Pension/.test(t)) : START_TASKS).map((label, sort) => ({ phase: "start", label, sort })) },
+    },
   });
   revalidatePath("/arpo/hr");
   back(`/arpo/hr/${e.id}`, "Medarbejderen er oprettet");
@@ -273,4 +279,59 @@ export async function cancelAbsence(absenceId: string, back_: string) {
   await prisma.absence.update({ where: { id: a.id }, data: { status: "CANCELLED", decidedById: viewer.id, decidedAt: new Date() } });
   revalidatePath("/arpo/mig");
   back(back_.startsWith("/arpo/") ? back_ : "/arpo/mig", "Annulleret");
+}
+
+/**
+ * Opsigelse: who gave notice and when - the last day of work is worked out under funktionærloven (lib/hr.ts
+ * noticeEnd) unless another is written (an agreement, an hourly worker, a freelancer). The steps for leaving are
+ * added, and the login closes by itself the day after the last day (lib/hr-retention.ts).
+ */
+export async function giveNotice(employeeId: string, f: FormData) {
+  await requireHrAdmin();
+  const e = await prisma.employee.findUnique({ where: { id: String(employeeId) }, include: { tasks: { where: { phase: "stop" }, select: { id: true } } } });
+  if (!e) throw new Error("Medarbejderen findes ikke.");
+  const by = str(f, "by") === "employee" ? "employee" : "employer";
+  const noticeDay = day(f, "noticeDay");
+  if (!noticeDay) throw new Error("Vælg datoen, opsigelsen blev givet.");
+  const own = day(f, "lastDay");
+  const law = noticeEnd(e.kind, ymdOfDate(e.startDate), e.probationEnd ? ymdOfDate(e.probationEnd) : null, noticeDay, by);
+  const lastDay = own ?? law?.lastDay;
+  if (!lastDay) throw new Error("Skriv sidste arbejdsdag - varslet følger her kontrakten, ikke funktionærloven.");
+  if (lastDay < noticeDay) throw new Error("Sidste arbejdsdag ligger før opsigelsen.");
+  await prisma.employee.update({
+    where: { id: e.id },
+    data: {
+      noticeGivenAt: asDate(noticeDay),
+      noticeBy: by,
+      endDate: asDate(lastDay),
+      ...(e.tasks.length ? {} : { tasks: { create: STOP_TASKS.map((label, sort) => ({ phase: "stop", label, sort })) } }),
+    },
+  });
+  revalidatePath(`/arpo/hr/${e.id}`);
+  back(`/arpo/hr/${e.id}`, `Sidste arbejdsdag er ${lastDay}`);
+}
+
+/** Takes the notice back (e.g. given by mistake) - the employment goes on. */
+export async function withdrawNotice(employeeId: string) {
+  await requireHrAdmin();
+  await prisma.employee.update({ where: { id: String(employeeId) }, data: { noticeGivenAt: null, noticeBy: null, endDate: null } });
+  back(`/arpo/hr/${employeeId}`, "Opsigelsen er trukket tilbage");
+}
+
+export async function toggleHrTask(taskId: string) {
+  const admin = await requireHrAdmin();
+  const t = await prisma.hrTask.findUnique({ where: { id: String(taskId) } });
+  if (!t) throw new Error("Punktet findes ikke.");
+  await prisma.hrTask.update({ where: { id: t.id }, data: t.doneAt ? { doneAt: null, doneById: null } : { doneAt: new Date(), doneById: admin.id } });
+  revalidatePath(`/arpo/hr/${t.employeeId}`);
+}
+
+export async function addHrTask(employeeId: string, phase: string, f: FormData) {
+  await requireHrAdmin();
+  const label = str(f, "label", 200);
+  if (!label) throw new Error("Skriv punktet.");
+  const e = await prisma.employee.findUnique({ where: { id: String(employeeId) }, select: { id: true } });
+  if (!e) throw new Error("Medarbejderen findes ikke.");
+  await prisma.hrTask.create({ data: { employeeId: e.id, phase: phase === "stop" ? "stop" : "start", label, sort: 100 } });
+  revalidatePath(`/arpo/hr/${e.id}`);
 }

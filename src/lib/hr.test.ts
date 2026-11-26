@@ -69,3 +69,20 @@ test("parse hours and week numbers, months back", () => {
   assert.equal(weekNumber("2027-01-01"), 53);
   assert.equal(monthsBack("2026-06-30", 4), "2026-02-28");
 });
+
+test("notice under funktionærloven", async () => {
+  const { noticeEnd } = await import("./hr");
+  // Within the first 5 months: 1 month to the end of a month.
+  assert.equal(noticeEnd("SALARIED", "2026-09-01", null, "2026-11-26", "employer")?.lastDay, "2026-12-31");
+  // In probation (agreed, within 3 months): 14 days.
+  assert.equal(noticeEnd("SALARIED", "2026-09-01", "2026-11-30", "2026-11-26", "employer")?.lastDay, "2026-12-10");
+  // After 1 year: 3 months.
+  assert.equal(noticeEnd("SALARIED", "2025-09-01", null, "2026-11-26", "employer")?.lastDay, "2027-02-28");
+  // After 3 years: 4 months.
+  assert.equal(noticeEnd("SALARIED", "2023-09-01", null, "2026-11-26", "employer")?.months, 4);
+  // After 10 years: 6 months.
+  assert.equal(noticeEnd("SALARIED", "2016-01-01", null, "2026-11-26", "employer")?.months, 6);
+  // The employee: 1 month to the end of a month.
+  assert.equal(noticeEnd("SALARIED", "2016-01-01", null, "2026-11-26", "employee")?.lastDay, "2026-12-31");
+  assert.equal(noticeEnd("FREELANCE", "2026-01-01", null, "2026-11-26", "employer"), null);
+});

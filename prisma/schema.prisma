@@ -2182,6 +2182,12 @@ model Employee {
   dayChanges    WorkDayChange[]
   weeks         WorkWeek[]
   absences      Absence[]
+  tasks         HrTask[]
+  /// Notice given (opsigelse): when, and by whom ("employer" or "employee") - the last day is endDate.
+  noticeGivenAt DateTime?      @db.Date
+  noticeBy      String?
+  /// HR data cleared 5 years after the employment ended (lib/hr-retention.ts) - only the name and dates are kept.
+  anonymizedAt  DateTime?
 }
 
 /// The pay from a date on - a new row for each change, so the history stays.
@@ -2299,4 +2305,19 @@ model Refilming {
   cancelledAt     DateTime?
 
   @@index([dealId, at])
+}
+
+
+/// A step when someone starts ("start") or leaves ("stop") - e.g. the contract signed, the equipment back.
+model HrTask {
+  id         String    @id @default(cuid())
+  employee   Employee  @relation(fields: [employeeId], references: [id])
+  employeeId String
+  phase      String
+  label      String
+  sort       Int       @default(0)
+  doneAt     DateTime?
+  doneById   String?
+
+  @@index([employeeId, phase])
 }
