@@ -33,14 +33,14 @@ export function contractProblem(e: Pick<Employee, "kind" | "homeAddress" | "duti
   return null;
 }
 
-export function employmentContractHtml(e: Employee & { user: { name: string; lastName: string | null } }, pay: PayTerms, sickTo: string): string {
+export function employmentContractHtml(e: Employee & { user: { name: string; lastName: string | null; email?: string; phone?: string | null } }, pay: PayTerms, sickTo: string): string {
   const name = `${e.user.name}${e.user.lastName ? ` ${e.user.lastName}` : ""}`;
   const weekly = e.weeklyMinutes / 60;
   const daily = weekly / Math.max(1, e.workDays.length);
   const commission = pay.model === "MONTHLY_COMMISSION" || pay.model === "COMMISSION_ONLY";
   const p = (n: number, title: string, body: string) => `<h2>${n}. ${title}</h2>${body}`;
   const sections = [
-    p(1, "Parterne", `<p>Arbejdsgiver: Nextview360 ApS, CVR 46452445, Danmarksgade 23, st., 9000 Aalborg.<br>Medarbejder: ${esc(name)}, ${esc(e.homeAddress)}.</p>`),
+    p(1, "Parterne", `<p>Arbejdsgiver: Nextview360 ApS, CVR 46452445, Danmarksgade 23, st., 9000 Aalborg.<br>Medarbejder: ${esc(name)}, ${esc(e.homeAddress)}.${e.user.email ? `<br>E-mail: ${esc(e.user.email)}` : ""}${e.user.phone ? `, telefon: ${esc(e.user.phone)}` : ""}</p>`),
     p(2, "Arbejdssted", `<p>Arbejdsstedet er Danmarksgade 23, st., 9000 Aalborg. Arbejdet udføres også ude hos kunderne og andre steder, som opgaverne kræver.</p>`),
     p(3, "Stilling og opgaver", `<p>Medarbejderen ansættes som ${esc(e.title)}. Opgaverne er ${esc(e.duties)} og de opgaver, der naturligt hører til stillingen.</p>`),
     p(

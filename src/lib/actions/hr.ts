@@ -415,7 +415,7 @@ export async function saveCarDetails(employeeId: string, back_: string, f: FormD
  */
 export async function sendEmploymentContract(employeeId: string, f: FormData) {
   await requireHrAdmin();
-  const e = await prisma.employee.findUnique({ where: { id: String(employeeId) }, include: { user: { select: { name: true, lastName: true, email: true } }, pay: { orderBy: { effectiveFrom: "desc" }, take: 1 } } });
+  const e = await prisma.employee.findUnique({ where: { id: String(employeeId) }, include: { user: { select: { name: true, lastName: true, email: true, phone: true } }, pay: { orderBy: { effectiveFrom: "desc" }, take: 1 } } });
   if (!e) throw new Error("Medarbejderen findes ikke.");
   const { contractProblem, employmentContractHtml } = await import("@/lib/employment-contract");
   const problem = contractProblem(e, e.pay[0]);
