@@ -4,8 +4,8 @@ import { prisma } from "@/lib/db";
 import { getTeamUser } from "@/lib/auth";
 import { isHrAdmin } from "@/lib/hr-access";
 import { createEmployee } from "@/lib/actions/hr";
-import { KIND_NAMES, addDays, registersTime, todayDk, weekNumber } from "@/lib/hr";
-import { holidayBalance, missingWeeks } from "@/lib/hr-data";
+import { KIND_NAMES, addDays, registersTime, sickDays12Months, todayDk, weekNumber } from "@/lib/hr";
+import { holidayBalance, missingWeeks, spansOf } from "@/lib/hr-data";
 import { TEAM_ROLES, TEAM_ROLE_NAMES } from "@/lib/team-roles";
 import { AbsenceList, Card, Saved, btn, btnLight, fmtDate, input, label } from "./hr-ui";
 import { EmploymentFields, PayFields } from "./employee-form";
@@ -82,6 +82,9 @@ export default async function HrPage({ searchParams }: { searchParams: Promise<{
                           {names.get(e.id)}
                         </Link>
                         {ended(e) && <span className="ml-2 text-xs text-slate-400">fratrådt</span>}
+                        {e.rule120 && !e.endDate && sickDays12Months(spansOf(e.absences), today) >= 100 && (
+                          <span className="ml-2 rounded-full bg-rose-50 px-2 py-0.5 text-xs font-semibold text-rose-700">{sickDays12Months(spansOf(e.absences), today)} sygedage</span>
+                        )}
                       </td>
                       <td className="px-3 py-2.5 text-slate-600">{KIND_NAMES[e.kind]}</td>
                       <td className="px-3 py-2.5 text-slate-600">{e.title}</td>

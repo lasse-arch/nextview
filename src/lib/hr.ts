@@ -246,3 +246,18 @@ export const STOP_TASKS = [
   "Andre konti lukket (Google, e-mail, adgangskoder)",
   "Udtalelse skrevet, hvis medarbejderen ønsker det",
 ];
+
+/**
+ * The 120-days rule (funktionærloven § 5, stk. 2): sick days with pay in the last 12 months, counted as calendar
+ * days (weekends and holidays inside a sickness count too). Notice must then be given right after the 120th day,
+ * while the employee is still sick - so HR warns from day 100.
+ */
+export function sickDays12Months(absences: AbsenceSpan[], today: Ymd): number {
+  const from = addDays(`${Number(today.slice(0, 4)) - 1}${today.slice(4)}`, 1);
+  const days = new Set<Ymd>();
+  for (const a of absences) {
+    if (a.kind !== "SICK" || a.status !== "APPROVED") continue;
+    for (let d = a.from > from ? a.from : from; d <= a.to && d <= today; d = addDays(d, 1)) days.add(d);
+  }
+  return days.size;
+}

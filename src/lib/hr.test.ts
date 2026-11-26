@@ -86,3 +86,12 @@ test("notice under funktionærloven", async () => {
   assert.equal(noticeEnd("SALARIED", "2016-01-01", null, "2026-11-26", "employee")?.lastDay, "2026-12-31");
   assert.equal(noticeEnd("FREELANCE", "2026-01-01", null, "2026-11-26", "employer"), null);
 });
+
+test("the 120-days rule counts calendar days of sickness in the last 12 months", async () => {
+  const { sickDays12Months } = await import("./hr");
+  const sick = (from: string, to: string, kind = "SICK") => ({ kind, from, to, halfDay: false, status: "APPROVED" });
+  assert.equal(sickDays12Months([sick("2026-11-02", "2026-11-15")], "2026-11-26"), 14); // weekends count
+  assert.equal(sickDays12Months([sick("2025-11-20", "2025-11-30")], "2026-11-26"), 4); // only the part inside 12 months
+  assert.equal(sickDays12Months([sick("2026-11-20", "2026-12-31")], "2026-11-26"), 7); // not days still to come
+  assert.equal(sickDays12Months([sick("2026-11-02", "2026-11-15", "CHILD_SICK")], "2026-11-26"), 0);
+});

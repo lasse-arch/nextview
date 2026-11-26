@@ -4,8 +4,8 @@ import { prisma } from "@/lib/db";
 import { getTeamUser } from "@/lib/auth";
 import { isHrAdmin, maySeePay, reachOf } from "@/lib/hr-access";
 import { addHrTask, addPayTerms, giveNotice, reopenWeek, toggleHrTask, updateEmployee, withdrawNotice } from "@/lib/actions/hr";
-import { KIND_NAMES, addDays, hoursText, isYmd, mondayOf, noticeEnd, registersTime, todayDk } from "@/lib/hr";
-import { holidayBalance, loadWeek, warningsFor } from "@/lib/hr-data";
+import { KIND_NAMES, addDays, hoursText, isYmd, mondayOf, noticeEnd, registersTime, sickDays12Months, todayDk } from "@/lib/hr";
+import { holidayBalance, loadWeek, spansOf, warningsFor } from "@/lib/hr-data";
 import { TEAM_ROLE_NAMES, rolesOf } from "@/lib/team-roles";
 import { AbsenceForm, AbsenceList, Card, HolidayBox, Saved, WeekForm, Warnings, btn, btnLight, fmtDate, input, label } from "../hr-ui";
 import { EmploymentFields, PayFields } from "../employee-form";
@@ -82,6 +82,21 @@ export default async function EmployeePage({ params, searchParams }: { params: P
         </>
       )}
 
+      {e.rule120 && !e.endDate && (() => {
+        const n = sickDays12Months(spansOf(e.absences), today);
+        const now = n >= 120;
+        const near = n >= 100;
+        return (
+          <div className={`rounded-xl border p-4 text-sm ${now ? "border-rose-300 bg-rose-50 text-rose-900" : near ? "border-amber-300 bg-amber-50 text-amber-900" : "border-slate-200 bg-white text-slate-700"}`}>
+            <span className="font-semibold">120-dages-reglen: {n} sygedage med løn de seneste 12 måneder.</span>{" "}
+            {now
+              ? "Grænsen er nået. Skal I bruge reglen, skal opsigelsen gives nu, mens medarbejderen stadig er syg: 1 måneds varsel til udgangen af en måned. Venter I, mister I retten denne gang."
+              : near
+                ? `${120 - n} dage til grænsen. Overvej i god tid, om I vil bruge reglen.`
+                : "Alle kalenderdage i en sygeperiode tæller, også weekender. Gælder ikke graviditet og barsel."}
+          </div>
+        );
+      })()}
       {time && <HolidayBox b={holidayBalance(e, e.absences, today)} />}
       {time && (
         <Card title="Fravær">

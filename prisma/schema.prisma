@@ -2188,6 +2188,8 @@ model Employee {
   noticeBy      String?
   /// HR data cleared 5 years after the employment ended (lib/hr-retention.ts) - only the name and dates are kept.
   anonymizedAt  DateTime?
+  /// The contract has the 120-days rule (funktionærloven § 5, stk. 2) - HR then counts the sick days and warns.
+  rule120       Boolean        @default(false)
 }
 
 /// The pay from a date on - a new row for each change, so the history stays.

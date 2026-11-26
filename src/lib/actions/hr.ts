@@ -66,6 +66,7 @@ function termsFrom(f: FormData) {
     workDays: [...new Set(workDays)].sort(),
     payrollNumber: str(f, "payrollNumber", 40) || null,
     note: str(f, "note", 2000) || null,
+    rule120: kind === "SALARIED" && f.get("rule120") === "on",
   };
 }
 
