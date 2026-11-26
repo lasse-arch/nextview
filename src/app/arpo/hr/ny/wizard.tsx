@@ -30,9 +30,10 @@ export function NewEmployeeWizard({ roles, existing, leaders }: { roles: { v: st
   const model = freelance ? "INVOICE" : v.payModel;
 
   const problem = (s: number): string | null => {
-    if (s === 0 && !v.userId) {
-      if (!v.name?.trim()) return "Skriv fornavnet.";
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.email ?? "")) return "Skriv personens egen e-mail - kontrakten sendes dertil.";
+    if (s === 0) {
+      if (!v.userId && !v.name?.trim()) return "Skriv fornavnet.";
+      if (!v.userId && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.email ?? "")) return "Skriv personens egen e-mail - kontrakten sendes dertil.";
+      if (v.userId && v.email?.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.email)) return "Den private e-mail ser forkert ud.";
       if (!freelance && !v.homeAddress?.trim()) return "Skriv adressen - den står i kontrakten.";
     }
     if (s === 1 && !v.title?.trim()) return "Skriv stillingen.";
@@ -59,7 +60,7 @@ export function NewEmployeeWizard({ roles, existing, leaders }: { roles: { v: st
   const kr = (s?: string) => (s ? `${s} kr.` : "-");
   const summary: [string, string][] = [
     ["Navn", v.userId ? (existing.find((x) => x.id === v.userId)?.name ?? "") : `${v.name ?? ""} ${v.lastName ?? ""}`.trim()],
-    ...(v.userId ? [] : ([["Egen e-mail", v.email ?? ""], ["Telefon", v.phone || "-"], ["Adresse", v.homeAddress || "-"]] as [string, string][])),
+    ...([["Privat e-mail", v.email || "-"], ["Telefon", v.phone || "-"], ["Adresse", v.homeAddress || "-"]] as [string, string][]),
     ["Stilling", v.title ?? ""],
     ["Ansat som", KIND_NAMES[v.kind as keyof typeof KIND_NAMES]],
     ["Første dag", v.startDate ?? ""],
@@ -99,13 +100,16 @@ export function NewEmployeeWizard({ roles, existing, leaders }: { roles: { v: st
             </select>
           </label>
         )}
-        <div hidden={Boolean(v.userId)} className="grid grid-cols-2 gap-3">
-          {field("name", "Fornavn", { name: "name", maxLength: 80 })}
-          {field("lastName", "Efternavn", { name: "lastName", maxLength: 80 })}
-          {field("email", "Egen e-mail (kontrakten sendes dertil)", { name: "email", type: "email", maxLength: 200 })}
-          {field("phone", "Telefon", { name: "phone", maxLength: 30 })}
+        <div className="grid grid-cols-2 gap-3">
+          {!v.userId && field("name", "Fornavn", { name: "name", maxLength: 80 })}
+          {!v.userId && field("lastName", "Efternavn", { name: "lastName", maxLength: 80 })}
+          {field("email", "Privat e-mail (kontrakt og login sendes dertil)", { name: "email", type: "email", maxLength: 200 })}
+          {field("phone", "Telefon", { name: "phone", type: "tel", maxLength: 30 })}
           {field("homeAddress", "Adresse", { name: "homeAddress", maxLength: 200, placeholder: "Gade og nr., postnr. og by" }, true)}
-          <p className="col-span-2 text-xs text-slate-500">En ny person får først adgang til Arpo, når kontrakten er underskrevet og de har fået en arbejds-mail (Google). CPR og bankkonto skrives kun i lønsystemet.</p>
+          <p className="col-span-2 text-xs text-slate-500">
+            {v.userId ? "E-mail, telefon og adresse står i kontrakten. " : "En ny person får først adgang til Arpo, når kontrakten er underskrevet og de har fået en arbejds-mail (Google). "}
+            CPR og bankkonto skrives kun i lønsystemet.
+          </p>
         </div>
       </section>
 

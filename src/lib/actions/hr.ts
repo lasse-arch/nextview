@@ -106,10 +106,17 @@ export async function createEmployee(f: FormData) {
   const signed = f.get("contractMode") === "signed" ? await signedContractFrom(f) : null;
   let userId = str(f, "userId", 40);
   let newPerson: { privateEmail: string } | null = null;
+  let ownEmail: string | null = null;
   if (userId) {
     const u = await prisma.user.findUnique({ where: { id: userId }, include: { employee: { select: { id: true } } } });
     if (!u) throw new Error("Brugeren findes ikke.");
     if (u.employee) throw new Error(`${u.name} er allerede i HR.`);
+    // Someone already in Arpo: their own e-mail and phone from the form (the address is saved below).
+    const email = str(f, "email", 200).toLowerCase();
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Den private e-mail ser forkert ud.");
+    ownEmail = email || null;
+    const phone = str(f, "phone", 30);
+    if (phone) await prisma.user.update({ where: { id: userId }, data: { phone } });
   } else {
     const name = str(f, "name", 80);
     const lastName = str(f, "lastName", 80) || null;
@@ -141,7 +148,7 @@ export async function createEmployee(f: FormData) {
     data: {
       ...terms,
       userId,
-      privateEmail: newPerson?.privateEmail ?? null,
+      privateEmail: newPerson?.privateEmail ?? ownEmail,
       homeAddress: str(f, "homeAddress", 200) || null,
       managerId: await managerFrom(f, userId),
       pay: { create: { ...pay, effectiveFrom: terms.startDate, createdById: admin.id } },
@@ -297,6 +304,9 @@ export async function updateEmployee(employeeId: string, f: FormData) {
   const e = await prisma.employee.findUnique({ where: { id: String(employeeId) } });
   if (!e) throw new Error("Medarbejderen findes ikke.");
   const terms = termsFrom(f);
+  // Contact (in the contract): their own e-mail, phone and address - only when the form has them.
+  const contact = f.has("privateEmail") ? contactFrom(f) : null;
+  if (contact) await prisma.user.update({ where: { id: e.userId }, data: { phone: contact.phone } });
   const carry = Number(str(f, "vacationCarryDays").replace(",", ".") || "0");
   const carryFrom = day(f, "vacationCarryFrom");
   await prisma.employee.update({
@@ -304,12 +314,20 @@ export async function updateEmployee(employeeId: string, f: FormData) {
     data: {
       ...terms,
       managerId: await managerFrom(f, e.userId),
+      ...(contact ? { privateEmail: contact.privateEmail, homeAddress: contact.homeAddress } : {}),
       vacationCarryDays: Number.isFinite(carry) && carry >= -30 && carry <= 60 ? carry : 0,
       vacationCarryFrom: carryFrom ? asDate(carryFrom) : null,
     },
   });
   revalidatePath(`/arpo/hr/${e.id}`);
   back(`/arpo/hr/${e.id}`, "Gemt");
+}
+
+/** A person's own e-mail, phone and address from a form - checked. */
+function contactFrom(f: FormData) {
+  const privateEmail = str(f, "privateEmail", 200).toLowerCase() || null;
+  if (privateEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(privateEmail)) throw new Error("Den private e-mail ser forkert ud.");
+  return { privateEmail, phone: str(f, "phone", 30) || null, homeAddress: str(f, "homeAddress", 200) || null };
 }
 
 /** New pay from a date - the earlier terms stay as history. */

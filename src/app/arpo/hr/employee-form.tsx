@@ -8,9 +8,26 @@ const ymd = (d: Date | null | undefined) => (d ? d.toISOString().slice(0, 10) : 
 const kr = (ore: number | null | undefined) => (ore == null ? "" : String(ore / 100).replace(".", ","));
 
 /** The employment's fields - for a new person and for changing one. */
-export function EmploymentFields({ e, leaders }: { e?: Employee; leaders: { id: string; name: string }[] }) {
+export function EmploymentFields({ e, leaders, phone }: { e?: Employee; leaders: { id: string; name: string }[]; /** The person's phone (on their user). */ phone?: string | null }) {
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      {e && (
+        <>
+          <p className="col-span-2 text-xs font-semibold uppercase tracking-wide text-slate-500 sm:col-span-4">Kontakt (står i kontrakten)</p>
+          <label className="col-span-2">
+            <span className={label}>Privat e-mail</span>
+            <input name="privateEmail" type="email" defaultValue={e.privateEmail ?? ""} maxLength={200} className={input} placeholder="Login og kontrakt sendes hertil" />
+          </label>
+          <label className="col-span-2">
+            <span className={label}>Telefon</span>
+            <input name="phone" type="tel" defaultValue={phone ?? ""} maxLength={30} className={input} />
+          </label>
+          <label className="col-span-2 sm:col-span-4">
+            <span className={label}>Adresse</span>
+            <input name="homeAddress" defaultValue={e.homeAddress ?? ""} maxLength={200} className={input} placeholder="Gade og nr., postnr. og by" />
+          </label>
+        </>
+      )}
       <label className="col-span-2">
         <span className={label}>Ansat som</span>
         <select name="kind" defaultValue={e?.kind ?? "SALARIED"} className={input}>

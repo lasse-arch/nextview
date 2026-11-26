@@ -31,7 +31,7 @@ export default async function EmployeePage({ params, searchParams }: { params: P
   const driveOn = await isIntegrationEnabled("GOOGLE_DRIVE");
   const e = await prisma.employee.findUnique({
     where: { id },
-    include: { user: { select: { id: true, name: true, lastName: true, email: true, role: true, extraRoles: true, disabledAt: true } }, manager: { select: { name: true } }, pay: { orderBy: { effectiveFrom: "desc" } }, absences: { orderBy: { from: "desc" } }, tasks: { orderBy: [{ sort: "asc" }, { label: "asc" }] }, documents: { select: { id: true, name: true, signedAt: true, driveFileId: true, createdAt: true }, orderBy: { createdAt: "desc" } }, terms: { orderBy: { from: "asc" } } },
+    include: { user: { select: { id: true, name: true, lastName: true, email: true, phone: true, role: true, extraRoles: true, disabledAt: true } }, manager: { select: { name: true } }, pay: { orderBy: { effectiveFrom: "desc" } }, absences: { orderBy: { from: "desc" } }, tasks: { orderBy: [{ sort: "asc" }, { label: "asc" }] }, documents: { select: { id: true, name: true, signedAt: true, driveFileId: true, createdAt: true }, orderBy: { createdAt: "desc" } }, terms: { orderBy: { from: "asc" } } },
   });
   if (!e) notFound();
   const reach = reachOf(user, e)!;
@@ -434,7 +434,7 @@ export default async function EmployeePage({ params, searchParams }: { params: P
 
       <Card title="Ansættelse">
         <form action={updateEmployee.bind(null, e.id)} className="space-y-4">
-          <EmploymentFields e={e} leaders={leaders.map((l) => ({ id: l.id, name: `${l.name}${l.lastName ? ` ${l.lastName}` : ""}` }))} />
+          <EmploymentFields e={e} phone={e.user.phone} leaders={leaders.map((l) => ({ id: l.id, name: `${l.name}${l.lastName ? ` ${l.lastName}` : ""}` }))} />
           {time && (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               <label>
