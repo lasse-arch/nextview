@@ -199,7 +199,7 @@ export default async function EmployeePage({ params, searchParams }: { params: P
       )}
 
       {showPay && (
-        <Card title="Særlige vilkår" sub="Det, der er aftalt ud over kontraktens faste tekst. Står i kontraktens § 17. En garantiløn regnes med i lønsedler-grundlaget: er løn, timer og provision under garantien, betales forskellen.">
+        <Card title="Særlige vilkår" sub="Det, der er aftalt ud over kontraktens faste tekst. Står i kontrakten under Særlige vilkår. En garantiløn regnes med i lønsedler-grundlaget: er løn, timer og provision under garantien, betales forskellen.">
           {e.terms.length > 0 && (
             <ul className="mb-3 divide-y divide-slate-100 rounded-lg border border-slate-200">
               {e.terms.map((t) => {
