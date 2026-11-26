@@ -61,6 +61,21 @@ export async function createDealManual(formData: FormData) {
   const contactEmail = String(formData.get("contactEmail") || "") || null;
   const contactPhone = String(formData.get("contactPhone") || "") || null;
 
+  // The same lead sent twice (a double click, or back and send again): open the one just made instead of a copy.
+  const justMade = await prisma.deal.findFirst({
+    where: {
+      importType: "MANUAL",
+      ownerId,
+      companyName: { equals: companyName, mode: "insensitive" },
+      cvrNumber,
+      address,
+      createdAt: { gte: new Date(Date.now() - 10 * 60_000) },
+    },
+    select: { id: true },
+    orderBy: { createdAt: "desc" },
+  });
+  if (justMade) redirect(`/arpo/deals/${justMade.id}`);
+
   const duplicates = await findPossibleDuplicates({ companyName, displayName, cvrNumber, address });
 
   const deal = await prisma.deal.create({

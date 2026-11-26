@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { useFormStatus } from "react-dom";
 import { createDealManual } from "@/lib/actions/deals";
 import { DisplayNameInput } from "../../display-name-input";
 import { cvrMessage } from "../[id]/cvr-lookup-field";
@@ -201,12 +202,23 @@ export function NewDealForm({ users, defaultOwnerId }: { users: User[]; defaultO
           ))}
         </select>
       </div>
-      <button
-        type="submit"
-        className="w-full rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800"
-      >
-        Opret deal
-      </button>
+      <CreateButton />
     </form>
+  );
+}
+
+/** "Opret deal": shows at once that it's working, and can't be sent twice while it is. */
+function CreateButton() {
+  const { pending } = useFormStatus();
+  return (
+    <button
+      type="submit"
+      disabled={pending}
+      aria-busy={pending}
+      className="flex w-full items-center justify-center gap-2 rounded-lg bg-slate-900 px-3 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 active:scale-[.99] disabled:cursor-wait disabled:bg-slate-700"
+    >
+      {pending && <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" aria-hidden />}
+      {pending ? "Opretter deal …" : "Opret deal"}
+    </button>
   );
 }
