@@ -1996,7 +1996,9 @@ function TourExperience({
     }
     track("welcome_choice", { choice: label });
     setWelcome(false);
-    if (go === "skip") return;
+    // "Jeg kigger selv rundt" / ✕: into the tour - with the menu open, when the tour has it open on start (after an
+    // intro film and a welcome too, not only when the tour starts straight in).
+    if (go === "skip") return void ((window.innerWidth <= 760 ? T.menuOpenOnStart.mobile : T.menuOpenOnStart.desktop) && setMenuOpen(true));
     if (go === "last") {
       if (lastRoom) enterTour(lastRoom.href, "welcome", lastRoom.name);
       return;

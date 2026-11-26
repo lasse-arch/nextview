@@ -1136,7 +1136,7 @@ export type TourConfig = {
   scanRooms?: { name: string; ss: number[] }[];
   /** Scan points to hide (sweep ids) - set under Scanpunkter. */
   hiddenSweeps: string[];
-  /** Is the menu open when the tour starts, per device. */
+  /** Is the menu open when the tour starts, per device - with a welcome (and an intro film), once the welcome is closed or "look around myself" is chosen. */
   menuOpenOnStart: { desktop: boolean; mobile: boolean };
   /** The tour dims behind an open menu, and a tap on it closes the menu - false: no dimming. */
   menuDim?: false;
