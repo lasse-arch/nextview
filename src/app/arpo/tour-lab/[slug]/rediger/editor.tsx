@@ -2382,7 +2382,7 @@ function ClaudePanel({
         <div className="flex items-center justify-between gap-2 px-1">
           <button
             type="button"
-            title="Send billeder eller en PDF med (fx skærmbilleder, fotos til touren eller kundens rettelser)"
+            title="Send billeder eller PDF'er med (fx skærmbilleder, fotos til touren, kundens rettelser - også på engelsk)"
             aria-label="Vedhæft billede"
             disabled={images.length + uploading >= MAX_CHAT_IMAGES}
             onClick={() => fileInput.current?.click()}
