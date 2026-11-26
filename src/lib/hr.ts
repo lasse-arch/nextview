@@ -308,3 +308,26 @@ export function guaranteeForMonth(list: Guarantee[], month: { from: Ymd; to: Ymd
   const guaranteeKr = Math.round((sum / days) * 100) / 100;
   return { guaranteeKr, topUpKr: Math.max(0, Math.round((guaranteeKr - earnedKr) * 100) / 100) };
 }
+
+/**
+ * The four usual jobs: a click fills in the title and the duties (they stand in the contract: "Opgaverne er <duties>
+ * og de opgaver, der naturligt hører til stillingen" - so each starts with "at"). Always editable afterwards.
+ */
+export const JOB_PRESETS: { title: string; duties: string }[] = [
+  {
+    title: "Sælger",
+    duties: "at finde og kontakte nye kunder, holde salgsmøder, give tilbud og sælge virtuelle rundvisninger og Nextview360's øvrige ydelser, registrere salgsarbejdet i Arpo og følge op på kunderne",
+  },
+  {
+    title: "Filmer",
+    duties: "at planlægge og gennemføre optagelser hos kunderne med 360°-kamera, foto, video og drone, efterbehandle materialet og gøre de virtuelle rundvisninger færdige i Arpo",
+  },
+  {
+    title: "Udvikler",
+    duties: "at udvikle, teste og vedligeholde Nextview360's software, herunder Arpo, tour-motoren og hjemmesiden, og at passe på sikkerheden og kundernes data",
+  },
+  {
+    title: "Praktikant",
+    duties: "at lære Nextview360's arbejde at kende og deltage i de opgaver, der aftales i praktikaftalen - fx salg, optagelser, efterbehandling og opsætning af rundvisninger - med en fast kontaktperson",
+  },
+];

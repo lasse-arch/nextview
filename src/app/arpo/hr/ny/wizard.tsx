@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { createEmployee } from "@/lib/actions/hr";
 import { KIND_NAMES, PAY_NAMES } from "@/lib/hr";
+import { JobPresets } from "../job-presets";
 
 const label = "block text-[11px] font-semibold uppercase tracking-wide text-slate-500";
 const input = "mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none";
@@ -111,6 +112,7 @@ export function NewEmployeeWizard({ roles, existing, leaders }: { roles: { v: st
       <section hidden={step !== 1} className="space-y-4">
         <h2 className="text-lg font-semibold text-slate-900">Stillingen</h2>
         <div className="grid grid-cols-2 gap-3">
+          <JobPresets onPick={(p) => setV((o) => ({ ...o, title: p.title, duties: p.duties }))} />
           {field("title", "Stilling", { name: "title", maxLength: 120, placeholder: "Fx Sælger, Filmer, Udvikler" })}
           <label>
             <span className={label}>Ansat som</span>
@@ -122,7 +124,10 @@ export function NewEmployeeWizard({ roles, existing, leaders }: { roles: { v: st
               ))}
             </select>
           </label>
-          {field("duties", "Opgaver (står i kontrakten)", { name: "duties", maxLength: 300, placeholder: "Fx at sælge virtuelle rundvisninger til nye kunder og følge op på dem" }, true)}
+          <label className="col-span-2">
+            <span className={label}>Opgaver (står i kontrakten)</span>
+            <textarea name="duties" value={v.duties ?? ""} onChange={set("duties")} maxLength={300} rows={3} className={input} placeholder="Fx at sælge virtuelle rundvisninger til nye kunder og følge op på dem" />
+          </label>
           <label hidden={Boolean(v.userId)}>
             <span className={label}>Rolle i Arpo (når de får adgang)</span>
             <select name="role" value={v.role} onChange={set("role")} className={input}>

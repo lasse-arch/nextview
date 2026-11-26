@@ -1,6 +1,7 @@
 import type { Employee, PayTerms } from "@prisma/client";
 import { KIND_NAMES, PAY_NAMES } from "@/lib/hr";
 import { input, label } from "./hr-ui";
+import { JobPresets } from "./job-presets";
 
 const DAYS = ["Man", "Tir", "Ons", "Tor", "Fre", "Lør", "Søn"];
 const ymd = (d: Date | null | undefined) => (d ? d.toISOString().slice(0, 10) : "");
@@ -20,6 +21,7 @@ export function EmploymentFields({ e, leaders }: { e?: Employee; leaders: { id: 
           ))}
         </select>
       </label>
+      <JobPresets />
       <label className="col-span-2">
         <span className={label}>Stilling</span>
         <input name="title" required defaultValue={e?.title} maxLength={120} className={input} placeholder="Fx Sælger, Filmer, Udvikler" />
@@ -70,7 +72,7 @@ export function EmploymentFields({ e, leaders }: { e?: Employee; leaders: { id: 
       </label>
       <label className="col-span-2 sm:col-span-4">
         <span className={label}>Opgaver (står i kontrakten)</span>
-        <input name="duties" defaultValue={e?.duties ?? ""} maxLength={300} className={input} placeholder="Fx at sælge virtuelle rundvisninger til nye kunder og følge op på dem" />
+        <textarea name="duties" defaultValue={e?.duties ?? ""} maxLength={300} rows={3} className={input} placeholder="Fx at sælge virtuelle rundvisninger til nye kunder og følge op på dem" />
       </label>
       <label className="col-span-2 sm:col-span-4">
         <span className={label}>Note</span>
