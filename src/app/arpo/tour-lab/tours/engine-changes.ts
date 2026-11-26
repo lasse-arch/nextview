@@ -9,6 +9,7 @@
 export type EngineChange = { date: string; kind: "ny" | "sikkerhed" | "hastighed" | "rettelse"; text: string };
 
 export const ENGINE_CHANGES: EngineChange[] = [
+  { date: "2026-11-26", kind: "ny", text: "Vis mig rundt: teksten på kortet er højst 3 linjer på computer og 2 på telefon, med \"Læs mere\" til resten (guiden holder pause, mens man læser). Knapperne er mindre, og på telefon står de side om side." },
   { date: "2026-11-26", kind: "hastighed", text: "Let tilstand: en computer, der har svært ved 3D (ingen grafikacceleration i browseren, eller en tour der bliver ved med at hakke), får selv en lettere tour - direkte skift mellem steder i stedet for flyvning, intet sløret glas over touren og ingen lange drejninger. Antallet ses på Health." },
   { date: "2026-11-24", kind: "rettelse", text: "Drejningen (Vis mig rundt og En linje på) starter blødt i stedet for med et hak - den lille prøvedrejning sker kun første gang i Vis mig rundt og aldrig i En linje på." },
   { date: "2026-11-24", kind: "rettelse", text: "En linje på: drejningen ved hvert øjeblik er nu den samme som i Vis mig rundt (rystede før), og den stopper med det samme, når man rører touren med musen, fingeren, hjulet eller tastaturet." },

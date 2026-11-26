@@ -162,11 +162,7 @@ export function GuidePlayer({
         </div>
         <h3>{stop.title}</h3>
         {/* The card's own short text when it has one - the voice still reads `text`. */}
-        {(stop.short || stop.text) && (
-          <p>
-            <RichText text={stop.short || stop.text} fold />
-          </p>
-        )}
+        {(stop.short || stop.text) && <StopText text={stop.short || stop.text} onOpen={() => timed && setPaused(true)} />}
         {stop.images?.length ? <CardPhotos images={stop.images} onOpen={(at) => onPhotos?.(stop.images!, at)} /> : null}
         {/* Who you meet here (the stop's own people, or the place card's at the same spot). */}
         {(stop.people ?? []).filter((p) => p.image).length > 0 && (
@@ -294,6 +290,44 @@ export function GuidePlayer({
   );
 }
 
+/**
+ * The stop's text, a few lines at most (3 on a computer, 2 on a phone) - "Læs mere" opens the rest in the card and
+ * pauses the timer, so nobody is carried on mid-sentence. The card is re-made per stop, so it starts short each time.
+ */
+function StopText({ text, onOpen }: { text: string; onOpen: () => void }) {
+  const tr = useT();
+  const ref = useRef<HTMLParagraphElement>(null);
+  const [cut, setCut] = useState(false);
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const p = ref.current;
+    if (!p) return;
+    const check = () => setCut(p.scrollHeight > p.clientHeight + 2);
+    const ro = new ResizeObserver(check);
+    ro.observe(p);
+    return () => ro.disconnect();
+  }, [text]);
+  return (
+    <>
+      <p ref={ref} className={`gd-txt ${open ? "aaben" : ""}`}>
+        <RichText text={text} fold />
+      </p>
+      {(cut || open) && (
+        <button
+          type="button"
+          className="gd-mere"
+          onClick={() => {
+            if (!open) onOpen();
+            setOpen(!open);
+          }}
+        >
+          {open ? tr("Vis mindre") : tr("Læs mere")}
+        </button>
+      )}
+    </>
+  );
+}
+
 export const GUIDE_CSS = `
 .gd-bars .gd-here{animation:none!important;width:100%;opacity:.55}
 .gd-sound{width:36px;border:0;border-radius:50%;background:rgba(0,0,0,.06);font-size:16px;cursor:pointer}
@@ -312,6 +346,12 @@ export const GUIDE_CSS = `
 .gd-video{margin:-4px -4px 12px}
 .gd-video .hv-pvideo{margin:0;border-radius:12px}
 .gd-card p{margin:0 0 14px;font-size:15px;line-height:1.5;color:#3d4a50}
+/* A few lines, then "Læs mere" - the whole text in the card only when asked for. */
+.gd-card p.gd-txt{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.gd-card p.gd-txt:has(+.gd-mere){margin-bottom:4px}
+.gd-card p.gd-txt.aaben{display:block!important;-webkit-line-clamp:unset!important;max-height:min(42vh,320px);overflow:auto!important;overscroll-behavior:contain}
+.gd-mere{display:block;margin:0 0 12px;padding:2px 0;border:0;background:none;font:inherit;font-size:13px;font-weight:800;color:var(--c-accent);cursor:pointer}
+.gd-mere:hover{text-decoration:underline}
 /* A text with a table of times ("Se tiderne") is never cut off after a few lines - the table would be hidden under the cut. It folds away itself instead. */
 .gd-card p:has(.rt-tider){display:block!important;-webkit-line-clamp:unset!important;overflow:visible!important}
 .gd-folk-mod button{display:flex;flex-direction:inherit;align-items:inherit;gap:inherit;min-width:0;max-width:100%;border:0;background:none;padding:0;text-align:inherit;cursor:pointer;font:inherit;color:inherit}
@@ -331,6 +371,7 @@ export const GUIDE_CSS = `
 .gd-selv svg{flex:none;width:22px;height:22px;fill:none;stroke:var(--c-accent);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;animation:gdSelv 2.4s ease-in-out infinite}
 @keyframes gdSelv{0%,100%{transform:translateX(-3px)}50%{transform:translateX(3px)}}
 .gd-end .hv-btn{display:inline-flex;padding:10px 16px;font-size:14px}
+.gd-knapper .hv-btn{padding:8px 15px;font-size:13.5px;min-height:0;line-height:1.2}
 .gd-ctrl{display:flex;align-items:center;gap:6px}
 .gd-ctrl button{white-space:nowrap;flex:none;height:36px;min-width:36px;border:0;border-radius:999px;background:#eef1f2;color:var(--c-main);font:inherit;font-weight:800;font-size:15px;cursor:pointer;padding:0 12px}
 .gd-ctrl button:disabled{opacity:.35;cursor:default}
@@ -350,6 +391,12 @@ export const GUIDE_CSS = `
   .gd-card{left:10px;right:10px;width:auto;bottom:calc(10px + env(safe-area-inset-bottom,0px));padding:14px 16px 12px}
   .gd-card h3{font-size:20px}
   .gd-card p{font-size:14px;margin-bottom:10px}
+  /* On a phone: two lines and "Læs mere", the buttons side by side in one row. */
+  .gd-card p.gd-txt{-webkit-line-clamp:2}
+  .gd-card p.gd-txt:has(+.gd-mere){margin-bottom:2px}
+  .gd-mere{margin-bottom:9px;font-size:12.5px}
+  .gd-knapper{flex-wrap:nowrap;gap:6px}
+  .gd-knapper .hv-btn{flex:1 1 0;min-width:0;justify-content:center;padding:8px 10px;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .gd-folk{margin:-2px 0 10px}
   .gd-folk img{width:38px;height:38px}
   /* People in one low row on a phone: a small photo with the name and role beside it (as on the place cards). */
@@ -391,5 +438,6 @@ export const GUIDE_CSS = `
 @media (min-width:761px){
   .gd-lille{width:min(320px,calc(100% - 48px));padding:14px 16px 12px}.gd-lille h3{font-size:20px}.gd-lille p{font-size:14px}
   .gd-stor{width:min(460px,calc(100% - 48px))}.gd-stor h3{font-size:26px}.gd-stor p{font-size:16px}
+  .gd-stor p.gd-txt{-webkit-line-clamp:4}.gd-lille p.gd-txt{-webkit-line-clamp:2}
 }
 `;
