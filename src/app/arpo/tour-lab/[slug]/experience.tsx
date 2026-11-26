@@ -2145,6 +2145,35 @@ function TourExperience({
     if (!sdkRef.current) throw new Error("Touren er ikke klar.");
     const all = guideStops(T, guideId).filter((s) => isPlaceHref(s.href));
     if (!all.length) throw new Error("Rundvisningen har ingen stop inde i touren at fotografere.");
+    return captureStops(progress, all);
+  }
+
+  /**
+   * "Tag billeder af stedet" (editor only): a place tile's own place, from its view and turned a little to each side -
+   * three photos the tile cross-fades between.
+   */
+  async function capturePlace(progress: (text: string) => void, href: string, title: string): Promise<string[]> {
+    if (!sdkRef.current) throw new Error("Touren er ikke klar.");
+    if (!isPlaceHref(href)) throw new Error("Flisen fører ikke til et sted inde i touren.");
+    const sdk = await sdkRef.current;
+    setPhase("tour");
+    progress(`Går til ${title} …`);
+    if (!(await flyTo(href, "instant"))) throw new Error("Kunne ikke gå til stedet.");
+    const out: string[] = [];
+    for (const [i, turn] of [0, -45, 90].entries()) {
+      progress(`${title}: billede ${i + 1}/3`);
+      if (turn) await sdk.Camera.rotate?.(turn, 0, { speed: 200 }).catch(() => {});
+      await new Promise((res) => setTimeout(res, i ? 1500 : 2500)); // the sharp textures
+      const shot = await sdk.Renderer.takeScreenShot({ width: 1600, height: 1000 }, { mattertags: false, sweeps: false, views: false, measurements: false });
+      out.push(await storyJpeg(shot, 1200, 750));
+    }
+    await flyTo(href, "instant"); // back to the place's own view
+    progress(`Gemmer ${out.length} billeder …`);
+    return out;
+  }
+
+  async function captureStops(progress: (text: string) => void, all: { href: string; title: string }[]): Promise<string[]> {
+    if (!sdkRef.current) throw new Error("Touren er ikke klar.");
     const pick = all.length <= 6 ? all : Array.from({ length: 6 }, (_, i) => all[Math.round((i * (all.length - 1)) / 5)]);
     const sdk = await sdkRef.current;
     setPhase("tour");
@@ -3000,16 +3029,16 @@ function TourExperience({
     setSelected(null);
     if (phase === "drone" && !entering) enterTour(T.start, "editor", "Start");
   }
-  const bridge = useRef({ sdk, room, menuGo, peek, phase, captureStories, captureGuide });
+  const bridge = useRef({ sdk, room, menuGo, peek, phase, captureStories, captureGuide, capturePlace });
   useEffect(() => {
-    bridge.current = { sdk, room, menuGo, peek, phase, captureStories, captureGuide };
+    bridge.current = { sdk, room, menuGo, peek, phase, captureStories, captureGuide, capturePlace };
   });
   useEffect(() => {
     if (window.parent === window) return;
     const reply = (msg: object) => window.parent.postMessage(msg, location.origin);
     async function onMessage(e: MessageEvent) {
       if (e.origin !== location.origin || e.source !== window.parent || !e.data?.type) return;
-      const { sdk, room, menuGo, captureStories: capture, captureGuide } = bridge.current;
+      const { sdk, room, menuGo, captureStories: capture, captureGuide, capturePlace } = bridge.current;
       if (e.data.type === "tour-go") {
         // The editor shows a place (Vis start, a scan point, a menu item): straight there - the front page / welcome mustn't cover it.
         setCover(false);
@@ -3049,7 +3078,12 @@ function TourExperience({
         setCover(false);
         setWelcome(false);
         try {
-          const images = await captureGuide((text) => reply({ type: "tour-guide-shots-progress", id: e.data.id, text }), typeof e.data.guide === "string" ? e.data.guide : null);
+          const progress = (text: string) => reply({ type: "tour-guide-shots-progress", id: e.data.id, text });
+          // A place tile: `place` is its link (checked to be a place in this tour); otherwise a guide's stops.
+          const images =
+            typeof e.data.place === "string"
+              ? await capturePlace(progress, e.data.place, typeof e.data.title === "string" ? e.data.title.slice(0, 80) : "Stedet")
+              : await captureGuide(progress, typeof e.data.guide === "string" ? e.data.guide : null);
           reply({ type: "tour-guide-shots", id: e.data.id, images });
         } catch (err) {
           reply({ type: "tour-guide-shots", id: e.data.id, error: err instanceof Error ? err.message : "Kunne ikke tage billederne." });
