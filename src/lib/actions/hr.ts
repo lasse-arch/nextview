@@ -67,6 +67,7 @@ function termsFrom(f: FormData) {
     payrollNumber: str(f, "payrollNumber", 40) || null,
     note: str(f, "note", 2000) || null,
     rule120: kind === "SALARIED" && f.get("rule120") === "on",
+    duties: str(f, "duties", 300) || null,
   };
 }
 
@@ -406,4 +407,36 @@ export async function saveCarDetails(employeeId: string, back_: string, f: FormD
   const plates = [...new Set(String(f.get("carPlates") ?? "").split(/[,;\n]+/).map(cleanPlate).filter(Boolean))].slice(0, 5);
   await prisma.employee.update({ where: { id: e.id }, data: { homeAddress: str(f, "homeAddress", 200) || null, carPlates: plates.join(", ") || null } });
   back(back_.startsWith("/arpo/") ? back_ : "/arpo/mig", "Gemt");
+}
+
+/**
+ * The employment contract (the approved text, lib/employment-contract.ts) sent for signing through DocuSeal: to
+ * Nextview360's signer and the employee. Once both have signed, the card and the start checklist show it.
+ */
+export async function sendEmploymentContract(employeeId: string, f: FormData) {
+  await requireHrAdmin();
+  const e = await prisma.employee.findUnique({ where: { id: String(employeeId) }, include: { user: { select: { name: true, lastName: true, email: true } }, pay: { orderBy: { effectiveFrom: "desc" }, take: 1 } } });
+  if (!e) throw new Error("Medarbejderen findes ikke.");
+  const { contractProblem, employmentContractHtml } = await import("@/lib/employment-contract");
+  const problem = contractProblem(e, e.pay[0]);
+  if (problem) throw new Error(problem);
+  const { isDocuSealConfigured, createAndSendSubmission } = await import("@/lib/docuseal");
+  if (!(await isDocuSealConfigured())) throw new Error("DocuSeal er ikke sat op eller er slået fra under Indstillinger.");
+  const { renderContractPdf } = await import("@/lib/contract-pdf-renderer");
+  const { CONTRACT_SIGNER } = await import("@/lib/contract-template-data");
+  const sickTo = str(f, "sickTo", 80) || CONTRACT_SIGNER.name;
+  const pdf = await renderContractPdf(employmentContractHtml(e, e.pay[0], sickTo));
+  const name = `${e.user.name}${e.user.lastName ? ` ${e.user.lastName}` : ""}`;
+  const submission = await createAndSendSubmission({
+    fileName: `Ansættelseskontrakt ${name}.pdf`,
+    fileBuffer: pdf,
+    documentName: `Ansættelseskontrakt - ${name}`,
+    submitters: [
+      { role: "Company", name: CONTRACT_SIGNER.name, email: CONTRACT_SIGNER.email, externalId: "director" },
+      { role: "Employee", name, email: e.user.email, externalId: "employee" },
+    ],
+    metadata: { employeeId: e.id },
+  });
+  await prisma.employee.update({ where: { id: e.id }, data: { contractSubmissionId: String(submission.id), contractSentAt: new Date(), contractViewedAt: null, contractSignedAt: null } });
+  back(`/arpo/hr/${e.id}`, "Kontrakten er sendt til underskrift");
 }

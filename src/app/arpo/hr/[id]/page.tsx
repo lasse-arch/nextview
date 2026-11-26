@@ -3,13 +3,15 @@ import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getTeamUser } from "@/lib/auth";
 import { isHrAdmin, maySeePay, reachOf } from "@/lib/hr-access";
-import { addHrTask, addPayTerms, giveNotice, reopenWeek, toggleHrTask, updateEmployee, withdrawNotice } from "@/lib/actions/hr";
+import { addHrTask, addPayTerms, giveNotice, sendEmploymentContract, reopenWeek, toggleHrTask, updateEmployee, withdrawNotice } from "@/lib/actions/hr";
 import { KIND_NAMES, addDays, hoursText, isYmd, mondayOf, noticeEnd, registersTime, sickDays12Months, todayDk } from "@/lib/hr";
 import { holidayBalance, loadWeek, spansOf, tripsOfYear, warningsFor } from "@/lib/hr-data";
 import { TEAM_ROLE_NAMES, rolesOf } from "@/lib/team-roles";
 import { AbsenceForm, AbsenceList, Card, HolidayBox, Saved, TripList, WeekForm, Warnings, btn, btnLight, fmtDate, input, label } from "../hr-ui";
 import { EmploymentFields, PayFields } from "../employee-form";
 import { PayLine } from "../pay-view";
+import { contractProblem } from "@/lib/employment-contract";
+import { CONTRACT_SIGNER } from "@/lib/contract-template-data";
 
 const CATEGORY_NAMES: Record<string, string> = { FILMING: "Filmning", TOUR_EDITING: "Tour-opbygning", REFILMING: "Genoptagelse", CORRECTIONS: "Rettelser", WEBSITE: "Hjemmeside" };
 
@@ -161,6 +163,37 @@ export default async function EmployeePage({ params, searchParams }: { params: P
           <p className="text-sm text-slate-500">Ingen timer på kunder de seneste 30 dage.</p>
         )}
       </Card>
+
+      {e.kind === "SALARIED" && (
+        <Card
+          title="Ansættelseskontrakt"
+          sub={
+            e.contractSignedAt
+              ? `Underskrevet ${fmtDate(e.contractSignedAt)}.`
+              : e.contractSentAt
+                ? `Sendt til underskrift ${fmtDate(e.contractSentAt)}${e.contractViewedAt ? `, åbnet ${fmtDate(e.contractViewedAt)}` : ", ikke åbnet endnu"}.`
+                : "Den godkendte kontrakt, udfyldt fra kortet. Ansættelsesbevisloven: senest 7 dage efter første arbejdsdag."
+          }
+        >
+          {(() => {
+            const problem = contractProblem(e, e.pay[0]);
+            if (problem) return <p className="text-sm text-amber-800">{problem}</p>;
+            return (
+              <form action={sendEmploymentContract.bind(null, e.id)} className="flex flex-wrap items-end gap-3">
+                <label className="min-w-[220px] flex-1">
+                  <span className={label}>Sygemelding til</span>
+                  <input name="sickTo" defaultValue={CONTRACT_SIGNER.name} maxLength={80} className={input} />
+                </label>
+                <a href={`/api/hr/kontrakt?medarbejder=${e.id}`} target="_blank" rel="noopener" className={btnLight}>
+                  Se kontrakten (PDF)
+                </a>
+                <button className={btn}>{e.contractSentAt ? "Send igen" : "Send til underskrift"}</button>
+                {(e.pay[0]?.model === "MONTHLY_COMMISSION" || e.pay[0]?.model === "COMMISSION_ONLY") && <p className="w-full text-xs text-amber-800">Kontrakten henviser til en vedlagt provisionsaftale - send den med.</p>}
+              </form>
+            );
+          })()}
+        </Card>
+      )}
 
       {(["start", "stop"] as const).map((phase) => {
         const list = e.tasks.filter((t) => t.phase === phase);

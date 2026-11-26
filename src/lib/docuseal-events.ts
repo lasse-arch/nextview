@@ -182,8 +182,21 @@ export async function handleDocuSealEvent(
     const standalone = await prisma.standaloneContract.findUnique({
       where: { docusealSubmissionId: String(submissionId) },
     });
-    if (standalone)
+    if (standalone) {
       await handleStandaloneEvent(standalone, type, isCustomer, changedAt);
+      return;
+    }
+    // An employment contract (HR): opened, and signed by both - then the start checklist's contract step is done.
+    const employee = await prisma.employee.findUnique({ where: { contractSubmissionId: String(submissionId) } });
+    if (employee) {
+      const byEmployee = payload.data?.external_id === "employee";
+      if (type === "form.viewed" && byEmployee && !employee.contractViewedAt)
+        await prisma.employee.update({ where: { id: employee.id }, data: { contractViewedAt: changedAt } });
+      if (type === "submission.completed" && !employee.contractSignedAt) {
+        await prisma.employee.update({ where: { id: employee.id }, data: { contractSignedAt: changedAt } });
+        await prisma.hrTask.updateMany({ where: { employeeId: employee.id, phase: "start", label: { startsWith: "Ansættelseskontrakt" }, doneAt: null }, data: { doneAt: changedAt } });
+      }
+    }
     return;
   }
 

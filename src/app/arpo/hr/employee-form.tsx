@@ -69,6 +69,10 @@ export function EmploymentFields({ e, leaders }: { e?: Employee; leaders: { id: 
         <input type="checkbox" name="rule120" defaultChecked={e ? e.rule120 : true} /> 120-dages-reglen står i kontrakten (funktionærer) - HR tæller sygedagene og advarer fra dag 100
       </label>
       <label className="col-span-2 sm:col-span-4">
+        <span className={label}>Opgaver (står i kontrakten)</span>
+        <input name="duties" defaultValue={e?.duties ?? ""} maxLength={300} className={input} placeholder="Fx at sælge virtuelle rundvisninger til nye kunder og følge op på dem" />
+      </label>
+      <label className="col-span-2 sm:col-span-4">
         <span className={label}>Note</span>
         <textarea name="note" defaultValue={e?.note ?? ""} maxLength={2000} rows={2} className={input} />
       </label>

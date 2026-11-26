@@ -2196,6 +2196,13 @@ model Employee {
   /// For the kørselsregnskab: where trips start or end from home, and the number plates of the cars they drive (comma-separated).
   homeAddress   String?
   carPlates     String?
+  /// The work, in a few words - stands in the employment contract (§ 3).
+  duties        String?
+  /// The employment contract sent for signing through DocuSeal (lib/employment-contract.ts).
+  contractSubmissionId String?   @unique
+  contractSentAt       DateTime?
+  contractViewedAt     DateTime?
+  contractSignedAt     DateTime?
 }
 
 /// The pay from a date on - a new row for each change, so the history stays.
