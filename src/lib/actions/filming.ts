@@ -1,5 +1,6 @@
 "use server";
 
+import { sendCrewBookingMails } from "@/lib/filming-crew-mail";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
@@ -59,6 +60,7 @@ export async function bookFilming(dealId: string, input: FilmingInput): Promise<
     dealId,
   });
 
+  await sendCrewBookingMails({ dealId, kind: "Optagelse", start: r.start, durationMinutes: r.durationMinutes, crewIds: r.crew.map((c) => c.id), bookerId: user.id, drone: deal.filmingDrone, brief: deal.filmingBrief });
   revalidatePath(`/arpo/deals/${dealId}`);
   return { ok: true, sentTo: r.sentTo };
 }
@@ -110,6 +112,7 @@ export async function bookRefilming(
     },
   });
   await logActivity({ type: "DEAL_FILMING_BOOKED", message: `${user.name} bookede genoptagelse hos ${dealName(deal)} ${date} kl. ${time}`, actorId: user.id, dealId: deal.id });
+  await sendCrewBookingMails({ dealId: deal.id, kind: "Genoptagelse", start: r.start, durationMinutes: r.durationMinutes, crewIds: r.crew.map((c) => c.id), bookerId: user.id, drone: Boolean(input.drone), brief });
   revalidatePath(`/arpo/deals/${deal.id}`);
   return { ok: true, sentTo: r.sentTo };
 }

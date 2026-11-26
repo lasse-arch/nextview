@@ -63,6 +63,12 @@ export async function getUnreadNewsCount(userId: string, newsReadAt: Date | null
 const DEFAULT_POSTS: { title: string; body: string; minutesAgo: number; screenshotUrl: string }[] = [
   {
     minutesAgo: 0,
+    title: "Filmere: tilgængelighed, opgaver og udbetaling",
+    body: "Har du rollen Filmer, finder du nu tre ting under Filmninger:\n\nMin tilgængelighed: sæt de dage, du kan filme de næste 3 måneder - hele dagen, formiddag, eftermiddag eller dine egne tider. Tryk på \"Tir\" for at vælge alle tirsdage på én gang.\n\nMine opgaver: hvornår og hvor du skal filme, kontaktperson med telefon og e-mail, skolens hjemmeside, hvem der har solgt opgaven, og hvad der er aftalt med kunden.\n\nUnder Mig ser du dine timer og en estimeret udbetaling for denne og sidste måned.\n\nNår en filmning bookes, viser dialogen ved hvert navn, om personen er ledig den dag eller allerede skal filme. Admin har desuden Planlægning med alle filmere for de næste to uger.",
+    screenshotUrl: "/news/filmer-ledig.png",
+  },
+  {
+    minutesAgo: 0,
     title: "HR: læg en underskrevet kontrakt ind",
     body: "Har en medarbejder allerede skrevet under på en kontrakt (fx på papir), kan den nu lægges ind i HR. Under Ny medarbejder vælger du \"Vi har allerede en underskrevet kontrakt\" og vælger PDF'en og datoen. Er personen allerede oprettet, gør du det på medarbejderens kort under Ansættelseskontrakt.\n\nKontrakten gemmes i Arpo og i Drev (mappen Nextview360 - Ansættelseskontrakter). Kontrakter, der underskrives gennem Arpo, gemmes nu også af sig selv. Kun admin og personen selv kan åbne den, og hver gang logges det.",
     screenshotUrl: "/news/hr-kontrakt.png",

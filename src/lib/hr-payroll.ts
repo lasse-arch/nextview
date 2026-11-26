@@ -6,7 +6,8 @@ import { spansOf, termsOf, tripsOfYear } from "@/lib/hr-data";
 /*
  * Lønsedler-grundlag: for a month, what the payroll system needs per person - the pay terms that apply, the
  * registered hours, the absence by kind, and the month's commission (A-income for employees; freelancers invoice
- * theirs). Arpo computes no tax: the payroll system does. Only for an admin (the callers check).
+ * theirs). Arpo computes no tax: the payroll system does. Only for an admin - or one employee's own row for "Mig"
+ * (`only`, the caller checks it is them).
  */
 
 export type PayrollRow = {
@@ -44,11 +45,11 @@ export function monthBounds(ym: string): { from: Ymd; to: Ymd } {
   return { from: `${ym}-01`, to: `${ym}-${String(last).padStart(2, "0")}` };
 }
 
-export async function payrollMonth(ym: string): Promise<PayrollRow[]> {
+export async function payrollMonth(ym: string, only?: { employeeId: string }): Promise<PayrollRow[]> {
   const { from, to } = monthBounds(ym);
   const today = todayDk();
   const employees = await prisma.employee.findMany({
-    where: { startDate: { lte: new Date(`${to}T00:00:00Z`) }, OR: [{ endDate: null }, { endDate: { gte: new Date(`${from}T00:00:00Z`) } }] },
+    where: { ...(only ? { id: only.employeeId } : {}), startDate: { lte: new Date(`${to}T00:00:00Z`) }, OR: [{ endDate: null }, { endDate: { gte: new Date(`${from}T00:00:00Z`) } }] },
     include: {
       user: { select: { id: true, name: true, lastName: true } },
       pay: { where: { effectiveFrom: { lte: new Date(`${to}T00:00:00Z`) } }, orderBy: { effectiveFrom: "desc" }, take: 1 },
@@ -157,4 +158,10 @@ export function payrollCsv(rows: PayrollRow[]): string {
     [r.name, r.payrollNumber, r.kind, r.model, num(r.monthlyKr), num(r.hourlyKr), num(r.commissionPct), r.pension, num(r.employedShare), num(r.normHours), num(r.workedHours), r.missingDays, ...kinds.map((k) => num(r.absence[k] ?? 0)), num(r.commissionKr), r.commissionHow, num(r.tripKm), num(r.tripKr), num(r.guaranteeKr || null), num(r.guaranteeTopUpKr || null), r.note].map(csvCell).join(";")
   );
   return `﻿${[head.map(csvCell).join(";"), ...lines].join("\r\n")}\r\n`;
+}
+
+/** What a row comes to before tax (pay for the part of the month, hours, commission, guarantee top-up) - and the tax-free kørepenge. */
+export function estimatedPay(r: PayrollRow): { grossKr: number; tripKr: number } {
+  const gross = (r.monthlyKr ?? 0) * r.employedShare + (r.hourlyKr ?? 0) * (r.workedHours ?? 0) + (r.commissionHow === "løn" ? r.commissionKr : 0) + r.guaranteeTopUpKr;
+  return { grossKr: Math.round(gross * 100) / 100, tripKr: r.tripKr };
 }

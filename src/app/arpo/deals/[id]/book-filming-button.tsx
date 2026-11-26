@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { bookFilming } from "@/lib/actions/filming";
+import { crewDay } from "@/lib/actions/availability";
 import { useToast } from "@/components/toast";
 
 const HOUR_OPTIONS = [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8];
@@ -41,6 +42,18 @@ export function BookFilmingButton({
   const [email, setEmail] = useState(contactEmail ?? "");
   const [extra, setExtra] = useState("");
   const [pending, startTransition] = useTransition();
+  // Who is free on the chosen day (their own "tilgængelighed") and who is already out filming then.
+  const [day, setDay] = useState<{ date: string; info: Awaited<ReturnType<typeof crewDay>> } | null>(null);
+  const chosenDate = startLocal.slice(0, 10);
+  useEffect(() => {
+    if (!open || !/^\d{4}-\d{2}-\d{2}$/.test(chosenDate)) return;
+    let live = true;
+    crewDay(chosenDate, dealId).then((info) => live && setDay({ date: chosenDate, info }));
+    return () => {
+      live = false;
+    };
+  }, [open, chosenDate, dealId]);
+  const dayInfo = day?.date === chosenDate ? day.info : null;
   const router = useRouter();
   const showToast = useToast();
 
@@ -107,6 +120,11 @@ export function BookFilmingButton({
               <label key={c.id} className="flex items-center gap-2 text-sm text-slate-700">
                 <input type="checkbox" checked={crew.includes(c.id)} onChange={() => toggle(c.id)} className="h-4 w-4" />
                 {c.name}
+                {dayInfo?.[c.id] && (
+                  <span className={`rounded-full px-1.5 py-0.5 text-[11px] font-medium ${dayInfo[c.id].busy.length ? "bg-amber-50 text-amber-800" : dayInfo[c.id].free ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
+                    {dayInfo[c.id].busy.length ? `filmer allerede ${dayInfo[c.id].busy.join(", ")}` : dayInfo[c.id].free ? `ledig ${dayInfo[c.id].free}` : "ikke sat som ledig"}
+                  </span>
+                )}
               </label>
             ))}
           </div>

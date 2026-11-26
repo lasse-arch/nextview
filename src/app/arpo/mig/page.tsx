@@ -1,8 +1,9 @@
 import { redirect } from "next/navigation";
+import { estimatedPay, payrollMonth } from "@/lib/hr-payroll";
 import { prisma } from "@/lib/db";
 import { getTeamUser } from "@/lib/auth";
 import { teamCan } from "@/lib/team-roles";
-import { KIND_NAMES, hoursText, isYmd, mondayOf, registersTime, todayDk, weekNumber } from "@/lib/hr";
+import { KIND_NAMES, hoursText, isYmd, mondayOf, monthsBack, registersTime, todayDk, weekNumber } from "@/lib/hr";
 import { holidayBalance, loadWeek, missingWeeks, tripSuggestions, tripsOfYear, warningsFor } from "@/lib/hr-data";
 import { AbsenceForm, AbsenceList, Card, HolidayBox, Saved, TripList, WeekForm, Warnings, btnLight, fmtDate, input, label } from "../hr/hr-ui";
 import { TripForm } from "../hr/trip-form";
@@ -48,6 +49,18 @@ export default async function MigPage({ searchParams }: { searchParams: Promise<
   ]);
   const monthKr = myTrips.filter((t) => t.status === "APPROVED" && t.date.toISOString().slice(0, 7) === ym).reduce((n, t) => n + (year?.pay.get(t.id) ?? 0), 0);
   const plates = (e.carPlates ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+  // "Timer og udbetaling": this month and last month, as lønsedler-grundlaget counts them - only their own row.
+  const lastYm = monthsBack(today, 1).slice(0, 7);
+  const payNow = pay
+    ? (
+        await Promise.all(
+          [
+            ["Denne måned", ym],
+            ["Sidste måned", lastYm],
+          ].map(async ([l, m]) => ({ label: l, row: (await payrollMonth(m, { employeeId: e.id }))[0] }))
+        )
+      ).flatMap(({ label: l, row }) => (row ? [{ label: l, r: row, est: estimatedPay(row) }] : []))
+    : null;
 
   return (
     <div className="mx-auto max-w-3xl space-y-5">
@@ -72,6 +85,29 @@ export default async function MigPage({ searchParams }: { searchParams: Promise<
       )}
       <Warnings list={warnings} />
       {week && <WeekForm employee={e} monday={monday} rows={week.rows} week={week.week} approverName={week.approverName} basePath="/arpo/mig" canEdit={!week.week?.approvedAt} canApprove={false} />}
+      {payNow && (
+        <Card title="Timer og udbetaling" sub="Et skøn ud fra dine registrerede timer og din løn - før skat. Lønsystemet regner den endelige løn.">
+          <div className="grid gap-3 sm:grid-cols-2">
+            {payNow.map(({ label: l, r, est }) => (
+              <div key={l} className="rounded-xl bg-slate-50 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{l}</p>
+                <p className="mt-1 text-2xl font-semibold text-slate-900">ca. {est.grossKr.toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr.</p>
+                <ul className="mt-2 space-y-0.5 text-sm text-slate-600">
+                  {r.workedHours != null && (
+                    <li>
+                      {r.workedHours.toLocaleString("da-DK")} timer registreret{r.hourlyKr ? ` × ${r.hourlyKr.toLocaleString("da-DK")} kr.` : ""}
+                    </li>
+                  )}
+                  {r.monthlyKr != null && <li>Månedsløn {r.monthlyKr.toLocaleString("da-DK")} kr.{r.employedShare < 1 ? ` (${Math.round(r.employedShare * 100)} % af måneden)` : ""}</li>}
+                  {r.commissionHow === "løn" && r.commissionKr > 0 && <li>Provision {r.commissionKr.toLocaleString("da-DK")} kr.</li>}
+                  {r.guaranteeTopUpKr > 0 && <li>Tillæg op til garantilønnen {r.guaranteeTopUpKr.toLocaleString("da-DK")} kr.</li>}
+                  {est.tripKr > 0 && <li>Plus skattefri kørepenge {est.tripKr.toLocaleString("da-DK")} kr.</li>}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
       {time && <HolidayBox b={holidayBalance(e, absences, today)} />}
       {time && (
         <Card title="Fravær" sub="Søg ferie og fri, eller meld dig syg.">

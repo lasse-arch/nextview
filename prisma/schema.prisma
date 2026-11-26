@@ -353,6 +353,7 @@ model User {
   /// HR: their employment (one per person) and the people they lead.
   employee            Employee?            @relation("EmployeeUser")
   leads               Employee[]           @relation("EmployeeManager")
+  filmerAvailability FilmerAvailability[] @relation("FilmerAvailability")
 }
 
 /// One entry per notable thing that happened in the CRM (deal created,
@@ -2293,6 +2294,23 @@ model Absence {
 }
 
 /// Who opened someone's pay, and when (GDPR: the access to pay can be traced).
+/// When a filmer can work (Planday-style "tilgængelighed"): one span per day, set by the filmer for the next ~3 months.
+/// The booking dialog and the planning overview show it, so a filming goes to someone who is free.
+model FilmerAvailability {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation("FilmerAvailability", fields: [userId], references: [id], onDelete: Cascade)
+  date      DateTime @db.Date
+  /// Minutes after midnight (Danish time), e.g. 480-1020 = 8-17.
+  fromMin   Int
+  toMin     Int
+  note      String?
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, date])
+  @@index([date])
+}
+
 /// "Særlige vilkår": a condition in the employee's contract beyond the standard text, from a date (and maybe to one) -
 /// a guaranteed minimum pay (GUARANTEE, `amountOre` a month: if pay and commission together are less, the difference
 /// is paid - lønsedler-grundlaget shows it) or any other agreed term in words (OTHER). Listed in the contract's own section.

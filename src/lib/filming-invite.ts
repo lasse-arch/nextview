@@ -43,7 +43,7 @@ export async function sendFilmingInvite(
   const senderId = account.userId;
   const [organizer, crew] = await Promise.all([
     prisma.user.findUniqueOrThrow({ where: { id: senderId } }),
-    prisma.user.findMany({ where: { id: { in: input.crewUserIds } }, orderBy: { name: "asc" }, select: { id: true, name: true, email: true } }),
+    prisma.user.findMany({ where: { id: { in: input.crewUserIds } }, orderBy: { name: "asc" }, select: { id: true, name: true, lastName: true, email: true, phone: true } }),
   ]);
   const durationMinutes = Math.round(hours * 60);
   const end = new Date(start.getTime() + durationMinutes * 60_000);
@@ -51,6 +51,7 @@ export async function sendFilmingInvite(
     start,
     hours,
     crewNames: crew.map((c) => c.name),
+    crew: crew.map((c) => ({ name: [c.name, c.lastName].filter(Boolean).join(" "), phone: c.phone })),
     contactName: deal.contactName,
     address: deal.address,
     organizer: { fullName: [organizer.name, organizer.lastName].filter(Boolean).join(" "), email: organizer.email, phone: organizer.phone },

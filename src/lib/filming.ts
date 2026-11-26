@@ -30,17 +30,26 @@ export function joinNames(names: string[]): string {
   return `${names.slice(0, -1).join(", ")} og ${names[names.length - 1]}`;
 }
 
+/**
+ * The new filming texts wait for Lasse's approval: the crew's phone numbers in the customer's invitation, and the
+ * mail to each filmer (lib/filming-crew-mail.ts). Until then the invitation names the crew only and no mail is sent.
+ */
+export const FILMING_TEXTS_APPROVED = false;
+
 export function buildFilmingDescription(input: {
   start: Date;
   hours: number;
   crewNames: string[];
+  /** The crew with their phone numbers - the customer can reach the ones coming (once the text is approved). */
+  crew?: { name: string; phone?: string | null }[];
   contactName?: string | null;
   address?: string | null;
   organizer: { fullName: string; email: string; phone?: string | null };
 }): string {
   const { date, time } = formatFilmingDate(input.start);
   const greeting = input.contactName?.trim() ? `Hej ${input.contactName.trim().split(/\s+/)[0]},` : "Hej,";
-  const crew = input.crewNames.length ? joinNames(input.crewNames) : "vi";
+  const withPhones = FILMING_TEXTS_APPROVED && input.crew?.length ? input.crew.map((c) => (c.phone?.trim() ? `${c.name} (tlf. ${c.phone.trim()})` : c.name)) : null;
+  const crew = withPhones ? joinNames(withPhones) : input.crewNames.length ? joinNames(input.crewNames) : "vi";
   return [
     greeting,
     "",

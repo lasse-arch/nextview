@@ -2,8 +2,9 @@ import { redirect } from "next/navigation";
 import { getTeamUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { teamCan } from "@/lib/team-roles";
+import { FilmTabs } from "./tabs";
 
-export const metadata = { title: "Mine filmninger" };
+export const metadata = { title: "Mine opgaver" };
 
 /** Wall-clock-as-UTC (like meetingDate): its UTC digits are the Danish time. */
 const when = (d: Date) => new Intl.DateTimeFormat("da-DK", { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit", timeZone: "UTC" }).format(d);
@@ -20,7 +21,8 @@ export default async function FilmingsPage() {
   const user = await getTeamUser();
   if (!user || !teamCan(user, "filming")) redirect("/arpo");
   const since = new Date(clock() - 14 * 86_400_000);
-  const dealSelect = { id: true, companyName: true, displayName: true, address: true, contactName: true, contactPhone: true } as const;
+  // What's needed on the day: the place, who to meet and how to reach them, and our seller who knows the customer.
+  const dealSelect = { id: true, companyName: true, displayName: true, address: true, contactName: true, contactPhone: true, contactEmail: true, websiteUrl: true, owner: { select: { name: true, lastName: true, phone: true } } } as const;
   const [deals, refilms] = await Promise.all([
     prisma.deal.findMany({
       where: { filmingAt: { gte: since }, filmingCrewIds: { contains: user.id } },
@@ -47,7 +49,7 @@ export default async function FilmingsPage() {
     const others = (f.crewIds?.split(",") ?? []).filter((id) => id !== user.id).map((id) => crew.get(id)).filter(Boolean);
     return (
       <li key={f.key} className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/[.05]">
-        <p className="text-[13px] font-semibold capitalize text-[#0071e3]">
+        <p className="text-[13px] font-semibold text-[#0071e3] first-letter:uppercase">
           {when(f.at)}
           {hours(f.minutes) && <span className="font-normal text-[#6e6e73]"> · ca. {hours(f.minutes)}</span>}
           {f.kind === "Genoptagelse" && <span className="ml-2 rounded-full bg-rose-50 px-2 py-0.5 text-[11px] font-semibold normal-case text-rose-700">Genoptagelse</span>}
@@ -58,19 +60,57 @@ export default async function FilmingsPage() {
             {d.address}
           </a>
         )}
-        {(d.contactName || d.contactPhone) && (
-          <p className="mt-2 text-[14px] text-[#3a3a3c]">
-            Mød {d.contactName ?? "kontaktpersonen"}
-            {d.contactPhone && (
-              <>
-                {" · "}
+        <dl className="mt-3 grid grid-cols-[110px_1fr] gap-x-3 gap-y-1 rounded-xl bg-[#f9f9fb] p-3 text-[14px]">
+          {d.contactName && (
+            <>
+              <dt className="text-[#6e6e73]">Kontaktperson</dt>
+              <dd className="font-medium text-[#1d1d1f]">{d.contactName}</dd>
+            </>
+          )}
+          {d.contactPhone && (
+            <>
+              <dt className="text-[#6e6e73]">Telefon</dt>
+              <dd>
                 <a href={`tel:${d.contactPhone.replace(/\s+/g, "")}`} className="text-[#0071e3]">
                   {d.contactPhone}
                 </a>
+              </dd>
+            </>
+          )}
+          {d.contactEmail && (
+            <>
+              <dt className="text-[#6e6e73]">E-mail</dt>
+              <dd className="truncate">
+                <a href={`mailto:${d.contactEmail}`} className="text-[#0071e3]">
+                  {d.contactEmail}
+                </a>
+              </dd>
+            </>
+          )}
+          {d.websiteUrl && /^https?:\/\//.test(d.websiteUrl) && (
+            <>
+              <dt className="text-[#6e6e73]">Hjemmeside</dt>
+              <dd className="truncate">
+                <a href={d.websiteUrl} target="_blank" rel="noopener noreferrer" className="text-[#0071e3]">
+                  {d.websiteUrl.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "")}
+                </a>
+              </dd>
+            </>
+          )}
+          <dt className="text-[#6e6e73]">Solgt af</dt>
+          <dd className="text-[#1d1d1f]">
+            {d.owner.name}
+            {d.owner.lastName ? ` ${d.owner.lastName}` : ""}
+            {d.owner.phone && (
+              <>
+                {", "}
+                <a href={`tel:${d.owner.phone.replace(/\s+/g, "")}`} className="text-[#0071e3]">
+                  {d.owner.phone}
+                </a>
               </>
             )}
-          </p>
-        )}
+          </dd>
+        </dl>
         {others.length > 0 && <p className="mt-1 text-[13px] text-[#6e6e73]">Sammen med {others.join(", ")}</p>}
         <div className={`mt-3 rounded-xl p-3 text-[14px] ${f.brief ? "bg-[#f5f5f7] text-[#1d1d1f]" : "bg-amber-50 text-amber-900"}`}>
           {f.brief ? (
@@ -89,7 +129,9 @@ export default async function FilmingsPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-6" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", system-ui, sans-serif' }}>
       <div>
-        <h1 className="text-[28px] font-semibold tracking-tight text-[#1d1d1f]">Mine filmninger</h1>
+        <h1 className="mb-4 text-2xl font-semibold text-[#1d1d1f]">Filmninger</h1>
+        <FilmTabs at="opgaver" admin={teamCan(user, "admin")} />
+        <h2 className="text-[20px] font-semibold tracking-tight text-[#1d1d1f]">Mine opgaver</h2>
         <p className="text-[14px] text-[#6e6e73]">Filmninger og genoptagelser, du er sat på - hvornår, hvor, hvem du skal møde, og hvad der er aftalt med kunden.</p>
       </div>
       {upcoming.length ? <ul className="space-y-3">{upcoming.map(card)}</ul> : <p className="rounded-2xl bg-white p-4 text-[14px] text-[#6e6e73] ring-1 ring-black/[.05]">Ingen kommende filmninger lige nu.</p>}
