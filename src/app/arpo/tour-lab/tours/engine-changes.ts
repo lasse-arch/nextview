@@ -9,6 +9,7 @@
 export type EngineChange = { date: string; kind: "ny" | "sikkerhed" | "hastighed" | "rettelse"; text: string };
 
 export const ENGINE_CHANGES: EngineChange[] = [
+  { date: "2026-11-26", kind: "ny", text: "Stedkort: lange tekster er nu også klippet på computer (4 linjer, 3 på det lille og 5 på det store kort) med \"Læs mere\", som viser resten og holder kortet åbent, mens man læser." },
   { date: "2026-11-26", kind: "rettelse", text: "\"Menu åben på computer/mobil\" virker nu også, når touren starter med en introfilm og en velkomst: menuen åbner, når velkomsten lukkes, eller man vælger at kigge selv rundt." },
   { date: "2026-11-26", kind: "ny", text: "Vis mig rundt: teksten på kortet er højst 3 linjer på computer og 2 på telefon, med \"Læs mere\" til resten (guiden holder pause, mens man læser). Knapperne er mindre, og på telefon står de side om side." },
   { date: "2026-11-26", kind: "hastighed", text: "Let tilstand: en computer, der har svært ved 3D (ingen grafikacceleration i browseren, eller en tour der bliver ved med at hakke), får selv en lettere tour - direkte skift mellem steder i stedet for flyvning, intet sløret glas over touren og ingen lange drejninger. Antallet ses på Health." },

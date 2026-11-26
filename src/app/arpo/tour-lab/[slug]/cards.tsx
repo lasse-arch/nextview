@@ -39,7 +39,7 @@ export function PlaceCard({
   const tr = useT();
   const [stopped, setStopped] = useState(false);
   const [page, setPage] = useState<1 | 2>(1);
-  const [open, setOpen] = useState(false); // phones: the text unfolded
+  const [open, setOpen] = useState(false); // the text unfolded ("Læs mere")
   // "Læs mere" only when the text is actually cut off (a short text has nothing more to read).
   const textEl = useRef<HTMLParagraphElement>(null);
   const [clipped, setClipped] = useState(false);
@@ -109,11 +109,18 @@ export function PlaceCard({
               <span className="pc-laes-tekst">{reading ? tr("Stop oplæsningen") : voice}</span>
             </button>
           )}
-          <p ref={textEl} className={open ? "" : "pc-klip"}>
+          <p ref={textEl} className={open ? "pc-aaben" : "pc-klip"}>
             <RichText text={card.text} />
           </p>
           {!open && clipped && (
-            <button type="button" className="pc-mere-mobil" onClick={() => setOpen(true)}>
+            <button
+              type="button"
+              className="pc-mere-mobil"
+              onClick={() => {
+                setOpen(true);
+                setStopped(true); // reading: the card stays until it's closed
+              }}
+            >
               {tr("Læs mere")}
             </button>
           )}
@@ -307,6 +314,14 @@ export const CARDS_CSS = `
   .pc-folk span{display:none}
   .pc-stor{width:min(42vw,340px)}.pc-lille{width:min(30vw,250px)}
 }
-@media (min-width:761px) and (min-height:501px){.pc p.pc-klip{display:block}}
+/* Computers too: a few lines and "Læs mere" - the whole text only when asked for (then it scrolls in the card if long). */
+@media (min-width:761px) and (min-height:501px){
+  .pc p.pc-klip{display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+  .pc-lille p.pc-klip{-webkit-line-clamp:3}.pc-stor p.pc-klip{-webkit-line-clamp:5}
+  .pc p.pc-klip:has(+.pc-mere-mobil){margin-bottom:4px}
+  .pc-mere-mobil{display:block;margin:0 0 12px;padding:2px 0;border:0;background:none;font:inherit;font-size:13.5px;font-weight:800;color:var(--c-accent);cursor:pointer}
+  .pc-mere-mobil:hover{text-decoration:underline}
+  .pc p.pc-aaben{max-height:min(42vh,340px);overflow:auto;overscroll-behavior:contain}
+}
 @media (max-width:760px),(max-height:500px) and (min-width:500px){.hv-pc-h-m .pc{left:auto;right:max(10px,env(safe-area-inset-right,0px))}}
 `;
