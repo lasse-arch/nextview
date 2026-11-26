@@ -5,7 +5,7 @@ import { CONTRACT_SIGNER } from "@/lib/contract-template-data";
 
 const LOGO_PATH = path.join(process.cwd(), "public/logo.png");
 
-function logoDataUri(): string {
+export function logoDataUri(): string {
   const buf = fs.readFileSync(LOGO_PATH);
   return `data:image/png;base64,${buf.toString("base64")}`;
 }

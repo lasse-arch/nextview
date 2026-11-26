@@ -1,10 +1,11 @@
 import "server-only";
 import type { ContractTerm, Employee, PayTerms } from "@prisma/client";
 import { CONTRACT_SIGNER } from "@/lib/contract-template-data";
+import { logoDataUri } from "@/lib/contract-html-template";
 
 /*
- * The employment contract for a funktionær, laid out like a classic Danish contract (the parties centred, a heading per
- * subject) - only the [fields] are filled in from the employee's card, the pay terms and the "særlige vilkår".
+ * The employment contract for a funktionær - designed like our customer contract (logo, the parties side by side,
+ * the key figures in a box, a heading per subject) - only the [fields] are filled in from the employee's card, the pay terms and the "særlige vilkår".
  * DocuSeal finds the signature and date fields from the {{…;role=X}} tags (see contract-html-template.ts).
  *
  * Never in it: the CPR number (it lives only in the payroll system), consent to personal data or photos (consent in an
@@ -49,8 +50,8 @@ type Term = Pick<ContractTerm, "kind" | "title" | "text" | "amountOre" | "from" 
 export function termText(t: Term): string {
   const when = `fra den ${date(t.from)}${t.to ? ` til og med den ${date(t.to)}` : ""}`;
   if (t.kind === "GUARANTEE")
-    return `<p><u>Garantiløn</u></p><p>${when[0].toUpperCase()}${when.slice(1)} er Medarbejderen garanteret en løn på mindst brutto ${kr(t.amountOre ?? 0)} kr. pr. måned. Er den samlede løn for måneden (fast løn, timeløn for de registrerede timer og provision) mindre, betaler Nextview360 forskellen sammen med lønnen. Gælder garantien eller ansættelsen kun en del af en måned, regnes garantien forholdsmæssigt.</p>`;
-  return `<p><u>${esc(t.title)}</u></p><p>${esc(t.text)} Vilkåret gælder ${when}.</p>`;
+    return `<p class="sub-h">Garantiløn</p><p>${when[0].toUpperCase()}${when.slice(1)} er Medarbejderen garanteret en løn på mindst brutto ${kr(t.amountOre ?? 0)} kr. pr. måned. Er den samlede løn for måneden (fast løn, timeløn for de registrerede timer og provision) mindre, betaler Nextview360 forskellen sammen med lønnen. Gælder garantien eller ansættelsen kun en del af en måned, regnes garantien forholdsmæssigt.</p>`;
+  return `<p class="sub-h">${esc(t.title)}</p><p>${esc(t.text)} Vilkåret gælder ${when}.</p>`;
 }
 
 type ContractEmployee = Employee & { user: { name: string; lastName: string | null; email?: string; phone?: string | null }; manager?: { name: string; lastName?: string | null } | null };
@@ -63,12 +64,16 @@ export function employmentContractHtml(e: ContractEmployee, pay: PayTerms, sickT
   const commission = pay.model === "MONTHLY_COMMISSION" || commissionOnly || (pay.commissionPct ?? 0) > 0;
   const fixed = !hourly && !commissionOnly;
   const manager = e.manager ? `${e.manager.name}${e.manager.lastName ? ` ${e.manager.lastName}` : ""}` : null;
-  const h = (title: string) => `<h2>${title}</h2>`;
-  const P = (...lines: string[]) => lines.filter(Boolean).map((l) => `<p>${l}</p>`).join("");
+  const h = (title: string) => `<p class="section-title">${title}</p>`;
+  const P = (...lines: string[]) => lines.filter(Boolean).map((l) => (l.startsWith("<u>") ? `<p class="sub-h">${l.slice(3, -4)}</p>` : `<p>${l}</p>`)).join("");
+  // The first time Arpo is named, it says what it is.
+  let arpoNamed = false;
+  const arpo = () => (arpoNamed ? "Arpo" : ((arpoNamed = true), "Arpo (Nextview360's CRM-system)"));
+  const field = (label: string, value: string) => `<div class="field-row"><span class="field-label">${esc(label)}</span><span class="field-value">${esc(value)}</span></div>`;
   const probation = e.probationEnd ? `Prøvetiden løber til og med den ${date(e.probationEnd)}` : "De første 3 måneder af ansættelsen er gensidig prøvetid";
 
   const pay7 = hourly
-    ? `Lønnen er ved tiltrædelse aftalt til <b>brutto ${kr(pay.hourlyOre ?? 0)} kr. pr. time</b> for de timer, Medarbejderen arbejder og registrerer i Arpo.`
+    ? `Lønnen er ved tiltrædelse aftalt til <b>brutto ${kr(pay.hourlyOre ?? 0)} kr. pr. time</b> for de timer, Medarbejderen arbejder og registrerer i ${arpo()}.`
     : commissionOnly
       ? `Lønnen er provision efter den vedlagte provisionsaftale.`
       : `Lønnen er ved tiltrædelse aftalt til <b>brutto ${kr(pay.monthlyOre ?? 0)} kr. pr. måned</b>.`;
@@ -91,7 +96,7 @@ export function employmentContractHtml(e: ContractEmployee, pay: PayTerms, sickT
     ),
     h("Arbejdstid"),
     P(
-      `Den normale arbejdstid er <b>${num(weekly)} timer om ugen</b>, fordelt på ${esc(workDaysText(e.workDays))}. Medarbejderen registrerer sin daglige arbejdstid i Arpo, som arbejdstidsloven kræver.`,
+      `Den normale arbejdstid er <b>${num(weekly)} timer om ugen</b>, fordelt på ${esc(workDaysText(e.workDays))}. Medarbejderen registrerer sin daglige arbejdstid i ${arpo()}, som arbejdstidsloven kræver.`,
       fixed ? `Medarbejderen er ansat på funktionsløn. Lønnen dækker derfor også arbejde ud over den normale arbejdstid, som stillingen naturligt kræver.` : hourly ? `Arbejde ud over den aftalte tid betales med timelønnen, når det er aftalt med nærmeste leder.` : "",
       `Nextview360 sørger for, at den gennemsnitlige ugentlige arbejdstid ikke overstiger 48 timer. Medarbejderen aftaler tilrettelæggelsen af arbejdet, ferie og andet fravær med ${manager ? esc(manager) : "nærmeste leder"}.`
     ),
@@ -100,11 +105,11 @@ export function employmentContractHtml(e: ContractEmployee, pay: PayTerms, sickT
       fixed
         ? `Medarbejderen har ret til 25 feriedage om året med løn og et ferietillæg på 1 % efter ferieloven.${commission ? " Af provisionen optjenes feriegodtgørelse på 12,5 %." : ""}`
         : `Medarbejderen har ret til 25 feriedage om året efter ferieloven. I stedet for løn under ferien optjenes feriegodtgørelse på 12,5 % af lønnen${commission ? " og provisionen" : ""}.`,
-      `Ferie aftales med Nextview360 og registreres i Arpo.`
+      `Ferie aftales med Nextview360 og registreres i ${arpo()}.`
     ),
     h("Sygdom og fravær"),
     P(
-      `Ved sygdom eller andet fravær giver Medarbejderen besked til ${esc(sickTo)} telefonisk så tidligt som muligt og senest ved arbejdstidens begyndelse på første fraværsdag, og registrerer fraværet i Arpo.`,
+      `Ved sygdom eller andet fravær giver Medarbejderen besked til ${esc(sickTo)} telefonisk så tidligt som muligt og senest ved arbejdstidens begyndelse på første fraværsdag, og registrerer fraværet i ${arpo()}.`,
       `Nextview360 kan bede om dokumentation for sygdom (en tro og love-erklæring eller en lægeerklæring på Nextview360's regning).`,
       `Medarbejderen får løn under sygdom efter funktionærloven og deltager i kommunens opfølgning ved længerevarende sygdom.`
     ),
@@ -125,9 +130,9 @@ export function employmentContractHtml(e: ContractEmployee, pay: PayTerms, sickT
       `<u>Arbejdsplads</u>`,
       `Medarbejderen har en arbejdsplads på kontoret, og der er gratis kaffe, te og sodavand til rådighed.`,
       `<u>Kørsel</u>`,
-      `Kørsel i egen bil for arbejdet godtgøres med skattefri kørepenge efter Skattestyrelsens satser, når kørslen er registreret i Arpo.`,
+      `Kørsel i egen bil for arbejdet godtgøres med skattefri kørepenge efter Skattestyrelsens satser, når kørslen er registreret i ${arpo()}.`,
       `<u>Udstyr</u>`,
-      `Udstyr, som Nextview360 stiller til rådighed (fx computer, telefon og kameraudstyr), tilhører Nextview360. Det skal behandles forsvarligt og afleveres straks ved fratræden. Privat brug aftales særskilt.`
+      `Udstyr, som Nextview360 stiller til rådighed (fx computer og kameraudstyr), tilhører Nextview360. Det skal behandles forsvarligt og afleveres straks ved fratræden. Privat brug aftales særskilt.`
     ),
     h("Uddannelse"),
     P(`Nextview360 tilbyder den oplæring, stillingen kræver. Uddannelse, som Nextview360 pålægger Medarbejderen, betales af Nextview360 og regnes som arbejdstid.`),
@@ -146,41 +151,79 @@ export function employmentContractHtml(e: ContractEmployee, pay: PayTerms, sickT
       `<u>Bibeskæftigelse</u>`,
       `Medarbejderen må gerne have arbejde ved siden af uden for arbejdstiden, når det ikke konkurrerer med Nextview360, ikke går ud over arbejdet her og overholder arbejdstidsreglerne. Medarbejderen fortæller Nextview360 om bibeskæftigelse.`,
       `<u>IT, e-mail og internet</u>`,
-      `Medarbejderen får en arbejdskonto hos Google og adgang til Arpo. De bruges til arbejdet, og i begrænset omfang må e-mail og internet bruges privat. Adgangen lukkes ved fratræden.`,
+      `Medarbejderen får en arbejdskonto hos Google og adgang til ${arpo()}. De bruges til arbejdet, og i begrænset omfang må e-mail og internet bruges privat. Adgangen lukkes ved fratræden.`,
       `<u>Persondata</u>`,
-      `Nextview360 behandler Medarbejderens personoplysninger som beskrevet i den udleverede privatlivsmeddelelse. CPR-nummer og bankoplysninger registreres kun i lønsystemet. Medarbejderen holder sin adresse og sine kontaktoplysninger opdateret i Arpo.`,
-      `<u>Udlæg</u>`,
-      `Udlæg, Medarbejderen har haft for Nextview360 efter aftale med nærmeste leder, refunderes mod kvittering, når kvitteringen er afleveret senest den 20. i måneden.`,
+      `Nextview360 behandler Medarbejderens personoplysninger som beskrevet i den udleverede privatlivsmeddelelse. CPR-nummer og bankoplysninger registreres kun i lønsystemet. Medarbejderen holder sin adresse og sine kontaktoplysninger opdateret i ${arpo()}.`,
       `<u>Misligholdelse</u>`,
       `Misligholder en af parterne sine forpligtelser væsentligt, kan den anden part ophæve ansættelsen uden varsel. Skyldes ophævelsen Medarbejderens misligholdelse, har Medarbejderen kun krav på løn indtil fratræden. Den part, der har misligholdt, erstatter den anden parts tab efter dansk rets almindelige regler.`,
       `<u>Tilbagelevering af materiale</u>`,
       `Ved fratræden afleverer Medarbejderen alt, der tilhører Nextview360, også optagelser, filer og andet i digital form. Medarbejderen kan ikke tilbageholde Nextview360's materiale.`
     ),
-    terms.length ? h("Særlige vilkår") + terms.map(termText).join("") : "",
-    h("Underskrifter"),
-    P(`Ansættelseskontrakten underskrives digitalt, og begge parter får en kopi.`),
+    terms.length ? `${h("Særlige vilkår")}<div class="terms">${terms.map(termText).join("")}</div>` : "",
   ].join("");
 
-  return `<!doctype html><html lang="da"><head><meta charset="utf-8"><style>
-  body{font-family:Helvetica,Arial,sans-serif;color:#111;font-size:10pt;line-height:1.5;margin:0;padding:56px 72px 48px}
-  h1{font-size:17pt;letter-spacing:.04em;text-align:center;margin:0 0 14px}
-  .parter{text-align:center;margin:0 0 18px}.parter b{display:block;margin-top:8px}.parter .og{margin:12px 0 4px}.parter small{color:#444}
-  .intro{margin:0 0 6px}
-  h2{font-size:10.5pt;margin:16px 0 5px}p{margin:0 0 7px}ul{margin:0 0 7px;padding-left:22px}li{margin:0 0 2px}u{text-underline-offset:2px}
-  .sig{display:flex;gap:40px;margin-top:26px;page-break-inside:avoid}.sig>div{flex:1}.sig-box{height:60px;border-bottom:1px solid #333;margin-bottom:6px}.small{color:#555;font-size:9pt}
-  </style></head><body>
-  <h1>ANSÆTTELSESKONTRAKT</h1>
-  <div class="parter">
-    <div><b>Parterne</b></div>
-    <b>Nextview360 ApS</b>Danmarksgade 23, st.<br>9000 Aalborg<br>CVR 46452445<br><small>(herefter kaldet "Nextview360")</small>
-    <div class="og">og</div>
-    <b>${esc(name)}</b>${esc(e.homeAddress)}${e.user.email ? `<br>E-mail: ${esc(e.user.email)}` : ""}${e.user.phone ? `<br>Mobil: ${esc(e.user.phone)}` : ""}<br><small>(herefter kaldet "Medarbejderen")</small>
+  const payLine = hourly ? `${kr(pay.hourlyOre ?? 0)} kr. pr. time` : commissionOnly ? "Provision" : `${kr(pay.monthlyOre ?? 0)} kr. pr. måned`;
+  return `<!doctype html><html lang="da"><head><meta charset="utf-8"><title>Ansættelseskontrakt ${esc(name)}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{--ink:#16233F;--fill:#EAF2FF;--fill-border:#CFE0FB;--line:#E4E7EC}
+  *{box-sizing:border-box}html,body{margin:0;padding:0;background:#fff}
+  body{font-family:'Inter',system-ui,-apple-system,Segoe UI,sans-serif;color:var(--ink);font-size:13.5px;line-height:1.55;-webkit-font-smoothing:antialiased}
+  .page{max-width:760px;margin:0 auto;padding:48px 48px 56px}
+  .masthead{text-align:center;margin-bottom:6px}.masthead img{height:40px;margin:0 auto 16px;display:block}
+  .doc-title{font-size:24px;font-weight:800;letter-spacing:-.01em;margin:0 0 4px}.doc-subtitle{font-size:14px;margin:0 0 18px}
+  .between-label{font-size:13px;margin:0 0 10px}
+  .party-grid{display:flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:12px}
+  .party-col{flex:1 1 0;min-width:220px;padding:16px 18px}.party-col+.party-col{border-left:1px solid var(--line)}
+  .party-name{font-weight:700;font-size:15px;margin:0 0 2px}.party-role{font-size:12px;margin:0 0 10px}
+  .field-row{display:flex;justify-content:space-between;gap:12px;padding:3px 0;font-size:13px}
+  .field-value{background:var(--fill);border:1px solid var(--fill-border);border-radius:6px;padding:2px 8px;font-weight:500;text-align:right}
+  .overview{background:#F8FAFC;border:1px solid var(--line);border-radius:12px;padding:14px 20px;margin:14px 0 6px}
+  .overview .field-row{font-size:13.5px;padding:4px 0}.overview .field-row:not(:last-child){border-bottom:1px solid #ECEFF3}.overview .field-label{font-weight:600}
+  .section-title{font-size:16px;font-weight:700;margin:22px 0 6px}
+  .sub-h{font-weight:600;font-size:13.5px;margin:12px 0 3px!important}
+  p{margin:0 0 8px}ul{margin:0 0 8px;padding-left:20px}li{margin-bottom:4px}
+  .terms{border:1px solid var(--line);border-radius:12px;padding:6px 18px 8px;margin-top:4px}
+  .sig-title{font-size:19px;font-weight:800;margin:28px 0 16px}
+  .sig-grid{display:flex;flex-wrap:wrap;gap:40px;page-break-inside:avoid;break-inside:avoid}.sig-grid>div{flex:1 1 0;min-width:220px}
+  .sig-party{font-size:13px;font-weight:700;margin-bottom:12px}.sig-box{border-bottom:1px solid var(--ink);height:56px;margin-bottom:10px}
+  .sig-meta{font-size:12.5px;line-height:1.6}.sig-meta b{font-weight:600}
+</style></head><body><div class="page">
+  <div class="masthead">
+    <img src="${logoDataUri()}" alt="Nextview360">
+    <h1 class="doc-title">Ansættelseskontrakt</h1>
+    <p class="doc-subtitle">Nextview360 ApS</p>
   </div>
-  <p class="intro">Der er dags dato indgået følgende <b>ansættelseskontrakt</b> på nedennævnte vilkår:</p>
+  <p class="between-label">Der er dags dato indgået følgende ansættelseskontrakt mellem:</p>
+  <div class="party-grid">
+    <div class="party-col">
+      <p class="party-name">Nextview360 ApS</p>
+      <p class="party-role">Arbejdsgiver (herefter "Nextview360")</p>
+      ${field("CVR", "46452445")}
+      ${field("Adresse", "Danmarksgade 23, st., 9000 Aalborg")}
+      ${field("Underskriver", CONTRACT_SIGNER.name)}
+    </div>
+    <div class="party-col">
+      <p class="party-name">${esc(name)}</p>
+      <p class="party-role">Medarbejder (herefter "Medarbejderen")</p>
+      ${field("Adresse", e.homeAddress ?? "")}
+      ${e.user.email ? field("E-mail", e.user.email) : ""}
+      ${e.user.phone ? field("Mobil", e.user.phone) : ""}
+    </div>
+  </div>
+  <div class="overview">
+    ${field("Stilling", e.title)}
+    ${field("Første arbejdsdag", date(e.startDate))}
+    ${field("Arbejdstid", `${num(weekly)} timer om ugen`)}
+    ${field("Løn", payLine + (commission && !commissionOnly ? " + provision" : ""))}
+  </div>
   ${body}
-  <div class="sig">
-    <div><div class="sig-box">{{Sign;type=signature;role=Company}}</div><b>For Nextview360 ApS</b><br><span class="small">${esc(CONTRACT_SIGNER.name)}</span><br><span class="small">Dato: {{Date;type=date;role=Company;format=DD/MM/YYYY}}</span></div>
-    <div><div class="sig-box">{{Sign;type=signature;role=Employee}}</div><b>Som Medarbejder</b><br><span class="small">${esc(name)}</span><br><span class="small">Dato: {{Date;type=date;role=Employee;format=DD/MM/YYYY}}</span></div>
+  <p class="sig-title">Underskrifter</p>
+  <p>Ansættelseskontrakten underskrives digitalt, og begge parter får en kopi.</p>
+  <div class="sig-grid">
+    <div><p class="sig-party">For Nextview360 ApS</p><div class="sig-box">{{Sign;type=signature;role=Company}}</div><p class="sig-meta"><b>${esc(CONTRACT_SIGNER.name)}</b><br>{{Date;type=date;role=Company;format=DD/MM/YYYY}}</p></div>
+    <div><p class="sig-party">Som Medarbejder</p><div class="sig-box">{{Sign;type=signature;role=Employee}}</div><p class="sig-meta"><b>${esc(name)}</b><br>{{Date;type=date;role=Employee;format=DD/MM/YYYY}}</p></div>
   </div>
-  </body></html>`;
+</div></body></html>`;
 }
