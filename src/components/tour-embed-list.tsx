@@ -7,10 +7,14 @@ import type { TourEmbed } from "@/lib/tour-embeds";
  * plain link only when they're web addresses.
  */
 
-type Words = { empty: string; counts: (seen: number, used: number) => string; seen: (when: string) => string; today: string; yesterday: string; daysAgo: (n: number) => string; note: string };
+type Words = { tight: (where: string) => string; above: string; below: string; both: string; empty: string; counts: (seen: number, used: number) => string; seen: (when: string) => string; today: string; yesterday: string; daysAgo: (n: number) => string; note: string };
 
 export const EMBED_WORDS: Record<"da" | "en", Words> = {
   da: {
+    tight: (where) => `Touren sidder helt op ad det, der står ${where} den. Giv den lidt luft - fx 40 px - så den ser ud som en del af siden. Den nye kode fra "Koder til hjemmesiden" har luften med.`,
+    above: "over",
+    below: "under",
+    both: "over og under",
     empty: "Vi har ikke set touren vist på en anden side endnu. Når den er sat ind på jeres hjemmeside, og nogen åbner den dér, kommer siden her.",
     counts: (seen, used) => `${seen} så touren, ${used} brugte den (90 dage)`,
     note: "\"Så touren\": mindst halvdelen af touren var på skærmen i et sekund - ikke bare loadet nederst på siden. \"Brugte den\": trykkede, trak eller scrollede i touren.",
@@ -20,6 +24,10 @@ export const EMBED_WORDS: Record<"da" | "en", Words> = {
     daysAgo: (n) => `for ${n} dage siden`,
   },
   en: {
+    tight: (where) => `The tour sits right up against what's ${where} it. Give it a little room - e.g. 40 px - so it looks like part of the page. The new code from "Codes for the website" has the room built in.`,
+    above: "above",
+    below: "below",
+    both: "above and below",
     empty: "We haven't seen the tour on another page yet. Once it's on your website and someone opens it there, the page shows up here.",
     counts: (seen, used) => `${seen} saw the tour, ${used} used it (90 days)`,
     note: "\"Saw the tour\": at least half of it was on the screen for a second - not just loaded further down the page. \"Used it\": tapped, dragged or scrolled in the tour.",
@@ -55,6 +63,11 @@ export function TourEmbedList({ embeds, words }: { embeds: TourEmbed[]; words: W
                 <span className="block text-[12px] text-[#8e8e93]">
                   {words.seen(when(e.daysAgo))} · {words.counts(e.seen, e.used)}
                 </span>
+                {e.tight && (
+                  <span className="mt-1 block rounded-lg bg-[#fff8e6] px-2.5 py-1.5 text-[12px] leading-snug text-[#8a5a00]">
+                    {words.tight(words.below)}
+                  </span>
+                )}
               </span>
             </li>
           );

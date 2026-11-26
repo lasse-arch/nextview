@@ -37,7 +37,8 @@ const css = (style: React.CSSProperties) =>
     .join(";");
 
 export function embedCode(url: string, title: string, size: EmbedSize) {
-  return `<div style="${css(embedBox(size))}">
+  // Room above and below, so the tour doesn't sit glued to the page's footer or the text over it (lib/embed-spacing.ts warns when it does).
+  return `<div style="${css(embedBox(size))};margin:40px auto">
   <iframe src="${url}" title="${title.replace(/"/g, "&quot;")}" style="position:absolute;inset:0;width:100%;height:100%;border:0;border-radius:12px"
     allow="fullscreen; xr-spatial-tracking; gyroscope; accelerometer; autoplay; clipboard-write; geolocation" allowfullscreen loading="lazy"></iframe>
 </div>`;

@@ -332,7 +332,8 @@ export async function assignDealTour(dealId: string, userId: string | null, dead
 /** "Her er touren vist": the pages showing the tour in a frame (last 90 days) - for the editor's Del og udgiv. */
 export async function tourEmbedsOf(slug: string): Promise<TourEmbed[]> {
   await requireTour(slug);
-  return tourEmbeds([slug]);
+  const { withSpacing } = await import("@/lib/tour-embeds");
+  return withSpacing(await tourEmbeds([slug]));
 }
 
 /**

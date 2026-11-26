@@ -24,7 +24,7 @@ import { LangToggle, LocationSwitcher, ReviewLauncher, TourThumb, ApproveTour, R
 import { periodText, type Period } from "@/lib/periods";
 import { TourShare } from "./tour-share";
 import { SitePlacement } from "./site-placement";
-import { tourEmbeds } from "@/lib/tour-embeds";
+import { tourEmbeds, withSpacing } from "@/lib/tour-embeds";
 import { EMBED_WORDS, TourEmbedList } from "@/components/tour-embed-list";
 import { TEXT, type Lang } from "./text";
 import { roleCan, type CustomerPerm, type DealAccess } from "@/lib/customer-roles";
@@ -191,7 +191,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
   const seesStats = scope.some((d) => canOn(d.id, "stats"));
   const needStats = seesStats && (page === "hjem" || page === "tal");
   // "Her er touren vist": the pages showing their tours (only their own tours - the list above is theirs).
-  const embeds = page === "hjemmeside" && !example ? await tourEmbeds(embedTours.map((x) => x.slug)) : [];
+  const embeds = page === "hjemmeside" && !example ? await withSpacing(await tourEmbeds(embedTours.map((x) => x.slug))) : [];
   const feedback =
     page === "rettelser" && reviewTours.length
       ? await prisma.tourFeedback.findMany({ where: { tourSlug: { in: reviewTours.map((x) => x.slug) } }, orderBy: { createdAt: "desc" }, take: 100, select: { id: true, tourSlug: true, kind: true, text: true, room: true, author: true, status: true, createdAt: true } })

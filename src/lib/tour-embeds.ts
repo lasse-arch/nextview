@@ -8,7 +8,7 @@ import { prisma } from "@/lib/db";
  */
 
 /** One page showing the tour: visits where the tour was on the screen there (`seen`) and where it was used (`used`) - not just loaded with the page. */
-export type TourEmbed = { host: string; url: string | null; seen: number; used: number; lastSeen: string; /** Whole days since it was last loaded there (0 = today). */ daysAgo: number };
+export type TourEmbed = { slug: string; host: string; url: string | null; /** The tour sits glued to what is above or below it on that page (lib/embed-spacing.ts) - a tip to give it room. */ tight?: { above: number | null; below: number | null } | null; seen: number; used: number; lastSeen: string; /** Whole days since it was last loaded there (0 = today). */ daysAgo: number };
 
 /** The pages showing these tours in the last 90 days, the newest first. */
 /**
@@ -30,19 +30,20 @@ export function isDevHost(host: string | null): boolean {
 export async function tourEmbeds(slugs: string[]): Promise<TourEmbed[]> {
   if (!slugs.length) return [];
   // Each visit's page, then whether the tour was seen (half of it on the screen for a second) or used there.
-  const rows = await prisma.$queryRawUnsafe<{ host: string | null; url: string | null; seen: bigint; used: bigint; last: Date }[]>(
+  const rows = await prisma.$queryRawUnsafe<{ slug: string; host: string | null; url: string | null; seen: bigint; used: bigint; last: Date }[]>(
     `WITH e AS (
-       SELECT DISTINCT ON (session) session, label AS host, url, "createdAt" FROM "TourEvent"
+       SELECT DISTINCT ON (session) session, "tourSlug" AS slug, label AS host, url, "createdAt" FROM "TourEvent"
        WHERE "tourSlug" = ANY($1::text[]) AND name = 'tour_embed' AND "createdAt" >= now() - interval '90 days'
        ORDER BY session, "createdAt" DESC),
      u AS (
        SELECT session, bool_or(name IN ('tour_seen', 'tour_use')) AS seen, bool_or(name = 'tour_use') AS used FROM "TourEvent"
        WHERE "tourSlug" = ANY($1::text[]) AND "createdAt" >= now() - interval '90 days' AND session IN (SELECT session FROM e) GROUP BY session)
-     SELECT e.host, e.url, count(*) FILTER (WHERE u.seen) AS seen, count(*) FILTER (WHERE u.used) AS used, max(e."createdAt") AS last
-     FROM e LEFT JOIN u USING (session) GROUP BY e.host, e.url ORDER BY last DESC LIMIT 30`,
+     SELECT e.slug, e.host, e.url, count(*) FILTER (WHERE u.seen) AS seen, count(*) FILTER (WHERE u.used) AS used, max(e."createdAt") AS last
+     FROM e LEFT JOIN u USING (session) GROUP BY e.slug, e.host, e.url ORDER BY last DESC LIMIT 30`,
     slugs
   );
   return rows.filter((r) => !isDevHost(r.host)).map((r) => ({
+    slug: r.slug,
     host: r.host ?? "ukendt side",
     url: r.url && /^https?:\/\//.test(r.url) ? r.url : null,
     seen: Number(r.seen),
@@ -50,4 +51,22 @@ export async function tourEmbeds(slugs: string[]): Promise<TourEmbed[]> {
     lastSeen: r.last.toISOString(),
     daysAgo: Math.max(0, Math.floor((Date.now() - r.last.getTime()) / 86_400_000)),
   }));
+}
+
+/** The spacing found on each page (lib/embed-spacing.ts) put on the list - and the pages not checked lately measured after the answer is sent. */
+export async function withSpacing(embeds: TourEmbed[]): Promise<TourEmbed[]> {
+  const { cachedSpacing, refreshSpacing } = await import("@/lib/embed-spacing");
+  const { after } = await import("next/server");
+  const bySlug = new Map<string, string[]>();
+  for (const e of embeds) if (e.url) bySlug.set(e.slug, [...(bySlug.get(e.slug) ?? []), e.url]);
+  const found = new Map<string, { above: number | null; below: number | null; tight: boolean }>();
+  for (const [slug, urls] of bySlug) {
+    const c = await cachedSpacing(slug, urls);
+    for (const [u, s] of c) if (!("error" in s)) found.set(`${slug} ${u}`, s);
+    after(() => refreshSpacing(slug, urls).catch(() => {}));
+  }
+  return embeds.map((e) => {
+    const s = e.url ? found.get(`${e.slug} ${e.url}`) : undefined;
+    return { ...e, tight: s?.tight ? { above: s.above, below: s.below } : null };
+  });
 }
