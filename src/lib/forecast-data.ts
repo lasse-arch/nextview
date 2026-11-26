@@ -26,8 +26,8 @@ import {
  */
 
 const DAY = 86_400_000;
-const SOLD_STAGES = new Set(["CONTRACT_SIGNED", "FILMED", "REVIEW", "LIVE"]);
-const PIPELINE = new Set(["CONTRACT_SIGNED", "FILMED", "REVIEW"]);
+const SOLD_STAGES = new Set(["CONTRACT_SIGNED", "FILMING_BOOKED", "FILMED", "REVIEW", "LIVE"]);
+const PIPELINE = new Set(["CONTRACT_SIGNED", "FILMING_BOOKED", "FILMED", "REVIEW"]);
 const OPEN = new Set(["MEETING_BOOKED", "FOLLOW_UP", "CONTRACT_SENT"]);
 /** Weeks a year with selling when nothing else is set: 52 less holidays and slow weeks. */
 const DEFAULT_SALES_WEEKS = 44;

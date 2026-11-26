@@ -36,6 +36,8 @@ export async function bookFilming(dealId: string, input: FilmingInput): Promise<
       filmingDurationMinutes: r.durationMinutes,
       filmingCrewIds: r.crew.map((c) => c.id).join(","),
       filmingEventId: r.eventId,
+      // Signed and now with a filming day: on to "Booket filmning dag" (never back from a later stage).
+      ...(deal.stage === "CONTRACT_SIGNED" ? { stage: "FILMING_BOOKED" as const } : {}),
       ...(input.contactEmail.trim() !== deal.contactEmail && !deal.contactEmail ? { contactEmail: input.contactEmail.trim() } : {}),
     },
   });

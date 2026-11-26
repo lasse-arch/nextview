@@ -348,7 +348,7 @@ export async function moveExistingToCallList(
   const kept: { name: string; stage: string }[] = [];
   const customers: string[] = [];
   for (const deal of deals) {
-    if (hasSigned(deal) || ["CONTRACT_SIGNED", "FILMED", "REVIEW", "LIVE"].includes(deal.stage)) {
+    if (hasSigned(deal) || ["CONTRACT_SIGNED", "FILMING_BOOKED", "FILMED", "REVIEW", "LIVE"].includes(deal.stage)) {
       customers.push(dealName(deal));
       continue;
     }

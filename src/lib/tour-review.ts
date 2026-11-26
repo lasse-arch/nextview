@@ -361,7 +361,7 @@ export async function sendReviewMail(
   await logActivity({ type: "DEAL_UPDATED", message: `${reminder ? "Påmindelse om gennemgang" : "Tour sendt til gennemgang"}${newAccess ? " (kundesiden åbnet)" : ""}: ${dealName(deal)}`, actorId: actor.id, dealId: deal.id });
   // The deal moves on to "Gennemgang inden live" (from Kontrakt underskrevet or Filmet - never back from Live).
   if (!reminder) {
-    const moved = await prisma.deal.updateMany({ where: { id: deal.id, stage: { in: ["CONTRACT_SIGNED", "FILMED"] } }, data: { stage: "REVIEW" } });
+    const moved = await prisma.deal.updateMany({ where: { id: deal.id, stage: { in: ["CONTRACT_SIGNED", "FILMING_BOOKED", "FILMED"] } }, data: { stage: "REVIEW" } });
     if (moved.count) {
       await prisma.deal.updateMany({ where: { id: deal.id, filmedAt: null }, data: { filmedAt: now } });
       await logActivity({ type: "DEAL_STAGE_REVIEW", message: `${dealName(deal)} er til gennemgang inden live`, actorId: actor.id, dealId: deal.id });

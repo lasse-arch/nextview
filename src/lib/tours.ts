@@ -88,7 +88,7 @@ export async function customersWithoutTour(only: { tourAssigneeId?: string } = {
       churnedAt: null,
       stage: { not: "LOST" },
       AND: [
-        { OR: [{ contractSignedAt: { not: null } }, { stage: { in: ["CONTRACT_SIGNED", "FILMED", "REVIEW", "LIVE"] } }] },
+        { OR: [{ contractSignedAt: { not: null } }, { stage: { in: ["CONTRACT_SIGNED", "FILMING_BOOKED", "FILMED", "REVIEW", "LIVE"] } }] },
         {
           OR: [
             { contractProducts: { path: ["nextviewTour", "selected"], equals: true } },

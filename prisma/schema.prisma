@@ -59,6 +59,8 @@ enum DealStage {
   FOLLOW_UP
   CONTRACT_SENT
   CONTRACT_SIGNED
+  /// "Booket filmning dag": the filming day is booked (Book filming moves it here).
+  FILMING_BOOKED
   FILMED
   /// "Gennemgang inden live": the tour is with the customer to look through (set when it's sent for review).
   REVIEW

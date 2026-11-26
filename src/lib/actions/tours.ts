@@ -107,7 +107,7 @@ export async function searchDeals(query: string) {
       AND: [
         { OR: [{ companyName: { contains: q, mode: "insensitive" } }, { displayName: { contains: q, mode: "insensitive" } }] },
         // Signed: a contract date, or a stage after signing (customers moved over from before Arpo may have no date).
-        { OR: [{ contractSignedAt: { not: null }, stage: { not: "LOST" } }, { stage: { in: ["CONTRACT_SIGNED", "FILMED", "REVIEW", "LIVE"] } }] },
+        { OR: [{ contractSignedAt: { not: null }, stage: { not: "LOST" } }, { stage: { in: ["CONTRACT_SIGNED", "FILMING_BOOKED", "FILMED", "REVIEW", "LIVE"] } }] },
       ],
     },
     select: { id: true, companyName: true, displayName: true },

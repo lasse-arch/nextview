@@ -9,7 +9,7 @@ import { contractedContractValue } from "@/lib/labels";
 /// i alt" stat tile (src/lib/dashboard-data.ts) - kept in sync by hand since
 /// duplicating a 3-item array beats importing a whole dashboard-data module
 /// just for this one constant.
-const SOLD_STAGES = ["LIVE", "CONTRACT_SIGNED", "FILMED", "REVIEW"] as const;
+const SOLD_STAGES = ["LIVE", "CONTRACT_SIGNED", "FILMING_BOOKED", "FILMED", "REVIEW"] as const;
 
 /** The start a fresh goal's `month` field should be saved with, for the
  * given period - recomputed every time a goal is (re-)saved (see

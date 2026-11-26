@@ -92,7 +92,7 @@ export async function myDay(user: { id: string; name: string; role: string }, no
     prisma.deal.count({ where: { ownerId: user.id, inLeadInbox: true, stage: { in: ["LEAD", "CONTACTED"] } } }),
     prisma.goal.findMany({ where: { userId: user.id, metric: "MEETINGS_BOOKED" } }),
     prisma.deal.findMany({
-      where: { ownerId: user.id, stage: "CONTRACT_SIGNED", contractSignedAt: { not: null }, OR: [{ filmingBrief: null }, { filmingDrone: null }] },
+      where: { ownerId: user.id, stage: { in: ["CONTRACT_SIGNED", "FILMING_BOOKED"] }, contractSignedAt: { not: null }, OR: [{ filmingBrief: null }, { filmingDrone: null }] },
       orderBy: { contractSignedAt: "asc" },
       select: { id: true, companyName: true, displayName: true, contractSignedAt: true, filmingAt: true },
     }),

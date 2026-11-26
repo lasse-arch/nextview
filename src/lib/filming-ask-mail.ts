@@ -104,7 +104,7 @@ async function dueDeals(now = new Date()) {
       contractSignedAt: { lte: new Date(now.getTime() - 24 * 3600_000), gte: new Date(now.getTime() - 14 * 86_400_000) },
       filmingAt: null,
       filmedAt: null,
-      stage: { notIn: ["LOST", "FILMED", "REVIEW", "LIVE"] },
+      stage: { notIn: ["LOST", "FILMING_BOOKED", "FILMED", "REVIEW", "LIVE"] },
       churnedAt: null,
       contactEmail: { not: null },
       // Not sent before (a failed try may be tried again - at most 3 times).

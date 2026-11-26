@@ -97,7 +97,7 @@ export default async function BetalingsservicePage() {
       },
     }),
     prisma.deal.findMany({
-      where: { paymentMethod: "BETALINGSSERVICE", churnedAt: null, stage: { in: ["CONTRACT_SIGNED", "FILMED", "REVIEW", "LIVE"] } },
+      where: { paymentMethod: "BETALINGSSERVICE", churnedAt: null, stage: { in: ["CONTRACT_SIGNED", "FILMING_BOOKED", "FILMED", "REVIEW", "LIVE"] } },
       orderBy: { bsCustomerNumber: "asc" },
       select: {
         id: true,
