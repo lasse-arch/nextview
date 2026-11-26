@@ -1,6 +1,6 @@
 "use client";
 
-import { RichText } from "./rich-text";
+import { RichText, airyParagraphs } from "./rich-text";
 import { useT } from "../tours/i18n-react";
 import { useEffect, useRef, useState } from "react";
 import type { CardPerson, PlaceCard as Card, TourConfig } from "../tours/types";
@@ -118,7 +118,7 @@ export function PlaceCard({
             </button>
           )}
           <p ref={textEl} className={open ? "pc-aaben" : "pc-klip"}>
-            <RichText text={card.text} />
+            <RichText text={wide ? airyParagraphs(card.text) : card.text} />
           </p>
           {wide && (
             <button
@@ -345,6 +345,9 @@ export const CARDS_CSS = `
 .pc-hero:hover img{transform:scale(1.03)}
 .pc-laeser h3{flex:none;font-size:27px;line-height:1.15;letter-spacing:-.01em;margin-bottom:12px}
 .pc-laeser p.pc-aaben{flex:1 1 auto;min-height:0;max-height:none;overflow:auto;overscroll-behavior:contain;font-size:16px;line-height:1.72;color:#2c3e44;max-width:62ch;padding-bottom:18px;margin-bottom:2px;-webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(to bottom,#000 calc(100% - 28px),transparent)}
+.pc-laeser p.pc-aaben .rt-afsnit+.rt-afsnit{margin-top:.95em}
+.pc-laeser p.pc-aaben .rt-afsnit:first-child:not(:only-child){font-size:1.07em;line-height:1.62;color:#1f2f34;font-weight:500}
+.pc-laeser p.pc-aaben{hyphens:auto;-webkit-hyphens:auto;text-wrap:pretty}
 .pc-laeser .pc-mindre{flex:none;display:block;text-align:left;margin:0 0 12px;padding:2px 0;border:0;background:none;font:inherit;font-size:13.5px;font-weight:800;color:var(--c-accent);cursor:pointer}
 .pc-laeser .pc-fotos,.pc-laeser .pc-folk{flex:none}
 .pc-laeser .pc-btns{flex:none;padding-top:14px;border-top:1px solid #eef1f2;gap:8px}

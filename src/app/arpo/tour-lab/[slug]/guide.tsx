@@ -1,6 +1,6 @@
 "use client";
 
-import { RichText } from "./rich-text";
+import { RichText, airyParagraphs } from "./rich-text";
 import { CardPhotos } from "./cards";
 import { PointVideo } from "./point-video";
 
@@ -310,7 +310,7 @@ function StopText({ text, onOpen }: { text: string; onOpen: () => void }) {
   return (
     <>
       <p ref={ref} className={`gd-txt ${open ? "aaben" : ""}`}>
-        <RichText text={text} fold />
+        <RichText text={open ? airyParagraphs(text) : text} fold />
       </p>
       {(cut || open) && (
         <button
@@ -350,6 +350,8 @@ export const GUIDE_CSS = `
 .gd-card p.gd-txt{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .gd-card p.gd-txt:has(+.gd-mere){margin-bottom:4px}
 .gd-card p.gd-txt.aaben{display:block!important;-webkit-line-clamp:unset!important;max-height:min(42vh,320px);overflow:auto!important;overscroll-behavior:contain}
+.gd-card p.gd-txt.aaben .rt-afsnit+.rt-afsnit{margin-top:.8em}
+.gd-card p.gd-txt.aaben{text-wrap:pretty}
 .gd-mere{display:block;margin:0 0 12px;padding:2px 0;border:0;background:none;font:inherit;font-size:13px;font-weight:800;color:var(--c-accent);cursor:pointer}
 .gd-mere:hover{text-decoration:underline}
 /* A text with a table of times ("Se tiderne") is never cut off after a few lines - the table would be hidden under the cut. It folds away itself instead. */

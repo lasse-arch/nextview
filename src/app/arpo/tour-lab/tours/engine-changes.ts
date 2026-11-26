@@ -9,6 +9,7 @@
 export type EngineChange = { date: string; kind: "ny" | "sikkerhed" | "hastighed" | "rettelse"; text: string };
 
 export const ENGINE_CHANGES: EngineChange[] = [
+  { date: "2026-11-26", kind: "ny", text: "Læs mere på stedkort og i Vis mig rundt: en lang tekst skrevet som én blok deles i luftige afsnit på to-tre sætninger, og det første står som indledning. Tekster med egne afsnit vises, som de er." },
   { date: "2026-11-26", kind: "ny", text: "Stedkort: \"Læs mere\" gør kortet til et læsepanel - bredere, større skrift, kortets første foto øverst og knapperne altid i bunden. På telefon som et ark nedefra." },
   { date: "2026-11-26", kind: "ny", text: "Stedkort: lange tekster er nu også klippet på computer (4 linjer, 3 på det lille og 5 på det store kort) med \"Læs mere\", som viser resten og holder kortet åbent, mens man læser." },
   { date: "2026-11-26", kind: "rettelse", text: "\"Menu åben på computer/mobil\" virker nu også, når touren starter med en introfilm og en velkomst: menuen åbner, når velkomsten lukkes, eller man vælger at kigge selv rundt." },

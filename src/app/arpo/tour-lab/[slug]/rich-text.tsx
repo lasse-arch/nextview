@@ -44,6 +44,44 @@ function Times({ rows, fold }: { rows: [string, string][]; fold: boolean }) {
   );
 }
 
+/** Words that end with a full stop without ending the sentence ("fx.", "ca.", "e.g.") - never a paragraph break after them. */
+const ABBREV = /(?:^|\s)(?:fx|f\.eks|ca|inkl|ekskl|bl\.a|mm|osv|evt|nr|tlf|kl|jf|dvs|ift|e\.g|i\.e|etc|approx|incl|no|vs|z\.b|bzw|usw|ggf|ca)\.$/i;
+
+/**
+ * A long text written as one block, made easy to read: paragraphs of two or three sentences (about 170+ characters
+ * each). A text with its own line breaks, a short one, or one with a table of times is left as it is.
+ */
+export function airyParagraphs(text: string): string {
+  const t = text.trim();
+  if (t.length < 260 || /\n/.test(t)) return t;
+  const sentences: string[] = [];
+  let start = 0;
+  const re = /[.!?]["»”')]?\s+(?=[A-ZÆØÅÄÖÜ0-9"«“(])/g;
+  for (let m = re.exec(t); m; m = re.exec(t)) {
+    const end = m.index + m[0].trimEnd().length;
+    if (ABBREV.test(t.slice(Math.max(0, end - 12), end))) continue;
+    sentences.push(t.slice(start, end).trim());
+    start = m.index + m[0].length;
+  }
+  sentences.push(t.slice(start).trim());
+  if (sentences.length < 3) return t;
+  const out: string[] = [];
+  let cur = "";
+  for (const s of sentences) {
+    cur = cur ? `${cur} ${s}` : s;
+    if (cur.length >= 170) {
+      out.push(cur);
+      cur = "";
+    }
+  }
+  if (cur) {
+    // A short tail joins the paragraph before it rather than standing alone.
+    if (cur.length < 90 && out.length) out[out.length - 1] += ` ${cur}`;
+    else out.push(cur);
+  }
+  return out.join("\n\n");
+}
+
 /** `fold`: tables of times fold away on a phone (see Times) - for the guide's card. */
 export function RichText({ text, fold = false }: { text: string; fold?: boolean }) {
   const paragraphs = text
