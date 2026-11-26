@@ -63,6 +63,7 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
                 <th className="px-3 py-2 text-right">Timer</th>
                 <th className="px-3 py-2">Fravær</th>
                 <th className="px-3 py-2 text-right">Provision</th>
+                <th className="px-3 py-2 text-right">Kørepenge</th>
                 <th className="px-5 py-2">Bemærkning</th>
               </tr>
             </thead>
@@ -94,6 +95,10 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
                   <td className="px-3 py-2.5 text-right tabular-nums text-slate-700">
                     {r.commissionKr ? kr(r.commissionKr) : "-"}
                     {r.commissionKr ? <div className="text-xs text-slate-500">via {r.commissionHow}</div> : null}
+                  </td>
+                  <td className="px-3 py-2.5 text-right tabular-nums text-slate-700">
+                    {r.tripKr ? kr(r.tripKr) : "-"}
+                    {r.tripKr ? <div className="text-xs text-slate-500">{r.tripKm.toLocaleString("da-DK")} km, skattefri</div> : null}
                   </td>
                   <td className="px-5 py-2.5 text-xs text-amber-800">{r.note}</td>
                 </tr>

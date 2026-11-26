@@ -1,6 +1,6 @@
 import Link from "next/link";
-import type { Absence, Employee } from "@prisma/client";
-import { approveWeek, cancelAbsence, decideAbsence, requestAbsence, saveWeek } from "@/lib/actions/hr";
+import type { Absence, Employee, Trip } from "@prisma/client";
+import { approveWeek, cancelAbsence, cancelTrip, decideAbsence, decideTrip, requestAbsence, saveWeek } from "@/lib/actions/hr";
 import { ABSENCE_NAMES, ABSENCE_STATUS_NAMES, addDays, hoursText, weekNumber, type Warning, type Ymd } from "@/lib/hr";
 import type { WeekRow, holidayBalance } from "@/lib/hr-data";
 
@@ -285,6 +285,46 @@ export function AbsenceList({
             )}
             {(mode === "admin" ? a.status !== "CANCELLED" && a.status !== "REJECTED" : mode === "own" && (a.status === "REQUESTED" || (a.status === "APPROVED" && a.from.toISOString().slice(0, 10) > new Date().toISOString().slice(0, 10)))) && (
               <form action={cancelAbsence.bind(null, a.id, backTo)}>
+                <button className="text-xs font-medium text-slate-500 underline hover:text-slate-800">Annullér</button>
+              </form>
+            )}
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+export function TripList({ list, backTo, mode, names, payOf }: { list: Trip[]; backTo: string; mode: "own" | "decide" | "admin"; names?: Map<string, string>; payOf?: Map<string, number> }) {
+  if (!list.length) return <p className="text-sm text-slate-500">Ingen kørsel.</p>;
+  return (
+    <ul className="divide-y divide-slate-100">
+      {list.map((t) => (
+        <li key={t.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5 text-sm">
+          <div className="min-w-0">
+            <span className="font-medium text-slate-900">
+              {names?.get(t.employeeId) ? `${names.get(t.employeeId)}: ` : ""}
+              {fmtDate(t.date)}, {t.km.toLocaleString("da-DK")} km
+            </span>
+            {payOf?.get(t.id) != null && <span className="text-slate-500"> = {payOf.get(t.id)!.toLocaleString("da-DK", { minimumFractionDigits: 2 })} kr.</span>}
+            <span className="block truncate text-xs text-slate-500">
+              {t.from} → {t.to}. {t.purpose}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${t.status === "APPROVED" ? "bg-emerald-50 text-emerald-700" : t.status === "REQUESTED" ? "bg-amber-50 text-amber-800" : "bg-slate-100 text-slate-500"}`}>{ABSENCE_STATUS_NAMES[t.status]}</span>
+            {mode === "decide" && t.status === "REQUESTED" && (
+              <>
+                <form action={decideTrip.bind(null, t.id, true, backTo)}>
+                  <button className="rounded-lg bg-emerald-600 px-3 py-1 text-xs font-semibold text-white hover:bg-emerald-700">Godkend</button>
+                </form>
+                <form action={decideTrip.bind(null, t.id, false, backTo)}>
+                  <button className="rounded-lg border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50">Afvis</button>
+                </form>
+              </>
+            )}
+            {(mode === "admin" ? t.status !== "CANCELLED" && t.status !== "REJECTED" : mode === "own" && t.status === "REQUESTED") && (
+              <form action={cancelTrip.bind(null, t.id, backTo)}>
                 <button className="text-xs font-medium text-slate-500 underline hover:text-slate-800">Annullér</button>
               </form>
             )}

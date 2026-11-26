@@ -261,3 +261,28 @@ export function sickDays12Months(absences: AbsenceSpan[], today: Ymd): number {
   }
   return days.size;
 }
+
+/**
+ * Skattestyrelsen's tax-free rates for driving one's own car for work (kr. per km): up to 20,000 km in a calendar
+ * year, and above. A year not here uses the latest known one - add each new year's rates (they come in November).
+ */
+export const MILEAGE_RATES: Record<number, { upTo20000: number; above: number }> = {
+  2025: { upTo20000: 3.81, above: 2.23 },
+  2026: { upTo20000: 3.94, above: 2.28 },
+  2027: { upTo20000: 4.13, above: 2.44 },
+};
+export function mileageRate(year: number) {
+  const known = Object.keys(MILEAGE_RATES).map(Number).sort((a, b) => a - b);
+  return MILEAGE_RATES[year] ?? MILEAGE_RATES[known.filter((y) => y <= year).pop() ?? known[0]];
+}
+
+/** Kørepenge for `km` driven after `kmBefore` km already that calendar year: the first 20,000 km at the higher rate. */
+export function mileagePay(year: number, kmBefore: number, km: number): number {
+  const r = mileageRate(year);
+  const low = Math.max(0, Math.min(km, 20_000 - kmBefore));
+  return Math.round((low * r.upTo20000 + (km - low) * r.above) * 100) / 100;
+}
+
+export const TRIP_KINDS = ["Kundebesøg", "Filmning", "Genoptagelse", "Opfølgning på kunde", "Møde", "Andet"] as const;
+/** A Danish number plate, tidied: "ab 12 345" → "AB 12 345" (letters and digits only, at most 10). */
+export const cleanPlate = (s: string) => s.toUpperCase().replace(/[^A-ZÆØÅ0-9 ]/g, "").replace(/\s+/g, " ").trim().slice(0, 10);

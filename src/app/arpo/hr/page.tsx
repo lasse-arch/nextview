@@ -7,7 +7,7 @@ import { createEmployee } from "@/lib/actions/hr";
 import { KIND_NAMES, addDays, registersTime, sickDays12Months, todayDk, weekNumber } from "@/lib/hr";
 import { holidayBalance, missingWeeks, spansOf } from "@/lib/hr-data";
 import { TEAM_ROLES, TEAM_ROLE_NAMES } from "@/lib/team-roles";
-import { AbsenceList, Card, Saved, btn, btnLight, fmtDate, input, label } from "./hr-ui";
+import { AbsenceList, Card, Saved, TripList, btn, btnLight, fmtDate, input, label } from "./hr-ui";
 import { EmploymentFields, PayFields } from "./employee-form";
 
 /*
@@ -29,11 +29,12 @@ export default async function HrPage({ searchParams }: { searchParams: Promise<{
   const list = all.filter((e) => showEnded || !ended(e));
   const ids = all.map((e) => e.id);
   const names = new Map(all.map((e) => [e.id, `${e.user.name}${e.user.lastName ? ` ${e.user.lastName}` : ""}`]));
-  const [weeks, pending, away, missing] = await Promise.all([
+  const [weeks, pending, away, missing, trips] = await Promise.all([
     prisma.workWeek.findMany({ where: { employeeId: { in: ids }, submittedAt: { not: null }, approvedAt: null }, orderBy: { weekStart: "asc" } }),
     prisma.absence.findMany({ where: { employeeId: { in: ids }, status: "REQUESTED" }, orderBy: { from: "asc" } }),
     prisma.absence.findMany({ where: { employeeId: { in: ids }, status: "APPROVED", to: { gte: new Date(`${today}T00:00:00Z`) }, from: { lte: new Date(`${addDays(today, 28)}T00:00:00Z`) } }, orderBy: { from: "asc" } }),
     Promise.all(all.filter((e) => registersTime(e.kind) && !ended(e)).map(async (e) => [e.id, (await missingWeeks(e, today, 4)).length] as const)),
+    prisma.trip.findMany({ where: { employeeId: { in: ids }, status: "REQUESTED" }, orderBy: { date: "asc" } }),
   ]);
   const missingOf = new Map(missing);
   const free = users.filter((u) => !u.employee);
@@ -128,6 +129,11 @@ export default async function HrPage({ searchParams }: { searchParams: Promise<{
           <AbsenceList list={pending} backTo="/arpo/hr" mode="decide" names={names} />
         </Card>
       </div>
+      {trips.length > 0 && (
+        <Card title="Kørsel til godkendelse" sub="Godkendte ture kommer med på lønsedler-grundlaget som skattefri kørepenge.">
+          <TripList list={trips} backTo="/arpo/hr" mode="decide" names={names} />
+        </Card>
+      )}
       <Card title="Væk de næste 4 uger">
         <AbsenceList list={away} backTo="/arpo/hr" mode="admin" names={names} />
       </Card>

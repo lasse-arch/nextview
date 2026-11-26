@@ -2185,6 +2185,7 @@ model Employee {
   weeks         WorkWeek[]
   absences      Absence[]
   tasks         HrTask[]
+  trips         Trip[]
   /// Notice given (opsigelse): when, and by whom ("employer" or "employee") - the last day is endDate.
   noticeGivenAt DateTime?      @db.Date
   noticeBy      String?
@@ -2192,6 +2193,9 @@ model Employee {
   anonymizedAt  DateTime?
   /// The contract has the 120-days rule (funktionærloven § 5, stk. 2) - HR then counts the sick days and warns.
   rule120       Boolean        @default(false)
+  /// For the kørselsregnskab: where trips start or end from home, and the number plates of the cars they drive (comma-separated).
+  homeAddress   String?
+  carPlates     String?
 }
 
 /// The pay from a date on - a new row for each change, so the history stays.
@@ -2324,4 +2328,31 @@ model HrTask {
   doneById   String?
 
   @@index([employeeId, phase])
+}
+
+
+/// One trip in the employee's own car for work (kørselsregnskab) - paid tax-free at Skattestyrelsen's rate
+/// (lib/hr.ts mileageRate) when approved. Date, from, to (and stops), purpose and km are what the rules require;
+/// name and CPR are in the payroll system.
+model Trip {
+  id          String        @id @default(cuid())
+  employee    Employee      @relation(fields: [employeeId], references: [id])
+  employeeId  String
+  date        DateTime      @db.Date
+  from        String
+  to          String
+  /// What it was: "Kundebesøg", "Filmning", "Opfølgning på kunde", "Møde", "Andet" - and `purpose` the details.
+  kind        String        @default("Andet")
+  purpose     String
+  /// The car's number plate.
+  plate       String?
+  /// Kilometres driven (one decimal).
+  km          Float
+  dealId      String?
+  status      AbsenceStatus @default(REQUESTED)
+  decidedById String?
+  decidedAt   DateTime?
+  createdAt   DateTime      @default(now())
+
+  @@index([employeeId, date])
 }

@@ -3,8 +3,10 @@ import { prisma } from "@/lib/db";
 import { getTeamUser } from "@/lib/auth";
 import { teamCan } from "@/lib/team-roles";
 import { KIND_NAMES, hoursText, isYmd, mondayOf, registersTime, todayDk, weekNumber } from "@/lib/hr";
-import { holidayBalance, loadWeek, missingWeeks, warningsFor } from "@/lib/hr-data";
-import { AbsenceForm, AbsenceList, Card, HolidayBox, Saved, WeekForm, Warnings, fmtDate } from "../hr/hr-ui";
+import { holidayBalance, loadWeek, missingWeeks, tripSuggestions, tripsOfYear, warningsFor } from "@/lib/hr-data";
+import { AbsenceForm, AbsenceList, Card, HolidayBox, Saved, TripList, WeekForm, Warnings, btnLight, fmtDate, input, label } from "../hr/hr-ui";
+import { TripForm } from "../hr/trip-form";
+import { saveCarDetails } from "@/lib/actions/hr";
 import { PayLine } from "../hr/pay-view";
 
 /*
@@ -38,6 +40,14 @@ export default async function MigPage({ searchParams }: { searchParams: Promise<
     time ? missingWeeks(e, today) : [],
   ]);
   const pay = e.pay[0];
+  const ym = today.slice(0, 7);
+  const [year, suggestions, myTrips] = await Promise.all([
+    time ? tripsOfYear(e.id, Number(today.slice(0, 4))) : null,
+    time ? tripSuggestions(user.id) : [],
+    time ? prisma.trip.findMany({ where: { employeeId: e.id, OR: [{ date: { gte: new Date(`${ym}-01T00:00:00Z`) } }, { status: "REQUESTED" }] }, orderBy: { date: "desc" } }) : [],
+  ]);
+  const monthKr = myTrips.filter((t) => t.status === "APPROVED" && t.date.toISOString().slice(0, 7) === ym).reduce((n, t) => n + (year?.pay.get(t.id) ?? 0), 0);
+  const plates = (e.carPlates ?? "").split(",").map((x) => x.trim()).filter(Boolean);
 
   return (
     <div className="mx-auto max-w-3xl space-y-5">
@@ -69,6 +79,39 @@ export default async function MigPage({ searchParams }: { searchParams: Promise<
           <div className="mt-5 border-t border-slate-100 pt-3">
             <AbsenceList list={absences} backTo="/arpo/mig" mode="own" />
           </div>
+        </Card>
+      )}
+      {time && (
+        <Card
+          title="Kørsel"
+          sub={`Kørepenge denne måned: ${monthKr.toLocaleString("da-DK", { minimumFractionDigits: 2 })} kr. (godkendte ture). Kørt i år: ${(year?.trips.reduce((n, t) => n + t.km, 0) ?? 0).toLocaleString("da-DK")} km.`}
+          right={
+            <a href={`/api/hr/koersel?medarbejder=${e.id}&maaned=${ym}`} className={btnLight}>
+              Kørselsregnskab (PDF)
+            </a>
+          }
+        >
+          <TripForm employeeId={e.id} backTo="/arpo/mig" suggestions={suggestions} home={e.homeAddress} plates={plates} />
+          <div className="mt-5 border-t border-slate-100 pt-3">
+            <TripList list={myTrips} backTo="/arpo/mig" mode="own" payOf={year?.pay} />
+          </div>
+          <details className="mt-4 border-t border-slate-100 pt-3">
+            <summary className="cursor-pointer text-sm font-semibold text-slate-700">Din adresse og bil</summary>
+            <form action={saveCarDetails.bind(null, e.id, "/arpo/mig")} className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <label className="col-span-2">
+                <span className={label}>Hjemmeadresse</span>
+                <input name="homeAddress" defaultValue={e.homeAddress ?? ""} maxLength={200} className={input} />
+              </label>
+              <label>
+                <span className={label}>Nummerplader</span>
+                <input name="carPlates" defaultValue={e.carPlates ?? ""} maxLength={60} placeholder="AB 12 345" className={input} />
+              </label>
+              <div className="flex items-end">
+                <button className={btnLight}>Gem</button>
+              </div>
+              <p className="col-span-2 text-xs text-slate-500 sm:col-span-4">Adressen står på dit kørselsregnskab, som Skattestyrelsen kræver. Kun du og en admin kan se den.</p>
+            </form>
+          </details>
         </Card>
       )}
       <Card title="Min ansættelse">

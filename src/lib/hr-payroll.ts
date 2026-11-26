@@ -1,7 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/db";
 import { ABSENCE_NAMES, KIND_NAMES, PAY_NAMES, absenceDays, addDays, normMinutes, registersTime, todayDk, type Ymd } from "@/lib/hr";
-import { spansOf, termsOf } from "@/lib/hr-data";
+import { spansOf, termsOf, tripsOfYear } from "@/lib/hr-data";
 
 /*
  * Lønsedler-grundlag: for a month, what the payroll system needs per person - the pay terms that apply, the
@@ -26,6 +26,9 @@ export type PayrollRow = {
   missingDays: number;
   absence: Record<string, number>;
   commissionKr: number;
+  /** Approved trips in the month: km and tax-free kørepenge (Skattestyrelsen's rates). */
+  tripKm: number;
+  tripKr: number;
   commissionHow: "løn" | "faktura" | "";
   note: string;
 };
@@ -58,6 +61,16 @@ export async function payrollMonth(ym: string): Promise<PayrollRow[]> {
   });
   const commissionOf = new Map(commissions.map((c) => [c.sellerId, c._sum.amount ?? 0]));
 
+  const year = Number(ym.slice(0, 4));
+  const tripsOf = new Map(
+    await Promise.all(
+      employees.map(async (e) => {
+        const { trips, pay } = await tripsOfYear(e.id, year);
+        const m = trips.filter((t) => t.date.toISOString().slice(0, 7) === ym);
+        return [e.id, { km: Math.round(m.reduce((n, t) => n + t.km, 0) * 10) / 10, kr: Math.round(m.reduce((n, t) => n + (pay.get(t.id) ?? 0), 0) * 100) / 100 }] as const;
+      })
+    )
+  );
   return employees.map((e) => {
     const t = termsOf(e);
     const p = e.pay[0];
@@ -101,6 +114,8 @@ export async function payrollMonth(ym: string): Promise<PayrollRow[]> {
       missingDays: missing,
       absence,
       commissionKr: commission,
+      tripKm: tripsOf.get(e.id)?.km ?? 0,
+      tripKr: tripsOf.get(e.id)?.kr ?? 0,
       commissionHow: commission ? (freelance ? "faktura" : "løn") : "",
       note: notes.join(". "),
     };
@@ -118,9 +133,9 @@ const num = (n: number | null) => (n == null ? "" : String(n).replace(".", ","))
 /** Semicolon-separated (Danish Excel), with a BOM so æøå are read right. */
 export function payrollCsv(rows: PayrollRow[]): string {
   const kinds = Object.keys(ABSENCE_NAMES) as (keyof typeof ABSENCE_NAMES)[];
-  const head = ["Navn", "Nr. i lønsystemet", "Ansat som", "Lønmodel", "Månedsløn (kr.)", "Timeløn (kr.)", "Provision %", "Pension (egen + firma)", "Andel af måneden", "Normtimer", "Registrerede timer", "Dage uden registrering", ...kinds.map((k) => `${ABSENCE_NAMES[k]} (dage)`), "Provision (kr.)", "Provision udbetales via", "Bemærkning"];
+  const head = ["Navn", "Nr. i lønsystemet", "Ansat som", "Lønmodel", "Månedsløn (kr.)", "Timeløn (kr.)", "Provision %", "Pension (egen + firma)", "Andel af måneden", "Normtimer", "Registrerede timer", "Dage uden registrering", ...kinds.map((k) => `${ABSENCE_NAMES[k]} (dage)`), "Provision (kr.)", "Provision udbetales via", "Kørsel (km)", "Kørepenge, skattefri (kr.)", "Bemærkning"];
   const lines = rows.map((r) =>
-    [r.name, r.payrollNumber, r.kind, r.model, num(r.monthlyKr), num(r.hourlyKr), num(r.commissionPct), r.pension, num(r.employedShare), num(r.normHours), num(r.workedHours), r.missingDays, ...kinds.map((k) => num(r.absence[k] ?? 0)), num(r.commissionKr), r.commissionHow, r.note].map(csvCell).join(";")
+    [r.name, r.payrollNumber, r.kind, r.model, num(r.monthlyKr), num(r.hourlyKr), num(r.commissionPct), r.pension, num(r.employedShare), num(r.normHours), num(r.workedHours), r.missingDays, ...kinds.map((k) => num(r.absence[k] ?? 0)), num(r.commissionKr), r.commissionHow, num(r.tripKm), num(r.tripKr), r.note].map(csvCell).join(";")
   );
   return `﻿${[head.map(csvCell).join(";"), ...lines].join("\r\n")}\r\n`;
 }

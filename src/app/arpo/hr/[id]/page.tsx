@@ -5,9 +5,9 @@ import { getTeamUser } from "@/lib/auth";
 import { isHrAdmin, maySeePay, reachOf } from "@/lib/hr-access";
 import { addHrTask, addPayTerms, giveNotice, reopenWeek, toggleHrTask, updateEmployee, withdrawNotice } from "@/lib/actions/hr";
 import { KIND_NAMES, addDays, hoursText, isYmd, mondayOf, noticeEnd, registersTime, sickDays12Months, todayDk } from "@/lib/hr";
-import { holidayBalance, loadWeek, spansOf, warningsFor } from "@/lib/hr-data";
+import { holidayBalance, loadWeek, spansOf, tripsOfYear, warningsFor } from "@/lib/hr-data";
 import { TEAM_ROLE_NAMES, rolesOf } from "@/lib/team-roles";
-import { AbsenceForm, AbsenceList, Card, HolidayBox, Saved, WeekForm, Warnings, btn, btnLight, fmtDate, input, label } from "../hr-ui";
+import { AbsenceForm, AbsenceList, Card, HolidayBox, Saved, TripList, WeekForm, Warnings, btn, btnLight, fmtDate, input, label } from "../hr-ui";
 import { EmploymentFields, PayFields } from "../employee-form";
 import { PayLine } from "../pay-view";
 
@@ -104,6 +104,24 @@ export default async function EmployeePage({ params, searchParams }: { params: P
           <div className="mt-5 border-t border-slate-100 pt-3">
             <AbsenceList list={e.absences} backTo={here} mode="admin" />
           </div>
+        </Card>
+      )}
+
+      {time && (
+        <Card
+          title="Kørsel"
+          sub={`${e.homeAddress ? `Adresse: ${e.homeAddress}. ` : "Ingen hjemmeadresse endnu. "}${e.carPlates ? `Bil: ${e.carPlates}.` : ""}`}
+          right={
+            <a href={`/api/hr/koersel?medarbejder=${e.id}&maaned=${today.slice(0, 7)}`} className={btnLight}>
+              Kørselsregnskab (PDF)
+            </a>
+          }
+        >
+          {await (async () => {
+            const y = await tripsOfYear(e.id, Number(today.slice(0, 4)));
+            const list = await prisma.trip.findMany({ where: { employeeId: e.id, date: { gte: new Date(`${addDays(today, -62)}T00:00:00Z`) } }, orderBy: { date: "desc" } });
+            return <TripList list={list} backTo={here} mode="admin" payOf={y.pay} />;
+          })()}
         </Card>
       )}
 

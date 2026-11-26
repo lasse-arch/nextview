@@ -95,3 +95,12 @@ test("the 120-days rule counts calendar days of sickness in the last 12 months",
   assert.equal(sickDays12Months([sick("2026-11-20", "2026-12-31")], "2026-11-26"), 7); // not days still to come
   assert.equal(sickDays12Months([sick("2026-11-02", "2026-11-15", "CHILD_SICK")], "2026-11-26"), 0);
 });
+
+test("kørepenge: 3,94 kr. per km up to 20,000 km in 2026, 2,28 above", async () => {
+  const { mileagePay, mileageRate } = await import("./hr");
+  assert.equal(mileagePay(2026, 0, 100), 394);
+  assert.equal(mileagePay(2026, 19_950, 100), 50 * 3.94 + 50 * 2.28);
+  assert.equal(mileagePay(2026, 25_000, 10), 22.8);
+  assert.equal(mileageRate(2027).upTo20000, 4.13);
+  assert.equal(mileageRate(2030).upTo20000, 4.13); // the latest known until a new year is added
+});

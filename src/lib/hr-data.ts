@@ -98,3 +98,44 @@ export async function missingWeeks(e: Employee, today: Ymd = todayDk(), back = 8
   }
   return out;
 }
+
+export type TripSuggestion = { key: string; date: string; label: string; address: string; kind: string; dealId: string };
+
+/** The viewer's own meetings and filmings of the last 45 days - to pick a trip from (date, address and purpose filled in). */
+export async function tripSuggestions(userId: string): Promise<TripSuggestion[]> {
+  const since = new Date(Date.now() - 45 * 86_400_000);
+  const now = new Date();
+  const sel = { id: true, companyName: true, displayName: true, address: true } as const;
+  const [meetings, filmings, refilms] = await Promise.all([
+    prisma.deal.findMany({ where: { ownerId: userId, meetingDate: { gte: since, lte: now }, meetingOnline: false, address: { not: null } }, select: { ...sel, meetingDate: true }, orderBy: { meetingDate: "desc" }, take: 40 }),
+    prisma.deal.findMany({ where: { filmingAt: { gte: since, lte: now }, filmingCrewIds: { contains: userId }, address: { not: null } }, select: { ...sel, filmingAt: true, filmingCrewIds: true }, orderBy: { filmingAt: "desc" }, take: 40 }),
+    prisma.refilming.findMany({ where: { at: { gte: since, lte: now }, crewIds: { contains: userId }, cancelledAt: null }, include: { deal: { select: sel } }, orderBy: { at: "desc" }, take: 40 }),
+  ]);
+  const name = (d: { companyName: string; displayName: string | null }) => d.displayName ?? d.companyName;
+  const day = (d: Date) => d.toISOString().slice(0, 10);
+  const out: TripSuggestion[] = [
+    ...meetings.map((d) => ({ key: `m${d.id}`, date: day(d.meetingDate!), label: `Møde hos ${name(d)}`, address: d.address!, kind: "Kundebesøg", dealId: d.id })),
+    ...filmings.filter((d) => d.filmingCrewIds?.split(",").includes(userId)).map((d) => ({ key: `f${d.id}`, date: day(d.filmingAt!), label: `Filmning hos ${name(d)}`, address: d.address!, kind: "Filmning", dealId: d.id })),
+    ...refilms.filter((r) => r.crewIds.split(",").includes(userId) && r.deal.address).map((r) => ({ key: `r${r.id}`, date: day(r.at), label: `Genoptagelse hos ${name(r.deal)}`, address: r.deal.address!, kind: "Genoptagelse", dealId: r.deal.id })),
+  ];
+  return out.sort((a, b) => b.date.localeCompare(a.date));
+}
+
+/**
+ * Kørepenge per trip: the approved trips of a calendar year in date order - the first 20,000 km at the higher rate.
+ * Returns the amount per trip id, and the km driven that year before `beforeDay` (for a month's account).
+ */
+export async function tripsOfYear(employeeId: string, year: number) {
+  const trips = await prisma.trip.findMany({
+    where: { employeeId, status: "APPROVED", date: { gte: new Date(`${year}-01-01T00:00:00Z`), lte: new Date(`${year}-12-31T00:00:00Z`) } },
+    orderBy: [{ date: "asc" }, { createdAt: "asc" }],
+  });
+  const { mileagePay } = await import("@/lib/hr");
+  const pay = new Map<string, number>();
+  let km = 0;
+  for (const t of trips) {
+    pay.set(t.id, mileagePay(year, km, t.km));
+    km += t.km;
+  }
+  return { trips, pay };
+}

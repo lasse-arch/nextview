@@ -8,7 +8,7 @@ import { prisma } from "@/lib/db";
 import { hashPassword } from "@/lib/password";
 import { TEAM_ROLES } from "@/lib/team-roles";
 import { employeeFor, hrViewer, isHrAdmin, requireHrAdmin } from "@/lib/hr-access";
-import { ABSENCE_NAMES, KIND_NAMES, PAY_NAMES, START_TASKS, STOP_TASKS, addDays, isYmd, mondayOf, noticeEnd, normMinutes, parseHours, registersTime, todayDk, weekOf } from "@/lib/hr";
+import { ABSENCE_NAMES, KIND_NAMES, PAY_NAMES, START_TASKS, STOP_TASKS, TRIP_KINDS, cleanPlate, addDays, isYmd, mondayOf, noticeEnd, normMinutes, parseHours, registersTime, todayDk, weekOf } from "@/lib/hr";
 
 /*
  * HR's actions. Every one asks who is asking (lib/hr-access.ts) and only ever trusts the ids and values it checks
@@ -335,4 +335,75 @@ export async function addHrTask(employeeId: string, phase: string, f: FormData) 
   if (!e) throw new Error("Medarbejderen findes ikke.");
   await prisma.hrTask.create({ data: { employeeId: e.id, phase: phase === "stop" ? "stop" : "start", label, sort: 100 } });
   revalidatePath(`/arpo/hr/${e.id}`);
+}
+
+/**
+ * Kørsel: a trip in one's own car for work - what Skattestyrelsen requires for tax-free kørepenge: the date, from
+ * where to where (and stops), the purpose and the km. The employee registers their own; an admin approves it.
+ */
+export async function addTrip(employeeId: string, back_: string, f: FormData) {
+  const viewer = await hrViewer();
+  const { e, reach } = await employeeFor(viewer, employeeId);
+  if (!registersTime(e.kind)) throw new Error("Freelancere får ikke kørepenge gennem lønnen - de fakturerer.");
+  const date = day(f, "date");
+  const from = str(f, "from", 200);
+  const to = str(f, "to", 300);
+  const purpose = str(f, "purpose", 300);
+  const km = Number(str(f, "km", 10).replace(",", "."));
+  const kind = oneOf(str(f, "kind"), TRIP_KINDS, "Andet");
+  const plate = cleanPlate(str(f, "plate", 20)) || null;
+  const dealId = str(f, "dealId", 40);
+  const deal = dealId ? await prisma.deal.findUnique({ where: { id: dealId }, select: { id: true } }) : null;
+  if (!date || date > todayDk()) throw new Error("Vælg datoen for turen (ikke en dag, der ikke er kommet).");
+  if (!from || !to) throw new Error("Skriv hvorfra og hvortil (og eventuelle stop undervejs).");
+  if (purpose.length < 3) throw new Error("Skriv formålet med turen, fx kundens navn og hvad du skulle.");
+  if (!Number.isFinite(km) || km <= 0 || km > 2000) throw new Error("Skriv antal km (fx 42,5).");
+  await prisma.trip.create({
+    data: {
+      employeeId: e.id,
+      date: asDate(date),
+      from,
+      to,
+      purpose,
+      kind,
+      plate,
+      dealId: deal?.id ?? null,
+      km: Math.round(km * 10) / 10,
+      ...(reach === "admin" ? { status: "APPROVED", decidedById: viewer.id, decidedAt: new Date() } : {}),
+    },
+  });
+  revalidatePath("/arpo/mig");
+  back(back_.startsWith("/arpo/") ? back_ : "/arpo/mig", reach === "admin" ? "Turen er registreret" : "Turen er sendt til godkendelse");
+}
+
+export async function decideTrip(tripId: string, approve: boolean, back_: string) {
+  const viewer = await hrViewer();
+  const t = await prisma.trip.findUnique({ where: { id: String(tripId) } });
+  if (!t) throw new Error("Turen findes ikke.");
+  await employeeFor(viewer, t.employeeId, isHrAdmin(viewer) ? "see" : "approve");
+  if (t.status !== "REQUESTED") throw new Error("Turen er allerede afgjort.");
+  await prisma.trip.update({ where: { id: t.id }, data: { status: approve ? "APPROVED" : "REJECTED", decidedById: viewer.id, decidedAt: new Date() } });
+  revalidatePath("/arpo/hr");
+  back(back_.startsWith("/arpo/") ? back_ : "/arpo/hr", approve ? "Godkendt" : "Afvist");
+}
+
+/** Takes a trip back before it's approved (an admin: any). */
+export async function cancelTrip(tripId: string, back_: string) {
+  const viewer = await hrViewer();
+  const t = await prisma.trip.findUnique({ where: { id: String(tripId) } });
+  if (!t) throw new Error("Turen findes ikke.");
+  const { reach } = await employeeFor(viewer, t.employeeId);
+  if (reach !== "admin" && t.status !== "REQUESTED") throw new Error("Turen er godkendt - bed en admin om at rette den.");
+  await prisma.trip.update({ where: { id: t.id }, data: { status: "CANCELLED", decidedById: viewer.id, decidedAt: new Date() } });
+  back(back_.startsWith("/arpo/") ? back_ : "/arpo/mig", "Turen er annulleret");
+}
+
+/** The employee's own home address and number plates, for the kørselsregnskab (an admin may set them too). */
+export async function saveCarDetails(employeeId: string, back_: string, f: FormData) {
+  const viewer = await hrViewer();
+  const { e, reach } = await employeeFor(viewer, employeeId);
+  if (reach === "leader") throw new Error("Kun medarbejderen selv eller en admin kan rette det.");
+  const plates = [...new Set(String(f.get("carPlates") ?? "").split(/[,;\n]+/).map(cleanPlate).filter(Boolean))].slice(0, 5);
+  await prisma.employee.update({ where: { id: e.id }, data: { homeAddress: str(f, "homeAddress", 200) || null, carPlates: plates.join(", ") || null } });
+  back(back_.startsWith("/arpo/") ? back_ : "/arpo/mig", "Gemt");
 }

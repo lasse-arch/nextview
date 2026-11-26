@@ -18,7 +18,7 @@ function html(ym: string, rows: PayrollRow[]) {
   const body = rows
     .map((r) => {
       const absence = kinds.filter((k) => r.absence[k]).map((k) => `${ABSENCE_NAMES[k]} ${kr(r.absence[k])} d`).join(", ") || "-";
-      return `<tr><td><b>${esc(r.name)}</b><br><span>${esc(r.kind)}${r.payrollNumber ? `, nr. ${esc(r.payrollNumber)}` : ""}</span></td><td>${esc(r.model)}${r.monthlyKr != null ? `<br>${kr(r.monthlyKr)} kr./md.` : ""}${r.hourlyKr != null ? `<br>${kr(r.hourlyKr)} kr./t` : ""}${r.pension ? `<br><span>Pension ${esc(r.pension)}</span>` : ""}</td><td class="n">${r.workedHours == null ? "-" : kr(r.workedHours)}<br><span>norm ${kr(r.normHours)}</span></td><td>${esc(absence)}</td><td class="n">${r.commissionKr ? `${kr(r.commissionKr)} kr.<br><span>via ${esc(r.commissionHow)}</span>` : "-"}</td><td>${esc(r.note)}</td></tr>`;
+      return `<tr><td><b>${esc(r.name)}</b><br><span>${esc(r.kind)}${r.payrollNumber ? `, nr. ${esc(r.payrollNumber)}` : ""}</span></td><td>${esc(r.model)}${r.monthlyKr != null ? `<br>${kr(r.monthlyKr)} kr./md.` : ""}${r.hourlyKr != null ? `<br>${kr(r.hourlyKr)} kr./t` : ""}${r.pension ? `<br><span>Pension ${esc(r.pension)}</span>` : ""}</td><td class="n">${r.workedHours == null ? "-" : kr(r.workedHours)}<br><span>norm ${kr(r.normHours)}</span></td><td>${esc(absence)}</td><td class="n">${r.commissionKr ? `${kr(r.commissionKr)} kr.<br><span>via ${esc(r.commissionHow)}</span>` : "-"}</td><td class="n">${r.tripKr ? `${kr(r.tripKr)} kr.<br><span>${kr(r.tripKm)} km</span>` : "-"}</td><td>${esc(r.note)}</td></tr>`;
     })
     .join("");
   return `<!doctype html><html lang="da"><head><meta charset="utf-8"><style>
@@ -27,7 +27,7 @@ function html(ym: string, rows: PayrollRow[]) {
   table{width:100%;border-collapse:collapse}th{text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:.04em;color:#555;border-bottom:1px solid #ccc;padding:6px}
   td{border-bottom:1px solid #eee;padding:7px 6px;vertical-align:top}td.n{text-align:right;white-space:nowrap}span{color:#666}
   </style></head><body><h1>Lønsedler-grundlag, ${esc(label)}</h1><p class="sub">Nextview360 ApS. Fra Arpo HR ${new Date().toLocaleDateString("da-DK")}. Skat, AM-bidrag, ATP og feriepenge beregnes i lønsystemet.</p>
-  <table><thead><tr><th>Medarbejder</th><th>Løn</th><th style="text-align:right">Timer</th><th>Fravær</th><th style="text-align:right">Provision</th><th>Bemærkning</th></tr></thead><tbody>${body}</tbody></table></body></html>`;
+  <table><thead><tr><th>Medarbejder</th><th>Løn</th><th style="text-align:right">Timer</th><th>Fravær</th><th style="text-align:right">Provision</th><th style="text-align:right">Kørepenge</th><th>Bemærkning</th></tr></thead><tbody>${body}</tbody></table></body></html>`;
 }
 
 export async function GET(request: Request) {

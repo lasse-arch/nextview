@@ -63,6 +63,12 @@ export async function getUnreadNewsCount(userId: string, newsReadAt: Date | null
 const DEFAULT_POSTS: { title: string; body: string; minutesAgo: number; screenshotUrl: string }[] = [
   {
     minutesAgo: 0,
+    title: "Kørepenge og kørselsregnskab",
+    body: "Under Mig → Kørsel registrerer du kørsel i egen bil for arbejdet. Vælg et af dine møder eller filmninger, så udfyldes dato, adresse og formål. Vælg om du kører fra kontoret eller hjemmefra, hvad turen var (kundebesøg, filmning, opfølgning ...), og din nummerplade.\n\nNår en admin har godkendt turen, kommer kørepengene med lønnen efter Skattestyrelsens satser (3,94 kr. pr. km i 2026 op til 20.000 km om året, 2,28 kr. derover). Kørselsregnskabet for måneden kan hentes som PDF.\n\nDeals har også fået en ny fase, Booket filmning dag, efter Kontrakt underskrevet. Book filming flytter dealen dertil af sig selv.",
+    screenshotUrl: "/news/koersel.png",
+  },
+  {
+    minutesAgo: 0,
     title: "HR: lønsedler-grundlag, opsigelse og tjeklister",
     body: "Under HR → Lønsedler-grundlag står hver måned det, lønsystemet skal bruge pr. medarbejder: lønmodel og løn, registrerede timer mod normtiden, fravær pr. type og månedens provision. Hent det som CSV til import eller som PDF. Mangler nogen at registrere timer, står det som en bemærkning, før lønnen køres.\n\nPå medarbejderkortet registreres en opsigelse: Arpo regner sidste arbejdsdag ud efter funktionærloven (også i prøvetiden), og adgangen til Arpo lukker af sig selv dagen efter. Der er tjeklister for, når nogen starter og stopper.\n\nHR-oplysninger slettes automatisk 5 år efter, at ansættelsen er ophørt, og registreret arbejdstid efter de 5 år, arbejdstidsloven kræver.",
     screenshotUrl: "/news/hr-loen.png",
