@@ -265,6 +265,43 @@ export function PhotoPicker({ image, onChange, preview, slug, photoKey }: { imag
   );
 }
 
+/**
+ * "Tag billeder af stoppene": the preview flies to up to 6 of the guide's stops and photographs each; the photos are
+ * saved with the tour and handed back (for the guide's welcome tile, which cross-fades between them).
+ */
+function GuideShotsButton({ guide, preview, slug, onDone, label = "Tag billeder af rundvisningens stop" }: { guide: string | null; preview: PreviewApi; slug: string; onDone: (urls: string[]) => void; label?: string }) {
+  const [note, setNote] = useState<{ text: string; error?: boolean } | null>(null);
+  const [busy, setBusy] = useState(false);
+  return (
+    <div className="space-y-1">
+      <button
+        type="button"
+        disabled={busy}
+        className={`${linkButton} flex w-full items-center justify-center gap-1.5`}
+        onClick={async () => {
+          setBusy(true);
+          setNote({ text: "Går rundt til stoppene …" });
+          try {
+            const r = await preview.guidePictures((text) => setNote({ text }), guide);
+            if (r.error || !r.images?.length) throw new Error(r.error ?? "Ingen billeder.");
+            const key = `guide-${guide ?? "main"}-${Date.now().toString(36)}`;
+            const urls = await Promise.all(r.images.map((img, i) => savePhoto(slug, `${key}-${i + 1}`, img)));
+            onDone(urls);
+            setNote({ text: `${urls.length} billeder sat på flisen - den skifter mellem dem.` });
+          } catch (err) {
+            setNote({ text: err instanceof Error ? err.message : String(err), error: true });
+          }
+          setBusy(false);
+        }}
+      >
+        <Icon d={CAMERA} className="h-4 w-4" />
+        {busy ? "Tager billeder …" : label}
+      </button>
+      {note && <p className={`px-1 text-[12px] ${note.error ? "text-[#ff3b30]" : "text-[#8e8e93]"}`}>{note.text}</p>}
+    </div>
+  );
+}
+
 type CardButton = { label: string; href: string; primary?: boolean } | { label: string; room: string };
 
 /** Buttons on a card: to a room (by its menu name) or a page. */
@@ -577,6 +614,14 @@ export function StartEditor({ config, edit, slug, preview }: Props) {
                         </option>
                       ))}
                     </select>
+                  )}
+                  {"guide" in t.go && (
+                    <GuideShotsButton
+                      guide={t.go.guide === true ? null : t.go.guide}
+                      preview={preview}
+                      slug={slug}
+                      onDone={(list) => set({ ...t, image: list[0], images: list.length > 1 ? list.slice(1) : undefined })}
+                    />
                   )}
                   {"room" in t.go && !t.place && <PlacePicker href={t.go.room} name={t.title} preview={preview} onChange={(href) => set({ ...t, go: { room: href, name: t.title } })} />}
                   {"href" in t.go && <LinkInput className="bg-white" value={t.go.href} onChange={(href) => set({ ...t, go: { href } })} />}

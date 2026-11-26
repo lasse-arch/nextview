@@ -2134,6 +2134,31 @@ function TourExperience({
     return list.length;
   }
 
+  /**
+   * "Tag billeder af stoppene" (editor only): flies to up to 6 of a guide's stops in the 3D tour - spread over the whole
+   * round - and returns a landscape photo of each (JPEG data URLs) for the guide's welcome tile. Stops on the drone scene
+   * or a map point are skipped; they have their own photos.
+   */
+  async function captureGuide(progress: (text: string) => void, guideId: string | null): Promise<string[]> {
+    if (!sdkRef.current) throw new Error("Touren er ikke klar.");
+    const all = guideStops(T, guideId).filter((s) => isPlaceHref(s.href));
+    if (!all.length) throw new Error("Rundvisningen har ingen stop inde i touren at fotografere.");
+    const pick = all.length <= 6 ? all : Array.from({ length: 6 }, (_, i) => all[Math.round((i * (all.length - 1)) / 5)]);
+    const sdk = await sdkRef.current;
+    setPhase("tour");
+    const out: string[] = [];
+    for (const [i, s] of pick.entries()) {
+      progress(`${i + 1}/${pick.length}: ${s.title}`);
+      if (!(await flyTo(s.href, "instant"))) continue;
+      await new Promise((res) => setTimeout(res, 2500)); // let the room's sharp textures load
+      const shot = await sdk.Renderer.takeScreenShot({ width: 1600, height: 1000 }, { mattertags: false, sweeps: false, views: false, measurements: false });
+      out.push(await storyJpeg(shot, 1200, 750));
+    }
+    if (!out.length) throw new Error("Kunne ikke nå nogen af stoppene.");
+    progress(`Gemmer ${out.length} billeder …`);
+    return out;
+  }
+
   /** A place from the cover or the dock: into the tour, right there. */
   async function placeGo(p: TourPlace, from: string) {
     if (!tourReady() && phase !== "drone") return holdUntilReady(() => void placeGo(p, from));
@@ -2973,16 +2998,16 @@ function TourExperience({
     setSelected(null);
     if (phase === "drone" && !entering) enterTour(T.start, "editor", "Start");
   }
-  const bridge = useRef({ sdk, room, menuGo, peek, phase, captureStories });
+  const bridge = useRef({ sdk, room, menuGo, peek, phase, captureStories, captureGuide });
   useEffect(() => {
-    bridge.current = { sdk, room, menuGo, peek, phase, captureStories };
+    bridge.current = { sdk, room, menuGo, peek, phase, captureStories, captureGuide };
   });
   useEffect(() => {
     if (window.parent === window) return;
     const reply = (msg: object) => window.parent.postMessage(msg, location.origin);
     async function onMessage(e: MessageEvent) {
       if (e.origin !== location.origin || e.source !== window.parent || !e.data?.type) return;
-      const { sdk, room, menuGo, captureStories: capture } = bridge.current;
+      const { sdk, room, menuGo, captureStories: capture, captureGuide } = bridge.current;
       if (e.data.type === "tour-go") {
         // The editor shows a place (Vis start, a scan point, a menu item): straight there - the front page / welcome mustn't cover it.
         setCover(false);
@@ -3013,6 +3038,19 @@ function TourExperience({
           reply({ type: "tour-stories", id: e.data.id, done: true, taken });
         } catch (err) {
           reply({ type: "tour-stories", id: e.data.id, error: err instanceof Error ? err.message : "Kunne ikke tage billederne." });
+        }
+        return;
+      }
+      if (e.data.type === "tour-guide-shots") {
+        // "Tag billeder af stoppene": photos of a guide's stops for its welcome tile, with progress to the editor.
+        if (!sdk) return reply({ type: "tour-guide-shots", id: e.data.id, error: "Touren er ikke klar endnu - vent et øjeblik." });
+        setCover(false);
+        setWelcome(false);
+        try {
+          const images = await captureGuide((text) => reply({ type: "tour-guide-shots-progress", id: e.data.id, text }), typeof e.data.guide === "string" ? e.data.guide : null);
+          reply({ type: "tour-guide-shots", id: e.data.id, images });
+        } catch (err) {
+          reply({ type: "tour-guide-shots", id: e.data.id, error: err instanceof Error ? err.message : "Kunne ikke tage billederne." });
         }
         return;
       }

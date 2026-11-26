@@ -368,4 +368,10 @@ bygninger eller et stort område (skoler, campingpladser, ferieparker).
   fliser med foto; ingen foto på accent-flisen.
 - Resten skifter mellem dark og light, så naboer ikke har samme farve.
 - Knappen "Sæt fliserne flot med nextviewAI" under Fliser gør det af sig selv.
+- Flisen til "Vis mig rundt" (eller en anden rundvisning) kan vise rundvisningens
+  egne stop: under flisen (Start → Fliser → flisen) er knappen "Tag billeder af
+  rundvisningens stop" - forhåndsvisningen går selv til op til 6 af stoppene,
+  tager et billede af hvert, og flisen toner over mellem dem. Beder brugeren om
+  det i chatten, så sig, at de skal trykke på den knap (du kan ikke selv tage
+  billeder i touren).
 

@@ -487,6 +487,7 @@ export function TourEditor({
       view: () => ask<{ href?: string; room?: string | null; position?: { x: number; y: number; z: number } }>("tour-view"),
       shot: () => ask<{ image?: string }>("tour-shot", 15000),
       storyPictures: (progress, which = "missing") => ask<{ done?: boolean; taken?: number }>("tour-stories", 10 * 60_000, progress, { which }),
+      guidePictures: (progress, guide) => ask<{ images?: string[] }>("tour-guide-shots", 5 * 60_000, progress, { guide }),
       pick: () => ask<{ position?: { x: number; y: number; z: number }; normal?: { x: number; y: number; z: number }; ss?: number | null; room?: string | null }>("tour-pick", 120000),
       showMenu: () => frame.current?.contentWindow?.postMessage({ type: "tour-show-menu" }, location.origin),
       go: (name, href) => frame.current?.contentWindow?.postMessage({ type: "tour-go", name, href }, location.origin),
