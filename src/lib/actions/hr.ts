@@ -148,9 +148,11 @@ export async function createEmployee(f: FormData) {
       tasks: { create: (terms.kind === "FREELANCE" ? START_TASKS.filter((t) => !/lønsystemet|Pension/.test(t)) : START_TASKS).map((label, sort) => ({ phase: "start", label, sort })) },
     },
   });
-  // "Garantiløn" in the wizard: from the first day of work.
+  // "Garantiløn" in the wizard: from the chosen day (never before the first day of work), else the first day.
   const guarantee = kronerToOre(str(f, "guarantee", 20));
-  if (guarantee && guarantee > 0 && guarantee <= 100_000_000) await prisma.contractTerm.create({ data: { employeeId: e.id, kind: "GUARANTEE", amountOre: guarantee, from: terms.startDate, createdById: admin.id } });
+  const guaranteeFrom = day(f, "guaranteeFrom");
+  if (guarantee && guarantee > 0 && guarantee <= 100_000_000)
+    await prisma.contractTerm.create({ data: { employeeId: e.id, kind: "GUARANTEE", amountOre: guarantee, from: guaranteeFrom && asDate(guaranteeFrom) > terms.startDate ? asDate(guaranteeFrom) : terms.startDate, createdById: admin.id } });
   if (signed) await storeSignedContract(e.id, signed, admin.id);
   revalidatePath("/arpo/hr");
   back(`/arpo/hr/${e.id}`, signed ? "Medarbejderen er oprettet, og kontrakten er gemt" : newPerson ? "Medarbejderen er oprettet - næste skridt er kontrakten" : "Medarbejderen er oprettet");
