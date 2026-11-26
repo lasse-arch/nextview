@@ -13,7 +13,7 @@ function logoDataUri(): string {
 const COMPANY = {
   name: "Nextview360 ApS",
   cvr: "46452445",
-  address: "Vesterbro 18, st., 9000 Aalborg",
+  address: "Danmarksgade 23, st., 9000 Aalborg",
 };
 
 type Labels = {
