@@ -6,13 +6,14 @@ import { createSign, randomInt } from "node:crypto";
  * created, and suspended the day after their last day of work - so nobody has to go into Google Admin.
  *
  * Set up once (see docs/google-workspace.md), only in Vercel env - never in code:
- *  - GOOGLE_WORKSPACE_KEY: the service account's JSON key (as is, or base64).
- *  - GOOGLE_WORKSPACE_ADMIN: the Workspace user Arpo acts as - its own admin user with a custom role that may only
- *    manage users in the employees' organisational unit (not a super admin), so the key can never touch Lasse or
- *    another admin.
- *  - GOOGLE_WORKSPACE_OU (optional): that unit, default "/Medarbejdere".
- * Only the scope admin.directory.user is asked for. On top of Google's own limits, Arpo only creates accounts on our
- * domain, inside that unit, and only suspends accounts it finds there that aren't admins.
+ *  - GOOGLE_WORKSPACE_KEY: the service account's JSON key (as is, or base64). The service account itself holds a
+ *    custom admin role in Google that may only manage users (not a super admin) - no user to act as, no domain-wide
+ *    delegation. Google never lets such a role change a super admin, so the key can't touch Lasse.
+ *  - GOOGLE_WORKSPACE_OU (optional): an organisational unit to keep Arpo inside - new accounts go there, and only
+ *    accounts in it are managed. Without it, new accounts go in the top unit and any non-admin can be managed.
+ *  - GOOGLE_WORKSPACE_ADMIN (optional, not used by us): a user to act as through domain-wide delegation instead.
+ * Only the scope admin.directory.user is asked for. On top of Google's own limits, Arpo only touches accounts on our
+ * domain that aren't admins in Google.
  */
 
 export const WORKSPACE_DOMAIN = "nextview360.dk";
@@ -23,7 +24,7 @@ type Key = { client_email: string; private_key: string };
 
 function key(): Key | null {
   const raw = process.env.GOOGLE_WORKSPACE_KEY?.trim();
-  if (!raw || !process.env.GOOGLE_WORKSPACE_ADMIN) return null;
+  if (!raw) return null;
   try {
     const json = JSON.parse(raw.startsWith("{") ? raw : Buffer.from(raw, "base64").toString("utf8")) as Partial<Key>;
     return json.client_email && json.private_key ? { client_email: json.client_email, private_key: json.private_key } : null;
@@ -35,20 +36,22 @@ function key(): Key | null {
 /** Is Arpo set up to make Google accounts? */
 export const workspaceReady = () => key() != null;
 
-export const workspaceUnit = () => {
-  const ou = (process.env.GOOGLE_WORKSPACE_OU || "/Medarbejdere").trim();
+/** The unit Arpo is kept inside, or null (the whole domain, admins aside). */
+export const workspaceUnit = (): string | null => {
+  const ou = process.env.GOOGLE_WORKSPACE_OU?.trim();
+  if (!ou || ou === "/") return null;
   return ou.startsWith("/") ? ou : `/${ou}`;
 };
 
 const b64url = (b: Buffer | string) => Buffer.from(b).toString("base64url");
 
-/** An access token for the admin user (service account with domain-wide delegation) - fetched per call, never kept. */
+/** An access token for the service account (its own admin role) - fetched per call, never kept. */
 async function token(): Promise<string> {
   const k = key();
   if (!k) throw new Error("Google Workspace er ikke sat op i Arpo endnu.");
   const now = Math.floor(Date.now() / 1000);
   const head = b64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
-  const claims = b64url(JSON.stringify({ iss: k.client_email, sub: process.env.GOOGLE_WORKSPACE_ADMIN, scope: SCOPE, aud: "https://oauth2.googleapis.com/token", iat: now, exp: now + 600 }));
+  const claims = b64url(JSON.stringify({ iss: k.client_email, ...(process.env.GOOGLE_WORKSPACE_ADMIN ? { sub: process.env.GOOGLE_WORKSPACE_ADMIN } : {}), scope: SCOPE, aud: "https://oauth2.googleapis.com/token", iat: now, exp: now + 600 }));
   const sig = createSign("RSA-SHA256").update(`${head}.${claims}`).sign(k.private_key).toString("base64url");
   const res = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
@@ -81,7 +84,7 @@ function firstPassword(): string {
 export const onOurDomain = (email: string) => email.toLowerCase().endsWith(`@${WORKSPACE_DOMAIN}`);
 
 /**
- * Creates the account in the employees' unit. Returns the first password - it goes only to the employee's own
+ * Creates the account (in GOOGLE_WORKSPACE_OU when set). Returns the first password - it goes only to the employee's own
  * e-mail, and is never stored or logged.
  */
 export async function createWorkspaceUser(u: { email: string; givenName: string; familyName: string }): Promise<{ password: string }> {
@@ -93,10 +96,10 @@ export async function createWorkspaceUser(u: { email: string; givenName: string;
     name: { givenName: u.givenName.slice(0, 60) || email.split("@")[0], familyName: u.familyName.slice(0, 60) || "-" },
     password,
     changePasswordAtNextLogin: true,
-    orgUnitPath: workspaceUnit(),
+    orgUnitPath: workspaceUnit() ?? "/",
   });
   if (r.status === 409) throw new Error(`${email} findes allerede i Google. Vælg en anden adresse, eller fjern fluebenet og giv adgang til den, der findes.`);
-  if (r.status === 403) throw new Error("Google sagde nej: Arpos admin-bruger må ikke oprette brugere i den afdeling - tjek rollen i Google Admin.");
+  if (r.status === 403) throw new Error("Google sagde nej: Arpos servicekonto må ikke oprette brugere - tjek, at den har rollen Arpo brugeradmin i Google Admin.");
   if (r.status < 200 || r.status >= 300) throw new Error(`Google kunne ikke oprette kontoen (${r.status}${r.data?.error?.message ? `: ${r.data.error.message}` : ""}).`);
   return { password };
 }
@@ -104,7 +107,7 @@ export async function createWorkspaceUser(u: { email: string; givenName: string;
 type GUser = { primaryEmail?: string; orgUnitPath?: string; isAdmin?: boolean; isDelegatedAdmin?: boolean; suspended?: boolean };
 
 /**
- * The account, if Arpo may touch it: on our domain, in the employees' unit and not an admin (Google's role says the
+ * The account, if Arpo may touch it: on our domain, not an admin and (when GOOGLE_WORKSPACE_OU is set) in that unit (Google's role says the
  * same - this is the second lock). `null` = it doesn't exist in Google.
  */
 async function managed(email: string): Promise<GUser | null> {
@@ -114,7 +117,7 @@ async function managed(email: string): Promise<GUser | null> {
   if (!u.data || u.status !== 200) throw new Error(`Google: kunne ikke slå ${email} op (${u.status}).`);
   const unit = workspaceUnit();
   if (u.data.isAdmin || u.data.isDelegatedAdmin) throw new Error(`${email} er administrator i Google - den styres ikke fra Arpo.`);
-  if (!(u.data.orgUnitPath === unit || u.data.orgUnitPath?.startsWith(`${unit}/`))) throw new Error(`${email} ligger ikke i ${unit} i Google - flyt den dertil i Google Admin én gang, så kan Arpo styre den.`);
+  if (unit && !(u.data.orgUnitPath === unit || u.data.orgUnitPath?.startsWith(`${unit}/`))) throw new Error(`${email} ligger ikke i ${unit} i Google - flyt den dertil i Google Admin én gang, så kan Arpo styre den.`);
   return u.data;
 }
 

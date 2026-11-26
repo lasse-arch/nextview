@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { createUser, endUserSessions, resetGooglePassword, setUserActive, signOutGoogle, updateUser } from "@/lib/actions/users";
-import { onOurDomain, workspaceReady, workspaceState, workspaceUnit } from "@/lib/google-workspace";
+import { onOurDomain, workspaceReady, workspaceState } from "@/lib/google-workspace";
 import { WORKSPACE_MAIL_APPROVED } from "@/lib/workspace-mail";
 import { commissionFrequencyLabels } from "@/lib/labels";
 import { AvatarUploader } from "../avatar-uploader";
@@ -249,7 +249,7 @@ export default async function UsersPage() {
 
       <p className="text-xs text-slate-500">
         {google
-          ? `Google-konti i ${workspaceUnit()} styres herfra: Deaktivér lukker også Google-kontoen, Genaktivér åbner den igen${WORKSPACE_MAIL_APPROVED ? ", og en ny adgangskode sendes til personens egen e-mail" : ""}. Administratorer i Google styres ikke fra Arpo.`
+          ? `Google-konti styres herfra: Deaktivér lukker også Google-kontoen, Genaktivér åbner den igen${WORKSPACE_MAIL_APPROVED ? ", og en ny adgangskode sendes til personens egen e-mail" : ""}. Administratorer i Google styres ikke fra Arpo.`
           : "Google Workspace er ikke koblet til Arpo endnu - så oprettes, lukkes og nulstilles Google-konti stadig i Google Admin (se docs/google-workspace.md)."}
       </p>
 
