@@ -7,6 +7,7 @@ import { startStyleOf } from "../../tours/presets";
 import { cardPeopleAt, guideExit, IMAGE_HREF, imageOfHref, isPlaceHref, PANO_HFOV, placeHref, startPlaces } from "../../tours/places";
 import { AiImageButton, AiImageList } from "./ai-image";
 import { writePlaceCards, type CardDraft } from "@/lib/actions/tour-cards";
+import { paragraphTexts } from "@/lib/actions/tour-paragraphs";
 import { designWelcomeTiles } from "@/lib/actions/tour-tiles-ai";
 import { darker as darkerHex } from "../../tours/contrast";
 import { useContext, useEffect, useState } from "react";
@@ -1586,6 +1587,7 @@ export function CardsEditor({ config, edit, preview, scanMap, mpskinsHidden }: O
       )}
       <Group title="Stedkort">
         <p className={small}>Et lille kort, der kommer frem, når man lander et bestemt sted - med en tekst om stedet og evt. knapper. Det forsvinder selv igen.</p>
+        <ParagraphsButton config={config} edit={edit} />
         <Field title="Størrelse" hint="Gælder alle stedkort og kortet, der kommer af sig selv. De skalerer altid med skærmen - en lille telefon får et mindre kort.">
           <Choice
             value={config.placeCardSize ?? "mellem"}
@@ -2398,6 +2400,72 @@ function tileDoes(go: WelcomeGo): string {
 }
 
 /** "Sæt fliserne flot": nextviewAI picks each tile's colour, photo and the recommended one - from the customer's site, to draw the visitor in. */
+/** The texts "Del teksterne i afsnit" looks at: stedkort, the guides' stops, points - and their translations. */
+function longTexts(c: TourConfig): string[] {
+  const long = (t: string | undefined | null) => (t && t.trim().length >= 200 && !/\n\s*\n/.test(t) ? [t.trim()] : []);
+  const stops = [...(c.guide?.stops ?? []), ...(c.guides ?? []).flatMap((g) => g.stops ?? [])];
+  const danish = [
+    ...(c.placeCards ?? []).flatMap((k) => [...long(k.text), ...long(k.more?.text)]),
+    ...(c.points ?? []).flatMap((p) => long(p.text)),
+    ...stops.flatMap((s) => ("text" in s ? [...long(s.text), ...long(s.short)] : [])),
+  ];
+  const all = new Set(danish);
+  for (const map of Object.values(c.translations ?? {})) for (const [k, v] of Object.entries(map)) if (all.has(k) || long(v).length) long(v).forEach((x) => all.add(x));
+  return [...all];
+}
+
+/** Puts the new texts in: each field that had an old text, and every translation - keyed by the new Danish text. */
+function applyParagraphs(d: TourConfig, out: Record<string, string>) {
+  const fix = (t: string | undefined) => (t && out[t.trim()]) || t;
+  for (const k of d.placeCards ?? []) {
+    k.text = fix(k.text) ?? k.text;
+    if (k.more?.text) k.more.text = fix(k.more.text) ?? k.more.text;
+  }
+  for (const p of d.points ?? []) if (p.text) p.text = fix(p.text) ?? p.text;
+  for (const s of [...(d.guide?.stops ?? []), ...(d.guides ?? []).flatMap((g) => g.stops ?? [])])
+    if ("text" in s) {
+      s.text = fix(s.text) ?? s.text;
+      if (s.short) s.short = fix(s.short);
+    }
+  for (const lang of Object.keys(d.translations ?? {})) {
+    const map = d.translations![lang];
+    d.translations![lang] = Object.fromEntries(Object.entries(map).map(([k, v]) => [out[k] ?? k, out[v.trim()] ?? v]));
+  }
+}
+
+/**
+ * "Del teksterne i afsnit": nextviewAI splits the long texts into paragraphs where the subject changes - every
+ * word unchanged (checked on the server) - in all languages. Into the draft; the user sees it and saves.
+ */
+function ParagraphsButton({ config, edit }: { config: TourConfig; edit: (fn: (d: TourConfig) => void) => void }) {
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<{ text: string; error?: boolean } | null>(null);
+  const n = longTexts(config).length;
+  if (!n && !note) return null;
+  return (
+    <div className="space-y-1">
+      <button
+        type="button"
+        disabled={busy || !n}
+        className={`${linkButton} w-full`}
+        onClick={async () => {
+          setBusy(true);
+          setNote({ text: `nextviewAI deler ${n} ${n === 1 ? "tekst" : "tekster"} i afsnit …` });
+          const r = await paragraphTexts(config.slug, longTexts(config));
+          setBusy(false);
+          if (!r.ok) return setNote({ text: r.error, error: true });
+          const changed = Object.keys(r.out).length;
+          if (changed) edit((d) => applyParagraphs(d, r.out));
+          setNote({ text: changed ? `${changed} ${changed === 1 ? "tekst er" : "tekster er"} delt i afsnit - ordene er de samme. Se dem i forhåndsvisningen, og gem.` : "Teksterne er allerede fine - ingen ændringer." });
+        }}
+      >
+        {busy ? "Deler i afsnit …" : `¶ Del lange tekster i afsnit (${n})`}
+      </button>
+      {note && <p className={`px-1 text-[12px] ${note.error ? "text-[#ff3b30]" : "text-[#8e8e93]"}`}>{note.text}</p>}
+    </div>
+  );
+}
+
 function TilesAiButton({ config, edit, slug }: { config: TourConfig; edit: (fn: (d: TourConfig) => void) => void; slug: string }) {
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<{ text: string; error?: boolean } | null>(null);
