@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getTeamUser } from "@/lib/auth";
 import { isHrAdmin, maySeePay, reachOf } from "@/lib/hr-access";
-import { addHrTask, addPayTerms, giveNotice, sendEmploymentContract, reopenWeek, toggleHrTask, updateEmployee, withdrawNotice } from "@/lib/actions/hr";
+import { activateAccess, addHrTask, addPayTerms, giveNotice, sendEmploymentContract, reopenWeek, toggleHrTask, updateEmployee, withdrawNotice } from "@/lib/actions/hr";
 import { KIND_NAMES, addDays, hoursText, isYmd, mondayOf, noticeEnd, registersTime, sickDays12Months, todayDk } from "@/lib/hr";
 import { holidayBalance, loadWeek, spansOf, tripsOfYear, warningsFor } from "@/lib/hr-data";
 import { TEAM_ROLE_NAMES, rolesOf } from "@/lib/team-roles";
@@ -60,6 +60,42 @@ export default async function EmployeePage({ params, searchParams }: { params: P
         </p>
       </div>
       <Saved msg={sp.saved} />
+      {(e.user.disabledAt || (e.kind === "SALARIED" && !e.contractSignedAt)) && !e.endDate && (() => {
+        const steps: { label: string; done: boolean; now?: boolean }[] = [
+          { label: "Oprettet i HR", done: true },
+          ...(e.kind === "SALARIED"
+            ? [
+                { label: e.contractSentAt ? `Kontrakt sendt ${fmtDate(e.contractSentAt)}` : "Send kontrakten (nedenfor)", done: Boolean(e.contractSentAt), now: !e.contractSentAt },
+                { label: e.contractSignedAt ? `Underskrevet ${fmtDate(e.contractSignedAt)}` : "Underskrives af medarbejderen og Nextview360", done: Boolean(e.contractSignedAt), now: Boolean(e.contractSentAt && !e.contractSignedAt) },
+              ]
+            : []),
+          { label: e.user.disabledAt ? "Adgang til Arpo med deres arbejds-mail" : "Adgang til Arpo", done: !e.user.disabledAt, now: Boolean(e.user.disabledAt && (e.kind !== "SALARIED" || e.contractSignedAt)) },
+        ];
+        return (
+          <Card title="Næste skridt">
+            <ol className="space-y-2">
+              {steps.map((st, i) => (
+                <li key={i} className="flex items-center gap-3 text-sm">
+                  <span className={`flex h-6 w-6 flex-none items-center justify-center rounded-full text-xs font-semibold ${st.done ? "bg-emerald-600 text-white" : st.now ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-500"}`}>{st.done ? "✓" : i + 1}</span>
+                  <span className={st.done ? "text-slate-500" : st.now ? "font-semibold text-slate-900" : "text-slate-600"}>{st.label}</span>
+                </li>
+              ))}
+            </ol>
+            {e.user.disabledAt && (
+              <form action={activateAccess.bind(null, e.id)} className="mt-4 flex flex-wrap items-end gap-3 border-t border-slate-100 pt-4">
+                <label className="min-w-[260px] flex-1">
+                  <span className={label}>Arbejds-mail (Google-kontoen)</span>
+                  <input name="workEmail" type="email" placeholder="fornavn@nextview360.dk" className={input} />
+                </label>
+                <button className={btn}>Giv adgang til Arpo</button>
+                <p className="w-full text-xs text-slate-500">
+                  {e.kind === "SALARIED" && !e.contractSignedAt ? "Normalt først når kontrakten er underskrevet. " : ""}Opret Google-kontoen først. De logger ind med Google på den adresse. Deres egen e-mail ({e.privateEmail ?? e.user.email}) bliver stående på kortet.
+                </p>
+              </form>
+            )}
+          </Card>
+        );
+      })()}
       <Warnings list={warnings} />
 
       {week && (

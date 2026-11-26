@@ -100,6 +100,7 @@ export async function createEmployee(f: FormData) {
   const admin = await requireHrAdmin();
   const terms = termsFrom(f);
   let userId = str(f, "userId", 40);
+  let newPerson: { privateEmail: string } | null = null;
   if (userId) {
     const u = await prisma.user.findUnique({ where: { id: userId }, include: { employee: { select: { id: true } } } });
     if (!u) throw new Error("Brugeren findes ikke.");
@@ -111,24 +112,59 @@ export async function createEmployee(f: FormData) {
     if (!name || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Skriv navn og en gyldig e-mail.");
     if (await prisma.user.findUnique({ where: { email } })) throw new Error("Der findes allerede en bruger med den e-mail - vælg personen på listen.");
     const role = oneOf(str(f, "role"), TEAM_ROLES.filter((r) => r !== "ADMIN"), "EMPLOYEE") as Role;
-    // No password: they log in with Google (the same e-mail) - a long random one nobody knows keeps the password door shut.
+    // No access to Arpo yet: they're let in once the contract is signed and they have a work account (activateAccess).
+    // No password either: they log in with Google - a long random one nobody knows keeps the password door shut.
     const u = await prisma.user.create({
-      data: { name, lastName, email, role, passwordHash: await hashPassword(randomBytes(32).toString("base64url")), isCommissionBased: false, canAccessBilling: false, commissionRate: 0 },
+      data: {
+        name,
+        lastName,
+        email,
+        phone: str(f, "phone", 30) || null,
+        role,
+        disabledAt: new Date(),
+        passwordHash: await hashPassword(randomBytes(32).toString("base64url")),
+        isCommissionBased: false,
+        canAccessBilling: false,
+        commissionRate: 0,
+      },
     });
     userId = u.id;
+    newPerson = { privateEmail: email };
   }
   const pay = payFrom(f, terms.kind);
   const e = await prisma.employee.create({
     data: {
       ...terms,
       userId,
+      privateEmail: newPerson?.privateEmail ?? null,
+      homeAddress: str(f, "homeAddress", 200) || null,
       managerId: await managerFrom(f, userId),
       pay: { create: { ...pay, effectiveFrom: terms.startDate, createdById: admin.id } },
       tasks: { create: (terms.kind === "FREELANCE" ? START_TASKS.filter((t) => !/lønsystemet|Pension/.test(t)) : START_TASKS).map((label, sort) => ({ phase: "start", label, sort })) },
     },
   });
   revalidatePath("/arpo/hr");
-  back(`/arpo/hr/${e.id}`, "Medarbejderen er oprettet");
+  back(`/arpo/hr/${e.id}`, newPerson ? "Medarbejderen er oprettet - næste skridt er kontrakten" : "Medarbejderen er oprettet");
+}
+
+/**
+ * Adgang til Arpo: once the contract is signed and they have a work account (Google, e.g. @nextview360.dk), the person's
+ * login becomes that address and is opened. Their own address stays on the card.
+ */
+export async function activateAccess(employeeId: string, f: FormData) {
+  const admin = await requireHrAdmin();
+  const e = await prisma.employee.findUnique({ where: { id: String(employeeId) }, include: { user: { select: { id: true, email: true } } } });
+  if (!e) throw new Error("Medarbejderen findes ikke.");
+  const email = str(f, "workEmail", 200).toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Skriv arbejds-e-mailen (Google-kontoen).");
+  const other = await prisma.user.findUnique({ where: { email }, select: { id: true } });
+  if (other && other.id !== e.userId) throw new Error("Den e-mail bruges allerede af en anden bruger.");
+  await prisma.$transaction([
+    prisma.user.update({ where: { id: e.userId }, data: { email, disabledAt: null, sessionVersion: { increment: 1 } } }),
+    prisma.employee.update({ where: { id: e.id }, data: { privateEmail: e.privateEmail ?? (e.user.email !== email ? e.user.email : null) } }),
+    prisma.hrTask.updateMany({ where: { employeeId: e.id, phase: "start", label: { startsWith: "Google-konto" }, doneAt: null }, data: { doneAt: new Date(), doneById: admin.id } }),
+  ]);
+  back(`/arpo/hr/${e.id}`, `Adgangen er åben - ${email} kan logge ind med Google`);
 }
 
 export async function updateEmployee(employeeId: string, f: FormData) {

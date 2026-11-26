@@ -2196,6 +2196,8 @@ model Employee {
   /// For the kørselsregnskab: where trips start or end from home, and the number plates of the cars they drive (comma-separated).
   homeAddress   String?
   carPlates     String?
+  /// Their own e-mail - where the contract goes before they have a work account (Google, @nextview360.dk).
+  privateEmail  String?
   /// The work, in a few words - stands in the employment contract (§ 3).
   duties        String?
   /// The employment contract sent for signing through DocuSeal (lib/employment-contract.ts).
