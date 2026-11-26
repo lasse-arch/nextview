@@ -4,7 +4,7 @@ import { logActivity } from "@/lib/activity";
 import { buildDealEmailAddress } from "@/lib/email-address";
 import { sendSystemMail } from "@/lib/system-mail";
 import { getAppBaseUrl } from "@/lib/email-oauth";
-import { CONTRACT_SIGNER } from "@/lib/contract-template-data";
+import { COMPANY_MAIL } from "@/lib/contract-template-data";
 
 /*
  * The contact form on nextview360.dk: every message becomes a lead in
@@ -74,7 +74,7 @@ async function notifyAdmins(dealId: string, input: Inquiry) {
         subject: `Ny henvendelse fra hjemmesiden: ${input.company || input.name}`,
         bodyText: lines.join("\n"),
         fromName: "Nextview360",
-        fromAddress: CONTRACT_SIGNER.email,
+        fromAddress: COMPANY_MAIL,
       });
       return;
     } catch {

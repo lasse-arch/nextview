@@ -50,10 +50,14 @@ export const PRODUCT_LABELS_EN: Record<keyof typeof PRODUCT_LABELS, string> = {
 
 /**
  * Only one person ever signs on our side, regardless of which seller owns
- * the deal - the director, not the salesperson (see the contract template's
- * "For leverandør" signature block, which prints this same fixed name).
+ * the deal - Lasse, on every contract (customers' and employees'), not the
+ * salesperson (see the contract template's "For leverandør" signature block,
+ * which prints this same fixed name). DocuSeal sends the signing request here.
  */
-export const CONTRACT_SIGNER = { name: "Victor Emil Rasmussen", email: "info@nextview360.dk" };
+export const CONTRACT_SIGNER = { name: "Lasse Sander Larsen", email: "lasse@nextview360.dk" };
+
+/** The shared address Arpo's own notices are sent from (contract signed, site inquiries) - not the signer's. */
+export const COMPANY_MAIL = "info@nextview360.dk";
 
 /**
  * Every product always has an etableringspris (one-off setup fee) - only

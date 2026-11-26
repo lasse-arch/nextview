@@ -2,13 +2,13 @@ import { prisma } from "@/lib/db";
 import { resendReady, sendSystemMail } from "@/lib/system-mail";
 import { getAppBaseUrl } from "@/lib/email-oauth";
 import { dealName } from "@/lib/labels";
-import { CONTRACT_SIGNER } from "@/lib/contract-template-data";
+import { COMPANY_MAIL } from "@/lib/contract-template-data";
 
 export type NotificationResult = { sent: boolean; reason?: string };
 
 /**
  * Notifies the deal owner and all admins by email when a contract is
- * signed - sent as the shared info@nextview360.dk address (CONTRACT_SIGNER),
+ * signed - sent as the shared info@nextview360.dk address (COMPANY_MAIL),
  * not whichever seller happens to own the deal. There's no dedicated Google
  * account for info@ - it's a "Send mail as" alias that runs through one of
  * the admins' own connected Gmail, so this tries each admin's connected
@@ -43,7 +43,7 @@ export async function sendContractSignedNotification(dealId: string): Promise<No
         subject: `Kontrakt underskrevet: ${dealName(deal)}`,
         bodyText: `${dealName(deal)} har lige underskrevet kontrakt.\n\nSe dealen: ${dealUrl}`,
         fromName: "Nextview360",
-        fromAddress: CONTRACT_SIGNER.email,
+        fromAddress: COMPANY_MAIL,
       });
       return { sent: true };
     } catch (err) {
@@ -66,7 +66,7 @@ export async function notifyTeam(params: { dealId?: string | null; subject: stri
   let lastError = "Ukendt fejl ved afsendelse.";
   for (const account of accounts.length ? accounts : [null]) {
     try {
-      await sendSystemMail(account, { to, subject: params.subject, bodyText: params.text, fromName: "Nextview360", fromAddress: CONTRACT_SIGNER.email });
+      await sendSystemMail(account, { to, subject: params.subject, bodyText: params.text, fromName: "Nextview360", fromAddress: COMPANY_MAIL });
       return { sent: true };
     } catch (err) {
       lastError = err instanceof Error ? err.message : lastError;
