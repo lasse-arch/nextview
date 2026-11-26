@@ -2187,6 +2187,7 @@ model Employee {
   tasks         HrTask[]
   trips         Trip[]
   documents     EmployeeDocument[]
+  terms         ContractTerm[]
   /// Notice given (opsigelse): when, and by whom ("employer" or "employee") - the last day is endDate.
   noticeGivenAt DateTime?      @db.Date
   noticeBy      String?
@@ -2292,6 +2293,25 @@ model Absence {
 }
 
 /// Who opened someone's pay, and when (GDPR: the access to pay can be traced).
+/// "Særlige vilkår": a condition in the employee's contract beyond the standard text, from a date (and maybe to one) -
+/// a guaranteed minimum pay (GUARANTEE, `amountOre` a month: if pay and commission together are less, the difference
+/// is paid - lønsedler-grundlaget shows it) or any other agreed term in words (OTHER). Listed in the contract's own section.
+model ContractTerm {
+  id          String    @id @default(cuid())
+  employeeId  String
+  employee    Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  kind        String
+  title       String?
+  text        String?
+  amountOre   Int?
+  from        DateTime  @db.Date
+  to          DateTime? @db.Date
+  createdById String
+  createdAt   DateTime  @default(now())
+
+  @@index([employeeId])
+}
+
 /// An employee's papers kept in Arpo - an employment contract signed elsewhere (uploaded) or through DocuSeal. Shown only
 /// to an admin and the person themself (like pay), every look logged. A copy goes to Google Drev when that's on.
 /// Deleted with the rest 5 years after the employment ended (hr-retention.ts).

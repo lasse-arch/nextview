@@ -148,6 +148,9 @@ export async function createEmployee(f: FormData) {
       tasks: { create: (terms.kind === "FREELANCE" ? START_TASKS.filter((t) => !/lønsystemet|Pension/.test(t)) : START_TASKS).map((label, sort) => ({ phase: "start", label, sort })) },
     },
   });
+  // "Garantiløn" in the wizard: from the first day of work.
+  const guarantee = kronerToOre(str(f, "guarantee", 20));
+  if (guarantee && guarantee > 0 && guarantee <= 100_000_000) await prisma.contractTerm.create({ data: { employeeId: e.id, kind: "GUARANTEE", amountOre: guarantee, from: terms.startDate, createdById: admin.id } });
   if (signed) await storeSignedContract(e.id, signed, admin.id);
   revalidatePath("/arpo/hr");
   back(`/arpo/hr/${e.id}`, signed ? "Medarbejderen er oprettet, og kontrakten er gemt" : newPerson ? "Medarbejderen er oprettet - næste skridt er kontrakten" : "Medarbejderen er oprettet");
@@ -181,6 +184,58 @@ export async function uploadSignedContract(employeeId: string, f: FormData) {
   await storeSignedContract(e.id, await signedContractFrom(f), admin.id);
   revalidatePath(`/arpo/hr/${e.id}`);
   back(`/arpo/hr/${e.id}`, "Kontrakten er gemt");
+}
+
+/**
+ * "Særlige vilkår": a guaranteed minimum pay a month (counted against pay + hours + commission in lønsedler-grundlaget)
+ * or another agreed term in words - from a date, maybe to one. They stand in the contract's § 17.
+ */
+export async function addContractTerm(employeeId: string, f: FormData) {
+  const admin = await requireHrAdmin();
+  const e = await prisma.employee.findUnique({ where: { id: String(employeeId) }, select: { id: true } });
+  if (!e) throw new Error("Medarbejderen findes ikke.");
+  await prisma.contractTerm.create({ data: { ...termFrom(f), employeeId: e.id, createdById: admin.id } });
+  revalidatePath(`/arpo/hr/${e.id}`);
+  back(`/arpo/hr/${e.id}`, "Vilkåret er gemt");
+}
+
+function termFrom(f: FormData) {
+  const kind = str(f, "termKind") === "OTHER" ? "OTHER" : "GUARANTEE";
+  const from = day(f, "termFrom");
+  const to = day(f, "termTo");
+  if (!from) throw new Error("Vælg datoen, vilkåret gælder fra.");
+  if (to && to < from) throw new Error("Slutdatoen ligger før startdatoen.");
+  if (kind === "GUARANTEE") {
+    const amountOre = kronerToOre(str(f, "termAmount", 20));
+    if (!amountOre || amountOre <= 0 || amountOre > 100_000_000) throw new Error("Skriv garantilønnen i kr. om måneden.");
+    return { kind, amountOre, title: null, text: null, from: asDate(from), to: to ? asDate(to) : null };
+  }
+  const title = str(f, "termTitle", 80);
+  const text = str(f, "termText", 1000);
+  if (!title || !text) throw new Error("Skriv en overskrift og hvad der er aftalt.");
+  return { kind, amountOre: null, title, text, from: asDate(from), to: to ? asDate(to) : null };
+}
+
+/** Ends a term on a date (it stays in the history and in contracts already signed). */
+export async function endContractTerm(termId: string, f: FormData) {
+  await requireHrAdmin();
+  const t = await prisma.contractTerm.findUnique({ where: { id: String(termId) } });
+  if (!t) throw new Error("Vilkåret findes ikke.");
+  const to = day(f, "termTo");
+  if (!to || asDate(to) < t.from) throw new Error("Vælg en slutdato efter startdatoen.");
+  await prisma.contractTerm.update({ where: { id: t.id }, data: { to: asDate(to) } });
+  revalidatePath(`/arpo/hr/${t.employeeId}`);
+  back(`/arpo/hr/${t.employeeId}`, "Vilkåret slutter den valgte dag");
+}
+
+/** Removes a term made by mistake. */
+export async function deleteContractTerm(termId: string) {
+  await requireHrAdmin();
+  const t = await prisma.contractTerm.findUnique({ where: { id: String(termId) } });
+  if (!t) throw new Error("Vilkåret findes ikke.");
+  await prisma.contractTerm.delete({ where: { id: t.id } });
+  revalidatePath(`/arpo/hr/${t.employeeId}`);
+  back(`/arpo/hr/${t.employeeId}`, "Vilkåret er slettet");
 }
 
 /** "Læg i Drev" for a document whose copy is missing (Drev was off, or failed). */
@@ -519,17 +574,18 @@ export async function saveCarDetails(employeeId: string, back_: string, f: FormD
  */
 export async function sendEmploymentContract(employeeId: string, f: FormData) {
   await requireHrAdmin();
-  const e = await prisma.employee.findUnique({ where: { id: String(employeeId) }, include: { user: { select: { name: true, lastName: true, email: true, phone: true } }, pay: { orderBy: { effectiveFrom: "desc" }, take: 1 } } });
+  const e = await prisma.employee.findUnique({ where: { id: String(employeeId) }, include: { user: { select: { name: true, lastName: true, email: true, phone: true } }, pay: { orderBy: { effectiveFrom: "desc" }, take: 1 }, terms: { orderBy: { from: "asc" } } } });
   if (!e) throw new Error("Medarbejderen findes ikke.");
-  const { contractProblem, employmentContractHtml } = await import("@/lib/employment-contract");
+  const { contractProblem, employmentContractHtml, usesUnapprovedText } = await import("@/lib/employment-contract");
   const problem = contractProblem(e, e.pay[0]);
   if (problem) throw new Error(problem);
+  if (usesUnapprovedText(e.pay[0], e.terms)) throw new Error("Kontrakten bruger tekst, der venter på godkendelse (særlige vilkår eller ren provisionsløn) - læs den som PDF, og godkend teksten først.");
   const { isDocuSealConfigured, createAndSendSubmission } = await import("@/lib/docuseal");
   if (!(await isDocuSealConfigured())) throw new Error("DocuSeal er ikke sat op eller er slået fra under Indstillinger.");
   const { renderContractPdf } = await import("@/lib/contract-pdf-renderer");
   const { CONTRACT_SIGNER } = await import("@/lib/contract-template-data");
   const sickTo = str(f, "sickTo", 80) || CONTRACT_SIGNER.name;
-  const pdf = await renderContractPdf(employmentContractHtml(e, e.pay[0], sickTo));
+  const pdf = await renderContractPdf(employmentContractHtml(e, e.pay[0], sickTo, e.terms));
   const name = `${e.user.name}${e.user.lastName ? ` ${e.user.lastName}` : ""}`;
   const submission = await createAndSendSubmission({
     fileName: `Ansættelseskontrakt ${name}.pdf`,

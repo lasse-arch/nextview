@@ -286,3 +286,25 @@ export function mileagePay(year: number, kmBefore: number, km: number): number {
 export const TRIP_KINDS = ["Kundebesøg", "Filmning", "Genoptagelse", "Opfølgning på kunde", "Møde", "Andet"] as const;
 /** A Danish number plate, tidied: "ab 12 345" → "AB 12 345" (letters and digits only, at most 10). */
 export const cleanPlate = (s: string) => s.toUpperCase().replace(/[^A-ZÆØÅ0-9 ]/g, "").replace(/\s+/g, " ").trim().slice(0, 10);
+
+/** A guaranteed minimum pay ("garantiløn") in force from `from` (to `to`, both included), in kr. a month. */
+export type Guarantee = { amountKr: number; from: Ymd; to: Ymd | null };
+
+/**
+ * A month's guarantee and the top-up it gives: the guarantee counts for the days of the month it and the employment
+ * both cover (a part month pro rata - two overlapping, the higher), and when what was earned (pay + commission) is
+ * less, the difference is paid. Kr., to the øre.
+ */
+export function guaranteeForMonth(list: Guarantee[], month: { from: Ymd; to: Ymd }, employed: { from: Ymd; to: Ymd | null }, earnedKr: number): { guaranteeKr: number; topUpKr: number } {
+  if (!list.length) return { guaranteeKr: 0, topUpKr: 0 };
+  let days = 0;
+  let sum = 0;
+  for (let d = month.from; d <= month.to; d = addDays(d, 1)) {
+    days++;
+    if (d < employed.from || (employed.to && d > employed.to)) continue;
+    const amount = Math.max(0, ...list.filter((g) => d >= g.from && (!g.to || d <= g.to)).map((g) => g.amountKr));
+    sum += amount;
+  }
+  const guaranteeKr = Math.round((sum / days) * 100) / 100;
+  return { guaranteeKr, topUpKr: Math.max(0, Math.round((guaranteeKr - earnedKr) * 100) / 100) };
+}

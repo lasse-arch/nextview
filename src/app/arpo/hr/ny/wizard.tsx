@@ -63,7 +63,7 @@ export function NewEmployeeWizard({ roles, existing, leaders }: { roles: { v: st
     ["Ansat som", KIND_NAMES[v.kind as keyof typeof KIND_NAMES]],
     ["Første dag", v.startDate ?? ""],
     ...(freelance ? [] : ([["Arbejdstid", `${v.weeklyHours} timer om ugen, ${days.map((d) => DAYS[d - 1]).join(", ")}`]] as [string, string][])),
-    ["Løn", `${PAY_NAMES[model as keyof typeof PAY_NAMES]}${v.monthly ? `, ${kr(v.monthly)} om måneden` : ""}${v.hourly ? `, ${kr(v.hourly)} i timen` : ""}${v.commissionPct ? `, ${v.commissionPct} % provision` : ""}`],
+    ["Løn", `${PAY_NAMES[model as keyof typeof PAY_NAMES]}${v.monthly ? `, ${kr(v.monthly)} om måneden` : ""}${v.hourly ? `, ${kr(v.hourly)} i timen` : ""}${v.commissionPct ? `, ${v.commissionPct} % provision` : ""}${v.guarantee?.trim() && !freelance ? `, garantiløn ${v.guarantee} kr. om måneden` : ""}`],
   ];
 
   return (
@@ -204,6 +204,8 @@ export function NewEmployeeWizard({ roles, existing, leaders }: { roles: { v: st
           {(model === "MONTHLY" || model === "MONTHLY_COMMISSION") && field("monthly", "Månedsløn (kr.)", { name: "monthly", inputMode: "decimal" })}
           {model === "HOURLY" && field("hourly", "Timeløn (kr.)", { name: "hourly", inputMode: "decimal" })}
           {(model === "MONTHLY_COMMISSION" || model === "COMMISSION_ONLY" || model === "INVOICE") && field("commissionPct", "Provision (%)", { name: "commissionPct", inputMode: "decimal" })}
+          {!freelance && field("guarantee", "Garantiløn (kr. om måneden), valgfri", { name: "guarantee", inputMode: "decimal", placeholder: "Fx 5000" })}
+          {!freelance && v.guarantee?.trim() && <p className="col-span-2 -mt-1 text-xs text-slate-500">Gælder fra første arbejdsdag. Løn, timer og provision regnes fra garantien, og er de mindre, betales forskellen. Kan ændres og sluttes på kortet under Særlige vilkår.</p>}
           {!freelance && field("pensionEmployeePct", "Pension egen (%), valgfri", { name: "pensionEmployeePct", inputMode: "decimal" })}
           {!freelance && field("pensionEmployerPct", "Pension firma (%), valgfri", { name: "pensionEmployerPct", inputMode: "decimal" })}
         </div>

@@ -1,6 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db";
-import { ABSENCE_NAMES, KIND_NAMES, PAY_NAMES, absenceDays, addDays, normMinutes, registersTime, todayDk, type Ymd } from "@/lib/hr";
+import { ABSENCE_NAMES, KIND_NAMES, PAY_NAMES, absenceDays, addDays, guaranteeForMonth, normMinutes, registersTime, todayDk, type Ymd } from "@/lib/hr";
 import { spansOf, termsOf, tripsOfYear } from "@/lib/hr-data";
 
 /*
@@ -30,6 +30,9 @@ export type PayrollRow = {
   tripKm: number;
   tripKr: number;
   commissionHow: "løn" | "faktura" | "";
+  /** A guaranteed minimum pay this month (Særlige vilkår, pro rata) and the top-up when pay + commission are less. */
+  guaranteeKr: number;
+  guaranteeTopUpKr: number;
   note: string;
 };
 
@@ -51,6 +54,7 @@ export async function payrollMonth(ym: string): Promise<PayrollRow[]> {
       pay: { where: { effectiveFrom: { lte: new Date(`${to}T00:00:00Z`) } }, orderBy: { effectiveFrom: "desc" }, take: 1 },
       days: { where: { date: { gte: new Date(`${from}T00:00:00Z`), lte: new Date(`${to}T00:00:00Z`) } } },
       absences: { where: { status: "APPROVED", from: { lte: new Date(`${to}T00:00:00Z`) }, to: { gte: new Date(`${from}T00:00:00Z`) } } },
+      terms: { where: { kind: "GUARANTEE", from: { lte: new Date(`${to}T00:00:00Z`) }, OR: [{ to: null }, { to: { gte: new Date(`${from}T00:00:00Z`) } }] } },
     },
     orderBy: { user: { name: "asc" } },
   });
@@ -99,6 +103,19 @@ export async function payrollMonth(ym: string): Promise<PayrollRow[]> {
     if (share < 1) notes.push(`Ansat ${employed} af ${days} dage i måneden`);
     if (missing) notes.push(`${missing} arbejdsdag${missing > 1 ? "e" : ""} uden registreret tid`);
     if (!p) notes.push("Ingen løn sat i HR");
+    // Garantiløn: what was earned (pay for the part of the month + hours + commission) against the guarantee.
+    // Freelancers invoice - a guarantee there is settled on the invoice, not here.
+    const workedHours = time ? Math.round((e.days.reduce((n, d) => n + d.minutes, 0) / 60) * 100) / 100 : null;
+    const earned = ((p?.monthlyOre ?? 0) / 100) * share + ((p?.hourlyOre ?? 0) / 100) * (workedHours ?? 0) + commission;
+    const guarantee = freelance
+      ? { guaranteeKr: 0, topUpKr: 0 }
+      : guaranteeForMonth(
+          e.terms.flatMap((g) => (g.amountOre ? [{ amountKr: g.amountOre / 100, from: ymd(g.from), to: g.to ? ymd(g.to) : null }] : [])),
+          { from, to },
+          { from: t.startDate, to: t.endDate },
+          earned
+        );
+    if (guarantee.topUpKr > 0) notes.push(`Garantiløn: løn og provision er under ${guarantee.guaranteeKr} kr. - tillæg ${guarantee.topUpKr} kr.`);
     return {
       name: `${e.user.name}${e.user.lastName ? ` ${e.user.lastName}` : ""}`,
       payrollNumber: e.payrollNumber ?? "",
@@ -110,13 +127,15 @@ export async function payrollMonth(ym: string): Promise<PayrollRow[]> {
       pension: p && (p.pensionEmployeePct != null || p.pensionEmployerPct != null) ? `${p.pensionEmployeePct ?? 0} % + ${p.pensionEmployerPct ?? 0} %` : "",
       employedShare: share,
       normHours: Math.round((norm / 60) * 100) / 100,
-      workedHours: time ? Math.round((e.days.reduce((n, d) => n + d.minutes, 0) / 60) * 100) / 100 : null,
+      workedHours,
       missingDays: missing,
       absence,
       commissionKr: commission,
       tripKm: tripsOf.get(e.id)?.km ?? 0,
       tripKr: tripsOf.get(e.id)?.kr ?? 0,
       commissionHow: commission ? (freelance ? "faktura" : "løn") : "",
+      guaranteeKr: guarantee.guaranteeKr,
+      guaranteeTopUpKr: guarantee.topUpKr,
       note: notes.join(". "),
     };
   });
@@ -133,9 +152,9 @@ const num = (n: number | null) => (n == null ? "" : String(n).replace(".", ","))
 /** Semicolon-separated (Danish Excel), with a BOM so æøå are read right. */
 export function payrollCsv(rows: PayrollRow[]): string {
   const kinds = Object.keys(ABSENCE_NAMES) as (keyof typeof ABSENCE_NAMES)[];
-  const head = ["Navn", "Nr. i lønsystemet", "Ansat som", "Lønmodel", "Månedsløn (kr.)", "Timeløn (kr.)", "Provision %", "Pension (egen + firma)", "Andel af måneden", "Normtimer", "Registrerede timer", "Dage uden registrering", ...kinds.map((k) => `${ABSENCE_NAMES[k]} (dage)`), "Provision (kr.)", "Provision udbetales via", "Kørsel (km)", "Kørepenge, skattefri (kr.)", "Bemærkning"];
+  const head = ["Navn", "Nr. i lønsystemet", "Ansat som", "Lønmodel", "Månedsløn (kr.)", "Timeløn (kr.)", "Provision %", "Pension (egen + firma)", "Andel af måneden", "Normtimer", "Registrerede timer", "Dage uden registrering", ...kinds.map((k) => `${ABSENCE_NAMES[k]} (dage)`), "Provision (kr.)", "Provision udbetales via", "Kørsel (km)", "Kørepenge, skattefri (kr.)", "Garantiløn (kr.)", "Garanti-tillæg (kr.)", "Bemærkning"];
   const lines = rows.map((r) =>
-    [r.name, r.payrollNumber, r.kind, r.model, num(r.monthlyKr), num(r.hourlyKr), num(r.commissionPct), r.pension, num(r.employedShare), num(r.normHours), num(r.workedHours), r.missingDays, ...kinds.map((k) => num(r.absence[k] ?? 0)), num(r.commissionKr), r.commissionHow, num(r.tripKm), num(r.tripKr), r.note].map(csvCell).join(";")
+    [r.name, r.payrollNumber, r.kind, r.model, num(r.monthlyKr), num(r.hourlyKr), num(r.commissionPct), r.pension, num(r.employedShare), num(r.normHours), num(r.workedHours), r.missingDays, ...kinds.map((k) => num(r.absence[k] ?? 0)), num(r.commissionKr), r.commissionHow, num(r.tripKm), num(r.tripKr), num(r.guaranteeKr || null), num(r.guaranteeTopUpKr || null), r.note].map(csvCell).join(";")
   );
   return `﻿${[head.map(csvCell).join(";"), ...lines].join("\r\n")}\r\n`;
 }

@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getTeamUser } from "@/lib/auth";
 import { isHrAdmin, maySeePay, reachOf } from "@/lib/hr-access";
-import { activateAccess, addHrTask, addPayTerms, copyDocumentToDrive, giveNotice, sendEmploymentContract, uploadSignedContract, reopenWeek, toggleHrTask, updateEmployee, withdrawNotice } from "@/lib/actions/hr";
+import { activateAccess, addContractTerm, addHrTask, addPayTerms, copyDocumentToDrive, deleteContractTerm, endContractTerm, giveNotice, sendEmploymentContract, uploadSignedContract, reopenWeek, toggleHrTask, updateEmployee, withdrawNotice } from "@/lib/actions/hr";
 import { KIND_NAMES, addDays, hoursText, isYmd, mondayOf, noticeEnd, registersTime, sickDays12Months, todayDk } from "@/lib/hr";
 import { holidayBalance, loadWeek, spansOf, tripsOfYear, warningsFor } from "@/lib/hr-data";
 import { TEAM_ROLE_NAMES, rolesOf } from "@/lib/team-roles";
@@ -31,7 +31,7 @@ export default async function EmployeePage({ params, searchParams }: { params: P
   const driveOn = await isIntegrationEnabled("GOOGLE_DRIVE");
   const e = await prisma.employee.findUnique({
     where: { id },
-    include: { user: { select: { id: true, name: true, lastName: true, email: true, role: true, extraRoles: true, disabledAt: true } }, manager: { select: { name: true } }, pay: { orderBy: { effectiveFrom: "desc" } }, absences: { orderBy: { from: "desc" } }, tasks: { orderBy: [{ sort: "asc" }, { label: "asc" }] }, documents: { select: { id: true, name: true, signedAt: true, driveFileId: true, createdAt: true }, orderBy: { createdAt: "desc" } } },
+    include: { user: { select: { id: true, name: true, lastName: true, email: true, role: true, extraRoles: true, disabledAt: true } }, manager: { select: { name: true } }, pay: { orderBy: { effectiveFrom: "desc" } }, absences: { orderBy: { from: "desc" } }, tasks: { orderBy: [{ sort: "asc" }, { label: "asc" }] }, documents: { select: { id: true, name: true, signedAt: true, driveFileId: true, createdAt: true }, orderBy: { createdAt: "desc" } }, terms: { orderBy: { from: "asc" } } },
   });
   if (!e) notFound();
   const reach = reachOf(user, e)!;
@@ -195,6 +195,89 @@ export default async function EmployeePage({ params, searchParams }: { params: P
               <button className={btn}>Gem lønnen</button>
             </form>
           </details>
+        </Card>
+      )}
+
+      {showPay && (
+        <Card title="Særlige vilkår" sub="Det, der er aftalt ud over kontraktens faste tekst. Står i kontraktens § 17. En garantiløn regnes med i lønsedler-grundlaget: er løn, timer og provision under garantien, betales forskellen.">
+          {e.terms.length > 0 && (
+            <ul className="mb-3 divide-y divide-slate-100 rounded-lg border border-slate-200">
+              {e.terms.map((t) => {
+                const over = t.to && t.to < new Date(`${todayDk()}T00:00:00Z`);
+                return (
+                  <li key={t.id} className={`px-3 py-2.5 text-sm ${over ? "opacity-60" : ""}`}>
+                    <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                      <span className="font-semibold text-slate-900">{t.kind === "GUARANTEE" ? `Garantiløn ${((t.amountOre ?? 0) / 100).toLocaleString("da-DK")} kr. om måneden` : t.title}</span>
+                      <span className="text-xs text-slate-500">
+                        Fra {fmtDate(t.from)}
+                        {t.to ? ` til og med ${fmtDate(t.to)}` : ""}
+                        {over ? " (slut)" : ""}
+                      </span>
+                    </div>
+                    {t.kind !== "GUARANTEE" && <p className="mt-1 text-slate-600">{t.text}</p>}
+                    {!over && (
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <form action={endContractTerm.bind(null, t.id)} className="flex items-center gap-2">
+                          <input type="date" name="termTo" required min={t.from.toISOString().slice(0, 10)} className="rounded-lg border border-slate-300 px-2 py-1 text-xs" />
+                          <button className={btnLight}>Slut den dag</button>
+                        </form>
+                        <form action={deleteContractTerm.bind(null, t.id)}>
+                          <button className="text-xs font-medium text-rose-700 hover:underline">Slet (oprettet ved en fejl)</button>
+                        </form>
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          <div className="space-y-2">
+            <details className="rounded-lg border border-slate-200 px-3 py-2">
+              <summary className="cursor-pointer text-sm font-semibold text-slate-700">+ Garantiløn</summary>
+              <form action={addContractTerm.bind(null, e.id)} className="mt-3 flex flex-wrap items-end gap-3">
+                <input type="hidden" name="termKind" value="GUARANTEE" />
+                <label>
+                  <span className={label}>Mindst (kr. om måneden)</span>
+                  <input name="termAmount" inputMode="decimal" required placeholder="5000" className={input} />
+                </label>
+                <label>
+                  <span className={label}>Gælder fra</span>
+                  <input type="date" name="termFrom" required className={input} />
+                </label>
+                <label>
+                  <span className={label}>Til og med (valgfri)</span>
+                  <input type="date" name="termTo" className={input} />
+                </label>
+                <button className={btn}>Gem garantilønnen</button>
+                <p className="w-full text-xs text-slate-500">Fx timeløn 170 kr. og garantiløn 5.000 kr.: timerne × 170 kr. (og provision) regnes fra de 5.000 kr. Er det mindre, betales forskellen. Er det mere, får de det hele.</p>
+              </form>
+            </details>
+            <details className="rounded-lg border border-slate-200 px-3 py-2">
+              <summary className="cursor-pointer text-sm font-semibold text-slate-700">+ Andet vilkår</summary>
+              <form action={addContractTerm.bind(null, e.id)} className="mt-3 grid grid-cols-2 gap-3">
+                <input type="hidden" name="termKind" value="OTHER" />
+                <label className="col-span-2">
+                  <span className={label}>Overskrift</span>
+                  <input name="termTitle" required maxLength={80} placeholder="Fx Firmatelefon, Hjemmearbejde, Uddannelse" className={input} />
+                </label>
+                <label className="col-span-2">
+                  <span className={label}>Hvad er aftalt</span>
+                  <textarea name="termText" required maxLength={1000} rows={3} className={input} />
+                </label>
+                <label>
+                  <span className={label}>Gælder fra</span>
+                  <input type="date" name="termFrom" required className={input} />
+                </label>
+                <label>
+                  <span className={label}>Til og med (valgfri)</span>
+                  <input type="date" name="termTo" className={input} />
+                </label>
+                <div className="col-span-2">
+                  <button className={btn}>Gem vilkåret</button>
+                </div>
+              </form>
+            </details>
+          </div>
         </Card>
       )}
 

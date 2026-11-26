@@ -1,12 +1,19 @@
 import "server-only";
-import type { Employee, PayTerms } from "@prisma/client";
+import type { ContractTerm, Employee, PayTerms } from "@prisma/client";
 import { CONTRACT_SIGNER } from "@/lib/contract-template-data";
 
 /*
  * The employment contract for a funktionær - the text Lasse approved (26 November 2026), word for word; only the
  * [fields] are filled in from the employee's card. Change the wording only after a new approval.
  * DocuSeal finds the signature and date fields from the {{…;role=X}} tags (see contract-html-template.ts).
+ *
+ * Waiting for approval: § 7 for pay by the hour or commission only, and § 17 "Særlige vilkår" (a guarantee or other terms).
+ * Until NEW_TEXT_APPROVED is true, a contract that uses them can be read as a PDF but not sent.
  */
+export const NEW_TEXT_APPROVED = false;
+
+/** Does this contract use text that still waits for approval? */
+export const usesUnapprovedText = (pay: Pick<PayTerms, "model"> | undefined, terms: unknown[]) => !NEW_TEXT_APPROVED && (pay?.model === "COMMISSION_ONLY" || pay?.model === "HOURLY" || terms.length > 0);
 
 const esc = (s: unknown) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
 const MONTHS = ["januar", "februar", "marts", "april", "maj", "juni", "juli", "august", "september", "oktober", "november", "december"];
@@ -29,11 +36,21 @@ export function contractProblem(e: Pick<Employee, "kind" | "homeAddress" | "duti
   if (e.kind !== "SALARIED") return "Kontrakten er til funktionærer (fast løn). Andre ansættelser har deres egen kontrakt.";
   if (!e.homeAddress) return "Skriv medarbejderens adresse (under Kørsel eller Ansættelse).";
   if (!e.duties) return "Skriv kort, hvad opgaverne er (Ansættelse → Opgaver).";
-  if (!pay?.monthlyOre) return "Sæt en månedsløn under Løn.";
+  if (pay?.model === "HOURLY" ? !pay.hourlyOre : !pay?.monthlyOre && pay?.model !== "COMMISSION_ONLY") return pay?.model === "HOURLY" ? "Sæt timelønnen under Løn." : "Sæt en månedsløn under Løn.";
   return null;
 }
 
-export function employmentContractHtml(e: Employee & { user: { name: string; lastName: string | null; email?: string; phone?: string | null } }, pay: PayTerms, sickTo: string): string {
+type Term = Pick<ContractTerm, "kind" | "title" | "text" | "amountOre" | "from" | "to">;
+
+/** One "særligt vilkår" in words. */
+export function termText(t: Term): string {
+  const when = `fra den ${date(t.from)}${t.to ? ` til og med den ${date(t.to)}` : ""}`;
+  if (t.kind === "GUARANTEE")
+    return `<b>Garantiløn:</b> ${when[0].toUpperCase()}${when.slice(1)} er medarbejderen garanteret en løn på mindst ${kr(t.amountOre ?? 0)} kr. om måneden før skat. Er lønnen og provisionen tilsammen mindre i en måned, betaler Nextview360 forskellen sammen med lønnen. Gælder garantien eller ansættelsen kun en del af en måned, regnes garantien forholdsmæssigt.`;
+  return `<b>${esc(t.title)}:</b> ${esc(t.text)} Vilkåret gælder ${when}.`;
+}
+
+export function employmentContractHtml(e: Employee & { user: { name: string; lastName: string | null; email?: string; phone?: string | null } }, pay: PayTerms, sickTo: string, terms: Term[] = []): string {
   const name = `${e.user.name}${e.user.lastName ? ` ${e.user.lastName}` : ""}`;
   const weekly = e.weeklyMinutes / 60;
   const daily = weekly / Math.max(1, e.workDays.length);
@@ -57,7 +74,11 @@ export function employmentContractHtml(e: Employee & { user: { name: string; las
     p(
       7,
       "Løn",
-      `<p>Lønnen er ${kr(pay.monthlyOre ?? 0)} kr. om måneden og udbetales bagud den sidste bankdag i måneden til medarbejderens NemKonto. ${commission ? "Medarbejderen får desuden provision efter den vedlagte provisionsaftale. Provisionen udbetales sammen med lønnen og beskattes som A-indkomst. " : ""}Lønnen tages op til forhandling én gang om året. Der er ikke en pensionsordning knyttet til ansættelsen.</p>`
+      pay.model === "HOURLY"
+        ? `<p>Lønnen er ${kr(pay.hourlyOre ?? 0)} kr. i timen for de timer, medarbejderen arbejder og registrerer i Arpo. Den udbetales bagud den sidste bankdag i måneden til medarbejderens NemKonto. ${commission ? "Medarbejderen får desuden provision efter den vedlagte provisionsaftale. Provisionen udbetales sammen med lønnen og beskattes som A-indkomst. " : ""}Lønnen tages op til forhandling én gang om året. Der er ikke en pensionsordning knyttet til ansættelsen.</p>`
+        : pay.model === "COMMISSION_ONLY"
+        ? `<p>Lønnen er provision efter den vedlagte provisionsaftale. Den udbetales bagud den sidste bankdag i måneden til medarbejderens NemKonto og beskattes som A-indkomst. Lønnen tages op til forhandling én gang om året. Der er ikke en pensionsordning knyttet til ansættelsen.</p>`
+        : `<p>Lønnen er ${kr(pay.monthlyOre ?? 0)} kr. om måneden og udbetales bagud den sidste bankdag i måneden til medarbejderens NemKonto. ${commission ? "Medarbejderen får desuden provision efter den vedlagte provisionsaftale. Provisionen udbetales sammen med lønnen og beskattes som A-indkomst. " : ""}Lønnen tages op til forhandling én gang om året. Der er ikke en pensionsordning knyttet til ansættelsen.</p>`
     ),
     p(8, "Ferie", `<p>Medarbejderen har ret til ferie efter ferieloven, dvs. 25 dage om året med løn og et ferietillæg på 1 %. Ferie aftales med Nextview360.</p>`),
     p(
@@ -76,6 +97,7 @@ export function employmentContractHtml(e: Employee & { user: { name: string; las
     p(14, "Tavshedspligt", `<p>Medarbejderen har tavshedspligt om forretningshemmeligheder og om oplysninger om kunder og kolleger, også efter ansættelsen er ophørt.</p>`),
     p(15, "Behandling af personoplysninger", `<p>Nextview360 behandler medarbejderens personoplysninger som beskrevet i den udleverede privatlivsmeddelelse.</p>`),
     p(16, "Sociale sikringsordninger", `<p>Nextview360 indbetaler ATP og de øvrige bidrag, loven kræver, gennem lønsystemet.</p>`),
+    ...(terms.length ? [p(17, "Særlige vilkår", terms.map((t) => `<p style="margin-bottom:6px">${termText(t)}</p>`).join(""))] : []),
   ];
   return `<!doctype html><html lang="da"><head><meta charset="utf-8"><style>
   body{font-family:Helvetica,Arial,sans-serif;color:#111;font-size:10.5pt;line-height:1.55;margin:0;padding:64px 72px 48px}

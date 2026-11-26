@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { absenceDays, earnedHolidayDays, easter, holidayName, holidayYear, monthsBack, normMinutes, parseHours, prefillMinutes, weekNumber, workWarnings, type EmployeeTerms } from "./hr";
+import { absenceDays, earnedHolidayDays, guaranteeForMonth, easter, holidayName, holidayYear, monthsBack, normMinutes, parseHours, prefillMinutes, weekNumber, workWarnings, type EmployeeTerms } from "./hr";
 
 const E: EmployeeTerms = { startDate: "2026-01-01", endDate: null, weeklyMinutes: 37 * 60, workDays: [1, 2, 3, 4, 5] };
 
@@ -103,4 +103,21 @@ test("kørepenge: 3,94 kr. per km up to 20,000 km in 2026, 2,28 above", async ()
   assert.equal(mileagePay(2026, 25_000, 10), 22.8);
   assert.equal(mileageRate(2027).upTo20000, 4.13);
   assert.equal(mileageRate(2030).upTo20000, 4.13); // the latest known until a new year is added
+});
+
+test("garantiløn: tops up to the guarantee, pro rata for a part month, never below zero", () => {
+  const g = [{ amountKr: 5000, from: "2027-01-01", to: null }];
+  const jan = { from: "2027-01-01", to: "2027-01-31" };
+  const always = { from: "2026-01-01", to: null };
+  assert.deepEqual(guaranteeForMonth(g, jan, always, 3200), { guaranteeKr: 5000, topUpKr: 1800 });
+  assert.deepEqual(guaranteeForMonth(g, jan, always, 7400), { guaranteeKr: 5000, topUpKr: 0 });
+  assert.deepEqual(guaranteeForMonth([], jan, always, 0), { guaranteeKr: 0, topUpKr: 0 });
+  // From the 16th: 16 of 31 days.
+  const half = guaranteeForMonth([{ amountKr: 5000, from: "2027-01-16", to: null }], jan, always, 0);
+  assert.equal(half.guaranteeKr, Math.round((5000 * 16) / 31 * 100) / 100);
+  // Ended before the month, or the employment ended: nothing.
+  assert.equal(guaranteeForMonth([{ amountKr: 5000, from: "2026-01-01", to: "2026-12-31" }], jan, always, 0).guaranteeKr, 0);
+  assert.equal(guaranteeForMonth(g, jan, { from: "2026-01-01", to: "2026-12-31" }, 0).topUpKr, 0);
+  // Two overlapping: the higher.
+  assert.equal(guaranteeForMonth([...g, { amountKr: 8000, from: "2027-01-01", to: null }], jan, always, 0).guaranteeKr, 8000);
 });

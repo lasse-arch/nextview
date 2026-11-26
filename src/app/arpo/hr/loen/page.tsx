@@ -82,6 +82,7 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
                     {r.monthlyKr != null && <div className="text-xs text-slate-500">{kr(r.monthlyKr)} om måneden</div>}
                     {r.hourlyKr != null && <div className="text-xs text-slate-500">{kr(r.hourlyKr)} i timen</div>}
                     {r.pension && <div className="text-xs text-slate-500">Pension {r.pension}</div>}
+                    {r.guaranteeKr > 0 && <div className="text-xs text-slate-500">Garantiløn {kr(r.guaranteeKr)}{r.guaranteeTopUpKr > 0 ? `, tillæg ${kr(r.guaranteeTopUpKr)}` : ""}</div>}
                   </td>
                   <td className="px-3 py-2.5 text-right tabular-nums text-slate-700">
                     {r.workedHours == null ? "-" : r.workedHours.toLocaleString("da-DK")}
