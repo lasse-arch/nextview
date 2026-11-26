@@ -272,8 +272,20 @@ export function PhotoPicker({ image, onChange, preview, slug, photoKey }: { imag
 function GuideShotsButton({ guide, place, preview, slug, onDone, label = "Tag billeder af rundvisningens stop" }: { guide: string | null; /** A place tile instead: its link and name. */ place?: { href: string; title: string }; preview: PreviewApi; slug: string; onDone: (urls: string[]) => void; label?: string }) {
   const [note, setNote] = useState<{ text: string; error?: boolean } | null>(null);
   const [busy, setBusy] = useState(false);
+  // A place: one photo, or a series of three the tile cross-fades between.
+  const [count, setCount] = useState<1 | 3>(3);
   return (
     <div className="space-y-1">
+      {place && (
+        <Choice
+          value={String(count)}
+          options={[
+            ["1", "1 billede"],
+            ["3", "Serie (3 billeder)"],
+          ]}
+          onChange={(v) => setCount(v === "1" ? 1 : 3)}
+        />
+      )}
       <button
         type="button"
         disabled={busy}
@@ -282,12 +294,12 @@ function GuideShotsButton({ guide, place, preview, slug, onDone, label = "Tag bi
           setBusy(true);
           setNote({ text: place ? "Går til stedet …" : "Går rundt til stoppene …" });
           try {
-            const r = place ? await preview.placePictures((text) => setNote({ text }), place.href, place.title) : await preview.guidePictures((text) => setNote({ text }), guide);
+            const r = place ? await preview.placePictures((text) => setNote({ text }), place.href, place.title, count) : await preview.guidePictures((text) => setNote({ text }), guide);
             if (r.error || !r.images?.length) throw new Error(r.error ?? "Ingen billeder.");
             const key = `${place ? "flise" : `guide-${guide ?? "main"}`}-${Date.now().toString(36)}`;
             const urls = await Promise.all(r.images.map((img, i) => savePhoto(slug, `${key}-${i + 1}`, img)));
             onDone(urls);
-            setNote({ text: `${urls.length} billeder sat på flisen - den skifter mellem dem.` });
+            setNote({ text: urls.length > 1 ? `${urls.length} billeder sat på flisen - den skifter mellem dem.` : "Billedet er sat på flisen." });
           } catch (err) {
             setNote({ text: err instanceof Error ? err.message : String(err), error: true });
           }
@@ -627,7 +639,7 @@ export function StartEditor({ config, edit, slug, preview }: Props) {
                     <GuideShotsButton
                       guide={null}
                       place={{ href: t.go.room, title: t.title || t.place || "Stedet" }}
-                      label="Tag billeder af stedet"
+                      label="Tag billede af stedet"
                       preview={preview}
                       slug={slug}
                       onDone={(list) => set({ ...t, image: list[0], images: list.length > 1 ? list.slice(1) : undefined })}

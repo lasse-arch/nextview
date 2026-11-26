@@ -118,8 +118,8 @@ export type PreviewApi = {
   storyPictures: (progress: (text: string) => void, which?: string) => Promise<{ done?: boolean; taken?: number; error?: string }>;
   /** Flies to up to 6 of a guide's stops (null = the main "Vis mig rundt") and returns a photo of each, as JPEG data URLs. */
   guidePictures: (progress: (text: string) => void, guide: string | null) => Promise<{ images?: string[]; error?: string }>;
-  /** Flies to a place (a tile's) and returns three photos - its own view and turned to each side - as JPEG data URLs. */
-  placePictures: (progress: (text: string) => void, href: string, title: string) => Promise<{ images?: string[]; error?: string }>;
+  /** Flies to a place (a tile's) and returns one photo of its view, or three (turned to each side too), as JPEG data URLs. */
+  placePictures: (progress: (text: string) => void, href: string, title: string, count: 1 | 3) => Promise<{ images?: string[]; error?: string }>;
   /** Waits for a click in the preview: the spot in the room (for a tag), the scan point and the room. */
   pick: () => Promise<{ position?: { x: number; y: number; z: number }; normal?: { x: number; y: number; z: number }; ss?: number | null; room?: string | null; error?: string }>;
   go: (name: string, href: string) => void;

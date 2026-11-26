@@ -2149,10 +2149,10 @@ function TourExperience({
   }
 
   /**
-   * "Tag billeder af stedet" (editor only): a place tile's own place, from its view and turned a little to each side -
-   * three photos the tile cross-fades between.
+   * "Tag billeder af stedet" (editor only): a place tile's own place - one photo from its view, or a series of three
+   * (turned a little to each side) the tile cross-fades between.
    */
-  async function capturePlace(progress: (text: string) => void, href: string, title: string): Promise<string[]> {
+  async function capturePlace(progress: (text: string) => void, href: string, title: string, count: 1 | 3 = 3): Promise<string[]> {
     if (!sdkRef.current) throw new Error("Touren er ikke klar.");
     if (!isPlaceHref(href)) throw new Error("Flisen fører ikke til et sted inde i touren.");
     const sdk = await sdkRef.current;
@@ -2160,15 +2160,15 @@ function TourExperience({
     progress(`Går til ${title} …`);
     if (!(await flyTo(href, "instant"))) throw new Error("Kunne ikke gå til stedet.");
     const out: string[] = [];
-    for (const [i, turn] of [0, -45, 90].entries()) {
-      progress(`${title}: billede ${i + 1}/3`);
+    for (const [i, turn] of [0, -45, 90].slice(0, count).entries()) {
+      progress(count > 1 ? `${title}: billede ${i + 1}/${count}` : `${title}: tager billedet`);
       if (turn) await sdk.Camera.rotate?.(turn, 0, { speed: 200 }).catch(() => {});
       await new Promise((res) => setTimeout(res, i ? 1500 : 2500)); // the sharp textures
       const shot = await sdk.Renderer.takeScreenShot({ width: 1600, height: 1000 }, { mattertags: false, sweeps: false, views: false, measurements: false });
       out.push(await storyJpeg(shot, 1200, 750));
     }
-    await flyTo(href, "instant"); // back to the place's own view
-    progress(`Gemmer ${out.length} billeder …`);
+    if (count > 1) await flyTo(href, "instant"); // back to the place's own view
+    progress(out.length > 1 ? `Gemmer ${out.length} billeder …` : "Gemmer billedet …");
     return out;
   }
 
@@ -3082,7 +3082,7 @@ function TourExperience({
           // A place tile: `place` is its link (checked to be a place in this tour); otherwise a guide's stops.
           const images =
             typeof e.data.place === "string"
-              ? await capturePlace(progress, e.data.place, typeof e.data.title === "string" ? e.data.title.slice(0, 80) : "Stedet")
+              ? await capturePlace(progress, e.data.place, typeof e.data.title === "string" ? e.data.title.slice(0, 80) : "Stedet", e.data.count === 1 ? 1 : 3)
               : await captureGuide(progress, typeof e.data.guide === "string" ? e.data.guide : null);
           reply({ type: "tour-guide-shots", id: e.data.id, images });
         } catch (err) {
