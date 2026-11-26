@@ -63,6 +63,12 @@ export async function getUnreadNewsCount(userId: string, newsReadAt: Date | null
 const DEFAULT_POSTS: { title: string; body: string; minutesAgo: number; screenshotUrl: string }[] = [
   {
     minutesAgo: 0,
+    title: "HR: læg en underskrevet kontrakt ind",
+    body: "Har en medarbejder allerede skrevet under på en kontrakt (fx på papir), kan den nu lægges ind i HR. Under Ny medarbejder vælger du \"Vi har allerede en underskrevet kontrakt\" og vælger PDF'en og datoen. Er personen allerede oprettet, gør du det på medarbejderens kort under Ansættelseskontrakt.\n\nKontrakten gemmes i Arpo og i Drev (mappen Nextview360 - Ansættelseskontrakter). Kontrakter, der underskrives gennem Arpo, gemmes nu også af sig selv. Kun admin og personen selv kan åbne den, og hver gang logges det.",
+    screenshotUrl: "/news/hr-kontrakt.png",
+  },
+  {
+    minutesAgo: 0,
     title: "Kørepenge og kørselsregnskab",
     body: "Under Mig → Kørsel registrerer du kørsel i egen bil for arbejdet. Vælg et af dine møder eller filmninger, så udfyldes dato, adresse og formål. Vælg om du kører fra kontoret eller hjemmefra, hvad turen var (kundebesøg, filmning, opfølgning ...), og din nummerplade.\n\nNår en admin har godkendt turen, kommer kørepengene med lønnen efter Skattestyrelsens satser (3,94 kr. pr. km i 2026 op til 20.000 km om året, 2,28 kr. derover). Kørselsregnskabet for måneden kan hentes som PDF.\n\nDeals har også fået en ny fase, Booket filmning dag, efter Kontrakt underskrevet. Book filming flytter dealen dertil af sig selv.",
     screenshotUrl: "/news/koersel.png",

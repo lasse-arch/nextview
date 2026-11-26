@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getTeamUser } from "@/lib/auth";
 import { isHrAdmin, maySeePay, reachOf } from "@/lib/hr-access";
-import { activateAccess, addHrTask, addPayTerms, giveNotice, sendEmploymentContract, reopenWeek, toggleHrTask, updateEmployee, withdrawNotice } from "@/lib/actions/hr";
+import { activateAccess, addHrTask, addPayTerms, copyDocumentToDrive, giveNotice, sendEmploymentContract, uploadSignedContract, reopenWeek, toggleHrTask, updateEmployee, withdrawNotice } from "@/lib/actions/hr";
 import { KIND_NAMES, addDays, hoursText, isYmd, mondayOf, noticeEnd, registersTime, sickDays12Months, todayDk } from "@/lib/hr";
 import { holidayBalance, loadWeek, spansOf, tripsOfYear, warningsFor } from "@/lib/hr-data";
 import { TEAM_ROLE_NAMES, rolesOf } from "@/lib/team-roles";
@@ -13,6 +13,7 @@ import { PayLine } from "../pay-view";
 import { contractProblem } from "@/lib/employment-contract";
 import { CONTRACT_SIGNER } from "@/lib/contract-template-data";
 import { workspaceReady } from "@/lib/google-workspace";
+import { isIntegrationEnabled } from "@/lib/integration-settings";
 import { WORKSPACE_MAIL_APPROVED } from "@/lib/workspace-mail";
 
 const CATEGORY_NAMES: Record<string, string> = { FILMING: "Filmning", TOUR_EDITING: "Tour-opbygning", REFILMING: "Genoptagelse", CORRECTIONS: "Rettelser", WEBSITE: "Hjemmeside" };
@@ -27,9 +28,10 @@ export default async function EmployeePage({ params, searchParams }: { params: P
   if (!isHrAdmin(user)) redirect("/arpo/mig");
   const [{ id }, sp] = await Promise.all([params, searchParams]);
   const googleReady = workspaceReady() && WORKSPACE_MAIL_APPROVED;
+  const driveOn = await isIntegrationEnabled("GOOGLE_DRIVE");
   const e = await prisma.employee.findUnique({
     where: { id },
-    include: { user: { select: { id: true, name: true, lastName: true, email: true, role: true, extraRoles: true, disabledAt: true } }, manager: { select: { name: true } }, pay: { orderBy: { effectiveFrom: "desc" } }, absences: { orderBy: { from: "desc" } }, tasks: { orderBy: [{ sort: "asc" }, { label: "asc" }] } },
+    include: { user: { select: { id: true, name: true, lastName: true, email: true, role: true, extraRoles: true, disabledAt: true } }, manager: { select: { name: true } }, pay: { orderBy: { effectiveFrom: "desc" } }, absences: { orderBy: { from: "desc" } }, tasks: { orderBy: [{ sort: "asc" }, { label: "asc" }] }, documents: { select: { id: true, name: true, signedAt: true, driveFileId: true, createdAt: true }, orderBy: { createdAt: "desc" } } },
   });
   if (!e) notFound();
   const reach = reachOf(user, e)!;
@@ -210,18 +212,39 @@ export default async function EmployeePage({ params, searchParams }: { params: P
         )}
       </Card>
 
-      {e.kind === "SALARIED" && (
-        <Card
-          title="Ansættelseskontrakt"
-          sub={
-            e.contractSignedAt
-              ? `Underskrevet ${fmtDate(e.contractSignedAt)}.`
+      <Card
+        title="Ansættelseskontrakt"
+        sub={
+          e.contractSignedAt
+            ? `Underskrevet ${fmtDate(e.contractSignedAt)}.`
+            : e.kind !== "SALARIED"
+              ? "Har I en underskrevet aftale, så læg den ind her - den gemmes i Arpo og i Drev."
               : e.contractSentAt
                 ? `Sendt til underskrift ${fmtDate(e.contractSentAt)}${e.contractViewedAt ? `, åbnet ${fmtDate(e.contractViewedAt)}` : ", ikke åbnet endnu"}.`
                 : "Den godkendte kontrakt, udfyldt fra kortet. Ansættelsesbevisloven: senest 7 dage efter første arbejdsdag."
-          }
-        >
-          {(() => {
+        }
+      >
+        {e.documents.length > 0 && (
+          <ul className="mb-4 divide-y divide-slate-100 rounded-lg border border-slate-200">
+            {e.documents.map((d) => (
+              <li key={d.id} className="flex flex-wrap items-center gap-3 px-3 py-2.5 text-sm">
+                <span className="min-w-0 flex-1 truncate text-slate-900">{d.name}</span>
+                {d.signedAt && <span className="text-xs text-slate-500">Underskrevet {fmtDate(d.signedAt)}</span>}
+                {d.driveFileId ? (
+                  <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">I Drev</span>
+                ) : driveOn ? (
+                  <form action={copyDocumentToDrive.bind(null, d.id)}>
+                    <button className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800 hover:bg-amber-100">Læg i Drev</button>
+                  </form>
+                ) : null}
+                <a href={`/api/hr/dokument?id=${d.id}`} target="_blank" rel="noopener" className={btnLight}>
+                  Åbn
+                </a>
+              </li>
+            ))}
+          </ul>
+        )}
+        {e.kind === "SALARIED" && !e.contractSignedAt && (() => {
             const problem = contractProblem(e, e.pay[0]);
             if (problem) return <p className="text-sm text-amber-800">{problem}</p>;
             return (
@@ -238,8 +261,22 @@ export default async function EmployeePage({ params, searchParams }: { params: P
               </form>
             );
           })()}
-        </Card>
-      )}
+        <details className="mt-3 text-sm" open={!e.documents.length && (e.kind !== "SALARIED" || Boolean(e.contractSignedAt))}>
+          <summary className="cursor-pointer font-medium text-slate-700">{e.documents.length ? "Læg en ny underskrevet kontrakt ind" : "Har I allerede en underskrevet kontrakt? Læg den ind"}</summary>
+          <form action={uploadSignedContract.bind(null, e.id)} className="mt-3 flex flex-wrap items-end gap-3">
+            <label className="min-w-[220px] flex-1">
+              <span className={label}>Kontrakten (PDF)</span>
+              <input type="file" name="contractFile" accept="application/pdf,.pdf" required className={input} />
+            </label>
+            <label>
+              <span className={label}>Underskrevet den</span>
+              <input type="date" name="contractSignedOn" required max={todayDk()} className={input} />
+            </label>
+            <button className={btn}>Gem kontrakten</button>
+            <p className="w-full text-xs text-slate-500">Den gemmes i Arpo{driveOn ? " og i Drev (mappen Nextview360 - Ansættelseskontrakter)" : ""}. Kun admin og personen selv kan åbne den, og hver gang logges det.</p>
+          </form>
+        </details>
+      </Card>
 
       {(["start", "stop"] as const).map((phase) => {
         const list = e.tasks.filter((t) => t.phase === phase);

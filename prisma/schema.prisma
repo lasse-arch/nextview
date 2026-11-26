@@ -2186,6 +2186,7 @@ model Employee {
   absences      Absence[]
   tasks         HrTask[]
   trips         Trip[]
+  documents     EmployeeDocument[]
   /// Notice given (opsigelse): when, and by whom ("employer" or "employee") - the last day is endDate.
   noticeGivenAt DateTime?      @db.Date
   noticeBy      String?
@@ -2291,6 +2292,27 @@ model Absence {
 }
 
 /// Who opened someone's pay, and when (GDPR: the access to pay can be traced).
+/// An employee's papers kept in Arpo - an employment contract signed elsewhere (uploaded) or through DocuSeal. Shown only
+/// to an admin and the person themself (like pay), every look logged. A copy goes to Google Drev when that's on.
+/// Deleted with the rest 5 years after the employment ended (hr-retention.ts).
+model EmployeeDocument {
+  id           String    @id @default(cuid())
+  employeeId   String
+  employee     Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  /// "contract" (ansættelseskontrakt).
+  kind         String
+  name         String
+  contentType  String
+  size         Int
+  data         Bytes
+  signedAt     DateTime?
+  driveFileId  String?
+  uploadedById String?
+  createdAt    DateTime  @default(now())
+
+  @@index([employeeId])
+}
+
 model HrAccessLog {
   id         String   @id @default(cuid())
   viewerId   String

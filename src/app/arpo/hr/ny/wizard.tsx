@@ -21,6 +21,8 @@ export function NewEmployeeWizard({ roles, existing, leaders }: { roles: { v: st
   const [v, setV] = useState<V>({ kind: "SALARIED", role: "EMPLOYEE", weeklyHours: "37", payModel: "MONTHLY", userId: "" });
   const [days, setDays] = useState<number[]>([1, 2, 3, 4, 5]);
   const [rule120, setRule120] = useState(true);
+  // "Vi har allerede en underskrevet kontrakt" (e.g. someone already working here): the PDF is kept with them.
+  const [signed, setSigned] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => setV((o) => ({ ...o, [k]: e.target.value }));
   const freelance = v.kind === "FREELANCE";
@@ -217,8 +219,33 @@ export function NewEmployeeWizard({ roles, existing, leaders }: { roles: { v: st
             </div>
           ))}
         </dl>
+        <fieldset className="space-y-2 rounded-xl border border-slate-200 p-4">
+          <legend className="px-1 text-sm font-semibold text-slate-900">Kontrakten</legend>
+          <label className="flex items-center gap-2 text-sm text-slate-700">
+            <input type="radio" name="contractMode" value="later" checked={!signed} onChange={() => setSigned(false)} />
+            {v.kind === "SALARIED" ? "Send den til underskrift bagefter (fra kortet)" : "Ingen kontrakt at lægge ind nu"}
+          </label>
+          <label className="flex items-center gap-2 text-sm text-slate-700">
+            <input type="radio" name="contractMode" value="signed" checked={signed} onChange={() => setSigned(true)} />
+            Vi har allerede en underskrevet kontrakt
+          </label>
+          {signed && (
+            <div className="grid grid-cols-2 gap-3 pt-1">
+              <label>
+                <span className={label}>Kontrakten (PDF)</span>
+                <input type="file" name="contractFile" accept="application/pdf,.pdf" required className={input} />
+              </label>
+              <label>
+                <span className={label}>Underskrevet den</span>
+                <input type="date" name="contractSignedOn" required className={input} />
+              </label>
+              <p className="col-span-2 text-xs text-slate-500">Den gemmes i Arpo og i Drev. Kun admin og personen selv kan åbne den.</p>
+            </div>
+          )}
+        </fieldset>
         <p className="text-sm text-slate-600">
-          Efter oprettelsen viser kortet de næste skridt: {v.kind === "SALARIED" ? "send kontrakten, vent på underskrift, og " : ""}giv adgang til Arpo med deres arbejds-mail.
+          Efter oprettelsen viser kortet de næste skridt: {v.kind === "SALARIED" && !signed ? "send kontrakten, vent på underskrift, og " : ""}
+          {v.userId ? "personen har allerede adgang til Arpo." : "giv adgang til Arpo med deres arbejds-mail."}
         </p>
       </section>
 
@@ -230,11 +257,13 @@ export function NewEmployeeWizard({ roles, existing, leaders }: { roles: { v: st
           </button>
         )}
         {step < STEPS.length - 1 ? (
-          <button type="button" onClick={next} className="rounded-lg bg-slate-900 px-5 py-2 text-sm font-semibold text-white hover:bg-slate-700">
+          // Own keys: without them React turns this very button into the submit one in the middle of the click on the
+          // last "Næste", and the browser then sends the form - before the last step is even seen.
+          <button key="next" type="button" onClick={next} className="rounded-lg bg-slate-900 px-5 py-2 text-sm font-semibold text-white hover:bg-slate-700">
             Næste
           </button>
         ) : (
-          <button className="rounded-lg bg-emerald-600 px-5 py-2 text-sm font-semibold text-white hover:bg-emerald-700">Opret medarbejder</button>
+          <button key="create" type="submit" className="rounded-lg bg-emerald-600 px-5 py-2 text-sm font-semibold text-white hover:bg-emerald-700">Opret medarbejder</button>
         )}
       </div>
     </form>

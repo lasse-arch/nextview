@@ -6,6 +6,7 @@
  */
 import { prisma } from "@/lib/db";
 import { downloadCompletedPdf } from "@/lib/docuseal";
+import { checkPdf, saveContract } from "@/lib/hr-documents";
 import { recalcCommission } from "@/lib/commission-service";
 import { sendContractSignedNotification } from "@/lib/notification-service";
 import {
@@ -195,6 +196,14 @@ export async function handleDocuSealEvent(
       if (type === "submission.completed" && !employee.contractSignedAt) {
         await prisma.employee.update({ where: { id: employee.id }, data: { contractSignedAt: changedAt } });
         await prisma.hrTask.updateMany({ where: { employeeId: employee.id, phase: "start", label: { startsWith: "Ansættelseskontrakt" }, doneAt: null }, data: { doneAt: changedAt } });
+        // The signed PDF is kept with the employee (and in Drev) - not only DocuSeal's copy.
+        try {
+          const u = await prisma.user.findUniqueOrThrow({ where: { id: employee.userId }, select: { name: true, lastName: true } });
+          const pdf = Buffer.from(await downloadCompletedPdf(String(submissionId)));
+          if (!checkPdf(pdf)) await saveContract(employee.id, pdf, { signedAt: changedAt, personName: `${u.name}${u.lastName ? ` ${u.lastName}` : ""}` });
+        } catch (err) {
+          console.error("[docuseal] den underskrevne ansættelseskontrakt kunne ikke gemmes", err instanceof Error ? err.message : err);
+        }
       }
     }
     return;

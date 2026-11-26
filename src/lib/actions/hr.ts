@@ -7,6 +7,7 @@ import type { AbsenceKind, EmploymentKind, PayModel, Role } from "@prisma/client
 import { prisma } from "@/lib/db";
 import { WORKSPACE_DOMAIN, createWorkspaceUser, onOurDomain, workspaceReady } from "@/lib/google-workspace";
 import { WORKSPACE_MAIL_APPROVED, sendWorkspaceMail } from "@/lib/workspace-mail";
+import { copyToDrive, pdfFrom, saveContract } from "@/lib/hr-documents";
 import { hashPassword } from "@/lib/password";
 import { TEAM_ROLES } from "@/lib/team-roles";
 import { employeeFor, hrViewer, isHrAdmin, requireHrAdmin } from "@/lib/hr-access";
@@ -101,6 +102,8 @@ function payFrom(f: FormData, kind: EmploymentKind) {
 export async function createEmployee(f: FormData) {
   const admin = await requireHrAdmin();
   const terms = termsFrom(f);
+  // "Vi har allerede en underskrevet kontrakt": checked before anything is made, so a bad file leaves nothing half-done.
+  const signed = f.get("contractMode") === "signed" ? await signedContractFrom(f) : null;
   let userId = str(f, "userId", 40);
   let newPerson: { privateEmail: string } | null = null;
   if (userId) {
@@ -145,8 +148,49 @@ export async function createEmployee(f: FormData) {
       tasks: { create: (terms.kind === "FREELANCE" ? START_TASKS.filter((t) => !/lønsystemet|Pension/.test(t)) : START_TASKS).map((label, sort) => ({ phase: "start", label, sort })) },
     },
   });
+  if (signed) await storeSignedContract(e.id, signed, admin.id);
   revalidatePath("/arpo/hr");
-  back(`/arpo/hr/${e.id}`, newPerson ? "Medarbejderen er oprettet - næste skridt er kontrakten" : "Medarbejderen er oprettet");
+  back(`/arpo/hr/${e.id}`, signed ? "Medarbejderen er oprettet, og kontrakten er gemt" : newPerson ? "Medarbejderen er oprettet - næste skridt er kontrakten" : "Medarbejderen er oprettet");
+}
+
+/** The signed contract from a form: the PDF (checked by its bytes) and the day it was signed. */
+async function signedContractFrom(f: FormData): Promise<{ pdf: Buffer; signedAt: Date }> {
+  const file = await pdfFrom(f, "contractFile");
+  if ("error" in file) throw new Error(file.error);
+  const signedOn = day(f, "contractSignedOn");
+  if (!signedOn) throw new Error("Vælg datoen, kontrakten blev underskrevet.");
+  if (signedOn > todayDk()) throw new Error("Underskriftsdatoen kan ikke ligge i fremtiden.");
+  return { pdf: file.buf, signedAt: asDate(signedOn) };
+}
+
+/** Keeps the contract (Arpo + Drev), marks the contract signed and its checklist line done. */
+async function storeSignedContract(employeeId: string, c: { pdf: Buffer; signedAt: Date }, adminId: string) {
+  const e = await prisma.employee.findUniqueOrThrow({ where: { id: employeeId }, include: { user: { select: { name: true, lastName: true } } } });
+  await saveContract(e.id, c.pdf, { signedAt: c.signedAt, uploadedById: adminId, personName: `${e.user.name}${e.user.lastName ? ` ${e.user.lastName}` : ""}` });
+  await prisma.$transaction([
+    prisma.employee.update({ where: { id: e.id }, data: { contractSignedAt: e.contractSignedAt ?? c.signedAt } }),
+    prisma.hrTask.updateMany({ where: { employeeId: e.id, phase: "start", label: { startsWith: "Ansættelseskontrakt" }, doneAt: null }, data: { doneAt: new Date(), doneById: adminId } }),
+  ]);
+}
+
+/** "Læg en underskrevet kontrakt ind" on the card - for a contract signed outside Arpo (e.g. on paper). */
+export async function uploadSignedContract(employeeId: string, f: FormData) {
+  const admin = await requireHrAdmin();
+  const e = await prisma.employee.findUnique({ where: { id: String(employeeId) }, select: { id: true } });
+  if (!e) throw new Error("Medarbejderen findes ikke.");
+  await storeSignedContract(e.id, await signedContractFrom(f), admin.id);
+  revalidatePath(`/arpo/hr/${e.id}`);
+  back(`/arpo/hr/${e.id}`, "Kontrakten er gemt");
+}
+
+/** "Læg i Drev" for a document whose copy is missing (Drev was off, or failed). */
+export async function copyDocumentToDrive(documentId: string) {
+  await requireHrAdmin();
+  const d = await prisma.employeeDocument.findUnique({ where: { id: String(documentId) }, select: { id: true, employeeId: true } });
+  if (!d) throw new Error("Dokumentet findes ikke.");
+  await copyToDrive(d.id);
+  revalidatePath(`/arpo/hr/${d.employeeId}`);
+  back(`/arpo/hr/${d.employeeId}`, "Kopien ligger i Drev");
 }
 
 /**
